@@ -372,6 +372,21 @@ async function main() {
   assert.equal(await owner.locator('.title-part').filter({hasText:'Сезон 1'}).locator('.media-card').count(),2);
   await owner.locator('.title-part').filter({hasText:'Сезон 1'}).locator('.media-card').first().click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
+  const cinema=owner.locator('.mv-player');
+  assert.equal(await cinema.count(),1,'Anime opens the advanced player');
+  assert.equal(await cinema.getByRole('combobox',{name:'Сезон'}).count(),1);
+  assert.equal(await cinema.getByRole('combobox',{name:'Серия'}).count(),1);
+  await cinema.getByRole('button',{name:'Настройки плеера'}).click();
+  assert.equal(await cinema.getByRole('combobox',{name:'Субтитры'}).count(),1);
+  await cinema.locator('input[type=file]').setInputFiles({
+    name:'example.srt',mimeType:'text/plain',
+    buffer:Buffer.from('1\n00:00:00,000 --> 00:00:01,500\nПривет\n')
+  });
+  await owner.waitForFunction(()=>document.querySelector('#viewerContent track')?.src?.startsWith('blob:'));
+  assert.equal(await cinema.locator('video track').count(),1,'SRT becomes a local VTT track');
+  await cinema.getByRole('combobox',{name:'Сезон'}).selectOption({label:'Сезон 2'});
+  await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
+  assert.equal(await owner.locator('.mv-player-library').getByRole('combobox',{name:'Сезон'}).inputValue()!=='',true);
   await owner.locator('#closeViewer').click();
   await owner.locator('#backToTitles').click();
   await owner.getByRole('button',{name:'Манга',exact:true}).click();
