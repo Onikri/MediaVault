@@ -213,6 +213,8 @@ async function main() {
   assert.equal(await owner.locator('video').evaluate(video=>video.paused),false,
     'Video starts after pressing custom player Play button');
   await owner.locator('.mv-player-controls button[aria-label="Пауза"]').click();
+  await owner.waitForFunction(()=>document.querySelector('.mv-player-panorama img')?.src.startsWith('data:image/jpeg'));
+  assert.notEqual(await owner.locator('.mv-player').evaluate(el=>el.style.getPropertyValue('--scene-rgb')),'218 139 91','A decoded frame supplies the pause artwork and its palette');
   await owner.getByRole('button',{name:'Загрузить файл целиком (резервный режим)'}).click();
   await owner.waitForFunction(()=>{
     const video=document.querySelector('#viewerContent video');
@@ -383,8 +385,9 @@ async function main() {
   const cinema=owner.locator('.mv-player');
   assert.equal(await cinema.count(),1,'Anime opens the advanced player');
   assert.equal(await owner.locator('#viewerContent').evaluate(el=>el.scrollTop),0,'Centering the active episode never scrolls the video out of view');
-  assert.equal(await cinema.getByRole('combobox',{name:'Сезон'}).count(),1);
-  assert.equal(await cinema.getByRole('combobox',{name:'Серия'}).count(),1);
+  await cinema.getByRole('tab',{name:/Серии/}).click();
+  assert.equal(await cinema.getByRole('combobox',{name:'Сезон в списке'}).count(),1);
+  await cinema.getByRole('button',{name:'Вернуться к просмотру'}).click();
   const output=path.join(PROJECT,'test-output');await fs.mkdir(output,{recursive:true});
   for(const width of [320,390,768,1280]){
     await owner.setViewportSize({width,height:900});
@@ -396,6 +399,7 @@ async function main() {
     await owner.keyboard.press('Escape');
     assert.equal(await owner.locator('#viewer').isVisible(),true,'Escape dismisses the player drawer before the viewer');
     await cinema.getByRole('tab',{name:'Настройки',exact:true}).click();
+    await cinema.getByRole('heading',{name:'Настройки просмотра'}).waitFor();
     await cinema.screenshot({path:path.join(output,'player-settings-'+width+'.png')});
     assert.ok(await cinema.locator('.mv-player-drawer').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Settings fit '+width);
     await cinema.getByRole('button',{name:'Вернуться к просмотру'}).click();
@@ -417,9 +421,11 @@ async function main() {
   });
   await owner.waitForFunction(()=>document.querySelector('#viewerContent track')?.src?.startsWith('blob:'));
   assert.equal(await cinema.locator('video track').count(),1,'SRT becomes a local VTT track');
-  await cinema.getByRole('combobox',{name:'Сезон'}).selectOption({label:'Сезон 2'});
+  await cinema.getByRole('tab',{name:/Серии/}).click();
+  await cinema.getByRole('combobox',{name:'Сезон в списке'}).selectOption({label:'Сезон 2'});
+  await cinema.locator('.mv-player-episode-list button').first().click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
-  assert.equal(await owner.locator('.mv-player-library').getByRole('combobox',{name:'Сезон'}).inputValue()!=='',true);
+  assert.equal(await owner.locator('.mv-player-library select').first().inputValue()!=='',true);
   await owner.locator('#closeViewer').click();
   await owner.locator('#backToTitles').click();
   await owner.getByRole('button',{name:'Манга',exact:true}).click();
