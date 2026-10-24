@@ -2,10 +2,10 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowLeft,ArrowRight,Pause,Play,Settings2,
   SkipForward,Subtitles,Volume2,VolumeX,PictureInPicture2,Maximize2} from 'lucide-react';
 import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
-import {startGpuUpscaler} from './gpu-upscaler.js';
+import {startNeuralUpscaler} from './neural-upscaler.js';
 
 const PREF_KEY='mediavault_player_preferences_v1';
-const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,sharpness:0.14,subSize:24,subOffset:8};
+const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,neuralMode:'balanced',subSize:24,subOffset:8};
 function getPrefs(){
   try{return {...DEFAULTS,...JSON.parse(localStorage.getItem(PREF_KEY)||'{}')};}catch{return DEFAULTS;}
 }
@@ -44,6 +44,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
   const [audioTracks,setAudioTracks]=useState([]),[activeAudio,setActiveAudio]=useState(0);
   const [subtitleText,setSubtitleText]=useState(''),[gpuActive,setGpuActive]=useState(false);
   const [gpuWarning,setGpuWarning]=useState('');
+  const [neuralStats,setNeuralStats]=useState(null);
   const [opening,setOpening]=useState(()=>getOpening(item,libraryId));
   const [openingDraft,setOpeningDraft]=useState(null);
   const lastStored=useRef(-1),resumeApplied=useRef(false),subtitleInput=useRef(null);
@@ -104,19 +105,37 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
     return()=>tracks.forEach(track=>track.removeEventListener?.('cuechange',refresh));
   },[subtitle,availableTracks,localTrack,source]);
   useEffect(()=>{
-    if(!source||!prefs.gpu||!canvasRef.current||!videoRef.current){setGpuActive(false);return;}
-    const canvas=canvasRef.current;
-    try{
-      const stop=startGpuUpscaler(videoRef.current,canvas,{
-        strength:prefs.sharpness,onFailure:()=>{setGpuWarning('GPU-обработка отключена: видеодрайвер или формат не поддерживается.');changePrefs({gpu:false});}
-      });
-      setGpuActive(true);setGpuWarning('');
-      return()=>{stop();setGpuActive(false);};
-    }catch{
-      setGpuActive(false);setGpuWarning('WebGL2 недоступен. Используется обычное видео.');
-      changePrefs({gpu:false});
+    if(!source||!prefs.gpu||!canvasRef.current||!videoRef.current){
+      setGpuActive(false);setNeuralStats(null);
+      return;
     }
-  },[source,prefs.gpu,prefs.sharpness]);
+    let disposed=false,stop;
+    const canvas=canvasRef.current;
+    canvas.style.opacity='0';
+    setGpuWarning('');setNeuralStats(null);setGpuActive(false);
+    (async()=>{
+      try{
+        stop=await startNeuralUpscaler(videoRef.current,canvas,{
+          mode:prefs.neuralMode,
+          onStats:stats=>{if(!disposed)setNeuralStats(stats);},
+          onFailure:error=>{
+            if(disposed)return;
+            setGpuWarning(error.message||'Ошибка нейросетевого инференса.');
+            setGpuActive(false);
+            changePrefs({gpu:false});
+          }
+        });
+        if(disposed)stop();
+        else setGpuActive(true);
+      }catch(error){
+        if(disposed)return;
+        setGpuActive(false);
+        setGpuWarning(error.message||'FSRCNN недоступна. Включено исходное видео.');
+        changePrefs({gpu:false});
+      }
+    })();
+    return()=>{disposed=true;stop?.();canvas.style.opacity='0';};
+  },[source,prefs.gpu,prefs.neuralMode]);
   const seek=seconds=>{
     const media=videoRef.current;
     if(media&&Number.isFinite(media.duration))media.currentTime=Math.max(0,Math.min(seconds,media.duration));
@@ -217,12 +236,12 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
         onDurationChange={loaded} onEnded={ended}
         onError={()=>{if(source)onError?.(Error('Браузер не может декодировать видео. Попробуй резервную загрузку.'));}}
         onClick={toggle} aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}</video>
-      <canvas ref={canvasRef} className={'mv-player-canvas'+(gpuActive?' is-visible':'')} aria-hidden="true"/>
+      <canvas ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
       {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:prefs.subOffset+'%'}}
         aria-live="off">{subtitleText}</div>}
       {!playing&&!busy&&source&&<button className="mv-player-center-play" aria-label="Воспроизвести" onClick={toggle}><Play size={32} fill="currentColor"/></button>}
       {canSkip&&<button className="mv-player-skip" onClick={()=>seek(opening.end)}><SkipForward size={16}/> Пропустить опенинг</button>}
-      {gpuActive&&<span className="mv-player-gpu-tag">GPU · WebGL2</span>}
+      {gpuActive&&<span className="mv-player-gpu-tag">AI FSRCNN ×2{neuralStats?` · ${neuralStats.fps} FPS`:``}</span>}
     </div>
     <div className="mv-player-console">
       <div className="mv-player-timeline"><input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
@@ -284,15 +303,20 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
         <label className="mv-player-check"><input type="checkbox" checked={prefs.autoSkip}
           onChange={event=>changePrefs({autoSkip:event.target.checked})}/> Автоматически пропускать опенинг</label>
         <label className="mv-player-check"><input type="checkbox" checked={prefs.gpu}
-          onChange={event=>changePrefs({gpu:event.target.checked})}/> Апскейлинг / повышение чёткости (WebGL2)</label>
-        {prefs.gpu&&<label>Резкость GPU<input aria-label="Резкость GPU" type="range" min="0" max="0.3" step="0.02"
-          value={prefs.sharpness} onChange={event=>changePrefs({sharpness:Number(event.target.value)})}/></label>}
+          onChange={event=>changePrefs({gpu:event.target.checked})}/> Нейросетевой апскейлинг FSRCNN ×2 (WebGPU)</label>
+        {prefs.gpu&&<label>Качество нейросети<select value={prefs.neuralMode||'balanced'}
+          onChange={event=>changePrefs({neuralMode:event.target.value})}>
+          <option value="performance">Экономный · 320px</option>
+          <option value="balanced">Баланс · 480px</option>
+          <option value="quality">Качество · 640px</option>
+        </select></label>}
+        {neuralStats&&prefs.gpu&&<small>FSRCNN: {neuralStats.width}×{neuralStats.height}, {neuralStats.fps} FPS, {neuralStats.latency} мс/кадр</small>}
         <div className="mv-player-intro"><span>Опенинг: {opening?clock(opening.start)+' – '+clock(opening.end):'не размечен'}</span>
           <div><button onClick={()=>setOpeningDraft(time)}>Начало {openingDraft!==null?'('+clock(openingDraft)+')':''}</button>
           <button disabled={openingDraft===null} onClick={markEnd}>Конец</button>
           <button disabled={!opening} onClick={()=>setIntro(null)}>Очистить</button></div>
         </div>
-        <small>GPU использует пространственный WebGL2-фильтр, не нейросетевой AI. В режиме PiP эффект недоступен. Несколько озвучек появляются при наличии альтернативных файлов одной серии или аудиодорожек.</small>
+        <small>FSRCNN ×2 — настоящая предобученная нейросеть ONNX. Инференс на WebGPU, без отправки кадров на сервер. Скорость зависит от видеокарты; если обработка медленная, плеер вернётся к исходному видео. В PiP показывается исходное видео. Несколько озвучек появляются при наличии альтернативных файлов одной серии или аудиодорожек.</small>
       </div>}
       {gpuWarning&&<p className="mv-player-warning" role="status">{gpuWarning}</p>}
     </div>
