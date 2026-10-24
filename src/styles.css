@@ -575,7 +575,7 @@ button { border: 0; }
 .mv-player-stage video,.mv-player-canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .mv-player-stage video{background:#000;cursor:pointer}
 .mv-player-canvas{opacity:0;pointer-events:none;transition:opacity .12s}
-.mv-player-canvas.is-visible{opacity:1}
+/* AI canvas is revealed only after a real neural inference result is drawn. */
 .mv-player-captions{position:absolute;left:5%;width:90%;text-align:center;pointer-events:none;white-space:pre-line;overflow-wrap:anywhere;line-height:1.35;font-weight:750;color:#fff;text-shadow:0 2px 4px #000,0 0 10px #000,2px 1px 1px #000;z-index:2}
 .mv-player-center-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:68px;height:68px;border-radius:50%;display:grid;place-items:center;color:#fff;background:#141316a8;backdrop-filter:blur(8px);border:1px solid #ffffff33;cursor:pointer;z-index:3}
 .mv-player-center-play:hover{background:#ff7a36;color:#191310}
