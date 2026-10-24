@@ -4,3 +4,7 @@ dist/
 __pycache__/
 *.pyc
 test-output/
+.venv/
+runtime-data/
+.env
+oauth-client.json

@@ -104,7 +104,7 @@ def plan_sources(job, resolver):
     return plans
 
 
-def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print):
+def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, event=None, cancelled=None):
     job = validate_job(value)
     if getattr(vault, "library_id", None) != job["library_id"]:
         raise SourceError("Открытая библиотека не совпадает с заданием.")
@@ -113,20 +113,26 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
     result = {"saved": 0, "skipped": 0, "failed": 0}
     try:
         plans = plan_sources(job, resolver)
+        if event:
+            event({"phase": "planned", "total": len(plans), "completed": 0})
         log(f"Найдено серий для задания: {len(plans)}. Обрабатываем по одной.")
         found = {entry["number"] for entry in plans if entry["number"] is not None}
         if job["selected"] is not None and job["selected"] - found:
             log("Некоторые указанные серии не опубликованы в найденных ссылках; они не будут выдуманы или загружены.")
         for index, entry in enumerate(plans, 1):
+            if cancelled and cancelled():
+                raise InterruptedError("Import cancelled")
             number, collection = entry["number"], entry["collection"]
             identity = entry["identity"] + (f":season={job['season']}" if job["season"] != 1 else "")
             label = f"Серия {number}" if number is not None else f"Видео {index}"
             # Check before contacting the player, because its signed links expire.
             if vault.completed(identity, collection=collection, episode=number):
                 result["skipped"] += 1
+                if event:
+                    event({"phase": "skipped", "completed": index, "total": len(plans)})
                 log(f"[{index}/{len(plans)}] {label}: уже в Drive, пропускаю.")
                 continue
-            log(f"[{index}/{len(plans)}] {label}: скачивание на сервер Google.")
+            log(f"[{index}/{len(plans)}] {label}: скачивание на сервер обработки.")
             # Every episode gets its own temporary directory; nothing accumulates for a season.
             with tempfile.TemporaryDirectory(prefix="mediavault-episode-") as temporary:
                 try:
@@ -134,6 +140,8 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                     stream = pick_stream(page.streams, job["quality"])
                     last_phase = [None]
                     def progress(event):
+                        if cancelled and cancelled():
+                            raise InterruptedError("Import cancelled")
                         phase = event.get("phase")
                         if phase != last_phase[0]:
                             text = {"downloading": "скачивание", "assembling": "сборка MP4",
@@ -141,9 +149,13 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                             if text:
                                 log(f"  {label}: {text}.")
                             last_phase[0] = phase
+                        emit({"phase": phase, "completed": index - 1, "total": len(plans), "episode": number})
+                    emit = event or (lambda value: None)
                     path = downloader(stream, temporary, http=resolver.http, quality=job["quality"], progress=progress)
                 except SourceError as error:
                     result["failed"] += 1
+                    if event:
+                        event({"phase": "source_error", "completed": index, "total": len(plans)})
                     log(f"  {label}: {error}")
                     continue
                 except Exception as error:
@@ -159,6 +171,8 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                                   episode=number, source_identity=identity, mime="video/mp4", progress=progress,
                                   section="anime",part=f"Сезон {job['season']}",season=job["season"])
                 result["saved"] += 1
+                if event:
+                    event({"phase": "saved", "completed": index, "total": len(plans)})
         log(f"Готово: сохранено {result['saved']}, уже были в Drive {result['skipped']}, недоступны {result['failed']}.")
         return result
     finally:

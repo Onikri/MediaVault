@@ -1,0 +1,25 @@
+[Unit]
+Description=MediaVault background import worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mediavault
+Group=mediavault
+WorkingDirectory=/opt/mediavault
+EnvironmentFile=/etc/mediavault.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/mediavault/.venv/bin/python /opt/mediavault/server/runtime_worker.py
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mediavault
+MemoryMax=1G
+CPUQuota=100%
+
+[Install]
+WantedBy=multi-user.target

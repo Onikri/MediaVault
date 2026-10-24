@@ -32,12 +32,14 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: server/requirements.txt
+          cache-dependency-path: |
+            server/requirements.txt
+            server/requirements-runtime.txt
 
       - name: Install dependencies
         run: |
           npm ci --no-audit --no-fund
-          python -m pip install -r server/requirements.txt
+          python -m pip install -r server/requirements-runtime.txt
 
       - name: Build and validate encrypted media
         run: |
@@ -56,6 +58,7 @@ jobs:
           export CHROMIUM_PATH
           npm run test:ui
           npm run test:browser
+          npm run test:automatic
 
       - name: Upload UI previews
         if: always()

@@ -334,6 +334,17 @@ class VaultDrive:
         self.catalog = catalog
         return catalog, metadata
 
+    def unlock_key(self, library_id, key):
+        """Restore a VM session from its encrypted credential store."""
+        envelope, metadata = self._read_raw(library_id)
+        if metadata.get("ownedByMe") is False or metadata.get("capabilities", {}).get("canEdit") is False:
+            raise VaultError("The owner account must be able to edit this catalog.")
+        catalog = open_catalog(envelope, key)
+        self.library_id, self.catalog = str(library_id), catalog
+        self._key, self._salt = key, _unb64(envelope["salt"])
+        self._manifest_cache = None
+        return self.library_id
+
     def refresh(self):
         return copy.deepcopy(self._latest()[0])
 
