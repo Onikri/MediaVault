@@ -133,8 +133,10 @@ export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose
   async function fullscreen(){
     try{
       const media=mediaRef.current;
-      if(media?.webkitEnterFullscreen)media.webkitEnterFullscreen();
-      else await (media?.requestFullscreen?media:panelRef.current)?.requestFullscreen?.();
+      const player=panelRef.current?.querySelector('.mv-player');
+      if(player?.requestFullscreen)await player.requestFullscreen();
+      else if(media?.webkitEnterFullscreen)media.webkitEnterFullscreen();
+      else await panelRef.current?.requestFullscreen?.();
     }catch(cause){methods.current.onError?.(cause);}
   }
 

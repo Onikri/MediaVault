@@ -214,7 +214,10 @@ async function main() {
     'Video starts after pressing custom player Play button');
   await owner.locator('.mv-player-controls button[aria-label="Пауза"]').click();
   await owner.getByRole('button',{name:'Загрузить файл целиком (резервный режим)'}).click();
-  await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
+  await owner.waitForFunction(()=>{
+    const video=document.querySelector('#viewerContent video');
+    return video?.currentSrc.startsWith('blob:')&&video.readyState>=2&&Number.isFinite(video.duration);
+  });
   assert.equal(await owner.locator('video').evaluate(video=>Math.round(video.duration)),2);
   await owner.locator('video').evaluate(video=>video.currentTime=1);
   await owner.waitForFunction(()=>document.querySelector('video').currentTime>=1);
@@ -379,8 +382,33 @@ async function main() {
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   const cinema=owner.locator('.mv-player');
   assert.equal(await cinema.count(),1,'Anime opens the advanced player');
+  assert.equal(await owner.locator('#viewerContent').evaluate(el=>el.scrollTop),0,'Centering the active episode never scrolls the video out of view');
   assert.equal(await cinema.getByRole('combobox',{name:'Сезон'}).count(),1);
   assert.equal(await cinema.getByRole('combobox',{name:'Серия'}).count(),1);
+  const output=path.join(PROJECT,'test-output');await fs.mkdir(output,{recursive:true});
+  for(const width of [320,390,768,1280]){
+    await owner.setViewportSize({width,height:900});
+    await cinema.screenshot({path:path.join(output,'player-'+width+'.png')});
+    assert.ok(await cinema.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Player has no horizontal overflow at '+width);
+    await cinema.getByRole('tab',{name:/Серии/}).click();
+    await cinema.getByRole('heading',{name:'Выбрать серию'}).waitFor();
+    assert.ok(await cinema.locator('.mv-player-drawer').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Episode drawer fits '+width);
+    await owner.keyboard.press('Escape');
+    assert.equal(await owner.locator('#viewer').isVisible(),true,'Escape dismisses the player drawer before the viewer');
+    await cinema.getByRole('tab',{name:'Настройки',exact:true}).click();
+    await cinema.screenshot({path:path.join(output,'player-settings-'+width+'.png')});
+    assert.ok(await cinema.locator('.mv-player-drawer').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Settings fit '+width);
+    await cinema.getByRole('button',{name:'Вернуться к просмотру'}).click();
+  }
+  await cinema.getByRole('tab',{name:'Смотреть',exact:true}).focus();
+  await owner.keyboard.press('ArrowRight');
+  assert.equal(await cinema.getByRole('tab',{name:/Серии/}).getAttribute('aria-selected'),'true','Arrow keys navigate player tabs');
+  await cinema.getByRole('button',{name:'Вернуться к просмотру'}).click();
+  await cinema.getByRole('button',{name:'На весь экран',exact:true}).click();
+  await owner.waitForFunction(()=>document.fullscreenElement?.classList.contains('mv-player'));
+  assert.equal(await cinema.locator('.mv-player-controls').isVisible(),true,'Fullscreen keeps custom playback controls');
+  await owner.evaluate(()=>document.exitFullscreen());
+  await owner.setViewportSize({width:390,height:860});
   await cinema.getByRole('button',{name:'Настройки плеера'}).click();
   assert.equal(await cinema.getByRole('combobox',{name:'Субтитры'}).count(),1);
   await cinema.locator('input[type=file]').setInputFiles({
