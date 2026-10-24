@@ -6,6 +6,14 @@
 
 **Серверный импорт:** [Открыть бесплатный Colab-блокнот](https://colab.research.google.com/github/Onikri/MediaVault/blob/main/notebooks/MediaVault_Server_Import.ipynb)
 
+## Автоматический импорт без Colab
+
+Добавлен режим собственной VM: поиск Shikimori/AnimeGO/AnimeVost, выбор источника,
+постоянная очередь и импорт в Drive после закрытия вкладки. Он включается через
+`importServerUrl` после настройки сервера. [Настройка, бесплатные ограничения и
+статус проверки источников](docs/automatic-import.md). Пока адрес пуст, работает
+описанный ниже ручной Colab. VM и OAuth требуют первоначальной настройки владельцем.
+
 ## Первый запуск
 
 1. Открой **Профиль → Войти через Google** и разреши чтение файлов Drive в окне Google. Отдельная кнопка подключения и ввод ID не требуются: приложение само ищет библиотеку после входа. Владелец — аккаунт `roma.shevchenko2020@gmail.com`. В коде хранится SHA-256 адреса для определения администратора. Папка другого аккаунта не используется: `storageFolderId` пустой, новая библиотека создаётся в Drive вошедшего владельца.
@@ -78,7 +86,7 @@ Node.js 22.12+, Python 3.10+, ffmpeg/ffprobe и Chromium:
 git clone https://github.com/Onikri/MediaVault.git
 cd MediaVault
 npm ci
-python -m pip install -r server/requirements.txt
+python -m pip install -r server/requirements-runtime.txt
 npm run dev
 ```
 

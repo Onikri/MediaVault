@@ -4,8 +4,13 @@ import * as Tabs from '@radix-ui/react-tabs';
 import {motion,useReducedMotion} from 'motion/react';
 import Icon from './Icons.jsx';
 import {buildServerJob,NOTEBOOK_URL} from './server-job.js';
+import AutomaticImport from './AutomaticImport.jsx';
 
-export default function ServerImport({state,onConnect,onRefresh}){
+export default function ServerImport(props){
+  return window.MEDIA_VAULT_CONFIG?.importServerUrl?<AutomaticImport {...props}/>:<ColabImport {...props}/>;
+}
+
+function ColabImport({state,onConnect,onRefresh}){
   const [mode,setMode]=useState('single');
   const [urls,setUrls]=useState('');
   const [collection,setCollection]=useState('');

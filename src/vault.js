@@ -3,6 +3,7 @@ import {newSalt,deriveVaultKey,openChunk,sealIndex,openIndex,base64ToBytes} from
 import {driveDownload,readEnvelope,findLibraries,createFolder,folderExists,uploadSmall,
   inviteReader} from "../drive.js";
 import {createUploadService} from "./upload.js";
+import {importRequest} from "./import-api.js";
 
 export const labels={all:"Все материалы",video:"Видео",audio:"Музыка",manga:"Манга",
   book:"Книги",image:"Изображения"};
@@ -345,6 +346,7 @@ function createController(get,patch){
   });
   async function uploadFiles(files,options={}){
     return run("upload",async expected=>{
+      await checkServerWrites(expected);
       await ensureWriteAccess(expected);
       patch({uploadProgress:[]});
       const results=await uploads.uploadFiles(files,options);
@@ -358,6 +360,7 @@ function createController(get,patch){
   }
   async function importStream(options){
     return run("upload",async expected=>{
+      await checkServerWrites(expected);
       await ensureWriteAccess(expected);
       patch({uploadProgress:[]});
       const item=await uploads.importStream(options);
@@ -369,6 +372,7 @@ function createController(get,patch){
   }
   async function importVideo(options,fetcher){
     return run("upload",async expected=>{
+      await checkServerWrites(expected);
       await ensureWriteAccess(expected);
       patch({uploadProgress:[]});
       const item=await uploads.importVideo(options,fetcher);
@@ -389,6 +393,19 @@ function createController(get,patch){
       toast("Приглашение отправлено. Передай ссылку и секретную фразу отдельно.");
       return true;
     });
+  }
+  async function checkServerWrites(expected){
+    if(!configuration().importServerUrl||!get().libraryId)return;
+    const {libraryId,key}=get(),token=driveToken();
+    const result=await importRequest(token,'/jobs?library='+encodeURIComponent(libraryId));
+    assertEpoch(expected);
+    if(result.jobs.some(job=>['queued','running'].includes(job.status)))throw Error('Дождись завершения серверного импорта перед загрузкой файлов.');
+    // A completed background import may have changed the catalogue since this tab opened.
+    const envelope=await readEnvelope(token,libraryId);
+    assertEpoch(expected);
+    const catalog=await openIndex(envelope,key);
+    assertEpoch(expected);
+    salt=base64ToBytes(envelope.salt);patch({catalog});
   }
   function inviteUrl(){
     if(!get().libraryId)throw Error("Сначала открой библиотеку.");

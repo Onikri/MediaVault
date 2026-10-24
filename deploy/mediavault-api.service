@@ -1,0 +1,24 @@
+[Unit]
+Description=MediaVault private import API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mediavault
+Group=mediavault
+WorkingDirectory=/opt/mediavault
+EnvironmentFile=/etc/mediavault.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/mediavault/.venv/bin/gunicorn --chdir /opt/mediavault/server --bind 127.0.0.1:8090 --workers 1 --threads 4 --timeout 180 runtime_api:create_app()
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mediavault
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
