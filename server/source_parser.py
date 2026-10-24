@@ -89,9 +89,10 @@ def playback_headers(headers=None):
 
 
 class PublicHttp:
-    def __init__(self, *, session=None, validate=public_url):
+    def __init__(self, *, session=None, validate=public_url, timeout=(20, 45)):
         self.session = session or requests.Session()
         self.validate = validate
+        self.timeout = timeout
         # Session is source-only and is never shared with Google Drive.
         self.session.headers.clear()
 
@@ -116,7 +117,7 @@ class PublicHttp:
                 # Clear cookies collected by previous HTML pages, including redirects.
                 self.session.cookies.clear()
                 response = self.session.request(method, url, headers=outgoing, data=data,
-                                                timeout=(20, 45), allow_redirects=False, stream=True)
+                                                timeout=self.timeout, allow_redirects=False, stream=True)
             except requests.RequestException:
                 raise SourceError("Источник не ответил. Повтори импорт позднее.") from None
             if response.status_code in {301, 302, 303, 307, 308}:
@@ -233,6 +234,7 @@ class PageParser(HTMLParser):
         self.select = ""
         self.option = None
         self.containers = []
+        self.yummy_player_id = None
 
     def link(self, value):
         try:
@@ -258,6 +260,17 @@ class PageParser(HTMLParser):
 
     def handle_starttag(self, tag, attributes):
         attrs = dict(attributes)
+        # The site's published player-relay.js loads these exact public slots.
+        # Read the same GET response as the iframe; no search/developer API,
+        # session, key or generated player ID is used.
+        if urlsplit(self.base).hostname == "yummyanime.tv":
+            identity = attrs.get("data-player-anime-id", "")
+            if re.fullmatch(r"\d{1,10}", identity):
+                self.yummy_player_id = identity
+            slot = attrs.get("data-player-slot", "")
+            if self.yummy_player_id and re.fullmatch(r"\d{1,2}", slot):
+                query = urlencode({"mod": "player", "id": self.yummy_player_id, "slot": slot})
+                self.result.players.append("https://yummyanime.tv/engine/ajax/controller.php?" + query)
         if tag == "div":
             self.containers.append(attrs.get("class", ""))
         if tag == "title":

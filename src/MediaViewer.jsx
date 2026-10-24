@@ -11,7 +11,7 @@ async function libraryReady(name,signal){
   throw Error('Не удалось загрузить обработчик книги или архива. Проверь подключение к сети.');
 }
 
-export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose,readWhole,prepareStream,onError}) {
+export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose,readWhole,prepareStream,onError,inline=false,renderEpisodeArtwork,onPlaybackChange}) {
   const [source,setSource]=useState('');
   const [text,setText]=useState('');
   const [busy,setBusy]=useState(true);
@@ -45,11 +45,11 @@ export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose
 
   useEffect(()=>{
     const previousOverflow=document.body.style.overflow;
-    document.body.style.overflow='hidden';
-    const onKey=event=>{if(event.key==='Escape')onClose();};
+    if(!inline)document.body.style.overflow='hidden';
+    const onKey=event=>{if(inline&&!panelRef.current?.contains(document.activeElement))return;const dialog=event.target.closest?.('[role="dialog"]');if(event.key==='Escape'&&!event.defaultPrevented&&(!dialog||dialog===panelRef.current))onClose();};
     window.addEventListener('keydown',onKey);
     return ()=>{document.body.style.overflow=previousOverflow;window.removeEventListener('keydown',onKey);};
-  },[onClose]);
+  },[onClose,inline]);
 
   useEffect(()=>{
     const current=++generation.current;
@@ -131,7 +131,7 @@ export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose
     }catch(cause){if(current===generation.current)report(cause);}
   }
 
-  return <section id="viewer" ref={panelRef} className="mv-viewer" role="dialog" aria-modal="true" aria-label={item.name}>
+  return <section id="viewer" ref={panelRef} className={'mv-viewer'+(inline?' mv-viewer-inline':'')} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={item.name}>
     <header className="mv-viewer-head">
       <button id="closeViewer" className="mv-icon-button" aria-label="Закрыть просмотр" onClick={onClose}>←</button>
       <div className="mv-viewer-title"><small>{names[item.category]||'Файл'}</small><strong>{item.name}</strong></div>
@@ -140,7 +140,7 @@ export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose
       {busy&&<div className="mv-viewer-loading" role="status">Расшифровка на устройстве…</div>}
       {error&&<div className="mv-viewer-error" role="alert">{error}</div>}
       {isMedia&&(item.category==='video'
-        ?<VideoPlayer item={item} source={source} catalog={catalog} libraryId={libraryId} mediaRef={mediaRef} onSelectItem={onSelectItem} onError={report} busy={busy}/>
+        ?<VideoPlayer item={item} source={source} catalog={catalog} libraryId={libraryId} mediaRef={mediaRef} onSelectItem={onSelectItem} onError={report} busy={busy} renderEpisodeArtwork={renderEpisodeArtwork} onPlaybackChange={onPlaybackChange}/>
         :<audio ref={mediaRef} src={source||undefined} controls preload="metadata" onError={()=>source&&report(Error('Браузер не смог воспроизвести аудио. Попробуй загрузить файл целиком.'))}/>)}
       {isMedia&&!source&&!busy&&!error&&<p>Потоковое воспроизведение недоступно. Загрузи файл целиком.</p>}
       {(item.category==='image'||item.category==='manga')&&source&&<img src={source} alt={item.category==='manga'?'Страница '+(page+1):item.name}/>}

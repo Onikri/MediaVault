@@ -24,6 +24,11 @@ export async function readEnvelope(token,id) {
   const data=await driveDownload(token,id);
   return JSON.parse(new TextDecoder().decode(data));
 }
+export async function readEnvelopeSnapshot(token,id) {
+  const res=await fetch(API+"/files/"+encodeURIComponent(id)+"?alt=media",{headers:{Authorization:"Bearer "+token}});
+  if(!res.ok)throw httpError("Ошибка чтения каталога: HTTP "+res.status,res.status);
+  return {envelope:await res.json(),etag:res.headers.get("ETag")};
+}
 export async function findLibraries(token,{ownedOnly=false,signal}={}) {
   const query="trashed = false and name = 'vault-catalog.enc.json'"+(ownedOnly?" and 'me' in owners":"");
   const files=[];
@@ -69,7 +74,7 @@ export async function uploadSmall(token,name,blob,parentId,options={}) {
 }
 export async function replaceSmall(token,id,blob,options={}) {
   const res=await fetch(UPLOAD+"/files/"+encodeURIComponent(id)+"?uploadType=media",{
-    method:"PATCH",signal:options.signal,headers:{Authorization:"Bearer "+token,"Content-Type":"application/octet-stream"},body:blob});
+    method:"PATCH",signal:options.signal,headers:{Authorization:"Bearer "+token,"Content-Type":"application/octet-stream",...(options.etag?{"If-Match":options.etag}:{})},body:blob});
   if(!res.ok) throw httpError("Не удалось сохранить каталог: HTTP "+res.status,res.status);
 }
 export async function inviteReader(token,folderId,email) {

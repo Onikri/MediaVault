@@ -40,7 +40,7 @@ export function buildPlaybackLibrary(current, catalog) {
     episode.variants.push({item, label: voiceLabel(item, 'Версия ' + (episode.variants.length + 1))});
   }
   return {
-    title: group?.name || current.name,
+    title: catalog?.titleProfiles?.[(current.section||'video')+':'+(group?.id||'file-'+current.id)]?.title || group?.metadata?.titles?.ru || group?.name || current.name,
     seasons: [...seasons.values()].map(part => ({
       id: part.id, name: part.name,
       episodes: [...part.episodes.values()].sort((a,b) => (a.number ?? Infinity) - (b.number ?? Infinity) ||

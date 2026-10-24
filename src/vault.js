@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from "react";
-import {newSalt,deriveVaultKey,openChunk,sealIndex,openIndex,base64ToBytes} from "../crypto.js";
+import {newSalt,deriveVaultMaterial,bytesToBase64,openChunk,sealIndex,openIndex,base64ToBytes} from "../crypto.js";
 import {driveDownload,readEnvelope,findLibraries,createFolder,folderExists,uploadSmall,
   inviteReader} from "../drive.js";
 import {createUploadService} from "./upload.js";
@@ -52,7 +52,7 @@ async function userFromToken(token){
 }
 
 function createController(get,patch){
-  let mounted=false,epoch=0,tokenTimer=null,toastTimer=null,worker=null,registration=null,salt=null;
+  let mounted=false,epoch=0,tokenTimer=null,toastTimer=null,worker=null,registration=null,salt=null,serverKey=null;
   const tokenAlive=()=>!!get().token&&Date.now()<get().tokenExpiresAt;
   const libraryStatus=()=>get().catalog?
     (get().admin?"Администратор":"Зритель")+" · библиотека открыта":
@@ -285,12 +285,13 @@ function createController(get,patch){
       patch({status:"Открываем каталог…"});
       const envelope=await readEnvelope(token,id);
       const nextSalt=base64ToBytes(envelope.salt);
-      const key=await deriveVaultKey(passphrase,nextSalt);
+      const material=await deriveVaultMaterial(passphrase,nextSalt),key=material.key;
       let catalog;
       try{catalog=await openIndex(envelope,key);}
       catch(cause){if(cause?.name==="OperationError")throw Error("Неверная секретная фраза или повреждённый каталог.");throw cause;}
       assertEpoch(expected);
       salt=nextSalt;
+      serverKey?.fill(0);serverKey=material.serverKey;
       patch({key,catalog});
       saveLibraryId(id);
       await syncWorker();
@@ -309,7 +310,7 @@ function createController(get,patch){
       await discoverLibrary(expected);
       if(get().libraryOptions.length)throw Error("Библиотека уже найдена. Открой её своей секретной фразой.");
       const token=driveToken();
-      const nextSalt=newSalt(),key=await deriveVaultKey(passphrase,nextSalt);
+      const nextSalt=newSalt(),material=await deriveVaultMaterial(passphrase,nextSalt),key=material.key;
       assertEpoch(expected);
       patch({status:"Создаём библиотеку…"});
       let folderId=configuration().storageFolderId||"";
@@ -325,6 +326,7 @@ function createController(get,patch){
         new Blob([JSON.stringify(sealed)],{type:"application/octet-stream"}),folderId);
       assertEpoch(expected);
       salt=nextSalt;
+      serverKey?.fill(0);serverKey=material.serverKey;
       patch({key,catalog});
       saveLibraryId(file.id);
       await syncWorker();
@@ -426,6 +428,19 @@ function createController(get,patch){
       return new Blob(buffers,{type:item.mime});
     }finally{if(expected===epoch&&!silent)patch({status:tokenAlive()?libraryStatus():"Обнови доступ к Drive"});}
   }
+  async function readArtwork(asset,{signal}={}){
+    const expected=epoch,key=get().key;
+    if(!key||!get().catalog)throw Error('Открой библиотеку для просмотра обложек.');
+    const bytes=await driveDownload(driveToken(),asset.fileId,{signal});assertEpoch(expected);
+    const data=await openChunk(bytes,key,asset.id,0,asset.iv);assertEpoch(expected);
+    return new Blob([data],{type:asset.mime});
+  }
+  async function saveTitleProfile(titleId,profile,images=[]){
+    return run('artwork',async expected=>{
+      await ensureWriteAccess(expected);
+      return uploads.saveTitleProfile(titleId,profile,images);
+    });
+  }
   async function refreshCatalog(){
     return run("refresh",async expected=>{
       if(!get().catalog||!get().key)throw Error("Сначала открой библиотеку.");
@@ -457,7 +472,7 @@ function createController(get,patch){
   }
   function logout(){
     uploads.cancel();
-    epoch++;salt=null;
+    epoch++;salt=null;serverKey?.fill(0);serverKey=null;
     clearTimeout(tokenTimer);clearTimeout(toastTimer);
     clearWorkerSession();
     patch({user:null,admin:false,token:null,tokenExpiresAt:0,key:null,catalog:null,driveConnected:false,driveWritable:false,
@@ -488,7 +503,7 @@ function createController(get,patch){
   }
   function unmount(){
     uploads.cancel();
-    mounted=false;epoch++;
+    mounted=false;epoch++;serverKey?.fill(0);serverKey=null;
     clearTimeout(tokenTimer);clearTimeout(toastTimer);
     navigator.serviceWorker?.removeEventListener("message",onMessage);
     navigator.serviceWorker?.removeEventListener("controllerchange",onControllerChange);
@@ -496,7 +511,8 @@ function createController(get,patch){
     clearWorkerSession();
   }
   return {mount,unmount,actions:{login,connectDrive,logout,unlock,createLibrary,uploadFiles,importStream,importVideo,
-    getState:uploads.getState,findMyLibrary,refreshCatalog,invite,copyInvite,inviteUrl,readWhole,prepareStream,error,clearToast}};
+    getServerKey:()=>{if(!get().admin||!get().catalog||!serverKey)throw Error("Открой библиотеку владельца.");return bytesToBase64(serverKey);},
+    getState:uploads.getState,findMyLibrary,refreshCatalog,invite,copyInvite,inviteUrl,readWhole,readArtwork,saveTitleProfile,prepareStream,error,clearToast}};
 }
 
 export function useVault(){

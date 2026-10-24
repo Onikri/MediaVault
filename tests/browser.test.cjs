@@ -15,6 +15,9 @@ const OWNER = 'owner@example.test';
 const READER = 'reader@example.test';
 const PHRASE = 'integration test phrase only';
 const files = new Map();
+const russianMetadataRequests=[];
+const artworkPNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a+kkAAAAASUVORK5CYII=','base64');
+const titleFixture={id:20,russian:'Наруто',name:'Naruto',kind:'tv',score:'8.0',status:'released',source:'manga_source',rating:'pg_13',description:'История юного ниндзя, который мечтает стать главой своей деревни.',aired_on:'2002-10-03',released_on:'2007-02-08',episodes:220,duration:23,image:{original:'https://art.example.test/cover.png'},genres:[{russian:'Приключения'},{russian:'Экшен'}]};
 const writes = [];
 let nextId = 0;
 let server;
@@ -39,6 +42,19 @@ async function installProvider(context, identity) {
     const url = new URL(request.url());
     const json = (body,status=200) => route.fulfill({status, headers:cors, contentType:'application/json', body:JSON.stringify(body)});
     if(url.pathname === '/media-vault/config.js') return route.fulfill({contentType:'text/javascript',body:'window.MEDIA_VAULT_CONFIG=Object.freeze('+JSON.stringify({googleClientId:'123-test.apps.googleusercontent.com',adminEmailSha256:createHash('sha256').update(OWNER).digest('hex'),storageFolderId:'',applicationName:'MediaVault'})+');'});
+    if(url.hostname === 'art.example.test')return route.fulfill({headers:cors,contentType:'image/png',body:artworkPNG});
+    if(url.hostname === 'graphql.anilist.co')return json({data:{Media:{id:1735,idMal:20,bannerImage:'https://art.example.test/banner.png',siteUrl:'https://anilist.co/anime/1735'}}});
+    if(url.hostname === 'shikimori.one'){
+      russianMetadataRequests.push(url.pathname);
+      if(url.pathname==='/api/animes')return json([titleFixture]);
+      if(url.pathname==='/api/mangas/11')return json({...titleFixture,id:11,kind:'manga',description:'Манга о приключениях юного ниндзя.',image:{original:'https://art.example.test/manga.png'}});
+      if(url.pathname==='/api/animes/20')return json(titleFixture);
+      if(url.pathname==='/api/animes/20/roles')return json([{roles:['Main'],roles_russian:['Главный герой'],character:{id:17,russian:'Наруто Узумаки',image:{original:'https://art.example.test/character.png'}}},{roles:['Director'],person:{russian:'Хаято Датэ'}}]);
+      if(url.pathname==='/api/animes/20/screenshots')return json([{original:'https://art.example.test/still.png'}]);
+      if(url.pathname==='/api/animes/20/related')return json([{relation_russian:'Первоисточник',manga:{id:11,russian:'Наруто',kind:'manga',image:{original:'https://art.example.test/manga.png'}}}]);
+      if(url.pathname==='/api/characters/17')return json({id:17,russian:'Наруто Узумаки',description:'Главный герой истории. Мечтает стать Хокагэ.',image:{original:'https://art.example.test/character.png'}});
+      return json([]);
+    }
     if(url.hostname === 'accounts.google.com') return route.fulfill({contentType:'text/javascript',body:`window.google={accounts:{oauth2:{initTokenClient(options){return {requestAccessToken(){window.__grants=(window.__grants||[]).concat(options.scope);options.callback({access_token:${JSON.stringify(identity)},expires_in:window.__tokenDuration||3600,scope:options.scope});}};},revoke(token,callback){callback?.({});}}}};`});
     if(url.hostname === 'cdn.jsdelivr.net') return route.fulfill({contentType:'text/javascript',body:''});
     if(url.hostname !== 'www.googleapis.com') return route.continue();
@@ -125,7 +141,7 @@ async function main() {
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base='http://127.0.0.1:'+server.address().port+'/media-vault/';
-  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const ownerContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'allow'});
   ownerContext.setDefaultTimeout(20000);
   await installProvider(ownerContext,OWNER);
@@ -163,23 +179,63 @@ async function main() {
     for(const chunk of item.chunks) assert.ok(!files.get(chunk.fileId).data.includes(Buffer.from('Encrypted hello')),'Stored chunk is encrypted');
   }
   const textItem=catalog.items.find(item=>item.name==='private-note.txt');
-  // The import form must prepare control data without fetching any video on this device.
-  const sourceRequests=[];
+  // The automatic import sends only control data/key to the owner's server, never source bytes.
+  const sourceRequests=[],submitted=[];let fakeTask=null,googleConfigured=false,googleConfiguration=null;
   owner.on('request',request=>{if(new URL(request.url()).hostname==='source.example.com')sourceRequests.push(request.url());});
+  await owner.route('https://import.example.com/**',async route=>{
+    const request=route.request(),url=new URL(request.url());
+    const respond=(data,status=200)=>route.fulfill({status,headers:cors,contentType:'application/json',body:JSON.stringify(data)});
+    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+    if(url.pathname==='/health')return respond({application:'MediaVault',version:4,origin:new URL(base).origin,oauthConfigured:googleConfigured});
+    if(url.pathname==='/auth/session')return respond({token:'fixture-server-session',driveConnected:true,oauthConfigured:googleConfigured});
+    if(url.pathname==='/admin/google-oauth'){
+      assert.equal(request.headers().authorization,'Bearer fixture-server-session');
+      googleConfiguration=request.postDataJSON();googleConfigured=true;return respond({oauthConfigured:true});
+    }
+    if(url.pathname==='/jobs'&&request.method()==='POST'){
+      const body=request.postDataJSON();submitted.push(body);
+      fakeTask={id:'task-1',created:Date.now()/1000,status:'queued',progress:{title:body.job.collection,total:2,saved:0,phase:'queued'}};
+      return respond(fakeTask,202);
+    }
+    if(url.pathname==='/jobs/task-1/cancel'){fakeTask={...fakeTask,status:'cancelled'};return respond(fakeTask);}
+    if(url.pathname==='/jobs')return respond({jobs:fakeTask?[fakeTask]:[]});
+    if(url.pathname==='/sources/inspect')return respond({provider:'fixture',dubs:[],seasons:[],releases:[],episodes:[{number:1,url:'https://source.example.com/episode-1'},{number:3,url:'https://source.example.com/episode-3'}]});
+    if(url.pathname.startsWith('/metadata/'))return respond({data:[]});
+    return respond({detail:'Not found'},404);
+  });
   await owner.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Импорт',exact:true}).click();
+  await owner.locator('.server-settings > summary').click();
+  await owner.locator('#importServer').fill('https://import.example.com');
+  await owner.locator('.server-address-form').getByRole('button',{name:'Подключить',exact:true}).click();
+  await owner.getByText('Drive подключён',{exact:true}).waitFor();
+  await owner.getByRole('heading',{name:'Подключи фоновый импорт один раз',exact:true}).waitFor();
+  const publicClientId=await owner.evaluate(()=>window.MEDIA_VAULT_CONFIG.googleClientId);
+  const fixtureClientSecret='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456789';
+  await owner.locator('#googleOAuthFile').setInputFiles({name:'oauth-fixture.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({web:{client_id:publicClientId,client_secret:fixtureClientSecret}}))});
+  await owner.getByRole('button',{name:'Сохранить настройки Google',exact:true}).click();
+  await owner.getByRole('heading',{name:'Подключи фоновый импорт один раз',exact:true}).waitFor({state:'detached'});
+  assert.deepEqual(googleConfiguration,{client_id:publicClientId,client_secret:fixtureClientSecret});
+  assert.ok(!(await owner.evaluate(()=>JSON.stringify({...localStorage})) ).includes(fixtureClientSecret),'Private Google settings never enter browser storage');
+  await owner.getByRole('tab',{name:'По ссылке',exact:true}).click();
   await owner.locator('#streamUrl').fill('https://source.example.com/season');
+  await owner.getByRole('button',{name:'Проверить',exact:true}).click();
+  await owner.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
   await owner.locator('#serverCollection').fill('Мой сезон');
-  await owner.locator('#serverEpisodes').fill('1-12');
+  await owner.getByRole('button',{name:'Диапазон',exact:true}).click();
+  await owner.getByRole('spinbutton',{name:'Первая серия',exact:true}).fill('1');
+  await owner.getByRole('spinbutton',{name:'Последняя серия',exact:true}).fill('3');
   await owner.locator('#importVideoBtn').click();
-  const serverJob=JSON.parse(await owner.locator('#serverJob').inputValue());
-  assert.deepEqual(serverJob,{version:1,library_id:catalogId,sources:['https://source.example.com/season'],collection:'Мой сезон',season:1,episodes:'1-12',quality:'720',resume:true});
-  assert.ok(!JSON.stringify(serverJob).includes(PHRASE));
-  assert.ok(!JSON.stringify(serverJob).includes(OWNER));
-  assert.ok((await owner.locator('#openColab').getAttribute('href')).includes('notebooks/MediaVault_Server_Import.ipynb'));
-  assert.deepEqual(sourceRequests,[],'Preparing server import never fetches source HTML, playlists or video on the device');
-  await owner.getByRole('button',{name:'Закрыть',exact:true}).click();
-  await owner.locator('#refreshAfterImport').click();
-  await owner.getByText('Библиотека обновлена.',{exact:true}).waitFor();
+  await owner.getByRole('heading',{name:'Очередь импорта',exact:true}).waitFor();
+  assert.equal(submitted.length,1);
+  const serverJob=submitted[0].job;
+  assert.equal(serverJob.version,2);assert.equal(serverJob.library_id,catalogId);assert.equal(serverJob.episodes,'1-3');
+  assert.deepEqual(serverJob.entries.map(e=>e.number),[1,3]);
+  assert.ok(!JSON.stringify(serverJob).includes(PHRASE));assert.ok(!JSON.stringify(serverJob).includes(OWNER));
+  assert.equal(Buffer.from(submitted[0].vault_key,'base64').length,32,'Only the derived encryption key goes to the configured owner server');
+  assert.deepEqual(sourceRequests,[],'The device never fetches source HTML, playlists or video during import');
+  assert.equal(await owner.locator('#openColab').count(),0,'No manual notebook hand-off remains');
+  await owner.getByRole('button',{name:'Остановить после файла'}).click();
+  await owner.getByText('Остановлено',{exact:true}).waitFor();
   await owner.locator('#libraryNav').click();
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===3);
   const delayedPattern='**/drive/v3/files/'+textItem.chunks[0].fileId+'?alt=media';
@@ -224,6 +280,7 @@ async function main() {
   await owner.locator('video').evaluate(video=>video.currentTime=1);
   await owner.waitForFunction(()=>document.querySelector('video').currentTime>=1);
   await owner.locator('#closeViewer').click();
+  if(await owner.locator('#backToTitles').isVisible())await owner.locator('#backToTitles').click();
   await owner.locator('#searchInput').fill('private-note');
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===1);
   assert.ok((await owner.locator('.media-card').innerText()).includes('private-note.txt'),'Search filters real catalog entries');
@@ -327,8 +384,27 @@ async function main() {
   assert.equal(await fresh.evaluate(()=>localStorage.getItem('mediavault_library')),catalogId,'A new device discovers and remembers the existing catalog');
   assert.equal(await fresh.locator('#createBtn').isVisible(),false,'Discovery prevents accidental duplicate creation');
   assert.equal(writes.length,writesBeforeDiscovery,'Login and discovery perform no Drive writes');
-  await fresh.locator('#passphrase').fill(PHRASE);
-  await fresh.locator('#unlockBtn').click();
+  let freshDriveConnected=false;
+  await fresh.route('https://import.example.com/**',async route=>{
+    const request=route.request(),url=new URL(request.url());const respond=data=>route.fulfill({headers:cors,contentType:'application/json',body:JSON.stringify(data)});
+    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
+    if(url.pathname==='/health')return respond({application:'MediaVault',version:4,origin:new URL(base).origin});
+    if(url.pathname==='/auth/session')return respond({token:'fixture-session',oauthConfigured:true,driveConnected:freshDriveConnected});
+    if(url.pathname==='/jobs')return respond({jobs:[]});
+    if(url.pathname==='/sources/inspect')return respond({provider:'fixture',dubs:[{id:'studio',name:'Studio Band',url:'https://source.example.com/studio'}],seasons:[{number:1,name:'Сезон 1'}],episodes:[{number:1,url:'https://source.example.com/ep1'},{number:3,url:'https://source.example.com/ep3'}]});
+    return respond({data:[]});
+  });
+  await fresh.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Импорт',exact:true}).click();
+  await fresh.locator('.server-settings>summary').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.server-address-form').getByRole('button',{name:'Подключить',exact:true}).click();
+  await fresh.getByText('Нужен доступ к Drive',{exact:true}).waitFor();await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();
+  await fresh.locator('#streamUrl').fill('https://source.example.com/titans');await fresh.getByRole('button',{name:'Проверить',exact:true}).click();await fresh.locator('#importDub').selectOption('https://source.example.com/studio');await fresh.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
+  await fresh.locator('#serverCollection').fill('Атака титанов');await fresh.getByRole('button',{name:'Одна',exact:true}).click();await fresh.getByRole('combobox',{name:'Номер серии'}).selectOption('3');
+  assert.equal(await fresh.locator('#importVideoBtn').isDisabled(),true);await fresh.locator('#importPrerequisites').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();
+  await fresh.getByRole('dialog').locator('#passphrase').fill(PHRASE);await fresh.getByRole('dialog').locator('#unlockBtn').click();await fresh.getByRole('dialog').waitFor({state:'detached'});
+  assert.equal(await fresh.locator('#streamUrl').inputValue(),'https://source.example.com/titans');assert.equal(await fresh.locator('#importDub').inputValue(),'https://source.example.com/studio');assert.equal(await fresh.getByRole('combobox',{name:'Номер серии'}).inputValue(),'3');
+  freshDriveConnected=true;await fresh.locator('#importPrerequisites').getByRole('button',{name:'Уже разрешил — проверить',exact:true}).click();await fresh.waitForFunction(()=>document.querySelector('#importVideoBtn')?.disabled===false);
+  assert.equal(await fresh.locator('#serverCollection').inputValue(),'Атака титанов','Unlocking and Drive reconnect preserve the complete import choice');
+  await fresh.locator('#libraryNav').click();
   await fresh.locator('#showFilesBtn').click();
   await fresh.waitForFunction(()=>document.querySelectorAll('.media-card').length===4);
   assert.equal(writes.length,writesBeforeDiscovery,'Opening a library does not need write access');
@@ -378,16 +454,46 @@ async function main() {
   await owner.getByRole('button',{name:'Аниме',exact:true}).click();
   assert.equal(await owner.locator('.title-card').count(),1,'Three episodes appear as one anime title');
   await owner.locator('.title-card').click();
-  assert.equal(await owner.locator('.title-part').count(),2,'Seasons appear inside the title');
-  assert.equal(await owner.locator('.title-part').filter({hasText:'Сезон 1'}).locator('.media-card').count(),2);
-  await owner.locator('.title-part').filter({hasText:'Сезон 1'}).locator('.media-card').first().click();
+  await owner.locator('#titleLookup').fill('Наруто');
+  await owner.getByRole('button',{name:'Найти',exact:true}).click();
+  await owner.getByText('Из твоего Drive',{exact:true}).waitFor();
+  await owner.getByText(titleFixture.description,{exact:true}).waitFor();
+  assert.equal(await owner.locator('.title-hero').getByRole('heading',{name:'Наруто',exact:true}).count(),1);
+  assert.ok(await owner.locator('.title-hero-facts').innerText().then(t=>t.includes('Хаято Датэ')&&t.includes('Манга')));
+  await owner.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
+  await owner.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
+  await owner.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
+  await owner.getByRole('button',{name:'Оценка 8',exact:true}).click();
+  await owner.getByText('8 из 10',{exact:true}).waitFor();
+  const snapshotProfile=(await decryptCatalog(files.get(catalogId))).titleProfiles;
+  assert.ok(Object.values(snapshotProfile).some(value=>value.userRatings?.[OWNER]===8&&value.characters[0].description.includes('Хокагэ')),'Russian character details and own rating are stored in the encrypted catalog');
+  assert.equal(await owner.getByRole('combobox',{name:'Сезон или том'}).locator('option').count(),2,'Seasons appear inside the title');
+  assert.equal(await owner.locator('.title-episode-card').count(),2);
+  await owner.locator('.title-episode-card').first().click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   const cinema=owner.locator('.mv-player');
   assert.equal(await cinema.count(),1,'Anime opens the advanced player');
   assert.equal(await owner.locator('#viewerContent').evaluate(el=>el.scrollTop),0,'Centering the active episode never scrolls the video out of view');
   assert.equal(await cinema.locator('.mv-player-play').count(),1,'One playback action');
+  const pictureBefore=await cinema.locator('.mv-player-screen').boundingBox();
+  await cinema.getByRole('button',{name:'Воспроизвести',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelector('video').paused===false);
+  const picturePlaying=await cinema.locator('.mv-player-screen').boundingBox();
+  assert.equal(picturePlaying.height,pictureBefore.height,'Pause/play never resizes the picture');
+  await cinema.getByRole('button',{name:'Пауза',exact:true}).click();
+  await cinema.focus();await owner.keyboard.press('k');await owner.waitForFunction(()=>document.querySelector('video').paused===false);await owner.keyboard.press('k');await owner.waitForFunction(()=>document.querySelector('video').paused===true);
+  await cinema.getByRole('button',{name:'Настройки плеера',exact:true}).click();
+  await cinema.getByRole('tab',{name:'Изображение',exact:true}).click();
+  await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('anime4k');
+  await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width>0&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
+  assert.equal(await cinema.locator('canvas').evaluate(c=>c.width),64,'Anime4K WebGL shaders upscale the 32px decoded fixture to 64px');
+  await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('off');
+  await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
+
   assert.equal(await cinema.getByRole('button',{name:'Настройки плеера'}).count(),1,'One settings entry');
   assert.equal(await cinema.locator('.mv-player-library,.mv-player-tabs,.mv-player-start').count(),0,'No duplicate navigation or playback buttons');
+  await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
+  await cinema.locator('.mv-player-touch-surface').evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
   const touchSession=await ownerContext.newCDPSession(owner);
   await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
   const swipe=async(zone,dx,dy)=>{
@@ -446,6 +552,7 @@ async function main() {
   await owner.evaluate(()=>document.exitFullscreen());
   await owner.setViewportSize({width:390,height:860});
   await cinema.getByRole('button',{name:'Настройки плеера'}).click();
+  await cinema.getByRole('tab',{name:'Субтитры',exact:true}).click();
   assert.equal(await cinema.getByRole('combobox',{name:'Субтитры'}).count(),1);
   await cinema.locator('input[type=file]').setInputFiles({
     name:'example.srt',mimeType:'text/plain',
@@ -468,7 +575,7 @@ async function main() {
   await owner.locator('#filesInput').setInputFiles([{name:'Том-01.txt',mimeType:'text/plain',buffer:Buffer.from('Light novel volume text')}]);
   await owner.waitForFunction(()=>document.querySelector('#count').textContent==='10 файлов');
   await owner.locator('.title-card').click();
-  await owner.locator('.title-part .media-card').click();
+  await owner.locator('.title-episode-card').click();
   await owner.locator('#viewerContent pre').waitFor();
   assert.equal(await owner.locator('#viewerContent pre').innerText(),'Light novel volume text','A light novel keeps the working book reader');
   await owner.locator('#closeViewer').click();
@@ -483,6 +590,43 @@ async function main() {
   const ranobeTitle=organized.storage.collections.find(group=>group.name==='Наруто'&&group.section==='ranobe');
   assert.equal(animeTitle.parts.length,2);assert.notEqual(animeTitle.folderId,mangaTitle.folderId);assert.notEqual(mangaTitle.folderId,ranobeTitle.folderId);
   assert.deepEqual(files.get(animeTitle.folderId).parents,[organized.storage.sectionFolders.anime]);
+  // A new device reads cached artwork and Russian metadata only from Drive.
+  const cachedContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'allow'});
+  cachedContext.setDefaultTimeout(20000);await installProvider(cachedContext,OWNER);
+  const cachedPage=await cachedContext.newPage(),externalArt=[];
+  cachedContext.on('request',request=>{if(new URL(request.url()).hostname==='art.example.test')externalArt.push(request.url());});
+  const metadataBeforeCache=russianMetadataRequests.length;
+  await cachedPage.goto(base+'?library='+catalogId+'#'+new URLSearchParams({title:'anime:'+animeTitle.id}));await signIn(cachedPage);await cachedPage.locator('#passphrase').fill(PHRASE);await cachedPage.locator('#unlockBtn').click();
+  await cachedPage.locator('.title-hero').waitFor();assert.equal(new URLSearchParams(new URL(cachedPage.url()).hash.slice(1)).get('title'),'anime:'+animeTitle.id,'A title deep link survives Google sign-in and unlocking');
+  await cachedPage.getByText(titleFixture.description,{exact:true}).waitFor();
+  await cachedPage.waitForFunction(()=>document.querySelector('.title-poster img')?.naturalWidth===1);
+  await cachedPage.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
+  await cachedPage.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
+  await cachedPage.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
+  assert.equal(russianMetadataRequests.length,metadataBeforeCache,'Cached title pages make no external metadata requests');assert.deepEqual(externalArt,[],'Cached art decrypts from Drive without returning to the image source');
+  const sceneErrors=[];cachedPage.on('pageerror',error=>sceneErrors.push(error.message));
+  await cachedPage.setViewportSize({width:1280,height:900});await cachedPage.mouse.move(20,200);
+  await cachedPage.waitForFunction(()=>parseFloat(document.querySelector('.title-scene')?.style.getPropertyValue('--scene-x')) < -1);
+  await cachedPage.evaluate(()=>window.scrollTo({top:400,behavior:'instant'}));
+  await cachedPage.waitForFunction(()=>parseFloat(document.querySelector('.title-scene')?.style.getPropertyValue('--scene-y')) < -1);
+  assert.deepEqual(sceneErrors,[],'Pointer and scroll parallax run without animation errors');
+  for(const width of [320,390,768,1280,1600]){
+    await cachedPage.setViewportSize({width,height:900});assert.ok(await cachedPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Title dossier fits '+width);
+    await cachedPage.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+    await cachedPage.screenshot({path:path.join(PROJECT,'test-output','title-page-'+width+'.png'),fullPage:false});
+  }
+  await cachedPage.locator('#backToTitles').click();
+  for(const [name,selector] of [['Маленькие плитки','.library-layout-compact'],['Список','.library-layout-list'],['Таблица','.library-table'],['Плитки','.library-layout-grid']]){await cachedPage.getByRole('button',{name,exact:true}).click();await cachedPage.locator(selector).waitFor();}
+  await cachedPage.getByRole('button',{name:'Раздел Аниме',exact:true}).click();await cachedPage.locator('.title-card').click();await cachedPage.locator('.title-related button').click();await cachedPage.locator('.title-hero').waitFor();
+  await cachedPage.getByRole('button',{name:'Добавить в коллекцию',exact:true}).click();await cachedPage.locator('#catalogSearch').waitFor();
+  assert.equal(await cachedPage.locator('#catalogSearch').inputValue(),'Наруто');assert.equal(await cachedPage.locator('.catalog-kind-row .chip-active').innerText(),'Манга','Related manga opens the manga import catalogue');
+  const sharedItem=organized.items.find(item=>item.collectionId===animeTitle.id&&item.category==='video');
+  const sharedPage=await cachedContext.newPage();
+  await sharedPage.goto(base+'?library='+catalogId+'#'+new URLSearchParams({episode:sharedItem.id,t:'1'}));await signIn(sharedPage);await sharedPage.locator('#passphrase').fill(PHRASE);await sharedPage.locator('#unlockBtn').click();
+  try{await sharedPage.waitForFunction(()=>document.querySelector('.mv-player video')?.readyState>=2&&document.querySelector('.mv-player video').currentTime>=.9);}
+  catch(error){console.error('Shared episode state:',await sharedPage.evaluate(()=>{const v=document.querySelector('.mv-player video');return {hash:location.hash,hasPlayer:!!v,ready:v?.readyState,duration:v?.duration,time:v?.currentTime,error:document.querySelector('.mv-viewer-error')?.textContent};}));throw error;}
+  assert.equal(await sharedPage.locator('.mv-viewer-inline').count(),1,'A shared episode opens inline at the shared time after unlocking');
+  await cachedContext.close();
   console.log('PASS: React production build; mocked Google login; encrypted catalog/TXT/PNG/MP4 upload; server job without video transfer or credential export; catalog refresh; mobile viewer/abort/Escape; MP4 stream/fallback/seek; search/category/name sort/favorites/history; phrase unlock; token reconnect; stopped worker recovery; reader scopes and UI without writes.');
   console.log('Screenshot: '+path.join(temp,'mobile-owner.png'));
   console.log('Live Google OAuth, real Drive ACL and physical Android/iOS playback remain outside this test.');

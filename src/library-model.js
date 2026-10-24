@@ -1,5 +1,6 @@
 // Reading format (category) and library section are separate: an EPUB may be
 // either a book or a light novel, and a title can also contain its cover image.
+import {importedProfile} from './title-metadata.js';
 export const SECTION_LABELS={anime:'Аниме',manga:'Манга',ranobe:'Ранобэ',book:'Книги',music:'Музыка',video:'Видео',image:'Фото'};
 export const SECTION_FORMAT={anime:'video',manga:'manga',ranobe:'book',book:'book',music:'audio',video:'video',image:'image'};
 const DEFAULT_SECTION={video:'video',audio:'music',manga:'manga',book:'book',image:'image'};
@@ -33,7 +34,8 @@ export function buildTitles(catalog,items=catalog?.items||[]){
   for(const item of items){
     const group=collections.get(item.collectionId),section=sectionForItem(item);
     const id=group?.id||'file-'+item.id,key=section+':'+id;
-    if(!result.has(key))result.set(key,{id:key,name:group?.name||item.name.replace(/\.[^.]+$/,''),
+    if(!result.has(key))result.set(key,{id:key,name:group?.name||item.name.replace(/\.[^.]+$/,''),collectionId:group?.id,
+      folderId:group?.folderId,metadataId:group?.metadataId||group?.metadata?.ids?.mal||item.metadataId,metadata:group?.metadata||null,profile:catalog?.titleProfiles?.[key]||importedProfile(group?.metadata),
       section,category:SECTION_FORMAT[section],items:[],parts:group?.parts||[],size:0,addedAt:item.addedAt});
     const title=result.get(key);title.items.push(item);title.size+=item.size||0;
     if(new Date(item.addedAt)>new Date(title.addedAt))title.addedAt=item.addedAt;

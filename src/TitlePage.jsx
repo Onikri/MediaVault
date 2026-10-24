@@ -1,0 +1,109 @@
+import {useEffect,useRef,useState} from 'react';
+import {useReducedMotion} from 'motion/react';
+import * as Dialog from '@radix-ui/react-dialog';
+import {ArrowLeft,Play,Star,ChevronRight,RefreshCw,Cloud,CloudUpload,Users,X,ExternalLink,Film} from 'lucide-react';
+import {loadTitleProfile,loadCharacter,searchRussianTitles,russianText,hasRussian} from './title-metadata.js';
+import {useArtwork,fetchArtwork} from './title-artwork.js';
+import {titleParts,SECTION_LABELS} from './library-model.js';
+import {episodeNumber,voiceLabel} from './player-model.js';
+import MediaViewer from './MediaViewer.jsx';
+import Artwork from './Artwork.jsx';
+import TitleBackdrop from './TitleBackdrop.jsx';
+
+const day=value=>{try{return value?new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(value)):'';}catch{return '';}};
+const equivalent=value=>String(value||'').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]/gu,'');
+export function TitleImage({url,profile,actions,libraryId,alt='',className='',fallback=true,...props}){
+  const source=useArtwork(url,profile,actions.readArtwork,libraryId);
+  const [broken,setBroken]=useState(false);useEffect(()=>setBroken(false),[source]);
+  return source&&!broken?<img src={source} className={className} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={()=>setBroken(true)} {...props}/>:fallback?<Artwork kind="video" className={className}/>:null;
+}
+export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,onImport,selected,onClosePlayer,onMetadataLoaded}){
+  const saved=state.catalog?.titleProfiles?.[title.id],hero=useRef(null),reduced=useReducedMotion();
+  const [profile,setProfile]=useState(saved||title.profile||null),[busy,setBusy]=useState(''),[error,setError]=useState(''),[candidates,setCandidates]=useState([]),[search,setSearch]=useState(title.name);
+  const [character,setCharacter]=useState(null),[characterBusy,setCharacterBusy]=useState(false),[characterError,setCharacterError]=useState('');
+  const [palette,setPalette]=useState(null),[playing,setPlaying]=useState(false);
+  const [part,setPart]=useState(''),[ratingBusy,setRatingBusy]=useState(false);
+  const abort=useRef(null),saveInProgress=useRef(false),live=useRef(state);live.current=state;
+  useEffect(()=>{if(saved)setProfile(saved);},[saved]);
+  useEffect(()=>{
+    const controller=new AbortController();abort.current=controller;
+    setProfile(saved||title.profile||null);setError('');setCandidates([]);setSearch(title.name);setPart('');setCharacter(null);
+    if(!saved?.sourceId){
+      const identity=title.metadataId||title.metadata?.ids?.mal;
+      if(identity)hydrate(identity,controller.signal);
+    }
+    return()=>controller.abort();
+  },[title.id]);
+  async function hydrate(id,signal=abort.current?.signal){
+    setBusy('loading');setError('');
+    try{
+      const result=await loadTitleProfile(id,title.section==='manga'?'manga':title.section==='ranobe'?'ranobe':'anime',{signal,server:window.MEDIA_VAULT_CONFIG?.importServerUrl,refresh:!!profile?.sourceId});
+      signal?.throwIfAborted();setProfile(result);onMetadataLoaded?.(title.id,result);
+      if(state.admin&&state.driveWritable)await save(result,signal);
+    }catch(cause){if(!signal?.aborted)setError(cause.message||'Не удалось получить русское описание.');}finally{if(!signal?.aborted)setBusy('');}
+  }
+  async function find(event){
+    event?.preventDefault();setBusy('search');setError('');
+    try{
+      const values=await searchRussianTitles(search,title.section, {signal:abort.current?.signal});setCandidates(values);
+      const match=values.filter(value=>[value.title,...value.aliases].some(alias=>equivalent(alias)===equivalent(search)));
+      if(match.length===1)await hydrate(match[0].sourceId);
+      else if(!values.length)setError('Тайтл пока не найден. Попробуй другое название.');
+    }catch(cause){if(!abort.current?.signal.aborted)setError(cause.message);}finally{if(!abort.current?.signal.aborted)setBusy('');}
+  }
+  async function save(value=profile,signal=abort.current?.signal){
+    if(!value||saveInProgress.current)return;saveInProgress.current=true;setBusy('saving');
+    try{
+      const {images,failed}=await fetchArtwork(value,{signal});signal?.throwIfAborted();
+      if(live.current.importActive)throw Error('Импорт ещё сохраняет серии. Оформление можно записать после его завершения.');
+      const result=await actions.saveTitleProfile(title.id,{...value,missingArtwork:failed},images);
+      if(result&&!signal?.aborted){setProfile(result);if(failed.length)setError('Описание сохранено. Часть изображений источник пока не отдал; их можно загрузить повторно.');}
+    }catch(cause){if(!signal?.aborted)setError(cause.message);}finally{saveInProgress.current=false;if(!signal?.aborted)setBusy('');}
+  }
+  async function showCharacter(value){
+    setCharacter(value);setCharacterError('');if(value.description)return;setCharacterBusy(true);
+    try{
+      const detail=await loadCharacter(value.id,{signal:abort.current?.signal});setCharacter({...value,...detail});
+      const updated={...profile,characters:profile.characters.map(c=>c.id===value.id?{...c,...detail}:c)};setProfile(updated);
+      if(state.admin&&state.driveWritable&&!saveInProgress.current)await actions.saveTitleProfile(title.id,updated);
+    }catch(cause){if(!abort.current?.signal.aborted)setCharacterError(cause.message);}finally{setCharacterBusy(false);}
+  }
+  async function rate(value){
+    setRatingBusy(true);setError('');
+    try{const result=await actions.saveTitleProfile(title.id,{...(profile||{}),userRatings:{...(profile?.userRatings||{}),[state.user.sub]:value}});if(result)setProfile(result);}
+    catch(cause){setError(cause.message);}finally{setRatingBusy(false);}
+  }
+  const p=profile||{},name=p.title&&p.title!=='Название уточняется'?p.title:title.name,parts=titleParts(title),currentPart=parts.find(value=>value.name===part)||parts[0];
+  const video=selected&&title.items.some(item=>item.id===selected.id)?selected:null;
+  const voices=[...new Set(title.items.filter(i=>i.category==='video').map(i=>voiceLabel(i)))];
+  const facts=[['Тип',p.format||SECTION_LABELS[title.section]||'Произведение'],['Тема',p.themes?.join(', ')],['Статус',p.status],['Выпуск',day(p.startDate)+(p.endDate?' — '+day(p.endDate):'')],['Первоисточник',p.origin],['Эпизоды',p.episodes?[p.episodesAired&&p.episodesAired!==p.episodes?p.episodesAired+' из':'',p.episodes].filter(Boolean).join(' '):null],['Длительность',p.duration?p.duration+' мин.':null],['Рейтинг',p.ratingCode],['Возраст',p.rating],['Озвучка',voices.join(', ')],['Режиссёры',p.directors?.join(', ')],['Студия',p.studios?.join(', ')]];
+  const ownRating=p.userRatings?.[state.user?.sub]||0;
+  const artProps={profile:p,actions,libraryId:state.libraryId};
+  return <article className="title-page" style={palette?{'--title-rgb':palette.base,'--accent':palette.accentCSS,'--title-accent':palette.accentCSS}:undefined}>
+    <TitleBackdrop profile={p} actions={actions} libraryId={state.libraryId} onPalette={setPalette} suspended={playing}/>
+    <button id="backToTitles" className="text-link title-page-back" onClick={onBack}><ArrowLeft size={16}/>Библиотека</button>
+    <section className="title-hero" ref={hero}>
+      <div className="title-hero-shade"/>
+      <div className="title-poster"><TitleImage url={p.cover} {...artProps} alt={'Обложка: '+name}/>{p.rating&&<span>{p.rating}</span>}</div>
+      <div className="title-hero-copy"><p className="eyebrow">{SECTION_LABELS[title.section]||p.format||'Произведение'}{p.year?' · '+p.year:''}{p.format?' · '+p.format:''}</p><h1>{name}</h1><div className="title-hero-status">{p.score&&<span className="title-score"><Star size={15} fill="currentColor"/>{p.score.toFixed(2)}<small>Шикимори</small></span>}{p.status&&<span>{p.status}</span>}<span>{title.items.length?title.items.length+' файлов в коллекции':'В мировом каталоге'}</span></div>
+        <div className="title-genre-list">{(p.genres||[]).map(genre=><span key={genre}>{genre}</span>)}</div>
+        <dl className="title-hero-facts">{facts.filter(([,value])=>value).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}{p.characters?.length>0&&<div><dt>Главные герои</dt><dd className="hero-character-links">{p.characters.filter(c=>/главн/i.test(c.role)).slice(0,5).map(c=><button key={c.id} onClick={()=>showCharacter(c)}>{c.name}</button>)}</dd></div>}</dl><div className="title-hero-actions">{title.items.length>0?<button className="btn btn-primary" onClick={()=>{onPlay(title.items.find(i=>i.category==='video')||title.items[0]);setTimeout(()=>document.getElementById('titlePlayback')?.scrollIntoView({behavior:reduced?'instant':'smooth',block:'center'}),60);}}><Play size={16} fill="currentColor"/>{video?'Продолжить просмотр':title.category==='video'?'Смотреть онлайн':title.category==='audio'?'Слушать':'Читать'}</button>:['game','book'].includes(title.section)?<a className="btn btn-primary" href={p.externalURL||p.sourceURL} target="_blank" rel="noopener noreferrer"><ExternalLink size={16}/>{title.section==='game'?'Открыть страницу игры':'Открыть источник'}</a>:<button className="btn btn-primary" onClick={()=>onImport?.(name,title.section)}><CloudUpload size={17}/>Добавить в коллекцию</button>}{p.savedAt&&<span className="title-saved"><Cloud size={14}/>Из твоего Drive</span>}</div>
+      </div>
+    </section>
+    <div className="title-page-columns"><div className="title-page-main">
+      <section className="title-description"><div className="section-heading"><h2>О произведении</h2>{busy&&<span className="fine" role="status">{busy==='saving'?'Сохраняем оформление в Drive…':busy==='search'?'Ищем тайтл…':'Загружаем сведения…'}</span>}</div><p>{russianText(p.description)||'Русское описание пока не загружено.'}</p>
+        {!p.sourceId&&<form className="title-match-form" onSubmit={find}><label htmlFor="titleLookup">Найти оформление и русское описание</label><div className="form-actions"><input id="titleLookup" className="field-input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Название аниме или манги"/><button className="btn btn-secondary btn-small" disabled={!!busy}>Найти</button></div>{candidates.length>1&&<div className="title-match-results">{candidates.map(value=><button key={value.sourceId} type="button" onClick={()=>hydrate(value.sourceId)}>{value.title}<small>{value.year||''} · {value.format}</small><ChevronRight size={16}/></button>)}</div>}</form>}
+        {error&&<p className="inline-error" role="alert">{error}</p>}{state.admin&&p.sourceId&&<div className="title-metadata-actions"><button className="text-link" disabled={!!busy} onClick={()=>save()}><CloudUpload size={14}/>{p.savedAt?p.missingArtwork?.length?'Дозагрузить изображения':'Обновить копию в Drive':'Сохранить оформление в Drive'}</button>{p.source!=='wikidata'&&<button className="text-link" disabled={!!busy} onClick={()=>hydrate(p.sourceId)}><RefreshCw size={13}/>Обновить сведения</button>}</div>}
+      </section>
+      {video&&<section id="titlePlayback" className="title-playback"><MediaViewer key={video.id} item={video} catalog={state.catalog} libraryId={state.libraryId} onSelectItem={onPlay} onClose={onClosePlayer} readWhole={actions.readWhole} prepareStream={actions.prepareStream} onError={actions.error} onPlaybackChange={setPlaying} renderEpisodeArtwork={(episode,index)=><TitleImage url={p.screenshots?.[index%(p.screenshots?.length||1)]||p.cover} {...artProps}/>} inline/></section>}
+      {!video&&title.items.length>0&&<section className="title-episodes"><div className="section-heading"><h2>{title.category==='video'?'Эпизоды':'Материалы'}</h2>{parts.length>1&&<select aria-label="Сезон или том" value={currentPart?.name||''} onChange={event=>setPart(event.target.value)}>{parts.map(value=><option key={value.name}>{value.name}</option>)}</select>}</div><div className="title-episode-grid">{currentPart?.items.map((item,index)=><button className="title-episode-card" key={item.id} onClick={()=>onPlay(item)}><span className="title-episode-art"><TitleImage url={p.screenshots?.[index%(p.screenshots?.length||1)]||p.cover} {...artProps}/><span><Play size={20} fill="currentColor"/></span><b>{String(item.episode||index+1).padStart(2,'0')}</b></span><strong>{item.category==='video'?'Серия '+(episodeNumber(item)||index+1):item.name}</strong><small>{voiceLabel(item)}</small></button>)}</div></section>}
+      {p.screenshots?.length>0&&<section className="title-stills"><div className="section-heading"><h2>Кадры из аниме</h2><Film size={17}/></div><div className="title-horizontal">{p.screenshots.map((url,index)=><TitleImage key={url} url={url} {...artProps} alt={'Кадр '+(index+1)}/>)}</div></section>}
+      <section className="title-characters"><div className="section-heading"><h2>Персонажи</h2><Users size={17}/></div>{p.characters?.length?<div className="title-character-grid">{p.characters.map(value=><button key={value.id} onClick={()=>showCharacter(value)}><TitleImage url={value.image} {...artProps} alt=""/><span><strong>{value.name}</strong><small>{value.role}</small></span></button>)}</div>:<p className="title-empty-note">{p.sourceId?'Каталог пока не предоставил персонажей.':'Персонажи появятся вместе со сведениями о тайтле.'}</p>}</section>
+      {p.related?.length>0&&<section className="title-related"><div className="section-heading"><h2>В этой вселенной</h2><span className="fine">Сезоны · Фильмы · Манга · Книги · Игры</span></div><div className="title-horizontal">{p.related.map(value=><button key={value.kind+value.id} onClick={()=>onRelated({...value,artwork:p.artwork,savedAt:p.savedAt})}><span className="related-poster"><TitleImage url={value.cover} {...artProps} alt={value.title}/><small>{value.format}</small></span><strong>{value.title}</strong><small>{value.relation}</small></button>)}</div></section>}
+      <section className="title-discussion"><div><h2>Обсуждение и обзоры</h2><p>Отзывы читателей и зрителей — на странице произведения.</p></div>{p.sourceURL&&<a className="text-link" href={p.sourceURL} target="_blank" rel="noopener noreferrer">{p.source==='wikidata'?'Открыть источник':'Читать на Шикимори'}<ExternalLink size={14}/></a>}</section>
+    </div><aside className="title-facts"><h2>В твоей коллекции</h2><dl><div><dt>Сохранено</dt><dd>{title.items.length} файлов</dd></div>{voices.length>0&&<div><dt>Озвучки</dt><dd>{voices.join(', ')}</dd></div>}</dl>{p.themes?.length>0&&<><h3>Темы</h3><div className="title-genre-list">{p.themes.map(value=><span key={value}>{value}</span>)}</div></>}
+      {state.admin&&<div className="title-rating"><h3>Твоя оценка</h3><p>{ownRating?ownRating+' из 10':'Как тебе эта история?'}</p><div role="group" aria-label="Оценить произведение">{Array.from({length:10},(_,index)=><button key={index} aria-label={'Оценка '+(index+1)} aria-pressed={ownRating===index+1} disabled={ratingBusy||!!state.busy||state.importActive} onClick={()=>rate(index+1)}>{index+1}</button>)}</div><small>Сохраняется в зашифрованном каталоге.</small></div>}
+    </aside></div>
+    <Dialog.Root open={!!character} onOpenChange={open=>{if(!open)setCharacter(null);}}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="server-dialog character-dialog"><Dialog.Close className="icon-button dialog-close" aria-label="Закрыть персонажа"><X size={18}/></Dialog.Close><Dialog.Title>{character?.name}</Dialog.Title><Dialog.Description className="sr-only">Описание персонажа на русском языке</Dialog.Description>{character&&<><TitleImage url={character.image} {...artProps} alt={character.name}/>{character.actors?.length>0&&<p className="character-actors">Сэйю: {character.actors.join(', ')}</p>}<p>{characterBusy?'Загружаем описание…':character.description||'Русское описание пока отсутствует в источнике.'}</p>{characterError&&<p className="inline-error" role="alert">{characterError}</p>}</>}</Dialog.Content></Dialog.Portal></Dialog.Root>
+  </article>;
+}

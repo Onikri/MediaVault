@@ -154,3 +154,13 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 - Size: 35,054 bytes. Git blob SHA-1 verification: 0ce756653b71056586ab508710135f4a3c967214. Invalid weights are rejected. This model is not a postprocessing shader. The source video is not sent to a remote inference server.
 - ONNX Runtime Web is copyright Microsoft Corporation and licensed under MIT: https://github.com/microsoft/onnxruntime/blob/main/LICENSE.
 - Neither the pretrained model nor the ONNX Runtime Web package is committed as part of this source tree; they load on demand from the listed public sources. The model and JS/WASM binaries are third-party network dependencies and won't be available offline unless previously cached by the browser.
+
+
+## Anime4K / Anime4K.js
+
+- Algorithms: [bloc97/Anime4K](https://github.com/bloc97/Anime4K), MIT.
+- Browser WebGL port: [monyone/Anime4K.js](https://github.com/monyone/Anime4K.js), `anime4k.js` 1.1.3, MIT, Copyright (c) 2023 もにょ～ん. Full license is included in the npm distribution. The app bundles the selected shader profiles and lazily loads them from its own Pages origin.
+- Russian catalogue, character and relationship metadata: [Shikimori public API](https://shikimori.one/api/doc). Source attribution stays with the cached title profile; no Shikimori account token or paid API key is used.
+
+- High-resolution catalogue banners: [AniList GraphQL Media](https://docs.anilist.co/reference/object/media), matched by MAL ID. Russian descriptions continue to come from Shikimori.
+- Confirmed cross-media relationships: [Wikidata/Wikibase API](https://www.mediawiki.org/wiki/Wikibase/API), linked through the title's Wikipedia page; Wikidata structured data is CC0. Images from Commons retain their source URLs; see each file page for its individual license.

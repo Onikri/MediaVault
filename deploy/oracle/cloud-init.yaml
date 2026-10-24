@@ -1,0 +1,15 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - docker.io
+  - docker-compose-v2
+runcmd:
+  - [systemctl, enable, --now, docker]
+  - [bash, -lc, "git clone --depth 1 https://github.com/Onikri/MediaVault.git /opt/mediavault"]
+  - [bash, -lc, "install -d -o 1000 -g 1000 -m 700 /opt/mediavault/deploy/oracle/data /opt/mediavault/deploy/oracle/data/temporary"]
+  - [bash, -lc, "install -m 600 /opt/mediavault/deploy/oracle/.env.example /opt/mediavault/deploy/oracle/.env"]
+# Deployment starts only after the private OAuth secret and HTTPS host are set.
+# No paid-plan changes, artificial load, service-account keys or Google tokens.

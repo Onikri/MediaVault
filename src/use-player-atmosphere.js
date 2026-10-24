@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 // Read only decoded frames already held by the player. No extra media requests.
 export default function usePlayerAtmosphere(videoRef,source,playing,rootRef){
   const [scene,setScene]=useState({image:'',color:'218 139 91'});
-  const raf=useRef(0),target=useRef([0,0]);
+  const raf=useRef(0),target=useRef([0,0]),isPlaying=useRef(playing);isPlaying.current=playing;
   useEffect(()=>{
     const video=videoRef.current;if(!video||!source)return;
     let cancelled=false,timer,frame;
@@ -22,7 +22,7 @@ export default function usePlayerAtmosphere(videoRef,source,playing,rootRef){
         // Black opening frames keep the last usable preview instead of replacing it.
         if(weight>30){
           const color=[r,g,b].map(v=>Math.round(Math.min(235,Math.max(65,v/weight*1.25)))).join(' ');
-          setScene({image:canvas.toDataURL('image/jpeg',.85),color});
+          setScene(previous=>({image:video.paused?canvas.toDataURL('image/jpeg',.82):previous.image,color}));
         }
       }catch{} // Tainted cross-origin video keeps native playback and the default palette.
     };
@@ -36,14 +36,13 @@ export default function usePlayerAtmosphere(videoRef,source,playing,rootRef){
     return()=>{cancelled=true;clearTimeout(timer);if(frame)video.cancelVideoFrameCallback?.(frame);video.removeEventListener('loadeddata',deferred);video.removeEventListener('pause',deferred);video.removeEventListener('seeked',deferred);};
   },[source,videoRef]);
   useEffect(()=>{
-    if(playing)return;
     const root=rootRef.current;if(!root||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
     let x=0,y=0;
-    const move=event=>{if(event.pointerType==='touch')return;const box=root.getBoundingClientRect();target.current=[(event.clientX-box.left)/box.width*2-1,(event.clientY-box.top)/box.height*2-1];};
+    const move=event=>{if(event.pointerType==='touch')return;const box=root.getBoundingClientRect();if(!isPlaying.current)target.current=[(event.clientX-box.left)/box.width*2-1,(event.clientY-box.top)/box.height*2-1];};
     const reset=()=>{target.current=[0,0];};
-    const animate=()=>{x+=(target.current[0]-x)*.045;y+=(target.current[1]-y)*.045;root.style.setProperty('--pan-x',x*14+'px');root.style.setProperty('--pan-y',y*9+'px');raf.current=requestAnimationFrame(animate);};
+    const animate=()=>{if(isPlaying.current)target.current=[0,0];x+=(target.current[0]-x)*.065;y+=(target.current[1]-y)*.065;root.style.setProperty('--pan-x',x*8+'px');root.style.setProperty('--pan-y',y*5+'px');raf.current=requestAnimationFrame(animate);};
     root.addEventListener('pointermove',move);root.addEventListener('pointerleave',reset);raf.current=requestAnimationFrame(animate);
     return()=>{cancelAnimationFrame(raf.current);root.removeEventListener('pointermove',move);root.removeEventListener('pointerleave',reset);root.style.setProperty('--pan-x','0px');root.style.setProperty('--pan-y','0px');};
-  },[playing,rootRef]);
+  },[rootRef]);
   return scene;
 }

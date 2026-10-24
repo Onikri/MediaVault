@@ -1,5 +1,5 @@
-import {CHUNK_SIZE,sealChunk,sealIndex,guessCategory,mimeFor} from "../crypto.js";
-import {createFolder,uploadSmall,replaceSmall} from "../drive.js";
+import {CHUNK_SIZE,sealChunk,sealIndex,openIndex,guessCategory,mimeFor} from "../crypto.js";
+import {createFolder,uploadSmall,replaceSmall,readEnvelope,readEnvelopeSnapshot} from "../drive.js";
 import {SECTION_LABELS,SECTION_FORMAT,sectionForCollection,uploadPlacement,sameName} from './library-model.js';
 
 const categories=["video","audio","manga","book","image"];
@@ -135,11 +135,11 @@ export function createUploadService({getSession,onCatalog,onProgress=()=>{},onAu
     const folder=await createFolder(token(context,signal),"asset-"+itemId,parent,{signal});
     return {itemId,folderId:folder.id,collection,part};
   }
-  async function commit(catalog,context,signal){
+  async function commit(catalog,context,signal,etag){
     assert(context,signal);
     const sealed=await sealIndex(catalog,context.key,context.salt);
     await replaceSmall(token(context,signal),context.libraryId,
-      new Blob([JSON.stringify(sealed)],{type:"application/octet-stream"}),{signal});
+      new Blob([JSON.stringify(sealed)],{type:"application/octet-stream"}),{signal,etag});
     assert(context,signal);
     await onCatalog(catalog);
   }
@@ -245,11 +245,42 @@ export function createUploadService({getSession,onCatalog,onProgress=()=>{},onAu
       return next;
     });
   }
+  async function saveTitleProfile(titleId,profile,images=[]){
+    const context=capture();
+    return enqueue(context,async()=>{
+      // Refresh inside the same mutation queue; background server imports may
+      // have added episodes since the title page was opened.
+      const latest=await openIndex(await readEnvelope(token(context),context.libraryId),context.key);
+      assert(context);
+      const groupId=String(titleId).split(':').slice(1).join(':');
+      const group=latest.storage?.collections?.find(value=>value.id===groupId);
+      const previous=latest.titleProfiles?.[titleId]||{};
+      const artwork={...(previous.artwork||{}),...(profile.artwork||{})};
+      let folderId=previous.artworkFolderId;
+      if(images.length&&!folderId){folderId=(await createFolder(token(context),'art-'+crypto.randomUUID(),group?.folderId||latest.folderId)).id;}
+      for(const {url,blob} of images){
+        assert(context);if(artwork[url]||!blob?.size||blob.size>2*1024*1024)continue;
+        const id=crypto.randomUUID(),sealed=await sealChunk(await blob.arrayBuffer(),context.key,id,0);
+        const file=await uploadSmall(token(context),'art-'+id+'.enc',new Blob([sealed.ciphertext]),folderId);
+        artwork[url]={id,fileId:file.id,iv:sealed.iv,mime:blob.type,size:blob.size};
+      }
+      // Merge a second fresh catalog after image transfers, keeping new episodes.
+      for(let attempt=0;attempt<3;attempt++){
+        const snapshot=await readEnvelopeSnapshot(token(context),context.libraryId);
+        const current=await openIndex(snapshot.envelope,context.key),recent=current.titleProfiles?.[titleId]||{};
+        assert(context);
+        const stored={...recent,...previous,...profile,userRatings:{...(recent.userRatings||{}),...(previous.userRatings||{}),...(profile.userRatings||{})},artwork:{...(recent.artwork||{}),...artwork},artworkFolderId:folderId||'',savedAt:new Date().toISOString()};
+        current.titleProfiles={...(current.titleProfiles||{}),[titleId]:stored};
+        try{await commit(current,context,undefined,snapshot.etag);return stored;}
+        catch(error){if(error.status!==412||attempt===2)throw error;}
+      }
+    });
+  }
   function cancel(){for(const controller of active)controller.abort();}
   function getState(){
     const current=getSession();
     return {signedIn:!!current.user,admin:!!current.admin,driveConnected:!!current.token,
       unlocked:!!current.catalog,libraryId:current.libraryId||"",uploading:active.size>0};
   }
-  return Object.freeze({uploadFiles,importStream,importVideo,mutateCatalog,cancel,getState});
+  return Object.freeze({uploadFiles,importStream,importVideo,mutateCatalog,saveTitleProfile,cancel,getState});
 }

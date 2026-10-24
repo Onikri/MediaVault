@@ -32,12 +32,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: server/requirements.txt
+          cache-dependency-path: server/requirements-service.txt
 
       - name: Install dependencies
         run: |
           npm ci --no-audit --no-fund
-          python -m pip install -r server/requirements.txt
+          python -m pip install -r server/requirements-service.txt
+          python -m pip install httpx==0.28.1
 
       - name: Build and validate encrypted media
         run: |

@@ -4,3 +4,10 @@ dist/
 __pycache__/
 *.pyc
 test-output/
+.env
+.env.*
+!.env.example
+.terraform/
+*.tfstate
+*.tfstate.*
+deploy/oracle/data/
