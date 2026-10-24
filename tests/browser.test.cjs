@@ -208,6 +208,11 @@ async function main() {
   await owner.locator('.media-card').filter({hasText:'private-video.mp4'}).click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   assert.equal(await owner.locator('video').evaluate(video=>Math.round(video.duration)),2,'Service Worker streams playable MP4');
+  await owner.locator('.mv-player-controls button[aria-label="Воспроизвести"]').click();
+  await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.paused===false);
+  assert.equal(await owner.locator('video').evaluate(video=>video.paused),false,
+    'Video starts after pressing custom player Play button');
+  await owner.locator('.mv-player-controls button[aria-label="Пауза"]').click();
   await owner.getByRole('button',{name:'Загрузить файл целиком (резервный режим)'}).click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   assert.equal(await owner.locator('video').evaluate(video=>Math.round(video.duration)),2);
