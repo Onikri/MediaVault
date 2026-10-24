@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import VideoPlayer from './VideoPlayer.jsx';
 
 const names={video:'Видео',audio:'Музыка',image:'Изображение',manga:'Манга',book:'Книга'};
 async function libraryReady(name,signal){
@@ -10,7 +11,7 @@ async function libraryReady(name,signal){
   throw Error('Не удалось загрузить обработчик книги или архива. Проверь подключение к сети.');
 }
 
-export default function MediaViewer({item,onClose,readWhole,prepareStream,onError}) {
+export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose,readWhole,prepareStream,onError}) {
   const [source,setSource]=useState('');
   const [text,setText]=useState('');
   const [busy,setBusy]=useState(true);
@@ -61,7 +62,7 @@ export default function MediaViewer({item,onClose,readWhole,prepareStream,onErro
     (async()=>{
       if(isMedia){
         const stream=await methods.current.prepareStream(item);
-        if(active()){setSource(stream||'');setBusy(false);}
+        if(active()){setSource(stream||'');setBusy(false);if(!stream)setError('Потоковый просмотр недоступен: браузер не активировал Service Worker или отсутствует сеанс Drive. Переподключи Google Drive, обнови страницу либо используй резервную загрузку.');}
         return;
       }
       // The signal also lets a reader that supports cancellation stop its download.
@@ -129,25 +130,17 @@ export default function MediaViewer({item,onClose,readWhole,prepareStream,onErro
       mediaUrl.current=next;setSource(next);setBusy(false);
     }catch(cause){if(current===generation.current)report(cause);}
   }
-  async function fullscreen(){
-    try{
-      const media=mediaRef.current;
-      if(media?.webkitEnterFullscreen)media.webkitEnterFullscreen();
-      else await (media?.requestFullscreen?media:panelRef.current)?.requestFullscreen?.();
-    }catch(cause){methods.current.onError?.(cause);}
-  }
 
   return <section id="viewer" ref={panelRef} className="mv-viewer" role="dialog" aria-modal="true" aria-label={item.name}>
     <header className="mv-viewer-head">
       <button id="closeViewer" className="mv-icon-button" aria-label="Закрыть просмотр" onClick={onClose}>←</button>
       <div className="mv-viewer-title"><small>{names[item.category]||'Файл'}</small><strong>{item.name}</strong></div>
-      {item.category==='video'&&<button className="mv-icon-button" aria-label="На весь экран" onClick={fullscreen}>⛶</button>}
     </header>
-    <div id="viewerContent" className={'mv-viewer-body'+(item.category==='manga'?' mv-viewer-manga':'')}>
+    <div id="viewerContent" className={'mv-viewer-body'+(item.category==='manga'?' mv-viewer-manga':item.category==='video'?' mv-viewer-video':'')}>
       {busy&&<div className="mv-viewer-loading" role="status">Расшифровка на устройстве…</div>}
       {error&&<div className="mv-viewer-error" role="alert">{error}</div>}
       {isMedia&&(item.category==='video'
-        ?<video ref={mediaRef} src={source||undefined} controls playsInline preload="metadata" onError={()=>source&&report(Error('Браузер не смог воспроизвести файл. Попробуй загрузить его целиком.'))}/>
+        ?<VideoPlayer item={item} source={source} catalog={catalog} libraryId={libraryId} mediaRef={mediaRef} onSelectItem={onSelectItem} onError={report} busy={busy}/>
         :<audio ref={mediaRef} src={source||undefined} controls preload="metadata" onError={()=>source&&report(Error('Браузер не смог воспроизвести аудио. Попробуй загрузить файл целиком.'))}/>)}
       {isMedia&&!source&&!busy&&!error&&<p>Потоковое воспроизведение недоступно. Загрузи файл целиком.</p>}
       {(item.category==='image'||item.category==='manga')&&source&&<img src={source} alt={item.category==='manga'?'Страница '+(page+1):item.name}/>}

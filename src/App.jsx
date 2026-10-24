@@ -86,6 +86,14 @@ export default function App(){
   const busy=!!state.busy;
   useEffect(()=>{setLibraryId(state.libraryId);setFavorites(readLocal(localPrefix+'_saved',[]));setHistory(readLocal(localPrefix+'_history',[]));},[state.libraryId]);
   useEffect(()=>{if(!state.catalog)setSelected(null);},[state.catalog]);
+  useEffect(()=>{
+    if(!state.catalog)return;
+    const params=new URLSearchParams(location.hash.slice(1)),id=params.get('episode');
+    if(!id)return;
+    const item=state.catalog.items.find(entry=>entry.id===id&&entry.category==='video');
+    if(item){const point=Number(params.get('t'));if(Number.isFinite(point)&&point>=0)sessionStorage.setItem('mediavault_pending_time_'+item.id,String(point));setSelected(item);window.history.replaceState(null,'',location.pathname+location.search);}
+  },[state.catalog]);
+
   useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});},[view]);
   const go=useCallback(next=>{setView(next);},[]);
   const closeViewer=useCallback(()=>setSelected(null),[]);
@@ -157,7 +165,7 @@ export default function App(){
     </motion.main>
     <nav className="bottom-nav" aria-label="Мобильная навигация">{navigation.map(item=><button id={item.id==='profile'?'profileNav':item.id==='library'?'libraryNav':undefined} key={item.id} className={'bottom-nav-item'+(view===item.id?' is-active':'')} onClick={()=>go(item.id)}><span className="nav-icon"><Icon name={item.icon} size={22}/></span><span className="nav-label">{item.label}</span></button>)}</nav>
     {state.toast&&<div id="toast" className={'toast'+(state.toast.bad?' toast-bad':'')} role="status"><Icon name={state.toast.bad?'close':'check'} size={18}/><span>{state.toast.message}</span><button className="icon-button" aria-label="Закрыть уведомление" onClick={actions.clearToast}><Icon name="close" size={16}/></button></div>}
-    {selected&&state.catalog&&<MediaViewer key={selected.id} item={selected} onClose={closeViewer} readWhole={actions.readWhole} prepareStream={actions.prepareStream} onError={actions.error}/>}
+    {selected&&state.catalog&&<MediaViewer key={selected.id} item={selected} catalog={state.catalog} libraryId={state.libraryId} onSelectItem={open} onClose={closeViewer} readWhole={actions.readWhole} prepareStream={actions.prepareStream} onError={actions.error}/>}
   </div>;
 }
 

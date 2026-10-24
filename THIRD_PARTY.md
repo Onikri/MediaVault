@@ -145,3 +145,12 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ```
+
+
+## FSRCNN ×2 / ONNX Runtime Web (optional neural super-resolution)
+
+- Inference runtime: [Microsoft ONNX Runtime Web 1.30.0](https://github.com/microsoft/onnxruntime), MIT license, loaded on demand from jsDelivr.
+- Pretrained model: [televisualarts-cloud/wefax_decoder, fsrcnn_x2.onnx](https://github.com/televisualarts-cloud/wefax_decoder/blob/main/wefax/models/fsrcnn_x2.onnx), converted from [Saafke/FSRCNN_Tensorflow](https://github.com/Saafke/FSRCNN_Tensorflow), Apache-2.0 license as published by the model distributor ([full FSRCNN license](https://github.com/televisualarts-cloud/wefax_decoder/blob/main/wefax/models/FSRCNN_LICENSE.txt)).
+- Size: 35,054 bytes. Git blob SHA-1 verification: 0ce756653b71056586ab508710135f4a3c967214. Invalid weights are rejected. This model is not a postprocessing shader. The source video is not sent to a remote inference server.
+- ONNX Runtime Web is copyright Microsoft Corporation and licensed under MIT: https://github.com/microsoft/onnxruntime/blob/main/LICENSE.
+- Neither the pretrained model nor the ONNX Runtime Web package is committed as part of this source tree; they load on demand from the listed public sources. The model and JS/WASM binaries are third-party network dependencies and won't be available offline unless previously cached by the browser.

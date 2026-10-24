@@ -208,8 +208,18 @@ async function main() {
   await owner.locator('.media-card').filter({hasText:'private-video.mp4'}).click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   assert.equal(await owner.locator('video').evaluate(video=>Math.round(video.duration)),2,'Service Worker streams playable MP4');
+  await owner.locator('.mv-player-controls button[aria-label="Воспроизвести"]').click();
+  await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.paused===false);
+  assert.equal(await owner.locator('video').evaluate(video=>video.paused),false,
+    'Video starts after pressing custom player Play button');
+  await owner.locator('.mv-player-controls button[aria-label="Пауза"]').click();
+  await owner.waitForFunction(()=>document.querySelector('.mv-player-panorama img')?.src.startsWith('data:image/jpeg'));
+  assert.notEqual(await owner.locator('.mv-player').evaluate(el=>el.style.getPropertyValue('--scene-rgb')),'218 139 91','A decoded frame supplies the pause artwork and its palette');
   await owner.getByRole('button',{name:'Загрузить файл целиком (резервный режим)'}).click();
-  await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
+  await owner.waitForFunction(()=>{
+    const video=document.querySelector('#viewerContent video');
+    return video?.currentSrc.startsWith('blob:')&&video.readyState>=2&&Number.isFinite(video.duration);
+  });
   assert.equal(await owner.locator('video').evaluate(video=>Math.round(video.duration)),2);
   await owner.locator('video').evaluate(video=>video.currentTime=1);
   await owner.waitForFunction(()=>document.querySelector('video').currentTime>=1);
@@ -372,6 +382,81 @@ async function main() {
   assert.equal(await owner.locator('.title-part').filter({hasText:'Сезон 1'}).locator('.media-card').count(),2);
   await owner.locator('.title-part').filter({hasText:'Сезон 1'}).locator('.media-card').first().click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
+  const cinema=owner.locator('.mv-player');
+  assert.equal(await cinema.count(),1,'Anime opens the advanced player');
+  assert.equal(await owner.locator('#viewerContent').evaluate(el=>el.scrollTop),0,'Centering the active episode never scrolls the video out of view');
+  assert.equal(await cinema.locator('.mv-player-play').count(),1,'One playback action');
+  assert.equal(await cinema.getByRole('button',{name:'Настройки плеера'}).count(),1,'One settings entry');
+  assert.equal(await cinema.locator('.mv-player-library,.mv-player-tabs,.mv-player-start').count(),0,'No duplicate navigation or playback buttons');
+  const touchSession=await ownerContext.newCDPSession(owner);
+  await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+  const swipe=async(zone,dx,dy)=>{
+    const rect=await cinema.locator('.mv-player-touch-surface').boundingBox();
+    const x=rect.x+rect.width*zone,y=rect.y+Math.min(rect.height*.3,200);
+    await touchSession.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+    const original=await cinema.locator('video').evaluate(v=>v.currentTime);
+    for(let i=1;i<=6;i++){
+      await touchSession.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx*i/6,y:y+dy*i/6}]});
+      if(dx&&i===3){
+        assert.equal(await cinema.locator('.mv-player-seek-preview').count(),1,'Scrubbing previews its destination on the timeline');
+        assert.equal(await cinema.locator('video').evaluate(v=>v.currentTime),original,'Touch seek waits for release');
+      }
+    }
+    await touchSession.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  };
+  await swipe(.15,0,-90);
+  assert.ok(await cinema.evaluate(el=>Number(el.style.getPropertyValue('--video-brightness'))>1),'Left vertical touch changes player brightness');
+  await swipe(.85,0,90);
+  assert.ok(await cinema.locator('video').evaluate(v=>v.volume<1),'Right vertical touch changes volume');
+  assert.equal(await cinema.locator('video').evaluate(v=>v.paused),true,'Swipes never trigger tap playback');
+  await swipe(.15,65,0);
+  assert.ok(await cinema.locator('video').evaluate(v=>v.currentTime>0),'Horizontal touch commits the timeline preview');
+  await swipe(.5,0,-90);
+  await cinema.getByRole('button',{name:'Закрыть эпизоды'}).waitFor();
+  assert.equal(await cinema.locator('.mv-player-rail').evaluate(el=>getComputedStyle(el).display),'grid','Center swipe expands the existing episode rail');
+  await cinema.getByRole('button',{name:'Закрыть эпизоды'}).click();
+  await swipe(.5,0,90);
+  await cinema.getByRole('heading',{name:'Настройки',exact:true}).waitFor();
+  await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
+  await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
+  await cinema.locator('video').evaluate(v=>v.currentTime=0);
+  await swipe(.5,0,0);
+  await owner.waitForFunction(()=>document.querySelector('video').paused===false);
+  await swipe(.5,0,0);
+  await owner.waitForFunction(()=>document.querySelector('video').paused===true);
+  await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:false});
+
+  const output=path.join(PROJECT,'test-output');await fs.mkdir(output,{recursive:true});
+  for(const width of [320,390,768,1280]){
+    await owner.setViewportSize({width,height:900});
+    await cinema.screenshot({path:path.join(output,'player-'+width+'.png')});
+    assert.ok(await cinema.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Player fits '+width);
+    assert.equal(await cinema.locator('.mv-player-card').count(),2,'One episode rail');
+    assert.equal(await cinema.locator('.mv-player-card.is-current .mv-player-card-art').evaluate(el=>getComputedStyle(el).outlineStyle),'none','No decorative selection frame');
+    await cinema.getByRole('button',{name:'Настройки плеера'}).click();
+    await cinema.getByRole('heading',{name:'Настройки',exact:true}).waitFor();
+    await cinema.screenshot({path:path.join(output,'player-settings-'+width+'.png')});
+    assert.ok(await cinema.locator('.mv-player-drawer').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Settings fit '+width);
+    await owner.keyboard.press('Escape');
+    assert.equal(await owner.locator('#viewer').isVisible(),true,'Escape dismisses settings first');
+  }
+  await cinema.getByRole('button',{name:'На весь экран',exact:true}).click();
+  await owner.waitForFunction(()=>document.fullscreenElement?.classList.contains('mv-player'));
+  assert.equal(await cinema.locator('.mv-player-controls').isVisible(),true,'Fullscreen keeps custom playback controls');
+  await owner.evaluate(()=>document.exitFullscreen());
+  await owner.setViewportSize({width:390,height:860});
+  await cinema.getByRole('button',{name:'Настройки плеера'}).click();
+  assert.equal(await cinema.getByRole('combobox',{name:'Субтитры'}).count(),1);
+  await cinema.locator('input[type=file]').setInputFiles({
+    name:'example.srt',mimeType:'text/plain',
+    buffer:Buffer.from('1\n00:00:00,000 --> 00:00:01,500\nПривет\n')
+  });
+  await owner.waitForFunction(()=>document.querySelector('#viewerContent track')?.src?.startsWith('blob:'));
+  assert.equal(await cinema.locator('video track').count(),1,'SRT becomes a local VTT track');
+  await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
+  await cinema.getByRole('combobox',{name:'Сезон',exact:true}).selectOption({label:'Сезон 2'});
+  await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
+  assert.equal(await owner.locator('.mv-player-season-title select').inputValue()!=='',true);
   await owner.locator('#closeViewer').click();
   await owner.locator('#backToTitles').click();
   await owner.getByRole('button',{name:'Манга',exact:true}).click();
