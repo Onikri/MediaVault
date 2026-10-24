@@ -58,7 +58,7 @@ const entry=path.join(ROOT,'test-output','automatic-harness.html');
     await page.locator('#serverPhrase').fill('fixture library phrase');
     await page.getByRole('button',{name:'Подключить автоматический импорт'}).click();
     await page.getByText('Библиотека подключена.',{exact:false}).waitFor();
-    await page.locator('#animeSearch').fill('Наруто');
+    await page.locator('#animeSearch').fill(width===320?'Наруто':'Naruto');
     await page.getByRole('button',{name:'Выбрать Наруто'}).click();
     await page.getByText('История юного ниндзя.').waitFor();
     await page.getByRole('button',{name:'Naruto — сезон 1'}).click();
@@ -75,6 +75,9 @@ const entry=path.join(ROOT,'test-output','automatic-harness.html');
     jobs=[{id:'job-12345678',status:'completed',progress:{phase:'saved',completed:1,total:1},result:{saved:1,failed:0,skipped:0}}];
     await page.getByText('Готово',{exact:true}).waitFor({timeout:12000});
     assert.ok(await page.evaluate(()=>window.refreshes>=1));
+    const refreshes=await page.evaluate(()=>window.refreshes);
+    await page.waitForTimeout(5500); // A second completed-job poll must not refresh/toast again.
+    assert.equal(await page.evaluate(()=>window.refreshes),refreshes);
     assert.deepEqual(unexpected,[],'No source video or Google requests in import UI');
     assert.deepEqual(errors,[]);
     await context.close();

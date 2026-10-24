@@ -106,7 +106,7 @@ class Store:
 
     def jobs(self, library):
         with self.connect() as db:
-            rows = db.execute("SELECT id,status,progress,result,label,created,updated,cancel FROM jobs WHERE library=? ORDER BY created DESC LIMIT 50", (library,)).fetchall()
+            rows = db.execute("SELECT id,status,progress,result,label,created,updated,cancel FROM jobs WHERE library=? ORDER BY CASE WHEN status IN ('queued','running') THEN 0 ELSE 1 END, created DESC LIMIT 70", (library,)).fetchall()
         result = []
         for row in rows:
             item = dict(row)

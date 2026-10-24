@@ -35,7 +35,7 @@ export default function AutomaticImport({state,onConnect,onRefresh}){
         for(const job of next.jobs){
           const saved=Number(job.progress?.completed||0);
           const previous=lastSaved.current.get(job.id);
-          if(previous!==undefined&&saved>previous&&['saved','skipped'].includes(job.progress?.phase))changed=true;
+          if(previous!==undefined&&previous>=0&&saved>previous&&['saved','skipped'].includes(job.progress?.phase))changed=true;
           if(previous!==undefined&&['completed','partial'].includes(job.status)&&previous!==-1){changed=true;lastSaved.current.set(job.id,-1);}
           else if(previous!==-1)lastSaved.current.set(job.id,saved);
         }

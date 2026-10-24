@@ -151,6 +151,17 @@ class RuntimeTests(unittest.TestCase):
             process_one(self.store, vault_factory=lambda: VaultDrive(self.drive), runner=runner)
         self.assertEqual(self.store.jobs(self.library)[0]['status'], 'cancelled')
 
+    def test_active_jobs_remain_visible_when_history_fills(self):
+        active = self.store.enqueue(job(self.library), 'active-request-0001')
+        self.store.take()
+        for index in range(75):
+            identifier = self.store.enqueue(job(self.library), 'history-request-%04d' % index)
+            self.store.cancel(identifier)
+        visible = self.store.jobs(self.library)
+        self.assertEqual(visible[0]['id'], active)
+        self.assertEqual(visible[0]['title'], 'Anime test')
+        self.assertEqual(visible[0]['status'], 'running')
+
     def test_requests_reject_unexpected_credentials_private_sources_and_oversized_body(self):
         invalid = job(self.library)
         invalid['refresh_token'] = 'SECRET'
