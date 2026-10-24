@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {ArrowLeft,ArrowRight,Check,ChevronDown,Expand,FastForward,Pause,Play,Settings2,
+import {ArrowLeft,ArrowRight,Pause,Play,Settings2,
   SkipForward,Subtitles,Volume2,VolumeX,PictureInPicture2,Maximize2} from 'lucide-react';
 import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
 import {startGpuUpscaler} from './gpu-upscaler.js';
@@ -64,8 +64,9 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
   useEffect(()=>{
     const media=videoRef.current;if(!media)return;
     media.playbackRate=Number(prefs.speed)||1;
-    media.volume=Number(prefs.volume)||1;
+    media.volume=Math.max(0,Math.min(1,Number(prefs.volume)));
   },[prefs.speed,prefs.volume]);
+  useEffect(()=>{resumeApplied.current=false;},[source]);
   useEffect(()=>{setOpening(getOpening(item,libraryId));setOpeningDraft(null);resumeApplied.current=false;lastStored.current=-1;},[item.id,libraryId]);
   useEffect(()=>()=>{if(localTrack)URL.revokeObjectURL(localTrack);},[localTrack]);
   useEffect(()=>{
@@ -135,7 +136,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
   function loaded(){
     const video=videoRef.current;if(!video)return;
     setDuration(Number.isFinite(video.duration)?video.duration:0);
-    video.playbackRate=Number(prefs.speed)||1;video.volume=Number(prefs.volume)||1;
+    video.playbackRate=Number(prefs.speed)||1;video.volume=Math.max(0,Math.min(1,Number(prefs.volume)));
     if(!resumeApplied.current){
       resumeApplied.current=true;
       const point=readResume(keyFor(libraryId,item.id));
@@ -215,7 +216,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
         onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);writeResume(keyFor(libraryId,item.id),videoRef.current?.currentTime||0);}}
         onDurationChange={loaded} onEnded={ended}
         onError={()=>{if(source)onError?.(Error('Браузер не может декодировать видео. Попробуй резервную загрузку.'));}}
-        onClick={toggle} aria-label="Воспроизвести или приостановить видео"/>
+        onClick={toggle} aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}</video>
       <canvas ref={canvasRef} className={'mv-player-canvas'+(gpuActive?' is-visible':'')} aria-hidden="true"/>
       {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:prefs.subOffset+'%'}}
         aria-live="off">{subtitleText}</div>}
