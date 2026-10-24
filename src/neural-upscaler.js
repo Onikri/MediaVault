@@ -90,6 +90,18 @@ export async function startNeuralUpscaler(video,canvas,{mode='balanced',onFailur
   const session=await ort.InferenceSession.create(model,{
     executionProviders:['webgpu'],graphOptimizationLevel:'all'
   });
+  // Verify that the browser actually runs the pretrained model on its WebGPU
+  // device before the UI reports active AI upscaling.
+  try{
+    const testFeed=new ort.Tensor('float32',new Float32Array(32*32),[1,1,32,32]);
+    const testOutput=await session.run({[session.inputNames[0]]:testFeed});
+    const probe=testOutput[session.outputNames[0]];
+    if(!probe||probe.dims[2]!==64||probe.dims[3]!==64)
+      throw Error('FSRCNN self-test returned an invalid tensor.');
+  }catch(error){
+    await session.release();
+    throw Error('Проверка GPU-инференса FSRCNN не прошла: '+error.message);
+  }
   let stopped=false,busy=false,callbackId=0,videoCallback=false,last=0,slow=0;
   let total=0,lastStats=performance.now(),captured=0;
   const input=document.createElement('canvas'),base=document.createElement('canvas');
