@@ -1,7 +1,9 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Pause,Play,Settings2,SkipForward,Subtitles,Volume2,VolumeX,PictureInPicture2,Maximize2,ChevronLeft,ChevronRight,Sparkles,X} from 'lucide-react';
+import {Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown} from 'lucide-react';
 import './player.css';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
+import usePlayerGestures from './use-player-gestures.js';
+import usePlayerActions from './use-player-actions.js';
 import usePlayerAtmosphere from './use-player-atmosphere.js';
 import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
 import {startNeuralUpscaler} from './neural-upscaler.js';
@@ -36,6 +38,16 @@ const tracksOf=video=>Array.from(video?.textTracks||[]).map((track,index)=>({
   id:track.label==='Загруженные субтитры'?'local':'native:'+index,
   name:track.label||(track.language?track.language:'Дорожка '+(index+1))
 }));
+function VolumeGlyph({value,muted}){
+  const level=muted?0:value;
+  return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-volume-level={level}>
+    <path d="M10 5 5 9H2v6h3l5 4z"/>
+    <path className="volume-wave" style={{opacity:level>.01?1:0}} d="M13 10a3 3 0 0 1 0 4"/>
+    <path className="volume-wave" style={{opacity:level>.35?1:0}} d="M16 7a7 7 0 0 1 0 10"/>
+    <path className="volume-wave" style={{opacity:level>.7?1:0}} d="M19 4a11 11 0 0 1 0 16"/>
+    <path className="volume-wave" style={{opacity:level===0?1:0}} d="m14 10 6 6m0-6-6 6"/>
+  </svg>;
+}
 export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSelectItem,onError,busy}){
   const ownRef=useRef(null),canvasRef=useRef(null),stageRef=useRef(null),railRef=useRef(null);
   const videoRef=mediaRef||ownRef;
@@ -43,6 +55,9 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
   const [prefs,setPrefs]=useState(getPrefs);
   const [time,setTime]=useState(0),[duration,setDuration]=useState(0),[buffered,setBuffered]=useState(0);
   const [playing,setPlaying]=useState(false),[muted,setMuted]=useState(false);
+  const [isFullscreen,setIsFullscreen]=useState(false),[isPip,setIsPip]=useState(false);
+  useEffect(()=>{const v=videoRef.current;const enter=()=>setIsPip(true),leave=()=>setIsPip(false);v?.addEventListener('enterpictureinpicture',enter);v?.addEventListener('leavepictureinpicture',leave);return()=>{v?.removeEventListener('enterpictureinpicture',enter);v?.removeEventListener('leavepictureinpicture',leave);};},[]);
+  useEffect(()=>{const update=()=>setIsFullscreen(document.fullscreenElement===stageRef.current);document.addEventListener('fullscreenchange',update);return()=>document.removeEventListener('fullscreenchange',update);},[]);
   const [panel,setPanel]=useState('watch'),[localTrack,setLocalTrack]=useState('');
   const [controlsVisible,setControlsVisible]=useState(true);
   const hideTimer=useRef(null);
@@ -178,13 +193,14 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
     video.playbackRate=Number(prefs.speed)||1;video.volume=Math.max(0,Math.min(1,Number(prefs.volume)));
     if(!resumeApplied.current){
       resumeApplied.current=true;
-      const point=readResume(keyFor(libraryId,item.id));
-      if(point>0&&point<video.duration-12)seek(point);
+      const shared=sessionStorage.getItem('mediavault_pending_time_'+item.id);
+      if(shared!==null){sessionStorage.removeItem('mediavault_pending_time_'+item.id);const point=Number(shared);if(Number.isFinite(point))seek(point);}
+      else{const point=readResume(keyFor(libraryId,item.id));if(point>0&&point<video.duration-12)seek(point);}
     }
   }
   function choose(nextItem,keepTime=false){
     if(!nextItem||nextItem.id===item.id)return;
-    if(keepTime)writeResume(keyFor(libraryId,nextItem.id),videoRef.current?.currentTime||0);
+    if(keepTime){try{sessionStorage.setItem('mediavault_pending_time_'+nextItem.id,String(videoRef.current?.currentTime||0));}catch{}}
     onSelectItem?.(nextItem);
   }
   function nextEpisode(){choose(next);}
@@ -244,12 +260,17 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
     window.addEventListener('keydown',handler,true);
     return()=>window.removeEventListener('keydown',handler,true);
   });
+  const gestures=usePlayerGestures({videoRef,volume:muted?0:prefs.volume,setVolume:value=>{setMuted(false);changePrefs({volume:value});},openPanel,toggle,reveal:revealControls});
+  const actions=usePlayerActions({videoRef,canvasRef,item,gpuActive});
+  const previewTime=gestures.feedback?.type==='seek'?gestures.feedback.value:time;
+  const effectiveVolume=muted?0:Number(prefs.volume);
+  const pip=async()=>{try{const v=videoRef.current;if(document.pictureInPictureElement)await document.exitPictureInPicture();else if(v?.requestPictureInPicture)await v.requestPictureInPicture();else if(v?.webkitSetPresentationMode)v.webkitSetPresentationMode(v.webkitPresentationMode==='picture-in-picture'?'inline':'picture-in-picture');}catch{}};
   const seekable=duration>0&&Number.isFinite(duration);
   const canSkip=opening&&time>=opening.start&&time<opening.end;
   const hiddenControls=playing&&panel==='watch'&&!controlsVisible;
-  const progress=seekable?Math.min(100,time/duration*100):0;
-  return <div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')}
-    style={{'--scene-rgb':scene.color}} aria-label="Видеоплеер MediaVault" role="region" onPointerMove={revealControls}
+  const progress=seekable?Math.min(100,previewTime/duration*100):0;
+  return <div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(panel==='episodes'?' episodes-open':'')}
+    style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness}} aria-label="Видеоплеер MediaVault" role="region" onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls}>
     <div className="mv-player-screen">
       <div className="mv-player-ambient" aria-hidden="true"/>
@@ -260,10 +281,16 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
           onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);writeResume(keyFor(libraryId,item.id),videoRef.current?.currentTime||0);}}
           onDurationChange={loaded} onEnded={ended}
           onError={()=>{if(source)diagnoseVideoFailure({video:videoRef.current,source}).then(message=>onError?.(Error(message))).catch(()=>{});}}
-          onClick={()=>{revealControls();toggle();}} aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}</video>
+          aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}</video>
         <canvas ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
         {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:(hiddenControls?prefs.subOffset:Math.max(22,prefs.subOffset))+'%'}} aria-live="off">{subtitleText}</div>}
       </div>
+      {panel==='watch'&&<div className="mv-player-touch-surface" {...gestures.surface} aria-hidden="true"/>}
+      <AnimatePresence>{gestures.feedback&&gestures.feedback.type!=='seek'&&<motion.output className="mv-player-gesture-hud" style={{x:'-50%',y:'-50%'}} initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:.95}} aria-live="off">
+        {gestures.feedback.type==='seek'?<><strong>{clock(gestures.feedback.value)}</strong><small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></>:gestures.feedback.type==='brightness'?<><Sun size={25}/><strong>{Math.round(gestures.feedback.value*100)}%</strong></>:gestures.feedback.type==='volume'?<><VolumeGlyph value={effectiveVolume}/><strong>{Math.round(effectiveVolume*100)}%</strong></>:<>{gestures.feedback.type==='episodes'?<ChevronsUp size={26}/>:<ChevronsDown size={26}/>}<small>{gestures.feedback.type==='episodes'?'Эпизоды':'Настройки'}</small></>}
+      </motion.output>}</AnimatePresence>
+      {actions.notice&&<output className="mv-player-action-notice" role="status">{actions.notice}</output>}
+      {actions.recording&&<button className="mv-player-recording" onClick={actions.clip}><i/> {actions.clipSeconds} / 30 сек. · Остановить</button>}
       <div id="player-panel-watch" hidden={panel!=='watch'} className="mv-player-watch">
         <AnimatePresence>{!playing&&<motion.div className="mv-player-overview" initial={{opacity:0,y:24,filter:'blur(8px)'}} animate={{opacity:1,y:0,filter:'blur(0px)'}} exit={{opacity:0,y:-12,filter:'blur(5px)'}} transition={{duration:reducedMotion?0:.65,ease:[.22,1,.36,1]}}>
           <h1>{library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,'')}</h1>
@@ -271,9 +298,11 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
         </motion.div>}</AnimatePresence>
       </div>
       <AnimatePresence mode="wait">
-      {panel!=='watch'&&<motion.section key={panel} initial={{opacity:0,x:-40}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-30}} transition={{duration:reducedMotion?0:.55,ease:[.22,1,.36,1]}} id="player-settings" role="region" aria-label="Настройки просмотра" className="mv-player-drawer">
+      {settingsOpen&&<motion.section key={panel} initial={{opacity:0,y:-35,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-25,scale:.98}} transition={{duration:reducedMotion?0:.55,ease:[.22,1,.36,1]}} id="player-settings" role="region" aria-label="Настройки просмотра" className="mv-player-drawer">
         <div className="mv-player-drawer-head"><h2>Настройки</h2><button aria-label="Закрыть настройки" onClick={()=>openPanel('watch')}><X size={19}/></button></div>
+        <div className="mv-player-quick-actions"><button onClick={actions.share}><Share2 size={19}/><span>Поделиться</span></button><button onClick={actions.screenshot}><Camera size={19}/><span>Кадр</span></button><button onClick={actions.clip} disabled={actions.recording} aria-pressed={actions.recording}><Video size={19}/><span>{actions.recording?'Запись…':'Клип'}</span></button></div>
         <div className="mv-player-settings">
+        <label>Качество<select aria-label="Качество" value={item.id} disabled={!episode?.variants.some(v=>v.item.id!==item.id&&v.label===episode.variants.find(x=>x.item.id===item.id)?.label)} onChange={e=>choose(episode.variants.find(v=>v.item.id===e.target.value)?.item,true)}>{episode?.variants.filter(v=>v.item.id===item.id||v.label===episode.variants.find(x=>x.item.id===item.id)?.label).map(v=><option key={v.item.id} value={v.item.id}>{v.item.quality||v.item.resolution||(v.item.id===item.id&&videoRef.current?.videoHeight?videoRef.current.videoHeight+'p':'Исходное')}</option>)}</select></label>
         {episode?.variants.length>1&&<label>Озвучка<select value={item.id} onChange={event=>choose(episode.variants.find(v=>v.item.id===event.target.value)?.item,true)}>{episode.variants.map(v=><option key={v.item.id} value={v.item.id}>{v.label}</option>)}</select></label>}
         <label>Скорость<select value={prefs.speed} onChange={event=>changePrefs({speed:Number(event.target.value)})}>
           {[0.5,0.75,1,1.25,1.5,1.75,2].map(v=><option key={v} value={v}>{v}×</option>)}</select></label>
@@ -307,33 +336,34 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
         </div>
         <small>Улучшение работает на твоём устройстве. При высокой нагрузке включится исходное видео. В режиме «Картинка в картинке» улучшение недоступно.</small>
         <button className="mv-player-settings-action" onClick={()=>subtitleInput.current?.click()}><Subtitles size={16}/> Загрузить субтитры SRT / VTT</button>
-        <button className="mv-player-settings-action" disabled={!videoRef.current?.requestPictureInPicture} onClick={()=>videoRef.current?.requestPictureInPicture?.().catch(()=>{})}><PictureInPicture2 size={16}/> Картинка в картинке</button>
+
       </div>
       </motion.section>}</AnimatePresence>
       {canSkip&&panel==='watch'&&<button className="mv-player-skip" onClick={()=>seek(opening.end)}><SkipForward size={16}/> Пропустить опенинг</button>}
       {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> AI ×2{neuralStats?` · ${neuralStats.fps} FPS`:``}</span>}
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
       <div className="mv-player-console" onPointerEnter={revealControls}>
-        <div className="mv-player-timeline"><input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
-          value={Math.min(time,seekable?duration:1)} disabled={!seekable} step="0.1" onChange={event=>seek(Number(event.target.value))}
+        <div className="mv-player-timeline">{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
+          value={Math.min(previewTime,seekable?duration:1)} disabled={!seekable} step="0.1" onChange={event=>seek(Number(event.target.value))}
           style={{'--played':progress+'%','--buffered':Math.max(progress,seekable?buffered/duration*100:0)+'%'}}/></div>
         <div className="mv-player-controls">
           <div className="mv-player-control-group">
-            <button className="mv-player-play" aria-label={playing?'Пауза':'Воспроизвести'} onClick={toggle} disabled={!source}>{playing?<Pause size={21} fill="currentColor"/>:<Play size={21} fill="currentColor"/>}</button>
-            <button aria-label={muted?'Включить звук':'Отключить звук'} onClick={()=>setMuted(!muted)}>{muted?<VolumeX size={19}/>:<Volume2 size={19}/>}</button>
-            <input className="mv-player-volume" type="range" min="0" max="1" step=".05" value={prefs.volume} aria-label="Громкость" onChange={event=>changePrefs({volume:Number(event.target.value)})}/>
+            <button className="mv-player-play" aria-label={playing?'Пауза':'Воспроизвести'} onClick={toggle} disabled={!source}><AnimatePresence mode="wait" initial={false}><motion.span key={playing?'pause':'play'} initial={{opacity:0,rotate:-35,scale:.6}} animate={{opacity:1,rotate:0,scale:1}} exit={{opacity:0,rotate:35,scale:.6}} transition={{duration:reducedMotion?0:.14}}>{playing?<Pause size={21} fill="currentColor"/>:<Play size={21} fill="currentColor"/>}</motion.span></AnimatePresence></button>
+            <button aria-label={effectiveVolume===0?'Включить звук':'Отключить звук'} onClick={()=>{if(effectiveVolume===0){setMuted(false);if(!prefs.volume)changePrefs({volume:1});}else setMuted(true);}}><VolumeGlyph value={prefs.volume} muted={muted}/></button>
+            <input className="mv-player-volume" type="range" min="0" max="1" step=".05" value={prefs.volume} aria-label="Громкость" onChange={event=>{setMuted(false);changePrefs({volume:Number(event.target.value)});}}/>
             <span className="mv-player-time">{clock(time)} <span>/ {clock(duration)}</span></span>
           </div>
           <div className="mv-player-control-group">
+            <button aria-label={isPip?'Закрыть мини-окно':'Мини-окно'} aria-pressed={isPip} title="Мини-окно" disabled={!videoRef.current?.requestPictureInPicture&&!videoRef.current?.webkitSetPresentationMode} onClick={pip}><PictureInPicture2 size={19}/></button>
             <button className={settingsOpen?'is-active':''} aria-label="Настройки плеера" aria-expanded={settingsOpen} onClick={()=>openPanel(settingsOpen?'watch':'settings')}><Settings2 size={20}/></button>
-            <button aria-label="На весь экран" onClick={fullscreen}><Maximize2 size={20}/></button>
+            <button aria-label={isFullscreen?'Выйти из полноэкранного режима':'На весь экран'} onClick={fullscreen}>{isFullscreen?<Minimize2 size={20}/>:<Maximize2 size={20}/>}</button>
           </div>
         </div>
       </div>
     </div>
     <input ref={subtitleInput} type="file" accept=".srt,.vtt,text/vtt" hidden onChange={attachSubtitle}/>
-    {episodes.length>1&&<section className="mv-player-shelf" inert={playing||panel!=='watch'} aria-label="Эпизоды сезона">
-      <div className="mv-player-shelf-heading"><div className="mv-player-season-title">{seasons.length>1?<label><span className="sr-only">Сезон</span><select value={season?.id||''} onChange={event=>choose(seasons.find(s=>s.id===event.target.value)?.episodes[0]?.variants[0]?.item)}>{seasons.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>:<span>{season?.name}</span>}<small>{season?.episodes.length} эпизодов</small></div><div><button aria-label="Предыдущие эпизоды" onClick={()=>scrollEpisodes(-360)}><ChevronLeft size={18}/></button><button aria-label="Следующие эпизоды" onClick={()=>scrollEpisodes(360)}><ChevronRight size={18}/></button></div></div>
+    {episodes.length>1&&<section className="mv-player-shelf" inert={panel!=='episodes'&&(playing||panel!=='watch')} aria-label="Эпизоды сезона">
+      <div className="mv-player-shelf-heading">{panel==='episodes'&&<button aria-label="Закрыть эпизоды" onClick={()=>openPanel('watch')}><X size={20}/></button>}<div className="mv-player-season-title">{seasons.length>1?<label><span className="sr-only">Сезон</span><select value={season?.id||''} onChange={event=>choose(seasons.find(s=>s.id===event.target.value)?.episodes[0]?.variants[0]?.item)}>{seasons.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>:<span>{season?.name}</span>}<button className="mv-player-expand-episodes" aria-label="Развернуть эпизоды" onClick={()=>openPanel(panel==='episodes'?'watch':'episodes')}>{season?.episodes.length} эпизодов <ChevronsUp size={12}/></button></div><div><button aria-label="Предыдущие эпизоды" onClick={()=>scrollEpisodes(-360)}><ChevronLeft size={18}/></button><button aria-label="Следующие эпизоды" onClick={()=>scrollEpisodes(360)}><ChevronRight size={18}/></button></div></div>
       <div className="mv-player-rail" ref={railRef}>{season?.episodes.map((ep,i)=>{
         const current=ep===episode;
         return <button key={ep.id} className={'mv-player-card'+(current?' is-current':'')} aria-current={current?'true':undefined} onClick={()=>{choose(ep.variants[0]?.item);openPanel('watch');}}>

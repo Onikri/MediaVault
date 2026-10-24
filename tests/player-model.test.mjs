@@ -36,3 +36,16 @@ test('validates opening marks and converts local subtitle files without HTML inj
   assert.match(toWebVtt('WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nHi','test.vtt'),/^WEBVTT/);
   assert.throws(()=>toWebVtt('bad','test.srt'));
 });
+
+// Direction locking and center zones keep taps, scrubbing and vertical controls distinct.
+import {gestureIntent} from '../src/use-player-gestures.js';
+test('touch gestures lock only after slop and choose actions by axis and starting zone',()=>{
+  assert.equal(gestureIntent(4,5,.1),null);
+  assert.equal(gestureIntent(30,4,.1),'seek');
+  assert.equal(gestureIntent(-30,4,.9),'seek');
+  assert.equal(gestureIntent(2,-30,.1),'brightness');
+  assert.equal(gestureIntent(2,30,.9),'volume');
+  assert.equal(gestureIntent(2,-30,.5),'episodes');
+  assert.equal(gestureIntent(2,30,.5),'settings');
+  assert.equal(gestureIntent(20,20,.5),null);
+});

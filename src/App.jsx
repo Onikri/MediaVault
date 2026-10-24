@@ -86,6 +86,14 @@ export default function App(){
   const busy=!!state.busy;
   useEffect(()=>{setLibraryId(state.libraryId);setFavorites(readLocal(localPrefix+'_saved',[]));setHistory(readLocal(localPrefix+'_history',[]));},[state.libraryId]);
   useEffect(()=>{if(!state.catalog)setSelected(null);},[state.catalog]);
+  useEffect(()=>{
+    if(!state.catalog)return;
+    const params=new URLSearchParams(location.hash.slice(1)),id=params.get('episode');
+    if(!id)return;
+    const item=state.catalog.items.find(entry=>entry.id===id&&entry.category==='video');
+    if(item){const point=Number(params.get('t'));if(Number.isFinite(point)&&point>=0)sessionStorage.setItem('mediavault_pending_time_'+item.id,String(point));setSelected(item);window.history.replaceState(null,'',location.pathname+location.search);}
+  },[state.catalog]);
+
   useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});},[view]);
   const go=useCallback(next=>{setView(next);},[]);
   const closeViewer=useCallback(()=>setSelected(null),[]);

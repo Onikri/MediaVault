@@ -388,6 +388,44 @@ async function main() {
   assert.equal(await cinema.locator('.mv-player-play').count(),1,'One playback action');
   assert.equal(await cinema.getByRole('button',{name:'Настройки плеера'}).count(),1,'One settings entry');
   assert.equal(await cinema.locator('.mv-player-library,.mv-player-tabs,.mv-player-start').count(),0,'No duplicate navigation or playback buttons');
+  const touchSession=await ownerContext.newCDPSession(owner);
+  await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+  const swipe=async(zone,dx,dy)=>{
+    const rect=await cinema.locator('.mv-player-touch-surface').boundingBox();
+    const x=rect.x+rect.width*zone,y=rect.y+Math.min(rect.height*.3,200);
+    await touchSession.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+    const original=await cinema.locator('video').evaluate(v=>v.currentTime);
+    for(let i=1;i<=6;i++){
+      await touchSession.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx*i/6,y:y+dy*i/6}]});
+      if(dx&&i===3){
+        assert.equal(await cinema.locator('.mv-player-seek-preview').count(),1,'Scrubbing previews its destination on the timeline');
+        assert.equal(await cinema.locator('video').evaluate(v=>v.currentTime),original,'Touch seek waits for release');
+      }
+    }
+    await touchSession.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  };
+  await swipe(.15,0,-90);
+  assert.ok(await cinema.evaluate(el=>Number(el.style.getPropertyValue('--video-brightness'))>1),'Left vertical touch changes player brightness');
+  await swipe(.85,0,90);
+  assert.ok(await cinema.locator('video').evaluate(v=>v.volume<1),'Right vertical touch changes volume');
+  assert.equal(await cinema.locator('video').evaluate(v=>v.paused),true,'Swipes never trigger tap playback');
+  await swipe(.15,65,0);
+  assert.ok(await cinema.locator('video').evaluate(v=>v.currentTime>0),'Horizontal touch commits the timeline preview');
+  await swipe(.5,0,-90);
+  await cinema.getByRole('button',{name:'Закрыть эпизоды'}).waitFor();
+  assert.equal(await cinema.locator('.mv-player-rail').evaluate(el=>getComputedStyle(el).display),'grid','Center swipe expands the existing episode rail');
+  await cinema.getByRole('button',{name:'Закрыть эпизоды'}).click();
+  await swipe(.5,0,90);
+  await cinema.getByRole('heading',{name:'Настройки',exact:true}).waitFor();
+  await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
+  await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
+  await cinema.locator('video').evaluate(v=>v.currentTime=0);
+  await swipe(.5,0,0);
+  await owner.waitForFunction(()=>document.querySelector('video').paused===false);
+  await swipe(.5,0,0);
+  await owner.waitForFunction(()=>document.querySelector('video').paused===true);
+  await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:false});
+
   const output=path.join(PROJECT,'test-output');await fs.mkdir(output,{recursive:true});
   for(const width of [320,390,768,1280]){
     await owner.setViewportSize({width,height:900});
