@@ -62,7 +62,7 @@ export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose
     (async()=>{
       if(isMedia){
         const stream=await methods.current.prepareStream(item);
-        if(active()){setSource(stream||'');setBusy(false);}
+        if(active()){setSource(stream||'');setBusy(false);if(!stream)setError('Потоковый просмотр недоступен: браузер не активировал Service Worker или отсутствует сеанс Drive. Переподключи Google Drive, обнови страницу либо используй резервную загрузку.');}
         return;
       }
       // The signal also lets a reader that supports cancellation stop its download.
