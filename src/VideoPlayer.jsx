@@ -3,6 +3,7 @@ import {ArrowLeft,ArrowRight,Pause,Play,Settings2,
   SkipForward,Subtitles,Volume2,VolumeX,PictureInPicture2,Maximize2} from 'lucide-react';
 import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
 import {startNeuralUpscaler} from './neural-upscaler.js';
+import {diagnoseVideoFailure} from './playback-diagnostics.js';
 
 const PREF_KEY='mediavault_player_preferences_v1';
 const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,neuralMode:'balanced',subSize:24,subOffset:8};
@@ -234,7 +235,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
         onLoadedMetadata={loaded} onTimeUpdate={onTime}
         onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);writeResume(keyFor(libraryId,item.id),videoRef.current?.currentTime||0);}}
         onDurationChange={loaded} onEnded={ended}
-        onError={()=>{if(source)onError?.(Error('Браузер не может декодировать видео. Попробуй резервную загрузку.'));}}
+        onError={()=>{if(source)diagnoseVideoFailure({video:videoRef.current,source}).then(message=>onError?.(Error(message))).catch(()=>{});}}
         onClick={toggle} aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}</video>
       <canvas ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
       {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:prefs.subOffset+'%'}}
