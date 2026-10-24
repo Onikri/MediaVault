@@ -1,4 +1,4 @@
-export const NOTEBOOK_URL='https://colab.research.google.com/github/Onikri/hots_tank.github.io/blob/main/media-vault/notebooks/MediaVault_Server_Import.ipynb';
+export const NOTEBOOK_URL='https://colab.research.google.com/github/Onikri/MediaVault/blob/main/notebooks/MediaVault_Server_Import.ipynb';
 
 export function publicSourceUrl(value){
   let url;

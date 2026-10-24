@@ -55,7 +55,7 @@ from pathlib import Path
 import hashlib, json, shutil, subprocess, sys, urllib.request
 
 SOURCE_HASHES = ''' + repr(HASHES) + '''
-BASE = "https://raw.githubusercontent.com/Onikri/hots_tank.github.io/main/media-vault/"
+BASE = "https://raw.githubusercontent.com/Onikri/MediaVault/main/"
 RUNTIME = Path("/content/mediavault-server")
 RUNTIME.mkdir(parents=True, exist_ok=True)
 for relative, expected in SOURCE_HASHES.items():
@@ -105,7 +105,7 @@ try:
         phrase = None
     result = run_job(job, vault)
     print("Откройте сайт и нажмите «Обновить библиотеку»:")
-    print("https://onikri.github.io/hots_tank.github.io/media-vault/?library=" + vault.library_id)
+    print("https://onikri.github.io/MediaVault/?library=" + vault.library_id)
 except (SourceError, VaultError) as error:
     print("Импорт остановлен:", str(error))
     print("Завершённые серии сохранены. После исправления причины можно запустить то же задание.")
@@ -132,8 +132,8 @@ Google управляет Colab. Завершите сессию через **С
 и удалить среду выполнения**, когда импорт закончен. Во время обычного просмотра
 на сайте видео, разумеется, скачивается из Drive на устройство зрителя.
 
-[Исходный код и инструкции](https://github.com/Onikri/hots_tank.github.io/tree/main/media-vault)
-· [Использованные открытые библиотеки](https://github.com/Onikri/hots_tank.github.io/blob/main/media-vault/THIRD_PARTY.md)
+[Исходный код и инструкции](https://github.com/Onikri/MediaVault)
+· [Использованные открытые библиотеки](https://github.com/Onikri/MediaVault/blob/main/THIRD_PARTY.md)
 ''')]
 
 notebook = {'nbformat': 4, 'nbformat_minor': 5,

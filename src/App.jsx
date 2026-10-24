@@ -17,7 +17,7 @@ const sections=[{id:'anime',art:'video',name:'Аниме',formats:'ТАЙТЛЫ 
 const navigation=[{id:'home',label:'Главная',icon:'home'},{id:'library',label:'Библиотека',icon:'library'},{id:'import',label:'Импорт',icon:'cloud'},
   {id:'history',label:'История',icon:'history'},{id:'profile',label:'Профиль',icon:'user'}];
 const filters=[{id:'all',label:'Всё'},...Object.entries(SECTION_LABELS).map(([id,label])=>({id,label}))];
-const guide='https://github.com/Onikri/hots_tank.github.io/blob/main/media-vault/README.md';
+const guide='https://github.com/Onikri/MediaVault/blob/main/README.md';
 function readLocal(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}}
 function writeLocal(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
 function plural(n){return n%10===1&&n%100!==11?'материал':n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?'материала':'материалов';}

@@ -2,9 +2,9 @@
 
 Мобильная медиатека на React/Vite: манга, видео, книги, музыка и изображения в собственном Google Drive. Новый интерфейс использует Radix UI, Motion и Lucide. В библиотеке показываются реальные файлы из расшифрованного каталога.
 
-**Сайт:** https://onikri.github.io/hots_tank.github.io/media-vault/
+**Сайт:** https://onikri.github.io/MediaVault/
 
-**Серверный импорт:** [Открыть бесплатный Colab-блокнот](https://colab.research.google.com/github/Onikri/hots_tank.github.io/blob/main/media-vault/notebooks/MediaVault_Server_Import.ipynb)
+**Серверный импорт:** [Открыть бесплатный Colab-блокнот](https://colab.research.google.com/github/Onikri/MediaVault/blob/main/notebooks/MediaVault_Server_Import.ipynb)
 
 ## Первый запуск
 
@@ -75,7 +75,8 @@ MediaVault
 Node.js 22.12+, Python 3.10+, ffmpeg/ffprobe и Chromium:
 
 ```sh
-cd media-vault
+git clone https://github.com/Onikri/MediaVault.git
+cd MediaVault
 npm ci
 python -m pip install -r server/requirements.txt
 npm run dev
@@ -98,6 +99,8 @@ CHROMIUM_PATH=/usr/bin/chromium MEDIA_VAULT_SKIP_BUILD=1 npm run test:browser
 
 ## GitHub Pages
 
-Workflow `.github/workflows/pages.yml` сначала выполняет проверки, восстанавливает основной Tank guide из существующего архива и добавляет сборку MediaVault в отдельную папку. Остальные страницы сайта сохраняются. При legacy-источнике Pages workflow ждёт окончания автоматической сборки той же ревизии и затем публикует полный сайт. Рекомендуемый источник в Settings → Pages — GitHub Actions; сам workflow настройку источника не меняет.
+Workflow `.github/workflows/pages.yml` выполняет модульные, серверные и браузерные проверки, проверяет актуальность Colab-блокнота и публикует `dist/` как самостоятельный сайт. В Settings → Pages → Source выбери **GitHub Actions**. Публикация выполняется из ветки `main`; для pull request запускаются только проверки. Vite использует относительные пути, поэтому приложение работает по адресу `/MediaVault/` без дополнительной настройки базового пути. Google OAuth использует тот же origin `https://onikri.github.io`.
+
+MediaVault выделен из папки `media-vault` репозитория `Onikri/hots_tank.github.io`. История изменений проекта сохранена с исходными авторами, датами и сообщениями коммитов; файлы перенесены в корень. При выделении папки Git пересоздаёт коммиты, поэтому их SHA отличаются от исходных.
 
 [Открытые библиотеки и лицензии](THIRD_PARTY.md).
