@@ -27,14 +27,14 @@ export function buildPlaybackLibrary(current, catalog) {
   const seasons = new Map();
   for (const item of assets) {
     const part = partNames.get(item.partId) || item.partName ||
-      (numeric(item.season) ? 'Сезон ' + item.season : 'Фильмы и серии');
+      (numeric(item.season) ? 'Сезон ' + item.season : 'Эпизоды');
     const key = item.partId || part;
     if (!seasons.has(key)) seasons.set(key, {id: key, name: part, episodes: new Map()});
     const season = seasons.get(key);
     const number = episodeNumber(item);
     const episodeKey = number === null ? 'file:' + item.id : 'episode:' + number;
     if (!season.episodes.has(episodeKey)) season.episodes.set(episodeKey, {
-      id: episodeKey, number, label: number === null ? item.name : 'Серия ' + number, variants: []
+      id: episodeKey, number, label: number === null ? item.name : 'Эпизод ' + number, variants: []
     });
     const episode = season.episodes.get(episodeKey);
     episode.variants.push({item, label: voiceLabel(item, 'Версия ' + (episode.variants.length + 1))});

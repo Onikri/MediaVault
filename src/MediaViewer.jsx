@@ -130,21 +130,11 @@ export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose
       mediaUrl.current=next;setSource(next);setBusy(false);
     }catch(cause){if(current===generation.current)report(cause);}
   }
-  async function fullscreen(){
-    try{
-      const media=mediaRef.current;
-      const player=panelRef.current?.querySelector('.mv-player');
-      if(player?.requestFullscreen)await player.requestFullscreen();
-      else if(media?.webkitEnterFullscreen)media.webkitEnterFullscreen();
-      else await panelRef.current?.requestFullscreen?.();
-    }catch(cause){methods.current.onError?.(cause);}
-  }
 
   return <section id="viewer" ref={panelRef} className="mv-viewer" role="dialog" aria-modal="true" aria-label={item.name}>
     <header className="mv-viewer-head">
       <button id="closeViewer" className="mv-icon-button" aria-label="Закрыть просмотр" onClick={onClose}>←</button>
       <div className="mv-viewer-title"><small>{names[item.category]||'Файл'}</small><strong>{item.name}</strong></div>
-      {item.category==='video'&&<button className="mv-icon-button" aria-label="На весь экран" onClick={fullscreen}>⛶</button>}
     </header>
     <div id="viewerContent" className={'mv-viewer-body'+(item.category==='manga'?' mv-viewer-manga':item.category==='video'?' mv-viewer-video':'')}>
       {busy&&<div className="mv-viewer-loading" role="status">Расшифровка на устройстве…</div>}

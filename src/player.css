@@ -229,3 +229,27 @@
 @media(prefers-reduced-motion:reduce){.mv-player-panorama{transform:none!important}.mv-player-panorama img{animation:none!important}}
 .mv-player-nav{transition:opacity .7s,transform .7s}
 .is-playing.controls-hidden .mv-player-nav:not(:focus-within):not(:hover){opacity:0;transform:translateY(-12px);pointer-events:none}
+/* Minimal controls: one playback action, one episode rail, one settings drawer. */
+.mv-player-overview{bottom:315px;max-width:70%}
+.mv-player-overview h1{font-size:clamp(32px,4vw,56px);letter-spacing:-1.4px;margin-bottom:14px;font-weight:450}
+.mv-player-overview>p{color:#ffffff90;font-size:12px;letter-spacing:.5px;margin:0}
+.mv-player-console{bottom:210px;padding:20px 6% 10px}
+.mv-player-control-group{gap:14px}.mv-player-controls .mv-player-play{padding:0;width:28px;min-width:28px;color:#eee}
+.mv-player-control-group button:hover{background:transparent;color:var(--accent)}
+.mv-player-timeline input[type=range]{height:2px}.mv-player-timeline input[type=range]::-webkit-slider-thumb{width:7px;height:7px;box-shadow:none}
+.mv-player-card-art,.mv-player-card.is-current .mv-player-card-art,.mv-player-card:hover .mv-player-card-art{border:0;outline:0;box-shadow:none;background:linear-gradient(130deg,rgb(var(--scene-rgb)/.15),#15181b);border-radius:2px}
+.mv-player-card.is-current{transform:none}.mv-player-card:hover{transform:translateY(-3px)}
+.mv-player-card.is-current>strong{color:#fff}.mv-player-card.is-current>strong:before{content:'•';color:var(--accent);margin-right:6px}
+.mv-player-card-art>small{display:none}.mv-player-card-number{color:#ffffff20;font-size:42px;font-weight:300;right:14px;top:8px}
+.mv-player-card>small{display:none}.mv-player-card>strong{font-size:10px;letter-spacing:.2px;margin-top:12px}
+.mv-player-rail{padding:4px 0 12px;gap:18px}.mv-player-shelf-heading{margin-bottom:12px}
+.mv-player-season-title{display:flex;align-items:center;gap:14px;color:#fff8;font-size:10px}
+.mv-player-season-title select{border:0;background:transparent;font-size:11px;padding:4px 20px 4px 0;min-height:30px}
+.mv-player-season-title small{margin:0;font-size:9px;color:#fff4}
+.mv-player-shelf-heading>div:last-child:not(.mv-player-season-title){gap:12px}.mv-player-shelf-heading button{background:none;border:0;width:22px;height:26px;color:#fff6}
+.mv-player-drawer{top:35px;bottom:95px;background:linear-gradient(90deg,#0b0e14ee,#0b0e14bb);border:0}
+.mv-player-drawer-head h2{font-size:20px;margin:0;font-weight:450}.mv-player-drawer-head>button{background:none;border-radius:0}
+.mv-player-settings-action{display:flex;align-items:center;gap:10px;padding:10px 0;background:none;color:#ffffffa0;font-size:11px;text-align:left}
+.mv-player-settings-action:hover{color:#fff}
+@media(max-width:650px){.mv-player-overview{bottom:290px;max-width:85%}.mv-player-overview h1{font-size:34px}.mv-player-console{bottom:205px}.mv-player-controls{flex-wrap:nowrap}.mv-player-control-group{gap:12px}.mv-player-control-group button{min-width:28px}.mv-player-drawer{top:15px;bottom:85px}.mv-player-shelf-heading>div:last-child{display:none}.mv-player-shelf-heading .mv-player-season-title{display:flex!important}.mv-player-card{flex-basis:145px}.mv-player-rail{gap:14px}}
+@media(max-height:520px) and (orientation:landscape){.mv-player:fullscreen .mv-player-overview{bottom:160px}.mv-player:fullscreen .mv-player-drawer{top:0}.mv-player:fullscreen .mv-player-overview h1{font-size:28px}}
