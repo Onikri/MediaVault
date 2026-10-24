@@ -1,6 +1,6 @@
 # Использованные открытые библиотеки
 
-Собственные компоненты MediaVault вызывают эти библиотеки; платные сервисы и API аниме-каталогов не подключены.
+Собственные компоненты MediaVault вызывают эти библиотеки; платные сервисы не подключены. Опциональный VM-поиск использует публичный API Shikimori для карточек и рейтингов; парсер видео по-прежнему работает с публичными страницами и плеерами.
 
 | Библиотека | Назначение | Лицензия / исходники |
 |---|---|---|
@@ -12,6 +12,10 @@
 | anime-dl-core 0.5.1 | Публичные плееры Kodik/Aniboom/Sibnet/Animedia; API-адаптеры отключены | MIT · https://github.com/ialakey/anime-dl-core |
 | m3u8 6.0.0 | Разбор HLS | MIT · https://github.com/globocom/m3u8 |
 | requests | HTTP источников | Apache-2.0 · https://github.com/psf/requests |
+| Flask 3.1.2 | API автоматического импорта | BSD-3-Clause · https://github.com/pallets/flask |
+| Gunicorn 23.0.0 | HTTP-сервер на VM | MIT · https://github.com/benoitc/gunicorn |
+| Beautiful Soup 4.13.4 | Разбор поисковых страниц и текста карточек | MIT · https://www.crummy.com/software/BeautifulSoup/ |
+| google-auth-oauthlib 1.2.2 | Первоначальное подключение Drive на VM | Apache-2.0 · https://github.com/googleapis/google-auth-library-python-oauthlib |
 | cryptography | Совместимое с Web Crypto AES-GCM | Apache-2.0/BSD · https://github.com/pyca/cryptography |
 | google-api-python-client / google-auth | Авторизованный Drive владельца | Apache-2.0 · https://github.com/googleapis/google-api-python-client |
 | FFmpeg | Локальная сборка и проверка MP4 в Colab | LGPL/GPL зависит от сборки · https://ffmpeg.org/legal.html |
