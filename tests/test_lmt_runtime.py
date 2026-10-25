@@ -9,10 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'server'))
 from lmt_runtime import LmtRuntime
 
 
-def response(status=200, headers=None):
-    return SimpleNamespace(status=status, headers=headers or {}, dispose=AsyncMock())
-
-
 class WeightRoutingTests(IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.runtime = LmtRuntime('.', '.')
