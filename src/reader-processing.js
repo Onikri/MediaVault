@@ -50,6 +50,11 @@ export async function processOnBackend(blob,options,service,signal,status=()=>{}
 
 export function createPageProcessor({getConfig,getService,getChapter}){
  let queue=Promise.resolve();const cache=new Map();
+ const remember=(key,result)=>{
+  cache.set(key,result);const size=value=>(value.renderedImage?.byteLength||0)+(value.cleanedImage?.byteLength||0);
+  let bytes=0;for(const value of cache.values())bytes+=size(value);
+  while(cache.size>5||bytes>64*1024*1024){const first=cache.keys().next().value;bytes-=size(cache.get(first));cache.delete(first);}
+ };
  const process=(blob,signal,status,pageIndex)=>{
   const config=structuredClone(getConfig()),chapter=getChapter();
   const key=chapter.id+':'+pageIndex+':'+JSON.stringify(config);
@@ -78,13 +83,11 @@ export function createPageProcessor({getConfig,getService,getChapter}){
     result={...result,...processed,regions:backendOptions.translate?processed.regions:result.regions};
    }
    signal.throwIfAborted();
-   cache.set(key,result);
-   let bytes=0;for(const value of cache.values())bytes+=value.renderedImage?.byteLength||0;
-   while(cache.size>5||bytes>64*1024*1024){const first=cache.keys().next().value;bytes-=cache.get(first).renderedImage?.byteLength||0;cache.delete(first);}
+   remember(key,result);
    return result;
   };
   const task=queue.catch(()=>{}).then(run);queue=task;return task;
  };
- process.remember=(pageIndex,result,patch={})=>{const config={...getConfig(),...patch},chapter=getChapter();cache.set(chapter.id+':'+pageIndex+':'+JSON.stringify(config),result);};
+ process.remember=(pageIndex,result,patch={})=>{const config={...getConfig(),...patch},chapter=getChapter();remember(chapter.id+':'+pageIndex+':'+JSON.stringify(config),result);};
  return process;
 }

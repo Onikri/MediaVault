@@ -13,9 +13,9 @@ import TranslationLayer from './TranslationLayer.jsx';
 import './manga-reader.css';
 import {spreadPages,turnPage} from './reader-layout.js';
 function Page({index,entry,active,preload,translate,processing,processorKey,translator,editorConfig,editorService,onEditorApply,onVisible,onError}){
- const [editor,setEditor]=useState(false),resultRef=useRef(null),editedUrl=useRef(null);
- useEffect(()=>()=>{if(editedUrl.current)URL.revokeObjectURL(editedUrl.current);},[]);
+ const [editor,setEditor]=useState(false),resultRef=useRef(null);
  const host=useRef(null),[near,setNear]=useState(false),[source,setSource]=useState(''),[ratio,setRatio]=useState(0),[imageSize,setImageSize]=useState({width:0,height:0}),[regions,setRegions]=useState(null),[translated,setTranslated]=useState(''),[message,setMessage]=useState(''),[translating,setTranslating]=useState(false),[attempt,setAttempt]=useState(0),[failed,setFailed]=useState(false),blob=useRef(null);
+ useEffect(()=>{if(!source)resultRef.current=null;},[source]);
  useEffect(()=>{const observer=new IntersectionObserver(e=>{setNear(e.some(x=>x.isIntersecting));},{rootMargin:preload?'100% 0px':'0px'});if(host.current)observer.observe(host.current);return()=>observer.disconnect();},[preload]);
  useEffect(()=>{if(!near&&!active){setSource('');return;}let closed=false,url;entry.async('blob').then(b=>{if(closed)return;blob.current=b;url=URL.createObjectURL(b);setSource(url);}).catch(e=>!closed&&onError(e.message));return()=>{closed=true;blob.current=null;if(url)URL.revokeObjectURL(url);};},[entry,near,active]);
  useEffect(()=>{const node=host.current?.querySelector('img');if(!node)return;const observer=new ResizeObserver(entries=>{const r=entries[0].contentRect;setImageSize({width:r.width,height:r.height});});observer.observe(node);return()=>observer.disconnect();},[source]);
@@ -25,7 +25,7 @@ function Page({index,entry,active,preload,translate,processing,processorKey,tran
   {source?<div className="reader-page-image"><img src={processing&&translated?translated:source} onLoad={e=>setRatio(e.currentTarget.naturalHeight/e.currentTarget.naturalWidth)} alt={'Страница '+(index+1)} decoding="async"/>{translate&&regions?.length>0&&<TranslationLayer regions={regions} size={imageSize}/>}
 </div>:<div className="reader-page-placeholder" style={ratio?{aspectRatio:1/ratio,minHeight:0}:undefined}>Страница {index+1}</div>}
   {source&&['lmt','backend'].includes(editorConfig?.engine)&&<button type="button" className="reader-page-editor" onClick={()=>setEditor(true)}>Редактор LMT · области и текст</button>}
-  {editor&&blob.current&&<LmtEditor blob={blob.current} config={editorConfig} result={resultRef.current} service={editorService} onClose={()=>setEditor(false)} onApply={data=>{resultRef.current=data;if(editedUrl.current)URL.revokeObjectURL(editedUrl.current);editedUrl.current=URL.createObjectURL(new Blob([data.renderedImage],{type:data.renderedMime||'image/webp'}));setTranslated(editedUrl.current);setRegions(data.regions||[]);onEditorApply(index,data);}}/>}
+  {editor&&blob.current&&<LmtEditor blob={blob.current} config={editorConfig} result={resultRef.current} service={editorService} onClose={()=>setEditor(false)} onApply={data=>{resultRef.current=data;setRegions(data.regions||[]);onEditorApply(index,data);}}/>}
   {processing&&message&&<figcaption role="status">{message}{failed&&!translating&&<button onClick={()=>setAttempt(v=>v+1)}>Повторить</button>}</figcaption>}
  </figure>;
 }

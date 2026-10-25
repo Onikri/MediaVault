@@ -25,7 +25,9 @@ COPY --chown=vault:vault --chmod=0644 server/*.py ./
 COPY --chown=vault:vault server/mangajanai-models.json ./
 COPY --chown=vault:vault --chmod=0644 scripts/benchmark-reader.py scripts/install-mangajanai.py ./scripts/
 COPY --from=lmt-build --chown=vault:vault /build/dist/lmt /app/lmt
+RUN chmod 0755 /app/scripts
 ENV LMT_ASSETS_DIR=/app/lmt
 USER vault
+RUN python scripts/install-mangajanai.py --list >/dev/null && python scripts/benchmark-reader.py --mode inventory >/dev/null
 EXPOSE 7860
 CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1", "--no-access-log"]

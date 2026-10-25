@@ -17,10 +17,12 @@ export default function LmtEditor({blob,config,result,service,onApply,onClose}){
    }else if(data.type==='stage'){
     const abort=new AbortController();controllers.add(abort);
     try{
-     const options={translate:true,upscale:false,operation:data.operation,boxes:data.boxes||null,
+     const upscaling=data.operation==='upscale';
+     const options={translate:!upscaling,upscale:upscaling,operation:upscaling?'process':data.operation,boxes:data.boxes||null,
       gateForce:!!data.gateForce,language:config.language||'English',targetLanguage:config.targetLanguage||'Russian',
       ocr:config.ocr||'paddle',detector:config.detector||'comic-bubble',inpaint:config.inpaint||'fast',
-      allowDownloads:!!config.allowDownloads,contextKey:config.contextKey||'default'};
+      allowDownloads:!!config.allowDownloads,contextKey:config.contextKey||'default',
+      scale:config.upscale?.scale||2,model:config.upscale?.model||'auto',content:config.upscale?.content||'auto',tile:config.upscale?.tile||256};
      const value=await processOnBackend(new Blob([data.bytes]),options,service,abort.signal,status=>{if(!closed)port.postMessage({type:'progress',status});});
      if(!closed)port.postMessage({type:'stage-result',id:data.id,result:value});
     }catch(e){if(!closed)port.postMessage({type:'stage-result',id:data.id,error:e.message});}

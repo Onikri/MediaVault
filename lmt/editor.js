@@ -6,12 +6,13 @@ import {drawFittedText,resolveFontStack} from './upstream/lib/canvas/text-fit.ts
 import './upstream/assets/app.css';
 import './editor.css';
 
-let port,config,bytes,bitmap,component,originalSrc,cleanedSrc,lastResult,sequence=0;
+let port,config,bytes,bitmap,component,originalSrc,cleanedSrc,lastResult,upscaled,sequence=0;
+const sourceTexts=new Map(),boxKey=b=>[b.x1,b.y1,b.x2,b.y2].join(':');
 const pending=new Map(),urls=new Set();
 const status=text=>{document.getElementById('editor-status').textContent=text;};
 function imageUrl(data,mime='image/webp'){const url=URL.createObjectURL(new Blob([data],{type:mime}));urls.add(url);return url;}
 async function stage(operation,boxes,extra={},sourceBytes=bytes){
- if(config.engine!=='backend')return globalThis.mangaTranslate(sourceBytes.slice(0),{...config,operation,boxes,...extra},status);
+ if(config.engine!=='backend'&&operation!=='upscale')return globalThis.mangaTranslate(sourceBytes.slice(0),{...config,operation,boxes,...extra},status);
  const id=++sequence;
  return new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>{pending.delete(id);reject(Error('Backend не завершил обработку.'));},16*60*1000);
@@ -27,14 +28,24 @@ async function clean(boxes){
 }
 async function render(translations,boxes){
  const valid=boxes.filter((_,i)=>translations[i]&&!boxes[i].gateSkip);
- const background=await clean(valid),image=await createImageBitmap(await(await fetch(background)).blob());
- const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
+ const background=await clean(valid);let backgroundBytes=await(await fetch(background)).arrayBuffer(),upscaleInfo;
+ if(config.upscale?.enabled){
+  if(upscaled?.key!==background)upscaled={key:background,result:await stage('upscale',undefined,{},backgroundBytes)};
+  backgroundBytes=upscaled.result.renderedImage;upscaleInfo=upscaled.result.upscale;
+ }
+ const image=await createImageBitmap(new Blob([backgroundBytes]));
+ const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
  const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,canvas.width,canvas.height);image.close();
  const font=await resolveFontStack();
- for(let i=0;i<boxes.length;i++)if(translations[i]&&!boxes[i].gateSkip)await drawFittedText(ctx,translations[i],boxes[i],font,40);
+ const sx=canvas.width/bitmap.width,sy=canvas.height/bitmap.height;
+ for(let i=0;i<boxes.length;i++)if(translations[i]&&!boxes[i].gateSkip){
+  const b=boxes[i],style={...b.style};
+  if(style.fontSize)style.fontSize*=sy;if(style.strokeWidth)style.strokeWidth*=sy;
+  await drawFittedText(ctx,translations[i],{...b,x1:b.x1*sx,x2:b.x2*sx,y1:b.y1*sy,y2:b.y2*sy,style},font,40*sy);
+ }
  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.95));
  if(!blob)throw Error('Не удалось собрать страницу.');
- lastResult={renderedImage:await blob.arrayBuffer(),renderedMime:'image/webp',regions:boxes.map((b,i)=>({x:b.x1/bitmap.width,y:b.y1/bitmap.height,w:(b.x2-b.x1)/bitmap.width,h:(b.y2-b.y1)/bitmap.height,text:translations[i]||'',original:b.original||'',style:b.style,placement:'note'}))};
+ lastResult={renderedImage:await blob.arrayBuffer(),renderedMime:'image/webp',upscale:upscaleInfo,regions:boxes.map((b,i)=>({x:b.x1/bitmap.width,y:b.y1/bitmap.height,w:(b.x2-b.x1)/bitmap.width,h:(b.y2-b.y1)/bitmap.height,text:translations[i]||'',original:sourceTexts.get(boxKey(b))||b.original||'',style:b.style,placement:'note'}))};
  status('Страница готова. Примени изменения, чтобы вернуться в читалку.');
  return imageUrl(lastResult.renderedImage);
 }
@@ -68,7 +79,7 @@ async function initialize(data){
   targetImageRect:rect,scaleX:rect.width/bitmap.width,scaleY:rect.height/bitmap.height,originalSrc,wrapper,
   getTranslationCache:async()=>cached,
   requestBubbleDetection:async()=>{try{return (await stage('detect')).boxes||[];}catch(e){return {error:e.message};}},
-  requestTextTranslation:async(boxes,_,options)=>{try{const result=await stage('translate',boxes,{gateForce:!!options?.gateForce});for(let i=0;i<boxes.length;i++)boxes[i].original=result.sourceTexts?.[i]||'';return result;}catch(e){return {error:e.message};}},
+  requestTextTranslation:async(boxes,_,options)=>{try{const result=await stage('translate',boxes,{gateForce:!!options?.gateForce});for(let i=0;i<boxes.length;i++)sourceTexts.set(boxKey(boxes[i]),result.sourceTexts?.[i]||'');return result;}catch(e){return {error:e.message};}},
   renderTranslations:render,getCleanedSrc:clean,applyInpaintPatches:applyPatches,exportCanvasToJpeg:exportJpeg,
   onClose:()=>port.postMessage({type:'close'})
  }});
