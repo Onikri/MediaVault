@@ -11,13 +11,8 @@ export function clearArtworkCache(next=''){
   blobs.clear();
   images.clear();
 }
-let activeReads=0;const waiting=[];
-async function limitedRead(operation){
-  if(activeReads>=4)await new Promise(resolve=>waiting.push(resolve));else activeReads++;
-  try{return await operation();}finally{const next=waiting.shift();if(next)next();else activeReads--;}
-}
 async function externalImage(url,{signal}={}){
-  if(!images.has(url))images.set(url,(async()=>{
+  if(!images.has(url))images.set(url,boundedRead(async()=>{
     const server=globalThis.window?.MEDIA_VAULT_CONFIG?.importServerUrl;
     const current=url.replace(/^https:\/\/(?:desu\.)?shikimori\.one\//,match=>match.replace('.one/','.io/'));
     const targets=server?[server+'/artwork?'+new URLSearchParams({url:current}),current]:[current];
@@ -31,36 +26,47 @@ async function externalImage(url,{signal}={}){
       }catch{}
     }
     throw Error('Изображение пока недоступно.');
-  })().catch(error=>{images.delete(url);throw error;}));
+  }).catch(error=>{images.delete(url);throw error;}));
   const blob=await images.get(url);signal?.throwIfAborted();return blob;
 }
-export function useArtwork(url,profile,readArtwork,libraryId){
-  const asset=profile?.artwork?.[url],key=asset?.fileId;
-  const [source,setSource]=useState('');
+let activeReads=0;const waiting=[];
+async function boundedRead(work){
+  if(activeReads>=4)await new Promise(resolve=>waiting.push(resolve));else activeReads++;
+  try{return await work();}finally{const next=waiting.shift();if(next)next();else activeReads--;}
+}
+export function useArtwork(url,profile,readArtwork,libraryId,enabled=true){
+  const asset=profile?.artwork?.[url],key=asset?.fileId,remote=imageURL(url);
+  const identity=String(libraryId||'')+':'+(key||remote),[result,setResult]=useState({identity:'',source:''}),[retry,setRetry]=useState(0);
   useEffect(()=>{
-    let closed=false;setSource('');
+    if(!enabled)return;
+    let closed=false,local='',timer;const generation=scope;
+    const publish=source=>{if(!closed)setResult({identity,source});};
     if(!asset){
-      const remote=imageURL(url);setSource(remote);if(!remote)return;
-      let local='';externalImage(remote).then(blob=>{if(!closed){local=URL.createObjectURL(blob);setSource(local);}}).catch(()=>{});
+      publish(remote);if(!remote)return;
+      externalImage(remote).then(blob=>{if(!closed){local=URL.createObjectURL(blob);publish(local);}}).catch(()=>{});
       return()=>{closed=true;if(local)URL.revokeObjectURL(local);};
     }
     if(!blobs.has(key)){
-      const generation=scope;
-      const entry={promise:limitedRead(()=>readArtwork(asset)).then(blob=>{
-        if(generation!==scope)return '';entry.url=URL.createObjectURL(blob);return entry.url;
-      })};blobs.set(key,entry);entry.promise.catch(()=>blobs.delete(key));
+      const entry={promise:boundedRead(async()=>{
+        if(generation!==scope)throw new DOMException('Library changed','AbortError');
+        const blob=await readArtwork(asset);if(generation!==scope)return '';entry.url=URL.createObjectURL(blob);return entry.url;
+      })};blobs.set(key,entry);entry.promise.catch(()=>{if(blobs.get(key)===entry)blobs.delete(key);});
     }
-    blobs.get(key).promise.then(value=>{if(!closed)setSource(value);}).catch(()=>{});
-    return()=>{closed=true;};
-  },[url,key,libraryId,readArtwork,!!profile?.savedAt]);
-  return source;
+    const cached=blobs.get(key);if(cached.url)publish(cached.url);
+    cached.promise.then(publish).catch(()=>{
+      if(closed)return;
+      if(remote){publish(remote);externalImage(remote).then(blob=>{if(!closed){local=URL.createObjectURL(blob);publish(local);}}).catch(()=>{});}
+      if(retry<2)timer=setTimeout(()=>setRetry(n=>n+1),retry?1800:500);
+    });
+    return()=>{closed=true;clearTimeout(timer);if(local)URL.revokeObjectURL(local);};
+  },[identity,readArtwork,retry,enabled]);
+  if(!enabled)return '';
+  return result.identity===identity?result.source:asset?blobs.get(key)?.url||'':remote;
 }
 export async function fetchArtwork(profile,{signal}={}){
   const images=[],failed=[];
-  const missing=profileArtwork(profile).filter(url=>!profile.artwork?.[url]);
-  failed.push(...missing.slice(48));
-  for(const url of missing.slice(0,48)){
-    if(profile.artwork?.[url])continue;signal?.throwIfAborted();
+  for(const url of profileArtwork(profile).filter(url=>!profile.artwork?.[url]).slice(0,48)){
+    signal?.throwIfAborted();
     try{
       let blob=await externalImage(url,{signal});
       // Keep original high-resolution stills when small; bound very large art

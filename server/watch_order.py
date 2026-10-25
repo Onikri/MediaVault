@@ -1,8 +1,13 @@
 """Release order from exact franchise IDs; no invented chronology for alternate routes."""
 from metadata_catalog import get_json
+import time,threading
+_cache={};_lock=threading.Lock()
 
 
 def watch_order(identity):
+    with _lock:
+        cached=_cache.get(identity)
+        if cached and cached[0]>time.monotonic():return cached[1]
     data=get_json('https://shikimori.io/api/animes/'+identity+'/franchise')
     nodes=data.get('nodes') or [];edges=data.get('links') or []
     # Franchise edges do not define a single mandatory route for Fate or alternate adaptations.
@@ -21,6 +26,12 @@ def watch_order(identity):
         art=posters([v['id'] for v in values])
         for value in values:
             if art.get(value['id'],{}).get('title'):value['title']=art[value['id']]['title']
+            if art.get(value['id'],{}).get('cover'):value['cover']=art[value['id']]['cover']
     except Exception:pass
     values.sort(key=lambda n:(n['date'] or float('inf'),n['id']))
-    return {'items':values,'links':edges,'mode':'release','source':'Shikimori','message':'Порядок выхода. Альтернативные адаптации и ответвления не образуют единственную обязательную хронологию.'}
+    result={'items':values,'links':edges,'mode':'release','source':'Shikimori','message':'Порядок выхода. Альтернативные адаптации и ответвления не образуют единственную обязательную хронологию.'}
+
+    with _lock:
+        _cache[identity]=(time.monotonic()+21600,result)
+        while len(_cache)>128:_cache.pop(next(iter(_cache)))
+    return result

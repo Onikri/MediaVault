@@ -37,7 +37,7 @@ export function buildPlaybackLibrary(current, catalog) {
     const number = episodeNumber(item);
     const episodeKey = number === null ? 'file:' + item.id : 'episode:' + number;
     if (!season.episodes.has(episodeKey)) season.episodes.set(episodeKey, {
-      id: episodeKey, number, label: number === null ? item.name : 'Эпизод ' + number, variants: []
+      id: episodeKey,number,description:item.episodeDescription||'',label: item.episodeTitle|| (number === null ? item.name : 'Эпизод ' + number), variants: []
     });
     const episode = season.episodes.get(episodeKey);
     episode.variants.push({item, label: voiceLabel(item, 'Версия ' + (episode.variants.length + 1))});

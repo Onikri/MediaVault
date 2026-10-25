@@ -37,12 +37,14 @@ export default function usePlayerAtmosphere(videoRef,source,playing,rootRef){
   },[source,videoRef]);
   useEffect(()=>{
     const root=rootRef.current;if(!root||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-    let x=0,y=0;
-    const move=event=>{if(event.pointerType==='touch')return;const box=root.getBoundingClientRect();if(!isPlaying.current)target.current=[(event.clientX-box.left)/box.width*2-1,(event.clientY-box.top)/box.height*2-1];};
-    const reset=()=>{target.current=[0,0];};
-    const animate=()=>{if(isPlaying.current)target.current=[0,0];x+=(target.current[0]-x)*.065;y+=(target.current[1]-y)*.065;root.style.setProperty('--pan-x',x*8+'px');root.style.setProperty('--pan-y',y*5+'px');raf.current=requestAnimationFrame(animate);};
-    root.addEventListener('pointermove',move);root.addEventListener('pointerleave',reset);raf.current=requestAnimationFrame(animate);
-    return()=>{cancelAnimationFrame(raf.current);root.removeEventListener('pointermove',move);root.removeEventListener('pointerleave',reset);root.style.setProperty('--pan-x','0px');root.style.setProperty('--pan-y','0px');};
+    let x=0,y=0,last=performance.now();
+    const schedule=()=>{if(!raf.current){last=performance.now();raf.current=requestAnimationFrame(animate);}};
+    const move=event=>{if(event.pointerType==='touch'||isPlaying.current)return;const box=root.getBoundingClientRect();target.current=[(event.clientX-box.left)/box.width*2-1,(event.clientY-box.top)/box.height*2-1];schedule();};
+    const reset=()=>{target.current=[0,0];schedule();};
+    const animate=now=>{raf.current=0;if(isPlaying.current)target.current=[0,0];const factor=1-Math.exp(-Math.min(50,now-last)/150);last=now;x+=(target.current[0]-x)*factor;y+=(target.current[1]-y)*factor;root.style.setProperty('--pan-x',x*8+'px');root.style.setProperty('--pan-y',y*5+'px');if(Math.abs(target.current[0]-x)+Math.abs(target.current[1]-y)>.002)raf.current=requestAnimationFrame(animate);};
+    const video=videoRef.current;
+    root.addEventListener('pointermove',move);root.addEventListener('pointerleave',reset);video?.addEventListener('play',reset);
+    return()=>{cancelAnimationFrame(raf.current);raf.current=0;root.removeEventListener('pointermove',move);root.removeEventListener('pointerleave',reset);video?.removeEventListener('play',reset);root.style.setProperty('--pan-x','0px');root.style.setProperty('--pan-y','0px');};
   },[rootRef]);
   return scene;
 }

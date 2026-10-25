@@ -62,7 +62,7 @@ def validate_job(value):
         raise SourceError("Слишком много файлов в одном задании.")
     prepared = []
     for entry in entries:
-        if not isinstance(entry, dict) or set(entry) - {"number", "url", "title", "season"}:
+        if not isinstance(entry, dict) or set(entry) - {"number", "url", "title", "season", "description"}:
             raise SourceError("Некорректный список опубликованных серий.")
         number, entry_season = entry.get("number"), entry.get("season", season)
         if isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= 10000:
@@ -70,7 +70,7 @@ def validate_job(value):
         if isinstance(entry_season, bool) or not isinstance(entry_season, int) or not 1 <= entry_season <= 1000:
             raise SourceError("Некорректный сезон серии.")
         prepared.append({"number": number, "url": public_url(entry.get("url"), resolve_dns=False),
-                         "title": str(entry.get("title", ""))[:300], "season": entry_season})
+                         "title": str(entry.get("title", ""))[:300], "description":str(entry.get("description", ""))[:6000], "season": entry_season})
     metadata = value.get("metadata") or {}
     if not isinstance(metadata, dict) or len(json.dumps(metadata).encode()) > 100000:
         raise SourceError("Слишком большое описание тайтла.")
@@ -235,6 +235,10 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                         else (page.title or entry["title"] or collection)[:220] + "." + extension)
                 options = {"metadata": job["metadata"], "dub": job["dub"]} if job["metadata"] or job["dub"] else {}
                 if job.get('translation'):options['translation']=job['translation']
+                from title_extras import russian
+                episode_title=russian(entry.get('title'))
+                if episode_title and not re.fullmatch(r'(?:Серия|Эпизод)\s*\d+',episode_title,re.I):options['episode_title']=episode_title
+                if russian(entry.get('description')):options['episode_description']=russian(entry['description'])
                 if category == 'video':
                     height=video_height(path)
                     if height:options['quality']=height

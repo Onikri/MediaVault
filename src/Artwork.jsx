@@ -1,11 +1,11 @@
 import React,{useId} from 'react';
 
 // Original illustrations for sections and empty covers, never catalog records.
-export default function Artwork({kind='manga',hero=false,className=''}){
+export default function Artwork({kind='manga',hero=false,className='',ref}){
   const id=useId().replaceAll(':','');
   const colors={manga:['#ec6e46','#f2b27e','#21202a'],video:['#8e81ce','#d3baf5','#26213d'],audio:['#438ca1','#a8d4cd','#142e3a'],book:['#7c906a','#d3ce9a','#29352e'],image:['#af7898','#edc5bd','#392c42']};
   const [a,b,c]=colors[kind]||colors.manga;
-  return <svg className={className} viewBox={hero?'0 0 640 430':'0 0 300 390'} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  return <svg ref={ref} className={className} viewBox={hero?'0 0 640 430':'0 0 300 390'} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
     <defs><linearGradient id={id+'sky'} x2="0" y2="1"><stop stopColor={c}/><stop offset="1" stopColor={a}/></linearGradient><linearGradient id={id+'sun'} x2="0" y2="1"><stop stopColor={b}/><stop offset="1" stopColor={a}/></linearGradient></defs>
     {hero?<>
       <rect width="640" height="430" fill="#222124"/><path d="M80 0h560v430H0z" fill={'url(#'+id+'sky)'}/>

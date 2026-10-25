@@ -40,17 +40,18 @@ def get_json(url, *, params=None, body=None):
         raise SourceError("Каталог сейчас недоступен. Остальные источники продолжат поиск.") from None
 
 
-def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=None, part=""):
+def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=None, part="",genre="",tag=""):
     if provider not in {"kitsu", "anilist", "shikimori", "jikan", "tvmaze", "imdb", "wikidata"}:
         raise SourceError("Неизвестный каталог.")
     query, page = str(query).strip()[:160], max(1, min(100, int(page)))
-    if kind not in {"anime", "manga", "ranobe", "movie", "tv", "character"}:
+    if kind not in {"anime", "manga", "ranobe", "movie", "tv", "character", "person"}:
         raise SourceError("Неизвестный тип каталога.")
-    if part not in {'', 'roles', 'related', 'screenshots', 'external_links'} or (part and (provider != 'shikimori' or not identity)) or (kind == 'character' and (provider != 'shikimori' or not identity or part)):
+    if part not in {'', 'roles', 'related', 'screenshots', 'external_links'} or (part and (provider != 'shikimori' or not identity)) or (kind in {'character','person'} and (provider != 'shikimori' or not identity or part)):
         raise SourceError('Неизвестный раздел сведений о тайтле.')
     if identity and not re.fullmatch(r"(?:tt)?\d{1,12}|Q\d{1,12}", str(identity)):
         raise SourceError("Некорректный идентификатор тайтла.")
-    cache_key = (provider, query, kind, page, identity, str(year), part)
+    genre,tag=str(genre)[:80],str(tag)[:100]
+    cache_key = (provider, query, kind, page, identity, str(year), part,genre,tag)
     with _lock:
         cached = _cache.get(cache_key)
         if cached and cached[0] > time.monotonic():
@@ -66,27 +67,37 @@ def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=No
                 params["sort"] = "-userCount"
             if year and resource == "anime":
                 params["filter[seasonYear]"] = year
+        if not identity and (genre or tag):params['filter[categories]']=re.sub(r'[^a-z0-9]+','-',(genre or tag).lower()).strip('-')
         value = get_json(f"https://kitsu.io/api/edge/{resource}" + (f"/{identity}" if identity else ""), params=params)
     elif provider == "anilist":
         if identity:
             body = {"query": f"query($id:Int){{Media(id:$id){{{MEDIA_FIELDS}}}}}", "variables": {"id": int(identity)}}
         else:
-            arguments = "type:$type,sort:POPULARITY_DESC" + (",search:$search" if query else "") + (",seasonYear:$year" if year else "")
-            body = {"query": "query($search:String,$type:MediaType,$page:Int,$year:Int){Page(page:$page,perPage:16){pageInfo{hasNextPage} media(" + arguments + "){" + MEDIA_FIELDS + "}}}",
-                    "variables": {"search": query or None, "type": "MANGA" if resource == "manga" else "ANIME", "page": page, "year": int(year) if year else None}}
+            arguments = "type:$type,sort:POPULARITY_DESC" + (",search:$search" if query else "") + (",seasonYear:$year" if year else "") + (",genre_in:$genre" if genre else "") + (",tag_in:$tag" if tag else "")
+            definitions=["$type:MediaType","$page:Int"]+(["$search:String"] if query else [])+(["$year:Int"] if year else [])+(["$genre:[String]"] if genre else [])+(["$tag:[String]"] if tag else [])
+            body = {"query": "query("+",".join(definitions)+"){Page(page:$page,perPage:16){pageInfo{hasNextPage} media(" + arguments + "){" + MEDIA_FIELDS + "}}}",
+                    "variables": {"search": query or None, "type": "MANGA" if resource == "manga" else "ANIME", "page": page, "year": int(year) if year else None,"genre":[genre] if genre else None,"tag":[t.strip() for t in tag.split(",") if t.strip()] if tag else None}}
         value = get_json("https://graphql.anilist.co", body=body)
     elif provider == "shikimori":
-        resource = 'characters' if kind == 'character' else "mangas" if resource == "manga" else "animes"
+        resource = 'people' if kind=='person' else 'characters' if kind == 'character' else "mangas" if resource == "manga" else "animes"
         params = {"limit": 16, "page": page, "order": "popularity"}
         if query:
             params["search"] = query
         if year:
             params["season"] = str(year)
+        if not identity and (genre or tag):
+            from metadata_helpers import taxonomy_ids
+            ids=taxonomy_ids(genre,'manga' if kind in {'manga','ranobe'} else 'anime')+[v for label in tag.split(',') for v in taxonomy_ids(label.strip(),'manga' if kind in {'manga','ranobe'} else 'anime')]
+            if ids:params['genre']=','.join(dict.fromkeys(ids))
         value = get_json(f"https://shikimori.io/api/{resource}" + (f"/{identity}" if identity else "") + (f'/{part}' if part else ''), params=params)
     elif provider == "jikan":
         params = {"q": query, "page": page, "limit": 16, "sfw": "false"}
         if year and resource == "anime":
             params["start_date"], params["end_date"] = f"{year}-01-01", f"{year}-12-31"
+        if not identity and (genre or tag):
+            from metadata_helpers import taxonomy_ids
+            ids=taxonomy_ids(genre,resource)+[v for label in tag.split(',') for v in taxonomy_ids(label.strip(),resource)]
+            if ids:params['genres']=','.join(dict.fromkeys(ids))
         value = get_json(f"https://api.jikan.moe/v4/{resource}" + (f"/{identity}/full" if identity else ""), params=params)
     elif provider == "tvmaze":
         value = get_json(f"https://api.tvmaze.com/shows/{identity}", params={"embed": "episodes"}) if identity else get_json("https://api.tvmaze.com/search/shows", params={"q": query})
@@ -115,6 +126,12 @@ def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=No
             else:
                 encoded = quote(query.lower(), safe="")
                 value = get_json(f"https://v3.sg.media-imdb.com/suggestion/{encoded[:1]}/{encoded}.json")
+    if provider=='shikimori' and kind!='person' and part in {'','related','roles'}:
+        from poster_assets import repair
+        value=repair(value,'character' if kind=='character' else 'manga' if kind in {'manga','ranobe'} else 'anime',part)
+    if provider in {'kitsu','anilist','jikan'} and kind in {'anime','manga','ranobe'}:
+        from metadata_helpers import localize
+        value=localize(provider,value,'manga' if kind in {'manga','ranobe'} else 'anime')
     with _lock:
         _cache[cache_key] = (time.monotonic() + (21600 if identity else 120), value)
         _cache.move_to_end(cache_key)

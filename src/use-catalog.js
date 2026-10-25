@@ -3,8 +3,8 @@ import {catalogProviders,fetchCatalog,mergeCatalog,rankCatalog} from './catalog.
 
 const cache=new Map();
 const emptyItems=Object.freeze([]),emptyStatuses=Object.freeze({});
-export function useCatalog(query,kind,year,server,page=1,composing=false){
-  const text=query.trim(),cacheKey=JSON.stringify([text,kind,year,server,page]);
+export function useCatalog(query,kind,year,server,page=1,composing=false,filters={}){
+  const text=query.trim(),cacheKey=JSON.stringify([text,kind,year,server,page,filters.genre,filters.tag]);
   const [revision,setRevision]=useState(0),[snapshot,setSnapshot]=useState(null);
   const key=cacheKey+':'+revision+':'+composing;
   const retry=useCallback(()=>{cache.delete(cacheKey);setRevision(value=>value+1);},[cacheKey]);
@@ -21,7 +21,7 @@ export function useCatalog(query,kind,year,server,page=1,composing=false){
     const timer=setTimeout(()=>{
       Promise.allSettled(names.map(async provider=>{
         try{
-          const found=await fetchCatalog(provider,{query:text,kind,year,server,page,signal:abort.signal});
+          const found=await fetchCatalog(provider,{query:text,kind,year,genre:filters.genre,tag:filters.tag,server,page,signal:abort.signal});
           if(abort.signal.aborted)return;
           results[provider]=found;states[provider]='ok';
         }catch(error){

@@ -36,3 +36,8 @@ test('a browser denying localStorage does not crash progress loading',()=>{
   try{assert.equal(readProgress('a','b','c'),null);assert.doesNotThrow(()=>writeProgress('a','b',{id:'c'},20,100));}
   finally{if(descriptor)Object.defineProperty(globalThis,'localStorage',descriptor);else delete globalThis.localStorage;}
 });
+test('unknown external identifiers cannot merge unrelated catalogue records',async()=>{
+ const {normalizeCatalog,mergeCatalog}=await import('../src/catalog.js');
+ const data={data:{Page:{media:[{id:1,title:{english:'One'},idMal:0},{id:2,title:{english:'Two'},idMal:null}]}}};
+ const rows=normalizeCatalog('anilist',data,'anime');assert.deepEqual(rows[0].ids,{});assert.equal(mergeCatalog(rows).length,2);
+});

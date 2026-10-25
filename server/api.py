@@ -346,8 +346,8 @@ def title_watch_order(identity: str = ''):
 
 
 @app.get("/metadata/{provider}")
-def catalogue(provider: str, q: str = "", kind: str = "anime", page: int = 1, identity: str | None = None, year: int | None = None, part: str = ''):
-    return metadata(provider, query=q, kind=kind, page=page, identity=identity, year=year, part=part)
+def catalogue(provider: str, q: str = "", kind: str = "anime", page: int = 1, identity: str | None = None, year: int | None = None, part: str = '',genre:str='',tag:str=''):
+    return metadata(provider, query=q, kind=kind, page=page, identity=identity, year=year, part=part,genre=genre,tag=tag)
 
 
 @app.get('/artwork')
@@ -519,3 +519,6 @@ def resume(task_id: str, subject=Depends(owner)):
     store.update(task_id, status="queued", progress={"message": "", "phase": "queued",'cursor':0,'saved':0,'skipped':0,'failed':0,'recover_needed':True})
     wakeup.set()
     return task(task_id, subject)
+
+from trailer_service import install as install_trailers
+install_trailers(app, os.getenv("DATA_DIR", "/data"))

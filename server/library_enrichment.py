@@ -36,7 +36,7 @@ def load_profile(identity,kind):
     roles,related=extra[0][0],extra[1][0];screenshots=extra[2][0] if len(extra)>2 else []
     roles=sorted(roles,key=lambda role:0 if 'Main' in role.get('roles',[]) else 1)
     formats={'tv':'Аниме-сериал','movie':'Фильм','ova':'OVA','ona':'ONA','special':'Спецвыпуск','manga':'Манга','novel':'Ранобэ','light_novel':'Ранобэ'}
-    profile={'version':3,'source':'shikimori','sourceId':str(identity),'sourceURL':f"https://shikimori.io/{'animes' if kind=='anime' else 'mangas'}/{identity}",'language':'ru',
+    profile={'version':4,'source':'shikimori','sourceId':str(identity),'sourceURL':f"https://shikimori.io/{'animes' if kind=='anime' else 'mangas'}/{identity}",'language':'ru',
              'title':russian(details.get('russian')),'description':russian(details.get('description_html') or details.get('description')),
              'cover':image((details.get('image') or {}).get('original')),'format':formats.get(details.get('kind'),'Произведение'),
              'status':{'released':'Завершён','ongoing':'Выходит','anons':'Анонсирован'}.get(details.get('status'),''),
@@ -62,11 +62,14 @@ def load_profile(identity,kind):
         try:
             detail=metadata('shikimori',kind='character',identity=value['id'])
             return {**value,'description':russian(detail.get('description_html') or detail.get('description')),
-                    'actors':[russian(a.get('russian')) for a in detail.get('seyu',[]) if russian(a.get('russian'))]}
+                    'actors':[russian(a.get('russian')) for a in detail.get('seyu',[]) if russian(a.get('russian'))],
+                    'voiceActors':[{'id':str(a['id']),'name':russian(a.get('russian')),'image':image((a.get('image') or {}).get('original')),'role':'Сэйю'} for a in detail.get('seyu',[]) if a.get('id') and russian(a.get('russian'))]}
         except Exception:return value
     with ThreadPoolExecutor(max_workers=2) as pool:profile['characters']=list(pool.map(character_detail,profile['characters']))
     profile['partial']=profile['partial'] or not profile['description']
     if profile['screenshots']:profile['background']=profile['screenshots'][0]
+    from title_extras import staff_from_roles,trailers_from_details
+    profile['staff']=staff_from_roles(roles);profile['trailers']=trailers_from_details(details)
     try:
         from poster_assets import posters
         art=posters([str(identity),*[r['id'] for r in profile['related'] if r['kind']==kind]],kind)
@@ -117,17 +120,17 @@ def enrich_profile(vault,group,section):
     title_id=section+':'+group['id'];previous=vault.catalog.get('titleProfiles',{}).get(title_id,{})
     info=group.get('metadata') or {};identity=group.get('metadataId') or info.get('ids',{}).get('mal')
     profile=previous.copy()
-    if identity and (not previous.get('sourceId') or previous.get('version',0)<3 or previous.get('partial') and previous.get('retryAfter',0)<time.time()*1000):
+    if identity and (not previous.get('sourceId') or previous.get('version',0)<4 or previous.get('partial') and previous.get('retryAfter',0)<time.time()*1000):
         try:profile.update(load_profile(identity,'manga' if section in {'manga','ranobe'} else 'anime'))
         except Exception:profile.update({'partial':True,'retryAfter':int((time.time()+120)*1000)})
-    profile.setdefault('version',3);profile.setdefault('title',group['name']);profile.setdefault('language','ru')
+    profile.setdefault('version',4);profile.setdefault('title',group['name']);profile.setdefault('language','ru')
     own=[i['previewArtwork'] for i in vault.catalog['items'] if i.get('collectionId')==group['id'] and i.get('previewArtwork')][:10]
     assets={**profile.get('artwork',{}),**{'drive:'+a['id']:a for a in own}}
     own_urls=['drive:'+a['id'] for a in own]
-    if profile==previous and own_urls==previous.get('backgrounds',[]) and previous.get('artworkRetryAfter',0)>time.time()*1000:return previous
+    if profile==previous and all(url in previous.get('screenshots',[]) for url in own_urls) and previous.get('artworkRetryAfter',0)>time.time()*1000:return previous
     profile['artwork']=assets;published=[u for u in [profile.get('background'),*profile.get('screenshots',[])] if u and u.startswith('https://') and u!=profile.get('cover')];profile['backgrounds']=list(dict.fromkeys(published+own_urls))[:10]
     profile['screenshots']=list(dict.fromkeys(own_urls+profile.get('screenshots',[])))[:14]
-    urls=list(dict.fromkeys([profile.get('cover'),profile.get('background'),*profile['screenshots'],*[c.get('image') for c in profile.get('characters',[])],*[r.get('cover') for r in profile.get('related',[])]]))
+    urls=list(dict.fromkeys([profile.get('cover'),profile.get('background'),*profile['screenshots'],*[c.get('image') for c in profile.get('characters',[])],*[r.get('cover') for r in profile.get('related',[])],*[r.get('image') for r in profile.get('staff',[])],*[a.get('image') for c in profile.get('characters',[]) for a in c.get('voiceActors',[])],*[t.get('image') for t in profile.get('trailers',[])]]))
     from artwork import fetch_image
     def fetch(url):
         if not url or url in assets or not url.startswith('https://'):return None
@@ -136,8 +139,10 @@ def enrich_profile(vault,group,section):
             return (url,data,mime) if len(data)<=2*1024*1024 else None
         except Exception:return None
     images=[]
-    if previous.get('artworkRetryAfter',0)<time.time()*1000:
+    if previous.get('version',0)<4 or previous.get('artworkRetryAfter',0)<time.time()*1000:
         with ThreadPoolExecutor(max_workers=4) as executor:images=[value for value in executor.map(fetch,[u for u in urls if u and u not in assets][:48]) if value]
+    downloaded={value[0] for value in images}
+    profile['missingArtwork']=sum(1 for url in urls if url and url.startswith('https://') and url not in assets and url not in downloaded)
     profile['artworkRetryAfter']=int((time.time()+120)*1000)
     return vault.save_title_profile(title_id,profile,images)
 

@@ -286,7 +286,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       <div className="mv-player-ambient" aria-hidden="true"/>
       <div className="mv-player-panorama" aria-hidden="true">{scene.image&&<img src={scene.image} alt=""/>}</div>
       <div className="mv-player-stage">
-        <video ref={videoRef} src={source||undefined} playsInline preload="metadata" muted={muted}
+        <video ref={videoRef} src={source||undefined} crossOrigin="anonymous" playsInline preload="metadata" muted={muted}
           onLoadedMetadata={loaded} onTimeUpdate={onTime}
           onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);writeProgress(userId,libraryId,item,videoRef.current?.currentTime||0,videoRef.current?.duration);}}
           onDurationChange={loaded} onEnded={ended}
@@ -304,7 +304,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       <div id="player-panel-watch" className="mv-player-watch" aria-hidden={playing||panel!=='watch'}>
         <div className="mv-player-overview">
           <h1>{library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,'')}</h1>
-          <p>{season?.name}<span> / </span>{episode?.label}</p>
+          <p>{season?.name}<span> / </span>{episode?.label}</p>{episode?.description&&/[а-яё]/i.test(episode.description)&&<p className="mv-episode-description">{episode.description}</p>}
         {readResume(keyFor(userId,libraryId,item.id))>0&&<button className="mv-resume" onClick={()=>{seek(readResume(keyFor(userId,libraryId,item.id)));videoRef.current?.play().catch(onError);}}>Продолжить просмотр · {clock(readResume(keyFor(userId,libraryId,item.id)))}</button>}</div>
       </div>
       <AnimatePresence>
@@ -370,7 +370,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       <div className="mv-player-rail" ref={railRef}>{season?.episodes.map((ep,i)=>{
         const current=ep===episode;
         return <button key={ep.id} className={'mv-player-card'+(current?' is-current':'')} aria-current={current?'true':undefined} onClick={()=>{choose(ep.variants[0]?.item);openPanel('watch');}}>
-          <span className="mv-player-card-art">{renderEpisodeArtwork?renderEpisodeArtwork(ep,i):null}{(!renderEpisodeArtwork)&&(ep.variants[0]?.item.preview||item.preview||scene.image)&&<img className="mv-player-card-preview" src={ep.variants[0]?.item.preview||item.preview||scene.image} alt=""/>}<span className="mv-player-card-number">{String(ep.number||i+1).padStart(2,'0')}</span><small>{current?'СЕЙЧАС':String(i+1).padStart(2,'0')}</small></span>
+          <span className="mv-player-card-art">{renderEpisodeArtwork?renderEpisodeArtwork(ep.variants.find(v=>v.item.id===item.id)?.item||ep.variants.find(v=>v.item.previewArtwork)?.item||ep.variants[0]?.item,i):null}{(!renderEpisodeArtwork)&&(ep.variants[0]?.item.preview||item.preview||scene.image)&&<img className="mv-player-card-preview" src={ep.variants[0]?.item.preview||item.preview||scene.image} alt=""/>}<span className="mv-player-card-number">{String(ep.number||i+1).padStart(2,'0')}</span><small>{current?'СЕЙЧАС':String(i+1).padStart(2,'0')}</small></span>
           <strong>{ep.label}</strong><small>{ep.variants[0]?.label}</small>
         </button>;
       })}</div>

@@ -13,3 +13,5 @@ export function writeProgress(user,library,item,time,duration,storage){
     if(item.collectionId){const group=key(user,library,'collection:'+item.collectionId);if(done||time<1){if(readProgress(user,library,'collection:'+item.collectionId,storage)?.itemId===item.id)storage.removeItem(group);}else storage.setItem(group,JSON.stringify(value));}
   }catch{}
 }
+
+export function progressClock(seconds){const n=Math.max(0,Math.floor(seconds||0));return (n>=3600?Math.floor(n/3600)+":":"")+String(Math.floor(n%3600/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}

@@ -1,13 +1,24 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import Icon from './Icons.jsx';
 import Artwork from './Artwork.jsx';
+import {useArtwork} from './title-artwork.js';
 import {providers} from './catalog.js';
 import GoogleOAuthSetup from './GoogleOAuthSetup.jsx';
 
 export const kinds=[['anime','Аниме'],['manga','Манга'],['movie','Фильмы'],['ranobe','Ранобэ'],['tv','Сериалы']];
 export function Poster({item}){
-  const [failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[item.cover]);
-  return item.cover&&!failed?<img src={item.cover} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<Artwork kind={['manga','ranobe'].includes(item.kind)?'manga':'video'}/>;
+  const anchor=useRef(null),[visible,setVisible]=useState(false),[replacement,setReplacement]=useState(null);
+  useEffect(()=>{const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'300px'});if(anchor.current)observer.observe(anchor.current);return()=>observer.disconnect();},[]);
+  const source=useArtwork(replacement?.id===item.id?replacement.url:item.cover,null,null,null,visible);
+  const [failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[source]);
+  useEffect(()=>{
+    const server=window.MEDIA_VAULT_CONFIG?.importServerUrl,id=item.ids?.mal;
+    if(!visible||!server||!id||source&&!failed||replacement?.id===item.id)return;
+    const abort=new AbortController();
+    fetch(server+'/metadata/posters?'+new URLSearchParams({ids:id,kind:item.kind==='anime'?'anime':'manga'}),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(12000)])}).then(r=>r.ok?r.json():{}).then(data=>{if(!abort.signal.aborted)setReplacement({id:item.id,url:data[id]?.cover||item.cover});}).catch(()=>{});
+    return()=>abort.abort();
+  },[item.id,item.ids?.mal,item.kind,visible,source,failed,replacement]);
+  return source&&!failed?<img ref={anchor} src={source} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<Artwork ref={anchor} kind={['manga','ranobe'].includes(item.kind)?'manga':'video'}/>;
 }
 function DateLabel({value,japan=false}){
   try{return <time dateTime={value}>{new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',...(japan?{timeZone:'Asia/Tokyo'}:{})}).format(new Date(value))}{japan?' JST':''}</time>;}catch{return null;}

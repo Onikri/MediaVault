@@ -6,7 +6,7 @@ const ROOT=path.resolve(__dirname,'..'),entry=path.join(ROOT,'test-output','voic
 (async()=>{
   await fs.mkdir(path.dirname(entry),{recursive:true});
   await fs.writeFile(entry,`<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">
-import React from 'react';import {createRoot} from 'react-dom/client';import {TitleDetails} from '/src/CatalogBrowser.jsx';import '/src/styles.css';
+import React from 'react';import {createRoot} from 'react-dom/client';import {TitleDetails} from '/src/CatalogBrowser.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';
 const item={id:'shikimori:57334',provider:'shikimori',providerId:'57334',providers:['shikimori'],title:'Дандадан',titles:{ru:'Дандадан',en:'Dandadan'},aliases:['Дандадан','Dandadan'],year:2024,kind:'anime',format:'TV',genres:['Комедия'],tags:['Школа'],links:[],releases:[],ids:{mal:'57334'},description:'Проверка точного тайтла и переводов.',cover:''};
 window.MEDIA_VAULT_CONFIG={};
 const service={server:'https://fixture.example',status:'connected',session:{driveConnected:true},request:async(path,options={})=>{
@@ -52,6 +52,7 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
     const job=await page.evaluate(()=>window.submitted);assert.equal(job.version,3);assert.equal(job.quality,width===1280?'2160':'best');assert.equal(job.metadata.ids.mal,'57334');assert.equal(job.translation.player,'Kodik');assert.equal(job.dub,'Studio 39');assert.equal(job.translation.variantId,'variant-39-13');assert.deepEqual(job.entries.map(e=>e.number),[1,3]);
     assert.equal(discoveryCalls,2);assert.equal(inspectionCalls,2);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal overflow at '+width);
+    if(width===1280){const layout=await page.locator('.import-dossier-layout').boundingBox();assert.ok(layout.width>1000,'The dossier uses the desktop content width');}
     await page.screenshot({path:path.join(ROOT,'test-output','voice-import-'+width+'.png'),fullPage:true});
     assert.deepEqual(errors,[]);assert.ok(!external.some(url=>url.includes('.mp4')||url.includes('kodikplayer.com')),'The UI never downloads source video');
     await context.close();console.log('PASS exact-title grouped voice import at '+width+'px');

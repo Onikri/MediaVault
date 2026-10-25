@@ -64,12 +64,12 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
     const selectedTranslation=variant||inspection.dubs?.find(d=>d.url===dub);
     const job={version:3,library_id:state.libraryId,sources:[url],collection:collection.trim(),season:Number(season),episodes:episodeText||'all',quality,resume:true,
       section:kind==='manga'?'manga':kind==='ranobe'?'ranobe':['movie','tv'].includes(kind)?'video':'anime',metadata,
-      entries:published.map(entry=>({number:entry.number,url:entry.url,title:entry.title||'',season:Number(entry.season||season)})),
+      entries:published.map(entry=>({number:entry.number,url:entry.url,title:entry.title||'',...(entry.description?{description:entry.description}:{}),season:Number(entry.season||season)})),
       dub:variant?.name||inspection.dubs?.find(d=>d.url===dub)?.name||'',provider:inspection.provider,
       ...(selectedTranslation?.kind?{translation:{name:selectedTranslation.name,kind:selectedTranslation.kind,language:selectedTranslation.language||'und',player:selectedTranslation.player||'',variantId:selectedTranslation.id}}:{})};
     setBusy('submit');try{await service.submit(job);onSubmitted();}catch(cause){setError(cause.message);}finally{setBusy('');}
   }
-  return <form className="import-selection" onSubmit={submit}>
+  return <form className="import-selection import-compact" onSubmit={submit}>
     <div className="section-heading"><h3>В твою коллекцию</h3><span className="source-label"><Icon name="lock" size={12}/> Зашифровано в Drive</span></div>
 
     {manual&&<div className="form-field"><label className="input-label" htmlFor="manualKind">Тип произведения</label><select id="manualKind" className="field-input" value={manualKind} onChange={e=>{setManualKind(e.target.value);setInspection(null);}}>{kinds.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div>}

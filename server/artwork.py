@@ -4,7 +4,7 @@ import threading
 from urllib.parse import urlsplit
 from source_parser import PublicHttp, SourceError, public_url
 
-HOSTS={'shikimori.io','desu.shikimori.io','shikimori.one','shikimori.me','shikimori.org','desu.shikimori.one','s4.anilist.co','cdn.myanimelist.net',
+HOSTS={'img.youtube.com','i.ytimg.com','shikimori.io','desu.shikimori.io','shikimori.one','shikimori.me','shikimori.org','desu.shikimori.one','s4.anilist.co','cdn.myanimelist.net',
        'media.kitsu.io','media.kitsu.app','upload.wikimedia.org','commons.wikimedia.org'}
 cache,lock=OrderedDict(),threading.Lock()
 

@@ -176,3 +176,5 @@ keys, VK's `apiPrefetchCache`, Animedia's `data-vlnk`, and the retired
 SovetRomantica format. Fixture success is separate from live network success.
 
 - Playwright for Python 1.62.0 (Apache-2.0) and Chromium (BSD-style and third-party notices) run only on the server for public dynamic players; browser contexts contain no Google profile. Sources: https://github.com/microsoft/playwright-python and https://www.chromium.org/Home/chromium-security/ .
+
+- Public trailer preparation: [yt-dlp](https://github.com/yt-dlp/yt-dlp), 2026.10.21, [Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE). Its optional default dependencies retain their respective licenses. Only catalogue-listed public trailers are accepted; no credentials, paywall or DRM bypass is configured. FFmpeg/ffprobe are provided by the server distribution under their packaged licenses.

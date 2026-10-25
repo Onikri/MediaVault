@@ -1,12 +1,10 @@
 import {useEffect,useState} from 'react';
-export default function WatchOrder({identity,server}){
-  const [value,setValue]=useState(null),[error,setError]=useState('');
-  useEffect(()=>{
-    const controller=new AbortController();setValue(null);setError('');
-    if(!identity||!server)return()=>controller.abort();
-    fetch(server+'/metadata/watch-order?identity='+encodeURIComponent(identity),{signal:controller.signal}).then(async response=>{if(!response.ok)throw Error('Порядок просмотра временно недоступен.');return response.json();}).then(value=>{if(!Array.isArray(value.items))throw Error('Каталог не предоставил порядок выхода.');setValue(value);}).catch(cause=>{if(!controller.signal.aborted)setError(cause.message);});
-    return()=>controller.abort();
-  },[identity,server]);
-  if(!identity||!server)return null;
-  return <section className="watch-order"><h2>Порядок просмотра</h2>{error?<p>{error}</p>:!value?<p>Получаем связи франшизы…</p>:<><p className="fine">{value.message}</p><ol>{value.items.map(item=><li key={item.id} aria-current={item.current?'step':undefined}><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a>{item.current&&<strong> · Ты здесь</strong>}{item.year&&<small> · {item.year}</small>}</li>)}</ol></>}</section>;
+import {ListOrdered,Check,ExternalLink} from 'lucide-react';
+export default function WatchOrder({identity,server,onRelated,cached,onLoaded}){
+ const [value,setValue]=useState(null),[error,setError]=useState(''),[expanded,setExpanded]=useState(false);
+ useEffect(()=>{const controller=new AbortController();setValue(null);setError('');setExpanded(false);if(cached?.items){setValue(cached);return()=>controller.abort();}if(!identity||!server)return()=>controller.abort();
+ fetch(server+'/metadata/watch-order?identity='+encodeURIComponent(identity),{signal:controller.signal}).then(async r=>{if(!r.ok)throw Error('Порядок просмотра временно недоступен.');return r.json();}).then(data=>{if(!Array.isArray(data.items))throw Error('Каталог не предоставил порядок выхода.');setValue(data);onLoaded?.(data);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});return()=>controller.abort();},[identity,server,!!cached]);
+ if(!identity||!server)return null;
+ const items=value?.items||[],current=items.findIndex(i=>String(i.id)===String(identity)),start=Math.max(0,Math.min(current-2,items.length-6)),visible=expanded?items:items.slice(start,start+6);
+ return <section className="watch-order"><div className="section-heading"><h2><ListOrdered size={17}/>Порядок просмотра</h2><span className="fine">По дате выхода</span></div>{error?<p className="fine">{error}</p>:!value?<p className="fine">Получаем связи франшизы…</p>:<><p className="watch-order-note">{value.message}</p>{!!items.length&&<ol className={expanded?'watch-order-expanded':''}>{visible.map((item,index)=><li key={item.id} aria-current={item.current?'step':undefined}><span className="watch-step">{item.current?<Check size={13}/>:String((expanded?0:start)+index+1).padStart(2,'0')}</span><button onClick={()=>onRelated?.({...item,kind:'anime',relation:'Порядок просмотра',format:item.kind==='movie'?'Фильм':'Аниме'})}><span><strong>{/[а-яё]/i.test(item.title)?item.title:'Название уточняется'}</strong><small>{item.year||''}{item.current?' · Ты здесь':''}</small></span></button></li>)}</ol>}{items.length>6&&<button className="text-link credits-expand" onClick={()=>setExpanded(v=>!v)}>{expanded?'Свернуть':'Весь порядок · '+items.length+' произведений'}</button>}<a className="text-link watch-order-source" href={'https://shikimori.io/animes/'+identity+'/franchise'} target="_blank" rel="noopener noreferrer">Связи в каталоге<ExternalLink size={12}/></a></>}</section>;
 }

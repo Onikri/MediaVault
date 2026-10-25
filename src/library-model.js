@@ -34,7 +34,7 @@ export function buildTitles(catalog,items=catalog?.items||[]){
   for(const group of collections.values()){
     const section=sectionForCollection(group,catalog),profile=catalog?.titleProfiles?.[section+':'+group.id];
     const identity=profile?.sourceId||group.metadataId||group.metadata?.ids?.mal;
-    if(identity){const canonicalKey=section+':mal:'+identity;if(!canonical.has(canonicalKey))canonical.set(canonicalKey,group.id);groupKeys.set(group.id,canonical.get(canonicalKey));}
+    if(/^[1-9]\d{0,11}$/.test(String(identity||''))){const canonicalKey=section+':mal:'+identity;if(!canonical.has(canonicalKey))canonical.set(canonicalKey,group.id);groupKeys.set(group.id,canonical.get(canonicalKey));}
   }
   const result=new Map();
   for(const item of items){

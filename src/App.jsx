@@ -32,9 +32,10 @@ function writeLocal(key,value){try{localStorage.setItem(key,JSON.stringify(value
 function plural(n){return n%10===1&&n%100!==11?'материал':n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?'материала':'материалов';}
 
 function relatedPage(value,catalog){
-  const existing=buildTitles(catalog).find(t=>String(t.profile?.sourceId||t.metadataId)===String(value.id)&&t.section===value.kind);
-  return existing||{id:'remote:'+value.kind+':'+value.id,name:value.title,section:value.kind,category:value.kind==='anime'?'video':value.kind==='manga'?'manga':'book',items:[],parts:[],metadataId:value.provider==='wikidata'?null:value.id,
-    profile:{...value,source:value.provider==='wikidata'?'wikidata':'shikimori',sourceId:value.id,sourceURL:value.sourceURL||'https://shikimori.one/'+(['manga','ranobe'].includes(value.kind)?'mangas':'animes')+'/'+value.id,cover:value.cover,language:'ru',characters:[],related:[],screenshots:[]},external:true};
+  const externalId=value.ids?.mal||value.id;
+  const existing=buildTitles(catalog).find(t=>String(t.profile?.sourceId||t.metadataId)===String(externalId)&&t.section===value.kind);
+  return existing||{id:'remote:'+value.kind+':'+value.id,name:value.title,section:value.kind,category:value.kind==='anime'?'video':value.kind==='manga'?'manga':'book',items:[],parts:[],metadataId:value.ids?.mal||(value.provider==='wikidata'?null:value.id),
+    profile:{...value,source:value.provider==='wikidata'&&!value.ids?.mal?'wikidata':'shikimori',sourceId:externalId,sourceURL:value.sourceURL||'https://shikimori.one/'+(['manga','ranobe'].includes(value.kind)?'mangas':'animes')+'/'+value.id,cover:value.cover,language:'ru',characters:[],related:[],screenshots:[]},external:true};
 }
 function routedTitle(catalog,id){
   const existing=buildTitles(catalog).find(t=>t.id===id);if(existing)return existing;

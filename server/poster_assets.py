@@ -32,3 +32,21 @@ def posters(ids,kind='anime'):
             if len(_cache)>128:_cache.clear()
             _cache[key]=(time.monotonic()+(3600 if len(result)==len(ids) else 60),result)
     return result
+
+
+def missing(url):
+    return not url or bool(re.search(r'(?:/|_)(?:missing|404|no[_-]?image|no_poster)(?:[./_-]|$)',str(url),re.I))
+
+def repair(value,kind,part=''):
+    import copy
+    value=copy.deepcopy(value)
+    if kind=='character' or part=='roles':return value
+    groups=[('anime','anime'),('manga','manga')] if part=='related' else [(None,kind)]
+    for key,media in groups:
+        items=[r[key] for r in value if r.get(key)] if key else value if isinstance(value,list) else [value]
+        needed=[r for r in items if isinstance(r,dict) and r.get('id') and missing(r.get('image',{}).get('original'))]
+        try:assets=posters([r['id'] for r in needed],media) if needed else {}
+        except Exception:assets={}
+        for item in needed:
+            if assets.get(str(item['id']),{}).get('cover'):item.setdefault('image',{})['original']=assets[str(item['id'])]['cover']
+    return value

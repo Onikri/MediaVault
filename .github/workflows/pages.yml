@@ -39,6 +39,7 @@ jobs:
           npm ci --no-audit --no-fund
           python -m pip install -r server/requirements-service.txt
           python -m pip install httpx==0.28.1
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y ffmpeg; fi
 
       - name: Build and validate encrypted media
         run: |
@@ -66,7 +67,7 @@ jobs:
           npm run test:notebook
 
       - name: Responsive UI and browser integration
-        timeout-minutes: 5
+        timeout-minutes: 8
         env:
           MEDIA_VAULT_SKIP_BUILD: '1'
         run: |
@@ -78,7 +79,8 @@ jobs:
           {
             npm run test:ui &&
             npm run test:browser &&
-            npm run test:voices
+            npm run test:voices &&
+            npm run test:design
           } 2>&1 | tee test-output/browser-ci.log
           result=${PIPESTATUS[0]}
           {
