@@ -39,7 +39,7 @@ async def _check_player_access(page):
 
 
 async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,timeout=12):
-    try:from playwright.async_api import async_playwright
+    try:from playwright.async_api import async_playwright,TimeoutError as PlaywrightTimeout
     except ImportError:raise SourceError('Для динамического плеера обнови серверный образ с Chromium.') from None
     executable=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium') or shutil.which('google-chrome')
     if not executable:raise SourceError('На сервере не установлен Chromium для динамического плеера.')
@@ -107,6 +107,7 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                 if not captured:raise SourceError('Динамический плеер не опубликовал поддерживаемый MP4/HLS-поток.')
                 return list(captured.values())
             finally:await context.close()
+        except PlaywrightTimeout:raise SourceError('Плеер не ответил за отведённое время.') from None
         finally:await browser.close()
 
 
@@ -154,6 +155,7 @@ async def _render(url,*,validate=browser_destination,fixture=None,timeout=8):
             text=await page.content()
             if BLOCKED.search(text[:2*1024*1024]):raise SourceError('Источник требует проверку браузера или вход.')
             return text,validate(page.url)
+        except PlaywrightTimeout:raise SourceError('Источник не успел опубликовать разметку плеера.') from None
         finally:await browser.close()
 
 
