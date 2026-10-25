@@ -30,5 +30,5 @@ def posters(ids,kind='anime'):
     if result:
         with _lock:
             if len(_cache)>128:_cache.clear()
-            _cache[key]=(time.monotonic()+3600,result)
+            _cache[key]=(time.monotonic()+(3600 if len(result)==len(ids) else 60),result)
     return result

@@ -35,16 +35,20 @@ def discover(selected):
                 for candidate in matches[:2]:
                     try:
                         value=inspect_source(candidate['url'],http=http,kind=selected.get('kind','anime'))
+                        verified={**candidate,'ids':value.get('ids') or candidate.get('ids') or {},'year':value.get('year') or candidate.get('year')}
+                        accepted,evidence=match_title(selected,verified)
+                        if not accepted:continue
+                        if selected.get('year') and not verified.get('year') and evidence!='external_id':
+                            status='unverified';message='Название совпадает, но год или внешний ID не подтверждён страницей.';continue
                         # HTML title must not contradict the selected identity. Search snippets can be stale.
-                        page_title=value.get('title','').split(' / ')[0]
+                        import re
+                        page_title=re.split(r'\s+(?:смотреть|watch)\b|\s+[|–—]\s+',value.get('title',''),flags=re.I)[0]
                         if page_title and not match_title(selected,{'title':page_title,'kind':'anime'})[0]:
-                            # Site suffixes are allowed only after an exact catalogue title.
-                            if not any(page_title.casefold().startswith(name.casefold()+' ') or page_title.casefold()==name.casefold() for name in aliases(candidate)):
-                                continue
+                            continue
                         inspected.append({**value,'title':candidate['title'],'providerName':site.name,'matchEvidence':candidate['matchEvidence']})
                     except Exception:
                         status='unavailable';message='Страница найдена, плееры временно не ответили.'
-                return {'provider':site.id,'name':site.name,'status':'ok' if inspected else 'no_match' if matches or status in {'ok','empty'} else status,'message':message,'sources':inspected}
+                return {'provider':site.id,'name':site.name,'status':'ok' if any(v.get('dubs') for v in inspected) else 'no_players' if inspected else 'no_match' if matches or status in {'ok','empty'} else status,'message':message,'sources':inspected}
             except Exception:
                 return {'provider':site.id,'name':site.name,'status':'unavailable','message':'Источник не ответил или изменил разметку.','sources':[]}
             finally:http.close()

@@ -16,5 +16,11 @@ def watch_order(identity):
         values.append({'id':identifier,'title':node.get('russian') or node.get('name') or 'Название уточняется',
                        'date':raw,'year':node.get('year'),'current':identifier==identity,
                        'url':'https://shikimori.io/animes/'+identifier,'kind':node.get('kind')})
+    try:
+        from poster_assets import posters
+        art=posters([v['id'] for v in values])
+        for value in values:
+            if art.get(value['id'],{}).get('title'):value['title']=art[value['id']]['title']
+    except Exception:pass
     values.sort(key=lambda n:(n['date'] or float('inf'),n['id']))
     return {'items':values,'links':edges,'mode':'release','source':'Shikimori','message':'Порядок выхода. Альтернативные адаптации и ответвления не образуют единственную обязательную хронологию.'}

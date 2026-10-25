@@ -29,7 +29,7 @@ def season_of(value):
 
 
 def base_title(value):
-    text=str(value).casefold()
+    text=re.split(r'\s+(?:смотреть|watch)\b',str(value).casefold())[0]
     text=re.sub(r'\([^)]*(?:серий|эпизод|озвуч|субтит|20\d\d|19\d\d)[^)]*\)', '',text)
     text=re.sub(r'(?:\d+(?:st|nd|rd|th)?\s*(?:-?й\s*)?(?:сезон|season)|(?:сезон|season|tv|тв|part)\s*[-:]?\s*\d+)','',text)
     return normalized(re.sub(r'\s+\d{1,2}\s*$','',text))

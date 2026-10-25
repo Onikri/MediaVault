@@ -113,7 +113,8 @@ def parse_search(site, text, base, query=""):
             continue
         seen.add(url)
         result = {"provider": site.id, "providerName": site.name, "url": url, "title": title,
-                  "kind": site.kind, "dubs": [], "releaseDates": []}
+                  "kind": site.kind, "dubs": [], "releaseDates": [],
+                  "year": int(re.search(r'\b((?:19|20)\d{2})\b',card.get_text(' ',strip=True))[1]) if re.search(r'\b((?:19|20)\d{2})\b',card.get_text(' ',strip=True)) else None}
         if image:
             result["cover"] = link(image.get("data-src") or image.get("src"), base)
         elif site.id == 'jutsu':

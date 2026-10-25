@@ -1,6 +1,6 @@
 # Использованные открытые библиотеки
 
-Собственные компоненты MediaVault вызывают эти библиотеки; платные сервисы и API аниме-каталогов не подключены.
+Собственные компоненты MediaVault вызывают эти библиотеки; платные сервисы не подключены. Метаданные и публичные playback API отделены от Google Drive.
 
 | Библиотека | Назначение | Лицензия / исходники |
 |---|---|---|
@@ -9,7 +9,7 @@
 | Motion | Анимации с учётом reduced motion | MIT · https://github.com/motiondivision/motion |
 | Lucide | Иконки | ISC · https://github.com/lucide-icons/lucide |
 | Vite | Сборка | MIT · https://github.com/vitejs/vite |
-| anime-dl-core 0.5.1 | Публичные плееры Kodik/Aniboom/Sibnet/Animedia; API-адаптеры отключены | MIT · https://github.com/ialakey/anime-dl-core |
+| anime-dl-core 0.5.1 | Плееры Kodik/Aniboom/Sibnet/Animedia/CVH/VK/AniLiberty; публичные playback API разрешены точным списком | MIT · https://github.com/ialakey/anime-dl-core |
 | m3u8 6.0.0 | Разбор HLS | MIT · https://github.com/globocom/m3u8 |
 | requests | HTTP источников | Apache-2.0 · https://github.com/psf/requests |
 | cryptography | Совместимое с Web Crypto AES-GCM | Apache-2.0/BSD · https://github.com/pyca/cryptography |
@@ -164,3 +164,6 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 - High-resolution catalogue banners: [AniList GraphQL Media](https://docs.anilist.co/reference/object/media), matched by MAL ID. Russian descriptions continue to come from Shikimori.
 - Confirmed cross-media relationships: [Wikidata/Wikibase API](https://www.mediawiki.org/wiki/Wikibase/API), linked through the title's Wikipedia page; Wikidata structured data is CC0. Images from Commons retain their source URLs; see each file page for its individual license.
+
+
+AnimeGO provider/episode attributes were cross-checked against [AnimeParsers](https://github.com/YaNesyTortiK/AnimeParsers) at `cac4c83e03e43f2829506ef202a1279a4e0b78bf`, MIT (YaNesyTortiK). The adapter uses MediaVault’s source-only HTTP client; reference-package sessions and token collections are not imported. Player behavior was also reviewed against [the anime-dl-core author’s article](https://habr.com/ru/articles/1079156/). Existing `anime-dl-core` remains pinned to 0.5.1.

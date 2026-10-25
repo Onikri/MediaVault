@@ -755,3 +755,7 @@ button { border: 0; }
 .mv-resume{padding:10px 0;background:transparent;color:var(--accent);font-size:12px;pointer-events:auto}
 @media(max-width:1050px){.catalog-detail{grid-template-columns:minmax(0,1fr)}.catalog-detail>.detail-hero{grid-template-columns:120px minmax(0,1fr)}.catalog-detail>.detail-hero .detail-poster{width:120px}}
 @media(max-width:420px){.catalog-detail>.detail-hero{grid-template-columns:85px minmax(0,1fr);gap:12px}.catalog-detail>.detail-hero .detail-poster{width:85px}.catalog-detail>.detail-hero .detail-description{grid-column:1/-1;max-height:240px}.catalog-detail>[data-orientation]{padding:12px}.catalog-detail .import-tabs{justify-content:flex-start}}
+.catalog-detail .import-selection{padding:0;background:transparent;border:0;box-shadow:none}
+.catalog-detail .import-selection .section-heading{margin:6px 0 16px}
+.manual-source{margin:12px 0;font-size:12px}.manual-source summary{cursor:pointer;color:#b6a79b;padding:7px 0}
+.catalog-detail .import-selection .fine{font-size:11px;line-height:1.55}

@@ -165,7 +165,7 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             key=(item['url'],item['name'],item.get('kind'))
             if key not in choice_seen:choices.append(item);choice_seen.add(key)
         # Report direct/public single-player variants even when the page has no translation name.
-        if not current_choices and not buttons and current.streams:
+        if not current_choices and not buttons and (current.streams or current.episodes and player_name(url) in {'Kodik','Aniboom','AniLiberty','Animedia','VK Video'}):
             item=choice('',url,episodes=current.episodes or [{'number':episode_number(url) or 1,'url':url}])
             if item['url'] not in choice_seen:choices.append(item);choice_seen.add(item['url'])
         if depth<3:
@@ -182,7 +182,7 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             selected_page=parse_page(selected_text,selected_final)
             episodes=selected_page.episodes
             if not episodes and (selected_page.streams or re.search(r'/video/',urlsplit(selected_final).path)):
-                episodes=[{'number':1,'title':'Видео','url':selected_final}]
+                episodes=[{'number':episode_number(selected_final) or 1,'title':'Видео','url':selected_final}]
             _,selected_seasons=player_choices(selected_text,selected_final)
             if selected_seasons:seasons=selected_seasons
     if not episodes and page.streams:episodes=[{'number':episode_number(final) or 1,'url':final}]
@@ -196,7 +196,18 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             number=entry.get('season')
             if number:season_values.setdefault(number,{'number':number,'name':'Сезон '+str(number),'url':None})
     soup=BeautifulSoup(text,'html.parser')
+    ids={}
+    for namespace,expression in [('mal',r'myanimelist\.net/anime/(\d+)'),('shikimori',r'shikimori\.(?:one|io|me)/animes/(?:[a-z])?(\d+)')]:
+        found={re.search(expression,a.get('href',''))[1] for a in soup.select('a[href]') if re.search(expression,a.get('href',''))}
+        if len(found)==1:ids[namespace]=next(iter(found))
+    # Shikimori anime IDs use the MAL namespace.
+    if ids.get('shikimori') and not ids.get('mal'):ids['mal']=ids['shikimori']
+    year=None
+    for node in soup.select('[data-year], .year, [itemprop="datePublished"], meta[property="video:release_date"], meta[property="og:release_date"]'):
+        value=node.get('data-year') or node.get('content') or node.get_text(' ',strip=True)
+        matched=re.search(r'\b((?:19|20)\d{2})\b',value)
+        if matched:year=int(matched[1]);break
     releases=[{'date':e.get('datetime'),'label':e.parent.get_text(' ',strip=True)[:180]} for e in soup.select('.episode time[datetime], .release time[datetime], .schedule time[datetime], [data-episode] time[datetime]')][:100]
     return {'provider':provider,'providerName':provider_name,'title':page.title,'url':final,'dubs':choices,
             'seasons':sorted(season_values.values(),key=lambda e:e['number']),'episodes':episodes,'releases':releases,
-            'available':bool(episodes or choices),'diagnostics':diagnostics}
+            'available':bool(episodes or choices),'diagnostics':diagnostics,'ids':ids,'year':year}

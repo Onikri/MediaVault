@@ -10,6 +10,7 @@ export async function startAnime4K(video,canvas,{mode='balanced',onStats=()=>{},
   const width=Math.max(2,Math.min(video.videoWidth||640,limit));
   input.width=width;input.height=Math.max(2,Math.round(width*(video.videoHeight||360)/(video.videoWidth||640)));
   canvas.getContext('webgl',{powerPreference:'high-performance',alpha:false});
+  const direct=(video.videoWidth||640)<=limit;
   const upscaler=new ImageUpscaler(mode==='quality'?ANIME4KJS_SIMPLE_M_2X:ANIME4KJS_SIMPLE_S_2X);
   let stopped=false,frame=0,raf=0,count=0,slow=0,started=performance.now(),lastMediaTime=-1,lastRenderAt=0,nativeBase=null,windowStart=performance.now(),windowFrames=0,slowWindows=0;
   function stop(){
@@ -25,13 +26,13 @@ export async function startAnime4K(video,canvas,{mode='balanced',onStats=()=>{},
     if(!video.requestVideoFrameCallback&&!video.paused&&performance.now()-lastRenderAt<1000/30)return;
     lastMediaTime=video.currentTime;lastRenderAt=performance.now();
     try{
-      const start=performance.now();ctx.drawImage(video,0,0,input.width,input.height);upscaler.upscale();
+      const start=performance.now();if(!direct)ctx.drawImage(video,0,0,input.width,input.height);upscaler.upscale();
       const gl=canvas.getContext('webgl');
       if(!gl||gl.isContextLost()||gl.getError()!==gl.NO_ERROR)throw Error('Ошибка WebGL при обработке Anime4K.');
       canvas.style.opacity='1';count++;windowFrames++;
       const elapsed=performance.now()-start;slow=elapsed>65?slow+1:Math.max(0,slow-1);
       if(slow>18)throw Error('Anime4K не успевает за видео на этом устройстве. Продолжаем исходное видео.');
-      if(performance.now()-started>1000){onStats({engine:'Anime4K',width:canvas.width,height:canvas.height,fps:Math.round(count*1000/(performance.now()-started)),latency:Math.round(elapsed)});count=0;started=performance.now();}
+      if(performance.now()-started>1000){const debug=gl.getExtension('WEBGL_debug_renderer_info');const renderer=debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);onStats({renderer:String(renderer),engine:'Anime4K',width:canvas.width,height:canvas.height,fps:Math.round(count*1000/(performance.now()-started)),latency:Math.round(elapsed)});count=0;started=performance.now();}
     }catch(error){stop();onFailure(error);}
   }
   function tick(now,metadata){
@@ -49,7 +50,7 @@ export async function startAnime4K(video,canvas,{mode='balanced',onStats=()=>{},
     if(video.requestVideoFrameCallback)frame=video.requestVideoFrameCallback(tick);else if(!video.paused)raf=requestAnimationFrame(tick);
   }
   function wake(){if(!stopped&&!frame&&!raf)tick();}
-  try{upscaler.attachSource(input,canvas);canvas.addEventListener('webglcontextlost',lost);video.addEventListener('play',wake);video.addEventListener('pause',render);video.addEventListener('seeked',render);video.addEventListener('loadeddata',render);tick();}
+  try{upscaler.attachSource(direct?video:input,canvas);canvas.addEventListener('webglcontextlost',lost);video.addEventListener('play',wake);video.addEventListener('pause',render);video.addEventListener('seeked',render);video.addEventListener('loadeddata',render);tick();}
   catch(error){stop();throw error;}
   return stop;
 }

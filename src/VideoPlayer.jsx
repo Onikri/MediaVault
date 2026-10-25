@@ -212,7 +212,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   }
   function nextEpisode(){choose(next);}
   function ended(){
-    setPlaying(false);writeProgress(userId,libraryId,item,0,video.duration);
+    setPlaying(false);writeProgress(userId,libraryId,item,0,videoRef.current?.duration);
     if(prefs.autoNext)nextEpisode();
   }
   function toggle(){const video=videoRef.current;if(!video)return;

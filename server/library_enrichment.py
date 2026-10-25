@@ -137,7 +137,7 @@ def enrich_profile(vault,group,section):
         except Exception:return None
     images=[]
     if previous.get('artworkRetryAfter',0)<time.time()*1000:
-        with ThreadPoolExecutor(max_workers=4) as executor:images=[value for value in executor.map(fetch,urls[:48]) if value]
+        with ThreadPoolExecutor(max_workers=4) as executor:images=[value for value in executor.map(fetch,[u for u in urls if u and u not in assets][:48]) if value]
     profile['artworkRetryAfter']=int((time.time()+120)*1000)
     return vault.save_title_profile(title_id,profile,images)
 

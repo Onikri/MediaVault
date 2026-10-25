@@ -626,8 +626,8 @@ async function main() {
   await cachedPage.locator('#backToTitles').click();
   for(const [name,selector] of [['Маленькие плитки','.library-layout-compact'],['Список','.library-layout-list'],['Таблица','.library-table'],['Плитки','.library-layout-grid']]){await cachedPage.getByRole('button',{name,exact:true}).click();await cachedPage.locator(selector).waitFor();}
   await cachedPage.getByRole('button',{name:'Раздел Аниме',exact:true}).click();await cachedPage.locator('.title-card').click();await cachedPage.locator('.title-related button').click();await cachedPage.locator('.title-hero').waitFor();
-  await cachedPage.getByRole('button',{name:'Добавить в коллекцию',exact:true}).click();await cachedPage.locator('#catalogSearch').waitFor();
-  assert.equal(await cachedPage.locator('#catalogSearch').inputValue(),'Наруто');assert.equal(await cachedPage.locator('.catalog-kind-row .chip-active').innerText(),'Манга','Related manga opens the manga import catalogue');
+  await cachedPage.getByRole('button',{name:'Добавить в коллекцию',exact:true}).click();await cachedPage.locator('.catalog-detail .detail-hero').waitFor();
+  assert.equal(await cachedPage.locator('.detail-copy h2').innerText(),'Наруто');assert.ok((await cachedPage.locator('.detail-copy .eyebrow').innerText()).toLocaleLowerCase('ru').includes('манга'),'Related manga opens the exact title rather than starting an ambiguous name search');
   const sharedItem=organized.items.find(item=>item.collectionId===animeTitle.id&&item.category==='video');
   const sharedPage=await cachedContext.newPage();
   await sharedPage.goto(base+'?library='+catalogId+'#'+new URLSearchParams({episode:sharedItem.id,t:'1'}));await signIn(sharedPage);await sharedPage.locator('#passphrase').fill(PHRASE);await sharedPage.locator('#unlockBtn').click();

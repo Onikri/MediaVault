@@ -1,8 +1,8 @@
-"""Public HTML/player resolver. No anime catalogue/search REST APIs are used.
+"""Public HTML/player resolver with isolated source-only HTTP.
 
-Only the Kodik, Aniboom, Sibnet and Animedia player implementations from
-anime-dl-core (MIT) are enabled. API-based AniLibria/CVH/Alloha adapters are
-deliberately not registered. Google credentials never enter this module.
+Explicit registry: Kodik, Aniboom, Sibnet, Animedia, CVH, VK and AniLiberty.
+Only the enumerated public playback APIs are permitted. Google credentials
+never enter this module. Signed media links are resolved at download time.
 """
 from __future__ import annotations
 
@@ -350,7 +350,7 @@ def parse_page(text, base):
     page = parser.result
     page.streams = list({entry["url"]: entry for entry in page.streams}.values())[:100]
     page.players = list(dict.fromkeys(page.players))[:50]
-    # Multiple dubs can publish the same episode. Preserve the page's first choice.
+    # Preserve alternate translations; only identical episode URLs collapse.
     page.episodes = list({(entry["number"], entry["url"]): entry for entry in page.episodes}.values())
     page.episodes.sort(key=lambda entry: entry["number"])
     if '__NUXT_DATA__' in text:
@@ -380,8 +380,9 @@ class Resolver:
     def player(self, url, referer=None):
         from anime_dl_core import AniboomPlayer, AnimediaPlayer, KodikPlayer, SibnetPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer
         # Explicit registry: never ap.extract(), which also registers API-based players.
-        for player_type in (KodikPlayer, AniboomPlayer, SibnetPlayer, AnimediaPlayer, SovetRomanticaPlayer):
-            if player_type.matches(url):
+        for player_type in (KodikPlayer, AniboomPlayer, SibnetPlayer, AnimediaPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer):
+            cvh_video = player_type is CvhPlayer and urlsplit(url).hostname == 'plapi.cdnvideohub.com' and re.fullmatch(r'/api/v1/player/sv/video/\d+',urlsplit(url).path)
+            if cvh_video or player_type.matches(url):
                 with player_type(client=self.http) as player:
                     options = {"referer": referer} if referer else {}
                     if player_type is KodikPlayer:

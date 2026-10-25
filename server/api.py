@@ -201,7 +201,7 @@ async def lifespan(application):
         store.close()
 
 
-app = FastAPI(title="MediaVault import service", version="5.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="MediaVault import service", version="6.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
 
 
@@ -242,7 +242,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 5, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 6, "voiceDiscovery": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 

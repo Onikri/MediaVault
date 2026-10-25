@@ -20,15 +20,18 @@ export function voiceLabel(item, fallback = 'Оригинал') {
 }
 export function buildPlaybackLibrary(current, catalog) {
   const group = (catalog?.storage?.collections || []).find(entry => entry.id === current.collectionId);
+  const identity=group?.metadataId||group?.metadata?.ids?.mal||catalog?.titleProfiles?.[(current.section||'anime')+':'+group?.id]?.sourceId;
+  const matchingGroups=(catalog?.storage?.collections||[]).filter(g=>g.id===group?.id||identity&&String(g.metadataId||g.metadata?.ids?.mal||catalog?.titleProfiles?.[(current.section||'anime')+':'+g.id]?.sourceId||'')===String(identity));
+  const collectionIds=new Set(matchingGroups.map(g=>g.id));
   const assets = (catalog?.items || []).filter(item => video(item) &&
-    (current.collectionId ? item.collectionId === current.collectionId : item.id === current.id));
+    (current.collectionId ? collectionIds.has(item.collectionId) : item.id === current.id));
   if (!assets.some(item => item.id === current.id)) assets.push(current);
-  const partNames = new Map((group?.parts || []).map(part => [part.id, part.name]));
+  const partNames = new Map(matchingGroups.flatMap(g=>g.parts||[]).map(part => [part.id, part.name]));
   const seasons = new Map();
   for (const item of assets) {
     const part = partNames.get(item.partId) || item.partName ||
       (numeric(item.season) ? 'Сезон ' + item.season : 'Эпизоды');
-    const key = item.partId || part;
+    const key = matchingGroups.length>1?part:item.partId || part;
     if (!seasons.has(key)) seasons.set(key, {id: key, name: part, episodes: new Map()});
     const season = seasons.get(key);
     const number = episodeNumber(item);

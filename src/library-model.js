@@ -30,14 +30,23 @@ export function uploadPlacement({name,category,sourcePath='',section,collection,
 }
 export function buildTitles(catalog,items=catalog?.items||[]){
   const collections=new Map((catalog?.storage?.collections||[]).map(group=>[group.id,group]));
+  const canonical=new Map(),groupKeys=new Map();
+  for(const group of collections.values()){
+    const section=sectionForCollection(group,catalog),profile=catalog?.titleProfiles?.[section+':'+group.id];
+    const identity=profile?.sourceId||group.metadataId||group.metadata?.ids?.mal;
+    if(identity){const canonicalKey=section+':mal:'+identity;if(!canonical.has(canonicalKey))canonical.set(canonicalKey,group.id);groupKeys.set(group.id,canonical.get(canonicalKey));}
+  }
   const result=new Map();
   for(const item of items){
     const group=collections.get(item.collectionId),section=sectionForItem(item);
-    const id=group?.id||'file-'+item.id,key=section+':'+id;
+    const id=groupKeys.get(group?.id)||group?.id||'file-'+item.id,key=section+':'+id;
     if(!result.has(key))result.set(key,{id:key,name:group?.name||item.name.replace(/\.[^.]+$/,''),collectionId:group?.id,
       folderId:group?.folderId,metadataId:group?.metadataId||group?.metadata?.ids?.mal||item.metadataId,metadata:group?.metadata||null,profile:catalog?.titleProfiles?.[key]||importedProfile(group?.metadata),
       section,category:SECTION_FORMAT[section],items:[],parts:group?.parts||[],size:0,addedAt:item.addedAt});
     const title=result.get(key);title.items.push(item);title.size+=item.size||0;
+    if(group&&title.collectionId!==group.id){title.parts=[...new Map([...title.parts,...(group.parts||[])].map(part=>[part.id,part])).values()];
+      const relatedProfile=catalog?.titleProfiles?.[section+':'+group.id];if(relatedProfile?.title&&/[а-яё]/i.test(relatedProfile.title))title.profile=relatedProfile;
+    }
     if(new Date(item.addedAt)>new Date(title.addedAt))title.addedAt=item.addedAt;
   }
   return [...result.values()];

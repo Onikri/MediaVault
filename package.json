@@ -9,12 +9,13 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "test": "node --test tests/range.test.cjs tests/upload.test.cjs tests/upload.test.mjs tests/server-job.test.mjs tests/drive-discovery.test.mjs tests/library-model.test.mjs tests/player-model.test.mjs tests/neural-upscaler.test.mjs tests/playback-diagnostics.test.mjs tests/title-metadata.test.mjs tests/catalog.test.mjs tests/title-cache.test.mjs tests/palette-relations.test.mjs",
+    "test": "node --test tests/range.test.cjs tests/upload.test.cjs tests/upload.test.mjs tests/server-job.test.mjs tests/drive-discovery.test.mjs tests/library-model.test.mjs tests/player-model.test.mjs tests/neural-upscaler.test.mjs tests/playback-diagnostics.test.mjs tests/title-metadata.test.mjs tests/catalog.test.mjs tests/title-cache.test.mjs tests/palette-relations.test.mjs tests/watch-progress.test.mjs",
     "test:browser": "node tests/browser.test.cjs",
     "test:ui": "node tests/ui.test.cjs",
     "preview": "vite preview --host 0.0.0.0",
     "test:server": "python -m unittest discover -s tests -p 'test_*.py'",
-    "test:notebook": "python scripts/build-notebook.py --check"
+    "test:notebook": "python scripts/build-notebook.py --check",
+    "test:voices": "node tests/voice-ui.cjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.15",

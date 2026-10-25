@@ -4,7 +4,7 @@ export default function WatchOrder({identity,server}){
   useEffect(()=>{
     const controller=new AbortController();setValue(null);setError('');
     if(!identity||!server)return()=>controller.abort();
-    fetch(server+'/metadata/watch-order?identity='+encodeURIComponent(identity),{signal:controller.signal}).then(async response=>{if(!response.ok)throw Error('Порядок просмотра временно недоступен.');return response.json();}).then(setValue).catch(cause=>{if(!controller.signal.aborted)setError(cause.message);});
+    fetch(server+'/metadata/watch-order?identity='+encodeURIComponent(identity),{signal:controller.signal}).then(async response=>{if(!response.ok)throw Error('Порядок просмотра временно недоступен.');return response.json();}).then(value=>{if(!Array.isArray(value.items))throw Error('Каталог не предоставил порядок выхода.');setValue(value);}).catch(cause=>{if(!controller.signal.aborted)setError(cause.message);});
     return()=>controller.abort();
   },[identity,server]);
   if(!identity||!server)return null;

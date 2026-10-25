@@ -13,9 +13,8 @@ export function clearArtworkCache(next=''){
 }
 let activeReads=0;const waiting=[];
 async function limitedRead(operation){
-  if(activeReads>=4)await new Promise(resolve=>waiting.push(resolve));
-  activeReads++;
-  try{return await operation();}finally{activeReads--;waiting.shift()?.();}
+  if(activeReads>=4)await new Promise(resolve=>waiting.push(resolve));else activeReads++;
+  try{return await operation();}finally{const next=waiting.shift();if(next)next();else activeReads--;}
 }
 async function externalImage(url,{signal}={}){
   if(!images.has(url))images.set(url,(async()=>{
@@ -58,7 +57,9 @@ export function useArtwork(url,profile,readArtwork,libraryId){
 }
 export async function fetchArtwork(profile,{signal}={}){
   const images=[],failed=[];
-  for(const url of profileArtwork(profile).slice(0,48)){
+  const missing=profileArtwork(profile).filter(url=>!profile.artwork?.[url]);
+  failed.push(...missing.slice(48));
+  for(const url of missing.slice(0,48)){
     if(profile.artwork?.[url])continue;signal?.throwIfAborted();
     try{
       let blob=await externalImage(url,{signal});

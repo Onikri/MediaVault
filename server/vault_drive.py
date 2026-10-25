@@ -576,6 +576,11 @@ class VaultDrive:
             if existing:
                 return existing
         catalog, _ = self._latest()
+        incoming_id=(metadata or {}).get('ids',{}).get('mal')
+        if incoming_id:
+            same=next((group for group in catalog.get('storage',{}).get('collections',[])
+                       if group_section(group,catalog)==section and str(group.get('metadataId') or group.get('metadata',{}).get('ids',{}).get('mal') or '')==str(incoming_id)),None)
+            if same:collection=same['name']
         item_id, asset_id, collection_id, storage, selected_part = self._folders(catalog, category, collection, section, part)
         if metadata:
             if not isinstance(metadata, dict) or len(_json(metadata)) > 100000:
