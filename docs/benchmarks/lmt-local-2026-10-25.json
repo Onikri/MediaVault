@@ -1,0 +1,165 @@
+{
+  "approxProcessTreePeakRssKiB": 1707024,
+  "sample": "public-short-cropped-demo",
+  "sampleSHA256": "9fa8ed3c137202fdfad9723cc7b7c93aad97873f5ec4d10e26c572b323f1cb77",
+  "argosSharedWarm": true,
+  "argosWarmupMs": 1662,
+  "comparisonNotes": "Existing pipeline returns text overlays; LMT also renders inpainting/typesetting. Compare stages and text separately, not a blanket speedup ratio.",
+  "cpuCount": 3,
+  "pythonMaxRssKiB": 390060,
+  "childMaxRssKiB": 340440,
+  "modelTraffic": {
+    "requests": 5,
+    "downloadedBodyBytes": 22676546
+  },
+  "modelFetchMode": "pre-downloaded-real-weights",
+  "visionTested": false,
+  "results": [
+    {
+      "scenario": "existing-oracle-en-ru",
+      "run": 0,
+      "wallMs": 2835,
+      "regions": [
+        {
+          "x": 0.7319587628865979,
+          "y": 0.1796875,
+          "w": 0.15276476101218373,
+          "h": 0.5104166666666666,
+          "original": "YOU'RE INTERESTED IN THE PARANORMAL, You?!",
+          "placement": "note",
+          "confidence": 0,
+          "text": "Вы интересуетесь паранормальными явлениями?!"
+        },
+        {
+          "x": 0.07685098406747891,
+          "y": 0.359375,
+          "w": 0.1358950328022493,
+          "h": 0.29947916666666663,
+          "original": "I DON’T BELIEVE IN UFOS OR ALIENS.",
+          "placement": "note",
+          "confidence": 0,
+          "text": "Я не верю в НЛО и инопланетян."
+        }
+      ]
+    },
+    {
+      "scenario": "existing-oracle-en-ru",
+      "run": 1,
+      "wallMs": 2645,
+      "regions": [
+        {
+          "x": 0.7319587628865979,
+          "y": 0.1796875,
+          "w": 0.15276476101218373,
+          "h": 0.5104166666666666,
+          "original": "YOU'RE INTERESTED IN THE PARANORMAL, You?!",
+          "placement": "note",
+          "confidence": 0,
+          "text": "Вы интересуетесь паранормальными явлениями?!"
+        },
+        {
+          "x": 0.07685098406747891,
+          "y": 0.359375,
+          "w": 0.1358950328022493,
+          "h": 0.29947916666666663,
+          "original": "I DON’T BELIEVE IN UFOS OR ALIENS.",
+          "placement": "note",
+          "confidence": 0,
+          "text": "Я не верю в НЛО и инопланетян."
+        }
+      ]
+    },
+    {
+      "engine": "Libre Manga Translator",
+      "regions": [
+        {
+          "x": 0.2225312257103531,
+          "y": 0.1108200227220853,
+          "w": 0.07129672496477465,
+          "h": 0.13389162470897037,
+          "original": "( NAH.",
+          "text": "(НАХ.",
+          "placement": "note"
+        },
+        {
+          "x": 0.7221184992410361,
+          "y": 0.142460527519385,
+          "w": 0.17191748364349338,
+          "h": 0.5869764561454455,
+          "original": "In the PARAYOUU",
+          "text": "В ПАРАЙЮУ",
+          "placement": "note"
+        },
+        {
+          "x": 0.059906488282722964,
+          "y": 0.32313692073027295,
+          "w": 0.1706153859350317,
+          "h": 0.37589995563030243,
+          "original": "I DON'T BELIEVE IN UFOS OR ALIENS.",
+          "text": "Я не верю ни в НЛО, ни в инопланетян.",
+          "placement": "note"
+        }
+      ],
+      "timings": {
+        "detectionMs": 41918,
+        "ocrMs": 8674,
+        "translationMs": 769,
+        "inpaintMs": 758,
+        "typesetMs": 62,
+        "totalMs": 52689
+      },
+      "inputMode": "ocr",
+      "imageBytes": 80622,
+      "scenario": "lmt-ocr-argos",
+      "run": 0,
+      "wallMs": 53512
+    },
+    {
+      "engine": "Libre Manga Translator",
+      "regions": [
+        {
+          "x": 0.2225312257103531,
+          "y": 0.1108200227220853,
+          "w": 0.07129672496477465,
+          "h": 0.13389162470897037,
+          "original": "( NAH.",
+          "text": "(НАХ.",
+          "placement": "note"
+        },
+        {
+          "x": 0.7221184992410361,
+          "y": 0.142460527519385,
+          "w": 0.17191748364349338,
+          "h": 0.5869764561454455,
+          "original": "In the PARAYOUU",
+          "text": "В ПАРАЙЮУ",
+          "placement": "note"
+        },
+        {
+          "x": 0.059906488282722964,
+          "y": 0.32313692073027295,
+          "w": 0.1706153859350317,
+          "h": 0.37589995563030243,
+          "original": "I DON'T BELIEVE IN UFOS OR ALIENS.",
+          "text": "Я не верю ни в НЛО, ни в инопланетян.",
+          "placement": "note"
+        }
+      ],
+      "timings": {
+        "detectionMs": 4758,
+        "ocrMs": 1670,
+        "translationMs": 2171,
+        "inpaintMs": 904,
+        "typesetMs": 3,
+        "totalMs": 9865
+      },
+      "inputMode": "ocr",
+      "imageBytes": 80622,
+      "scenario": "lmt-ocr-argos",
+      "run": 1,
+      "wallMs": 9972
+    }
+  ],
+  "executionLabel": "local-validation-not-Oracle",
+  "machine": "x86_64"
+}

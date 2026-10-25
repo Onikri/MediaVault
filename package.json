@@ -1,6 +1,6 @@
 {
   "name": "media-vault",
-  "version": "5.6.0",
+  "version": "5.6.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -23,7 +23,7 @@
     "test:online": "node tests/online-browser.cjs",
     "test:translation": "node tests/translation-browser.cjs",
     "test:gpu": "node tests/fsr-browser.cjs",
-    "test:lmt": "node tests/lmt-browser.cjs"
+    "test:lmt": "node tests/lmt-browser.cjs && node tests/lmt-vision-browser.cjs"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.86",

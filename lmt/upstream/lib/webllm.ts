@@ -55,10 +55,10 @@ export async function translateLocal(
       resolvedModel,
       temperature,
     );
-    return validateTranslationResult(corrected, ocrResults.length);
+    return validateTranslationResult(corrected, ocrResults.length, {strict:true});
   }
 
-  return validateTranslationResult(raw, ocrResults.length);
+  return validateTranslationResult(raw, ocrResults.length, {strict:true});
 }
 
 export async function makeSiteRuleLocal(

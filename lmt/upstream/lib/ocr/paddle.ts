@@ -24,6 +24,7 @@ export interface PaddleEngineOptions {
   modelPath?: (langGroup: string) => `${string}.onnx`;
   /** Extension-local dict asset (e.g. bundled PP-OCRv6 dict) — skips the HF dict fetch. */
   bundledDictPath?: string;
+  dictPath?: (langGroup: string) => string;
 }
 
 export class PaddleOcrEngine implements OcrEngine {
@@ -75,7 +76,7 @@ export class PaddleOcrEngine implements OcrEngine {
       const dictText = await res.text();
       this.charset = buildCharset(dictText);
     } else {
-      const dictResp = await downloadArtifactHF(repo, DefaultConfig.ocrDictPath(langGroup));
+      const dictResp = await downloadArtifactHF(repo, (this.opts.dictPath ?? DefaultConfig.ocrDictPath)(langGroup));
       const dictText = await dictResp.text();
       if (!dictText || dictText.trim().length === 0) throw new Error(`Empty dictionary for ${langGroup}`);
       this.charset = buildCharset(dictText);

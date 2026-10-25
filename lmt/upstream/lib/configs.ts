@@ -143,6 +143,7 @@ export const DefaultConfig = {
     },
   ],
   llmModels: [
+    {id:"Qwen3.5-4B-q4f32_1-MLC",label:"Qwen 3.5 4B FP32",desc:"Quality without shader-f16",vram:"~4.7 GB"},
     {id: "Llama-3.2-1B-Instruct-q4f32_1-MLC", label: "Llama 3.2 1B FP32", desc: "No shader-f16 requirement", vram: "~1.1 GB"},
     {id: "Qwen3.5-0.8B-q4f32_1-MLC", label: "Qwen 3.5 0.8B FP32", desc: "No shader-f16 requirement", vram: "~1.9 GB"},
     {

@@ -41,7 +41,11 @@ const ppocrv6MangaEngine = new PaddleOcrEngine({
   bundledDictPath: "dicts/ppocrv6_dict.txt",
 });
 
+// Verified PP-OCRv5: 13.4 MB and all 11,172 modern Hangul syllables.
+const koreanV5Engine = new PaddleOcrEngine({id: "ppocrv5-korean", label: "PP-OCRv5 Korean",repo: "https://huggingface.co/monkt/paddleocr-onnx/resolve/407d31ecdc555de8282c578889774861eea2667e",modelPath: () => "korean/korean_PP-OCRv5_mobile_rec.onnx",bundledDictPath: "dicts/ppocrv5_korean_dict.txt"});
+
 export function getOcrEngine(id = DefaultConfig.ocrEngine): OcrEngine {
+  if (id === "ppocrv5-korean") return koreanV5Engine;
   if (id === "manga-ocr") return mangaOcrEngine;
   if (id === "ppocrv6-manga") return ppocrv6MangaEngine;
   if (id === "pororo") return pororoEngine;
@@ -52,6 +56,7 @@ export function getOcrEngine(id = DefaultConfig.ocrEngine): OcrEngine {
 export async function releaseOcrEngines(): Promise<void> {
   await Promise.all([
     paddleEngine.release?.(),
+    koreanV5Engine.release?.(),
     mangaOcrEngine.release?.(),
     pororoEngine.release?.(),
     ppocrv6MangaEngine.release?.(),
