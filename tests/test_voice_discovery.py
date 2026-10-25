@@ -107,3 +107,22 @@ class PosterTests(unittest.TestCase):
         self.assertFalse(poster_assets.usable('https://shikimori.io/assets/404/original.png'))
 
 if __name__=='__main__':unittest.main()
+
+class AggregationTests(unittest.TestCase):
+    def test_discovery_groups_only_confirmed_exact_work_and_never_inspects_unrelated_hits(self):
+        import source_discovery as discovery
+        from site_adapters import BY_ID
+        discovery._cache.clear()
+        selected={'title':'Дандадан','aliases':['Dandadan'],'year':2024,'kind':'anime','ids':{'mal':'57334'}}
+        visited=[]
+        def search(site,query,**kwargs):
+            return {'status':'ok','results':[{'title':'Дандадан','year':2024,'kind':'anime','url':site.root+'/dandadan','provider':site.id}, {'title':'Лазарь','year':2024,'kind':'anime','url':site.root+'/lazarus','provider':site.id}]}
+        def inspect(url,**kwargs):
+            visited.append(url)
+            return {'url':url,'title':'Дандадан','ids':{'mal':'57334'},'year':2024,'provider':'fixture', 'dubs':[choice('Studio A','https://kodikplayer.com/serial/1/h/720p')], 'episodes':[{'number':1,'url':url}]}
+        with patch.object(discovery,'SITES',[BY_ID['yummy'],BY_ID['animego']]),patch.object(discovery,'search_site',side_effect=search),patch.object(discovery,'inspect_source',side_effect=inspect):
+            result=discovery.discover(selected)
+        self.assertEqual(len(result['voices']),1)
+        self.assertEqual(len(result['voices'][0]['variants']),2)
+        self.assertTrue(all('dandadan' in url for url in visited))
+        self.assertEqual(len(visited),2)
