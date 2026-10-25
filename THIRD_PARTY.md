@@ -168,4 +168,11 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 AnimeGO provider/episode attributes were cross-checked against [AnimeParsers](https://github.com/YaNesyTortiK/AnimeParsers) at `cac4c83e03e43f2829506ef202a1279a4e0b78bf`, MIT (YaNesyTortiK). The adapter uses MediaVault’s source-only HTTP client; reference-package sessions and token collections are not imported. Player behavior was also reviewed against [the anime-dl-core author’s article](https://habr.com/ru/articles/1079156/). Existing `anime-dl-core` remains pinned to 0.5.1.
 
+The eight-player integration fixtures in `tests/fixtures/players` are public saved
+responses from `ialakey/anime-dl-core` commit
+`f23b7c1b1403c7adc7eaa60ba6323a75e35c9771` (MIT, license above). They cover the
+formats discussed in the article, including Kodik's decoded `ref`, CVH's MP4
+keys, VK's `apiPrefetchCache`, Animedia's `data-vlnk`, and the retired
+SovetRomantica format. Fixture success is separate from live network success.
+
 - Playwright for Python 1.62.0 (Apache-2.0) and Chromium (BSD-style and third-party notices) run only on the server for public dynamic players; browser contexts contain no Google profile. Sources: https://github.com/microsoft/playwright-python and https://www.chromium.org/Home/chromium-security/ .

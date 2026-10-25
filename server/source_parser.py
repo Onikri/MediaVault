@@ -18,13 +18,16 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import requests
+from anime_dl_core.http import DEFAULT_USER_AGENT
 
 
 class SourceError(RuntimeError):
     pass
 
 
-USER_AGENT = "MediaVault/3.0 (personal public-media importer)"
+# Use the same public browser UA as the player adapters' returned stream headers.
+# Some embeds reject a non-browser UA before their HTML can be parsed.
+USER_AGENT = DEFAULT_USER_AGENT
 MAX_DOCUMENT = 4 * 1024 * 1024
 MAX_VIDEO = 40 * 1024**3
 BLOCKED = re.compile(
@@ -60,7 +63,7 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
     playback_api = (
         host == "plapi.cdnvideohub.com" and bool(re.fullmatch(r"/api/v1/player/sv/(?:playlist|video/\d+)", url.path))
         or host in {"anilibria.top", "aniliberty.top", "api.anilibria.app"}
-        and bool(re.fullmatch(r"/api/v1/anime/releases/[a-zA-Z0-9_-]+", url.path))
+        and bool(re.fullmatch(r"/api/v1/(?:anime/releases/[a-zA-Z0-9_-]+|app/search/releases)", url.path))
     )
     if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
         raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
@@ -252,6 +255,7 @@ class PageParser(HTMLParser):
         self.option = None
         self.containers = []
         self.yummy_player_id = None
+        self.published_episodes = []
 
     def link(self, value):
         try:
@@ -277,6 +281,11 @@ class PageParser(HTMLParser):
 
     def handle_starttag(self, tag, attributes):
         attrs = dict(attributes)
+        if urlsplit(self.base).hostname in {'amd.online','animedia.online'} and attrs.get('data-vlnk'):
+            value=self.link(attrs['data-vlnk']);number=attrs.get('data-vid','')
+            if value and number.isdigit() and 1<=int(number)<=10000:
+                self.published_episodes.append({'number':int(number),'title':'Серия '+number,'url':value})
+                self.candidate(value,attrs=attrs)
         # The site's published player-relay.js loads these exact public slots.
         # Read the same GET response as the iframe; no search/developer API,
         # session, key or generated player ID is used.
@@ -366,6 +375,7 @@ def parse_page(text, base):
     for match in re.finditer(r"[\"']((?:https:)?//[^\s<>\"'\\]+|/[^\s<>\"'\\]+\.(?:mp4|m3u8)(?:\?[^\s<>\"'\\]*)?)[\"']", decoded):
         parser.candidate(match[1])
     page = parser.result
+    if parser.published_episodes:page.episodes=parser.published_episodes
     page.streams = list({entry["url"]: entry for entry in page.streams}.values())[:100]
     page.players = list(dict.fromkeys(page.players))[:50]
     # Preserve alternate translations; only identical episode URLs collapse.
@@ -398,7 +408,7 @@ class Resolver:
     def player(self, url, referer=None):
         from anime_dl_core import AniboomPlayer, AnimediaPlayer, KodikPlayer, SibnetPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer
         # Explicit registry: never ap.extract(), which also registers API-based players.
-        for player_type in (KodikPlayer, AniboomPlayer, SibnetPlayer, AnimediaPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer):
+        for player_type in (KodikPlayer, AniboomPlayer, SibnetPlayer, AnimediaPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer):
             cvh_video = player_type is CvhPlayer and urlsplit(url).hostname == 'plapi.cdnvideohub.com' and re.fullmatch(r'/api/v1/player/sv/video/\d+',urlsplit(url).path)
             if cvh_video or player_type.matches(url):
                 with player_type(client=self.http) as player:

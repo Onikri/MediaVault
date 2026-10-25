@@ -47,7 +47,7 @@ SITES = (
     Site("anilibria", "AniLiberty / AniLibria", "https://aniliberty.top", ("anilibria.tv", "anilibria.top", "aniliberty.top"), ".release, .release-item, .goodcell, a[href*='/anime/releases/release/']", "h2, h3, .title"),
     Site('animejoy','AnimeJoy','https://animejoy.ru',('animejoy.ru',),'.shortstory','.ntitle a, .ntitle, h2'),
     Site('sovet','SovetRomantica','https://sovetromantica.com',('sovetromantica.com',),'.anime--block__desu','.anime--block__name'),
-    Site('animedia','Animedia','https://amd.online',('amd.online','animedia.online'),'.shortstory, .poster, .movie-item','.title, h2, h3'),
+    Site('animedia','Animedia','https://amd.online',('amd.online','animedia.online'),'.shortstory, .poster, .movie-item','.title, h2, h3','/index.php'),
     Site('anidub','AniDub','https://anidub.life',('anidub.life','anime.anidub.life','online.anidub.life','v14.anidub.digital'),'.shortstory, .poster, .short','.title, h2, h3'),
     Site('anistar','AniStar','https://anistar.org',('anistar.org',),'.shortstory, .shortstoryContent','.shortstoryHead a, h2, h3'),
     Site('shiza','SHIZA Project','https://shiza-project.com',('shiza-project.com',),'.shortstory, .release, .post, a[href*="/releases/"]','h2, h3, .title'),
@@ -64,6 +64,8 @@ SITES = (
     Site('animeonline','AnimeOnline','https://animeonline.cc',('animeonline.cc',),'.shortstory, .movie-item','h2, h3, .movie-item__title'),
     Site('animeseries','AnimeSeries','https://animeseries.ru',('animeseries.ru',),'.shortstory','h2, h3, .title'),
     Site('animevosttv','AnimeVost catalogue','https://animevost.tv',('animevost.tv',),'.shortstory, .movie-item','h2, h3, .movie-item__title'),
+    Site('freeanime','FreeAnime','https://freeanime.ru',('freeanime.ru','www.freeanime.ru'),'.shortstory, .poster, .movie-item, .short-item, .th-item, article','.poster__title, .th-title, .short-title, .title, h2, h3','/index.php'),
+    Site('anixart','AniXart','https://anixart.site',('anixart.site','www.anixart.site'),'.shortstory, .poster, .movie-item, .short-item, .th-item, article','.poster__title, .th-title, .short-title, .title, h2, h3','/index.php'),
     Site("readmanga", "ReadManga", "https://readmanga.live", ("readmanga.live", "mintmanga.live"), ".tile, .manga-list-item", "h3, .title", "/search", "manga"),
 )
 BY_ID = {site.id: site for site in SITES}
@@ -93,6 +95,9 @@ def parse_search(site, text, base, query=""):
     cards = soup.select(site.cards)
     if site.id == "jutsu":
         cards = soup.select("a[href]")
+    elif not cards:
+        # DLE themes use different card classes but publish stable article links.
+        cards=[a for a in soup.select('a[href]') if re.fullmatch(r'/(?:[^/?#]+/)*\d+-[^/?#]+\.html',urlsplit(urljoin(base,a['href'])).path)]
     for card in cards:
         heading = card.select_one(site.title)
         anchor = heading.find_parent("a") if heading else None
@@ -196,6 +201,9 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime"):
     try:
         original = public_url(url, resolve_dns=False)
         site = site_for(original)
+        if site and site.id=='anilibria':
+            from aniliberty_source import inspect
+            return inspect(original,http,dub_url=dub_url)
         if urlsplit(original).path.lower().endswith((".mp4", ".m3u8")):
             return {"provider": "direct", "title": "Видео по ссылке", "url": original,
                     "dubs": [], "seasons": [], "episodes": [{"number": 1, "url": original}], "releases": []}
@@ -225,11 +233,12 @@ def search_site(site, query, *, http=None):
     own_http = http is None
     http = http or PublicHttp(timeout=(4,6),deadline=time.monotonic()+9)
     try:
-        text, final, _ = http.document(site.search_url(query))
-        values=parse_search(site,text,final,query)
-        if site.id=='anilibria' and not values:
-            from public_page_data import releases
-            values=releases(text,final,query)
+        if site.id=='anilibria':
+            from aniliberty_source import search
+            values=search(query,http)
+        else:
+            text, final, _ = http.document(site.search_url(query))
+            values=parse_search(site,text,final,query)
         return {"provider": site.id, "name": site.name, "status": "ok" if values else 'empty', "results": values,
                 **({'message':'В публичном HTML нет совпадений. Страница может загружать каталог отдельно в браузере.'} if not values else {})}
     except SourceError as error:

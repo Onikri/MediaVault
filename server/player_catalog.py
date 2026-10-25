@@ -216,6 +216,11 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
         value=node.get('data-year') or node.get('content') or node.get_text(' ',strip=True)
         matched=re.search(r'\b((?:19|20)\d{2})\b',value)
         if matched:year=int(matched[1]);break
+    if year is None:
+        for node in soup.select('li, tr, dt, .info-item, .finfo-item'):
+            value=node.get_text(' ',strip=True)
+            matched=re.match(r'^(?:Год(?:\s+(?:выхода|выпуска))?|Year)\s*:?\s*((?:19|20)\d{2})\b',value,re.I)
+            if matched:year=int(matched[1]);break
     releases=[{'date':e.get('datetime'),'label':e.parent.get_text(' ',strip=True)[:180]} for e in soup.select('.episode time[datetime], .release time[datetime], .schedule time[datetime], [data-episode] time[datetime]')][:100]
     return {'provider':provider,'providerName':provider_name,'title':page.title,'url':final,'dubs':choices,
             'seasons':sorted(season_values.values(),key=lambda e:e['number']),'episodes':episodes,'releases':releases,
