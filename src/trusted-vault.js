@@ -4,7 +4,7 @@ const bytes=value=>Uint8Array.from(atob(value),c=>c.charCodeAt(0));
 const b64=value=>btoa(String.fromCharCode(...new Uint8Array(value)));
 const aad=(sub,id)=>encoder.encode('MediaVault trusted library\n'+sub+'\n'+id);
 const recordId=(sub,id)=>'vault:'+sub+':'+id;
-async function wrapKey(){let key=await deviceStore('get','wrap-key');if(!key){key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);await deviceStore('put','wrap-key',key);}return key;}
+async function wrapKey(){let key=await deviceStore('get','wrap-key');if(!key){key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);key=await deviceStore('getOrPut','wrap-key',key);}return key;}
 async function prfKey(record){
   const credential=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{type:'public-key',id:bytes(record.credential)}],userVerification:'required',timeout:60000,extensions:{prf:{eval:{first:bytes(record.prfSalt)}}}}});
   const output=credential?.getClientExtensionResults()?.prf?.results?.first;

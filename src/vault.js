@@ -304,12 +304,12 @@ function createController(get,patch){
       assertEpoch(expected);
       salt=nextSalt;
       serverKey?.fill(0);serverKey=material.serverKey;
+      await saveTrustedCurrent(false,{...get(),libraryId:id,catalog}).catch(cause=>patch({deviceError:cause.message||'Не удалось сохранить быстрое открытие. Используй секретную фразу.'}));assertEpoch(expected);
       readerChunks.clear();readerChunkRequests.clear();patch({key,catalog});
       saveLibraryId(id);
       await syncWorker();
       assertEpoch(expected);
       enterLibrary();toast("Каталог расшифрован на устройстве.");
-      await saveTrustedCurrent().catch(cause=>patch({deviceError:cause.message}));
       return true;
     });
   }
@@ -340,12 +340,12 @@ function createController(get,patch){
       assertEpoch(expected);
       salt=nextSalt;
       serverKey?.fill(0);serverKey=material.serverKey;
+      await saveTrustedCurrent(false,{...get(),libraryId:file.id,catalog}).catch(cause=>patch({deviceError:cause.message||'Не удалось сохранить быстрое открытие. Используй секретную фразу.'}));assertEpoch(expected);
       readerChunks.clear();readerChunkRequests.clear();patch({key,catalog});
       saveLibraryId(file.id);
       await syncWorker();
       assertEpoch(expected);
       enterLibrary();toast("Библиотека создана. Сохрани секретную фразу и ссылку-приглашение.");
-      await saveTrustedCurrent().catch(cause=>patch({deviceError:cause.message}));
       return true;
     });
   }
@@ -522,11 +522,16 @@ function createController(get,patch){
       libraryOptions:[],libraryDiscovery:"idle",libraryDiscoveryError:"",
       workerReady:false,status:"Не подключено",notice:setupNotice(),toast:null,busy:"",uploadProgress:[],remembering:false,remembered:false,biometric:false,deviceError:''});
   }
-  async function saveTrustedCurrent(biometric=false){
-    if(!privacyPreferences().remember||!get().user||!get().catalog||!serverKey)return;
-    const existing=await trustedVault(get().user.sub,get().libraryId);
-    if(existing?.biometric&&!biometric){patch({biometric:true});return;}
-    await saveTrustedVault(get().user.sub,get().libraryId,serverKey,salt,{biometric});patch({biometric});
+  async function saveTrustedCurrent(biometric=false,current=get()){
+    if(!privacyPreferences().remember||!current.user||!current.catalog||!serverKey)return;
+    const expected=epoch,material=serverKey.slice();
+    try{
+      const existing=await trustedVault(current.user.sub,current.libraryId);assertEpoch(expected);
+      if(existing?.biometric&&!biometric){patch({biometric:true});return;}
+      await saveTrustedVault(current.user.sub,current.libraryId,material,salt,{biometric});
+      if(expected!==epoch||!privacyPreferences().remember){await forgetTrustedVault(current.user.sub,current.libraryId);throw cancelled();}
+      patch({biometric});
+    }finally{material.fill(0);}
   }
   async function tryTrustedLibrary(expected,gesture=false){
     if(!get().user||!get().libraryId||get().catalog)return false;
@@ -568,7 +573,7 @@ function createController(get,patch){
     return run('restore',async expected=>{
       patch({restoring:true});
       try{await renewSession();await discoverLibrary(expected);await tryTrustedLibrary(expected);return true;}
-      catch(cause){if(expected===epoch)patch({deviceError:cause.message});return false;}
+      catch(cause){if(expected===epoch)patch({deviceError:cause.message||'Не удалось открыть сохранённую библиотеку. Введи секретную фразу один раз.'});return false;}
       finally{if(expected===epoch)patch({restoring:false});}
     });
   }

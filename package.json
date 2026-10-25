@@ -18,7 +18,8 @@
     "test:notebook": "python scripts/build-notebook.py --check",
     "test:voices": "node tests/voice-ui.cjs",
     "test:manga": "node tests/manga-browser.cjs",
-    "test:music": "node tests/music-browser.cjs"
+    "test:music": "node tests/music-browser.cjs",
+    "test:trusted": "node tests/trusted-key-browser.cjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.15",
