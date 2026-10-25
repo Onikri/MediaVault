@@ -12,6 +12,7 @@ import time
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from source_parser import PublicHttp,Resolver
+from media_download import expand_stream_qualities,pick_stream
 
 SAMPLES={
     'Aniboom':'https://aniboom.one/embed/9G1MJ6NMV8z?episode=1&translation=30',
@@ -53,7 +54,9 @@ def check(sample):
         page=Resolver(http).resolve(url)
         result['streams']=len(page.streams)
         if not page.streams:raise ValueError('The player returned no MP4/HLS streams.')
-        stream=next((s for s in page.streams if s['type']=='hls'),page.streams[0])
+        streams=expand_stream_qualities(page.streams,http)
+        result['qualities']=sorted({int(s['quality']) for s in streams if s.get('quality')},reverse=True)
+        stream=pick_stream(streams,'best')
         result.update(status='verified',kind=stream['type'],**verify_stream(http,stream))
     except Exception as error:
         result.update(status='failed',errorClass=type(error).__name__,message=re.sub(r'https?://[^\s]+','[URL]',str(error))[:350])
@@ -78,7 +81,10 @@ def main():
     with ThreadPoolExecutor(max_workers=4) as pool:report['players']=list(pool.map(check,samples.items()))
     if args.catalog:
         from source_discovery import discover
-        report['catalog']=discover({'title':'Дандадан','aliases':['Dandadan'],'year':2024,'kind':'anime','ids':{'mal':'57334'}})
+        selected={'title':'Дандадан','aliases':['Dandadan'],'year':2024,'kind':'anime','ids':{'mal':'57334'}}
+        for attempt in range(6):
+            report['catalog']=discover(selected,refresh=attempt>0)
+            if not report['catalog'].get('pending'):break
     # Full reports can contain short-lived public source signatures; keep them private.
     descriptor=os.open(args.report,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
     os.fchmod(descriptor,0o600)
