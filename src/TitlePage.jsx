@@ -41,7 +41,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   useEffect(()=>{
     const controller=new AbortController();abort.current=controller;
     setProfile(saved||title.profile||null);setError('');setCandidates([]);setSearch(title.name);setPart('');setCharacter(null);
-    if(!saved?.sourceId||saved.version<4||saved.partial&&Date.now()>(saved.retryAfter||0)){
+    if(!saved?.sourceId||saved.version<4||(saved.partial||!saved.genres?.length)&&Date.now()>(saved.retryAfter||0)){
       const identity=title.metadataId||title.metadata?.ids?.mal;
       if(identity)hydrate(identity,controller.signal);
     }

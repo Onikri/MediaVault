@@ -120,7 +120,7 @@ def enrich_profile(vault,group,section):
     title_id=section+':'+group['id'];previous=vault.catalog.get('titleProfiles',{}).get(title_id,{})
     info=group.get('metadata') or {};identity=group.get('metadataId') or info.get('ids',{}).get('mal')
     profile=previous.copy()
-    if identity and (not previous.get('sourceId') or previous.get('version',0)<4 or previous.get('partial') and previous.get('retryAfter',0)<time.time()*1000):
+    if identity and (not previous.get('sourceId') or previous.get('version',0)<4 or (previous.get('partial') or not previous.get('genres')) and previous.get('retryAfter',0)<time.time()*1000):
         try:profile.update(load_profile(identity,'manga' if section in {'manga','ranobe'} else 'anime'))
         except Exception:profile.update({'partial':True,'retryAfter':int((time.time()+120)*1000)})
     profile.setdefault('version',4);profile.setdefault('title',group['name']);profile.setdefault('language','ru')

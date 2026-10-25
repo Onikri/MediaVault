@@ -10,6 +10,14 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 class TitleExtrasTests(unittest.TestCase):
+ def test_missing_poster_and_genres_are_repaired_by_exact_season_id_without_mutating_cache(self):
+  from poster_assets import repair
+  original={'id':60543,'image':{'original':'/assets/globals/missing_original.jpg'},'genres':[]}
+  genre={'id':'1','russian':'Экшен','name':'Action','kind':'genre'}
+  with patch('poster_assets.posters',return_value={'60543':{'cover':'https://shikimori.io/uploads/60543.jpeg','genres':[genre]}}) as lookup:
+   fixed=repair(original,'anime');lookup.assert_called_once_with([60543],'anime')
+  self.assertEqual(fixed['genres'],[genre]);self.assertIn('60543.jpeg',fixed['image']['original']);self.assertEqual(original['genres'],[])
+  self.assertIn('missing_original',original['image']['original'])
  def test_credits_and_trailers_preserve_only_supported_public_metadata(self):
   roles=[{'roles_russian':['Режиссёр'],'person':{'id':41,'russian':'Фуга Ямасиро','image':{'original':'/system/people/original/41.jpg'}}}]
   credits=staff_from_roles(roles);self.assertEqual(credits[0]['name'],'Фуга Ямасиро');self.assertTrue(credits[0]['image'].startswith('https://shikimori.io/'))
