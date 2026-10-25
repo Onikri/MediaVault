@@ -56,4 +56,4 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
     assert.deepEqual(errors,[]);assert.ok(!external.some(url=>url.includes('.mp4')||url.includes('kodikplayer.com')),'The UI never downloads source video');
     await context.close();console.log('PASS exact-title grouped voice import at '+width+'px');
   }
-})().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();await fs.rm(entry,{force:true});});
+})().catch(error=>{require('./ci-diagnostic.cjs')(error,'tests/voice-ui.cjs','Voice selection');console.error(error);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();await fs.rm(entry,{force:true});});

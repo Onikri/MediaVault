@@ -23,6 +23,7 @@ let nextId = 0;
 let server;
 let browser;
 let temp;
+let scenario='Bootstrap';
 const cors = {'access-control-allow-origin':'*', 'access-control-allow-headers':'*', 'access-control-allow-methods':'*'};
 
 function multipart(request) {
@@ -181,6 +182,7 @@ async function main() {
   }
   const textItem=catalog.items.find(item=>item.name==='private-note.txt');
   // The automatic import sends only control data/key to the owner's server, never source bytes.
+  scenario='Server import';
   const sourceRequests=[],submitted=[];let fakeTask=null,googleConfigured=false,googleConfiguration=null;
   owner.on('request',request=>{if(new URL(request.url()).hostname==='source.example.com')sourceRequests.push(request.url());});
   await owner.route('https://import.example.com/**',async route=>{
@@ -310,6 +312,7 @@ async function main() {
   await owner.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
   await owner.screenshot({path:path.join(temp,'mobile-owner.png'),fullPage:true});
   await owner.reload();
+  scenario='Session reconnect';
   await signIn(owner);
   await owner.locator('#passphrase').fill('deliberately wrong phrase');
   await owner.locator('#unlockBtn').click();
@@ -343,6 +346,7 @@ async function main() {
   assert.equal(streamed.status,206,'Worker restores session after being stopped');
   assert.deepEqual(Buffer.from(streamed.data),(await fs.readFile(mp4)).subarray(-16),'Restarted worker returns exact decrypted suffix');
   const writesBefore=writes.length;
+  scenario='Reader permissions';
   const readerContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'allow'});
   readerContext.setDefaultTimeout(20000);
   await installProvider(readerContext,READER);
@@ -435,6 +439,7 @@ async function main() {
   assert.equal(await blocked.evaluate(()=>localStorage.getItem('mediavault_library')),catalogId);
   await blockedContext.close();
   // Each anime gets one title card and one folder, containing its season folders.
+  scenario='Title library and playback';
   await owner.locator('.upload-options > summary').click();
   await owner.locator('#uploadSection').selectOption('anime');
   await owner.locator('#uploadCollection').fill('Наруто');
@@ -601,6 +606,7 @@ async function main() {
   assert.equal(animeTitle.parts.length,2);assert.notEqual(animeTitle.folderId,mangaTitle.folderId);assert.notEqual(mangaTitle.folderId,ranobeTitle.folderId);
   assert.deepEqual(files.get(animeTitle.folderId).parents,[organized.storage.sectionFolders.anime]);
   // A new device reads cached artwork and Russian metadata only from Drive.
+  scenario='Cached title metadata';
   const cachedContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'allow'});
   cachedContext.setDefaultTimeout(20000);await installProvider(cachedContext,OWNER);
   const cachedPage=await cachedContext.newPage(),externalArt=[];
@@ -637,9 +643,10 @@ async function main() {
   catch(error){console.error('Shared episode state:',await sharedPage.evaluate(()=>{const v=document.querySelector('.mv-player video');return {hash:location.hash,hasPlayer:!!v,ready:v?.readyState,duration:v?.duration,time:v?.currentTime,error:document.querySelector('.mv-viewer-error')?.textContent};}));throw error;}
   assert.equal(await sharedPage.locator('.mv-viewer-inline').count(),1,'A shared episode opens inline at the shared time after unlocking');
   await cachedContext.close();
+  scenario='Remembered device';
   await require('./remembered-browser.cjs')({browser,base,installProvider,OWNER,PHRASE,catalogId});
   console.log('PASS: React production build; mocked Google login; encrypted catalog/TXT/PNG/MP4 upload; server job without video transfer or credential export; catalog refresh; mobile viewer/abort/Escape; MP4 stream/fallback/seek; search/category/name sort/favorites/history; phrase unlock; token reconnect; stopped worker recovery; reader scopes and UI without writes.');
   console.log('Screenshot: '+path.join(temp,'mobile-owner.png'));
   console.log('Live Google OAuth, real Drive ACL and physical Android/iOS playback remain outside this test.');
 }
-main().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));});
+main().catch(error=>{require('./ci-diagnostic.cjs')(error,'tests/browser.test.cjs',scenario);console.error(error);process.exitCode=1;}).finally(async()=>{await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));});

@@ -111,4 +111,4 @@ async function run(){
     console.log('PASS UI '+width+'px: restored home/library/profile/history, filters, search, responsive layout');
   }
 }
-run().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));});
+run().catch(error=>{require('./ci-diagnostic.cjs')(error,'tests/ui.test.cjs','Responsive UI');console.error(error);process.exitCode=1;}).finally(async()=>{await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));});
