@@ -205,6 +205,11 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             number=entry.get('season')
             if number:season_values.setdefault(number,{'number':number,'name':'Сезон '+str(number),'url':None})
     soup=BeautifulSoup(text,'html.parser')
+    heading=soup.select_one('h1')
+    if heading and heading.get_text(' ',strip=True):page.title=heading.get_text(' ',strip=True)[:300]
+    if provider=='jutsu':
+        page.title=re.sub(r'^Смотреть\s+','',page.title,flags=re.I)
+        page.title=re.sub(r'\s+все серии(?: и сезоны)?\s*$','',page.title,flags=re.I)
     ids={}
     for namespace,expression in [('mal',r'myanimelist\.net/anime/(\d+)'),('shikimori',r'shikimori\.(?:one|io|me)/animes/(?:[a-z])?(\d+)')]:
         found={re.search(expression,a.get('href',''))[1] for a in soup.select('a[href]') if re.search(expression,a.get('href',''))}

@@ -1,0 +1,31 @@
+from pathlib import Path
+import sys
+import unittest
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
+from site_adapters import BY_ID,parse_search
+from title_identity import match_title
+from player_catalog import inspect_catalog
+
+class SourceCardTests(unittest.TestCase):
+    def test_search_scope_excludes_sidebar_cards_and_uses_published_image_title(self):
+        text='''<aside><div class="movie-item"><h2><a href="/1-other.html">Другое</a></h2></div></aside>
+        <main><div id="dle-content"><a href="/7576-dandadan.html"><span>9.4 8.42</span>
+        <img alt="Дандадан" src="/poster.jpg"><span>2024, экшен, комедия</span></a></div></main>'''
+        result=parse_search(BY_ID['anixart'],text,'https://anixart.site/index.php','Дандадан')
+        self.assertEqual(len(result),1)
+        self.assertEqual(result[0]['title'],'Дандадан')
+        self.assertEqual(result[0]['year'],2024)
+        self.assertTrue(match_title({'title':'Дандадан','kind':'anime','year':2024},result[0])[0])
+
+    def test_source_year_comes_from_labelled_metadata_and_heading_not_description(self):
+        class Http:
+            def document(self,*args,**kwargs):raise AssertionError('No player URL is published by this fixture')
+        value=inspect_catalog('https://anixart.site/7576-dandadan.html',
+            '<title>Аниме онлайн</title><h1>Дандадан</h1><p>История началась в 1999 году.</p><ul><li>Год выхода: 2024</li></ul>',
+            'https://anixart.site/7576-dandadan.html',Http(),provider='anixart')
+        self.assertEqual(value['title'],'Дандадан');self.assertEqual(value['year'],2024)
+
+    def test_fallback_keeps_explicit_title_attribute_above_rating_text(self):
+        result=parse_search(BY_ID['animedia'],'<div id="dle-content"><a href="/4662-dandadan.html" title="Дандадан"><b>9.8</b></a></div>',
+                            'https://amd.online/index.php','Дандадан')
+        self.assertEqual(result[0]['title'],'Дандадан')

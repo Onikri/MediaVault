@@ -91,13 +91,14 @@ def link(value, base):
 
 def parse_search(site, text, base, query=""):
     soup = BeautifulSoup(text, "html.parser")
+    content=soup.select_one('#dle-content') or soup.select_one('main') or soup
     results, seen = [], set()
-    cards = soup.select(site.cards)
+    cards = content.select(site.cards)
     if site.id == "jutsu":
-        cards = soup.select("a[href]")
+        cards = content.select("a[href]")
     elif not cards:
         # DLE themes use different card classes but publish stable article links.
-        cards=[a for a in soup.select('a[href]') if re.fullmatch(r'/(?:[^/?#]+/)*\d+-[^/?#]+\.html',urlsplit(urljoin(base,a['href'])).path)]
+        cards=[a for a in content.select('a[href]') if re.fullmatch(r'/(?:[^/?#]+/)*\d+-[^/?#]+\.html',urlsplit(urljoin(base,a['href'])).path)]
     for card in cards:
         heading = card.select_one(site.title)
         anchor = heading.find_parent("a") if heading else None
@@ -108,7 +109,7 @@ def parse_search(site, text, base, query=""):
         if not url or urlsplit(url).hostname not in site.hosts or url in seen:
             continue
         image = card.select_one("img")
-        title = clean(heading.get_text(" ", strip=True) if heading else anchor.get_text(" ", strip=True))
+        title = clean(heading.get_text(" ", strip=True) if heading else anchor.get('title') or (image.get('alt') if image else '') or anchor.get_text(" ", strip=True))
         title = title or clean(anchor.get("title")) or clean(image.get("alt") if image else "")
         if site.id == "jutsu":
             if not card.select_one(".aaname, .all_anime_global, .all_anime") and not re.search(r"class=[\"'][^\"']*all_anime", str(card)):
