@@ -61,8 +61,9 @@ DOCKER
 fi
 docker network inspect "$network" >/dev/null 2>&1 || docker network create "$network" >/dev/null
 docker inspect mediavault-reader-llm >/dev/null 2>&1 && { echo 'An existing measurement is using the LLM container';exit 4; }
-cleanup(){ docker stop -t 15 mediavault-reader-llm >/dev/null 2>&1 || true; }
+cleanup(){ docker stop -t 15 mediavault-reader-lmt-measure mediavault-reader-llm >/dev/null 2>&1 || true; }
 trap cleanup EXIT
+trap 'exit 143' TERM INT
 docker run -d --rm --name mediavault-reader-llm --network "$network" \
   --cpus=2 --memory=4g --memory-swap=4g --cap-drop=ALL --security-opt=no-new-privileges \
   --read-only --tmpfs /tmp:rw,nosuid,nodev,size=64m -v "$data/llm:/models:ro" \
@@ -90,6 +91,8 @@ if ! docker run --rm --name mediavault-reader-lmt-measure --network "$network" \
 fi
 cat "$data/benchmark/lmt-$variant-a1.json"
 printf '\nLLM separate-container cgroup memory peak (includes file cache, not part of Python RSS):\n'
-docker exec mediavault-reader-llm cat /sys/fs/cgroup/memory.peak || echo 'cgroup memory peak unavailable'
+if docker exec mediavault-reader-llm cat /sys/fs/cgroup/memory.peak >"$data/benchmark/llm-$variant-memory-peak.txt"; then
+  cat "$data/benchmark/llm-$variant-memory-peak.txt"
+else echo 'cgroup memory peak unavailable';fi
 docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}'
 docker logs --tail 10 mediavault-reader-llm

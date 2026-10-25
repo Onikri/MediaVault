@@ -7,7 +7,7 @@ import base64
 import mimetypes
 import os
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlsplit, urljoin
 
 
 class LmtRuntime:
@@ -27,6 +27,14 @@ class LmtRuntime:
                 'llmConfigured': bool(os.getenv('LMT_LLM_URL') and os.getenv('LMT_LLM_MODEL')),
                 'engine': 'Libre Manga Translator', 'mode': 'backend',
                 'source': 'https://github.com/Onikri/MediaVault/tree/main/lmt'}
+
+    @staticmethod
+    def _weight_url_allowed(raw):
+        url = urlsplit(raw)
+        return url.scheme == 'https' and not url.username and not url.password and (
+            url.hostname in {'huggingface.co', 'hf.co', 'cdn-lfs.huggingface.co', 'cdn-lfs-us-1.huggingface.co',
+                             'github.com', 'release-assets.githubusercontent.com', 'raw.githubusercontent.com'} or
+            (url.hostname or '').endswith('.hf.co') or (url.hostname or '').endswith('.huggingface.co'))
 
     async def _route(self, route):
         request = route.request
@@ -54,12 +62,36 @@ class LmtRuntime:
             await route.fulfill(content_type=mime, body=path.read_bytes())
             return
         # Weights only; no page uploads, telemetry or arbitrary client URLs.
-        if self.allow_downloads and url.scheme == 'https' and (
-            url.hostname in {'huggingface.co', 'hf.co', 'cdn-lfs.huggingface.co', 'cdn-lfs-us-1.huggingface.co',
-                             'github.com', 'release-assets.githubusercontent.com', 'raw.githubusercontent.com'} or
-            (url.hostname or '').endswith('.hf.co') or (url.hostname or '').endswith('.huggingface.co')
-        ) and request.method in {'GET', 'HEAD'}:
-            await route.continue_()
+        if self.allow_downloads and self._weight_url_allowed(request.url) and request.method in {'GET', 'HEAD'}:
+            # Extension fetch privileges are absent in the private web page.
+            # Fetch only these allowed weight hosts and supply CORS locally.
+            # Browser redirect requests are not routed again by Playwright.
+            # Follow manually, validating every hop before issuing the request.
+            target = request.url
+            try:
+                for _ in range(6):
+                    if not self._weight_url_allowed(target):
+                        break
+                    response = await self.browser.request.fetch(target, method=request.method, max_redirects=0, timeout=90000)
+                    if response.status in {301,302,303,307,308}:
+                        target = urljoin(target, response.headers.get('location',''))
+                        await response.dispose()
+                        continue
+                    break
+                else:
+                    await route.abort('failed')
+                    return
+            except Exception:
+                await route.abort('failed')
+                return
+            if not self._weight_url_allowed(target) or response.status in {301,302,303,307,308}:
+                await route.abort('failed')
+                return
+            try:
+                await route.fulfill(response=response, headers={**response.headers,
+                                    'access-control-allow-origin': '*'})
+            finally:
+                await response.dispose()
         else:
             await route.abort('blockedbyclient')
 
