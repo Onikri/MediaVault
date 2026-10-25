@@ -120,6 +120,13 @@ Ampere Altra, GPU отсутствует. `deploy/oracle/measure-existing.py` и
 `measure-inventory.sh` читает RAM, load, диск, Docker stats и health. Замеры
 самого inference на VM ещё предстоят; результаты публикуются отдельно.
 
+Первичная диагностика VM: aarch64, 2 CPU; MemTotal 12 213 568 kB,
+MemAvailable 10 734 276 kB, swap отсутствует, load 0,095 / 0,102 / 0,040.
+Свободно 34 ГБ из 48 ГБ. Importer: 741,8 МиБ, CPU 0,90%; HTTPS: 33,98 МиБ,
+CPU 0,12%. Это реальный выполненный Run Command, exit 0.
+`benchmark-reader.sh <SHA> prepare` собирает отдельный образ и модельный каталог;
+`upscale` запускает контейнер с 2 CPU / 4 ГиБ RAM, без private volume production.
+
 `test_reader_processing.py` проверяет авторизацию, изоляцию, очередь, отмену,
 истечение результатов, декодирование и сборку тайлов. Численный тест тайлов
 использует fixture и не считается нейросетевым инференсом. `processing-browser.cjs`
