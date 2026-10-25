@@ -53,7 +53,7 @@ with log.open('w') as output:
     execute(['git','-C',str(release),'fetch','--depth=1','origin',revision],stdout=output,stderr=output)
     execute(['git','-C',str(release),'checkout','--detach','FETCH_HEAD'],stdout=output,stderr=output)
     if command(['git','-C',str(release),'rev-parse','HEAD'])!=revision:raise SystemExit('Release SHA mismatch.')
-    execute(['docker','build','--label','org.opencontainers.image.revision='+revision,'-t',image,str(release/'server')],stdout=output,stderr=output)
+    execute(['docker','build','--label','org.opencontainers.image.revision='+revision,'-t',image,'-f',str(release/'server'/'Dockerfile'),str(release)],stdout=output,stderr=output)
 expected_version=int(command(['docker','run','--rm','--network','none','--entrypoint','python',image,'-c','import api; print(api.health()["version"])']))
 if expected_version<6:raise SystemExit('The release does not support voice discovery; no replacement made.')
 override=work/('release-'+revision[:12]+'.yaml')

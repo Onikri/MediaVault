@@ -1,0 +1,11 @@
+.git
+.codex-local
+.venv
+node_modules
+dist
+test-output
+deploy/oracle/data
+**/__pycache__
+**/.env
+**/.env.*
+!**/.env.example

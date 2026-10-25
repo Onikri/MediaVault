@@ -1,6 +1,8 @@
 services:
   importer:
-    build: ../../server
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile
     restart: unless-stopped
     env_file: .env
     environment:

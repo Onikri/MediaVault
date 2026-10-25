@@ -12,7 +12,9 @@ export const env = {
     "ogkalu/comic-text-and-bubble-detector",
   comicTextDetectorUrl:
     metaEnv.WXT_COMIC_TEXT_DETECTOR_URL ||
-    "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/comictextdetector.pt.onnx",
+    // Byte-identical mirror of beta-0.3, pinned and checked by hashes.ts.
+    // GitHub release downloads lack the CORS needed outside an extension.
+    "https://huggingface.co/spaces/III111II1I1/detector/resolve/a825d0838cf5a8320c1e35a69fec7ccc1787025e/data/comictextdetector.pt.onnx",
 
   // OCR models
   paddleOCRModelRepo:

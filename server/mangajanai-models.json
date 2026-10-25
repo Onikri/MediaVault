@@ -1,0 +1,63 @@
+{
+  "source": "https://github.com/the-database/MangaJaNai",
+  "revision": "d2f8f92dc75303c557ca2d7a507913eff512ff32",
+  "license": "CC-BY-NC-4.0",
+  "archives": [
+    {
+      "release": "3.0.0",
+      "name": "IllustrationJaNai_V3denoise.zip",
+      "url": "https://github.com/the-database/MangaJaNai/releases/download/3.0.0/IllustrationJaNai_V3denoise.zip",
+      "bytes": 166680846,
+      "sha256": "6c26828ad8e142c9e9c7181451257f3f56a0f5c7f897d9c7878ce898404f53e5"
+    },
+    {
+      "release": "3.0.0",
+      "name": "IllustrationJaNai_V3denoise_onnx.zip",
+      "url": "https://github.com/the-database/MangaJaNai/releases/download/3.0.0/IllustrationJaNai_V3denoise_onnx.zip",
+      "bytes": 72377257,
+      "sha256": "86d393d5c55a7ac0df986cd42e79a0351ecf89b370752f79d4fd0a9cf3f2aa58"
+    },
+    {
+      "release": "3.0.0",
+      "name": "IllustrationJaNai_V3detail.zip",
+      "url": "https://github.com/the-database/MangaJaNai/releases/download/3.0.0/IllustrationJaNai_V3detail.zip",
+      "bytes": 318641534,
+      "sha256": "27749962bc934779f867730cdb10617e3d7475313f920a7a966c56b75dbdbeda"
+    },
+    {
+      "release": "3.0.0",
+      "name": "IllustrationJaNai_V3detail_onnx.zip",
+      "url": "https://github.com/the-database/MangaJaNai/releases/download/3.0.0/IllustrationJaNai_V3detail_onnx.zip",
+      "bytes": 139136442,
+      "sha256": "839277aca3b3a0ed1e2ea972331622354ef31d214a563f68e08ae42e1067c53c"
+    },
+    {
+      "release": "2.0.0",
+      "name": "4x_IllustrationJaNai_V2standard_ModelsOnly.zip",
+      "url": "https://github.com/the-database/MangaJaNai/releases/download/2.0.0/4x_IllustrationJaNai_V2standard_ModelsOnly.zip",
+      "bytes": 158770791,
+      "sha256": "deb0e71aa63257692399419e33991be0496c037049948e4207936b4145d20ba5"
+    },
+    {
+      "release": "2.0.0",
+      "name": "IllustrationJaNai_V2_DeJPEG_ModelsOnly.zip",
+      "url": "https://github.com/the-database/MangaJaNai/releases/download/2.0.0/IllustrationJaNai_V2_DeJPEG_ModelsOnly.zip",
+      "bytes": 28280226,
+      "sha256": "2d2e2d6b03e96b60b3689c25278c25bf8cd329e20d8ccb38e14a1e8e7439ea31"
+    },
+    {
+      "release": "1.0.0",
+      "name": "IllustrationJaNai_V1_ModelsOnly.zip",
+      "url": "https://github.com/the-database/MangaJaNai/releases/download/1.0.0/IllustrationJaNai_V1_ModelsOnly.zip",
+      "bytes": 104634657,
+      "sha256": null
+    },
+    {
+      "release": "1.0.0",
+      "name": "MangaJaNai_V1_ModelsOnly.zip",
+      "url": "https://github.com/the-database/MangaJaNai/releases/download/1.0.0/MangaJaNai_V1_ModelsOnly.zip",
+      "bytes": 433383160,
+      "sha256": "5156f4167875bba51a8ed52bd1c794b0d7277f7103f99b397518066e4dda7e55"
+    }
+  ]
+}

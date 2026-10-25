@@ -1,0 +1,7 @@
+-r requirements-service.txt
+spandrel==0.4.2
+torch==2.10.0
+torchvision==0.25.0
+onnxruntime==1.31.0
+psutil==7.0.0
+# Install the PyTorch CPU or CUDA wheel appropriate to the machine first.

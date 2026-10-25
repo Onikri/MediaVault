@@ -10,3 +10,4 @@ ctranslate2==4.6.0
 sentencepiece==0.2.1
 
 opencv-python-headless==4.12.0.88
+httpx==0.28.1
