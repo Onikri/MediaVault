@@ -73,7 +73,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
     setBusy('submit');try{await service.submit(job);onSubmitted();}catch(cause){setError(cause.message);}finally{setBusy('');}
   }
   if(kind==='manga')return <MangaImport state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary}/>;
-  return <>{online&&<OnlineViewer kind="video" entries={published} initial={published.find(e=>e.number===Number(one))||published[0]} title={collection} service={service} userId={state.user?.sub} dub={variant?.name||inspection?.dubs?.find(d=>d.url===dub)?.name||''} metadata={item} onClose={()=>setOnline(false)}/>}<form className="import-selection import-compact" onSubmit={submit}>
+  return <>{online&&<OnlineViewer kind="video" entries={published.map(e=>({...e,season:Number(e.season||season)}))} initial={published.find(e=>e.number===Number(one))||published[0]} title={collection} service={service} userId={state.user?.sub} dub={variant?.name||inspection?.dubs?.find(d=>d.url===dub)?.name||''} metadata={item} onClose={()=>setOnline(false)}/>}<form className="import-selection import-compact" onSubmit={submit}>
     <div className="section-heading"><h3>В твою коллекцию</h3><span className="source-label"><Icon name="lock" size={12}/> Зашифровано в Drive</span></div>
 
     {manual&&<div className="form-field"><label className="input-label" htmlFor="manualKind">Тип произведения</label><select id="manualKind" className="field-input" value={manualKind} onChange={e=>{setManualKind(e.target.value);setInspection(null);}}>{kinds.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div>}
