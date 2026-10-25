@@ -2,9 +2,10 @@ from pathlib import Path
 import sys
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
-from site_adapters import BY_ID,parse_search
+from site_adapters import BY_ID,parse_search,search_site
 from title_identity import match_title
 from player_catalog import inspect_catalog
+from source_parser import PublicHttp,public_url,SourceError
 
 class SourceCardTests(unittest.TestCase):
     def test_search_scope_excludes_sidebar_cards_and_uses_published_image_title(self):
@@ -29,3 +30,24 @@ class SourceCardTests(unittest.TestCase):
         result=parse_search(BY_ID['animedia'],'<div id="dle-content"><a href="/4662-dandadan.html" title="Дандадан"><b>9.8</b></a></div>',
                             'https://amd.online/index.php','Дандадан')
         self.assertEqual(result[0]['title'],'Дандадан')
+
+    def test_freeanime_uses_the_published_post_search_form(self):
+        calls=[]
+        class Http:
+            def document(self,url,**kwargs):
+                calls.append((url,kwargs));return '<main><a href="/12-dandadan.html" title="Дандадан">2024</a></main>',url,{}
+        result=search_site(BY_ID['freeanime'],'Дандадан',http=Http())
+        self.assertEqual(result['status'],'ok')
+        self.assertEqual(calls,[('https://freeanime.ru/',{'method':'POST','data':{'do':'search','subaction':'search','story':'Дандадан'}})])
+
+    def test_public_search_post_never_opens_login_or_arbitrary_forms(self):
+        from unittest.mock import Mock
+        import requests
+        session=requests.Session();response=Mock(status_code=200,headers={});session.request=Mock(return_value=response)
+        http=PublicHttp(session=session,validate=lambda u:public_url(u,resolve_dns=False))
+        data={'do':'search','subaction':'search','story':'Дандадан'}
+        http._open('https://freeanime.ru/',method='POST',data=data,headers={'Cookie':'private-fixture','Authorization':'Bearer fixture'})
+        headers=session.request.call_args.kwargs['headers']
+        self.assertNotIn('Cookie',headers);self.assertNotIn('Authorization',headers)
+        for url,body in [('https://freeanime.ru/login',data),('https://other.example.com/',data),('https://freeanime.ru/',{**data,'login_password':'fixture'})]:
+            with self.assertRaises(SourceError):http._open(url,method='POST',data=body)

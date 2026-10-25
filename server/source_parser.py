@@ -120,13 +120,17 @@ class PublicHttp:
         if byte_range:
             outgoing["Range"] = byte_range
         if method == "POST":
-            # Only a public Kodik player's same-origin playback form, not a site API.
+            # Explicit public playback/search forms; never login or arbitrary APIs.
             host = urlsplit(url).hostname
-            if not (host in {"kodikplayer.com", "kodik.info", "kodik.biz", "kodik.cc", "aniqit.com"}
-                    and re.fullmatch(r"/[a-zA-Z0-9_-]{1,40}", urlsplit(url).path)):
-                raise SourceError("Этот POST не относится к поддерживаемому публичному плееру.")
-            outgoing["X-Requested-With"] = "XMLHttpRequest"
-            outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
+            player_form=host in {"kodikplayer.com", "kodik.info", "kodik.biz", "kodik.cc", "aniqit.com"} and re.fullmatch(r"/[a-zA-Z0-9_-]{1,40}", urlsplit(url).path)
+            search_form=(host in {'freeanime.ru','www.freeanime.ru'} and urlsplit(url).path in {'/','/index.php'}
+                         and isinstance(data,dict) and set(data)=={'do','subaction','story'}
+                         and data.get('do')=='search' and data.get('subaction')=='search'
+                         and isinstance(data.get('story'),str) and 0<len(data['story'])<=200)
+            if not (player_form or search_form):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            if player_form:
+                outgoing["X-Requested-With"] = "XMLHttpRequest"
+                outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
         for hop in range(6):
             if self.deadline and time.monotonic() >= self.deadline:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')

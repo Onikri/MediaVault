@@ -23,6 +23,7 @@ class Site:
     title: str
     search_path: str = "/"
     kind: str = "anime"
+    search_method: str = "GET"
 
     def search_url(self, query):
         if self.id == "animego":
@@ -64,7 +65,7 @@ SITES = (
     Site('animeonline','AnimeOnline','https://animeonline.cc',('animeonline.cc',),'.shortstory, .movie-item','h2, h3, .movie-item__title'),
     Site('animeseries','AnimeSeries','https://animeseries.ru',('animeseries.ru',),'.shortstory','h2, h3, .title'),
     Site('animevosttv','AnimeVost catalogue','https://animevost.tv',('animevost.tv',),'.shortstory, .movie-item','h2, h3, .movie-item__title'),
-    Site('freeanime','FreeAnime','https://freeanime.ru',('freeanime.ru','www.freeanime.ru'),'.shortstory, .poster, .movie-item, .short-item, .th-item, article','.poster__title, .th-title, .short-title, .title, h2, h3','/index.php'),
+    Site('freeanime','FreeAnime','https://freeanime.ru',('freeanime.ru','www.freeanime.ru'),'.shortstory, .poster, .movie-item, .short-item, .th-item, article','.poster__title, .th-title, .short-title, .title, h2, h3',search_method='POST'),
     Site('anixart','AniXart','https://anixart.site',('anixart.site','www.anixart.site'),'.shortstory, .poster, .movie-item, .short-item, .th-item, article','.poster__title, .th-title, .short-title, .title, h2, h3','/index.php'),
     Site("readmanga", "ReadManga", "https://readmanga.live", ("readmanga.live", "mintmanga.live"), ".tile, .manga-list-item", "h3, .title", "/search", "manga"),
 )
@@ -238,7 +239,9 @@ def search_site(site, query, *, http=None):
             from aniliberty_source import search
             values=search(query,http)
         else:
-            text, final, _ = http.document(site.search_url(query))
+            if site.search_method=='POST':
+                text,final,_=http.document(site.root+site.search_path,method='POST',data={'do':'search','subaction':'search','story':query})
+            else:text, final, _ = http.document(site.search_url(query))
             values=parse_search(site,text,final,query)
         return {"provider": site.id, "name": site.name, "status": "ok" if values else 'empty', "results": values,
                 **({'message':'В публичном HTML нет совпадений. Страница может загружать каталог отдельно в браузере.'} if not values else {})}
