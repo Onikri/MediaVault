@@ -30,6 +30,19 @@ rollback(){
 if ! docker compose up -d --no-deps importer; then rollback; exit 1; fi
 for attempt in $(seq 1 30); do
   if docker compose exec -T importer python -c 'import json,urllib.request; result=json.load(urllib.request.urlopen("http://127.0.0.1:7860/health",timeout=3)); assert result["version"]>=6 and result["voiceDiscovery"]' >/dev/null 2>&1; then
+    # Test the real source network on the VM. No Drive session or media download.
+    # External-site outages do not roll back an otherwise healthy importer.
+    timeout 90 docker compose exec -T importer python - <<'PY' || echo 'Source diagnostics incomplete; importer health still passed.'
+import json
+from source_discovery import discover
+selected={'title':'Дандадан','aliases':['Dandadan'],'year':2024,'kind':'anime','ids':{'mal':'57334'}}
+result=discover(selected)
+print('Live source check: Dandadan / MAL 57334 / 2024',flush=True)
+for provider in result['providers']:
+    print(provider['name']+': '+provider['status'],flush=True)
+voices=[{'name':voice['name'],'kind':voice['kind'],'players':list(dict.fromkeys(v['player'] for v in voice['variants'])),'variants':len(voice['variants'])} for voice in result['voices']]
+print('Confirmed translations: '+json.dumps(voices,ensure_ascii=False),flush=True)
+PY
     echo "MediaVault importer updated to $commit; health version 6 confirmed."
     exit 0
   fi
