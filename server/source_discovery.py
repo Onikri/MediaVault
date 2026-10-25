@@ -11,12 +11,15 @@ _cache={};_lock=threading.Lock();_slots=threading.BoundedSemaphore(2)
 _progress={}
 
 
-def discover(selected,*,refresh=False):
+def discover(selected,*,refresh=False,continuing=False):
     if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')
     key=repr((selected.get('ids'),aliases(selected),selected.get('year'),selected.get('kind')))
     with _lock:
         hit=_cache.get(key)
         if not refresh and hit and hit[0]>time.monotonic():return hit[1]
+        if refresh and not continuing:
+            hit=None
+            for stale in [k for k in _progress if k[0]==key]:_progress.pop(stale,None)
         known={s['url']:s for s in hit[1]['sources'] if s.get('complete',True)} if hit and hit[0]>time.monotonic() else {}
     if not _slots.acquire(blocking=False):raise ValueError('Поиск источников уже выполняется. Повтори через несколько секунд.')
     try:

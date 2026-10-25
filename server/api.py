@@ -414,6 +414,7 @@ def source_inspect(body: Inspection, subject=Depends(owner)):
 class TitleDiscovery(StrictBody):
     title: dict
     refresh: bool = False
+    continuing: bool = False
 
 
 class QualityInspection(StrictBody):
@@ -432,7 +433,7 @@ def discover_voices(body: TitleDiscovery, subject=Depends(owner)):
     if len(json.dumps(body.title)) > 10000:
         raise HTTPException(422, 'Слишком большое описание тайтла.')
     try:
-        return discover(body.title,refresh=body.refresh)
+        return discover(body.title,refresh=body.refresh,continuing=body.continuing)
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
 

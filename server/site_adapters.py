@@ -241,6 +241,9 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime",st
                 if urlsplit(target).hostname not in site.hosts:raise SourceError('Источник перенаправил на другой сайт.')
                 if state is not None:state.clear();state.update({'_root':(rendered,target),'_rendered':True})
                 result=inspect_catalog(original,rendered,target,http,dub_url=dub_url,season=season,provider=site.id,provider_name=site.name,state=state)
+                if not result['dubs']:
+                    result['complete']=False
+                    result['diagnostics'].append({'status':'unavailable','message':'Источник не опубликовал подтверждённый список плееров.'})
             except SourceError:
                 if result is None:raise
                 result['complete']=False

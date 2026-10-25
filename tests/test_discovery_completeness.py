@@ -35,3 +35,17 @@ class DiscoveryCompletenessTests(unittest.TestCase):
             final=api.source_inspect(api.Inspection(url=root,continuation=token),subject='owner-one')
         self.assertTrue(final['complete']);self.assertNotIn('continuation',final)
         self.assertNotIn(token,api._inspection_states)
+
+    def test_explicit_refresh_sees_new_studios_while_continuation_reuses_complete_sources(self):
+        selected={'title':'Refresh show','kind':'anime','year':2024}
+        candidate={'title':'Refresh show','kind':'anime','year':2024,'url':'https://catalog.example.com/refresh-show'}
+        count=[1]
+        def inspect(url,**kwargs):
+            return {**candidate,'dubs':[choice('Studio '+str(i),'https://kodikplayer.com/serial/'+str(i)+'/hash/720p') for i in range(count[0])],'complete':True}
+        with patch.object(source_discovery,'SITES',[SimpleNamespace(id='fixture',name='Fixture',kind='anime')]),patch.object(source_discovery,'search_site',return_value={'status':'ok','results':[candidate]}),patch.object(source_discovery,'inspect_source',side_effect=inspect) as parser:
+            first=source_discovery.discover(selected,refresh=True)
+            count[0]=2
+            continued=source_discovery.discover(selected,refresh=True,continuing=True)
+            refreshed=source_discovery.discover(selected,refresh=True)
+        self.assertEqual(len(first['voices']),1);self.assertEqual(len(continued['voices']),1)
+        self.assertEqual(len(refreshed['voices']),2);self.assertEqual(parser.call_count,2)

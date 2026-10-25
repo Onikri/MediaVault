@@ -83,7 +83,7 @@ def main():
         from source_discovery import discover
         selected={'title':'Дандадан','aliases':['Dandadan'],'year':2024,'kind':'anime','ids':{'mal':'57334'}}
         for attempt in range(6):
-            report['catalog']=discover(selected,refresh=attempt>0)
+            report['catalog']=discover(selected,refresh=attempt>0,continuing=attempt>0)
             if not report['catalog'].get('pending'):break
     # Full reports can contain short-lived public source signatures; keep them private.
     descriptor=os.open(args.report,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)

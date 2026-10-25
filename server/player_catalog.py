@@ -190,6 +190,8 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             for child in current.players:
                 if (urlsplit(child).hostname or '').endswith(('youtube.com','youtu.be','youtube-nocookie.com')):continue
                 pending.append((None,child,url,depth+1))
+        elif any(child not in seen for child in current.players):
+            diagnostics.append({'status':'unavailable','message':'Слишком глубокая цепочка вложенных страниц; список переводов неполный.'})
     # A selected variant must still be published by this source, including nested players.
     selected=next((item for item in choices if item['url']==dub_url),None) if dub_url else None
     if dub_url and selected is None and not pending:raise SourceError('Выбранная озвучка больше не найдена на странице. Обнови список.')

@@ -26,7 +26,7 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
       const json=data=>route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*','access-control-allow-methods':'*','access-control-allow-headers':'*'},body:JSON.stringify(data)});
       if(url.hostname!=='fixture.example'){external.push(url.href);return json([]);}
       if(url.pathname==='/sources/discover'){
-        const selected=req.postDataJSON().title;assert.equal(selected.ids.mal,'57334');assert.equal(selected.year,2024);
+        const body=req.postDataJSON(),selected=body.title;assert.equal(selected.ids.mal,'57334');assert.equal(selected.year,2024);assert.equal(body.continuing,discoveryCalls>0);
         discoveryCalls++;const pending=discoveryCalls===1;
         return json({pending,progress:pending?128:256,complete:!pending,voices:Array.from({length:pending?20:40},(_,i)=>({id:'studio-'+i,name:'Studio '+i,kind:'voice',language:'ru',variants:Array.from({length:14},(_,j)=>({id:'variant-'+i+'-'+j,name:'Studio '+i,kind:'voice',language:'ru',player:'Kodik',sourceTitle:'Дандадан',sourceUrl:'https://source.example/dandadan',providerName:'Источник '+j,url:'https://kodikplayer.com/serial/'+(1000+i*100+j)+'/hash/720p',episodes:[{number:1},{number:3}]}))})),providers:[{provider:'source',name:'Источник A',status:'ok'}]});
       }

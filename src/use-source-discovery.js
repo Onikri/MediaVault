@@ -10,7 +10,7 @@ export default function useSourceDiscovery(item,service){
     const search=async()=>{
       let value,continuing=false,previousProgress=-1,stalled=0;
       do{
-        value=await service.request('/sources/discover',{method:'POST',body:{title,refresh:revision>0||continuing},signal:AbortSignal.any([controller.signal,AbortSignal.timeout(90000)])});
+        value=await service.request('/sources/discover',{method:'POST',body:{title,refresh:revision>0||continuing,continuing},signal:AbortSignal.any([controller.signal,AbortSignal.timeout(90000)])});
         if(controller.signal.aborted)return;
         setData(value);continuing=!!value.pending;
         stalled=continuing&&value.progress===previousProgress?stalled+1:0;previousProgress=value.progress;
