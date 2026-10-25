@@ -192,6 +192,7 @@ async def lifespan(application):
     if os.getenv("MEDIA_VAULT_DISABLE_WORKER") != "1":
         thread.start()
     yield
+    await app.state.reader_processor.close()
     stopping.set()
     wakeup.set()
     if thread.is_alive():
@@ -208,7 +209,7 @@ app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET",
 @app.middleware("http")
 async def limits(request: Request, call_next):
     if request.method == "POST":
-        maximum=14*1024*1024 if request.url.path=="/reader/translate" else 512*1024
+        maximum=15*1024*1024 if request.url.path in {"/reader/translate", "/reader/jobs"} else 512*1024
         if request.headers.get("origin") not in (None, ORIGIN):
             return JSONResponse({"detail": "Origin denied"}, status_code=403)
         try:
@@ -557,6 +558,8 @@ install_trailers(app, os.getenv("DATA_DIR", "/data"))
 
 from reader_translation import install as install_reader_translation
 install_reader_translation(app, os.getenv("DATA_DIR", "/data"), owner)
+from reader_processing import install as install_reader_processing
+install_reader_processing(app, os.getenv("DATA_DIR", "/data"), owner)
 from anime_music import install as install_anime_music
 install_anime_music(app)
 

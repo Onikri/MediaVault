@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build && node scripts/build-lmt.mjs",
-    "test": "node --test tests/range.test.cjs tests/upload.test.cjs tests/upload.test.mjs tests/server-job.test.mjs tests/drive-discovery.test.mjs tests/library-model.test.mjs tests/player-model.test.mjs tests/neural-upscaler.test.mjs tests/playback-diagnostics.test.mjs tests/title-metadata.test.mjs tests/catalog.test.mjs tests/title-cache.test.mjs tests/palette-relations.test.mjs tests/watch-progress.test.mjs tests/manga.test.mjs tests/reader.test.mjs tests/reader-layout.test.mjs tests/lmt.test.mjs tests/fsr.test.mjs",
+    "test": "node --test tests/range.test.cjs tests/upload.test.cjs tests/upload.test.mjs tests/server-job.test.mjs tests/drive-discovery.test.mjs tests/library-model.test.mjs tests/player-model.test.mjs tests/neural-upscaler.test.mjs tests/playback-diagnostics.test.mjs tests/title-metadata.test.mjs tests/catalog.test.mjs tests/title-cache.test.mjs tests/palette-relations.test.mjs tests/watch-progress.test.mjs tests/manga.test.mjs tests/reader.test.mjs tests/reader-layout.test.mjs tests/lmt.test.mjs tests/fsr.test.mjs tests/reader-processing.test.mjs",
     "test:browser": "node tests/browser.test.cjs",
     "test:design": "node tests/design-browser.cjs",
     "test:ui": "node tests/ui.test.cjs",
@@ -23,7 +23,8 @@
     "test:online": "node tests/online-browser.cjs",
     "test:translation": "node tests/translation-browser.cjs",
     "test:gpu": "node tests/fsr-browser.cjs",
-    "test:lmt": "node tests/lmt-browser.cjs"
+    "test:lmt": "node tests/lmt-browser.cjs",
+    "test:processing": "node --test tests/reader-processing.test.mjs"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.86",
@@ -33,13 +34,18 @@
     "hls.js": "^1.6.13",
     "jszip": "3.10.1",
     "lucide-react": "^0.468.0",
+    "lucide-svelte": "0.563.0",
     "motion": "14.1.0",
     "onnxruntime-web": "^1.30.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "svelte": "5.57.2"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "6.2.4",
+    "@tailwindcss/vite": "4.1.18",
     "playwright": "1.62.1",
+    "tailwindcss": "4.1.18",
     "vite": "7.1.12"
   }
 }

@@ -213,3 +213,18 @@ The short Dandadan excerpt in `translation-demo.html` is artwork by Yukinobu Tat
 - ONNX Runtime Web 1.30.0 (MIT), https://github.com/microsoft/onnxruntime ; WebLLM 0.2.86 (Apache-2.0), https://github.com/mlc-ai/web-llm . Model weights retain upstream licenses; they are downloaded separately only after opt-in, not included in the Pages artifact.
 - AMD FidelityFX FSR1 1.0.2, MIT, via agyild's mpv luma port. Full notice, original shader and source SHA256: [src/vendor/fsr1](src/vendor/fsr1/). WebGL2 binding and guarded flat-field RCAS preserve the original EASU/RCAS algorithms. Public notice is `FSR1-LICENSE.txt`. FSR is not a neural model.
 - Lanczos3 is the classical windowed-sinc reconstruction kernel, implemented directly for WebGL; no third-party neural weights are involved. [Research, alternatives and device limits](docs/video-upscalers.md).
+# Manga reader backend additions
+
+The AGPL Libre Manga Translator web adapter now includes upstream Overlay and
+overlay editor components from `39a95be1890e2ea3e227052976bbaf576a8eb7b3`.
+Web bindings, responsive toolbar changes and backend adapters are published here.
+Bundled Bangers, Comic Neue and Noto Sans are SIL OFL 1.1; full notices are in
+`lmt/upstream/assets/fonts/*-OFL.txt` and included in the built LMT artifact.
+No Google Fonts request is made by this adapter.
+
+[MangaJaNai / IllustrationJaNai](https://github.com/the-database/MangaJaNai)
+model weights are CC BY-NC 4.0. The manifest records official release URLs and
+checksums; weights are not committed. The V1 manga archive checksum was measured
+from its official release asset because GitHub does not publish a digest for that
+older upload. PyTorch, Spandrel and ONNX Runtime run inference on the operator's
+machine; their respective dependency licenses also apply.

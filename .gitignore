@@ -11,3 +11,6 @@ test-output/
 *.tfstate
 *.tfstate.*
 deploy/oracle/data/
+.codex-local/
+.venv/
+.codex/config.toml

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import {languages} from './languages.js';
 export function validateConfig(config={}){
  if(!config.allowDownloads)throw Error('Разреши загрузку моделей в настройках LMT.');
- if(!['English','Japanese','Korean','Chinese (Simplified)'].includes(config.language||'English'))throw Error('Выбери исходный язык страницы.');
+ if(!languages.includes(config.language||'English'))throw Error('Выбери исходный язык страницы.');
+ if(config.targetLanguage&&!languages.filter(l=>l!=='Auto-Detect').includes(config.targetLanguage))throw Error('Выбери язык перевода.');
  if(['ppocrv6-manga','manga-ocr'].includes(config.ocr)&&config.language!=='Japanese')throw Error('Этот OCR предназначен для японского языка. Выбери PaddleOCR.');
  if(config.ocr==='pororo'&&config.language!=='Korean')throw Error('Pororo предназначен для корейского языка. Выбери PaddleOCR.');
  if(config.mode==='api'){

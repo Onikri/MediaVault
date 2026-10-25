@@ -87,6 +87,7 @@ jobs:
             npm run test:translation &&
             npm run test:gpu &&
             npm run test:lmt &&
+            node tests/processing-browser.cjs &&
             npm run test:trusted
           } 2>&1 | tee test-output/browser-ci.log
           result=${PIPESTATUS[0]}
