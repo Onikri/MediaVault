@@ -21,7 +21,7 @@ export function voiceLabel(item, fallback = 'Оригинал') {
 export function buildPlaybackLibrary(current, catalog) {
   const group = (catalog?.storage?.collections || []).find(entry => entry.id === current.collectionId);
   const identity=group?.metadataId||group?.metadata?.ids?.mal||catalog?.titleProfiles?.[(current.section||'anime')+':'+group?.id]?.sourceId;
-  const matchingGroups=(catalog?.storage?.collections||[]).filter(g=>g.id===group?.id||identity&&String(g.metadataId||g.metadata?.ids?.mal||catalog?.titleProfiles?.[(current.section||'anime')+':'+g.id]?.sourceId||'')===String(identity));
+  const matchingGroups=(catalog?.storage?.collections||[]).filter(g=>g.id===group?.id||identity&&g.section===group?.section&&String(g.metadataId||g.metadata?.ids?.mal||catalog?.titleProfiles?.[(current.section||'anime')+':'+g.id]?.sourceId||'')===String(identity));
   const collectionIds=new Set(matchingGroups.map(g=>g.id));
   const assets = (catalog?.items || []).filter(item => video(item) &&
     (current.collectionId ? collectionIds.has(item.collectionId) : item.id === current.id));

@@ -4,3 +4,4 @@ google-api-python-client==2.201.0
 google-auth==2.62.0
 m3u8==6.0.0
 requests==2.34.2
+beautifulsoup4==4.14.3

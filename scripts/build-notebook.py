@@ -6,7 +6,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ['server/source_parser.py', 'server/media_download.py', 'server/run_import.py',
-         'server/vault_drive.py', 'server/requirements.txt']
+         'server/vault_drive.py', 'server/player_catalog.py', 'server/browser_player.py', 'server/public_page_data.py', 'server/requirements.txt']
 HASHES = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in FILES}
 
 

@@ -16,6 +16,8 @@ CVH_API='https://plapi.cdnvideohub.com/api/v1/player/sv'
 
 def player_name(url):
     host=urlsplit(url).hostname or ''
+    if host in {'jut.su','www.jut.su'}:return 'Jut.su'
+    if host.endswith('.stravers.live'):return 'Alloha (динамический)'
     if host in KODIK:return 'Kodik'
     if 'aniboom' in host:return 'Aniboom'
     if 'sibnet' in host:return 'Sibnet'
@@ -146,6 +148,10 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             current=parse_page(document,url)
         except SourceError:
             diagnostics.append({'player':player_name(url),'status':'unavailable'});continue
+        if provider=='anilibria' and current.episodes and re.search(r'/anime/releases/release/[a-zA-Z0-9_-]+',urlsplit(url).path):
+            base_url=re.match(r'(https://[^/]+/anime/releases/release/[a-zA-Z0-9_-]+)',url)[1]
+            current.episodes=[{**entry,'url':base_url+'/episodes/'+str(entry['number'])} for entry in current.episodes]
+            current.streams=[]
         published=animego_episode_pages(document,url)
         buttons=animego_buttons(document,url)
         current_choices,current_seasons=player_choices(document,url)
@@ -165,9 +171,11 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             key=(item['url'],item['name'],item.get('kind'))
             if key not in choice_seen:choices.append(item);choice_seen.add(key)
         # Report direct/public single-player variants even when the page has no translation name.
-        if not current_choices and not buttons and (current.streams or current.episodes and player_name(url) in {'Kodik','Aniboom','AniLiberty','Animedia','VK Video'}):
+        if not current_choices and not buttons and (current.streams or current.episodes and player_name(url) in {'Kodik','Aniboom','AniLiberty','Animedia','VK Video','Jut.su'}):
             item=choice('',url,episodes=current.episodes or [{'number':episode_number(url) or 1,'url':url}])
             if item['url'] not in choice_seen:choices.append(item);choice_seen.add(item['url'])
+        if not current_choices and player_name(url)=='Alloha (динамический)':
+            choices.append(choice('',url,player='Alloha (динамический)',episodes=[{'number':1,'url':url,'title':'Опубликованный iframe'}]))
         if depth<3:
             for child in current.players[:12]:
                 if (urlsplit(child).hostname or '').endswith(('youtube.com','youtu.be','youtube-nocookie.com')):continue
@@ -187,7 +195,8 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             if selected_seasons:seasons=selected_seasons
     if not episodes and page.streams:episodes=[{'number':episode_number(final) or 1,'url':final}]
     for entry in episodes:
-        entry.setdefault('season',season or 1)
+        published_season=re.search(r'/(?:season|sezon|tv)[-_/](\d+)',urlsplit(entry['url']).path,re.I)
+        entry.setdefault('season',int(published_season[1]) if published_season else season or 1)
     # Preserve distinct translated episode links. Only exact duplicates collapse.
     episodes=list({(e.get('season',1),e['number'],e['url']):e for e in episodes}.values())
     season_values={int(e['number']):e for e in seasons}

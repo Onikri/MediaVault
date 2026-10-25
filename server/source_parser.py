@@ -36,7 +36,7 @@ BLOCKED = re.compile(
 )
 
 
-def public_url(value, *, resolve_dns=True):
+def public_url(value, *, resolve_dns=True, allow_api=False):
     """Validate every request and every redirect, including nested HLS URLs."""
     if not isinstance(value, str) or len(value) > 8192:
         raise SourceError("Некорректная ссылка источника.")
@@ -62,7 +62,7 @@ def public_url(value, *, resolve_dns=True):
         or host in {"anilibria.top", "aniliberty.top", "api.anilibria.app"}
         and bool(re.fullmatch(r"/api/v1/anime/releases/[a-zA-Z0-9_-]+", url.path))
     )
-    if not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
+    if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
         raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
     if resolve_dns:
         try:
@@ -425,4 +425,8 @@ class Resolver:
                 if error.__class__.__module__.startswith("anime_dl_core"):
                     continue
                 raise
+        host=urlsplit(url).hostname or ''
+        if host in {'jut.su','www.jut.su'} or host.endswith('.stravers.live'):
+            from browser_player import extract
+            return Page(title=page.title,streams=extract(url,referer))
         raise SourceError("Публичный MP4/HLS-поток не найден. Вставь ссылку на доступную серию или поддерживаемый плеер.")

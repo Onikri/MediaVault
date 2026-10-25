@@ -86,15 +86,15 @@ export function reconstructRgb(baseRgb,neuralY) {
 export async function startNeuralUpscaler(video,canvas,{mode='balanced',onFailure=()=>{},onStats=()=>{}}={}) {
   const settings=QUALITY_MODES[mode]||QUALITY_MODES.balanced;
   const ort=await loadRuntime();
+  const model=await modelBytes();
   const adapter=await navigator.gpu?.requestAdapter({powerPreference:'high-performance'});
   if(!adapter)throw Error('Производительный WebGPU-адаптер недоступен.');
   const gpuInfo=adapter.info||{};
   const device=await adapter.requestDevice();
   ort.env.webgpu.device=device;
-  const model=await modelBytes();
-  const session=await ort.InferenceSession.create(model,{
-    executionProviders:['webgpu'],graphOptimizationLevel:'all'
-  });
+  let session;
+  try{session=await ort.InferenceSession.create(model,{executionProviders:['webgpu'],graphOptimizationLevel:'all'});}
+  catch(error){device.destroy();throw error;}
   // Verify that the browser actually runs the pretrained model on its WebGPU
   // device before the UI reports active AI upscaling.
   try{
