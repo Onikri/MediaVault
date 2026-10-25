@@ -7,6 +7,7 @@ const projectRoot = dirname(fileURLToPath(import.meta.url));
 const runtimeFiles = [
   'config.js',
   'spotify-callback.html',
+  'translation-demo.html',
   'sw.js',
   'crypto.js',
   'drive.js',

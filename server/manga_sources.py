@@ -87,10 +87,11 @@ def search_url(site,query):
     if site.family=='chan':return site.root+'/?'+urlencode({'do':'search','subaction':'search','story':query})
     if site.family=='hub':return site.root+'/search/title?'+urlencode({'query':query})
     return site.root+'/search?'+urlencode({'q':query,**({'type':'manga'} if site.family=='buff' else {})})
-def search_title(title):
+def search_title(title,language='auto'):
+    if language not in {'auto','all','ru','en'}:raise SourceError('Выбери язык источника: все, русский или английский.')
     if not isinstance(title,dict) or title.get('kind')!='manga' or not aliases(title):raise SourceError('Выбери конкретную мангу из каталога.')
     if len(json.dumps(title).encode())>50000:raise SourceError('Описание выбранной манги слишком велико.')
-    key=json.dumps([title.get('ids'),aliases(title),title.get('year')],sort_keys=True,ensure_ascii=False)
+    key=json.dumps([language,title.get('ids'),aliases(title),title.get('year')],sort_keys=True,ensure_ascii=False)
     with _lock:hit=_cache.get(key)
     if hit and hit[0]>time.monotonic():return hit[1]
     def work(site):
@@ -110,9 +111,10 @@ def search_title(title):
         return {'provider':site.id,'name':site.name,'status':status,'message':message,'results':results}
     # Current GroupLe search is JS/API-only; its HTML reader remains available
     # for direct links. Do not misrepresent an empty HTML search as a working API.
-    with ThreadPoolExecutor(max_workers=4) as pool:providers=list(pool.map(work,[s for s in SITES if s.family not in {'grouple','pill'}]))
-    if not any(p['results'] for p in providers):providers.append(work(next(s for s in SITES if s.family=='pill')))
-    result={'results':list({v['url']:v for p in providers for v in p['results']}.values()),'providers':[{k:p[k] for k in ('provider','name','status','message')} for p in providers],'language':'ru','checkedAt':int(time.time())}
+    sites=[s for s in SITES if s.family!='grouple' and (s.family=='pill' if language=='en' else True if language=='all' else s.family!='pill')]
+    with ThreadPoolExecutor(max_workers=5) as pool:providers=list(pool.map(work,sites))
+    if language=='auto' and not any(p['results'] for p in providers):providers.append(work(next(s for s in SITES if s.family=='pill')))
+    result={'results':list({v['url']:v for p in providers for v in p['results']}.values()),'providers':[{k:p[k] for k in ('provider','name','status','message')} for p in providers],'language':language,'checkedAt':int(time.time())}
     with _lock:
         if len(_cache)>80:_cache.clear()
         _cache[key]=(time.monotonic()+120,result)

@@ -1,3 +1,4 @@
+import {translationFont} from '../src/translation-layout.js';
 import test from 'node:test';import assert from 'node:assert/strict';import JSZip from 'jszip';
 import {openRangeArchive} from '../src/zip-reader.js';import{sanitize,readSettings,saveSettings}from'../src/reader-settings.js';import{toggleTrack,tracks,spotifySearch,youtubeSearch,musicIdentityFor}from'../src/music-library.js';
 const storage=()=>{const m=new Map();return{getItem:k=>m.get(k),setItem:(k,v)=>m.set(k,v)}};
@@ -6,3 +7,5 @@ test('malformed and compressed archives use the compatible loader instead of tru
 test('reader preferences and music library are isolated by account',()=>{const s=storage();saveSettings('A',{mode:'scroll',preload:4,translate:true},s);assert.equal(readSettings('A',s).mode,'scroll');assert.equal(readSettings('B',s).translate,false);assert.equal(sanitize({width:100000,preload:100}).width,900);const t={id:'theme:1',title:'Song',artists:['Artist']};toggleTrack('A',t,s);assert.equal(tracks('A',s).length,1);assert.equal(tracks('B',s).length,0);assert.equal(toggleTrack('A',t,s).length,0);assert.ok(spotifySearch(t).startsWith('https://open.spotify.com/search/'));assert.ok(youtubeSearch(t).startsWith('https://music.youtube.com/'));});
 
 test('movie numeric IDs never become unrelated anime music',()=>{assert.equal(musicIdentityFor({section:'movie',metadataId:57334}),null);assert.equal(musicIdentityFor({section:'anime',metadataId:57334}),'57334');assert.equal(musicIdentityFor({section:'movie',collectionId:'film'},{storage:{collections:[{id:'film',metadata:{ids:{mal:'199'}}}]}}),'199');});
+
+test('translation text adapts to the speech bubble and reader size',()=>{const r={w:.16,h:.1,text:'Я не верю в НЛО и инопланетян.'};const small=translationFont(r,{width:390,height:585}),large=translationFont(r,{width:1000,height:1500});assert.ok(small>=9&&small<large);assert.ok(large<=18);assert.ok(translationFont({...r,text:'длинный перевод '.repeat(100)},{width:390,height:585})>=9);});

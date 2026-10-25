@@ -3,15 +3,17 @@ import {Settings2,BookOpen,ArrowLeft,ArrowRight,Languages,X,Wifi,ChevronDown} fr
 import {openChapter} from './zip-reader.js';
 import {readReading,writeReading} from './reading-progress.js';
 import {readSettings,saveSettings} from './reader-settings.js';
+import {translationFont} from './translation-layout.js';
 import './manga-reader.css';
 function Page({index,entry,active,preload,translate,translator,onVisible,onError}){
- const host=useRef(null),[near,setNear]=useState(false),[source,setSource]=useState(''),[ratio,setRatio]=useState(0),[regions,setRegions]=useState(null),[message,setMessage]=useState(''),[attempt,setAttempt]=useState(0),blob=useRef(null);
+ const host=useRef(null),[near,setNear]=useState(false),[source,setSource]=useState(''),[ratio,setRatio]=useState(0),[imageSize,setImageSize]=useState({width:0,height:0}),[regions,setRegions]=useState(null),[message,setMessage]=useState(''),[attempt,setAttempt]=useState(0),blob=useRef(null);
  useEffect(()=>{const observer=new IntersectionObserver(e=>{setNear(e.some(x=>x.isIntersecting));},{rootMargin:preload?'100% 0px':'0px'});if(host.current)observer.observe(host.current);return()=>observer.disconnect();},[preload]);
  useEffect(()=>{if(!near&&!active){setSource('');return;}let closed=false,url;entry.async('blob').then(b=>{if(closed)return;blob.current=b;url=URL.createObjectURL(b);setSource(url);}).catch(e=>!closed&&onError(e.message));return()=>{closed=true;blob.current=null;if(url)URL.revokeObjectURL(url);};},[entry,near,active]);
+ useEffect(()=>{const node=host.current?.querySelector('img');if(!node)return;const observer=new ResizeObserver(entries=>{const r=entries[0].contentRect;setImageSize({width:r.width,height:r.height});});observer.observe(node);return()=>observer.disconnect();},[source]);
  useEffect(()=>{if(!source||!translate||!translator)return;let closed=false;const abort=new AbortController();setMessage('Распознаём текст и переводим…');translator(blob.current,abort.signal).then(data=>{if(!closed){setRegions(data.regions||[]);setMessage(data.regions?.length?'':'Английский текст не распознан.');}}).catch(e=>{if(!closed)setMessage(e.message);});return()=>{closed=true;abort.abort();};},[source,translate,translator,attempt]);
  useEffect(()=>{const observer=new IntersectionObserver(e=>{if(e.some(x=>x.isIntersecting))onVisible(index);},{rootMargin:'-10% 0px -60% 0px'});if(host.current)observer.observe(host.current);return()=>observer.disconnect();},[index,onVisible]);
  return <figure ref={host} className="reader-page" data-page={index}>
-  {source?<div className="reader-page-image"><img src={source} onLoad={e=>setRatio(e.currentTarget.naturalHeight/e.currentTarget.naturalWidth)} alt={'Страница '+(index+1)} decoding="async"/>{translate&&regions?.map((r,i)=><span key={i} className="reader-translation" title={r.original} style={{left:r.x*100+'%',top:r.y*100+'%',width:r.w*100+'%',minHeight:r.h*100+'%',fontSize:'clamp(9px,1.5vw,18px)'}}>{r.text}</span>)}</div>:<div className="reader-page-placeholder" style={ratio?{aspectRatio:1/ratio,minHeight:0}:undefined}>Страница {index+1}</div>}
+  {source?<div className="reader-page-image"><img src={source} onLoad={e=>setRatio(e.currentTarget.naturalHeight/e.currentTarget.naturalWidth)} alt={'Страница '+(index+1)} decoding="async"/>{translate&&regions?.map((r,i)=><span key={i} className="reader-translation" title={r.original} style={{left:r.x*100+'%',top:r.y*100+'%',width:r.w*100+'%',height:r.h*100+'%',fontSize:translationFont(r,imageSize)+'px'}}>{r.text}</span>)}</div>:<div className="reader-page-placeholder" style={ratio?{aspectRatio:1/ratio,minHeight:0}:undefined}>Страница {index+1}</div>}
   {translate&&message&&<figcaption role="status">{message}{!message.includes('Распознаём')&&<button onClick={()=>setAttempt(v=>v+1)}>Повторить</button>}</figcaption>}
  </figure>;
 }

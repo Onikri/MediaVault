@@ -53,17 +53,84 @@ def ocr_regions(tsv,width,height):
             x,y,w,h=(int(row[k]) for k in ('left','top','width','height'))
             if confidence<38 or not re.search('[A-Za-z]',text) or w<2 or h<3:continue
             key=(row['page_num'],row['block_num'],row['par_num'])
-            groups.setdefault(key,[]).append((x,y,w,h,text))
+            groups.setdefault(key,[]).append((x,y,w,h,text,confidence))
         except (ValueError,KeyError,TypeError):continue
     result=[]
     for words in groups.values():
         text=' '.join(w[4] for w in words)
-        if len(re.findall('[A-Za-z]',text))<3 or len(text)>1500:continue
+        short=text.strip(' .!?,:;').casefold()
+        if len(text)>1500:continue
+        if len(re.findall('[A-Za-z]',text))<3 and not (short in {'a','i','an','am','as','at','be','by','do','go','he','hi','if','in','is','it','me','my','no','of','oh','ok','on','or','so','to','up','us','we'} and min(w[5] for w in words)>=70):continue
         left=max(0,min(w[0] for w in words)-3);top=max(0,min(w[1] for w in words)-3)
         right=min(width,max(w[0]+w[2] for w in words)+3);bottom=min(height,max(w[1]+w[3] for w in words)+3)
         if right<=left or bottom<=top:continue
         result.append({'x':left/width,'y':top/height,'w':(right-left)/width,'h':(bottom-top)/height,'original':text})
+    return result[:300]
+
+def merge_bubbles(regions):
+    # PSM 11 often returns each printed line as a separate block. Translating
+    # those fragments independently loses negations and names. Join only close,
+    # aligned lines, while keeping neighbouring columns/panels separate.
+    groups=[]
+    for region in sorted(regions,key=lambda r:(r['y'],r['x'])):
+        candidates=[]
+        for group in groups:
+            last=group[-1];gap=region['y']-(last['y']+last['h']);height=max(last['h'],region['h'])
+            overlap=min(last['x']+last['w'],region['x']+region['w'])-max(last['x'],region['x'])
+            center=abs(last['x']+last['w']/2-region['x']-region['w']/2)
+            if sum(len(r['original']) for r in group)+len(region['original'])<=1500 and -.5*height<=gap<=1.1*height and overlap>=.5*min(last['w'],region['w']) and center<=max(.02,.45*max(last['w'],region['w'])):
+                candidates.append((abs(gap)+center,group))
+        if candidates:min(candidates,key=lambda v:v[0])[1].append(region)
+        else:groups.append([region])
+    result=[]
+    for group in groups:
+        left=min(r['x'] for r in group);top=min(r['y'] for r in group)
+        right=max(r['x']+r['w'] for r in group);bottom=max(r['y']+r['h'] for r in group)
+        text=group[0]['original']
+        for row in group[1:]:
+            following=row['original'];text=text[:-1]+following if re.search(r'[A-Za-z]-$',text) and re.match('[A-Za-z]',following) else text+' '+following
+        result.append({'x':left,'y':top,'w':right-left,'h':bottom-top,'original':text})
     return result[:60]
+
+def translation_input(text):
+    text=text.translate(str.maketrans({'’':"'",'‘':"'",'“':'"','”':'"'}))
+    letters=re.findall('[A-Za-z]',text)
+    if letters and sum(c.isupper() for c in letters)/len(letters)>.8:text=text.capitalize()
+    acronyms={'ufo':'UFO','ufos':'UFOs','uap':'UAP','uaps':'UAPs','dna':'DNA','nasa':'NASA','fbi':'FBI','cia':'CIA','tv':'TV','usa':'USA','gps':'GPS'}
+    text=re.sub(r'\b(?:UFOs?|UAPs?|DNA|NASA|FBI|CIA|TV|USA|GPS)\b',lambda m:acronyms[m[0].lower()],text,flags=re.I)
+    return re.sub(r'\bi\b','I',text)
+
+def refine_bubbles(image,regions,work):
+    # A second OCR pass treats each detected speech bubble as one text block.
+    # This recovers short/missed lines between the first and last detected rows.
+    targets=[];paths=[]
+    for index,region in enumerate(regions):
+        if region['h']<.028 or len(region['original'])<9:continue
+        left=max(0,int(region['x']*image.width)-7);top=max(0,int(region['y']*image.height)-7)
+        right=min(image.width,int((region['x']+region['w'])*image.width)+7);bottom=min(image.height,int((region['y']+region['h'])*image.height)+7)
+        path=Path(work)/('bubble-'+str(index)+'.png');image.crop((left,top,right,bottom)).save(path);paths.append(str(path));targets.append(index)
+        if len(targets)>=40:break
+    if not targets:return regions
+    filelist=Path(work)/'bubbles.txt';filelist.write_text('\n'.join(paths)+'\n')
+    try:
+        output=subprocess.run(['tesseract',str(filelist),'stdout','-l','eng','--psm','6','tsv'],capture_output=True,timeout=20,check=False,env={**os.environ,'OMP_THREAD_LIMIT':'1'})
+        if output.returncode:return regions
+        pages={}
+        for row in csv.DictReader(io.StringIO(output.stdout.decode('utf-8','replace')),delimiter='\t'):
+            try:
+                text=row.get('text','').strip();confidence=float(row.get('conf','-1'));page=int(row['page_num'])
+                if confidence<30 or not re.search('[A-Za-z]',text):continue
+                pages.setdefault(page,[]).append((text,confidence,row.get('line_num')))
+            except (ValueError,TypeError,KeyError):continue
+        for page,words in pages.items():
+            if not 1<=page<=len(targets) or sum(w[1] for w in words)/len(words)<50:continue
+            text=''
+            for word,confidence,line in words:
+                text=text[:-1]+word if re.search(r'[A-Za-z]-$',text) and re.match('[A-Za-z]',word) else (text+' '+word).strip()
+            target=regions[targets[page-1]]
+            if len(target['original'])/2<=len(text)<=1500:target['original']=text
+    except (OSError,subprocess.SubprocessError):pass
+    return regions
 
 def translate_image(data,data_dir):
     from PIL import Image,ImageOps
@@ -79,9 +146,9 @@ def translate_image(data,data_dir):
         try:
             result=subprocess.run(['tesseract',str(path),'stdout','-l','eng','--psm','11','tsv'],capture_output=True,timeout=20,check=False,env={**os.environ,'OMP_THREAD_LIMIT':'1'})
             if result.returncode:raise ValueError()
-            regions=ocr_regions(result.stdout.decode('utf-8','replace'),width,height)
+            regions=refine_bubbles(image,merge_bubbles(ocr_regions(result.stdout.decode('utf-8','replace'),width,height)),work)
             if regions:
-                translated=translate_texts([r['original'] for r in regions],data_dir)
+                translated=translate_texts([translation_input(r['original']) for r in regions],data_dir)
                 for region,text in zip(regions,translated):region['text']=text
             return {'regions':regions,'sourceLanguage':'en','targetLanguage':'ru','machineTranslation':True}
         except Exception:raise HTTPException(503,'OCR или перевод временно недоступен. Оригинал страницы сохранён.') from None

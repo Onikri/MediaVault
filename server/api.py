@@ -243,7 +243,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 9, "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 10, "mangaLanguages":["ru","en"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -425,10 +425,13 @@ class TitleDiscovery(StrictBody):
     refresh: bool = False
     continuing: bool = False
 
+class MangaDiscovery(TitleDiscovery):
+    language:str=Field(default='auto',pattern=r'^(auto|all|ru|en)$')
+
 @app.post('/manga/search')
-def manga_search(body:TitleDiscovery,subject=Depends(owner)):
+def manga_search(body:MangaDiscovery,subject=Depends(owner)):
     from manga_sources import search_title
-    return search_title(body.title)
+    return search_title(body.title,body.language)
 
 class MangaInspection(StrictBody):
     url:str=Field(max_length=8192)

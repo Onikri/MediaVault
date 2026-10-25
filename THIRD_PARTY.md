@@ -194,3 +194,5 @@ AniList and Kitsu; no paid credentials are used.
 Tesseract (Apache-2.0), CTranslate2 (MIT), SentencePiece (Apache-2.0) and Pillow (HPND) power the optional local OCR/translation pipeline. The separately downloaded Argos English–Russian 1.9 model retains its upstream metadata and README with OPUS/dataset credits. See https://github.com/argosopentech/argos-translate and https://argos-net.com/v1/translate-en_ru-1_9.argosmodel . No code from the GPL manga-image-translator/mokuro projects or MPL Suwayomi-WebUI is copied.
 
 AnimeThemes supplies song credits through its public API: https://animethemes.moe/ . Spotify/YouTube playback and playlist actions remain with their official services; no audio downloads or rights are granted by this application. Research, limits and setup: [docs/reader-music.md](docs/reader-music.md).
+
+The short Dandadan excerpt in `translation-demo.html` is artwork by Yukinobu Tatsu, included to illustrate machine translation. The artwork is excluded from the application code license; its source is credited in the demonstration. The public demo contains only a cropped excerpt and precomputed real OCR/model output.
