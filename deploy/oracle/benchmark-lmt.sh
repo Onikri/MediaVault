@@ -4,14 +4,26 @@ set -euo pipefail
 umask 027
 revision="${1:?Pass the SHA of an already prepared reader image}"
 stage="${2:-prepare}"
+variant="${3:-4b}"
 [[ "$revision" =~ ^[a-f0-9]{40}$ ]] || exit 2
-[[ "$stage" =~ ^(prepare|lmt|combined)$ ]] || exit 2
+[[ "$stage" =~ ^(prepare|lmt)$ ]] || exit 2
+[[ "$variant" =~ ^(4b|baseline)$ ]] || exit 2
 root=/opt/mediavault-reader-bench
 data="$root/data"
 reader="mediavault-reader-bench:${revision:0:12}"
 llm=mediavault-reader-llm:b11887
 network=mediavault-reader-bench
-model=Qwen3-0.6B-Q8_0.gguf
+if [[ "$variant" == 4b ]]; then
+  model=Qwen3-4B-Q4_K_M.gguf
+  modelrepo=Qwen/Qwen3-4B-GGUF
+  modelrev=bc640142c66e1fdd12af0bd68f40445458f3869b
+  modelhash=7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5
+else
+  model=Qwen3-0.6B-Q8_0.gguf
+  modelrepo=Qwen/Qwen3-0.6B-GGUF
+  modelrev=23749fefcc72300e3a2ad315e1317431b06b590a
+  modelhash=9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031
+fi
 [[ "$(uname -m)" == aarch64 ]] || { echo 'This benchmark requires ARM64'; exit 2; }
 docker image inspect "$reader" >/dev/null
 python3 - <<'PY'
@@ -37,11 +49,11 @@ ENTRYPOINT ["/opt/llama-b11887/llama-server"]
 DOCKER
   docker build -t "$llm" "$root/llama-image" >"$root/llama-build.log" 2>&1 || { tail -30 "$root/llama-build.log";exit 3; }
   if [[ ! -f "$data/llm/$model" ]]; then
-    curl -fL --retry 2 "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/23749fefcc72300e3a2ad315e1317431b06b590a/Qwen3-0.6B-Q8_0.gguf" -o "$data/llm/$model.part"
-    echo '9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031  '"$data/llm/$model.part" | sha256sum -c -
+    curl -fL --retry 2 "https://huggingface.co/$modelrepo/resolve/$modelrev/$model" -o "$data/llm/$model.part"
+    echo "$modelhash  $data/llm/$model.part" | sha256sum -c -
     mv "$data/llm/$model.part" "$data/llm/$model"
   fi
-  echo '9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031  '"$data/llm/$model" | sha256sum -c -
+  echo "$modelhash  $data/llm/$model" | sha256sum -c -
   chmod 644 "$data/llm/$model"
   docker run --rm --network none --cpus=1 --memory=1g --cap-drop=ALL --security-opt=no-new-privileges "$llm" --version
   echo LLM_PREPARED
@@ -52,7 +64,7 @@ docker inspect mediavault-reader-llm >/dev/null 2>&1 && { echo 'An existing meas
 cleanup(){ docker stop -t 15 mediavault-reader-llm >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 docker run -d --rm --name mediavault-reader-llm --network "$network" \
-  --cpus=2 --memory=2g --memory-swap=2g --cap-drop=ALL --security-opt=no-new-privileges \
+  --cpus=2 --memory=4g --memory-swap=4g --cap-drop=ALL --security-opt=no-new-privileges \
   --read-only --tmpfs /tmp:rw,nosuid,nodev,size=64m -v "$data/llm:/models:ro" \
   "$llm" -m "/models/$model" -c 4096 -t 2 --parallel 1 --host 0.0.0.0 --port 8081 --reasoning off --no-webui >/dev/null
 # Poll from a temporary container on the private network; no host listener.
@@ -68,14 +80,15 @@ docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}'
 if ! docker run --rm --name mediavault-reader-lmt-measure --network "$network" \
   --cpus=2 --memory=4g --memory-swap=4g --cap-drop=ALL --security-opt=no-new-privileges \
   -v "$data:/data" -e TMPDIR=/data/tmp -e OMP_NUM_THREADS=2 -e MKL_NUM_THREADS=2 \
-  -e LMT_LLM_URL=http://mediavault-reader-llm:8081/v1 -e LMT_LLM_MODEL=Qwen3-0.6B-Q8_0 \
+  -e LMT_LLM_URL=http://mediavault-reader-llm:8081/v1 -e "LMT_LLM_MODEL=${model%.gguf}" \
   "$reader" python scripts/benchmark-reader.py --mode "$stage" --threads 2 \
   --models /data/mangajanai --data /data/benchmark --image /data/benchmark/page.jpg \
-  --language Japanese --ocr paddle --inpaint fast --runs 2 --tile 128 \
-  --output "/data/benchmark/$stage-a1.json" >"$root/$stage.log" 2>&1; then
-  tail -40 "$root/$stage.log";docker logs --tail 15 mediavault-reader-llm;exit 5
+  --language Japanese --ocr manga-ocr --detector comic-text-detector --inpaint quality --runs 2 \
+  --save-result "/data/benchmark/lmt-$variant-result.webp" --save-transcript "/data/benchmark/lmt-$variant-transcript.json" \
+  --output "/data/benchmark/lmt-$variant-a1.json" >"$root/lmt-$variant.log" 2>&1; then
+  tail -40 "$root/lmt-$variant.log";docker logs --tail 15 mediavault-reader-llm;exit 5
 fi
-cat "$data/benchmark/$stage-a1.json"
+cat "$data/benchmark/lmt-$variant-a1.json"
 printf '\nLLM separate-container cgroup memory peak (includes file cache, not part of Python RSS):\n'
 docker exec mediavault-reader-llm cat /sys/fs/cgroup/memory.peak || echo 'cgroup memory peak unavailable'
 docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}'

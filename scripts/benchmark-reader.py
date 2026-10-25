@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import hashlib
 import io
 import json
@@ -93,9 +94,11 @@ async def main():
     parser.add_argument('--runs', type=int, choices=range(1,6), default=2)
     parser.add_argument('--language', default='English')
     parser.add_argument('--ocr', default='paddle')
+    parser.add_argument('--detector', choices=['comic-bubble','comic-text-detector'], default='comic-bubble')
     parser.add_argument('--inpaint', choices=['fast','quality'], default='fast')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--save-result', type=Path, help='Optional private preview of the last result')
+    parser.add_argument('--save-transcript', type=Path, help='Optional private OCR/translation transcript for quality review')
     parser.add_argument('--include-pid', type=int, action='append', default=[], help='Include a separate local LLM process in RSS sampling')
     args = parser.parse_args()
     report = {'host': inventory(), 'mode': args.mode, 'utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'runs': []}
@@ -115,7 +118,7 @@ async def main():
         data = args.image.read_bytes()
         report['input'] = {'name': args.image.name, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes':len(data)}
         options = ProcessOptions(translate=args.mode in {'lmt','combined'}, upscale=args.mode in {'upscale','combined'},
-                                 language=args.language, ocr=args.ocr, inpaint=args.inpaint, allowDownloads=True,
+                                 language=args.language, ocr=args.ocr, detector=args.detector, inpaint=args.inpaint, allowDownloads=True,
                                  scale=args.scale, tile=args.tile, model=args.model).model_dump()
         report['options'] = options
         try:
@@ -123,13 +126,19 @@ async def main():
                 job = {'data':data, 'options':options, 'subject':'benchmark', 'cancel':False}
                 with Measurement(args.include_pid) as measurement:
                     result = await asyncio.wait_for(processor._process(job), timeout=900)
-                record = {'run':run+1, 'cold':run==0, **measurement.values,
-                          'upscale':result.get('upscale'), 'regions':len(result.get('regions', []))}
+                if not result.get('renderedImage'):
+                    raise RuntimeError('Pipeline returned no rendered page; this is not a completed inference measurement')
+                record = {'run':run+1, 'firstRunInProcess':run==0, **measurement.values,
+                          'upscale':result.get('upscale'), 'regions':len(result.get('regions', [])),
+                          'timings':result.get('timings'), 'inpaintRegions':result.get('inpaintRegions'),
+                          'renderedImageBytes':len(base64.b64decode(result['renderedImage']))}
                 report['runs'].append(record)
                 if args.save_result and result.get('renderedImage'):
-                    import base64
                     args.save_result.parent.mkdir(parents=True, exist_ok=True)
                     args.save_result.write_bytes(base64.b64decode(result['renderedImage']))
+                if args.save_transcript:
+                    args.save_transcript.parent.mkdir(parents=True, exist_ok=True)
+                    args.save_transcript.write_text(json.dumps(result.get('regions',[]),ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
                 print(json.dumps(record), flush=True)
         finally:
             await processor.close()
