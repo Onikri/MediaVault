@@ -24,7 +24,7 @@ def observed_streams(value):
     for url in urls:
         try:result.append(public_url(url,resolve_dns=False))
         except SourceError:pass
-    return list(dict.fromkeys(result))[:30]
+    return list(dict.fromkeys(result))
 
 
 def browser_destination(url,*,resolve_dns=True):
@@ -98,6 +98,12 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     try:await asyncio.wait_for(done.wait(),timeout=timeout)
                     except asyncio.TimeoutError:pass
                 await _check_player_access(page)
+                # A browser request usually exposes only the selected quality.
+                # Preserve every public source currently published in the DOM.
+                for source in await page.locator('video[src],video source[src]').evaluate_all('(nodes)=>nodes.map(n=>({url:n.src,quality:n.getAttribute("res")||n.getAttribute("data-quality")||n.getAttribute("label")}))'):
+                    record(source['url'])
+                    quality=re.fullmatch(r'(\d{1,4})p?',str(source.get('quality') or ''),re.I)
+                    if source['url'] in captured and quality and 1<=int(quality[1])<=8640:captured[source['url']]['quality']=int(quality[1])
                 if not captured:raise SourceError('Динамический плеер не опубликовал поддерживаемый MP4/HLS-поток.')
                 return list(captured.values())
             finally:await context.close()

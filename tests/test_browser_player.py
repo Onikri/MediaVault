@@ -51,4 +51,12 @@ class BrowserPlayerTests(unittest.TestCase):
         with self.assertRaisesRegex(SourceError,'JutPlus'):
             asyncio.run(_extract(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture={url:('<div class="tab_need_plus">JutPlus</div>','text/html')},timeout=1))
 
+    @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium is required for dynamic player integration')
+    def test_every_dom_quality_is_preserved_even_when_only_one_stream_was_requested(self):
+        url='https://public.example.com/qualities'
+        heights=[144,240,360,480,720,1080,1440,2160,4320]
+        markup='<video>'+''.join('<source src="https://cdn.example.com/'+str(q)+'.mp4" res="'+str(q)+'">' for q in heights)+'</video>'
+        result=asyncio.run(_extract(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture={url:(markup,'text/html')},timeout=1))
+        self.assertEqual(sorted(s['quality'] for s in result),heights)
+
 if __name__=='__main__':unittest.main()

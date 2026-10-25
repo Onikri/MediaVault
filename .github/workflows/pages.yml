@@ -44,7 +44,25 @@ jobs:
         run: |
           npm run build
           npm test
-          npm run test:server
+
+      - name: Validate server and queue recovery
+        run: |
+          mkdir -p test-output
+          set +e
+          npm run test:server 2>&1 | tee test-output/server-ci.log
+          result=${PIPESTATUS[0]}
+          python - "$result" <<'PY'
+          import re,sys
+          from pathlib import Path
+          if sys.argv[1]!='0':
+              text=Path('test-output/server-ci.log').read_text()
+              for file,line in sorted(set(re.findall(r'File "[^"\n]*?((?:tests|server|scripts)/[a-zA-Z0-9_-]+\.py)", line ([0-9]+)',text))):
+                  print('::error file='+file+',line='+line+'::Server validation failed at this code location.')
+          PY
+          exit "$result"
+
+      - name: Validate notebook checksums
+        run: |
           npm run test:notebook
 
       - name: Responsive UI and browser integration
