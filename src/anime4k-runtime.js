@@ -1,17 +1,18 @@
-import {ImageUpscaler,ANIME4KJS_SIMPLE_S_2X,ANIME4KJS_SIMPLE_M_2X} from 'anime4k.js';
+import {ImageUpscaler,ANIME4KJS_SIMPLE_S_2X,ANIME4KJS_SIMPLE_M_2X,ANIME4KJS_SIMPLE_L_2X,ANIME4KJS_SIMPLE_VL_2X,ANIME4KJS_SIMPLE_UL_2X} from 'anime4k.js';
 
 // Anime4K 4.0.1 shaders, not a CSS sharpening effect. One render per decoded frame.
-export async function startAnime4K(video,canvas,{mode='balanced',onStats=()=>{},onFailure=()=>{}}={}){
+export async function startAnime4K(video,canvas,{mode='balanced',profile='anime4k',onStats=()=>{},onFailure=()=>{}}={}){
   if(typeof OffscreenCanvas==='undefined'||!ImageUpscaler.isSupported())throw Error('Этот браузер не поддерживает нужные расширения WebGL для Anime4K.');
   if(video.readyState<2)await new Promise((resolve,reject)=>{const finish=error=>{clearTimeout(timer);video.removeEventListener('loadeddata',ready);video.removeEventListener('error',failed);error?reject(error):resolve();};const ready=()=>finish(),failed=()=>finish(Error('Не удалось получить кадр для Anime4K.')),timer=setTimeout(failed,10000);video.addEventListener('loadeddata',ready);video.addEventListener('error',failed);});
   const input=document.createElement('canvas'),ctx=input.getContext('2d',{alpha:false});
   const coarse=matchMedia('(any-pointer: coarse)').matches;
-  const limit=mode==='performance'?640:mode==='quality'?(coarse?960:1920):(coarse?800:1280);
+  const limit=profile!=='anime4k'?1920:mode==='performance'?640:mode==='quality'?(coarse?960:1920):(coarse?800:1280);
   const width=Math.max(2,Math.min(video.videoWidth||640,limit));
   input.width=width;input.height=Math.max(2,Math.round(width*(video.videoHeight||360)/(video.videoWidth||640)));
   canvas.getContext('webgl',{powerPreference:'high-performance',alpha:false});
   const direct=(video.videoWidth||640)<=limit;
-  const upscaler=new ImageUpscaler(mode==='quality'?ANIME4KJS_SIMPLE_M_2X:ANIME4KJS_SIMPLE_S_2X);
+  const profiles={'anime4k-l':ANIME4KJS_SIMPLE_L_2X,'anime4k-vl':ANIME4KJS_SIMPLE_VL_2X,'anime4k-ul':ANIME4KJS_SIMPLE_UL_2X};
+  const upscaler=new ImageUpscaler(profiles[profile]||(mode==='quality'?ANIME4KJS_SIMPLE_M_2X:ANIME4KJS_SIMPLE_S_2X));
   let stopped=false,frame=0,raf=0,count=0,slow=0,started=performance.now(),lastMediaTime=-1,lastRenderAt=0,nativeBase=null,windowStart=performance.now(),windowFrames=0,slowWindows=0;
   function stop(){
     if(stopped)return;stopped=true;

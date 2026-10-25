@@ -85,7 +85,10 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const mobileDevice=/Android|iPhone|iPad/i.test(navigator.userAgent)||matchMedia('(any-pointer: coarse)').matches;
   const deviceProfile=prefs.deviceProfile==='auto'?(mobileDevice?'phone':'desktop'):prefs.deviceProfile;
   const engine=prefs.upscaler==='auto'?(deviceProfile==='desktop'?'anime4k':'mobile'):prefs.upscaler;
-  const engineName=engine==='mobile'?'Мобильный GPU':engine==='fsrcnn'?'FSRCNN':'Anime4K';
+  const [colors,setColors]=useState(()=>{try{return JSON.parse(localStorage.getItem('mv_video_colors')||'{}');}catch{return {};}});
+  function color(change){setColors(old=>{const next={...old,...change};localStorage.setItem('mv_video_colors',JSON.stringify(next));return next;});}
+  const colorFilter=`saturate(${colors.saturation??1}) contrast(${colors.contrast??1}) brightness(${colors.brightness??1})`;
+  const engineName=engine==='mobile'?'Мобильный GPU':engine==='fsrcnn'?'FSRCNN':({'anime4k-l':'Anime4K L','anime4k-vl':'Anime4K VL','anime4k-ul':'Anime4K UL'}[engine]||'Anime4K');
   function retryGpu(value=prefs.upscaler){setGpuAttempt(n=>n+1);changePrefs({gpu:value!=='off',...(value!=='off'?{upscaler:value}:{})});}
   const [opening,setOpening]=useState(()=>getOpening(item,libraryId));
   const [openingDraft,setOpeningDraft]=useState(null);
@@ -175,7 +178,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       try{
         const start=engine==='mobile'?startMobileGpu:engine==='fsrcnn'?startNeuralUpscaler:(await import('./anime4k-runtime.js')).startAnime4K;
         stop=await start(videoRef.current,canvas,{
-          mode:prefs.neuralMode,deviceProfile,
+          mode:prefs.neuralMode,profile:engine,deviceProfile,
           onStats:stats=>{if(!disposed)setNeuralStats(stats);},
           onFailure:error=>{
             if(disposed)return;
@@ -299,7 +302,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const hiddenControls=playing&&panel==='watch'&&!controlsVisible;
   const progress=seekable?Math.min(100,previewTime/duration*100):0;
   return <div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(panel==='episodes'?' episodes-open':'')}
-    style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
+    style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls}>
     <div className="mv-player-screen">
       <div className="mv-player-ambient" aria-hidden="true"/>
@@ -344,11 +347,11 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
           <button disabled={!opening} onClick={()=>setIntro(null)}>Очистить</button></div>
         </div>
 </div>,
-        image:<div className="mv-player-settings"><label>Устройство<select aria-label="Профиль устройства" value={prefs.deviceProfile||'auto'} onChange={event=>{setGpuAttempt(n=>n+1);changePrefs({deviceProfile:event.target.value});}}><option value="auto">Автоматически</option><option value="phone">Телефон / Android</option><option value="tablet">Планшет</option><option value="desktop">Компьютер</option></select></label><label>Улучшение<select aria-label="Алгоритм улучшения" value={prefs.gpu?(prefs.upscaler||'auto'):'off'} onChange={event=>retryGpu(event.target.value)}><option value="off">Выключено</option><option value="auto">Авто · {deviceProfile==='desktop'?'Anime4K':'мобильный GPU'}</option><option value="mobile">Мобильный GPU · лёгкий</option><option value="anime4k">Anime4K ×2 · мощный GPU</option><option value="fsrcnn">FSRCNN ×2 · WebGPU</option></select></label>
+        image:<div className="mv-player-settings"><label>Устройство<select aria-label="Профиль устройства" value={prefs.deviceProfile||'auto'} onChange={event=>{setGpuAttempt(n=>n+1);changePrefs({deviceProfile:event.target.value});}}><option value="auto">Автоматически</option><option value="phone">Телефон / Android</option><option value="tablet">Планшет</option><option value="desktop">Компьютер</option></select></label><label>Улучшение<select aria-label="Алгоритм улучшения" value={prefs.gpu?(prefs.upscaler||'auto'):'off'} onChange={event=>retryGpu(event.target.value)}><option value="off">Выключено</option><option value="auto">Авто · {deviceProfile==='desktop'?'Anime4K':'мобильный GPU'}</option><option value="mobile">Мобильный GPU · лёгкий</option><option value="anime4k">Anime4K ×2 · мощный GPU</option><option value="anime4k-l">Anime4K L ×2 · дискретный GPU</option><option value="anime4k-vl">Anime4K VL ×2 · высокая нагрузка</option><option value="anime4k-ul">Anime4K UL ×2 · максимальная нагрузка</option><option value="fsrcnn">FSRCNN ×2 · WebGPU</option></select></label>
         {prefs.gpu&&<label>Нагрузка<select aria-label="Режим улучшения" value={prefs.neuralMode||'balanced'} onChange={event=>changePrefs({neuralMode:event.target.value})}><option value="performance">Экономный</option><option value="balanced">Баланс</option><option value="quality">Качество</option></select></label>}
         {neuralStats&&prefs.gpu&&<small>{engineName}: {neuralStats.width}×{neuralStats.height} · {neuralStats.fps} кадр/с · {neuralStats.latency} мс{(neuralStats.adapter||neuralStats.renderer)?' · '+(neuralStats.adapter||neuralStats.renderer):''}{neuralStats.software?' · программный рендерер браузера':''}</small>}
         {gpuWarning&&<button onClick={()=>retryGpu(mobileDevice?'mobile':prefs.upscaler)}>Повторить на новом GPU-контексте</button>}
-        <p className="player-setting-help">Мобильный режим обрабатывает текстуру видео в WebGL без нейросети на CPU. Anime4K оставлен для мощных GPU. Если браузер отключил аппаратное ускорение, сайт не может включить видеокарту за него. Мини-окно показывает исходник.</p></div>,
+        <fieldset className="player-colors"><legend>Цвет изображения</legend><div className="chip-row">{[['Оригинал',1,1,1],['Аниме · сочнее',1.18,1.06,1.01],['Мягкий',1.06,.97,1.03]].map(([name,saturation,contrast,brightness])=><button key={name} onClick={()=>color({saturation,contrast,brightness})}>{name}</button>)}</div>{[['saturation','Насыщенность',.5,1.6],['contrast','Контраст',.8,1.3],['brightness','Яркость',.8,1.2]].map(([id,label,min,max])=><label key={id}>{label}<input aria-label={label+' изображения'} type="range" min={min} max={max} step=".01" value={colors[id]??1} onChange={e=>color({[id]:Number(e.target.value)})}/><small>{Math.round((colors[id]??1)*100)}%</small></label>)}</fieldset><p className="player-setting-help">Запрашивается высокопроизводительный GPU. Конкретную видеокарту выбирает браузер и ОС; сайт не может принудительно включить дискретную карту.</p><p className="player-setting-help">Мобильный режим обрабатывает текстуру видео в WebGL без нейросети на CPU. Anime4K оставлен для мощных GPU. Если браузер отключил аппаратное ускорение, сайт не может включить видеокарту за него. Мини-окно показывает исходник.</p></div>,
         captions:<div className="mv-player-settings">        <label>Субтитры<select value={subtitle} onChange={event=>setSubtitle(event.target.value)}>
           <option value="off">Выключены</option>
           {availableTracks.map(track=><option key={track.id} value={track.id}>{track.name}</option>)}
