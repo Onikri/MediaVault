@@ -6,6 +6,17 @@ spec=importlib.util.spec_from_file_location('cloud_update',Path(__file__).resolv
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 
 class UpdateTests(unittest.TestCase):
+    def test_read_only_inspection_does_not_run_the_updater_or_print_container_credentials(self):
+        def cli(args,region):
+            if args[:3]==['compute','instance','get']:return {'lifecycle-state':'RUNNING','compartment-id':'compartment','agent-config':{'plugins-config':[{'name':'Compute Instance Run Command','desired-state':'ENABLED'}]}}
+            if args[:3]==['instance-agent','command','create']:
+                script=json.loads(args[args.index('--content')+1])['source']['text']
+                self.assertNotIn('update-existing.sh',script);self.assertNotIn('git fetch',script)
+                self.assertNotIn("get('Env')",script);self.assertIn('com.docker.compose.project.working_dir',script)
+                return {'id':'inspect-command'}
+            return {'lifecycle-state':'SUCCEEDED','content':{'text':'installation inspection complete'}}
+        result=module.deploy(None,'region',instance_id='ocid1.instance.oc1.eu-frankfurt-1.fixture',inspect=True,cli=cli,report=lambda _:None,pause=lambda _:None)
+        self.assertEqual(result,{'inspected':True})
     def test_uses_existing_vm_and_only_enables_requested_plugin(self):
         calls=[]
         # Real regional instance OCIDs contain hyphens; global IAM fixtures do not.

@@ -39,8 +39,28 @@ sudo -n bash "$script" '{revision}'
 '''
 
 
-def deploy(revision,region,*,instance_id=None,enable_plugin=False,cli=command,report=print,pause=time.sleep):
-    script=remote_script(revision)
+def inspection_script():
+    return '''set -euo pipefail
+sudo -n python3 - <<'PY'
+import json,subprocess
+from pathlib import Path
+ids=subprocess.check_output(['docker','ps','-aq'],text=True).split()
+containers=json.loads(subprocess.check_output(['docker','inspect',*ids],text=True)) if ids else []
+for container in containers:
+    labels=container.get('Config',{}).get('Labels') or {}
+    if labels.get('com.docker.compose.service') not in {'importer','https'} and 'mediavault' not in container.get('Name','').lower():continue
+    print(json.dumps({'name':container['Name'],'state':container.get('State',{}).get('Status'),'image':container.get('Config',{}).get('Image'),'compose':{key:value for key,value in labels.items() if key in {'com.docker.compose.project','com.docker.compose.project.working_dir','com.docker.compose.project.config_files','com.docker.compose.service'}},'mounts':[{'source':m.get('Source'),'destination':m.get('Destination'),'type':m.get('Type')} for m in container.get('Mounts',[])]},ensure_ascii=False))
+for root in [Path('/opt'),Path('/srv')]:
+    if root.is_dir():
+        for directory in sorted(root.iterdir())[:50]:
+            if directory.is_dir():print(json.dumps({'directory':str(directory),'git':(directory/'.git').exists(),'oracle_env':(directory/'deploy/oracle/.env').is_file(),'root_env':(directory/'.env').is_file()}))
+print('installation inspection complete')
+PY
+'''
+
+
+def deploy(revision,region,*,instance_id=None,enable_plugin=False,inspect=False,cli=command,report=print,pause=time.sleep):
+    script=inspection_script() if inspect else remote_script(revision)
     if not instance_id:
         inventory=cli(['search','resource','structured-search','--query-text',"query instance resources where displayName = 'mediavault-import' && lifecycleState = 'RUNNING'"],region)
         items=inventory.get('items',[])
@@ -63,8 +83,8 @@ def deploy(revision,region,*,instance_id=None,enable_plugin=False,cli=command,re
     content={'source':{'sourceType':'TEXT','text':script},'output':{'outputType':'TEXT'}}
     created=cli(['instance-agent','command','create','--compartment-id',instance['compartment-id'],
                  '--target',json.dumps({'instanceId':instance_id}),'--content',json.dumps(content),
-                 '--timeout-in-seconds','1200','--display-name','MediaVault update '+revision[:12]],region)
-    identifier=created['id'];report('Oracle Run Command: '+identifier);report('Обновление отправлено в Oracle. Сборка Chromium может занять несколько минут.')
+                 '--timeout-in-seconds','1200','--display-name','MediaVault inspect' if inspect else 'MediaVault update '+revision[:12]],region)
+    identifier=created['id'];report('Oracle Run Command: '+identifier);report('Проверка расположения установки отправлена в Oracle.' if inspect else 'Обновление отправлено в Oracle. Сборка Chromium может занять несколько минут.')
     previous=None
     for attempt in range(260):
         try:value=cli(['instance-agent','command-execution','get','--command-id',identifier,'--instance-id',instance_id],region)
@@ -79,8 +99,9 @@ def deploy(revision,region,*,instance_id=None,enable_plugin=False,cli=command,re
             output=value.get('content') or {};text=output.get('text','') if isinstance(output,dict) else ''
             if text:report(text[-4000:])
             code=value.get('exit-code',value.get('exitCode'))
-            if state=='SUCCEEDED' and code in (None,0) and 'health version 6 confirmed' in text:
-                return {'updated':True,'revision':revision,'health_version':6}
+            marker='installation inspection complete' if inspect else 'health version 6 confirmed'
+            if state=='SUCCEEDED' and code in (None,0) and marker in text:
+                return {'inspected':True} if inspect else {'updated':True,'revision':revision,'health_version':6}
             raise UpdateError('Oracle завершил команду без подтверждения новой версии. Сообщение выше показывает причину; не повторяй обновление вслепую.')
         pause(5)
     raise UpdateError('Истекло время ожидания. Проверь команду в Oracle Run Command; повторное обновление не запускалось.')
@@ -88,13 +109,15 @@ def deploy(revision,region,*,instance_id=None,enable_plugin=False,cli=command,re
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--revision',required=True)
+    parser.add_argument('--revision')
+    parser.add_argument('--inspect',action='store_true',help='Только пути Docker Compose и томов; содержимое .env не читается.')
     parser.add_argument('--region',default='eu-frankfurt-1')
     parser.add_argument('--instance-id')
     parser.add_argument('--enable-run-command',action='store_true')
     args=parser.parse_args()
+    if not args.inspect and not args.revision:raise UpdateError('Для обновления нужен --revision; для проверки путей используй --inspect.')
     if not shutil.which('oci'):raise UpdateError('Запусти эту команду в Oracle Cloud Shell с авторизованным OCI CLI.')
-    print(json.dumps(deploy(args.revision,args.region,instance_id=args.instance_id,enable_plugin=args.enable_run_command),ensure_ascii=False))
+    print(json.dumps(deploy(args.revision,args.region,instance_id=args.instance_id,enable_plugin=args.enable_run_command,inspect=args.inspect),ensure_ascii=False))
 
 
 if __name__=='__main__':
