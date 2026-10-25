@@ -3,3 +3,5 @@ export function tracks(user,storage=globalThis.localStorage){try{const a=JSON.pa
 export function toggleTrack(user,track,storage=globalThis.localStorage){let all=tracks(user,storage);all=all.some(t=>t.id===track.id)?all.filter(t=>t.id!==track.id):[{...track,savedAt:Date.now()},...all].slice(0,500);try{storage.setItem(key(user),JSON.stringify(all));globalThis.dispatchEvent?.(new Event('mediavault-music'));}catch{}return all;}
 export const spotifySearch=track=>'https://open.spotify.com/search/'+encodeURIComponent([track.title,...track.artists||[]].join(' '));
 export const youtubeSearch=track=>'https://music.youtube.com/search?q='+encodeURIComponent([track.title,...track.artists||[]].join(' '));
+// Numeric IDs from TMDB/TV catalogues are not MAL IDs.
+export function musicIdentityFor(item,catalog){const group=catalog?.storage?.collections?.find(v=>v.id===item.collectionId);const explicit=group?.metadata?.ids?.mal||item.metadata?.ids?.mal;const value=explicit||((item.section||group?.section)==='anime'?(item.metadataId||group?.metadataId):null);return /^[1-9]\d{0,11}$/.test(String(value||''))?String(value):null;}

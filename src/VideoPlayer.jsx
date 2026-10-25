@@ -9,6 +9,7 @@ import usePlayerAtmosphere from './use-player-atmosphere.js';
 import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
 import {startNeuralUpscaler} from './neural-upscaler.js';
 import Soundtrack from './Soundtrack.jsx';
+import {musicIdentityFor} from './music-library.js';
 import PlayerSettings,{SettingsGlyph} from './PlayerSettings.jsx';
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {startMobileGpu} from './mobile-gpu-upscaler.js';
@@ -61,7 +62,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const [controlsVisible,setControlsVisible]=useState(true);
   const hideTimer=useRef(null);
   const [musicOpen,setMusicOpen]=useState(false);
-  const musicIdentity=item.metadataId||catalog?.storage?.collections?.find?.(v=>v.id===item.collectionId)?.metadata?.ids?.mal;
+  const musicIdentity=musicIdentityFor(item,catalog);
   const settingsOpen=panel==='settings';
   const scene=usePlayerAtmosphere(videoRef,source,playing,stageRef);
   const [subtitle,setSubtitle]=useState('off'),[availableTracks,setAvailableTracks]=useState([]);
