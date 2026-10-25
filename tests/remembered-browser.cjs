@@ -43,7 +43,9 @@ module.exports=async function({browser,base,installProvider,OWNER,PHRASE,catalog
   await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));
   await page.waitForFunction(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('mediavault-trusted-device-v1',1);q.onsuccess=()=>r(q.result);});try{return await new Promise(r=>{const q=db.transaction('records').objectStore('records').getAll();q.onsuccess=()=>r(q.result.some(v=>v?.libraryId&&v?.data));});}finally{db.close();}});
   const cookie=await page.evaluate(()=>document.cookie);assert.ok(cookie.includes('mv_preferences='));assert.ok(!cookie.includes(OWNER)&&!cookie.includes(PHRASE)&&!cookie.includes('access_token'));
-  await page.reload();await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));
+  await page.reload();
+  try{await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));}
+  catch(error){console.error('Remembered fixture restore diagnostics:',{restores,deviceCount:devices.size,body:(await page.locator('body').innerText()).slice(-6000)});throw error;}
   assert.equal(await page.evaluate(()=>window.__grants?.length||0),0,'Reload restores Google and the encrypted library without another Google popup or phrase');
   assert.ok(restores>=1,'Restoring uses a real ECDSA-signed challenge');
   const protectedKey=await page.evaluate(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('mediavault-trusted-device-v1',1);q.onsuccess=()=>r(q.result);});const record=await new Promise(r=>{const q=db.transaction('records').objectStore('records').get('auth');q.onsuccess=()=>r(q.result);});db.close();try{await crypto.subtle.exportKey('jwk',record.privateKey);return false;}catch{return record.privateKey.extractable===false;}});
