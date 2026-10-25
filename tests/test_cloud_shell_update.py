@@ -6,6 +6,9 @@ spec=importlib.util.spec_from_file_location('cloud_update',Path(__file__).resolv
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 
 class UpdateTests(unittest.TestCase):
+    def test_resuming_active_jobs_requires_an_explicit_option(self):
+        self.assertNotIn('--resume-active-jobs',module.remote_script('a'*40))
+        self.assertIn('--resume-active-jobs',module.remote_script('a'*40,resume_active=True))
     def test_read_only_inspection_does_not_run_the_updater_or_print_container_credentials(self):
         def cli(args,region):
             if args[:3]==['compute','instance','get']:return {'lifecycle-state':'RUNNING','compartment-id':'compartment','agent-config':{'plugins-config':[{'name':'Compute Instance Run Command','desired-state':'ENABLED'}]}}

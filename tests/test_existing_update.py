@@ -16,14 +16,14 @@ REVISION='a'*40
 
 
 class ExistingUpdateTests(unittest.TestCase):
-    def exercise(self,root,*,active=False,health_failure=False):
+    def exercise(self,root,*,active=False,health_failure=False,resume_active=False):
         work=root/'legacy/media-vault/deploy/oracle';data=work/'data';data.mkdir(parents=True)
         for name,value in [('.env','private-fixture'),('compose.yaml','services: {}'),('release-v51.yaml','services: {}'),('Caddyfile','fixture')]:
             (work/name).write_text(value)
         (data/'service.key').write_bytes(b'private-fixture-key')
         with sqlite3.connect(data/'tasks.sqlite') as db:
-            db.executescript('CREATE TABLE tasks (status TEXT); CREATE TABLE settings (name TEXT,value BLOB);')
-            db.execute('INSERT INTO tasks VALUES (?)',('running' if active else 'done',))
+            db.executescript('CREATE TABLE tasks (id TEXT,status TEXT,data BLOB); CREATE TABLE settings (name TEXT,value BLOB);')
+            db.execute('INSERT INTO tasks VALUES (?,?,?)',('task-fixture','running' if active else 'done',b'encrypted-task-fixture'))
             db.execute('INSERT INTO settings VALUES (?,?)',('oauth-fixture',b'encrypted-fixture'))
         files=[str(work/'compose.yaml'),str(work/'release-v51.yaml')]
         old={'Id':'old','Image':'sha256:old','Config':{'Labels':{
@@ -49,11 +49,11 @@ class ExistingUpdateTests(unittest.TestCase):
                     return json.dumps({'application':'MediaVault','version':6,'voiceDiscovery':True,'oauthConfigured':True})
             raise AssertionError(args)
         def run(args,**kwargs):calls.append(args)
-        code=SCRIPT.read_text().split("python3 - \"$revision\" <<'PY'\n",1)[1].rsplit('\nPY',1)[0]
+        code=SCRIPT.read_text().split("python3 - \"$@\" <<'PY'\n",1)[1].rsplit('\nPY',1)[0]
         # Relocate only host deployment directories into this isolated fixture.
         code=code.replace("'/opt/mediavault-releases'",repr(str(root/'releases'))).replace("'/opt/mediavault-backups'",repr(str(root/'backups'))).replace("'/var/tmp/mediavault-update-'",repr(str(root/'update-')))
         try:
-            with patch.object(sys,'argv',['update',REVISION]),patch('subprocess.check_output',side_effect=output),patch('subprocess.run',side_effect=run),patch('time.sleep'),contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+            with patch.object(sys,'argv',['update',REVISION,*(['--resume-active-jobs'] if resume_active else [])]),patch('subprocess.check_output',side_effect=output),patch('subprocess.run',side_effect=run),patch('time.sleep'),contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
                 exec(compile(code,str(SCRIPT),'exec'),{})
         except BaseException as error:return work,data,files,calls,error
         return work,data,files,calls,None
@@ -68,6 +68,17 @@ class ExistingUpdateTests(unittest.TestCase):
             self.assertIn(str(work/('release-'+REVISION[:12]+'.yaml')),up)
             self.assertEqual((work/'.env').read_text(),'private-fixture')
             self.assertEqual((data/'service.key').read_bytes(),b'private-fixture-key')
+
+    def test_explicit_resume_validates_preserved_payloads_with_worker_disabled_first(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);work,data,files,calls,error=self.exercise(root,active=True,resume_active=True)
+            self.assertIsNone(error)
+            ups=[c for c in calls if c[:2]==['docker','compose'] and 'up' in c]
+            maintenance=str(work/('maintenance-'+REVISION[:12]+'.yaml'))
+            self.assertEqual(len(ups),2)
+            self.assertIn(maintenance,ups[0]);self.assertNotIn(maintenance,ups[1])
+            with sqlite3.connect(data/'tasks.sqlite') as db:
+                self.assertEqual(db.execute('SELECT status FROM tasks').fetchone()[0],'running')
             archive=next((root/'backups').glob('*/private-data.tar.gz'))
             self.assertEqual(archive.stat().st_mode&0o777,0o600)
             with tarfile.open(archive) as saved:

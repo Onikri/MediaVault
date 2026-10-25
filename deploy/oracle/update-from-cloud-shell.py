@@ -24,7 +24,7 @@ def command(arguments,region):
     except (ValueError,KeyError):raise UpdateError('Неизвестный ответ OCI CLI.') from None
 
 
-def remote_script(revision):
+def remote_script(revision,*,resume_active=False):
     if not re.fullmatch('[a-f0-9]{40}',revision):raise UpdateError('Нужен полный проверенный SHA коммита.')
     url=f'https://raw.githubusercontent.com/Onikri/MediaVault/{revision}/deploy/oracle/update-existing.sh'
     return f'''set -euo pipefail
@@ -35,7 +35,7 @@ fi
 script=$(mktemp)
 trap 'rm -f "$script"' EXIT
 curl -fsSL '{url}' -o "$script"
-sudo -n bash "$script" '{revision}'
+sudo -n bash "$script" '{revision}'{' --resume-active-jobs' if resume_active else ''}
 '''
 
 
@@ -59,8 +59,8 @@ PY
 '''
 
 
-def deploy(revision,region,*,instance_id=None,enable_plugin=False,inspect=False,cli=command,report=print,pause=time.sleep):
-    script=inspection_script() if inspect else remote_script(revision)
+def deploy(revision,region,*,instance_id=None,enable_plugin=False,inspect=False,resume_active=False,cli=command,report=print,pause=time.sleep):
+    script=inspection_script() if inspect else remote_script(revision,resume_active=resume_active)
     if not instance_id:
         inventory=cli(['search','resource','structured-search','--query-text',"query instance resources where displayName = 'mediavault-import' && lifecycleState = 'RUNNING'"],region)
         items=inventory.get('items',[])
@@ -114,10 +114,11 @@ def main():
     parser.add_argument('--region',default='eu-frankfurt-1')
     parser.add_argument('--instance-id')
     parser.add_argument('--enable-run-command',action='store_true')
+    parser.add_argument('--resume-active-jobs',action='store_true',help='Сохранить очередь и восстановить незавершённые задания после проверенного перезапуска.')
     args=parser.parse_args()
     if not args.inspect and not args.revision:raise UpdateError('Для обновления нужен --revision; для проверки путей используй --inspect.')
     if not shutil.which('oci'):raise UpdateError('Запусти эту команду в Oracle Cloud Shell с авторизованным OCI CLI.')
-    print(json.dumps(deploy(args.revision,args.region,instance_id=args.instance_id,enable_plugin=args.enable_run_command,inspect=args.inspect),ensure_ascii=False))
+    print(json.dumps(deploy(args.revision,args.region,instance_id=args.instance_id,enable_plugin=args.enable_run_command,inspect=args.inspect,resume_active=args.resume_active_jobs),ensure_ascii=False))
 
 
 if __name__=='__main__':
