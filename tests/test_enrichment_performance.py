@@ -28,6 +28,14 @@ class EnrichmentPerformance(unittest.TestCase):
             store.close();store=TaskStore(folder)
             self.assertTrue(store.get(second['id'])['progress']['recover_needed']);store.close()
 
+    def test_running_legacy_season_resumes_its_current_episode_without_double_counting(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store=TaskStore(folder);task=store.add('owner',{'job':{},'vault_key':'fixture'},'legacy')
+            store.next();store.update(task['id'],progress={'current':11,'saved':10,'total':68,'phase':'uploading'})
+            store.close();store=TaskStore(folder)
+            progress=store.get(task['id'])['progress']
+            self.assertEqual(progress['cursor'],10);self.assertEqual(progress['saved'],10);self.assertTrue(progress['recover_needed']);store.close()
+
     def test_parallel_upload_keeps_chunk_order_and_authentication(self):
         class ConcurrentDrive(FakeDrive):
             supports_parallel=True

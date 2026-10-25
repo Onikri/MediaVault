@@ -44,6 +44,8 @@ class TaskStore:
             # Episode manifests in Drive make a restart safe: completed episodes are skipped.
             for identity,raw in self.database.execute("SELECT id,progress FROM tasks WHERE status='running'").fetchall():
                 progress=self.open(raw,identity);progress['recover_needed']=True
+                if 'cursor' not in progress:
+                    progress['cursor']=max(0,int(progress.get('current',1))- (0 if progress.get('phase')=='episode_done' else 1))
                 self.database.execute("UPDATE tasks SET status='queued',progress=? WHERE id=?",(self.seal(progress,identity),identity))
 
     def seal(self, value, aad):
