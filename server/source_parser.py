@@ -406,7 +406,8 @@ class Resolver:
         return parse_page(text, final)
 
     def player(self, url, referer=None):
-        from anime_dl_core import AniboomPlayer, AnimediaPlayer, KodikPlayer, SibnetPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer
+        from anime_dl_core import AniboomPlayer, AnimediaPlayer, SibnetPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer
+        from player_compat import KodikPlayer
         # Explicit registry: never ap.extract(), which also registers API-based players.
         for player_type in (KodikPlayer, AniboomPlayer, SibnetPlayer, AnimediaPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer):
             cvh_video = player_type is CvhPlayer and urlsplit(url).hostname == 'plapi.cdnvideohub.com' and re.fullmatch(r'/api/v1/player/sv/video/\d+',urlsplit(url).path)

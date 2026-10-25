@@ -4,6 +4,8 @@ import sys
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from source_parser import PublicHttp,Resolver,public_url,playback_headers,parse_page
+from player_compat import KodikPlayer
+from anime_dl_core.errors import ExtractionError
 
 FIXTURES=Path(__file__).parent/'fixtures/players'
 
@@ -53,3 +55,26 @@ class PlayerContractTests(unittest.TestCase):
         value=playback_headers({'Cookie':'private-google-fixture','Authorization':'Bearer private-fixture','Referer':'https://animego.org/'})
         self.assertNotIn('Cookie',value);self.assertNotIn('Authorization',value)
         self.assertEqual(value['Referer'],'https://animego.org/')
+
+    def test_kodik_endpoint_handles_whitespace_quotes_and_rejects_ambiguous_or_foreign_paths(self):
+        for script in ['url:atob("L2Z0b3I=")', '"url" : window.atob( "L2Z0b3I=" )', r'url:atob(\"L2Z0b3I=\")']:
+            self.assertEqual(KodikPlayer._parse_post_path(script,'https://kodikplayer.com/assets/js/player.js'),'/ftor')
+        for script in ['url:atob("aHR0cHM6Ly9vdGhlci5leGFtcGxlLmNvbS8=")','url:atob("L2Z0b3I="), url:atob("L290aGVy")']:
+            with self.assertRaises(ExtractionError):KodikPlayer._parse_post_path(script,'https://kodikplayer.com/assets/js/player.js')
+
+    def test_kodik_split_scripts_keep_ref_and_selected_video_in_the_real_post(self):
+        from unittest.mock import patch
+        html=(FIXTURES/'kodik_embed.html').read_text()
+        html+='<script src="https://127.0.0.1/assets/js/private.js"></script><script src="/assets/js/app.request.js"></script>'
+        class SplitHttp(FixtureHttp):
+            def document(self,url,**kwargs):
+                if '/seria/' in url:return html,url,{}
+                if '/assets/js/' in url and not url.endswith('app.request.js'):return '/* renderer only */',url,{}
+                return super().document(url,**kwargs)
+        http=SplitHttp({'app.request.js':'kodik_player_script.js','/ftor':'kodik_ftor.json'})
+        page=Resolver(http).resolve('https://kodikplayer.com/seria/1304528/932d5da818729ec5ccc9be7968ee3717/720p')
+        self.assertTrue(page.streams)
+        post=next(kwargs for url,kwargs in http.calls if '/ftor' in url)
+        self.assertEqual(post['data']['id'],'1304528')
+        self.assertEqual(post['data']['ref'],'https://animego.org/')
+        self.assertFalse(any('127.0.0.1' in url for url,_ in http.calls))
