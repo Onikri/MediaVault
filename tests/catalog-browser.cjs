@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const catalogueHosts=/https:\/\/(?:kitsu\.io|shikimori\.one|graphql\.anilist\.co|api\.jikan\.moe|api\.tvmaze\.com|www\.wikidata\.org)\//;
+const catalogueHosts=/https:\/\/(?:kitsu\.io|shikimori\.io|graphql\.anilist\.co|api\.jikan\.moe|api\.tvmaze\.com|www\.wikidata\.org)\//;
 const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*'};
 const title=(id,name,resource='anime')=>({id:String(id),type:resource,attributes:{canonicalTitle:name,titles:{en:name},subtype:resource==='manga'?'manga':'TV',startDate:'2020-01-01',episodeCount:12}});
 const gate=()=>{let release;const promise=new Promise(resolve=>release=resolve);return {promise,release};};
@@ -11,7 +11,7 @@ module.exports=async function checkDynamicCatalogue(page){
     const query=url.searchParams.get('filter[text]')||url.searchParams.get('search')||url.searchParams.get('q')||route.request().postDataJSON()?.variables?.search||'';
     requests.push({provider,query});let body={data:[]},status=200;
     if(provider==='graphql.anilist.co')body={data:{Page:{media:[]}}};
-    if(provider==='shikimori.one'){
+    if(provider==='shikimori.io'){
       body=[];
       if(query==='Star'){
         await late.promise;

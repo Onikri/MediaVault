@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from source_parser import SourceError
 
 
-USER_AGENT = "MediaVault/4.0 (https://github.com/Onikri/hots_tank.github.io; personal catalogue)"
+USER_AGENT = "MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal catalogue)"
 MEDIA_FIELDS = """id idMal type format status title{romaji english native} synonyms description
  coverImage{large} genres tags{name isAdult} isAdult episodes chapters volumes seasonYear season
  startDate{year month day} endDate{year month day} siteUrl nextAiringEpisode{episode airingAt}
@@ -25,7 +25,7 @@ def get_json(url, *, params=None, body=None):
     try:
         with requests.Session() as session:
             session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
-            response = session.post(url, json=body, timeout=(6, 15), stream=True) if body else session.get(url, params=params, timeout=(6, 15), stream=True)
+            response = session.post(url, json=body, timeout=(4, 7), stream=True) if body else session.get(url, params=params, timeout=(4, 7), stream=True)
             with response:
                 if response.status_code == 429:
                     raise SourceError("Каталог ограничил частоту запросов. Попробуй немного позже.")
@@ -40,15 +40,17 @@ def get_json(url, *, params=None, body=None):
         raise SourceError("Каталог сейчас недоступен. Остальные источники продолжат поиск.") from None
 
 
-def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=None):
+def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=None, part=""):
     if provider not in {"kitsu", "anilist", "shikimori", "jikan", "tvmaze", "imdb", "wikidata"}:
         raise SourceError("Неизвестный каталог.")
     query, page = str(query).strip()[:160], max(1, min(100, int(page)))
-    if kind not in {"anime", "manga", "ranobe", "movie", "tv"}:
+    if kind not in {"anime", "manga", "ranobe", "movie", "tv", "character"}:
         raise SourceError("Неизвестный тип каталога.")
+    if part not in {'', 'roles', 'related', 'screenshots', 'external_links'} or (part and (provider != 'shikimori' or not identity)) or (kind == 'character' and (provider != 'shikimori' or not identity or part)):
+        raise SourceError('Неизвестный раздел сведений о тайтле.')
     if identity and not re.fullmatch(r"(?:tt)?\d{1,12}|Q\d{1,12}", str(identity)):
         raise SourceError("Некорректный идентификатор тайтла.")
-    cache_key = (provider, query, kind, page, identity, str(year))
+    cache_key = (provider, query, kind, page, identity, str(year), part)
     with _lock:
         cached = _cache.get(cache_key)
         if cached and cached[0] > time.monotonic():
@@ -74,13 +76,13 @@ def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=No
                     "variables": {"search": query or None, "type": "MANGA" if resource == "manga" else "ANIME", "page": page, "year": int(year) if year else None}}
         value = get_json("https://graphql.anilist.co", body=body)
     elif provider == "shikimori":
-        resource = "mangas" if resource == "manga" else "animes"
+        resource = 'characters' if kind == 'character' else "mangas" if resource == "manga" else "animes"
         params = {"limit": 16, "page": page, "order": "popularity"}
         if query:
             params["search"] = query
         if year:
             params["season"] = str(year)
-        value = get_json(f"https://shikimori.one/api/{resource}" + (f"/{identity}" if identity else ""), params=params)
+        value = get_json(f"https://shikimori.io/api/{resource}" + (f"/{identity}" if identity else "") + (f'/{part}' if part else ''), params=params)
     elif provider == "jikan":
         params = {"q": query, "page": page, "limit": 16, "sfw": "false"}
         if year and resource == "anime":

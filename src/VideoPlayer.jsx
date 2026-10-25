@@ -9,9 +9,10 @@ import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
 import {startNeuralUpscaler} from './neural-upscaler.js';
 import PlayerSettings,{SettingsGlyph} from './PlayerSettings.jsx';
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
+import {startMobileGpu} from './mobile-gpu-upscaler.js';
 
 const PREF_KEY='mediavault_player_preferences_v1';
-const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,upscaler:'anime4k',neuralMode:'balanced',subSize:24,subOffset:8};
+const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,upscaler:'auto',deviceProfile:'auto',neuralMode:'balanced',subSize:24,subOffset:8};
 function getPrefs(){
   try{return {...DEFAULTS,...JSON.parse(localStorage.getItem(PREF_KEY)||'{}')};}catch{return DEFAULTS;}
 }
@@ -69,6 +70,12 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
   const [subtitleText,setSubtitleText]=useState(''),[gpuActive,setGpuActive]=useState(false);
   const [gpuWarning,setGpuWarning]=useState('');
   const [neuralStats,setNeuralStats]=useState(null);
+  const [gpuAttempt,setGpuAttempt]=useState(0);
+  const mobileDevice=/Android|iPhone|iPad/i.test(navigator.userAgent)||matchMedia('(any-pointer: coarse)').matches;
+  const deviceProfile=prefs.deviceProfile==='auto'?(mobileDevice?'phone':'desktop'):prefs.deviceProfile;
+  const engine=prefs.upscaler==='auto'?(deviceProfile==='desktop'?'anime4k':'mobile'):prefs.upscaler;
+  const engineName=engine==='mobile'?'Мобильный GPU':engine==='fsrcnn'?'FSRCNN':'Anime4K';
+  function retryGpu(value=prefs.upscaler){setGpuAttempt(n=>n+1);changePrefs({gpu:value!=='off',...(value!=='off'?{upscaler:value}:{})});}
   const [opening,setOpening]=useState(()=>getOpening(item,libraryId));
   const [openingDraft,setOpeningDraft]=useState(null);
   const lastStored=useRef(-1),resumeApplied=useRef(false),subtitleInput=useRef(null);
@@ -145,25 +152,26 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
       setGpuActive(false);setNeuralStats(null);
       return;
     }
-    let disposed=false,stop;
+    let disposed=false,stop,failed=false;
     const canvas=canvasRef.current;
     canvas.style.opacity='0';
     setGpuWarning('');setNeuralStats(null);setGpuActive(false);
     (async()=>{
       try{
-        const start=prefs.upscaler==='fsrcnn'?startNeuralUpscaler:(await import('./anime4k-runtime.js')).startAnime4K;
+        const start=engine==='mobile'?startMobileGpu:engine==='fsrcnn'?startNeuralUpscaler:(await import('./anime4k-runtime.js')).startAnime4K;
         stop=await start(videoRef.current,canvas,{
-          mode:prefs.neuralMode,
+          mode:prefs.neuralMode,deviceProfile,
           onStats:stats=>{if(!disposed)setNeuralStats(stats);},
           onFailure:error=>{
             if(disposed)return;
+            failed=true;
             setGpuWarning(error.message||'Ошибка нейросетевого инференса.');
             setGpuActive(false);
             changePrefs({gpu:false});
           }
         });
         if(disposed)stop();
-        else setGpuActive(true);
+        else if(!failed)setGpuActive(true);
       }catch(error){
         if(disposed)return;
         setGpuActive(false);
@@ -172,7 +180,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
       }
     })();
     return()=>{disposed=true;stop?.();canvas.style.opacity='0';};
-  },[source,prefs.gpu,prefs.neuralMode,prefs.upscaler]);
+  },[source,prefs.gpu,prefs.neuralMode,engine,deviceProfile,gpuAttempt]);
   const seek=seconds=>{
     const media=videoRef.current;
     if(media&&Number.isFinite(media.duration))media.currentTime=Math.max(0,Math.min(seconds,media.duration));
@@ -288,7 +296,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
           onDurationChange={loaded} onEnded={ended}
           onError={()=>{if(source)diagnoseVideoFailure({video:videoRef.current,source}).then(message=>onError?.(Error(message))).catch(()=>{});}}
           aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}</video>
-        <canvas key={prefs.upscaler||'anime4k'} ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
+        <canvas key={engine+':'+deviceProfile+':'+prefs.neuralMode+':'+gpuAttempt} ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
         {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:(hiddenControls?prefs.subOffset:Math.max(22,prefs.subOffset))+'%'}} aria-live="off">{subtitleText}</div>}
       </div>
       {panel==='watch'&&<div className="mv-player-touch-surface" {...gestures.surface} aria-hidden="true"/>}
@@ -321,10 +329,11 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
           <button disabled={!opening} onClick={()=>setIntro(null)}>Очистить</button></div>
         </div>
 </div>,
-        image:<div className="mv-player-settings"><label>Улучшение<select aria-label="Алгоритм улучшения" value={prefs.gpu?(prefs.upscaler||'anime4k'):'off'} onChange={event=>changePrefs({gpu:event.target.value!=='off',upscaler:event.target.value==='off'?(prefs.upscaler||'anime4k'):event.target.value})}><option value="off">Выключено</option><option value="anime4k">Anime4K ×2 · WebGL</option><option value="fsrcnn">FSRCNN ×2 · WebGPU</option></select></label>
+        image:<div className="mv-player-settings"><label>Устройство<select aria-label="Профиль устройства" value={prefs.deviceProfile||'auto'} onChange={event=>{setGpuAttempt(n=>n+1);changePrefs({deviceProfile:event.target.value});}}><option value="auto">Автоматически</option><option value="phone">Телефон / Android</option><option value="tablet">Планшет</option><option value="desktop">Компьютер</option></select></label><label>Улучшение<select aria-label="Алгоритм улучшения" value={prefs.gpu?(prefs.upscaler||'auto'):'off'} onChange={event=>retryGpu(event.target.value)}><option value="off">Выключено</option><option value="auto">Авто · {deviceProfile==='desktop'?'Anime4K':'мобильный GPU'}</option><option value="mobile">Мобильный GPU · лёгкий</option><option value="anime4k">Anime4K ×2 · мощный GPU</option><option value="fsrcnn">FSRCNN ×2 · WebGPU</option></select></label>
         {prefs.gpu&&<label>Нагрузка<select aria-label="Режим улучшения" value={prefs.neuralMode||'balanced'} onChange={event=>changePrefs({neuralMode:event.target.value})}><option value="performance">Экономный</option><option value="balanced">Баланс</option><option value="quality">Качество</option></select></label>}
-        {neuralStats&&prefs.gpu&&<small>{prefs.upscaler==='fsrcnn'?'FSRCNN':'Anime4K'}: {neuralStats.width}×{neuralStats.height} · {neuralStats.fps} кадр/с · {neuralStats.latency} мс</small>}
-        <p className="player-setting-help">Обработка на твоём устройстве. Экономный режим подходит для телефонов. При перегрузке вернётся исходное видео. Мини-окно показывает исходник.</p></div>,
+        {neuralStats&&prefs.gpu&&<small>{engineName}: {neuralStats.width}×{neuralStats.height} · {neuralStats.fps} кадр/с · {neuralStats.latency} мс{neuralStats.renderer?' · '+neuralStats.renderer:''}{neuralStats.software?' · программный рендерер браузера':''}</small>}
+        {gpuWarning&&<button onClick={()=>retryGpu(mobileDevice?'mobile':prefs.upscaler)}>Повторить на новом GPU-контексте</button>}
+        <p className="player-setting-help">Мобильный режим обрабатывает текстуру видео в WebGL без нейросети на CPU. Anime4K оставлен для мощных GPU. Если браузер отключил аппаратное ускорение, сайт не может включить видеокарту за него. Мини-окно показывает исходник.</p></div>,
         captions:<div className="mv-player-settings">        <label>Субтитры<select value={subtitle} onChange={event=>setSubtitle(event.target.value)}>
           <option value="off">Выключены</option>
           {availableTracks.map(track=><option key={track.id} value={track.id}>{track.name}</option>)}
@@ -338,7 +347,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
 <p className="player-setting-help">Ссылка откроет эту серию с текущей позиции после входа в библиотеку. Клип записывается до 30 секунд.</p></div>
       }}</PlayerSettings>}</AnimatePresence>
       {canSkip&&panel==='watch'&&<button className="mv-player-skip" onClick={()=>seek(opening.end)}><SkipForward size={16}/> Пропустить опенинг</button>}
-      {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {prefs.upscaler==='fsrcnn'?'FSRCNN':'Anime4K'} ×2{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
+      {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {engineName}{engine==='mobile'?'':' ×2'}{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
       <div className="mv-player-console" onPointerEnter={revealControls}>
         <div className="mv-player-timeline">{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}

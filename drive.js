@@ -4,7 +4,7 @@ const UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 function httpError(message,status){return Object.assign(Error(message),{status});}
 export async function driveRequest(token, path, options={}) {
   const {headers={},...other}=options;
-  const res=await fetch(API+path,{...other,headers:{Authorization:"Bearer "+token,...headers}});
+  const res=await fetch(API+path,{...other,signal:other.signal||AbortSignal.timeout(30000),headers:{Authorization:"Bearer "+token,...headers}});
   if (!res.ok) {
     let msg;
     try { const body=await res.json();msg=body.error?.message || res.statusText; }
@@ -16,12 +16,12 @@ export async function driveRequest(token, path, options={}) {
 }
 export async function driveDownload(token, id, options={}) {
   const res=await fetch(API+"/files/"+encodeURIComponent(id)+"?alt=media",
-    {signal:options.signal,headers:{Authorization:"Bearer "+token}});
+    {signal:options.signal||AbortSignal.timeout(options.timeout||120000),headers:{Authorization:"Bearer "+token}});
   if(!res.ok) throw httpError("Ошибка скачивания из Drive: HTTP "+res.status,res.status);
   return res.arrayBuffer();
 }
 export async function readEnvelope(token,id) {
-  const data=await driveDownload(token,id);
+  const data=await driveDownload(token,id,{timeout:30000});
   return JSON.parse(new TextDecoder().decode(data));
 }
 export async function readEnvelopeSnapshot(token,id) {

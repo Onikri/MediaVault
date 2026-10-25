@@ -147,6 +147,26 @@ class ServerMediaTests(unittest.TestCase):
                                capture_output=True, check=True)
                 self.assertGreater(len(commands), 1)
 
+    def test_parallel_hls_finishes_out_of_order_but_remux_preserves_the_video(self):
+        import threading,time
+        fixture=self.fixtures['ts']
+        class ParallelHttp(FixtureHttp):
+            def __init__(self):super().__init__(fixture.documents,fixture.media);self.lock=threading.Lock();self.active=0;self.peak=0
+            def fork(self):return self
+            def close(self):pass
+            def download(self,url,target,**options):
+                with self.lock:self.active+=1;self.peak=max(self.peak,self.active)
+                try:
+                    time.sleep(.05 if '000000' in url else .02)
+                    return super().download(url,target,**options)
+                finally:
+                    with self.lock:self.active-=1
+        http=ParallelHttp()
+        with tempfile.TemporaryDirectory() as directory:
+            output=download_episode({'type':'hls','url':'https://cdn.example.com/ts/index.m3u8'},directory,http=http)
+            self.assertGreater(http.peak,1);self.assertGreater(float(verify_video(output)['format']['duration']),2)
+            subprocess.run(['ffmpeg','-nostdin','-v','error','-i',str(output),'-f','null','-'],check=True,capture_output=True)
+
     def test_master_selects_real_quality_and_preserves_alternate_audio(self):
         http = copy.deepcopy(self.fixtures['ts'])
         http.documents['https://cdn.example.com/master.m3u8'] = '''#EXTM3U

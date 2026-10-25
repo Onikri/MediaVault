@@ -35,16 +35,17 @@ function multipart(request) {
   return {metadata:JSON.parse(body.subarray(first,divider).toString()), data:body.subarray(dataStart,dataEnd)};
 }
 
-async function installProvider(context, identity) {
+async function installProvider(context, identity,options={}) {
+  await context.addInitScript(options=>{if(!options.showConsent&&!localStorage.getItem('mediavault_privacy_v1'))localStorage.setItem('mediavault_privacy_v1',JSON.stringify({version:1,chosen:true,remember:false}));},options);
   await context.route('**/*', async route => {
     await (async()=>{
     const request = route.request();
     const url = new URL(request.url());
     const json = (body,status=200) => route.fulfill({status, headers:cors, contentType:'application/json', body:JSON.stringify(body)});
-    if(url.pathname === '/media-vault/config.js') return route.fulfill({contentType:'text/javascript',body:'window.MEDIA_VAULT_CONFIG=Object.freeze('+JSON.stringify({googleClientId:'123-test.apps.googleusercontent.com',adminEmailSha256:createHash('sha256').update(OWNER).digest('hex'),storageFolderId:'',applicationName:'MediaVault'})+');'});
+    if(url.pathname === '/media-vault/config.js') return route.fulfill({contentType:'text/javascript',body:'window.MEDIA_VAULT_CONFIG=Object.freeze('+JSON.stringify({googleClientId:'123-test.apps.googleusercontent.com',adminEmailSha256:createHash('sha256').update(OWNER).digest('hex'),storageFolderId:'',applicationName:'MediaVault',...(options.server?{importServerUrl:options.server}:{})})+');'});
     if(url.hostname === 'art.example.test')return route.fulfill({headers:cors,contentType:'image/png',body:artworkPNG});
     if(url.hostname === 'graphql.anilist.co')return json({data:{Media:{id:1735,idMal:20,bannerImage:'https://art.example.test/banner.png',siteUrl:'https://anilist.co/anime/1735'}}});
-    if(url.hostname === 'shikimori.one'){
+    if(url.hostname === 'shikimori.io'){
       russianMetadataRequests.push(url.pathname);
       if(url.pathname==='/api/animes')return json([titleFixture]);
       if(url.pathname==='/api/mangas/11')return json({...titleFixture,id:11,kind:'manga',description:'Манга о приключениях юного ниндзя.',image:{original:'https://art.example.test/manga.png'}});
@@ -234,7 +235,7 @@ async function main() {
   assert.equal(Buffer.from(submitted[0].vault_key,'base64').length,32,'Only the derived encryption key goes to the configured owner server');
   assert.deepEqual(sourceRequests,[],'The device never fetches source HTML, playlists or video during import');
   assert.equal(await owner.locator('#openColab').count(),0,'No manual notebook hand-off remains');
-  await owner.getByRole('button',{name:'Остановить после файла'}).click();
+  await owner.getByRole('button',{name:'Остановить',exact:true}).click();
   await owner.getByText('Остановлено',{exact:true}).waitFor();
   await owner.locator('#libraryNav').click();
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===3);
@@ -487,6 +488,13 @@ async function main() {
   await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('anime4k');
   await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width>0&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
   assert.equal(await cinema.locator('canvas').evaluate(c=>c.width),64,'Anime4K WebGL shaders upscale the 32px decoded fixture to 64px');
+  await cinema.getByRole('combobox',{name:'Профиль устройства'}).selectOption('tablet');
+  await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('mobile');
+  await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width===64&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
+  await cinema.locator('canvas').evaluate(canvas=>canvas.dispatchEvent(new Event('webglcontextlost',{cancelable:true})));
+  await owner.waitForFunction(()=>document.querySelector('.mv-player-warning')?.textContent.includes('Контекст GPU'));
+  await cinema.getByRole('button',{name:'Повторить на новом GPU-контексте'}).click();
+  await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width===64&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
   await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('off');
   await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
 
@@ -627,6 +635,7 @@ async function main() {
   catch(error){console.error('Shared episode state:',await sharedPage.evaluate(()=>{const v=document.querySelector('.mv-player video');return {hash:location.hash,hasPlayer:!!v,ready:v?.readyState,duration:v?.duration,time:v?.currentTime,error:document.querySelector('.mv-viewer-error')?.textContent};}));throw error;}
   assert.equal(await sharedPage.locator('.mv-viewer-inline').count(),1,'A shared episode opens inline at the shared time after unlocking');
   await cachedContext.close();
+  await require('./remembered-browser.cjs')({browser,base,installProvider,OWNER,PHRASE,catalogId});
   console.log('PASS: React production build; mocked Google login; encrypted catalog/TXT/PNG/MP4 upload; server job without video transfer or credential export; catalog refresh; mobile viewer/abort/Escape; MP4 stream/fallback/seek; search/category/name sort/favorites/history; phrase unlock; token reconnect; stopped worker recovery; reader scopes and UI without writes.');
   console.log('Screenshot: '+path.join(temp,'mobile-owner.png'));
   console.log('Live Google OAuth, real Drive ACL and physical Android/iOS playback remain outside this test.');

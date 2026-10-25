@@ -12,7 +12,7 @@ export function createImportClient(server,googleToken,fetcher=fetch){
   async function request(path,{method='GET',body,auth=true,headers={},signal}={}){
     if(!server)throw Error('Сервер импорта ещё не подключён.');
     if(auth&&!session)await authenticate();
-    const response=await fetcher(server+path,{method,signal,headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
+    const response=await fetcher(server+path,{method,signal:signal||AbortSignal.timeout(path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
     const result=await response.json().catch(()=>({}));
     if(!response.ok){if(response.status===401)session=null;throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status});}
     return result;
@@ -23,9 +23,9 @@ export function createImportClient(server,googleToken,fetcher=fetch){
       const health=await request('/health',{auth:false});
       if(health.application!=='MediaVault'||health.version<4||health.origin!==window.location.origin)throw Error('Этот адрес не подтвердил конфигурацию MediaVault.');
       if(!googleToken())throw Error('Сначала войди через Google.');
-      const response=await fetcher(server+'/auth/session',{method:'POST',headers:{Authorization:'Bearer '+googleToken()}});
+      const response=await fetcher(server+'/auth/session',{method:'POST',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+googleToken()}});
       const data=await response.json();if(!response.ok)throw Error(data.detail||'Сервер не подтвердил вход.');
-      session=data;return data;
+      session={...data,serverVersion:health.version};return session;
     })();
     try{return await signing;}finally{signing=null;}
   }
@@ -37,6 +37,7 @@ export function useImportService(state,actions){
   const live=useRef(state);live.current=state;
   const client=useMemo(()=>createImportClient(server,()=>live.current.token),[server,state.user?.sub]);
   const refreshSignature=useRef('');
+  const enrichmentRequested=useRef('');
   const active=jobs.some(job=>['queued','running','cancelling'].includes(job.status));
   function setServer(value){const address=validateServer(value);try{localStorage.setItem('mediavault_import_server',address);}catch{}setAddress(address);}
   useEffect(()=>{
@@ -93,7 +94,24 @@ export function useImportService(state,actions){
     const task=await client.request('/jobs',{method:'POST',body:{job,vault_key:actions.getServerKey()},headers:{'Idempotency-Key':crypto.randomUUID()}});
     setJobs(old=>[task,...old.filter(value=>value.id!==task.id)]);return task;
   }
+  async function enrichLibrary(titleId){
+    if(!session?.driveConnected)throw Error('Подключи фоновый доступ сервера к Drive.');
+    const raw=state.libraryId+':'+(titleId||'all')+':'+Date.now();
+    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw));
+    const id='enrich-'+[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
+    const task=await client.request('/library/enrich',{method:'POST',body:{library_id:state.libraryId,vault_key:actions.getServerKey(),...(titleId?{title_id:titleId}:{})},headers:{'Idempotency-Key':id}});
+    setJobs(old=>[task,...old.filter(value=>value.id!==task.id)]);return task;
+  }
+  useEffect(()=>{
+    const key=state.user?.sub+':'+state.libraryId;
+    if(!state.catalog||!state.admin||state.busy||!session?.driveConnected||!(session.serverVersion>=5)||enrichmentRequested.current===key)return;
+    const videos=state.catalog.items.filter(item=>item.category==='video');
+    if(!videos.length)return;
+    enrichmentRequested.current=key;
+    const pending=jobs.some(job=>job.progress?.taskType==='enrich'&&['queued','running'].includes(job.status));
+    if(!pending&&(videos.some(item=>!item.previewArtwork)||Object.values(state.catalog.titleProfiles||{}).some(p=>p.version<2||p.partial)))enrichLibrary().catch(()=>{enrichmentRequested.current='';});
+  },[state.catalog,!!state.busy,session?.driveConnected,session?.serverVersion]);
   async function operation(id,op){const task=await client.request('/jobs/'+encodeURIComponent(id)+'/'+op,{method:'POST'});setJobs(old=>old.map(value=>value.id===id?task:value));return task;}
-  return {server,setServer,status,error,session,jobs,active,connect,submit,refresh,configureGoogle,
+  return {server,setServer,status,error,session,jobs,active,connect,submit,refresh,configureGoogle,enrichLibrary,
     request:client.request,cancel:id=>operation(id,'cancel'),resume:id=>operation(id,'resume')};
 }

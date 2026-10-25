@@ -160,7 +160,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 - Algorithms: [bloc97/Anime4K](https://github.com/bloc97/Anime4K), MIT.
 - Browser WebGL port: [monyone/Anime4K.js](https://github.com/monyone/Anime4K.js), `anime4k.js` 1.1.3, MIT, Copyright (c) 2023 もにょ～ん. Full license is included in the npm distribution. The app bundles the selected shader profiles and lazily loads them from its own Pages origin.
-- Russian catalogue, character and relationship metadata: [Shikimori public API](https://shikimori.one/api/doc). Source attribution stays with the cached title profile; no Shikimori account token or paid API key is used.
+- Russian catalogue, character and relationship metadata: [Shikimori public API](https://shikimori.io/api/doc). Source attribution stays with the cached title profile; no Shikimori account token or paid API key is used.
 
 - High-resolution catalogue banners: [AniList GraphQL Media](https://docs.anilist.co/reference/object/media), matched by MAL ID. Russian descriptions continue to come from Shikimori.
 - Confirmed cross-media relationships: [Wikidata/Wikibase API](https://www.mediawiki.org/wiki/Wikibase/API), linked through the title's Wikipedia page; Wikidata structured data is CC0. Images from Commons retain their source URLs; see each file page for its individual license.

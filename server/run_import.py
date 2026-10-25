@@ -140,7 +140,7 @@ def plan_sources(job, resolver):
     return plans
 
 
-def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None):
+def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None):
     job = validate_job(value)
     if getattr(vault, "library_id", None) != job["library_id"]:
         raise SourceError("Открытая библиотека не совпадает с заданием.")
@@ -154,9 +154,12 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
         found = {entry["number"] for entry in plans if entry["number"] is not None}
         if job["selected"] is not None and job["selected"] - found:
             log("Некоторые указанные серии не опубликованы в найденных ссылках; они не будут выдуманы или загружены.")
-        for index, entry in enumerate(plans, 1):
+        cursor = max(0,int(start_index))
+        selected_plans=plans[cursor:cursor+max_files] if max_files else plans[cursor:]
+        for index, entry in enumerate(selected_plans, cursor+1):
             if cancelled and cancelled():
                 break
+            cursor=index
             number, collection = entry["number"], entry["collection"]
             season = entry.get("season", job["season"])
             identity = entry["identity"] + (f":season={season}" if season != 1 else "")
@@ -177,6 +180,8 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                 try:
                     last_phase = [None]
                     def report(event):
+                        if cancelled and cancelled():
+                            raise SourceError('Импорт отменён владельцем.')
                         event = dict(event)
                         if "total" in event:
                             event["bytesTotal"] = event.pop("total")
@@ -211,18 +216,25 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                         continue
                     raise
                 # Drive/auth/quota errors stop immediately; prior completed episodes are preserved.
+                if cancelled and cancelled():
+                    break
                 extension, mime = ("cbz", "application/vnd.comicbook+zip") if category == "manga" else ("txt", "text/plain") if category == "book" else ("mp4", "video/mp4")
                 noun = "глава" if category in {"manga", "book"} else "серия"
                 name = (f"{collection} — {noun} {number:03d}.{extension}" if number is not None
                         else (page.title or entry["title"] or collection)[:220] + "." + extension)
                 options = {"metadata": job["metadata"], "dub": job["dub"]} if job["metadata"] or job["dub"] else {}
-                vault.upload_file(path, name=name, category=category, collection=collection,
+                if category == 'video':
+                    from media_download import preview_frame
+                    thumbnail = preview_frame(path)
+                    if thumbnail: options['preview'] = thumbnail
+                saved_item=vault.upload_file(path, name=name, category=category, collection=collection,
                                   episode=number, source_identity=identity, mime=mime, progress=report,
                                   section=job["section"], part=f"{'Том' if category != 'video' else 'Сезон'} {season}", season=season, **options)
                 result["saved"] += 1
                 emit({**result, "phase": "episode_done"})
+                if on_saved:on_saved(saved_item)
         log(f"Готово: сохранено {result['saved']}, уже были в Drive {result['skipped']}, недоступны {result['failed']}.")
-        return result
+        return {**result,'cursor':cursor,'remaining':cursor<len(plans),'total':len(plans)} if max_files else result
     finally:
         if own_resolver:
             resolver.http.close()

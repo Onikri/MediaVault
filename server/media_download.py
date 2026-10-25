@@ -10,6 +10,8 @@ import math
 from pathlib import Path
 import shutil
 import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urljoin, urlsplit
 
 import m3u8
@@ -60,6 +62,7 @@ class HlsDownload:
         self.http, self.directory, self.quality = http, Path(directory), quality
         self.headers, self.progress = playback_headers(headers), progress
         self.total = 0
+        self._lock = threading.Lock()
         self.directory.mkdir(parents=True, exist_ok=True)
 
     def _resource(self, url, path, byte_range=None, maximum=None):
@@ -72,7 +75,10 @@ class HlsDownload:
         if budget <= 0:
             raise SourceError("В бесплатной сессии закончилось место. Уже сохранённые серии останутся в Drive.")
         size = self.http.download(url, path, headers=self.headers, byte_range=byte_range, maximum=budget)
-        self.total += size
+        with self._lock:
+            self.total += size
+            if self.total > MAX_VIDEO:
+                raise SourceError('Размер видео превысил лимит свободного диска.')
         return size
 
     def materialize(self, url, name="video", depth=0):
@@ -107,6 +113,7 @@ class HlsDownload:
                       urljoin(final, segment.key.uri) if segment.key and segment.key.uri else None,
                       segment.init_section.byterange if segment.init_section else None)
                      for segment in playlist.segments]
+        downloads=[]
         for index, (segment, segment_url, map_url, key_url, map_range) in enumerate(resources):
             key = segment.key
             if key and key.method != "NONE":
@@ -132,10 +139,33 @@ class HlsDownload:
             if extension not in {".ts", ".m4s", ".mp4", ".aac", ".mp3", ".ac3", ".ec3", ".m4a"}:
                 extension = ".m4s" if initialization else ".ts"
             filename = f"segment-{index:06d}{extension}"
-            self._resource(segment_url, target / filename, byte_range(segment.byterange, segment_url, offsets))
+            downloads.append((segment_url, target / filename, byte_range(segment.byterange, segment_url, offsets)))
             segment.uri, segment.byterange = filename, None
-            if index % 25 == 0 or index + 1 == len(resources):
-                self.progress({"phase": "downloading", "loaded": index + 1, "total": len(resources)})
+        # Each worker owns its requests.Session. No shared cookies/transports.
+        local=threading.local();clients=[];client_lock=threading.Lock();saved=0
+        def download(entry):
+            nonlocal saved
+            if hasattr(self.http,'fork'):
+                if not hasattr(local,'http'):
+                    local.http=self.http.fork()
+                    with client_lock:clients.append(local.http)
+                client=local.http
+            else:client=self.http
+            url,path,range_=entry
+            with self._lock:
+                budget=min(MAX_VIDEO-self.total,(shutil.disk_usage(self.directory).free-128*1024**2)//2)
+            if budget<=0:raise SourceError('Недостаточно свободного диска для серии.')
+            size=client.download(url,path,headers=self.headers,byte_range=range_,maximum=budget)
+            with self._lock:
+                self.total+=size;saved+=1
+                if self.total>MAX_VIDEO:raise SourceError('Превышен лимит размера видео.')
+                if saved%10==0 or saved==len(downloads):self.progress({'phase':'downloading','loaded':saved,'total':len(downloads),'downloadedBytes':self.total})
+        try:
+            with ThreadPoolExecutor(max_workers=4 if hasattr(self.http,'fork') else 1) as executor:
+                # map submits references only; media remains on disk, not in RAM.
+                for _ in executor.map(download,downloads):pass
+        finally:
+            for client in clients:client.close()
         manifest = target / "local.m3u8"
         manifest.write_text(playlist.dumps(), encoding="utf-8")
         return [manifest]
@@ -183,8 +213,21 @@ def download_episode(stream, directory, *, http, quality="720", progress=lambda 
     args += ["-map", "0:v:0", "-map", "1:a:0" if len(inputs) > 1 else "0:a:0?",
              "-c", "copy", "-movflags", "+faststart", str(output)]
     progress({"phase": "assembling", "loaded": 0, "total": 0})
-    result = run(args, capture_output=True, text=True, timeout=7200, check=False)
+    result = run(args, capture_output=True, text=True, timeout=900, check=False)
     if result.returncode:
         raise SourceError("ffmpeg не смог собрать MP4 из этого потока. Готовые серии можно продолжить отдельным запуском.")
     verify_video(output, run=run)
     return output
+
+
+def preview_frame(path):
+    """Decode a single real episode frame. Never transcode the actual video."""
+    try:
+        info = verify_video(path)
+        point = float(info['format']['duration']) * .35
+        result = subprocess.run(['ffmpeg','-nostdin','-v','error','-ss',str(round(point,2)),'-i',str(path),
+                                 '-frames:v','1','-vf',"scale='min(1280,iw)':-2",'-q:v','4','-threads','1','-f','image2pipe','-vcodec','mjpeg','-'],
+                                capture_output=True,timeout=25,check=False)
+        image=result.stdout
+        return image if result.returncode==0 and image.startswith(b'\xff\xd8\xff') and len(image)<=500000 else None
+    except (subprocess.SubprocessError,SourceError,ValueError,KeyError):return None

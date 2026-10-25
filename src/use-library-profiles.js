@@ -9,7 +9,7 @@ export default function useLibraryProfiles(state,actions,server,importing){
   const attempted=useRef(new Set()),live=useRef(state);live.current=state;
   useEffect(()=>{
     if(!state.catalog||!state.admin||!state.driveWritable||importing)return;
-    const title=buildTitles(state.catalog).find(t=>t.metadataId&&!state.catalog.titleProfiles?.[t.id]?.sourceId&&!attempted.current.has(t.id));
+    const title=buildTitles(state.catalog).find(t=>{const p=state.catalog.titleProfiles?.[t.id];return t.metadataId&&(!p?.sourceId||p.version<2||p.partial&&Date.now()>(p.retryAfter||0))&&!attempted.current.has(t.id);});
     if(!title)return;
     let closed=false,timer;const controller=new AbortController();
     const start=async()=>{

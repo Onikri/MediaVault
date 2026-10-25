@@ -1,8 +1,8 @@
 // Public, free metadata only. Video extraction does not use these APIs.
 import {crossMediaFromLinks,highResolutionArtwork} from './cross-media.js';
-const ORIGIN='https://shikimori.one';
+const ORIGIN='https://shikimori.io';
 const pending=new Map();
-let queue=Promise.resolve(),lastRequest=0;
+let lastRequest=0;
 export const hasRussian=value=>/[а-яё]/i.test(String(value||''));
 export function plainText(value){
   return String(value||'').replace(/<br\s*\/?\s*>/gi,'\n').replace(/<\/(?:p|div|li|h[1-6])>/gi,'\n\n').replace(/<[^>]*>/g,'').replace(/\[(?:\/?[a-z_]+)(?:[^\]]*)\]/gi,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\n{3,}/g,'\n\n').trim();
@@ -16,8 +16,8 @@ export const translated={tv:'Сериал',movie:'Фильм',ova:'OVA',ona:'ONA
 export const translate=(value,fallback='Не указано')=>translated[String(value||'').toLowerCase()]||(hasRussian(value)?String(value):fallback);
 export function importedProfile(value){
   if(!value||!Object.keys(value).length)return null;
-  return {version:1,language:'ru',title:russianText(value.titles?.ru)||russianText(value.title),sourceId:value.ids?.mal||'',
-    description:russianText(value.description),cover:imageURL(value.cover),background:imageURL(value.background||value.cover),
+  return {version:2,partial:true,language:'ru',title:russianText(value.titles?.ru)||russianText(value.title),sourceId:value.ids?.mal||'',
+    description:russianText(value.description),cover:imageURL(value.cover),background:imageURL(value.background),
     genres:(value.genres||[]).filter(hasRussian),themes:(value.tags||[]).filter(hasRussian),format:translate(value.format),status:translate(value.status),
     year:value.year,startDate:value.startDate,endDate:value.endDate,episodes:value.episodes,chapters:value.chapters,volumes:value.volumes,rating:value.age?value.age+'+':'',characters:[],related:[],screenshots:[]};
 }
@@ -28,10 +28,10 @@ export function normalizeProfile(data,{roles=[],related=[],screenshots=[]}={}){
   const id=String(data.id),kind=['manga','novel','light_novel','manhwa','manhua','one_shot'].includes(data.kind)?'manga':'anime';
   const chars=roles.filter(r=>r.character).sort((a,b)=>Number(b.roles?.includes('Main'))-Number(a.roles?.includes('Main'))).slice(0,18);
   const cover=imageURL(data.image?.original||data.image?.preview||'');
-  return {version:1,language:'ru',source:'shikimori',sourceId:id,sourceURL:ORIGIN+(data.url||'/'+resource(kind)+'/'+id),kind,
+  return {version:2,language:'ru',source:'shikimori',sourceId:id,sourceURL:ORIGIN+(data.url||'/'+resource(kind)+'/'+id),kind,
     title:nameOf(data,'Название уточняется'),aliases:[data.name,...(data.english||[]),...(data.japanese||[]),...(data.synonyms||[])].filter(Boolean),
     description:russianText(data.description_html||data.description),cover,
-    background:imageURL(screenshots[0]?.original||data.screenshots?.[0]?.original||'')||cover,
+    background:imageURL(screenshots[0]?.original||data.screenshots?.[0]?.original||''),
     screenshots:(screenshots.length?screenshots:data.screenshots||[]).slice(0,10).map(s=>imageURL(s.original||s.preview)).filter(Boolean),
     format:translate(data.kind),status:translate(data.status),year:Number(String(data.aired_on||'').slice(0,4))||null,
     startDate:data.aired_on||'',endDate:data.released_on||'',episodes:data.episodes||null,episodesAired:data.episodes_aired||null,
@@ -47,22 +47,21 @@ async function request(path,{signal,server}={}){
   signal?.throwIfAborted();
   const key=path;
   if(!pending.has(key)){
-    const work=queue.catch(()=>{}).then(async()=>{
-      const delay=Math.max(0,400-(Date.now()-lastRequest));if(delay)await new Promise(r=>setTimeout(r,delay));lastRequest=Date.now();
-      const timeout=AbortSignal.timeout(12000);
-      try{
-        const response=await fetch(ORIGIN+'/api/'+path,{signal:timeout,headers:{Accept:'application/json'}});
-        if(!response.ok)throw Error(response.status===429?'Шикимори ограничил частоту запросов. Повтори позже.':'Шикимори сейчас недоступен.');
-        return await response.json();
-      }catch(error){
-        const match=path.match(/^(animes|mangas)\/(\d+)$/);
-        if(!server||!match)throw error;
-        const response=await fetch(server+'/metadata/shikimori?identity='+match[2]+'&kind='+(match[1]==='mangas'?'manga':'anime'),{signal:AbortSignal.timeout(12000)});
-        if(!response.ok)throw Error('Русский каталог сейчас недоступен. Сохранённые сведения останутся в библиотеке.');
-        return response.json();
+    const work=(async()=>{
+      const match=path.match(/^(animes|mangas|characters)\/(\d+)(?:\/(roles|related|screenshots|external_links))?$/),list=!match||!!match[3];
+      const valid=value=>list?Array.isArray(value):value&&String(value.id)===match[2];
+      const targets=[];
+      if(server&&match)targets.push(server+'/metadata/shikimori?'+new URLSearchParams({identity:match[2],kind:match[1]==='characters'?'character':match[1]==='mangas'?'manga':'anime',...(match[3]?{part:match[3]}:{})}));
+      targets.push(ORIGIN+'/api/'+path);
+      for(const target of targets){
+        try{
+          if(target.startsWith(ORIGIN)){const start=Math.max(Date.now(),lastRequest+400);lastRequest=start;const delay=start-Date.now();if(delay)await new Promise(r=>setTimeout(r,delay));}
+          const response=await fetch(target,{signal:AbortSignal.timeout(7500),headers:{Accept:'application/json'}});
+          if(!response.ok)throw Error();const value=await response.json();if(!valid(value))throw Error();return value;
+        }catch{}
       }
-    });
-    queue=work.catch(()=>{});
+      throw Error('Шикимори сейчас недоступен. Можно повторить синхронизацию; сохранённые сведения остаются в Drive.');
+    })();
     pending.set(key,work);work.catch(()=>pending.delete(key));
   }
   const value=await pending.get(key);signal?.throwIfAborted();return value;
@@ -73,7 +72,7 @@ export async function searchRussianTitles(name,kind='anime',options={}){
 }
 export async function loadTitleProfile(id,kind='anime',options={}){
   if(!/^\d{1,12}$/.test(String(id)))throw Error('Укажи тайтл из каталога Шикимори.');
-  const path=resource(kind)+'/'+id;
+  kind=['manga','ranobe','novel'].includes(kind)?kind:'anime';const path=resource(kind)+'/'+id;
   if(options.refresh)for(const key of pending.keys())if(key===path||key.startsWith(path+'/'))pending.delete(key);
   const data=await request(path,options);
   const names=['roles','related',...(kind==='anime'?['screenshots']:[])];
@@ -86,7 +85,7 @@ export async function loadTitleProfile(id,kind='anime',options={}){
   if(art?.background){profile.backgrounds=[imageURL(art.background)].filter(Boolean);profile.artworkSources=[{provider:'anilist',url:art.sourceURL}];}
   if(art?.cover)profile.cover=imageURL(art.cover);
   for(const value of cross)if(!profile.related.some(item=>item.kind===value.kind&&item.title===value.title))profile.related.push(value);
-  return {...profile,partial:extra.some(r=>r.status==='rejected')};
+  return {...profile,partial:extra.some(r=>r.status==='rejected')||!profile.description,missingParts:names.filter((_,i)=>extra[i].status==='rejected'),retryAfter:Date.now()+60000};
 }
 export async function loadCharacter(id,options={}){
   if(!/^\d{1,12}$/.test(String(id)))throw Error('Некорректный персонаж.');

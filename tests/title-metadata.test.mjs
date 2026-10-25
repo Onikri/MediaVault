@@ -8,7 +8,7 @@ test('Russian dossier uses Russian descriptions, characters, facts and related m
   related:[{relation_russian:'Первоисточник',manga:{id:23390,russian:'Атака титанов',kind:'manga'}}],screenshots:[{original:'/still.jpg'}]
  });
  assert.equal(profile.title,'Атака титанов');assert.equal(profile.description,'');assert.equal(profile.status,'Завершён');assert.equal(profile.origin,'Манга');assert.equal(profile.rating,'17+');assert.deepEqual(profile.genres,['Экшен']);
- assert.equal(profile.characters[0].name,'Эрен Йегер');assert.equal(profile.related[0].kind,'manga');assert.equal(profile.background,'https://shikimori.one/still.jpg');
+ assert.equal(profile.characters[0].name,'Эрен Йегер');assert.equal(profile.related[0].kind,'manga');assert.equal(profile.background,'https://shikimori.io/still.jpg');
  assert.equal(russianText('<p>Русское <b>описание</b></p>'),'Русское описание');assert.equal(plainText('[character=1]Эрен[/character]'),'Эрен');
  assert.equal(imageURL('javascript:alert(1)'),'');assert.equal(imageURL(''),'');assert.equal(imageURL('https://user:password@example.test/image.jpg'),'');
  assert.equal(profileArtwork(profile).length,3);

@@ -42,7 +42,9 @@ class TaskStore:
                     UNIQUE(owner,idempotency));
             """)
             # Episode manifests in Drive make a restart safe: completed episodes are skipped.
-            self.database.execute("UPDATE tasks SET status='queued' WHERE status='running'")
+            for identity,raw in self.database.execute("SELECT id,progress FROM tasks WHERE status='running'").fetchall():
+                progress=self.open(raw,identity);progress['recover_needed']=True
+                self.database.execute("UPDATE tasks SET status='queued',progress=? WHERE id=?",(self.seal(progress,identity),identity))
 
     def seal(self, value, aad):
         nonce = os.urandom(12)
@@ -75,7 +77,7 @@ class TaskStore:
             task_id, now = str(uuid.uuid4()), time.time()
             self.database.execute("INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?)", (
                 task_id, owner, "queued", now, now, self.seal(data, task_id),
-                self.seal({"phase": "queued", "saved": 0, "total": 0}, task_id), idempotency))
+                self.seal({"phase": "queued", "saved": 0, "total": 0, 'recover_needed': False, 'taskType': data.get('kind','import')}, task_id), idempotency))
         return self.get(task_id, owner)
 
     def get(self, task_id, owner=None, *, private=False):
@@ -92,11 +94,14 @@ class TaskStore:
     def list(self, owner):
         with self.lock:
             ids = self.database.execute("SELECT id FROM tasks WHERE owner=? ORDER BY created DESC LIMIT 40", (owner,)).fetchall()
-        return [self.get(row[0], owner) for row in ids]
+        values=[self.get(row[0], owner) for row in ids]
+        queued=sorted((v for v in values if v['status']=='queued'),key=lambda v:v['updated'])
+        for index,value in enumerate(queued,1):value['queuePosition']=index
+        return values
 
     def next(self):
         with self.lock, self.database:
-            row = self.database.execute("SELECT id FROM tasks WHERE status='queued' ORDER BY created LIMIT 1").fetchone()
+            row = self.database.execute("SELECT id FROM tasks WHERE status='queued' ORDER BY updated,created LIMIT 1").fetchone()
             if row:
                 self.database.execute("UPDATE tasks SET status='running',updated=? WHERE id=?", (time.time(), row[0]))
                 return self.get(row[0], private=True)

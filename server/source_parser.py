@@ -89,15 +89,19 @@ def playback_headers(headers=None):
 
 
 class PublicHttp:
-    def __init__(self, *, session=None, validate=public_url, timeout=(20, 45)):
+    def __init__(self, *, session=None, validate=public_url, timeout=(6, 20), deadline=None):
         self.session = session or requests.Session()
         self.validate = validate
         self.timeout = timeout
+        self.deadline = deadline
         # Session is source-only and is never shared with Google Drive.
         self.session.headers.clear()
 
     def close(self):
         self.session.close()
+
+    def fork(self):
+        return PublicHttp(validate=self.validate,timeout=self.timeout,deadline=self.deadline)
 
     def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None):
         url = self.validate(value)
@@ -113,11 +117,16 @@ class PublicHttp:
             outgoing["X-Requested-With"] = "XMLHttpRequest"
             outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
         for hop in range(6):
+            if self.deadline and time.monotonic() >= self.deadline:
+                raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             try:
                 # Clear cookies collected by previous HTML pages, including redirects.
                 self.session.cookies.clear()
+                timeout=self.timeout
+                if self.deadline:
+                    remaining=max(.2,self.deadline-time.monotonic());timeout=(min(timeout[0],remaining),min(timeout[1],remaining))
                 response = self.session.request(method, url, headers=outgoing, data=data,
-                                                timeout=self.timeout, allow_redirects=False, stream=True)
+                                                timeout=timeout, allow_redirects=False, stream=True)
             except requests.RequestException:
                 raise SourceError("Источник не ответил. Повтори импорт позднее.") from None
             if response.status_code in {301, 302, 303, 307, 308}:
@@ -147,7 +156,7 @@ class PublicHttp:
             parts, size, start = [], 0, time.monotonic()
             for block in response.iter_content(65536):
                 size += len(block)
-                if size > MAX_DOCUMENT or time.monotonic() - start > 90:
+                if size > MAX_DOCUMENT or time.monotonic() - start > 20 or self.deadline and time.monotonic() > self.deadline:
                     raise SourceError("Страница или плейлист слишком велики.")
                 parts.append(block)
             text = b"".join(parts).decode(response.encoding if response.encoding not in (None, "ISO-8859-1") else "utf-8", errors="replace")
@@ -340,6 +349,15 @@ def parse_page(text, base):
     # Multiple dubs can publish the same episode. Preserve the page's first choice.
     page.episodes = list({entry["number"]: entry for entry in reversed(page.episodes)}.values())
     page.episodes.sort(key=lambda entry: entry["number"])
+    if '__NUXT_DATA__' in text:
+        from public_page_data import episode_streams
+        published=episode_streams(text,base)
+        if published:
+            page.episodes=sorted(published,key=lambda e:e['number'])
+            selected=re.search(r'/episodes/(\d+)',urlsplit(base).path)
+            if selected:
+                found=next((entry for entry in published if entry['number']==int(selected[1])),None)
+                if found:page.streams=[{'url':found['url'],'type':'hls','quality':None,'headers':{}}]
     return page
 
 
@@ -356,9 +374,9 @@ class Resolver:
         return parse_page(text, final)
 
     def player(self, url, referer=None):
-        from anime_dl_core import AniboomPlayer, AnimediaPlayer, KodikPlayer, SibnetPlayer
+        from anime_dl_core import AniboomPlayer, AnimediaPlayer, KodikPlayer, SibnetPlayer, SovetRomanticaPlayer
         # Explicit registry: never ap.extract(), which also registers API-based players.
-        for player_type in (KodikPlayer, AniboomPlayer, SibnetPlayer, AnimediaPlayer):
+        for player_type in (KodikPlayer, AniboomPlayer, SibnetPlayer, AnimediaPlayer, SovetRomanticaPlayer):
             if player_type.matches(url):
                 with player_type(client=self.http) as player:
                     options = {"referer": referer} if referer else {}

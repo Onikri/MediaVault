@@ -22,6 +22,9 @@ import random
 import time
 import uuid
 import unicodedata
+import threading
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -151,8 +154,29 @@ def _transient(error) -> bool:
 class GoogleDriveAdapter:
     """Small Drive API v3 adapter; fake adapters implement the same methods in tests."""
 
-    def __init__(self, service):
-        self.service = service
+    def __init__(self, service, credentials=None):
+        self._original_service = service
+        self._credentials = credentials
+        self._owner_thread = threading.get_ident()
+        self._local = threading.local()
+        self._id_lock, self._ids = threading.Lock(), deque()
+        self.supports_parallel = credentials is not None
+
+    @property
+    def service(self):
+        # httplib2 transports must not be shared by upload threads.
+        if not self.supports_parallel or threading.get_ident() == self._owner_thread:
+            return self._original_service
+        if not hasattr(self._local, 'service'):
+            self._local.service = self._build(copy.deepcopy(self._credentials))
+        return self._local.service
+
+    @staticmethod
+    def _build(credentials):
+        from googleapiclient.discovery import build
+        from google_auth_httplib2 import AuthorizedHttp
+        import httplib2
+        return build('drive','v3',http=AuthorizedHttp(credentials,http=httplib2.Http(timeout=30)),cache_discovery=False)
 
     @classmethod
     def from_adc(cls, credentials=None):
@@ -161,8 +185,7 @@ class GoogleDriveAdapter:
             credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/drive"])
         if getattr(credentials, "service_account_email", None):
             raise VaultError("Use the owner's normal Google user account.")
-        from googleapiclient.discovery import build
-        return cls(build("drive", "v3", credentials=credentials, cache_discovery=False))
+        return cls(cls._build(credentials), credentials)
 
     @staticmethod
     def _execute(request):
@@ -181,7 +204,10 @@ class GoogleDriveAdapter:
         return self._execute(self.service.about().get(fields="user(emailAddress)"))["user"]["emailAddress"]
 
     def allocate_id(self):
-        return self._execute(self.service.files().generateIds(count=1, space="drive", type="files"))["ids"][0]
+        with self._id_lock:
+            if not self._ids:
+                self._ids.extend(self._execute(self.service.files().generateIds(count=128, space="drive", type="files"))["ids"])
+            return self._ids.popleft()
 
     def metadata(self, file_id):
         return self._execute(self.service.files().get(
@@ -245,6 +271,7 @@ class VaultDrive:
         self._key = None
         self._salt = None
         self._manifest_cache = None
+        self._commit_lock = threading.RLock()
         email = self._retry(self.drive.owner_email)
         digest = hashlib.sha256(str(email).strip().lower().encode("utf-8")).hexdigest()
         if digest != ADMIN_EMAIL_SHA256:
@@ -382,6 +409,10 @@ class VaultDrive:
         return merged
 
     def _commit_item(self, item, storage):
+        with self._commit_lock:
+            return self._commit_item_unlocked(item,storage)
+
+    def _commit_item_unlocked(self, item, storage):
         fingerprint = item.get("importFingerprint")
         for _ in range(5):
             latest, metadata = self._latest()
@@ -409,6 +440,46 @@ class VaultDrive:
             if any(entry.get("id") == item["id"] for entry in verified["items"]):
                 return next(entry for entry in verified["items"] if entry.get("id") == item["id"])
         raise ConcurrentUpdateError("Catalog is busy. The encrypted asset manifest permits recovery.")
+
+    def edit_catalog(self,editor):
+        with self._commit_lock:
+            for _ in range(5):
+                latest,metadata=self._latest();editor(latest)
+                if self.drive.metadata(self.library_id).get('version') != metadata.get('version'):continue
+                try:self.drive.replace_bytes(self.library_id,_json(seal_catalog(latest,self._key,self._salt)),etag=metadata.get('_etag'))
+                except Exception as error:
+                    if _status(error)==412 or _transient(error):continue
+                    raise
+                return self._latest()[0]
+        raise ConcurrentUpdateError('Каталог занят. Повтори обновление оформления.')
+
+    def save_preview(self,item_id,image):
+        item=next(i for i in self.catalog['items'] if i['id']==item_id)
+        if item.get('previewArtwork'):return item['previewArtwork']
+        identity=str(uuid.uuid4());sealed=seal_chunk(image,self._key,identity,0)
+        remote=self._new_bytes('preview-'+identity+'.enc',sealed['ciphertext'],item['folderId'])
+        asset={'id':identity,'fileId':remote,'iv':sealed['iv'],'mime':'image/jpeg','size':len(image)}
+        def edit(catalog):
+            current=next(i for i in catalog['items'] if i['id']==item_id)
+            current.setdefault('previewArtwork',asset)
+        self.edit_catalog(edit);return asset
+
+    def save_title_profile(self,title_id,profile,images=()):
+        previous=self.catalog.get('titleProfiles',{}).get(title_id,{})
+        artwork={**previous.get('artwork',{}),**profile.get('artwork',{})}
+        group=next((g for g in self.catalog.get('storage',{}).get('collections',[]) if title_id.endswith(':'+g['id'])),None)
+        folder=previous.get('artworkFolderId')
+        if images and not folder:folder=self._new_folder('art-'+str(uuid.uuid4()),group['folderId'] if group else self.catalog['folderId'])
+        for url,data,mime in images:
+            if url in artwork:continue
+            identity=str(uuid.uuid4());sealed=seal_chunk(data,self._key,identity,0)
+            remote=self._new_bytes('art-'+identity+'.enc',sealed['ciphertext'],folder)
+            artwork[url]={'id':identity,'fileId':remote,'iv':sealed['iv'],'mime':mime,'size':len(data)}
+        def edit(catalog):
+            recent=catalog.setdefault('titleProfiles',{}).get(title_id,{})
+            catalog['titleProfiles'][title_id]={**recent,**profile,'artwork':{**recent.get('artwork',{}),**artwork},'artworkFolderId':folder or '',
+                                               'userRatings':{**profile.get('userRatings',{}),**recent.get('userRatings',{})},'savedAt':_now()}
+        return self.edit_catalog(edit)['titleProfiles'][title_id]
 
     def _folders(self, catalog, category, collection, section, part):
         storage = copy.deepcopy(catalog.get("storage") or {})
@@ -487,7 +558,7 @@ class VaultDrive:
 
     def upload_file(self, path, *, name=None, category="video", collection="Без коллекции",
                     episode=None, source_identity=None, mime=None, metadata_id=None, progress=None,
-                    section=None, part="", season=None, metadata=None, dub=""):
+                    section=None, part="", season=None, metadata=None, dub="", preview=None):
         if category not in CATEGORIES:
             raise VaultError("Unsupported media category.")
         file_path = Path(path)
@@ -514,18 +585,34 @@ class VaultDrive:
         checkpoint_written = False
         try:
             chunks, loaded, content_hash = [], 0, hashlib.sha256()
-            with file_path.open("rb") as source:
+            parallel = 2 if getattr(self.drive, 'supports_parallel', False) else 1
+            started, encryption_ms, pending = time.monotonic(), 0, deque()
+            def completed_upload():
+                nonlocal loaded
+                future, nonce, length = pending.popleft()
+                chunks.append({'fileId': future.result(), 'iv': nonce})
+                loaded += length
+                elapsed = max(.001, time.monotonic() - started)
+                if progress:
+                    progress({'loaded': loaded, 'total': size, 'phase': 'uploading', 'uploadSeconds': round(elapsed, 2),
+                              'encryptionMs': round(encryption_ms, 2), 'mbps': round(loaded / 1048576 / elapsed, 2), 'activeUploads': parallel})
+            with file_path.open("rb") as source, ThreadPoolExecutor(max_workers=parallel) as executor:
+                index = 0
                 while True:
+                    if len(pending) >= parallel:
+                        completed_upload()
                     raw = source.read(CHUNK_SIZE)
                     if not raw:
                         break
                     content_hash.update(raw)
-                    sealed = seal_chunk(raw, self._key, item_id, len(chunks))
-                    remote_id = self._new_bytes(f"part-{len(chunks):06d}.enc", sealed["ciphertext"], asset_id)
-                    chunks.append({"fileId": remote_id, "iv": sealed["iv"]})
-                    loaded += len(raw)
-                    if progress:
-                        progress({"loaded": loaded, "total": size, "phase": "uploading"})
+                    before = time.monotonic()
+                    sealed = seal_chunk(raw, self._key, item_id, index)
+                    encryption_ms += (time.monotonic() - before) * 1000
+                    future = executor.submit(self._new_bytes, f'part-{index:06d}.enc', sealed['ciphertext'], asset_id)
+                    pending.append((future, sealed['iv'], len(raw)))
+                    index += 1
+                while pending:
+                    completed_upload()
             if loaded != size or file_path.stat().st_size != size:
                 raise VaultError("Source file changed while uploading.")
             item = {"id": item_id, "folderId": asset_id, "name": filename, "category": category,
@@ -546,6 +633,10 @@ class VaultDrive:
             if source_identity:
                 item["importFingerprint"] = source_fingerprint(
                     source_identity, collection=collection, episode=episode, category=category)
+            if preview:
+                preview_id = str(uuid.uuid4()); sealed = seal_chunk(preview, self._key, preview_id, 0)
+                remote = self._new_bytes('preview.enc', sealed['ciphertext'], asset_id)
+                item['previewArtwork'] = {'fileId': remote, 'id': preview_id, 'iv': sealed['iv'], 'mime': 'image/jpeg'}
             checkpoint = {"version": 1, "folderId": catalog["folderId"], "checkpoint": "asset-v1",
                           "items": [item], "storage": storage, "completedAt": _now()}
             self._new_bytes("manifest.enc.json", _json(seal_catalog(checkpoint, self._key, self._salt)), asset_id)

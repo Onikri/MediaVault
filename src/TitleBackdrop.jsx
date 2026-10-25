@@ -13,7 +13,7 @@ function Slide({url,profile,actions,libraryId,onPalette}){
 }
 export default function TitleBackdrop({profile,actions,libraryId,onPalette,suspended=false}){
   const reduced=useReducedMotion(),[index,setIndex]=useState(0),[paused,setPaused]=useState(false),root=useRef(null),position=useRef({x:0,y:0});
-  const slides=[...new Set([...(profile.backgrounds||[]),...(profile.screenshots||[]),profile.background,profile.cover])].filter(Boolean).slice(0,6);
+  const slides=[...new Set([...(profile.backgrounds||[]),...(profile.screenshots||[]),profile.background])].filter(url=>url&&url!==profile.cover).slice(0,6);
   const signature=slides.join('|');
   useEffect(()=>{setIndex(0);},[signature]);
   useEffect(()=>{

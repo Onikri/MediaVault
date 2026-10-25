@@ -1,4 +1,4 @@
-import {russianText,translate} from './title-metadata.js';
+import {russianText,translate,imageURL} from './title-metadata.js';
 // Free metadata only. Source discovery and every media byte stay on the import server.
 const strip=value=>String(value||'').replace(/<[^>]*>/g,' ').replace(/\[\/?(?:b|i|u|url|spoiler|quote)[^\]]*\]/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
 export const normalized=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -59,8 +59,8 @@ export function normalizeCatalog(provider,data,kind='anime'){
     releases:[...(a.airingSchedule?.nodes||[]),...(a.nextAiringEpisode?[a.nextAiringEpisode]:[])].map(e=>({episode:e.episode,date:e.airingAt,kind:'original',provider:'anilist'})),
     ids:a.idMal?{mal:String(a.idMal)}:{},links:[{provider,url:a.siteUrl}]}));
   if(provider==='shikimori')return list(data).filter(a=>a?.id!=null&&(a.name||a.russian)).map(a=>record(provider,a.id,kind,{titles:{ru:a.russian,en:a.name,native:a.japanese?.[0]},aliases:[...(a.synonyms||[]),...(a.english||[]),...(a.japanese||[])],description:a.description,
-    cover:a.image?.original?'https://shikimori.one'+a.image.original:'',format:a.kind,genres:(a.genres||[]).map(g=>g.russian||g.name),episodes:a.episodes,chapters:a.chapters,volumes:a.volumes,
-    status:a.status,startDate:a.aired_on,endDate:a.released_on,age:ageOf(a.rating),ageLabel:a.rating,ids:{mal:String(a.id)},links:[{provider,url:'https://shikimori.one'+a.url}]}));
+    cover:imageURL(a.image?.original||''),format:a.kind,genres:(a.genres||[]).map(g=>g.russian||g.name),episodes:a.episodes,chapters:a.chapters,volumes:a.volumes,
+    status:a.status,startDate:a.aired_on,endDate:a.released_on,age:ageOf(a.rating),ageLabel:a.rating,ids:{mal:String(a.id)},links:[{provider,url:imageURL(a.url||'')}]}));
   if(provider==='jikan')return list(data.data).map(a=>record(provider,a.mal_id,kind,{titles:{en:a.title_english,native:a.title_japanese},title:a.title,aliases:(a.titles||[]).map(t=>t.title),description:a.synopsis,
     cover:a.images?.webp?.large_image_url||a.images?.jpg?.large_image_url,format:a.type,year:a.year,genres:(a.genres||[]).map(g=>g.name),tags:[...(a.themes||[]),...(a.demographics||[])].map(t=>t.name),
     age:ageOf(a.rating),ageLabel:a.rating,episodes:a.episodes,chapters:a.chapters,volumes:a.volumes,status:a.status,startDate:a.aired?.from||a.published?.from,endDate:a.aired?.to||a.published?.to,
@@ -111,7 +111,7 @@ export function providerUrl(provider,{query='',kind='anime',page=1,identity,year
     if(!identity){url.searchParams.set('page[limit]',16);url.searchParams.set('page[offset]',(page-1)*16);if(query)url.searchParams.set('filter[text]',query);else url.searchParams.set('sort','-userCount');if(year&&resource==='anime')url.searchParams.set('filter[seasonYear]',year);}
     return url.href;
   }
-  if(provider==='shikimori'){const url=new URL('https://shikimori.one/api/'+(resource==='anime'?'animes':'mangas')+(identity?'/'+identity:''));if(!identity){url.searchParams.set('search',query);url.searchParams.set('limit',16);url.searchParams.set('page',page);url.searchParams.set('order','popularity');if(year)url.searchParams.set('season',year);}return url.href;}
+  if(provider==='shikimori'){const url=new URL('https://shikimori.io/api/'+(resource==='anime'?'animes':'mangas')+(identity?'/'+identity:''));if(!identity){url.searchParams.set('search',query);url.searchParams.set('limit',16);url.searchParams.set('page',page);url.searchParams.set('order','popularity');if(year)url.searchParams.set('season',year);}return url.href;}
   if(provider==='jikan'){const url=new URL('https://api.jikan.moe/v4/'+resource+(identity?'/'+identity+'/full':''));if(!identity){url.searchParams.set('q',query);url.searchParams.set('limit',16);url.searchParams.set('page',page);}return url.href;}
   if(provider==='tvmaze')return identity?'https://api.tvmaze.com/shows/'+identity+'?embed=episodes':'https://api.tvmaze.com/search/shows?q='+encodeURIComponent(query);
   if(provider==='wikidata')return 'https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&origin=*&language='+(/[А-Яа-яЁё]/.test(query)?'ru':/[ぁ-ヿ]/.test(query)?'ja':/[가-힣]/.test(query)?'ko':/[一-鿿]/.test(query)?'zh':'en')+'&search='+encodeURIComponent(query)+'&limit=20';

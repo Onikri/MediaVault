@@ -31,7 +31,9 @@ class Site:
             # Jut.su's public catalogue is HTML; its search form is not a DLE API.
             return self.root + "/anime/"
         if self.id == "anilibria":
-            return self.root + "/pages/catalog.php?" + urlencode({"search": query})
+            return self.root + "/anime/catalog?" + urlencode({"search": query})
+        if self.id == 'sovet':
+            return self.root + '/anime?' + urlencode({'query': query})
         return self.root + self.search_path + "?" + urlencode({"do": "search", "subaction": "search", "story": query})
 
 
@@ -40,7 +42,9 @@ SITES = (
     Site("animego", "AnimeGo", "https://animego.me", ("animego.me", "animego.org"), ".animes-list-item, .anime-item", ".h5, h2, h3"),
     Site("jutsu", "Jut.su", "https://jut.su", ("jut.su",), ".all_anime_global, .all_anime", ".aaname, .anime_name"),
     Site("animevost", "AnimeVost", "https://animevost.org", ("animevost.org",), ".shortstory", ".shortstoryHead h2, .shortstoryHead a", "/index.php"),
-    Site("anilibria", "AniLibria", "https://anilibria.tv", ("anilibria.tv", "anilibria.top", "aniliberty.top"), ".release, .release-item, .goodcell", "h2, h3, .title"),
+    Site("anilibria", "AniLiberty / AniLibria", "https://aniliberty.top", ("anilibria.tv", "anilibria.top", "aniliberty.top"), ".release, .release-item, .goodcell, a[href*='/anime/releases/release/']", "h2, h3, .title"),
+    Site('animejoy','AnimeJoy','https://animejoy.ru',('animejoy.ru',),'.shortstory','.ntitle a, .ntitle, h2'),
+    Site('sovet','SovetRomantica','https://sovetromantica.com',('sovetromantica.com',),'.anime--block__desu','.anime--block__name'),
     Site("readmanga", "ReadManga", "https://readmanga.live", ("readmanga.live", "mintmanga.live"), ".tile, .manga-list-item", "h3, .title", "/search", "manga"),
 )
 BY_ID = {site.id: site for site in SITES}
@@ -93,6 +97,10 @@ def parse_search(site, text, base, query=""):
                   "kind": site.kind, "dubs": [], "releaseDates": []}
         if image:
             result["cover"] = link(image.get("data-src") or image.get("src"), base)
+        elif site.id == 'jutsu':
+            background=card.select_one('.all_anime_image[style]')
+            match=re.search(r'url\([\"\']?([^\"\')]+)',background.get('style','')) if background else None
+            if match:result['cover']=link(match[1],base)
         # Only labels actually present in the HTML are exposed as voice filters.
         for element in card.select("[data-translation], [data-dubbing], .dubbing, .translation"):
             value = clean(element.get("data-translation") or element.get("data-dubbing") or element.get_text(" "), 120)
@@ -164,7 +172,7 @@ def parse_reader(text, base):
 
 def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime"):
     own_http = http is None
-    http = http or PublicHttp()
+    http = http or PublicHttp(timeout=(4,7),deadline=time.monotonic()+18)
     try:
         original = public_url(url, resolve_dns=False)
         site = site_for(original)
@@ -263,10 +271,15 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime"):
 
 def search_site(site, query, *, http=None):
     own_http = http is None
-    http = http or PublicHttp(timeout=(5, 12))
+    http = http or PublicHttp(timeout=(4,6),deadline=time.monotonic()+9)
     try:
         text, final, _ = http.document(site.search_url(query))
-        return {"provider": site.id, "name": site.name, "status": "ok", "results": parse_search(site, text, final, query)}
+        values=parse_search(site,text,final,query)
+        if site.id=='anilibria' and not values:
+            from public_page_data import releases
+            values=releases(text,final,query)
+        return {"provider": site.id, "name": site.name, "status": "ok" if values else 'empty', "results": values,
+                **({'message':'В публичном HTML нет совпадений. Страница может загружать каталог отдельно в браузере.'} if not values else {})}
     except SourceError as error:
         return {"provider": site.id, "name": site.name, "status": "unavailable", "message": str(error), "results": []}
     finally:
@@ -274,16 +287,27 @@ def search_site(site, query, *, http=None):
             http.close()
 
 
+_search_cache,_search_lock={},threading.Lock()
+
+
 def search_sources(query, kind="anime"):
     if kind not in {"anime", "manga"}:
         return {"providers": [], "results": [], "checkedAt": int(time.time())}
+    key=(query.casefold(),kind)
+    with _search_lock:
+        cached=_search_cache.get(key)
+        if cached and cached[0]>time.monotonic():return cached[1]
     sites = [site for site in SITES if site.kind == ("manga" if kind == "manga" else "anime")]
     results = []
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(search_site, site, query) for site in sites]
         for future in as_completed(futures):
             results.append(future.result())
-    return {"providers": results, "results": [item for result in results for item in result["results"]], "checkedAt": int(time.time())}
+    value={"providers": results, "results": [item for result in results for item in result["results"]], "checkedAt": int(time.time())}
+    with _search_lock:
+        _search_cache[key]=(time.monotonic()+120,value)
+        if len(_search_cache)>128:_search_cache.pop(next(iter(_search_cache)))
+    return value
 
 
 _voice_cache, _voice_lock = {}, threading.Lock()
@@ -299,26 +323,30 @@ def voice_availability(query):
     normalize = lambda value: re.sub(r"[^\w]+", " ", value.casefold()).strip()
     target = normalize(query)
     dubs, sources = set(), []
-    for identity in ("yummy", "animevost"):
-        result = search_site(BY_ID[identity], query)
+    def check(result):
+        identity=result['provider']
         score = lambda item: max(
             difflib.SequenceMatcher(None, target, normalize(item["title"].split("/")[0])).ratio(),
             difflib.SequenceMatcher(None, target, normalize(urlsplit(item["url"]).path)).ratio())
         candidates = sorted(result["results"], key=score, reverse=True)
         if not candidates or score(candidates[0]) < 0.45:
-            continue
+            return None
         candidate = candidates[0]
         # Search results are only candidates. A voice is reported with its source URL.
-        http = PublicHttp(timeout=(5, 12))
+        http = PublicHttp(timeout=(4,6),deadline=time.monotonic()+10)
         try:
             inspected = inspect_source(candidate["url"], http=http)
             names = [entry["name"] for entry in inspected["dubs"]]
-            dubs.update(names)
-            sources.append({"provider": identity, "title": candidate["title"], "url": candidate["url"], "dubs": names})
+            return {"provider": identity, "title": candidate["title"], "url": candidate["url"], "dubs": names}
         except SourceError:
             pass
         finally:
             http.close()
+        return None
+    candidates=search_sources(query)['providers']
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        for result in executor.map(check,candidates):
+            if result:sources.append(result);dubs.update(result['dubs'])
     value = {"query": query, "dubs": sorted(dubs), "sources": sources, "checkedAt": int(time.time())}
     with _voice_lock:
         _voice_cache[query.casefold()] = (time.monotonic() + 900, value)

@@ -3,6 +3,10 @@ import {newSalt,deriveVaultMaterial,bytesToBase64,openChunk,sealIndex,openIndex,
 import {driveDownload,readEnvelope,findLibraries,createFolder,folderExists,uploadSmall,
   inviteReader} from "../drive.js";
 import {createUploadService} from "./upload.js";
+import {privacyPreferences,savePrivacyPreferences} from './privacy.js';
+import {rememberGoogleSession,restoreGoogleSession,forgetGoogleSession} from './device-auth.js';
+import {saveTrustedVault,openTrustedVault,trustedVault,forgetTrustedVault,biometricAvailable} from './trusted-vault.js';
+import {deviceStore} from './device-storage.js';
 
 export const labels={all:"Все материалы",video:"Видео",audio:"Музыка",manga:"Манга",
   book:"Книги",image:"Изображения"};
@@ -27,7 +31,8 @@ function initialState(){
   return {user:null,admin:false,token:null,tokenExpiresAt:0,key:null,catalog:null,
     libraryId:storedLibrary(),status:"Не подключено",notice:setupNotice(),toast:null,
     busy:"",uploadProgress:[],driveConnected:false,driveWritable:false,
-    libraryOptions:[],libraryDiscovery:"idle",libraryDiscoveryError:"",workerReady:false,authConfigured:isConfigured()};
+    libraryOptions:[],libraryDiscovery:"idle",libraryDiscoveryError:"",workerReady:false,authConfigured:isConfigured(),
+    remembering:privacyPreferences().remember,remembered:false,restoring:false,biometric:false,deviceError:''};
 }
 function cancelled(){return new DOMException("Операция отменена","AbortError");}
 async function hashEmail(email){
@@ -44,7 +49,7 @@ async function googleReady(){
 }
 async function userFromToken(token){
   const response=await fetch("https://www.googleapis.com/oauth2/v3/userinfo",
-    {headers:{Authorization:"Bearer "+token}});
+    {signal:AbortSignal.timeout(12000),headers:{Authorization:"Bearer "+token}});
   if(!response.ok)throw Object.assign(Error("Не удалось проверить личность через Google."),{status:response.status});
   const user=await response.json();
   if(!user.email_verified||!user.email||!user.sub)throw Error("Google не подтвердил email.");
@@ -52,7 +57,7 @@ async function userFromToken(token){
 }
 
 function createController(get,patch){
-  let mounted=false,epoch=0,tokenTimer=null,toastTimer=null,worker=null,registration=null,salt=null,serverKey=null;
+  let mounted=false,epoch=0,tokenTimer=null,toastTimer=null,worker=null,registration=null,salt=null,serverKey=null,restoring=null;
   const tokenAlive=()=>!!get().token&&Date.now()<get().tokenExpiresAt;
   const libraryStatus=()=>get().catalog?
     (get().admin?"Администратор":"Зритель")+" · библиотека открыта":
@@ -86,7 +91,10 @@ function createController(get,patch){
     clearTimeout(tokenTimer);
     const current=get();
     if(!current.token)return;
-    tokenTimer=setTimeout(()=>expireDrive(current.token),Math.max(0,current.tokenExpiresAt-Date.now()-15000));
+    tokenTimer=setTimeout(()=>{
+      if(privacyPreferences().remember)renewSession().catch(()=>expireDrive(current.token));
+      else expireDrive(current.token);
+    },Math.max(privacyPreferences().remember?5000:0,current.tokenExpiresAt-Date.now()-(privacyPreferences().remember?120000:15000)));
   }
   function driveToken(){
     if(!tokenAlive()){
@@ -262,7 +270,11 @@ function createController(get,patch){
         notice:{title:"Разреши доступ к файлам",text:"Доступ к Google Drive запрашивается вместе со входом. Подтверди его в окне Google."}});
       acceptDriveToken(result);
       await discoverLibrary(expected);
-      toast(get().libraryDiscovery==="found"?"Библиотека найдена. Введи свою секретную фразу.":admin?"Осталось придумать секретную фразу — остальное создадим автоматически.":"Вход выполнен. Для доступа нужно приглашение владельца.");
+      if(privacyPreferences().remember){
+        await rememberAccountInternal().catch(cause=>patch({deviceError:cause.message}));
+        await tryTrustedLibrary(expected);
+      }
+      toast(get().catalog?'Библиотека открыта на этом устройстве.':get().libraryDiscovery==="found"?"Библиотека найдена. Введи свою секретную фразу.":admin?"Осталось придумать секретную фразу — остальное создадим автоматически.":"Вход выполнен. Для доступа нужно приглашение владельца.");
       return true;
     });
   }
@@ -288,7 +300,7 @@ function createController(get,patch){
       const material=await deriveVaultMaterial(passphrase,nextSalt),key=material.key;
       let catalog;
       try{catalog=await openIndex(envelope,key);}
-      catch(cause){if(cause?.name==="OperationError")throw Error("Неверная секретная фраза или повреждённый каталог.");throw cause;}
+      catch(cause){material.serverKey.fill(0);if(cause?.name==="OperationError")throw Error("Неверная секретная фраза или повреждённый каталог.");throw cause;}
       assertEpoch(expected);
       salt=nextSalt;
       serverKey?.fill(0);serverKey=material.serverKey;
@@ -297,6 +309,7 @@ function createController(get,patch){
       await syncWorker();
       assertEpoch(expected);
       enterLibrary();toast("Каталог расшифрован на устройстве.");
+      await saveTrustedCurrent().catch(cause=>patch({deviceError:cause.message}));
       return true;
     });
   }
@@ -332,6 +345,7 @@ function createController(get,patch){
       await syncWorker();
       assertEpoch(expected);
       enterLibrary();toast("Библиотека создана. Сохрани секретную фразу и ссылку-приглашение.");
+      await saveTrustedCurrent().catch(cause=>patch({deviceError:cause.message}));
       return true;
     });
   }
@@ -471,35 +485,96 @@ function createController(get,patch){
     return new URL("__media__/"+encodeURIComponent(item.id),baseUrl()).href;
   }
   function logout(){
+    forgetGoogleSession().catch(()=>{});
+    deviceStore('delete','wrap-key').catch(()=>{});
+    if(get().user&&get().libraryId)forgetTrustedVault(get().user.sub,get().libraryId).catch(()=>{});
+    savePrivacyPreferences(false);
     uploads.cancel();
     epoch++;salt=null;serverKey?.fill(0);serverKey=null;
     clearTimeout(tokenTimer);clearTimeout(toastTimer);
     clearWorkerSession();
     patch({user:null,admin:false,token:null,tokenExpiresAt:0,key:null,catalog:null,driveConnected:false,driveWritable:false,
       libraryOptions:[],libraryDiscovery:"idle",libraryDiscoveryError:"",
-      workerReady:false,status:"Не подключено",notice:setupNotice(),toast:null,busy:"",uploadProgress:[]});
+      workerReady:false,status:"Не подключено",notice:setupNotice(),toast:null,busy:"",uploadProgress:[],remembering:false,remembered:false,biometric:false,deviceError:''});
   }
+  async function saveTrustedCurrent(biometric=false){
+    if(!privacyPreferences().remember||!get().user||!get().catalog||!serverKey)return;
+    const existing=await trustedVault(get().user.sub,get().libraryId);
+    if(existing?.biometric&&!biometric){patch({biometric:true});return;}
+    await saveTrustedVault(get().user.sub,get().libraryId,serverKey,salt,{biometric});patch({biometric});
+  }
+  async function tryTrustedLibrary(expected,gesture=false){
+    if(!get().user||!get().libraryId||get().catalog)return false;
+    const record=await trustedVault(get().user.sub,get().libraryId);assertEpoch(expected);
+    patch({biometric:!!record?.biometric});if(!record||record.biometric&&!gesture)return false;
+    const material=await openTrustedVault(get().user.sub,get().libraryId);assertEpoch(expected);
+    if(!material)return false;
+    try{
+      const envelope=await readEnvelope(driveToken(),get().libraryId);assertEpoch(expected);
+      const catalog=await openIndex(envelope,material.key);assertEpoch(expected);
+      salt=base64ToBytes(envelope.salt);serverKey?.fill(0);serverKey=material.serverKey;
+      patch({key:material.key,catalog});await syncWorker();assertEpoch(expected);enterLibrary();return true;
+    }catch(cause){material.serverKey.fill(0);throw cause;}
+  }
+  async function rememberAccountInternal(){
+    if(!get().user||!tokenAlive())return;
+    const server=configuration().importServerUrl;if(!server)throw Error('Не настроен сервер сохранённого входа.');
+    const expected=epoch;
+    await rememberGoogleSession(server,driveToken(),get().user);
+    if(expected!==epoch||!privacyPreferences().remember){await forgetGoogleSession().catch(()=>{});throw cancelled();}
+    patch({remembered:true,deviceError:''});
+    await saveTrustedCurrent();return true;
+  }
+  async function rememberAccount(){return run('remember',async()=>{savePrivacyPreferences(true);patch({remembering:true});return rememberAccountInternal();});}
+  async function renewSession(){
+    if(restoring)return restoring;
+    const expected=epoch;
+    restoring=(async()=>{
+      const result=await restoreGoogleSession();if(!result)throw Error('На этом устройстве пока не сохранён вход.');
+      const user=await userFromToken(result.access_token);assertEpoch(expected);
+      if(get().user&&user.sub!==get().user.sub)throw Error('Сохранён другой аккаунт. Войди через Google.');
+      patch({user,admin:(await hashEmail(user.email))===configuration().adminEmailSha256,remembered:true,deviceError:''});
+      acceptDriveToken(result);await syncWorker();return true;
+    })();
+    try{return await restoring;}finally{restoring=null;}
+  }
+  async function restoreLogin(){
+    if(!privacyPreferences().remember)return false;
+    return run('restore',async expected=>{
+      patch({restoring:true});
+      try{await renewSession();await discoverLibrary(expected);await tryTrustedLibrary(expected);return true;}
+      catch(cause){if(expected===epoch)patch({deviceError:cause.message});return false;}
+      finally{if(expected===epoch)patch({restoring:false});}
+    });
+  }
+  async function biometricUnlock(){return run('biometric',expected=>tryTrustedLibrary(expected,true));}
+  async function enableBiometric(){return run('biometric',async()=>{if(!get().catalog)throw Error('Сначала открой библиотеку секретной фразой.');savePrivacyPreferences(true);await forgetTrustedVault(get().user.sub,get().libraryId);await saveTrustedCurrent(true);toast('Библиотека защищена биометрией или PIN устройства.');return true;});}
+  function onPrivacy(event){patch({remembering:!!event.detail.remember,...(!event.detail.remember?{remembered:false,biometric:false}:{})});}
   function onMessage(event){
     if(event.data?.type==="SESSION_REQUIRED"){
       const payload=workerSession();
       event.ports?.[0]?.postMessage(payload||{type:"SESSION_UNAVAILABLE"});
       if(!payload&&get().token&&!tokenAlive())expireDrive();
     }
-    if(event.data?.type==="DRIVE_AUTH_REQUIRED")expireDrive();
+    if(event.data?.type==="DRIVE_AUTH_REQUIRED"){
+      if(privacyPreferences().remember)renewSession().catch(()=>expireDrive());else expireDrive();
+    }
   }
   function onControllerChange(){
     worker=matchingWorker();
     patch({workerReady:false});
     if(workerSession())syncWorker().catch(error);
   }
-  function onFocus(){if(get().token&&!tokenAlive())expireDrive();}
+  function onFocus(){if(get().token&&!tokenAlive()){if(privacyPreferences().remember)renewSession().catch(()=>expireDrive());else expireDrive();}}
   function mount(){
     mounted=true;
     navigator.serviceWorker?.addEventListener("message",onMessage);
     navigator.serviceWorker?.addEventListener("controllerchange",onControllerChange);
     window.addEventListener("focus",onFocus);
+    window.addEventListener('mediavault-privacy',onPrivacy);
     scheduleExpiry();
     registerWorker().catch(cause=>console.warn("Service Worker недоступен:",cause));
+    restoreLogin();
   }
   function unmount(){
     uploads.cancel();
@@ -508,9 +583,10 @@ function createController(get,patch){
     navigator.serviceWorker?.removeEventListener("message",onMessage);
     navigator.serviceWorker?.removeEventListener("controllerchange",onControllerChange);
     window.removeEventListener("focus",onFocus);
+    window.removeEventListener('mediavault-privacy',onPrivacy);
     clearWorkerSession();
   }
-  return {mount,unmount,actions:{login,connectDrive,logout,unlock,createLibrary,uploadFiles,importStream,importVideo,
+  return {mount,unmount,actions:{login,connectDrive,logout,unlock,createLibrary,uploadFiles,importStream,importVideo,rememberAccount,restoreLogin,biometricUnlock,enableBiometric,biometricAvailable,notify:toast,
     getServerKey:()=>{if(!get().admin||!get().catalog||!serverKey)throw Error("Открой библиотеку владельца.");return bytesToBase64(serverKey);},
     getState:uploads.getState,findMyLibrary,refreshCatalog,invite,copyInvite,inviteUrl,readWhole,readArtwork,saveTitleProfile,prepareStream,error,clearToast}};
 }

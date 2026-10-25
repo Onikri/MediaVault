@@ -34,11 +34,12 @@ async function run(){
   for(const width of [320,390,768,1280]){
     const context=await browser.newContext({viewport:{width,height:860},reducedMotion:'reduce',serviceWorkers:'block'});
     context.setDefaultTimeout(20000);
+    await context.addInitScript(()=>localStorage.setItem('mediavault_privacy_v1',JSON.stringify({version:1,chosen:true,remember:false})));
     await context.route('**/media-vault/config.js',route=>route.fulfill({contentType:'text/javascript',body:'window.MEDIA_VAULT_CONFIG='+JSON.stringify({googleClientId:'test.apps.googleusercontent.com',adminEmailSha256:createHash('sha256').update(OWNER).digest('hex'),storageFolderId:''})}));
     await context.route('https://accounts.google.com/**',route=>route.fulfill({contentType:'text/javascript',body:`window.google={accounts:{oauth2:{initTokenClient:options=>({requestAccessToken(){options.callback({access_token:'ui-test-token',expires_in:3600,scope:options.scope})}})}}};`}));
     await context.route('https://www.googleapis.com/**',route=>route.fulfill({headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},contentType:'application/json',body:JSON.stringify(route.request().url().includes('/userinfo')?{sub:'owner',email:OWNER,email_verified:true,given_name:'Owner'}:{files:[]})}));
     await context.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({contentType:'text/javascript',body:''}));
-    await context.route(/https:\/\/(?:kitsu\.io|shikimori\.one|graphql\.anilist\.co|api\.jikan\.moe|api\.tvmaze\.com|www\.wikidata\.org)\//,route=>{
+    await context.route(/https:\/\/(?:kitsu\.io|shikimori\.io|graphql\.anilist\.co|api\.jikan\.moe|api\.tvmaze\.com|www\.wikidata\.org)\//,route=>{
       const url=new URL(route.request().url());
       const body=url.hostname==='kitsu.io'?{data:[{id:'20',type:'anime',attributes:{canonicalTitle:'Naruto',titles:{en:'Naruto',ja_jp:'ナルト'},synopsis:'Test catalogue description',subtype:'TV',episodeCount:220,startDate:'2002-10-03',ageRating:'PG'}}]}:url.hostname==='graphql.anilist.co'?{data:{Page:{media:[]}}}:{data:[]};
       return route.fulfill({headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},contentType:'application/json',body:JSON.stringify(body)});

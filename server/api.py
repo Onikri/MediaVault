@@ -14,13 +14,14 @@ import json
 import os
 import re
 import secrets
+import sys
 import threading
 import time
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 import requests
@@ -71,17 +72,23 @@ def owner(authorization: str = Header(default="")):
         raise HTTPException(401, "Войди через Google на сайте заново.") from None
 
 
-def google_user(token):
+def google_identity(token):
     try:
         response = requests.get("https://www.googleapis.com/oauth2/v3/userinfo", headers={"Authorization": "Bearer " + token}, timeout=(6, 15))
         response.raise_for_status()
         user = response.json()
-        digest = hashlib.sha256(str(user.get("email", "")).strip().lower().encode()).hexdigest()
-        if user.get("email_verified") is not True or digest != ADMIN_EMAIL_SHA256 or not user.get("sub"):
-            raise HTTPException(403, "Сервер доступен только владельцу MediaVault.")
+        if user.get("email_verified") is not True or not user.get("email") or not user.get("sub"):
+            raise HTTPException(403, "Google не подтвердил аккаунт.")
         return user
     except (requests.RequestException, ValueError):
         raise HTTPException(401, "Google не подтвердил вход. Подключи аккаунт на сайте заново.") from None
+
+
+def google_user(token):
+    user = google_identity(token)
+    if hashlib.sha256(user['email'].strip().lower().encode()).hexdigest() != ADMIN_EMAIL_SHA256:
+        raise HTTPException(403, 'Сервер импорта доступен только владельцу MediaVault.')
+    return user
 
 
 def drive_credentials(subject):
@@ -93,6 +100,21 @@ def drive_credentials(subject):
     return Credentials(token=None, refresh_token=value["refresh_token"], token_uri="https://oauth2.googleapis.com/token",
                        client_id=CLIENT_ID, client_secret=secret,
                        scopes=["openid", "email", "profile", "https://www.googleapis.com/auth/drive"])
+
+
+def drive_error_message(error):
+    status=getattr(getattr(error,'resp',None),'status',None)
+    if status is None:return None
+    try:
+        body=json.loads(getattr(error,'content',b'{}'))
+        reasons={entry.get('reason') for entry in body.get('error',{}).get('errors',[])}
+    except (ValueError,TypeError,AttributeError):reasons=set()
+    if 'storageQuotaExceeded' in reasons:return 'На Google Drive недостаточно свободного места. Готовые серии сохранены. Освободи место и продолжи задание.'
+    if status==429 or reasons & {'rateLimitExceeded','userRateLimitExceeded'}:return 'Google временно ограничил запись в Drive. Готовые серии сохранены; задание можно продолжить позже.'
+    if status==403:return 'Google Drive не разрешил запись. Проверь доступ владельца к папке библиотеки и разрешение на запись.'
+    if status==404:return 'Файл или папка библиотеки недоступны в Google Drive. Открой свою библиотеку заново.'
+    if status in {500,502,503,504}:return 'Google Drive временно недоступен. Завершённые серии сохранены; повтори продолжение позже.'
+    return None
 
 
 def worker():
@@ -114,15 +136,33 @@ def worker():
             store.update(task_id, progress={"phase": "preparing"})
             data = task["data"]
             vault = VaultDrive(GoogleDriveAdapter.from_adc(drive_credentials(task["owner"])))
-            vault.unlock_key(data["job"]["library_id"], base64.b64decode(data["vault_key"], validate=True))
+            library_id=data.get('library_id') or data['job']['library_id']
+            vault.unlock_key(library_id, base64.b64decode(data["vault_key"], validate=True))
+            if not task['progress'].get('recover_needed',True):vault._manifest_cache=[]
+            base_counts={key:task['progress'].get(key,0) for key in ('saved','skipped','failed')}
             def progress(event):
+                event={**event,**{key:base_counts[key]+event[key] for key in base_counts if key in event}}
                 store.update(task_id, progress=event)
             def cancelled():
                 return store.get(task_id)["status"] == "cancelling"
-            result = run_job(data["job"], vault, log=lambda _: None, progress=progress, cancelled=cancelled,
-                             temporary_dir=store.directory / "temporary")
+            if data.get('kind')=='enrich':
+                from library_enrichment import enrichment_step
+                result=enrichment_step(vault,cursor=task['progress'].get('cursor',0),title_id=data.get('title_id'),progress=progress)
+            else:
+                def saved(item):
+                    group=item.get('collectionId')
+                    if group and item.get('category')=='video':
+                        identity='artwork-'+hashlib.sha256((library_id+':'+group+':v2').encode()).hexdigest()
+                        try:store.add(task['owner'],{'kind':'enrich','library_id':library_id,'vault_key':data['vault_key'],'title_id':item.get('section','anime')+':'+group},identity)
+                        except ValueError:pass
+                result = run_job(data["job"], vault, log=lambda _: None, progress=progress, cancelled=cancelled,
+                                 temporary_dir=store.directory / "temporary",start_index=task['progress'].get('cursor',0),max_files=1,on_saved=saved)
+            result={**result,**{key:base_counts[key]+result[key] for key in base_counts}}
             if cancelled():
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
+            elif result.get('remaining'):
+                store.update(task_id,status='queued',progress={**result,'phase':'queued','recover_needed':False,'message':'Следующая серия — после одного файла из других заданий.'})
+                wakeup.set()
             elif result["failed"]:
                 store.update(task_id, status="failed", progress={"phase": "failed", **result,
                     "message": "Некоторые файлы недоступны в источнике. Сохранённые уже в коллекции; задание можно продолжить."})
@@ -134,7 +174,7 @@ def worker():
             elif error.__class__.__module__.startswith("google.auth") or isinstance(error, HTTPException):
                 store.update(task_id, status="waiting_auth", progress={"message": "Серверу нужно повторное разрешение Google. Завершённые серии сохранены."})
             else:
-                message = str(error) if isinstance(error, (SourceError, VaultError)) else "Импорт остановился. Завершённые файлы в Drive сохранены; задание можно продолжить."
+                message = drive_error_message(error) or (str(error) if isinstance(error, (SourceError, VaultError)) else "Импорт остановился. Завершённые файлы в Drive сохранены; задание можно продолжить.")
                 store.update(task_id, status="failed", progress={"phase": "failed", "message": message[:500]})
         finally:
             if vault:
@@ -161,7 +201,7 @@ async def lifespan(application):
         store.close()
 
 
-app = FastAPI(title="MediaVault import service", version="4.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="MediaVault import service", version="5.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
 
 
@@ -202,7 +242,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 4, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 5, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -233,16 +273,20 @@ def configure_google(body: GoogleOAuthConfiguration, subject=Depends(owner)):
 
 @app.post("/oauth/start")
 def oauth_start(subject=Depends(owner)):
+    return {"url": oauth_url(subject)}
+
+
+def oauth_url(subject, *, device_id=None, readonly=False):
     if not client_secret() or not PUBLIC_URL.startswith("https://"):
         raise HTTPException(503, "Администратору нужно завершить одноразовую настройку Google OAuth на сервере.")
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(48)
-    store.setting("oauth:" + state, {"sub": subject, "expires": time.time() + 600, "verifier": verifier})
+    store.setting("oauth:" + state, {"sub": subject, "expires": time.time() + 600, "verifier": verifier, "device": device_id, "readonly": readonly})
     params = {"client_id": CLIENT_ID, "redirect_uri": REDIRECT, "response_type": "code",
-              "scope": "openid email profile https://www.googleapis.com/auth/drive", "state": state,
+              "scope": "openid email profile https://www.googleapis.com/auth/" + ("drive.readonly" if readonly else "drive"), "state": state,
               "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true",
               "code_challenge_method": "S256", "code_challenge": b64url(hashlib.sha256(verifier.encode()).digest())}
-    return {"url": "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)}
+    return "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
 
 
 @app.get("/oauth/callback", response_class=HTMLResponse)
@@ -257,17 +301,24 @@ def oauth_callback(state: str = "", code: str = "", error: str = ""):
         tokens = response.json()
     except (requests.RequestException, ValueError):
         raise HTTPException(502, "Не удалось завершить разрешение Google. Повтори подключение.") from None
-    user = google_user(tokens.get("access_token", ""))
+    user = (google_identity if pending.get('device') else google_user)(tokens.get("access_token", ""))
     if user["sub"] != pending["sub"]:
         raise HTTPException(403, "Выбран другой Google-аккаунт.")
     scopes = set(tokens.get("scope", "").split())
-    if "https://www.googleapis.com/auth/drive" not in scopes:
+    required_scope = 'https://www.googleapis.com/auth/drive.readonly' if pending.get('readonly') else 'https://www.googleapis.com/auth/drive'
+    if required_scope not in scopes and 'https://www.googleapis.com/auth/drive' not in scopes:
         raise HTTPException(403, "Для серверного импорта нужно разрешить запись в Google Drive.")
-    old = store.setting("google:" + user["sub"]) or {}
+    destination = 'device-google:' + pending['device'] if pending.get('device') else 'google:' + user['sub']
+    old = store.setting(destination) or {}
     refresh = tokens.get("refresh_token") or old.get("refresh_token")
     if not refresh:
         raise HTTPException(400, "Google не выдал фоновый доступ. Повтори подключение с подтверждением разрешений.")
-    store.setting("google:" + user["sub"], {"refresh_token": refresh})
+    store.setting(destination, {"refresh_token": refresh, 'scope': tokens.get('scope', '')})
+    if pending.get('device'):
+        device = store.setting('device:' + pending['device'])
+        if not device or device['sub'] != user['sub']:
+            raise HTTPException(403, 'Устройство больше не зарегистрировано.')
+        store.setting('device:' + pending['device'], {**device, 'ready': True, 'expires':time.time()+90*86400})
     for task in store.list(user["sub"]):
         if task["status"] == "waiting_auth":
             store.update(task["id"], status="queued")
@@ -276,9 +327,20 @@ def oauth_callback(state: str = "", code: str = "", error: str = ""):
     return "<!doctype html><meta charset=utf-8><title>MediaVault</title><p>Google Drive подключён. Можно вернуться в MediaVault.</p><script>if(window.opener){window.opener.postMessage({type:'mediavault-server-connected'}," + json.dumps(ORIGIN) + ");window.close();}</script>"
 
 
+from device_sessions import install as install_device_sessions
+install_device_sessions(app, sys.modules[__name__])
+
+
 @app.get("/metadata/{provider}")
-def catalogue(provider: str, q: str = "", kind: str = "anime", page: int = 1, identity: str | None = None, year: int | None = None):
-    return metadata(provider, query=q, kind=kind, page=page, identity=identity, year=year)
+def catalogue(provider: str, q: str = "", kind: str = "anime", page: int = 1, identity: str | None = None, year: int | None = None, part: str = ''):
+    return metadata(provider, query=q, kind=kind, page=page, identity=identity, year=year, part=part)
+
+
+@app.get('/artwork')
+def artwork(url: str):
+    from artwork import fetch_image
+    data,mime=fetch_image(url)
+    return Response(data,media_type=mime,headers={'Cache-Control':'public,max-age=86400','X-Content-Type-Options':'nosniff'})
 
 
 @app.get("/sources/search")
@@ -339,6 +401,24 @@ def tasks(subject=Depends(owner)):
     return {"jobs": store.list(subject)}
 
 
+class Enrichment(StrictBody):
+    library_id: str = Field(pattern=r'^[A-Za-z0-9_-]{5,256}$')
+    vault_key: SecretStr
+    title_id: str | None = Field(default=None,max_length=300)
+
+
+@app.post('/library/enrich',status_code=202)
+def enrich_library(body: Enrichment,subject=Depends(owner),idempotency_key: str=Header(default='')):
+    try:
+        if len(base64.b64decode(body.vault_key.get_secret_value(),validate=True))!=32:raise ValueError()
+    except ValueError:raise HTTPException(422,'Некорректный ключ библиотеки.') from None
+    if not re.fullmatch(r'[\w-]{16,100}',idempotency_key,re.ASCII):raise HTTPException(422,'Нужен идентификатор синхронизации.')
+    if not store.setting('google:'+subject):raise HTTPException(409,'Подключи фоновый доступ к Drive.')
+    try:task=store.add(subject,{'kind':'enrich','library_id':body.library_id,'vault_key':body.vault_key.get_secret_value(),'title_id':body.title_id},idempotency_key)
+    except ValueError as error:raise HTTPException(429,str(error)) from None
+    wakeup.set();return task
+
+
 @app.get("/jobs/{task_id}")
 def task(task_id: str, subject=Depends(owner)):
     value = store.get(task_id, subject)
@@ -363,6 +443,6 @@ def resume(task_id: str, subject=Depends(owner)):
     private = store.get(task_id, subject, private=True)
     if not private["data"].get("vault_key"):
         raise HTTPException(409, "Открой библиотеку и запусти новое задание: завершённые серии будут пропущены.")
-    store.update(task_id, status="queued", progress={"message": "", "phase": "queued"})
+    store.update(task_id, status="queued", progress={"message": "", "phase": "queued",'cursor':0,'saved':0,'skipped':0,'failed':0,'recover_needed':True})
     wakeup.set()
     return task(task_id, subject)
