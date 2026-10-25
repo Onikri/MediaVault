@@ -9,6 +9,11 @@ import usePlayerAtmosphere from './use-player-atmosphere.js';
 import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
 import {startNeuralUpscaler} from './neural-upscaler.js';
 import Soundtrack from './Soundtrack.jsx';
+import TimelinePreview from './TimelinePreview.jsx';
+import useVideoStream from './use-video-stream.js';
+import useEpisodeMusic from './use-episode-music.js';
+import {playMusic} from './music-player.js';
+import {youtubeSearch,spotifySearch} from './music-library.js';
 import {musicIdentityFor} from './music-library.js';
 import PlayerSettings,{SettingsGlyph} from './PlayerSettings.jsx';
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
@@ -51,8 +56,12 @@ function VolumeGlyph({value,muted}){
 export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange}){
   const ownRef=useRef(null),canvasRef=useRef(null),stageRef=useRef(null),railRef=useRef(null);
   const videoRef=mediaRef||ownRef;
+  const streaming=useVideoStream(videoRef,source,item.onlineType,onError);
   const reducedMotion=useReducedMotion();
+  useEffect(()=>{const pause=()=>videoRef.current?.pause();addEventListener('mediavault-music-playing',pause);return()=>removeEventListener('mediavault-music-playing',pause);},[]);
   const [prefs,setPrefs]=useState(getPrefs);
+  const [hoverSeek,setHoverSeek]=useState(null),seekTimer=useRef(null);
+  useEffect(()=>()=>clearTimeout(seekTimer.current),[]);
   const [time,setTime]=useState(0),[duration,setDuration]=useState(0),[buffered,setBuffered]=useState(0);
   const [playing,setPlaying]=useState(false),[muted,setMuted]=useState(false);
   const [isFullscreen,setIsFullscreen]=useState(false),[isPip,setIsPip]=useState(false);
@@ -63,6 +72,8 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const hideTimer=useRef(null);
   const [musicOpen,setMusicOpen]=useState(false);
   const musicIdentity=musicIdentityFor(item,catalog);
+  const episodeMusic=useEpisodeMusic(musicIdentity,item.episode,duration);
+  const [dismissedCue,setDismissedCue]=useState('');
   const settingsOpen=panel==='settings';
   const scene=usePlayerAtmosphere(videoRef,source,playing,stageRef);
   const [subtitle,setSubtitle]=useState('off'),[availableTracks,setAvailableTracks]=useState([]);
@@ -78,6 +89,10 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   function retryGpu(value=prefs.upscaler){setGpuAttempt(n=>n+1);changePrefs({gpu:value!=='off',...(value!=='off'?{upscaler:value}:{})});}
   const [opening,setOpening]=useState(()=>getOpening(item,libraryId));
   const [openingDraft,setOpeningDraft]=useState(null);
+  const effectiveOpening=opening||episodeMusic.intervals.find(v=>v.type==='op');
+  const ending=openingBounds(item.ending)||episodeMusic.intervals.find(v=>v.type==='ed');
+  const activeTheme=effectiveOpening&&time>=effectiveOpening.start&&time<effectiveOpening.end?'OP':ending&&time>=ending.start&&time<ending.end?'ED':null;
+  const songCandidates=episodeMusic.tracks.filter(t=>t.type===activeTheme),currentSong=songCandidates.length===1?songCandidates[0]:null;
   const lastStored=useRef(-1),resumeApplied=useRef(false),subtitleInput=useRef(null);
   const library=useMemo(()=>buildPlaybackLibrary(item,catalog),[item.id,catalog]);
   const seasons=library.seasons;
@@ -190,8 +205,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
     setTime(video.currentTime);
     const ranges=video.buffered;
     if(ranges.length)setBuffered(ranges.end(ranges.length-1));
-    if(prefs.autoSkip&&opening&&video.currentTime>=opening.start&&video.currentTime<opening.end-0.2)
-      seek(opening.end);
+    if(prefs.autoSkip){const skip=[effectiveOpening,ending].find(v=>v&&video.currentTime>=v.start&&video.currentTime<v.end-.2);if(skip)seek(skip.end);}
     if(Math.abs(video.currentTime-lastStored.current)>=5){
       lastStored.current=video.currentTime;
       writeProgress(userId,libraryId,item,video.currentTime,video.duration);
@@ -229,7 +243,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
     else video?.webkitEnterFullscreen?.();
   }
   function switchAudio(index){
-    const list=videoRef.current?.audioTracks;if(!list)return;
+    if(streaming.audio.length){streaming.setAudio(index);setActiveAudio(index);return;}const list=videoRef.current?.audioTracks;if(!list)return;
     for(let i=0;i<list.length;i++)list[i].enabled=i===index;
     setActiveAudio(index);
   }
@@ -280,7 +294,8 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const effectiveVolume=muted?0:Number(prefs.volume);
   const pip=async()=>{try{const v=videoRef.current;if(document.pictureInPictureElement)await document.exitPictureInPicture();else if(v?.requestPictureInPicture)await v.requestPictureInPicture();else if(v?.webkitSetPresentationMode)v.webkitSetPresentationMode(v.webkitPresentationMode==='picture-in-picture'?'inline':'picture-in-picture');}catch{}};
   const seekable=duration>0&&Number.isFinite(duration);
-  const canSkip=opening&&time>=opening.start&&time<opening.end;
+  const skipRange=[effectiveOpening,ending].find(v=>v&&time>=v.start&&time<v.end);
+  const canSkip=!!skipRange;
   const hiddenControls=playing&&panel==='watch'&&!controlsVisible;
   const progress=seekable?Math.min(100,previewTime/duration*100):0;
   return <div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(panel==='episodes'?' episodes-open':'')}
@@ -290,7 +305,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       <div className="mv-player-ambient" aria-hidden="true"/>
       <div className="mv-player-panorama" aria-hidden="true">{scene.image&&<img src={scene.image} alt=""/>}</div>
       <div className="mv-player-stage">
-        <video ref={videoRef} src={source||undefined} crossOrigin="anonymous" playsInline preload="metadata" muted={muted}
+        <video ref={videoRef} src={streaming.hls?undefined:source||undefined} crossOrigin="anonymous" playsInline preload="metadata" muted={muted}
           onLoadedMetadata={loaded} onTimeUpdate={onTime}
           onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);writeProgress(userId,libraryId,item,videoRef.current?.currentTime||0,videoRef.current?.duration);}}
           onDurationChange={loaded} onEnded={ended}
@@ -313,16 +328,16 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       </div>
       <AnimatePresence>
       {settingsOpen&&<PlayerSettings onClose={()=>openPanel('watch')}>{{
-        watch:<div className="mv-player-settings">        <label>Качество<select aria-label="Качество" value={item.id} disabled={!episode?.variants.some(v=>v.item.id!==item.id&&v.label===episode.variants.find(x=>x.item.id===item.id)?.label)} onChange={e=>choose(episode.variants.find(v=>v.item.id===e.target.value)?.item,true)}>{episode?.variants.filter(v=>v.item.id===item.id||v.label===episode.variants.find(x=>x.item.id===item.id)?.label).map(v=><option key={v.item.id} value={v.item.id}>{v.item.quality||v.item.resolution||(v.item.id===item.id&&videoRef.current?.videoHeight?videoRef.current.videoHeight+'p':'Исходное')}</option>)}</select></label>
+        watch:<div className="mv-player-settings">        <label>Качество{streaming.levels.length?<select aria-label="Качество" value={streaming.level} onChange={e=>streaming.setLevel(Number(e.target.value))}><option value={-1}>Автоматически</option>{streaming.levels.map(l=><option key={l.index} value={l.index}>{l.height}p</option>)}</select>:<select aria-label="Качество" value={item.id} disabled={!episode?.variants.some(v=>v.item.id!==item.id&&v.label===episode.variants.find(x=>x.item.id===item.id)?.label)} onChange={e=>choose(episode.variants.find(v=>v.item.id===e.target.value)?.item,true)}>{episode?.variants.filter(v=>v.item.id===item.id||v.label===episode.variants.find(x=>x.item.id===item.id)?.label).map(v=><option key={v.item.id} value={v.item.id}>{v.item.quality||v.item.resolution||(v.item.id===item.id&&videoRef.current?.videoHeight?videoRef.current.videoHeight+'p':'Исходное')}</option>)}</select>}</label>
         {episode?.variants.length>1&&<label>Озвучка<select value={item.id} onChange={event=>choose(episode.variants.find(v=>v.item.id===event.target.value)?.item,true)}>{episode.variants.map(v=><option key={v.item.id} value={v.item.id}>{v.label}</option>)}</select></label>}
         <label>Скорость<select value={prefs.speed} onChange={event=>changePrefs({speed:Number(event.target.value)})}>
           {[0.5,0.75,1,1.25,1.5,1.75,2].map(v=><option key={v} value={v}>{v}×</option>)}</select></label>
-        {audioTracks.length>1&&<label>Аудиодорожка<select value={activeAudio} onChange={event=>switchAudio(Number(event.target.value))}>
-          {audioTracks.map(a=><option key={a.index} value={a.index}>{a.name}</option>)}</select></label>}
+        {(streaming.audio.length||audioTracks.length)>1&&<label>Аудиодорожка<select value={activeAudio} onChange={event=>switchAudio(Number(event.target.value))}>
+          {(streaming.audio.length?streaming.audio:audioTracks).map(a=><option key={a.index} value={a.index}>{a.name}</option>)}</select></label>}
         <label className="mv-player-check"><input type="checkbox" checked={prefs.autoNext}
           onChange={event=>changePrefs({autoNext:event.target.checked})}/> Следующий эпизод автоматически</label>
         <label className="mv-player-check"><input type="checkbox" checked={prefs.autoSkip}
-          onChange={event=>changePrefs({autoSkip:event.target.checked})}/> Автоматически пропускать опенинг</label>
+          onChange={event=>changePrefs({autoSkip:event.target.checked})}/> Пропускать опенинг и эндинг</label>
         <div className="mv-player-intro"><span>Опенинг: {opening?clock(opening.start)+' – '+clock(opening.end):'не размечен'}</span>
           <div><button onClick={()=>setOpeningDraft(time)}>Начало {openingDraft!==null?'('+clock(openingDraft)+')':''}</button>
           <button disabled={openingDraft===null} onClick={markEnd}>Конец</button>
@@ -346,11 +361,12 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
         actions:<div className="mv-player-settings">        <div className="mv-player-quick-actions"><button onClick={actions.share}><Share2 size={19}/><span>Поделиться</span></button><button onClick={actions.screenshot}><Camera size={19}/><span>Кадр</span></button><button onClick={actions.clip} disabled={actions.recording} aria-pressed={actions.recording}><Video size={19}/><span>{actions.recording?'Запись…':'Клип'}</span></button></div>
 <p className="player-setting-help">Ссылка откроет эту серию с текущей позиции после входа в библиотеку. Клип записывается до 30 секунд.</p></div>
       }}</PlayerSettings>}</AnimatePresence>
-      {canSkip&&panel==='watch'&&<button className="mv-player-skip" onClick={()=>seek(opening.end)}><SkipForward size={16}/> Пропустить опенинг</button>}
+      {canSkip&&panel==='watch'&&<button className="mv-player-skip" onClick={()=>seek(skipRange.end)}><SkipForward size={16}/> {skipRange===ending?'Пропустить эндинг':'Пропустить опенинг'}</button>}
+      <AnimatePresence>{currentSong&&dismissedCue!==currentSong.id&&panel==='watch'&&<motion.aside className="mv-song-cue" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:5}}><Music2 size={18}/><div><small>{activeTheme==='OP'?'Сейчас звучит · опенинг':'Сейчас звучит · эндинг'}</small><strong>{currentSong.title}</strong><span>{currentSong.artists?.join(', ')}</span><div><button onClick={()=>playMusic(currentSong)}><Play size={12}/>Слушать</button><a href={youtubeSearch(currentSong)} target="_blank" rel="noopener noreferrer">YouTube</a><a href={spotifySearch(currentSong)} target="_blank" rel="noopener noreferrer">Spotify</a></div></div><button aria-label="Скрыть песню" onClick={()=>setDismissedCue(currentSong.id)}><X size={13}/></button></motion.aside>}</AnimatePresence>
       {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {engineName}{engine==='mobile'?'':' ×2'}{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
       <div className="mv-player-console" onPointerEnter={revealControls}>
-        <div className="mv-player-timeline">{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
+        <div className="mv-player-timeline" onPointerMove={e=>{if(!seekable||!source||navigator.connection?.saveData)return;const r=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));clearTimeout(seekTimer.current);const value={time:fraction*duration,left:Math.max(14,Math.min(86,fraction*100))};seekTimer.current=setTimeout(()=>setHoverSeek(value),200);}} onPointerLeave={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}} onPointerCancel={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}}>{hoverSeek&&<TimelinePreview source={source} type={item.onlineType} point={hoverSeek.time} left={hoverSeek.left}/>}{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
           value={Math.min(previewTime,seekable?duration:1)} disabled={!seekable} step="0.1" onChange={event=>seek(Number(event.target.value))}
           style={{'--played':progress+'%','--buffered':Math.max(progress,seekable?buffered/duration*100:0)+'%'}}/></div>
         <div className="mv-player-controls">

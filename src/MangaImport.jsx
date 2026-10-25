@@ -2,8 +2,10 @@ import {useEffect,useRef,useState} from 'react';
 import {BookOpen,Globe,Check,ArrowRight,ShieldCheck,RefreshCw} from 'lucide-react';
 import ImportReadiness,{canImport} from './ImportReadiness.jsx';
 import {selectChapters,mangaMetadata} from './manga-import.js';
+import OnlineViewer from './OnlineViewer.jsx';
 import {kinds} from './ImportParts.jsx';
 export default function MangaImport({state,service,item,onSubmitted,onOpenLibrary,manual,onKindChange}){
+ const [online,setOnline]=useState(false);
  const [language,setLanguage]=useState('all'),[quality,setQuality]=useState('best'),[sources,setSources]=useState([]),[providers,setProviders]=useState([]),[searching,setSearching]=useState(false),[revision,setRevision]=useState(0),[inspection,setInspection]=useState(null),[url,setUrl]=useState(''),[collection,setCollection]=useState(item?.title||''),[volume,setVolume]=useState('all'),[team,setTeam]=useState(''),[mode,setMode]=useState('all'),[one,setOne]=useState(''),[first,setFirst]=useState('0'),[last,setLast]=useState('20'),[list,setList]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState('');
  const generation=useRef(0),ready=canImport(state,service),supported=Number(service.session?.serverVersion||0)>=8,languageAware=Number(service.session?.serverVersion||0)>=10;
  const names=[item?.titles?.en,item?.titles?.en_jp,item?.title,...item?.aliases||[]].filter(v=>typeof v==='string');const englishName=names.find(v=>/[a-z]/i.test(v)&&!/[а-яё]/i.test(v))||item?.title||'';
@@ -18,7 +20,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
   const job={version:3,library_id:state.libraryId,sources:[inspection.url||url],collection:collection.trim(),season:volume==='all'?1:Number(volume),episodes:'all',quality,resume:true,section:'manga',metadata:mangaMetadata(item),dub:team,translation:{name:team||'Перевод',kind:'manga',language:inspection.language},provider:inspection.provider,entries:chosen.map(e=>({number:e.number,url:e.url,title:e.title||'Глава '+e.number,season:Number(e.season||1)}))};
   setBusy('submit');try{await service.submit(job);onSubmitted?.();}catch(cause){setError(cause.message);}finally{setBusy('');}
  }
- return <form className="import-selection import-compact manga-import" onSubmit={submit}>
+ return <>{online&&<OnlineViewer kind="manga" entries={chosen} initial={chosen[0]} title={collection} service={service} userId={state.user?.sub} language={inspection?.language} metadata={item} onClose={()=>setOnline(false)}/>}<form className="import-selection import-compact manga-import" onSubmit={submit}>
   <div className="section-heading"><div><span className="eyebrow">ОТ СТРАНИЦЫ К ИСТОРИИ</span><h3>Манга · Манхва · Вебтуны</h3></div><span className="manga-language">{language==='all'?'RU + EN':language.toUpperCase()}</span></div>
   <a className="text-link" href="./translation-demo.html" target="_blank" rel="noopener noreferrer">Посмотреть пример перевода EN → RU</a>
   <div className="chip-row manga-language-options" role="group" aria-label="Язык источника манги">{[['all','Все языки'],['ru','Русский'],['en','English · EN → RU']].map(([id,label])=><button type="button" key={id} className={'chip'+(language===id?' chip-active':'')} aria-pressed={language===id} disabled={busy==='submit'} onClick={()=>setLanguage(id)}>{label}</button>)}</div>
@@ -39,9 +41,10 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
     <p className="fine">{selectionError||'К добавлению: '+chosen.length+' глав. Дробные главы и экстра сохраняются отдельно.'}</p>
    </div></>}
   {inspection&&<label className="form-field input-label">Изображения в Drive<select aria-label="Качество страниц манги" className="field-input" value={quality} onChange={e=>setQuality(e.target.value)}><option value="best">Оригинал · без изменений</option><option value="1920">Сбалансированно · до 1920 px</option><option value="1280">Экономия трафика · до 1280 px</option></select><small className="fine">Сжатие выполняет сервер до шифрования. Исходные размеры при уменьшении не восстановить.</small></label>}
+  {Number(service.session?.serverVersion)>=11&&chosen.length>0&&<button type="button" className="btn btn-secondary online-launch" disabled={!!busy||service.status!=='connected'} onClick={()=>setOnline(true)}><BookOpen size={17}/>Читать сейчас · без импорта</button>}
   <ImportReadiness state={state} service={service} onOpenLibrary={onOpenLibrary}/>{error&&<p className="inline-error" role="alert">{error}</p>}
   <button className="btn btn-primary import-submit" id="importMangaBtn" type="submit" disabled={!ready||!supported||!!busy||!!state.busy||!chosen.length||!!selectionError}><BookOpen size={17}/>{busy==='submit'?'Отправляем…':chosen.length?'Добавить '+chosen.length+' '+(chosen.length%100>=11&&chosen.length%100<=14?'глав':chosen.length%10===1?'главу':chosen.length%10>=2&&chosen.length%10<=4?'главы':'глав')+' в коллекцию':'Импортировать мангу'}<ArrowRight size={16}/></button>
   <p className="manga-server-note"><ShieldCheck size={13}/><span>Oracle собирает CBZ и шифрует главы в Drive. Страницы не скачиваются на твоё устройство при импорте.</span></p>
   {providers.length>0&&<details className="provider-diagnostics"><summary>Проверенные читалки · {providers.length}</summary>{providers.map(p=><p key={p.provider}><b>{p.name}</b><span>{p.status==='ok'?'Найден точный тайтл':p.status==='empty'?'Совпадений нет':p.message||'Временно недоступен'}</span></p>)}</details>}
- </form>;
+ </form></>;
 }

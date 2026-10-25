@@ -196,3 +196,11 @@ Tesseract (Apache-2.0), CTranslate2 (MIT), SentencePiece (Apache-2.0) and Pillow
 AnimeThemes supplies song credits through its public API: https://animethemes.moe/ . Spotify/YouTube playback and playlist actions remain with their official services; no audio downloads or rights are granted by this application. Research, limits and setup: [docs/reader-music.md](docs/reader-music.md).
 
 The short Dandadan excerpt in `translation-demo.html` is artwork by Yukinobu Tatsu, included to illustrate machine translation. The artwork is excluded from the application code license; its source is credited in the demonstration. The public demo contains only a cropped excerpt and precomputed real OCR/model output.
+
+## Online playback and reader 5.5
+
+- HLS.js 1.6.13, Apache-2.0: https://github.com/video-dev/hls.js . Loaded only for HLS MediaSource playback.
+- MangaLib public field formats were reviewed against Keiyoushi LibGroup at f1edb0341163935686ba09a444eef092287779f3 (Apache-2.0). MediaVault implements its own key-free client and does not copy authentication or restriction bypasses.
+- MangaDex free public API: https://api.mangadex.org/docs/ . Scanlation images retain their original owners' rights; API access does not grant redistribution rights.
+- Opening/ending annotations: AniSkip https://api.aniskip.com/ . Music credits: AnimeThemes. Artist identities: MusicBrainz (core data CC0), with Russian Wikidata descriptions (CC0) and Wikipedia extracts (CC BY-SA, source links retained).
+- YouTube music and trailers use the official IFrame Player API https://developers.google.com/youtube/iframe_api_reference . Videos remain visible and controlled by YouTube; MediaVault does not extract or download their audio.

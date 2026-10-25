@@ -23,6 +23,7 @@ export async function openRangeArchive(item,readRange,signal){
  return entries.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
 }
 export async function openChapter(item,readWhole,readRange,signal){
+ if(item.onlinePages?.length)return item.onlinePages.map((url,n)=>({name:String(n).padStart(4,'0')+'.jpg',async:async()=>{const r=await fetch(url,{signal,cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer'});if(!r.ok)throw Error('Не удалось загрузить страницу. Открой онлайн-главу снова.');const b=await r.blob();if(!b.type.startsWith('image/')||b.size>30*1024*1024)throw Error('Источник не предоставил страницу.');return b;}}));
  if(readRange&&item.chunks?.length&&item.size){try{return await openRangeArchive(item,readRange,signal);}catch(e){if(signal?.aborted)throw e;}}
  const blob=await readWhole(item,{silent:true,signal});const{default:JSZip}=await import('jszip');const zip=await JSZip.loadAsync(blob);
  const entries=Object.values(zip.files).filter(e=>!e.dir&&/\.(jpe?g|png|webp|gif|avif)$/i.test(e.name)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));

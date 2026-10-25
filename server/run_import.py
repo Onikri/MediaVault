@@ -259,7 +259,9 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                 if category == 'video':
                     height=video_height(path)
                     if height:options['quality']=height
-                    from media_download import preview_frame
+                    from media_download import preview_frame,animated_preview
+                    motion=animated_preview(path)
+                    if motion:options['preview_motion']=motion
                     thumbnail = preview_frame(path)
                     if thumbnail: options['preview'] = thumbnail
                 elif category=='manga':

@@ -257,3 +257,15 @@ def preview_frame(path):
         image=result.stdout
         return image if result.returncode==0 and image.startswith(b'\xff\xd8\xff') and len(image)<=500000 else None
     except (subprocess.SubprocessError,SourceError,ValueError,KeyError):return None
+
+
+def animated_preview(path):
+    """Four seconds, 480px H.264, silent. Bounded optional artwork, not a transcode."""
+    try:
+        import tempfile
+        info=verify_video(path);duration=float(info['format']['duration']);point=max(0,min(duration-4,duration*.35))
+        with tempfile.TemporaryDirectory() as work:
+            out=Path(work)/'preview.mp4'
+            result=subprocess.run(['ffmpeg','-nostdin','-v','error','-ss',str(round(point,2)),'-i',str(path),'-t','4','-an','-vf',"fps=8,scale='min(480,iw)':-2",'-c:v','libx264','-preset','ultrafast','-crf','30','-pix_fmt','yuv420p','-threads','1','-movflags','+faststart',str(out)],capture_output=True,timeout=18,check=False)
+            return out.read_bytes() if result.returncode==0 and out.is_file() and 0<out.stat().st_size<=800000 else None
+    except (OSError,ValueError,KeyError,SourceError,subprocess.SubprocessError):return None

@@ -17,9 +17,13 @@ def image_extension(header):
 
 def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
     if not site_for(url):raise SourceError('Эта читалка пока не поддерживается.')
-    text,final,_=http.document(url)
-    if not site_for(final):raise SourceError('Глава перенаправила на другую читалку.')
-    pages=parse_pages(text,final)
+    if site_for(url).family in {'lib','dex'}:
+        from manga_sources import inspect
+        data=inspect(url,http);final=data['url'];pages=data['pages']
+    else:
+        text,final,_=http.document(url)
+        if not site_for(final):raise SourceError('Глава перенаправила на другую читалку.')
+        pages=parse_pages(text,final)
     if not pages or len(pages)>500:raise SourceError('В открытой главе не найдены изображения или превышен лимит 500 страниц.')
     output=Path(temporary)/'chapter.cbz';local=threading.local();clients=[];lock=threading.Lock()
     def download(entry):

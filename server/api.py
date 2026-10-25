@@ -243,7 +243,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 10, "mangaLanguages":["ru","en"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 11, "onlinePlayback":True, "mangaLanguages":["ru","en"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -559,3 +559,10 @@ from reader_translation import install as install_reader_translation
 install_reader_translation(app, os.getenv("DATA_DIR", "/data"), owner)
 from anime_music import install as install_anime_music
 install_anime_music(app)
+
+from online_sessions import install as install_online
+install_online(app,owner)
+from music_playback import install as install_music_playback
+install_music_playback(app)
+from music_artists import install as install_music_artists
+install_music_artists(app)

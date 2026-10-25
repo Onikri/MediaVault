@@ -16,6 +16,7 @@ import Soundtrack from './Soundtrack.jsx';
 import Trailers from './Trailers.jsx';
 import PlatformRatings from './PlatformRatings.jsx';
 import TitleNavigation from './TitleNavigation.jsx';
+import HoverPreview from './HoverPreview.jsx';
 import {readReading} from './reading-progress.js';
 
 const day=value=>{try{return value?new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(value)):'';}catch{return '';}};
@@ -30,7 +31,7 @@ export function TitleImage({url,profile,actions,libraryId,alt='',className='',fa
 export function EpisodeArtwork({item,profile,actions,libraryId,index=0}){
   const asset=item.previewArtwork;
   const url=asset?'drive:'+asset.id:profile?.episodeImages?.[String(item.episode)]||'';
-  return url?<TitleImage url={url} profile={asset?{artwork:{[url]:asset}}:profile} actions={actions} libraryId={libraryId}/>:<div className="episode-preview-pending"><span>{String(item.episode??index+1).padStart(2,'0')}</span><small>{item.category==='manga'?'Обложка главы':'Кадр серии'} появится после синхронизации</small></div>;
+  return <HoverPreview item={item} actions={actions}>{url?<TitleImage url={url} profile={asset?{artwork:{[url]:asset}}:profile} actions={actions} libraryId={libraryId}/>:<div className="episode-preview-pending"><span>{String(item.episode??index+1).padStart(2,'0')}</span><small>{item.category==='manga'?'Обложка главы':'Кадр серии'} появится после синхронизации</small></div>}</HoverPreview>;
 }
 export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,onImport,selected,onClosePlayer,onMetadataLoaded}){
   const continuation=(title.category==='manga'?readReading:readProgress)(state.user?.sub,state.libraryId,'collection:'+title.collectionId);

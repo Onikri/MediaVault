@@ -26,7 +26,10 @@ SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('man
        MangaSite('readmanga','ReadManga','https://a.zazaza.me','grouple',('readmanga.live','readmanga.io','readmanga.me')),
        MangaSite('mintmanga','MintManga','https://mintmanga.live','grouple'),
        MangaSite('mangabuff','MangaBuff','https://mangabuff.ru','buff'),
-       MangaSite('mangapill','MangaPill · EN','https://mangapill.com','pill'))
+       MangaSite('mangapill','MangaPill · EN','https://mangapill.com','pill'),
+       MangaSite('mangakatana','MangaKatana · EN','https://mangakatana.com','katana'),
+       MangaSite('mangadex','MangaDex','https://mangadex.org','dex'),
+       MangaSite('mangalib','MangaLib','https://mangalib.me','lib',('mangalib.org',)))
 _cache={};_lock=threading.RLock()
 def site_for(url):
     host=urlsplit(url).hostname
@@ -68,7 +71,7 @@ def parse_search(text,base,site):
             image=card.select_one('img');year=re.search(r'\b(19\d\d|20\d\d)\b',card.get_text(' ',strip=True))
             results.append({'provider':site.id,'providerName':site.name,'title':names[0],'aliases':names,'url':safe_link(anchor.get('href'),base),'kind':'manga','language':'en','year':int(year[1]) if year else None,'cover':safe_link(image.get('data-src') or image.get('src'),base) if image else ''})
         return results
-    selectors={'poisk':('article.card,.manga-card','.card-title,h2.entry-title','a.card-about,a[href*="/manga/"]'),
+    selectors={'katana':('#book_list .item','h3.title a','h3.title a'),'poisk':('article.card,.manga-card','.card-title,h2.entry-title','a.card-about,a[href*="/manga/"]'),
                'hub':('.item-grid','a.fw-medium','a.fw-medium'),
                'chan':('.content_row','h2 a','h2 a'),
                'buff':('.cards__item','.cards__name','a[href*="/manga/"]'),
@@ -80,10 +83,11 @@ def parse_search(text,base,site):
         names=title_aliases((heading or anchor).get_text(' ',strip=True));url=safe_link(anchor.get('href'),base)
         if not names or not url or site_for(url)!=site:continue
         image=card.select_one('img');year=re.search(r'(?:Год[:\s]*)(19\d\d|20\d\d)',card.get_text(' ',strip=True))
-        results.append({'provider':site.id,'providerName':site.name,'title':names[0],'aliases':names,'url':url,'kind':'manga','language':'ru',
+        results.append({'provider':site.id,'providerName':site.name,'title':names[0],'aliases':names,'url':url,'kind':'manga','language':'en' if site.family=='katana' else 'ru',
                         'year':int(year[1]) if year else None,'cover':safe_link(image.get('data-src') or image.get('src'),base) if image else ''})
     return list({v['url']:v for v in results}.values())
 def search_url(site,query):
+    if site.family=='katana':return site.root+'/?'+urlencode({'search':query,'search_by':'book_name'})
     if site.family=='chan':return site.root+'/?'+urlencode({'do':'search','subaction':'search','story':query})
     if site.family=='hub':return site.root+'/search/title?'+urlencode({'query':query})
     return site.root+'/search?'+urlencode({'q':query,**({'type':'manga'} if site.family=='buff' else {})})
@@ -97,23 +101,35 @@ def search_title(title,language='auto'):
     def work(site):
         http=PublicHttp(timeout=(3,6),deadline=time.monotonic()+16);results=[];message='Точное совпадение не найдено.';status='empty'
         try:
-            queries=[q for q in aliases(title) if re.search('[a-z]',q,re.I) and not re.search('[а-яё]',q,re.I)] if site.family=='pill' else aliases(title)
+            queries=[q for q in aliases(title) if re.search('[a-z]',q,re.I) and not re.search('[а-яё]',q,re.I)] if site.family in {'pill','katana'} else aliases(title)
             for query in queries[:2]:
-                text,final,_=http.document(search_url(site,query))
-                if site_for(final)!=site:raise SourceError('Источник перенаправил поиск на другой сайт.')
-                for value in parse_search(text,final,site):
+                if site.family in {'dex','lib'}:
+                    from manga_catalog_adapters import dex_search,lib_search
+                    candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http)
+                else:
+                    text,final,_=http.document(search_url(site,query))
+                    if site_for(final)!=site:raise SourceError('Источник перенаправил поиск на другой сайт.')
+                    candidates=parse_search(text,final,site)
+                for value in candidates:
                     accepted,evidence=match_title(title,value)
-                    if accepted:results.append({**value,'matchEvidence':evidence})
+                    if accepted:
+                        if site.family=='dex':
+                            from manga_catalog_adapters import dex_available
+                            if not dex_available(value['url'],http):continue
+                        results.append({**value,'matchEvidence':evidence})
                 if results:break
             status='ok' if results else 'empty'
+            if results:message='Найдено точных совпадений: '+str(len(results))
         except SourceError as error:status='unavailable';message=str(error)
+        except (ValueError,TypeError,KeyError):status='unavailable';message='Формат читалки изменился; адаптер требует проверки.'
         finally:http.close()
         return {'provider':site.id,'name':site.name,'status':status,'message':message,'results':results}
     # Current GroupLe search is JS/API-only; its HTML reader remains available
     # for direct links. Do not misrepresent an empty HTML search as a working API.
-    sites=[s for s in SITES if s.family!='grouple' and (s.family=='pill' if language=='en' else True if language=='all' else s.family!='pill')]
+    sites=[s for s in SITES if s.family!='grouple' and (s.family in {'pill','katana','dex'} if language=='en' else True if language=='all' else s.family not in {'pill','katana'})]
     with ThreadPoolExecutor(max_workers=5) as pool:providers=list(pool.map(work,sites))
-    if language=='auto' and not any(p['results'] for p in providers):providers.append(work(next(s for s in SITES if s.family=='pill')))
+    if language=='auto' and not any(p['results'] for p in providers):
+        with ThreadPoolExecutor(max_workers=2) as pool:providers.extend(pool.map(work,[s for s in SITES if s.family in {'pill','katana'}]))
     result={'results':list({v['url']:v for p in providers for v in p['results']}.values()),'providers':[{k:p[k] for k in ('provider','name','status','message')} for p in providers],'language':language,'checkedAt':int(time.time())}
     with _lock:
         if len(_cache)>80:_cache.clear()
@@ -138,6 +154,11 @@ def parse_chapters(text,base):
 
 def parse_pages(text,base):
     soup=BeautifulSoup(text,'html.parser');guard(soup);pages=[]
+    if urlsplit(base).hostname=='mangakatana.com':
+        match=re.search(r'var\s+thzq\s*=\s*(\[[^;]+\])',text)
+        if match:
+            try:pages.extend(ast.literal_eval(match[1]))
+            except (ValueError,SyntaxError):pass
     # MultiChan publishes a JSON image list, sometimes with a trailing comma.
     full=re.search(r'["\']fullimg["\']\s*:\s*(\[[\s\S]*?\])',text)
     if full:
@@ -165,6 +186,10 @@ def parse_pages(text,base):
 def inspect(url,http=None):
     own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
     try:
+        initial=site_for(url)
+        if initial and initial.family in {'dex','lib'}:
+            from manga_catalog_adapters import inspect_catalog
+            return inspect_catalog(url,http)
         text,final,_=http.document(public_url(url,resolve_dns=False));soup=BeautifulSoup(text,'html.parser');guard(soup);site=site_for(final)
         if not site:raise SourceError('Для этой читалки пока нет проверенного адаптера.')
         heading=soup.select_one('.cr-hero-names__main,.detail-panel h1,h1,.card header .text-base span,meta[itemprop=name]')
@@ -190,7 +215,7 @@ def inspect(url,http=None):
             volume=re.search(r'Том\s*(\d+)',labels,re.I)
             season=int(volume[1]) if volume else int(path[1]) if path else 1
             chapters=[{'number':number,'season':max(1,season),'url':final,'title':'Глава '+str(number),'language':'ru','translator':''}]
-        language='en' if site.family=='pill' else 'ru'
+        language='en' if site.family in {'pill','katana'} else 'ru'
         for chapter in chapters:chapter['language']=language
         chapters=sorted({c['url']:c for c in chapters}.values(),key=lambda c:(c['season'],c['number'],c['translator']))
         return {'provider':site.id,'providerName':site.name,'title':title,'url':final,'kind':'manga','language':language,'episodes':chapters,'pages':pages,

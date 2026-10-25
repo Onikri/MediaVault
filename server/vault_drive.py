@@ -558,7 +558,7 @@ class VaultDrive:
 
     def upload_file(self, path, *, name=None, category="video", collection="Без коллекции",
                     episode=None, source_identity=None, mime=None, metadata_id=None, progress=None,
-                    section=None, part="", season=None, metadata=None, dub="", preview=None, translation=None,quality=None,episode_title="",episode_description=""):
+                    section=None, part="", season=None, metadata=None, dub="", preview=None, preview_motion=None, translation=None,quality=None,episode_title="",episode_description=""):
         if category not in CATEGORIES:
             raise VaultError("Unsupported media category.")
         file_path = Path(path)
@@ -648,6 +648,10 @@ class VaultDrive:
                 preview_id = str(uuid.uuid4()); sealed = seal_chunk(preview, self._key, preview_id, 0)
                 remote = self._new_bytes('preview.enc', sealed['ciphertext'], asset_id)
                 item['previewArtwork'] = {'fileId': remote, 'id': preview_id, 'iv': sealed['iv'], 'mime': 'image/jpeg'}
+            if preview_motion and len(preview_motion)<=800000:
+                motion_id=str(uuid.uuid4());sealed=seal_chunk(preview_motion,self._key,motion_id,0)
+                remote=self._new_bytes('motion-preview.enc',sealed['ciphertext'],asset_id)
+                item['motionArtwork']={'fileId':remote,'id':motion_id,'iv':sealed['iv'],'mime':'video/mp4','size':len(preview_motion)}
             checkpoint = {"version": 1, "folderId": catalog["folderId"], "checkpoint": "asset-v1",
                           "items": [item], "storage": storage, "completedAt": _now()}
             self._new_bytes("manifest.enc.json", _json(seal_catalog(checkpoint, self._key, self._salt)), asset_id)
