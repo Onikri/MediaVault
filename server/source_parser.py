@@ -375,7 +375,12 @@ def parse_page(text, base):
     parser = PageParser(base)
     parser.feed(text)
     # Public inline player configuration; scripts are read as text, never executed.
-    decoded = html.unescape(text).replace("\\/", "/")
+    decoded = html.unescape(text).replace("\\/", "/").replace('\\"','"').replace("\\'", "'")
+    decoded=re.sub(r'\\u00(26|3d|2f|3a)',lambda m:chr(int(m[1],16)),decoded,flags=re.I)
+    # DLE player switchers often publish iframe markup inside an escaped JS string.
+    for match in re.finditer(r'''<iframe\b[^>]*\b(?:src|data-src)\s*=\s*["']([^"']+)["']''',decoded,re.I):
+        target=parser.link(match[1])
+        if target:parser.result.players.append(target)
     for match in re.finditer(r"[\"']((?:https:)?//[^\s<>\"'\\]+|/[^\s<>\"'\\]+\.(?:mp4|m3u8)(?:\?[^\s<>\"'\\]*)?)[\"']", decoded):
         parser.candidate(match[1])
     page = parser.result

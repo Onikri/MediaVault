@@ -5,7 +5,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from site_adapters import BY_ID,parse_search,search_site
 from title_identity import match_title
 from player_catalog import inspect_catalog
-from source_parser import PublicHttp,public_url,SourceError
+from source_parser import PublicHttp,public_url,SourceError,parse_page
 
 class SourceCardTests(unittest.TestCase):
     def test_search_scope_excludes_sidebar_cards_and_uses_published_image_title(self):
@@ -51,3 +51,9 @@ class SourceCardTests(unittest.TestCase):
         self.assertNotIn('Cookie',headers);self.assertNotIn('Authorization',headers)
         for url,body in [('https://freeanime.ru/login',data),('https://other.example.com/',data),('https://freeanime.ru/',{**data,'login_password':'fixture'})]:
             with self.assertRaises(SourceError):http._open(url,method='POST',data=body)
+
+    def test_escaped_iframe_switcher_preserves_public_player_and_selected_translation(self):
+        text=r'''<script>const player = "<iframe src=\"https:\/\/public.stravers.live\/?token_movie=public-fixture\u0026translation=7\"></iframe>";</script>'''
+        page=parse_page(text,'https://anixart.site/7576-dandadan.html')
+        self.assertIn('https://public.stravers.live/?token_movie=public-fixture&translation=7',page.players)
+        self.assertFalse(page.streams,'An iframe is never a downloadable media stream')
