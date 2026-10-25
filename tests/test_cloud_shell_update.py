@@ -30,3 +30,13 @@ class UpdateTests(unittest.TestCase):
             if args[:3]==['instance-agent','command','create']:return {'id':'command'}
             return {'lifecycle-state':'FAILED','content':{'text':'sudo denied'}}
         with self.assertRaises(module.UpdateError):module.deploy('a'*40,'region',instance_id='ocid1.instance.oc1.fixture',cli=cli,report=lambda _:None,pause=lambda _:None)
+    def test_eventual_command_execution_visibility_is_retried_without_a_second_deploy(self):
+        attempts=[];created=[]
+        def cli(args,region):
+            if args[:3]==['compute','instance','get']:return {'lifecycle-state':'RUNNING','compartment-id':'compartment','agent-config':{'plugins-config':[{'name':'Compute Instance Run Command','desired-state':'ENABLED'}]}}
+            if args[:3]==['instance-agent','command','create']:created.append(args);return {'id':'command'}
+            attempts.append(args)
+            if len(attempts)==1:raise module.UpdateError('Oracle: NotAuthorizedOrNotFound')
+            return {'lifecycle-state':'SUCCEEDED','exit-code':0,'content':{'text':'health version 6 confirmed'}}
+        value=module.deploy('a'*40,'region',instance_id='ocid1.instance.oc1.fixture',cli=cli,report=lambda _:None,pause=lambda _:None)
+        self.assertTrue(value['updated']);self.assertEqual(len(created),1);self.assertEqual(len(attempts),2)

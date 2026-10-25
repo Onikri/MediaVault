@@ -64,10 +64,15 @@ def deploy(revision,region,*,instance_id=None,enable_plugin=False,cli=command,re
     created=cli(['instance-agent','command','create','--compartment-id',instance['compartment-id'],
                  '--target',json.dumps({'instanceId':instance_id}),'--content',json.dumps(content),
                  '--timeout-in-seconds','1200','--display-name','MediaVault update '+revision[:12]],region)
-    identifier=created['id'];report('Обновление отправлено в Oracle. Сборка Chromium может занять несколько минут.')
+    identifier=created['id'];report('Oracle Run Command: '+identifier);report('Обновление отправлено в Oracle. Сборка Chromium может занять несколько минут.')
     previous=None
-    for _ in range(260):
-        value=cli(['instance-agent','command-execution','get','--command-id',identifier,'--instance-id',instance_id],region)
+    for attempt in range(260):
+        try:value=cli(['instance-agent','command-execution','get','--command-id',identifier,'--instance-id',instance_id],region)
+        except UpdateError as error:
+            # Execution can appear only after the instance agent first polls the command.
+            if attempt<24 and any(code in str(error) for code in ('NotAuthorizedOrNotFound','NotFound')):
+                pause(5);continue
+            raise
         state=value.get('lifecycle-state','UNKNOWN')
         if state!=previous:report('Состояние: '+state);previous=state
         if state in {'SUCCEEDED','FAILED','TIMED_OUT','CANCELED','CANCELLED','EXPIRED'}:
