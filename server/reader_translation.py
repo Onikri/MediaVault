@@ -5,6 +5,7 @@ from fastapi import Depends,HTTPException
 from pydantic import BaseModel,ConfigDict,Field
 MODEL_URL='https://argos-net.com/v1/translate-en_ru-1_9.argosmodel'
 MODEL_SHA256='591d743ae103752b88ffc38785c50421320f4eff93c8967e0d3d2e14d4e27811'
+PIPELINE_VERSION=2
 MAX_IMAGE=10*1024*1024
 slot=threading.BoundedSemaphore(1)
 _engine=None
@@ -42,7 +43,7 @@ def translate_texts(texts,data_dir):
         engine=ctranslate2.Translator(str(model_root(data_dir)/'model'),device='cpu',compute_type='int8',inter_threads=1,intra_threads=1)
         _engine=(tokenizer,engine)
     tokenizer,engine=_engine
-    result=engine.translate_batch([tokenizer.encode(s,out_type=str) for s in texts],beam_size=2,max_decoding_length=256,max_input_length=256)
+    result=engine.translate_batch([tokenizer.encode(s,out_type=str) for s in texts],beam_size=4,max_decoding_length=256,max_input_length=256)
     return [tokenizer.decode(r.hypotheses[0]) for r in result]
 
 def ocr_regions(tsv,width,height):
@@ -64,7 +65,7 @@ def ocr_regions(tsv,width,height):
         left=max(0,min(w[0] for w in words)-3);top=max(0,min(w[1] for w in words)-3)
         right=min(width,max(w[0]+w[2] for w in words)+3);bottom=min(height,max(w[1]+w[3] for w in words)+3)
         if right<=left or bottom<=top:continue
-        result.append({'x':left/width,'y':top/height,'w':(right-left)/width,'h':(bottom-top)/height,'original':text})
+        result.append({'x':left/width,'y':top/height,'w':(right-left)/width,'h':(bottom-top)/height,'original':text,'confidence':round(sum(w[5] for w in words)/len(words))})
     return result[:300]
 
 def merge_bubbles(regions):
@@ -98,6 +99,7 @@ def translation_input(text):
     if letters and sum(c.isupper() for c in letters)/len(letters)>.8:text=text.capitalize()
     acronyms={'ufo':'UFO','ufos':'UFOs','uap':'UAP','uaps':'UAPs','dna':'DNA','nasa':'NASA','fbi':'FBI','cia':'CIA','tv':'TV','usa':'USA','gps':'GPS'}
     text=re.sub(r'\b(?:UFOs?|UAPs?|DNA|NASA|FBI|CIA|TV|USA|GPS)\b',lambda m:acronyms[m[0].lower()],text,flags=re.I)
+    text=re.sub(r'\bUAPs?\b','unidentified aerial phenomena',text,flags=re.I)
     return re.sub(r'\bi\b','I',text)
 
 def refine_bubbles(image,regions,work):
@@ -106,9 +108,15 @@ def refine_bubbles(image,regions,work):
     targets=[];paths=[]
     for index,region in enumerate(regions):
         if region['h']<.028 or len(region['original'])<9:continue
-        left=max(0,int(region['x']*image.width)-7);top=max(0,int(region['y']*image.height)-7)
-        right=min(image.width,int((region['x']+region['w'])*image.width)+7);bottom=min(image.height,int((region['y']+region['h'])*image.height)+7)
-        path=Path(work)/('bubble-'+str(index)+'.png');image.crop((left,top,right,bottom)).save(path);paths.append(str(path));targets.append(index)
+        shaped=bool(region.get('shape'));box=region.get('ocrBox',region)
+        padding=24 if shaped else 7
+        left=max(0,int(box['x']*image.width)-padding);top=max(0,int(box['y']*image.height)-7)
+        right=min(image.width,int((box['x']+box['w'])*image.width)+padding);bottom=min(image.height,int((box['y']+box['h'])*image.height)+7)
+        if shaped:
+            left=max(left,int(region['x']*image.width));top=max(top,int(region['y']*image.height))
+            right=min(right,int((region['x']+region['w'])*image.width));bottom=min(bottom,int((region['y']+region['h'])*image.height))
+        path=Path(work)/('bubble-'+str(index)+'.png');crop=image.crop((left,top,right,bottom))
+        crop=crop.resize((crop.width*2,crop.height*2));crop.save(path);paths.append(str(path));targets.append(index)
         if len(targets)>=40:break
     if not targets:return regions
     filelist=Path(work)/'bubbles.txt';filelist.write_text('\n'.join(paths)+'\n')
@@ -118,17 +126,22 @@ def refine_bubbles(image,regions,work):
         pages={}
         for row in csv.DictReader(io.StringIO(output.stdout.decode('utf-8','replace')),delimiter='\t'):
             try:
-                text=row.get('text','').strip();confidence=float(row.get('conf','-1'));page=int(row['page_num'])
-                if confidence<30 or not re.search('[A-Za-z]',text):continue
+                text=row.get('text','').strip().lstrip('{}[]|') or row.get('text','').strip();confidence=float(row.get('conf','-1'));page=int(row['page_num'])
+                if confidence<20 or not (re.search('[A-Za-z]',text) or text=='|'):continue
                 pages.setdefault(page,[]).append((text,confidence,row.get('line_num')))
             except (ValueError,TypeError,KeyError):continue
         for page,words in pages.items():
             if not 1<=page<=len(targets) or sum(w[1] for w in words)/len(words)<50:continue
+            if words and words[0][0]=='|' and len(words)>1 and re.match(r"(?i)^(?:do|don['’]?t|am|was|have|will|can|believe)$",words[1][0]):words[0]=('I',words[0][1],words[0][2])
+            words=[w for w in words if w[0]!='|']
             text=''
             for word,confidence,line in words:
                 text=text[:-1]+word if re.search(r'[A-Za-z]-$',text) and re.match('[A-Za-z]',word) else (text+' '+word).strip()
             target=regions[targets[page-1]]
-            if len(target['original'])/2<=len(text)<=1500:target['original']=text
+            if len(text)<len(target['original'])*.8:
+                target['placement']='note'
+                target['ocrUncertain']=True
+            elif len(text)<=1500:target['original']=text
     except (OSError,subprocess.SubprocessError):pass
     return regions
 
@@ -146,11 +159,13 @@ def translate_image(data,data_dir):
         try:
             result=subprocess.run(['tesseract',str(path),'stdout','-l','eng','--psm','11','tsv'],capture_output=True,timeout=20,check=False,env={**os.environ,'OMP_THREAD_LIMIT':'1'})
             if result.returncode:raise ValueError()
-            regions=refine_bubbles(image,merge_bubbles(ocr_regions(result.stdout.decode('utf-8','replace'),width,height)),work)
+            from reader_bubbles import speech_regions
+            regions=refine_bubbles(image,speech_regions(image,ocr_regions(result.stdout.decode('utf-8','replace'),width,height)),work)
             if regions:
                 translated=translate_texts([translation_input(r['original']) for r in regions],data_dir)
                 for region,text in zip(regions,translated):region['text']=text
-            return {'regions':regions,'sourceLanguage':'en','targetLanguage':'ru','machineTranslation':True}
+            for r in regions:r.pop('ocrBox',None)
+            return {'pipelineVersion':PIPELINE_VERSION,'regions':regions,'sourceLanguage':'en','targetLanguage':'ru','machineTranslation':True}
         except Exception:raise HTTPException(503,'OCR или перевод временно недоступен. Оригинал страницы сохранён.') from None
 
 def install(app,data_dir,owner):
@@ -158,14 +173,14 @@ def install(app,data_dir,owner):
         model_config=ConfigDict(extra='forbid')
         image:str=Field(min_length=20,max_length=14*1024*1024)
     @app.get('/reader/translation')
-    def status():return {'ready':ready(data_dir),'sourceLanguage':'en','targetLanguage':'ru','message':'Модель EN → RU установлена.' if ready(data_dir) else 'Модель перевода ещё не установлена на сервере.'}
+    def status():return {'pipelineVersion':PIPELINE_VERSION,'ready':ready(data_dir),'sourceLanguage':'en','targetLanguage':'ru','message':'Модель EN → RU установлена.' if ready(data_dir) else 'Модель перевода ещё не установлена на сервере.'}
     @app.post('/reader/translate')
     def translate(body:Body,subject=Depends(owner)):
         if not ready(data_dir):raise HTTPException(503,'Модель перевода ещё не установлена на сервере.')
         try:data=base64.b64decode(body.image,validate=True)
         except ValueError:raise HTTPException(422,'Некорректная страница.') from None
         if len(data)>MAX_IMAGE:raise HTTPException(413,'Страница превышает лимит 10 МБ.')
-        key=(subject,hashlib.sha256(data).digest())
+        key=(subject,PIPELINE_VERSION,hashlib.sha256(data).digest())
         with _cache_lock:hit=_cache.get(key)
         if hit and hit[0]>time.monotonic():return hit[1]
         if not slot.acquire(blocking=False):raise HTTPException(429,'Другая страница переводится. Повтори через несколько секунд.')

@@ -1,6 +1,6 @@
 {
   "name": "media-vault",
-  "version": "5.5.0",
+  "version": "5.5.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -20,7 +20,8 @@
     "test:manga": "node tests/manga-browser.cjs",
     "test:music": "node tests/music-browser.cjs",
     "test:trusted": "node tests/trusted-key-browser.cjs",
-    "test:online": "node tests/online-browser.cjs"
+    "test:online": "node tests/online-browser.cjs",
+    "test:translation": "node tests/translation-browser.cjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.15",

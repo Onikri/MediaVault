@@ -204,3 +204,5 @@ The short Dandadan excerpt in `translation-demo.html` is artwork by Yukinobu Tat
 - MangaDex free public API: https://api.mangadex.org/docs/ . Scanlation images retain their original owners' rights; API access does not grant redistribution rights.
 - Opening/ending annotations: AniSkip https://api.aniskip.com/ . Music credits: AnimeThemes. Artist identities: MusicBrainz (core data CC0), with Russian Wikidata descriptions (CC0) and Wikipedia extracts (CC BY-SA, source links retained).
 - YouTube music and trailers use the official IFrame Player API https://developers.google.com/youtube/iframe_api_reference . Videos remain visible and controlled by YouTube; MediaVault does not extract or download their audio.
+
+- OpenCV 4.12.0 (opencv-python-headless 4.12.0.88), Apache-2.0: https://github.com/opencv/opencv . Used on CPU for connected speech interiors; no page images are sent to an external OCR service.
