@@ -385,8 +385,8 @@ def parse_page(text, base):
         parser.candidate(match[1])
     page = parser.result
     if parser.published_episodes:page.episodes=parser.published_episodes
-    page.streams = list({entry["url"]: entry for entry in page.streams}.values())[:100]
-    page.players = list(dict.fromkeys(page.players))[:50]
+    page.streams = list({entry["url"]: entry for entry in page.streams}.values())
+    page.players = list(dict.fromkeys(page.players))
     # Preserve alternate translations; only identical episode URLs collapse.
     page.episodes = list({(entry["number"], entry["url"]): entry for entry in page.episodes}.values())
     page.episodes.sort(key=lambda entry: entry["number"])

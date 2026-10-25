@@ -5,7 +5,7 @@ import {buildServerJob,validateEpisodeSelection,publicSourceUrl,NOTEBOOK_URL} fr
 test('server job contains only control information, never credentials or keys',()=>{
   const job=buildServerJob({libraryId:'catalog-test',urls:'https://example.com/season#player\nhttps://example.com/season',
     collection:'  Сезон 1  ',episodes:'1, 3-8',quality:'720',token:'DO-NOT-EXPORT',passphrase:'PRIVATE',key:{private:true}});
-  assert.deepEqual(job,{version:1,library_id:'catalog-test',sources:['https://example.com/season'],collection:'Сезон 1',season:1,episodes:'1,3-8',quality:'720',resume:true});
+  assert.deepEqual(job,{version:3,library_id:'catalog-test',sources:['https://example.com/season'],collection:'Сезон 1',season:1,episodes:'1,3-8',quality:'720',resume:true});
   assert.equal(NOTEBOOK_URL,'https://colab.research.google.com/github/Onikri/MediaVault/blob/main/notebooks/MediaVault_Server_Import.ipynb');
 });
 

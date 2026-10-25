@@ -7,7 +7,7 @@ import re
 import tempfile
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from media_download import download_episode, pick_stream
+from media_download import download_episode, pick_stream,video_height,expand_stream_qualities
 from source_parser import Resolver, SourceError, episode_number, public_url
 
 
@@ -28,11 +28,11 @@ def episode_selection(value):
 
 
 def validate_job(value):
-    if not isinstance(value, dict) or value.get("version") not in {1, 2}:
+    if not isinstance(value, dict) or value.get("version") not in {1, 2, 3}:
         raise SourceError("Неизвестная версия задания MediaVault.")
     # Reject accidental pasted credentials rather than saving or forwarding them.
     allowed = {"version", "library_id", "sources", "collection", "episodes", "quality", "resume", "season"}
-    if value["version"] == 2:
+    if value["version"] >= 2:
         allowed |= {"section", "metadata", "entries", "dub", "provider", "translation"}
     if set(value) - allowed:
         raise SourceError("В задании есть лишние поля. Скопируй новое задание с сайта.")
@@ -43,9 +43,10 @@ def validate_job(value):
     if not isinstance(urls, list) or not 1 <= len(urls) <= 200:
         raise SourceError("В задании должно быть от 1 до 200 ссылок.")
     sources = list(dict.fromkeys(public_url(url, resolve_dns=False) for url in urls))
-    quality = str(value.get("quality", "720"))
-    if quality not in {"best", "1080", "720", "480", "360"}:
+    quality = str(value.get("quality", "best" if value['version']>=3 else "720"))
+    if quality!='best' and (not quality.isdigit() or not 1<=int(quality)<=8640):
         raise SourceError("Некорректное качество.")
+    if quality!='best':quality=str(int(quality))
     collection = str(value.get("collection", "")).strip()[:180]
     season = value.get("season", 1)
     if isinstance(season, bool) or not str(season).isdigit() or not 1 <= int(season) <= 1000:
@@ -79,7 +80,7 @@ def validate_job(value):
     if translation:
         if translation.get('kind') not in {'voice','subtitles'} or any(not isinstance(v,str) or len(v)>180 for v in translation.values()):
             raise SourceError('Некорректные параметры перевода.')
-    return {"library_id": library, "sources": sources, "collection": collection,
+    return {"version":value['version'],"library_id": library, "sources": sources, "collection": collection,
             "quality": quality, "selected": selected, "season": int(season), "section": section,
             "metadata": metadata, "entries": prepared, "translation":translation, "dub": str(value.get("dub", ""))[:120]}
 
@@ -171,6 +172,9 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
             identity = entry["identity"] + (':translation=' + __import__('hashlib').sha256(json.dumps(job['translation'],sort_keys=True).encode()).hexdigest() if job.get('translation') else '') + (f":season={season}" if season != 1 else "")
             if job["dub"]:
                 identity += ":dub=" + job["dub"]
+            # Old queued jobs keep their exact fingerprints and recovery behavior.
+            # New jobs may intentionally import another quality of the same dub.
+            if job['version']>=3:identity+=':quality='+job['quality']
             label = f"Серия {number}" if number is not None else f"Видео {index}"
             emit({"current": index, "total": len(plans), "episode": number, "title": collection,
                   "phase": "preparing", **result})
@@ -209,7 +213,8 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                         page = type("Chapter", (), {"title": entry["title"]})()
                     else:
                         page = resolver.resolve(entry["url"])
-                        stream = pick_stream(page.streams, job["quality"])
+                        streams=expand_stream_qualities(page.streams,resolver.http)
+                        stream = pick_stream(streams, job["quality"])
                         path = downloader(stream, temporary, http=resolver.http, quality=job["quality"], progress=report)
                 except SourceError as error:
                     result["failed"] += 1
@@ -231,6 +236,8 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                 options = {"metadata": job["metadata"], "dub": job["dub"]} if job["metadata"] or job["dub"] else {}
                 if job.get('translation'):options['translation']=job['translation']
                 if category == 'video':
+                    height=video_height(path)
+                    if height:options['quality']=height
                     from media_download import preview_frame
                     thumbnail = preview_frame(path)
                     if thumbnail: options['preview'] = thumbnail

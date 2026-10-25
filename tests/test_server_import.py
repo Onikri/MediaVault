@@ -214,7 +214,8 @@ unavailable.m3u8
             with tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / 'decrypted.mp4'
                 path.write_bytes(raw)
-                verify_video(path)
+                info=verify_video(path)
+                self.assertEqual(item['quality'],str(next(s['height'] for s in info['streams'] if s.get('codec_type')=='video'))+'p')
             for remote in drive.files.values():
                 self.assertNotIn('Тестовый сезон', remote['name'])
                 if remote['name'].startswith('part-'):

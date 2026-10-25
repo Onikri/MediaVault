@@ -187,7 +187,7 @@ async function main() {
     const request=route.request(),url=new URL(request.url());
     const respond=(data,status=200)=>route.fulfill({status,headers:cors,contentType:'application/json',body:JSON.stringify(data)});
     if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
-    if(url.pathname==='/health')return respond({application:'MediaVault',version:4,origin:new URL(base).origin,oauthConfigured:googleConfigured});
+    if(url.pathname==='/health')return respond({application:'MediaVault',version:7,origin:new URL(base).origin,oauthConfigured:googleConfigured});
     if(url.pathname==='/auth/session')return respond({token:'fixture-server-session',driveConnected:true,oauthConfigured:googleConfigured});
     if(url.pathname==='/admin/google-oauth'){
       assert.equal(request.headers().authorization,'Bearer fixture-server-session');
@@ -201,6 +201,7 @@ async function main() {
     if(url.pathname==='/jobs/task-1/cancel'){fakeTask={...fakeTask,status:'cancelled'};return respond(fakeTask);}
     if(url.pathname==='/jobs')return respond({jobs:fakeTask?[fakeTask]:[]});
     if(url.pathname==='/sources/inspect')return respond({provider:'fixture',dubs:[],seasons:[],releases:[],episodes:[{number:1,url:'https://source.example.com/episode-1'},{number:3,url:'https://source.example.com/episode-3'}]});
+    if(url.pathname==='/sources/qualities')return respond({qualities:[2160,1080,720,480,360],best:2160,original:false});
     if(url.pathname.startsWith('/metadata/'))return respond({data:[]});
     return respond({detail:'Not found'},404);
   });
@@ -229,7 +230,7 @@ async function main() {
   await owner.getByRole('heading',{name:'Очередь импорта',exact:true}).waitFor();
   assert.equal(submitted.length,1);
   const serverJob=submitted[0].job;
-  assert.equal(serverJob.version,2);assert.equal(serverJob.library_id,catalogId);assert.equal(serverJob.episodes,'1-3');
+  assert.equal(serverJob.version,3);assert.equal(serverJob.quality,'best');assert.equal(serverJob.library_id,catalogId);assert.equal(serverJob.episodes,'1-3');
   assert.deepEqual(serverJob.entries.map(e=>e.number),[1,3]);
   assert.ok(!JSON.stringify(serverJob).includes(PHRASE));assert.ok(!JSON.stringify(serverJob).includes(OWNER));
   assert.equal(Buffer.from(submitted[0].vault_key,'base64').length,32,'Only the derived encryption key goes to the configured owner server');
@@ -389,10 +390,11 @@ async function main() {
   await fresh.route('https://import.example.com/**',async route=>{
     const request=route.request(),url=new URL(request.url());const respond=data=>route.fulfill({headers:cors,contentType:'application/json',body:JSON.stringify(data)});
     if(request.method()==='OPTIONS')return route.fulfill({status:204,headers:cors});
-    if(url.pathname==='/health')return respond({application:'MediaVault',version:4,origin:new URL(base).origin});
+    if(url.pathname==='/health')return respond({application:'MediaVault',version:7,origin:new URL(base).origin});
     if(url.pathname==='/auth/session')return respond({token:'fixture-session',oauthConfigured:true,driveConnected:freshDriveConnected});
     if(url.pathname==='/jobs')return respond({jobs:[]});
     if(url.pathname==='/sources/inspect')return respond({provider:'fixture',dubs:[{id:'studio',name:'Studio Band',url:'https://source.example.com/studio'}],seasons:[{number:1,name:'Сезон 1'}],episodes:[{number:1,url:'https://source.example.com/ep1'},{number:3,url:'https://source.example.com/ep3'}]});
+    if(url.pathname==='/sources/qualities')return respond({qualities:[1080,720],best:1080,original:false});
     return respond({data:[]});
   });
   await fresh.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Импорт',exact:true}).click();

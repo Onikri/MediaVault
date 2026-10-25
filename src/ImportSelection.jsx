@@ -9,7 +9,8 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
   const [url,setUrl]=useState(''),[collection,setCollection]=useState(item?.title||''),[season,setSeason]=useState('1'),[manualKind,setManualKind]=useState('anime');
   const [found,setFound]=useState([]),[providers,setProviders]=useState([]),[inspection,setInspection]=useState(null),[dub,setDub]=useState('');
   const [mode,setMode]=useState('all'),[one,setOne]=useState(''),[first,setFirst]=useState('1'),[last,setLast]=useState('12'),[list,setList]=useState('');
-  const [quality,setQuality]=useState('720'),[busy,setBusy]=useState(''),[searching,setSearching]=useState(false),[error,setError]=useState('');
+  const [quality,setQuality]=useState('best'),[busy,setBusy]=useState(''),[searching,setSearching]=useState(false),[error,setError]=useState('');
+  const [qualityData,setQualityData]=useState(null),[qualityLoading,setQualityLoading]=useState(false),[qualityError,setQualityError]=useState(''),[qualityRevision,setQualityRevision]=useState(0);
   const generation=useRef(0),kind=item?.kind||manualKind,ready=canImport(state,service);
   const discovery=useSourceDiscovery(item,service),[variant,setVariant]=useState(null);
   useEffect(()=>{
@@ -25,15 +26,35 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
   async function inspect(value,voice='',selectedSeason=season){
     const version=++generation.current;setUrl(value);setBusy('inspect');setError('');setDub(voice);
     try{
-      const data=await service.request('/sources/inspect',{method:'POST',body:{url:value,...(voice?{dub_url:voice}:{}),season:Number(selectedSeason),kind}});
+      let data,continuation,previousProgress=-1,stalled=0;
+      do{
+        data=await service.request('/sources/inspect',{method:'POST',body:{url:value,...(voice?{dub_url:voice}:{}),season:Number(selectedSeason),kind,...(continuation?{continuation}:{})}});
+        if(version!==generation.current)return;
+        continuation=data.continuation;
+        stalled=continuation&&data.scannedPages===previousProgress?stalled+1:0;previousProgress=data.scannedPages;
+        if(stalled>=3)throw Error('Источник перестал отвечать во время проверки. Повтори позднее; другой перевод не подставлялся.');
+      }while(continuation);
       if(version===generation.current){setInspection(data);if(data.seasons?.length&&!data.seasons.some(value=>value.number===Number(selectedSeason)))setSeason('');if(data.episodes?.length){setOne(String(data.episodes[0].number));setFirst(String(data.episodes[0].number));setLast(String(data.episodes.at(-1).number));}}
     }catch(cause){if(version===generation.current){setInspection(null);setError(cause.message);}}finally{if(version===generation.current)setBusy('');}
   }
   const published=(inspection?.episodes||[]).filter(e=>!e.season||Number(e.season)===Number(season));
   const episodeText=mode==='all'?'all':mode==='single'?one:mode==='range'?first+'-'+last:list;
+  const qualityEpisode=(mode==='single'?published.find(e=>e.number===Number(one)):mode==='range'?published.find(e=>e.number>=Number(first)&&e.number<=Number(last)):published[0])?.url;
+  useEffect(()=>{
+    const controller=new AbortController();setQuality('best');setQualityData(null);setQualityError('');setQualityLoading(false);
+    if(!qualityEpisode||!['anime','movie','tv'].includes(kind)||service.status!=='connected')return()=>controller.abort();
+    if(service.session?.serverVersion&&service.session.serverVersion<7){setQualityError('Для полного списка качеств обнови сервер импорта.');return()=>controller.abort();}
+    setQualityLoading(true);
+    service.request('/sources/qualities',{method:'POST',body:{url:qualityEpisode},signal:controller.signal})
+      .then(data=>{if(!controller.signal.aborted)setQualityData(data);})
+      .catch(cause=>{if(!controller.signal.aborted)setQualityError(cause.message);})
+      .finally(()=>{if(!controller.signal.aborted)setQualityLoading(false);});
+    return()=>controller.abort();
+  },[qualityEpisode,kind,service.status,service.session?.serverVersion,qualityRevision]);
   async function submit(event){
     event.preventDefault();setError('');
     if(!ready){setError('Открой библиотеку владельца и подключи сервер к Google Drive.');return;}
+    if(service.session?.serverVersion&&service.session.serverVersion<7){setError('Обнови сервер импорта для полного выбора озвучек и качеств.');return;}
     if(!url||!collection.trim()){setError('Выбери источник и название тайтла.');return;}
     if(!inspection){setError('Сначала проверь ссылку: нужны опубликованные серии или главы.');return;}
     if(inspection.dubs?.length&&!dub){setError('Выбери озвучку из плеера.');return;}
@@ -41,7 +62,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
     if(mode==='range'&&(!Number(first)||Number(last)<Number(first))){setError('Проверь начало и конец диапазона.');return;}
     const metadata=item?Object.fromEntries(['title','titles','aliases','description','cover','year','format','genres','tags','age','ageLabel','episodes','chapters','volumes','status','startDate','endDate','releases','ids','links','kind'].map(key=>[key,item[key]])):{};
     const selectedTranslation=variant||inspection.dubs?.find(d=>d.url===dub);
-    const job={version:2,library_id:state.libraryId,sources:[url],collection:collection.trim(),season:Number(season),episodes:episodeText||'all',quality,resume:true,
+    const job={version:3,library_id:state.libraryId,sources:[url],collection:collection.trim(),season:Number(season),episodes:episodeText||'all',quality,resume:true,
       section:kind==='manga'?'manga':kind==='ranobe'?'ranobe':['movie','tv'].includes(kind)?'video':'anime',metadata,
       entries:published.map(entry=>({number:entry.number,url:entry.url,title:entry.title||'',season:Number(entry.season||season)})),
       dub:variant?.name||inspection.dubs?.find(d=>d.url===dub)?.name||'',provider:inspection.provider,
@@ -59,7 +80,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
     {inspection&&!inspection.dubs?.length&&['anime','movie','tv'].includes(kind)&&<p className="fine">Источник не указал названия озвучек. Будет использована дорожка доступного плеера.</p>}
     <div className="import-field-grid"><div className="form-field"><label className="input-label" htmlFor="serverCollection">Название в коллекции</label><input id="serverCollection" className="field-input" value={collection} onChange={e=>setCollection(e.target.value)} required placeholder="Название тайтла"/></div><div className="form-field"><label className="input-label" htmlFor="serverSeason">{['manga','ranobe'].includes(kind)?'Том':'Сезон'}</label>{inspection?.seasons?.length?<select id="serverSeason" className="field-input" required value={season} onChange={e=>{const selected=inspection.seasons.find(s=>s.number===Number(e.target.value));setSeason(e.target.value);if(selected?.url)inspect(selected.url,'',e.target.value);}}><option value="">Выбери опубликованный сезон</option>{inspection.seasons.map(s=><option key={s.number} value={s.number}>{s.name||s.number}</option>)}</select>:<input id="serverSeason" className="field-input" type="number" min="1" max="1000" value={season} onChange={e=>setSeason(e.target.value)} required/>}</div></div>
     <div className="episode-selection" role="group" aria-labelledby="episodeSelectionLabel"><p id="episodeSelectionLabel" className="episode-selection-legend">{kind==='manga'?'Какие главы добавить':'Какие серии добавить'}</p><div className="chip-row">{[['all','Весь сезон'],['single','Одна'],['range','Диапазон'],['list','Свой список']].map(([id,label])=><button type="button" key={id} className={'chip'+(mode===id?' chip-active':'')} onClick={()=>setMode(id)}>{id==='all'&&kind==='manga'?'Все главы':label}</button>)}</div>{mode==='single'&&<select className="field-input" value={one} onChange={e=>setOne(e.target.value)} aria-label="Номер серии">{published.map(e=><option key={e.url} value={e.number}>{e.title||'Серия '+e.number}</option>)}</select>}{mode==='range'&&<div className="import-field-grid"><input className="field-input" type="number" min="1" value={first} onChange={e=>setFirst(e.target.value)} aria-label="Первая серия"/><input className="field-input" type="number" min="1" value={last} onChange={e=>setLast(e.target.value)} aria-label="Последняя серия"/></div>}{mode==='list'&&<input id="serverEpisodes" className="field-input" value={list} onChange={e=>setList(e.target.value)} placeholder="1, 3, 5-8" aria-label="Список серий"/>}<p className="fine">{inspection?`Найдено опубликованных файлов: ${published.length}. `:''}Добавляются только доступные файлы. Завершённые повторно не скачиваются.</p></div>
-    {['anime','movie','tv'].includes(kind)&&<><label className="input-label" htmlFor="serverQuality">Качество</label><select id="serverQuality" className="field-input" value={quality} onChange={e=>setQuality(e.target.value)}>{[['best','Лучшее доступное'],['1080','До 1080p'],['720','До 720p'],['480','До 480p'],['360','До 360p']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></>}
+    {['anime','movie','tv'].includes(kind)&&<><label className="input-label" htmlFor="serverQuality">Качество</label><select id="serverQuality" className="field-input" value={quality} onChange={e=>setQuality(e.target.value)}><option value="best">Лучшее доступное{qualityData?.best?' · '+qualityData.best+'p':''}</option>{(qualityData?.qualities||[]).map(height=><option key={height} value={String(height)}>До {height}p</option>)}</select>{qualityLoading&&<p className="fine" role="status">Проверяем все качества выбранного плеера…</p>}{qualityError&&<p className="fine">{qualityError} <button type="button" className="text-link" onClick={()=>setQualityRevision(v=>v+1)}>Повторить проверку качеств</button></p>}{qualityData&&<p className="fine">Показаны качества выбранной серии и озвучки. «Лучшее доступное» выбирает максимум отдельно для каждой серии.</p>}</>}
     {state.busy&&<p className="fine" role="status">Библиотека обновляется. Импорт будет доступен через несколько секунд.</p>}<ImportReadiness state={state} service={service} onOpenLibrary={onOpenLibrary}/>
     {error&&<p className="inline-error" role="alert">{error}</p>}<button id="importVideoBtn" className="btn btn-primary import-submit" disabled={!ready||!!busy||!!state.busy||!inspection} type="submit"><Icon name="cloud" size={18}/>{busy==='submit'?'Отправляем на сервер…':'Импортировать в коллекцию'}<Icon name="arrow" size={17}/></button><p className="fine">После принятия задания сервером вкладку можно закрыть. Результат появится в библиотеке автоматически.</p>
     {inspection&&<details className="source-calendar"><summary>Даты публикаций этого источника</summary><ReleaseCalendar dubReleases={inspection.releases||[]}/></details>}

@@ -98,10 +98,11 @@ def deploy(revision,region,*,instance_id=None,enable_plugin=False,inspect=False,
         if state in {'SUCCEEDED','FAILED','TIMED_OUT','CANCELED','CANCELLED','EXPIRED'}:
             output=value.get('content') or {};text=output.get('text','') if isinstance(output,dict) else ''
             if text:report(text[-4000:])
-            code=value.get('exit-code',value.get('exitCode'))
-            marker='installation inspection complete' if inspect else 'health version 6 confirmed'
-            if state=='SUCCEEDED' and code in (None,0) and marker in text:
-                return {'inspected':True} if inspect else {'updated':True,'revision':revision,'health_version':6}
+            code=value.get('exit-code',value.get('exitCode',output.get('exit-code') if isinstance(output,dict) else None))
+            version=re.search(r'health version (\d+) confirmed',text)
+            confirmed='installation inspection complete' in text if inspect else bool(version and int(version[1])>=6)
+            if state=='SUCCEEDED' and code in (None,0) and confirmed:
+                return {'inspected':True} if inspect else {'updated':True,'revision':revision,'health_version':int(version[1])}
             raise UpdateError('Oracle завершил команду без подтверждения новой версии. Сообщение выше показывает причину; не повторяй обновление вслепую.')
         pause(5)
     raise UpdateError('Истекло время ожидания. Проверь команду в Oracle Run Command; повторное обновление не запускалось.')

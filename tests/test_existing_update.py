@@ -36,6 +36,7 @@ class ExistingUpdateTests(unittest.TestCase):
             calls.append(args)
             if args==['docker','ps','-q']:return 'old'
             if args[:2]==['docker','inspect']:return json.dumps([old])
+            if args[:2]==['docker','run']:return '7'
             if args[0]=='git':
                 if 'get-url' in args:return 'https://github.com/Onikri/MediaVault.git'
                 if 'status' in args:return ''
@@ -46,7 +47,7 @@ class ExistingUpdateTests(unittest.TestCase):
                 if 'exec' in args:
                     if not any('release-'+REVISION[:12] in arg for arg in args):return json.dumps({'application':'MediaVault','version':5,'oauthConfigured':True})
                     if health_failure:raise subprocess.CalledProcessError(1,args)
-                    return json.dumps({'application':'MediaVault','version':6,'voiceDiscovery':True,'oauthConfigured':True})
+                    return json.dumps({'application':'MediaVault','version':7,'voiceDiscovery':True,'sourceQualities':True,'oauthConfigured':True})
             raise AssertionError(args)
         def run(args,**kwargs):calls.append(args)
         code=SCRIPT.read_text().split("python3 - \"$@\" <<'PY'\n",1)[1].rsplit('\nPY',1)[0]

@@ -78,3 +78,33 @@ class PlayerContractTests(unittest.TestCase):
         self.assertEqual(post['data']['id'],'1304528')
         self.assertEqual(post['data']['ref'],'https://animego.org/')
         self.assertFalse(any('127.0.0.1' in url for url,_ in http.calls))
+
+    def test_all_published_embeds_and_translations_survive_enumeration(self):
+        from player_catalog import inspect_catalog,group_voices
+        class Http:
+            def document(self,url,**kwargs):
+                if 'kodikplayer.com' in url:return '<title>Player</title>',url,{}
+                number=int(url.rsplit('/',1)[1])
+                return '<select name="translation"><option value="https://kodikplayer.com/serial/'+str(number)+'/hash/720p">Studio '+str(number)+'</option></select>',url,{}
+        root='https://catalog.example.com/show'
+        text=''.join('<iframe src="https://player.example.com/embed/'+str(i)+'"></iframe>' for i in range(60))
+        result=inspect_catalog(root,text,root,Http())
+        self.assertEqual(len(result['dubs']),60)
+        self.assertEqual(len(group_voices([result])),60)
+        self.assertTrue(result['complete'])
+
+    def test_large_graph_continues_instead_of_losing_players_after_a_batch(self):
+        from player_catalog import inspect_catalog
+        class Http:
+            def __init__(self):self.calls=[]
+            def document(self,url,**kwargs):
+                self.calls.append(url)
+                if 'kodikplayer.com' in url:return '<title>Player</title>',url,{}
+                i=url.rsplit('/',1)[1]
+                return '<select name="translation"><option value="https://kodikplayer.com/serial/'+i+'/hash/720p">Studio '+i+'</option></select>',url,{}
+        root='https://catalog.example.com/show';text=''.join('<iframe src="https://player.example.com/embed/'+str(i)+'"></iframe>' for i in range(180))
+        state={};http=Http();value=inspect_catalog(root,text,root,http,state=state)
+        self.assertTrue(value['pending']);self.assertFalse(value['complete'])
+        while value['pending']:value=inspect_catalog(root,text,root,http,state=state)
+        self.assertEqual(len(value['dubs']),180);self.assertTrue(value['complete'])
+        self.assertEqual(len(http.calls),len(set(http.calls)),'Previously inspected public pages are not fetched again')

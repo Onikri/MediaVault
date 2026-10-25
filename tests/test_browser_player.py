@@ -5,7 +5,7 @@ import shutil
 import sys
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
-from browser_player import _extract, observed_streams, browser_destination
+from browser_player import _extract, _render, observed_streams, browser_destination
 from source_parser import SourceError
 
 class BrowserPlayerTests(unittest.TestCase):
@@ -31,5 +31,24 @@ class BrowserPlayerTests(unittest.TestCase):
         url='https://public.example.com/challenge'
         with self.assertRaises(SourceError):
             asyncio.run(_extract(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture={url:('<title>Just a moment</title>','text/html')},timeout=1))
+
+    @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium is required for dynamic catalogue integration')
+    def test_render_discovers_a_published_lazy_iframe_without_media_or_user_session(self):
+        url='https://catalog.example.com/title'
+        frame='https://player.example.com/embed/7'
+        fixture={url:('<html><h1>Exact show</h1><script>setTimeout(()=>{const f=document.createElement("iframe");f.src="'+frame+'";document.body.appendChild(f)},40)</script></html>','text/html'),frame:('<html></html>','text/html')}
+        text,target=asyncio.run(_render(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=3))
+        self.assertIn(frame,text);self.assertEqual(target,url)
+
+    @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium is required for dynamic catalogue integration')
+    def test_render_does_not_treat_a_challenge_as_an_empty_catalogue(self):
+        url='https://catalog.example.com/title'
+        with self.assertRaises(SourceError):asyncio.run(_render(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture={url:('<title>Just a moment</title>','text/html')},timeout=1))
+
+    @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium is required for dynamic player integration')
+    def test_visible_jutplus_gate_is_not_replaced_with_an_unrelated_stream(self):
+        url='https://public.example.com/plus'
+        with self.assertRaisesRegex(SourceError,'JutPlus'):
+            asyncio.run(_extract(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture={url:('<div class="tab_need_plus">JutPlus</div>','text/html')},timeout=1))
 
 if __name__=='__main__':unittest.main()

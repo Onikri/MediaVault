@@ -201,7 +201,7 @@ async def lifespan(application):
         store.close()
 
 
-app = FastAPI(title="MediaVault import service", version="6.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="MediaVault import service", version="7.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
 
 
@@ -242,7 +242,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 6, "voiceDiscovery": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 7, "voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -376,17 +376,54 @@ class Inspection(StrictBody):
     dub_url: str | None = Field(default=None, max_length=8192)
     season: int | None = Field(default=None, ge=1, le=1000)
     kind: str = "anime"
+    continuation: str | None = Field(default=None,max_length=100)
+
+
+_inspection_states={}
+_inspection_lock=threading.Lock()
 
 
 @app.post("/sources/inspect")
 def source_inspect(body: Inspection, subject=Depends(owner)):
     if body.kind not in {"anime", "movie", "tv", "manga", "ranobe"}:
         raise HTTPException(422, "Неизвестный тип произведения.")
-    return inspect_source(body.url, dub_url=body.dub_url, season=body.season, kind=body.kind)
+    signature=(subject,body.url,body.dub_url,body.season,body.kind)
+    with _inspection_lock:
+        for token in [k for k,v in _inspection_states.items() if v['expires']<time.monotonic()]:_inspection_states.pop(token,None)
+        token=body.continuation or secrets.token_urlsafe(20)
+        if body.continuation:
+            entry=_inspection_states.get(token)
+            if not entry or entry['signature']!=signature:raise HTTPException(422,'Проверка истекла. Запусти проверку ссылки заново.')
+        else:
+            if len(_inspection_states)>=16:_inspection_states.pop(next(iter(_inspection_states)))
+            entry={'signature':signature,'state':{},'lock':threading.Lock(),'expires':time.monotonic()+300}
+            _inspection_states[token]=entry
+    try:
+        with entry['lock']:
+            value=inspect_source(body.url,dub_url=body.dub_url,season=body.season,kind=body.kind,state=entry['state'])
+            entry['expires']=time.monotonic()+300
+    except BaseException:
+        with _inspection_lock:_inspection_states.pop(token,None)
+        raise
+    if value.get('pending'):value['continuation']=token
+    else:
+        with _inspection_lock:_inspection_states.pop(token,None)
+    return value
 
 
 class TitleDiscovery(StrictBody):
     title: dict
+    refresh: bool = False
+
+
+class QualityInspection(StrictBody):
+    url: str = Field(max_length=8192)
+
+
+@app.post('/sources/qualities')
+def source_qualities(body: QualityInspection, subject=Depends(owner)):
+    from source_quality import inspect_qualities
+    return inspect_qualities(body.url)
 
 
 @app.post('/sources/discover')
@@ -395,7 +432,7 @@ def discover_voices(body: TitleDiscovery, subject=Depends(owner)):
     if len(json.dumps(body.title)) > 10000:
         raise HTTPException(422, 'Слишком большое описание тайтла.')
     try:
-        return discover(body.title)
+        return discover(body.title,refresh=body.refresh)
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
 

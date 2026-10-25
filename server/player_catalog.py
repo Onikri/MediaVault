@@ -6,6 +6,7 @@ CVH uses only its two public, explicitly allowlisted playback endpoints.
 import hashlib
 import re
 import unicodedata
+import time
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin
 from bs4 import BeautifulSoup
 from source_parser import SourceError, public_url, public_player_html
@@ -120,20 +121,25 @@ def group_voices(inspections):
     return sorted(groups.values(),key=lambda g:(g['kind'],g['name'].casefold()))
 
 
-def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider='public',provider_name=''):
+def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider='public',provider_name='',state=None):
     from site_adapters import player_choices
     from source_parser import parse_page, episode_number
     page=parse_page(text,final)
-    pending=[(text,final,None,0)]
+    state=state if state is not None else {}
+    initial=[(text,final,None,0)]
     # AnimeGO's public player page, not a fabricated list of N episode URLs.
     if provider=='animego':
         match=re.search(r'-(\d+)/?$',urlsplit(final).path)
-        if match:pending.append((None,urljoin(final,'/player/'+match[1]),final,1))
-    seen=set();choices=[];episodes=list(page.episodes);seasons=[];diagnostics=[];choice_seen=set()
-    while pending and len(seen)<24:
+        if match:initial.append((None,urljoin(final,'/player/'+match[1]),final,1))
+    pending=state.setdefault('pending',initial);seen=state.setdefault('seen',set())
+    choices=state.setdefault('choices',[]);episodes=state.setdefault('episodes',list(page.episodes))
+    seasons=state.setdefault('seasons',[]);diagnostics=state.setdefault('diagnostics',[]);choice_seen=state.setdefault('choice_seen',set())
+    processed=0
+    while pending and processed<128:
+        if getattr(http,'deadline',None) and time.monotonic()>=http.deadline:break
         document,url,referer,depth=pending.pop(0)
         if url in seen:continue
-        seen.add(url)
+        seen.add(url);processed+=1
         if '/cdn-iframe/' in url:
             try:
                 for item in cvh_choices(url,http):
@@ -141,12 +147,16 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
                     item['url']=item['episodes'][0]['url']
                     if item['id'] not in choice_seen:choices.append(item);choice_seen.add(item['id'])
             except Exception:
+                if getattr(http,'deadline',None) and time.monotonic()>=http.deadline:
+                    pending.insert(0,(document,url,referer,depth));seen.discard(url);break
                 diagnostics.append({'player':'CVH','status':'unavailable'})
             continue
         try:
             if document is None:document,url,_=http.document(url,headers={'Referer':referer} if referer else None)
             current=parse_page(document,url)
         except SourceError:
+            if getattr(http,'deadline',None) and time.monotonic()>=http.deadline:
+                pending.insert(0,(document,url,referer,depth));seen.discard(url);break
             diagnostics.append({'player':player_name(url),'status':'unavailable'});continue
         if provider=='anilibria' and current.episodes and re.search(r'/anime/releases/release/[a-zA-Z0-9_-]+',urlsplit(url).path):
             base_url=re.match(r'(https://[^/]+/anime/releases/release/[a-zA-Z0-9_-]+)',url)[1]
@@ -176,13 +186,13 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             if item['url'] not in choice_seen:choices.append(item);choice_seen.add(item['url'])
         if not current_choices and player_name(url)=='Alloha (динамический)':
             choices.append(choice('',url,player='Alloha (динамический)',episodes=[{'number':1,'url':url,'title':'Опубликованный iframe'}]))
-        if depth<3:
-            for child in current.players[:12]:
+        if depth<8:
+            for child in current.players:
                 if (urlsplit(child).hostname or '').endswith(('youtube.com','youtu.be','youtube-nocookie.com')):continue
                 pending.append((None,child,url,depth+1))
     # A selected variant must still be published by this source, including nested players.
     selected=next((item for item in choices if item['url']==dub_url),None) if dub_url else None
-    if dub_url and selected is None:raise SourceError('Выбранная озвучка больше не найдена на странице. Обнови список.')
+    if dub_url and selected is None and not pending:raise SourceError('Выбранная озвучка больше не найдена на странице. Обнови список.')
     if selected:
         episodes=selected.get('episodes') or []
         if not episodes:
@@ -227,6 +237,11 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             matched=re.match(r'^(?:Год(?:\s+(?:выхода|выпуска))?|Year)\s*:?\s*((?:19|20)\d{2})\b',value,re.I)
             if matched:year=int(matched[1]);break
     releases=[{'date':e.get('datetime'),'label':e.parent.get_text(' ',strip=True)[:180]} for e in soup.select('.episode time[datetime], .release time[datetime], .schedule time[datetime], [data-episode] time[datetime]')][:100]
-    return {'provider':provider,'providerName':provider_name,'title':page.title,'url':final,'dubs':choices,
+    state['episodes']=episodes;state['seasons']=seasons
+    report_diagnostics=list(diagnostics)
+    if pending:report_diagnostics.append({'status':'incomplete','message':'Проверка не завершена; оставшиеся плееры не считаются отсутствующими.'})
+    complete=not pending and not any(d.get('status')=='unavailable' for d in diagnostics)
+    import copy
+    return copy.deepcopy({'provider':provider,'providerName':provider_name,'title':page.title,'url':final,'dubs':choices,'complete':complete,'pending':bool(pending),'scannedPages':len(seen),
             'seasons':sorted(season_values.values(),key=lambda e:e['number']),'episodes':episodes,'releases':releases,
-            'available':bool(episodes or choices),'diagnostics':diagnostics,'ids':ids,'year':year}
+            'available':bool(episodes or choices),'diagnostics':report_diagnostics,'ids':ids,'year':year})

@@ -19,7 +19,24 @@ import m3u8
 from source_parser import MAX_VIDEO, SourceError, playback_headers
 
 
-def pick_stream(streams, quality="720"):
+def expand_stream_qualities(streams, http):
+    """Expose master resolutions while retaining its audio groups for download."""
+    result=[];masters={}
+    for stream in streams:
+        if stream.get('type')!='hls' or stream.get('quality'):
+            result.append(stream);continue
+        key=(stream['url'],tuple(sorted((stream.get('headers') or {}).items())))
+        if key not in masters:
+            text,final,_=http.document(stream['url'],headers=stream.get('headers'))
+            if not text.lstrip().startswith('#EXTM3U'):raise SourceError('Плеер не вернул HLS-плейлист для проверки качеств.')
+            playlist=m3u8.loads(text,uri=final)
+            masters[key]=sorted({int(v.stream_info.resolution[1]) for v in playlist.playlists if v.stream_info.resolution})
+        heights=masters[key]
+        result.extend([{**stream,'quality':height} for height in heights] if heights else [stream])
+    return result
+
+
+def pick_stream(streams, quality="best"):
     candidates = [entry for entry in streams if entry.get("type") in {"hls", "mp4"}]
     cap = None if quality == "best" else int(quality)
     known = [entry for entry in candidates if entry.get("quality") and (cap is None or int(entry["quality"]) <= cap)]
@@ -58,7 +75,7 @@ def byte_range(value, url, offsets):
 
 
 class HlsDownload:
-    def __init__(self, http, directory, quality="720", headers=None, progress=lambda _: None):
+    def __init__(self, http, directory, quality="best", headers=None, progress=lambda _: None):
         self.http, self.directory, self.quality = http, Path(directory), quality
         self.headers, self.progress = playback_headers(headers), progress
         self.total = 0
@@ -172,7 +189,7 @@ class HlsDownload:
 
 
 def verify_video(path, *, run=subprocess.run):
-    result = run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type:format=duration,size",
+    result = run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height:format=duration,size",
                   "-of", "json", str(path)], capture_output=True, text=True, timeout=60, check=False)
     try:
         info = json.loads(result.stdout)
@@ -187,7 +204,16 @@ def verify_video(path, *, run=subprocess.run):
     return info
 
 
-def download_episode(stream, directory, *, http, quality="720", progress=lambda _: None, run=subprocess.run):
+def video_height(path,*,run=subprocess.run):
+    """Optional display metadata; download_episode performs the integrity check."""
+    try:
+        result=run(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=height','-of','json',str(path)],capture_output=True,text=True,timeout=15,check=False)
+        heights=[s['height'] for s in json.loads(result.stdout).get('streams',[]) if isinstance(s.get('height'),int)]
+        return max(heights) if result.returncode==0 and heights else None
+    except (OSError,subprocess.TimeoutExpired,ValueError,TypeError):return None
+
+
+def download_episode(stream, directory, *, http, quality="best", progress=lambda _: None, run=subprocess.run):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     progress({"phase": "downloading", "loaded": 0, "total": 0})

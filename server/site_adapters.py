@@ -134,7 +134,7 @@ def parse_search(site, text, base, query=""):
             if value and value not in result["dubs"]:
                 result["dubs"].append(value)
         results.append(result)
-    return results[:24]
+    return results
 
 
 def player_choices(text, base):
@@ -197,7 +197,7 @@ def parse_reader(text, base):
     return list(dict.fromkeys(pages)), list({entry["url"]: entry for entry in chapters}.values())
 
 
-def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime"):
+def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime",state=None):
     own_http = http is None
     http = http or PublicHttp(timeout=(4,7),deadline=time.monotonic()+18)
     try:
@@ -209,7 +209,10 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime"):
         if urlsplit(original).path.lower().endswith((".mp4", ".m3u8")):
             return {"provider": "direct", "title": "Видео по ссылке", "url": original,
                     "dubs": [], "seasons": [], "episodes": [{"number": 1, "url": original}], "releases": []}
-        text, final, _ = http.document(original)
+        if state is not None and state.get('_root'):text,final=state['_root']
+        else:
+            text, final, _ = http.document(original)
+            if state is not None:state['_root']=(text,final)
         page = parse_page(text, final)
         choices, seasons = player_choices(text, final)
         if kind == "ranobe":
@@ -224,8 +227,25 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime"):
                     "episodes": chapters or ([{"number": 1, "url": final}] if pages else []),
                     "pages": pages, "kind": "manga", "releases": []}
         from player_catalog import inspect_catalog
-        return inspect_catalog(original, text, final, http, dub_url=dub_url, season=season,
-                               provider=site.id if site else 'public', provider_name=site.name if site else 'Публичный источник')
+        dynamic=bool(site and site.id in {'anixart','freeanime'})
+        try:
+            result=inspect_catalog(original, text, final, http, dub_url=dub_url, season=season,
+                                   provider=site.id if site else 'public', provider_name=site.name if site else 'Публичный источник',state=state)
+        except SourceError:
+            if not dynamic:raise
+            result=None
+        if dynamic and not (state or {}).get('_rendered') and (result is None or not result['dubs']):
+            try:
+                from browser_player import render
+                rendered,target=render(original,timeout=6)
+                if urlsplit(target).hostname not in site.hosts:raise SourceError('Источник перенаправил на другой сайт.')
+                if state is not None:state.clear();state.update({'_root':(rendered,target),'_rendered':True})
+                result=inspect_catalog(original,rendered,target,http,dub_url=dub_url,season=season,provider=site.id,provider_name=site.name,state=state)
+            except SourceError:
+                if result is None:raise
+                result['complete']=False
+                result['diagnostics'].append({'status':'unavailable','message':'Динамический список плееров не подтверждён.'})
+        return result
     finally:
         if own_http:
             http.close()
