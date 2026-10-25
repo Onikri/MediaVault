@@ -21,27 +21,21 @@ class WeightRoutingTests(IsolatedAsyncioTestCase):
         self.runtime.browser = SimpleNamespace(request=SimpleNamespace(fetch=self.fetch))
 
     async def route(self, url, method='GET'):
-        route = SimpleNamespace(request=SimpleNamespace(url=url, method=method), fulfill=AsyncMock(), abort=AsyncMock())
+        route = SimpleNamespace(request=SimpleNamespace(url=url, method=method), fulfill=AsyncMock(), abort=AsyncMock(), continue_=AsyncMock())
         await self.runtime._route(route)
         return route
 
-    async def test_allowed_redirect_is_fetched_and_given_cors(self):
-        redirect = 'https://release-assets.githubusercontent.com/model.onnx'
-        final = response(headers={'access-control-allow-origin': 'https://other.example'})
-        self.fetch.side_effect = [response(302, {'location': redirect}), final]
-        route = await self.route('https://github.com/vendor/models/releases/download/v1/model.onnx')
-        self.assertEqual([c.args[0] for c in self.fetch.call_args_list],
-                         ['https://github.com/vendor/models/releases/download/v1/model.onnx', redirect])
-        self.assertEqual(route.fulfill.call_args.kwargs['headers']['access-control-allow-origin'], '*')
+    async def test_hf_weights_use_native_streaming(self):
+        route = await self.route('https://huggingface.co/vendor/resolve/main/model.onnx')
+        route.continue_.assert_awaited_once()
+        self.fetch.assert_not_called()
         route.abort.assert_not_called()
-        final.dispose.assert_awaited_once()
 
-    async def test_redirect_to_metadata_is_never_requested(self):
-        self.fetch.return_value = response(302, {'location': 'http://169.254.169.254/opc/v2/'})
-        route = await self.route('https://github.com/vendor/model.onnx')
-        self.fetch.assert_awaited_once()
-        route.abort.assert_awaited_once()
-        route.fulfill.assert_not_called()
+    async def test_metadata_host_is_denied(self):
+        route = await self.route('http://169.254.169.254/opc/v2/')
+        self.fetch.assert_not_called()
+        route.abort.assert_awaited_once_with('blockedbyclient')
+        route.continue_.assert_not_called()
 
     async def test_model_host_upload_is_denied(self):
         route = await self.route('https://huggingface.co/vendor/model', 'POST')

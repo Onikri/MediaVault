@@ -228,3 +228,11 @@ checksums; weights are not committed. The V1 manga archive checksum was measured
 from its official release asset because GitHub does not publish a digest for that
 older upload. PyTorch, Spandrel and ONNX Runtime run inference on the operator's
 machine; their respective dependency licenses also apply.
+# Comic Text Detector download mirror
+
+The web/backend adapter downloads the original `comictextdetector.pt.onnx`
+through a CORS-enabled [pinned Hugging Face mirror](https://huggingface.co/spaces/III111II1I1/detector/blob/a825d0838cf5a8320c1e35a69fec7ccc1787025e/data/comictextdetector.pt.onnx).
+Its SHA-256 is identical to the upstream GitHub beta-0.3 weight:
+`1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f`.
+The existing LMT hash manifest enforces this value before inference.
+

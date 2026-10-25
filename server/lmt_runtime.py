@@ -7,7 +7,7 @@ import base64
 import mimetypes
 import os
 from pathlib import Path
-from urllib.parse import unquote, urlsplit, urljoin
+from urllib.parse import unquote, urlsplit
 
 
 class LmtRuntime:
@@ -32,8 +32,7 @@ class LmtRuntime:
     def _weight_url_allowed(raw):
         url = urlsplit(raw)
         return url.scheme == 'https' and not url.username and not url.password and (
-            url.hostname in {'huggingface.co', 'hf.co', 'cdn-lfs.huggingface.co', 'cdn-lfs-us-1.huggingface.co',
-                             'github.com', 'release-assets.githubusercontent.com', 'raw.githubusercontent.com'} or
+            url.hostname in {'huggingface.co', 'hf.co', 'cdn-lfs.huggingface.co', 'cdn-lfs-us-1.huggingface.co'} or
             (url.hostname or '').endswith('.hf.co') or (url.hostname or '').endswith('.huggingface.co'))
 
     async def _route(self, route):
@@ -63,35 +62,7 @@ class LmtRuntime:
             return
         # Weights only; no page uploads, telemetry or arbitrary client URLs.
         if self.allow_downloads and self._weight_url_allowed(request.url) and request.method in {'GET', 'HEAD'}:
-            # Extension fetch privileges are absent in the private web page.
-            # Fetch only these allowed weight hosts and supply CORS locally.
-            # Browser redirect requests are not routed again by Playwright.
-            # Follow manually, validating every hop before issuing the request.
-            target = request.url
-            try:
-                for _ in range(6):
-                    if not self._weight_url_allowed(target):
-                        break
-                    response = await self.browser.request.fetch(target, method=request.method, max_redirects=0, timeout=90000)
-                    if response.status in {301,302,303,307,308}:
-                        target = urljoin(target, response.headers.get('location',''))
-                        await response.dispose()
-                        continue
-                    break
-                else:
-                    await route.abort('failed')
-                    return
-            except Exception:
-                await route.abort('failed')
-                return
-            if not self._weight_url_allowed(target) or response.status in {301,302,303,307,308}:
-                await route.abort('failed')
-                return
-            try:
-                await route.fulfill(response=response, headers={**response.headers,
-                                    'access-control-allow-origin': '*'})
-            finally:
-                await response.dispose()
+            await route.continue_()
         else:
             await route.abort('blockedbyclient')
 
