@@ -19,6 +19,9 @@ const runtimeFiles = [
 export default defineConfig({
   base: './',
   publicDir: false,
+  // The standalone AGPL engine is built separately; don't eagerly prebundle
+  // its multi-megabyte ONNX/WebLLM graph when starting the main React app.
+  optimizeDeps: {entries: ['index.html']},
   server: {port: 8080, strictPort: true},
   preview: {port: 8080, strictPort: true},
   esbuild: {jsx: 'automatic'},

@@ -18,6 +18,7 @@ import {musicIdentityFor} from './music-library.js';
 import PlayerSettings,{SettingsGlyph} from './PlayerSettings.jsx';
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {startMobileGpu} from './mobile-gpu-upscaler.js';
+import {startFsr} from './fsr-upscaler.js';
 
 const PREF_KEY='mediavault_player_preferences_v1';
 const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,upscaler:'auto',deviceProfile:'auto',neuralMode:'balanced',subSize:24,subOffset:8};
@@ -88,7 +89,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const [colors,setColors]=useState(()=>{try{return JSON.parse(localStorage.getItem('mv_video_colors')||'{}');}catch{return {};}});
   function color(change){setColors(old=>{const next={...old,...change};localStorage.setItem('mv_video_colors',JSON.stringify(next));return next;});}
   const colorFilter=`saturate(${colors.saturation??1}) contrast(${colors.contrast??1}) brightness(${colors.brightness??1})`;
-  const engineName=engine==='mobile'?'Мобильный GPU':engine==='fsrcnn'?'FSRCNN':({'anime4k-l':'Anime4K L','anime4k-vl':'Anime4K VL','anime4k-ul':'Anime4K UL'}[engine]||'Anime4K');
+  const engineName=engine==='lanczos'?'Lanczos3':engine.startsWith('fsr-')||engine==='fsr'?(engine==='fsr-soft'?'FSR1 · мягкий':'FSR1'):engine==='mobile'?'Мобильный GPU':engine==='fsrcnn'?'FSRCNN':({'anime4k-l':'Anime4K L','anime4k-vl':'Anime4K VL','anime4k-ul':'Anime4K UL'}[engine]||'Anime4K');
   function retryGpu(value=prefs.upscaler){setGpuAttempt(n=>n+1);changePrefs({gpu:value!=='off',...(value!=='off'?{upscaler:value}:{})});}
   const [opening,setOpening]=useState(()=>getOpening(item,libraryId));
   const [openingDraft,setOpeningDraft]=useState(null);
@@ -176,7 +177,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
     setGpuWarning('');setNeuralStats(null);setGpuActive(false);
     (async()=>{
       try{
-        const start=engine==='mobile'?startMobileGpu:engine==='fsrcnn'?startNeuralUpscaler:(await import('./anime4k-runtime.js')).startAnime4K;
+        const start=engine==='fsr'||engine==='fsr-soft'?startFsr:engine==='mobile'||engine==='lanczos'?startMobileGpu:engine==='fsrcnn'?startNeuralUpscaler:(await import('./anime4k-runtime.js')).startAnime4K;
         stop=await start(videoRef.current,canvas,{
           mode:prefs.neuralMode,profile:engine,deviceProfile,
           onStats:stats=>{if(!disposed)setNeuralStats(stats);},
@@ -347,7 +348,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
           <button disabled={!opening} onClick={()=>setIntro(null)}>Очистить</button></div>
         </div>
 </div>,
-        image:<div className="mv-player-settings"><label>Устройство<select aria-label="Профиль устройства" value={prefs.deviceProfile||'auto'} onChange={event=>{setGpuAttempt(n=>n+1);changePrefs({deviceProfile:event.target.value});}}><option value="auto">Автоматически</option><option value="phone">Телефон / Android</option><option value="tablet">Планшет</option><option value="desktop">Компьютер</option></select></label><label>Улучшение<select aria-label="Алгоритм улучшения" value={prefs.gpu?(prefs.upscaler||'auto'):'off'} onChange={event=>retryGpu(event.target.value)}><option value="off">Выключено</option><option value="auto">Авто · {deviceProfile==='desktop'?'Anime4K':'мобильный GPU'}</option><option value="mobile">Мобильный GPU · лёгкий</option><option value="anime4k">Anime4K ×2 · мощный GPU</option><option value="anime4k-l">Anime4K L ×2 · дискретный GPU</option><option value="anime4k-vl">Anime4K VL ×2 · высокая нагрузка</option><option value="anime4k-ul">Anime4K UL ×2 · максимальная нагрузка</option><option value="fsrcnn">FSRCNN ×2 · WebGPU</option></select></label>
+        image:<div className="mv-player-settings"><label>Устройство<select aria-label="Профиль устройства" value={prefs.deviceProfile||'auto'} onChange={event=>{setGpuAttempt(n=>n+1);changePrefs({deviceProfile:event.target.value});}}><option value="auto">Автоматически</option><option value="phone">Телефон / Android</option><option value="tablet">Планшет</option><option value="desktop">Компьютер</option></select></label><label>Улучшение<select aria-label="Алгоритм улучшения" value={prefs.gpu?(prefs.upscaler||'auto'):'off'} onChange={event=>retryGpu(event.target.value)}><option value="off">Выключено</option><option value="auto">Авто · {deviceProfile==='desktop'?'Anime4K':'мобильный GPU'}</option><option value="mobile">Мобильный GPU · лёгкий</option><option value="anime4k">Anime4K ×2 · мощный GPU</option><option value="anime4k-l">Anime4K L ×2 · дискретный GPU</option><option value="anime4k-vl">Anime4K VL ×2 · высокая нагрузка</option><option value="anime4k-ul">Anime4K UL ×2 · максимальная нагрузка</option><option value="lanczos">Lanczos3 · без нейросети</option><option value="fsr">AMD FSR1 · EASU + RCAS</option><option value="fsr-soft">AMD FSR1 · мягкая резкость</option><option value="fsrcnn">FSRCNN ×2 · WebGPU</option></select></label>
         {prefs.gpu&&<label>Нагрузка<select aria-label="Режим улучшения" value={prefs.neuralMode||'balanced'} onChange={event=>changePrefs({neuralMode:event.target.value})}><option value="performance">Экономный</option><option value="balanced">Баланс</option><option value="quality">Качество</option></select></label>}
         {neuralStats&&prefs.gpu&&<small>{engineName}: {neuralStats.width}×{neuralStats.height} · {neuralStats.fps} кадр/с · {neuralStats.latency} мс{(neuralStats.adapter||neuralStats.renderer)?' · '+(neuralStats.adapter||neuralStats.renderer):''}{neuralStats.software?' · программный рендерер браузера':''}</small>}
         {gpuWarning&&<button onClick={()=>retryGpu(mobileDevice?'mobile':prefs.upscaler)}>Повторить на новом GPU-контексте</button>}
@@ -366,7 +367,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       }}</PlayerSettings>}</AnimatePresence>
       {canSkip&&panel==='watch'&&<button className="mv-player-skip" onClick={()=>seek(skipRange.end)}><SkipForward size={16}/> {skipRange===ending?'Пропустить эндинг':'Пропустить опенинг'}</button>}
       <AnimatePresence>{currentSong&&dismissedCue!==currentSong.id&&panel==='watch'&&<motion.aside className="mv-song-cue" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:5}}><Music2 size={18}/><div><small>{activeTheme==='OP'?'Сейчас звучит · опенинг':'Сейчас звучит · эндинг'}</small><strong>{currentSong.title}</strong><span>{currentSong.artists?.join(', ')}</span><div><button onClick={()=>playMusic(currentSong)}><Play size={12}/>Слушать</button><a href={youtubeSearch(currentSong)} target="_blank" rel="noopener noreferrer">YouTube</a><a href={spotifySearch(currentSong)} target="_blank" rel="noopener noreferrer">Spotify</a></div></div><button aria-label="Скрыть песню" onClick={()=>setDismissedCue(currentSong.id)}><X size={13}/></button></motion.aside>}</AnimatePresence>
-      {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {engineName}{engine==='mobile'?'':' ×2'}{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
+      {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {engineName}{engine==='mobile'||engine==='lanczos'||engine.startsWith('fsr')?'':' ×2'}{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
       <div className="mv-player-console" onPointerEnter={revealControls}>
         <div className="mv-player-timeline" onPointerMove={e=>{if(!seekable||!source||navigator.connection?.saveData)return;const r=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));clearTimeout(seekTimer.current);const value={time:fraction*duration,left:Math.max(14,Math.min(86,fraction*100))};seekTimer.current=setTimeout(()=>setHoverSeek(value),200);}} onPointerLeave={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}} onPointerCancel={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}}>{hoverSeek&&<TimelinePreview source={source} type={item.onlineType} point={hoverSeek.time} left={hoverSeek.left}/>}{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}

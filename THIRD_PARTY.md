@@ -206,3 +206,10 @@ The short Dandadan excerpt in `translation-demo.html` is artwork by Yukinobu Tat
 - YouTube music and trailers use the official IFrame Player API https://developers.google.com/youtube/iframe_api_reference . Videos remain visible and controlled by YouTube; MediaVault does not extract or download their audio.
 
 - OpenCV 4.12.0 (opencv-python-headless 4.12.0.88), Apache-2.0: https://github.com/opencv/opencv . Used on CPU for connected speech interiors; no page images are sent to an external OCR service.
+
+## Libre Manga Translator and video reconstruction 5.6
+
+- Libre Manga Translator, mrdhnto, commit `39a95be1890e2ea3e227052976bbaf576a8eb7b3`, AGPL-3.0-or-later. The standalone adapted web engine and corresponding source are in [lmt/](lmt/), full license [lmt/upstream/LICENSE](lmt/upstream/LICENSE). Engine settings link to source/license. Native client communicates with it via MessageChannel. See [integration and modifications](docs/libre-manga-integration.md).
+- ONNX Runtime Web 1.30.0 (MIT), https://github.com/microsoft/onnxruntime ; WebLLM 0.2.86 (Apache-2.0), https://github.com/mlc-ai/web-llm . Model weights retain upstream licenses; they are downloaded separately only after opt-in, not included in the Pages artifact.
+- AMD FidelityFX FSR1 1.0.2, MIT, via agyild's mpv luma port. Full notice, original shader and source SHA256: [src/vendor/fsr1](src/vendor/fsr1/). WebGL2 binding and guarded flat-field RCAS preserve the original EASU/RCAS algorithms. Public notice is `FSR1-LICENSE.txt`. FSR is not a neural model.
+- Lanczos3 is the classical windowed-sinc reconstruction kernel, implemented directly for WebGL; no third-party neural weights are involved. [Research, alternatives and device limits](docs/video-upscalers.md).

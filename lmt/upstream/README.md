@@ -1,0 +1,474 @@
+<div align="center">
+  <img src="docs/images/libre-manga-translator.png" width="120" alt="Libre Manga Translator">
+  <h1>Libre Manga Translator</h1>
+  <p><i>"Translate manga directly in your browser: 100% on-device (Local), cloud (Gemini), or self-hosted LLM backends"</i></p>
+
+  <p>
+    <img src="https://img.shields.io/github/v/release/mrdhnto/libre-manga-translator?style=flat&logo=github&logoColor=white&color=00ffff" alt="Version">
+    <img src="https://img.shields.io/badge/Platform-Chrome%20%7C%20Firefox-8a2be2?style=flat&logo=googlechrome&logoColor=white" alt="Browser Support">
+    <img src="https://img.shields.io/badge/GPU-where_the_model_supports_it-e05a2c?style=flat&logo=wgpu&logoColor=white" alt="WebGPU where the model supports it, WASM CPU otherwise">
+    <img src="https://img.shields.io/badge/Framework-Svelte%205%20%2B%20WXT-ff3e00?style=flat&logo=svelte&logoColor=white" alt="Svelte 5">
+    <img src="https://img.shields.io/badge/License-AGPL--3.0-00ff7f?style=flat" alt="License">
+  </p>
+
+  <p>
+    <a href="https://github.com/mrdhnto/libre-manga-translator/releases/latest"><img src="docs/images/github-badge.svg" height="40" alt="Get it on GitHub"></a>
+    <a href="https://addons.mozilla.org/en-US/firefox/addon/libre-manga-translator/" target="_blank" rel="noopener"><img src="docs/images/firefox-badge.svg" height="40" alt="Get it on Firefox AMO"></a>
+    <a href="https://chromewebstore.google.com/detail/libre-manga-translator/ojpfedogijigmfcpckgghdeepmpaikag" target="_blank" rel="noopener"><img src="docs/images/chrome-badge.svg" height="40" alt="Get it on Chrome Web Store"></a>
+  </p>
+</div>
+
+Translate manga in your browser with freedom to choose how. Run everything on your device, offload to the cloud, or point at your own self-hosted LLM backend - **you decide where your data goes**.
+
+> Originally based on the pipeline concept of **[ComicTL](https://github.com/kiuyha/ComicTL)** by Ketut Shridhara and routing ideas from the experimental [Local Manga Translator](https://github.com/mrdhnto/local-manga-translator) proof-of-concept. LMT is an independent, extensively rewritten evolution — modernizing the runtime, vision models, inpainting ladder, and reader workflows. See [Credits & Attribution](#credits--attribution) for full lineage.
+
+---
+
+## Three Translation Modes, Three Pipelines
+
+**Local Mode** (default, fully local) runs everything on-device. A WebLLM model (Llama-3.2-1B, Qwen3.5-0.8B, Qwen3.5-2B, or Qwen3.5-4B) translates **on the GPU via WebLLM**; bubble detection and OCR run locally too, on CPU (WASM) for the models WebGPU cannot execute — see [What runs on GPU](/docs/technical.md#what-runs-on-gpu). No API key, no account, no uploads. Works completely offline after the initial model download.
+
+**Gemini Mode** (cloud, opt-in) sends the page image to Google's Gemini API, which handles both text recognition and translation in one call. It runs **no OCR and no script gate** — see the matrix below. Your API key goes straight from your browser to Google - no proxy, no middleman.
+
+**API Mode** (self-hosted) connects to your own LLM server (Ollama, LM Studio, or any OpenAI-compatible endpoint) running locally or remotely. Uses local OCR Engine for text extraction, then sends only the extracted text to your server for translation - no image leaves your machine in this mode. Full control over the model and infrastructure.
+
+*Libre - you choose where your data goes. Toggle back to the original image any time.*
+
+### What each mode actually runs
+
+Detection, inpainting and typesetting are shared. Gate, OCR and translation are not, and Gemini also skips box review whenever boxes were found. This is the branch in `src/entrypoints/offscreen/main.ts` (box review: `src/lib/components/Overlay.svelte`), stated plainly:
+
+| Stage | Local | API Mode | Gemini |
+|---|---|---|---|
+| Bubble detection (RT-DETR / CTD) | on-device | on-device | on-device |
+| Interactive box review & refinement | optional | optional | **skipped** when boxes were found (opens only if nothing was detected); *Refine Boxes* reopens it after the first result |
+| Script gate (holds SFX, art, foreign text) | runs | runs | **does not run** |
+| OCR text extraction (Paddle / PP-OCRv6 / Manga-OCR / Pororo) | runs | runs | **does not run** |
+| Translation engine | WebLLM in-browser | your server, **text only** | Gemini, **whole page image** |
+| Where the source text comes from | OCR output | OCR output | Gemini's own answer |
+| SFX / non-speech protection | script gate + box review | script gate + box review | **none on the first request** — every detected box is numbered and sent; delete SFX boxes via *Refine Boxes* and re-translate |
+| Inpainting (Fast ladder / LaMa) | on-device | on-device | on-device |
+| Typesetting & render | on-device | on-device | on-device |
+
+In Gemini mode the Debug Panel reports the gate as `off` because nothing gated. OCR settings in **Vision › OCR** do not apply to it. Choose Gemini for its translation quality and its tolerance of weak hardware; choose Local or API when the script gate holding sound effects matters to you.
+
+*See **[docs/technical.md](docs/technical.md)** for what actualy run in GPU Mode*
+
+---
+
+## Showcase & Visual Proof
+
+<details open>
+<summary>📸 <b>Translation Proof: Raw vs Translated</b></summary>
+
+| Original Raw Manga Page | Translated Result (Inpainted + Rendered) |
+| :---: | :---: |
+| ![Original Manga](docs/images/raw-sample.jpg) | ![Translated Result](docs/images/translated-sample.jpg) |
+
+</details>
+
+<details>
+<summary>⚡ <b>In-Page Reader Experience & Automation</b></summary>
+
+| Hover Translation Trigger Pill | Continuous Scroll Auto-Translate |
+| :---: | :---: |
+| ![Hover Trigger](docs/images/floating-trigger.jpg) | ![Auto Translate](docs/images/auto-translate.jpg) |
+
+</details>
+
+<details>
+<summary>✏️ <b>Interactive Bubble Editor & Translation Refinement</b></summary>
+
+| Bounding Box Refinement & Reading Order | In-Place Translation & OCR Inspection Modal |
+| :---: | :---: |
+| ![Refine Boxes](docs/images/refine-editor.jpg) | ![Edit Modal](docs/images/edit-modal.jpg) |
+
+</details>
+
+<details>
+<summary>🎨 <b>Adaptive Inpainting & Redraw Quality</b></summary>
+
+| Neural LaMa Redraw vs Clean Art Recovery | Inpainting Ladder Controls |
+| :---: | :---: |
+| ![Inpaint Quality](docs/images/inpaint-quality.jpg) | ![Inpaint Settings](docs/images/sidebar-inpaint.jpg) |
+
+</details>
+
+<details>
+<summary>⚙️ <b>Control Panels & Model Management</b></summary>
+
+| On-Page Sliding Sidebar | Extension Popup Quick Pick |
+| :---: | :---: |
+| ![Sidebar Pipeline](docs/images/sidebar-pipeline.jpg) | ![Popup View](docs/images/popup.jpg) |
+
+| Offline Model Storage & Cache Manager | Site Rule Generator & Custom Adapters |
+| :---: | :---: |
+| ![Model Storage](docs/images/model-storage.jpg) | ![Site Adapters](docs/images/site-adapters.jpg) |
+
+</details>
+
+---
+
+## How It Works
+
+Libre Manga Translator coordinates vision, OCR, translation, and inpainting through a streamlined browser pipeline:
+
+1. **Bubble Detection** — RT-DETR or ComicTextDetector scans the manga page on-device inside an isolated offscreen document, producing accurate bounding boxes sorted in manga reading order (right-to-left, top-to-bottom).
+2. **Review & Refinement (Optional)** — An interactive on-page editor lets you resize, merge, create, or delete bubbles before translation. Enable *Skip bbox refining* or *Auto-translate* to bypass this step completely. Gemini mode always bypasses it when boxes were found; use *Refine Boxes* on the result to remove sound-effect boxes and re-translate.
+3. **Script Verification & OCR** — An on-device script-identification gate inspects detected regions to ensure they contain the target language. Sound effects, art, and foreign text are held back. Multilingual PaddleOCR, PP-OCRv6 Manga, Manga-OCR, or Pororo OCR extracts text with coordinate tracking.
+4. **Translation Routing** — Text routes to your selected backend: 100% on-device Local mode (WebLLM Llama-3.2 / Qwen3.5), your self-hosted LLM server via API Mode (Ollama / LM Studio), or Google's Gemini API. In Gemini mode step 3 does not run at all (no script gate, no OCR: Gemini reads the page itself) — see [What each mode actually runs](#what-each-mode-actually-runs).
+5. **Adaptive Inpainting** — A multi-stage inpainting ladder fits a text-shaped mask per region and uses the lightest suitable cleaner (planar fill → bilateral denoise → Telea, or neural LaMa redraw for complex art), ensuring clean text removal without ghost rectangles.
+6. **Typesetting & Rendering** — Translated text is automatically wrapped, sized, and rendered on the image canvas using bundled manga fonts or custom user-uploaded typography.
+
+> 📊 **Detailed Architecture:** Detection and model execution run entirely in an isolated offscreen document, keeping heavy tensor inference off the main page thread. For the complete Mermaid pipeline diagram, model weights, and technical specifications, see **[docs/technical.md](docs/technical.md)**.
+
+---
+
+## Features
+
+### 🎯 Translation Modes & Flexibility
+- **Full Local Pipeline (Local mode):** Comic Bubble Detector (RT-DETR, default) and Comic Text Detector run via ONNX Runtime Web. PaddleOCR extracts text on-device. Llama-3.2-1B, Qwen3.5-0.8B, Qwen3.5-2B, or Qwen3.5-4B translates via WebLLM with GPU acceleration. After the initial weights download, the entire workflow operates completely offline.
+- **Cloud Direct (Gemini):** Your browser sends the **whole page image** to Google's Gemini API using your own API key — downscaled to ≤1024 px wide, re-encoded as JPEG at quality 0.75, with each detected region drawn on it as a numbered red box so the model can answer one translation per box — plus any series summary and term dictionary you have stored. It is not a crop, and the full artwork of that page leaves the device; nothing is sent until you pick this mode and paste a key. Best for low-resource hardware without a dedicated GPU, or when you want state-of-the-art multimodal translation accuracy.
+- **API Mode (Self-Hosted):** Connect to your own LLM server running locally or across your LAN/WAN. **Sends extracted text only** — the OCR strings from each box, the target language, and your series context. No page image, and no crop, leaves the device in this mode. Supports Ollama, LM Studio, vLLM, OpenRouter, Venice AI, and any OpenAI-compatible `/v1/chat/completions` endpoint.
+- **Dual Schema Support:** Seamlessly switch between standard OpenAI JSON (`response_format.json_object`) and LM Studio experimental format (`input` array + `system_prompt`) without modifying your underlying models.
+
+### 👁️ Vision, Detection & OCR
+- **On-Device Detectors:** Choose between RT-DETR-v2 (default, 11.1 MB, fast bubble & text detection) and Comic Text Detector with pixel-mask segmentation (94.7 MB, dense bubble seeding).
+- **OCR Engine Choice:** Pick the ideal reader in **Vision › OCR**:
+  - **PaddleOCR** (~90 MB): Fast multilingual generalist with 11 language packs (Latin + Chinese/Japanese ship at setup; Korean, Thai, Arabic, Hindi, etc., load on first encounter).
+  - **PP-OCRv6 Manga** (~21 MB): Lightweight fine-tune optimized specifically for Japanese manga text.
+  - **Manga-OCR** (~460 MB): Flagship model for vertical writing, stylized lettering, and complex Japanese typography.
+  - **Pororo OCR** (~74 MB): Korean specialist engine (TPS-VGG-BiLSTM architecture with 2,589 vocabulary) optimized for Manhwa and Webtoon text extraction.
+- **Intelligent Script Gate (Local and API modes):** An on-device script-identification model checks every bubble before translation. Non-target text, sound effects (SFX), and artwork lettering remain untouched with a dashed indicator and an optional one-click *Translate anyway* override. Gemini mode does not run the gate.
+- **Resumable Model Downloads:** Every weight is opt-in — press Download when ready, then pause and resume anytime from the setup wizard, popup, or sidebar (progress follows you across all three). Deleting a cached model restarts its download from scratch.
+
+### 🎨 Inpainting & Typography
+- **Fast Inpainting Ladder (Default):** Fits text-shaped masks and chooses the lightest suitable cleaner: planar paper-sampling fill on flat backgrounds, bilateral denoise on grainy scans, and Telea fast-marching only where true reconstruction is needed. Prevents ghost boxes, halos, and washed-out artifacts.
+- **Quality Neural Inpainting (LaMa):** Deep-learning redraw for complex screentones, halftones, and textured art behind text. Runs a standalone LaMa pass with automatic fallback into the Fast ladder for declined regions. If Quality is selected without downloaded weights, translation runs the Fast ladder instead and the option switches back automatically — no error, no surprise re-download.
+- **Always Inpaint Mode:** Toggle in settings and popup to override quality-decline rollbacks and force inpainting across all detected regions, preventing leftover untranslated text.
+- **Custom Typography:** Ships with comic and manga fonts (Noto Sans, Bangers, Comic Neue) and allows dropping in any custom TTF, OTF, or WOFF font file with automatic font scaling.
+- **Compare & Export:** Instant toggle between original and translated artwork, plus one-click JPEG export of the final translated page (or raw/cleaned layers).
+
+### 📖 Reader Experience & Automation
+- **Floating Hover Trigger:** Hover any manga image (`>= 260px`) to reveal a low-profile pinned **Translate** pill. After translation, it transforms into an unobtrusive action hub for editing, adjusting boxes, or toggling view modes.
+- **Continuous Auto-Translate:** Automatically detects and translates chapter pages as they scroll into the viewport with sequential queue management to prevent VRAM or API rate exhaustion.
+- **Multi-Layer Visual Canvas Editor:** Seamlessly inspect and switch between **Raw Scan**, **Cleaned Scan** (inpainted background), and **Result Scan** layers.
+- **Interactive Inpaint Patch & Restore:** Paint additional inpaint patches or restore raw original artwork directly on the cleaned canvas without re-translating.
+- **Contextual In-Place Styling:** In-canvas floating toolbar (`ContextualStyleBar`) to adjust font family, size, alignment, and color per bubble, plus raw OCR transcript inspection via `FloatingRawTextPill`.
+- **Series Context & Continuity:** Preserves series title, character glossaries, and the last 5 translated bubbles across chapter pages for terminology consistency.
+- **Site Rule Adapters:** Regex-based rules detect series names, chapters, and page numbers across popular manga sites, with an integrated AI rule generator to create new adapters in seconds.
+
+### 🛡️ Privacy, Security & Control
+- **100% Zero Telemetry:** No analytics, no pingbacks, no tracking pixels, and no improvement uploads. Your reading activity stays entirely on your machine.
+- **Hardened Image Proxy:** Background proxy (`PROXY_IMAGE`) enforces strict allowlisting on `http(s)` URLs, blocking loopback, RFC1918 private IPs, cloud metadata addresses, and internal schemes.
+- **Universal CORS & Anti-Hotlink Fallback:** Automatically circumvents CDN referer checks and Cloudflare protection via background declarativeNetRequest headers.
+- **Model Storage & GPU Controls:** Manage downloaded weights, view cache allocations, purge models (purging also clears any paused partial, so re-downloads start fresh), and toggle WebGPU/WASM acceleration per subsystem in **System › GPU Acceleration**.
+- **Detailed Diagnostics:** Exportable session logs detailing timings, OCR text, inpainting statistics, and error traces without storing image or base64 payloads.
+
+---
+
+## Roadmap & Status
+
+All core functionality is now fully released. Our current focus is actively improving OCR accuracy across diverse manga/manhwa formats, Bug Fixing and elevating the overall reader and editing experience. Check the [commit history](../../commits/main) for day-to-day activity between releases.
+
+### ✅ Released
+
+The core translation engine is complete, offering a production-grade, offline-first reader experience across Chrome and Firefox:
+
+- **Three Translation Modes** — 100% on-device local translation (WebLLM on GPU, ONNX Runtime on WebAssembly where a model needs it), private self-hosted servers (Ollama, LM Studio), or direct cloud translation (Gemini API).
+- **Vision & Multilingual OCR** — On-device speech bubble detection and multilingual text extraction (PaddleOCR, Japanese Manga-OCR, PP-OCRv6 Manga, and Korean Pororo OCR) with smart script filtering.
+- **Adaptive Inpainting & Redraw** — Seamless text removal using intelligent paper sampling and neural redraw (LaMa), backed by an "Always Inpaint" override for complex backgrounds.
+- **Multi-Layer Visual Canvas Editor** — In-place reader editor with layer switching (Raw, Cleaned, and Result), interactive inpaint patch/restore drawing tools, and contextual typography styling.
+- **Reader Automation & Ergonomics** — Zero-flicker hover translation trigger, continuous scroll auto-translation, series context memory, and one-click high-resolution image export.
+- **Resumable Downloads** — Opt-in model weights with cross-UI pause/resume (setup, popup, sidebar), cache-gated option switching, and automatic Fast fallback when LaMa weights are missing.
+- **Privacy by Design** — Zero telemetry, no analytics, no external servers, and completely local execution.
+
+### 🔧 In Progress
+
+- *Improve OCR Config* - Improving OCR reliability to get better translation results.
+- *Bug Fixing & Hardening* - Fixing bugs and improving stability and usability.
+
+### 🐛 Known Issues (actively investigating)
+
+- *OCR reliability on Manhwa / Webtoon text* - Pororo OCR still give poor results compared with Python Based Engine.
+- *Image Observer Failure* - Some site images are not detected by LMT Observer and the translation pill doesn't show up.
+
+Found a bug not listed here? Open an issue - it helps prioritize.
+
+### 🗺️ Planned
+
+- More community site adapters
+
+---
+### Known Limitations
+
+- **Firefox Add-on Store is bound to the `firefox-wllama-engine` branch:** We appealed to Mozilla for an exception to use the unified WebLLM engine (`main` branch), but their automated 2 MB per-file limit cannot be waived. To comply with store guidelines, the Firefox release uses `@wllama/wllama`.
+
+---
+
+*Status as of October 2026. This list changes as issues are found and fixed
+during dev testing - it's not a fixed commitment, just where things stand.*
+
+---
+
+## Installation
+
+### From the browser stores (recommended)
+
+Both stores serve signed, auto-updating builds that survive a browser restart — no terminal, no build step:
+
+- **Chrome:** [Libre Manga Translator on the Chrome Web Store](https://chromewebstore.google.com/detail/libre-manga-translator/ojpfedogijigmfcpckgghdeepmpaikag)
+- **Firefox:** [Libre Manga Translator on Firefox Add-ons (AMO)](https://addons.mozilla.org/en-US/firefox/addon/libre-manga-translator/)
+
+After installing, jump to [First-time setup](#first-time-setup).
+
+### From source (development build)
+
+Use this only to run or hack on unreleased changes. Requires [Bun](https://bun.sh).
+
+```bash
+git clone https://github.com/mrdhnto/libre-manga-translator.git
+cd libre-manga-translator
+bun install
+
+# Development with hot reload
+bun run dev           # Chrome
+bun run dev:firefox   # Firefox
+
+# Production build
+bun run build
+bun run build:firefox
+```
+
+Copy `.env.example` to `.env` and fill in the values before building.
+
+#### Chrome (load unpacked)
+
+1. Build the project: `bun run build`
+2. Open `chrome://extensions`
+3. Enable **Developer mode** (toggle in the top right)
+4. Click **Load unpacked** and select the `.output/chrome-mv3/` folder
+
+#### Firefox (temporary add-on)
+
+1. Build the project: `bun run build:firefox`
+2. Open `about:debugging#/runtime/this-firefox`
+3. Click **Load Temporary Add-on**
+4. Select any file inside the `.output/firefox-mv2/` folder
+
+> Temporary add-ons are a development affordance and do not survive a browser restart. For day-to-day use, install the signed Firefox build from AMO above.
+
+### First-time setup
+
+Open the extension popup and go through the onboarding flow, or go to **Settings** directly.
+
+- **Local Mode:** Select Local in the Home tab and download the model weights once when ready — all downloads are opt-in with pause/resume. Roughly 0.8–4 GB depending on which LLM you pick (Llama-3.2-1B, Qwen3.5-0.8B, Qwen3.5-2B, or Qwen3.5-4B).
+- **Gemini Mode:** Paste your Gemini API key (free at [aistudio.google.com](https://aistudio.google.com)), then set the mode to Gemini in the Home tab.
+- **API Mode:**
+  1. Select API Mode in the Home tab
+  2. Choose your schema (OpenAI or LM Studio)
+  3. Set the Host URL (e.g. `http://127.0.0.1:11434/v1` for Ollama or `http://127.0.0.1:1234/api/v1` for LM Studio)
+  4. Enter your model name (e.g. `qwen3.5:4b`)
+  5. Click **Test Connection** to verify
+
+---
+
+## Quick Start
+
+1. Open any manga page in Chrome or Firefox
+2. Hover a page image and click the floating **Translate** pill (or click the LMT icon and **Translate Active Page**)
+3. The overlay opens and runs bubble detection automatically
+4. Adjust any boxes that were missed or drawn wrong (skipped if `Skip bbox refining` or `Auto-translate` is on, and in Gemini mode whenever boxes were found — use **Refine Boxes** afterwards)
+5. Click **Confirm**
+6. Read, or use the results toolbar:
+   - **Edit:** Adjust translations or fix typos with live canvas re-render
+   - **Refine Boxes:** Go back to adjust bubble coordinates and re-translate
+   - **Save JPG:** Export full-resolution translated image
+   - **Original toggle:** Swap between raw page and translated result
+
+---
+
+## API Mode Setup Guide
+
+### Recommended: Ollama
+
+1. **Install Ollama:** Download from [ollama.com](https://ollama.com)
+2. **Pull a model:** `ollama pull qwen3.5:4b`
+3. **Configure LMT:**
+   - Host: `http://127.0.0.1:11434/v1`
+   - Schema: OpenAI
+   - Model: `qwen3.5:4b`
+
+### Alternative: LM Studio
+
+1. **Download LM Studio:** Install from [lmstudio.ai](https://lmstudio.ai)
+2. **Download a model:** Search for and download a text model like `tiny-aya-global`
+3. **Start Local Server:**
+   - Go to the **Local Server** tab
+   - Select your model
+   - Click **Start Server**
+4. **Configure LMT:**
+   - Host: `http://127.0.0.1:1234/api/v1`
+   - Schema: LM Studio (Experimental)
+   - Model: match what you loaded in LM Studio
+
+
+#### Or any other OpenAI-compatible App like Unsloth Desktop, Jan, GPT4All, Llama.cpp and many more.
+
+### OpenAI-Compatible Services
+
+Any service exposing `/v1/chat/completions` works:
+- **OpenRouter:** `https://openrouter.ai/api/v1`
+- **Venice AI:** `https://api.venice.ai/api/v1`
+- **Together AI:** `https://api.together.xyz/v1`
+
+---
+
+## Adding Site Support (Pull Requests Welcome)
+
+LMT figures out the series name, chapter ID, and page index for each URL using site adapter rules. Most manga sites are not covered yet.
+
+Adding one is the shortest contribution you can make to this project, and it helps everyone who reads on that site.
+
+### Where rules live
+
+There are two places, with clear separation:
+
+- **`src/lib/adapters/`** - community adapters. One file per site, auto-imported at build time. This is where your PR goes. No registry edits, no build config - drop a file in and the next build bundles it.
+- **`src/lib/adapters.ts`** - trusted core, maintained by the LMT maintainers for long-trusted, stable sites. If your adapter becomes a community staple, it may graduate here.
+
+Precedence on domain conflicts: user custom rules > trusted core > community adapters.
+
+### What an adapter looks like
+
+```typescript
+// src/lib/adapters/mangadex.ts
+
+// One file per site. Auto-imported at build time.
+// See src/lib/adapters/README.md and _example.ts.
+export default {
+  id: "mangadex",
+  domain: "mangadex.org",
+  seriesName: {
+    regex: "^(?:.*?\\|\\s*)?(?:(?:Chapter|Vol)[^\\-]+\\-\\s*)?(.*?)\\s*\\-\\s*MangaDex",
+    source: "title",     // extract from document.title
+  },
+  chapterId: {
+    regex: "\\/chapter\\/([^/]+)",
+    source: "path",      // extract from window.location.pathname
+  },
+  pageIndex: {
+    regex: "\\/(\\d+)\\/?$",
+    source: "path",
+  },
+  containerSelector: ".md--reader-chapter", // selector for the page container (adapter for automatic translation)
+  imageSelector: ".md--page img.img, .md--reader-chapter img[src^='blob:']", // selector for the images that need to be processed (adapter for automatic translation)
+} satisfies SiteRule;
+```
+
+Each field needs a `regex` with exactly one capturing group and a `source` (`"title"` for `document.title`, `"path"` for `window.location.pathname`).
+
+### You do not need to write the regex by hand
+
+Open any chapter on the site you want to support, click the LMT icon, and use the **AI rule generator** in Settings. It reads the current page title and URL, sends them to whichever AI you have active (Local, Gemini, or API), and returns a draft rule you can paste straight into your adapter file.
+
+The one rule: the regex has to work for any manga on that site, not just the one you tested on. Verify it against at least two different series before submitting.
+
+### Submitting
+
+1. Fork the repo
+2. Copy `src/lib/adapters/_example.ts` to `src/lib/adapters/<site-domain>.ts` and fill it in
+3. Open a PR with the site name in the title
+
+That is it. The next build picks the file up automatically - no registry to edit.
+
+---
+
+## Detection Models
+
+Two selectable detectors, all on-device: Comic Bubble Detector RT-DETR (default, 11.1 MB, bubbles + free text) and Comic Text Detector with pixel-mask seeding (94.7 MB, denser bubbles + free text). Switch in **Vision › Detection** (popup `Home` quick pick or sidebar/popup settings, `ModelSelect` with `Cached`/download). Min Confidence 0.5.
+
+Full table with licenses and weight links: [docs/technical.md](docs/technical.md).
+
+---
+
+## Tech Stack
+
+WXT + Svelte 5 + TypeScript + Tailwind CSS. On-device detection (RT-DETR / ComicTextDetector), OCR (PaddleOCR / PP-OCRv6 Manga / Manga-OCR / Pororo OCR), and Fast inpaint ladder (planar fill / denoise / Telea) or Quality LaMa-first pass via ONNX Runtime Web; WebLLM (Llama-3.2 / Qwen3.5), Gemini, or self-hosted LLM for translation. Bun for builds.
+
+Full layer table: [docs/technical.md](docs/technical.md).
+
+---
+
+## Project Structure
+
+Standard WXT layout: `src/entrypoints/` (background, content + auto-translate/registry, offscreen, popup `Home`+`Settings`, setup) + `src/lib/` (security, hardware, manifests, server/validator, detections, OCR, gate, inpaint, gemini, server, adapters, canvas, components/overlay + settings + ui/ModelSelect) + `scripts/` self-checks.
+
+Full annotated tree: [docs/technical.md](docs/technical.md).
+
+---
+
+
+## Contributing
+
+This is a community-driven project. Whether you are a developer or a manga reader with a great idea, contributions are welcome.
+
+- Found a bug? Open an issue.
+- Have a feature idea? Start a discussion.
+- Want to code? Submit a Pull Request.
+
+The easiest place to start is a **site adapter PR** - add support for your favorite manga site in about three minutes.
+
+---
+
+## Credits & Attribution
+
+### Lineage & Foundations
+This project began as an evolution of **[ComicTL](https://github.com/kiuyha/ComicTL)** by Ketut Shridhara. ComicTL established the early viability of in-browser manga translation, contributing:
+- Bubble detection pipeline and ONNX Runtime Web integration
+- PaddleOCR on-device text extraction with coordinate mapping
+- Initial WebLLM translation foundation (via WebGPU)
+- Interactive bubble editor with undo/redo and reading-order sort
+- Series context and custom glossary system
+- Site adapter framework with AI rule generation
+- Gemini cloud translation path
+
+### Architecture & Independent Evolution
+Following the initial fork, LMT underwent an extensive architectural rewrite (~70%+) to address browser constraints, stability, and reader ergonomics:
+- **Core Architecture & Performance** — Modular offscreen document isolation for non-blocking UI, cooperative event-loop scheduling (`scheduler.yield`), and Svelte 5 runes migration.
+- **Self-Hosted API Mode** — Native support for local/remote LLM servers (Ollama, LM Studio, OpenAI-compatible) with dual JSON schema parsing and live connection testing (ported from the experimental [Local Manga Translator](https://github.com/mrdhnto/local-manga-translator) PoC).
+- **Adaptive Inpainting Ladder** — Independent multi-stage cleaning pipeline (planar fill, bilateral denoise, Telea) and deep-learning LaMa redraw to prevent flat-patch and ghost-box artifacts (ladder and gate techniques inspired by architectural concepts in [Manga Cleaner](https://github.com/k-omiq/Bear) by KoMiQ).
+- **Language Verification Gate** — On-device script identification to prevent mistranslating sound effects and artwork lettering.
+- **Reader Ergonomics** — Pinned hover translation pill, continuous scroll auto-translation, in-place OCR/translation editing, and one-click image export.
+
+### Key components and libraries
+
+Detection (RT-DETR, ComicTextDetector), script gate (OSD LSTM), OCR (PaddleOCR, PP-OCRv6 Manga, Manga-OCR, Pororo OCR), inpainting (Fast ladder + optional Quality LaMa), local translation (WebLLM Llama-3.2 / Qwen3.5). Built on WXT + Svelte 5 + TypeScript + Tailwind CSS (see `LICENSE` appendix for the full linked-library table).
+
+Full per-model table with sizes, licenses, and weight links: [docs/technical.md](docs/technical.md). Full upstream/technique/library attributions: [LICENSE](LICENSE) appendix.
+
+---
+
+## License
+
+[AGPL-3.0-or-later](LICENSE)
+
+From version 1.0.0 Stable the project is licensed under the GNU AGPL-3.0-or-later. Copyleft guarantees this fork stays open: anyone may redistribute or build on it, but every distributed or network-hosted derivative must keep its complete source available under the same terms. Beta releases through v1.0.0-Beta5 were MIT-licensed (see their tags). See [LICENSE](LICENSE) for the full text and attribution appendix.
+
+Copyright (C) 2026 Libre Manga Translator. This program is free software under the
+GNU Affero General Public License v3 (or later). The appendix in [LICENSE](LICENSE)
+lists upstream codebases, technique inspirations, linked libraries, on-demand model
+weights, and fonts.
+
+This project is a derivative work. Upstream notices are preserved in `LICENSE`:
+ComicTL codebase © 2025-2026 Ketut Shridhara (MIT — combined work conveyed under AGPL);
+LMT additions © 2026 Libre Manga Translator.
+
+**Third-party model weights (on-demand, never bundled):**
+- Weights download only when needed to the user's local browser cache and follow their upstream licenses (see table in `LICENSE` / `docs/technical.md`).
+
+---
+
+## Disclaimer
+
+This project is for personal use and educational exploration of flexible AI deployment in browser extensions. Always support the official releases of the manga you read.

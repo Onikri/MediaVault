@@ -1,0 +1,2 @@
+import test from'node:test';import assert from'node:assert/strict';import{fsrSize}from'../src/fsr-upscaler.js';
+test('FSR output respects aspect, 2x limit and device quality cap',()=>{assert.deepEqual(fsrSize(1280,720),{width:2560,height:1440});assert.deepEqual(fsrSize(1920,1080,3840),{width:3840,height:2160});assert.deepEqual(fsrSize(1920,1080,1280),{width:1280,height:720});assert.throws(()=>fsrSize(0,720));assert.throws(()=>fsrSize(NaN,100));});

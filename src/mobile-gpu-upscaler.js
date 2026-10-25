@@ -1,13 +1,15 @@
 // Lightweight Catmull-Rom reconstruction and bounded luma sharpening in WebGL.
 // Video frames go straight to a GPU texture; no Canvas getImageData / CPU NN.
-export async function startMobileGpu(video,canvas,{mode='balanced',onStats=()=>{},onFailure=()=>{}}={}){
+export async function startMobileGpu(video,canvas,{mode='balanced',profile='mobile',onStats=()=>{},onFailure=()=>{}}={}){
   const gl=canvas.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:false,powerPreference:'high-performance'});
   if(!gl)throw Error('WebGL недоступен. Включи аппаратное ускорение браузера или используй исходное видео.');
   const extension=gl.getExtension('WEBGL_debug_renderer_info');
   const renderer=extension?String(gl.getParameter(extension.UNMASKED_RENDERER_WEBGL)):String(gl.getParameter(gl.RENDERER));
   const software=/swiftshader|llvmpipe|software|microsoft basic render/i.test(renderer);
   const vertex='attribute vec2 p;varying vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}';
-  const fragment=`precision highp float;varying vec2 uv;uniform sampler2D image;uniform vec2 size;uniform float strength;
+  const fragment=profile==='lanczos'?`precision highp float;varying vec2 uv;uniform sampler2D image;uniform vec2 size;uniform float strength;
+float lanczos(float x){x=abs(x);if(x<.0001)return 1.;if(x>=3.)return 0.;return sin(3.14159265359*x)*sin(3.14159265359*x/3.)/(3.2898681337*x*x);}
+void main(){vec2 p=uv*size-.5;vec2 base=floor(p);vec2 f=fract(p);vec3 c=vec3(0.);float sum=0.;for(int y=0;y<6;y++){for(int x=0;x<6;x++){vec2 o=vec2(float(x-2),float(y-2));float w=lanczos(o.x-f.x)*lanczos(o.y-f.y);c+=texture2D(image,clamp((base+o+.5)/size,.5/size,(size-.5)/size)).rgb*w;sum+=w;}}gl_FragColor=vec4(clamp(c/max(sum,.00001),0.,1.),1.);}`:`precision highp float;varying vec2 uv;uniform sampler2D image;uniform vec2 size;uniform float strength;
 vec4 cubic(float x){float x2=x*x;float x3=x2*x;return vec4(-.5*x+x2-.5*x3,1.-2.5*x2+1.5*x3,.5*x+2.*x2-1.5*x3,-.5*x2+.5*x3);}
 vec3 sampleAt(vec2 p){return texture2D(image,clamp(p/size,vec2(.5)/size,(size-.5)/size)).rgb;}
 void main(){vec2 pixel=uv*size-.5;vec2 f=fract(pixel);vec2 base=floor(pixel)+.5;vec4 wx=cubic(f.x);vec4 wy=cubic(f.y);vec3 c=vec3(0.);
@@ -29,7 +31,7 @@ vec3 l=sampleAt(base+vec2(-1.,0.)),r=sampleAt(base+vec2(1.,0.)),t=sampleAt(base+
       lastTime=video.currentTime;lastAt=performance.now();const start=lastAt;
       try{const width=Math.min(cap,video.videoWidth*2),height=Math.round(width*video.videoHeight/video.videoWidth);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}gl.viewport(0,0,width,height);gl.uniform2f(size,video.videoWidth,video.videoHeight);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);if(gl.isContextLost()||gl.getError()!==gl.NO_ERROR)throw Error('Ошибка мобильного GPU-фильтра.');canvas.style.opacity='1';frames++;
         const latency=performance.now()-start;slow=latency>100?slow+1:Math.max(0,slow-1);if(slow>12)throw Error('Аппаратное ускорение не успевает. Попробуй экономный режим или исходное видео.');
-        if(performance.now()-started>1000){onStats({engine:'Мобильный GPU',renderer,software,width,height,fps:Math.round(frames*1000/(performance.now()-started)),latency:Math.round(latency)});frames=0;started=performance.now();}
+        if(performance.now()-started>1000){onStats({engine:profile==='lanczos'?'Lanczos3':'Мобильный GPU',renderer,software,width,height,fps:Math.round(frames*1000/(performance.now()-started)),latency:Math.round(latency)});frames=0;started=performance.now();}
       }catch(error){stop();onFailure(error);return;}
     }
     if(video.requestVideoFrameCallback)frame=video.requestVideoFrameCallback(tick);else if(!video.paused)raf=requestAnimationFrame(tick);
