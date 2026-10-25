@@ -18,7 +18,7 @@ export function wikidataRelations(entity,values,types={}){
     if(!kind)return null;
     const filename=first(value,'P18'),release=first(value,'P577')?.time,site=first(value,'P856'),steam=first(value,'P1733');
     const sourceURL='https://www.wikidata.org/wiki/'+id;
-    return {id,provider:'wikidata',kind,title:value.labels.ru.value,description:value.descriptions?.ru?.value||'',relation,
+    return {id,ids:{mal:first(value,kind==='manga'?'P4087':'P4086')},provider:'wikidata',kind,title:value.labels.ru.value,description:value.descriptions?.ru?.value||'',relation,
       format:{game:'Игра',book:'Книга',ranobe:'Ранобэ',manga:'Манга',movie:'Фильм',anime:'Аниме'}[kind],
       year:release?Number(release.match(/\d{4}/)?.[0])||null:null,
       cover:typeof filename==='string'?'https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(filename)+'?width=800':'',

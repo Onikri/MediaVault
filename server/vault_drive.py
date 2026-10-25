@@ -558,7 +558,7 @@ class VaultDrive:
 
     def upload_file(self, path, *, name=None, category="video", collection="Без коллекции",
                     episode=None, source_identity=None, mime=None, metadata_id=None, progress=None,
-                    section=None, part="", season=None, metadata=None, dub="", preview=None):
+                    section=None, part="", season=None, metadata=None, dub="", preview=None, translation=None):
         if category not in CATEGORIES:
             raise VaultError("Unsupported media category.")
         file_path = Path(path)
@@ -624,6 +624,8 @@ class VaultDrive:
                 item.update({"partId": selected_part["id"], "partName": selected_part["name"]})
             if season is not None:
                 item["season"] = season
+            if translation:
+                item['translationInfo'] = copy.deepcopy(translation)
             if dub:
                 item["dub"] = str(dub)[:120]
             if episode is not None:

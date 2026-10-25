@@ -11,7 +11,7 @@ async function libraryReady(name,signal){
   throw Error('Не удалось загрузить обработчик книги или архива. Проверь подключение к сети.');
 }
 
-export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose,readWhole,prepareStream,onError,inline=false,renderEpisodeArtwork,onPlaybackChange}) {
+export default function MediaViewer({item,catalog,libraryId,userId,onSelectItem,onClose,readWhole,prepareStream,onError,inline=false,renderEpisodeArtwork,onPlaybackChange}) {
   const [source,setSource]=useState('');
   const [text,setText]=useState('');
   const [busy,setBusy]=useState(true);
@@ -140,7 +140,7 @@ export default function MediaViewer({item,catalog,libraryId,onSelectItem,onClose
       {busy&&<div className="mv-viewer-loading" role="status">Расшифровка на устройстве…</div>}
       {error&&<div className="mv-viewer-error" role="alert">{error}</div>}
       {isMedia&&(item.category==='video'
-        ?<VideoPlayer item={item} source={source} catalog={catalog} libraryId={libraryId} mediaRef={mediaRef} onSelectItem={onSelectItem} onError={report} busy={busy} renderEpisodeArtwork={renderEpisodeArtwork} onPlaybackChange={onPlaybackChange}/>
+        ?<VideoPlayer userId={userId} item={item} source={source} catalog={catalog} libraryId={libraryId} mediaRef={mediaRef} onSelectItem={onSelectItem} onError={report} busy={busy} renderEpisodeArtwork={renderEpisodeArtwork} onPlaybackChange={onPlaybackChange}/>
         :<audio ref={mediaRef} src={source||undefined} controls preload="metadata" onError={()=>source&&report(Error('Браузер не смог воспроизвести аудио. Попробуй загрузить файл целиком.'))}/>)}
       {isMedia&&!source&&!busy&&!error&&<p>Потоковое воспроизведение недоступно. Загрузи файл целиком.</p>}
       {(item.category==='image'||item.category==='manga')&&source&&<img src={source} alt={item.category==='manga'?'Страница '+(page+1):item.name}/>}

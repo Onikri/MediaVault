@@ -26,12 +26,14 @@ class Site:
 
     def search_url(self, query):
         if self.id == "animego":
-            return self.root + "/search/anime?" + urlencode({"search": query})
+            return self.root + "/search/anime?" + urlencode({"q": query})
         if self.id == "jutsu":
             # Jut.su's public catalogue is HTML; its search form is not a DLE API.
             return self.root + "/anime/"
         if self.id == "anilibria":
-            return self.root + "/anime/catalog?" + urlencode({"search": query})
+            return self.root + "/anime/catalog?" + urlencode({"q": query})
+        if self.id == 'shiza':
+            return self.root + '/releases?' + urlencode({'search':query})
         if self.id == 'sovet':
             return self.root + '/anime?' + urlencode({'query': query})
         return self.root + self.search_path + "?" + urlencode({"do": "search", "subaction": "search", "story": query})
@@ -39,12 +41,29 @@ class Site:
 
 SITES = (
     Site("yummy", "YummyAnime", "https://yummyanime.tv", ("yummyanime.tv",), ".movie-item", ".movie-item__title"),
-    Site("animego", "AnimeGo", "https://animego.me", ("animego.me", "animego.org"), ".animes-list-item, .anime-item", ".h5, h2, h3"),
+    Site("animego", "AnimeGo", "https://animego.me", ("animego.me", "animego.org"), ".animes-list-item, .anime-item, .ani-grid__item", ".h5, h2, h3"),
     Site("jutsu", "Jut.su", "https://jut.su", ("jut.su",), ".all_anime_global, .all_anime", ".aaname, .anime_name"),
     Site("animevost", "AnimeVost", "https://animevost.org", ("animevost.org",), ".shortstory", ".shortstoryHead h2, .shortstoryHead a", "/index.php"),
     Site("anilibria", "AniLiberty / AniLibria", "https://aniliberty.top", ("anilibria.tv", "anilibria.top", "aniliberty.top"), ".release, .release-item, .goodcell, a[href*='/anime/releases/release/']", "h2, h3, .title"),
     Site('animejoy','AnimeJoy','https://animejoy.ru',('animejoy.ru',),'.shortstory','.ntitle a, .ntitle, h2'),
     Site('sovet','SovetRomantica','https://sovetromantica.com',('sovetromantica.com',),'.anime--block__desu','.anime--block__name'),
+    Site('animedia','Animedia','https://amd.online',('amd.online','animedia.online'),'.shortstory, .poster, .movie-item','.title, h2, h3'),
+    Site('anidub','AniDub','https://anidub.life',('anidub.life','anime.anidub.life','online.anidub.life','v14.anidub.digital'),'.shortstory, .poster, .short','.title, h2, h3'),
+    Site('anistar','AniStar','https://anistar.org',('anistar.org',),'.shortstory, .shortstoryContent','.shortstoryHead a, h2, h3'),
+    Site('shiza','SHIZA Project','https://shiza-project.com',('shiza-project.com',),'.shortstory, .release, .post, a[href*="/releases/"]','h2, h3, .title'),
+    Site('animejet','AnimeJet','https://animejet.org',('animejet.org',),'.movie-item, .shortstory, .poster','.movie-item__title, h2, h3'),
+    Site('anilibriafun','AniLibria releases','https://anilibria.tv',('anilibria.tv',),'.goodcell, .release','.title, h2, h3'),
+    Site('anime365','Anime365','https://smotret-anime.org',('smotret-anime.org','smotret-anime.com'),'.m-catalog-item','h2, h3, .item-title'),
+    Site('animeon','AnimeOn','https://animeon.club',('animeon.club',),'.movie-item, .shortstory','.movie-item__title, h2, h3'),
+    Site('animebesst','AnimeBesst','https://animebesst.org',('animebesst.org',),'.shortstory, .movie-item','h2, h3, .movie-item__title'),
+    Site('animebuff','AnimeBuff','https://animebuff.ru',('animebuff.ru',),'.anime-item, .shortstory','h2, h3, .title'),
+    Site('animeone','AnimeOne','https://animeone.online',('animeone.online',),'.movie-item, .shortstory','.movie-item__title, h2, h3'),
+    Site('animebit','AnimeBit','https://animebit.ru',('animebit.ru',),'.shortstory, .poster','h2, h3, .title'),
+    Site('animelayer','AnimeLayer','https://animelayer.ru',('animelayer.ru',),'.release, .shortstory','h2, h3, .title'),
+    Site('animespirit','AnimeSpirit','https://animespirit.ru',('animespirit.ru',),'.shortstory','h2, h3, .title'),
+    Site('animeonline','AnimeOnline','https://animeonline.cc',('animeonline.cc',),'.shortstory, .movie-item','h2, h3, .movie-item__title'),
+    Site('animeseries','AnimeSeries','https://animeseries.ru',('animeseries.ru',),'.shortstory','h2, h3, .title'),
+    Site('animevosttv','AnimeVost catalogue','https://animevost.tv',('animevost.tv',),'.shortstory, .movie-item','h2, h3, .movie-item__title'),
     Site("readmanga", "ReadManga", "https://readmanga.live", ("readmanga.live", "mintmanga.live"), ".tile, .manga-list-item", "h3, .title", "/search", "manga"),
 )
 BY_ID = {site.id: site for site in SITES}
@@ -85,7 +104,7 @@ def parse_search(site, text, base, query=""):
             continue
         image = card.select_one("img")
         title = clean(heading.get_text(" ", strip=True) if heading else anchor.get_text(" ", strip=True))
-        title = title or clean(image.get("alt") if image else "")
+        title = title or clean(anchor.get("title")) or clean(image.get("alt") if image else "")
         if site.id == "jutsu":
             if not card.select_one(".aaname, .all_anime_global, .all_anime") and not re.search(r"class=[\"'][^\"']*all_anime", str(card)):
                 continue
@@ -193,77 +212,9 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime"):
             return {"provider": site.id if site else "public", "title": page.title, "url": final, "dubs": [], "seasons": [],
                     "episodes": chapters or ([{"number": 1, "url": final}] if pages else []),
                     "pages": pages, "kind": "manga", "releases": []}
-        # Inspect bounded nested public frames, including a site's player relay.
-        # JSON iframe responses are parsed as text, never executed as scripts.
-        def embedded_pages():
-            pending = [(embed, final, 1) for embed in page.players[:8]]
-            seen = {final}
-            count = 0
-            while pending and count < 12:
-                embed, referer, depth = pending.pop(0)
-                if embed in seen or urlsplit(embed).hostname in {"www.youtube.com", "youtube.com", "youtu.be", "www.youtube-nocookie.com"}:
-                    continue
-                seen.add(embed)
-                count += 1
-                try:
-                    embedded_text, embedded_final, _ = http.document(embed, headers={"Referer": referer})
-                    embedded = parse_page(embedded_text, embedded_final)
-                except SourceError:
-                    continue
-                yield embedded_text, embedded_final, embedded
-                if depth < 3:
-                    pending.extend((child, embedded_final, depth + 1) for child in embedded.players[:8])
-
-        # A selected dub must be published by the source or its embedded player.
-        if dub_url:
-            candidates = [public_url(dub_url, resolve_dns=False)]
-            dub_referer = final
-            allowed = {entry["url"] for entry in choices}
-            if dub_url not in allowed:
-                # A selected dub belongs to an embedded player, whose choices are checked below.
-                found = False
-                for embedded_text, embedded_final, _ in embedded_pages():
-                    values, _ = player_choices(embedded_text, embedded_final)
-                    if dub_url in {entry["url"] for entry in values}:
-                        found = True
-                        choices = values
-                        dub_referer = embedded_final
-                        break
-                if not found:
-                    raise SourceError("Выбранная озвучка больше не найдена на странице. Обнови список.")
-        else:
-            candidates = None
-        episodes = [] if dub_url else page.episodes
-        if candidates:
-            selected_text, selected_final, _ = http.document(candidates[0], headers={"Referer": dub_referer})
-            selected_page = parse_page(selected_text, selected_final)
-            documents = [(selected_text, selected_final, selected_page)]
-        else:
-            documents = embedded_pages()
-        for embedded_text, embedded_final, embedded in documents:
-            new_choices, new_seasons = player_choices(embedded_text, embedded_final)
-            choices = (new_choices or choices) if dub_url else (choices or new_choices)
-            seasons = new_seasons if dub_url else (seasons or new_seasons)
-            if embedded.episodes:
-                episodes = embedded.episodes
-                break
-            target = urlsplit(embedded_final)
-            if target.hostname in {"kodikplayer.com", "kodik.info", "kodik.biz", "kodik.cc", "aniqit.com"} and re.match(r"/video/[\w-]+/[\w-]+(?:/|$)", target.path):
-                episodes = [{"number": 1, "title": "Видео", "url": embedded_final}]
-                break
-        if not episodes and page.streams:
-            episodes = [{"number": episode_number(final) or 1, "url": final}]
-        # Episode season/translation values are recorded, never guessed from a total count.
-        for entry in episodes:
-            match = re.search(r"(?:season|sezon)[/-](\d+)", entry["url"], re.I)
-            if match:
-                entry["season"] = int(match[1])
-        soup = BeautifulSoup(text, "html.parser")
-        releases = [{"date": element.get("datetime"), "label": clean(element.parent.get_text(" "))}
-                    for element in soup.select(".episode time[datetime], .release time[datetime], .schedule time[datetime], [data-episode] time[datetime]") if element.get("datetime")][:100]
-        return {"provider": site.id if site else "public", "title": page.title, "url": final,
-                "dubs": choices, "seasons": seasons, "episodes": episodes, "releases": releases,
-                "available": bool(episodes), "checkedAt": int(time.time())}
+        from player_catalog import inspect_catalog
+        return inspect_catalog(original, text, final, http, dub_url=dub_url, season=season,
+                               provider=site.id if site else 'public', provider_name=site.name if site else 'Публичный источник')
     finally:
         if own_http:
             http.close()
@@ -297,7 +248,7 @@ def search_sources(query, kind="anime"):
     with _search_lock:
         cached=_search_cache.get(key)
         if cached and cached[0]>time.monotonic():return cached[1]
-    sites = [site for site in SITES if site.kind == ("manga" if kind == "manga" else "anime")]
+    sites = [site for site in SITES if site.id != "sovet" and site.kind == ("manga" if kind == "manga" else "anime")]
     results = []
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(search_site, site, query) for site in sites]

@@ -95,6 +95,9 @@ export function mergeCatalog(values){
 }
 
 export function matchesFilters(item,filters){
+  if(filters.tag){const names=[...(item.tags||[]),...(item.genres||[])].flatMap(v=>[v,genreLabels[v]||v]).map(v=>v.toLocaleLowerCase('ru'));
+    if(!filters.tag.split(',').map(v=>v.trim().toLocaleLowerCase('ru')).filter(Boolean).every(tag=>names.some(name=>name.includes(tag))))return false;}
+
   if(filters.year&&String(item.year)!==String(filters.year))return false;
   if(filters.genre&&!item.genres.some(g=>normalized(genreLabels[g]||g).includes(normalized(filters.genre))))return false;
   if(filters.format&&normalized(item.format)!==normalized(filters.format))return false;

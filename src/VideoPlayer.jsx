@@ -2,6 +2,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown} from 'lucide-react';
 import './player.css';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
+import {readProgress,writeProgress} from './playback-progress.js';
 import usePlayerGestures from './use-player-gestures.js';
 import usePlayerActions from './use-player-actions.js';
 import usePlayerAtmosphere from './use-player-atmosphere.js';
@@ -21,13 +22,8 @@ function clock(seconds){
   const n=Math.floor(seconds),h=Math.floor(n/3600),m=Math.floor(n%3600/60),s=n%60;
   return (h?h+':'+String(m).padStart(2,'0'):String(m).padStart(2,'0'))+':'+String(s).padStart(2,'0');
 }
-function keyFor(libraryId,id){return 'mediavault_playback_'+String(libraryId||'local')+'_'+id;}
-function readResume(key){
-  try{const value=Number(localStorage.getItem(key));return Number.isFinite(value)&&value>=10?value:0;}catch{return 0;}
-}
-function writeResume(key,value){
-  try{if(value>10)localStorage.setItem(key,String(Math.floor(value)));else localStorage.removeItem(key);}catch{}
-}
+function keyFor(userId,libraryId,id){return [userId,libraryId,id];}
+function readResume(key){return readProgress(...key)?.time||0;}
 function openerKey(libraryId,id){return 'mediavault_opening_'+String(libraryId||'local')+'_'+id;}
 function getOpening(item,libraryId){
   try{
@@ -50,7 +46,7 @@ function VolumeGlyph({value,muted}){
     <path className="volume-wave" style={{opacity:level===0?1:0}} d="m14 10 6 6m0-6-6 6"/>
   </svg>;
 }
-export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange}){
+export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange}){
   const ownRef=useRef(null),canvasRef=useRef(null),stageRef=useRef(null),railRef=useRef(null);
   const videoRef=mediaRef||ownRef;
   const reducedMotion=useReducedMotion();
@@ -194,7 +190,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
       seek(opening.end);
     if(Math.abs(video.currentTime-lastStored.current)>=5){
       lastStored.current=video.currentTime;
-      writeResume(keyFor(libraryId,item.id),video.currentTime);
+      writeProgress(userId,libraryId,item,video.currentTime,video.duration);
     }
   }
   function loaded(){
@@ -206,7 +202,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
       resumeApplied.current=true;
       const shared=sessionStorage.getItem('mediavault_pending_time_'+item.id);
       if(shared!==null){sessionStorage.removeItem('mediavault_pending_time_'+item.id);const point=Number(shared);if(Number.isFinite(point))seek(point);}
-      else{const point=readResume(keyFor(libraryId,item.id));if(point>0&&point<video.duration-12)seek(point);}
+      else{const point=readResume(keyFor(userId,libraryId,item.id));if(point>0&&point<video.duration-12)seek(point);}
     }
   }
   function choose(nextItem,keepTime=false){
@@ -216,7 +212,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
   }
   function nextEpisode(){choose(next);}
   function ended(){
-    setPlaying(false);writeResume(keyFor(libraryId,item.id),0);
+    setPlaying(false);writeProgress(userId,libraryId,item,0,video.duration);
     if(prefs.autoNext)nextEpisode();
   }
   function toggle(){const video=videoRef.current;if(!video)return;
@@ -292,7 +288,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
       <div className="mv-player-stage">
         <video ref={videoRef} src={source||undefined} playsInline preload="metadata" muted={muted}
           onLoadedMetadata={loaded} onTimeUpdate={onTime}
-          onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);writeResume(keyFor(libraryId,item.id),videoRef.current?.currentTime||0);}}
+          onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);writeProgress(userId,libraryId,item,videoRef.current?.currentTime||0,videoRef.current?.duration);}}
           onDurationChange={loaded} onEnded={ended}
           onError={()=>{if(source)diagnoseVideoFailure({video:videoRef.current,source}).then(message=>onError?.(Error(message))).catch(()=>{});}}
           aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}</video>
@@ -309,7 +305,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
         <div className="mv-player-overview">
           <h1>{library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,'')}</h1>
           <p>{season?.name}<span> / </span>{episode?.label}</p>
-        </div>
+        {readResume(keyFor(userId,libraryId,item.id))>0&&<button className="mv-resume" onClick={()=>{seek(readResume(keyFor(userId,libraryId,item.id)));videoRef.current?.play().catch(onError);}}>Продолжить просмотр · {clock(readResume(keyFor(userId,libraryId,item.id)))}</button>}</div>
       </div>
       <AnimatePresence>
       {settingsOpen&&<PlayerSettings onClose={()=>openPanel('watch')}>{{
@@ -331,7 +327,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,mediaRef,onSe
 </div>,
         image:<div className="mv-player-settings"><label>Устройство<select aria-label="Профиль устройства" value={prefs.deviceProfile||'auto'} onChange={event=>{setGpuAttempt(n=>n+1);changePrefs({deviceProfile:event.target.value});}}><option value="auto">Автоматически</option><option value="phone">Телефон / Android</option><option value="tablet">Планшет</option><option value="desktop">Компьютер</option></select></label><label>Улучшение<select aria-label="Алгоритм улучшения" value={prefs.gpu?(prefs.upscaler||'auto'):'off'} onChange={event=>retryGpu(event.target.value)}><option value="off">Выключено</option><option value="auto">Авто · {deviceProfile==='desktop'?'Anime4K':'мобильный GPU'}</option><option value="mobile">Мобильный GPU · лёгкий</option><option value="anime4k">Anime4K ×2 · мощный GPU</option><option value="fsrcnn">FSRCNN ×2 · WebGPU</option></select></label>
         {prefs.gpu&&<label>Нагрузка<select aria-label="Режим улучшения" value={prefs.neuralMode||'balanced'} onChange={event=>changePrefs({neuralMode:event.target.value})}><option value="performance">Экономный</option><option value="balanced">Баланс</option><option value="quality">Качество</option></select></label>}
-        {neuralStats&&prefs.gpu&&<small>{engineName}: {neuralStats.width}×{neuralStats.height} · {neuralStats.fps} кадр/с · {neuralStats.latency} мс{neuralStats.renderer?' · '+neuralStats.renderer:''}{neuralStats.software?' · программный рендерер браузера':''}</small>}
+        {neuralStats&&prefs.gpu&&<small>{engineName}: {neuralStats.width}×{neuralStats.height} · {neuralStats.fps} кадр/с · {neuralStats.latency} мс{(neuralStats.adapter||neuralStats.renderer)?' · '+(neuralStats.adapter||neuralStats.renderer):''}{neuralStats.software?' · программный рендерер браузера':''}</small>}
         {gpuWarning&&<button onClick={()=>retryGpu(mobileDevice?'mobile':prefs.upscaler)}>Повторить на новом GPU-контексте</button>}
         <p className="player-setting-help">Мобильный режим обрабатывает текстуру видео в WebGL без нейросети на CPU. Anime4K оставлен для мощных GPU. Если браузер отключил аппаратное ускорение, сайт не может включить видеокарту за него. Мини-окно показывает исходник.</p></div>,
         captions:<div className="mv-player-settings">        <label>Субтитры<select value={subtitle} onChange={event=>setSubtitle(event.target.value)}>

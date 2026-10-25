@@ -13,7 +13,7 @@ export function episodeNumber(item) {
 }
 export function voiceLabel(item, fallback = 'Оригинал') {
   for (const key of ['voice', 'dub', 'dubbing', 'translation', 'audioLabel']) {
-    if (typeof item[key] === 'string' && item[key].trim()) return item[key].trim().slice(0, 80);
+    if (typeof item[key] === 'string' && item[key].trim()) return item[key].trim().slice(0, 80)+(item.translationInfo?.kind==='subtitles'?' · субтитры':'');
   }
   const bracket = String(item.name || '').match(/[\[(]([^\])]{2,60})[\])]/);
   return bracket ? bracket[1].trim() : fallback;

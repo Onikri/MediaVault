@@ -33,7 +33,7 @@ def validate_job(value):
     # Reject accidental pasted credentials rather than saving or forwarding them.
     allowed = {"version", "library_id", "sources", "collection", "episodes", "quality", "resume", "season"}
     if value["version"] == 2:
-        allowed |= {"section", "metadata", "entries", "dub", "provider"}
+        allowed |= {"section", "metadata", "entries", "dub", "provider", "translation"}
     if set(value) - allowed:
         raise SourceError("В задании есть лишние поля. Скопируй новое задание с сайта.")
     library = value.get("library_id", "")
@@ -73,16 +73,22 @@ def validate_job(value):
     metadata = value.get("metadata") or {}
     if not isinstance(metadata, dict) or len(json.dumps(metadata).encode()) > 100000:
         raise SourceError("Слишком большое описание тайтла.")
+    translation=value.get('translation') or {}
+    if not isinstance(translation,dict) or set(translation)-{'name','kind','language','player','variantId'}:
+        raise SourceError('Некорректный перевод.')
+    if translation:
+        if translation.get('kind') not in {'voice','subtitles'} or any(not isinstance(v,str) or len(v)>180 for v in translation.values()):
+            raise SourceError('Некорректные параметры перевода.')
     return {"library_id": library, "sources": sources, "collection": collection,
             "quality": quality, "selected": selected, "season": int(season), "section": section,
-            "metadata": metadata, "entries": prepared, "dub": str(value.get("dub", ""))[:120]}
+            "metadata": metadata, "entries": prepared, "translation":translation, "dub": str(value.get("dub", ""))[:120]}
 
 
 def source_identity(url):
     """Keep logical episode/dub identity; remove rotating CDN signatures."""
     parsed = urlsplit(url)
     query = [(key, value) for key, value in parse_qsl(parsed.query)
-             if key.lower() in {"episode", "season", "translation", "videoid", "id", "oid", "dubbing"}]
+             if key.lower() in {"episode", "season", "translation", "videoid", "id", "oid", "dubbing", "mv_translation", "mv_player"}]
     stable = urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path,
                         urlencode(sorted(query)), ""))
     # A non-URL prefix keeps vault_drive from dropping meaningful episode queries.
@@ -162,7 +168,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
             cursor=index
             number, collection = entry["number"], entry["collection"]
             season = entry.get("season", job["season"])
-            identity = entry["identity"] + (f":season={season}" if season != 1 else "")
+            identity = entry["identity"] + (':translation=' + __import__('hashlib').sha256(json.dumps(job['translation'],sort_keys=True).encode()).hexdigest() if job.get('translation') else '') + (f":season={season}" if season != 1 else "")
             if job["dub"]:
                 identity += ":dub=" + job["dub"]
             label = f"Серия {number}" if number is not None else f"Видео {index}"
@@ -223,6 +229,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                 name = (f"{collection} — {noun} {number:03d}.{extension}" if number is not None
                         else (page.title or entry["title"] or collection)[:220] + "." + extension)
                 options = {"metadata": job["metadata"], "dub": job["dub"]} if job["metadata"] or job["dub"] else {}
+                if job.get('translation'):options['translation']=job['translation']
                 if category == 'video':
                     from media_download import preview_frame
                     thumbnail = preview_frame(path)

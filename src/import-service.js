@@ -12,7 +12,7 @@ export function createImportClient(server,googleToken,fetcher=fetch){
   async function request(path,{method='GET',body,auth=true,headers={},signal}={}){
     if(!server)throw Error('Сервер импорта ещё не подключён.');
     if(auth&&!session)await authenticate();
-    const response=await fetcher(server+path,{method,signal:signal||AbortSignal.timeout(path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
+    const response=await fetcher(server+path,{method,signal:signal||AbortSignal.timeout(['/sources/discover','/sources/calendar'].includes(path)?90000:path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
     const result=await response.json().catch(()=>({}));
     if(!response.ok){if(response.status===401)session=null;throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status});}
     return result;
@@ -109,7 +109,7 @@ export function useImportService(state,actions){
     if(!videos.length)return;
     enrichmentRequested.current=key;
     const pending=jobs.some(job=>job.progress?.taskType==='enrich'&&['queued','running'].includes(job.status));
-    if(!pending&&(videos.some(item=>!item.previewArtwork)||Object.values(state.catalog.titleProfiles||{}).some(p=>p.version<2||p.partial)))enrichLibrary().catch(()=>{enrichmentRequested.current='';});
+    if(!pending&&(videos.some(item=>!item.previewArtwork)||Object.values(state.catalog.titleProfiles||{}).some(p=>p.version<3||p.partial)))enrichLibrary().catch(()=>{enrichmentRequested.current='';});
   },[state.catalog,!!state.busy,session?.driveConnected,session?.serverVersion]);
   async function operation(id,op){const task=await client.request('/jobs/'+encodeURIComponent(id)+'/'+op,{method:'POST'});setJobs(old=>old.map(value=>value.id===id?task:value));return task;}
   return {server,setServer,status,error,session,jobs,active,connect,submit,refresh,configureGoogle,enrichLibrary,

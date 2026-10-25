@@ -371,6 +371,41 @@ def source_inspect(body: Inspection, subject=Depends(owner)):
     return inspect_source(body.url, dub_url=body.dub_url, season=body.season, kind=body.kind)
 
 
+class TitleDiscovery(StrictBody):
+    title: dict
+
+
+@app.post('/sources/discover')
+def discover_voices(body: TitleDiscovery, subject=Depends(owner)):
+    from source_discovery import discover
+    if len(json.dumps(body.title)) > 10000:
+        raise HTTPException(422, 'Слишком большое описание тайтла.')
+    try:
+        return discover(body.title)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+
+
+@app.get('/metadata/posters')
+def title_posters(ids: str = '', kind: str = 'anime'):
+    from poster_assets import posters
+    if len(ids)>400 or kind not in {'anime','manga','ranobe'}:raise HTTPException(422,'Некорректные ID постеров.')
+    return posters(ids.split(','),kind)
+
+
+@app.get('/sources/calendar')
+def source_calendar(subject=Depends(owner)):
+    from release_calendar import calendar
+    return calendar()
+
+
+@app.get('/metadata/watch-order')
+def title_watch_order(identity: str = ''):
+    if not re.fullmatch(r'\d{1,12}',identity):raise HTTPException(422,'Некорректный тайтл.')
+    from watch_order import watch_order
+    return watch_order(identity)
+
+
 class ImportTask(StrictBody):
     job: dict
     vault_key: str = Field(min_length=44, max_length=44)

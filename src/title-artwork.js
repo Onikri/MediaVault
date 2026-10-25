@@ -11,6 +11,12 @@ export function clearArtworkCache(next=''){
   blobs.clear();
   images.clear();
 }
+let activeReads=0;const waiting=[];
+async function limitedRead(operation){
+  if(activeReads>=4)await new Promise(resolve=>waiting.push(resolve));
+  activeReads++;
+  try{return await operation();}finally{activeReads--;waiting.shift()?.();}
+}
 async function externalImage(url,{signal}={}){
   if(!images.has(url))images.set(url,(async()=>{
     const server=globalThis.window?.MEDIA_VAULT_CONFIG?.importServerUrl;
@@ -41,7 +47,7 @@ export function useArtwork(url,profile,readArtwork,libraryId){
     }
     if(!blobs.has(key)){
       const generation=scope;
-      const entry={promise:readArtwork(asset).then(blob=>{
+      const entry={promise:limitedRead(()=>readArtwork(asset)).then(blob=>{
         if(generation!==scope)return '';entry.url=URL.createObjectURL(blob);return entry.url;
       })};blobs.set(key,entry);entry.promise.catch(()=>blobs.delete(key));
     }

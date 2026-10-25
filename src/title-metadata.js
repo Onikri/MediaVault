@@ -9,14 +9,14 @@ export function plainText(value){
 }
 export const russianText=value=>{const text=plainText(value),letters=(text.match(/\p{L}/gu)||[]).length,cyrillic=(text.match(/[а-яё]/gi)||[]).length;return cyrillic&&cyrillic/Math.max(1,letters)>=.25?text:'';};
 export function imageURL(value){
-  if(!value||typeof value!=='string')return '';
+  if(!value||typeof value!=='string'||/(?:\/|_)(?:404|missing|no[_-]?image)(?:[.\/_-]|$)/i.test(value))return '';
   try{const url=new URL(value,ORIGIN);return url.protocol==='https:'&&!url.username&&!url.password?url.href:'';}catch{return '';}
 }
-export const translated={tv:'Сериал',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
+export const translated={tv:'Аниме-сериал',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
 export const translate=(value,fallback='Не указано')=>translated[String(value||'').toLowerCase()]||(hasRussian(value)?String(value):fallback);
 export function importedProfile(value){
   if(!value||!Object.keys(value).length)return null;
-  return {version:2,partial:true,language:'ru',title:russianText(value.titles?.ru)||russianText(value.title),sourceId:value.ids?.mal||'',
+  return {version:3,partial:true,language:'ru',title:russianText(value.titles?.ru)||russianText(value.title),sourceId:value.ids?.mal||'',
     description:russianText(value.description),cover:imageURL(value.cover),background:imageURL(value.background),
     genres:(value.genres||[]).filter(hasRussian),themes:(value.tags||[]).filter(hasRussian),format:translate(value.format),status:translate(value.status),
     year:value.year,startDate:value.startDate,endDate:value.endDate,episodes:value.episodes,chapters:value.chapters,volumes:value.volumes,rating:value.age?value.age+'+':'',characters:[],related:[],screenshots:[]};
@@ -28,7 +28,7 @@ export function normalizeProfile(data,{roles=[],related=[],screenshots=[]}={}){
   const id=String(data.id),kind=['manga','novel','light_novel','manhwa','manhua','one_shot'].includes(data.kind)?'manga':'anime';
   const chars=roles.filter(r=>r.character).sort((a,b)=>Number(b.roles?.includes('Main'))-Number(a.roles?.includes('Main'))).slice(0,18);
   const cover=imageURL(data.image?.original||data.image?.preview||'');
-  return {version:2,language:'ru',source:'shikimori',sourceId:id,sourceURL:ORIGIN+(data.url||'/'+resource(kind)+'/'+id),kind,
+  return {version:3,language:'ru',source:'shikimori',sourceId:id,sourceURL:ORIGIN+(data.url||'/'+resource(kind)+'/'+id),kind,
     title:nameOf(data,'Название уточняется'),aliases:[data.name,...(data.english||[]),...(data.japanese||[]),...(data.synonyms||[])].filter(Boolean),
     description:russianText(data.description_html||data.description),cover,
     background:imageURL(screenshots[0]?.original||data.screenshots?.[0]?.original||''),
@@ -84,7 +84,16 @@ export async function loadTitleProfile(id,kind='anime',options={}){
   const art=enrichment[0].status==='fulfilled'?enrichment[0].value:null,cross=enrichment[1].status==='fulfilled'?enrichment[1].value:[];
   if(art?.background){profile.backgrounds=[imageURL(art.background)].filter(Boolean);profile.artworkSources=[{provider:'anilist',url:art.sourceURL}];}
   if(art?.cover)profile.cover=imageURL(art.cover);
-  for(const value of cross)if(!profile.related.some(item=>item.kind===value.kind&&item.title===value.title))profile.related.push(value);
+  for(const value of cross)if(!profile.related.some(item=>item.kind===value.kind&&(String(item.id)===String(value.ids?.mal||'')||item.title===value.title)))profile.related.push(value);
+  if(options.server){
+    const ids=[id,...profile.related.filter(r=>r.kind===kind).map(r=>r.id)].filter(v=>/^\d+$/.test(v));
+    try{
+      const response=await fetch(options.server+'/metadata/posters?'+new URLSearchParams({ids:[...new Set(ids)].join(','),kind}),{signal:options.signal||AbortSignal.timeout(10000)});
+      if(response.ok){const posters=await response.json();if(imageURL(posters[id]?.cover))profile.cover=imageURL(posters[id].cover);
+        profile.related=profile.related.map(value=>({...value,...(posters[value.id]?{cover:imageURL(posters[value.id].cover),title:russianText(posters[value.id].title)||value.title}:{})}));}
+    }catch(cause){options.signal?.throwIfAborted();}
+  }
+  profile.related=[...new Map(profile.related.map(r=>[r.kind+':'+(r.ids?.mal||r.id),r])).values()];
   return {...profile,partial:extra.some(r=>r.status==='rejected')||!profile.description,missingParts:names.filter((_,i)=>extra[i].status==='rejected'),retryAfter:Date.now()+60000};
 }
 export async function loadCharacter(id,options={}){

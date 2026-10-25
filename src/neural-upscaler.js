@@ -86,6 +86,11 @@ export function reconstructRgb(baseRgb,neuralY) {
 export async function startNeuralUpscaler(video,canvas,{mode='balanced',onFailure=()=>{},onStats=()=>{}}={}) {
   const settings=QUALITY_MODES[mode]||QUALITY_MODES.balanced;
   const ort=await loadRuntime();
+  const adapter=await navigator.gpu?.requestAdapter({powerPreference:'high-performance'});
+  if(!adapter)throw Error('Производительный WebGPU-адаптер недоступен.');
+  const gpuInfo=adapter.info||{};
+  const device=await adapter.requestDevice();
+  ort.env.webgpu.device=device;
   const model=await modelBytes();
   const session=await ort.InferenceSession.create(model,{
     executionProviders:['webgpu'],graphOptimizationLevel:'all'
@@ -99,7 +104,7 @@ export async function startNeuralUpscaler(video,canvas,{mode='balanced',onFailur
     if(!probe||probe.dims[2]!==64||probe.dims[3]!==64)
       throw Error('FSRCNN self-test returned an invalid tensor.');
   }catch(error){
-    await session.release();
+    await session.release();device.destroy();
     throw Error('Проверка GPU-инференса FSRCNN не прошла: '+error.message);
   }
   let stopped=false,busy=false,callbackId=0,videoCallback=false,last=0,slow=0;
@@ -108,7 +113,7 @@ export async function startNeuralUpscaler(video,canvas,{mode='balanced',onFailur
   const inCtx=input.getContext('2d',{willReadFrequently:true});
   const baseCtx=base.getContext('2d',{willReadFrequently:true});
   const outputCtx=canvas.getContext('2d',{alpha:false});
-  if(!inCtx||!baseCtx||!outputCtx){await session.release();throw Error('Canvas 2D недоступен.');}
+  if(!inCtx||!baseCtx||!outputCtx){await session.release();device.destroy();throw Error('Canvas 2D недоступен.');}
   function stop(){
     if(stopped)return;
     stopped=true;
@@ -121,7 +126,7 @@ export async function startNeuralUpscaler(video,canvas,{mode='balanced',onFailur
     document.removeEventListener('visibilitychange',visibility);
     canvas.style.opacity='0';
     // The in-flight run must complete before session resources are released.
-    if(!busy)session.release().catch(()=>{});
+    if(!busy)session.release().catch(()=>{}).finally(()=>device.destroy());
   }
   function fail(error){if(stopped)return;stop();onFailure(error);}
   function clearFrame(){canvas.style.opacity='0';last=0;}
@@ -165,13 +170,13 @@ export async function startNeuralUpscaler(video,canvas,{mode='balanced',onFailur
       if(slow>=4)throw Error('FSRCNN слишком медленная на этом GPU. Выбери экономный режим.');
       const now=performance.now();
       if(now-lastStats>=1000){
-        onStats({fps:Math.round(total*1000/(now-lastStats)),latency:Math.round(elapsed),width:ow,height:oh});
+        onStats({adapter:gpuInfo.description||gpuInfo.device||gpuInfo.vendor||'WebGPU (название скрыто браузером)',fps:Math.round(total*1000/(now-lastStats)),latency:Math.round(elapsed),width:ow,height:oh});
         lastStats=now;total=0;
       }
     }catch(error){fail(error);}
     finally{
       busy=false;
-      if(stopped)session.release().catch(()=>{});
+      if(stopped)session.release().catch(()=>{}).finally(()=>device.destroy());
     }
   };
   function schedule(){

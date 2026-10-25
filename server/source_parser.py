@@ -56,10 +56,14 @@ def public_url(value, *, resolve_dns=True):
         pass
     else:
         raise SourceError("IP-адреса не поддерживаются; укажи публичный домен.")
-    # Disallow catalogue REST/GraphQL calls even if a page advertises an API URL.
-    if (host.startswith(("api.", "plapi."))
-            or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
-        raise SourceError("API сайтов отключены: нужна публичная страница или ссылка плеера.")
+    # Only these public playback APIs are allowed; arbitrary site APIs remain blocked.
+    playback_api = (
+        host == "plapi.cdnvideohub.com" and bool(re.fullmatch(r"/api/v1/player/sv/(?:playlist|video/\d+)", url.path))
+        or host in {"anilibria.top", "aniliberty.top", "api.anilibria.app"}
+        and bool(re.fullmatch(r"/api/v1/anime/releases/[a-zA-Z0-9_-]+", url.path))
+    )
+    if not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
+        raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
     if resolve_dns:
         try:
             addresses = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
@@ -347,7 +351,7 @@ def parse_page(text, base):
     page.streams = list({entry["url"]: entry for entry in page.streams}.values())[:100]
     page.players = list(dict.fromkeys(page.players))[:50]
     # Multiple dubs can publish the same episode. Preserve the page's first choice.
-    page.episodes = list({entry["number"]: entry for entry in reversed(page.episodes)}.values())
+    page.episodes = list({(entry["number"], entry["url"]): entry for entry in page.episodes}.values())
     page.episodes.sort(key=lambda entry: entry["number"])
     if '__NUXT_DATA__' in text:
         from public_page_data import episode_streams
@@ -374,7 +378,7 @@ class Resolver:
         return parse_page(text, final)
 
     def player(self, url, referer=None):
-        from anime_dl_core import AniboomPlayer, AnimediaPlayer, KodikPlayer, SibnetPlayer, SovetRomanticaPlayer
+        from anime_dl_core import AniboomPlayer, AnimediaPlayer, KodikPlayer, SibnetPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer
         # Explicit registry: never ap.extract(), which also registers API-based players.
         for player_type in (KodikPlayer, AniboomPlayer, SibnetPlayer, AnimediaPlayer, SovetRomanticaPlayer):
             if player_type.matches(url):
@@ -396,6 +400,15 @@ class Resolver:
         if url in visited:
             raise SourceError("Источник зациклил вложенные плееры.")
         visited.add(url)
+        from player_catalog import relay_selection, animego_buttons
+        selected = relay_selection(url)
+        if selected:
+            original, translation, player = selected
+            text, final, _ = self.http.document(original)
+            matches = [v for v in animego_buttons(text, final) if v['id'] == translation and v['player'] == player]
+            if len(matches) != 1:
+                raise SourceError('Выбранный перевод этой серии отсутствует. Другая озвучка автоматически не подставляется.')
+            return self.resolve(matches[0]['url'], referer=final, depth=depth+1, visited=visited)
         page = self.player(url, referer) or self.inspect(url)
         if page.streams:
             return page

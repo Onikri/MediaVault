@@ -9,6 +9,7 @@ export async function startAnime4K(video,canvas,{mode='balanced',onStats=()=>{},
   const limit=mode==='performance'?640:mode==='quality'?(coarse?960:1920):(coarse?800:1280);
   const width=Math.max(2,Math.min(video.videoWidth||640,limit));
   input.width=width;input.height=Math.max(2,Math.round(width*(video.videoHeight||360)/(video.videoWidth||640)));
+  canvas.getContext('webgl',{powerPreference:'high-performance',alpha:false});
   const upscaler=new ImageUpscaler(mode==='quality'?ANIME4KJS_SIMPLE_M_2X:ANIME4KJS_SIMPLE_S_2X);
   let stopped=false,frame=0,raf=0,count=0,slow=0,started=performance.now(),lastMediaTime=-1,lastRenderAt=0,nativeBase=null,windowStart=performance.now(),windowFrames=0,slowWindows=0;
   function stop(){

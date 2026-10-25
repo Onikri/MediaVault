@@ -22,7 +22,7 @@ def russian(value):
     return text if re.search('[а-яё]',text,re.I) else ''
 
 def image(value):
-    if not value:return ''
+    if not value or re.search(r'(?:/|_)(?:missing|404|no[_-]?image)(?:[./_-]|$)',value,re.I):return ''
     value=urljoin('https://shikimori.io',value)
     return value if value.startswith('https://') else ''
 
@@ -35,8 +35,8 @@ def load_profile(identity,kind):
     with ThreadPoolExecutor(max_workers=3) as pool:extra=list(pool.map(fetch,names))
     roles,related=extra[0][0],extra[1][0];screenshots=extra[2][0] if len(extra)>2 else []
     roles=sorted(roles,key=lambda role:0 if 'Main' in role.get('roles',[]) else 1)
-    formats={'tv':'Сериал','movie':'Фильм','ova':'OVA','ona':'ONA','special':'Спецвыпуск','manga':'Манга','novel':'Ранобэ','light_novel':'Ранобэ'}
-    profile={'version':2,'source':'shikimori','sourceId':str(identity),'sourceURL':f"https://shikimori.io/{'animes' if kind=='anime' else 'mangas'}/{identity}",'language':'ru',
+    formats={'tv':'Аниме-сериал','movie':'Фильм','ova':'OVA','ona':'ONA','special':'Спецвыпуск','manga':'Манга','novel':'Ранобэ','light_novel':'Ранобэ'}
+    profile={'version':3,'source':'shikimori','sourceId':str(identity),'sourceURL':f"https://shikimori.io/{'animes' if kind=='anime' else 'mangas'}/{identity}",'language':'ru',
              'title':russian(details.get('russian')),'description':russian(details.get('description_html') or details.get('description')),
              'cover':image((details.get('image') or {}).get('original')),'format':formats.get(details.get('kind'),'Произведение'),
              'status':{'released':'Завершён','ongoing':'Выходит','anons':'Анонсирован'}.get(details.get('status'),''),
@@ -67,6 +67,13 @@ def load_profile(identity,kind):
     with ThreadPoolExecutor(max_workers=2) as pool:profile['characters']=list(pool.map(character_detail,profile['characters']))
     profile['partial']=profile['partial'] or not profile['description']
     if profile['screenshots']:profile['background']=profile['screenshots'][0]
+    try:
+        from poster_assets import posters
+        art=posters([str(identity),*[r['id'] for r in profile['related'] if r['kind']==kind]],kind)
+        if art.get(str(identity)):profile['cover']=art[str(identity)]['cover']
+        for related in profile['related']:
+            if art.get(related['id']):related.update(art[related['id']])
+    except Exception:pass
     return profile
 
 def preview_existing(vault,item):
@@ -110,10 +117,10 @@ def enrich_profile(vault,group,section):
     title_id=section+':'+group['id'];previous=vault.catalog.get('titleProfiles',{}).get(title_id,{})
     info=group.get('metadata') or {};identity=group.get('metadataId') or info.get('ids',{}).get('mal')
     profile=previous.copy()
-    if identity and (not previous.get('sourceId') or previous.get('version',0)<2 or previous.get('partial') and previous.get('retryAfter',0)<time.time()*1000):
+    if identity and (not previous.get('sourceId') or previous.get('version',0)<3 or previous.get('partial') and previous.get('retryAfter',0)<time.time()*1000):
         try:profile.update(load_profile(identity,'manga' if section in {'manga','ranobe'} else 'anime'))
         except Exception:profile.update({'partial':True,'retryAfter':int((time.time()+120)*1000)})
-    profile.setdefault('version',2);profile.setdefault('title',group['name']);profile.setdefault('language','ru')
+    profile.setdefault('version',3);profile.setdefault('title',group['name']);profile.setdefault('language','ru')
     own=[i['previewArtwork'] for i in vault.catalog['items'] if i.get('collectionId')==group['id'] and i.get('previewArtwork')][:10]
     assets={**profile.get('artwork',{}),**{'drive:'+a['id']:a for a in own}}
     own_urls=['drive:'+a['id'] for a in own]
