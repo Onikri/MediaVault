@@ -13,7 +13,7 @@ export function imageURL(value){
   if(!value||typeof value!=='string'||/(?:\/|_)(?:404|missing|no[_-]?image)(?:[.\/_-]|$)/i.test(value))return '';
   try{const url=new URL(value,ORIGIN);return url.protocol==='https:'&&!url.username&&!url.password?url.href:'';}catch{return '';}
 }
-export const translated={tv:'Аниме',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
+export const translated={tv:'Аниме',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',webtoon:'Вебтун',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
 export const translate=(value,fallback='Не указано')=>translated[String(value||'').toLowerCase()]||(hasRussian(value)?String(value):fallback);
 export function importedProfile(value){
   if(!value||!Object.keys(value).length)return null;
@@ -26,7 +26,7 @@ const themeNames=new Set(['Меха','Психологическое','Школ�
 const nameOf=(value,fallback)=>russianText(value?.russian)||fallback;
 const resource=kind=>['manga','ranobe','novel'].includes(kind)?'mangas':'animes';
 export function normalizeProfile(data,{roles=[],related=[],screenshots=[]}={}){
-  const id=String(data.id),kind=['manga','novel','light_novel','manhwa','manhua','one_shot'].includes(data.kind)?'manga':'anime';
+  const id=String(data.id),kind=['manga','novel','light_novel','manhwa','manhua','one_shot','web_manga','webtoon'].includes(data.kind)?'manga':'anime';
   const chars=roles.filter(r=>r.character).sort((a,b)=>Number(b.roles?.includes('Main'))-Number(a.roles?.includes('Main'))).slice(0,18);
   const cover=imageURL(data.image?.original||data.image?.preview||'');
   return {version:4,language:'ru',source:'shikimori',sourceId:id,sourceURL:ORIGIN+(data.url||'/'+resource(kind)+'/'+id),kind,

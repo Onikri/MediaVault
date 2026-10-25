@@ -15,8 +15,8 @@ def image_extension(header):
     if header[4:8]==b'ftyp' and header[8:12] in {b'avif',b'avis'}:return 'avif'
     return None
 
-def download_chapter(url,temporary,http,progress=lambda _:None):
-    if not site_for(url):raise SourceError('Эта русскоязычная читалка пока не поддерживается.')
+def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
+    if not site_for(url):raise SourceError('Эта читалка пока не поддерживается.')
     text,final,_=http.document(url)
     if not site_for(final):raise SourceError('Глава перенаправила на другую читалку.')
     pages=parse_pages(text,final)
@@ -32,6 +32,11 @@ def download_chapter(url,temporary,http,progress=lambda _:None):
         local.http.download(url,target,headers={'Referer':final},maximum=30*1024*1024)
         with target.open('rb') as source:extension=image_extension(source.read(32))
         if not extension:raise SourceError('Читалка вернула заглушку вместо изображения страницы.')
+        if quality in {'1280','1920'}:
+            packed=target.with_suffix('.jpg')
+            result=subprocess.run(['ffmpeg','-nostdin','-v','error','-i',str(target),'-frames:v','1','-vf',"scale='min("+quality+",iw)':-2",'-q:v','4','-threads','1',str(packed)],capture_output=True,timeout=20,check=False)
+            if result.returncode:raise SourceError('Не удалось сжать страницу. Выбери оригинальное качество.')
+            target.unlink();target=packed;extension='jpg'
         return index,target,extension
     workers=3 if hasattr(http,'fork') else 1
     try:

@@ -4,3 +4,7 @@ uvicorn==0.52.1
 playwright==1.62.0
 
 yt-dlp[default]==2026.10.21
+
+Pillow==11.3.0
+ctranslate2==4.6.0
+sentencepiece==0.2.1

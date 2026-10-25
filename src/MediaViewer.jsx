@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import MangaReader from './MangaReader.jsx';
 import VideoPlayer from './VideoPlayer.jsx';
 import {readReading,writeReading} from './reading-progress.js';
 
@@ -12,7 +13,7 @@ async function libraryReady(name,signal){
   throw Error('Не удалось загрузить обработчик книги или архива. Проверь подключение к сети.');
 }
 
-export default function MediaViewer({item,catalog,libraryId,userId,onSelectItem,onClose,readWhole,prepareStream,onError,inline=false,renderEpisodeArtwork,onPlaybackChange}) {
+function LegacyMediaViewer({item,catalog,libraryId,userId,onSelectItem,onClose,readWhole,prepareStream,onError,inline=false,renderEpisodeArtwork,onPlaybackChange}) {
   const [source,setSource]=useState('');
   const [text,setText]=useState('');
   const [busy,setBusy]=useState(true);
@@ -168,3 +169,5 @@ export default function MediaViewer({item,catalog,libraryId,userId,onSelectItem,
     </footer>
   </section>;
 }
+
+export default function MediaViewer(props){return props.item.category==='manga'?<MangaReader {...props}/>:<LegacyMediaViewer {...props}/>;}

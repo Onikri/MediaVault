@@ -208,14 +208,15 @@ app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET",
 @app.middleware("http")
 async def limits(request: Request, call_next):
     if request.method == "POST":
+        maximum=14*1024*1024 if request.url.path=="/reader/translate" else 512*1024
         if request.headers.get("origin") not in (None, ORIGIN):
             return JSONResponse({"detail": "Origin denied"}, status_code=403)
         try:
-            if int(request.headers.get("content-length", "0")) > 512 * 1024:
+            if int(request.headers.get("content-length", "0")) > maximum:
                 return JSONResponse({"detail": "Request too large"}, status_code=413)
         except ValueError:
             return JSONResponse({"detail": "Invalid content length"}, status_code=400)
-        if len(await request.body()) > 512 * 1024:
+        if len(await request.body()) > maximum:
             return JSONResponse({"detail": "Request too large"}, status_code=413)
     response = await call_next(request)
     response.headers["Cache-Control"] = "no-store"
@@ -242,7 +243,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 8, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 9, "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -550,3 +551,8 @@ def resume(task_id: str, subject=Depends(owner)):
 
 from trailer_service import install as install_trailers
 install_trailers(app, os.getenv("DATA_DIR", "/data"))
+
+from reader_translation import install as install_reader_translation
+install_reader_translation(app, os.getenv("DATA_DIR", "/data"), owner)
+from anime_music import install as install_anime_music
+install_anime_music(app)

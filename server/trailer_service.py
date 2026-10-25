@@ -51,7 +51,7 @@ def download(token,url,directory):
         runtime=['--js-runtimes','node:'+str(node)] if node.is_file() else []
         result=subprocess.run([sys.executable,'-m','yt_dlp','--ignore-config','--no-playlist','--no-progress','--no-part','--quiet','--no-warnings',
             '--socket-timeout','12','--retries','1','--fragment-retries','1','--max-filesize','100M','--match-filter','duration <= 600 & !is_live',
-            '-f','best[height<=720][ext=mp4][vcodec!=none][acodec!=none]/best[height<=720][vcodec!=none][acodec!=none]',
+            '--merge-output-format','mp4','-f','best[height<=720][ext=mp4][vcodec!=none][acodec!=none]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][vcodec!=none][acodec!=none]',
             '-o',str(target),*runtime,'--',url],capture_output=True,timeout=120,check=False)
         paths=[p for p in directory.glob(token+'.*') if p.suffix in {'.mp4','.webm','.mkv','.mov'}]
         if result.returncode or not paths or not 0<paths[0].stat().st_size<=MAX_BYTES:raise ValueError()

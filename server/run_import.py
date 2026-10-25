@@ -83,7 +83,7 @@ def validate_job(value):
     if not isinstance(translation,dict) or set(translation)-{'name','kind','language','player','variantId'}:
         raise SourceError('Некорректный перевод.')
     if translation:
-        if translation.get('kind') not in {'voice','subtitles'} or any(not isinstance(v,str) or len(v)>180 for v in translation.values()):
+        if translation.get('kind') not in ({'manga'} if section=='manga' else {'voice','subtitles'}) or any(not isinstance(v,str) or len(v)>180 for v in translation.values()):
             raise SourceError('Некорректные параметры перевода.')
     return {"version":value['version'],"library_id": library, "sources": sources, "collection": collection,
             "quality": quality, "selected": selected, "chapters":chapters,"season": int(season), "section": section,
@@ -222,7 +222,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                                 log(f"  {label}: {text}.")
                             last_phase[0] = phase
                     if category == "manga":
-                        path = download_chapter(entry["url"], temporary, resolver.http,progress=report)
+                        path = download_chapter(entry["url"], temporary, resolver.http,progress=report,quality=job["quality"])
                         page = type("Chapter", (), {"title": entry["title"]})()
                     elif category == "book":
                         path = download_text(entry["url"], temporary, resolver.http)
@@ -279,9 +279,9 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
             resolver.http.close()
 
 
-def download_chapter(url, temporary, http,progress=lambda _:None):
+def download_chapter(url, temporary, http,progress=lambda _:None,quality='best'):
     from manga_download import download_chapter as download
-    return download(url,temporary,http,progress=progress)
+    return download(url,temporary,http,progress=progress,quality=quality)
 
 
 def download_text(url, temporary, http):

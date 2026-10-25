@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM python:3.12-slim-bookworm
 ENV CHROMIUM_PATH=/usr/bin/chromium PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates chromium && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates chromium tesseract-ocr tesseract-ocr-eng libgomp1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements.txt requirements-service.txt ./
 RUN --mount=type=secret,id=proxy_ca \

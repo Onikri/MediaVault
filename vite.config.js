@@ -6,6 +6,7 @@ import {defineConfig} from 'vite';
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const runtimeFiles = [
   'config.js',
+  'spotify-callback.html',
   'sw.js',
   'crypto.js',
   'drive.js',

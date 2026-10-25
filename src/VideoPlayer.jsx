@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown} from 'lucide-react';
+import {Music2,Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown} from 'lucide-react';
 import './player.css';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {readProgress,writeProgress} from './playback-progress.js';
@@ -8,6 +8,7 @@ import usePlayerActions from './use-player-actions.js';
 import usePlayerAtmosphere from './use-player-atmosphere.js';
 import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
 import {startNeuralUpscaler} from './neural-upscaler.js';
+import Soundtrack from './Soundtrack.jsx';
 import PlayerSettings,{SettingsGlyph} from './PlayerSettings.jsx';
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {startMobileGpu} from './mobile-gpu-upscaler.js';
@@ -59,6 +60,8 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const [panel,setPanel]=useState('watch'),[localTrack,setLocalTrack]=useState('');
   const [controlsVisible,setControlsVisible]=useState(true);
   const hideTimer=useRef(null);
+  const [musicOpen,setMusicOpen]=useState(false);
+  const musicIdentity=item.metadataId||catalog?.storage?.collections?.find?.(v=>v.id===item.collectionId)?.metadata?.ids?.mal;
   const settingsOpen=panel==='settings';
   const scene=usePlayerAtmosphere(videoRef,source,playing,stageRef);
   const [subtitle,setSubtitle]=useState('off'),[availableTracks,setAvailableTracks]=useState([]);
@@ -358,13 +361,14 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
           </div>
           <div className="mv-player-control-group">
             <button aria-label={isPip?'Закрыть мини-окно':'Мини-окно'} aria-pressed={isPip} title="Мини-окно" disabled={!videoRef.current?.requestPictureInPicture&&!videoRef.current?.webkitSetPresentationMode} onClick={pip}><PictureInPicture2 size={19}/></button>
-            <button className={settingsOpen?'is-active':''} aria-label="Настройки плеера" aria-expanded={settingsOpen} onClick={()=>openPanel(settingsOpen?'watch':'settings')}><SettingsGlyph/></button>
+            {musicIdentity&&<button aria-label="Музыка из аниме" aria-expanded={musicOpen} onClick={()=>setMusicOpen(v=>!v)}><Music2 size={19}/></button>}<button className={settingsOpen?'is-active':''} aria-label="Настройки плеера" aria-expanded={settingsOpen} onClick={()=>openPanel(settingsOpen?'watch':'settings')}><SettingsGlyph/></button>
             <button aria-label={isFullscreen?'Выйти из полноэкранного режима':'На весь экран'} onClick={fullscreen}>{isFullscreen?<Minimize2 size={20}/>:<Maximize2 size={20}/>}</button>
           </div>
         </div>
       </div>
     </div>
     <input ref={subtitleInput} type="file" accept=".srt,.vtt,text/vtt" hidden onChange={attachSubtitle}/>
+    {musicOpen&&<aside className="mv-player-music"><button className="icon-button" aria-label="Закрыть музыку" onClick={()=>setMusicOpen(false)}><X size={17}/></button><Soundtrack identity={musicIdentity} userId={userId} compact/></aside>}
     {episodes.length>1&&<section className="mv-player-shelf" inert={settingsOpen} aria-label="Эпизоды сезона">
       <div className="mv-player-shelf-heading">{panel==='episodes'&&<button aria-label="Закрыть эпизоды" onClick={()=>openPanel('watch')}><X size={20}/></button>}<div className="mv-player-season-title">{seasons.length>1?<label><span className="sr-only">Сезон</span><select value={season?.id||''} onChange={event=>choose(seasons.find(s=>s.id===event.target.value)?.episodes[0]?.variants[0]?.item)}>{seasons.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>:<span>{season?.name}</span>}<button className="mv-player-expand-episodes" aria-label="Развернуть эпизоды" onClick={()=>openPanel(panel==='episodes'?'watch':'episodes')}>{season?.episodes.length} эпизодов <ChevronsUp size={12}/></button></div><div><button aria-label="Предыдущие эпизоды" onClick={()=>scrollEpisodes(-360)}><ChevronLeft size={18}/></button><button aria-label="Следующие эпизоды" onClick={()=>scrollEpisodes(360)}><ChevronRight size={18}/></button></div></div>
       <div className="mv-player-rail" ref={railRef}>{season?.episodes.map((ep,i)=>{

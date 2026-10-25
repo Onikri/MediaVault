@@ -81,7 +81,8 @@ jobs:
             npm run test:browser &&
             npm run test:voices &&
             npm run test:design &&
-            npm run test:manga
+            npm run test:manga &&
+            npm run test:music
           } 2>&1 | tee test-output/browser-ci.log
           result=${PIPESTATUS[0]}
           {

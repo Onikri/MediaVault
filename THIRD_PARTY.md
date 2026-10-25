@@ -188,3 +188,9 @@ JSZip 3.10.1 is additionally bundled as a lazy module for the native CBZ reader
 under its MIT option; the full license is included in the npm package.
 Ratings retain platform attribution and source links: Shikimori, MyAnimeList/Jikan,
 AniList and Kitsu; no paid credentials are used.
+
+## Reader translation and music (5.4)
+
+Tesseract (Apache-2.0), CTranslate2 (MIT), SentencePiece (Apache-2.0) and Pillow (HPND) power the optional local OCR/translation pipeline. The separately downloaded Argos English–Russian 1.9 model retains its upstream metadata and README with OPUS/dataset credits. See https://github.com/argosopentech/argos-translate and https://argos-net.com/v1/translate-en_ru-1_9.argosmodel . No code from the GPL manga-image-translator/mokuro projects or MPL Suwayomi-WebUI is copied.
+
+AnimeThemes supplies song credits through its public API: https://animethemes.moe/ . Spotify/YouTube playback and playlist actions remain with their official services; no audio downloads or rights are granted by this application. Research, limits and setup: [docs/reader-music.md](docs/reader-music.md).

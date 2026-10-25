@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from "react";
-import {newSalt,deriveVaultMaterial,bytesToBase64,openChunk,sealIndex,openIndex,base64ToBytes} from "../crypto.js";
+import {CHUNK_SIZE,newSalt,deriveVaultMaterial,bytesToBase64,openChunk,sealIndex,openIndex,base64ToBytes} from "../crypto.js";
 import {driveDownload,readEnvelope,findLibraries,createFolder,folderExists,uploadSmall,
   inviteReader} from "../drive.js";
 import {createUploadService} from "./upload.js";
@@ -304,7 +304,7 @@ function createController(get,patch){
       assertEpoch(expected);
       salt=nextSalt;
       serverKey?.fill(0);serverKey=material.serverKey;
-      patch({key,catalog});
+      readerChunks.clear();readerChunkRequests.clear();patch({key,catalog});
       saveLibraryId(id);
       await syncWorker();
       assertEpoch(expected);
@@ -340,7 +340,7 @@ function createController(get,patch){
       assertEpoch(expected);
       salt=nextSalt;
       serverKey?.fill(0);serverKey=material.serverKey;
-      patch({key,catalog});
+      readerChunks.clear();readerChunkRequests.clear();patch({key,catalog});
       saveLibraryId(file.id);
       await syncWorker();
       assertEpoch(expected);
@@ -420,6 +420,31 @@ function createController(get,patch){
       return link;
     }catch(cause){error(cause);return false;}
   }
+  const readerChunks=new Map(),readerChunkRequests=new Map();
+  async function readRange(item,start,end,{signal}={}){
+    const expected=epoch,key=get().key;
+    if(!key||!get().catalog)throw Error('Сначала открой библиотеку.');
+    if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||end<=start||end>item.size||end-start>32*1024*1024)throw Error('Некорректный диапазон страницы.');
+    const buffers=[];
+    for(let index=Math.floor(start/CHUNK_SIZE);index<=Math.floor((end-1)/CHUNK_SIZE);index++){
+      assertEpoch(expected);if(signal?.aborted)throw cancelled();
+      const chunk=item.chunks[index];if(!chunk)throw Error('В каталоге отсутствует часть архива.');
+      const id=expected+':'+item.id+':'+index;let bytes=readerChunks.get(id);
+      if(!bytes){
+        if(!readerChunkRequests.has(id)){
+          const task=(async()=>{try{
+            const encrypted=await driveDownload(driveToken(),chunk.fileId,{signal});assertEpoch(expected);
+            const data=new Uint8Array(await openChunk(encrypted,key,item.id,index,chunk.iv));assertEpoch(expected);
+            if(signal?.aborted)throw cancelled();
+            readerChunks.set(id,data);while(readerChunks.size>4)readerChunks.delete(readerChunks.keys().next().value);return data;
+          }finally{readerChunkRequests.delete(id);}})();readerChunkRequests.set(id,task);
+        }
+        bytes=await readerChunkRequests.get(id);if(signal?.aborted)throw cancelled();
+      }
+      buffers.push(bytes.slice(Math.max(0,start-index*CHUNK_SIZE),Math.min(bytes.length,end-index*CHUNK_SIZE)));
+    }
+    assertEpoch(expected);return new Blob(buffers);
+  }
   async function readWhole(item,{silent=false,signal}={}){
     const expected=epoch,key=get().key;
     if(!key||!get().catalog)throw Error("Сначала открой библиотеку.");
@@ -490,7 +515,7 @@ function createController(get,patch){
     if(get().user&&get().libraryId)forgetTrustedVault(get().user.sub,get().libraryId).catch(()=>{});
     savePrivacyPreferences(false);
     uploads.cancel();
-    epoch++;salt=null;serverKey?.fill(0);serverKey=null;
+    epoch++;readerChunks.clear();readerChunkRequests.clear();window.dispatchEvent(new Event('mediavault-locked'));salt=null;serverKey?.fill(0);serverKey=null;
     clearTimeout(tokenTimer);clearTimeout(toastTimer);
     clearWorkerSession();
     patch({user:null,admin:false,token:null,tokenExpiresAt:0,key:null,catalog:null,driveConnected:false,driveWritable:false,
@@ -513,7 +538,7 @@ function createController(get,patch){
       const envelope=await readEnvelope(driveToken(),get().libraryId);assertEpoch(expected);
       const catalog=await openIndex(envelope,material.key);assertEpoch(expected);
       salt=base64ToBytes(envelope.salt);serverKey?.fill(0);serverKey=material.serverKey;
-      patch({key:material.key,catalog});await syncWorker();assertEpoch(expected);enterLibrary();return true;
+      readerChunks.clear();readerChunkRequests.clear();patch({key:material.key,catalog});await syncWorker();assertEpoch(expected);enterLibrary();return true;
     }catch(cause){material.serverKey.fill(0);throw cause;}
   }
   async function rememberAccountInternal(){
@@ -578,7 +603,7 @@ function createController(get,patch){
   }
   function unmount(){
     uploads.cancel();
-    mounted=false;epoch++;serverKey?.fill(0);serverKey=null;
+    mounted=false;epoch++;readerChunks.clear();readerChunkRequests.clear();serverKey?.fill(0);serverKey=null;
     clearTimeout(tokenTimer);clearTimeout(toastTimer);
     navigator.serviceWorker?.removeEventListener("message",onMessage);
     navigator.serviceWorker?.removeEventListener("controllerchange",onControllerChange);
@@ -588,7 +613,7 @@ function createController(get,patch){
   }
   return {mount,unmount,actions:{login,connectDrive,logout,unlock,createLibrary,uploadFiles,importStream,importVideo,rememberAccount,restoreLogin,biometricUnlock,enableBiometric,biometricAvailable,notify:toast,
     getServerKey:()=>{if(!get().admin||!get().catalog||!serverKey)throw Error("Открой библиотеку владельца.");return bytesToBase64(serverKey);},
-    getState:uploads.getState,findMyLibrary,refreshCatalog,invite,copyInvite,inviteUrl,readWhole,readArtwork,saveTitleProfile,prepareStream,error,clearToast}};
+    getState:uploads.getState,findMyLibrary,refreshCatalog,invite,copyInvite,inviteUrl,readWhole,readRange,readArtwork,saveTitleProfile,prepareStream,error,clearToast}};
 }
 
 export function useVault(){

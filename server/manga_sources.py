@@ -25,7 +25,8 @@ SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('man
        MangaSite('mangachan','MangaChan','https://im.manga-chan.me','chan',('manga-chan.me','mangachan.me')),
        MangaSite('readmanga','ReadManga','https://a.zazaza.me','grouple',('readmanga.live','readmanga.io','readmanga.me')),
        MangaSite('mintmanga','MintManga','https://mintmanga.live','grouple'),
-       MangaSite('mangabuff','MangaBuff','https://mangabuff.ru','buff'))
+       MangaSite('mangabuff','MangaBuff','https://mangabuff.ru','buff'),
+       MangaSite('mangapill','MangaPill · EN','https://mangapill.com','pill'))
 _cache={};_lock=threading.RLock()
 def site_for(url):
     host=urlsplit(url).hostname
@@ -59,6 +60,14 @@ def title_aliases(value):
     return list(dict.fromkeys([value,*[clean(v) for v in re.split(r'\s/\s|\s\|\s|[()]',value) if len(clean(v))>1]]))
 def parse_search(text,base,site):
     soup=BeautifulSoup(text,'html.parser');results=[]
+    if site.family=='pill':
+        for anchor in soup.select('a.mb-2[href^="/manga/"]')[:40]:
+            card=anchor.parent.parent;heading=anchor.select_one('.font-black');other=anchor.select_one('.text-secondary')
+            names=[clean((heading or anchor).get_text(' ',strip=True))]
+            if other:names.extend(title_aliases(other.get_text(' ',strip=True)))
+            image=card.select_one('img');year=re.search(r'\b(19\d\d|20\d\d)\b',card.get_text(' ',strip=True))
+            results.append({'provider':site.id,'providerName':site.name,'title':names[0],'aliases':names,'url':safe_link(anchor.get('href'),base),'kind':'manga','language':'en','year':int(year[1]) if year else None,'cover':safe_link(image.get('data-src') or image.get('src'),base) if image else ''})
+        return results
     selectors={'poisk':('article.card,.manga-card','.card-title,h2.entry-title','a.card-about,a[href*="/manga/"]'),
                'hub':('.item-grid','a.fw-medium','a.fw-medium'),
                'chan':('.content_row','h2 a','h2 a'),
@@ -87,7 +96,8 @@ def search_title(title):
     def work(site):
         http=PublicHttp(timeout=(3,6),deadline=time.monotonic()+16);results=[];message='Точное совпадение не найдено.';status='empty'
         try:
-            for query in aliases(title)[:2]:
+            queries=[q for q in aliases(title) if re.search('[a-z]',q,re.I) and not re.search('[а-яё]',q,re.I)] if site.family=='pill' else aliases(title)
+            for query in queries[:2]:
                 text,final,_=http.document(search_url(site,query))
                 if site_for(final)!=site:raise SourceError('Источник перенаправил поиск на другой сайт.')
                 for value in parse_search(text,final,site):
@@ -100,7 +110,8 @@ def search_title(title):
         return {'provider':site.id,'name':site.name,'status':status,'message':message,'results':results}
     # Current GroupLe search is JS/API-only; its HTML reader remains available
     # for direct links. Do not misrepresent an empty HTML search as a working API.
-    with ThreadPoolExecutor(max_workers=4) as pool:providers=list(pool.map(work,[s for s in SITES if s.family!='grouple']))
+    with ThreadPoolExecutor(max_workers=4) as pool:providers=list(pool.map(work,[s for s in SITES if s.family not in {'grouple','pill'}]))
+    if not any(p['results'] for p in providers):providers.append(work(next(s for s in SITES if s.family=='pill')))
     result={'results':list({v['url']:v for p in providers for v in p['results']}.values()),'providers':[{k:p[k] for k in ('provider','name','status','message')} for p in providers],'language':'ru','checkedAt':int(time.time())}
     with _lock:
         if len(_cache)>80:_cache.clear()
@@ -109,7 +120,7 @@ def search_title(title):
 
 def parse_chapters(text,base):
     soup=BeautifulSoup(text,'html.parser');guard(soup);chapters=[]
-    for anchor in soup.select('a.chapter-link,a.chapters__item,.chapter-item a,.detail-item div.align-items-center > a,.table_cha a,.chapters a,.chapter-link a'):
+    for anchor in soup.select('a.chapter-link,a.chapters__item,.chapter-item a,.detail-item div.align-items-center > a,.table_cha a,.chapters a,.chapter-link a,a[href^="/chapters/"]'):
         row=anchor.find_parent('tr') or anchor.find_parent(class_='chapter-item') or anchor
         label=clean(anchor.get_text(' ',strip=True));number=re.search(r'(?:глава|часть|chapter)\s*(\d+(?:[.,]\d{1,3})?)',label,re.I)
         data=row.select_one('[data-num]') if row.name!='td' else row
@@ -144,7 +155,7 @@ def parse_pages(text,base):
             else:value=middle+host+end
             pages.append('https:'+value if value.startswith('//') else value)
     if not pages:
-        for image in soup.select('img.page-image,img.reader-viewer-img,.reader__pages img,.reader-page img,.manga-pages img,img[data-page],#mangaPicture'):
+        for image in soup.select('img.js-page,img.page-image,img.reader-viewer-img,.reader__pages img,.reader-page img,.manga-pages img,img[data-page],#mangaPicture'):
             pages.append(image.get('data-src') or image.get('data-original') or image.get('src'))
     result=list(dict.fromkeys(safe_link(p,base) for p in pages if p))
     return [p for p in result if p and not re.search(r'(?:placeholder|no-image|premium|blocked|not.?found)',urlsplit(p).path,re.I)]
@@ -153,7 +164,7 @@ def inspect(url,http=None):
     own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
     try:
         text,final,_=http.document(public_url(url,resolve_dns=False));soup=BeautifulSoup(text,'html.parser');guard(soup);site=site_for(final)
-        if not site:raise SourceError('Для этой читалки пока нет проверенного русскоязычного адаптера.')
+        if not site:raise SourceError('Для этой читалки пока нет проверенного адаптера.')
         heading=soup.select_one('.cr-hero-names__main,.detail-panel h1,h1,.card header .text-base span,meta[itemprop=name]')
         title=clean(heading.get('content') or heading.get_text(' ',strip=True)) if heading else clean(soup.title.get_text().split(' — ')[0] if soup.title else '')
         chapters=parse_chapters(text,final);pages=parse_pages(text,final)
@@ -177,8 +188,10 @@ def inspect(url,http=None):
             volume=re.search(r'Том\s*(\d+)',labels,re.I)
             season=int(volume[1]) if volume else int(path[1]) if path else 1
             chapters=[{'number':number,'season':max(1,season),'url':final,'title':'Глава '+str(number),'language':'ru','translator':''}]
+        language='en' if site.family=='pill' else 'ru'
+        for chapter in chapters:chapter['language']=language
         chapters=sorted({c['url']:c for c in chapters}.values(),key=lambda c:(c['season'],c['number'],c['translator']))
-        return {'provider':site.id,'providerName':site.name,'title':title,'url':final,'kind':'manga','language':'ru','episodes':chapters,'pages':pages,
+        return {'provider':site.id,'providerName':site.name,'title':title,'url':final,'kind':'manga','language':language,'episodes':chapters,'pages':pages,
                 'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({c['season'] for c in chapters})],'dubs':[],'releases':[],
                 'truncated':truncated,'available':bool(chapters),'translations':sorted({c['translator'] for c in chapters if c['translator']})}
     finally:
