@@ -51,8 +51,11 @@ function MediaCard({item,saved,onSave,onOpen,readWhole,vaultKey,displayName,deta
   const [cover,setCover]=useState('');
   const reduced=useReducedMotion();
   const card=useRef(null);
+  const preview=item.previewArtwork,previewURL=preview?'drive:'+preview.id:'';
+  const posterURL=hideSave?profile?.cover||previewURL:previewURL||profile?.cover;
+  const artworkProfile=preview?{...profile,artwork:{...profile?.artwork,[previewURL]:preview}}:profile;
   useEffect(()=>{
-    if(!vaultKey||!['image','manga'].includes(item.category)||item.size>20*1024*1024)return;
+    if(posterURL||!vaultKey||!['image','manga'].includes(item.category)||item.size>20*1024*1024)return;
     let url='',closed=false;const abort=new AbortController();
     const observer=new IntersectionObserver(entries=>{
       if(!entries.some(entry=>entry.isIntersecting))return;
@@ -60,8 +63,8 @@ function MediaCard({item,saved,onSave,onOpen,readWhole,vaultKey,displayName,deta
       (async()=>{
         let blob=await readWhole(item,{silent:true,signal:abort.signal});
         if(item.category==='manga'){
-          if(!window.JSZip)return;
-          const zip=await window.JSZip.loadAsync(blob);
+          const {default:JSZip}=await import('jszip');
+          const zip=await JSZip.loadAsync(blob);
           const page=Object.values(zip.files).filter(entry=>!entry.dir&&/\.(jpe?g|png|webp|gif)$/i.test(entry.name)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}))[0];
           if(!page)return;blob=await page.async('blob');
         }
@@ -70,10 +73,10 @@ function MediaCard({item,saved,onSave,onOpen,readWhole,vaultKey,displayName,deta
     },{rootMargin:'180px'});
     if(card.current)observer.observe(card.current);
     return()=>{closed=true;abort.abort();observer.disconnect();if(url)URL.revokeObjectURL(url);};
-  },[item.id,vaultKey,readWhole]);
+  },[item.id,vaultKey,readWhole,posterURL]);
   return <motion.article ref={card} className={'media-card'+(hideSave?' title-card':'')} data-title-name={hideSave?displayName:undefined} whileHover={reduced?undefined:{y:-3}} whileTap={reduced?undefined:{scale:.985}} layout>
     <button className="media-open" onClick={()=>onOpen(item)} aria-label={'Открыть '+(displayName||item.name)}>
-      <div className="media-cover">{profile?.cover?<TitleImage url={profile.cover} profile={profile} actions={actions} libraryId={libraryId}/>:cover?<img src={cover} alt="" loading="lazy"/>:<Artwork kind={item.category}/>}
+      <div className="media-cover">{posterURL?<TitleImage url={posterURL} profile={artworkProfile} actions={actions} libraryId={libraryId}/>:cover?<img src={cover} alt="" loading="lazy"/>:<Artwork kind={item.category}/>}
         <span className="media-category">{hideSave?SECTION_LABELS[sectionForItem(item)]:labels[item.category]}</span>
         <span className="media-open-indicator"><Icon name={item.category==='video'?'video':item.category==='audio'?'audio':'book'} size={24}/></span>
       </div>

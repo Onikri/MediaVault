@@ -151,7 +151,7 @@ def worker():
             else:
                 def saved(item):
                     group=item.get('collectionId')
-                    if group and item.get('category')=='video':
+                    if group and item.get('category') in {'video','manga'}:
                         identity='artwork-'+hashlib.sha256((library_id+':'+group+':v2').encode()).hexdigest()
                         try:store.add(task['owner'],{'kind':'enrich','library_id':library_id,'vault_key':data['vault_key'],'title_id':item.get('section','anime')+':'+group},identity)
                         except ValueError:pass
@@ -201,7 +201,7 @@ async def lifespan(application):
         store.close()
 
 
-app = FastAPI(title="MediaVault import service", version="7.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="MediaVault import service", version="8.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
 
 
@@ -242,7 +242,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 7, "voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 8, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -345,6 +345,11 @@ def title_watch_order(identity: str = ''):
     return watch_order(identity)
 
 
+@app.get('/metadata/ratings')
+def title_platform_ratings(identity:str='',kind:str='anime'):
+    from title_ratings import ratings
+    return ratings(identity,kind)
+
 @app.get("/metadata/{provider}")
 def catalogue(provider: str, q: str = "", kind: str = "anime", page: int = 1, identity: str | None = None, year: int | None = None, part: str = '',genre:str='',tag:str=''):
     return metadata(provider, query=q, kind=kind, page=page, identity=identity, year=year, part=part,genre=genre,tag=tag)
@@ -361,6 +366,9 @@ def artwork(url: str):
 def source_search(q: str, kind: str = "anime", subject=Depends(owner)):
     if not 2 <= len(q.strip()) <= 160:
         raise HTTPException(422, "Укажи название от 2 до 160 символов.")
+    if kind=='manga':
+        from manga_sources import search_title
+        return search_title({'kind':'manga','title':q.strip()})
     return search_sources(q.strip(), kind)
 
 
@@ -415,6 +423,26 @@ class TitleDiscovery(StrictBody):
     title: dict
     refresh: bool = False
     continuing: bool = False
+
+@app.post('/manga/search')
+def manga_search(body:TitleDiscovery,subject=Depends(owner)):
+    from manga_sources import search_title
+    return search_title(body.title)
+
+class MangaInspection(StrictBody):
+    url:str=Field(max_length=8192)
+    title:dict|None=None
+
+@app.post('/manga/inspect')
+def manga_inspect(body:MangaInspection,subject=Depends(owner)):
+    from manga_sources import inspect,title_aliases
+    from title_identity import match_title
+    value=inspect(body.url)
+    if body.title:
+        if len(json.dumps(body.title).encode())>50000:raise HTTPException(422,'Слишком большое описание манги.')
+        candidate={'title':value['title'],'aliases':title_aliases(value['title']),'kind':'manga'}
+        if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
+    return value
 
 
 class QualityInspection(StrictBody):

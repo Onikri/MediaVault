@@ -10,6 +10,7 @@ import ImportSelection from './ImportSelection.jsx';
 import CatalogSearch from './CatalogSearch.jsx';
 import {tagLabels,localLabel,russianLabels} from './taxonomy.js';
 import {translate} from './title-metadata.js';
+import PlatformRatings from './PlatformRatings.jsx';
 import {useVoices} from './use-voices.js';
 const noTitles=Object.freeze([]);
 
@@ -23,6 +24,7 @@ export function TitleDetails({value,service,state,onBack,onSubmitted,onOpenLibra
   return <section className="catalog-detail"><button className="text-link catalog-back" onClick={onBack}><Icon name="back" size={16}/>К результатам поиска</button>
     <div className="import-dossier-layout"><div className="import-dossier-main"><div className="detail-hero"><div className="detail-poster"><Poster item={item}/></div><div className="detail-copy"><span className="eyebrow">{kinds.find(k=>k[0]===item.kind)?.[1]||'Произведение'}{loading?' · обновляем сведения':''}</span><h2>{item.title}</h2><div className="detail-facts">{item.year&&<span>{item.year}</span>}{item.format&&<span>{translate(item.format)}</span>}{item.ageLabel&&<span>{item.ageLabel}</span>}{item.episodes&&<span>{item.episodes} серий</span>}</div><div className="detail-genres">{item.genres.map(genre=><span key={genre}>{genreLabels[genre]||genre}</span>)}</div></div></div>
       <p className="detail-description">{item.description||'Русское описание пока не предоставлено каталогом.'}</p>
+      <PlatformRatings identity={item.ids?.mal} kind={item.kind} server={service.server} compact/>
       <Tabs.Root value={tab} onValueChange={setTab}><Tabs.List className="import-tabs" aria-label="Карточка тайтла"><Tabs.Trigger value="import">О произведении</Tabs.Trigger><Tabs.Trigger value="calendar">Календарь</Tabs.Trigger><Tabs.Trigger value="about">Подробности</Tabs.Trigger></Tabs.List>
         <Tabs.Content value="import"><div className="detail-tags">{russianLabels(item.tags).slice(0,18).map(tag=><span key={tag}>{tag}</span>)}</div><p className="fine">Озвучки справа собраны только для выбранного тайтла и года. Другой сезон выбирается отдельной карточкой.</p></Tabs.Content>
         <Tabs.Content value="calendar"><ReleaseCalendar items={[item]}/></Tabs.Content>

@@ -13,7 +13,7 @@ let vite,browser;
  const harness=path.join(dir,'design-harness.html');
  await fs.writeFile(harness,`<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="scene-root"></div><div id="root"></div><script type="module">
  import React,{useState} from 'react';import{createRoot}from'react-dom/client';
- import TitlePage from '/src/TitlePage.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';
+ import TitlePage from '/src/TitlePage.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/discovery-polish.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:'https://fixture.example'};window.artworkReads=[];
  const art=id=>({id,fileId:id,iv:'fixture',mime:'image/png'}),cover='https://art.test/cover',person='https://art.test/person';
  const profile={version:4,sourceId:'57334',sourceURL:'https://shikimori.io/animes/57334',title:'Дандадан',year:2024,format:'Аниме',description:'Двое школьников сталкиваются с необъяснимым. История о дружбе и сверхъестественном.',genres:['Комедия','Сверхъестественное'],characters:[],related:[],screenshots:[],staff:[{id:'41',name:'Фуга Ямасиро',role:'Режиссёр',image:person}],trailers:[{id:'62092',title:'Тизер',image:cover}],cover,artwork:{[cover]:art('cover'),[person]:art('person')}};

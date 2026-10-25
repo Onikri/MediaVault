@@ -166,35 +166,8 @@ def player_choices(text, base):
 
 
 def parse_reader(text, base):
-    """ReadManga's HTML reader exposes image locations without a developer API."""
-    soup = BeautifulSoup(text, "html.parser")
-    pages, chapters = [], []
-    for image in soup.select("#mangaPicture, .reader-page img, .manga-pages img, img[data-page]"):
-        value = link(image.get("data-src") or image.get("src"), base)
-        if value:
-            pages.append(value)
-    # rm_h.init is parsed as data, never evaluated as JavaScript.
-    match = re.search(r"rm_h\.init\s*\(\s*(\[\s*\[.*?\]\s*\])", text, re.S)
-    if match:
-        import json
-        try:
-            values = json.loads(match[1])
-            for parts in values:
-                if isinstance(parts, list) and all(isinstance(part, str) for part in parts[:3]):
-                    value = link("".join(parts[:3]), base)
-                    if value:
-                        pages.append(value)
-        except (ValueError, TypeError):
-            pass
-    for anchor in soup.select(".chapters-link, .chapters a[href], .chapter-link"):
-        value = link(anchor.get("href"), base)
-        number = episode_number(anchor.get_text(" "))
-        if number is None:
-            match = re.search(r"(?:глава|chapter|ch)\s*(\d+)", anchor.get_text(" "), re.I)
-            number = int(match[1]) if match else None
-        if value and number:
-            chapters.append({"number": number, "url": value, "title": clean(anchor.get_text(" "))})
-    return list(dict.fromkeys(pages)), list({entry["url"]: entry for entry in chapters}.values())
+    from manga_sources import parse_pages,parse_chapters
+    return parse_pages(text,base),parse_chapters(text,base)
 
 
 def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime",state=None):
@@ -203,6 +176,9 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime",st
     try:
         original = public_url(url, resolve_dns=False)
         site = site_for(original)
+        if kind=='manga':
+            from manga_sources import inspect
+            return inspect(original,http=http)
         if site and site.id=='anilibria':
             from aniliberty_source import inspect
             return inspect(original,http,dub_url=dub_url)

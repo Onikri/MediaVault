@@ -6,6 +6,7 @@ import json
 import re
 import threading
 import time
+from urllib.parse import urlsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -24,7 +25,7 @@ _cache, _lock = OrderedDict(), threading.RLock()
 def get_json(url, *, params=None, body=None):
     try:
         with requests.Session() as session:
-            session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
+            session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/vnd.api+json" if urlsplit(url).hostname=='kitsu.io' else "application/json"})
             response = session.post(url, json=body, timeout=(4, 7), stream=True) if body else session.get(url, params=params, timeout=(4, 7), stream=True)
             with response:
                 if response.status_code == 429:

@@ -70,6 +70,9 @@ def load_profile(identity,kind):
     if profile['screenshots']:profile['background']=profile['screenshots'][0]
     from title_extras import staff_from_roles,trailers_from_details
     profile['staff']=staff_from_roles(roles);profile['trailers']=trailers_from_details(details)
+    from title_ratings import known_ratings
+    cached=known_ratings(identity,kind)
+    if cached:profile['ratings']=cached
     try:
         from poster_assets import posters
         art=posters([str(identity),*[r['id'] for r in profile['related'] if r['kind']==kind]],kind)
@@ -147,11 +150,11 @@ def enrich_profile(vault,group,section):
     return vault.save_title_profile(title_id,profile,images)
 
 def enrichment_step(vault,*,cursor=0,title_id=None,progress=lambda _:None):
-    items=[i for i in vault.catalog['items'] if i.get('category')=='video' and (not title_id or title_id.endswith(':'+str(i.get('collectionId',''))))]
+    items=[i for i in vault.catalog['items'] if i.get('category') in {'video','manga'} and (not title_id or title_id.endswith(':'+str(i.get('collectionId',''))))]
     if cursor>=len(items):return {'cursor':cursor,'remaining':False,'total':len(items),'saved':0,'failed':0,'skipped':0}
     item=items[cursor];progress({'phase':'artwork','title':'Оформление библиотеки','current':cursor+1,'total':len(items)})
     failed=False
-    if not item.get('previewArtwork'):
+    if item.get('category')=='video' and not item.get('previewArtwork'):
         frame=preview_existing(vault,item)
         if frame:vault.save_preview(item['id'],frame)
         else:failed=True

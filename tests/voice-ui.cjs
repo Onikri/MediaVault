@@ -6,7 +6,7 @@ const ROOT=path.resolve(__dirname,'..'),entry=path.join(ROOT,'test-output','voic
 (async()=>{
   await fs.mkdir(path.dirname(entry),{recursive:true});
   await fs.writeFile(entry,`<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">
-import React from 'react';import {createRoot} from 'react-dom/client';import {TitleDetails} from '/src/CatalogBrowser.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';
+import React from 'react';import {createRoot} from 'react-dom/client';import {TitleDetails} from '/src/CatalogBrowser.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/discovery-polish.css';
 const item={id:'shikimori:57334',provider:'shikimori',providerId:'57334',providers:['shikimori'],title:'Дандадан',titles:{ru:'Дандадан',en:'Dandadan'},aliases:['Дандадан','Dandadan'],year:2024,kind:'anime',format:'TV',genres:['Комедия'],tags:['Школа'],links:[],releases:[],ids:{mal:'57334'},description:'Проверка точного тайтла и переводов.',cover:''};
 window.MEDIA_VAULT_CONFIG={};
 const service={server:'https://fixture.example',status:'connected',session:{driveConnected:true},request:async(path,options={})=>{

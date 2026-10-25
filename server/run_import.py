@@ -53,10 +53,12 @@ def validate_job(value):
         raise SourceError("Укажи номер сезона от 1 до 1000.")
     if len(sources) > 1 and not collection:
         raise SourceError("Укажи общее название аниме для списка серий.")
-    selected = episode_selection(value.get("episodes", "all"))
     section = value.get("section", "anime")
     if section not in {"anime", "video", "manga", "ranobe", "book"}:
         raise SourceError("Неизвестный раздел импорта.")
+    from manga_sources import chapter_ranges
+    selected = None if section=='manga' else episode_selection(value.get('episodes','all'))
+    chapters = chapter_ranges(value.get('episodes','all')) if section=='manga' else None
     entries = value.get("entries") or []
     if not isinstance(entries, list) or len(entries) > 1000:
         raise SourceError("Слишком много файлов в одном задании.")
@@ -65,7 +67,10 @@ def validate_job(value):
         if not isinstance(entry, dict) or set(entry) - {"number", "url", "title", "season", "description"}:
             raise SourceError("Некорректный список опубликованных серий.")
         number, entry_season = entry.get("number"), entry.get("season", season)
-        if isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= 10000:
+        if section=='manga':
+            from manga_sources import chapter_number
+            number=chapter_number(number)
+        elif isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= 10000:
             raise SourceError("Некорректный номер опубликованной серии.")
         if isinstance(entry_season, bool) or not isinstance(entry_season, int) or not 1 <= entry_season <= 1000:
             raise SourceError("Некорректный сезон серии.")
@@ -81,7 +86,7 @@ def validate_job(value):
         if translation.get('kind') not in {'voice','subtitles'} or any(not isinstance(v,str) or len(v)>180 for v in translation.values()):
             raise SourceError('Некорректные параметры перевода.')
     return {"version":value['version'],"library_id": library, "sources": sources, "collection": collection,
-            "quality": quality, "selected": selected, "season": int(season), "section": section,
+            "quality": quality, "selected": selected, "chapters":chapters,"season": int(season), "section": section,
             "metadata": metadata, "entries": prepared, "translation":translation, "dub": str(value.get("dub", ""))[:120]}
 
 
@@ -98,9 +103,14 @@ def source_identity(url):
 
 def plan_sources(job, resolver):
     seen, plans, discovered = set(), [], set()
+    def wanted(number):
+        if job['section']=='manga':
+            from manga_sources import selected
+            return selected(number,job.get('chapters'))
+        return job['selected'] is None or number in job['selected']
     if job.get("entries"):
         for entry in job["entries"]:
-            if job["selected"] is not None and entry["number"] not in job["selected"]:
+            if not wanted(entry['number']):
                 continue
             identity = source_identity(entry["url"])
             key = (identity, entry["season"], entry["number"])
@@ -111,7 +121,13 @@ def plan_sources(job, resolver):
             raise SourceError("Выбранные серии отсутствуют в опубликованном списке.")
         return plans
     for index, source in enumerate(job["sources"], 1):
-        page = resolver.inspect(source)
+        if job['section']=='manga':
+            from manga_sources import inspect
+            from types import SimpleNamespace
+            value=inspect(source,http=resolver.http)
+            if not value['episodes']:raise SourceError('В этой манге не найдены открытые главы для импорта.')
+            page=SimpleNamespace(episodes=value['episodes'],title=value['title'],streams=[],players=[])
+        else:page = resolver.inspect(source)
         episodes = page.episodes
         # A title page may embed a serial player with actual published episode options.
         if not episodes and not page.streams:
@@ -133,7 +149,7 @@ def plan_sources(job, resolver):
             number = episode.get("number")
             if number:
                 discovered.add(number)
-            if job["selected"] is not None and number not in job["selected"]:
+            if not wanted(number):
                 continue
             identity = source_identity(episode["url"])
             if identity in seen:
@@ -141,7 +157,7 @@ def plan_sources(job, resolver):
             seen.add(identity)
             plans.append({"number": number, "title": episode.get("title") or page.title,
                           "url": episode["url"], "identity": identity,
-                          "collection": job["collection"] or page.title[:180] or "Импорт аниме"})
+                          "season":episode.get('season',job['season']) if job['section']=='manga' else job['season'],"collection": job["collection"] or page.title[:180] or "Импорт"})
     if not plans:
         raise SourceError("Нужные опубликованные серии не найдены. Можно вставить отдельные ссылки серий списком.")
     return plans
@@ -206,7 +222,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                                 log(f"  {label}: {text}.")
                             last_phase[0] = phase
                     if category == "manga":
-                        path = download_chapter(entry["url"], temporary, resolver.http)
+                        path = download_chapter(entry["url"], temporary, resolver.http,progress=report)
                         page = type("Chapter", (), {"title": entry["title"]})()
                     elif category == "book":
                         path = download_text(entry["url"], temporary, resolver.http)
@@ -231,7 +247,8 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                     break
                 extension, mime = ("cbz", "application/vnd.comicbook+zip") if category == "manga" else ("txt", "text/plain") if category == "book" else ("mp4", "video/mp4")
                 noun = "глава" if category in {"manga", "book"} else "серия"
-                name = (f"{collection} — {noun} {number:03d}.{extension}" if number is not None
+                number_label=str(number).zfill(3) if isinstance(number,int) else str(number)
+                name = (f"{collection} — {noun} {number_label}.{extension}" if number is not None
                         else (page.title or entry["title"] or collection)[:220] + "." + extension)
                 options = {"metadata": job["metadata"], "dub": job["dub"]} if job["metadata"] or job["dub"] else {}
                 if job.get('translation'):options['translation']=job['translation']
@@ -245,6 +262,10 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                     from media_download import preview_frame
                     thumbnail = preview_frame(path)
                     if thumbnail: options['preview'] = thumbnail
+                elif category=='manga':
+                    from manga_download import chapter_preview
+                    thumbnail=chapter_preview(path)
+                    if thumbnail:options['preview']=thumbnail
                 saved_item=vault.upload_file(path, name=name, category=category, collection=collection,
                                   episode=number, source_identity=identity, mime=mime, progress=report,
                                   section=job["section"], part=f"{'Том' if category != 'video' else 'Сезон'} {season}", season=season, **options)
@@ -258,28 +279,9 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
             resolver.http.close()
 
 
-def download_chapter(url, temporary, http):
-    import zipfile
-    from site_adapters import parse_reader
-    text, final, _ = http.document(url)
-    pages, _ = parse_reader(text, final)
-    if not pages or len(pages) > 500:
-        raise SourceError("На странице не найдены доступные изображения главы.")
-    output = Path(temporary) / "chapter.cbz"
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
-        for index, source in enumerate(pages, 1):
-            image = Path(temporary) / "page"
-            http.download(source, image, headers={"Referer": final}, maximum=30 * 1024 * 1024)
-            with image.open("rb") as image_file:
-                header = image_file.read(16)
-            extension = "jpg" if header.startswith(b"\xff\xd8\xff") else "png" if header.startswith(b"\x89PNG\r\n\x1a\n") else "webp" if header[:4] == b"RIFF" and header[8:12] == b"WEBP" else None
-            if not extension:
-                raise SourceError("Источник вернул не изображение страницы.")
-            archive.write(image, f"{index:04d}.{extension}")
-            image.unlink()
-            if output.stat().st_size > 1024**3:
-                raise SourceError("Глава превышает лимит размера.")
-    return output
+def download_chapter(url, temporary, http,progress=lambda _:None):
+    from manga_download import download_chapter as download
+    return download(url,temporary,http,progress=progress)
 
 
 def download_text(url, temporary, http):

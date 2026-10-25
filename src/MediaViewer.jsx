@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import VideoPlayer from './VideoPlayer.jsx';
+import {readReading,writeReading} from './reading-progress.js';
 
 const names={video:'Видео',audio:'Музыка',image:'Изображение',manga:'Манга',book:'Книга'};
 async function libraryReady(name,signal){
@@ -34,6 +35,9 @@ export default function MediaViewer({item,catalog,libraryId,userId,onSelectItem,
   methods.current={readWhole,prepareStream,onError};
   const extension=item.name.toLowerCase().split('.').pop();
   const isMedia=item.category==='video'||item.category==='audio';
+  const chapters=item.category==='manga'?(catalog?.items||[]).filter(value=>value.category==='manga'&&value.collectionId===item.collectionId&&(!item.dub||value.dub===item.dub)).sort((a,b)=>(Number(a.season)||1)-(Number(b.season)||1)||(Number(a.episode)||0)-(Number(b.episode)||0)):[];
+  const chapterIndex=chapters.findIndex(value=>value.id===item.id);
+  useEffect(()=>{if(item.category!=='manga'||!pageCount)return;const handler=event=>{if(event.defaultPrevented||event.target.closest?.('input,textarea,select,[contenteditable=true]')||inline&&!panelRef.current?.contains(document.activeElement))return;if(!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();setPage(value=>Math.max(0,Math.min(pageCount-1,value+(event.key==='ArrowRight'?1:-1))));};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[item.category,pageCount,inline]);
 
   function report(cause){
     const message=cause?.message||String(cause);
@@ -71,13 +75,13 @@ export default function MediaViewer({item,catalog,libraryId,userId,onSelectItem,
       if(item.category==='image'||extension==='pdf'){
         setSource(objectUrl(blob));
       }else if(item.category==='manga'){
-        const JSZip=await libraryReady('JSZip',abort.signal);
+        const {default:JSZip}=await import('jszip');
         const zip=await JSZip.loadAsync(blob);
         if(!active())return;
         const entries=Object.values(zip.files).filter(entry=>!entry.dir&&/\.(jpe?g|png|webp|gif|avif)$/i.test(entry.name))
           .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
         if(!entries.length)throw Error('В архиве нет изображений.');
-        entriesRef.current=entries;setPageCount(entries.length);
+        entriesRef.current=entries;const saved=readReading(userId,libraryId,item.id);setPage(saved&&saved.page<entries.length?saved.page:0);setPageCount(entries.length);
       }else if(extension==='txt'){
         const content=await blob.text();if(active())setText(content);
       }else if(extension==='epub'){
@@ -114,7 +118,7 @@ export default function MediaViewer({item,catalog,libraryId,userId,onSelectItem,
       if(request!==pageRequest.current||current!==generation.current)return;
       const next=objectUrl(blob);
       if(pageUrl.current){URL.revokeObjectURL(pageUrl.current);urls.current.delete(pageUrl.current);}
-      pageUrl.current=next;setSource(next);setBusy(false);
+      pageUrl.current=next;setSource(next);setBusy(false);writeReading(userId,libraryId,item,page,pageCount);
     }).catch(cause=>{if(request===pageRequest.current&&current===generation.current)report(cause);});
   },[page,pageCount]);
 
@@ -151,9 +155,11 @@ export default function MediaViewer({item,catalog,libraryId,userId,onSelectItem,
     <footer className="mv-viewer-tools">
       {isMedia&&<button className="mv-button mv-button-secondary" disabled={busy} onClick={fallback}>Загрузить файл целиком (резервный режим)</button>}
       {item.category==='manga'&&pageCount>0&&<>
+        {onSelectItem&&chapters.length>1&&<button className="mv-button mv-button-secondary manga-chapter-switch" disabled={chapterIndex<=0} onClick={()=>onSelectItem(chapters[chapterIndex-1])} aria-label="Предыдущая глава">← Глава</button>}
         <button className="mv-button mv-button-secondary" disabled={page===0||busy} onClick={()=>setPage(value=>Math.max(0,value-1))}>← Назад</button>
         <span aria-live="polite">{page+1} / {pageCount}</span>
         <button className="mv-button mv-button-secondary" disabled={page===pageCount-1||busy} onClick={()=>setPage(value=>Math.min(pageCount-1,value+1))}>Вперёд →</button>
+        {onSelectItem&&chapters.length>1&&<button className="mv-button mv-button-secondary manga-chapter-switch" disabled={chapterIndex<0||chapterIndex>=chapters.length-1} onClick={()=>onSelectItem(chapters[chapterIndex+1])} aria-label="Следующая глава">Глава →</button>}
       </>}
       {rendition&&<>
         <button className="mv-button mv-button-secondary" onClick={()=>rendition.prev().catch(report)}>← Назад</button>

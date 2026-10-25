@@ -4,6 +4,7 @@ import VoicePicker from './VoicePicker.jsx';
 import useSourceDiscovery from './use-source-discovery.js';
 import ImportReadiness,{canImport} from './ImportReadiness.jsx';
 import {kinds,ReleaseCalendar} from './ImportParts.jsx';
+import MangaImport from './MangaImport.jsx';
 
 export default function ImportSelection({state,service,item,manual=false,onSubmitted,onOpenLibrary}){
   const [url,setUrl]=useState(''),[collection,setCollection]=useState(item?.title||''),[season,setSeason]=useState('1'),[manualKind,setManualKind]=useState('anime');
@@ -18,7 +19,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
   },[item?.id]);
   useEffect(()=>{
     let closed=false;
-    if(!item||item.kind==='anime'||service.status!=='connected')return;
+    if(!item||['anime','manga'].includes(item.kind)||service.status!=='connected')return;
     setSearching(true);
     service.request('/sources/search?q='+encodeURIComponent(item.title)+'&kind='+item.kind).then(data=>{if(!closed){setFound(data.results||[]);setProviders(data.providers||[]);}}).catch(cause=>{if(!closed)setError(cause.message);}).finally(()=>{if(!closed)setSearching(false);});
     return()=>{closed=true;setSearching(false);};
@@ -69,6 +70,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
       ...(selectedTranslation?.kind?{translation:{name:selectedTranslation.name,kind:selectedTranslation.kind,language:selectedTranslation.language||'und',player:selectedTranslation.player||'',variantId:selectedTranslation.id}}:{})};
     setBusy('submit');try{await service.submit(job);onSubmitted();}catch(cause){setError(cause.message);}finally{setBusy('');}
   }
+  if(kind==='manga')return <MangaImport state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary}/>;
   return <form className="import-selection import-compact" onSubmit={submit}>
     <div className="section-heading"><h3>В твою коллекцию</h3><span className="source-label"><Icon name="lock" size={12}/> Зашифровано в Drive</span></div>
 

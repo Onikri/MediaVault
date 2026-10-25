@@ -178,3 +178,13 @@ SovetRomantica format. Fixture success is separate from live network success.
 - Playwright for Python 1.62.0 (Apache-2.0) and Chromium (BSD-style and third-party notices) run only on the server for public dynamic players; browser contexts contain no Google profile. Sources: https://github.com/microsoft/playwright-python and https://www.chromium.org/Home/chromium-security/ .
 
 - Public trailer preparation: [yt-dlp](https://github.com/yt-dlp/yt-dlp), 2026.10.21, [Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE). Its optional default dependencies retain their respective licenses. Only catalogue-listed public trailers are accepted; no credentials, paywall or DRM bypass is configured. FFmpeg/ffprobe are provided by the server distribution under their packaged licenses.
+
+Russian manga adapter behavior and current HTML selectors were cross-checked
+against [Keiyoushi extensions-source](https://github.com/keiyoushi/extensions-source/tree/b2f43180511e576bb235800e8958531489d6692b)
+(Apache-2.0), especially MangaPoisk, MangaHub, MangaBuff, MultiChan and GroupLe.
+MediaVault uses its own Python implementation; it does not bundle Android clients,
+authentication interceptors, site user hashes or challenge bypasses.
+JSZip 3.10.1 is additionally bundled as a lazy module for the native CBZ reader
+under its MIT option; the full license is included in the npm package.
+Ratings retain platform attribution and source links: Shikimori, MyAnimeList/Jikan,
+AniList and Kitsu; no paid credentials are used.
