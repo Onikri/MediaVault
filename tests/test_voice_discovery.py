@@ -126,3 +126,14 @@ class AggregationTests(unittest.TestCase):
         self.assertEqual(len(result['voices'][0]['variants']),2)
         self.assertTrue(all('dandadan' in url for url in visited))
         self.assertEqual(len(visited),2)
+
+class MetadataRouteTests(unittest.TestCase):
+    def test_static_poster_and_watch_order_routes_are_not_shadowed_by_provider_route(self):
+        import os,tempfile
+        from fastapi.testclient import TestClient
+        import api
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory,'MEDIA_VAULT_DISABLE_WORKER':'1'}):
+            with TestClient(api.app) as client,patch('poster_assets.posters',return_value={'57334':{'cover':'https://desu.shikimori.io/poster.jpg'}}),patch('watch_order.watch_order',return_value={'items':[{'id':'57334','current':True}]}),patch.object(api,'metadata',side_effect=AssertionError('Static route reached generic metadata handler')):
+                self.assertEqual(client.get('/metadata/posters?ids=57334').json()['57334']['cover'],'https://desu.shikimori.io/poster.jpg')
+                self.assertTrue(client.get('/metadata/watch-order?identity=57334').json()['items'][0]['current'])
+                self.assertEqual(client.get('/metadata/watch-order?identity=bad').status_code,422)

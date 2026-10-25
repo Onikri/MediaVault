@@ -331,6 +331,20 @@ from device_sessions import install as install_device_sessions
 install_device_sessions(app, sys.modules[__name__])
 
 
+@app.get('/metadata/posters')
+def title_posters(ids: str = '', kind: str = 'anime'):
+    from poster_assets import posters
+    if len(ids)>400 or kind not in {'anime','manga','ranobe'}:raise HTTPException(422,'Некорректные ID постеров.')
+    return posters(ids.split(','),kind)
+
+
+@app.get('/metadata/watch-order')
+def title_watch_order(identity: str = ''):
+    if not re.fullmatch(r'\d{1,12}',identity):raise HTTPException(422,'Некорректный тайтл.')
+    from watch_order import watch_order
+    return watch_order(identity)
+
+
 @app.get("/metadata/{provider}")
 def catalogue(provider: str, q: str = "", kind: str = "anime", page: int = 1, identity: str | None = None, year: int | None = None, part: str = ''):
     return metadata(provider, query=q, kind=kind, page=page, identity=identity, year=year, part=part)
@@ -386,24 +400,10 @@ def discover_voices(body: TitleDiscovery, subject=Depends(owner)):
         raise HTTPException(422, str(error)) from None
 
 
-@app.get('/metadata/posters')
-def title_posters(ids: str = '', kind: str = 'anime'):
-    from poster_assets import posters
-    if len(ids)>400 or kind not in {'anime','manga','ranobe'}:raise HTTPException(422,'Некорректные ID постеров.')
-    return posters(ids.split(','),kind)
-
-
 @app.get('/sources/calendar')
 def source_calendar(subject=Depends(owner)):
     from release_calendar import calendar
     return calendar()
-
-
-@app.get('/metadata/watch-order')
-def title_watch_order(identity: str = ''):
-    if not re.fullmatch(r'\d{1,12}',identity):raise HTTPException(422,'Некорректный тайтл.')
-    from watch_order import watch_order
-    return watch_order(identity)
 
 
 class ImportTask(StrictBody):
