@@ -8,7 +8,7 @@ import re
 import unicodedata
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin
 from bs4 import BeautifulSoup
-from source_parser import SourceError, public_url
+from source_parser import SourceError, public_url, public_player_html
 
 KODIK={'kodikplayer.com','kodik.info','kodik.biz','kodik.cc','aniqit.com'}
 CVH_API='https://plapi.cdnvideohub.com/api/v1/player/sv'
@@ -48,7 +48,7 @@ def choice(name, url, *, identity='', kind='', language='und', player='', episod
 
 def animego_buttons(text,base):
     result=[]
-    for button in BeautifulSoup(text,'html.parser').select('[data-player][data-translation-title]'):
+    for button in BeautifulSoup(public_player_html(text,base),'html.parser').select('[data-player][data-translation-title]'):
         raw=button.get('data-player')
         if not raw:continue
         try:
@@ -61,7 +61,7 @@ def animego_buttons(text,base):
 
 def animego_episode_pages(text,base):
     result=[]
-    for node in BeautifulSoup(text,'html.parser').select('[data-episode][data-episode-number]'):
+    for node in BeautifulSoup(public_player_html(text,base),'html.parser').select('[data-episode][data-episode-number]'):
         identity,number=node.get('data-episode',''),node.get('data-episode-number','')
         if identity.isdigit() and number.isdigit() and 0<int(number)<=10000:
             result.append({'number':int(number),'url':urljoin(base,'/player/videos/'+identity),'title':'Серия '+number})

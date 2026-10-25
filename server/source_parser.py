@@ -110,6 +110,10 @@ class PublicHttp:
     def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None):
         url = self.validate(value)
         outgoing = playback_headers(headers)
+        if urlsplit(url).hostname in {'animego.org','animego.me'} and re.fullmatch(r'/player/(?:videos/)?\d+/?',urlsplit(url).path):
+            # These published player pages return their HTML in data.content.
+            outgoing['X-Requested-With'] = 'XMLHttpRequest'
+            outgoing['Accept'] = 'application/json, text/javascript, */*; q=0.01'
         if byte_range:
             outgoing["Range"] = byte_range
         if method == "POST":
@@ -338,7 +342,21 @@ class PageParser(HTMLParser):
             self.select = ""
 
 
+def public_player_html(text, base):
+    """Unwrap AnimeGO's public XHR response without treating arbitrary JSON as HTML."""
+    if urlsplit(base).hostname not in {'animego.org','animego.me'} or not re.fullmatch(r'/player/(?:videos/)?\d+/?',urlsplit(base).path) or not text.lstrip().startswith('{'):
+        return text
+    try:
+        data=json.loads(text).get('data')
+        content=data.get('content') if isinstance(data,dict) else None
+        if not isinstance(content,str) or not content.strip():raise ValueError()
+        return html.unescape(content)
+    except (ValueError,AttributeError):
+        raise SourceError('AnimeGO не вернул содержимое публичного плеера.') from None
+
+
 def parse_page(text, base):
+    text=public_player_html(text,base)
     if BLOCKED.search(text):
         raise SourceError("Источник требует проверку браузера или подписку.")
     parser = PageParser(base)

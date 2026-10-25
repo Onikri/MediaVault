@@ -41,7 +41,7 @@ class Site:
 
 SITES = (
     Site("yummy", "YummyAnime", "https://yummyanime.tv", ("yummyanime.tv",), ".movie-item", ".movie-item__title"),
-    Site("animego", "AnimeGo", "https://animego.me", ("animego.me", "animego.org"), ".animes-list-item, .anime-item, .ani-grid__item", ".h5, h2, h3"),
+    Site("animego", "AnimeGo", "https://animego.me", ("animego.me", "animego.org"), ".animes-list-item, .anime-item, .ani-grid__item", ".ani-grid__item-title, .h5, h2, h3"),
     Site("jutsu", "Jut.su", "https://jut.su", ("jut.su",), ".all_anime_global, .all_anime", ".aaname, .anime_name"),
     Site("animevost", "AnimeVost", "https://animevost.org", ("animevost.org",), ".shortstory", ".shortstoryHead h2, .shortstoryHead a", "/index.php"),
     Site("anilibria", "AniLiberty / AniLibria", "https://aniliberty.top", ("anilibria.tv", "anilibria.top", "aniliberty.top"), ".release, .release-item, .goodcell, a[href*='/anime/releases/release/']", "h2, h3, .title"),

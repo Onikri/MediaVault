@@ -1,5 +1,6 @@
 """Published player shapes, identity, and exact selected-translation preservation."""
 import json
+import html
 from pathlib import Path
 import sys
 import unittest
@@ -48,8 +49,9 @@ class PlayerCatalogTests(unittest.TestCase):
         root='https://animego.org/anime/show-70';relay='https://animego.org/player/70'
         def buttons(ep,studio='A'):
             return f'<div id="provider"><button data-player="//aniboom.one/embed/show?episode={ep}&amp;translation=30" data-provider-title="AniBoom" data-ptranslation="30" data-translation-title="{studio}"></button></div>'
-        pages={root:'<title>Show</title>',relay:buttons(1)+'<button data-episode="101" data-episode-number="1"></button><button data-episode-number="3" data-episode="103"></button>',
-               'https://animego.org/player/videos/101':buttons(1),'https://animego.org/player/videos/103':buttons(3)}
+        def envelope(value):return json.dumps({'data':{'content':html.escape(value)}})
+        pages={root:'<title>Show</title>',relay:envelope(buttons(1)+'<button data-episode="101" data-episode-number="1"></button><button data-episode-number="3" data-episode="103"></button>'),
+               'https://animego.org/player/videos/101':envelope(buttons(1)),'https://animego.org/player/videos/103':envelope(buttons(3))}
         http=Http(pages);found=inspect_catalog(root,pages[root],root,http,provider='animego')
         studio=found['dubs'][0]
         self.assertEqual([e['number'] for e in studio['episodes']],[1,3])
@@ -61,8 +63,23 @@ class PlayerCatalogTests(unittest.TestCase):
         resolver.resolve(studio['episodes'][1]['url'])
         self.assertIn('episode=3',seen[0][0]);self.assertNotIn('episode=1',seen[0][0])
         self.assertEqual(seen[0][1],'https://animego.org/player/videos/103')
-        pages['https://animego.org/player/videos/103']=buttons(3).replace('data-ptranslation="30"','data-ptranslation="31"')
+        pages['https://animego.org/player/videos/103']=envelope(buttons(3).replace('data-ptranslation="30"','data-ptranslation="31"'))
         with self.assertRaises(SourceError):resolver.resolve(studio['episodes'][1]['url'])
+
+    def test_modern_animego_card_and_xhr_headers(self):
+        from site_adapters import BY_ID,parse_search
+        from requests import Session,Response
+        import io
+        text='<div class="ani-grid__item"><a class="ani-grid__item-body" href="/anime/show-70"><img src="/a.jpg"><div class="ani-grid__item-title">Дандадан 2</div><span class="ani-grid__item-genres__link">2025</span></a></div>'
+        found=parse_search(BY_ID['animego'],text,'https://animego.me/search/anime?q=show')
+        self.assertEqual((found[0]['title'],found[0]['year']),('Дандадан 2',2025))
+        response=Response();response.status_code=200;response.raw=io.BytesIO(b'{"data":{"content":"<div>player</div>"}}')
+        with Session() as session,patch.object(session,'request',return_value=response) as request:
+            http=PublicHttp(session=session,validate=lambda value:value)
+            http.document('https://animego.me/player/70',headers={'Authorization':'private-google-token','Cookie':'private-session'})
+            headers=request.call_args.kwargs['headers']
+            self.assertEqual(headers['X-Requested-With'],'XMLHttpRequest')
+            self.assertNotIn('Authorization',headers);self.assertNotIn('Cookie',headers)
 
     def test_cvh_exposes_every_real_voice_episode_and_quality(self):
         playlist='https://plapi.cdnvideohub.com/api/v1/player/sv/playlist?pub=747&aggr=mali&id=42'
