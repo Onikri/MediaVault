@@ -8,9 +8,11 @@ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 class UpdateTests(unittest.TestCase):
     def test_uses_existing_vm_and_only_enables_requested_plugin(self):
         calls=[]
+        # Real regional instance OCIDs contain hyphens; global IAM fixtures do not.
+        instance_id='ocid1.instance.oc1.eu-frankfurt-1.anthfixture123456789'
         def cli(args,region):
             calls.append(args)
-            if args[:3]==['search','resource','structured-search']:return {'items':[{'identifier':'ocid1.instance.oc1.fixture'}]}
+            if args[:3]==['search','resource','structured-search']:return {'items':[{'identifier':instance_id}]}
             if args[:3]==['compute','instance','get']:return {'lifecycle-state':'RUNNING','compartment-id':'compartment','agent-config':{'plugins-config':[{'name':'Monitoring','desired-state':'DISABLED'}]}}
             if args[:3]==['compute','instance','update']:return {}
             if args[:3]==['instance-agent','command','create']:
@@ -18,6 +20,8 @@ class UpdateTests(unittest.TestCase):
             return {'lifecycle-state':'SUCCEEDED','exit-code':0,'content':{'text':'health version 6 confirmed'}}
         value=module.deploy('a'*40,'eu-frankfurt-1',enable_plugin=True,cli=cli,report=lambda _:None,pause=lambda _:None)
         self.assertTrue(value['updated'])
+        get=next(c for c in calls if c[:3]==['compute','instance','get'])
+        self.assertEqual(get[get.index('--instance-id')+1],instance_id)
         update=next(c for c in calls if c[:3]==['compute','instance','update'])
         config=json.loads(update[update.index('--agent-config')+1])
         self.assertIn({'name':'Monitoring','desiredState':'DISABLED'},config['pluginsConfig'])

@@ -46,7 +46,7 @@ def deploy(revision,region,*,instance_id=None,enable_plugin=False,cli=command,re
         items=inventory.get('items',[])
         if len(items)!=1:raise UpdateError('Не найдена одна работающая mediavault-import. Укажи её OCID через --instance-id; новые VM не создаются.')
         instance_id=items[0]['identifier']
-    if not re.fullmatch(r'ocid1\.instance\.[a-zA-Z0-9.]+',instance_id):raise UpdateError('Некорректный OCID существующей VM.')
+    if not re.fullmatch(r'ocid1\.instance\.[a-zA-Z0-9.-]+',instance_id):raise UpdateError('Некорректный OCID существующей VM.')
     instance=cli(['compute','instance','get','--instance-id',instance_id],region)
     if instance.get('lifecycle-state')!='RUNNING':raise UpdateError('Существующая VM не запущена. Скрипт не запускает и не пересоздаёт VM.')
     config=instance.get('agent-config') or {}
