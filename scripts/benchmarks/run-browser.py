@@ -32,7 +32,7 @@ async def main():
    if '/languages/english/' in url:path=models/('english.onnx' if file.endswith('.onnx') else 'english-dict.txt')
    elif '/languages/chinese/' in url:path=models/('paddle-cn.onnx' if file.endswith('.onnx') else 'paddle-cn-dict.txt')
    else:path=aliases.get(file)
-   if not path or not path.exists():return await route.abort()
+   if not path or not path.exists():return await route.continue_()
    await route.fulfill(path=str(path),headers={'access-control-allow-origin':'*'})
   await page.route('https://huggingface.co/**',weights);await page.route('https://github.com/**.onnx',weights)
   native=None
@@ -78,6 +78,8 @@ async def main():
      if c.get('language'):continue
      boxes=[dict(zip(['x1','y1','x2','y2'],r['box'])) for r in c['regions']]
      await execute('inpaint:'+model+':'+c['id'],'inpaint',c,model,[list((root/'cases'/c['file']).read_bytes()),boxes,model])
-  if native:await native.close()
+  if native:
+   out['nativeCachedModels']=[{'file':f.name,'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()} for f in sorted((models/'native-cache').glob('*.onnx'))]
+   await native.close()
   await browser.close()
 asyncio.run(main());server.shutdown();save();print('REPORT',report)
