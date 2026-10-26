@@ -123,7 +123,12 @@ class LmtRuntime:
     async def reset_page(self):
         page, self.page = self.page, None
         if page:
-            await page.close()
+            try:
+                await page.close()
+            except Exception:
+                # A dead browser/driver is already closed. Preserve the
+                # inference/startup error that triggered this cleanup.
+                pass
 
     async def typeset(self, data, regions, scale):
         await self._start()
@@ -136,9 +141,11 @@ class LmtRuntime:
 
     async def close(self):
         await self.reset_page()
-        if self.browser:
-            await self.browser.close()
-            self.browser = None
-        if self.playwright:
-            await self.playwright.stop()
-            self.playwright = None
+        browser, self.browser = self.browser, None
+        playwright, self.playwright = self.playwright, None
+        for resource, method in [(browser,'close'),(playwright,'stop')]:
+            if resource:
+                try:
+                    await getattr(resource,method)()
+                except Exception:
+                    pass

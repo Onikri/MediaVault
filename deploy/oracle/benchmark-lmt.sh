@@ -33,8 +33,8 @@ if shutil.disk_usage('/opt').free<4*1024**3:raise SystemExit('Less than 4 GiB fr
 deadline=time.monotonic()+180
 while True:
  m={x.split(':',1)[0]:int(x.split()[1])*1024 for x in Path('/proc/meminfo').read_text().splitlines() if len(x.split())>=3 and x.split()[1].isdigit()}
- if m['MemAvailable']>=8*1024**3 and os.getloadavg()[0]<=1.5:break
- if time.monotonic()>=deadline:raise SystemExit('VM remained busy or had less than 8 GiB available RAM; benchmark postponed')
+ if m['MemAvailable']>=10*1024**3 and os.getloadavg()[0]<=1.5:break
+ if time.monotonic()>=deadline:raise SystemExit('VM remained busy or had less than 10 GiB available RAM; benchmark postponed')
  time.sleep(5)
 print('VM ready: load1=%.2f availableGiB=%.2f'%(os.getloadavg()[0],m['MemAvailable']/1024**3),flush=True)
 PY
@@ -103,7 +103,7 @@ else:raise SystemExit("LLM failed to start")
 '
 docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}'
 backend_id=$(docker create --name mediavault-reader-lmt-measure --network "$network" \
-  --cpus=2 --memory=4g --memory-swap=4g --cap-drop=ALL --security-opt=no-new-privileges \
+  --cpus=2 --memory=6g --memory-swap=6g --cap-drop=ALL --security-opt=no-new-privileges \
   -v "$data:/data" -e TMPDIR=/data/tmp -e OMP_NUM_THREADS=2 -e MKL_NUM_THREADS=2 \
   -e LMT_LLM_URL=http://mediavault-reader-llm:8081/v1 -e "LMT_LLM_MODEL=${model%.gguf}" \
   "$reader" python scripts/benchmark-reader.py --mode "$stage" --threads 2 \

@@ -47,3 +47,17 @@ class WeightRoutingTests(IsolatedAsyncioTestCase):
     async def test_fake_host_and_credentials_are_rejected(self):
         for url in ['https://huggingface.co.evil.example/model', 'https://user:secret@huggingface.co/model']:
             self.assertFalse(self.runtime._weight_url_allowed(url))
+
+    async def test_driver_cleanup_preserves_primary_startup_error(self):
+        self.runtime._start = AsyncMock(side_effect=RuntimeError('primary startup failure'))
+        page = SimpleNamespace(close=AsyncMock(side_effect=RuntimeError('driver closed')))
+        browser = SimpleNamespace(close=AsyncMock(side_effect=RuntimeError('driver closed')))
+        playwright = SimpleNamespace(stop=AsyncMock())
+        self.runtime.page, self.runtime.browser, self.runtime.playwright = page, browser, playwright
+        with self.assertRaisesRegex(RuntimeError,'primary startup failure'):
+            await self.runtime.run(b'fixture',{'allowDownloads':True},lambda _:None)
+        playwright.stop.assert_awaited_once()
+        self.assertIsNone(self.runtime.page)
+        self.assertIsNone(self.runtime.browser)
+        self.assertIsNone(self.runtime.playwright)
+        self.assertFalse(self.runtime.allow_downloads)
