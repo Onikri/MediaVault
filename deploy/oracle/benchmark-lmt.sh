@@ -27,12 +27,16 @@ fi
 [[ "$(uname -m)" == aarch64 ]] || { echo 'This benchmark requires ARM64'; exit 2; }
 docker image inspect "$reader" >/dev/null
 python3 - <<'PY'
-import os,shutil
+import os,shutil,time
 from pathlib import Path
-m={x.split(':',1)[0]:int(x.split()[1])*1024 for x in Path('/proc/meminfo').read_text().splitlines() if len(x.split())>=3 and x.split()[1].isdigit()}
-if m['MemAvailable']<6*1024**3:raise SystemExit('Less than 6 GiB available RAM')
 if shutil.disk_usage('/opt').free<4*1024**3:raise SystemExit('Less than 4 GiB free disk')
-if os.getloadavg()[0]>1.5:raise SystemExit('VM is busy; benchmark postponed')
+deadline=time.monotonic()+180
+while True:
+ m={x.split(':',1)[0]:int(x.split()[1])*1024 for x in Path('/proc/meminfo').read_text().splitlines() if len(x.split())>=3 and x.split()[1].isdigit()}
+ if m['MemAvailable']>=8*1024**3 and os.getloadavg()[0]<=1.5:break
+ if time.monotonic()>=deadline:raise SystemExit('VM remained busy or had less than 8 GiB available RAM; benchmark postponed')
+ time.sleep(5)
+print('VM ready: load1=%.2f availableGiB=%.2f'%(os.getloadavg()[0],m['MemAvailable']/1024**3),flush=True)
 PY
 if [[ "$stage" == prepare ]]; then
   mkdir -p "$root/llama-image" "$data/llm"
