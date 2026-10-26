@@ -6,7 +6,7 @@ import argparse,asyncio,base64,hashlib,http.server,json,os,platform,threading,ti
 from pathlib import Path
 from playwright.async_api import async_playwright
 from metrics import match_boxes,cer
-p=argparse.ArgumentParser();p.add_argument('--retry-errors',action='store_true');p.add_argument('--detectors',default='comic-bubble,comic-text-detector');p.add_argument('--runtime',choices=['wasm','native'],default='wasm');p.add_argument('--threads',type=int,default=2);p.add_argument('--root',default='test-output/manga-quality');p.add_argument('--models',default='test-output/quality-models');p.add_argument('--label',required=True);p.add_argument('--resume',action='store_true');p.add_argument('--stages',default='detection,ocr,fonts');p.add_argument('--chromium',default='/usr/bin/chromium');args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--include-language-detection',action='store_true');p.add_argument('--japanese-ocr',default='paddle,ppocrv6-manga');p.add_argument('--retry-errors',action='store_true');p.add_argument('--detectors',default='comic-bubble,comic-text-detector');p.add_argument('--runtime',choices=['wasm','native'],default='wasm');p.add_argument('--threads',type=int,default=2);p.add_argument('--root',default='test-output/manga-quality');p.add_argument('--models',default='test-output/quality-models');p.add_argument('--label',required=True);p.add_argument('--resume',action='store_true');p.add_argument('--stages',default='detection,ocr,fonts');p.add_argument('--chromium',default='/usr/bin/chromium');args=p.parse_args()
 root=Path(args.root).resolve();models=Path(args.models).resolve();report=root/'browser-results.json';cases=json.loads((root/'cases/cases.json').read_text())
 out=json.loads(report.read_text()) if args.resume and report.exists() else {'environment':args.label,'machine':platform.machine(),'threads':1 if args.runtime=='wasm' else args.threads,'runtime':args.runtime+'-cpu','results':[]}
 # Cache key includes the complete bundle, fixtures and models; stale reports fail closed.
@@ -54,6 +54,8 @@ async def main():
    try:
     result=await page.evaluate('async p=>window.bench[p.stage](...p.args)',{'stage':stage,'args':params});record.update({'fonts':result} if stage=='fonts' else result)
     if stage=='detect':record['metrics']=match_boxes([r['box'] for r in case['regions']],[[b['x1'],b['y1'],b['x2'],b['y2']] for b in result['boxes']])
+    if stage=='detect' and case.get('partialAnnotations'):
+     record['unlabelledPredictions']=record['metrics']['fp'];record['metrics'].update({'fp':None,'precision':None,'f1':None,'partialAnnotations':True})
     if stage=='ocr':record['cer']=sum(cer(a['text'],b.get('text','')) for a,b in zip(case['regions'],result['results']))/len(case['regions']);record['reference']=[r['text'] for r in case['regions']]
     if stage=='inpaint':
      file=root/(key.replace(':','-')+'.png');file.write_bytes(bytes(record.pop('image')));record['image']=file.name
@@ -62,12 +64,12 @@ async def main():
   if 'detection' in args.stages.split(','):
    for model in args.detectors.split(','):
     for c in cases:
-     if c.get('language'):continue
+     if c.get('language') and not args.include_language_detection:continue
      await execute('detect:'+model+':'+c['id'],'detect',c,model,[list((root/'cases'/c['file']).read_bytes()),model])
     await page.evaluate('window.bench.release()')
   if 'ocr' in args.stages.split(','):
    for c in cases:
-    language=c.get('language','English');engines={'English':['paddle'],'Japanese':['paddle','ppocrv6-manga'],'Korean':['pororo','ppocrv5-korean']}[language]
+    language=c.get('language','English');engines={'English':['paddle'],'Japanese':args.japanese_ocr.split(','),'Korean':['pororo','ppocrv5-korean']}[language]
     for model in engines:
      boxes=[dict(zip(['x1','y1','x2','y2'],r['box'])) for r in c['regions']]
      await execute('ocr:'+model+':'+c['id'],'ocr',c,model,[list((root/'cases'/c['file']).read_bytes()),boxes,language,model]);await page.evaluate('window.bench.release()')
@@ -75,7 +77,7 @@ async def main():
   if 'inpaint' in args.stages.split(','):
    for model in ['fast','quality']:
     for c in cases:
-     if c.get('language'):continue
+     if c.get('language') and not args.include_language_detection:continue
      boxes=[dict(zip(['x1','y1','x2','y2'],r['box'])) for r in c['regions']]
      await execute('inpaint:'+model+':'+c['id'],'inpaint',c,model,[list((root/'cases'/c['file']).read_bytes()),boxes,model])
   if native:

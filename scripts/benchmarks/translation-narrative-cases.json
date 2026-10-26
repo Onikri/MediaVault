@@ -1,0 +1,5 @@
+[
+ {"id":"last-day-retirement","source":"今日が引退前の最後の日になると思う","reference":"Думаю, сегодня мой последний день перед выходом на пенсию.","language":"ja","checks":["послед"]},
+ {"id":"edward-interjection","source":"あらエドワード...もう店を出ていくの?","reference":"О, Эдвард... уже уходишь из магазина?","language":"ja","checks":["Эдвард","магазин"]},
+ {"id":"return-home-grown-grandchild","source":"ああ家に帰って成長した孫の姿を見るのが楽しみだ","reference":"Да, жду не дождусь, когда вернусь домой и увижу, как вырос мой внук.","language":"ja","checks":["дом"]}
+]
