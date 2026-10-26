@@ -1,0 +1,14 @@
+[
+ {"id":"negation","source":"I do not believe in aliens.","reference":"Я не верю в инопланетян.","language":"en","checks":["не"]},
+ {"id":"prohibition","source":"Wait! Do not open that door.","reference":"Стой! Не открывай эту дверь.","language":"en","checks":["не"]},
+ {"id":"name","source":"Momo, are you all right?","reference":"Момо, ты в порядке?","language":"en","checks":["Момо"]},
+ {"id":"double-negation","source":"It is not that I do not trust you. I just want to protect you.","reference":"Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.","language":"en","checks":["не"]},
+ {"id":"idiom","source":"You have got to be kidding me!","reference":"Да ты издеваешься!","language":"en"},
+ {"id":"conditional","source":"If he had arrived five minutes earlier, we could have saved her.","reference":"Если бы он пришёл на пять минут раньше, мы могли бы её спасти.","language":"en","checks":["бы"]},
+ {"id":"ellipsis","source":"I thought you were... No, forget it.","reference":"Я думал, ты... Нет, забудь.","language":"en"},
+ {"id":"acronym","source":"I believe in ghosts, but I do not believe in UFOs.","reference":"Я верю в призраков, но не верю в НЛО.","language":"en","checks":["не","НЛО"]},
+ {"id":"ja-negation","source":"私は宇宙人を信じていません。","reference":"Я не верю в инопланетян.","language":"ja","checks":["не"]},
+ {"id":"ja-prohibition","source":"その扉を開けないでください！","reference":"Не открывай эту дверь!","language":"ja","checks":["не"]},
+ {"id":"ko-negation","source":"나는 외계인을 믿지 않는다.","reference":"Я не верю в инопланетян.","language":"ko","checks":["не"]},
+ {"id":"ko-prohibition","source":"그 문을 열지 마세요!","reference":"Не открывай эту дверь!","language":"ko","checks":["не"]}
+]

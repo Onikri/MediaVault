@@ -1,0 +1,46 @@
+[
+  {
+    "id": "comic-relief",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/comicrelief/ComicRelief-Regular.ttf",
+    "sourceSHA256": "9ef4958ab06385d91f635f83a15569786b243f9d010cfb3f9a5cdda593c7bc22",
+    "file": "comic-relief.woff2",
+    "bytes": 27828,
+    "sha256": "637adb30ab5143aa983caf181b49921bc8da371e953f31f5b451dfd0a418378e",
+    "russianGlyphsVerified": 71,
+    "license": "SIL Open Font License 1.1"
+  },
+  {
+    "id": "comic-relief-bold",
+    "weight": 700,
+    "source": "https://raw.githubusercontent.com/google/fonts/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/comicrelief/ComicRelief-Bold.ttf",
+    "sourceSHA256": "33aee007212b696afd57d50c901135cd723cd188f7ad98f3a1c572ea64e8f0d5",
+    "file": "comic-relief-bold.woff2",
+    "bytes": 35456,
+    "sha256": "69a77a62214397bd5408b5fd021f0b7f9a9fddc28dcd5d2cc81937c0ea5c9e6a",
+    "russianGlyphsVerified": 71,
+    "license": "SIL Open Font License 1.1"
+  },
+  {
+    "id": "pangolin",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/pangolin/Pangolin-Regular.ttf",
+    "sourceSHA256": "cf4f0a46704c7859d4943320fce6c6d06cc7dc450ef971c3676ef36f9f482299",
+    "file": "pangolin.woff2",
+    "bytes": 146712,
+    "sha256": "482ab48b8de5dc732b4bb6fd472d5d2cb5dabad3bc63328b2b4f9146ea6b776a",
+    "russianGlyphsVerified": 71,
+    "license": "SIL Open Font License 1.1"
+  },
+  {
+    "id": "neucha",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/e7db6ca603fd4862010383ff17ffd6cc4ffac1c0/ofl/neucha/Neucha.ttf",
+    "sourceSHA256": "7927bd6ce090fa032857dcbc3ad0e8b765c462d0a72a8779068132496b4e087d",
+    "file": "neucha.woff2",
+    "bytes": 38136,
+    "sha256": "4f2204462210e97575a305bc2b6d1a2deb11f1898d3ade18b18323d3b58e469f",
+    "russianGlyphsVerified": 71,
+    "license": "SIL Open Font License 1.1"
+  }
+]

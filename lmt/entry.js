@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './shim.js';
+import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {validateConfig} from './config.js';
 import {getCachedSegmentation} from './upstream/lib/detections/segmentation.ts';
 const contexts=new Map();let running=false;
@@ -33,7 +34,7 @@ async function pipeline(bytes,config,progress){
   progress('Восстанавливаем фон и набираем русский текст');t=performance.now();const segmentation=getCachedSegmentation(source);const cleaned=await(config.inpaint==='quality'?inpaintImageQuality:inpaintImageAuto)(source,valid.map(v=>v.box),{segmentation});timings.inpaintMs=Math.round(performance.now()-t);
   const cleanBitmap=await createImageBitmap(await(await fetch(cleaned.url)).blob()),canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;const ctx=canvas.getContext('2d');ctx.drawImage(cleanBitmap,0,0);cleanBitmap.close();t=performance.now();
   const blocked=new Set(cleaned.regions.filter(r=>['declined','skipped'].includes(r.method)).map(r=>r.index));const warnings=[];if(blocked.size)warnings.push('Часть реплик оставлена в оригинале: полный перевод доступен по маркерам.');if(config.inpaint==='quality'&&cleaned.regions.some(r=>r.lamaStage==='failed'))warnings.push('LaMa не выполнила часть редро: использован быстрый клининг.');
-  for(const [i,value]of valid.entries())if(!blocked.has(i))await drawFittedText(ctx,value.text,value.box,'system-ui, sans-serif',40);timings.typesetMs=Math.round(performance.now()-t);
+  const fontStack=await loadMangaFont(config.font||'comic-relief');for(const [i,value]of valid.entries())if(!blocked.has(i))await drawFittedText(ctx,value.text,{...value.box,style:{bold:false,...value.box.style}},fontStack,40);timings.typesetMs=Math.round(performance.now()-t);
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.94));if(!blob)throw Error('Не удалось собрать страницу.');timings.totalMs=Math.round(performance.now()-started);
   return {engine:'Libre Manga Translator',sourceLanguage:config.language,targetLanguage:'ru',machineTranslation:true,timings,warnings,inpaint:{requested:config.inpaint||'fast',methods:[...new Set(cleaned.regions.map(r=>r.method))],unpainted:blocked.size,segmentationUsed:!!segmentation},inputMode:config.apiInput==='vision'&&config.mode==='api'?'vision':'ocr',renderedImage:await blob.arrayBuffer(),renderedMime:blob.type,regions:valid.map(v=>({x:v.box.x1/bitmap.width,y:v.box.y1/bitmap.height,w:(v.box.x2-v.box.x1)/bitmap.width,h:(v.box.y2-v.box.y1)/bitmap.height,original:texts[v.index],text:v.text,placement:'note'}))};
  }finally{globalThis.lmtProgress=null;bitmap?.close();URL.revokeObjectURL(source);}

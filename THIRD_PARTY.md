@@ -215,3 +215,15 @@ The short Dandadan excerpt in `translation-demo.html` is artwork by Yukinobu Tat
 - Lanczos3 is the classical windowed-sinc reconstruction kernel, implemented directly for WebGL; no third-party neural weights are involved. [Research, alternatives and device limits](docs/video-upscalers.md).
 
 - Quality profile 5.6.1 adds PaddleOCR Korean PP-OCRv5 (Apache-2.0) via the monkt ONNX conversion pinned to `407d31ecdc555de8282c578889774861eea2667e`. The full-Hangul dictionary is bundled in `lmt/upstream/dicts/ppocrv5_korean_dict.txt`; ONNX model SHA256 is verified before use. OpenAI-compatible VLM/SoM requests use our AGPL adapter `lmt/vision.js`; no Gemini client or paid account is activated.
+
+### Кириллические шрифты читалки
+
+Comic Relief (Jeff Davis), Pangolin (Kevin Burke) и Neucha (Jovanny Lemonad) —
+SIL Open Font License 1.1. Файлы WOFF2 поставляются с сайта MediaVault, без
+запросов к Google Fonts. Лицензии, точные исходные URL/ревизия Google Fonts,
+размеры и SHA-256 находятся в `reader-fonts/`. Сохранены Latin/Cyrillic и знаки
+пунктуации; русские 66 букв, включая Ё/ё, проверены после конвертации.
+
+Нативный ONNX-мост и перевод отдельных реплик перенесены для воспроизводимых
+измерений из ветки `codex/manga-backend-processing`, commit `cc005d4537d040b8df38a63617af949529c447bf`.
+Он не включает модели или токены и не меняет работающий importer.

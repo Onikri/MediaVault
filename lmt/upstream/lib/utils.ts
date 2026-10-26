@@ -1,4 +1,5 @@
 import * as ort from "onnxruntime-web/all";
+import {createNativeSession} from "./native-onnx";
 import { resolveExecutionProvidersForModel } from "./hardware";
 import { getExpectedSha256, verifyBufferSha256 } from "./manifests/hashes";
 
@@ -115,6 +116,10 @@ export async function downloadArtifactHF(
   }
 
   const requestPromise = (async () => {
+    if (!noReturn && /\.onnx(?:\?|$)/.test(url)) {
+      const native = await createNativeSession(url, getExpectedSha256(path, url));
+      if (native) return native;
+    }
     const cache = await caches.open(cacheName);
 
     // Cache-first: silent per-load update checks were removed. Updates are

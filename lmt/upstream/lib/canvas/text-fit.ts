@@ -81,7 +81,7 @@ export function calculateFittedTextLayout(
   }
 
   const ctx = getMeasureCtx();
-  const fontWeight = bold ? "700" : "600";
+  const fontWeight = bold ? "700" : "400";
   const fontStyle = italic ? "italic" : "normal";
   const buildFont = (size: number) =>
     `${fontStyle === "italic" ? "italic " : ""}${fontWeight} ${size}px ${fontStack}`;
@@ -192,7 +192,7 @@ export async function drawFittedText(
   const style = bbox.style;
   const bold = style?.bold ?? true;
   const italic = style?.italic ?? false;
-  const fontWeight = bold ? "700" : "600";
+  const fontWeight = bold ? "700" : "400";
   const fontStyle = italic ? "italic" : "normal";
 
   try {
