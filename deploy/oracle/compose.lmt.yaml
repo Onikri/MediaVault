@@ -1,0 +1,37 @@
+# Add to the existing compose project. Importer image/config/data are unchanged.
+services:
+  lmt:
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile.lmt
+    restart: unless-stopped
+    cpus: 2
+    mem_limit: 6g
+    memswap_limit: 6g
+    environment:
+      LMT_LLM_URL: http://lmt-llm:8081/v1
+      LMT_LLM_MODEL: Hy-MT2-1.8B-Q8_0
+      LMT_LLM_PROFILE: hymt2
+      LMT_ONNX_RUNTIME: native
+      LMT_ONNX_THREADS: 2
+      ALLOWED_ORIGIN: https://onikri.github.io
+    volumes:
+      - ${LMT_STORAGE_DIR:-/opt/mediavault-lmt/data}:/data
+    tmpfs: [/tmp:size=512m,uid=1000,gid=1000,mode=1777]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    depends_on: [lmt-llm]
+  lmt-llm:
+    # Existing, verified official llama.cpp ARM64 b11887 image from our tests.
+    image: mediavault-reader-llm:b11887
+    restart: unless-stopped
+    cpus: 2
+    mem_limit: 3g
+    memswap_limit: 3g
+    read_only: true
+    tmpfs: [/tmp:size=64m,uid=1000,gid=1000,mode=1777]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    volumes:
+      - /opt/mediavault-reader-bench/data/llm:/models:ro
+    command: [-m,/models/Hy-MT2-1.8B-Q8_0.gguf,--alias,Hy-MT2-1.8B-Q8_0,-c,'4096',-t,'2',--parallel,'1',--host,0.0.0.0,--port,'8081',--reasoning,off,--no-webui]

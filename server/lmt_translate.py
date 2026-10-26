@@ -12,8 +12,8 @@ class SegmentTranslator:
         if os.getenv('LMT_LLM_API_KEY'):
             headers['Authorization'] = 'Bearer ' + os.environ['LMT_LLM_API_KEY']
         body = {'model': os.environ['LMT_LLM_MODEL'], 'messages': [{'role': 'user', 'content': prompt}],
-                'temperature': 0.2, 'top_p': 0.6, 'top_k': 20, 'repeat_penalty': 1.05,
-                'max_tokens': budget, 'stream': False, 'chat_template_kwargs': {'enable_thinking': False}}
+                'temperature': 0.7, 'top_p': 0.6, 'top_k': 20, 'repeat_penalty': 1.05,
+                'max_tokens': budget, 'stream': False, 'seed': 42, 'chat_template_kwargs': {'enable_thinking': False}}
         async with httpx.AsyncClient(timeout=180, trust_env=False, follow_redirects=False) as client:
             response = await client.post(os.environ['LMT_LLM_URL'].rstrip('/') + '/chat/completions', json=body, headers=headers)
             response.raise_for_status()
@@ -43,7 +43,7 @@ class SegmentTranslator:
         diagnostics = {'profile': 'segments', 'requests': 0, 'segmentFallbacks': 0}
         for index, source in active:
             diagnostics['requests'] += 1
-            prompt = prefix + f'Translate the following segment into {target}, without additional explanation.\n\n{source}'
+            prompt = (f'Translate the following text into {target}. Note that you should only output the translated result without any additional explanation:\n\n' + source) if os.getenv('LMT_LLM_PROFILE') == 'hymt2' else prefix + f'Translate the following segment into {target}, without additional explanation.\n\n{source}'
             translations[index] = await self._complete(prompt, min(1536, max(128, len(source) * 4)))
             if translations[index] == source and re.search(r'[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]', source) and target == 'Russian':
                 raise ValueError('Model returned untranslated source text')

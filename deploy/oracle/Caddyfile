@@ -1,9 +1,17 @@
 {$SERVER_NAME} {
     encode zstd gzip
-    request_body {
-        max_size 512KB
+    handle /reader/lmt/* {
+        request_body {
+            max_size 14MB
+        }
+        reverse_proxy lmt:7861
     }
-    reverse_proxy importer:7860
+    handle {
+        request_body {
+            max_size 512KB
+        }
+        reverse_proxy importer:7860
+    }
     header {
         Strict-Transport-Security "max-age=31536000"
         Referrer-Policy "no-referrer"

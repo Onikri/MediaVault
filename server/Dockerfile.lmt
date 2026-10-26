@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+FROM node:22-bookworm-slim AS build
+WORKDIR /src
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY lmt ./lmt
+COPY src/ocr-profiles.js ./src/ocr-profiles.js
+COPY reader-fonts ./reader-fonts
+# Use a standalone build: only the AGPL engine, dictionaries and native hashes.
+COPY scripts/build-lmt-server.mjs ./scripts/build-lmt-server.mjs
+RUN node scripts/build-lmt-server.mjs
+FROM python:3.12-slim-bookworm
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 CHROMIUM_PATH=/usr/bin/chromium LMT_CHROMIUM_NO_SANDBOX=1 LMT_ASSETS_DIR=/assets LMT_ONNX_RUNTIME=native LMT_ONNX_THREADS=2 LMT_LLM_PROFILE=hymt2
+RUN apt-get update && apt-get install -y --no-install-recommends chromium ca-certificates libgomp1 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY server/requirements-lmt.txt ./
+RUN pip install --no-cache-dir -r requirements-lmt.txt
+COPY --from=build /assets /assets
+COPY server/lmt_service.py server/lmt_runtime.py server/lmt_onnx.py server/lmt_translate.py ./
+RUN useradd --uid 1000 --create-home vault && mkdir /data && chown vault:vault /data
+USER 1000:1000
+CMD ["uvicorn","lmt_service:app","--host","0.0.0.0","--port","7861","--workers","1","--no-access-log"]
