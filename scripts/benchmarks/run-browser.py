@@ -10,7 +10,7 @@ p=argparse.ArgumentParser();p.add_argument('--detectors',default='comic-bubble,c
 root=Path(args.root).resolve();models=Path(args.models).resolve();report=root/'browser-results.json';cases=json.loads((root/'cases/cases.json').read_text())
 out=json.loads(report.read_text()) if args.resume and report.exists() else {'environment':args.label,'machine':platform.machine(),'threads':1 if args.runtime=='wasm' else args.threads,'runtime':args.runtime+'-cpu','results':[]}
 # Cache key includes the complete bundle, fixtures and models; stale reports fail closed.
-fingerprint=hashlib.sha256(b''.join(f.read_bytes() for f in sorted((root/'browser/assets').glob('*.js')))+args.runtime.encode()+json.dumps(cases,sort_keys=True).encode()+b''.join(hashlib.sha256(f.read_bytes()).digest() for f in sorted(models.glob('*.onnx')))).hexdigest()
+fingerprint=hashlib.sha256(b''.join(f.read_bytes() for f in sorted((root/'browser/assets').glob('*.js')))+args.runtime.encode()+json.dumps(cases,sort_keys=True).encode()+(root/'browser/native-models.json').read_bytes()+str(args.threads).encode()).hexdigest()
 if out.get('fingerprint',fingerprint)!=fingerprint:raise SystemExit('Inputs changed: use a new report directory, not --resume.')
 out['fingerprint']=fingerprint
 out['models']=[{'file':f.name,'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()} for f in sorted(models.glob('*.onnx'))]
