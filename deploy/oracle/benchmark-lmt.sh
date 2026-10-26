@@ -71,6 +71,15 @@ fi
 docker network inspect "$network" >/dev/null 2>&1 || docker network create "$network" >/dev/null
 docker inspect mediavault-reader-llm >/dev/null 2>&1 && { echo 'An existing measurement is using the LLM container';exit 4; }
 docker inspect mediavault-reader-lmt-measure >/dev/null 2>&1 && { echo 'An existing backend measurement container exists';exit 4; }
+# A cgroup OOM can leave Chromium singleton symlinks pointing at a removed
+# benchmark container. Only this dedicated profile is used by the guarded job.
+python3 - <<'PY'
+from pathlib import Path
+profile=Path('/opt/mediavault-reader-bench/data/benchmark/lmt-browser')
+for name in ['SingletonLock','SingletonSocket','SingletonCookie']:
+ p=profile/name
+ if p.is_symlink():p.unlink()
+PY
 llm_id=''
 backend_id=''
 cleanup(){
