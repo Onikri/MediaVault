@@ -5,14 +5,15 @@ from pathlib import Path
 import ctranslate2,sentencepiece,requests
 from sacrebleu.metrics import CHRF
 from translation_inputs import inputs_for
-p=argparse.ArgumentParser();p.add_argument('--profile',choices=['json','segments'],default='json');p.add_argument('--model',choices=['argos','opus','nllb','openai'],required=True);p.add_argument('--model-dir');p.add_argument('--url');p.add_argument('--name');p.add_argument('--label',required=True);p.add_argument('--output',required=True);p.add_argument('--cases',default=str(Path(__file__).with_name('translation-cases.json')));p.add_argument('--runs',type=int,default=2);p.add_argument('--threads',type=int,default=2);a=p.parse_args();cases=json.loads(Path(a.cases).read_text());output=Path(a.output);output.parent.mkdir(parents=True,exist_ok=True)
+from translation_requests import segment_request
+p=argparse.ArgumentParser();p.add_argument('--prompt-profile',choices=['standard','hymt2'],default='standard');p.add_argument('--profile',choices=['json','segments'],default='json');p.add_argument('--model',choices=['argos','opus','nllb','openai'],required=True);p.add_argument('--model-dir');p.add_argument('--url');p.add_argument('--name');p.add_argument('--label',required=True);p.add_argument('--output',required=True);p.add_argument('--cases',default=str(Path(__file__).with_name('translation-cases.json')));p.add_argument('--runs',type=int,default=2);p.add_argument('--threads',type=int,default=2);a=p.parse_args();cases=json.loads(Path(a.cases).read_text());output=Path(a.output);output.parent.mkdir(parents=True,exist_ok=True)
 if a.model in ['argos','opus']:cases=[c for c in cases if c['language']=='en']
 key=hashlib.sha256(Path(a.cases).read_bytes()+(a.name or a.model).encode()).hexdigest()
 if output.exists():
  previous=json.loads(output.read_text())
  if previous.get('key')==key and len(previous.get('runs',[]))>=a.runs:print('RESUME',output);raise SystemExit()
  raise SystemExit('Existing incomplete/different report; preserve it and select a new output.')
-out={'key':key,'executionLabel':a.label,'machine':platform.machine(),'model':a.name or a.model,'profile':a.profile,'threads':a.threads,'runs':[]};start=time.perf_counter()
+out={'key':key,'executionLabel':a.label,'machine':platform.machine(),'model':a.name or a.model,'profile':a.profile,'promptProfile':a.prompt_profile,'threads':a.threads,'runs':[]};start=time.perf_counter()
 if a.model!='openai':
  root=Path(a.model_dir);out['modelFiles']=[{'name':f.name,'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()} for f in sorted(root.iterdir()) if f.is_file()]
  engine=ctranslate2.Translator(str(root/'model' if a.model=='argos' else root),device='cpu',compute_type='int8',inter_threads=1,intra_threads=a.threads)
@@ -26,7 +27,7 @@ for run in range(a.runs):
   if a.model=='openai':
    if a.profile=='segments':
     for c in cases:
-     body={'model':a.name,'temperature':0,'seed':42,'max_tokens':512,'chat_template_kwargs':{'enable_thinking':False},'messages':[{'role':'system','content':'Translate manga dialogue into natural Russian. Preserve names, negation and meaning. Return only the translated dialogue, no explanations.'},{'role':'user','content':c['source']}]}
+     body=segment_request(c['source'],a.name,a.prompt_profile)
      response=requests.post(a.url.rstrip('/')+'/chat/completions',json=body,timeout=300);response.raise_for_status();choice=response.json()['choices'][0]
      if choice.get('finish_reason')=='length':raise ValueError('A segment reached its token budget')
      text=choice['message']['content'].strip()
