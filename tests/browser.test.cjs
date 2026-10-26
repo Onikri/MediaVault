@@ -550,13 +550,13 @@ async function main() {
   const output=path.join(PROJECT,'test-output');await fs.mkdir(output,{recursive:true});
   for(const width of [320,390,768,1280]){
     await owner.setViewportSize({width,height:900});
-    await cinema.screenshot({path:path.join(output,'player-'+width+'.png')});
+    await cinema.screenshot({path:path.join(output,'player-'+width+'.png'),animations:'disabled'});
     assert.ok(await cinema.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Player fits '+width);
     assert.equal(await cinema.locator('.mv-player-card').count(),2,'One episode rail');
     assert.equal(await cinema.locator('.mv-player-card.is-current .mv-player-card-art').evaluate(el=>getComputedStyle(el).outlineStyle),'none','No decorative selection frame');
     await cinema.getByRole('button',{name:'Настройки плеера'}).click();
     await cinema.getByRole('heading',{name:'Настройки',exact:true}).waitFor();
-    await cinema.screenshot({path:path.join(output,'player-settings-'+width+'.png')});
+    await cinema.screenshot({path:path.join(output,'player-settings-'+width+'.png'),animations:'disabled'});
     assert.ok(await cinema.locator('.mv-player-drawer').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Settings fit '+width);
     await owner.keyboard.press('Escape');
     assert.equal(await owner.locator('#viewer').isVisible(),true,'Escape dismisses settings first');

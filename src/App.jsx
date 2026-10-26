@@ -145,7 +145,12 @@ export default function App(){
     const change=()=>{if(restoreRoute(location.hash))return;const next=location.hash.slice(1);if(['home','library','import','history','profile'].includes(next)){setView(next);setActiveTitle(null);setSelected(null);}};
     window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);
   },[]);
-  useEffect(()=>{if(state.catalog&&state.remembered){const resume=pendingRoute.current;if(resume&&restoreRoute(resume))pendingRoute.current='';else if(['home','profile'].includes(view))go('library');}},[!!state.catalog]);
+  useEffect(()=>{
+    if(!state.catalog)return;
+    const resume=pendingRoute.current;
+    if(resume){pendingRoute.current='';if(!restoreRoute(resume))go('library');}
+    else if(state.remembered&&['home','profile'].includes(view))go('library');
+  },[!!state.catalog,state.libraryId]);
   const go=useCallback(next=>{setView(next);setActiveTitle(null);if(location.hash!=='#'+next)location.hash=next;},[]);
   const closeViewer=useCallback(()=>setSelected(null),[]);
   function selectCategory(id){setCategory(id);setFavoritesOnly(false);setQuery('');go('library');}
@@ -160,7 +165,7 @@ export default function App(){
   async function openLibrary(create=false,stay=false){
     const resume=pendingRoute.current;
     const ok=create?await actions.createLibrary(passphrase,again):await actions.unlock(libraryId,passphrase);
-    if(ok){setPassphrase('');setAgain('');setCategory('all');if(stay)setLibraryDialog(false);else if(resume&&restoreRoute(resume))pendingRoute.current='';else go('library');}
+    if(ok){setPassphrase('');setAgain('');setCategory('all');if(stay)setLibraryDialog(false);else if(resume)setView('library');else go('library');}
   }
   async function connect(){const ok=await actions.connectDrive();if(ok&&state.catalog)go('library');}
   async function upload(event){const files=Array.from(event.target.files||[]);event.target.value='';if(importService.active){actions.error(Error("Дождись завершения серверного импорта перед добавлением файлов."));return;}if(files.length&&await actions.refreshCatalog())actions.uploadFiles(files,{collection:uploadCollection,section:uploadSection==='auto'?(category==='all'?undefined:category):uploadSection,part:uploadPart});}
