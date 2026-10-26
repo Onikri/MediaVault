@@ -17,7 +17,8 @@ async function pipeline(bytes,config,progress){
   bitmap=await createImageBitmap(new Blob([bytes]));if(bitmap.width*bitmap.height>24000000)throw Error('Страница превышает 24 Мп.');
   progress('Определяем речевые области · при первом запуске загружаются модели');let t=performance.now();const boxes=await detectTextBubble(source,.5,config.detector||'comic-bubble');timings.detectionMs=Math.round(performance.now()-t);
   if(boxes.length>100)throw Error('Найдено слишком много областей. Раздели длинный вебтун на страницы.');
-  if(!boxes.length)return {regions:[],engine:'Libre Manga Translator',renderedImage:bytes,renderedMime:'image/'+(bytes[0]===137?'png':'jpeg'),message:'На этой странице речевые области не найдены.'};
+  for(const box of boxes)if(![box.x1,box.y1,box.x2,box.y2].every(Number.isFinite)||box.x1<0||box.y1<0||box.x2>bitmap.width||box.y2>bitmap.height||box.x2<=box.x1||box.y2<=box.y1)throw Error('Область текста выходит за границы страницы. Попробуй другой детектор.');
+  if(!boxes.length){const header=new Uint8Array(bytes);return {regions:[],engine:'Libre Manga Translator',renderedImage:bytes,renderedMime:header[0]===137?'image/png':header[0]===82?'image/webp':'image/jpeg',message:'На этой странице речевые области не найдены.'};}
   const contextKey=config.contextKey||'default',context=contexts.get(contextKey);let translated,texts;
   if(config.mode==='api'&&config.apiInput==='vision'){
    progress('VLM читает страницу и переводит реплики с визуальным контекстом');const{translateVision}=await import('./vision.js');t=performance.now();translated=await translateVision(bitmap,boxes,config,context);timings.translationMs=Math.round(performance.now()-t);timings.ocrMs=0;texts=translated.sourceTexts;
@@ -36,7 +37,7 @@ async function pipeline(bytes,config,progress){
   if(!valid.length)throw Error('Модель не вернула переведённые реплики. Попробуй другую модель.');
   progress('Восстанавливаем фон и набираем русский текст');t=performance.now();const segmentation=getCachedSegmentation(source);const cleaned=await(config.inpaint==='quality'?inpaintImageQuality:inpaintImageAuto)(source,valid.map(v=>v.box),{segmentation});timings.inpaintMs=Math.round(performance.now()-t);
   const cleanBitmap=await createImageBitmap(await(await fetch(cleaned.url)).blob()),canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;const ctx=canvas.getContext('2d');ctx.drawImage(cleanBitmap,0,0);cleanBitmap.close();t=performance.now();
-  const blocked=new Set(cleaned.regions.filter(r=>['declined','skipped'].includes(r.method)).map(r=>r.index));const warnings=[];if(blocked.size)warnings.push('Часть реплик оставлена в оригинале: полный перевод доступен по маркерам.');if(config.inpaint==='quality'&&cleaned.regions.some(r=>r.lamaStage==='failed'))warnings.push('LaMa не выполнила часть редро: использован быстрый клининг.');
+  const blocked=new Set(cleaned.regions.filter(r=>['declined','skipped'].includes(r.method)).map(r=>r.index));const warnings=[];if(valid.length<boxes.length)warnings.push('Часть областей не распознана; выбери другой OCR или проверь исходный язык.');if(blocked.size)warnings.push('Часть областей оставлена в оригинале; полный текст доступен под страницей.');if(config.inpaint==='quality'&&cleaned.regions.some(r=>r.lamaStage==='failed'))warnings.push('LaMa не выполнила часть редро: использован быстрый клининг.');
   const fontStack=await loadMangaFont(config.font||'comic-relief'),layouts=[];
   for(const [i,value]of valid.entries())if(!blocked.has(i)){
    const box={...value.box,style:{...value.box.style,bold:false}},layout=calculateFittedTextLayout(value.text,box.x2-box.x1,box.y2-box.y1,fontStack,undefined,false,false,40);

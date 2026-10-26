@@ -39,3 +39,17 @@ class QueueTests(IsolatedAsyncioTestCase):
   token=base64.urlsafe_b64encode(json.dumps({'sub':'attacker'}).encode()).decode()+'.fake'
   with patch('httpx.AsyncClient.get',new=AsyncMock(return_value=type('R',(),{'status_code':401})())):
    with self.assertRaises(HTTPException):await owner('Bearer '+token)
+
+class RouteTests(TestCase):
+ def test_public_status_protected_jobs_and_sanitized_invalid_input(self):
+  from fastapi.testclient import TestClient
+  from lmt_service import app
+  with tempfile.TemporaryDirectory() as tmp,patch.dict('os.environ',{'LMT_DATA_DIR':tmp,'LMT_ASSETS_DIR':tmp}):
+   with TestClient(app) as client:
+    self.assertFalse(client.get('/reader/lmt/status').json()['ready'])
+    self.assertEqual(client.post('/reader/lmt/jobs',json={'image':'x'*20,'options':{}}).status_code,401)
+    app.dependency_overrides[owner]=lambda:'fixture-owner'
+    try:
+     r=client.post('/reader/lmt/jobs',json={'image':'private-page-fixture','options':{'host':'http://attacker.invalid'}})
+     self.assertEqual(r.status_code,422);self.assertNotIn('private-page-fixture',r.text);self.assertNotIn('attacker.invalid',r.text)
+    finally:app.dependency_overrides.clear()

@@ -54,6 +54,8 @@ for old in bench.rglob('*.onnx'):
   except OSError:shutil.copy2(old,cache/old.name)
 image='mediavault-lmt:'+revision[:12]
 run(['docker','build','-f','server/Dockerfile.lmt','-t',image,'.'],cwd=source,timeout=1500)
+meminfo={line.split(':',1)[0]:int(line.split()[1])*1024 for line in Path('/proc/meminfo').read_text().splitlines() if len(line.split())>=3 and line.split()[1].isdigit()}
+if meminfo.get('MemAvailable',0)<9*1024**3:raise SystemExit('VM is busy: need 9 GiB available before starting the quality worker. Existing containers untouched.')
 # Private Docker DNS, no new published host port. Existing importer untouched.
 for name in ['mediavault-lmt','mediavault-lmt-llm']:
  existing=subprocess.run(['docker','inspect',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

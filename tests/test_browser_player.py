@@ -37,7 +37,8 @@ class BrowserPlayerTests(unittest.TestCase):
         url='https://catalog.example.com/title'
         frame='https://player.example.com/embed/7'
         fixture={url:('<html><h1>Exact show</h1><script>setTimeout(()=>{const f=document.createElement("iframe");f.src="'+frame+'";document.body.appendChild(f)},40)</script></html>','text/html'),frame:('<html></html>','text/html')}
-        text,target=asyncio.run(_render(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=3))
+        # The deadline includes cold Chromium startup, not only the 40 ms fixture.
+        text,target=asyncio.run(_render(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=8))
         self.assertIn(frame,text);self.assertEqual(target,url)
 
     @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium is required for dynamic catalogue integration')

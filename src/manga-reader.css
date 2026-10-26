@@ -32,3 +32,6 @@
 .reader-settings .lmt-settings .reader-checkbox{display:flex;align-items:center;gap:9px;line-height:1.5}
 .lmt-ready{color:#a0d6b2!important}
 .reader-page figcaption{display:flex;align-items:center;justify-content:center;gap:10px;line-height:1.6;min-height:32px;padding:7px 14px;font-size:12px;color:#d9c7a5;background:#171c1d}
+.reader-layout-settings{margin-top:18px;padding-top:12px;border-top:1px solid #ffffff14}.reader-layout-settings>summary{cursor:pointer;font-size:13px;color:#c8b594;padding:8px 0}
+.reader-translation-notice{line-height:1.5;min-height:36px}.reader-translation-notice>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.reader-toolbar .mv-icon-button[aria-pressed=true]{color:#e4c38e;background:#c8984826}
