@@ -1,12 +1,17 @@
 import {resolveMangaOcr} from './ocr-profiles.js';
-export const TRANSLATION_VERSION=4;
+export const TRANSLATION_VERSION=5;
 export function translationConfig(value={}){
  const backend=!value.engine||['oracle','backend'].includes(value.engine);
- return {...value,version:TRANSLATION_VERSION,engine:backend?'backend':'lmt',mode:value.mode||'gpu',language:value.language||'English',ocr:value.ocr||'auto',detector:value.detector||'comic-bubble',inpaint:value.inpaint||'quality',font:value.font||'comic-relief',translator:value.translator||'hymt2',model:value.model||'Qwen3.5-4B-q4f16_1-MLC',prefetch:[0,1,2,4].includes(value.prefetch)?value.prefetch:2,cache:value.cache!==false};
+ return {...value,version:TRANSLATION_VERSION,engine:backend?'backend':'lmt',mode:value.mode||'gpu',deviceTranslator:['index','webllm'].includes(value.deviceTranslator)?value.deviceTranslator:'hymt2',hymtQuant:['q4','q6','q8'].includes(value.hymtQuant)?value.hymtQuant:'q8',deviceCompute:['cpu','gpu'].includes(value.deviceCompute)?value.deviceCompute:'auto',language:value.language||'English',ocr:value.ocr||'auto',detector:value.detector||'comic-bubble',panelDetector:value.panelDetector||'none',inpaint:value.inpaint||'quality',font:value.font||'comic-relief',translator:value.translator||'hymt2',model:value.model||'Qwen3.5-4B-q4f16_1-MLC',prefetch:[0,1,2,4].includes(value.prefetch)?value.prefetch:2,cache:value.cache!==false};
+}
+export function migrateTranslationSettings(value={}){
+ // Earlier settings predate the full VM worker: a stored Qwen/default browser
+ // mode must not keep selecting the old experiment after the quality rollout.
+ return value.version>=4?translationConfig(value):translationConfig({...value,engine:'backend',translator:'hymt2',detector:'comic-bubble',ocr:'auto',inpaint:'quality',mode:'gpu',model:'Qwen3.5-4B-q4f16_1-MLC'});
 }
 export function resultConfig(value){
  const v=translationConfig(value);
- return {version:TRANSLATION_VERSION,engine:v.engine,mode:v.engine==='backend'?'backend':v.mode,language:v.language,ocr:resolveMangaOcr(v.language,v.ocr),detector:v.detector,inpaint:v.inpaint,font:v.font,translator:v.engine==='backend'?v.translator:v.mode==='api'?v.serverModel:v.model,...(v.mode==='api'&&v.engine!=='backend'?{host:v.host,apiInput:v.apiInput}:{}),typesetter:'fitted-cyrillic-v2'};
+ return {version:TRANSLATION_VERSION,engine:v.engine,mode:v.engine==='backend'?'backend':v.mode,language:v.language,ocr:resolveMangaOcr(v.language,v.ocr),detector:v.detector,panelDetector:v.panelDetector,inpaint:v.inpaint,font:v.font,translator:v.engine==='backend'?v.translator:v.mode==='api'?v.serverModel:v.deviceTranslator!=='webllm'?(v.deviceTranslator==='index'?'Index-Translate-2B-':'Hy-MT2-1.8B-')+v.hymtQuant:v.model,...(v.mode==='api'&&v.engine!=='backend'?{host:v.host,apiInput:v.apiInput}:{}),...(v.engine!=='backend'&&v.mode!=='api'&&v.deviceTranslator!=='webllm'?{deviceCompute:v.deviceCompute}:{}),typesetter:'fitted-cyrillic-v2'};
 }
 export function hasRenderedPage(result){return !!result?.renderedImage&&result.renderedImage.byteLength>0;}
 export function requireRenderedPage(result){if(!hasRenderedPage(result))throw Error(result?.message||'Готовая страница не получена. Оригинал сохранён; попробуй другой OCR или язык.');return result;}

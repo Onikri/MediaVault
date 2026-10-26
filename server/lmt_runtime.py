@@ -20,6 +20,8 @@ class LmtRuntime:
         self.progress = lambda _: None
         self.allow_downloads = False
         self.native = None
+        from lmt_translate import SegmentTranslator
+        self.translator = SegmentTranslator()
 
     def status(self):
         return {'ready': (self.assets / 'index.html').is_file() and
@@ -84,9 +86,18 @@ class LmtRuntime:
             await self.browser.route('**/*', self._route)
         self.page = await self.browser.new_page()
         await self.page.expose_function('mvProgress', lambda status: self.progress(status))
+        async def detect(request):
+            import httpx
+            endpoint=os.getenv('LMT_DETECT_URL')
+            if not endpoint:
+                raise ValueError('Тяжёлые детекторы не установлены на этой ВМ.')
+            async with httpx.AsyncClient(timeout=200,trust_env=False,follow_redirects=False) as client:
+                response=await client.post(endpoint.rstrip('/')+'/detect',json=request)
+                response.raise_for_status()
+                return response.json()
+        await self.page.expose_function('mvMangaDetect', detect)
         if os.getenv('LMT_LLM_PROFILE', 'hymt2') in {'segments','hymt2'}:
-            from lmt_translate import SegmentTranslator
-            await self.page.expose_function('mvTranslate', SegmentTranslator().translate)
+            await self.page.expose_function('mvTranslate', self.translator.translate)
         if os.getenv('LMT_ONNX_RUNTIME', 'wasm') == 'native':
             if self.native is None:
                 from lmt_onnx import NativeOnnx
@@ -101,6 +112,7 @@ class LmtRuntime:
     async def run(self, data, config, progress):
         self.progress = progress
         self.allow_downloads = config.get('allowDownloads', False)
+        self.translator.profile = config.get('translator', 'hymt2')
         try:
             await self._start(config.get('operation','process') in {'process','translate'})
         except BaseException:

@@ -36,8 +36,8 @@ const pororoEngine = new PororoOcrEngine();
 const ppocrv6MangaEngine = new PaddleOcrEngine({
   id: "ppocrv6-manga",
   label: "PP-OCRv6 Manga (Japanese)",
-  repo: env.ppocrv6MangaRepo,
-  modelPath: () => "ppocr-rec-v6-small-manga.onnx",
+  repo: "https://huggingface.co/Kellenok/PP-OCRv6_manga/resolve/62375557b5b0a4b2bc8e05484a97c7ea1df7229e",
+  modelPath: () => "rec/manga_rec_v0.2.onnx",
   bundledDictPath: "dicts/ppocrv6_dict.txt",
 });
 

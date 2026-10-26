@@ -51,6 +51,15 @@ class BridgeTests(IsolatedAsyncioTestCase):
         self.assertEqual(result['translations'], ['Сегодня последний день перед пенсией.', '', 'Возвращаюсь домой.'])
         self.assertEqual(translator._complete.await_count, 2)
 
+    async def test_index_uses_official_prompt_and_remains_separate_from_hymt(self):
+        translator=SegmentTranslator('index')
+        translator._complete=AsyncMock(return_value='Не открывай дверь.')
+        result=await translator.translate({'texts':['Do not open the door.']})
+        self.assertEqual(result['translationDiagnostics']['profile'],'index')
+        prompt=translator._complete.await_args.args[0]
+        self.assertTrue(prompt.startswith('请将以下文本翻译为俄语'))
+        self.assertTrue(prompt.endswith('\n\nDo not open the door.'))
+
     async def test_untranslated_source_is_rejected(self):
         translator = SegmentTranslator()
         translator._complete = AsyncMock(return_value='家に帰る')

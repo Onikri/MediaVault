@@ -1,0 +1,19 @@
+{
+  "translations": [
+    "Не открывайте эту дверь.",
+    "С нетерпением жду возвращения домой."
+  ],
+  "context": null,
+  "translationDiagnostics": {
+    "profile": "index-device",
+    "model": "Index-Translate-2B.Q4_K_M.gguf",
+    "runtime": "wllama-3.8.1",
+    "libllama": "b11364-46ca246"
+  },
+  "elapsedMs": 240936,
+  "crossOriginIsolated": false,
+  "navigatorGPU": true,
+  "modelBytes": 1312164352,
+  "actualInference": true,
+  "wallMs": 241019
+}

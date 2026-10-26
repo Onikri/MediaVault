@@ -1,0 +1,19 @@
+{
+  "translations": [
+    "Не открывайте эту дверь.",
+    "Я с нетерпением жду момента возвращения домой."
+  ],
+  "context": null,
+  "translationDiagnostics": {
+    "profile": "hymt2-device",
+    "model": "Hy-MT2-1.8B-Q8_0.gguf",
+    "runtime": "wllama-3.8.1",
+    "libllama": "b11364-46ca246"
+  },
+  "elapsedMs": 433480,
+  "crossOriginIsolated": false,
+  "navigatorGPU": true,
+  "modelBytes": 1908528192,
+  "actualInference": true,
+  "wallMs": 433707
+}

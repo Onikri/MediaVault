@@ -227,3 +227,13 @@ SIL Open Font License 1.1. Файлы WOFF2 поставляются с сайт
 Нативный ONNX-мост и перевод отдельных реплик перенесены для воспроизводимых
 измерений из ветки `codex/manga-backend-processing`, commit `cc005d4537d040b8df38a63617af949529c447bf`.
 Он не включает модели или токены и не меняет работающий importer.
+
+## Локальные переводчики и дополнительные детекторы (26.10.2026)
+
+- wllama 3.8.1 (MIT), https://github.com/ngxson/wllama; hash-wasm 4.12.0 (MIT), https://github.com/Daninet/hash-wasm. Реальный llama.cpp/WASM/WebGPU, без внешнего сервиса перевода.
+- Tencent Hy-MT2 1.8B GGUF (Apache-2.0): закреплённые ревизия, размеры и SHA-256 в `src/hymt-models.js`.
+- IndexTeam Index-Translate 2B GGUF (Apache-2.0), https://github.com/bilibili/Index-Translate; ревизия и SHA-256 в `src/index-models.js`. Официальный китайский prompt, greedy decoding; рекламные бенчмарки автора не считаются нашими результатами.
+- leoxs22/manga-panel-detector-yolo26n, ревизия `40a2854663d537563cfb95c370288a84c6505b9a`, AGPL-3.0, Manga109-s attribution. ONNX-конверсия mednasserallah закреплена на `f6b7f3cb2bada1ec7d8b16501f9c984890811445`. Метаданные ONNX подтверждают AGPL-3.0, несмотря на Apache-метку конверсии. Классы: frame=0, text=1. Изображения Manga109-s не поставляются.
+- Kellenok/PP-OCRv6_manga v0.2 (Apache-2.0), ревизия `62375557b5b0a4b2bc8e05484a97c7ea1df7229e`. Детектор DB и CTC recognizer поставляются отдельно; включён полный словарь (18 708 символов). Web postprocess использует прямоугольный DB unclip, не точный полигональный OpenCV unclip.
+- mosesb/best-comic-panel-detection, `bbab11504194d0b341ac3f6099f3592aa0604ae3`, YOLOv12x, только панели. Карточка помечена Apache-2.0, архитектура/рантайм Ultralytics AGPL-3.0; сохраняем обе ссылки и применимые требования AGPL к нашему адаптеру. Веса не включены в Git/Pages.
+- MAGI, Ragav Sachdeva / Andrew Zisserman, The Manga Whisperer, https://github.com/ragavsachdeva/magi, https://huggingface.co/ragavsachdeva/magi, `15ad498ad45093ad3b833d625728220c6309ad99`. В upstream не указан отдельный LICENSE; исходники/веса MAGI не перепубликуются в проекте. Наш самостоятельно реализованный detection-only адаптер использует проверенные safetensors и Transformers, не `trust_remote_code`. Модель скачивается оператором отдельно для сравнений. OCR/character clustering MAGI не объявляются реализованными.

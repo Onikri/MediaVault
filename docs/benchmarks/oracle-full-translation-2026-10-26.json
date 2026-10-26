@@ -1,0 +1,54 @@
+{
+  "actualInference": true,
+  "sample": "upstream Japanese sample, 3 dialogue regions",
+  "detector": "RT-DETR",
+  "translator": "Hy-MT2-1.8B-Q8_0",
+  "inpaint": {
+    "requested": "quality",
+    "methods": [
+      "lama"
+    ],
+    "unpainted": 0,
+    "segmentationUsed": false
+  },
+  "typesetting": {
+    "engine": "fitted-cyrillic-v2",
+    "font": "comic-relief",
+    "layouts": [
+      {
+        "index": 0,
+        "fontSize": 28,
+        "lines": 3,
+        "fits": true
+      },
+      {
+        "index": 1,
+        "fontSize": 29,
+        "lines": 3,
+        "fits": true
+      },
+      {
+        "index": 2,
+        "fontSize": 32,
+        "lines": 3,
+        "fits": true
+      }
+    ]
+  },
+  "timings": {
+    "detectionMs": 8902,
+    "ocrMs": 30551,
+    "translationMs": 25111,
+    "inpaintMs": 37167,
+    "typesetMs": 228,
+    "totalMs": 103290
+  },
+  "warnings": [],
+  "translations": [
+    "Думаю, сегодня будет последний день перед моим уходом на пенсию.",
+    "Ах, Эдвард: Ты уже собираешься уйти из магазина?",
+    "Ах, как приятно вернуться домой и увидеть, как растут мои внуки."
+  ],
+  "cacheHit": true,
+  "renderSHA": "bc20607cc8d12298312145385f3cfe3f12c8cba039e0bad0f995e2f51c6449e0"
+}

@@ -13,6 +13,9 @@ export const KNOWN_MODEL_SHA256: Record<string, string> = {
   // Script gate (ogkalu/image-script-identification)
   "osd_lstm.onnx": "b18e0c1479d9eb67394993098f7e1079c9a93ef6f7b0416ee333fccb865c6e72",
   "osd_labels.json": "a1888156b005065039c356e13a7bbef1ec454b45bf6aaf18c11f4a59b1ee35c5",
+  "manga_panel_detector_fp32_1024.onnx": "e66667bc6d5f00013ff27efc15d21e521825369d44dfd5d7f6e43cda2ca512b7",
+  "manga_det_v0.2.onnx": "d132078c46e292b226fb5a2ca52a7612ad319262dfdf493e7d8e3be435295978",
+  "manga_rec_v0.2.onnx": "de12c84c63e62c80339e882e675983d886670dcb6f0147e1ed041afd6fa81888",
   // Detection
   "detector-v4-s_int8.onnx": "5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79",
   "comictextdetector.pt.onnx": "1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f",

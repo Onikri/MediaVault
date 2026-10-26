@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from PIL import Image
 from lmt_runtime import LmtRuntime
 
-VERSION = 4
+VERSION = 5
 MAX_IMAGE = 10 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = 24_000_000
 
@@ -33,10 +33,11 @@ class Options(BaseModel):
     model_config = ConfigDict(extra='forbid')
     language: Literal['English','Japanese','Korean','Chinese (Simplified)'] = 'English'
     ocr: Literal['paddle','manga-ocr','ppocrv6-manga','ppocrv5-korean','pororo'] = 'paddle'
-    detector: Literal['comic-bubble','comic-text-detector'] = 'comic-bubble'
+    detector: Literal['comic-bubble','comic-text-detector','yolo26n-manga','ppocrv6-det','magi'] = 'comic-bubble'
+    panelDetector: Literal['none','yolo26n-manga','yolov12-panels'] = 'none'
     inpaint: Literal['quality','fast'] = 'quality'
     font: Literal['comic-relief','pangolin','neucha','system'] = 'comic-relief'
-    translator: Literal['hymt2'] = 'hymt2'
+    translator: Literal['hymt2','index'] = 'hymt2'
 
 class Body(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -79,6 +80,7 @@ class Processor:
     def status(self):
         s=self.runtime.status()
         return {**s,'version':VERSION,'modelLabel':'Hy-MT2 1.8B Q8 · LaMa Manga',
+                'translators':['hymt2']+(['index'] if os.getenv('LMT_INDEX_MODEL') else []),
                 'message': 'Полный LMT готов.' if s['ready'] else 'Модели полного LMT ещё не настроены на ВМ.',
                 'cache':'encrypted','cacheLifetimeDays':7,'queued':sum(j['state']=='queued' for j in self.jobs.values()),
                 'defaults':Options().model_dump()}

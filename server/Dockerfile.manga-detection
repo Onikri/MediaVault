@@ -1,0 +1,9 @@
+# Reuse the existing free VM's tested CPU/PyTorch benchmark image.
+FROM mediavault-quality:ca49a57fae03
+USER root
+RUN pip install --no-cache-dir transformers==4.38.2 timm==1.0.15 ultralytics==8.4.117 fastapi==0.141.1 uvicorn==0.52.1 safetensors==0.6.2
+COPY server/manga_detection_worker.py server/manga_detection_service.py /app/
+ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HOME=/tmp/hf YOLO_CONFIG_DIR=/tmp/yolo OMP_NUM_THREADS=2
+USER 1000:1000
+WORKDIR /app
+ENTRYPOINT ["python", "-m", "uvicorn", "manga_detection_service:app", "--host", "0.0.0.0", "--port", "7862", "--no-access-log"]
