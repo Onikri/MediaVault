@@ -102,6 +102,10 @@ async def main():
     parser.add_argument('--include-pid', type=int, action='append', default=[], help='Include a separate local LLM process in RSS sampling')
     args = parser.parse_args()
     report = {'host': inventory(), 'mode': args.mode, 'utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'runs': []}
+    def save_report():
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
     if args.mode != 'inventory':
         if not args.image:
             parser.error('--image is required for real inference')
@@ -124,11 +128,20 @@ async def main():
         try:
             for run in range(args.runs):
                 job = {'data':data, 'options':options, 'subject':'benchmark', 'cancel':False}
-                with Measurement(args.include_pid) as measurement:
-                    result = await asyncio.wait_for(processor._process(job), timeout=900)
-                if not result.get('renderedImage'):
-                    raise RuntimeError('Pipeline returned no rendered page; this is not a completed inference measurement')
-                record = {'run':run+1, 'firstRunInProcess':run==0, **measurement.values,
+                measurement = Measurement(args.include_pid)
+                try:
+                    with measurement:
+                        result = await asyncio.wait_for(processor._process(job), timeout=900)
+                    if not result.get('renderedImage'):
+                        raise RuntimeError('Pipeline returned no rendered page; this is not a completed inference measurement')
+                except BaseException as error:
+                    record = {'run':run+1, 'success':False, 'firstRunInProcess':run==0,
+                              **measurement.values, 'errorType':type(error).__name__,
+                              'lastStage':job.get('status','decode')}
+                    report['runs'].append(record)
+                    print(json.dumps(record,ensure_ascii=False),flush=True)
+                    raise
+                record = {'run':run+1, 'success':True, 'firstRunInProcess':run==0, **measurement.values,
                           'upscale':result.get('upscale'), 'regions':len(result.get('regions', [])),
                           'timings':result.get('timings'), 'inpaintRegions':result.get('inpaintRegions'),
                           'renderedImageBytes':len(base64.b64decode(result['renderedImage']))}
@@ -140,11 +153,13 @@ async def main():
                     args.save_transcript.parent.mkdir(parents=True, exist_ok=True)
                     args.save_transcript.write_text(json.dumps(result.get('regions',[]),ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
                 print(json.dumps(record), flush=True)
+                save_report()
         finally:
-            await processor.close()
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+            try:
+                await processor.close()
+            finally:
+                save_report()
+    save_report()
     print(json.dumps(report, ensure_ascii=False), flush=True)
 
 

@@ -107,6 +107,10 @@ docker build -f server/Dockerfile -t mediavault-reader .
 области. `quality` не считается выполненным LaMa, если upstream перешёл на
 Fast. `firstRunInProcess` означает первый прогон текущего процесса;
 дисковый кеш при этом может быть заполнен ранее.
+Неуспешный прогон сохраняется с `success=false`, временем до ошибки и последним
+этапом; он не считается скоростью готовой страницы. Для ограниченного вывода OCI:
+`python scripts/summarize-reader-benchmark.py /private/data/benchmark/lmt-4b-a1.json`.
+Полные изображения и transcript по умолчанию в краткий отчёт не включаются.
 
 `benchmark-reader.sh <SHA> prepare-lmt` собирает окружение без установки
 апскейл-моделей. `benchmark-lmt.sh <SHA> prepare 4b` готовит официальный
@@ -159,7 +163,10 @@ CPU 0,12%. Это реальный выполненный Run Command, exit 0.
 проверяет реальные UI/MessageChannel/editor lifecycle с API fixture на 360/1280 px,
 включая исправление реплики и применение в читалке. Старые LMT/манга-тесты
 сохранены. Полный Python suite локально имеет Windows-ошибки POSIX permissions,
-блокировок SQLite и fMP4 fixture; Linux CI должен проверить серверный результат.
+блокировок SQLite и fMP4 fixture. Linux CI для `98dfb0f` успешно выполнил сборку,
+72 Node-теста, серверный набор из 161 теста и браузерные проверки, включая редактор
+на 360/1280 px. CI проверяет контракты; реальная нейросетевая обработка приведена
+отдельно выше.
 
 ## Что ещё нужно подтвердить для полного переноса
 
