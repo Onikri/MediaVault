@@ -48,7 +48,18 @@ jobs:
       - name: Ensure ffmpeg is available
         timeout-minutes: 3
         run: |
-          if ! command -v ffmpeg >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y ffmpeg; fi
+          if ! command -v ffmpeg >/dev/null; then
+            # The hosted image's Azure HTTP mirror can stall on large codecs.
+            # Keep Ubuntu's signed packages and use its official HTTPS mirrors.
+            if [ -f /etc/apt/apt-mirrors.txt ]; then
+              printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+            fi
+            if [ -f /etc/apt/apt-mirrors-security.txt ]; then
+              printf '%s\n' 'https://security.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors-security.txt >/dev/null
+            fi
+            sudo apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=20 update -qq
+            sudo apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=20 install -y --no-install-recommends ffmpeg
+          fi
 
       - name: Build and validate encrypted media
         run: |
