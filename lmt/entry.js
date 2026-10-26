@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './shim.js';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
+import {resolveMangaOcr} from '../src/ocr-profiles.js';
 import {validateConfig} from './config.js';
 import {getCachedSegmentation} from './upstream/lib/detections/segmentation.ts';
 const contexts=new Map();let running=false;
@@ -21,7 +22,7 @@ async function pipeline(bytes,config,progress){
   if(config.mode==='api'&&config.apiInput==='vision'){
    progress('VLM читает страницу и переводит реплики с визуальным контекстом');const{translateVision}=await import('./vision.js');t=performance.now();translated=await translateVision(bitmap,boxes,config,context);timings.translationMs=Math.round(performance.now()-t);timings.ocrMs=0;texts=translated.sourceTexts;
   }else{
-   progress('Распознаём текст · '+boxes.length+' областей');const{textRecognise}=await import('./upstream/lib/ocr/main.ts');t=performance.now();const ocr=await textRecognise(source,boxes,config.language||'English',.55,4,48,{enabled:true},(!config.ocr||config.ocr==='auto')?defaultOcr(config.language):config.ocr);timings.ocrMs=Math.round(performance.now()-t);
+   progress('Распознаём текст · '+boxes.length+' областей');const{textRecognise}=await import('./upstream/lib/ocr/main.ts');t=performance.now();const ocr=await textRecognise(source,boxes,config.language||'English',.55,4,48,{enabled:true},resolveMangaOcr(config.language,config.ocr));timings.ocrMs=Math.round(performance.now()-t);
    texts=ocr.results.map(r=>r.gateSkip||r.failed?'':r.text);if(!texts.some(Boolean))return {regions:[],engine:'Libre Manga Translator',message:'OCR не распознал реплики. Проверь исходный язык и движок.'};
    progress('Переводим полные реплики на русский');t=performance.now();
    if(config.mode==='api'){const{translateWithServer}=await import('./upstream/lib/server/main.ts');translated=await translateWithServer(texts,'Russian',config.language||'English',context,{serverHost:new URL(config.host).href,serverSchema:'openai',serverModel:config.serverModel,useServerApiKey:!!config.apiKey,serverApiKey:config.apiKey,temperature:.1});}
@@ -39,7 +40,6 @@ async function pipeline(bytes,config,progress){
   return {engine:'Libre Manga Translator',sourceLanguage:config.language,targetLanguage:'ru',machineTranslation:true,timings,warnings,inpaint:{requested:config.inpaint||'fast',methods:[...new Set(cleaned.regions.map(r=>r.method))],unpainted:blocked.size,segmentationUsed:!!segmentation},inputMode:config.apiInput==='vision'&&config.mode==='api'?'vision':'ocr',renderedImage:await blob.arrayBuffer(),renderedMime:blob.type,regions:valid.map(v=>({x:v.box.x1/bitmap.width,y:v.box.y1/bitmap.height,w:(v.box.x2-v.box.x1)/bitmap.width,h:(v.box.y2-v.box.y1)/bitmap.height,original:texts[v.index],text:v.text,placement:'note'}))};
  }finally{globalThis.lmtProgress=null;bitmap?.close();URL.revokeObjectURL(source);}
 }
-function defaultOcr(language){return language==='Japanese'?'ppocrv6-manga':language==='Korean'?'ppocrv5-korean':'paddle';}
 addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==parent||event.data?.type!=='mv-lmt-connect'||event.ports.length!==1)return;
  const port=event.ports[0];port.onmessage=async({data})=>{if(data.type!=='translate')return;if(running){port.postMessage({id:data.id,error:'Предыдущая страница ещё обрабатывается.'});return;}running=true;

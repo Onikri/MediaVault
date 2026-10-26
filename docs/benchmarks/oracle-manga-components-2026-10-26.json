@@ -1,0 +1,2707 @@
+{
+  "executionLabel": "ORACLE-A1-aarch64-2-OCPU-12GB",
+  "sourceCommit": "ca49a57fae03bc4aa63793ec9b30f53b41101cb2",
+  "reports": {
+    "browser-results.json": {
+      "environment": "ORACLE-A1-aarch64-2-OCPU-12GB",
+      "machine": "aarch64",
+      "threads": 2,
+      "runtime": "native-cpu",
+      "results": [
+        {
+          "key": "detect:comic-bubble:clean",
+          "stage": "detect",
+          "case": "clean",
+          "model": "comic-bubble",
+          "ms": 2118.4000000059605,
+          "boxes": [
+            {
+              "x1": 119.90557956695557,
+              "y1": 104.10297560691833,
+              "x2": 312.2573642730713,
+              "y2": 223.0645067691803,
+              "confidence": 0.9265550374984741
+            },
+            {
+              "x1": 522.2439842224121,
+              "y1": 145.85728931427002,
+              "x2": 759.7361402511597,
+              "y2": 265.22060346603394,
+              "confidence": 0.9369962215423584
+            },
+            {
+              "x1": 136.9374804496765,
+              "y1": 469.6260862350464,
+              "x2": 340.61123180389404,
+              "y2": 587.573902130127,
+              "confidence": 0.9249793291091919
+            },
+            {
+              "x1": 519.077766418457,
+              "y1": 774.1699342727661,
+              "x2": 761.1324672698975,
+              "y2": 893.2940406799316,
+              "confidence": 0.9213534593582153
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 2486
+        },
+        {
+          "key": "detect:comic-bubble:adjacent",
+          "stage": "detect",
+          "case": "adjacent",
+          "model": "comic-bubble",
+          "ms": 786.4000000059605,
+          "boxes": [
+            {
+              "x1": 486.2935333251953,
+              "y1": 129.51981472969055,
+              "x2": 785.8611087799072,
+              "y2": 213.25727772712708,
+              "confidence": 0.9169913530349731
+            },
+            {
+              "x1": 89.41503691673279,
+              "y1": 130.49866247177124,
+              "x2": 386.7952423095703,
+              "y2": 212.6098484992981,
+              "confidence": 0.9168360233306885
+            },
+            {
+              "x1": 489.93806171417236,
+              "y1": 520.1312046051025,
+              "x2": 778.7231140136719,
+              "y2": 601.9910402297974,
+              "confidence": 0.9170489311218262
+            },
+            {
+              "x1": 87.38135147094727,
+              "y1": 521.1527614593506,
+              "x2": 387.66196060180664,
+              "y2": 602.4220390319824,
+              "confidence": 0.9200397729873657
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 1032
+        },
+        {
+          "key": "detect:comic-bubble:low-contrast",
+          "stage": "detect",
+          "case": "low-contrast",
+          "model": "comic-bubble",
+          "ms": 749.6999999880791,
+          "boxes": [
+            {
+              "x1": 119.25685214996338,
+              "y1": 104.12028479576111,
+              "x2": 313.65985441207886,
+              "y2": 222.72384357452393,
+              "confidence": 0.9144287109375
+            },
+            {
+              "x1": 520.8342294692993,
+              "y1": 145.4369251728058,
+              "x2": 759.5931558609009,
+              "y2": 264.8756785392761,
+              "confidence": 0.9278286695480347
+            },
+            {
+              "x1": 135.5451922416687,
+              "y1": 469.18029594421387,
+              "x2": 342.29415702819824,
+              "y2": 586.9011516571045,
+              "confidence": 0.9146706461906433
+            },
+            {
+              "x1": 517.205961227417,
+              "y1": 773.5269241333008,
+              "x2": 762.3148422241211,
+              "y2": 893.7644309997559,
+              "confidence": 0.9101287126541138
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 1015
+        },
+        {
+          "key": "detect:comic-bubble:over-art",
+          "stage": "detect",
+          "case": "over-art",
+          "model": "comic-bubble",
+          "ms": 755.4000000059605,
+          "boxes": [
+            {
+              "x1": 112.03596997261047,
+              "y1": 98.98615646362305,
+              "x2": 319.6673231124878,
+              "y2": 227.86024045944214,
+              "confidence": 0.8926316499710083
+            },
+            {
+              "x1": 512.4573163986206,
+              "y1": 139.20640397071838,
+              "x2": 768.8224153518677,
+              "y2": 266.8404550552368,
+              "confidence": 0.9179096221923828
+            },
+            {
+              "x1": 126.82070541381836,
+              "y1": 462.6188020706177,
+              "x2": 349.85402393341064,
+              "y2": 585.825569152832,
+              "confidence": 0.8745653629302979
+            },
+            {
+              "x1": 509.08983993530273,
+              "y1": 766.1076288223267,
+              "x2": 770.611870765686,
+              "y2": 893.9325923919678,
+              "confidence": 0.8220970630645752
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 1026
+        },
+        {
+          "key": "detect:comic-bubble:skewed",
+          "stage": "detect",
+          "case": "skewed",
+          "model": "comic-bubble",
+          "ms": 834.2000000178814,
+          "boxes": [
+            {
+              "x1": 85.64845252037048,
+              "y1": 123.16654253005981,
+              "x2": 280.1793460845947,
+              "y2": 246.7944474220276,
+              "confidence": 0.8905293941497803
+            },
+            {
+              "x1": 487.0290689468384,
+              "y1": 127.21080827713013,
+              "x2": 724.8117046356201,
+              "y2": 251.03915882110596,
+              "confidence": 0.9017428159713745
+            },
+            {
+              "x1": 130.59880304336548,
+              "y1": 484.16260528564453,
+              "x2": 337.74719047546387,
+              "y2": 608.8022060394287,
+              "confidence": 0.9013907313346863
+            },
+            {
+              "x1": 538.2401399612427,
+              "y1": 749.4154863357544,
+              "x2": 782.9868392944336,
+              "y2": 879.7468729019165,
+              "confidence": 0.8878709077835083
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 5750
+        },
+        {
+          "key": "detect:comic-bubble:tall-webtoon",
+          "stage": "detect",
+          "case": "tall-webtoon",
+          "model": "comic-bubble",
+          "ms": 2275.5999999940395,
+          "boxes": [
+            {
+              "x1": 105.41815090179443,
+              "y1": 152.9334716796875,
+              "x2": 302.00272369384766,
+              "y2": 274.3595190048218,
+              "confidence": 0.9193280935287476
+            },
+            {
+              "x1": 380.1066093444824,
+              "y1": 748.1692485809326,
+              "x2": 621.3337020874023,
+              "y2": 869.4144554138184,
+              "confidence": 0.9235906600952148
+            },
+            {
+              "x1": 107.90998268127441,
+              "y1": 1372.3658256530762,
+              "x2": 320.08133697509766,
+              "y2": 1495.2198333740234,
+              "confidence": 0.909318208694458
+            },
+            {
+              "x1": 377.4925880432129,
+              "y1": 1942.519681930542,
+              "x2": 622.2637252807617,
+              "y2": 2063.719493865967,
+              "confidence": 0.91905677318573
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 2651
+        },
+        {
+          "key": "detect:comic-text-detector:clean",
+          "stage": "detect",
+          "case": "clean",
+          "model": "comic-text-detector",
+          "ms": 8884.600000023842,
+          "boxes": [
+            {
+              "x1": 131.5478809475899,
+              "y1": 108.25330357253551,
+              "x2": 300.67247170209885,
+              "y2": 216.31713171303272,
+              "confidence": 0.5769278946172776
+            },
+            {
+              "x1": 537.9394501745701,
+              "y1": 149.28607980906963,
+              "x2": 748.0129757821561,
+              "y2": 258.16363652050495,
+              "confidence": 0.6673187978176998
+            },
+            {
+              "x1": 144.62514522671702,
+              "y1": 470.37081572413445,
+              "x2": 332.0145854651928,
+              "y2": 581.3568070232868,
+              "confidence": 0.9104594809120172
+            },
+            {
+              "x1": 529.2766109406948,
+              "y1": 777.9569495767355,
+              "x2": 752.3881191313268,
+              "y2": 885.9378706365824,
+              "confidence": 0.8189091236874049
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 9153
+        },
+        {
+          "key": "detect:comic-text-detector:adjacent",
+          "stage": "detect",
+          "case": "adjacent",
+          "model": "comic-text-detector",
+          "ms": 8171,
+          "boxes": [
+            {
+              "x1": 98.3014121949673,
+              "y1": 133.7953966408968,
+              "x2": 374.18667021393776,
+              "y2": 207.0441025942564,
+              "confidence": 0.7201734142704481
+            },
+            {
+              "x1": 499.65265545248985,
+              "y1": 134.02160036563873,
+              "x2": 773.0986291468145,
+              "y2": 206.4126409292221,
+              "confidence": 0.8023331468370856
+            },
+            {
+              "x1": 100.26048946380618,
+              "y1": 523.802921205759,
+              "x2": 375.30390787124634,
+              "y2": 596.0869103372097,
+              "confidence": 0.84241752187679
+            },
+            {
+              "x1": 505.4025024473667,
+              "y1": 525.251213490963,
+              "x2": 764.8124614655973,
+              "y2": 597.8861890435219,
+              "confidence": 0.8744829607170814
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 8401
+        },
+        {
+          "key": "detect:comic-text-detector:low-contrast",
+          "stage": "detect",
+          "case": "low-contrast",
+          "model": "comic-text-detector",
+          "ms": 7929.299999982119,
+          "boxes": [
+            {
+              "x1": 130.49716728925708,
+              "y1": 107.00177218019962,
+              "x2": 300.30855256319046,
+              "y2": 216.2029418796301,
+              "confidence": 0.905703309108219
+            },
+            {
+              "x1": 532.4716560840607,
+              "y1": 149.8699985742569,
+              "x2": 749.249591112137,
+              "y2": 258.36390924453735,
+              "confidence": 0.9431798428806246
+            },
+            {
+              "x1": 147.9640811979771,
+              "y1": 472.64503578841686,
+              "x2": 329.87214717268944,
+              "y2": 580.2475478202105,
+              "confidence": 0.9265125206134712
+            },
+            {
+              "x1": 529.6721078753471,
+              "y1": 779.8671357631683,
+              "x2": 752.5103242993356,
+              "y2": 884.5211274623871,
+              "confidence": 0.9506162082598735
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 8201
+        },
+        {
+          "key": "detect:comic-text-detector:over-art",
+          "stage": "detect",
+          "case": "over-art",
+          "model": "comic-text-detector",
+          "ms": 7837.5,
+          "boxes": [
+            {
+              "x1": 131.43596130609515,
+              "y1": 109.22414663434029,
+              "x2": 298.7495781779289,
+              "y2": 216.25925001502037,
+              "confidence": 0.9374108304758622
+            },
+            {
+              "x1": 531.1009519100189,
+              "y1": 151.21974650025368,
+              "x2": 750.0055568218232,
+              "y2": 258.4430545270443,
+              "confidence": 0.9412730447971711
+            },
+            {
+              "x1": 147.22685071825984,
+              "y1": 473.8598343282938,
+              "x2": 327.5825643837452,
+              "y2": 581.561857804656,
+              "confidence": 0.8463033556020605
+            },
+            {
+              "x1": 526.4142759442329,
+              "y1": 779.8038449436426,
+              "x2": 753.6974789500238,
+              "y2": 886.010459408164,
+              "confidence": 0.8181311937164537
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 8091
+        },
+        {
+          "key": "detect:comic-text-detector:skewed",
+          "stage": "detect",
+          "case": "skewed",
+          "model": "comic-text-detector",
+          "ms": 8369.40000000596,
+          "boxes": [
+            {
+              "x1": 96.87260094285014,
+              "y1": 124.70484751462936,
+              "x2": 268.530611127615,
+              "y2": 241.4151809811592,
+              "confidence": 0.8636034444107565
+            },
+            {
+              "x1": 496.4332200884819,
+              "y1": 125.79735073447227,
+              "x2": 716.6806967854501,
+              "y2": 245.0478896200657,
+              "confidence": 0.8935664046954415
+            },
+            {
+              "x1": 141.72308596968654,
+              "y1": 486.19933131337166,
+              "x2": 328.5808259546757,
+              "y2": 601.0881840884686,
+              "confidence": 0.8928958784429426
+            },
+            {
+              "x1": 548.625292658806,
+              "y1": 754.7930546402931,
+              "x2": 772.3816500902177,
+              "y2": 872.8217057585716,
+              "confidence": 0.915225586603583
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 13087
+        },
+        {
+          "key": "detect:comic-text-detector:tall-webtoon",
+          "stage": "detect",
+          "case": "tall-webtoon",
+          "model": "comic-text-detector",
+          "ms": 7850.800000011921,
+          "boxes": [
+            {
+              "x1": 119.38667449355127,
+              "y1": 156.61258924007416,
+              "x2": 286.283116966486,
+              "y2": 264.0313900709152,
+              "confidence": 0.9500232600034906
+            },
+            {
+              "x1": 392.3506409227848,
+              "y1": 749.0713961720467,
+              "x2": 608.7652662694454,
+              "y2": 860.9196655154228,
+              "confidence": 0.9507694860661964
+            },
+            {
+              "x1": 121.73036824166778,
+              "y1": 1374.4421674236655,
+              "x2": 305.43524231016636,
+              "y2": 1483.6808727756143,
+              "confidence": 0.9498961367822858
+            },
+            {
+              "x1": 390.0834694802761,
+              "y1": 1945.1123252809048,
+              "x2": 611.2040752470493,
+              "y2": 2056.157825857401,
+              "confidence": 0.9568500660305546
+            }
+          ],
+          "metrics": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "iouThreshold": 0.3
+          },
+          "wallMs": 8258
+        },
+        {
+          "key": "ocr:paddle:clean",
+          "stage": "ocr",
+          "case": "clean",
+          "model": "paddle",
+          "ms": 1713.4000000059605,
+          "results": [
+            {
+              "text": "I DO NOT BELIEVE IN ALIENS.",
+              "confidence": 0.995490027325494,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WAIT! DO NOT OPEN THAT DOOR.",
+              "confidence": 0.9864980221898466,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "MOMO, ARE YOU ALL RIGHT?",
+              "confidence": 0.992971086312854,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WE WILL MEET AGAIN TOMORROW.",
+              "confidence": 0.9980845708537984,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.0,
+          "reference": [
+            "I DO NOT BELIEVE IN ALIENS.",
+            "WAIT! DO NOT OPEN THAT DOOR.",
+            "MOMO, ARE YOU ALL RIGHT?",
+            "WE WILL MEET AGAIN TOMORROW."
+          ],
+          "wallMs": 2000
+        },
+        {
+          "key": "ocr:paddle:adjacent",
+          "stage": "ocr",
+          "case": "adjacent",
+          "model": "paddle",
+          "ms": 714,
+          "results": [
+            {
+              "text": "I DO NOT BELIEVE IN ALIENS.",
+              "confidence": 0.9989833356742572,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WAIT! DO NOT OPEN THAT DOOR.",
+              "confidence": 0.9976299126358593,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "MOMO, ARE YOU ALL RIGHT?",
+              "confidence": 0.9921745088170557,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WE WILL MEET AGAIN TOMORROW.",
+              "confidence": 0.9974686428904533,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.0,
+          "reference": [
+            "I DO NOT BELIEVE IN ALIENS.",
+            "WAIT! DO NOT OPEN THAT DOOR.",
+            "MOMO, ARE YOU ALL RIGHT?",
+            "WE WILL MEET AGAIN TOMORROW."
+          ],
+          "wallMs": 936
+        },
+        {
+          "key": "ocr:paddle:low-contrast",
+          "stage": "ocr",
+          "case": "low-contrast",
+          "model": "paddle",
+          "ms": 778.9000000059605,
+          "results": [
+            {
+              "text": "I DO NOT BELIEVE IN ALIENS.",
+              "confidence": 0.993043825668948,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WAIT! DO NOT OPEN THAT DOOR.",
+              "confidence": 0.9916383712380021,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "MOMO, ARE YOU ALL RIGHT?",
+              "confidence": 0.9945595496230655,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WE WILL MEET AGAIN TOMORROW.",
+              "confidence": 0.9985943935535572,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.0,
+          "reference": [
+            "I DO NOT BELIEVE IN ALIENS.",
+            "WAIT! DO NOT OPEN THAT DOOR.",
+            "MOMO, ARE YOU ALL RIGHT?",
+            "WE WILL MEET AGAIN TOMORROW."
+          ],
+          "wallMs": 1081
+        },
+        {
+          "key": "ocr:paddle:over-art",
+          "stage": "ocr",
+          "case": "over-art",
+          "model": "paddle",
+          "ms": 817.5,
+          "results": [
+            {
+              "text": "I DO NOT BELIEVE IN ALIENS.",
+              "confidence": 0.9949528718278522,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WAIT! DO NOT OPEN THAT DOOR.",
+              "confidence": 0.991679796134984,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "MOMO, ARE YOU ALL RIGHT?",
+              "confidence": 0.9975709128316749,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WE WILL MEET AGAIN TOMORROW.",
+              "confidence": 0.9841532861744916,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.0,
+          "reference": [
+            "I DO NOT BELIEVE IN ALIENS.",
+            "WAIT! DO NOT OPEN THAT DOOR.",
+            "MOMO, ARE YOU ALL RIGHT?",
+            "WE WILL MEET AGAIN TOMORROW."
+          ],
+          "wallMs": 1086
+        },
+        {
+          "key": "ocr:paddle:skewed",
+          "stage": "ocr",
+          "case": "skewed",
+          "model": "paddle",
+          "ms": 609.9000000059605,
+          "results": [
+            {
+              "text": "I DO NOT BELIEVE IN ALIENS.",
+              "confidence": 0.9925631160537401,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WAT! DO NO DOOR.",
+              "confidence": 0.860595953464508,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "MOMO, ARE YOU ALL RIGHT?",
+              "confidence": 0.9993246692829031,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WE WILL EET TOMORROW.",
+              "confidence": 0.8241277230207367,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.16964285714285715,
+          "reference": [
+            "I DO NOT BELIEVE IN ALIENS.",
+            "WAIT! DO NOT OPEN THAT DOOR.",
+            "MOMO, ARE YOU ALL RIGHT?",
+            "WE WILL MEET AGAIN TOMORROW."
+          ],
+          "wallMs": 5387
+        },
+        {
+          "key": "ocr:paddle:tall-webtoon",
+          "stage": "ocr",
+          "case": "tall-webtoon",
+          "model": "paddle",
+          "ms": 773.0999999940395,
+          "results": [
+            {
+              "text": "I DO NOT BELIEVE IN ALIENS.",
+              "confidence": 0.9988911857207615,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WAIT! DO NOT OPEN THAT DOOR.",
+              "confidence": 0.9864980221898466,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "MOMO, ARE YOU ALL RIGHT?",
+              "confidence": 0.992971086312854,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "WE WILL MEET AGAIN TOMORROW.",
+              "confidence": 0.9980845708537984,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.0,
+          "reference": [
+            "I DO NOT BELIEVE IN ALIENS.",
+            "WAIT! DO NOT OPEN THAT DOOR.",
+            "MOMO, ARE YOU ALL RIGHT?",
+            "WE WILL MEET AGAIN TOMORROW."
+          ],
+          "wallMs": 1158
+        },
+        {
+          "key": "ocr:paddle:japanese",
+          "stage": "ocr",
+          "case": "japanese",
+          "model": "paddle",
+          "ms": 4127.699999988079,
+          "results": [
+            {
+              "text": "私は宇宙人を信じていません。",
+              "confidence": 0.9987113220351083,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "その扉を開けないでください！",
+              "confidence": 0.9984120173113686,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.0,
+          "reference": [
+            "私は宇宙人を信じていません。",
+            "その扉を開けないでください！"
+          ],
+          "wallMs": 4267
+        },
+        {
+          "key": "ocr:ppocrv6-manga:japanese",
+          "stage": "ocr",
+          "case": "japanese",
+          "model": "ppocrv6-manga",
+          "ms": 2867,
+          "results": [
+            {
+              "text": "私は宇宙人を信じていません。",
+              "confidence": 0.9991516470909119,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "その扉を開けないでください！",
+              "confidence": 0.9976406736033303,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.0,
+          "reference": [
+            "私は宇宙人を信じていません。",
+            "その扉を開けないでください！"
+          ],
+          "wallMs": 3018
+        },
+        {
+          "key": "ocr:pororo:korean",
+          "stage": "ocr",
+          "case": "korean",
+          "model": "pororo",
+          "ms": 2810.5,
+          "results": [
+            {
+              "text": "",
+              "confidence": 0,
+              "failed": true,
+              "gateSkip": null
+            },
+            {
+              "text": "그픈들달빼?'",
+              "confidence": 0.6991928443552373,
+              "failed": false,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.9583333333333333,
+          "reference": [
+            "나는 외계인을 믿지 않는다.",
+            "그 문을 열지 마세요!"
+          ],
+          "wallMs": 2896
+        },
+        {
+          "key": "ocr:ppocrv5-korean:korean",
+          "stage": "ocr",
+          "case": "korean",
+          "model": "ppocrv5-korean",
+          "ms": 1670.5,
+          "results": [
+            {
+              "text": "나는 외계인을 믿지 않는다.",
+              "confidence": 0.9949697891871134,
+              "failed": null,
+              "gateSkip": null
+            },
+            {
+              "text": "그 문을 열지 마세요!",
+              "confidence": 0.9695016443729401,
+              "failed": null,
+              "gateSkip": null
+            }
+          ],
+          "cer": 0.0,
+          "reference": [
+            "나는 외계인을 믿지 않는다.",
+            "그 문을 열지 마세요!"
+          ],
+          "wallMs": 1751
+        },
+        {
+          "key": "fonts:all",
+          "stage": "fonts",
+          "case": null,
+          "model": "bundled",
+          "error": "dictionary update sequence element #0 has length 4; 2 is required",
+          "wallMs": 178
+        },
+        {
+          "key": "fonts:all",
+          "stage": "fonts",
+          "case": null,
+          "model": "bundled",
+          "fonts": [
+            {
+              "id": "comic-relief",
+              "family": "MV Comic Relief",
+              "available": true,
+              "layouts": [
+                {
+                  "w": 140,
+                  "h": 100,
+                  "fontSize": 13,
+                  "lines": [
+                    "Момо, ты в",
+                    "порядке? Не",
+                    "открывай эту",
+                    "дверь! Ёжик ждёт у",
+                    "подъезда."
+                  ],
+                  "lineH": 16.25,
+                  "blockH": 81.25,
+                  "pad": 8,
+                  "maxW": 124,
+                  "maxH": 84
+                },
+                {
+                  "w": 220,
+                  "h": 170,
+                  "fontSize": 24,
+                  "lines": [
+                    "Момо, ты в",
+                    "порядке? Не",
+                    "открывай эту",
+                    "дверь! Ёжик ждёт",
+                    "у подъезда."
+                  ],
+                  "lineH": 30,
+                  "blockH": 150,
+                  "pad": 8,
+                  "maxW": 204,
+                  "maxH": 154
+                },
+                {
+                  "w": 100,
+                  "h": 60,
+                  "fontSize": 8,
+                  "lines": [
+                    "Момо, ты в порядке?",
+                    "Не открывай эту",
+                    "дверь! Ёжик ждёт у",
+                    "подъезда."
+                  ],
+                  "lineH": 10,
+                  "blockH": 40,
+                  "pad": 8,
+                  "maxW": 84,
+                  "maxH": 44
+                }
+              ]
+            },
+            {
+              "id": "pangolin",
+              "family": "MV Pangolin",
+              "available": true,
+              "layouts": [
+                {
+                  "w": 140,
+                  "h": 100,
+                  "fontSize": 13,
+                  "lines": [
+                    "Момо, ты в порядке?",
+                    "Не открывай эту",
+                    "дверь! Ёжик ждёт у",
+                    "подъезда."
+                  ],
+                  "lineH": 16.25,
+                  "blockH": 65,
+                  "pad": 8,
+                  "maxW": 124,
+                  "maxH": 84
+                },
+                {
+                  "w": 220,
+                  "h": 170,
+                  "fontSize": 24,
+                  "lines": [
+                    "Момо, ты в",
+                    "порядке? Не",
+                    "открывай эту",
+                    "дверь! Ёжик ждёт у",
+                    "подъезда."
+                  ],
+                  "lineH": 30,
+                  "blockH": 150,
+                  "pad": 8,
+                  "maxW": 204,
+                  "maxH": 154
+                },
+                {
+                  "w": 100,
+                  "h": 60,
+                  "fontSize": 8,
+                  "lines": [
+                    "Момо, ты в порядке? Не",
+                    "открывай эту дверь!",
+                    "Ёжик ждёт у подъезда."
+                  ],
+                  "lineH": 10,
+                  "blockH": 30,
+                  "pad": 8,
+                  "maxW": 84,
+                  "maxH": 44
+                }
+              ]
+            },
+            {
+              "id": "neucha",
+              "family": "MV Neucha",
+              "available": true,
+              "layouts": [
+                {
+                  "w": 140,
+                  "h": 100,
+                  "fontSize": 15,
+                  "lines": [
+                    "Момо, ты в порядке?",
+                    "Не открывай эту",
+                    "дверь! Ёжик ждёт у",
+                    "подъезда."
+                  ],
+                  "lineH": 18.75,
+                  "blockH": 75,
+                  "pad": 8,
+                  "maxW": 124,
+                  "maxH": 84
+                },
+                {
+                  "w": 220,
+                  "h": 170,
+                  "fontSize": 25,
+                  "lines": [
+                    "Момо, ты в порядке?",
+                    "Не открывай эту",
+                    "дверь! Ёжик ждёт у",
+                    "подъезда."
+                  ],
+                  "lineH": 31.25,
+                  "blockH": 125,
+                  "pad": 8,
+                  "maxW": 204,
+                  "maxH": 154
+                },
+                {
+                  "w": 100,
+                  "h": 60,
+                  "fontSize": 9,
+                  "lines": [
+                    "Момо, ты в порядке? Не",
+                    "открывай эту дверь!",
+                    "Ёжик ждёт у подъезда."
+                  ],
+                  "lineH": 11.25,
+                  "blockH": 33.75,
+                  "pad": 8,
+                  "maxW": 84,
+                  "maxH": 44
+                }
+              ]
+            },
+            {
+              "id": "system",
+              "family": "system-ui",
+              "available": true,
+              "layouts": [
+                {
+                  "w": 140,
+                  "h": 100,
+                  "fontSize": 13,
+                  "lines": [
+                    "Момо, ты в",
+                    "порядке? Не",
+                    "открывай эту",
+                    "дверь! Ёжик",
+                    "ждёт у подъезда."
+                  ],
+                  "lineH": 16.25,
+                  "blockH": 81.25,
+                  "pad": 8,
+                  "maxW": 124,
+                  "maxH": 84
+                },
+                {
+                  "w": 220,
+                  "h": 170,
+                  "fontSize": 21,
+                  "lines": [
+                    "Момо, ты в",
+                    "порядке? Не",
+                    "открывай эту",
+                    "дверь! Ёжик",
+                    "ждёт у подъезда."
+                  ],
+                  "lineH": 26.25,
+                  "blockH": 131.25,
+                  "pad": 8,
+                  "maxW": 204,
+                  "maxH": 154
+                },
+                {
+                  "w": 100,
+                  "h": 60,
+                  "fontSize": 7,
+                  "lines": [
+                    "Момо, ты в порядке?",
+                    "Не открывай эту",
+                    "дверь! Ёжик ждёт у",
+                    "подъезда."
+                  ],
+                  "lineH": 8.75,
+                  "blockH": 35,
+                  "pad": 8,
+                  "maxW": 84,
+                  "maxH": 44
+                }
+              ]
+            }
+          ],
+          "wallMs": 192
+        }
+      ],
+      "fingerprint": "eae899b6b13c314c7d2533bbd0eda124c4a11cb43f2812549e58f125053bb595",
+      "models": [
+        {
+          "file": "ctd.onnx",
+          "bytes": 94669756,
+          "sha256": "1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f"
+        },
+        {
+          "file": "lama.onnx",
+          "bytes": 206291843,
+          "sha256": "de31ffa5ba26916b8ea35319f6c12151ff9654d4261bccf0583a69bb095315f9"
+        },
+        {
+          "file": "migan.onnx",
+          "bytes": 28079181,
+          "sha256": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b"
+        }
+      ],
+      "nativeCachedModels": [
+        {
+          "file": "25369c7dbeaed126dc5adb9f97134003b2d7fa7257861e0a4d90b5c5b2343d69.onnx",
+          "bytes": 76907335,
+          "sha256": "25369c7dbeaed126dc5adb9f97134003b2d7fa7257861e0a4d90b5c5b2343d69"
+        },
+        {
+          "file": "26fa4f47060f58e25962b9af6beaee05c8182b90e026c4ecc6db165d9dfdc38a.onnx",
+          "bytes": 84468836,
+          "sha256": "26fa4f47060f58e25962b9af6beaee05c8182b90e026c4ecc6db165d9dfdc38a"
+        },
+        {
+          "file": "322f140154c820fcb83c3d24cfe42c9ec70dd1a1834163306a7338136e4f1eaa.onnx",
+          "bytes": 13401252,
+          "sha256": "322f140154c820fcb83c3d24cfe42c9ec70dd1a1834163306a7338136e4f1eaa"
+        },
+        {
+          "file": "4e16deb22c4da6468bdca539b2cd3c8687825538b67109177c47d359ab994cd7.onnx",
+          "bytes": 7830888,
+          "sha256": "4e16deb22c4da6468bdca539b2cd3c8687825538b67109177c47d359ab994cd7"
+        },
+        {
+          "file": "5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79.onnx",
+          "bytes": 11120765,
+          "sha256": "5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79"
+        },
+        {
+          "file": "c5cc5038a98c3df3e2d37de5716f603e2b0bcd3536c74078fdd91876a48a25ef.onnx",
+          "bytes": 21143614,
+          "sha256": "c5cc5038a98c3df3e2d37de5716f603e2b0bcd3536c74078fdd91876a48a25ef"
+        }
+      ]
+    },
+    "inpaint/results.json": {
+      "executionLabel": "ORACLE-A1-aarch64-2-OCPU-12GB",
+      "machine": "aarch64",
+      "threads": 2,
+      "size": [
+        256,
+        256
+      ],
+      "mask": "exact glyph mask plus 3px dilation, not predicted mask",
+      "notes": "Synthetic reconstruction stress test. PSNR is not a manga visual-quality score; see output images. MI-GAN internal pipeline resizes to its training resolution.",
+      "results": [
+        {
+          "model": "planar-fill",
+          "case": "white",
+          "run": 0,
+          "ms": 10,
+          "maskedPSNRdB": null,
+          "maskedMAE": 0.0,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "planar-fill-white.png"
+        },
+        {
+          "model": "planar-fill",
+          "case": "white",
+          "run": 1,
+          "ms": 8,
+          "maskedPSNRdB": null,
+          "maskedMAE": 0.0,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "planar-fill-white.png"
+        },
+        {
+          "model": "planar-fill",
+          "case": "gradient",
+          "run": 0,
+          "ms": 10,
+          "maskedPSNRdB": 21.231,
+          "maskedMAE": 18.6937,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "planar-fill-gradient.png"
+        },
+        {
+          "model": "planar-fill",
+          "case": "gradient",
+          "run": 1,
+          "ms": 8,
+          "maskedPSNRdB": 21.231,
+          "maskedMAE": 18.6937,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "planar-fill-gradient.png"
+        },
+        {
+          "model": "planar-fill",
+          "case": "screentone",
+          "run": 0,
+          "ms": 10,
+          "maskedPSNRdB": 9.618,
+          "maskedMAE": 36.4106,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "planar-fill-screentone.png"
+        },
+        {
+          "model": "planar-fill",
+          "case": "screentone",
+          "run": 1,
+          "ms": 8,
+          "maskedPSNRdB": 9.618,
+          "maskedMAE": 36.4106,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "planar-fill-screentone.png"
+        },
+        {
+          "model": "planar-fill",
+          "case": "line-art",
+          "run": 0,
+          "ms": 11,
+          "maskedPSNRdB": 12.414,
+          "maskedMAE": 17.347,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "planar-fill-line-art.png"
+        },
+        {
+          "model": "planar-fill",
+          "case": "line-art",
+          "run": 1,
+          "ms": 8,
+          "maskedPSNRdB": 12.414,
+          "maskedMAE": 17.347,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "planar-fill-line-art.png"
+        },
+        {
+          "model": "telea",
+          "case": "white",
+          "run": 0,
+          "ms": 29,
+          "maskedPSNRdB": 45.409,
+          "maskedMAE": 1.0101,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "telea-white.png"
+        },
+        {
+          "model": "telea",
+          "case": "white",
+          "run": 1,
+          "ms": 13,
+          "maskedPSNRdB": 45.409,
+          "maskedMAE": 1.0101,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "telea-white.png"
+        },
+        {
+          "model": "telea",
+          "case": "gradient",
+          "run": 0,
+          "ms": 17,
+          "maskedPSNRdB": 43.738,
+          "maskedMAE": 1.2594,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "telea-gradient.png"
+        },
+        {
+          "model": "telea",
+          "case": "gradient",
+          "run": 1,
+          "ms": 13,
+          "maskedPSNRdB": 43.738,
+          "maskedMAE": 1.2594,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "telea-gradient.png"
+        },
+        {
+          "model": "telea",
+          "case": "screentone",
+          "run": 0,
+          "ms": 17,
+          "maskedPSNRdB": 9.47,
+          "maskedMAE": 60.4401,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "telea-screentone.png"
+        },
+        {
+          "model": "telea",
+          "case": "screentone",
+          "run": 1,
+          "ms": 13,
+          "maskedPSNRdB": 9.47,
+          "maskedMAE": 60.4401,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "telea-screentone.png"
+        },
+        {
+          "model": "telea",
+          "case": "line-art",
+          "run": 0,
+          "ms": 18,
+          "maskedPSNRdB": 11.635,
+          "maskedMAE": 32.8077,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "telea-line-art.png"
+        },
+        {
+          "model": "telea",
+          "case": "line-art",
+          "run": 1,
+          "ms": 13,
+          "maskedPSNRdB": 11.635,
+          "maskedMAE": 32.8077,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "telea-line-art.png"
+        },
+        {
+          "model": "navier-stokes",
+          "case": "white",
+          "run": 0,
+          "ms": 14,
+          "maskedPSNRdB": null,
+          "maskedMAE": 0.0,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "navier-stokes-white.png"
+        },
+        {
+          "model": "navier-stokes",
+          "case": "white",
+          "run": 1,
+          "ms": 12,
+          "maskedPSNRdB": null,
+          "maskedMAE": 0.0,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "navier-stokes-white.png"
+        },
+        {
+          "model": "navier-stokes",
+          "case": "gradient",
+          "run": 0,
+          "ms": 15,
+          "maskedPSNRdB": 53.213,
+          "maskedMAE": 0.2007,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "navier-stokes-gradient.png"
+        },
+        {
+          "model": "navier-stokes",
+          "case": "gradient",
+          "run": 1,
+          "ms": 13,
+          "maskedPSNRdB": 53.213,
+          "maskedMAE": 0.2007,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "navier-stokes-gradient.png"
+        },
+        {
+          "model": "navier-stokes",
+          "case": "screentone",
+          "run": 0,
+          "ms": 17,
+          "maskedPSNRdB": 9.247,
+          "maskedMAE": 67.0396,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "navier-stokes-screentone.png"
+        },
+        {
+          "model": "navier-stokes",
+          "case": "screentone",
+          "run": 1,
+          "ms": 13,
+          "maskedPSNRdB": 9.247,
+          "maskedMAE": 67.0396,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "navier-stokes-screentone.png"
+        },
+        {
+          "model": "navier-stokes",
+          "case": "line-art",
+          "run": 0,
+          "ms": 18,
+          "maskedPSNRdB": 11.332,
+          "maskedMAE": 39.6119,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "navier-stokes-line-art.png"
+        },
+        {
+          "model": "navier-stokes",
+          "case": "line-art",
+          "run": 1,
+          "ms": 13,
+          "maskedPSNRdB": 11.332,
+          "maskedMAE": 39.6119,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "navier-stokes-line-art.png"
+        },
+        {
+          "model": "lama",
+          "case": "white",
+          "run": 0,
+          "ms": 1899,
+          "maskedPSNRdB": 47.309,
+          "maskedMAE": 1.0169,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "lama-white.png"
+        },
+        {
+          "model": "lama",
+          "case": "white",
+          "run": 1,
+          "ms": 1874,
+          "maskedPSNRdB": 47.309,
+          "maskedMAE": 1.0169,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "lama-white.png"
+        },
+        {
+          "model": "lama",
+          "case": "gradient",
+          "run": 0,
+          "ms": 1877,
+          "maskedPSNRdB": 38.288,
+          "maskedMAE": 2.9524,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "lama-gradient.png"
+        },
+        {
+          "model": "lama",
+          "case": "gradient",
+          "run": 1,
+          "ms": 1876,
+          "maskedPSNRdB": 38.288,
+          "maskedMAE": 2.9524,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "lama-gradient.png"
+        },
+        {
+          "model": "lama",
+          "case": "screentone",
+          "run": 0,
+          "ms": 1879,
+          "maskedPSNRdB": 13.057,
+          "maskedMAE": 32.8858,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "lama-screentone.png"
+        },
+        {
+          "model": "lama",
+          "case": "screentone",
+          "run": 1,
+          "ms": 1871,
+          "maskedPSNRdB": 13.057,
+          "maskedMAE": 32.8858,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "lama-screentone.png"
+        },
+        {
+          "model": "lama",
+          "case": "line-art",
+          "run": 0,
+          "ms": 1874,
+          "maskedPSNRdB": 21.488,
+          "maskedMAE": 7.8771,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "lama-line-art.png"
+        },
+        {
+          "model": "lama",
+          "case": "line-art",
+          "run": 1,
+          "ms": 1873,
+          "maskedPSNRdB": 21.488,
+          "maskedMAE": 7.8771,
+          "rawOutsideMaskMAE": 0.0,
+          "output": "lama-line-art.png"
+        },
+        {
+          "model": "migan",
+          "case": "white",
+          "run": 0,
+          "ms": 1028,
+          "maskedPSNRdB": 49.456,
+          "maskedMAE": 0.5625,
+          "rawOutsideMaskMAE": 0.0007,
+          "output": "migan-white.png"
+        },
+        {
+          "model": "migan",
+          "case": "white",
+          "run": 1,
+          "ms": 1065,
+          "maskedPSNRdB": 49.456,
+          "maskedMAE": 0.5625,
+          "rawOutsideMaskMAE": 0.0007,
+          "output": "migan-white.png"
+        },
+        {
+          "model": "migan",
+          "case": "gradient",
+          "run": 0,
+          "ms": 1007,
+          "maskedPSNRdB": 47.558,
+          "maskedMAE": 0.7619,
+          "rawOutsideMaskMAE": 0.0039,
+          "output": "migan-gradient.png"
+        },
+        {
+          "model": "migan",
+          "case": "gradient",
+          "run": 1,
+          "ms": 982,
+          "maskedPSNRdB": 47.558,
+          "maskedMAE": 0.7619,
+          "rawOutsideMaskMAE": 0.0039,
+          "output": "migan-gradient.png"
+        },
+        {
+          "model": "migan",
+          "case": "screentone",
+          "run": 0,
+          "ms": 985,
+          "maskedPSNRdB": 11.827,
+          "maskedMAE": 39.907,
+          "rawOutsideMaskMAE": 0.0275,
+          "output": "migan-screentone.png"
+        },
+        {
+          "model": "migan",
+          "case": "screentone",
+          "run": 1,
+          "ms": 984,
+          "maskedPSNRdB": 11.827,
+          "maskedMAE": 39.907,
+          "rawOutsideMaskMAE": 0.0275,
+          "output": "migan-screentone.png"
+        },
+        {
+          "model": "migan",
+          "case": "line-art",
+          "run": 0,
+          "ms": 989,
+          "maskedPSNRdB": 13.197,
+          "maskedMAE": 30.844,
+          "rawOutsideMaskMAE": 0.0277,
+          "output": "migan-line-art.png"
+        },
+        {
+          "model": "migan",
+          "case": "line-art",
+          "run": 1,
+          "ms": 983,
+          "maskedPSNRdB": 13.197,
+          "maskedMAE": 30.844,
+          "rawOutsideMaskMAE": 0.0277,
+          "output": "migan-line-art.png"
+        }
+      ],
+      "models": {
+        "lama": {
+          "bytes": 206291843,
+          "sha256": "de31ffa5ba26916b8ea35319f6c12151ff9654d4261bccf0583a69bb095315f9",
+          "loadMs": 11871
+        },
+        "migan": {
+          "bytes": 28079181,
+          "sha256": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b",
+          "loadMs": 238
+        }
+      },
+      "maxRssKiB": 931680
+    },
+    "text-argos.json": {
+      "key": "71e8217683f157a336165d2f64b504b5ebb659bd6a4bdb3364fe1ba9562abca8",
+      "executionLabel": "ORACLE-A1-aarch64-2-OCPU-12GB",
+      "machine": "aarch64",
+      "model": "argos",
+      "profile": "json",
+      "threads": 2,
+      "runs": [
+        {
+          "run": 0,
+          "ms": 2065,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "negation",
+              "source": "I do not believe in aliens.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в инопланетян.",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "prohibition",
+              "source": "Wait! Do not open that door.",
+              "reference": "Стой! Не открывай эту дверь.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Не открывай эту дверь.",
+              "chrFpp": 78.69
+            },
+            {
+              "id": "name",
+              "source": "Momo, are you all right?",
+              "reference": "Момо, ты в порядке?",
+              "language": "en",
+              "checks": {
+                "Момо": true
+              },
+              "translation": "Момо, ты в порядке?",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "double-negation",
+              "source": "It is not that I do not trust you. I just want to protect you.",
+              "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Дело не в том, что я не доверяю тебе. Я просто хочу защитить тебя.",
+              "chrFpp": 75.57
+            },
+            {
+              "id": "idiom",
+              "source": "You have got to be kidding me!",
+              "reference": "Да ты издеваешься!",
+              "language": "en",
+              "translation": "Ты должно быть шутишь!",
+              "chrFpp": 9.05,
+              "checks": {}
+            },
+            {
+              "id": "conditional",
+              "source": "If he had arrived five minutes earlier, we could have saved her.",
+              "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+              "language": "en",
+              "checks": {
+                "бы": true
+              },
+              "translation": "Если бы он приехал на пять минут раньше, мы могли бы спасти ее.",
+              "chrFpp": 78.12
+            },
+            {
+              "id": "ellipsis",
+              "source": "I thought you were... No, forget it.",
+              "reference": "Я думал, ты... Нет, забудь.",
+              "language": "en",
+              "translation": "Я думал, что ты... Нет, забудь об этом.",
+              "chrFpp": 77.59,
+              "checks": {}
+            },
+            {
+              "id": "acronym",
+              "source": "I believe in ghosts, but I do not believe in UFOs.",
+              "reference": "Я верю в призраков, но не верю в НЛО.",
+              "language": "en",
+              "checks": {
+                "не": true,
+                "НЛО": true
+              },
+              "translation": "Я верю в привидения, но не верю в НЛО.",
+              "chrFpp": 71.95
+            }
+          ],
+          "chrFpp": 75.59
+        },
+        {
+          "run": 1,
+          "ms": 2345,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "negation",
+              "source": "I do not believe in aliens.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в инопланетян.",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "prohibition",
+              "source": "Wait! Do not open that door.",
+              "reference": "Стой! Не открывай эту дверь.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Не открывай эту дверь.",
+              "chrFpp": 78.69
+            },
+            {
+              "id": "name",
+              "source": "Momo, are you all right?",
+              "reference": "Момо, ты в порядке?",
+              "language": "en",
+              "checks": {
+                "Момо": true
+              },
+              "translation": "Момо, ты в порядке?",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "double-negation",
+              "source": "It is not that I do not trust you. I just want to protect you.",
+              "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Дело не в том, что я не доверяю тебе. Я просто хочу защитить тебя.",
+              "chrFpp": 75.57
+            },
+            {
+              "id": "idiom",
+              "source": "You have got to be kidding me!",
+              "reference": "Да ты издеваешься!",
+              "language": "en",
+              "translation": "Ты должно быть шутишь!",
+              "chrFpp": 9.05,
+              "checks": {}
+            },
+            {
+              "id": "conditional",
+              "source": "If he had arrived five minutes earlier, we could have saved her.",
+              "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+              "language": "en",
+              "checks": {
+                "бы": true
+              },
+              "translation": "Если бы он приехал на пять минут раньше, мы могли бы спасти ее.",
+              "chrFpp": 78.12
+            },
+            {
+              "id": "ellipsis",
+              "source": "I thought you were... No, forget it.",
+              "reference": "Я думал, ты... Нет, забудь.",
+              "language": "en",
+              "translation": "Я думал, что ты... Нет, забудь об этом.",
+              "chrFpp": 77.59,
+              "checks": {}
+            },
+            {
+              "id": "acronym",
+              "source": "I believe in ghosts, but I do not believe in UFOs.",
+              "reference": "Я верю в призраков, но не верю в НЛО.",
+              "language": "en",
+              "checks": {
+                "не": true,
+                "НЛО": true
+              },
+              "translation": "Я верю в привидения, но не верю в НЛО.",
+              "chrFpp": 71.95
+            }
+          ],
+          "chrFpp": 75.59
+        }
+      ],
+      "modelFiles": [
+        {
+          "name": "README.md",
+          "bytes": 7704,
+          "sha256": "ae9d1fa7d28837433eb979e5e442c3907fa84d10458ff9f3d23eb372bf0061cd"
+        },
+        {
+          "name": "metadata.json",
+          "bytes": 255,
+          "sha256": "a40657925da1c25d98d8a6bc53c436a5b1179bd8771e016147d88587edf1b529"
+        },
+        {
+          "name": "sentencepiece.model",
+          "bytes": 943491,
+          "sha256": "cdd7fd3f6b069cd1baa90d95682ec6851119ae0d734438ba85d3678b2f1e2a66"
+        }
+      ],
+      "loadMs": 2724,
+      "maxRssKiB": 554508
+    },
+    "text-opus.json": {
+      "key": "97566b83ba3a945ce6f9483f600f9bf20d5fffd71d16941da89565c6dc884b9e",
+      "executionLabel": "ORACLE-A1-aarch64-2-OCPU-12GB",
+      "machine": "aarch64",
+      "model": "opus",
+      "profile": "json",
+      "threads": 2,
+      "runs": [
+        {
+          "run": 0,
+          "ms": 572,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "negation",
+              "source": "I do not believe in aliens.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев.",
+              "chrFpp": 44.42
+            },
+            {
+              "id": "prohibition",
+              "source": "Wait! Do not open that door.",
+              "reference": "Стой! Не открывай эту дверь.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Стой, не открывай дверь.",
+              "chrFpp": 50.22
+            },
+            {
+              "id": "name",
+              "source": "Momo, are you all right?",
+              "reference": "Момо, ты в порядке?",
+              "language": "en",
+              "checks": {
+                "Момо": true
+              },
+              "translation": "Момо, ты в порядке?",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "double-negation",
+              "source": "It is not that I do not trust you. I just want to protect you.",
+              "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Дело не в том, что я не доверяю тебе, я просто хочу защитить тебя.",
+              "chrFpp": 69.56
+            },
+            {
+              "id": "idiom",
+              "source": "You have got to be kidding me!",
+              "reference": "Да ты издеваешься!",
+              "language": "en",
+              "translation": "Ты, должно быть, шутишь!",
+              "chrFpp": 8.68,
+              "checks": {}
+            },
+            {
+              "id": "conditional",
+              "source": "If he had arrived five minutes earlier, we could have saved her.",
+              "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+              "language": "en",
+              "checks": {
+                "бы": true
+              },
+              "translation": "Если бы он приехал на пять минут раньше, мы могли бы спасти ее.",
+              "chrFpp": 78.12
+            },
+            {
+              "id": "ellipsis",
+              "source": "I thought you were... No, forget it.",
+              "reference": "Я думал, ты... Нет, забудь.",
+              "language": "en",
+              "translation": "Нет, забудь.",
+              "chrFpp": 46.52,
+              "checks": {}
+            },
+            {
+              "id": "acronym",
+              "source": "I believe in ghosts, but I do not believe in UFOs.",
+              "reference": "Я верю в призраков, но не верю в НЛО.",
+              "language": "en",
+              "checks": {
+                "не": true,
+                "НЛО": true
+              },
+              "translation": "Я верю в призраков, но не в НЛО.",
+              "chrFpp": 82.23
+            }
+          ],
+          "chrFpp": 65.03
+        },
+        {
+          "run": 1,
+          "ms": 543,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "negation",
+              "source": "I do not believe in aliens.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев.",
+              "chrFpp": 44.42
+            },
+            {
+              "id": "prohibition",
+              "source": "Wait! Do not open that door.",
+              "reference": "Стой! Не открывай эту дверь.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Стой, не открывай дверь.",
+              "chrFpp": 50.22
+            },
+            {
+              "id": "name",
+              "source": "Momo, are you all right?",
+              "reference": "Момо, ты в порядке?",
+              "language": "en",
+              "checks": {
+                "Момо": true
+              },
+              "translation": "Момо, ты в порядке?",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "double-negation",
+              "source": "It is not that I do not trust you. I just want to protect you.",
+              "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Дело не в том, что я не доверяю тебе, я просто хочу защитить тебя.",
+              "chrFpp": 69.56
+            },
+            {
+              "id": "idiom",
+              "source": "You have got to be kidding me!",
+              "reference": "Да ты издеваешься!",
+              "language": "en",
+              "translation": "Ты, должно быть, шутишь!",
+              "chrFpp": 8.68,
+              "checks": {}
+            },
+            {
+              "id": "conditional",
+              "source": "If he had arrived five minutes earlier, we could have saved her.",
+              "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+              "language": "en",
+              "checks": {
+                "бы": true
+              },
+              "translation": "Если бы он приехал на пять минут раньше, мы могли бы спасти ее.",
+              "chrFpp": 78.12
+            },
+            {
+              "id": "ellipsis",
+              "source": "I thought you were... No, forget it.",
+              "reference": "Я думал, ты... Нет, забудь.",
+              "language": "en",
+              "translation": "Нет, забудь.",
+              "chrFpp": 46.52,
+              "checks": {}
+            },
+            {
+              "id": "acronym",
+              "source": "I believe in ghosts, but I do not believe in UFOs.",
+              "reference": "Я верю в призраков, но не верю в НЛО.",
+              "language": "en",
+              "checks": {
+                "не": true,
+                "НЛО": true
+              },
+              "translation": "Я верю в призраков, но не в НЛО.",
+              "chrFpp": 82.23
+            }
+          ],
+          "chrFpp": 65.03
+        }
+      ],
+      "modelFiles": [
+        {
+          "name": "config.json",
+          "bytes": 223,
+          "sha256": "8f6496adfc930cbfecbe8281112197705c488fab47d34b4829b06d7f478909af"
+        },
+        {
+          "name": "model.bin",
+          "bytes": 152955057,
+          "sha256": "8a395f62f51d01f9fb78f6bd317267111e114462caf4144c255ca9624a4d135b"
+        },
+        {
+          "name": "shared_vocabulary.json",
+          "bytes": 2300269,
+          "sha256": "bf1812383ed402163a2ed1b553e175e7db96a54ed68b6c15566018fdf945ed99"
+        },
+        {
+          "name": "source.spm",
+          "bytes": 802781,
+          "sha256": "16bebef1389a0b8ab452772c4e35b9e605e5713f8ac7baa71ca701394eaa086d"
+        },
+        {
+          "name": "target.spm",
+          "bytes": 1080169,
+          "sha256": "745998e51ba5b058e38b7ac7765c25c43ed5c1c39cc92b27163b9b2e323c9d7c"
+        }
+      ],
+      "loadMs": 824,
+      "maxRssKiB": 620152
+    },
+    "text-nllb.json": {
+      "key": "5d069a72a5b2fae854d7812bf83193ea4d9cfafd2577401e11f771ed18515b84",
+      "executionLabel": "ORACLE-A1-aarch64-2-OCPU-12GB",
+      "machine": "aarch64",
+      "model": "nllb",
+      "profile": "json",
+      "threads": 2,
+      "runs": [
+        {
+          "run": 0,
+          "ms": 3969,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "negation",
+              "source": "I do not believe in aliens.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев.",
+              "chrFpp": 44.42
+            },
+            {
+              "id": "prohibition",
+              "source": "Wait! Do not open that door.",
+              "reference": "Стой! Не открывай эту дверь.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Подожди, не открывай эту дверь.",
+              "chrFpp": 66.4
+            },
+            {
+              "id": "name",
+              "source": "Momo, are you all right?",
+              "reference": "Момо, ты в порядке?",
+              "language": "en",
+              "checks": {
+                "Момо": true
+              },
+              "translation": "Момо, ты в порядке?",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "double-negation",
+              "source": "It is not that I do not trust you. I just want to protect you.",
+              "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Это не значит, что я тебе не доверяю, я просто хочу тебя защитить.",
+              "chrFpp": 71.11
+            },
+            {
+              "id": "idiom",
+              "source": "You have got to be kidding me!",
+              "reference": "Да ты издеваешься!",
+              "language": "en",
+              "translation": "Ты, должно быть, шутишь!",
+              "chrFpp": 8.68,
+              "checks": {}
+            },
+            {
+              "id": "conditional",
+              "source": "If he had arrived five minutes earlier, we could have saved her.",
+              "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+              "language": "en",
+              "checks": {
+                "бы": true
+              },
+              "translation": "Если бы он прибыл пять минут раньше, мы могли бы спасти ее.",
+              "chrFpp": 72.85
+            },
+            {
+              "id": "ellipsis",
+              "source": "I thought you were... No, forget it.",
+              "reference": "Я думал, ты... Нет, забудь.",
+              "language": "en",
+              "translation": "Я думал, ты...",
+              "chrFpp": 53.24,
+              "checks": {}
+            },
+            {
+              "id": "acronym",
+              "source": "I believe in ghosts, but I do not believe in UFOs.",
+              "reference": "Я верю в призраков, но не верю в НЛО.",
+              "language": "en",
+              "checks": {
+                "не": true,
+                "НЛО": true
+              },
+              "translation": "Я верю в призраков, но не в НЛО.",
+              "chrFpp": 82.23
+            },
+            {
+              "id": "ja-negation",
+              "source": "私は宇宙人を信じていません。",
+              "reference": "Я не верю в инопланетян.",
+              "language": "ja",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев.",
+              "chrFpp": 44.42
+            },
+            {
+              "id": "ja-prohibition",
+              "source": "その扉を開けないでください！",
+              "reference": "Не открывай эту дверь!",
+              "language": "ja",
+              "checks": {
+                "не": true
+              },
+              "translation": "Не открывайте дверь!",
+              "chrFpp": 61.31
+            },
+            {
+              "id": "ko-negation",
+              "source": "나는 외계인을 믿지 않는다.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "ko",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю инопланетянам.",
+              "chrFpp": 68.75
+            },
+            {
+              "id": "ko-prohibition",
+              "source": "그 문을 열지 마세요!",
+              "reference": "Не открывай эту дверь!",
+              "language": "ko",
+              "checks": {
+                "не": true
+              },
+              "translation": "Не открывайте эту дверь!",
+              "chrFpp": 77.5
+            }
+          ],
+          "chrFpp": 65.74
+        },
+        {
+          "run": 1,
+          "ms": 3846,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "negation",
+              "source": "I do not believe in aliens.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев.",
+              "chrFpp": 44.42
+            },
+            {
+              "id": "prohibition",
+              "source": "Wait! Do not open that door.",
+              "reference": "Стой! Не открывай эту дверь.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Подожди, не открывай эту дверь.",
+              "chrFpp": 66.4
+            },
+            {
+              "id": "name",
+              "source": "Momo, are you all right?",
+              "reference": "Момо, ты в порядке?",
+              "language": "en",
+              "checks": {
+                "Момо": true
+              },
+              "translation": "Момо, ты в порядке?",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "double-negation",
+              "source": "It is not that I do not trust you. I just want to protect you.",
+              "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Это не значит, что я тебе не доверяю, я просто хочу тебя защитить.",
+              "chrFpp": 71.11
+            },
+            {
+              "id": "idiom",
+              "source": "You have got to be kidding me!",
+              "reference": "Да ты издеваешься!",
+              "language": "en",
+              "translation": "Ты, должно быть, шутишь!",
+              "chrFpp": 8.68,
+              "checks": {}
+            },
+            {
+              "id": "conditional",
+              "source": "If he had arrived five minutes earlier, we could have saved her.",
+              "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+              "language": "en",
+              "checks": {
+                "бы": true
+              },
+              "translation": "Если бы он прибыл пять минут раньше, мы могли бы спасти ее.",
+              "chrFpp": 72.85
+            },
+            {
+              "id": "ellipsis",
+              "source": "I thought you were... No, forget it.",
+              "reference": "Я думал, ты... Нет, забудь.",
+              "language": "en",
+              "translation": "Я думал, ты...",
+              "chrFpp": 53.24,
+              "checks": {}
+            },
+            {
+              "id": "acronym",
+              "source": "I believe in ghosts, but I do not believe in UFOs.",
+              "reference": "Я верю в призраков, но не верю в НЛО.",
+              "language": "en",
+              "checks": {
+                "не": true,
+                "НЛО": true
+              },
+              "translation": "Я верю в призраков, но не в НЛО.",
+              "chrFpp": 82.23
+            },
+            {
+              "id": "ja-negation",
+              "source": "私は宇宙人を信じていません。",
+              "reference": "Я не верю в инопланетян.",
+              "language": "ja",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев.",
+              "chrFpp": 44.42
+            },
+            {
+              "id": "ja-prohibition",
+              "source": "その扉を開けないでください！",
+              "reference": "Не открывай эту дверь!",
+              "language": "ja",
+              "checks": {
+                "не": true
+              },
+              "translation": "Не открывайте дверь!",
+              "chrFpp": 61.31
+            },
+            {
+              "id": "ko-negation",
+              "source": "나는 외계인을 믿지 않는다.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "ko",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю инопланетянам.",
+              "chrFpp": 68.75
+            },
+            {
+              "id": "ko-prohibition",
+              "source": "그 문을 열지 마세요!",
+              "reference": "Не открывай эту дверь!",
+              "language": "ko",
+              "checks": {
+                "не": true
+              },
+              "translation": "Не открывайте эту дверь!",
+              "chrFpp": 77.5
+            }
+          ],
+          "chrFpp": 65.74
+        }
+      ],
+      "modelFiles": [
+        {
+          "name": "LICENSE.model.md",
+          "bytes": 19333,
+          "sha256": "a7950c0fed88e9a177617e3836e9dc0ae4f4a96e59b15c3706de38ace171aca4"
+        },
+        {
+          "name": "config.json",
+          "bytes": 189,
+          "sha256": "4244772990e30069563e3ddfb4ad6dc95bdfd2ac3de667ea8858c9b0a8433fa8"
+        },
+        {
+          "name": "model.bin",
+          "bytes": 2464511400,
+          "sha256": "c04fb4ea42229c5f43f645e73d49175d34c3e0883ee5b3b110cbb1612dd4bcda"
+        },
+        {
+          "name": "sentencepiece.bpe.model",
+          "bytes": 4852054,
+          "sha256": "14bb8dfb35c0ffdea7bc01e56cea38b9e3d5efcdcb9c251d6b40538e1aab555a"
+        },
+        {
+          "name": "shared_vocabulary.json",
+          "bytes": 5921176,
+          "sha256": "af53bfd0e6f726209e7325e45b87ab3b14e5856f7d42d7b9be91de3287c45267"
+        }
+      ],
+      "loadMs": 26204,
+      "maxRssKiB": 2654840
+    },
+    "text-4b-segments.json": {
+      "key": "e7e0ce683b7c5723f340c29adc9716efed90d7dc71d9f400f87660c1fa331ef4",
+      "executionLabel": "ORACLE-A1-aarch64-2-OCPU-12GB",
+      "machine": "aarch64",
+      "model": "Qwen3-4B-Q4_K_M",
+      "profile": "segments",
+      "threads": 2,
+      "runs": [
+        {
+          "run": 0,
+          "ms": 48773,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "negation",
+              "source": "I do not believe in aliens.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев.",
+              "chrFpp": 44.42
+            },
+            {
+              "id": "prohibition",
+              "source": "Wait! Do not open that door.",
+              "reference": "Стой! Не открывай эту дверь.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Внимание! Не открывай эту дверь.",
+              "chrFpp": 79.97
+            },
+            {
+              "id": "name",
+              "source": "Momo, are you all right?",
+              "reference": "Момо, ты в порядке?",
+              "language": "en",
+              "checks": {
+                "Момо": true
+              },
+              "translation": "Момо, ты в порядке?",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "double-negation",
+              "source": "It is not that I do not trust you. I just want to protect you.",
+              "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Это не то, что я не доверяю вам. Я просто хочу защитить вас.",
+              "chrFpp": 52.88
+            },
+            {
+              "id": "idiom",
+              "source": "You have got to be kidding me!",
+              "reference": "Да ты издеваешься!",
+              "language": "en",
+              "translation": "Вы издеваетесь над ней!",
+              "chrFpp": 34.87,
+              "checks": {}
+            },
+            {
+              "id": "conditional",
+              "source": "If he had arrived five minutes earlier, we could have saved her.",
+              "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+              "language": "en",
+              "checks": {
+                "бы": true
+              },
+              "translation": "Если бы он пришёл на пять минут раньше, мы могли бы спасти её.",
+              "chrFpp": 89.53
+            },
+            {
+              "id": "ellipsis",
+              "source": "I thought you were... No, forget it.",
+              "reference": "Я думал, ты... Нет, забудь.",
+              "language": "en",
+              "translation": "Я думал, что ты... Нет, забудь.",
+              "chrFpp": 86.31,
+              "checks": {}
+            },
+            {
+              "id": "acronym",
+              "source": "I believe in ghosts, but I do not believe in UFOs.",
+              "reference": "Я верю в призраков, но не верю в НЛО.",
+              "language": "en",
+              "checks": {
+                "не": true,
+                "НЛО": false
+              },
+              "translation": "Я верю в призраков, но не верю в UFO.",
+              "chrFpp": 85.43
+            },
+            {
+              "id": "ja-negation",
+              "source": "私は宇宙人を信じていません。",
+              "reference": "Я не верю в инопланетян.",
+              "language": "ja",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в внеземные существа.",
+              "chrFpp": 43.09
+            },
+            {
+              "id": "ja-prohibition",
+              "source": "その扉を開けないでください！",
+              "reference": "Не открывай эту дверь!",
+              "language": "ja",
+              "checks": {
+                "не": true
+              },
+              "translation": "Не открывайте эту дверь!",
+              "chrFpp": 77.5
+            },
+            {
+              "id": "ko-negation",
+              "source": "나는 외계인을 믿지 않는다.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "ko",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в иностранных людей.",
+              "chrFpp": 56.21
+            },
+            {
+              "id": "ko-prohibition",
+              "source": "그 문을 열지 마세요!",
+              "reference": "Не открывай эту дверь!",
+              "language": "ko",
+              "checks": {
+                "не": true
+              },
+              "translation": "Не открывайте эту дверь!",
+              "chrFpp": 77.5
+            }
+          ],
+          "chrFpp": 70.39
+        }
+      ],
+      "loadMs": 0,
+      "maxRssKiB": 248040
+    },
+    "text-q35-segments.json": {
+      "key": "702161e3a2a4acfa73074a6a02916194f5d035151253bef7047cd21c269dca67",
+      "executionLabel": "ORACLE-A1-aarch64-2-OCPU-12GB",
+      "machine": "aarch64",
+      "model": "Qwen3.5-2B-Q8_0",
+      "profile": "segments",
+      "threads": 2,
+      "runs": [
+        {
+          "run": 0,
+          "ms": 20605,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "negation",
+              "source": "I do not believe in aliens.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев.",
+              "chrFpp": 44.42
+            },
+            {
+              "id": "prohibition",
+              "source": "Wait! Do not open that door.",
+              "reference": "Стой! Не открывай эту дверь.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Подождите! Не открывайте эту дверь.",
+              "chrFpp": 64.89
+            },
+            {
+              "id": "name",
+              "source": "Momo, are you all right?",
+              "reference": "Момо, ты в порядке?",
+              "language": "en",
+              "checks": {
+                "Момо": true
+              },
+              "translation": "Момо, всё хорошо?",
+              "chrFpp": 26.16
+            },
+            {
+              "id": "double-negation",
+              "source": "It is not that I do not trust you. I just want to protect you.",
+              "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+              "language": "en",
+              "checks": {
+                "не": true
+              },
+              "translation": "Это не то, что я не верю в вас. Я просто хочу защитить вас.",
+              "chrFpp": 45.13
+            },
+            {
+              "id": "idiom",
+              "source": "You have got to be kidding me!",
+              "reference": "Да ты издеваешься!",
+              "language": "en",
+              "translation": "Вы же насмехаетесь над этим?",
+              "chrFpp": 7.86,
+              "checks": {}
+            },
+            {
+              "id": "conditional",
+              "source": "If he had arrived five minutes earlier, we could have saved her.",
+              "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+              "language": "en",
+              "checks": {
+                "бы": true
+              },
+              "translation": "Если бы он был здесь на пять минут раньше, мы могли бы спасли её.",
+              "chrFpp": 69.48
+            },
+            {
+              "id": "ellipsis",
+              "source": "I thought you were... No, forget it.",
+              "reference": "Я думал, ты... Нет, забудь.",
+              "language": "en",
+              "translation": "Я думал, что ты... Нет, лучше так и останется.",
+              "chrFpp": 53.31,
+              "checks": {}
+            },
+            {
+              "id": "acronym",
+              "source": "I believe in ghosts, but I do not believe in UFOs.",
+              "reference": "Я верю в призраков, но не верю в НЛО.",
+              "language": "en",
+              "checks": {
+                "не": true,
+                "НЛО": false
+              },
+              "translation": "Я верю в призраков, но не верю в пришельцев.",
+              "chrFpp": 82.36
+            },
+            {
+              "id": "ja-negation",
+              "source": "私は宇宙人を信じていません。",
+              "reference": "Я не верю в инопланетян.",
+              "language": "ja",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в пришельцев из космоса.",
+              "chrFpp": 42.54
+            },
+            {
+              "id": "ja-prohibition",
+              "source": "その扉を開けないでください！",
+              "reference": "Не открывай эту дверь!",
+              "language": "ja",
+              "checks": {
+                "не": true
+              },
+              "translation": "Откройте эту дверь нельзя!",
+              "chrFpp": 40.48
+            },
+            {
+              "id": "ko-negation",
+              "source": "나는 외계인을 믿지 않는다.",
+              "reference": "Я не верю в инопланетян.",
+              "language": "ko",
+              "checks": {
+                "не": true
+              },
+              "translation": "Я не верю в инопланетян.",
+              "chrFpp": 100.0
+            },
+            {
+              "id": "ko-prohibition",
+              "source": "그 문을 열지 마세요!",
+              "reference": "Не открывай эту дверь!",
+              "language": "ko",
+              "checks": {
+                "не": false
+              },
+              "translation": "Откройте эту дверь!",
+              "chrFpp": 50.39
+            }
+          ],
+          "chrFpp": 55.55
+        }
+      ],
+      "loadMs": 0,
+      "maxRssKiB": 247988
+    }
+  }
+}

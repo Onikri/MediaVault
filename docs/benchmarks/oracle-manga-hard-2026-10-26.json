@@ -1,0 +1,475 @@
+{
+  "files": {
+    "hard-browser-results.json": "a8f9fe021d24cd6e5da2abc455a03451d467392cabe9cd8af1c9aed4e2e8a6be",
+    "text-nllb-narrative.json": "3dbd5daf2edbc1e5868382758cb47d9a2b14fb450f38ae0675187e233c36b81c",
+    "text-4b-narrative.json": "9ed7c58ef4920a7ed17206f8edb2fb0b982e087c7bdce9c1cd5902bea2d2016a",
+    "text-q35-narrative.json": "90b47de522ddb82c4d532710b0d42a12b70cb608b7e2db56c3ad3859c11b3c8d"
+  },
+  "narrative": {
+    "nllb": {
+      "model": "nllb",
+      "runs": [
+        {
+          "run": 0,
+          "ms": 2431,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "last-day-retirement",
+              "source": "今日が引退前の最後の日になると思う",
+              "reference": "Думаю, сегодня мой последний день перед выходом на пенсию.",
+              "language": "ja",
+              "checks": {
+                "послед": true
+              },
+              "translation": "Я думаю, сегодня будет последний день до выхода на пенсию.",
+              "chrFpp": 59.39
+            },
+            {
+              "id": "edward-interjection",
+              "source": "あらエドワード...もう店を出ていくの?",
+              "reference": "О, Эдвард... уже уходишь из магазина?",
+              "language": "ja",
+              "checks": {
+                "Эдвард": true,
+                "магазин": true
+              },
+              "translation": "Эй, Эдвард, ты уходишь из магазина?",
+              "chrFpp": 62.84
+            },
+            {
+              "id": "return-home-grown-grandchild",
+              "source": "ああ家に帰って成長した孫の姿を見るのが楽しみだ",
+              "reference": "Да, жду не дождусь, когда вернусь домой и увижу, как вырос мой внук.",
+              "language": "ja",
+              "checks": {
+                "дом": true
+              },
+              "translation": "О, я очень рада, что вернулась домой и увидела своего внука.",
+              "chrFpp": 27.61
+            }
+          ],
+          "chrFpp": 46.82
+        }
+      ]
+    },
+    "4b": {
+      "model": "Qwen3-4B-Q4_K_M",
+      "runs": [
+        {
+          "run": 0,
+          "ms": 15552,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "last-day-retirement",
+              "source": "今日が引退前の最後の日になると思う",
+              "reference": "Думаю, сегодня мой последний день перед выходом на пенсию.",
+              "language": "ja",
+              "checks": {
+                "послед": true
+              },
+              "translation": "Я думаю, что сегодня последний день до отставки.",
+              "chrFpp": 38.38
+            },
+            {
+              "id": "edward-interjection",
+              "source": "あらエドワード...もう店を出ていくの?",
+              "reference": "О, Эдвард... уже уходишь из магазина?",
+              "language": "ja",
+              "checks": {
+                "Эдвард": true,
+                "магазин": false
+              },
+              "translation": "Ала Эдвард... уже уходишь?",
+              "chrFpp": 57.91
+            },
+            {
+              "id": "return-home-grown-grandchild",
+              "source": "ああ家に帰って成長した孫の姿を見るのが楽しみだ",
+              "reference": "Да, жду не дождусь, когда вернусь домой и увижу, как вырос мой внук.",
+              "language": "ja",
+              "checks": {
+                "дом": false
+              },
+              "translation": "Аа, рада видеть, как мой внуок вырос.",
+              "chrFpp": 23.52
+            }
+          ],
+          "chrFpp": 36.82
+        }
+      ]
+    },
+    "q35": {
+      "model": "Qwen3.5-2B-Q8_0",
+      "runs": [
+        {
+          "run": 0,
+          "ms": 6411,
+          "valid": true,
+          "error": null,
+          "cases": [
+            {
+              "id": "last-day-retirement",
+              "source": "今日が引退前の最後の日になると思う",
+              "reference": "Думаю, сегодня мой последний день перед выходом на пенсию.",
+              "language": "ja",
+              "checks": {
+                "послед": true
+              },
+              "translation": "Сегодня, думаю, будет последним днем до моего ухода.",
+              "chrFpp": 26.47
+            },
+            {
+              "id": "edward-interjection",
+              "source": "あらエドワード...もう店を出ていくの?",
+              "reference": "О, Эдвард... уже уходишь из магазина?",
+              "language": "ja",
+              "checks": {
+                "Эдвард": true,
+                "магазин": true
+              },
+              "translation": "Ара, Эдвард... ты уже идешь из магазина?",
+              "chrFpp": 63.56
+            },
+            {
+              "id": "return-home-grown-grandchild",
+              "source": "ああ家に帰って成長した孫の姿を見るのが楽しみだ",
+              "reference": "Да, жду не дождусь, когда вернусь домой и увижу, как вырос мой внук.",
+              "language": "ja",
+              "checks": {
+                "дом": true
+              },
+              "translation": "Мне нравится видеть, как мой внук вырос дома.",
+              "chrFpp": 26.84
+            }
+          ],
+          "chrFpp": 35.78
+        }
+      ]
+    }
+  },
+  "hard": {
+    "environment": "ORACLE-A1-aarch64-2-OCPU-12GB",
+    "machine": "aarch64",
+    "runtime": "native-cpu",
+    "threads": 2,
+    "fingerprint": "c2d540498604e16bb04baa29bb42ba821b36b55607ef24fb1ef2767934f46d22",
+    "results": [
+      {
+        "key": "detect:comic-bubble:jp-vertical",
+        "stage": "detect",
+        "case": "jp-vertical",
+        "model": "comic-bubble",
+        "ms": 12614,
+        "metrics": {
+          "tp": 4,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "iouThreshold": 0.3
+        },
+        "wallMs": 23171
+      },
+      {
+        "key": "detect:comic-bubble:ko-dialogue",
+        "stage": "detect",
+        "case": "ko-dialogue",
+        "model": "comic-bubble",
+        "ms": 925.9000000059605,
+        "metrics": {
+          "tp": 2,
+          "fp": null,
+          "fn": 0,
+          "precision": null,
+          "recall": 1.0,
+          "f1": null,
+          "iouThreshold": 0.3,
+          "partialAnnotations": true
+        },
+        "unlabelledPredictions": 1,
+        "wallMs": 11586
+      },
+      {
+        "key": "detect:comic-text-detector:jp-vertical",
+        "stage": "detect",
+        "case": "jp-vertical",
+        "model": "comic-text-detector",
+        "ms": 9368.700000017881,
+        "metrics": {
+          "tp": 4,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "iouThreshold": 0.3
+        },
+        "wallMs": 19560
+      },
+      {
+        "key": "detect:comic-text-detector:ko-dialogue",
+        "stage": "detect",
+        "case": "ko-dialogue",
+        "model": "comic-text-detector",
+        "ms": 8941.699999988079,
+        "metrics": {
+          "tp": 2,
+          "fp": null,
+          "fn": 0,
+          "precision": null,
+          "recall": 1.0,
+          "f1": null,
+          "iouThreshold": 0.3,
+          "partialAnnotations": true
+        },
+        "unlabelledPredictions": 1,
+        "wallMs": 19442
+      },
+      {
+        "key": "ocr:paddle:jp-vertical",
+        "stage": "ocr",
+        "case": "jp-vertical",
+        "model": "paddle",
+        "ms": 3540,
+        "results": [
+          {
+            "text": "",
+            "confidence": 0,
+            "failed": true,
+            "gateSkip": null
+          },
+          {
+            "text": "緒になれるように!",
+            "confidence": 0.9413492216004266,
+            "failed": null,
+            "gateSkip": null
+          },
+          {
+            "text": "",
+            "confidence": 0,
+            "failed": true,
+            "gateSkip": null
+          },
+          {
+            "text": "は じ ま り は じ ま り",
+            "confidence": 0.9976510927081108,
+            "failed": null,
+            "gateSkip": null
+          }
+        ],
+        "cer": 0.8597222222222223,
+        "wallMs": 13655,
+        "alphanumericCER": 0.6447368421052632
+      },
+      {
+        "key": "ocr:ppocrv6-manga:jp-vertical",
+        "stage": "ocr",
+        "case": "jp-vertical",
+        "model": "ppocrv6-manga",
+        "ms": 2235.100000023842,
+        "results": [
+          {
+            "text": "",
+            "confidence": 0,
+            "failed": true,
+            "gateSkip": null
+          },
+          {
+            "text": "一緒になれるように！",
+            "confidence": 0.9638689756393433,
+            "failed": null,
+            "gateSkip": null
+          },
+          {
+            "text": "KR",
+            "confidence": 0.4556572213768959,
+            "failed": null,
+            "gateSkip": null
+          },
+          {
+            "text": "は じ ま り は じ ま り S",
+            "confidence": 0.9898000491989983,
+            "failed": null,
+            "gateSkip": null
+          }
+        ],
+        "cer": 0.875,
+        "wallMs": 13129,
+        "alphanumericCER": 0.662828947368421
+      },
+      {
+        "key": "ocr:manga-ocr:jp-vertical",
+        "stage": "ocr",
+        "case": "jp-vertical",
+        "model": "manga-ocr",
+        "ms": 24642.100000023842,
+        "results": [
+          {
+            "text": "これはあたしとセラの冒険のお話",
+            "confidence": 0.9,
+            "failed": false,
+            "gateSkip": null
+          },
+          {
+            "text": "いつかまた家族として一緒になれるように!",
+            "confidence": 0.9,
+            "failed": false,
+            "gateSkip": null
+          },
+          {
+            "text": "苦しみと喜びを分かち合いながらあたしたちはこの分断された世界を旅してる",
+            "confidence": 0.9,
+            "failed": false,
+            "gateSkip": null
+          },
+          {
+            "text": "はじまりはじまり〜",
+            "confidence": 0.9,
+            "failed": false,
+            "gateSkip": null
+          }
+        ],
+        "cer": 0.027777777777777776,
+        "wallMs": 34640,
+        "alphanumericCER": 0.0
+      },
+      {
+        "key": "ocr:pororo:ko-dialogue",
+        "stage": "ocr",
+        "case": "ko-dialogue",
+        "model": "pororo",
+        "ms": 4423.4000000059605,
+        "results": [
+          {
+            "text": "크벤액은 (르편 랄!",
+            "confidence": 0.5528138776334707,
+            "failed": false,
+            "gateSkip": null
+          },
+          {
+            "text": "",
+            "confidence": 0,
+            "failed": true,
+            "gateSkip": null
+          }
+        ],
+        "cer": 0.90625,
+        "wallMs": 14708,
+        "alphanumericCER": 0.9583333333333333
+      },
+      {
+        "key": "ocr:ppocrv5-korean:ko-dialogue",
+        "stage": "ocr",
+        "case": "ko-dialogue",
+        "model": "ppocrv5-korean",
+        "ms": 2605.0999999940395,
+        "results": [
+          {
+            "text": "코엔지역은 이리로 가면 될까?",
+            "confidence": 0.9986662043465508,
+            "failed": null,
+            "gateSkip": null
+          },
+          {
+            "text": "저기 총각 뭐 좀물어볼게",
+            "confidence": 0.8678647547960282,
+            "failed": null,
+            "gateSkip": null
+          }
+        ],
+        "cer": 0.11764705882352941,
+        "wallMs": 12773,
+        "alphanumericCER": 0.0
+      }
+    ],
+    "cases": [
+      {
+        "id": "jp-vertical",
+        "language": "Japanese",
+        "file": "vertical-japanese-test.png",
+        "width": 3430,
+        "height": 2417,
+        "regions": [
+          {
+            "box": [
+              2928,
+              662,
+              3022,
+              986
+            ],
+            "text": "これはあたしとセラの冒険のお話"
+          },
+          {
+            "box": [
+              551,
+              466,
+              769,
+              902
+            ],
+            "text": "いつかまた家族として一緒になれるように！"
+          },
+          {
+            "box": [
+              2272,
+              1847,
+              2414,
+              2333
+            ],
+            "text": "苦しみと喜びを分かち合いながらあたしたちはこの分断された世界を旅してる"
+          },
+          {
+            "box": [
+              477,
+              719,
+              513,
+              1024
+            ],
+            "text": "はじまりはじまり～"
+          }
+        ],
+        "kind": "upstream-real-test-page",
+        "source": "https://raw.githubusercontent.com/mrdhnto/libre-manga-translator/39a95be1890e2ea3e227052976bbaf576a8eb7b3/tests/assets/vertical-japanese-test.png",
+        "sha256": "58774e40995de1e2bd74713570a05d6b966776c4e8da671204fa19452900a76e",
+        "partialAnnotations": false,
+        "annotationNotes": "Korean dialogue boxes only; SFX/signs unlabelled. Japanese labels use the four upstream e2e narration references."
+      },
+      {
+        "id": "ko-dialogue",
+        "language": "Korean",
+        "file": "korean-test.png",
+        "width": 1284,
+        "height": 1843,
+        "regions": [
+          {
+            "box": [
+              300,
+              1330,
+              470,
+              1500
+            ],
+            "text": "코엔지역은 이리로 가면 될까?"
+          },
+          {
+            "box": [
+              877,
+              1220,
+              1085,
+              1380
+            ],
+            "text": "저기... 총각 뭐 좀 물어볼게"
+          }
+        ],
+        "kind": "upstream-real-test-page",
+        "source": "https://raw.githubusercontent.com/mrdhnto/libre-manga-translator/39a95be1890e2ea3e227052976bbaf576a8eb7b3/tests/assets/korean-test.png",
+        "sha256": "6d84f710f88de31adc1294c3ad6d669cb4b47d9e2e75e4abf73e13d1d88f8097",
+        "partialAnnotations": true,
+        "annotationNotes": "Korean dialogue boxes only; SFX/signs unlabelled. Japanese labels use the four upstream e2e narration references."
+      }
+    ]
+  }
+}

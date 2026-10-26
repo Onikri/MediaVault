@@ -13,3 +13,6 @@ test('VLM skips irrelevant OCR script restrictions and Korean V5 covers only Kor
  assert.doesNotThrow(()=>validateConfig({allowDownloads:true,mode:'api',apiInput:'vision',host:'https://example.org/v1',serverModel:'vision',ocr:'pororo',language:'English'}));
  assert.throws(()=>validateConfig({allowDownloads:true,ocr:'ppocrv5-korean',language:'English'}));
 });
+
+import {resolveMangaOcr} from '../src/ocr-profiles.js';
+test('quality OCR defaults preserve vertical Japanese accuracy and explicit user choices',()=>{assert.equal(resolveMangaOcr('Japanese','auto'),'manga-ocr');assert.equal(resolveMangaOcr('Japanese'),'manga-ocr');assert.equal(resolveMangaOcr('Japanese','ppocrv6-manga'),'ppocrv6-manga');assert.equal(resolveMangaOcr('Korean','auto'),'ppocrv5-korean');assert.equal(resolveMangaOcr('English','auto'),'paddle');});

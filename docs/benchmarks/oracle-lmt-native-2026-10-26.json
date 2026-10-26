@@ -1,0 +1,555 @@
+{
+  "machine": "aarch64",
+  "ocpus": 2,
+  "ramGiB": 12,
+  "sourceCommit": "cc005d4537d040b8df38a63617af949529c447bf",
+  "reports": {
+    "lmt-4b-a1.json": {
+      "host": {
+        "hostname": "5f0cf322b6b5",
+        "system": "Linux-6.17.0-1020-oracle-aarch64-with-glibc2.36",
+        "architecture": "aarch64",
+        "logicalCpus": 2,
+        "loadAverage": [
+          0.68212890625,
+          0.20458984375,
+          0.12451171875
+        ],
+        "ramBytes": 12506693632,
+        "availableRamBytes": 7717613568,
+        "diskFreeBytes": 24918265856,
+        "python": "3.12.15",
+        "cgroupMemoryLimit": "6442450944",
+        "cgroupCpuLimit": "200000 100000"
+      },
+      "mode": "lmt",
+      "utc": "2026-10-26T06:56:47Z",
+      "runs": [
+        {
+          "run": 1,
+          "success": true,
+          "firstRunInProcess": true,
+          "wallSeconds": 173.16,
+          "pythonCpuSeconds": 5.216,
+          "peakProcessTreeRssBytes": 5239758848,
+          "rssNote": "sum of resident pages, including shared pages; sampled every 50 ms",
+          "upscale": null,
+          "regions": 3,
+          "timings": {
+            "initializationMs": 754.6000000238419,
+            "detectionMs": 22694,
+            "ocrMs": 31130.100000023842,
+            "translationMs": 62248,
+            "inpaintMs": 52480.29999998212,
+            "typesetMs": 811.7999999821186,
+            "totalMs": 170299.10000002384
+          },
+          "inpaintRegions": [
+            {
+              "index": 0,
+              "method": "lama",
+              "ms": 12008,
+              "cluster": 0,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 1,
+              "method": "lama",
+              "ms": 11989,
+              "cluster": 1,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 2,
+              "method": "lama",
+              "ms": 13546,
+              "cluster": 2,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            }
+          ],
+          "renderedImageBytes": 548296
+        },
+        {
+          "run": 2,
+          "success": true,
+          "firstRunInProcess": false,
+          "wallSeconds": 130.647,
+          "pythonCpuSeconds": 3.595,
+          "peakProcessTreeRssBytes": 4489560064,
+          "rssNote": "sum of resident pages, including shared pages; sampled every 50 ms",
+          "upscale": null,
+          "regions": 3,
+          "timings": {
+            "initializationMs": 2.800000011920929,
+            "detectionMs": 13737.200000017881,
+            "ocrMs": 13745.5,
+            "translationMs": 63659.09999999404,
+            "inpaintMs": 37742.40000000596,
+            "typesetMs": 739.7999999821186,
+            "totalMs": 129798.09999999404
+          },
+          "inpaintRegions": [
+            {
+              "index": 0,
+              "method": "lama",
+              "ms": 12060,
+              "cluster": 0,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 1,
+              "method": "lama",
+              "ms": 11993,
+              "cluster": 1,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 2,
+              "method": "lama",
+              "ms": 13484,
+              "cluster": 2,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            }
+          ],
+          "renderedImageBytes": 548004
+        }
+      ],
+      "input": {
+        "name": "page.jpg",
+        "sha256": "56ed1dde6e8d880f1db136d1b2861262449b7311c5eefa9454c59613f347ea37",
+        "bytes": 865285
+      },
+      "options": {
+        "translate": true,
+        "upscale": false,
+        "operation": "process",
+        "boxes": null,
+        "gateForce": false,
+        "language": "Japanese",
+        "targetLanguage": "Russian",
+        "ocr": "manga-ocr",
+        "detector": "comic-text-detector",
+        "inpaint": "quality",
+        "allowDownloads": true,
+        "contextKey": "default",
+        "scale": 2,
+        "model": "auto",
+        "content": "auto",
+        "tile": 128
+      }
+    },
+    "lmt-4b-transcript.json": [
+      {
+        "x": 0.6171344067456076,
+        "y": 0.10625185090609207,
+        "w": 0.2583152097620006,
+        "h": 0.044576078289591876,
+        "original": "今日が引退前の最後の日になると思う",
+        "text": "Я думаю, что сегодня будет последним днем перед уходом",
+        "placement": "note"
+      },
+      {
+        "x": 0.12911582623035492,
+        "y": 0.2608302367807211,
+        "w": 0.233211206434072,
+        "h": 0.04365221002086362,
+        "original": "あらエドワード...もう店を出ていくの?",
+        "text": "Ах, Эдвард... вы уже собираетесь уходить из магазина?",
+        "placement": "note"
+      },
+      {
+        "x": 0.12411327302542785,
+        "y": 0.46222504246540685,
+        "w": 0.2797897765744185,
+        "h": 0.04344125055655202,
+        "original": "ああ家に帰って成長した孫の姿を見るのが楽しみだ",
+        "text": "Да, я жду, чтобы увидеть образ молодого внука, который вырос",
+        "placement": "note"
+      }
+    ],
+    "lmt-4b-native-baseline-manga-ocr-a1.json": {
+      "host": {
+        "hostname": "778880e5099b",
+        "system": "Linux-6.17.0-1020-oracle-aarch64-with-glibc2.36",
+        "architecture": "aarch64",
+        "logicalCpus": 2,
+        "loadAverage": [
+          0.26123046875,
+          0.087890625,
+          0.02978515625
+        ],
+        "ramBytes": 12506693632,
+        "availableRamBytes": 7718453248,
+        "diskFreeBytes": 23810781184,
+        "python": "3.12.15",
+        "cgroupMemoryLimit": "6442450944",
+        "cgroupCpuLimit": "200000 100000"
+      },
+      "mode": "lmt",
+      "utc": "2026-10-26T11:36:59Z",
+      "runs": [
+        {
+          "run": 1,
+          "success": true,
+          "firstRunInProcess": true,
+          "wallSeconds": 120.282,
+          "pythonCpuSeconds": 56.995,
+          "peakProcessTreeRssBytes": 4254420992,
+          "rssNote": "sum of resident pages, including shared pages; sampled every 50 ms",
+          "upscale": null,
+          "regions": 3,
+          "timings": {
+            "initializationMs": 722.6999999880791,
+            "detectionMs": 10007.199999988079,
+            "ocrMs": 17847.100000023842,
+            "translationMs": 61858.90000000596,
+            "inpaintMs": 25703.90000000596,
+            "typesetMs": 857.1999999880791,
+            "totalMs": 117168.69999998808
+          },
+          "inpaintRegions": [
+            {
+              "index": 0,
+              "method": "lama",
+              "ms": 3418,
+              "cluster": 0,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 1,
+              "method": "lama",
+              "ms": 3303,
+              "cluster": 1,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 2,
+              "method": "lama",
+              "ms": 3658,
+              "cluster": 2,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            }
+          ],
+          "onnxRuntime": "native-cpu",
+          "translationDiagnostics": null,
+          "coverage": {
+            "detected": 3,
+            "recognized": 3,
+            "translated": 3,
+            "ocrWarnings": []
+          },
+          "renderedImageBytes": 548296
+        },
+        {
+          "run": 2,
+          "success": true,
+          "firstRunInProcess": false,
+          "wallSeconds": 84.857,
+          "pythonCpuSeconds": 49.676,
+          "peakProcessTreeRssBytes": 4849995776,
+          "rssNote": "sum of resident pages, including shared pages; sampled every 50 ms",
+          "upscale": null,
+          "regions": 3,
+          "timings": {
+            "initializationMs": 4.700000017881393,
+            "detectionMs": 8616.799999982119,
+            "ocrMs": 20644.80000001192,
+            "translationMs": 29022.59999999404,
+            "inpaintMs": 24732.899999976158,
+            "typesetMs": 770.5,
+            "totalMs": 84001.5
+          },
+          "inpaintRegions": [
+            {
+              "index": 0,
+              "method": "lama",
+              "ms": 17621,
+              "cluster": 0,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 1,
+              "method": "lama",
+              "ms": 3266,
+              "cluster": 1,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 2,
+              "method": "lama",
+              "ms": 3634,
+              "cluster": 2,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            }
+          ],
+          "onnxRuntime": "native-cpu",
+          "translationDiagnostics": null,
+          "coverage": {
+            "detected": 3,
+            "recognized": 3,
+            "translated": 3,
+            "ocrWarnings": []
+          },
+          "renderedImageBytes": 545238
+        }
+      ],
+      "input": {
+        "name": "page.jpg",
+        "sha256": "56ed1dde6e8d880f1db136d1b2861262449b7311c5eefa9454c59613f347ea37",
+        "bytes": 865285
+      },
+      "options": {
+        "translate": true,
+        "upscale": false,
+        "operation": "process",
+        "boxes": null,
+        "gateForce": false,
+        "language": "Japanese",
+        "targetLanguage": "Russian",
+        "ocr": "manga-ocr",
+        "detector": "comic-text-detector",
+        "inpaint": "quality",
+        "allowDownloads": true,
+        "contextKey": "default",
+        "scale": 2,
+        "model": "auto",
+        "content": "auto",
+        "tile": 128
+      }
+    },
+    "lmt-4b-native-baseline-manga-ocr-transcript.json": [
+      {
+        "x": 0.6171344067456076,
+        "y": 0.10625184904344692,
+        "w": 0.2583152097620006,
+        "h": 0.044576082014882175,
+        "original": "今日が引退前の最後の日になると思う",
+        "text": "Я думаю, что это последний день перед уходом",
+        "placement": "note"
+      },
+      {
+        "x": 0.12911583673067756,
+        "y": 0.2608302367807211,
+        "w": 0.23321118543342675,
+        "h": 0.04365221002086362,
+        "original": "あらエドワード...もう店を出ていくの?",
+        "text": "А-а Эдвард... ты уже собираешься уходить из магазина?",
+        "placement": "note"
+      },
+      {
+        "x": 0.12411327302542785,
+        "y": 0.46222503874011656,
+        "w": 0.2797897765744185,
+        "h": 0.04344125800713262,
+        "original": "ああ家に帰って成長した孫の姿を見るのが楽しみだ",
+        "text": "Да, я жду, чтобы увидеть образ молодого внука, который вырос",
+        "placement": "note"
+      }
+    ],
+    "lmt-4b-segments-baseline-manga-ocr-a1.json": {
+      "host": {
+        "hostname": "10edbd415517",
+        "system": "Linux-6.17.0-1020-oracle-aarch64-with-glibc2.36",
+        "architecture": "aarch64",
+        "logicalCpus": 2,
+        "loadAverage": [
+          1.33984375,
+          0.9052734375,
+          0.3857421875
+        ],
+        "ramBytes": 12506693632,
+        "availableRamBytes": 7737151488,
+        "diskFreeBytes": 23044452352,
+        "python": "3.12.15",
+        "cgroupMemoryLimit": "6442450944",
+        "cgroupCpuLimit": "200000 100000"
+      },
+      "mode": "lmt",
+      "utc": "2026-10-26T11:40:51Z",
+      "runs": [
+        {
+          "run": 1,
+          "success": true,
+          "firstRunInProcess": true,
+          "wallSeconds": 65.783,
+          "pythonCpuSeconds": 49.589,
+          "peakProcessTreeRssBytes": 4444704768,
+          "rssNote": "sum of resident pages, including shared pages; sampled every 50 ms",
+          "upscale": null,
+          "regions": 3,
+          "timings": {
+            "initializationMs": 750.8000000119209,
+            "detectionMs": 9081.700000017881,
+            "ocrMs": 14274.300000011921,
+            "translationMs": 15152.59999999404,
+            "inpaintMs": 22473.5,
+            "typesetMs": 723.9000000059605,
+            "totalMs": 62620.90000000596
+          },
+          "inpaintRegions": [
+            {
+              "index": 0,
+              "method": "lama",
+              "ms": 3307,
+              "cluster": 0,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 1,
+              "method": "lama",
+              "ms": 3274,
+              "cluster": 1,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 2,
+              "method": "lama",
+              "ms": 3654,
+              "cluster": 2,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            }
+          ],
+          "onnxRuntime": "native-cpu",
+          "translationDiagnostics": {
+            "profile": "segments",
+            "requests": 3,
+            "segmentFallbacks": 0
+          },
+          "coverage": {
+            "detected": 3,
+            "recognized": 3,
+            "translated": 3,
+            "ocrWarnings": []
+          },
+          "renderedImageBytes": 543698
+        },
+        {
+          "run": 2,
+          "success": true,
+          "firstRunInProcess": false,
+          "wallSeconds": 65.973,
+          "pythonCpuSeconds": 49.059,
+          "peakProcessTreeRssBytes": 5347811328,
+          "rssNote": "sum of resident pages, including shared pages; sampled every 50 ms",
+          "upscale": null,
+          "regions": 3,
+          "timings": {
+            "initializationMs": 1.899999976158142,
+            "detectionMs": 8499.800000011921,
+            "ocrMs": 19610,
+            "translationMs": 11045.09999999404,
+            "inpaintMs": 25017.79999998212,
+            "typesetMs": 773.5,
+            "totalMs": 65113.89999997616
+          },
+          "inpaintRegions": [
+            {
+              "index": 0,
+              "method": "lama",
+              "ms": 17812,
+              "cluster": 0,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 1,
+              "method": "lama",
+              "ms": 3257,
+              "cluster": 1,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            },
+            {
+              "index": 2,
+              "method": "lama",
+              "ms": 3716,
+              "cluster": 2,
+              "clusterBoxes": 1,
+              "lamaStage": "painted"
+            }
+          ],
+          "onnxRuntime": "native-cpu",
+          "translationDiagnostics": {
+            "profile": "segments",
+            "requests": 3,
+            "segmentFallbacks": 0
+          },
+          "coverage": {
+            "detected": 3,
+            "recognized": 3,
+            "translated": 3,
+            "ocrWarnings": []
+          },
+          "renderedImageBytes": 543536
+        }
+      ],
+      "input": {
+        "name": "page.jpg",
+        "sha256": "56ed1dde6e8d880f1db136d1b2861262449b7311c5eefa9454c59613f347ea37",
+        "bytes": 865285
+      },
+      "options": {
+        "translate": true,
+        "upscale": false,
+        "operation": "process",
+        "boxes": null,
+        "gateForce": false,
+        "language": "Japanese",
+        "targetLanguage": "Russian",
+        "ocr": "manga-ocr",
+        "detector": "comic-text-detector",
+        "inpaint": "quality",
+        "allowDownloads": true,
+        "contextKey": "default",
+        "scale": 2,
+        "model": "auto",
+        "content": "auto",
+        "tile": 128
+      }
+    },
+    "lmt-4b-segments-baseline-manga-ocr-transcript.json": [
+      {
+        "x": 0.6171344067456076,
+        "y": 0.10625184904344692,
+        "w": 0.2583152097620006,
+        "h": 0.044576082014882175,
+        "original": "今日が引退前の最後の日になると思う",
+        "text": "Сегодня будет последним днем до отставки.",
+        "placement": "note"
+      },
+      {
+        "x": 0.12911583673067756,
+        "y": 0.2608302367807211,
+        "w": 0.23321118543342675,
+        "h": 0.04365221002086362,
+        "original": "あらエドワード...もう店を出ていくの?",
+        "text": "Алло Эдвард... уже уходишь из магазина?",
+        "placement": "note"
+      },
+      {
+        "x": 0.12411327302542785,
+        "y": 0.46222503874011656,
+        "w": 0.2797897765744185,
+        "h": 0.04344125800713262,
+        "original": "ああ家に帰って成長した孫の姿を見るのが楽しみだ",
+        "text": "Аа, рада видеть внуков, которые выросли.",
+        "placement": "note"
+      }
+    ]
+  }
+}
