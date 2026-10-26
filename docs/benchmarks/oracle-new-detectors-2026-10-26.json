@@ -1,0 +1,109 @@
+{
+  "actualInference": true,
+  "machine": "aarch64",
+  "label": "Oracle A1 ARM 2 OCPU 12 GiB CPU actual",
+  "runtime": "production JS + native ONNX CPU, 2 threads",
+  "results": [
+    {
+      "case": "jp-vertical",
+      "model": "yolo26n-manga",
+      "imageSHA256": "58774e40995de1e2bd74713570a05d6b966776c4e8da671204fa19452900a76e",
+      "panelModel": "yolo26n-manga",
+      "metrics": {
+        "tp": 2,
+        "fp": 1,
+        "fn": 2,
+        "precision": 0.6666666666666666,
+        "recall": 0.5,
+        "f1": 0.5714285714285715,
+        "iouThreshold": 0.3
+      },
+      "ms": 30676
+    },
+    {
+      "case": "jp-vertical",
+      "model": "ppocrv6-det",
+      "imageSHA256": "58774e40995de1e2bd74713570a05d6b966776c4e8da671204fa19452900a76e",
+      "panelModel": "none",
+      "metrics": {
+        "tp": 4,
+        "fp": 7,
+        "fn": 0,
+        "precision": 0.36363636363636365,
+        "recall": 1.0,
+        "f1": 0.5333333333333333,
+        "iouThreshold": 0.3
+      },
+      "ms": 34137
+    },
+    {
+      "case": "jp-vertical",
+      "model": "ppocrv6-manga-v0.2",
+      "stage": "ocr",
+      "references": [
+        "これはあたしとセラの冒険のお話",
+        "いつかまた家族として一緒になれるように！",
+        "苦しみと喜びを分かち合いながらあたしたちはこの分断された世界を旅してる",
+        "はじまりはじまり～"
+      ],
+      "results": [
+        {
+          "text": "これはあたしとセラの冒険のお話",
+          "confidence": 0.9983495672543844,
+          "failed": false
+        },
+        {
+          "text": "いつかまた家族として緒になれるように!",
+          "confidence": 0.9776499961551867,
+          "failed": false
+        },
+        {
+          "text": "苦しみと喜びを分かち合いながらあたしたちはこの分断された世界を旅してる",
+          "confidence": 0.9997203520366124,
+          "failed": false
+        },
+        {
+          "text": "はじまりはじまり〜",
+          "confidence": 0.9821932249599032,
+          "failed": false
+        }
+      ],
+      "cer": 0.04027777777777777,
+      "ms": 8583
+    },
+    {
+      "case": "ko-dialogue",
+      "model": "yolo26n-manga",
+      "imageSHA256": "6d84f710f88de31adc1294c3ad6d669cb4b47d9e2e75e4abf73e13d1d88f8097",
+      "panelModel": "yolo26n-manga",
+      "metrics": {
+        "tp": 2,
+        "fp": null,
+        "fn": 0,
+        "precision": null,
+        "recall": 1.0,
+        "f1": null,
+        "iouThreshold": 0.3,
+        "partialAnnotations": true
+      },
+      "ms": 2346
+    },
+    {
+      "case": "ko-dialogue",
+      "model": "ppocrv6-det",
+      "imageSHA256": "6d84f710f88de31adc1294c3ad6d669cb4b47d9e2e75e4abf73e13d1d88f8097",
+      "panelModel": "none",
+      "metrics": {
+        "tp": 2,
+        "fp": null,
+        "fn": 0,
+        "precision": null,
+        "recall": 1.0,
+        "f1": null,
+        "iouThreshold": 0.3,
+        "partialAnnotations": true
+      },
+      "ms": 1874
+    }
+  ]
+}

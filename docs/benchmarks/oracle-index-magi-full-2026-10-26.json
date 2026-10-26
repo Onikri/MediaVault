@@ -1,0 +1,102 @@
+{
+  "actualInference": true,
+  "options": {
+    "language": "Japanese",
+    "ocr": "manga-ocr",
+    "detector": "magi",
+    "panelDetector": "yolov12-panels",
+    "inpaint": "quality",
+    "font": "comic-relief",
+    "translator": "index"
+  },
+  "sampleSHA256": "56ed1dde6e8d880f1db136d1b2861262449b7311c5eefa9454c59613f347ea37",
+  "engine": "Libre Manga Translator",
+  "sourceLanguage": "Japanese",
+  "targetLanguage": "ru",
+  "machineTranslation": true,
+  "detection": {
+    "model": "magi",
+    "panelModel": "yolov12-panels",
+    "panels": 1
+  },
+  "translationDiagnostics": {
+    "profile": "index",
+    "requests": 3,
+    "segmentFallbacks": 0
+  },
+  "typesetting": {
+    "engine": "fitted-cyrillic-v2",
+    "font": "comic-relief",
+    "layouts": [
+      {
+        "index": 0,
+        "fontSize": 23,
+        "lines": 2,
+        "fits": true
+      },
+      {
+        "index": 1,
+        "fontSize": 23,
+        "lines": 2,
+        "fits": true
+      },
+      {
+        "index": 2,
+        "fontSize": 23,
+        "lines": 3,
+        "fits": true
+      }
+    ]
+  },
+  "timings": {
+    "detectionMs": 20242,
+    "ocrMs": 20361,
+    "translationMs": 33282,
+    "inpaintMs": 25989,
+    "typesetMs": 55,
+    "totalMs": 100821
+  },
+  "warnings": [],
+  "inpaint": {
+    "requested": "quality",
+    "methods": [
+      "lama"
+    ],
+    "unpainted": 0,
+    "segmentationUsed": false
+  },
+  "inputMode": "ocr",
+  "renderedMime": "image/webp",
+  "regions": [
+    {
+      "x": 0.6209515482187271,
+      "y": 0.1094681192189455,
+      "w": 0.252303808927536,
+      "h": 0.039847131818532944,
+      "original": "今日が引退前の最後の日になると思う",
+      "text": "Думаю, сегодня будет последний день перед его выходом на пенсию.",
+      "placement": "note"
+    },
+    {
+      "x": 0.13525552302598953,
+      "y": 0.26441401056945324,
+      "w": 0.22152768075466156,
+      "h": 0.04087889567017555,
+      "original": "あらエドワード...もう店を出ていくの?",
+      "text": "О, Эдвард... ты уже собираешься выходить из магазина?",
+      "placement": "note"
+    },
+    {
+      "x": 0.12700888514518738,
+      "y": 0.4660018887370825,
+      "w": 0.2778398394584656,
+      "h": 0.0430724211037159,
+      "original": "ああ家に帰って成長した孫の姿を見るのが楽しみだ",
+      "text": "Ах, с нетерпением жду возможности вернуться домой и увидеть, как вырос мой внук.",
+      "placement": "note"
+    }
+  ],
+  "renderSHA256": "ac153faba97180dc830887a692ca0e2420043e32c978390315015a1290003110",
+  "cacheHit": true,
+  "passed": true
+}
