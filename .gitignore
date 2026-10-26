@@ -1,4 +1,5 @@
 node_modules/
+.codex-local/
 dist/
 .vite/
 __pycache__/

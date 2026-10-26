@@ -1,8 +1,8 @@
 import {resolveMangaOcr} from './ocr-profiles.js';
-export const TRANSLATION_VERSION=5;
+export const TRANSLATION_VERSION=6;
 export function translationConfig(value={}){
  const backend=!value.engine||['oracle','backend'].includes(value.engine);
- return {...value,version:TRANSLATION_VERSION,engine:backend?'backend':'lmt',mode:value.mode||'gpu',deviceTranslator:['index','webllm'].includes(value.deviceTranslator)?value.deviceTranslator:'hymt2',hymtQuant:['q4','q6','q8'].includes(value.hymtQuant)?value.hymtQuant:'q8',deviceCompute:['cpu','gpu'].includes(value.deviceCompute)?value.deviceCompute:'auto',language:value.language||'English',ocr:value.ocr||'auto',detector:!backend&&value.detector==='magi'?'comic-bubble':value.detector||'comic-bubble',panelDetector:!backend&&value.panelDetector==='yolov12-panels'?'none':value.panelDetector||'none',inpaint:value.inpaint||'quality',font:value.font||'comic-relief',translator:value.translator||'hymt2',model:value.model||'Qwen3.5-4B-q4f16_1-MLC',prefetch:[0,1,2,4].includes(value.prefetch)?value.prefetch:2,cache:value.cache!==false};
+ return {...value,version:TRANSLATION_VERSION,engine:value.engine==='gemma'?'gemma':backend?'backend':'lmt',mode:value.mode||'gpu',deviceTranslator:['index','webllm'].includes(value.deviceTranslator)?value.deviceTranslator:'hymt2',hymtQuant:['q4','q6','q8'].includes(value.hymtQuant)?value.hymtQuant:'q8',deviceCompute:['cpu','gpu'].includes(value.deviceCompute)?value.deviceCompute:'auto',language:value.language||'English',ocr:value.ocr||'auto',detector:!backend&&value.detector==='magi'?'comic-bubble':value.detector||'comic-bubble',panelDetector:!backend&&value.panelDetector==='yolov12-panels'?'none':value.panelDetector||'none',inpaint:value.inpaint||'quality',font:value.font||(value.engine==='gemma'?'auto':'comic-relief'),translator:value.translator||'hymt2',model:value.model||'Qwen3.5-4B-q4f16_1-MLC',prefetch:[0,1,2,4].includes(value.prefetch)?value.prefetch:2,cache:value.cache!==false};
 }
 export function migrateTranslationSettings(value={}){
  // Earlier settings predate the full VM worker: a stored Qwen/default browser
@@ -11,6 +11,7 @@ export function migrateTranslationSettings(value={}){
 }
 export function resultConfig(value){
  const v=translationConfig(value);
+ if(v.engine==='gemma')return {version:TRANSLATION_VERSION,engine:'gemma',mode:'gemma',language:v.language,ocr:'none',detector:'comic-bubble',detectionConfidence:.15,inpaint:v.inpaint,font:v.font,translator:'google-gemma4-pool',promptVersion:v.gemmaPromptVersion||'localization-v1',typesetter:'source-style-cyrillic-v1'};
  return {version:TRANSLATION_VERSION,engine:v.engine,mode:v.engine==='backend'?'backend':v.mode,language:v.language,ocr:resolveMangaOcr(v.language,v.ocr),detector:v.detector,panelDetector:v.panelDetector,inpaint:v.inpaint,font:v.font,translator:v.engine==='backend'?v.translator:v.mode==='api'?v.serverModel:v.deviceTranslator!=='webllm'?(v.deviceTranslator==='index'?'Index-Translate-2B-':'Hy-MT2-1.8B-')+v.hymtQuant:v.model,...(v.mode==='api'&&v.engine!=='backend'?{host:v.host,apiInput:v.apiInput}:{}),...(v.engine!=='backend'&&v.mode!=='api'&&v.deviceTranslator!=='webllm'?{deviceCompute:v.deviceCompute}:{}),typesetter:'fitted-cyrillic-v2'};
 }
 export function hasRenderedPage(result){return !!result?.renderedImage&&result.renderedImage.byteLength>0;}

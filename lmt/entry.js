@@ -6,6 +6,10 @@ import {validateConfig} from './config.js';
 import {getCachedSegmentation} from './upstream/lib/detections/segmentation.ts';
 const contexts=new Map();let running=false;
 async function pipeline(bytes,config,progress){
+ if(config.operation==='gemma-prepare'||config.operation==='gemma-render'){
+  const{prepareGemmaPage,renderGemmaPage}=await import('./gemma-device.js');
+  return await(config.operation==='gemma-prepare'?prepareGemmaPage:renderGemmaPage)(bytes,config,progress);
+ }
  validateConfig(config);
  if(bytes.byteLength>10*1024*1024)throw Error('Страница превышает 10 МБ.');
  if(config.mode!=='api'&&config.deviceTranslator==='webllm'&&!navigator.gpu)throw Error('Для локального LMT нужен WebGPU. Используй совместимый браузер или режим своего LLM-сервера.');

@@ -64,7 +64,8 @@ class EncryptedCache:
         except (OSError,ValueError): return None
         except Exception: return None  # corrupt/authentication-failed entries are recomputed
     def write(self,key,value):
-        if not value.get('renderedImage') or value.get('warnings') or value.get('inpaint',{}).get('unpainted'): return
+        if value.get('kind')=='gemma-vision' and any(r.get('status')=='unreadable' for p in value.get('pages',[]) for r in p.get('regions',[])):return
+        if value.get('kind')!='gemma-vision' and (not value.get('renderedImage') or value.get('warnings') or value.get('inpaint',{}).get('unpainted')): return
         iv=secrets.token_bytes(12);raw=iv+self.cipher.encrypt(iv,json.dumps(value,ensure_ascii=False).encode(),key.encode())
         p=self.directory/(key+'.cache');tmp=p.with_suffix('.part');tmp.write_bytes(raw);tmp.chmod(0o600);tmp.replace(p)
         files=sorted(self.directory.glob('*.cache'),key=lambda f:f.stat().st_mtime);total=sum(f.stat().st_size for f in files)
@@ -149,8 +150,12 @@ async def owner(authorization: str = Header(default='')):
 @asynccontextmanager
 async def lifespan(app):
     app.state.processor=Processor(os.getenv('LMT_DATA_DIR','/data'))
+    from gemma_jobs import GemmaJobs
+    app.state.gemma=GemmaJobs(os.getenv('LMT_DATA_DIR','/data'),EncryptedCache)
     try:yield
-    finally:await app.state.processor.close()
+    finally:
+        await app.state.gemma.close()
+        await app.state.processor.close()
 app=FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware,allow_origins=[os.getenv('ALLOWED_ORIGIN','https://onikri.github.io')],allow_methods=['GET','POST'],allow_headers=['Authorization','Content-Type'])
 @app.exception_handler(RequestValidationError)
@@ -159,6 +164,8 @@ async def invalid_request(request,error):
 @app.get('/reader/lmt/status')
 async def status():
     value=app.state.processor.status()
+    from gemma_translate import status as gemma_status
+    value['gemma']=gemma_status()
     if value['ready']:
         try:
             url=os.environ['LMT_LLM_URL'].rstrip('/').removesuffix('/v1')+'/health'
@@ -189,3 +196,6 @@ async def poll(job_id:str,subject=Depends(owner)):
 @app.post('/reader/lmt/jobs/{job_id}/cancel')
 async def cancel(job_id:str,subject=Depends(owner)):
     p=app.state.processor;p.cancel(p.get(job_id,subject));return {'state':'cancelled'}
+
+from gemma_jobs import install_routes
+install_routes(app,owner)
