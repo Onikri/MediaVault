@@ -62,11 +62,23 @@ LMT_LLM_URL=http://127.0.0.1:8081/v1
 LMT_LLM_MODEL=your-local-model
 LMT_LLM_SCHEMA=openai
 LMT_LLM_API_KEY=
+LMT_ONNX_RUNTIME=native
+LMT_ONNX_THREADS=2
+LMT_LLM_PROFILE=segments
 MANGAJANAI_MODEL_DIR=/private/data/mangajanai
 MANGAJANAI_DEVICE=cpu
 OMP_NUM_THREADS=2
 MKL_NUM_THREADS=2
 ```
+
+`native` запускает исходные ONNX-графы через CPUExecutionProvider на backend;
+`wasm` оставляет прежний браузерный runtime. Нативные веса проверяются по manifest
+сборки и сохраняются рядом с профилем в `onnx-models/`. `segments` отправляет
+каждую непустую реплику отдельно в свой OpenAI-compatible endpoint, сохраняя
+контекст и словарь; без этого параметра остаётся JSON-протокол upstream.
+Ни один режим не использует внешний переводчик. Отчёт содержит `coverage`,
+причины пропусков OCR, фактические методы инпейнта и runtime. Отсутствующий
+перевод непустой реплики завершает задание ошибкой до очистки рисунка.
 
 В Docker LLM должен быть доступен из контейнера. Его loopback отличается от
 loopback VM; используй имя сервиса в приватной Docker-сети. Endpoint LLM не

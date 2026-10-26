@@ -127,7 +127,9 @@ async def main():
         report['options'] = options
         try:
             for run in range(args.runs):
-                job = {'data':data, 'options':options, 'subject':'benchmark', 'cancel':False}
+                # Repeated latency measurements start with identical translation
+                # context; model/session caches stay warm, prior answers do not.
+                job = {'data':data, 'options':{**options, 'contextKey':f'benchmark-{run}'}, 'subject':'benchmark', 'cancel':False}
                 measurement = Measurement(args.include_pid)
                 try:
                     with measurement:
@@ -144,6 +146,8 @@ async def main():
                 record = {'run':run+1, 'success':True, 'firstRunInProcess':run==0, **measurement.values,
                           'upscale':result.get('upscale'), 'regions':len(result.get('regions', [])),
                           'timings':result.get('timings'), 'inpaintRegions':result.get('inpaintRegions'),
+                          'onnxRuntime':result.get('onnxRuntime'), 'translationDiagnostics':result.get('translationDiagnostics'),
+                          'coverage':result.get('coverage'),
                           'renderedImageBytes':len(base64.b64decode(result['renderedImage']))}
                 report['runs'].append(record)
                 if args.save_result and result.get('renderedImage'):

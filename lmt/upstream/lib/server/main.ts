@@ -63,6 +63,9 @@ async function callServer(
     }
 
     const data = await response.json();
+    if (data?.choices?.[0]?.finish_reason === 'length') {
+      throw new Error('Translation was truncated by the model output limit');
+    }
     const content =
       config.serverSchema === "lmstudio"
         ? data?.output?.[0]?.content
@@ -126,10 +129,10 @@ export async function translateWithServer(
       `${userPrompt}\n\nCORRECTION: Your previous response contained ${received} items but EXACTLY ${ocrResults.length} are required — one per input box, same order, empty boxes as "". Return the full corrected JSON now.`,
       config,
     );
-    return validateTranslationResult(corrected, ocrResults.length);
+    return validateTranslationResult(corrected, ocrResults.length, {strict:true});
   }
 
-  return validateTranslationResult(raw, ocrResults.length);
+  return validateTranslationResult(raw, ocrResults.length, {strict:true});
 }
 
 export async function makeSiteRuleWithServer(

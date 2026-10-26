@@ -7,13 +7,22 @@ stage="${2:-prepare}"
 variant="${3:-4b}"
 [[ "$revision" =~ ^[a-f0-9]{40}$ ]] || exit 2
 [[ "$stage" =~ ^(prepare|lmt)$ ]] || exit 2
-[[ "$variant" =~ ^(4b|baseline)$ ]] || exit 2
+[[ "$variant" =~ ^(4b|4b-native|4b-segments|baseline|q35)$ ]] || exit 2
+sample="${4:-baseline}"
+ocr="${5:-manga-ocr}"
+[[ "$sample" =~ ^(baseline|jp-hard|ko-hard|zh-hard)$ ]] || exit 2
+[[ "$ocr" =~ ^(manga-ocr|ppocrv6-manga|paddle|pororo)$ ]] || exit 2
 root=/opt/mediavault-reader-bench
 data="$root/data"
 reader="mediavault-reader-bench:${revision:0:12}"
 llm=mediavault-reader-llm:b11887
 network=mediavault-reader-bench
-if [[ "$variant" == 4b ]]; then
+if [[ "$variant" == q35 ]]; then
+  modelrepo=unsloth/Qwen3.5-2B-GGUF
+  modelrev=f6d5376be1edb4d416d56da11e5397a961aca8ae
+  model=Qwen3.5-2B-Q8_0.gguf
+  modelhash=1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1
+elif [[ "$variant" == 4b || "$variant" == 4b-native || "$variant" == 4b-segments ]]; then
   model=Qwen3-4B-Q4_K_M.gguf
   modelrepo=Qwen/Qwen3-4B-GGUF
   modelrev=bc640142c66e1fdd12af0bd68f40445458f3869b
@@ -24,6 +33,21 @@ else
   modelrev=23749fefcc72300e3a2ad315e1317431b06b590a
   modelhash=9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031
 fi
+onnx=wasm
+profile=openai
+if [[ "$variant" == q35 || "$variant" == 4b-native || "$variant" == 4b-segments ]]; then onnx=native;fi
+if [[ "$variant" == q35 || "$variant" == 4b-segments ]]; then profile=segments;fi
+language=Japanese
+imagepath="$data/benchmark/page.jpg"
+if [[ "$sample" != baseline ]]; then
+  case "$sample" in
+    jp-hard) filename=vertical-japanese-test.png;samplehash=58774e40995de1e2bd74713570a05d6b966776c4e8da671204fa19452900a76e;;
+    ko-hard) filename=korean-test.png;language=Korean;samplehash=6d84f710f88de31adc1294c3ad6d669cb4b47d9e2e75e4abf73e13d1d88f8097;;
+    zh-hard) filename=chinese-vertical-test.jpg;language=Chinese;samplehash=47dbd5443d841ca98f8ab5570c2a1260c84bc97ae25a0b378e3908c146dc351d;;
+  esac
+  imagepath="$data/benchmark/$filename"
+fi
+label="$variant-$sample-$ocr"
 [[ "$(uname -m)" == aarch64 ]] || { echo 'This benchmark requires ARM64'; exit 2; }
 docker image inspect "$reader" >/dev/null
 python3 - <<'PY'
@@ -68,6 +92,11 @@ DOCKER
   echo LLM_PREPARED
   exit
 fi
+if [[ "$sample" != baseline && ! -f "$imagepath" ]]; then
+  curl -fL --retry 2 "https://raw.githubusercontent.com/mrdhnto/libre-manga-translator/39a95be1890e2ea3e227052976bbaf576a8eb7b3/tests/assets/$filename" -o "$imagepath"
+  chmod 644 "$imagepath"
+fi
+if [[ "$sample" != baseline ]]; then echo "$samplehash  $imagepath" | sha256sum -c -;fi
 docker network inspect "$network" >/dev/null 2>&1 || docker network create "$network" >/dev/null
 docker inspect mediavault-reader-llm >/dev/null 2>&1 && { echo 'An existing measurement is using the LLM container';exit 4; }
 docker inspect mediavault-reader-lmt-measure >/dev/null 2>&1 && { echo 'An existing backend measurement container exists';exit 4; }
@@ -114,19 +143,20 @@ docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}'
 backend_id=$(docker create --name mediavault-reader-lmt-measure --network "$network" \
   --cpus=2 --memory=6g --memory-swap=6g --cap-drop=ALL --security-opt=no-new-privileges \
   -v "$data:/data" -e TMPDIR=/data/tmp -e OMP_NUM_THREADS=2 -e MKL_NUM_THREADS=2 \
+  -e "LMT_ONNX_RUNTIME=$onnx" -e LMT_ONNX_THREADS=2 -e "LMT_LLM_PROFILE=$profile" \
   -e LMT_LLM_URL=http://mediavault-reader-llm:8081/v1 -e "LMT_LLM_MODEL=${model%.gguf}" \
   "$reader" python scripts/benchmark-reader.py --mode "$stage" --threads 2 \
-  --models /data/mangajanai --data /data/benchmark --image /data/benchmark/page.jpg \
-  --language Japanese --ocr manga-ocr --detector comic-text-detector --inpaint quality --runs 2 \
-  --save-result "/data/benchmark/lmt-$variant-result.webp" --save-transcript "/data/benchmark/lmt-$variant-transcript.json" \
-  --output "/data/benchmark/lmt-$variant-a1.json")
+  --models /data/mangajanai --data /data/benchmark --image "/data/benchmark/$(basename "$imagepath")" \
+  --language "$language" --ocr "$ocr" --detector comic-text-detector --inpaint quality --runs 2 \
+  --save-result "/data/benchmark/lmt-$label-result.webp" --save-transcript "/data/benchmark/lmt-$label-transcript.json" \
+  --output "/data/benchmark/lmt-$label-a1.json")
 backend_start_status=0
 docker start -a "$backend_id" >"$root/lmt-$variant.log" 2>&1 || backend_start_status=$?
 backend_exit=$(docker inspect --format '{{.State.ExitCode}}' "$backend_id")
 if [[ "$backend_start_status" -ne 0 || "$backend_exit" -ne 0 ]]; then
   tail -40 "$root/lmt-$variant.log";docker logs --tail 15 mediavault-reader-llm;exit 5
 fi
-cat "$data/benchmark/lmt-$variant-a1.json"
+cat "$data/benchmark/lmt-$label-a1.json"
 printf '\nLLM separate-container cgroup memory peak (includes file cache, not part of Python RSS):\n'
 if docker exec mediavault-reader-llm cat /sys/fs/cgroup/memory.peak >"$data/benchmark/llm-$variant-memory-peak.txt"; then
   cat "$data/benchmark/llm-$variant-memory-peak.txt"

@@ -36,9 +36,11 @@ async function pipeline(bytes,config,progress){
   if(config.mode==='api'){
    const endpoint=new URL(config.host);if(endpoint.username||endpoint.password||!['https:','http:'].includes(endpoint.protocol))throw Error('Некорректный адрес своего сервера.');
    if(endpoint.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(endpoint.hostname))throw Error('Для удалённого сервера нужен HTTPS.');
-   translated=await measure('translationMs',()=>translateWithServer(texts,target,config.language||'English',context,{serverHost:endpoint.href,serverSchema:config.serverSchema||'openai',serverModel:config.serverModel,useServerApiKey:false,temperature:.2}));
+   translated=await measure('translationMs',()=>typeof globalThis.mvTranslate==='function'?globalThis.mvTranslate({texts,target,source:config.language||'English',context}):translateWithServer(texts,target,config.language||'English',context,{serverHost:endpoint.href,serverSchema:config.serverSchema||'openai',serverModel:config.serverModel,useServerApiKey:false,temperature:.2}));
   }else translated=await measure('translationMs',()=>translateLocal(texts,target,config.language||'English',context,config.model||'Qwen3.5-0.8B-q4f16_1-MLC',.2));
-  if(translated.context){contexts.set(contextKey,translated.context);while(contexts.size>8)contexts.delete(contexts.keys().next().value);}
+  if(!Array.isArray(translated.translations)||translated.translations.length!==texts.length||texts.some((t,i)=>typeof translated.translations[i]!=='string'||(t.trim()&&!translated.translations[i].trim())))throw Error('Перевод неполный: модель пропустила реплику. Страница не изменена.');
+  const nextContext={...context,...translated.context,recentHistory:[...(context?.recentHistory||[]),{text:texts.map((t,i)=>t?'Source: '+t+' → '+translated.translations[i]:'').filter(Boolean).join('\n')}].slice(-2)};
+  contexts.set(contextKey,nextContext);while(contexts.size>8)contexts.delete(contexts.keys().next().value);
   if(config.operation==='translate')return {regions:[],boxes,translations:translated.translations,sourceTexts:texts,context:translated.context,gateSkip:ocr.results.map(r=>r.gateSkip||null)};
   const valid=boxes.map((b,i)=>({box:b,index:i,text:String(translated.translations?.[i]||'')})).filter(v=>texts[v.index]&&v.text);
   if(!valid.length)throw Error('Модель не вернула переведённые реплики. Попробуй другую модель.');
@@ -47,7 +49,8 @@ async function pipeline(bytes,config,progress){
   const regions=valid.map(v=>({x:v.box.x1/bitmap.width,y:v.box.y1/bitmap.height,w:(v.box.x2-v.box.x1)/bitmap.width,h:(v.box.y2-v.box.y1)/bitmap.height,original:texts[v.index],text:v.text,placement:'note'}));
   progress('Набираем переведённый текст');const renderedImage=await measure('typesetMs',()=>renderTranslated(cleanedImage,regions));
   const inpaintRegions=cleaned.regions.map(({index,method,ms,cluster,clusterBoxes,lamaStage})=>({index,method,ms,cluster,clusterBoxes,lamaStage}));
-  return {engine:'Libre Manga Translator',sourceLanguage:config.language,targetLanguage:target,machineTranslation:true,renderedImage,cleanedImage,renderedMime:'image/webp',regions,inpaintRegions,timings:diagnostics()};
+  const ocrWarnings=ocr.results.flatMap((r,index)=>r.gateSkip||r.failed||!r.text.trim()?[{index,reason:r.gateSkip||(r.failed?'recognition-failed':'empty')}]:[]);
+  return {engine:'Libre Manga Translator',sourceLanguage:config.language,targetLanguage:target,machineTranslation:true,renderedImage,cleanedImage,renderedMime:'image/webp',regions,inpaintRegions,timings:diagnostics(),translationDiagnostics:translated.translationDiagnostics,onnxRuntime:typeof globalThis.mvOrtCreate==='function'?'native-cpu':'wasm',coverage:{detected:boxes.length,recognized:texts.filter(Boolean).length,translated:regions.length,ocrWarnings}};
  }finally{globalThis.lmtProgress=null;bitmap?.close();URL.revokeObjectURL(source);}
 }
 // The private backend loads the same engine as the browser iframe.

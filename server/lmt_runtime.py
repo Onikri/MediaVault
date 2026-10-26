@@ -19,6 +19,7 @@ class LmtRuntime:
         self.browser = self.playwright = self.page = None
         self.progress = lambda _: None
         self.allow_downloads = False
+        self.native = None
 
     def status(self):
         return {'ready': (self.assets / 'index.html').is_file() and
@@ -85,6 +86,17 @@ class LmtRuntime:
             await self.browser.route('**/*', self._route)
         self.page = await self.browser.new_page()
         await self.page.expose_function('mvProgress', lambda status: self.progress(status))
+        if os.getenv('LMT_LLM_PROFILE') == 'segments':
+            from lmt_translate import SegmentTranslator
+            await self.page.expose_function('mvTranslate', SegmentTranslator().translate)
+        if os.getenv('LMT_ONNX_RUNTIME', 'wasm') == 'native':
+            if self.native is None:
+                from lmt_onnx import NativeOnnx
+                self.native = NativeOnnx(self.assets, self.directory.parent / 'onnx-models',
+                                         int(os.getenv('LMT_ONNX_THREADS', '2')))
+            await self.page.expose_function('mvOrtCreate', lambda request: self.native.create(request, self.allow_downloads))
+            await self.page.expose_function('mvOrtRun', self.native.run)
+            await self.page.expose_function('mvOrtRelease', self.native.release)
         await self.page.goto(self.ORIGIN + '/index.html')
         await self.page.wait_for_function('typeof window.mangaTranslate === "function"')
 
@@ -141,6 +153,9 @@ class LmtRuntime:
 
     async def close(self):
         await self.reset_page()
+        native, self.native = self.native, None
+        if native:
+            await native.close()
         browser, self.browser = self.browser, None
         playwright, self.playwright = self.playwright, None
         for resource, method in [(browser,'close'),(playwright,'stop')]:

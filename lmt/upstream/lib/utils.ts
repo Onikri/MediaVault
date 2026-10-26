@@ -1,6 +1,7 @@
 import * as ort from "onnxruntime-web/all";
 import { resolveExecutionProvidersForModel } from "./hardware";
 import { getExpectedSha256, verifyBufferSha256 } from "./manifests/hashes";
+import { createNativeSession } from './native-onnx';
 
 export function sniffMime(bytes: Uint8Array): string {
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
@@ -115,6 +116,10 @@ export async function downloadArtifactHF(
   }
 
   const requestPromise = (async () => {
+    if (!noReturn && /\.onnx(?:\?|$)/.test(url)) {
+      const native = await createNativeSession(url, getExpectedSha256(path, url));
+      if (native) return native;
+    }
     const cache = await caches.open(cacheName);
 
     // Cache-first: silent per-load update checks were removed. Updates are

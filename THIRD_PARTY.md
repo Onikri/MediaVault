@@ -236,3 +236,25 @@ through a CORS-enabled [pinned Hugging Face mirror](https://huggingface.co/space
 Its SHA-256 is identical to the upstream GitHub beta-0.3 weight:
 `1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f`.
 The existing LMT hash manifest enforces this value before inference.
+
+## CPU manga pipeline candidates
+
+The optional native backend uses ONNX Runtime 1.31.0 (MIT) with the same
+SHA-256 verified upstream detector, OCR and LaMa weights. The bridge and build
+manifest are corresponding AGPL integration source; no weights are bundled.
+
+Qwen3.5-2B is Apache-2.0 ([original model and license](https://huggingface.co/Qwen/Qwen3.5-2B)).
+The benchmark pins Unsloth's GGUF conversion at
+`f6d5376be1edb4d416d56da11e5397a961aca8ae`, Q8_0 SHA-256
+`1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1`.
+[Conversion source/card](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF).
+
+PP-OCRv6 small manga is Apache-2.0 according to its
+[publisher's card](https://huggingface.co/fumetodev/PP-OCRv6_small_rec_manga_ONNX);
+its existing hash remains enforced. It is Japanese-only and does not replace
+the Korean/Chinese OCR models.
+
+HY-MT1.5 was investigated but excluded from the Frankfurt benchmark: its
+[Tencent HY community license](https://huggingface.co/tencent/HY-MT1.5-1.8B/blob/main/License.txt)
+excludes the European Union, United Kingdom and South Korea from its territory.
+No HY-MT weights or deployment option are included in this project.
