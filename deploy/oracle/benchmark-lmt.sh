@@ -36,6 +36,8 @@ if os.getloadavg()[0]>1.5:raise SystemExit('VM is busy; benchmark postponed')
 PY
 if [[ "$stage" == prepare ]]; then
   mkdir -p "$root/llama-image" "$data/llm"
+  chown 1000:1000 "$data/llm"
+  chmod 0750 "$data/llm"
   curl -fL --retry 2 https://github.com/ggml-org/llama.cpp/releases/download/b11887/llama-b11887-bin-ubuntu-arm64.tar.gz -o "$root/llama-image/llama.tar.gz"
   echo '469436cab640d9edf74a447cb180902b996f7c448f9b0a1eb94663f71aba74a3  '"$root/llama-image/llama.tar.gz" | sha256sum -c -
   # The official ARM binary requires GLIBC_2.38; Debian bookworm is too old.
@@ -55,19 +57,37 @@ DOCKER
   fi
   echo "$modelhash  $data/llm/$model" | sha256sum -c -
   chmod 644 "$data/llm/$model"
+  docker run --rm --network none --cpus=.25 --memory=128m --cap-drop=ALL --security-opt=no-new-privileges \
+    -v "$data/llm:/models:ro" "$reader" python -c \
+    'from pathlib import Path;import sys;p=Path(sys.argv[1]);assert p.open("rb").read(4)==b"GGUF";print("LLM weights readable by container uid=1000")' "/models/$model"
   docker run --rm --network none --cpus=1 --memory=1g --cap-drop=ALL --security-opt=no-new-privileges "$llm" --version
   echo LLM_PREPARED
   exit
 fi
 docker network inspect "$network" >/dev/null 2>&1 || docker network create "$network" >/dev/null
 docker inspect mediavault-reader-llm >/dev/null 2>&1 && { echo 'An existing measurement is using the LLM container';exit 4; }
-cleanup(){ docker stop -t 15 mediavault-reader-lmt-measure mediavault-reader-llm >/dev/null 2>&1 || true; }
+docker inspect mediavault-reader-lmt-measure >/dev/null 2>&1 && { echo 'An existing backend measurement container exists';exit 4; }
+llm_id=''
+backend_id=''
+cleanup(){
+  for id in "$backend_id" "$llm_id"; do
+    [[ -n "$id" ]] || continue
+    docker inspect --format '{{json .State}}' "$id" >>"$root/lmt-$variant-container-states.jsonl" 2>/dev/null || true
+  done
+  if [[ -n "$llm_id" ]]; then docker logs "$llm_id" >"$root/llm-$variant.log" 2>&1 || true;fi
+  for id in "$backend_id" "$llm_id"; do
+    [[ -n "$id" ]] || continue
+    docker stop -t 15 "$id" >/dev/null 2>&1 || true
+    docker rm "$id" >/dev/null 2>&1 || true
+  done
+}
 trap cleanup EXIT
 trap 'exit 143' TERM INT
-docker run -d --rm --name mediavault-reader-llm --network "$network" \
+llm_id=$(docker create --name mediavault-reader-llm --network "$network" \
   --cpus=2 --memory=4g --memory-swap=4g --cap-drop=ALL --security-opt=no-new-privileges \
   --read-only --tmpfs /tmp:rw,nosuid,nodev,size=64m -v "$data/llm:/models:ro" \
-  "$llm" -m "/models/$model" -c 4096 -t 2 --parallel 1 --host 0.0.0.0 --port 8081 --reasoning off --no-webui >/dev/null
+  "$llm" -m "/models/$model" --alias "${model%.gguf}" -c 4096 -t 2 --parallel 1 --host 0.0.0.0 --port 8081 --reasoning off --no-webui)
+docker start "$llm_id" >/dev/null
 # Poll from a temporary container on the private network; no host listener.
 docker run --rm --network "$network" --cpus=.25 --memory=128m --cap-drop=ALL --security-opt=no-new-privileges "$reader" python -c '
 import time,urllib.request
@@ -78,7 +98,7 @@ for i in range(120):
 else:raise SystemExit("LLM failed to start")
 '
 docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}'
-if ! docker run --rm --name mediavault-reader-lmt-measure --network "$network" \
+backend_id=$(docker create --name mediavault-reader-lmt-measure --network "$network" \
   --cpus=2 --memory=4g --memory-swap=4g --cap-drop=ALL --security-opt=no-new-privileges \
   -v "$data:/data" -e TMPDIR=/data/tmp -e OMP_NUM_THREADS=2 -e MKL_NUM_THREADS=2 \
   -e LMT_LLM_URL=http://mediavault-reader-llm:8081/v1 -e "LMT_LLM_MODEL=${model%.gguf}" \
@@ -86,7 +106,11 @@ if ! docker run --rm --name mediavault-reader-lmt-measure --network "$network" \
   --models /data/mangajanai --data /data/benchmark --image /data/benchmark/page.jpg \
   --language Japanese --ocr manga-ocr --detector comic-text-detector --inpaint quality --runs 2 \
   --save-result "/data/benchmark/lmt-$variant-result.webp" --save-transcript "/data/benchmark/lmt-$variant-transcript.json" \
-  --output "/data/benchmark/lmt-$variant-a1.json" >"$root/lmt-$variant.log" 2>&1; then
+  --output "/data/benchmark/lmt-$variant-a1.json")
+backend_start_status=0
+docker start -a "$backend_id" >"$root/lmt-$variant.log" 2>&1 || backend_start_status=$?
+backend_exit=$(docker inspect --format '{{.State.ExitCode}}' "$backend_id")
+if [[ "$backend_start_status" -ne 0 || "$backend_exit" -ne 0 ]]; then
   tail -40 "$root/lmt-$variant.log";docker logs --tail 15 mediavault-reader-llm;exit 5
 fi
 cat "$data/benchmark/lmt-$variant-a1.json"
