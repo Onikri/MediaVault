@@ -15,5 +15,10 @@
   "navigatorGPU": true,
   "modelBytes": 1312164352,
   "actualInference": true,
-  "wallMs": 241019
+  "wallMs": 241019,
+  "compute": "CPU/WASM, --disable-gpu, one thread",
+  "hardwareGPUUsed": false,
+  "physicalAndroidTested": false,
+  "weightSHA256": "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a",
+  "weightTransport": "Local HTTP stream of the byte-identical official GGUF; only URL resolver overridden. Includes OPFS write, SHA verification, model load and 2 completions. Initial external GGUF download excluded."
 }

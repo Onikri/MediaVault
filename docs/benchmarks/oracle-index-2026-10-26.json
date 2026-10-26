@@ -1,0 +1,179 @@
+{
+  "actualInference": true,
+  "model": "Index-Translate-2B.Q8_0",
+  "machine": "Oracle A1 ARM 2 OCPU / 12 GiB, CPU",
+  "cases": [
+    {
+      "id": "negation",
+      "source": "I do not believe in aliens.",
+      "reference": "Я не верю в инопланетян.",
+      "language": "en",
+      "checks": [
+        "не"
+      ],
+      "translation": "Я не верю в инопланетян.",
+      "ms": 1865
+    },
+    {
+      "id": "prohibition",
+      "source": "Wait! Do not open that door.",
+      "reference": "Стой! Не открывай эту дверь.",
+      "language": "en",
+      "checks": [
+        "не"
+      ],
+      "translation": "Постойте! Не открывайте эту дверь.",
+      "ms": 2349
+    },
+    {
+      "id": "name",
+      "source": "Momo, are you all right?",
+      "reference": "Момо, ты в порядке?",
+      "language": "en",
+      "checks": [
+        "Момо"
+      ],
+      "translation": "Момо, ты в порядке?",
+      "ms": 1637
+    },
+    {
+      "id": "double-negation",
+      "source": "It is not that I do not trust you. I just want to protect you.",
+      "reference": "Дело не в том, что я тебе не доверяю. Я просто хочу тебя защитить.",
+      "language": "en",
+      "checks": [
+        "не"
+      ],
+      "translation": "Дело не в том, что я вам не доверяю. Я просто хочу вас защитить.",
+      "ms": 3026
+    },
+    {
+      "id": "idiom",
+      "source": "You have got to be kidding me!",
+      "reference": "Да ты издеваешься!",
+      "language": "en",
+      "translation": "Ты же, должно быть, шучишь!",
+      "ms": 2050
+    },
+    {
+      "id": "conditional",
+      "source": "If he had arrived five minutes earlier, we could have saved her.",
+      "reference": "Если бы он пришёл на пять минут раньше, мы могли бы её спасти.",
+      "language": "en",
+      "checks": [
+        "бы"
+      ],
+      "translation": "Если бы он прибыл на пять минут раньше, мы могли бы спасти её.",
+      "ms": 2528
+    },
+    {
+      "id": "ellipsis",
+      "source": "I thought you were... No, forget it.",
+      "reference": "Я думал, ты... Нет, забудь.",
+      "language": "en",
+      "translation": "Я думал, ты... Нет, забудь.",
+      "ms": 2228
+    },
+    {
+      "id": "acronym",
+      "source": "I believe in ghosts, but I do not believe in UFOs.",
+      "reference": "Я верю в призраков, но не верю в НЛО.",
+      "language": "en",
+      "checks": [
+        "не",
+        "НЛО"
+      ],
+      "translation": "Я верю в призраков, но не верю в НЛО.",
+      "ms": 2507
+    },
+    {
+      "id": "ja-negation",
+      "source": "私は宇宙人を信じていません。",
+      "reference": "Я не верю в инопланетян.",
+      "language": "ja",
+      "checks": [
+        "не"
+      ],
+      "translation": "Я не верю в инопланетян.",
+      "ms": 1808
+    },
+    {
+      "id": "ja-prohibition",
+      "source": "その扉を開けないでください！",
+      "reference": "Не открывай эту дверь!",
+      "language": "ja",
+      "checks": [
+        "не"
+      ],
+      "translation": "Не открывайте эту дверь!",
+      "ms": 1506
+    },
+    {
+      "id": "ko-negation",
+      "source": "나는 외계인을 믿지 않는다.",
+      "reference": "Я не верю в инопланетян.",
+      "language": "ko",
+      "checks": [
+        "не"
+      ],
+      "translation": "Я не верю в инопланетян.",
+      "ms": 1881
+    },
+    {
+      "id": "ko-prohibition",
+      "source": "그 문을 열지 마세요!",
+      "reference": "Не открывай эту дверь!",
+      "language": "ko",
+      "checks": [
+        "не"
+      ],
+      "translation": "Не открывайте эту дверь!",
+      "ms": 1559
+    },
+    {
+      "id": "last-day-retirement",
+      "source": "今日が引退前の最後の日になると思う",
+      "reference": "Думаю, сегодня мой последний день перед выходом на пенсию.",
+      "language": "ja",
+      "checks": [
+        "послед"
+      ],
+      "translation": "Думаю, сегодня будет последний день перед его выходом на пенсию.",
+      "ms": 2374
+    },
+    {
+      "id": "edward-interjection",
+      "source": "あらエドワード...もう店を出ていくの?",
+      "reference": "О, Эдвард... уже уходишь из магазина?",
+      "language": "ja",
+      "checks": [
+        "Эдвард",
+        "магазин"
+      ],
+      "translation": "О, Эдвард... ты уже собираешься выходить из магазина?",
+      "ms": 2471
+    },
+    {
+      "id": "return-home-grown-grandchild",
+      "source": "ああ家に帰って成長した孫の姿を見るのが楽しみだ",
+      "reference": "Да, жду не дождусь, когда вернусь домой и увижу, как вырос мой внук.",
+      "language": "ja",
+      "checks": [
+        "дом"
+      ],
+      "translation": "Ах, с нетерпением жду возможности вернуться домой и увидеть, как вырос мой внук.",
+      "ms": 3105
+    }
+  ],
+  "complete": true,
+  "memoryStats": "2.736GiB / 3GiB",
+  "weightSHA256": "a09d287f41d297206947a2e51acc29dd03c8b22356111fdb1e289c0c97c173f3",
+  "weightBytes": 2076674560,
+  "threads": 2,
+  "sampling": {
+    "temperature": 0,
+    "max_tokens": 512,
+    "thinking": false,
+    "systemPrompt": false
+  }
+}

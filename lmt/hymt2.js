@@ -11,6 +11,7 @@ export function createHymtTranslator({createEngine=()=>new Wllama({default:wasmU
  async function close(){const old=engine;engine=null;identity='';if(old)await old.exit().catch(()=>{});}
  async function load(config,progress){
   const indexed=config.deviceTranslator==='index',name=indexed?'Index Translate':'Hy-MT2',model=indexed?indexModel(config.hymtQuant):hymtModel(config.hymtQuant),compute=config.deviceCompute||'auto',key=model.sha+':'+compute;
+  if(compute==='gpu'&&!navigator.gpu)throw Error('WebGPU недоступен. Выбери «Авто» или «CPU / WASM».');
   if(engine&&identity===key)return engine;
   await close();engine=createEngine();
   // No implicit latest-version compatibility scripts from a third-party CDN.
@@ -26,7 +27,6 @@ export function createHymtTranslator({createEngine=()=>new Wllama({default:wasmU
     for(const blob of await source.open()){const reader=blob.stream().getReader();try{while(true){const{done,value}=await reader.read();if(done)break;hash.update(value);}}finally{reader.releaseLock();}}
     if(hash.digest()!==model.sha){await source.remove();throw Error('Веса '+name+' не прошли проверку SHA-256.');}verified.add(model.sha);
    }
-   if(compute==='gpu'&&!navigator.gpu)throw Error('WebGPU недоступен. Выбери «Авто» или «CPU / WASM».');
    const params={n_ctx:2048,n_batch:128,n_ubatch:64,n_parallel:1,n_threads:globalThis.crossOriginIsolated?Math.max(1,Math.min(4,navigator.hardwareConcurrency||1)):1,n_gpu_layers:compute==='cpu'?0:99999,seed:42,reasoning:false,warmup:false,default_template_kwargs:{enable_thinking:false}};
    progress(name+' · запускаем '+(compute==='cpu'?'CPU / WASM':'WebGPU или CPU / WASM'));
    try{await engine.loadModel(source,params);}

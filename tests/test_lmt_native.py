@@ -60,6 +60,20 @@ class BridgeTests(IsolatedAsyncioTestCase):
         self.assertTrue(prompt.startswith('请将以下文本翻译为俄语'))
         self.assertTrue(prompt.endswith('\n\nDo not open the door.'))
 
+    async def test_index_request_uses_operator_model_and_greedy_decoding(self):
+        import httpx
+        real_client=httpx.AsyncClient
+        def handle(request):
+            body=json.loads(request.content)
+            self.assertEqual(body['model'],'Index-Translate-2B.Q8_0')
+            self.assertEqual(body['temperature'],0)
+            self.assertNotIn('repeat_penalty',body)
+            self.assertEqual([m['role'] for m in body['messages']],['user'])
+            return httpx.Response(200,json={'choices':[{'finish_reason':'stop','message':{'content':'Привет.'}}]})
+        def client(**kwargs):return real_client(transport=httpx.MockTransport(handle),**kwargs)
+        with patch.dict('os.environ',{'LMT_LLM_URL':'http://operator-only/v1','LMT_LLM_MODEL':'Hy-MT2','LMT_INDEX_MODEL':'Index-Translate-2B.Q8_0'}),patch('lmt_translate.httpx.AsyncClient',side_effect=client):
+            self.assertEqual(await SegmentTranslator('index')._complete('test',128),'Привет.')
+
     async def test_untranslated_source_is_rejected(self):
         translator = SegmentTranslator()
         translator._complete = AsyncMock(return_value='家に帰る')

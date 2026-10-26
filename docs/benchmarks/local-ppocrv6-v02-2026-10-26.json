@@ -1,0 +1,66 @@
+{
+  "actualInference": true,
+  "machine": "x86_64",
+  "label": "CaaS x86_64 CPU actual, preloaded verified weights",
+  "runtime": "production JS + native ONNX CPU, 2 threads",
+  "results": [
+    {
+      "case": "japanese",
+      "model": "ppocrv6-manga-v0.2",
+      "stage": "ocr",
+      "references": [
+        "私は宇宙人を信じていません。",
+        "その扉を開けないでください！"
+      ],
+      "results": [
+        {
+          "text": "私は宇宙人を信じていません。",
+          "confidence": 0.999228937285287,
+          "failed": false
+        },
+        {
+          "text": "その扉を開けないでください!",
+          "confidence": 0.9946070441177913,
+          "failed": false
+        }
+      ],
+      "cer": 0.0,
+      "ms": 53001
+    },
+    {
+      "case": "jp-vertical",
+      "model": "ppocrv6-manga-v0.2",
+      "stage": "ocr",
+      "references": [
+        "これはあたしとセラの冒険のお話",
+        "いつかまた家族として一緒になれるように！",
+        "苦しみと喜びを分かち合いながらあたしたちはこの分断された世界を旅してる",
+        "はじまりはじまり～"
+      ],
+      "results": [
+        {
+          "text": "これはあたしとセラの冒険のお話",
+          "confidence": 0.9983486811319987,
+          "failed": false
+        },
+        {
+          "text": "いつかまた家族として緒になれるように!",
+          "confidence": 0.9776495193180285,
+          "failed": false
+        },
+        {
+          "text": "苦しみと喜びを分かち合いながらあたしたちはこの分断された世界を旅してる",
+          "confidence": 0.9997196895735604,
+          "failed": false
+        },
+        {
+          "text": "はじまりはじまり〜",
+          "confidence": 0.9821904102961222,
+          "failed": false
+        }
+      ],
+      "cer": 0.04027777777777777,
+      "ms": 63937
+    }
+  ]
+}

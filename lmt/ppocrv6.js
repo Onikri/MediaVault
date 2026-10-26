@@ -26,7 +26,8 @@ export async function recognizePpManga(source,boxes){
      let last=0;for(let i=0;i<values.length;i+=classes){let idx=0,max=-Infinity;for(let j=0;j<classes;j++)if(values[i+j]>max){max=values[i+j];idx=j;}if(idx&&idx!==last){text+=dict[idx];score+=max;count++;}last=idx;}
     }finally{input.dispose();if(output)Object.values(output).forEach(v=>v.dispose());}
    }
-   results.push({text,confidence:count?score/count:0,failed:!text});
+   const confidence=count?score/count:0;
+   results.push({text,confidence,failed:!text||confidence<.55});
   }return {results};
  }finally{bitmap.close();}
 }

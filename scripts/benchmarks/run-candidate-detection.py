@@ -25,7 +25,7 @@ async def main(args):
             directory=Path(case_dir);cases=json.loads((directory/'cases.json').read_text())
             for case in cases:
                 raw=(directory/case['file']).read_bytes();image=base64.b64encode(raw).decode()
-                for model in ['yolo26n-manga','ppocrv6-det']:
+                for model in (['yolo26n-manga','ppocrv6-det'] if not args.ocr_only else []):
                     record={'case':case['id'],'model':model,'imageSHA256':hashlib.sha256(raw).hexdigest()};start=time.monotonic()
                     try:
                         result=await runtime.page.evaluate("async p=>window.mangaDetect(Uint8Array.from(atob(p.image),c=>c.charCodeAt(0)).buffer,{detector:p.model,language:p.language,panelDetector:p.model==='yolo26n-manga'?'yolo26n-manga':'none'})",{'image':image,'model':model,'language':case.get('language','English')})
@@ -44,4 +44,4 @@ async def main(args):
     finally:await runtime.close()
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--assets',default='dist/lmt');p.add_argument('--weights',required=True);p.add_argument('--cases',nargs='+',required=True);p.add_argument('--output',required=True);p.add_argument('--label',required=True);p.add_argument('--chromium',default='/usr/bin/chromium');asyncio.run(main(p.parse_args()))
+    p=argparse.ArgumentParser();p.add_argument('--ocr-only',action='store_true');p.add_argument('--assets',default='dist/lmt');p.add_argument('--weights',required=True);p.add_argument('--cases',nargs='+',required=True);p.add_argument('--output',required=True);p.add_argument('--label',required=True);p.add_argument('--chromium',default='/usr/bin/chromium');asyncio.run(main(p.parse_args()))
