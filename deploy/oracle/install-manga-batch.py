@@ -63,7 +63,7 @@ def healthy(n):
         time.sleep(2)
     return False
 if not exists('mediavault-manga-redis'):
-    run(['docker','run','-d','--name','mediavault-manga-redis','--network',network,'--network-alias','manga-redis','--restart','unless-stopped','--memory=192m','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges','redis:7.4.6-alpine','redis-server','--save','','--appendonly','no','--maxmemory','128mb','--maxmemory-policy','allkeys-lru'])
+    run(['docker','run','-d','--name','mediavault-manga-redis','--user=999:999','--network',network,'--network-alias','manga-redis','--restart','unless-stopped','--memory=192m','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges','redis:7.4.6-alpine','redis-server','--save','','--appendonly','no','--maxmemory','128mb','--maxmemory-policy','allkeys-lru'])
 if exists(candidate):run(['docker','rm','-f',candidate])
 run(['docker','run','-d','--name',candidate,*common,image])
 if not healthy(candidate):

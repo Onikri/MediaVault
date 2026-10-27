@@ -28,6 +28,7 @@ services:
     depends_on: [manga-redis]
   manga-redis:
     image: redis:7.4.6-alpine
+    user: "999:999"
     restart: unless-stopped
     mem_limit: 192m
     read_only: true
