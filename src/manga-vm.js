@@ -10,18 +10,19 @@ export async function parseSse(response,onEvent,signal){
 export async function chapterFingerprint(item,names){const value=[item.id,item.size,item.chunks.map(c=>[c.fileId,c.iv]),names],digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value)));return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');}
 
 export class VmChapter {
- constructor({item,names,direction,scope,service,cache=true,policy}){
-  Object.assign(this,{item,names,direction,scope,service,cache,policy});this.controller=new AbortController();this.waiters=new Map();this.pages=new Map();this.streams=new Map();this.id=null;this.opening=null;this.fingerprint=chapterFingerprint(item,names);this.worker=null;this.renderJobs=new Map();this.serial=0;
+ constructor({item,names,direction,scope,service,cache=true,policy,canStart=()=>true}){
+  Object.assign(this,{item,names,direction,scope,service,cache,policy,canStart});this.controller=new AbortController();this.waiters=new Map();this.pages=new Map();this.streams=new Map();this.id=null;this.opening=null;this.fingerprint=chapterFingerprint(item,names);this.worker=null;this.renderJobs=new Map();this.serial=0;
  }
  cacheId(page){return 'manga-json:'+this.scope+':'+this.manifest+':'+this.policy+':'+this.direction+':'+page;}
  async open(){
-  if(!this.opening)this.opening=(async()=>{const s=await this.service().openReaderChapter(this.item,this.names,this.direction,this.controller.signal);this.id=s.id;this.manifest=await this.fingerprint;if(this.manifest!==s.manifest)throw Error('Состав главы изменился. Открой её заново.');if(this.policy&&s.policy!==this.policy)throw Error('Версия перевода обновилась. Открой читалку заново.');this.policy=s.policy;})();
+  if(!this.opening)this.opening=(async()=>{const s=await this.service().openReaderChapter(this.item,this.names,this.direction,this.controller.signal);this.id=s.id;this.manifest=await this.fingerprint;if(this.manifest!==s.manifest)throw Error('Состав главы изменился. Открой её заново.');if(this.policy&&s.policy!==this.policy)throw Error('Версия перевода обновилась. Открой читалку заново.');this.policy=s.policy;})().catch(error=>{this.opening=null;if(this.id){const id=this.id;this.id=null;this.service().request('/api/v1/chapters/'+id,{method:'DELETE'}).catch(()=>{});}throw error;});
   return this.opening;
  }
  async json(page,status){
   this.controller.signal.throwIfAborted();this.manifest=await this.fingerprint;
   if(this.pages.has(page))return this.pages.get(page);
   if(this.cache&&this.policy){const hit=await getTranslation(this.cacheId(page),this.scope);if(hit){this.pages.set(page,hit.page);return {...hit.page,cacheHit:true};}}
+  if(!this.canStart())throw Error('Добавь ключ Google AI Studio в настройках ВМ.');
   status?.('ВМ · получаем перевод с координатами');await this.open();
   let waiter=this.waiters.get(page);if(!waiter){waiter={};waiter.promise=new Promise((resolve,reject)=>Object.assign(waiter,{resolve,reject}));this.waiters.set(page,waiter);}
   if(![...this.streams.keys()].some(start=>page>=start&&page<start+12))this.stream(page);
