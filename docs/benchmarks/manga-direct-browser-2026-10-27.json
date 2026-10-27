@@ -1,0 +1,44 @@
+{
+  "provenance": "Actual production English contour detector and Canvas Worker on CaaS x86_64 with synthetic owned English lettering; Google replies are fixtures, no live API latency/quality result. Viewport widths do not represent different physical devices.",
+  "results": [
+    {
+      "width": 390,
+      "provenance": "Actual English contour detector and Canvas worker. Google response is a fixture, not an API speed/quality measurement.",
+      "modelDownloads": 0,
+      "googleRequests": 1,
+      "workerTimings": [
+        {
+          "detectionMs": 509,
+          "ocrMs": 0,
+          "translationMs": 209,
+          "inpaintMs": 78.10000002384186,
+          "typesetMs": 3.5,
+          "renderMs": 340
+        }
+      ],
+      "changedPixels": 16583
+    },
+    {
+      "width": 1366,
+      "provenance": "Actual English contour detector and Canvas worker. Google response is a fixture, not an API speed/quality measurement.",
+      "modelDownloads": 0,
+      "googleRequests": 1,
+      "workerTimings": [
+        {
+          "detectionMs": 272,
+          "ocrMs": 0,
+          "translationMs": 211,
+          "inpaintMs": 45.09999996423721,
+          "typesetMs": 0.30000007152557373,
+          "renderMs": 190.60000002384186
+        }
+      ],
+      "changedPixels": 16583
+    }
+  ],
+  "rtDetrColdWasmMs": [
+    42706,
+    51609
+  ],
+  "limits": "Contour detection is an experimental EN speed option; complex artwork/light or small text may be missed. RT-DETR is selectable. Ten-second full Google translation not measured."
+}

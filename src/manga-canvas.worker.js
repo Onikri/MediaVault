@@ -3,6 +3,7 @@
 import {teleaInpaint} from '../lmt/upstream/lib/inpaint/telea.ts';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {fitComicText,styleFont} from './manga-typeset.js';
+import {prepareEnglishPage} from './manga-fast-detect.js';
 
 function clean(ctx,region,complex){
  const[x,y,x2,y2]=region.text_bbox.map(Math.round),pad=complex?16:3;
@@ -45,9 +46,12 @@ async function render({data:{id,blob,page,font='auto'}}){
    ctx.restore();typesetMs+=performance.now()-t;layouts.push({uid:region.uid,font:idFont,fontSize:fit.fontSize,lines:fit.lines.length,fits:true});
   }
   const renderedBitmap=canvas.transferToImageBitmap();
-  self.postMessage({id,result:{renderedBitmap,warnings,typesetting:{engine:'worker-cyrillic-oval-v1',layouts},inpaint:{methods:[...methods]},timings:{...page.timings,inpaintMs,typesetMs,renderMs:performance.now()-start},regions:page.regions.map(r=>({id:r.uid,text:r.ru_translation,original:r.source_text,x:r.text_bbox[0]/page.width,y:r.text_bbox[1]/page.height,w:(r.text_bbox[2]-r.text_bbox[0])/page.width,h:(r.text_bbox[3]-r.text_bbox[1])/page.height})),usage:page.usage,engine:'Gemma 4 · VM JSON → Canvas Worker',cacheHit:page.cacheHit}},[renderedBitmap]);
+  self.postMessage({id,result:{renderedBitmap,warnings,typesetting:{engine:'worker-cyrillic-oval-v1',layouts},inpaint:{methods:[...methods]},timings:{...page.timings,inpaintMs,typesetMs,renderMs:performance.now()-start},regions:page.regions.map(r=>({id:r.uid,text:r.ru_translation,original:r.source_text,x:r.text_bbox[0]/page.width,y:r.text_bbox[1]/page.height,w:(r.text_bbox[2]-r.text_bbox[0])/page.width,h:(r.text_bbox[3]-r.text_bbox[1])/page.height})),usage:page.usage,engine:page.engine||'Gemma 4 · VM JSON → Canvas Worker',cacheHit:page.cacheHit}},[renderedBitmap]);
  }catch(error){self.postMessage({id,error:error.message});}finally{bitmap?.close();}
 };
 
 let queue=Promise.resolve();
-self.onmessage=event=>{queue=queue.catch(()=>{}).then(()=>render(event));};
+self.onmessage=event=>{queue=queue.catch(()=>{}).then(async()=>{
+ if(event.data.operation==='direct-prepare'){try{self.postMessage({id:event.data.id,result:await prepareEnglishPage(event.data.blob,event.data.index,event.data.direction)});}catch(error){self.postMessage({id:event.data.id,error:error.message});}return;}
+ await render(event);
+});};

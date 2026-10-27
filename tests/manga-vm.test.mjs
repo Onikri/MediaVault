@@ -20,13 +20,14 @@ async function liveChapter(){
 }
 test('live legacy status and per-page progress arrive before translation; retry ignores an older stream error',async()=>{
  const{chapter,controllers,manifest}=await liveChapter(),seen1=[],seen2=[];
+ const until=async condition=>{const deadline=Date.now()+5000;while(!condition()&&Date.now()<deadline)await tick();assert.ok(condition(),'Expected stream event did not arrive');};
  try{
   const first=chapter.json(1,value=>seen1.push(value));const firstError=assert.rejects(first,/temporary/);
-  const second=chapter.json(2,value=>seen2.push(value));await tick();await tick();assert.equal(controllers.length,1);
-  controllers[0].enqueue(wire('status',{message:'Google is processing'}));await tick();assert.equal(seen1.at(-1).message,'Google is processing');
-  controllers[0].enqueue(wire('progress',{page:2,phase:'google',message:'Background page',totalRegions:10,completedRegions:3}));await tick();assert.equal(seen2.at(-1).message,'Background page');assert.notEqual(seen1.at(-1).message,'Background page');
+  const second=chapter.json(2,value=>seen2.push(value));await until(()=>controllers.length===1);
+  controllers[0].enqueue(wire('status',{message:'Google is processing'}));await until(()=>seen1.at(-1)?.message==='Google is processing');
+  controllers[0].enqueue(wire('progress',{page:2,phase:'google',message:'Background page',totalRegions:10,completedRegions:3}));await until(()=>seen2.at(-1)?.message==='Background page');assert.notEqual(seen1.at(-1).message,'Background page');
   controllers[0].enqueue(wire('page_error',{page:1,message:'temporary'}));await firstError;
-  const retry=chapter.json(1,value=>seen1.push(value));await tick();await tick();assert.equal(controllers.length,2);
+  const retry=chapter.json(1,value=>seen1.push(value));await until(()=>controllers.length===2);
   controllers[0].enqueue(wire('page_error',{page:1,message:'old failure must not reject retry'}));await tick();
   const result={page:1,manifest,policy:'p',regions:[]};controllers[1].enqueue(wire('page_translated',result));assert.deepEqual(await retry,result);
   controllers[0].enqueue(wire('page_translated',{...result,page:2}));assert.equal((await second).page,2);
