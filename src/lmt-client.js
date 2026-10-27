@@ -1,4 +1,5 @@
 // The AGPL translation engine stays in a separate, lazily loaded iframe.
+import {TRANSLATION_VERSION} from './manga-translation.js';
 let instance=null,sequence=0;const pending=new Map();
 export function stopLmt(reason=Error('LMT остановлен.')){
  const old=instance;instance=null;old?.frame.remove();old?.port.close();old?.cancelReady(reason);
@@ -21,7 +22,11 @@ async function connect(){
   frame.addEventListener('mv-dispose',()=>clearTimeout(timer),{once:true});
  });
  instance={frame,port:channel.port1,ready,cancelReady:reason=>{frame.dispatchEvent(new Event('mv-dispose'));rejectReady(reason);}};
- frame.src=new URL('lmt/index.html',new URL(import.meta.env.BASE_URL,location.href)).href;document.body.append(frame);return ready;
+ const url=new URL('lmt/index.html',new URL(import.meta.env.BASE_URL,location.href));
+ // HTML has a stable path on Pages. Tie it to this hashed app bundle so a
+ // freshly updated selector cannot start an older, cached translation engine.
+ url.searchParams.set('engine',TRANSLATION_VERSION+':'+new URL(import.meta.url).pathname);
+ frame.src=url.href;document.body.append(frame);return ready;
 }
 export async function translateLmt(blob,config,signal,status){
  if(!config.allowDownloads)throw Error('Разреши загрузку моделей в настройках LMT.');

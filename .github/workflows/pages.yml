@@ -43,7 +43,7 @@ jobs:
         timeout-minutes: 7
         run: |
           python -m pip install --timeout 30 --retries 2 -r server/requirements-service.txt
-          python -m pip install --timeout 30 --retries 2 httpx==0.28.1
+          python -m pip install --timeout 30 --retries 2 -r server/requirements-batch.txt
 
       - name: Ensure ffmpeg is available
         timeout-minutes: 3
@@ -98,6 +98,7 @@ jobs:
           set +e
           {
             npm run test:ui &&
+            npm run test:vm &&
             npm run test:browser &&
             npm run test:voices &&
             npm run test:design &&
@@ -107,6 +108,7 @@ jobs:
             npm run test:translation &&
             npm run test:gpu &&
             npm run test:lmt &&
+            npm run test:gemma &&
             npm run test:trusted
           } 2>&1 | tee test-output/browser-ci.log
           result=${PIPESTATUS[0]}

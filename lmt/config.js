@@ -2,7 +2,7 @@
 export function validateConfig(config={}){
  if(!config.allowDownloads)throw Error('Разреши загрузку моделей в настройках LMT.');
  if(!['English','Japanese','Korean','Chinese (Simplified)'].includes(config.language||'English'))throw Error('Выбери исходный язык страницы.');
- const vision=config.mode==='api'&&config.apiInput==='vision';
+ const vision=config.mode==='gemma'||config.mode==='api'&&config.apiInput==='vision';
  if(!vision&&config.ocr==='ppocrv5-korean'&&config.language!=='Korean')throw Error('PP-OCRv5 Korean предназначен для корейского языка.');
  if(!vision&&['ppocrv6-manga','manga-ocr'].includes(config.ocr)&&config.language!=='Japanese')throw Error('Этот OCR предназначен для японского языка. Выбери PaddleOCR.');
  if(!vision&&config.ocr==='pororo'&&config.language!=='Korean')throw Error('Pororo предназначен для корейского языка. Выбери PaddleOCR.');

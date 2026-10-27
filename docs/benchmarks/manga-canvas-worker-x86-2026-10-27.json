@@ -1,0 +1,71 @@
+{
+  "provenance": "Actual Chromium OffscreenCanvas, real Cyrillic fonts and cleanup, explicit fixture translations/coordinates; not a physical phone or Google translation benchmark",
+  "canvas": [
+    600,
+    850
+  ],
+  "runs": [
+    {
+      "viewportWidth": 390,
+      "timings": [
+        {
+          "inpaintMs": 19.30000001192093,
+          "typesetMs": 0.5,
+          "renderMs": 68.5
+        }
+      ]
+    },
+    {
+      "viewportWidth": 1366,
+      "timings": [
+        {
+          "inpaintMs": 26.900000035762787,
+          "typesetMs": 0.8999999761581421,
+          "renderMs": 77.90000003576279
+        },
+        {
+          "inpaintMs": 8.199999988079071,
+          "typesetMs": 0.20000004768371582,
+          "renderMs": 16.100000023841858
+        }
+      ]
+    }
+  ],
+  "additionalRunsDuringContainerBuild": [
+    {
+      "viewportWidth": 390,
+      "timings": [
+        {
+          "inpaintMs": 34.69999998807907,
+          "typesetMs": 0.5,
+          "renderMs": 118.30000001192093
+        },
+        {
+          "inpaintMs": 25.5,
+          "typesetMs": 0.3999999761581421,
+          "renderMs": 123.40000003576279
+        }
+      ]
+    },
+    {
+      "viewportWidth": 1366,
+      "timings": [
+        {
+          "inpaintMs": 41.89999997615814,
+          "typesetMs": 0.30000001192092896,
+          "renderMs": 79.19999998807907
+        },
+        {
+          "inpaintMs": 15.400000035762787,
+          "typesetMs": 0.2999999523162842,
+          "renderMs": 26.5
+        },
+        {
+          "inpaintMs": 26.599999964237213,
+          "typesetMs": 0.30000001192092896,
+          "renderMs": 90.30000001192093
+        }
+      ]
+    }
+  ]
+}

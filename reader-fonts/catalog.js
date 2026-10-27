@@ -11,7 +11,7 @@ const loaded=new Map();
 export async function loadMangaFont(id){
  const font=mangaFont(id);if(!font.regular)return mangaFontStack(id);
  if(!loaded.has(font.id)){
-  const promise=Promise.all([[font.regular,'400'],...(font.bold?[[font.bold,'700']]:[])].map(async([url,weight])=>{const face=await new FontFace(font.family,`url("${url}")`,{weight,style:'normal'}).load();document.fonts.add(face);}));
+  const promise=Promise.all([[font.regular,'400'],...(font.bold?[[font.bold,'700']]:[])].map(async([url,weight])=>{const face=await new FontFace(font.family,`url("${url}")`,{weight,style:'normal'}).load();(globalThis.fonts||globalThis.document?.fonts).add(face);}));
   loaded.set(font.id,promise);promise.catch(()=>loaded.delete(font.id));
  }
  await loaded.get(font.id);return mangaFontStack(id);

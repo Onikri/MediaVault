@@ -35,3 +35,12 @@
 .reader-layout-settings{margin-top:18px;padding-top:12px;border-top:1px solid #ffffff14}.reader-layout-settings>summary{cursor:pointer;font-size:13px;color:#c8b594;padding:8px 0}
 .reader-translation-notice{line-height:1.5;min-height:36px}.reader-translation-notice>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .reader-toolbar .mv-icon-button[aria-pressed=true]{color:#e4c38e;background:#c8984826}
+.reader-page-image{position:relative}
+.reader-page-image .reader-translated-overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;transition:opacity 120ms ease}
+.reader-google-key{padding:12px;border:1px solid var(--border,#ffffff20);border-radius:12px;display:grid;gap:8px}
+.reader-google-key small{line-height:1.5}
+@media(prefers-reduced-motion:reduce){.reader-page-image .reader-translated-overlay{transition:none}}
+
+.reader-image-stack{position:relative}
+.reader-google-key label{display:grid;gap:6px}
+.reader-google-key input{width:100%;min-width:0;max-width:100%;box-sizing:border-box}

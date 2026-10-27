@@ -1,0 +1,9 @@
+.git
+.codex-local
+node_modules
+dist
+test-output
+__pycache__
+*.pyc
+.env
+.env.*
