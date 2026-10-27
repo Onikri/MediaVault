@@ -13,9 +13,9 @@ import io
 POLICY=hashlib.sha256(json.dumps([SCHEMA_VERSION,MODEL_IDS,PROMPT_VERSION,MODEL_SHA256,.35,640,1280],separators=(',',':')).encode()).hexdigest()[:24]
 
 class RealtimeChapterOrchestrator:
-    def __init__(self,sources,detector,translator,cache):
+    def __init__(self,sources,detector,translator,cache,*,batch_timeout=45):
         self.sources=sources;self.detector=detector;self.translator=translator;self.cache=cache
-        self.pending={};self.queue=asyncio.PriorityQueue();self.serial=itertools.count();self.workers=[];self.detector_gate=asyncio.Semaphore(1);self.delayed=set();self.closed=False
+        self.pending={};self.queue=asyncio.PriorityQueue();self.serial=itertools.count();self.workers=[];self.detector_gate=asyncio.Semaphore(1);self.delayed=set();self.closed=False;self.batch_timeout=batch_timeout
     def start(self):
         if not self.workers:self.workers=[asyncio.create_task(self.work()) for _ in range(2)]
     def key(self,s,page):return self.cache.identity(s['scope'],s['manifest'],page,POLICY+':'+s.get('direction','ltr'))
@@ -72,8 +72,14 @@ class RealtimeChapterOrchestrator:
                 part['som']=await asyncio.to_thread(remark)
             return part
         async def translate(pack):
-            try:rows,meta=await self.translator.translate(pack)
-            except BatchTooLarge:
+            try:
+                if len(pack)>1:
+                    # A slow four-page call must not hold the current page for
+                    # repeated 90-second model attempts. Preserve quota leases
+                    # and fall back to smaller requests after this deadline.
+                    async with asyncio.timeout(self.batch_timeout):rows,meta=await self.translator.translate(pack)
+                else:rows,meta=await self.translator.translate(pack)
+            except (BatchTooLarge,TimeoutError):
                 if len(pack)>1:
                     half=len(pack)//2;await translate(pack[:half]);await translate(pack[half:]);return
                 p=pack[0];regions=p['regions']

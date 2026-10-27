@@ -72,6 +72,7 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
   values,meta=await provider.translate(pages);self.assertEqual(len(values),4);self.assertEqual(meta['model'],'gemma-4-31b-it');self.assertEqual(sum(p.inline_data is not None for p in calls[0]['contents'][0].parts),4);self.assertEqual(calls[0]['config'].thinking_config.thinking_level,'MINIMAL')
   schema=calls[0]['config'].response_schema
   self.assertEqual(schema['items']['properties']['uid']['enum'],[f'P{i}_B1' for i in range(1,5)])
+  self.assertEqual((schema['minItems'],schema['maxItems']),(4,4))
   self.assertEqual(calls[0]['config'].max_output_tokens,2048)
   self.assertIn('never deduplicate',calls[0]['contents'][0].parts[0].text)
  async def test_429_shared_quota_does_not_rotate_and_independent_does(self):
@@ -107,6 +108,36 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
   values,meta=await p.translate([{'page':1,'width':100,'height':100,'regions':[{'uid':'P1_B1'}],'som':b'x'}])
   self.assertEqual(meta['model'],'gemma-4-26b-a4b-it');self.assertEqual(len(values),1)
   window=q.snapshot()['groups']['google-project'];self.assertEqual(window['reservedInputTokens'],6500);self.assertEqual(window['requests'],2)
+ async def test_incomplete_cloud_reply_requests_smaller_fragments_without_inventing_text(self):
+  from manga_batch.provider import BatchTooLarge,ProviderUnavailable
+  class Models:
+   async def count_tokens(self,**kw):return NS(total_tokens=100)
+   async def generate_content(self,**kw):return NS(text=json.dumps([row('P1_B1')]),candidates=[NS(finish_reason='STOP')],usage_metadata=None)
+  p=GemmaBatchTranslator(QuotaPacer(),'/unused',client=NS(aio=NS(models=Models())))
+  pages=[{'page':i,'width':100,'height':100,'regions':[{'uid':f'P{i}_B1'}],'som':b'x'} for i in [1,2]]
+  with self.assertRaises(BatchTooLarge):await p.translate(pages)
+  with self.assertRaises(ProviderUnavailable):await p.translate(pages[1:])
+ async def test_slow_multi_page_cloud_call_splits_and_validated_pages_reach_cache(self):
+  class Archive:
+   def acquire(self):pass
+   def release(self):pass
+   def page(self,name):return b'fixture'
+  class Detector:
+   def detect(self,data,page,rtl):return Image.new('RGB',(100,100),'white'),[{'uid':f'P{page}_B1','text_bbox':[10,10,80,80],'bubble_bbox':None,'layout_bbox':[10,10,80,80]}],{}
+  class Provider:
+   def __init__(self):self.calls=[]
+   async def translate(self,pages):
+    self.calls.append(len(pages))
+    if len(pages)>1:await asyncio.sleep(30)
+    return {r['uid']:row(r['uid']) for p in pages for r in p['regions']},{'model':'fixture'}
+  with tempfile.TemporaryDirectory() as d:
+   cache=JsonCache(d);provider=Provider();engine=RealtimeChapterOrchestrator(None,Detector(),provider,cache,batch_timeout=.02)
+   source={'scope':'timeout-fixture','manifest':'m','names':['1','2'],'archive':Archive()}
+   try:
+    _,jobs=await engine.window(source,1);values=await asyncio.wait_for(asyncio.gather(*(j['future'] for j in jobs)),1)
+    self.assertEqual(provider.calls,[2,1,1]);self.assertEqual([v['regions'][0]['uid'] for v in values],['P1_B1','P2_B1'])
+    hits,pending=await engine.window(source,1);self.assertEqual(len(hits),2);self.assertFalse(pending)
+   finally:await engine.close();await cache.close()
  async def test_singleflight_batches_dense_split_and_cache_replay(self):
   class Files:
    def __init__(self):self.leases=0

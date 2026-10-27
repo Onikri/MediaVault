@@ -95,7 +95,12 @@ class GemmaBatchTranslator:
                 if code in (500,502,503,504):
                     await self.pacer.limited(model,5,project_wide=False);last=Deferred(5);continue
                 if isinstance(error,(ValueError,json.JSONDecodeError)) and config is None:raise ProviderUnavailable('Подсчёт токенов Google недоступен. Оригинал сохранён.') from error
-                if isinstance(error,(ValueError,json.JSONDecodeError)):raise ProviderUnavailable('Неполный или некорректный JSON Google. Оригинал сохранён.') from error
+                if isinstance(error,(ValueError,json.JSONDecodeError)):
+                    # Similar pages can be semantically deduplicated even with
+                    # constrained IDs. Retry smaller fragments, never guess a
+                    # missing translation or attach text to a different box.
+                    if len(ids)>1:raise BatchTooLarge('Incomplete multi-region reply') from error
+                    raise ProviderUnavailable('Неполный или некорректный JSON Google. Оригинал сохранён.') from error
                 raise ProviderUnavailable('Ошибка Google API'+(' · HTTP '+str(code) if code else '')+'. Проверь ключ, доступ к модели и квоту.') from error
         if isinstance(last,Deferred):raise last
         raise ProviderUnavailable('Модели Gemma 4 недоступны для этого проекта Google.')

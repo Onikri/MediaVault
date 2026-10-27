@@ -1,0 +1,101 @@
+{
+  "provenance": "Actual native ONNX, RAM SoM and encrypted Redis/SQLite on existing Oracle A1. Public Japanese scan, not a user Drive chapter. Cloud results recorded separately.",
+  "machine": "aarch64",
+  "ocpus": 2,
+  "memoryGiB": 12,
+  "gpu": false,
+  "modelBytes": 11120765,
+  "modelSha256": "5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79",
+  "sessionLoadMs": 406.35,
+  "runs": 6,
+  "sampleWidth": 3430,
+  "sampleHeight": 2417,
+  "regions": 4,
+  "medianDetectionMs": 341.01,
+  "medianSomMs": 154.84,
+  "somMaxDimension": 1280,
+  "somWebpQuality": 80,
+  "somWebpMethod": 2,
+  "cache": {
+    "encrypted": true,
+    "wrongOwnerDenied": true,
+    "redisPong": true,
+    "hotMedianMs": 0.128,
+    "sqliteHitMs": 0.439
+  },
+  "unchangedImporter": {
+    "restarted": false,
+    "queueCompleted": 18,
+    "historicalFailed": 1,
+    "active": 0
+  },
+  "limits": "Not a measured 45 ms detection or 3.8 s/four-page translation. Cache tests used a maintenance namespace, not a whole Drive chapter.",
+  "cloudOnePage": {
+    "provenance": "Actual RT-DETR + SoM + Gemma API + production orchestrator and encrypted cache, public in-memory Japanese fixture; not a decrypted Drive chapter or blind translation-quality benchmark",
+    "model": "gemma-4-31b-it",
+    "pages": 1,
+    "regions": 4,
+    "russianNonempty": 4,
+    "exactIdsValidated": true,
+    "singleflightSharedFuture": true,
+    "firstPassMs": 18763.92,
+    "cloudMs": 17478.2,
+    "cacheReplayMs": 0.353,
+    "cacheHits": 1,
+    "cachePending": 0,
+    "inputTokens": 1926,
+    "outputTokens": 518,
+    "structuredOutput": true,
+    "jsonMime": true
+  },
+  "clientActualTranslationRender": {
+    "provenance": "Actual VM Gemma translations and RT-DETR coordinates; actual client Worker/typesetter. Drive/SSE transport is replayed locally from the public fixture.",
+    "machine": "x86_64 Chromium; viewport sizes are not physical phone benchmarks",
+    "sourceSize": [
+      3430,
+      2417
+    ],
+    "runs": [
+      {
+        "viewportWidth": 390,
+        "renderMs": 806.2,
+        "inpaintMs": 138.3,
+        "typesetMs": 0.8,
+        "renderedRegions": 4,
+        "warnings": [],
+        "methods": [
+          "adaptive-glyph-fill"
+        ]
+      },
+      {
+        "viewportWidth": 1366,
+        "renderMs": 289.9,
+        "inpaintMs": 88.5,
+        "typesetMs": 0.5,
+        "renderedRegions": 4,
+        "warnings": [],
+        "methods": [
+          "adaptive-glyph-fill"
+        ]
+      }
+    ]
+  },
+  "multiPageBeforeAdaptiveFix": {
+    "defaultProviderFourPageTimeoutSeconds": 240,
+    "moeOnly": {
+      "model": "gemma-4-26b-a4b-it",
+      "countedInputTokens": 6722,
+      "countMs": 303,
+      "generationMs": 12506,
+      "expectedRegions": 16,
+      "returnedIds": [
+        "P1_B1",
+        "P1_B2",
+        "P1_B3",
+        "P4_B4"
+      ],
+      "replyRejected": true
+    },
+    "fixture": "Four copies of the same public Japanese scan. This exposed semantic deduplication, not a sequential-page quality score. Fixed by exact array length and strict smaller-fragment fallback; post-fix cloud validation recorded separately."
+  }
+}
