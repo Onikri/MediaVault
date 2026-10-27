@@ -36,21 +36,21 @@ export function englishTextBoxes({data,width:w,height:h}){
  const blocks=new Map();candidates.forEach((l,i)=>{const key=find(i),b=blocks.get(key);if(b){b.x1=Math.min(b.x1,l.x1);b.y1=Math.min(b.y1,l.y1);b.x2=Math.max(b.x2,l.x2);b.y2=Math.max(b.y2,l.y2);b.count+=l.count;}else blocks.set(key,{...l});});
  return [...blocks.values()].filter(b=>b.count>=3&&(b.x2-b.x1)*(b.y2-b.y1)<w*h*.16).map(b=>({x1:Math.max(0,b.x1-3),y1:Math.max(0,b.y1-3),x2:Math.min(w,b.x2+3),y2:Math.min(h,b.y2+3)}));
 }
-export async function prepareEnglishPage(blob,index,direction='rtl'){
+export async function prepareEnglishPage(blob,index,direction='rtl',inputMode='annotated'){
  const start=performance.now(),bitmap=await createImageBitmap(blob);
  try{
   const decodeMs=performance.now()-start;
   if(bitmap.width*bitmap.height>24_000_000)throw Error('Страница превышает 24 Мп.');
   const scale=Math.min(1,1280/Math.max(bitmap.width,bitmap.height)),canvas=new OffscreenCanvas(Math.round(bitmap.width*scale),Math.round(bitmap.height*scale)),ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
   const detectStart=performance.now();
-  const boxes=englishTextBoxes(ctx.getImageData(0,0,canvas.width,canvas.height)).map(b=>Object.fromEntries(Object.entries(b).map(([k,v])=>[k,v/scale]))).sort((a,b)=>Math.abs(a.y1-b.y1)<Math.min(a.y2-a.y1,b.y2-b.y1)*.4?(direction==='ltr'?a.x1-b.x1:b.x1-a.x1):a.y1-b.y1);
+  const boxes=(inputMode==='vision'?[]:englishTextBoxes(ctx.getImageData(0,0,canvas.width,canvas.height))).map(b=>Object.fromEntries(Object.entries(b).map(([k,v])=>[k,v/scale]))).sort((a,b)=>Math.abs(a.y1-b.y1)<Math.min(a.y2-a.y1,b.y2-b.y1)*.4?(direction==='ltr'?a.x1-b.x1:b.x1-a.x1):a.y1-b.y1);
   const detectMs=performance.now()-detectStart;
   if(boxes.length>60)throw Error('Фон слишком сложный для лёгкого поиска. Выбери RT-DETR.');
   const id='P'+(index+1),regions=boxes.map((b,i)=>({id:id+'_B'+(i+1),bbox:[b.x1,b.y1,b.x2,b.y2].map(Math.round)}));
   const markStart=performance.now();
-  for(const r of regions){const[x,y,x2,y2]=r.bbox.map(n=>n*scale);ctx.strokeStyle='#ff0033';ctx.lineWidth=2;ctx.strokeRect(x,y,x2-x,y2-y);ctx.font='bold 12px sans-serif';const width=ctx.measureText(r.id).width+6,top=Math.max(0,y-16);ctx.fillStyle='#ff0033';ctx.fillRect(x,top,width,15);ctx.fillStyle='white';ctx.textBaseline='top';ctx.fillText(r.id,x+3,top+1);}
+  for(const r of inputMode==='annotated'?regions:[]){const[x,y,x2,y2]=r.bbox.map(n=>n*scale);ctx.strokeStyle='#ff0033';ctx.lineWidth=2;ctx.strokeRect(x,y,x2-x,y2-y);ctx.font='bold 12px sans-serif';const width=ctx.measureText(r.id).width+6,top=Math.max(0,y-16);ctx.fillStyle='#ff0033';ctx.fillRect(x,top,width,15);ctx.fillStyle='white';ctx.textBaseline='top';ctx.fillText(r.id,x+3,top+1);}
   const markMs=performance.now()-markStart,encodeStart=performance.now();
   const image=await canvas.convertToBlob({type:'image/webp',quality:.8}),bytes=new Uint8Array(await image.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
-  return {id,page:index+1,width:bitmap.width,height:bitmap.height,image:btoa(binary),mime:image.type,regions,sentWidth:canvas.width,sentHeight:canvas.height,prepareTimings:{decodeMs,detectMs,markMs,encodeMs:performance.now()-encodeStart},detectionMs:Math.round(performance.now()-start)};
+  return {id,inputMode,detector:inputMode==='vision'?'google':'en-fast',page:index+1,width:bitmap.width,height:bitmap.height,image:btoa(binary),mime:image.type,regions,sentWidth:canvas.width,sentHeight:canvas.height,prepareTimings:{decodeMs,detectMs,markMs,encodeMs:performance.now()-encodeStart},detectionMs:Math.round(performance.now()-start)};
  }finally{bitmap.close();}
 }

@@ -5,6 +5,8 @@ import {DirectChapter} from '../src/manga-direct.js';
 import {translationConfig,resultConfig} from '../src/manga-translation.js';
 import {directKey,setDirectKey} from '../src/manga-direct-key.js';
 import {englishTextBoxes} from '../src/manga-fast-detect.js';
+import {compareDirectInputs} from '../src/manga-direct-comparison.js';
+import {geometryAgreement} from '../src/manga-vision-geometry.js';
 const page=n=>({id:'P'+n,page:n,width:600,height:850,mime:'image/webp',image:'fixture',detectionMs:3,regions:[{id:'P'+n+'_B1',bbox:[100,100,300,250]}]});
 const reply=rows=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(rows)}]}}]});
 test('direct mode is a separate compact cache variant without personal secrets',()=>{
@@ -66,4 +68,35 @@ test('weight-free English detection joins letters and lines while keeping neighb
  assert.deepEqual(englishTextBoxes({width,height,data}),[]);
  for(const [x0,y0]of[[50,70],[320,70],[50,100],[320,100]])for(let g=0;g<8;g++)for(let y=y0;y<y0+18;y++)for(let x=x0+g*15;x<x0+g*15+8;x++){const n=(y*width+x)*4;data[n]=data[n+1]=data[n+2]=0;}
  assert.deepEqual(englishTextBoxes({width,height,data}),[{x1:47,y1:67,x2:166,y2:121},{x1:317,y1:67,x2:436,y2:121}]);
+});
+test('three Google input contracts separate labels, pixel coordinates and self detection',()=>{
+ const marked=page(10),coordinate={...marked,inputMode:'coordinates'},raw={...marked,inputMode:'vision',regions:[]};
+ const a=directRequest([marked]),b=directRequest([coordinate]),c=directRequest([raw]);
+ assert.match(a.contents[0].parts[1].text,/P10_B1/);assert.ok(!a.contents[0].parts[1].text.includes('originalWidth'));
+ assert.deepEqual(JSON.parse(b.contents[0].parts[1].text).regions[0],{id:'P10_B1',box:[100,100,300,250]});
+ assert.match(c.contents[0].parts[0].text,/Y FIRST/);assert.match(c.contents[0].parts[0].text,/RIGHT TO LEFT/);assert.ok(!JSON.stringify(c).includes('P10_B1'));assert.equal(c.generationConfig.maxOutputTokens,8192);
+ const variants=['annotated','coordinates','vision'].map(directInput=>JSON.stringify(resultConfig({engine:'direct',directInput})));assert.equal(new Set(variants).size,3);
+ assert.notDeepEqual(resultConfig({engine:'direct',directDetector:'ctd'}),resultConfig({engine:'direct',directDetector:'rtdetr'}));
+});
+test('Google self detection maps Y-first normalized coordinates to ORIGINAL pixels, preserving layout',()=>{
+ const p={...page(10),width:800,height:1600,sentWidth:640,sentHeight:1280,inputMode:'vision',regions:[]};
+ const result=validateDirectResponse(reply([{box:[100,200,200,400],layout:[90,190,220,420],ru:'Не открывай дверь!',f:1,k:0}]),[p])[0];
+ assert.deepEqual(result.regions[0].text_bbox,[160,160,320,320]);assert.deepEqual(result.regions[0].layout_bbox,[152,144,336,352]);assert.equal(result.regions[0].uid,'P10_B1');assert.equal(result.regions[0].font_style,'bold_scream');
+ assert.deepEqual(validateDirectResponse(reply([]),[p])[0].regions,[]);
+});
+test('unsafe Google geometry fails closed before any eraser receives it',()=>{
+ const p={...page(1),inputMode:'vision',regions:[]},valid={box:[100,100,200,300],ru:'Стой!'};
+ for(const box of [[-1,100,200,300],[100,100,100,300],[0,0,1000,1000],[100,100,101,101],['100',100,200,300]])assert.throws(()=>validateDirectResponse(reply([{...valid,box}]),[p]));
+ assert.throws(()=>validateDirectResponse(reply([valid,valid]),[p]),/продублировал/);
+ assert.throws(()=>validateDirectResponse(reply([{...valid,layout:[150,100,200,300]}]),[p]),/не вмещает/);
+ assert.throws(()=>validateDirectResponse(reply([{...valid,ru:'English'}]),[p]),/непереведённая/);
+ assert.equal(geometryAgreement([[0,0,10,10]],[[0,0,10,10],[50,50,60,60]]).matched,1);
+});
+test('vision pages with zero local regions still reach Google and can be rendered',async()=>{
+ let prepares=0;const {c,calls}=chapter({config:translationConfig({engine:'direct',directInput:'vision'}),prepare:async()=>{prepares++;return {...page(1),inputMode:'vision',regions:[]};},google:async pages=>{calls.push(pages);return {pages:validateDirectResponse(reply([{box:[100,100,200,300],ru:'Привет!'}]),pages)};}});
+ const result=await c.render(new Blob(['image']),0,'auto',null,{},new AbortController().signal);assert.equal(prepares,1);assert.equal(calls.length,1);assert.equal(result.regions[0].ru_translation,'Привет!');c.close();
+});
+test('comparison shares source and local geometry, makes three explicit requests without touching reader cache',async()=>{
+ const seen=[],base=page(1);const result=await compareDirectInputs({blob:new Blob(['image']),index:0,key:'fixture',config:translationConfig({engine:'direct'}),prepare:async(blob,i,status,inputMode)=>({...base,inputMode,detector:inputMode==='vision'?'google':'en-fast',regions:inputMode==='vision'?[]:base.regions,image:inputMode==='vision'?'raw-image':'marked-image'}),google:async(pages,options)=>{seen.push({pages,context:options.context});return {pages:validateDirectResponse(reply(pages[0].inputMode==='vision'?[{box:[100,100,200,300],ru:'Привет!'}]:[{id:'P1_B1',ru:'Привет!'}]),pages),diagnostics:{requestBytes:1000,metrics:{uploadMs:1}},usage:{promptTokenCount:400}};}});
+ assert.deepEqual(seen.map(r=>r.pages[0].inputMode),['annotated','coordinates','vision']);assert.deepEqual(seen[0].pages[0].regions,seen[1].pages[0].regions);assert.equal(seen[1].pages[0].image,seen[2].pages[0].image);assert.ok(seen.every(r=>r.context===''));assert.equal(result.results.length,3);assert.ok(result.results.every(r=>r.state==='done'));assert.ok(!JSON.stringify(result).includes('fixture'));assert.ok(!JSON.stringify(result).includes('raw-image'));
 });

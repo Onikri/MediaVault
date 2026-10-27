@@ -38,7 +38,7 @@ export async function detectManga(source,config){
    if(chosen==='yolo26n-manga'&&panelModel==='yolo26n-manga')panels=mergeTiledBoxes(allPanels);
    if(panelModel==='yolo26n-manga'&&chosen!=='yolo26n-manga')panels=(await single(bitmap,'yolo26n-manga')).panels;
   }
-  if(!text){const{detectTextBubble}=await import('./upstream/lib/detections/main.ts');text=await detectTextBubble(source,.5,model);}
+  if(!text){const{detectTextBubble}=await import('./upstream/lib/detections/main.ts');text=await detectTextBubble(source,config.detectionConfidence??.5,model);}
   return {boxes:orderByPanels(text,panels,config.language==='Japanese'),panels,model,panelModel};
  }finally{bitmap.close();}
 }

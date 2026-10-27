@@ -2,6 +2,7 @@
 // Detection and cleanup only. No OCR graph or translation model is loaded.
 import {validateConfig} from './config.js';
 import {drawStyledRegion} from './typography.js';
+import {DIRECT_DETECTORS} from '../src/manga-direct-profiles.js';
 
 async function setup(config){
  validateConfig({...config,mode:'gemma'});
@@ -13,9 +14,11 @@ export async function prepareGemmaPage(bytes,config,progress){
  const bitmap=await createImageBitmap(new Blob([bytes])),url=URL.createObjectURL(new Blob([bytes]));
  try{
   if(bitmap.width*bitmap.height>24_000_000)throw Error('Страница превышает 24 Мп.');
-  progress('RT-DETR Comic v4 · ищем текст и координаты без OCR');const started=performance.now();
-  const{detectTextBubble}=await import('./upstream/lib/detections/main.ts');
-  let boxes=await detectTextBubble(url,config.fastDirect ? .35 : .15,'comic-bubble');
+  const chosen=config.fastDirect?DIRECT_DETECTORS.find(v=>v.id===config.directDetector):DIRECT_DETECTORS.find(v=>v.id==='rtdetr');
+  if(!chosen?.model)throw Error('Выбери доступный детектор текста.');
+  progress(chosen.label+' · ищем координаты без OCR');const started=performance.now();
+  const {detectManga}=await import('./detection.js');
+  let boxes=(await detectManga(url,{...config,detector:chosen.model,panelDetector:'none',detectionConfidence:config.fastDirect ? .35 : .15})).boxes;
   if(config.fastDirect)boxes=boxes.filter(b=>b.x2-b.x1>=8&&b.y2-b.y1>=8).sort((a,b)=>Math.abs(a.y1-b.y1)<Math.min(a.y2-a.y1,b.y2-b.y1)*.4?(config.direction==='ltr'?a.x1-b.x1:b.x1-a.x1):a.y1-b.y1);
   if(boxes.length>100)throw Error('Слишком много областей на странице. Раздели длинный вебтун.');
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -24,13 +27,13 @@ export async function prepareGemmaPage(bytes,config,progress){
   for(const r of regions)if(!r.bbox.every(Number.isFinite)||r.bbox[0]<0||r.bbox[1]<0||r.bbox[2]>bitmap.width||r.bbox[3]>bitmap.height||r.bbox[2]<=r.bbox[0]||r.bbox[3]<=r.bbox[1])throw Error('Детектор вернул некорректные координаты.');
   const scale=Math.min(1,1280/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
   const ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
-  for(const [i,r]of regions.entries()){
+  for(const [i,r]of (config.directInput==='coordinates'?[]:regions).entries()){
    const[x,y,z,w]=r.bbox.map(v=>v*scale);ctx.strokeStyle='#e11d48';ctx.lineWidth=2;ctx.strokeRect(x,y,z-x,w-y);
    const label=config.fastDirect?r.id:'B'+(i+1);ctx.font='bold 12px sans-serif';const top=Math.max(0,y-16),lw=ctx.measureText(label).width+6;
    ctx.fillStyle='white';ctx.fillRect(x,top,lw,15);ctx.fillStyle='#b10024';ctx.textBaseline='top';ctx.fillText(label,x+3,top+1);
   }
   const encoded=canvas.toDataURL('image/webp',.8),match=/^data:(image\/\w+);base64,(.+)$/.exec(encoded);
-  return {id,width:bitmap.width,height:bitmap.height,image:match[2],mime:match[1],regions,sentWidth:canvas.width,sentHeight:canvas.height,detectionMs:Math.round(performance.now()-started),sourceSha256:digest};
+  return {id,page:(Number.isInteger(config.pageIndex)?config.pageIndex:0)+1,inputMode:config.directInput||'annotated',detector:chosen.id,width:bitmap.width,height:bitmap.height,image:match[2],mime:match[1],regions,sentWidth:canvas.width,sentHeight:canvas.height,detectionMs:Math.round(performance.now()-started),sourceSha256:digest};
  }finally{globalThis.lmtProgress=null;bitmap.close();URL.revokeObjectURL(url);}
 }
 

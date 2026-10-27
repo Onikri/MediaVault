@@ -1,6 +1,8 @@
 import {translateLmt} from './lmt-client.js';
 import {callDirectGoogle} from './manga-direct-api.js';
 import {directKey} from './manga-direct-key.js';
+import {DIRECT_DETECTORS} from './manga-direct-profiles.js';
+import {compareDirectInputs} from './manga-direct-comparison.js';
 import {translationCacheKey,getTranslation,putTranslation} from './translation-cache.js';
 
 const cancelled=()=>new DOMException('Читалка закрыта','AbortError');
@@ -16,7 +18,7 @@ function waitFor(promise,signal){
 export class DirectChapter{
  constructor({entries,scope,keyScope,config,direction='rtl',prepare,google=callDirectGoogle,cacheKey=translationCacheKey,readCache=getTranslation,writeCache=putTranslation,renderPage,getKey=directKey}){
   Object.assign(this,{entries,scope,keyScope,config,direction,google,cacheKey,readCache,writeCache,getKey});
-  this.prepare=prepare||((blob,index,status)=>config.directDetector==='rtdetr'?translateLmt(blob,{...config,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({operation:'direct-prepare',blob,index,direction}));
+  this.prepare=prepare||((blob,index,status,inputMode=config.directInput)=>inputMode!=='vision'&&DIRECT_DETECTORS.some(v=>v.id===config.directDetector&&v.model)?translateLmt(blob,{...config,directInput:inputMode,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({operation:'direct-prepare',blob,index,direction,inputMode},status));
   this.renderPage=renderPage||this.renderCanvas.bind(this);this.controller=new AbortController();this.jobs=new Map();this.listeners=new Map();this.progress=new Map();this.context=new Map();this.active=false;this.worker=null;this.renders=new Map();this.serial=0;this.bypass=new Set();
  }
  notify(index,value){this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
@@ -44,14 +46,14 @@ export class DirectChapter{
     const hit=await this.cached(first);if(hit){this.finish(first,hit);continue;}
     const key=this.getKey(this.keyScope);if(!key)throw Error('Введи личный ключ Google AI Studio в настройках быстрого режима.');
     const prepare=async job=>{
-     this.notify(job.index,{phase:'detecting',message:this.config.directDetector==='rtdetr'?'Устройство · RT-DETR INT8, только координаты текста':'Устройство · лёгкий поиск английских текстовых блоков'});
+     this.notify(job.index,{phase:'detecting',message:this.config.directInput==='vision'?'Чистая страница · координаты и текст определит Google':DIRECT_DETECTORS.find(v=>v.id===this.config.directDetector)?.label||'Подготовка страницы'});
      const begin=performance.now();const page=await this.prepare(job.blob,job.index,message=>this.notify(job.index,{phase:'detecting',message}));
      job.prepareMs=Math.round(performance.now()-begin);job.prepared=page;
      return {...page,page:job.index+1};
     };
     const prepared=[await prepare(first)];this.controller.signal.throwIfAborted();
-    const nonempty=prepared.filter(p=>p.regions.length);
-    if(!nonempty.length&&this.config.directDetector!=='rtdetr')throw Error('Лёгкий поиск не нашёл реплики. Выбери RT-DETR в настройках быстрого режима.');
+    const nonempty=prepared.filter(p=>p.regions.length||p.inputMode==='vision');
+    if(!nonempty.length&&this.config.directDetector!=='rtdetr')throw Error('Лёгкий поиск не нашёл реплики. Выбери другой детектор или самостоятельный поиск Google.');
     let translated=[],cloudMs=0,usage,diagnostics;
     if(nonempty.length){
      const regions=nonempty.reduce((n,p)=>n+p.regions.length,0);
@@ -85,7 +87,7 @@ export class DirectChapter{
    const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v2:'+this.config.inpaint+':'+font;
    if(this.config.cache&&!this.bypass.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
    const job=this.request(index,blob,background),stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
-   this.notify(index,{phase:'cleaning',message:page.cacheHit?'Из кэша устройства · вставляем русский текст':'Лёгкая очистка и русский набор',completedRegions:page.regions.length,totalRegions:page.regions.length,diagnostics:page.diagnostics});
+   this.notify(index,{phase:'cleaning',message:page.cacheHit?'Из кэша устройства · вставляем русский текст':'Лёгкая очистка и русский набор',completedRegions:0,totalRegions:page.regions.length,diagnostics:page.diagnostics});
    const painting=this.renderPage(blob,page,font,value=>this.notify(index,{...value,completedRegions:value.cleanedRegions||0,totalRegions:page.regions.filter(r=>r.ru_translation?.trim()).length,diagnostics:page.diagnostics})).then(result=>{if(signal?.aborted){result.renderedBitmap?.close();throw signal.reason;}return result;});
    let result;try{result=await waitFor(painting,signal);}catch(error){error.stage='render';throw error;}signal?.throwIfAborted();
    if(this.config.cache&&result.cacheImage){const {renderedBitmap,cacheImage,diagnostics,...save}=result;await this.writeCache(renderCacheId,this.scope,{...save,renderedImage:cacheImage,renderedMime:'image/webp'});}delete result.cacheImage;
@@ -95,6 +97,7 @@ export class DirectChapter{
   }finally{if(status)listeners.delete(status);if(!listeners.size)this.listeners.delete(index);}
  }
  invalidate(index){if(this.jobs.get(index)?.state==='running')return;this.jobs.delete(index);this.progress.delete(index);this.bypass.add(index);}
+ async compare(blob,index,{signal,onProgress}={}){return compareDirectInputs({blob,index,prepare:this.prepare,google:this.google,key:this.getKey(this.keyScope),config:this.config,direction:this.direction,signal:signal||this.controller.signal,onProgress});}
  prefetch(index){if(this.jobs.has(index-1)&&index<this.entries.length&&!this.jobs.has(index)&&this.getKey(this.keyScope))this.request(index,null,true);}
  renderCanvas(blob,page,font,status){
   return this.canvasTask({blob,page,font,mode:this.config.inpaint||'hybrid',cache:this.config.cache},status);

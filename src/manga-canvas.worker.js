@@ -5,7 +5,7 @@ let queue=Promise.resolve();
 self.onmessage=event=>{queue=queue.catch(()=>{}).then(async()=>{
  const {id,blob,page,font='auto',mode='fast',cache=false}=event.data;
  try{
-  if(event.data.operation==='direct-prepare'){self.postMessage({id,result:await prepareEnglishPage(blob,event.data.index,event.data.direction)});return;}
+  if(event.data.operation==='direct-prepare'){self.postMessage({id,result:await prepareEnglishPage(blob,event.data.index,event.data.direction,event.data.inputMode)});return;}
   const status=value=>self.postMessage({id,status:value});
   const lama=mode==='fast'?undefined:async(image,mask,progress)=>{const {inpaintLamaPatch}=await import('./manga-lama.js');return inpaintLamaPatch(image,mask,progress);};
   const result=await renderComicPage({blob,page,font,mode,cache,lama,status});
