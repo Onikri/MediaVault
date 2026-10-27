@@ -31,7 +31,7 @@ class GemmaBatchTranslator:
             ids.extend(r['uid'] for r in p['regions'])
             parts.extend([types.Part.from_text(text=json.dumps({'page':p['page'],'width':p['width'],'height':p['height'],'regions':p['regions']},ensure_ascii=False)),types.Part.from_bytes(data=p['som'],mime_type='image/webp')])
         schema=generation_schema(ids)
-        parts.insert(0,types.Part.from_text(text='Required UID list (copy exactly, including P and B; never deduplicate identical-looking pages): '+json.dumps(ids)+'. Return one row for EVERY UID, in this order. uid is the label, never punctuation or recognized dialogue.'))
+        parts.insert(0,types.Part.from_text(text='Return exactly '+str(len(ids))+' JSON objects, one for EVERY UID in this list, in this order: '+json.dumps(ids)+'. Copy IDs exactly, including P and B. Never deduplicate identical-looking pages. uid is the label, never punctuation or recognized dialogue.'))
         if not self.schema:
             parts.insert(1,types.Part.from_text(text='Output JSON matching this schema exactly: '+json.dumps(schema)))
         contents=[types.Content(role='user',parts=parts)]

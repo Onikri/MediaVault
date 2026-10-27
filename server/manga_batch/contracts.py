@@ -52,4 +52,4 @@ def generation_schema(expected_ids=None):
         # mistake text/punctuation in the picture for the visual box label.
         props['uid']['enum'] = list(expected_ids)
         props['connected_to_uid']['enum'] = list(expected_ids)
-    return {'type':'ARRAY',**({'minItems':len(expected_ids),'maxItems':len(expected_ids)} if expected_ids else {}),'items':{'type':'OBJECT','required':[n for n,f in Translation.model_fields.items() if f.is_required()], 'properties':props}}
+    return {'type':'ARRAY','items':{'type':'OBJECT','required':[n for n,f in Translation.model_fields.items() if f.is_required()], 'properties':props}}

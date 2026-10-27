@@ -72,9 +72,9 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
   values,meta=await provider.translate(pages);self.assertEqual(len(values),4);self.assertEqual(meta['model'],'gemma-4-31b-it');self.assertEqual(sum(p.inline_data is not None for p in calls[0]['contents'][0].parts),4);self.assertEqual(calls[0]['config'].thinking_config.thinking_level,'MINIMAL')
   schema=calls[0]['config'].response_schema
   self.assertEqual(schema['items']['properties']['uid']['enum'],[f'P{i}_B1' for i in range(1,5)])
-  self.assertEqual((schema['minItems'],schema['maxItems']),(4,4))
+  self.assertNotIn('minItems',schema);self.assertNotIn('maxItems',schema)
   self.assertEqual(calls[0]['config'].max_output_tokens,2048)
-  self.assertIn('never deduplicate',calls[0]['contents'][0].parts[0].text)
+  self.assertIn('Never deduplicate',calls[0]['contents'][0].parts[0].text);self.assertIn('exactly 4 JSON objects',calls[0]['contents'][0].parts[0].text)
  async def test_429_shared_quota_does_not_rotate_and_independent_does(self):
   from google.genai.errors import ClientError
   class Models:
