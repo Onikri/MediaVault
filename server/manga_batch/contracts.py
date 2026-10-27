@@ -51,5 +51,7 @@ def generation_schema(expected_ids=None):
         # Constrain the actual IDs, not just their shape: some models otherwise
         # mistake text/punctuation in the picture for the visual box label.
         props['uid']['enum'] = list(expected_ids)
-        props['connected_to_uid']['enum'] = list(expected_ids)
+        # Keep nullable connections unconstrained in Google's decoder. Their
+        # membership and acyclicity are checked locally; a singleton enum can
+        # otherwise encourage a self-link or an empty-array escape response.
     return {'type':'ARRAY','items':{'type':'OBJECT','required':[n for n,f in Translation.model_fields.items() if f.is_required()], 'properties':props}}

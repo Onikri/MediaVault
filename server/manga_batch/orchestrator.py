@@ -122,7 +122,7 @@ class RealtimeChapterOrchestrator:
                 # Keep coordinates, SoM and completed text, not up to128 full
                 # compressed originals while a quota window is closed.
                 for j in jobs:j.get('prepared',{}).pop('source_bytes',None)
-                if any(time.monotonic()-j['created']>900 for j in jobs):self.fail(jobs,ValueError('Квота Google не восстановилась за 15 минут. Повтори позже.'))
+                if any(time.monotonic()-j['created']>900 for j in jobs):self.fail(jobs,ValueError('Google не завершил перевод за 15 минут. Повтори позже.'))
                 else:self.requeue(jobs,e.seconds)
             except asyncio.CancelledError:raise
             except Exception as e:self.fail(jobs,e)

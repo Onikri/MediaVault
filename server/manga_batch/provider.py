@@ -107,6 +107,10 @@ class GemmaBatchTranslator:
                     # constrained IDs. Retry smaller fragments, never guess a
                     # missing translation or attach text to a different box.
                     if len(ids)>1:raise BatchTooLarge('Incomplete multi-region reply') from error
+                    # A malformed fallback must not discard completed chapter
+                    # fragments while the primary is only temporarily cooling
+                    # down. Let the orchestrator retain them and retry it.
+                    if isinstance(last,Deferred):raise last
                     raise ProviderUnavailable('Неполный или некорректный JSON Google. Оригинал сохранён.') from error
                 raise ProviderUnavailable('Ошибка Google API'+(' · HTTP '+str(code) if code else '')+'. Проверь ключ, доступ к модели и квоту.') from error
         if isinstance(last,Deferred):raise last

@@ -155,6 +155,18 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
     self.assertEqual(provider.calls,[2,1,1]);self.assertEqual([v['regions'][0]['uid'] for v in values],['P1_B1','P2_B1'])
     hits,pending=await engine.window(source,1);self.assertEqual(len(hits),2);self.assertFalse(pending)
    finally:await engine.close();await cache.close()
+ async def test_empty_fallback_keeps_work_pending_until_primary_recovers(self):
+  now=[0];q=QuotaPacer(clock=lambda:now[0]);await q.limited('gemma-4-31b-it',30,project_wide=False)
+  class Models:
+   def __init__(self):self.generated=[]
+   async def count_tokens(self,**kw):return NS(total_tokens=100)
+   async def generate_content(self,**kw):
+    self.generated.append(kw['model']);value=[row('P1_B1')] if kw['model']=='gemma-4-31b-it' else []
+    return NS(text=json.dumps(value),candidates=[NS(finish_reason='STOP')],usage_metadata=None)
+  m=Models();provider=GemmaBatchTranslator(q,'/unused',client=NS(aio=NS(models=m)));pages=[{'page':1,'width':100,'height':100,'regions':[{'uid':'P1_B1'}],'som':b'x'}]
+  with self.assertRaises(Deferred):await provider.translate(pages)
+  now[0]=31;values,meta=await provider.translate(pages)
+  self.assertEqual(len(values),1);self.assertEqual(meta['model'],'gemma-4-31b-it');self.assertEqual(m.generated,['gemma-4-26b-a4b-it','gemma-4-31b-it'])
  async def test_singleflight_batches_dense_split_and_cache_replay(self):
   class Files:
    def __init__(self):self.leases=0
