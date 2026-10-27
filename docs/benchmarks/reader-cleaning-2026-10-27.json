@@ -1,0 +1,29 @@
+{
+  "regression": {
+    "changed": 2706,
+    "methods": [
+      "adaptive-glyph-fill"
+    ],
+    "unpainted": 1,
+    "layouts": 1,
+    "warnings": [
+      "Очищено 1 из 2 областей. Остальные сохранены в оригинале; перевод доступен под страницей."
+    ],
+    "failurePreserved": true
+  },
+  "realLaMa": {
+    "ms": 190112.5,
+    "methods": [
+      "lama"
+    ],
+    "unpainted": 0,
+    "layouts": 1,
+    "timings": {
+      "inpaintMs": 189853.30000001192,
+      "typesetMs": 40.69999998807907,
+      "renderMs": 190098.69999998808
+    },
+    "warnings": []
+  },
+  "provenance": "Actual LaMa WASM, original pinned weights served locally; not a Google inference benchmark."
+}

@@ -28,6 +28,7 @@ export default defineConfig({
   server: {port: 8080, strictPort: true,watch:{ignored:path=>path.replaceAll('\\','/').startsWith(resolve(projectRoot,'.codex-local').replaceAll('\\','/')+'/')}},
   preview: {port: 8080, strictPort: true},
   esbuild: {jsx: 'automatic'},
+  worker: {format: 'es'},
   build: {
     outDir: 'dist',
     emptyOutDir: true,

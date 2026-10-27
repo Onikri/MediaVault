@@ -1,0 +1,32 @@
+// Actual canvas/worker/Cyrillic fonts; optional real LaMa WASM with pinned local
+// weights: MANGA_REAL_LAMA=1 npm run test:cleaning. No Google calls in this test.
+const assert=require('node:assert/strict'),fs=require('node:fs/promises'),{createReadStream}=require('node:fs'),path=require('node:path'),{chromium}=require('playwright');let browser,vite;
+(async()=>{
+ const root=path.resolve(__dirname,'..'),out=path.join(root,'test-output'),real=process.env.MANGA_REAL_LAMA==='1',port=7889;await fs.mkdir(out,{recursive:true});
+ process.env.WXT_LAMA_INPAINT_MODEL_REPO='http://127.0.0.1:'+port+'/models';
+ await fs.writeFile(path.join(out,'cleaning.html'),'<html><meta name="viewport" content="width=device-width,initial-scale=1"><canvas id="view" style="max-width:100%"></canvas><script type="module">import{DirectChapter}from"/src/manga-direct.js";import{renderComicPage}from"/src/manga-renderer.js";window.DirectChapter=DirectChapter;window.renderComicPage=renderComicPage;</script></html>');
+ const{createServer}=await import('vite');vite=await createServer({root,envPrefix:['VITE_','WXT_'],logLevel:'error',plugins:[{name:'local-verified-model',configureServer(server){server.middlewares.use(async(req,res,next)=>{
+  const p=new URL(req.url,'http://fixture').pathname;
+  if(p==='/models/lama-manga-dynamic.onnx'){const file=path.join(out,'quality-models/lama.onnx'),stat=await fs.stat(file);res.setHeader('Content-Type','application/octet-stream');res.setHeader('Content-Length',stat.size);createReadStream(file).pipe(res);return;}
+  if(p.startsWith('/lmt/ort-wasm-')){const file=path.join(root,'node_modules/onnxruntime-web/dist',path.basename(p));res.setHeader('Content-Type',p.endsWith('.wasm')?'application/wasm':'text/javascript');createReadStream(file).on('error',()=>{res.statusCode=404;res.end();}).pipe(res);return;}
+  next();
+ });}}],server:{host:'127.0.0.1',port,strictPort:true}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ const page=await browser.newPage({viewport:{width:900,height:800}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(240000);await page.goto('http://127.0.0.1:'+port+'/test-output/cleaning.html');await page.waitForFunction(()=>window.renderComicPage);
+ const result=await page.evaluate(async()=>{
+  const canvas=document.createElement('canvas');canvas.width=600;canvas.height=500;const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,600,500);ctx.fillStyle='black';ctx.font='bold 27px sans-serif';ctx.fillText('HELLO FRIEND',65,90);ctx.fillRect(370,200,150,80);
+  const blob=await new Promise(r=>canvas.toBlob(r)),source=await createImageBitmap(blob),raw=ctx.getImageData(0,0,600,500).data.slice();
+  const regions=[{uid:'P1_B1',text_bbox:[60,60,290,100],ru_translation:'Привет, друг!',font_style:'standard_comic',text_category:'dialogue'},{uid:'P1_B2',text_bbox:[370,200,520,280],ru_translation:'Сложный фон',font_style:'standard_comic',text_category:'dialogue'}],page={width:600,height:500,regions,timings:{}};
+  const chapter=new window.DirectChapter({entries:[],scope:'fixture',config:{inpaint:'fast',cache:false}});
+  const output=await chapter.canvasTask({blob,page,mode:'fast'});ctx.drawImage(output.renderedBitmap,0,0);output.renderedBitmap.close();
+  const after=ctx.getImageData(0,0,600,500).data;let changed=0;for(let n=0;n<raw.length;n+=4)if(raw[n]!==after[n])changed++;
+  if(after[(220*600+400)*4]!==0)throw Error('Unsafe region changed');
+  const local=await window.renderComicPage({blob,page:{...page,regions:[{...regions[0],text_bbox:[60,60,290,100]},{...regions[1],text_bbox:[340,180,550,300]}]},mode:'quality',lama:async()=>{throw Error('fixture unavailable');}});local.renderedBitmap.close();
+  window.fixture={blob,page:{...page,regions:regions.slice(0,1)},chapter};
+  const view=document.getElementById('view');view.width=600;view.height=500;view.getContext('2d').drawImage(canvas,0,0);source.close();
+  return {changed,methods:output.inpaint.methods,unpainted:output.inpaint.unpainted,layouts:output.typesetting.layouts.length,warnings:output.warnings,failurePreserved:local.inpaint.unpainted>0};
+ });
+ assert.ok(result.changed>100);assert.equal(result.layouts,1);assert.equal(result.unpainted,1);assert.ok(result.warnings.length);assert.ok(result.failurePreserved);await page.screenshot({path:path.join(out,'manga-cleaning-regression.png')});
+ let measured;
+ if(real){measured=await page.evaluate(async()=>{const {chapter,blob,page}=window.fixture,start=performance.now(),output=await chapter.canvasTask({blob,page,mode:'quality'});document.getElementById('view').getContext('2d').drawImage(output.renderedBitmap,0,0);output.renderedBitmap.close();return{ms:performance.now()-start,methods:output.inpaint.methods,unpainted:output.inpaint.unpainted,layouts:output.typesetting.layouts.length,timings:output.timings,warnings:output.warnings};});assert.deepEqual(measured.methods,['lama']);assert.equal(measured.unpainted,0);assert.equal(measured.layouts,1);await page.screenshot({path:path.join(out,'manga-cleaning-real-lama.png')});}
+ await page.evaluate(()=>window.fixture.chapter.close());assert.deepEqual(errors,[]);await fs.writeFile(path.join(out,'manga-cleaning-result.json'),JSON.stringify({regression:result,realLaMa:measured||null,provenance:real?'Actual LaMa WASM, original pinned weights served locally; not a Google inference benchmark.':'Actual worker and cleanup; injected model failure only, no neural inference.'},null,2));console.log('PASS safe per-region cleanup, no whole-page Telea crash, immutable original, measured Cyrillic fitting'+(real?' + actual LaMa WASM':'')+(measured?' '+Math.round(measured.ms)+'ms':''));
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();await fs.rm(path.resolve(__dirname,'../test-output/cleaning.html'),{force:true});});

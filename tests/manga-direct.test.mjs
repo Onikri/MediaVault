@@ -8,7 +8,7 @@ import {englishTextBoxes} from '../src/manga-fast-detect.js';
 const page=n=>({id:'P'+n,page:n,width:600,height:850,mime:'image/webp',image:'fixture',detectionMs:3,regions:[{id:'P'+n+'_B1',bbox:[100,100,300,250]}]});
 const reply=rows=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(rows)}]}}]});
 test('direct mode is a separate compact cache variant without personal secrets',()=>{
- const c=translationConfig({engine:'direct',apiKey:'private-fixture'});assert.equal(c.engine,'direct');assert.equal(c.directModel,'gemma-4-26b-a4b-it');assert.equal(c.inpaint,'fast');assert.equal(c.font,'auto');
+ const c=translationConfig({engine:'direct',apiKey:'private-fixture'});assert.equal(c.engine,'direct');assert.equal(c.directModel,'gemma-4-26b-a4b-it');assert.equal(c.inpaint,'hybrid');assert.equal(c.font,'auto');
  const variant=resultConfig(c);assert.equal(variant.direction,'rtl');assert.ok(!JSON.stringify(variant).includes('private-fixture'));assert.notDeepEqual(variant,resultConfig({...c,engine:'vm'}));assert.notDeepEqual(variant,resultConfig({...c,directModel:'gemma-4-31b-it'}));
 });
 test('one compact single-image request, RTL context, no OCR transcription or expensive schema',()=>{
@@ -26,12 +26,12 @@ test('strict UID and Russian validation preserve exact local geometry and font s
 });
 test('personal key travels only in Google header, quota errors do not retry or leak response',async()=>{
  const calls=[];const fetcher=async(url,request)=>{calls.push({url,request});return{ok:false,status:429,text:async()=>JSON.stringify({error:{message:'private-fixture'}})};};
- await assert.rejects(callDirectGoogle([page(1)],{key:'private-fixture',fetcher}),e=>/Лимит/.test(e.message)&&!e.message.includes('private-fixture'));
+ await assert.rejects(callDirectGoogle([page(1)],{key:'private-fixture',fetcher,gemmaProfile:'compat'}),e=>/Лимит/.test(e.message)&&!e.message.includes('private-fixture'));
  assert.equal(calls.length,1);assert.match(calls[0].url,/generativelanguage.googleapis.com\/v1beta\/models\/gemma-4-26b-a4b-it:generateContent$/);assert.equal(calls[0].request.headers['x-goog-api-key'],'private-fixture');assert.ok(!calls[0].request.body.includes('private-fixture'));assert.equal(calls[0].request.credentials,'omit');
 });
 test('Google call has a bounded deadline and reports timeout without background retries',async()=>{
  const keepAlive=setTimeout(()=>{},80);
- try{await assert.rejects(callDirectGoogle([page(1)],{key:'fixture',timeoutMs:10,fetcher:async(_,r)=>new Promise((resolve,reject)=>r.signal.addEventListener('abort',()=>reject(r.signal.reason),{once:true}))}),/0\.01 с/);}finally{clearTimeout(keepAlive);}
+ try{await assert.rejects(callDirectGoogle([page(1)],{key:'fixture',gemmaProfile:'compat',timeoutMs:10,fetcher:async(_,r)=>new Promise((resolve,reject)=>r.signal.addEventListener('abort',()=>reject(r.signal.reason),{once:true}))}),/0\.01 с/);}finally{clearTimeout(keepAlive);}
 });
 function chapter(extra={}){
  const calls=[],cache=new Map();
@@ -53,6 +53,10 @@ test('cache is reusable before asking for a key; bad model result can be manuall
  let n=0;const other=chapter({google:async pages=>{if(!n++)throw Error('Google unavailable');return {pages:pages.map(p=>({...p,regions:[]}))};}});
  await assert.rejects(other.c.render(new Blob(['first']),0,'auto',null,{},new AbortController().signal),/unavailable/);
  await other.c.render(new Blob(['first']),0,'auto',null,{},new AbortController().signal);assert.equal(n,2);other.c.close();
+});
+test('retrying a failed renderer reuses translated JSON and does not call Google again',async()=>{
+ let renders=0;const {c,calls}=chapter({renderPage:async(blob,page)=>{if(!renders++)throw Error('renderer fixture');return {regions:page.regions,timings:{}};}}),signal=new AbortController().signal;
+ await assert.rejects(c.render(new Blob(['first']),0,'auto',null,{},signal),error=>error.stage==='render');await c.render(new Blob(['first']),0,'auto',null,{},signal);assert.equal(calls.length,1);c.close();
 });
 test('personal keys are separated by user and never stored in localStorage',()=>{
  setDirectKey('one','fixture-one');setDirectKey('two','fixture-two');assert.equal(directKey('one'),'fixture-one');assert.equal(directKey('two'),'fixture-two');setDirectKey('one','');assert.equal(directKey('one'),'');assert.throws(()=>setDirectKey('x','bad\nkey'),/Проверь/);setDirectKey('two','');

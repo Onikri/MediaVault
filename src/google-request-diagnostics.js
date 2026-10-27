@@ -23,25 +23,27 @@ export function safeDiagnosticExport(d){
 // XHR exposes request-upload events that Fetch does not expose. Upload elapsed
 // includes connection/CORS; headers waiting includes Google and network time.
 // Neither is advertised as pure wire time or model inference time.
-export function xhrGoogle({url,key,json,signal,timeoutMs,onEvent,xhrFactory=()=>new XMLHttpRequest()}){
+export function xhrGoogle({url,key,json,signal,timeoutMs,onEvent,onChunk,idleTimeoutMs=0,xhrFactory=()=>new XMLHttpRequest()}){
  return new Promise((resolve,reject)=>{
-  const xhr=xhrFactory(),start=performance.now();let uploadEnd=null,headersAt=null,firstAt=null,settled=false;
+  const xhr=xhrFactory(),start=performance.now();let uploadEnd=null,headersAt=null,firstAt=null,settled=false,cursor=0,idleTimer;
   const elapsed=()=>Math.round(performance.now()-start),emit=(phase,extra={})=>onEvent?.({phase,elapsedMs:elapsed(),...extra});
-  const cleanup=()=>signal?.removeEventListener('abort',abort),finish=(fn,value)=>{if(settled)return;settled=true;cleanup();fn(value);};
+  const cleanup=()=>{clearTimeout(idleTimer);signal?.removeEventListener('abort',abort);},finish=(fn,value)=>{if(settled)return;settled=true;cleanup();fn(value);};
+  const resetIdle=()=>{if(!idleTimeoutMs)return;clearTimeout(idleTimer);idleTimer=setTimeout(()=>{finish(reject,Object.assign(Error('Gemma не присылает данные '+idleTimeoutMs/1000+' с.'),{name:'TimeoutError'}));xhr.abort();},idleTimeoutMs);};
+  const feed=()=>{if(!onChunk||settled)return true;const part=(xhr.responseText||'').slice(cursor);cursor=(xhr.responseText||'').length;if(!part)return true;try{onChunk(part);resetIdle();return true;}catch(error){finish(reject,error);xhr.abort();return false;}};
   const abort=()=>{xhr.abort();finish(reject,signal.reason||new DOMException('Отменено','AbortError'));};
   if(signal?.aborted){finish(reject,signal.reason);return;}
   signal?.addEventListener('abort',abort,{once:true});
   xhr.open('POST',url);xhr.timeout=timeoutMs;xhr.withCredentials=false;
   xhr.setRequestHeader('Content-Type','application/json');xhr.setRequestHeader('x-goog-api-key',key);
   xhr.upload.onprogress=e=>emit('uploading',{uploadLoaded:e.loaded,uploadTotal:e.lengthComputable?e.total:null});
-  xhr.upload.onload=()=>{uploadEnd=elapsed();emit('waiting',{uploadMs:uploadEnd,uploadLoaded:byteLength(json),uploadTotal:byteLength(json)});};
-  xhr.onreadystatechange=()=>{if(xhr.readyState>=2&&headersAt===null){headersAt=elapsed();emit('headers',{httpStatus:xhr.status,headersMs:headersAt,waitAfterUploadMs:uploadEnd===null?null:Math.max(0,headersAt-uploadEnd)});}};
-  xhr.onprogress=e=>{if(firstAt===null){firstAt=elapsed();emit('receiving',{firstByteMs:firstAt});}emit('receiving',{downloadLoaded:e.loaded,downloadTotal:e.lengthComputable?e.total:null});};
-  xhr.onload=()=>{const end=elapsed();emit('received',{httpStatus:xhr.status,networkMs:end,downloadMs:headersAt===null?null:Math.max(0,end-headersAt),responseBytes:byteLength(xhr.responseText||'')});finish(resolve,{status:xhr.status,text:xhr.responseText||'',retryAfter:xhr.getResponseHeader('Retry-After')});};
+  xhr.upload.onload=()=>{uploadEnd=elapsed();resetIdle();emit('waiting',{uploadMs:uploadEnd,uploadLoaded:byteLength(json),uploadTotal:byteLength(json)});};
+  xhr.onreadystatechange=()=>{if(xhr.readyState>=2&&xhr.status>0&&headersAt===null){headersAt=elapsed();emit('headers',{httpStatus:xhr.status,headersMs:headersAt,waitAfterUploadMs:uploadEnd===null?null:Math.max(0,headersAt-uploadEnd)});}};
+  xhr.onprogress=e=>{if(firstAt===null){firstAt=elapsed();emit('receiving',{firstByteMs:firstAt});}if(!feed())return;emit('receiving',{downloadLoaded:e.loaded,downloadTotal:e.lengthComputable?e.total:null});};
+  xhr.onload=()=>{if(!feed())return;const end=elapsed();emit('received',{httpStatus:xhr.status,networkMs:end,downloadMs:headersAt===null?null:Math.max(0,end-headersAt),responseBytes:byteLength(xhr.responseText||'')});finish(resolve,{status:xhr.status,text:xhr.responseText||'',retryAfter:xhr.getResponseHeader('Retry-After')});};
   xhr.onerror=()=>finish(reject,Error('Сетевая ошибка или CORS: браузер не получил ответ Google.'));
   xhr.ontimeout=()=>finish(reject,Object.assign(Error('Google не ответил за '+timeoutMs/1000+' с.'),{name:'TimeoutError'}));
   xhr.onabort=()=>finish(reject,signal?.reason||new DOMException('Отменено','AbortError'));
-  emit('sending',{sentAt:Date.now()});try{xhr.send(json);}catch(error){finish(reject,error);}
+  emit('sending',{sentAt:Date.now()});resetIdle();try{xhr.send(json);}catch(error){finish(reject,error);}
  });
 }
 export async function fetchGoogle({url,key,json,signal,timeoutMs,onEvent,fetcher}){

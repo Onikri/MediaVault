@@ -28,9 +28,10 @@ export class DirectChapter{
   this.jobs.set(index,job);this.notify(index,{phase:'queued',message:background?'Готовим следующую страницу заранее':'Быстрый режим · готовим страницу на устройстве'});
   queueMicrotask(()=>this.drain());return job;
  }
+ async jsonCacheId(blob,index){return await this.cacheKey(blob,{...this.config,direction:this.direction,font:'auto',inpaint:'fast'},this.scope)+':chapter='+encodeURIComponent(this.config.contextKey||'chapter')+':page='+index;}
  async cached(job){
   const sourceStart=performance.now(),blob=job.blob||await this.entries[job.index].async('blob');job.sourceReadMs=Math.round(performance.now()-sourceStart);const cacheStart=performance.now();this.controller.signal.throwIfAborted();job.blob=blob;
-  job.cacheId=await this.cacheKey(blob,{...this.config,direction:this.direction},this.scope)+':chapter='+encodeURIComponent(this.config.contextKey||'chapter')+':page='+job.index;
+  job.cacheId=await this.jsonCacheId(blob,job.index);
   if(this.config.cache&&!this.bypass.has(job.index)){const hit=await this.readCache(job.cacheId,this.scope);if(hit?.kind==='manga-json'&&hit.page)return {...hit.page,cacheHit:true};}
   job.cacheMs=Math.round(performance.now()-cacheStart);return null;
  }
@@ -56,10 +57,10 @@ export class DirectChapter{
      const regions=nonempty.reduce((n,p)=>n+p.regions.length,0);
      if(regions>100)throw Error('Слишком много реплик для быстрого запроса. Выбери одну страницу за запрос.');
      for(const job of group)this.notify(job.index,{phase:'translating',message:'Напрямую в Google · '+nonempty.length+' стр., минимальные размышления',model:this.config.directModel,totalRegions:prepared.find(p=>p.page===job.index+1)?.regions.length,completedRegions:0,attempt:1});
-     const start=performance.now();const answer=await this.google(nonempty,{key,model:this.config.directModel,direction:this.direction,context:[...this.context].filter(([i])=>i<first.index).sort((a,b)=>a[0]-b[0]).map(([,text])=>text).join('\n').slice(-1200),signal:this.controller.signal,timeoutMs:this.config.directTimeoutMs,onDiagnostic:value=>{
-      const names={prepared:'Запрос подготовлен',sending:'Отправляем в Google · соединение и CORS',uploading:'Отправляем изображение в Google',waiting:'Изображение отправлено · ждём Google',headers:'Google начал отвечать',receiving:'Получаем ответ Google',received:'Ответ получен · проверяем JSON',complete:'JSON проверен',error:'Ошибка Google'};
+     const start=performance.now();const answer=await this.google(nonempty,{key,model:this.config.directModel,direction:this.direction,gemmaProfile:this.config.gemmaProfile||'native',context:[...this.context].filter(([i])=>i<first.index).sort((a,b)=>a[0]-b[0]).map(([,text])=>text).join('\n').slice(-1200),signal:this.controller.signal,timeoutMs:this.config.directTimeoutMs,onDiagnostic:value=>{
+      const names={prepared:'Запрос подготовлен',sending:'Отправляем в Google · соединение и CORS',uploading:'Отправляем изображение в Google',waiting:'Изображение отправлено · ждём Google',headers:'Google начал отвечать',streaming:'Gemma присылает перевод · поток активен',receiving:'Получаем ответ Google',received:'Ответ получен · проверяем JSON',complete:'JSON проверен',error:'Ошибка Google'};
       const local={sourceBytes:first.blob?.size,queueMs:first.queueMs,sourceReadMs:first.sourceReadMs,fingerprintAndCacheMs:first.cacheMs,clientPreparationMs:first.prepareMs,...first.prepared?.prepareTimings};
-      first.diagnostics={...value,local};for(const job of group)this.notify(job.index,{phase:'translating',message:names[value.stage]||'Google · обработка',model:this.config.directModel,diagnostics:first.diagnostics});
+      first.diagnostics={...value,local};for(const job of group)this.notify(job.index,{phase:'translating',message:names[value.stage]||'Google · обработка',model:this.config.directModel,completedRegions:value.metrics?.completedRegions||0,totalRegions:first.prepared?.regions.length,diagnostics:first.diagnostics});
      }});
      diagnostics=first.diagnostics||answer.diagnostics;cloudMs=Math.round(performance.now()-start);translated=answer.pages;usage=answer.usage;
     }
@@ -81,10 +82,13 @@ export class DirectChapter{
   signal?.throwIfAborted();const listeners=this.listeners.get(index)||new Set();if(status)listeners.add(status);this.listeners.set(index,listeners);
   const last=this.progress.get(index);if(last)status?.(last);
   try{
+   const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v2:'+this.config.inpaint+':'+font;
+   if(this.config.cache&&!this.bypass.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
    const job=this.request(index,blob,background),stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
    this.notify(index,{phase:'cleaning',message:page.cacheHit?'Из кэша устройства · вставляем русский текст':'Лёгкая очистка и русский набор',completedRegions:page.regions.length,totalRegions:page.regions.length,diagnostics:page.diagnostics});
-   const painting=this.renderPage(blob,page,font).then(result=>{if(signal?.aborted){result.renderedBitmap?.close();throw signal.reason;}return result;});
-   const result=await waitFor(painting,signal);signal?.throwIfAborted();
+   const painting=this.renderPage(blob,page,font,value=>this.notify(index,{...value,completedRegions:value.cleanedRegions||0,totalRegions:page.regions.filter(r=>r.ru_translation?.trim()).length,diagnostics:page.diagnostics})).then(result=>{if(signal?.aborted){result.renderedBitmap?.close();throw signal.reason;}return result;});
+   let result;try{result=await waitFor(painting,signal);}catch(error){error.stage='render';throw error;}signal?.throwIfAborted();
+   if(this.config.cache&&result.cacheImage){const {renderedBitmap,cacheImage,diagnostics,...save}=result;await this.writeCache(renderCacheId,this.scope,{...save,renderedImage:cacheImage,renderedMime:'image/webp'});}delete result.cacheImage;
    result.timings={...result.timings,directTotalMs:Math.round(performance.now()-(fromMemory?renderStarted:job.started))};
    if(page.diagnostics)result.diagnostics={...page.diagnostics,stage:'ready',local:{...page.diagnostics.local,inpaintMs:result.timings.inpaintMs,typesetMs:result.timings.typesetMs,renderMs:result.timings.renderMs,totalMs:result.timings.directTotalMs}};
    return result;
@@ -92,17 +96,17 @@ export class DirectChapter{
  }
  invalidate(index){if(this.jobs.get(index)?.state==='running')return;this.jobs.delete(index);this.progress.delete(index);this.bypass.add(index);}
  prefetch(index){if(this.jobs.has(index-1)&&index<this.entries.length&&!this.jobs.has(index)&&this.getKey(this.keyScope))this.request(index,null,true);}
- renderCanvas(blob,page,font){
-  return this.canvasTask({blob,page,font});
+ renderCanvas(blob,page,font,status){
+  return this.canvasTask({blob,page,font,mode:this.config.inpaint||'hybrid',cache:this.config.cache},status);
  }
- canvasTask(message){
+ canvasTask(message,status){
   this.controller.signal.throwIfAborted();
   if(!this.worker){
    this.worker=new Worker(new URL('./manga-canvas.worker.js',import.meta.url),{type:'module'});
-   this.worker.onmessage=({data})=>{const job=this.renders.get(data.id);if(job){this.renders.delete(data.id);data.error?job.reject(Error(data.error)):job.resolve(data.result);}};
+   this.worker.onmessage=({data})=>{const job=this.renders.get(data.id);if(job){if(data.status){job.status?.(data.status);return;}this.renders.delete(data.id);data.error?job.reject(Error(data.error)):job.resolve(data.result);}};
    this.worker.onerror=()=>{for(const job of this.renders.values())job.reject(Error('Не удалось отрисовать страницу. Повтори перевод.'));this.renders.clear();this.worker?.terminate();this.worker=null;};
   }
-  const id=++this.serial;return new Promise((resolve,reject)=>{this.renders.set(id,{resolve,reject});this.worker.postMessage({id,...message});});
+  const id=++this.serial;return new Promise((resolve,reject)=>{this.renders.set(id,{resolve,reject,status});this.worker.postMessage({id,...message});});
  }
  close(){this.controller.abort(cancelled());this.worker?.terminate();for(const job of [...this.jobs.values(),...this.renders.values()])job.reject(this.controller.signal.reason);this.jobs.clear();this.renders.clear();this.listeners.clear();this.progress.clear();this.context.clear();}
 }

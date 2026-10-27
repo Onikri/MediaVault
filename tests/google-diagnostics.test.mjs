@@ -25,5 +25,5 @@ test('XHR abort/timeout release caller and cannot turn into an unbounded wait',a
  const controller=new AbortController();let xhr;
  const factory=()=>xhr={upload:{},open(){},setRequestHeader(){},send(){},abort(){this.onabort();}};
  const task=xhrGoogle({url:'https://google.fixture',key:'private',json:'{}',signal:controller.signal,timeoutMs:10,xhrFactory:factory});controller.abort();await assert.rejects(task,{name:'AbortError'});
- const timeout=xhrGoogle({url:'https://google.fixture',key:'private',json:'{}',timeoutMs:10,xhrFactory:factory});xhr.ontimeout();await assert.rejects(timeout,{name:'TimeoutError'});
+ const seen=[];const timeout=xhrGoogle({url:'https://google.fixture',key:'private',json:'{}',timeoutMs:10,onEvent:e=>seen.push(e),xhrFactory:factory});xhr.readyState=4;xhr.status=0;xhr.onreadystatechange();assert.ok(!seen.some(e=>e.phase==='headers'));xhr.ontimeout();await assert.rejects(timeout,{name:'TimeoutError'});
 });

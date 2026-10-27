@@ -100,6 +100,7 @@ jobs:
             npm run test:ui &&
             npm run test:vm &&
             npm run test:direct &&
+            npm run test:cleaning &&
             npm run test:browser &&
             npm run test:voices &&
             npm run test:design &&

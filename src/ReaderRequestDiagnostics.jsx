@@ -9,9 +9,11 @@ export default function ReaderRequestDiagnostics({value:d,now}){
  function download(){const blob=new Blob([JSON.stringify(d.requestBody,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mediavault-google-request.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
  async function copy(){try{await navigator.clipboard.writeText(JSON.stringify(safeDiagnosticExport(d),null,2));setMessage('Отчёт скопирован. API-ключ исключён.');}catch{setMessage('Не удалось скопировать. Выдели JSON ниже.');}}
  return <details className="reader-request-diagnostics"><summary>Запрос Google и подробные метрики</summary><div className="reader-request-body">
-  <p><strong>{d.model}</strong> · {d.pages} стр. · {d.boxes} блоков · HTTP {d.httpStatus||'не получен'}</p>
+  <p><strong>{d.model}</strong> · {d.protocol||'JSON'} · {d.pages} стр. · {d.boxes} блоков · HTTP {d.httpStatus||'не получен'}</p>
   <p>JSON запроса: <strong>{bytes(d.requestBytes)}</strong> / {bytes(d.limitBytes)} inline-данных. Максимум ответа: {d.requestBody?.generationConfig?.maxOutputTokens} токенов. Квота запросов и токенов в минуту зависит от проекта Google.</p>
   {d.modelInputLimit&&<p>Лимиты модели по документации: вход {d.modelInputLimit.toLocaleString('ru-RU')} токенов, выход {d.modelOutputLimit?.toLocaleString('ru-RU')}. Это размер контекста, не минутная квота ключа.</p>}
+  {m.chunks>0&&<p>Поток: {m.chunks} событий · {m.streamChars||0} символов · {m.completedRegions||0} завершённых реплик. Новые данные подтверждают работу запроса.</p>}
+  {d.idleTimeoutMs>0&&<p>Gemma: ожидание новых данных до {d.idleTimeoutMs/1000} с; общий предел {d.timeoutMs/1000} с. MINIMAL отключает thinking у Gemma.</p>}
   {m.sentAt&&d.stage!=='ready'&&d.stage!=='complete'&&d.stage!=='error'&&<p role="status">С начала отправки: {Math.max(0,(now-m.sentAt)/1000).toFixed(1)} с · тайм-аут {d.timeoutMs/1000} с{Number.isFinite(m.uploadLoaded)?' · отправлено '+bytes(m.uploadLoaded)+(m.uploadTotal?' / '+bytes(m.uploadTotal):''):''}</p>}
   <dl>{rows.map(([name,n])=><div key={name}><dt>{name}</dt><dd>{time(n)}</dd></div>)}</dl>
   <p className="reader-hint">Отсчёт начинается после получения исходника читалкой. Браузер не отделяет время соединения/CORS от отправки, а работу модели — от сетевого ожидания. Неизмеренные значения показаны прочерком или пометкой, без выдуманной скорости.</p>
