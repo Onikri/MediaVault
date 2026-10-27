@@ -4,10 +4,10 @@ import {GemmaQueue} from '../src/gemma-queue.js';
 import {translationConfig,resultConfig} from '../src/manga-translation.js';
 test('Gemma cache profile excludes OCR, client credentials and translation weights',()=>{
  const config=translationConfig({engine:'gemma',apiKey:'do-not-store',serverModel:'irrelevant'});
- assert.equal(config.engine,'gemma');assert.equal(config.font,'auto');
- const key=resultConfig(config);assert.equal(key.ocr,'none');assert.equal(key.mode,'gemma');
- assert.equal(key.translator,'google-gemma4-pool');assert.equal(key.apiKey,undefined);assert.equal(key.host,undefined);
- assert.notDeepEqual(key,resultConfig({...config,gemmaPromptVersion:'new-prompt'}));
+ assert.equal(config.engine,'vm');assert.equal(config.font,'auto');
+ const key=resultConfig(config);assert.equal(key.ocr,undefined);assert.equal(key.engine,'vm');
+ assert.equal(key.translator,undefined);assert.equal(key.apiKey,undefined);assert.equal(key.host,undefined);
+ assert.notDeepEqual(key,resultConfig({...config,vmPolicy:'new-prompt'}));
 });
 test('up to four queued pages share a batch; visible work stays first',async()=>{
  const calls=[],q=new GemmaQueue(async inputs=>{calls.push(inputs);return inputs;});

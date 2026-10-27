@@ -7,7 +7,7 @@ export function fontForStyle(style,override='auto'){
  return {standard_comic:'comic-relief',bold_scream:'comic-relief',handwritten_sloppy:'pangolin',serif_serious:'serif',digital_box:'mono',sfx_art:'neucha'}[style]||'comic-relief';
 }
 export async function drawStyledRegion(ctx,region,fontOverride='auto'){
- const [x1,y1,x2,y2]=region.bbox,a=region.appearance||{},style=region.font_style||'standard_comic';
+ const [x1,y1,x2,y2]=(region.layout_bbox||region.bbox),a=region.appearance||{},style=region.font_style||'standard_comic';
  const id=fontForStyle(style,fontOverride),font=id==='serif'?'Georgia, "Times New Roman", serif':id==='mono'?'Consolas, "Courier New", monospace':await loadMangaFont(id);
  const bold=!!a.bold,italic=!!a.italic,w=x2-x1,h=y2-y1,angle=Math.max(-90,Math.min(90,Number(a.rotation)||0))*Math.PI/180;
  const quarter=Math.abs(angle)>Math.PI/4,baseW=quarter?h:w,baseH=quarter?w:h;

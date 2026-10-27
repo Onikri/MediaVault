@@ -1,0 +1,34 @@
+{
+  "provenance": "Actual Chromium OffscreenCanvas, real Cyrillic fonts and cleanup, explicit fixture translations/coordinates; not a physical phone or Google translation benchmark",
+  "canvas": [
+    600,
+    850
+  ],
+  "runs": [
+    {
+      "viewportWidth": 390,
+      "timings": [
+        {
+          "inpaintMs": 19.30000001192093,
+          "typesetMs": 0.5,
+          "renderMs": 68.5
+        }
+      ]
+    },
+    {
+      "viewportWidth": 1366,
+      "timings": [
+        {
+          "inpaintMs": 26.900000035762787,
+          "typesetMs": 0.8999999761581421,
+          "renderMs": 77.90000003576279
+        },
+        {
+          "inpaintMs": 8.199999988079071,
+          "typesetMs": 0.20000004768371582,
+          "renderMs": 16.100000023841858
+        }
+      ]
+    }
+  ]
+}

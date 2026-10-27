@@ -1,5 +1,13 @@
 {$SERVER_NAME} {
     encode zstd gzip
+    handle /api/v1/* {
+        request_body {
+            max_size 512KB
+        }
+        reverse_proxy manga-batch:7863 {
+            flush_interval -1
+        }
+    }
     handle /reader/lmt/* {
         request_body {
             max_size 14MB

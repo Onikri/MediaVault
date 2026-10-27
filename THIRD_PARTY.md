@@ -237,3 +237,10 @@ SIL Open Font License 1.1. Файлы WOFF2 поставляются с сайт
 - Kellenok/PP-OCRv6_manga v0.2 (Apache-2.0), ревизия `62375557b5b0a4b2bc8e05484a97c7ea1df7229e`. Детектор DB и CTC recognizer поставляются отдельно; включён полный словарь (18 708 символов). Web postprocess использует прямоугольный DB unclip, не точный полигональный OpenCV unclip.
 - mosesb/best-comic-panel-detection, `bbab11504194d0b341ac3f6099f3592aa0604ae3`, YOLOv12x, только панели. Карточка помечена Apache-2.0, архитектура/рантайм Ultralytics AGPL-3.0; сохраняем обе ссылки и применимые требования AGPL к нашему адаптеру. Веса не включены в Git/Pages.
 - MAGI, Ragav Sachdeva / Andrew Zisserman, The Manga Whisperer, https://github.com/ragavsachdeva/magi, https://huggingface.co/ragavsachdeva/magi, `15ad498ad45093ad3b833d625728220c6309ad99`. В upstream не указан отдельный LICENSE; исходники/веса MAGI не перепубликуются в проекте. Наш самостоятельно реализованный detection-only адаптер использует проверенные safetensors и Transformers, не `trust_remote_code`. Модель скачивается оператором отдельно для сравнений. OCR/character clustering MAGI не объявляются реализованными.
+
+
+### Пакетный VM JSON-путь (27 октября 2026)
+
+- `src/manga-canvas.worker.js` импортирует Telea из Libre Manga Translator; новый изолированный Worker и `src/manga-typeset.js` распространяются под AGPL-3.0-or-later. Полный соответствующий исходник опубликован в этом репозитории; текст лицензии — `lmt/upstream/LICENSE`. Связь читалки с Worker — стандартные сообщения и ImageBitmap. Шрифты остаются под SIL OFL1.1.
+- Google Gen AI Python SDK `google-genai==2.33.0`, Apache-2.0: https://github.com/googleapis/python-genai . API-ключ принадлежит владельцу проекта и не включается в исходники/Pages. Используются только бесплатные Gemma4; платные Gemini fallback по умолчанию отсутствуют.
+- redis-py6.4.0 (MIT), https://github.com/redis/redis-py . Сервис использует отдельный официальный Redis7.4.6 image; лицензии Redis относятся к серверному контейнеру и поставляются upstream. Данные перевода шифруются до записи в Redis/SQLite.

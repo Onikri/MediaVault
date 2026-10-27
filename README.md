@@ -273,3 +273,10 @@ pipeline с локальными OCR/WebLLM/inpainting и режимом сво�
 и Lanczos3 в дополнение к Anime4K и FSRCNN. [Сравнение и ограничения](docs/video-upscalers.md).
 `npm run test:lmt` проверяет запуск/отмену web-port, `npm run test:gpu` —
 реальную компиляцию/рендер шейдеров (без подтверждения скорости физической GPU).
+
+
+### Пакетный перевод: полностью локально или ВМ
+
+В читалке два места обработки. Локальный режим оставляет страницы на устройстве (Hy-MT2/Index). Новый режим ВМ читает CBZ прямо с Drive, ищет координаты RT-DETR и переводит до четырёх сканов через бесплатные Gemma4; клиент получает JSON по SSE и очищает/набирает страницу в Worker. Старый серверный Hy-MT2/Index остаётся вариантом сравнения. Ключ AI Studio устанавливается закрытой формой владельца на ВМ.
+
+Полная архитектура, реальные ограничения и различие замеров/фикстур: [ARCHITECTURE_AND_SPEC.md](ARCHITECTURE_AND_SPEC.md). Установка sidecar без перезапуска importer: [install-manga-batch.py](deploy/oracle/install-manga-batch.py). Не переключайте рабочий сайт на новый VM default до установки сервиса. Тесты: `npm run test:vm`, `python -m unittest discover -s tests -p test_manga_batch.py`.

@@ -1,3 +1,7 @@
+# Исторический протокол гибридного перевода
+
+Этот первоначальный вариант с детектором на устройстве заменён серверным RT-DETR, чтением Drive напрямую и SSE JSON. Актуальная реализация и ограничения: [ARCHITECTURE_AND_SPEC.md](../ARCHITECTURE_AND_SPEC.md). Описание ниже сохранено для сравнения; оно не описывает текущий основной путь.
+
 # Gemma: device → own VM → Google → device
 
 This opt-in reader mode translates English, Japanese and Korean pages into Russian

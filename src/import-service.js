@@ -9,10 +9,11 @@ export function validateServer(value){
 function storedServer(){try{return validateServer(window.MEDIA_VAULT_CONFIG?.importServerUrl||localStorage.getItem('mediavault_import_server')||'');}catch{return '';}}
 export function createImportClient(server,googleToken,fetcher=fetch){
   let session=null,signing=null;
-  async function request(path,{method='GET',body,auth=true,headers={},signal}={}){
+  async function request(path,{method='GET',body,auth=true,headers={},signal,raw=false}={}){
     if(!server)throw Error('Сервер импорта ещё не подключён.');
     if(auth&&!session)await authenticate();
     const response=await fetcher(server+path,{method,signal:signal||AbortSignal.timeout(['/sources/discover','/sources/calendar'].includes(path)?90000:path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
+    if(raw&&response.ok)return response;
     const result=await response.json().catch(()=>({}));
     if(!response.ok){if(response.status===401)session=null;throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status});}
     return result;
@@ -113,5 +114,6 @@ export function useImportService(state,actions){
   },[state.catalog,!!state.busy,session?.driveConnected,session?.serverVersion]);
   async function operation(id,op){const task=await client.request('/jobs/'+encodeURIComponent(id)+'/'+op,{method:'POST'});setJobs(old=>old.map(value=>value.id===id?task:value));return task;}
   return {server,setServer,status,error,session,jobs,active,connect,submit,refresh,configureGoogle,enrichLibrary,
+    openReaderChapter:(item,names,direction,signal)=>client.request('/api/v1/chapters',{method:'POST',body:{library_id:live.current.libraryId,item_id:item.id,vault_key:actions.getServerKey(),names,direction},signal}),
     request:client.request,cancel:id=>operation(id,'cancel'),resume:id=>operation(id,'resume')};
 }

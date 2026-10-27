@@ -1,0 +1,73 @@
+{
+  "provenance": "ACTUAL native ORT detection and RAM-only Pillow/WebP, no Google API call",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "modelSha256": "5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79",
+  "modelBytes": 11120765,
+  "sessionLoadMs": 16515.13,
+  "sample": "japanese.png",
+  "runs": [
+    {
+      "preprocessMs": 84.7,
+      "inferenceMs": 1398.24,
+      "detectionMs": 1484.42,
+      "somMs": 13.56,
+      "somBytes": 10994,
+      "somWidth": 900,
+      "somHeight": 260,
+      "regions": 3
+    },
+    {
+      "preprocessMs": 54.66,
+      "inferenceMs": 693.58,
+      "detectionMs": 749.98,
+      "somMs": 11.91,
+      "somBytes": 10994,
+      "somWidth": 900,
+      "somHeight": 260,
+      "regions": 3
+    },
+    {
+      "preprocessMs": 13.89,
+      "inferenceMs": 704.79,
+      "detectionMs": 720.36,
+      "somMs": 11.96,
+      "somBytes": 10994,
+      "somWidth": 900,
+      "somHeight": 260,
+      "regions": 3
+    },
+    {
+      "preprocessMs": 48.23,
+      "inferenceMs": 712.07,
+      "detectionMs": 762.42,
+      "somMs": 75.86,
+      "somBytes": 10994,
+      "somWidth": 900,
+      "somHeight": 260,
+      "regions": 3
+    },
+    {
+      "preprocessMs": 16.04,
+      "inferenceMs": 824.5,
+      "detectionMs": 841.79,
+      "somMs": 18.38,
+      "somBytes": 10994,
+      "somWidth": 900,
+      "somHeight": 260,
+      "regions": 3
+    },
+    {
+      "preprocessMs": 47.84,
+      "inferenceMs": 748.05,
+      "detectionMs": 797.17,
+      "somMs": 48.87,
+      "somBytes": 10994,
+      "somWidth": 900,
+      "somHeight": 260,
+      "regions": 3
+    }
+  ],
+  "medianDetectionMs": 779.795,
+  "medianSomMs": 15.969999999999999
+}

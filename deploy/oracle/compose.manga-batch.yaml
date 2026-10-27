@@ -1,0 +1,36 @@
+# Overlay on the EXISTING Oracle compose project. No cloud resources or public
+# model port. Importer is not rebuilt or restarted. A1 ARM64, 2 OCPU / 12 GiB.
+services:
+  manga-batch:
+    platform: linux/arm64
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile.manga-batch
+    restart: unless-stopped
+    cpus: 2
+    mem_limit: 2g
+    memswap_limit: 2g
+    read_only: true
+    tmpfs: [/tmp:size=32m,uid=1000,gid=1000,mode=1777]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    environment:
+      ALLOWED_ORIGIN: https://onikri.github.io
+      REDIS_URL: redis://manga-redis:6379/0
+      GEMMA_TPM_BUDGET: '13000'
+      GEMMA_RPM_BUDGET: '14'
+      # Set to 1 ONLY after Google quota dimensions confirm separate pools.
+      GEMMA_INDEPENDENT_POOLS: '0'
+    volumes:
+      - ${MANGA_BATCH_DATA:-/opt/mediavault-manga-batch/data}:/data
+      - ${IMPORTER_DATA_DIR:-/opt/mediavault/data}:/importer:ro
+      - ${MANGA_BATCH_MODELS:-/opt/mediavault-manga-batch/models}:/models:ro
+    depends_on: [manga-redis]
+  manga-redis:
+    image: redis:7.4.6-alpine
+    restart: unless-stopped
+    mem_limit: 192m
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    command: [redis-server,--save,'',--appendonly,'no',--maxmemory,128mb,--maxmemory-policy,allkeys-lru]

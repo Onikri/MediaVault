@@ -62,6 +62,6 @@ export async function renderGemmaPage(bytes,config,progress){
   return {engine:'RT-DETR → own backend → Google Gemma → LaMa',inputMode:'vision',sourceLanguage:config.language,targetLanguage:'ru',machineTranslation:true,renderedImage,renderedMime:blob.type,...(config.returnCleaned?{cleanedImage:await cleanBlob.arrayBuffer()}:{}),
    timings:{detectionMs:prepared.detectionMs,ocrMs:0,translationMs:config.cloudMs||0,inpaintMs,typesetMs},usage:config.usage||[],warnings,
    typesetting:{engine:'source-style-cyrillic-v1',font:config.font||'auto',layouts},inpaint:{requested:config.inpaint||'quality',methods:[...new Set(cleaned.regions.map(r=>r.method))],unpainted:blocked.size},
-   regions:result.regions.map(r=>({id:r.id,x:r.bbox[0]/bitmap.width,y:r.bbox[1]/bitmap.height,w:(r.bbox[2]-r.bbox[0])/bitmap.width,h:(r.bbox[3]-r.bbox[1])/bitmap.height,text:r.translation,original:'',placement:'note',fontStyle:r.font_style,speechStyle:r.speech_style,status:r.status,appearance:r.appearance}))};
+   regions:result.regions.map(r=>({id:r.id,x:r.bbox[0]/bitmap.width,y:r.bbox[1]/bitmap.height,w:(r.bbox[2]-r.bbox[0])/bitmap.width,h:(r.bbox[3]-r.bbox[1])/bitmap.height,text:r.translation,original:r.source_text||'',placement:'note',fontStyle:r.font_style,speechStyle:r.speech_style,status:r.status,appearance:r.appearance}))};
  }finally{bitmap?.close();URL.revokeObjectURL(url);if(cleanedUrl&&cleanedUrl!==url)URL.revokeObjectURL(cleanedUrl);}
 }
