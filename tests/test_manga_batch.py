@@ -68,8 +68,10 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
    async def generate_content(self,**kwargs):
     calls.append(kwargs);return NS(text=json.dumps([row('P'+str(i)+'_B1') for i in range(1,5)]),candidates=[NS(finish_reason='STOP')],usage_metadata=NS(prompt_token_count=90,candidates_token_count=50))
   provider=GemmaBatchTranslator(QuotaPacer(),'/no-key',client=NS(aio=NS(models=Models())))
-  pages=[{'page':i,'width':100,'height':100,'regions':[{'uid':'P'+str(i)+'_B1'}],'som':b'image-fixture'} for i in range(1,5)]
+  pages=[{'page':i,'width':100,'height':100,'regions':[{'uid':'P'+str(i)+'_B1','text_bbox':[123.123456789,234.23456789,345.3456789,456.456789],'bubble_bbox':[100.123456789,200.123456789,400.123456789,500.123456789],'layout_bbox':[100.123456789,200.123456789,400.123456789,500.123456789],'confidence':.987654321,'detection_class':'text_bubble'}],'som':b'image-fixture'} for i in range(1,5)]
   values,meta=await provider.translate(pages);self.assertEqual(len(values),4);self.assertEqual(meta['model'],'gemma-4-31b-it');self.assertEqual(sum(p.inline_data is not None for p in calls[0]['contents'][0].parts),4);self.assertEqual(calls[0]['config'].thinking_config.thinking_level,'MINIMAL')
+  metadata=[json.loads(p.text) for p in calls[0]['contents'][0].parts if p.text and p.text.startswith('{"page"')]
+  self.assertEqual(metadata[0]['regions'],[{'uid':'P1_B1','kind':'text_bubble'}]);self.assertLess(len(json.dumps(metadata[0]['regions'])),len(json.dumps(pages[0]['regions']))/3)
   schema=calls[0]['config'].response_schema
   self.assertEqual(schema['items']['properties']['uid']['enum'],[f'P{i}_B1' for i in range(1,5)])
   self.assertNotIn('minItems',schema);self.assertNotIn('maxItems',schema)
@@ -149,11 +151,11 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
     return {r['uid']:row(r['uid']) for p in pages for r in p['regions']},{'model':'fixture'}
   with tempfile.TemporaryDirectory() as d:
    cache=JsonCache(d);provider=Provider();engine=RealtimeChapterOrchestrator(None,Detector(),provider,cache,batch_timeout=.02)
-   source={'scope':'timeout-fixture','manifest':'m','names':['1','2'],'archive':Archive()}
+   source={'scope':'timeout-fixture','manifest':'m','names':['1','2','3'],'archive':Archive()}
    try:
     _,jobs=await engine.window(source,1);values=await asyncio.wait_for(asyncio.gather(*(j['future'] for j in jobs)),1)
-    self.assertEqual(provider.calls,[2,1,1]);self.assertEqual([v['regions'][0]['uid'] for v in values],['P1_B1','P2_B1'])
-    hits,pending=await engine.window(source,1);self.assertEqual(len(hits),2);self.assertFalse(pending)
+    self.assertIn(2,provider.calls);self.assertEqual(provider.calls.count(1),3);self.assertEqual([v['regions'][0]['uid'] for v in values],['P1_B1','P2_B1','P3_B1'])
+    hits,pending=await engine.window(source,1);self.assertEqual(len(hits),3);self.assertFalse(pending)
    finally:await engine.close();await cache.close()
  async def test_empty_fallback_keeps_work_pending_until_primary_recovers(self):
   now=[0];q=QuotaPacer(clock=lambda:now[0]);await q.limited('gemma-4-31b-it',30,project_wide=False)
@@ -220,11 +222,53 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
    self.assertEqual(len(result),1);self.assertEqual(len(calls),2);self.assertNotIn('systemInstruction',calls[0][1]);self.assertIn('systemInstruction',calls[1][1]);self.assertIn('LOCALIZATION',calls[0][1]['contents'][0]['parts'][0]['text']);self.assertEqual(meta['inputTokens'],110)
   finally:await client.aio.aclose()
 
+ async def test_ready_prefetch_page_is_cached_and_delivered_before_a_later_fragment_fails(self):
+  from manga_batch.provider import BatchTooLarge
+  from manga_batch.progress import report
+  entered=asyncio.Event();release=asyncio.Event()
+  class Files:
+   def __init__(self):self.leases=0
+   def acquire(self):self.leases+=1
+   def release(self):self.leases-=1
+   def page(self,name):return b'fixture'
+  class Detector:
+   def detect(self,data,page,rtl):return Image.new('RGB',(100,100),'white'),[{'uid':f'P{page}_B1','text_bbox':[10,10,80,80],'bubble_bbox':None,'layout_bbox':[10,10,80,80]}],{}
+  class Provider:
+   async def translate(self,pages):
+    report('google','Observed model request',model='fixture')
+    if len(pages)>1:raise BatchTooLarge('split fixture')
+    if pages[0]['page']==3:
+     entered.set();await release.wait();raise RuntimeError('later-page failure')
+    return {r['uid']:row(r['uid']) for p in pages for r in p['regions']},{'model':'fixture'}
+  with tempfile.TemporaryDirectory() as d:
+   cache=JsonCache(d);files=Files();engine=RealtimeChapterOrchestrator(None,Detector(),Provider(),cache)
+   source={'scope':'incremental','manifest':'m','names':['1','2','3'],'archive':files}
+   try:
+    _,jobs=await engine.window(source,1);await asyncio.wait_for(entered.wait(),2)
+    self.assertTrue(jobs[0]['future'].done());self.assertTrue(jobs[1]['future'].done());self.assertFalse(jobs[2]['future'].done())
+    cached=await cache.get(engine.key(source,2),source['scope']);self.assertEqual(cached['regions'][0]['uid'],'P2_B1')
+    progress=engine.snapshot(jobs[2]);self.assertEqual(progress['phase'],'google');self.assertEqual(progress['attempt'],2);self.assertEqual(progress['totalRegions'],1);self.assertEqual(progress['completedRegions'],0)
+    self.assertNotIn('source_bytes',json.dumps(progress));release.set()
+    with self.assertRaisesRegex(RuntimeError,'later-page'):await jobs[2]['future']
+    self.assertEqual((await cache.get(engine.key(source,2),source['scope']))['page'],2)
+    self.assertEqual(files.leases,0)
+   finally:release.set();await engine.close();await cache.close()
+
+ async def test_progress_callbacks_are_isolated_between_concurrent_model_requests(self):
+  from manga_batch.progress import observing,report
+  a=[];b=[]
+  async def task(name,events):
+   with observing(events.append):
+    report('counting',name);await asyncio.sleep(.001);report('google',name)
+  await asyncio.gather(task('first',a),task('second',b));report('ignored','outside')
+  self.assertEqual([v['message'] for v in a],['first','first']);self.assertEqual([v['message'] for v in b],['second','second'])
+
 class HttpContracts(unittest.IsolatedAsyncioTestCase):
  async def test_authentication_and_sse_cache_order(self):
   import httpx
   from manga_batch.app import app,owner
   class Engine:
+   def snapshot(self,j):return {'page':j['page'],'revision':1,'phase':'queued','message':'Waiting'}
    async def window(self,s,current):
     f=asyncio.get_running_loop().create_future();f.set_result({'page':2,'policy':'p'})
     return [{'page':1,'cacheHit':True}],[{'future':f,'page':2}]
@@ -239,5 +283,34 @@ class HttpContracts(unittest.IsolatedAsyncioTestCase):
    module.session=fake_session
    try:
     response=await client.get('/api/v1/chapters/session/stream?currentPage=1',headers={'Origin':'https://onikri.github.io'})
-    self.assertEqual(response.status_code,200);self.assertIn('text/event-stream',response.headers['content-type']);self.assertEqual(response.headers['access-control-allow-origin'],'https://onikri.github.io');self.assertLess(response.text.index('"page":1'),response.text.index('"page":2'));self.assertIn('event: complete',response.text);self.assertEqual(response.headers['cache-control'],'no-store')
+    self.assertEqual(response.status_code,200);self.assertIn('text/event-stream',response.headers['content-type']);self.assertEqual(response.headers['access-control-allow-origin'],'https://onikri.github.io');self.assertLess(response.text.index('"page":1'),response.text.index('"page":2'));self.assertIn('event: complete',response.text);self.assertIn('no-store',response.headers['cache-control']);self.assertIn('no-transform',response.headers['cache-control']);self.assertEqual(response.headers['content-encoding'],'identity')
    finally:module.session=original;app.dependency_overrides.clear()
+
+ async def test_live_sse_progress_precedes_results_and_a_ready_page_does_not_wait_for_tail(self):
+  import manga_batch.app as module
+  from manga_batch.app import stream,app
+  one=asyncio.get_running_loop().create_future();two=asyncio.get_running_loop().create_future()
+  state={'phase':'queued','message':'Queued','revision':1}
+  class Engine:
+   async def window(self,s,current):return [],[{'page':1,'future':one},{'page':2,'future':two}]
+   def snapshot(self,job):return {**state,'page':job['page'],'completedRegions':0,'totalRegions':4,'serverTimeMs':int(time.time()*1000)}
+  class Request:
+   async def is_disconnected(self):return False
+  request=Request();request.app=app;app.state.engine=Engine();old_session=module.session
+  async def get_session(id,subject):return {'names':['1','2']}
+  module.session=get_session;iterator=None
+  try:
+   response=await stream('fixture',request,1,'owner');iterator=response.body_iterator
+   self.assertIn('event: ready',await anext(iterator))
+   self.assertIn('"phase":"queued"',await anext(iterator));await anext(iterator)
+   state.update(phase='google',message='Actual stage changed',revision=2)
+   first_update=await asyncio.wait_for(anext(iterator),1);self.assertIn('"phase":"google"',first_update);await anext(iterator)
+   one.set_result({'page':1,'regions':[]});event=await asyncio.wait_for(anext(iterator),1)
+   self.assertIn('event: page_translated',event);self.assertIn('"page":1',event);self.assertFalse(two.done())
+   two.set_exception(ValueError('tail failure'));event=await anext(iterator);self.assertIn('event: page_error',event);self.assertIn('tail failure',event)
+   self.assertIn('event: complete',await anext(iterator))
+  finally:
+   module.session=old_session
+   if iterator:await iterator.aclose()
+   for future in [one,two]:
+    if not future.done():future.cancel()

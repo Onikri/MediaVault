@@ -44,3 +44,12 @@
 .reader-image-stack{position:relative}
 .reader-google-key label{display:grid;gap:6px}
 .reader-google-key input{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.reader-live-progress{flex:1;min-width:0;display:grid;gap:4px;padding:3px 0}
+.reader-live-progress>span{overflow-wrap:anywhere;line-height:1.45}
+.reader-live-progress>small{font-size:10px;color:#b8b0a2;line-height:1.55;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.reader-live-progress>progress{width:100%;max-width:420px;height:3px;border:0;accent-color:#d8ac76}
+.reader-live-progress-error>span{color:#f0b4a7}
+.reader-live-progress>button{justify-self:start;font-size:11px}
+.reader-translation-notice{align-items:flex-start}
+.reader-translation-notice>svg{flex:none;margin-top:8px}
+.reader-translation-notice>button{flex:none;align-self:center}

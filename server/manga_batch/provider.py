@@ -5,6 +5,7 @@ from pathlib import Path
 from .contracts import MODEL_IDS, generation_schema, validate_reply
 from .prompt import SYSTEM_PROMPT
 from .quota import Deferred
+from .progress import report
 
 class ProviderUnavailable(Exception):pass
 class BatchTooLarge(Exception):pass
@@ -29,7 +30,7 @@ class GemmaBatchTranslator:
         ids=[]
         for p in pages:
             ids.extend(r['uid'] for r in p['regions'])
-            parts.extend([types.Part.from_text(text=json.dumps({'page':p['page'],'width':p['width'],'height':p['height'],'regions':p['regions']},ensure_ascii=False)),types.Part.from_bytes(data=p['som'],mime_type='image/webp')])
+            parts.extend([types.Part.from_text(text=json.dumps({'page':p['page'],'width':p['width'],'height':p['height'],'regions':[{'uid':r['uid'],'kind':r.get('detection_class','text')} for r in p['regions']]},ensure_ascii=False)),types.Part.from_bytes(data=p['som'],mime_type='image/webp')])
         schema=generation_schema(ids)
         parts.insert(0,types.Part.from_text(text='Return exactly '+str(len(ids))+' JSON objects, one for EVERY UID in this list, in this order: '+json.dumps(ids)+'. Copy IDs exactly, including P and B. Never deduplicate identical-looking pages. uid is the label, never punctuation or recognized dialogue.'))
         if not self.schema:
@@ -43,12 +44,14 @@ class GemmaBatchTranslator:
         for model in models:
             config=None;lease=None
             try:
+                report('counting','Подсчитываем размер запроса к Google',model=model,batchPages=len(pages),batchRegions=len(ids))
                 count=await client.aio.models.count_tokens(model=model,contents=count_contents)
                 # CountTokens may omit schema overhead. Reserve a measured prompt
                 # count plus a conservative allowance, then settle actual usage.
                 tokens=int(count.total_tokens)+768
                 if tokens>self.pacer.tpm:raise BatchTooLarge('Input token budget exceeded')
                 lease=await self.pacer.reserve([model],tokens)
+                report('google','Google переводит размеченные страницы',model=model,inputTokens=tokens,batchPages=len(pages),batchRegions=len(ids))
                 config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT,temperature=0,max_output_tokens=min(16384,max(2048,1024+256*len(ids))),**({'response_mime_type':'application/json'} if self.json_mode else {}),thinking_config=types.ThinkingConfig(thinking_level='MINIMAL'),safety_settings=[types.SafetySetting(category='HARM_CATEGORY_'+c,threshold='BLOCK_NONE') for c in ['HARASSMENT','HATE_SPEECH','DANGEROUS_CONTENT','SEXUALLY_EXPLICIT']],**({'response_schema':schema} if self.schema else {}))
                 started=time.perf_counter();response=await client.aio.models.generate_content(model=model,contents=contents,config=config)
                 usage=response.usage_metadata
@@ -58,10 +61,13 @@ class GemmaBatchTranslator:
                 if reason.endswith('MAX_TOKENS'):raise BatchTooLarge('Output truncated')
                 if not reason.endswith('STOP'):raise ProviderUnavailable('Google не завершил перевод: '+reason)
                 raw=(response.text or '').strip();raw=re.sub(r'^```(?:json)?\s*|\s*```$','',raw)
+                report('validating','Проверяем полноту ответа и номера реплик',model=model)
                 rows=validate_reply(json.loads(raw),ids)
                 return rows,{'model':model,'cloudMs':round((time.perf_counter()-started)*1000,2),'inputTokens':usage.prompt_token_count if usage else None,'outputTokens':usage.candidates_token_count if usage else None,'pages':len(pages),'boxes':len(ids),'structuredOutput':bool(config.response_schema),'jsonMime':self.json_mode}
             except BatchTooLarge:raise
-            except Deferred as error:last=error;continue
+            except Deferred as error:
+                report('waiting','Google: пауза перед следующей попыткой',model=model,retryAfterSeconds=error.seconds)
+                last=error;continue
             except Exception as error:
                 code=getattr(error,'code',None)
                 if code==429:
@@ -83,8 +89,11 @@ class GemmaBatchTranslator:
                     dimensions += [d['quotaDimensions'] for d in entries if isinstance(d,dict) and 'quotaDimensions' in d]
                     per_model=bool(dimensions) and all(d.get('model',d.get('base_model')) in (model,'models/'+model) for d in dimensions)
                     await self.pacer.limited(model,delay,project_wide=not per_model)
+                    report('quota','Google ограничил частоту запросов · ожидаем квоту',model=model,errorCode=429,retryAfterSeconds=delay)
                     last=Deferred(delay);continue
-                if code==404:self.disabled.add(model);last=error;continue
+                if code==404:
+                    report('switching_model','Модель недоступна · выбираем резервную',model=model,errorCode=404)
+                    self.disabled.add(model);last=error;continue
                 message=str(error).lower()
                 if code==400 and ('response_mime' in message or 'mime type' in message) and (self.json_mode or config and config.response_mime_type):
                     if lease is not None:await self.pacer.account(lease,0)
@@ -93,6 +102,7 @@ class GemmaBatchTranslator:
                     if lease is not None:await self.pacer.account(lease,0)
                     self.schema=False;raise Deferred(.05)
                 if code in (500,502,503,504):
+                    report('server_retry','Google вернул ошибку · повторяем меньшим запросом',model=model,errorCode=code)
                     # A rejected/server-failed request has no usage to settle.
                     # Don't let its estimate permanently starve the smaller
                     # request or alternate model. Retain RPM; actual 429s still
@@ -100,13 +110,17 @@ class GemmaBatchTranslator:
                     # ambiguous, so keep that reservation conservatively.
                     if lease is not None and code!=504:await self.pacer.account(lease,0)
                     if len(pages)>1:raise BatchTooLarge('Google failed the multi-page request') from error
-                    await self.pacer.limited(model,30,project_wide=False);last=Deferred(30);continue
+                    await self.pacer.limited(model,30,project_wide=False)
+                    report('waiting','Основная модель восстанавливается · пробуем резервную',model=model,retryAfterSeconds=30)
+                    last=Deferred(30);continue
                 if isinstance(error,(ValueError,json.JSONDecodeError)) and config is None:raise ProviderUnavailable('Подсчёт токенов Google недоступен. Оригинал сохранён.') from error
                 if isinstance(error,(ValueError,json.JSONDecodeError)):
                     # Similar pages can be semantically deduplicated even with
                     # constrained IDs. Retry smaller fragments, never guess a
                     # missing translation or attach text to a different box.
-                    if len(ids)>1:raise BatchTooLarge('Incomplete multi-region reply') from error
+                    if len(ids)>1:
+                        report('splitting','Ответ неполный · переводим меньшими фрагментами',model=model)
+                        raise BatchTooLarge('Incomplete multi-region reply') from error
                     # A malformed fallback must not discard completed chapter
                     # fragments while the primary is only temporarily cooling
                     # down. Let the orchestrator retain them and retry it.

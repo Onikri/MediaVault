@@ -47,7 +47,7 @@ async def bounds(request,call_next):
         try:length=int(request.headers.get('content-length','0'))
         except ValueError:return JSONResponse({'detail':'Некорректный Content-Length.'},status_code=400)
         if length>512*1024:return JSONResponse({'detail':'Запрос превышает 512 КиБ.'},status_code=413)
-    response=await call_next(request);response.headers['Cache-Control']='no-store';return response
+    response=await call_next(request);response.headers['Cache-Control']='no-store, no-transform' if response.headers.get('content-type','').startswith('text/event-stream') else 'no-store';return response
 
 def owner(authorization:str=Header(default='')):
     if not authorization.startswith('Bearer '):raise HTTPException(401,'Войди в профиль владельца ВМ.')
@@ -71,7 +71,7 @@ async def session(id,subject):
 @app.get('/api/v1/manga-translation/status')
 async def status(request:Request):
     engine=request.app.state.engine
-    return {'ready':request.app.state.detector_ready and engine.translator.configured(),'configured':engine.translator.configured(),'detectorReady':request.app.state.detector_ready,'models':list(MODEL_IDS),'policy':POLICY,'maxPages':4,'maxBoxes':65,'prefetchPages':12,'serverInpaint':False,'quota':engine.translator.pacer.snapshot(),'message':'Пакетный перевод Gemma 4 · JSON → устройство' if engine.translator.configured() else 'Установи ключ Google AI Studio в настройках ВМ.'}
+    return {'ready':request.app.state.detector_ready and engine.translator.configured(),'configured':engine.translator.configured(),'detectorReady':request.app.state.detector_ready,'models':list(MODEL_IDS),'policy':POLICY,'maxPages':4,'maxBoxes':65,'prefetchPages':12,'serverInpaint':False,'progressVersion':1,'foregroundPages':1,'quota':engine.translator.pacer.snapshot(),'message':'Пакетный перевод Gemma 4 · JSON → устройство' if engine.translator.configured() else 'Установи ключ Google AI Studio в настройках ВМ.'}
 @app.post('/api/v1/manga-translation/key')
 async def configure(body:GoogleKey,request:Request,subject=Depends(owner)):
     key=body.key.get_secret_value().strip()
@@ -121,16 +121,26 @@ async def stream(id:str,request:Request,currentPage:int=1,subject=Depends(owner)
     if not 1<=currentPage<=len(s['names']):raise HTTPException(422,'Страницы нет в главе.')
     async def events():
         yield event('ready',{'policy':POLICY,'currentPage':currentPage})
-        hits,jobs=await request.app.state.engine.window(s,currentPage)
+        engine=request.app.state.engine
+        try:hits,jobs=await engine.window(s,currentPage)
+        except Exception as error:
+            yield event('page_error',{'page':currentPage,'message':str(error)[:500]})
+            yield event('complete',{'currentPage':currentPage});return
         for hit in hits:yield event('page_translated',hit)
-        pending={j['future']:j['page'] for j in jobs}
+        pending={j['future']:j for j in jobs};versions={};last_heartbeat=time.monotonic()
         while pending:
             if await request.is_disconnected():return
-            done,_=await asyncio.wait(pending,timeout=10,return_when=asyncio.FIRST_COMPLETED)
-            if not done:yield event('status',{'message':'Переводим пакет или ожидаем квоту Google.'});continue
+            for job in pending.values():
+                value=engine.snapshot(job)
+                if versions.get(job['page'])!=value['revision']:
+                    versions[job['page']]=value['revision'];yield event('progress',value)
+            done,_=await asyncio.wait(pending,timeout=.75,return_when=asyncio.FIRST_COMPLETED)
             for f in done:
-                page=pending.pop(f)
+                job=pending.pop(f)
                 try:yield event('page_translated',f.result())
-                except Exception as e:yield event('page_error',{'page':page,'message':str(e)[:500]})
+                except Exception as error:yield event('page_error',{'page':job['page'],'message':str(error)[:500]})
+            if time.monotonic()-last_heartbeat>=10:
+                yield event('heartbeat',{'serverTimeMs':int(time.time()*1000)})
+                last_heartbeat=time.monotonic()
         yield event('complete',{'currentPage':currentPage})
-    return StreamingResponse(events(),media_type='text/event-stream',headers={'X-Accel-Buffering':'no','Cache-Control':'no-store','Connection':'keep-alive'})
+    return StreamingResponse(events(),media_type='text/event-stream',headers={'X-Accel-Buffering':'no','Content-Encoding':'identity','Cache-Control':'no-store, no-transform','Connection':'keep-alive'})
