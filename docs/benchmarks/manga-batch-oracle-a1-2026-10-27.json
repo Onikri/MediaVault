@@ -96,6 +96,13 @@
       ],
       "replyRejected": true
     },
-    "fixture": "Four copies of the same public Japanese scan. This exposed semantic deduplication, not a sequential-page quality score. Fixed by exact array length and strict smaller-fragment fallback; post-fix cloud validation recorded separately."
+    "fixture": "Four copies of the same public Japanese scan. This exposed semantic deduplication, not a sequential-page quality score. Exact cardinality is validated locally; unsupported native minItems/maxItems are not sent. Slow, incomplete and server-failed batches split into smaller fragments.",
+    "primary500": {
+      "model": "gemma-4-31b-it",
+      "countedInputTokens": 6728,
+      "generateMs": 1811,
+      "http": 500,
+      "bug": "Unsettled token reservation could starve the fallback; resolved by releasing unconfirmed input reservations on explicit server failures and splitting the failed batch."
+    }
   }
 }

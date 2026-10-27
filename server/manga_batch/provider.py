@@ -93,7 +93,14 @@ class GemmaBatchTranslator:
                     if lease is not None:await self.pacer.account(lease,0)
                     self.schema=False;raise Deferred(.05)
                 if code in (500,502,503,504):
-                    await self.pacer.limited(model,5,project_wide=False);last=Deferred(5);continue
+                    # A rejected/server-failed request has no usage to settle.
+                    # Don't let its estimate permanently starve the smaller
+                    # request or alternate model. Retain RPM; actual 429s still
+                    # enforce Google's own quota/cooldown. A gateway timeout is
+                    # ambiguous, so keep that reservation conservatively.
+                    if lease is not None and code!=504:await self.pacer.account(lease,0)
+                    if len(pages)>1:raise BatchTooLarge('Google failed the multi-page request') from error
+                    await self.pacer.limited(model,30,project_wide=False);last=Deferred(30);continue
                 if isinstance(error,(ValueError,json.JSONDecodeError)) and config is None:raise ProviderUnavailable('Подсчёт токенов Google недоступен. Оригинал сохранён.') from error
                 if isinstance(error,(ValueError,json.JSONDecodeError)):
                     # Similar pages can be semantically deduplicated even with

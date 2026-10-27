@@ -117,6 +117,23 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
   pages=[{'page':i,'width':100,'height':100,'regions':[{'uid':f'P{i}_B1'}],'som':b'x'} for i in [1,2]]
   with self.assertRaises(BatchTooLarge):await p.translate(pages)
   with self.assertRaises(ProviderUnavailable):await p.translate(pages[1:])
+ async def test_google_500_does_not_reserve_phantom_tokens_or_repeat_a_large_request(self):
+  from google.genai.errors import ServerError
+  from manga_batch.provider import BatchTooLarge
+  class Models:
+   def __init__(self):self.calls=[]
+   async def count_tokens(self,**kw):return NS(total_tokens=7000)
+   async def generate_content(self,**kw):
+    self.calls.append(kw['model'])
+    if len(self.calls)==1:raise ServerError(500,{'error':{'message':'Internal error'}})
+    return NS(text=json.dumps([row('P1_B1')]),candidates=[NS(finish_reason='STOP')],usage_metadata=None)
+  m=Models();q=QuotaPacer();provider=GemmaBatchTranslator(q,'/unused',client=NS(aio=NS(models=m)))
+  pages=[{'page':i,'width':100,'height':100,'regions':[{'uid':f'P{i}_B1'}],'som':b'x'} for i in [1,2]]
+  with self.assertRaises(BatchTooLarge):await provider.translate(pages)
+  self.assertEqual(q.snapshot()['groups']['google-project'],{'reservedInputTokens':0,'requests':1})
+  values,meta=await provider.translate(pages[:1]);self.assertEqual(len(values),1);self.assertEqual(m.calls,['gemma-4-31b-it']*2)
+  m=Models();provider=GemmaBatchTranslator(QuotaPacer(),'/unused',client=NS(aio=NS(models=m)))
+  values,meta=await provider.translate(pages[:1]);self.assertEqual(meta['model'],'gemma-4-26b-a4b-it');self.assertEqual(len(values),1)
  async def test_slow_multi_page_cloud_call_splits_and_validated_pages_reach_cache(self):
   class Archive:
    def acquire(self):pass
