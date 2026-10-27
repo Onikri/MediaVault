@@ -39,7 +39,7 @@ def validate_reply(value, expected):
             seen.add(current); current = links[current]
     return {r.uid:r.model_dump() for r in rows}
 
-def generation_schema():
+def generation_schema(expected_ids=None):
     # Google's uppercase schema is kept explicit: no unsupported Pydantic $defs.
     props = {}
     for name,field in Translation.model_fields.items():
@@ -47,4 +47,9 @@ def generation_schema():
         props[name] = {'type':'STRING'}
         if enum and all(isinstance(v,str) for v in enum): props[name]['enum'] = list(enum)
     props['connected_to_uid'] = {'type':'STRING','nullable':True}
+    if expected_ids:
+        # Constrain the actual IDs, not just their shape: some models otherwise
+        # mistake text/punctuation in the picture for the visual box label.
+        props['uid']['enum'] = list(expected_ids)
+        props['connected_to_uid']['enum'] = list(expected_ids)
     return {'type':'ARRAY','items':{'type':'OBJECT','required':[n for n,f in Translation.model_fields.items() if f.is_required()], 'properties':props}}

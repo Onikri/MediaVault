@@ -70,6 +70,10 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
   provider=GemmaBatchTranslator(QuotaPacer(),'/no-key',client=NS(aio=NS(models=Models())))
   pages=[{'page':i,'width':100,'height':100,'regions':[{'uid':'P'+str(i)+'_B1'}],'som':b'image-fixture'} for i in range(1,5)]
   values,meta=await provider.translate(pages);self.assertEqual(len(values),4);self.assertEqual(meta['model'],'gemma-4-31b-it');self.assertEqual(sum(p.inline_data is not None for p in calls[0]['contents'][0].parts),4);self.assertEqual(calls[0]['config'].thinking_config.thinking_level,'MINIMAL')
+  schema=calls[0]['config'].response_schema
+  self.assertEqual(schema['items']['properties']['uid']['enum'],[f'P{i}_B1' for i in range(1,5)])
+  self.assertEqual(calls[0]['config'].max_output_tokens,2048)
+  self.assertIn('never deduplicate',calls[0]['contents'][0].parts[0].text)
  async def test_429_shared_quota_does_not_rotate_and_independent_does(self):
   from google.genai.errors import ClientError
   class Models:
@@ -90,6 +94,19 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
     return await super().generate_content(**kw)
   m=PerModel();p=GemmaBatchTranslator(QuotaPacer(independent=True),'/x',client=NS(aio=NS(models=m)))
   values,meta=await p.translate([{'page':1,'width':1,'height':1,'regions':[{'uid':'P1_B1'}],'som':b'x'}]);self.assertEqual(meta['model'],'gemma-4-26b-a4b-it');self.assertEqual(len(values),1)
+ async def test_rejected_model_budget_does_not_block_shared_pool_fallback(self):
+  from google.genai.errors import ClientError
+  class Models:
+   def __init__(self):self.calls=[]
+   async def count_tokens(self,**kw):return NS(total_tokens=7000)
+   async def generate_content(self,**kw):
+    self.calls.append(kw['model'])
+    if len(self.calls)==1:raise ClientError(429,{'error':{'message':'quota','details':[{'violations':[{'quotaDimensions':{'model':kw['model']}}]},{'retryDelay':'2s'}]}})
+    return NS(text=json.dumps([row('P1_B1')]),candidates=[NS(finish_reason='STOP')],usage_metadata=NS(prompt_token_count=6500,candidates_token_count=80))
+  models=Models();q=QuotaPacer();p=GemmaBatchTranslator(q,'/unused',client=NS(aio=NS(models=models)))
+  values,meta=await p.translate([{'page':1,'width':100,'height':100,'regions':[{'uid':'P1_B1'}],'som':b'x'}])
+  self.assertEqual(meta['model'],'gemma-4-26b-a4b-it');self.assertEqual(len(values),1)
+  window=q.snapshot()['groups']['google-project'];self.assertEqual(window['reservedInputTokens'],6500);self.assertEqual(window['requests'],2)
  async def test_singleflight_batches_dense_split_and_cache_replay(self):
   class Files:
    def __init__(self):self.leases=0
@@ -114,16 +131,17 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
   from google.genai.errors import ClientError
   for message in ['response_schema is unsupported','response_mime_type is unsupported']:
    class Models:
-    def __init__(self):self.calls=[]
+    def __init__(self):self.calls=[];self.parts=[]
     async def count_tokens(self,**kw):return NS(total_tokens=100)
     async def generate_content(self,**kw):
-     self.calls.append(kw['config'])
+     self.calls.append(kw['config']);self.parts.append(kw['contents'][0].parts)
      if len(self.calls)==1:raise ClientError(400,{'error':{'message':message}})
      return NS(text=json.dumps([row('P1_B1')]),candidates=[NS(finish_reason='STOP')],usage_metadata=None)
    m=Models();p=GemmaBatchTranslator(QuotaPacer(),'/x',client=NS(aio=NS(models=m)))
    pages=[{'page':1,'width':100,'height':100,'regions':[{'uid':'P1_B1'}],'som':b'x'}]
    with self.assertRaises(Deferred):await p.translate(pages)
    rows,meta=await p.translate(pages);self.assertEqual(len(rows),1);self.assertFalse(meta['structuredOutput']);self.assertIsNone(m.calls[-1].response_schema)
+   self.assertTrue(any('"ru_translation"' in (part.text or '') and 'Output JSON matching' in part.text for part in m.parts[-1]))
    if 'mime' in message:self.assertIsNone(m.calls[-1].response_mime_type)
 
  async def test_real_google_sdk_serializes_count_and_generate_contracts(self):
