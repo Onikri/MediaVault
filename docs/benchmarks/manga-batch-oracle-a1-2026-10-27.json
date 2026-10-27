@@ -104,5 +104,31 @@
       "http": 500,
       "bug": "Unsettled token reservation could starve the fallback; resolved by releasing unconfirmed input reservations on explicit server failures and splitting the failed batch."
     }
+  },
+  "postFixRecoveryStress": {
+    "provenance": "Actual production RT-DETR, SoM, primary/fallback Gemma provider, split/retry orchestrator and encrypted Redis/SQLite; four copies of one public Japanese scan with distinct page UIDs. This verifies strict completeness/recovery and cache, not sequential-page narrative translation quality or actual encrypted Drive reading.",
+    "codeCommit": "e60ea0d818dbcac972cbac37e27096a18510f3c8",
+    "completed": true,
+    "pages": 4,
+    "regions": 16,
+    "russianNonempty": 16,
+    "sharedFuture": true,
+    "cacheHits": 4,
+    "cachePending": 0,
+    "elapsedMs": 102948.94,
+    "cacheReplayMs": 1.144,
+    "apiRequests": 6,
+    "firstPageFirstSuccessfulFragment": {
+      "model": "gemma-4-26b-a4b-it",
+      "cloudMs": 5175.02,
+      "inputTokens": 1361,
+      "outputTokens": 205,
+      "pages": 1,
+      "boxes": 2,
+      "structuredOutput": true,
+      "jsonMime": true
+    },
+    "importerNotRestarted": true,
+    "googleApiKeyFileMode": "0o600"
   }
 }
