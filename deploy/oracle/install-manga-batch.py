@@ -85,10 +85,17 @@ try:
         }
     }
 '''
-    if 'handle /api/v1/*' not in original:
+    if 'reverse_proxy @mangaBatch manga-batch:7863' in original:
+        proposed=original
+    elif 'handle /api/v1/*' not in original:
         anchor='    handle /reader/lmt/* {'
-        if anchor not in original:raise RuntimeError('Unknown Caddy routing; review before applying')
-        proposed=original.replace(anchor,route+anchor,1)
+        if anchor in original:proposed=original.replace(anchor,route+anchor,1)
+        elif '    reverse_proxy @lmt lmt:7861' in original:
+            # Older production configuration uses named matchers rather than
+            # handle blocks. Keep its request limits and existing proxies.
+            batch_route='    @mangaBatch path /api/v1/*\n    reverse_proxy @mangaBatch manga-batch:7863 {\n        flush_interval -1\n    }\n'
+            proposed=original.replace('    reverse_proxy @lmt lmt:7861',batch_route+'    reverse_proxy @lmt lmt:7861',1)
+        else:raise RuntimeError('Unknown Caddy routing; review before applying')
     else:
         if 'reverse_proxy manga-batch:7863' not in original:raise RuntimeError('Existing /api/v1 route belongs to another service')
         proposed=original
