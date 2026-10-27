@@ -11,9 +11,9 @@ test('direct mode is a separate compact cache variant without personal secrets',
  const c=translationConfig({engine:'direct',apiKey:'private-fixture'});assert.equal(c.engine,'direct');assert.equal(c.directModel,'gemma-4-26b-a4b-it');assert.equal(c.inpaint,'fast');assert.equal(c.font,'auto');
  const variant=resultConfig(c);assert.equal(variant.direction,'rtl');assert.ok(!JSON.stringify(variant).includes('private-fixture'));assert.notDeepEqual(variant,resultConfig({...c,engine:'vm'}));assert.notDeepEqual(variant,resultConfig({...c,directModel:'gemma-4-31b-it'}));
 });
-test('one compact two-image request, RTL context, no OCR transcription or expensive schema',()=>{
- const r=directRequest([page(1),page(2)],{context:'Старое имя'});assert.equal(r.contents[0].parts.filter(p=>p.inlineData).length,2);assert.match(r.contents[0].parts[0].text,/RIGHT TO LEFT/);assert.match(r.contents[0].parts[0].text,/Старое имя/);assert.equal(r.generationConfig.thinkingConfig.thinkingLevel,'MINIMAL');assert.equal(r.generationConfig.responseSchema,undefined);
- assert.throws(()=>directRequest([page(1),page(2),page(3)]),/двух/);assert.throws(()=>directRequest([page(1)],{model:'unapproved-model'}),/модель/);
+test('one compact single-image request, RTL context, no OCR transcription or expensive schema',()=>{
+ const r=directRequest([page(1)],{context:'Старое имя'});assert.equal(r.contents[0].parts.filter(p=>p.inlineData).length,1);assert.match(r.contents[0].parts[0].text,/RIGHT TO LEFT/);assert.match(r.contents[0].parts[0].text,/Старое имя/);assert.equal(r.generationConfig.thinkingConfig.thinkingLevel,'MINIMAL');assert.equal(r.generationConfig.responseSchema,undefined);
+ assert.throws(()=>directRequest([page(1),page(2)]),/одна/);assert.throws(()=>directRequest([page(1)],{model:'unapproved-model'}),/модель/);
 });
 test('strict UID and Russian validation preserve exact local geometry and font styles',()=>{
  const rows=[{id:'P2_B1',ru:'Не открывай!',f:1,k:0},{id:'P1_B1',ru:'Привет, друг!',f:2,k:1}],out=validateDirectResponse(reply(rows),[page(1),page(2)]);
@@ -25,23 +25,23 @@ test('strict UID and Russian validation preserve exact local geometry and font s
  assert.throws(()=>validateDirectResponse({candidates:[{finishReason:'MAX_TOKENS'}]},[page(1)]),/обрезан/);
 });
 test('personal key travels only in Google header, quota errors do not retry or leak response',async()=>{
- const calls=[];const fetcher=async(url,request)=>{calls.push({url,request});return{ok:false,status:429,json:async()=>({error:{message:'private-fixture'}})};};
+ const calls=[];const fetcher=async(url,request)=>{calls.push({url,request});return{ok:false,status:429,text:async()=>JSON.stringify({error:{message:'private-fixture'}})};};
  await assert.rejects(callDirectGoogle([page(1)],{key:'private-fixture',fetcher}),e=>/Лимит/.test(e.message)&&!e.message.includes('private-fixture'));
  assert.equal(calls.length,1);assert.match(calls[0].url,/generativelanguage.googleapis.com\/v1beta\/models\/gemma-4-26b-a4b-it:generateContent$/);assert.equal(calls[0].request.headers['x-goog-api-key'],'private-fixture');assert.ok(!calls[0].request.body.includes('private-fixture'));assert.equal(calls[0].request.credentials,'omit');
 });
 test('Google call has a bounded deadline and reports timeout without background retries',async()=>{
  const keepAlive=setTimeout(()=>{},80);
- try{await assert.rejects(callDirectGoogle([page(1)],{key:'fixture',timeoutMs:10,fetcher:async(_,r)=>new Promise((resolve,reject)=>r.signal.addEventListener('abort',()=>reject(r.signal.reason),{once:true}))}),/30 с/);}finally{clearTimeout(keepAlive);}
+ try{await assert.rejects(callDirectGoogle([page(1)],{key:'fixture',timeoutMs:10,fetcher:async(_,r)=>new Promise((resolve,reject)=>r.signal.addEventListener('abort',()=>reject(r.signal.reason),{once:true}))}),/0\.01 с/);}finally{clearTimeout(keepAlive);}
 });
 function chapter(extra={}){
  const calls=[],cache=new Map();
  const c=new DirectChapter({entries:Array.from({length:8},()=>({async:async()=>new Blob(['fixture'])})),scope:'profile:library',keyScope:'profile',config:translationConfig({engine:'direct'}),prepare:async(blob,i)=>page(i+1),google:async(pages)=>{calls.push(pages.map(p=>p.page));return {pages:validateDirectResponse(reply(pages.map(p=>({id:p.regions[0].id,ru:'Привет, друг!',f:0,k:0}))),pages)};},cacheKey:async(blob,c,scope)=>scope+':'+await blob.text(),readCache:async()=>null,writeCache:async(id,scope,value)=>cache.set(id,value),renderPage:async(blob,p)=>({regions:p.regions,timings:p.timings}),getKey:()=> 'fixture-personal',...extra});return {c,calls,cache};
 }
-test('current and next page share a max-two request and cached JSON avoids second Google call',async()=>{
+test('each page has its own request and repeated reading avoids another Google call',async()=>{
  const {c,calls,cache}=chapter(),s=new AbortController().signal,status=[];
  const a=await c.render(new Blob(['first']),0,'auto',x=>status.push(x),{},s);
  const b=await c.render(new Blob(['second']),1,'auto',null,{},s);
- assert.deepEqual(calls,[[1,2]]);assert.equal(a.regions.length,1);assert.equal(b.regions.length,1);assert.equal(cache.size,2);assert.ok(status.some(p=>p.phase==='translating'));assert.ok(status.some(p=>p.phase==='cleaning'));c.close();
+ await c.render(new Blob(['first']),0,'auto',null,{},s);assert.deepEqual(calls,[[1],[2]]);assert.equal(a.regions.length,1);assert.equal(b.regions.length,1);assert.equal(cache.size,2);assert.ok(status.some(p=>p.phase==='translating'));assert.ok(status.some(p=>p.phase==='cleaning'));c.invalidate(0);await c.render(new Blob(['first']),0,'auto',null,{},s);assert.deepEqual(calls,[[1],[2],[1]]);c.close();
 });
 test('slow adjacent source does not delay current page; explicit single-page mode stays single',async()=>{
  const {c,calls}=chapter({entries:[{async:async()=>new Blob(['first'])},{async:()=>new Promise(()=>{})}]});

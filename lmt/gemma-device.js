@@ -30,7 +30,7 @@ export async function prepareGemmaPage(bytes,config,progress){
    ctx.fillStyle='white';ctx.fillRect(x,top,lw,15);ctx.fillStyle='#b10024';ctx.textBaseline='top';ctx.fillText(label,x+3,top+1);
   }
   const encoded=canvas.toDataURL('image/webp',.8),match=/^data:(image\/\w+);base64,(.+)$/.exec(encoded);
-  return {id,width:bitmap.width,height:bitmap.height,image:match[2],mime:match[1],regions,detectionMs:Math.round(performance.now()-started),sourceSha256:digest};
+  return {id,width:bitmap.width,height:bitmap.height,image:match[2],mime:match[1],regions,sentWidth:canvas.width,sentHeight:canvas.height,detectionMs:Math.round(performance.now()-started),sourceSha256:digest};
  }finally{globalThis.lmtProgress=null;bitmap.close();URL.revokeObjectURL(url);}
 }
 
