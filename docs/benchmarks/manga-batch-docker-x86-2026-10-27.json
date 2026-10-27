@@ -1,0 +1,13 @@
+{
+  "provenance": "Actual x86_64 Docker build and readiness/auth smoke, no Google API call, not Oracle ARM64",
+  "image": "sha256:46b22214e3141d73a284f8990385a0bede431e6fffc4bb0652ea81a9634d3d4a",
+  "user": "vault",
+  "readOnlyRootfs": true,
+  "memoryLimitBytes": 2147483648,
+  "oomKilled": false,
+  "restarts": 0,
+  "nativeDetectorReady": true,
+  "googleKeyConfigured": false,
+  "unauthenticatedChapterPostStatus": 401,
+  "hostPortsPublished": false
+}

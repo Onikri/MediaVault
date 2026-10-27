@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 from fastapi import FastAPI, Depends, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from .cache import JsonCache
 from .source import ReadOnlySettings, SourceSessions
@@ -44,7 +44,9 @@ app.add_middleware(CORSMiddleware,allow_origins=[os.getenv('ALLOWED_ORIGIN','htt
 @app.middleware('http')
 async def bounds(request,call_next):
     if request.method in ('POST','PUT'):
-        if int(request.headers.get('content-length','0'))>512*1024:raise HTTPException(413,'Запрос превышает 512 КиБ.')
+        try:length=int(request.headers.get('content-length','0'))
+        except ValueError:return JSONResponse({'detail':'Некорректный Content-Length.'},status_code=400)
+        if length>512*1024:return JSONResponse({'detail':'Запрос превышает 512 КиБ.'},status_code=413)
     response=await call_next(request);response.headers['Cache-Control']='no-store';return response
 
 def owner(authorization:str=Header(default='')):

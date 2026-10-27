@@ -30,5 +30,42 @@
         }
       ]
     }
+  ],
+  "additionalRunsDuringContainerBuild": [
+    {
+      "viewportWidth": 390,
+      "timings": [
+        {
+          "inpaintMs": 34.69999998807907,
+          "typesetMs": 0.5,
+          "renderMs": 118.30000001192093
+        },
+        {
+          "inpaintMs": 25.5,
+          "typesetMs": 0.3999999761581421,
+          "renderMs": 123.40000003576279
+        }
+      ]
+    },
+    {
+      "viewportWidth": 1366,
+      "timings": [
+        {
+          "inpaintMs": 41.89999997615814,
+          "typesetMs": 0.30000001192092896,
+          "renderMs": 79.19999998807907
+        },
+        {
+          "inpaintMs": 15.400000035762787,
+          "typesetMs": 0.2999999523162842,
+          "renderMs": 26.5
+        },
+        {
+          "inpaintMs": 26.599999964237213,
+          "typesetMs": 0.30000001192092896,
+          "renderMs": 90.30000001192093
+        }
+      ]
+    }
   ]
 }

@@ -110,6 +110,22 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
    cache=JsonCache(d);provider=Provider();engine=RealtimeChapterOrchestrator(None,Detector(),provider,cache);files=Files();s={'scope':'u:lib','manifest':'m','names':[str(i) for i in range(4)],'archive':files}
    _,jobs=await engine.window(s,1);_,other=await engine.window(s,1);self.assertIs(jobs[0]['future'],other[0]['future']);out=await asyncio.gather(*(j['future'] for j in jobs));self.assertEqual(len(out[0]['regions']),70);self.assertTrue(all(p<=4 and n<=65 for p,n in provider.calls));self.assertEqual(sum(n for p,n in provider.calls),73,'Quota retry must not translate successful fragments twice');calls=len(provider.calls);hits,waiting=await engine.window(s,1);self.assertEqual(len(hits),4);self.assertEqual(waiting,[]);self.assertEqual(len(provider.calls),calls);self.assertEqual(files.leases,0);await engine.close();await cache.close()
 
+ async def test_unsupported_schema_or_json_mime_retries_with_strict_local_validation(self):
+  from google.genai.errors import ClientError
+  for message in ['response_schema is unsupported','response_mime_type is unsupported']:
+   class Models:
+    def __init__(self):self.calls=[]
+    async def count_tokens(self,**kw):return NS(total_tokens=100)
+    async def generate_content(self,**kw):
+     self.calls.append(kw['config'])
+     if len(self.calls)==1:raise ClientError(400,{'error':{'message':message}})
+     return NS(text=json.dumps([row('P1_B1')]),candidates=[NS(finish_reason='STOP')],usage_metadata=None)
+   m=Models();p=GemmaBatchTranslator(QuotaPacer(),'/x',client=NS(aio=NS(models=m)))
+   pages=[{'page':1,'width':100,'height':100,'regions':[{'uid':'P1_B1'}],'som':b'x'}]
+   with self.assertRaises(Deferred):await p.translate(pages)
+   rows,meta=await p.translate(pages);self.assertEqual(len(rows),1);self.assertFalse(meta['structuredOutput']);self.assertIsNone(m.calls[-1].response_schema)
+   if 'mime' in message:self.assertIsNone(m.calls[-1].response_mime_type)
+
 class HttpContracts(unittest.IsolatedAsyncioTestCase):
  async def test_authentication_and_sse_cache_order(self):
   import httpx
@@ -121,6 +137,7 @@ class HttpContracts(unittest.IsolatedAsyncioTestCase):
   app.state.engine=Engine()
   async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://test') as client:
    response=await client.post('/api/v1/chapters',json={});self.assertEqual(response.status_code,401)
+   response=await client.post('/api/v1/chapters',headers={'Content-Length':'524289'});self.assertEqual(response.status_code,413)
    app.dependency_overrides[owner]=lambda:'subject'
    import manga_batch.app as module
    original=module.session

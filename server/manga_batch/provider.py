@@ -11,7 +11,7 @@ class BatchTooLarge(Exception):pass
 
 class GemmaBatchTranslator:
     def __init__(self,pacer,key_file,*,client=None):
-        self.pacer=pacer;self.key_file=Path(key_file);self.client=client;self.disabled=set();self.schema=True
+        self.pacer=pacer;self.key_file=Path(key_file);self.client=client;self.disabled=set();self.schema=True;self.json_mode=True
     def configured(self):return self.client is not None or self.key_file.is_file()
     def sdk(self):
         if self.client is None:
@@ -33,6 +33,7 @@ class GemmaBatchTranslator:
         contents=[types.Content(role='user',parts=parts)]
         client=self.sdk();last=None
         for model in models:
+            config=None
             try:
                 count=await client.aio.models.count_tokens(model=model,contents=contents,config=types.CountTokensConfig(system_instruction=SYSTEM_PROMPT))
                 # CountTokens may omit schema overhead. Reserve a measured prompt
@@ -40,7 +41,7 @@ class GemmaBatchTranslator:
                 tokens=int(count.total_tokens)+768
                 if tokens>self.pacer.tpm:raise BatchTooLarge('Input token budget exceeded')
                 lease=await self.pacer.reserve([model],tokens)
-                config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT,temperature=0,max_output_tokens=16384,response_mime_type='application/json',thinking_config=types.ThinkingConfig(thinking_level='MINIMAL'),safety_settings=[types.SafetySetting(category='HARM_CATEGORY_'+c,threshold='BLOCK_NONE') for c in ['HARASSMENT','HATE_SPEECH','DANGEROUS_CONTENT','SEXUALLY_EXPLICIT']],**({'response_schema':generation_schema()} if self.schema else {}))
+                config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT,temperature=0,max_output_tokens=16384,**({'response_mime_type':'application/json'} if self.json_mode else {}),thinking_config=types.ThinkingConfig(thinking_level='MINIMAL'),safety_settings=[types.SafetySetting(category='HARM_CATEGORY_'+c,threshold='BLOCK_NONE') for c in ['HARASSMENT','HATE_SPEECH','DANGEROUS_CONTENT','SEXUALLY_EXPLICIT']],**({'response_schema':generation_schema()} if self.schema else {}))
                 started=time.perf_counter();response=await client.aio.models.generate_content(model=model,contents=contents,config=config)
                 usage=response.usage_metadata
                 if usage and usage.prompt_token_count is not None:await self.pacer.account(lease,usage.prompt_token_count)
@@ -50,7 +51,7 @@ class GemmaBatchTranslator:
                 if not reason.endswith('STOP'):raise ProviderUnavailable('Google не завершил перевод: '+reason)
                 raw=(response.text or '').strip();raw=re.sub(r'^```(?:json)?\s*|\s*```$','',raw)
                 rows=validate_reply(json.loads(raw),ids)
-                return rows,{'model':model,'cloudMs':round((time.perf_counter()-started)*1000,2),'inputTokens':usage.prompt_token_count if usage else None,'outputTokens':usage.candidates_token_count if usage else None,'pages':len(pages),'boxes':len(ids),'structuredOutput':self.schema}
+                return rows,{'model':model,'cloudMs':round((time.perf_counter()-started)*1000,2),'inputTokens':usage.prompt_token_count if usage else None,'outputTokens':usage.candidates_token_count if usage else None,'pages':len(pages),'boxes':len(ids),'structuredOutput':bool(config.response_schema),'jsonMime':self.json_mode}
             except BatchTooLarge:raise
             except Deferred as error:last=error;continue
             except Exception as error:
@@ -65,7 +66,10 @@ class GemmaBatchTranslator:
                     await self.pacer.limited(model,delay,project_wide=not per_model)
                     last=Deferred(delay);continue
                 if code==404:self.disabled.add(model);last=error;continue
-                if code==400 and self.schema and any(s in str(error).lower() for s in ['schema','structured','response_mime']):
+                message=str(error).lower()
+                if code==400 and ('response_mime' in message or 'mime type' in message) and (self.json_mode or config and config.response_mime_type):
+                    self.json_mode=False;self.schema=False;raise Deferred(.05)
+                if code==400 and any(s in message for s in ['schema','structured']) and (self.schema or config and config.response_schema):
                     self.schema=False;raise Deferred(.05)
                 if code in (500,502,503,504):
                     await self.pacer.limited(model,5,project_wide=False);last=Deferred(5);continue

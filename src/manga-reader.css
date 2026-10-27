@@ -42,3 +42,5 @@
 @media(prefers-reduced-motion:reduce){.reader-page-image .reader-translated-overlay{transition:none}}
 
 .reader-image-stack{position:relative}
+.reader-google-key label{display:grid;gap:6px}
+.reader-google-key input{width:100%;min-width:0;max-width:100%;box-sizing:border-box}

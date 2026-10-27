@@ -6,7 +6,7 @@ COPY server/requirements-batch.txt ./requirements.txt
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir -r requirements.txt; else pip install --no-cache-dir -r requirements.txt; fi
 RUN useradd --uid 1000 --create-home vault && mkdir /data && chown vault:vault /data
-COPY server/manga_batch ./manga_batch
-COPY server/vault_drive.py ./vault_drive.py
+COPY --chown=vault:vault server/manga_batch ./manga_batch
+COPY --chown=vault:vault server/vault_drive.py ./vault_drive.py
 USER vault
 CMD ["uvicorn","manga_batch.app:app","--host","0.0.0.0","--port","7863","--workers","1","--no-access-log"]
