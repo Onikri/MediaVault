@@ -1,4 +1,4 @@
-"""Russian manga adapters. Public HTML and inline page data, never site API keys."""
+"""Multilingual manga and manhwa adapters. Public HTML and inline page data, never site API keys."""
 import ast
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -19,6 +19,8 @@ class MangaSite:
     root:str
     family:str
     hosts:tuple=()
+    languages:tuple=('ru',)
+    format:str=''
 
 SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('mangapoisk.io','eropoisk.com')),
        MangaSite('mangahub','MangaHub','https://mangahub.ru','hub'),
@@ -26,14 +28,20 @@ SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('man
        MangaSite('readmanga','ReadManga','https://a.zazaza.me','grouple',('readmanga.live','readmanga.io','readmanga.me')),
        MangaSite('mintmanga','MintManga','https://mintmanga.live','grouple'),
        MangaSite('mangabuff','MangaBuff','https://mangabuff.ru','buff'),
-       MangaSite('mangapill','MangaPill · EN','https://mangapill.com','pill'),
-       MangaSite('mangakatana','MangaKatana · EN','https://mangakatana.com','katana'),
-       MangaSite('mangadex','MangaDex','https://mangadex.org','dex'),
-       MangaSite('mangalib','MangaLib','https://mangalib.me','lib',('mangalib.org',)))
+       MangaSite('mangapill','MangaPill · EN','https://mangapill.com','pill',languages=('en',)),
+       MangaSite('mangakatana','MangaKatana · EN','https://mangakatana.com','katana',languages=('en',)),
+       MangaSite('mangadex','MangaDex','https://mangadex.org','dex',languages=('ru','en','ja','ko')),
+       MangaSite('mangalib','MangaLib','https://mangalib.me','lib',('mangalib.org',)),
+       MangaSite('senmanga','Sen Manga · JA','https://raw.senmanga.com','sen',languages=('ja',),format='manga'),
+       MangaSite('mangaraw','MangaRaw · JA','https://mangaraw.co.uk','mangaraw',languages=('ja',),format='manga'),
+       MangaSite('naver-webtoon','Naver Webtoon · KO','https://comic.naver.com/webtoon','naver',languages=('ko',),format='manhwa'),
+       MangaSite('naver-best','Naver Best Challenge · KO','https://comic.naver.com/bestChallenge','naver',languages=('ko',),format='manhwa'),
+       MangaSite('naver-challenge','Naver Challenge · KO','https://comic.naver.com/challenge','naver',languages=('ko',),format='manhwa'),
+       MangaSite('toonkor','Toonkor · KO','https://toonkor7.org','toonkor',hosts=('toonkor0.org','toonkor2.org'),languages=('ko',),format='manhwa'))
 _cache={};_lock=threading.RLock()
 def site_for(url):
     host=urlsplit(url).hostname
-    return next((s for s in SITES if host in (urlsplit(s.root).hostname,*s.hosts)),None)
+    return next((s for s in SITES if host in (urlsplit(s.root).hostname,*s.hosts) and (s.family!='naver' or urlsplit(url).path.startswith(urlsplit(s.root).path+'/'))),None)
 def clean(value):return re.sub(r'\s+',' ',str(value or '')).strip()[:300]
 def chapter_number(value):
     text=str(value).strip().replace(',','.')
@@ -91,21 +99,32 @@ def search_url(site,query):
     if site.family=='chan':return site.root+'/?'+urlencode({'do':'search','subaction':'search','story':query})
     if site.family=='hub':return site.root+'/search/title?'+urlencode({'query':query})
     return site.root+'/search?'+urlencode({'q':query,**({'type':'manga'} if site.family=='buff' else {})})
-def search_title(title,language='auto'):
-    if language not in {'auto','all','ru','en'}:raise SourceError('Выбери язык источника: все, русский или английский.')
+def normalized_format(value):
+    value=str(value or '').lower().replace('-','_')
+    return {'манга':'manga','манхва':'manhwa','маньхуа':'manhua','вебтун':'webtoon','web_manga':'manga','long_strip':'webtoon'}.get(value,value)
+
+def search_title(title,language='auto',format='all'):
+    if language not in {'auto','all','ru','en','ja','ko'}:raise SourceError('Выбери русский, английский, японский или корейский язык источника.')
+    if format not in {'all','manga','manhwa','manhua','webtoon'}:raise SourceError('Выбери доступный формат комикса.')
     if not isinstance(title,dict) or title.get('kind')!='manga' or not aliases(title):raise SourceError('Выбери конкретную мангу из каталога.')
     if len(json.dumps(title).encode())>50000:raise SourceError('Описание выбранной манги слишком велико.')
-    key=json.dumps([language,title.get('ids'),aliases(title),title.get('year')],sort_keys=True,ensure_ascii=False)
+    key=json.dumps([2,language,format,title.get('ids'),aliases(title),title.get('year')],sort_keys=True,ensure_ascii=False)
     with _lock:hit=_cache.get(key)
     if hit and hit[0]>time.monotonic():return hit[1]
+    search_deadline=time.monotonic()+18
     def work(site):
-        http=PublicHttp(timeout=(3,6),deadline=time.monotonic()+16);results=[];message='Точное совпадение не найдено.';status='empty'
+        http=PublicHttp(timeout=(3,6),deadline=search_deadline);results=[];message='Точное совпадение не найдено.';status='empty'
         try:
             queries=[q for q in aliases(title) if re.search('[a-z]',q,re.I) and not re.search('[а-яё]',q,re.I)] if site.family in {'pill','katana'} else aliases(title)
+            if site.languages==('ja',):queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\u3040-\u30ff\u3400-\u9fff]',q)))
+            if site.languages==('ko',):queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\uac00-\ud7af]',q)))
             for query in queries[:2]:
                 if site.family in {'dex','lib'}:
                     from manga_catalog_adapters import dex_search,lib_search
                     candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http)
+                elif site.family in {'naver','mangaraw','sen','toonkor'}:
+                    from manga_raw_adapters import search
+                    candidates=search(query,site,http)
                 else:
                     text,final,_=http.document(search_url(site,query))
                     if site_for(final)!=site:raise SourceError('Источник перенаправил поиск на другой сайт.')
@@ -116,21 +135,23 @@ def search_title(title,language='auto'):
                         if site.family=='dex':
                             from manga_catalog_adapters import dex_available
                             if not dex_available(value['url'],http):continue
-                        results.append({**value,'matchEvidence':evidence})
+                        source_format=normalized_format(value.get('format') or title.get('format') or site.format)
+                        if format!='all' and source_format and source_format!=format and not (format=='webtoon' and value.get('readingMode')=='scroll'):continue
+                        results.append({**value,'format':source_format,'matchEvidence':evidence})
                 if results:break
             status='ok' if results else 'empty'
             if results:message='Найдено точных совпадений: '+str(len(results))
         except SourceError as error:status='unavailable';message=str(error)
-        except (ValueError,TypeError,KeyError):status='unavailable';message='Формат читалки изменился; адаптер требует проверки.'
+        except (ValueError,TypeError,KeyError,AttributeError):status='unavailable';message='Формат читалки изменился; адаптер требует проверки.'
         finally:http.close()
         return {'provider':site.id,'name':site.name,'status':status,'message':message,'results':results}
     # Current GroupLe search is JS/API-only; its HTML reader remains available
     # for direct links. Do not misrepresent an empty HTML search as a working API.
-    sites=[s for s in SITES if s.family!='grouple' and (s.family in {'pill','katana','dex'} if language=='en' else True if language=='all' else s.family not in {'pill','katana'})]
-    with ThreadPoolExecutor(max_workers=5) as pool:providers=list(pool.map(work,sites))
+    sites=[s for s in SITES if s.family!='grouple' and (language=='all' or (language if language!='auto' else 'ru') in s.languages) and (format not in {'manhwa','manhua','webtoon'} or not s.format or s.format==format or format=='webtoon' and s.format=='manhwa')]
+    with ThreadPoolExecutor(max_workers=min(12,len(sites) or 1)) as pool:providers=list(pool.map(work,sites))
     if language=='auto' and not any(p['results'] for p in providers):
         with ThreadPoolExecutor(max_workers=2) as pool:providers.extend(pool.map(work,[s for s in SITES if s.family in {'pill','katana'}]))
-    result={'results':list({v['url']:v for p in providers for v in p['results']}.values()),'providers':[{k:p[k] for k in ('provider','name','status','message')} for p in providers],'language':language,'checkedAt':int(time.time())}
+    result={'results':list({v['url']:v for p in providers for v in p['results']}.values()),'providers':[{k:p[k] for k in ('provider','name','status','message')} for p in providers],'language':language,'format':format,'checkedAt':int(time.time())}
     with _lock:
         if len(_cache)>80:_cache.clear()
         _cache[key]=(time.monotonic()+120,result)
@@ -187,6 +208,10 @@ def inspect(url,http=None):
     own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
     try:
         initial=site_for(url)
+        if initial and initial.family in {'naver','mangaraw','sen','toonkor'}:
+            from manga_raw_adapters import inspect as inspect_raw
+            try:return inspect_raw(url,initial,http)
+            except (ValueError,TypeError,KeyError,AttributeError):raise SourceError('Читалка изменила формат данных. Адаптер требует проверки.') from None
         if initial and initial.family in {'dex','lib'}:
             from manga_catalog_adapters import inspect_catalog
             return inspect_catalog(url,http)

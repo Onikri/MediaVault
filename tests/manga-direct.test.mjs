@@ -78,6 +78,13 @@ test('three Google input contracts separate labels, pixel coordinates and self d
  const variants=['annotated','coordinates','vision'].map(directInput=>JSON.stringify(resultConfig({engine:'direct',directInput})));assert.equal(new Set(variants).size,3);
  assert.notDeepEqual(resultConfig({engine:'direct',directDetector:'ctd'}),resultConfig({engine:'direct',directDetector:'rtdetr'}));
 });
+test('raw reading sends the real source language and avoids the EN-only detector for CJK',()=>{
+ for(const language of ['Japanese','Korean']){
+  const c=translationConfig({engine:'direct',language,directDetector:'en-fast'});assert.equal(c.directDetector,'rtdetr');
+  const body=directRequest([{...page(1),inputMode:'vision',regions:[]}],{language});assert.match(body.contents[0].parts[0].text,new RegExp('readable '+language+' text'));
+ }
+ assert.throws(()=>directRequest([page(1)],{language:'untrusted prompt'}),/исходный язык/);
+});
 test('Google self detection maps Y-first normalized coordinates to ORIGINAL pixels, preserving layout',()=>{
  const p={...page(10),width:800,height:1600,sentWidth:640,sentHeight:1280,inputMode:'vision',regions:[]};
  const result=validateDirectResponse(reply([{box:[100,200,200,400],layout:[90,190,220,420],ru:'Не открывай дверь!',f:1,k:0}]),[p])[0];

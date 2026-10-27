@@ -94,7 +94,7 @@ def source_identity(url):
     """Keep logical episode/dub identity; remove rotating CDN signatures."""
     parsed = urlsplit(url)
     query = [(key, value) for key, value in parse_qsl(parsed.query)
-             if key.lower() in {"episode", "season", "translation", "videoid", "id", "oid", "dubbing", "mv_translation", "mv_player"}]
+             if key.lower() in {"episode", "season", "translation", "videoid", "id", "oid", "dubbing", "mv_translation", "mv_player", "titleid", "no", "title_no", "episode_no", "lang"}]
     stable = urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path,
                         urlencode(sorted(query)), ""))
     # A non-URL prefix keeps vault_drive from dropping meaningful episode queries.

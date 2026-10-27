@@ -17,7 +17,7 @@ class MangaLanguages(unittest.TestCase):
     elif host=='mangapill.com':text='<div><div><a class="mb-2" href="/manga/42/demo"><div class="font-black">Demo Manga</div></a></div></div>'
     else:text='<html></html>'
     return text,url,{}
-  with patch('manga_sources.PublicHttp',Http),patch('manga_catalog_adapters.PublicHttp',Http):return source.search_title({'title':'Тестовая манга','aliases':['Demo Manga'],'kind':'manga'},language)
+  with patch('manga_sources.PublicHttp',Http),patch('manga_catalog_adapters.PublicHttp',Http),patch('manga_raw_adapters.PublicHttp',Http):return source.search_title({'title':'Тестовая манга','aliases':['Demo Manga'],'kind':'manga'},language)
  def test_all_languages_includes_english_even_when_russian_exists(self):
   result=self.search('all');self.assertEqual({v['language'] for v in result['results']},{'ru','en'})
  def test_english_does_not_contact_russian_sites(self):

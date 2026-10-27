@@ -87,7 +87,7 @@ def playback_headers(headers=None):
         if not isinstance(value, str) or len(value) > 8192 or "\r" in value or "\n" in value:
             raise SourceError("Некорректный заголовок плеера.")
         if name in {"Referer", "Origin"}:
-            value = public_url(value, resolve_dns=False)
+            value = requests.utils.requote_uri(public_url(value, resolve_dns=False))
             if name == "Origin":
                 parsed = urlsplit(value)
                 value = f"{parsed.scheme}://{parsed.netloc}"

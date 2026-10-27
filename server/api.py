@@ -243,7 +243,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 11, "onlinePlayback":True, "mangaLanguages":["ru","en"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 12, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -426,12 +426,13 @@ class TitleDiscovery(StrictBody):
     continuing: bool = False
 
 class MangaDiscovery(TitleDiscovery):
-    language:str=Field(default='auto',pattern=r'^(auto|all|ru|en)$')
+    language:str=Field(default='auto',pattern=r'^(auto|all|ru|en|ja|ko)$')
+    format:str=Field(default='all',pattern=r'^(all|manga|manhwa|manhua|webtoon)$')
 
 @app.post('/manga/search')
 def manga_search(body:MangaDiscovery,subject=Depends(owner)):
     from manga_sources import search_title
-    return search_title(body.title,body.language)
+    return search_title(body.title,body.language,body.format)
 
 class MangaInspection(StrictBody):
     url:str=Field(max_length=8192)
@@ -444,7 +445,7 @@ def manga_inspect(body:MangaInspection,subject=Depends(owner)):
     value=inspect(body.url)
     if body.title:
         if len(json.dumps(body.title).encode())>50000:raise HTTPException(422,'Слишком большое описание манги.')
-        candidate={'title':value['title'],'aliases':title_aliases(value['title']),'kind':'manga'}
+        candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('aliases') or [])])),'kind':'manga'}
         if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
     return value
 

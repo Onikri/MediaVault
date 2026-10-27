@@ -25,7 +25,7 @@ def get(url,http):
 def names(attributes):
     return list(dict.fromkeys(v for row in [attributes.get('title',{}),*attributes.get('altTitles',[])] for v in row.values() if isinstance(v,str) and v.strip()))
 def dex_search(query,language,http):
-    languages=['en'] if language=='en' else ['ru','en'] if language=='all' else ['ru']
+    languages=['ru','en','ja','ko'] if language=='all' else [language if language in {'ru','en','ja','ko'} else 'ru']
     params=[('title',query),('limit','25'),('includes[]','cover_art')]+[('availableTranslatedLanguage[]',l) for l in languages]+[('contentRating[]',r) for r in ['safe','suggestive','erotica']]
     rows=get('https://api.mangadex.org/manga?'+urlencode(params),http).get('data',[]);out=[]
     for row in rows:
@@ -35,7 +35,7 @@ def dex_search(query,language,http):
         for lang in languages:
             if lang not in a.get('availableTranslatedLanguages',[]):continue
             name=a.get('title',{}).get('ru') or next((v['ru'] for v in a.get('altTitles',[]) if v.get('ru')),aliases[0])
-            out.append({'provider':'mangadex','providerName':'MangaDex · '+lang.upper(),'title':name,'aliases':aliases,'kind':'manga','language':lang,'year':a.get('year'),'url':'https://mangadex.org/title/'+row['id']+'?lang='+lang,'cover':'https://uploads.mangadex.org/covers/'+row['id']+'/'+cover+'.256.jpg' if cover else ''})
+            out.append({'provider':'mangadex','providerName':'MangaDex · '+lang.upper(),'title':name,'aliases':aliases,'kind':'manga','format':'manhwa' if a.get('originalLanguage')=='ko' else 'manhua' if a.get('originalLanguage') in {'zh','zh-hk'} else 'manga','readingMode':'scroll' if any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in a.get('tags',[])) else 'pages','language':lang,'year':a.get('year'),'url':'https://mangadex.org/title/'+row['id']+'?lang='+lang,'cover':'https://uploads.mangadex.org/covers/'+row['id']+'/'+cover+'.256.jpg' if cover else ''})
     return out
 
 def dex_available(url,http):
@@ -57,7 +57,7 @@ def inspect_catalog(url,http):
     from manga_sources import chapter_number,clean
     p=urlsplit(url);query=parse_qs(p.query);chapters=[];pages=[];language=query.get('lang',['ru'])[0]
     if p.hostname=='mangadex.org':
-        language=language if language in {'ru','en'} else 'ru'
+        language=language if language in {'ru','en','ja','ko'} else 'ru'
         match=re.fullmatch(r'/(title|chapter)/('+UUID+r')(?:/[^/]*)?/?',p.path)
         if not match:raise SourceError('Нужна ссылка MangaDex на тайтл или главу.')
         kind,identity=match.groups()
@@ -65,7 +65,7 @@ def inspect_catalog(url,http):
             record=get('https://api.mangadex.org/chapter/'+identity,http).get('data',{});a=record.get('attributes',{})
             if a.get('externalUrl'):raise SourceError('Эта глава доступна только на внешнем сайте.')
             language=a.get('translatedLanguage')
-            if language not in {'ru','en'}:raise SourceError('Выбери русский или английский перевод.')
+            if language not in {'ru','en','ja','ko'}:raise SourceError('Выбери доступный язык главы: RU, EN, JA или KO.')
             server=get('https://api.mangadex.org/at-home/server/'+identity+'?forcePort443=true',http);part=server.get('chapter',{});base=public_url(server.get('baseUrl',''),resolve_dns=False)
             pages=[base+'/data/'+quote(part['hash'],safe='')+'/'+quote(f,safe='') for f in part.get('data',[])][:1500]
             root=next((v['id'] for v in record.get('relationships',[]) if v['type']=='manga'),None)
@@ -86,7 +86,8 @@ def inspect_catalog(url,http):
                 if not rows:break
                 offset+=len(rows)
             truncated=offset<total
-        return result('mangadex','MangaDex',title,url,language,chapters,pages,truncated)
+        attributes=detail.get('attributes',{});format='manhwa' if attributes.get('originalLanguage')=='ko' else 'manhua' if attributes.get('originalLanguage') in {'zh','zh-hk'} else 'manga'
+        return {**result('mangadex','MangaDex',title,url,language,chapters,pages,truncated),'format':format,'readingMode':'scroll' if format=='manhwa' or any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in attributes.get('tags',[])) else 'pages','aliases':names(attributes)}
     match=re.fullmatch(r'/ru/(?:manga/)?([\w-]+)(?:/read/v(\d+)/c(\d+(?:\.\d+)?))?/?',p.path)
     if not match:raise SourceError('Нужна ссылка MangaLib на тайтл или главу.')
     slug,volume,number=match.groups();detail=get(LIB+'/api/manga/'+slug+'?fields[]=otherNames&fields[]=eng_name',http).get('data',{});title=detail.get('rus_name') or detail.get('name') or detail.get('eng_name') or slug

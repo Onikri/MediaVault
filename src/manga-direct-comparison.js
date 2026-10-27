@@ -14,7 +14,7 @@ export async function compareDirectInputs({blob,index,prepare,google,key,config,
   onProgress({message:variant.label,results:[...results,row]});
   try{
    const page=inputs[variant.id];if(!page.regions.length&&variant.id!=='vision')throw Error('Локальный детектор не нашёл текст. Запрос не отправлен.');
-   const answer=await google([page],{key,model:config.directModel,direction,context:'',gemmaProfile:config.gemmaProfile,signal,timeoutMs:config.directTimeoutMs,onDiagnostic:d=>onProgress({message:variant.label+' · '+(d.stage==='streaming'?'получаем перевод':d.stage==='waiting'?'ждём Google':d.stage),results:[...results,row]})});
+   const answer=await google([page],{key,model:config.directModel,language:config.language,direction,context:'',gemmaProfile:config.gemmaProfile,signal,timeoutMs:config.directTimeoutMs,onDiagnostic:d=>onProgress({message:variant.label+' · '+(d.stage==='streaming'?'получаем перевод':d.stage==='waiting'?'ждём Google':d.stage),results:[...results,row]})});
    const p=answer.pages[0],d=answer.diagnostics||{};
    row={...row,state:'done',ms:Math.round(performance.now()-start),regions:p.regions,boxes:p.regions.length,requestBytes:d.requestBytes,metrics:d.metrics,usage:answer.usage,agreement:geometryAgreement(marked.regions.map(r=>r.bbox),p.regions.map(r=>r.text_bbox))};
   }catch(error){if(signal?.aborted)throw signal.reason;row={...row,state:'error',ms:Math.round(performance.now()-start),error:error.message,requestBytes:error.diagnostics?.requestBytes,metrics:error.diagnostics?.metrics};}

@@ -9,3 +9,7 @@ test('Reading positions are isolated by account and library and remember the exa
  const values=new Map(),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};const item={id:'chapter-12.5',collectionId:'story'};
  writeReading('A','library',item,3,64,storage);assert.equal(readReading('A','library',item.id,storage).page,3);assert.equal(readReading('A','library','collection:story',storage).itemId,item.id);assert.equal(readReading('B','library',item.id,storage),null);assert.equal(readReading('A','other',item.id,storage),null);
 });
+test('raw Japanese and Korean chapters keep their source language and never mix with translated variants',()=>{
+ const entries=['ru','en','ja','ko'].flatMap(language=>[{number:0,season:1,language,url:language+'0'},{number:1.5,season:1,language,url:language+'1.5'}]);
+ assert.deepEqual(selectChapters(entries,{language:'ja'}).map(v=>v.url),['ja0','ja1.5']);assert.deepEqual(selectChapters(entries,{language:'ko',selection:'1-2'}).map(v=>v.url),['ko1.5']);
+});

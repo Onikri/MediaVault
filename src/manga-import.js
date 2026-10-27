@@ -1,3 +1,6 @@
+export const MANGA_LANGUAGES=[['all','Все языки'],['ru','Русский'],['en','Английский'],['ja','Японский · равки'],['ko','Корейский · оригинал']];
+export const MANGA_FORMATS=[['all','Все форматы'],['manga','Манга'],['manhwa','Манхва'],['manhua','Маньхуа'],['webtoon','Вебтуны']];
+export const mangaLanguageName=code=>MANGA_LANGUAGES.find(v=>v[0]===code)?.[1]||code?.toUpperCase()||'Язык не указан';
 export function chapterRanges(text){
  if(!text||String(text).toLowerCase()==='all')return null;
  return String(text).split(',').map(value=>{const m=value.match(/^\s*(\d+(?:\.\d{1,3})?)(?:\s*-\s*(\d+(?:\.\d{1,3})?))?\s*$/);if(!m)throw Error('Укажи главы: 0, 1-20, 12.5.');const a=Number(m[1]),b=Number(m[2]||m[1]);if(b<a||b>=10000)throw Error('Проверь диапазон глав.');return [a,b];});
