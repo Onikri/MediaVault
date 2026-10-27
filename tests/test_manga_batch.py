@@ -126,6 +126,22 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
    rows,meta=await p.translate(pages);self.assertEqual(len(rows),1);self.assertFalse(meta['structuredOutput']);self.assertIsNone(m.calls[-1].response_schema)
    if 'mime' in message:self.assertIsNone(m.calls[-1].response_mime_type)
 
+ async def test_real_google_sdk_serializes_count_and_generate_contracts(self):
+  import httpx
+  from google import genai
+  from google.genai import types
+  calls=[]
+  def response(request):
+   body=json.loads(request.content);calls.append((request.url.path,body))
+   if request.url.path.endswith(':countTokens'):return httpx.Response(200,json={'totalTokens':100})
+   return httpx.Response(200,json={'candidates':[{'finishReason':'STOP','content':{'role':'model','parts':[{'text':json.dumps([row('P1_B1')])}]}}],'usageMetadata':{'promptTokenCount':110,'candidatesTokenCount':80}})
+  client=genai.Client(api_key='explicit-sdk-fixture',http_options=types.HttpOptions(async_client_args={'transport':httpx.MockTransport(response)}))
+  try:
+   provider=GemmaBatchTranslator(QuotaPacer(),'/not-used',client=client)
+   result,meta=await provider.translate([{'page':1,'width':100,'height':100,'regions':[{'uid':'P1_B1'}],'som':b'fixture'}])
+   self.assertEqual(len(result),1);self.assertEqual(len(calls),2);self.assertNotIn('systemInstruction',calls[0][1]);self.assertIn('systemInstruction',calls[1][1]);self.assertIn('LOCALIZATION',calls[0][1]['contents'][0]['parts'][0]['text']);self.assertEqual(meta['inputTokens'],110)
+  finally:await client.aio.aclose()
+
 class HttpContracts(unittest.IsolatedAsyncioTestCase):
  async def test_authentication_and_sse_cache_order(self):
   import httpx

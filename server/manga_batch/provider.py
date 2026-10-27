@@ -31,11 +31,15 @@ class GemmaBatchTranslator:
             ids.extend(r['uid'] for r in p['regions'])
             parts.extend([types.Part.from_text(text=json.dumps({'page':p['page'],'width':p['width'],'height':p['height'],'regions':p['regions']},ensure_ascii=False)),types.Part.from_bytes(data=p['som'],mime_type='image/webp')])
         contents=[types.Content(role='user',parts=parts)]
+        # Gemini Developer API's CountTokensConfig does not accept a system
+        # instruction. Count its text and schema as extra count-only parts;
+        # generation still uses the proper separate system instruction.
+        count_contents=[types.Content(role='user',parts=[types.Part.from_text(text=SYSTEM_PROMPT),types.Part.from_text(text=json.dumps(generation_schema())),*parts])]
         client=self.sdk();last=None
         for model in models:
             config=None
             try:
-                count=await client.aio.models.count_tokens(model=model,contents=contents,config=types.CountTokensConfig(system_instruction=SYSTEM_PROMPT))
+                count=await client.aio.models.count_tokens(model=model,contents=count_contents)
                 # CountTokens may omit schema overhead. Reserve a measured prompt
                 # count plus a conservative allowance, then settle actual usage.
                 tokens=int(count.total_tokens)+768
@@ -73,6 +77,7 @@ class GemmaBatchTranslator:
                     self.schema=False;raise Deferred(.05)
                 if code in (500,502,503,504):
                     await self.pacer.limited(model,5,project_wide=False);last=Deferred(5);continue
+                if isinstance(error,(ValueError,json.JSONDecodeError)) and config is None:raise ProviderUnavailable('Подсчёт токенов Google недоступен. Оригинал сохранён.') from error
                 if isinstance(error,(ValueError,json.JSONDecodeError)):raise ProviderUnavailable('Неполный или некорректный JSON Google. Оригинал сохранён.') from error
                 raise ProviderUnavailable('Ошибка Google API'+(' · HTTP '+str(code) if code else '')+'. Проверь ключ, доступ к модели и квоту.') from error
         if isinstance(last,Deferred):raise last
