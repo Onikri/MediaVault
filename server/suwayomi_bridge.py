@@ -90,7 +90,7 @@ def extension_catalog(language='all',query=''):
     return {'extensions':result,'total':len(extensions()),'matching':len(result)}
 
 def install(package):
-    if not re.fullmatch(r'eu\.kanade\.tachiyomi\.extension\.[a-z0-9_.]{1,140}',package):raise SourceError('Выбери источник из каталога.')
+    if not re.fullmatch(r'eu\.kanade\.tachiyomi\.extension\.[A-Za-z0-9_.]{1,140}',package):raise SourceError('Выбери источник из каталога.')
     with _install_lock:
         found=next((x for x in extensions() if x['pkgName']==package and not x.get('obsolete')),None)
         if not found:raise SourceError('Это расширение отсутствует в доверенном каталоге.')
