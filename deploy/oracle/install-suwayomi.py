@@ -3,11 +3,11 @@
 Run after updating the importer to backend v14. No cloud resources/ports created.
 """
 from pathlib import Path
-import hashlib,json,os,secrets,shutil,subprocess,sys,time
+import argparse,hashlib,json,os,secrets,shutil,sqlite3,subprocess,sys,time
 IMAGE='ghcr.io/suwayomi/suwayomi-server@sha256:1fac27c387dc2ea9949e1a01ad7f6d6de9d72d3988338a95476748e5c45c4582'
 ROOT=Path('/opt/mediavault-suwayomi')
 
-def main():
+def main(all_languages=False):
     ROOT.mkdir(exist_ok=True,mode=0o700);ROOT.chmod(0o700)
     log=(ROOT/'install.log').open('a')
     def cmd(args):return subprocess.check_output(args,text=True,stderr=log).strip()
@@ -20,6 +20,9 @@ def main():
     health_code='import json,urllib.request; print(json.dumps(json.load(urllib.request.urlopen("http://127.0.0.1:7860/health",timeout=5))))'
     before=json.loads(cmd(['docker','exec',importer['Id'],'python','-c',health_code]))
     if before['version']<14:raise RuntimeError('Update importer to v14 before enabling Suwayomi.')
+    if all_languages and before['version']<15:raise RuntimeError('Language packs need importer v15.')
+    with sqlite3.connect('file:'+str(data/'tasks.sqlite')+'?mode=ro',uri=True) as db:
+        if db.execute("SELECT count(*) FROM tasks WHERE status IN ('queued','running','cancelling')").fetchone()[0]:raise RuntimeError('Wait for active imports before changing the importer configuration.')
     if shutil.disk_usage(ROOT).free<2*1024**3:raise RuntimeError('Need 2 GiB free disk.')
     fingerprints={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [work/'.env',data/'service.key']}
     authfile=data/'suwayomi-auth.json'
@@ -62,8 +65,14 @@ def main():
             if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=expected:raise RuntimeError('Existing private configuration changed.')
         source_code="import json;from suwayomi_bridge import extensions,install,status;wanted={'eu.kanade.tachiyomi.extension.en.mangapill','eu.kanade.tachiyomi.extension.ru.mangalib','eu.kanade.tachiyomi.extension.ru.mangapoisk','eu.kanade.tachiyomi.extension.ja.senmanga','eu.kanade.tachiyomi.extension.ko.navercomic'};available={e['pkgName'] for e in extensions()};results=[]\nfor package in sorted(wanted & available):\n try:results.append(install(package))\n except Exception:results.append({'installed':False})\nv=status();print(json.dumps({'ready':v['ready'],'availableExtensions':v['availableExtensions'],'sources':len(v['sources']),'installs':results}))"
         result=json.loads(cmd(['docker','exec',cid,'python','-c',source_code]));(ROOT/'verification.json').write_text(json.dumps(result,indent=2))
+        if all_languages:
+            # The deployment operator starts bulk installation separately through
+            # the existing authenticated API; no local auth token is manufactured.
+            print('Language packs available: use the owner-only install-pack endpoint for RU/EN/JA/KO.')
         print(json.dumps({'installed':True,'privateOnly':True,'availableExtensions':count,'sources':result['sources'],'oauthPreserved':True}))
     except Exception:
         run([*base,'up','-d','--no-deps','--no-build','importer']);raise
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--all-languages',action='store_true',help='Require the resumable RU/EN/JA/KO language-pack API (v15).')
+    main(parser.parse_args().all_languages)

@@ -9,6 +9,7 @@ import requests
 from source_parser import SourceError,public_url
 
 PREFIX='/__manga/suwayomi/'
+LANGUAGES={'ru','en','ja','ko'}
 _cache={};_lock=threading.RLock();_install_lock=threading.Lock()
 
 def configured():return bool(os.getenv('SUWAYOMI_URL') and os.getenv('SUWAYOMI_AUTH_FILE') and os.getenv('PUBLIC_URL','').startswith('https://'))
@@ -84,8 +85,9 @@ def status():
 
 def extension_catalog(language='all',query=''):
     query=query.casefold().strip()[:80]
-    result=[{'package':x['pkgName'],'name':x['name'],'language':x['lang'],'adult':bool(x.get('isNsfw')),'installed':bool(x.get('installed')),'obsolete':bool(x.get('obsolete'))} for x in extensions() if (language=='all' or x['lang'] in {language,'all'}) and (not query or query in x['name'].casefold())]
-    return {'extensions':result,'total':len(extensions())}
+    result=[{'package':x['pkgName'],'name':x['name'],'language':x['lang'],'adult':bool(x.get('isNsfw')),'installed':bool(x.get('installed')),'obsolete':bool(x.get('obsolete'))} for x in extensions() if x['lang'] in {*LANGUAGES,'all'} and (language=='all' or x['lang'] in {language,'all'}) and (not query or query in x['name'].casefold())]
+    result.sort(key=lambda x:(not x['installed'],x['language'],x['name'].casefold(),x['package']))
+    return {'extensions':result,'total':len(extensions()),'matching':len(result)}
 
 def install(package):
     if not re.fullmatch(r'eu\.kanade\.tachiyomi\.extension\.[a-z0-9_.]{1,140}',package):raise SourceError('Выбери источник из каталога.')
@@ -135,14 +137,20 @@ def page_image(value):
     try:return client.get(f'/manga/{manga}/chapter/{chapter}/page/{page}',{'updateProgress':'false'},timeout=25,image=True)
     finally:client.close()
 
-def search(title,language='all',format='all'):
+def search(title,language='all',format='all',offset=0,limit=8):
     from title_identity import aliases,match_title
     if not configured():return {'results':[],'providers':[]}
     try:active=[s for s in sources() if s['lang'] in ({'ru'} if language=='auto' else {'ru','en','ja','ko'} if language=='all' else {language})]
     except SourceError as e:return {'results':[],'providers':[{'provider':'suwayomi','name':'Дополнительные источники','status':'unavailable','message':str(e)}]}
-    deadline=time.monotonic()+16
+    # A stable, explicit window replaces the old silent first-32-source cut-off.
+    # The UI can continue until every installed source in this language is tried.
+    active=sorted(active,key=lambda s:(s['lang'],s['name'].casefold(),str(s['id'])))
+    total=len(active);offset=max(0,min(int(offset),total));limit=max(1,min(int(limit),16))
+    deadline=time.monotonic()+12
     def work(source):
-        provider='suwayomi:'+str(source['id']);result=[];client=Client()
+        provider='suwayomi:'+str(source['id']);result=[]
+        if deadline-time.monotonic()<1:return {'provider':provider,'name':source['name'],'status':'pending','results':[],'attempted':False}
+        client=Client()
         try:
             queries=aliases(title)
             lang=source['lang'];pattern={'ja':r'[\u3040-\u30ff\u3400-\u9fff]','ko':r'[\uac00-\ud7af]','ru':r'[а-яё]','en':r'[a-z]'}[lang]
@@ -150,17 +158,18 @@ def search(title,language='all',format='all'):
             for query in queries[:2]:
                 remaining=deadline-time.monotonic()
                 if remaining<1:break
-                rows=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':query,'pageNum':1},timeout=min(6,remaining)).get('mangaList',[])
+                rows=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':query,'pageNum':1},timeout=min(4,remaining)).get('mangaList',[])
                 for row in rows[:40]:
                     candidate={'title':row['title'],'aliases':[row['title']],'kind':'manga'};accepted,evidence=match_title(title,candidate)
                     try:canonical=public_url(row.get('realUrl') or urljoin(source.get('baseUrl',''),row.get('url','')),resolve_dns=False)
                     except SourceError:canonical=''
                     if accepted:result.append({**candidate,'url':reference(row['id']),'sourceUrl':canonical, 'provider':provider,'providerName':source['name'],'language':lang,'format':title.get('format') or ('manhwa' if lang=='ko' else 'manga'),'matchEvidence':evidence,'cover':''})
                 if result:break
-            return {'provider':provider,'name':source['name'],'status':'ok' if result else 'empty','message':'','results':result}
-        except (SourceError,ValueError,TypeError,KeyError,AttributeError):return {'provider':provider,'name':source['name'],'status':'unavailable','message':'Источник временно недоступен или изменил формат ответа.','results':[]}
+            return {'provider':provider,'name':source['name'],'status':'ok' if result else 'empty','message':'','results':result,'attempted':True}
+        except (SourceError,ValueError,TypeError,KeyError,AttributeError):return {'provider':provider,'name':source['name'],'status':'unavailable','message':'Источник временно недоступен или изменил формат ответа.','results':[],'attempted':True}
         finally:client.close()
-    # A modest installed set, not a synchronous search of the entire extension catalog.
-    active=active[:32]
-    with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(work,active))
-    return {'results':[v for row in rows for v in row['results']],'providers':[{k:v for k,v in row.items() if k!='results'} for row in rows]}
+    with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(work,active[offset:offset+limit]))
+    attempted=[r for r in rows if r['attempted']];next_offset=offset+len(attempted)
+    return {'results':[v for row in attempted for v in row['results']],
+            'providers':[{k:v for k,v in row.items() if k not in {'results','attempted'}} for row in attempted],
+            'window':{'offset':offset,'checked':len(attempted),'nextOffset':next_offset,'totalSources':total,'hasMore':next_offset<total}}

@@ -23,3 +23,39 @@ Existing remembered-profile and wrapped-library-key support remains in place. Th
 ## Verification
 
 `python -m unittest discover -s tests -p 'test_*.py'`, `npm test`, `npm run test:trusted`, `npm run test:suwayomi`, `npm run test:manga`, `npm run test:direct`, `npm run test:online`, and `npm run test:reader` cover private-route boundaries, exact identity, chapter numbering, CBZ integration, encrypted IndexedDB reload/account isolation, installation UI and existing readers. Real upstream source availability is verified separately; fixture tests do not assert all packages work.
+
+## Language packs and search coverage · backend v15
+
+The owner can install every non-obsolete RU/EN/JA/KO package, including packages
+marked `all`, using **Import → Manga → More sources → Connect all RU/EN/JA/KO**.
+Installation runs sequentially in the importer background, with a private atomic
+journal at `/data/suwayomi-install.json`. Closing the tab does not stop it. A server
+restart is shown as interrupted; starting again queries the actual installed
+catalog and retries missing/failed packages. No arbitrary APK URL is accepted.
+
+Endpoints (existing owner authentication is required):
+- `POST /manga/bridge/install-pack`, body `{"languages":["ru","en","ja","ko"]}`;
+- `GET /manga/bridge/install-pack`, progress and failed packages;
+- `POST /manga/bridge/search`, the usual title/language/format plus `bridgeOffset`
+  and `bridgeLimit` (default8, maximum16).
+
+Installing hundreds of extensions does not trigger a global download or library
+update. The former silent first32-source search cap is removed. Title search now
+reports `checked`, `nextOffset`, `totalSources` and `hasMore`; the reader/import
+screen offers **Check next sources**. Source order is stable and language-specific.
+Each request has a bounded window and time budget; unstarted sources remain for
+the next request. This makes every installed supported source reachable without
+sending hundreds of simultaneous requests to the free Oracle VM. Unavailable
+sites and empty searches remain distinguishable from pending sources.
+
+`install-suwayomi.py --all-languages` requires v15 and verifies that no imports
+are active before changing Compose. It installs the private service and initial
+sample extensions; bulk installation is then started through the owner API/UI.
+The checkbox/button action is not a claim that every website works: installation,
+search, chapter listing and actual image retrieval are separate checks.
+
+Tests of language-pack selection, retry, journal persistence and search beyond32
+sources use explicit provider fixtures. The browser contract checks individual and
+bulk installation, progress and continued search at360/1440px. Live Oracle/source
+results are recorded separately; test pages and private server logs stay outside
+Git in `.codex-local/`.

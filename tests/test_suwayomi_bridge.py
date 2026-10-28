@@ -37,6 +37,24 @@ class BridgeTests(unittest.TestCase):
             def get(self,*a,**kw):return {'mangaList':[{'id':1,'title':'One Piece'},{'id':2,'title':'Unrelated Adventure'}]}
         with patch.object(bridge,'sources',return_value=[{'id':'8448310129093543312','lang':'en','name':'MangaPill'}]),patch.object(bridge,'Client',Fake):
             result=bridge.search({'kind':'manga','title':'One Piece','aliases':['ワンピース']},'en');self.assertEqual([x['title'] for x in result['results']],['One Piece']);self.assertIn('8448310129093543312',result['results'][0]['provider'])
+    def test_every_installed_source_is_reachable_after_the_old_first_32(self):
+        contacted=[]
+        class Fake:
+            def close(self):pass
+            def get(self,path,*a,**kw):contacted.append(path);return {'mangaList':[{'id':int(path.split('/')[2]),'title':'One Piece'}]}
+        sources=[{'id':str(9000000000000000000+i),'lang':'en','name':f'Source {i:03}'} for i in range(65)]
+        offset=0;found=[]
+        with patch.object(bridge,'sources',return_value=sources),patch.object(bridge,'Client',Fake):
+            while True:
+                result=bridge.search({'kind':'manga','title':'One Piece'},'en',offset=offset)
+                self.assertLessEqual(result['window']['checked'],8);found.extend(result['results']);offset=result['window']['nextOffset']
+                if not result['window']['hasMore']:break
+        self.assertEqual(len(contacted),65);self.assertEqual(len({r['provider'] for r in found}),65);self.assertEqual(offset,65)
+    def test_supported_catalog_keeps_multilingual_packages_and_excludes_other_languages(self):
+        rows=[{'pkgName':lang,'name':lang,'lang':lang} for lang in ['ru','en','ja','ko','all','fr']]
+        with patch.object(bridge,'extensions',return_value=rows):
+            self.assertEqual({r['language'] for r in bridge.extension_catalog()['extensions']},{'ru','en','ja','ko','all'})
+            self.assertEqual({r['language'] for r in bridge.extension_catalog('ja')['extensions']},{'ja','all'})
     def test_chapter_cbz_fetches_images_privately(self):
         from manga_download import download_chapter
         from PIL import Image
