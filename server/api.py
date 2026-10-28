@@ -243,7 +243,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 14, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 15, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -428,6 +428,8 @@ class TitleDiscovery(StrictBody):
 class MangaDiscovery(TitleDiscovery):
     language:str=Field(default='auto',pattern=r'^(auto|all|ru|en|ja|ko)$')
     format:str=Field(default='all',pattern=r'^(all|manga|manhwa|manhua|webtoon)$')
+    bridgeOffset:int=Field(default=0,ge=0,le=10000)
+    bridgeLimit:int=Field(default=8,ge=1,le=16)
 
 @app.post('/manga/search')
 def manga_search(body:MangaDiscovery,subject=Depends(owner)):
@@ -436,10 +438,10 @@ def manga_search(body:MangaDiscovery,subject=Depends(owner)):
     from suwayomi_bridge import search as bridge_search
     with ThreadPoolExecutor(max_workers=2) as pool:
         native=pool.submit(search_title,body.title,body.language,body.format)
-        bridge=pool.submit(bridge_search,body.title,body.language,body.format)
+        bridge=pool.submit(bridge_search,body.title,body.language,body.format,body.bridgeOffset,body.bridgeLimit)
         result=native.result();extra=bridge.result()
     known={v['url'] for v in result['results']}
-    return {**result,'results':[*result['results'],*[v for v in extra['results'] if (v.get('sourceUrl') or v['url']) not in known]],'providers':[*result['providers'],*extra['providers']]}
+    return {**result,'results':[*result['results'],*[v for v in extra['results'] if (v.get('sourceUrl') or v['url']) not in known]],'providers':[*result['providers'],*extra['providers']],'bridgeSearch':extra.get('window')}
 
 
 @app.get('/manga/bridge/status')
@@ -460,6 +462,24 @@ class MangaExtension(StrictBody):
 def manga_bridge_install(body:MangaExtension,subject=Depends(owner)):
     from suwayomi_bridge import install
     return install(body.package)
+
+class MangaLanguagePack(StrictBody):
+    languages:list[str]=Field(min_length=1,max_length=4)
+
+@app.post('/manga/bridge/install-pack',status_code=202)
+def manga_bridge_install_pack(body:MangaLanguagePack,subject=Depends(owner)):
+    from suwayomi_installer import start
+    return start(body.languages)
+
+@app.get('/manga/bridge/install-pack')
+def manga_bridge_pack_status(subject=Depends(owner)):
+    from suwayomi_installer import status
+    return status()
+
+@app.post('/manga/bridge/search')
+def manga_bridge_search(body:MangaDiscovery,subject=Depends(owner)):
+    from suwayomi_bridge import search
+    return search(body.title,body.language,body.format,body.bridgeOffset,body.bridgeLimit)
 
 class MangaInspection(StrictBody):
     url:str=Field(max_length=8192)
