@@ -1,5 +1,8 @@
 import sys
 import unittest
+import tempfile
+import zipfile
+import base64
 from pathlib import Path
 from unittest.mock import patch
 
@@ -7,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'server'))
 import manga_sources as sources
 import manga_webtoons as web
 from source_parser import SourceError
+from manga_download import download_chapter
 
 TITLE = 'https://www.webtoons.com/en/fantasy/demo/list?title_no=95'
 CHAPTER = 'https://www.webtoons.com/en/fantasy/demo/season-1-ep-0/viewer?title_no=95&episode_no=1'
@@ -69,6 +73,21 @@ class WebtoonSources(unittest.TestCase):
         for http in [Http('<img src="/cover.jpg">'), Http('<div id="_imageList"><img data-url="/secret.jpg"></div>', 'https://www.webtoons.com/member/login')]:
             with self.assertRaises(SourceError):
                 sources.inspect(CHAPTER, http)
+
+    def test_import_uses_the_same_verified_reader_pages_as_online_viewing(self):
+        image = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a+kkAAAAASUVORK5CYII=')
+        downloads = []
+        class ReaderHttp(Http):
+            def download(self, url, path, **kwargs):
+                downloads.append((url, kwargs.get('headers', {}).get('Referer')))
+                Path(path).write_bytes(image)
+        html = '<h1 class="subj">Demo</h1><div id="_imageList"><img data-url="https://cdn.example/2.png"><img data-url="https://cdn.example/1.png"></div>'
+        with tempfile.TemporaryDirectory() as directory:
+            path = download_chapter(CHAPTER, directory, ReaderHttp(html))
+            with zipfile.ZipFile(path) as archive:
+                self.assertEqual(archive.namelist(), ['0001.png', '0002.png'])
+                self.assertEqual(archive.read('0002.png'), image)
+        self.assertEqual(downloads, [('https://cdn.example/2.png', CHAPTER), ('https://cdn.example/1.png', CHAPTER)])
 
 
 if __name__ == '__main__':
