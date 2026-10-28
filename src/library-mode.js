@@ -1,0 +1,2 @@
+export function readLibraryMode(user,storage=globalThis.localStorage){try{return storage.getItem('mv_library_mode:'+encodeURIComponent(user||'anonymous'))==='online'?'online':'drive';}catch{return 'drive';}}
+export function saveLibraryMode(user,value,storage=globalThis.localStorage){if(!['drive','online'].includes(value))return;try{storage.setItem('mv_library_mode:'+encodeURIComponent(user||'anonymous'),value);}catch{}}

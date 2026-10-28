@@ -37,7 +37,8 @@ SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('man
        MangaSite('naver-webtoon','Naver Webtoon · KO','https://comic.naver.com/webtoon','naver',languages=('ko',),format='manhwa'),
        MangaSite('naver-best','Naver Best Challenge · KO','https://comic.naver.com/bestChallenge','naver',languages=('ko',),format='manhwa'),
        MangaSite('naver-challenge','Naver Challenge · KO','https://comic.naver.com/challenge','naver',languages=('ko',),format='manhwa'),
-       MangaSite('toonkor','Toonkor · KO','https://toonkor7.org','toonkor',hosts=('toonkor0.org','toonkor2.org'),languages=('ko',),format='manhwa'))
+       MangaSite('toonkor','Toonkor · KO','https://toonkor7.org','toonkor',hosts=('toonkor0.org','toonkor2.org'),languages=('ko',),format='manhwa'),
+       MangaSite('webtoons','WEBTOON · EN · Originals и Canvas','https://www.webtoons.com','webtoons',hosts=('webtoons.com','m.webtoons.com'),languages=('en',),format='webtoon'))
 _cache={};_lock=threading.RLock()
 def site_for(url):
     host=urlsplit(url).hostname
@@ -115,13 +116,16 @@ def search_title(title,language='auto',format='all'):
     def work(site):
         http=PublicHttp(timeout=(3,6),deadline=search_deadline);results=[];message='Точное совпадение не найдено.';status='empty'
         try:
-            queries=[q for q in aliases(title) if re.search('[a-z]',q,re.I) and not re.search('[а-яё]',q,re.I)] if site.family in {'pill','katana'} else aliases(title)
+            queries=[q for q in aliases(title) if re.search('[a-z]',q,re.I) and not re.search('[а-яё]',q,re.I)] if site.family in {'pill','katana','webtoons'} else aliases(title)
             if site.languages==('ja',):queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\u3040-\u30ff\u3400-\u9fff]',q)))
             if site.languages==('ko',):queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\uac00-\ud7af]',q)))
             for query in queries[:2]:
                 if site.family in {'dex','lib'}:
                     from manga_catalog_adapters import dex_search,lib_search
                     candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http)
+                elif site.family=='webtoons':
+                    from manga_webtoons import search
+                    candidates=search(query,site,http)
                 elif site.family in {'naver','mangaraw','sen','toonkor'}:
                     from manga_raw_adapters import search
                     candidates=search(query,site,http)
@@ -136,7 +140,7 @@ def search_title(title,language='auto',format='all'):
                             from manga_catalog_adapters import dex_available
                             if not dex_available(value['url'],http):continue
                         source_format=normalized_format(value.get('format') or title.get('format') or site.format)
-                        if format!='all' and source_format and source_format!=format and not (format=='webtoon' and value.get('readingMode')=='scroll'):continue
+                        if format!='all' and source_format and source_format!=format and not (format=='webtoon' and value.get('readingMode')=='scroll' or format=='manhwa' and source_format=='webtoon' and normalized_format(title.get('format'))=='manhwa'):continue
                         results.append({**value,'format':source_format,'matchEvidence':evidence})
                 if results:break
             status='ok' if results else 'empty'
@@ -147,10 +151,10 @@ def search_title(title,language='auto',format='all'):
         return {'provider':site.id,'name':site.name,'status':status,'message':message,'results':results}
     # Current GroupLe search is JS/API-only; its HTML reader remains available
     # for direct links. Do not misrepresent an empty HTML search as a working API.
-    sites=[s for s in SITES if s.family!='grouple' and (language=='all' or (language if language!='auto' else 'ru') in s.languages) and (format not in {'manhwa','manhua','webtoon'} or not s.format or s.format==format or format=='webtoon' and s.format=='manhwa')]
+    sites=[s for s in SITES if s.family!='grouple' and (language=='all' or (language if language!='auto' else 'ru') in s.languages) and (format not in {'manhwa','manhua','webtoon'} or not s.format or s.format==format or format=='webtoon' and s.format=='manhwa' or format=='manhwa' and s.format=='webtoon')]
     with ThreadPoolExecutor(max_workers=min(12,len(sites) or 1)) as pool:providers=list(pool.map(work,sites))
     if language=='auto' and not any(p['results'] for p in providers):
-        with ThreadPoolExecutor(max_workers=2) as pool:providers.extend(pool.map(work,[s for s in SITES if s.family in {'pill','katana'}]))
+        with ThreadPoolExecutor(max_workers=3) as pool:providers.extend(pool.map(work,[s for s in SITES if s.family in {'pill','katana','webtoons'}]))
     result={'results':list({v['url']:v for p in providers for v in p['results']}.values()),'providers':[{k:p[k] for k in ('provider','name','status','message')} for p in providers],'language':language,'format':format,'checkedAt':int(time.time())}
     with _lock:
         if len(_cache)>80:_cache.clear()
@@ -208,6 +212,10 @@ def inspect(url,http=None):
     own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
     try:
         initial=site_for(url)
+        if initial and initial.family=='webtoons':
+            from manga_webtoons import inspect as inspect_webtoons
+            try:return inspect_webtoons(url,initial,http)
+            except (ValueError,TypeError,KeyError,AttributeError):raise SourceError('WEBTOON изменил формат данных. Адаптер требует проверки.') from None
         if initial and initial.family in {'naver','mangaraw','sen','toonkor'}:
             from manga_raw_adapters import inspect as inspect_raw
             try:return inspect_raw(url,initial,http)

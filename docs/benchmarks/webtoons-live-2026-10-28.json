@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-28",
+  "environment": "workspace, not Oracle VM",
+  "provenance": "Live public WEBTOON Originals and Canvas: title list, chapter images, actual first image fetch. No account cookies or paid episodes.",
+  "searchResults": 15,
+  "results": [
+    {
+      "provider": "webtoons",
+      "format": "webtoon",
+      "language": "en",
+      "url": "https://www.webtoons.com/en/fantasy/tower-of-god/list?title_no=95",
+      "title": "Tower of God",
+      "chapters": 652,
+      "pages": 8,
+      "firstPageBytes": 56662,
+      "firstPageFormat": "jpg",
+      "sha256": "e83c68e2b838141976a97f532725aa6e86c37f6ae7054b5aa31344b5a301b3a6",
+      "timingsMs": {
+        "title": 3002,
+        "chapter": 1760,
+        "firstPage": 1241
+      }
+    },
+    {
+      "provider": "webtoons",
+      "format": "webtoon",
+      "language": "en",
+      "url": "https://www.webtoons.com/en/canvas/tower-of-god-no-mans-tower/list?title_no=726081",
+      "title": "Tower Of God (No Mans Tower)",
+      "chapters": 158,
+      "pages": 55,
+      "firstPageBytes": 374910,
+      "firstPageFormat": "png",
+      "sha256": "b7aa5fb0f54c0e5f1e9f261c1fd0fb17e05cf12c9998bb81950039514c6fe537",
+      "timingsMs": {
+        "title": 1889,
+        "chapter": 1103,
+        "firstPage": 1638
+      }
+    }
+  ]
+}

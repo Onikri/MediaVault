@@ -4,7 +4,8 @@ export const canImport=(state,service)=>!!(state.admin&&state.catalog&&service.s
 export default function ImportReadiness({state,service,onOpenLibrary}){
   const [busy,setBusy]=useState(''),[error,setError]=useState('');
   if(canImport(state,service))return null;
-  function settings(){const panel=document.querySelector('.server-settings');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'});panel.querySelector('input')?.focus({preventScroll:true});}}
+  function settings(){document.querySelector('.import-settings-trigger')?.click();}
+
   async function run(action){setError('');setBusy(action);try{await service[action]();}catch(cause){setError(cause.message);}finally{setBusy('');}}
   return <aside id="importPrerequisites" className="import-readiness" aria-label="Подготовка импорта"><h4><Icon name="lock" size={16}/>Осталось перед импортом</h4>
     {!state.admin?<div><p>{state.user?'Импорт доступен владельцу библиотеки.':'Войди через Google, чтобы добавить файлы в свою коллекцию.'}</p><button type="button" className="btn btn-secondary btn-small" onClick={onOpenLibrary}>{state.user?'Войти владельцем':'Войти через Google'}</button></div>:<>

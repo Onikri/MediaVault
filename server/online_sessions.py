@@ -1,6 +1,7 @@
 """Short-lived, owner-created playback capabilities. No Drive writes or open proxy."""
 from dataclasses import dataclass,field
 import re,secrets,threading,time
+import m3u8
 from urllib.parse import urljoin,urlsplit
 from fastapi import Depends,HTTPException,Header
 from fastapi.responses import Response,StreamingResponse
@@ -13,6 +14,8 @@ class Session:
     headers:dict
     expires:float
     kind:str='video'
+    max_height:int|None=None
+    manifests:dict=field(default_factory=dict)
     resources:dict=field(default_factory=dict)
     reverse:dict=field(default_factory=dict)
     lock:object=field(default_factory=threading.RLock)
@@ -35,9 +38,16 @@ def create(owner,headers,kind='video'):
         if len(sessions)>=24 or sum(s.owner==owner for s in sessions.values())>=4:raise HTTPException(429,'Закрой предыдущий онлайн-просмотр и повтори.')
         token=secrets.token_urlsafe(32);session=Session(owner,headers,time.monotonic()+7200,kind);sessions[token]=session;return token,session
 
-def rewrite_manifest(text,base,link):
+def rewrite_manifest(text,base,link,max_height=None):
     if not text.lstrip().startswith('#EXTM3U'):raise SourceError('Источник не предоставил HLS.')
     if re.search(r'#EXT-X-(?:SESSION-KEY|KEY):[^\n]*(?:METHOD=(?!NONE)[^,\s]+|KEYFORMAT=)',text):raise SourceError('Зашифрованные и DRM-потоки в онлайн-режиме не поддерживаются.')
+    if max_height is not None:
+        playlist=m3u8.loads(text,uri=base)
+        if playlist.playlists:
+            variants=[v for v in playlist.playlists if v.stream_info.resolution and v.stream_info.resolution[1]<=max_height]
+            if not variants:raise SourceError('В этом потоке нет качества в выбранных пределах.')
+            playlist.playlists[:]=variants
+            text=playlist.dumps()
     lines=[]
     for line in text.splitlines():
         if line.startswith('#'):
@@ -63,14 +73,24 @@ def install(app,owner):
                 if not data['pages']:raise SourceError('Выбери конкретную опубликованную главу.')
                 token,s=create(subject,{'Referer':data['url']},'manga')
                 return {'id':token,'kind':'manga','language':data['language'],'pages':['/online/'+token+'/'+s.resource(url) for url in data['pages'][:1500]],'expiresIn':7200}
-            from media_download import pick_stream,expand_stream_qualities
+            started=time.monotonic()
+            from media_download import pick_stream
             page=Resolver(http).resolve(body.url)
-            stream=pick_stream(expand_stream_qualities(page.streams,http),body.quality)
+            # Keep the HLS master: playback adapts while segments arrive. Do not
+            # probe every variant or download/transcode an episode before play.
+            masters=[v for v in page.streams if v.get('type')=='hls' and not v.get('quality')]
+            stream=masters[0] if masters else pick_stream(page.streams,body.quality)
+            max_height=None if body.quality=='best' else int(body.quality)
+            manifest=None
             # Check the first manifest now, before granting a playback capability.
             if stream['type']=='hls':
-                text,final,_=http.document(stream['url'],headers=stream.get('headers'));rewrite_manifest(text,final,lambda v:v)
+                text,final,_=http.document(stream['url'],headers=stream.get('headers'));rewrite_manifest(text,final,lambda v:v,max_height)
+                manifest=(text,final,time.monotonic()+30)
             token,s=create(subject,stream.get('headers') or {})
-            return {'id':token,'kind':'video','url':'/online/'+token+'/'+s.resource(stream['url']),'type':stream['type'],'expiresIn':7200}
+            s.max_height=max_height
+            resource=s.resource(stream['url'])
+            if manifest:s.manifests[resource]=manifest
+            return {'id':token,'kind':'video','url':'/online/'+token+'/'+resource,'type':stream['type'],'expiresIn':7200,'preparationMs':round((time.monotonic()-started)*1000)}
         finally:http.close()
 
     @app.delete('/online/{token}')
@@ -89,6 +109,10 @@ def install(app,owner):
         if not s.slots.acquire(blocking=False):raise HTTPException(429,'Дождись загрузки предыдущих частей.')
         http=PublicHttp(timeout=(5,20));response=None;handed=False
         try:
+            with s.lock:cached=s.manifests.pop(resource,None)
+            if cached and cached[2]>time.monotonic():
+                data=rewrite_manifest(cached[0],cached[1],lambda value:'/online/'+token+'/'+s.resource(value),s.max_height)
+                return Response(data,media_type='application/vnd.apple.mpegurl',headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
             response,final=http._open(url,headers=s.headers,byte_range=range_header or None)
             mime=response.headers.get('Content-Type','').split(';')[0].lower()
             common={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}
@@ -109,7 +133,7 @@ def install(app,owner):
                     size+=len(block)
                     if size>4*1024*1024:raise SourceError('Слишком большой плейлист.')
                     parts.append(block)
-                data=rewrite_manifest(b''.join(parts).decode('utf-8'),final,lambda value:'/online/'+token+'/'+s.resource(value))
+                data=rewrite_manifest(b''.join(parts).decode('utf-8'),final,lambda value:'/online/'+token+'/'+s.resource(value),s.max_height)
                 return Response(data,media_type='application/vnd.apple.mpegurl',headers=common)
             allowed=mime.startswith(('video/','audio/','image/')) or mime in {'application/octet-stream','binary/octet-stream','text/vtt'}
             if not allowed:raise SourceError('Источник вернул неподдерживаемый файл.')

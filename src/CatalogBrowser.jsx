@@ -14,7 +14,7 @@ import PlatformRatings from './PlatformRatings.jsx';
 import {useVoices} from './use-voices.js';
 const noTitles=Object.freeze([]);
 
-export function TitleDetails({value,service,state,onBack,onSubmitted,onOpenLibrary}){
+export function TitleDetails({value,service,state,onBack,onSubmitted,onOpenLibrary,destination}){
   const [item,setItem]=useState(value),[tab,setTab]=useState('import'),[loading,setLoading]=useState(false);
   useEffect(()=>{
     const abort=new AbortController();setItem(value);setLoading(true);
@@ -29,11 +29,11 @@ export function TitleDetails({value,service,state,onBack,onSubmitted,onOpenLibra
         <Tabs.Content value="import"><div className="detail-tags">{russianLabels(item.tags).slice(0,18).map(tag=><span key={tag}>{tag}</span>)}</div><p className="fine">{item.kind==='manga'?'Справа — доступные главы выбранного произведения. Язык, тома и главы можно выбрать перед импортом.':'Озвучки справа собраны только для выбранного тайтла и года. Другой сезон выбирается отдельной карточкой.'}</p></Tabs.Content>
         <Tabs.Content value="calendar"><ReleaseCalendar items={[item]}/></Tabs.Content>
         <Tabs.Content value="about"><dl className="title-information"><div><dt>Начало выпуска</dt><dd>{item.startDate?.slice(0,10)||'Не указано'}</dd></div><div><dt>Окончание выпуска</dt><dd>{item.endDate?.slice(0,10)||'Не указано'}</dd></div><div><dt>Каталоги</dt><dd>{item.providers.map(p=>providers[p]).join(' · ')}</dd></div></dl></Tabs.Content>
-      </Tabs.Root></div><aside className="import-dossier-panel"><ImportSelection onOpenLibrary={onOpenLibrary} item={item} state={state} service={service} onSubmitted={onSubmitted}/></aside></div>
+      </Tabs.Root></div><aside className="import-dossier-panel"><ImportSelection destination={destination} onOpenLibrary={onOpenLibrary} item={item} state={state} service={service} onSubmitted={onSubmitted}/></aside></div>
   </section>;
 }
 
-export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpenLibrary,initialQuery,initialKind,initialTarget,initialItem}){
+export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpenLibrary,initialQuery,initialKind,initialTarget,initialItem,destination}){
   const preset=initialTarget||initialItem;
   const [query,setQuery]=useState(initialQuery||''),[kind,setKind]=useState(initialKind||'anime'),[selected,setSelected]=useState(preset||null);
   const [filters,setFilters]=useState({year:'',genre:'',tag:'',format:'',age:''}),[voice,setVoice]=useState(''),[showFilters,setShowFilters]=useState(false),[page,setPage]=useState(1),[composing,setComposing]=useState(false);
@@ -49,7 +49,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   function choose(item){setSelected(item);}
   const spelling=visible.find(item=>item.searchSpelling)?.searchSpelling;
   const unavailable=Object.values(statuses).includes('unavailable');
-  if(selected)return <TitleDetails onOpenLibrary={onOpenLibrary} value={selected} service={service} state={state} onBack={()=>setSelected(null)} onSubmitted={onSubmitted}/>;
+  if(selected)return <TitleDetails destination={destination} onOpenLibrary={onOpenLibrary} value={selected} service={service} state={state} onBack={()=>setSelected(null)} onSubmitted={onSubmitted}/>;
   return <><motion.section className="catalog-intro" initial={reduced?false:{opacity:0,y:8}} animate={{opacity:1,y:0}}><span className="server-tag"><i/> ОТКРЫВАЙ НОВЫЕ ИСТОРИИ</span><h2>Миров больше,<br/><em>чем кажется.</em></h2><p>Аниме, манга и кино из бесплатных каталогов.<br/>Импорт — прямо с сервера в твой Google Drive.</p><div className="catalog-orbit"><Artwork hero/></div></motion.section>
     <div className="catalog-kind-row" aria-label="Тип произведения">{kinds.map(([id,label])=><button key={id} className={'chip'+(kind===id?' chip-active':'')} onClick={()=>{setKind(id);setVoice('');setFilters({year:'',genre:'',tag:'',format:'',age:''});setPage(1);}}>{label}</button>)}</div>
     <CatalogSearch query={query} onQuery={value=>{setQuery(value);setPage(1);}} suggestions={suggestions} loading={loading} showFilters={showFilters} onToggleFilters={()=>setShowFilters(value=>!value)} onChoose={choose} onComposing={setComposing}/>

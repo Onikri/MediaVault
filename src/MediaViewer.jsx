@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import MangaReader from './MangaReader.jsx';
+import BookReader from './BookReader.jsx';
 import VideoPlayer from './VideoPlayer.jsx';
 import {readReading,writeReading} from './reading-progress.js';
 
@@ -170,4 +171,4 @@ function LegacyMediaViewer({item,catalog,libraryId,userId,onSelectItem,onClose,r
   </section>;
 }
 
-export default function MediaViewer(props){return props.item.category==='manga'?<MangaReader {...props}/>:<LegacyMediaViewer {...props}/>;}
+export default function MediaViewer(props){return props.item.category==='manga'?<MangaReader {...props}/>:props.item.category==='book'?<BookReader {...props}/>:<LegacyMediaViewer {...props}/>;}

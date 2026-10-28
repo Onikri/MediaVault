@@ -105,6 +105,7 @@ jobs:
             npm run test:voices &&
             npm run test:design &&
             npm run test:manga &&
+            npm run test:reader &&
             npm run test:music &&
             npm run test:online &&
             npm run test:translation &&

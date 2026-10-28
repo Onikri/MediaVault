@@ -58,7 +58,7 @@ export function guessCategory(file) {
   if (["mp4","webm","m4v","mov","mkv"].includes(ext)) return "video";
   if (["mp3","m4a","aac","ogg","opus","flac","wav"].includes(ext)) return "audio";
   if (["cbz","zip"].includes(ext)) return "manga";
-  if (["pdf","epub","txt"].includes(ext)) return "book";
+  if (["pdf","epub","txt","fb2"].includes(ext)) return "book";
   if (["jpg","jpeg","png","webp","gif","avif","bmp"].includes(ext)) return "image";
   throw Error("Неподдерживаемый формат: ." + ext);
 }
@@ -67,7 +67,7 @@ export function mimeFor(file,category) {
   const ext = file.name.toLowerCase().split(".").pop();
   const map={mp4:"video/mp4",m4v:"video/mp4",webm:"video/webm",mp3:"audio/mpeg",
     m4a:"audio/mp4",ogg:"audio/ogg",opus:"audio/ogg",wav:"audio/wav",
-    pdf:"application/pdf",epub:"application/epub+zip",txt:"text/plain",
+    pdf:"application/pdf",epub:"application/epub+zip",fb2:"application/x-fictionbook+xml",txt:"text/plain",
     jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif",
     avif:"image/avif",cbz:"application/vnd.comicbook+zip"};
   return map[ext] || "application/octet-stream";

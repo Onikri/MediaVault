@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build && node scripts/build-lmt.mjs",
-    "test": "node --test tests/range.test.cjs tests/upload.test.cjs tests/upload.test.mjs tests/server-job.test.mjs tests/drive-discovery.test.mjs tests/library-model.test.mjs tests/player-model.test.mjs tests/neural-upscaler.test.mjs tests/playback-diagnostics.test.mjs tests/title-metadata.test.mjs tests/catalog.test.mjs tests/title-cache.test.mjs tests/palette-relations.test.mjs tests/watch-progress.test.mjs tests/manga.test.mjs tests/reader.test.mjs tests/reader-layout.test.mjs tests/lmt.test.mjs tests/fsr.test.mjs tests/manga-translation.test.mjs tests/detection-geometry.test.mjs tests/gemma-queue.test.mjs tests/manga-vm.test.mjs tests/manga-direct.test.mjs tests/google-diagnostics.test.mjs tests/manga-cleaning.test.mjs",
+    "test": "node --test tests/range.test.cjs tests/upload.test.cjs tests/upload.test.mjs tests/server-job.test.mjs tests/drive-discovery.test.mjs tests/library-model.test.mjs tests/player-model.test.mjs tests/neural-upscaler.test.mjs tests/playback-diagnostics.test.mjs tests/title-metadata.test.mjs tests/catalog.test.mjs tests/title-cache.test.mjs tests/palette-relations.test.mjs tests/watch-progress.test.mjs tests/manga.test.mjs tests/reader.test.mjs tests/reader-layout.test.mjs tests/lmt.test.mjs tests/fsr.test.mjs tests/manga-translation.test.mjs tests/detection-geometry.test.mjs tests/gemma-queue.test.mjs tests/manga-vm.test.mjs tests/manga-direct.test.mjs tests/google-diagnostics.test.mjs tests/manga-cleaning.test.mjs tests/book-content.test.mjs",
     "test:browser": "node tests/browser.test.cjs",
     "test:design": "node tests/design-browser.cjs",
     "test:ui": "node tests/ui.test.cjs",
@@ -28,7 +28,8 @@
     "test:gemma": "node tests/gemma-browser.cjs",
     "test:vm": "node tests/manga-vm-browser.cjs",
     "test:direct": "node tests/manga-direct-browser.cjs",
-    "test:cleaning": "node tests/manga-cleaning-browser.cjs"
+    "test:cleaning": "node tests/manga-cleaning-browser.cjs",
+    "test:reader": "node tests/immersive-reader-browser.cjs"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.86",
@@ -36,17 +37,22 @@
     "@radix-ui/react-tabs": "1.1.13",
     "@wllama/wllama": "3.8.1",
     "anime4k.js": "1.1.3",
+    "epubjs": "0.3.93",
     "hash-wasm": "4.12.0",
     "hls.js": "^1.6.13",
     "jszip": "3.10.1",
     "lucide-react": "^0.468.0",
     "motion": "14.1.0",
     "onnxruntime-web": "^1.30.0",
+    "pdfjs-dist": "5.4.296",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
   "devDependencies": {
     "playwright": "1.62.1",
     "vite": "7.1.12"
+  },
+  "overrides": {
+    "@xmldom/xmldom": "0.9.12"
   }
 }
