@@ -243,7 +243,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 13, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 14, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -432,7 +432,34 @@ class MangaDiscovery(TitleDiscovery):
 @app.post('/manga/search')
 def manga_search(body:MangaDiscovery,subject=Depends(owner)):
     from manga_sources import search_title
-    return search_title(body.title,body.language,body.format)
+    from concurrent.futures import ThreadPoolExecutor
+    from suwayomi_bridge import search as bridge_search
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        native=pool.submit(search_title,body.title,body.language,body.format)
+        bridge=pool.submit(bridge_search,body.title,body.language,body.format)
+        result=native.result();extra=bridge.result()
+    known={v['url'] for v in result['results']}
+    return {**result,'results':[*result['results'],*[v for v in extra['results'] if (v.get('sourceUrl') or v['url']) not in known]],'providers':[*result['providers'],*extra['providers']]}
+
+
+@app.get('/manga/bridge/status')
+def manga_bridge_status(subject=Depends(owner)):
+    from suwayomi_bridge import status
+    return status()
+
+@app.get('/manga/bridge/extensions')
+def manga_bridge_extensions(language:str='all',q:str='',subject=Depends(owner)):
+    from suwayomi_bridge import extension_catalog
+    if language not in {'all','ru','en','ja','ko'}:raise HTTPException(422,'Выбери язык источника.')
+    return extension_catalog(language,q)
+
+class MangaExtension(StrictBody):
+    package:str=Field(max_length=180)
+
+@app.post('/manga/bridge/install')
+def manga_bridge_install(body:MangaExtension,subject=Depends(owner)):
+    from suwayomi_bridge import install
+    return install(body.package)
 
 class MangaInspection(StrictBody):
     url:str=Field(max_length=8192)

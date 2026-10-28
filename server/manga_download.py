@@ -17,7 +17,7 @@ def image_extension(header):
 
 def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
     if not site_for(url):raise SourceError('Эта читалка пока не поддерживается.')
-    if site_for(url).family in {'lib','dex','naver','mangaraw','sen','toonkor','webtoons'}:
+    if site_for(url).family in {'lib','dex','naver','mangaraw','sen','toonkor','webtoons','suwayomi'}:
         from manga_sources import inspect
         data=inspect(url,http);final=data['url'];pages=data['pages']
     else:
@@ -33,7 +33,9 @@ def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
             if local.http is not http:
                 with lock:clients.append(local.http)
         target=Path(temporary)/f'page-{index:04d}'
-        local.http.download(url,target,headers={'Referer':final},maximum=30*1024*1024)
+        from suwayomi_bridge import parse_reference,page_image
+        if parse_reference(url):target.write_bytes(page_image(url)[0])
+        else:local.http.download(url,target,headers={'Referer':final},maximum=30*1024*1024)
         with target.open('rb') as source:extension=image_extension(source.read(32))
         if not extension:raise SourceError('Читалка вернула заглушку вместо изображения страницы.')
         if quality in {'1280','1920'}:

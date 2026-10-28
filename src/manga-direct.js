@@ -1,6 +1,6 @@
 import {translateLmt} from './lmt-client.js';
 import {callDirectGoogle} from './manga-direct-api.js';
-import {directKey} from './manga-direct-key.js';
+import {directKey,restoreDirectKey} from './manga-direct-key.js';
 import {DIRECT_DETECTORS} from './manga-direct-profiles.js';
 import {compareDirectInputs} from './manga-direct-comparison.js';
 import {translationCacheKey,getTranslation,putTranslation} from './translation-cache.js';
@@ -44,7 +44,7 @@ export class DirectChapter{
    first.state='running';first.queueMs=Math.round(performance.now()-first.started);let group=[first];
    try{
     const hit=await this.cached(first);if(hit){this.finish(first,hit);continue;}
-    const key=this.getKey(this.keyScope);if(!key)throw Error('Введи личный ключ Google AI Studio в настройках быстрого режима.');
+    const key=this.getKey(this.keyScope)||(this.getKey===directKey?await restoreDirectKey(this.keyScope):'');if(!key)throw Error('Введи личный ключ Google AI Studio в настройках быстрого режима.');
     const prepare=async job=>{
      this.notify(job.index,{phase:'detecting',message:this.config.directInput==='vision'?'Чистая страница · координаты и текст определит Google':DIRECT_DETECTORS.find(v=>v.id===this.config.directDetector)?.label||'Подготовка страницы'});
      const begin=performance.now();const page=await this.prepare(job.blob,job.index,message=>this.notify(job.index,{phase:'detecting',message}));

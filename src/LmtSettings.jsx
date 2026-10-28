@@ -1,15 +1,18 @@
-import {useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {GOOGLE_TRANSLATION_MODELS} from './google-models.js';
 import {resolveMangaOcr} from './ocr-profiles.js';
 import {INDEX_MODELS} from './index-models.js';
 import {HYMT_MODELS} from './hymt-models.js';
 import {MANGA_FONTS} from '../reader-fonts/catalog.js';
 import {translationConfig,migrateTranslationSettings} from './manga-translation.js';
-import {directKey,setDirectKey,remembersDirectKey} from './manga-direct-key.js';
+import {directKey,setDirectKey,restoreDirectKey,rememberDirectKey,remembersDeviceKey,forgetRememberedDirectKey} from './manga-direct-key.js';
+import {privacyPreferences} from './privacy.js';
 import {DIRECT_DETECTORS,DIRECT_INPUTS} from './manga-direct-profiles.js';
 function DirectKeySettings({scope,onApply}){
- const [key,setKey]=useState(()=>directKey(scope)),[remember,setRemember]=useState(()=>remembersDirectKey(scope)),[message,setMessage]=useState('');
- return <div className="reader-google-key"><label>Личный ключ Google AI Studio<input aria-label="Личный ключ быстрого перевода" type="password" autoComplete="off" spellCheck={false} value={key} onChange={e=>setKey(e.target.value)}/></label><label className="reader-checkbox"><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/>Сохранить до закрытия этой вкладки</label><button type="button" onClick={()=>{try{setDirectKey(scope,key,remember);setMessage(key.trim()?'Ключ применён. Можно запускать перевод.':'Ключ удалён.');onApply?.();}catch(e){setMessage(e.message);}}}>{key.trim()?'Применить личный ключ':'Удалить личный ключ'}</button><small role="status">{message||'Запрос идёт с устройства прямо в Google. Ключ используется только для твоего перевода и не передаётся на ВМ.'}</small><a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer">Получить ключ в Google AI Studio</a></div>;
+ const [key,setKey]=useState(()=>directKey(scope)),[remember,setRemember]=useState(()=>remembersDeviceKey(scope)||privacyPreferences().remember),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),dirty=useRef(false),allowed=!!scope&&scope!=='anonymous';
+ useEffect(()=>{let closed=false;restoreDirectKey(scope).then(value=>{if(!closed&&!dirty.current&&value){setKey(value);setRemember(remembersDeviceKey(scope));setMessage('Ключ восстановлен на этом устройстве.');}});return()=>{closed=true;};},[scope]);
+ async function apply(){setBusy(true);try{const value=key.trim();if(value&&remember&&allowed){await rememberDirectKey(scope,value);setMessage('Ключ зашифрован и сохранён для этого профиля на 90 дней.');}else{await forgetRememberedDirectKey(scope);setDirectKey(scope,value);setMessage(value?'Ключ применён для этой вкладки.':'Ключ удалён с устройства.');}onApply?.();}catch(e){setMessage(e.message);}finally{setBusy(false);}}
+ return <div className="reader-google-key"><label>Личный ключ Google AI Studio<input aria-label="Личный ключ быстрого перевода" type="password" autoComplete="off" spellCheck={false} value={key} onChange={e=>{dirty.current=true;setKey(e.target.value);}}/></label><label className="reader-checkbox"><input type="checkbox" checked={remember&&allowed} disabled={!allowed||busy} onChange={e=>setRemember(e.target.checked)}/>Запомнить на этом устройстве</label><button type="button" disabled={busy} onClick={apply}>{busy?'Сохраняем…':key.trim()?'Применить личный ключ':'Удалить личный ключ'}</button><small role="status">{message||'Ключ привязан к твоему профилю. Запросы перевода идут с устройства прямо в Google.'}</small><a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer">Получить ключ в Google AI Studio</a></div>;
 }
 export function readLmt(user){try{const v=JSON.parse(localStorage.getItem('mv_lmt_settings:'+user)||'{}');if(!v||typeof v!=='object')return translationConfig();delete v.apiKey;if(v.model?.startsWith('Llama-'))delete v.model;return migrateTranslationSettings(v);}catch{return translationConfig();}}
 export function saveLmt(user,value){try{const{apiKey,...safe}=value;localStorage.setItem('mv_lmt_settings:'+user,JSON.stringify(safe));}catch{}}

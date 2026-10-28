@@ -113,6 +113,10 @@ def install(app,owner):
             if cached and cached[2]>time.monotonic():
                 data=rewrite_manifest(cached[0],cached[1],lambda value:'/online/'+token+'/'+s.resource(value),s.max_height)
                 return Response(data,media_type='application/vnd.apple.mpegurl',headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
+            from suwayomi_bridge import parse_reference,page_image
+            if s.kind=='manga' and parse_reference(url):
+                raw,mime=page_image(url)
+                return Response(raw,media_type=mime,headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
             response,final=http._open(url,headers=s.headers,byte_range=range_header or None)
             mime=response.headers.get('Content-Type','').split(';')[0].lower()
             common={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}

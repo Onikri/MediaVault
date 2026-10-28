@@ -1,3 +1,4 @@
+import {forgetRememberedDirectKey} from './manga-direct-key.js';
 import {useEffect,useRef,useState} from "react";
 import {CHUNK_SIZE,newSalt,deriveVaultMaterial,bytesToBase64,openChunk,sealIndex,openIndex,base64ToBytes} from "../crypto.js";
 import {driveDownload,readEnvelope,findLibraries,createFolder,folderExists,uploadSmall,
@@ -510,6 +511,7 @@ function createController(get,patch){
     return new URL("__media__/"+encodeURIComponent(item.id),baseUrl()).href;
   }
   function logout(){
+    if(get().user?.sub)forgetRememberedDirectKey(String(get().user.sub)).catch(()=>{});
     forgetGoogleSession().catch(()=>{});
     deviceStore('delete','wrap-key').catch(()=>{});
     if(get().user&&get().libraryId)forgetTrustedVault(get().user.sub,get().libraryId).catch(()=>{});

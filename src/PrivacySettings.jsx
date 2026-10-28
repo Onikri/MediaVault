@@ -15,7 +15,7 @@ export function CookieNotice({state,actions}){
 export default function DeviceSettings({state,actions}){
   const [available,setAvailable]=useState(false),[message,setMessage]=useState('');
   useEffect(()=>{actions.biometricAvailable().then(setAvailable);},[]);
-  async function forget(){await forgetGoogleSession().catch(()=>{});await deviceStore('clear');savePrivacyPreferences(false);setMessage('Сохранённый вход удалён. Текущая открытая библиотека останется доступна до выхода.');}
+  async function forget(){await forgetGoogleSession().catch(()=>{});await deviceStore('clear');window.dispatchEvent(new Event('mediavault-forgot-device'));savePrivacyPreferences(false);setMessage('Сохранённый вход и API-ключи удалены. Текущая открытая библиотека останется доступна до выхода.');}
   return <section className="settings-card device-settings"><div className="section-heading"><h2 className="section-title"><ShieldCheck size={20}/>Вход на этом устройстве</h2></div>
     <p>На личном телефоне или планшете можно восстанавливать вход и открывать библиотеку без повторного ввода фразы. Google может потребовать повторное разрешение, если доступ отозван или истёк.</p>
     <div className="device-status">{state.restoring?'Восстанавливаем вход…':state.remembered?<><Check size={15}/>Вход сохранён на 90 дней</>:state.remembering?'Запоминание разрешено; заверши настройку после входа.':'Автоматический вход выключен'}</div>

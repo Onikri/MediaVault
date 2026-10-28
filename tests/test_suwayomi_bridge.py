@@ -1,0 +1,69 @@
+import io,json,os,sys,tempfile,unittest,zipfile
+from pathlib import Path
+from unittest.mock import patch
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
+import suwayomi_bridge as bridge
+from source_parser import SourceError
+
+ENV={'PUBLIC_URL':'https://media.example','SUWAYOMI_URL':'http://suwayomi:4567','SUWAYOMI_AUTH_FILE':'/private/auth'}
+class BridgeTests(unittest.TestCase):
+    def setUp(self):self.env=patch.dict(os.environ,ENV);self.env.start();bridge._cache.clear()
+    def tearDown(self):self.env.stop();bridge._cache.clear()
+    def test_identifiers_are_not_an_open_proxy(self):
+        good='https://media.example/__manga/suwayomi/m/1/c/4/p/0'
+        self.assertEqual(bridge.parse_reference(good),(1,4,0))
+        for url in [good+'?url=http://127.0.0.1',good.replace('media.example','evil.example'),good.replace('https:','http:'),good.replace('/m/1','/m/0'),good.replace('/c/4','/c/0'),good.replace('/p/0','/p/-1'),good.replace('/p/0','/p/10000')]:self.assertIsNone(bridge.parse_reference(url))
+        with patch.dict(os.environ,{'SUWAYOMI_URL':''}):self.assertIsNone(bridge.parse_reference(good))
+    def test_chapter_number_is_not_the_source_index(self):
+        class Fake:
+            def close(self):pass
+            def get(self,path,*a,**kw):
+                if path=='/manga/1':return {'id':1,'title':'One Piece','source':{'id':'8448310129093543312','lang':'en','name':'MangaPill'}}
+                if path.endswith('/chapters'):return [{'index':4,'chapterNumber':0,'name':'Volume 2 Chapter 0','scanlator':'Team'},{'index':5,'chapterNumber':12.5,'name':'Extra'}]
+                if path.endswith('/chapter/4'):return {'pageCount':2}
+                raise AssertionError(path)
+        with patch.object(bridge,'Client',Fake):
+            data=bridge.inspect(bridge.reference(1));self.assertEqual([x['number'] for x in data['episodes']],[12.5,0]);self.assertEqual(data['episodes'][1]['url'],bridge.reference(1,4));self.assertEqual(data['episodes'][1]['season'],2)
+            data=bridge.inspect(bridge.reference(1,4));self.assertEqual(len(data['pages']),2);self.assertEqual(bridge.parse_reference(data['pages'][0]),(1,4,0))
+            with self.assertRaises(SourceError):bridge.inspect(bridge.reference(1,999))
+    def test_install_only_catalogued_packages(self):
+        with patch.object(bridge,'extensions',return_value=[]),patch.object(bridge,'Client') as client:
+            for name in ['../../etc/passwd','eu.kanade.tachiyomi.extension.en.unknown']:
+                with self.assertRaises(SourceError):bridge.install(name)
+            client.assert_not_called()
+    def test_source_search_requires_exact_title(self):
+        class Fake:
+            def close(self):pass
+            def get(self,*a,**kw):return {'mangaList':[{'id':1,'title':'One Piece'},{'id':2,'title':'Unrelated Adventure'}]}
+        with patch.object(bridge,'sources',return_value=[{'id':'8448310129093543312','lang':'en','name':'MangaPill'}]),patch.object(bridge,'Client',Fake):
+            result=bridge.search({'kind':'manga','title':'One Piece','aliases':['ワンピース']},'en');self.assertEqual([x['title'] for x in result['results']],['One Piece']);self.assertIn('8448310129093543312',result['results'][0]['provider'])
+    def test_chapter_cbz_fetches_images_privately(self):
+        from manga_download import download_chapter
+        from PIL import Image
+        buffer=io.BytesIO();Image.new('RGB',(16,16),'white').save(buffer,'PNG');raw=buffer.getvalue()
+        class Http:
+            def download(self,*a,**kw):raise AssertionError('Must not HTTP-fetch an identifier URL')
+        with tempfile.TemporaryDirectory() as directory,patch.object(bridge,'inspect',return_value={'url':bridge.reference(1,4),'pages':[bridge.reference(1,4,0)]}),patch.object(bridge,'page_image',return_value=(raw,'image/png')):
+            result=download_chapter(bridge.reference(1,4),directory,Http())
+            with zipfile.ZipFile(result) as z:self.assertEqual(z.read('0001.png'),raw)
+
+    def test_online_capability_uses_private_image_fetch(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        import online_sessions as online
+        online.sessions.clear();app=FastAPI();online.install(app,lambda:'owner')
+        token,session=online.create('owner',{},'manga');key=session.resource(bridge.reference(1,4,0))
+        with patch.object(bridge,'page_image',return_value=(b'image bytes','image/jpeg')) as image,patch('online_sessions.PublicHttp._open') as public:
+            result=TestClient(app).get('/online/'+token+'/'+key)
+        self.assertEqual(result.status_code,200);self.assertEqual(result.content,b'image bytes');self.assertEqual(result.headers['content-type'],'image/jpeg');public.assert_not_called();image.assert_called_once()
+        self.assertEqual(TestClient(app).get('/online/'+token+'/unknown').status_code,410)
+    def test_internal_client_never_follows_redirects_or_accepts_arbitrary_hosts(self):
+        with patch.dict(os.environ,{'SUWAYOMI_URL':'http://evil.example:4567'}):
+            with self.assertRaises(SourceError):bridge.Client()
+        with tempfile.TemporaryDirectory() as directory:
+            auth=Path(directory)/'auth';auth.write_text(json.dumps({'username':'test','password':'fixture-private'}))
+            with patch.dict(os.environ,{'SUWAYOMI_AUTH_FILE':str(auth)}),patch('suwayomi_bridge.requests.Session') as session:
+                client=bridge.Client();session.return_value.get.return_value.status_code=302
+                with self.assertRaises(SourceError):client.get('/source/list')
+                self.assertFalse(session.return_value.get.call_args.kwargs['allow_redirects']);self.assertFalse(session.return_value.trust_env)
+                client.close()

@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from decimal import Decimal,InvalidOperation
 import json
+import os
 import re
 import threading
 import time
@@ -41,6 +42,8 @@ SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('man
        MangaSite('webtoons','WEBTOON · EN · Originals и Canvas','https://www.webtoons.com','webtoons',hosts=('webtoons.com','m.webtoons.com'),languages=('en',),format='webtoon'))
 _cache={};_lock=threading.RLock()
 def site_for(url):
+    from suwayomi_bridge import parse_reference
+    if parse_reference(url):return MangaSite("suwayomi","Дополнительные источники",os.getenv("PUBLIC_URL",""),"suwayomi",languages=("ru","en","ja","ko"))
     host=urlsplit(url).hostname
     return next((s for s in SITES if host in (urlsplit(s.root).hostname,*s.hosts) and (s.family!='naver' or urlsplit(url).path.startswith(urlsplit(s.root).path+'/'))),None)
 def clean(value):return re.sub(r'\s+',' ',str(value or '')).strip()[:300]
@@ -212,6 +215,9 @@ def inspect(url,http=None):
     own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
     try:
         initial=site_for(url)
+        if initial and initial.family=='suwayomi':
+            from suwayomi_bridge import inspect as inspect_bridge
+            return inspect_bridge(url)
         if initial and initial.family=='webtoons':
             from manga_webtoons import inspect as inspect_webtoons
             try:return inspect_webtoons(url,initial,http)
