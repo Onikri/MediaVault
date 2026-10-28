@@ -1,6 +1,8 @@
 // Local integration test: Google Identity and Drive are fake providers; no live credentials.
 // Run: npm run test:browser (builds the production React app; requires Chromium).
 const assert = require('node:assert/strict');
+const {revealReader}=require('./reader-controls.cjs');
+async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.locator('#closeViewer').click();}
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
@@ -208,10 +210,10 @@ async function main() {
     return respond({detail:'Not found'},404);
   });
   await owner.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Импорт',exact:true}).click();
-  await owner.locator('.server-settings > summary').click();
+  await owner.locator('.import-settings-trigger').click();
   await owner.locator('#importServer').fill('https://import.example.com');
-  await owner.locator('.server-address-form').getByRole('button',{name:'Подключить',exact:true}).click();
-  await owner.getByText('Drive подключён',{exact:true}).waitFor();
+  await owner.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
+  await owner.getByText('Фоновое сохранение подключено',{exact:true}).waitFor();
   await owner.getByRole('heading',{name:'Подключи фоновый импорт один раз',exact:true}).waitFor();
   const publicClientId=await owner.evaluate(()=>window.MEDIA_VAULT_CONFIG.googleClientId);
   const fixtureClientSecret='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456789';
@@ -220,6 +222,7 @@ async function main() {
   await owner.getByRole('heading',{name:'Подключи фоновый импорт один раз',exact:true}).waitFor({state:'detached'});
   assert.deepEqual(googleConfiguration,{client_id:publicClientId,client_secret:fixtureClientSecret});
   assert.ok(!(await owner.evaluate(()=>JSON.stringify({...localStorage})) ).includes(fixtureClientSecret),'Private Google settings never enter browser storage');
+  await owner.getByRole('button',{name:'Закрыть настройки импорта'}).click();
   await owner.getByRole('tab',{name:'По ссылке',exact:true}).click();
   await owner.locator('#streamUrl').fill('https://source.example.com/season');
   await owner.getByRole('button',{name:'Проверить',exact:true}).click();
@@ -253,14 +256,14 @@ async function main() {
   await owner.locator('.media-card').filter({hasText:'private-note.txt'}).click();
   const startTimer=setTimeout(()=>downloadFailed(Error('Viewer did not request the encrypted text chunk')),10000);
   try{await downloading;}finally{clearTimeout(startTimer);}
-  await owner.locator('#closeViewer').click();
+  await closeViewer(owner);
   releaseDownload();
   await owner.unroute(delayedPattern);
   assert.equal(await owner.locator('#viewer').isVisible(),false,'Closing during a download leaves the viewer closed');
   await owner.locator('.media-card').filter({hasText:'private-note.txt'}).click();
-  await owner.locator('#viewerContent pre').waitFor();
-  assert.equal(await owner.locator('#viewerContent pre').innerText(),'Encrypted hello from mobile');
-  await owner.locator('#closeViewer').click();
+  await owner.locator('.reader-prose').waitFor();
+  assert.equal(await owner.locator('.reader-prose').innerText(),'Encrypted hello from mobile');
+  await closeViewer(owner);
   await owner.locator('.media-card').filter({hasText:'private-image.png'}).click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent img')?.naturalWidth===1);
   await owner.keyboard.press('Escape');
@@ -283,7 +286,7 @@ async function main() {
   assert.equal(await owner.locator('video').evaluate(video=>Math.round(video.duration)),2);
   await owner.locator('video').evaluate(video=>video.currentTime=1);
   await owner.waitForFunction(()=>document.querySelector('video').currentTime>=1);
-  await owner.locator('#closeViewer').click();
+  await closeViewer(owner);
   if(await owner.locator('#backToTitles').isVisible())await owner.locator('#backToTitles').click();
   await owner.locator('#searchInput').fill('private-note');
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===1);
@@ -305,8 +308,8 @@ async function main() {
   await owner.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'История',exact:true}).click();
   assert.equal(await owner.locator('.history-item').count(),3,'History records the three opened files');
   await owner.locator('.history-item').filter({hasText:'private-note.txt'}).click();
-  await owner.locator('#viewerContent pre').waitFor();
-  await owner.locator('#closeViewer').click();
+  await owner.locator('.reader-prose').waitFor();
+  await closeViewer(owner);
   await owner.locator('#libraryNav').click();
   assert.ok(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile viewport has no horizontal overflow');
   await owner.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
@@ -361,8 +364,8 @@ async function main() {
   assert.equal(await reader.locator('#adminPanel').isVisible(),false);
   assert.equal(await reader.locator('#uploadBtn').isVisible(),false);
   await reader.locator('.media-card').filter({hasText:'private-note.txt'}).click();
-  await reader.locator('#viewerContent pre').waitFor();
-  assert.equal(await reader.locator('#viewerContent pre').innerText(),'Encrypted hello from mobile');
+  await reader.locator('.reader-prose').waitFor();
+  assert.equal(await reader.locator('.reader-prose').innerText(),'Encrypted hello from mobile');
   const scopes=await reader.evaluate(()=>window.__grants);
   assert.ok(scopes.some(scope=>scope.includes('/auth/drive.readonly')));
   assert.ok(!scopes.some(scope=>/\/auth\/drive(?:\s|$)/.test(scope)));
@@ -402,8 +405,8 @@ async function main() {
     return respond({data:[]});
   });
   await fresh.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Импорт',exact:true}).click();
-  await fresh.locator('.server-settings>summary').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.server-address-form').getByRole('button',{name:'Подключить',exact:true}).click();
-  await fresh.getByText('Нужен доступ к Drive',{exact:true}).waitFor();await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();
+  await fresh.locator('.import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
+  await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();
   await fresh.locator('#streamUrl').fill('https://source.example.com/titans');await fresh.getByRole('button',{name:'Проверить',exact:true}).click();await fresh.locator('#importDub').selectOption('https://source.example.com/studio');await fresh.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
   await fresh.locator('#serverCollection').fill('Атака титанов');await fresh.getByRole('button',{name:'Одна',exact:true}).click();await fresh.getByRole('combobox',{name:'Номер серии'}).selectOption('3');
   assert.equal(await fresh.locator('#importVideoBtn').isDisabled(),true);await fresh.locator('#importPrerequisites').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();
@@ -579,7 +582,7 @@ async function main() {
   await cinema.getByRole('combobox',{name:'Сезон',exact:true}).selectOption({label:'Сезон 2'});
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   assert.equal(await owner.locator('.mv-player-season-title select').inputValue()!=='',true);
-  await owner.locator('#closeViewer').click();
+  await closeViewer(owner);
   await owner.locator('#backToTitles').click();
   await owner.getByRole('button',{name:'Манга',exact:true}).click();
   assert.equal(await owner.locator('.title-card').count(),1);
@@ -591,9 +594,9 @@ async function main() {
   await owner.waitForFunction(()=>document.querySelector('#count').textContent==='10 файлов');
   await owner.locator('.title-card').click();
   await owner.locator('.title-episode-card').click();
-  await owner.locator('#viewerContent pre').waitFor();
-  assert.equal(await owner.locator('#viewerContent pre').innerText(),'Light novel volume text','A light novel keeps the working book reader');
-  await owner.locator('#closeViewer').click();
+  await owner.locator('.reader-prose').waitFor();
+  assert.equal(await owner.locator('.reader-prose').innerText(),'Light novel volume text','A light novel keeps the working book reader');
+  await closeViewer(owner);
   await owner.locator('#backToTitles').click();
   await fs.mkdir(path.join(PROJECT,'test-output'),{recursive:true});
   await owner.locator('.upload-options > summary').click();

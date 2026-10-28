@@ -62,7 +62,7 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
    {status&&<div className="reader-quiet-status">{status}</div>}{fullscreenError&&<small role="status">{fullscreenError}</small>}
   </div>
   {hint&&!visible&&!activePanel&&<div className="reader-gesture-hint" aria-hidden="true">Касание центра — меню{paged?' · По краям — листать':''}</div>}
-  <Dialog.Root open={!!activePanel} onOpenChange={open=>!open&&closePanel()}><Dialog.Portal><Dialog.Overlay className="reader-panel-backdrop"/><Dialog.Content className={'reader-panel reader-panel-'+activePanel} data-reader-panel onCloseAutoFocus={e=>{e.preventDefault();root.current?.focus({preventScroll:true});}}>
+  <Dialog.Root open={!!activePanel} onOpenChange={open=>!open&&closePanel()}><Dialog.Portal container={full?root.current:undefined}><Dialog.Overlay className="reader-panel-backdrop"/><Dialog.Content className={'reader-panel reader-panel-'+activePanel} data-reader-panel onCloseAutoFocus={e=>{e.preventDefault();root.current?.focus({preventScroll:true});}}>
    <header><div><small>Твоё пространство для чтения</small><Dialog.Title>{activePanel==='settings'?'Настройки читалки':activePanel==='contents'?'Главы и тома':'Превью страниц'}</Dialog.Title></div><Dialog.Close className="reader-control" aria-label={activePanel==='settings'?'Закрыть настройки читалки':'Закрыть панель читалки'}><X size={20}/></Dialog.Close></header>
    <Dialog.Description className="sr-only">Настройки и навигация. Закрой панель, чтобы вернуться к чтению.</Dialog.Description>
    <div className="reader-panel-body" onClick={e=>{if(activePanel!=='settings'&&e.target.closest('button'))closePanel();}}>{activePanel==='settings'?settings:activePanel==='contents'?contents:previews}</div>
