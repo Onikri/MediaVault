@@ -31,6 +31,16 @@ class BridgeTests(unittest.TestCase):
             for name in ['../../etc/passwd','eu.kanade.tachiyomi.extension.en.unknown']:
                 with self.assertRaises(SourceError):bridge.install(name)
             client.assert_not_called()
+    def test_catalogued_mixed_case_package_installs_without_changing_its_id(self):
+        package='eu.kanade.tachiyomi.extension.all.vinnieVeritas'
+        row={'pkgName':package,'name':'Vinne Veritas - CCC','installed':False}
+        with patch.object(bridge,'extensions',return_value=[row]),patch.object(bridge,'Client') as client:
+            self.assertTrue(bridge.install(package)['installed'])
+            client.return_value.get.assert_called_once_with('/extension/install/'+package,timeout=90)
+            client.return_value.close.assert_called_once()
+        with patch.object(bridge,'extensions',return_value=[]),patch.object(bridge,'Client') as client:
+            with self.assertRaises(SourceError):bridge.install(package)
+            client.assert_not_called()
     def test_source_search_requires_exact_title(self):
         class Fake:
             def close(self):pass
