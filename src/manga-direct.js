@@ -97,7 +97,7 @@ export class DirectChapter{
   }finally{if(status)listeners.delete(status);if(!listeners.size)this.listeners.delete(index);}
  }
  invalidate(index){if(this.jobs.get(index)?.state==='running')return;this.jobs.delete(index);this.progress.delete(index);this.bypass.add(index);}
- async compare(blob,index,{signal,onProgress}={}){return compareDirectInputs({blob,index,prepare:this.prepare,google:this.google,key:this.getKey(this.keyScope),config:this.config,direction:this.direction,signal:signal||this.controller.signal,onProgress});}
+ async compare(blob,index,{signal,onProgress}={}){const key=this.getKey(this.keyScope)||(this.getKey===directKey?await restoreDirectKey(this.keyScope):'');return compareDirectInputs({blob,index,prepare:this.prepare,google:this.google,key,config:this.config,direction:this.direction,signal:signal||this.controller.signal,onProgress});}
  prefetch(index){if(this.jobs.has(index-1)&&index<this.entries.length&&!this.jobs.has(index)&&this.getKey(this.keyScope))this.request(index,null,true);}
  renderCanvas(blob,page,font,status){
   return this.canvasTask({blob,page,font,mode:this.config.inpaint||'hybrid',cache:this.config.cache},status);

@@ -3,10 +3,10 @@ Protocol: Suwayomi Server v2.4 REST v1 (MPL-2.0 upstream, no vendored code).
 """
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,urljoin
 import json,os,re,threading,time
 import requests
-from source_parser import SourceError
+from source_parser import SourceError,public_url
 
 PREFIX='/__manga/suwayomi/'
 _cache={};_lock=threading.RLock();_install_lock=threading.Lock()
@@ -153,7 +153,9 @@ def search(title,language='all',format='all'):
                 rows=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':query,'pageNum':1},timeout=min(6,remaining)).get('mangaList',[])
                 for row in rows[:40]:
                     candidate={'title':row['title'],'aliases':[row['title']],'kind':'manga'};accepted,evidence=match_title(title,candidate)
-                    if accepted:result.append({**candidate,'url':reference(row['id']),'sourceUrl':row.get('realUrl') or '', 'provider':provider,'providerName':source['name'],'language':lang,'format':title.get('format') or ('manhwa' if lang=='ko' else 'manga'),'matchEvidence':evidence,'cover':''})
+                    try:canonical=public_url(row.get('realUrl') or urljoin(source.get('baseUrl',''),row.get('url','')),resolve_dns=False)
+                    except SourceError:canonical=''
+                    if accepted:result.append({**candidate,'url':reference(row['id']),'sourceUrl':canonical, 'provider':provider,'providerName':source['name'],'language':lang,'format':title.get('format') or ('manhwa' if lang=='ko' else 'manga'),'matchEvidence':evidence,'cover':''})
                 if result:break
             return {'provider':provider,'name':source['name'],'status':'ok' if result else 'empty','message':'','results':result}
         except (SourceError,ValueError,TypeError,KeyError,AttributeError):return {'provider':provider,'name':source['name'],'status':'unavailable','message':'Источник временно недоступен или изменил формат ответа.','results':[]}
