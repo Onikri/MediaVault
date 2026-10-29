@@ -5,6 +5,12 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from manga_catalog_adapters import api_url,dex_search,inspect_catalog,get
 from source_parser import SourceError
 class MangaCatalogAdapters(unittest.TestCase):
+ def test_lib_inspection_keeps_original_aliases_for_english_metadata_identity(self):
+  from title_identity import match_title
+  with patch('manga_catalog_adapters.get',side_effect=[{'data':{'rus_name':'Наруто','eng_name':'Naruto','otherNames':['ナルト']}},{'data':[]}]):
+   value=inspect_catalog('https://mangalib.me/ru/195--naruto',None)
+  self.assertEqual(value['aliases'],['Наруто','Naruto','ナルト'])
+  self.assertTrue(match_title({'title':'Naruto','kind':'manga'},value)[0])
  def test_lib_public_api_identifies_catalogue_without_account_credentials(self):
   with patch('manga_catalog_adapters.PublicHttp') as client:
    instance=client.return_value;instance.session.headers={};instance.document.return_value=('{}','','')

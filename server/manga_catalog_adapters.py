@@ -117,7 +117,8 @@ def inspect_catalog(url,http):
                 bid=str(branch.get('branch_id') or '');suffix='?bid='+bid if bid.isdigit() else ''
                 team=', '.join(v.get('name','') for v in branch.get('teams',[]))
                 chapters.append({'number':chapter_number(n),'season':max(1,int(vol)),'title':clean(row.get('name')) or 'Глава '+n,'url':'https://mangalib.me/ru/'+slug+'/read/v'+vol+'/c'+n+suffix,'translator':team,'language':'ru'})
-    return result('mangalib','MangaLib',title,url,'ru',chapters,pages,len(chapters)>=1500)
+    aliases=list(dict.fromkeys(v.strip() for v in [detail.get('rus_name'),detail.get('eng_name'),detail.get('name'),*(detail.get('otherNames') or [])] if isinstance(v,str) and v.strip()))
+    return {**result('mangalib','MangaLib',title,url,'ru',chapters,pages,len(chapters)>=1500),'aliases':aliases}
 
 def result(provider,name,title,url,language,chapters,pages,truncated=False):
     return {'provider':provider,'providerName':name,'title':str(title)[:300],'url':url,'kind':'manga','language':language,'episodes':chapters,'pages':pages,'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({c['season'] for c in chapters})],'dubs':[],'releases':[],'truncated':truncated,'available':bool(chapters),'translations':sorted({c['translator'] for c in chapters if c['translator']})}
