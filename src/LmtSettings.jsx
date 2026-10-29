@@ -1,3 +1,4 @@
+import ReaderModelStorage from './ReaderModelStorage.jsx';
 import GoogleKeySettings from './GoogleKeyFields.jsx';
 import './reader-settings-grid.css';
 import {GOOGLE_TRANSLATION_MODELS} from './google-models.js';
@@ -33,6 +34,7 @@ export default function LmtSettings({value,onChange,backendStatus,onClearCache,o
   {!visual&&<label>Кто восстанавливает фон<select aria-label="Восстановление фона LMT" value={v.inpaint} onChange={e=>set({inpaint:e.target.value})}><option value="quality">LaMa Manga · качественное восстановление (~206 МБ)</option><option value="fast">Быстрый · заливка / Telea</option></select></label>}
   <label>Шрифт перевода<select aria-label="Шрифт перевода манги" value={v.font} onChange={e=>set({font:e.target.value})}>{visual&&<option value="auto">Авто · по стилю оригинала</option>}{MANGA_FONTS.map(f=><option key={f.id} value={f.id}>{f.label}</option>)}</select></label><p className="reader-hint">{visual?'Выбранная модель определяет стиль реплики. Набор подбирает кириллический шрифт, кегль и переносы по форме облачка. Два блока в одном облачке получают раздельные области.':'Автовёрстка подбирает кегль и переносы по размеру области, проверяет границы и центрирует текст. Если реплика не помещается, обработчик сообщает об этом.'}</p>
   {!visual&&<label>Переводить заранее<select aria-label="Переводить заранее" value={v.prefetch} onChange={e=>set({prefetch:Number(e.target.value)})}>{[0,1,2,4].map(n=><option key={n} value={n}>{n?n+' стр. вперёд':'Только текущая страница'}</option>)}</select></label>}
+  <ReaderModelStorage config={v}/>
   <label className="reader-checkbox"><input type="checkbox" checked={v.cache} onChange={e=>set({cache:e.target.checked})}/>Сохранять готовый перевод на устройстве</label><p className="reader-hint">Зашифрованный кэш для этого профиля и библиотеки: до 160 страниц / 192 МБ. Повторное открытие не запускает модели. Изменение моделей создаёт новый вариант.</p><button type="button" onClick={onClearCache}>Очистить кэш перевода</button>
   <a href="./lmt/upstream/LICENSE" target="_blank" rel="noopener noreferrer">AGPL-3.0 · лицензия</a> · <a href="https://github.com/Onikri/MediaVault/tree/main" target="_blank" rel="noopener noreferrer">Исходники</a>
  </details>;

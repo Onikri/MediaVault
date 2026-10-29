@@ -4,7 +4,7 @@ import {fitComicText,styleFont} from './manga-typeset.js';
 import {prepareInkPatch,preparePageInk,compositeInkPatch,dilateInk} from './manga-cleaning.js';
 export const READER_RENDER_VERSION=5;
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
-export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page'}){
+export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false}){
  const start=performance.now(),bitmap=await createImageBitmap(blob);
  try{
   if(bitmap.width!==page.width||bitmap.height!==page.height||bitmap.width*bitmap.height>24_000_000)throw Error('Размер исходной страницы изменился.');
@@ -65,6 +65,7 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    inpaintMs+=performance.now()-t;
   }
   ctx.putImageData(working,0,0);
+  const debug=captureDebug?{cleanedImage:await(await canvas.convertToBlob({type:'image/webp',quality:.95})).arrayBuffer(),detected:{width:page.width,height:page.height,regions:page.regions.map(r=>({id:r.uid,bbox:r.text_bbox}))},coordinatesKind:'translation'}:undefined;
   // Typography is the last phase. Cleanup never reads these newly drawn glyphs.
   const layouts=[];for(const p of plans)if(p.painted){
    const t=performance.now(),dark=p.background.reduce((a,v)=>a+v,0)<384,complex=['sfx','sign','whisper_aside'].includes(p.region.text_category),{box,fit}=p;
@@ -78,6 +79,6 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   if(lamaUnavailable)warnings.push((mode==='moebius'?'Moebius':'LaMa')+': '+lamaUnavailable);
   let cacheImage;if(cache&&!unpainted)cacheImage=await(await canvas.convertToBlob({type:'image/webp',quality:.94})).arrayBuffer();
   const renderedBitmap=canvas.transferToImageBitmap();
-  return {renderedBitmap,cacheImage,warnings,typesetting:{engine:'staged-cyrillic-v2',layouts},inpaint:{requested:mode,strategy:mode==='moebius'?moebiusStrategy:'regions',modelCalls,execution:pageExecution,methods:[...methods],unpainted,regions:records},timings:{...page.timings,inpaintMs,typesetMs,renderMs:performance.now()-start},regions:page.regions.map(r=>({id:r.uid,text:r.ru_translation,original:r.source_text,x:r.text_bbox[0]/page.width,y:r.text_bbox[1]/page.height,w:(r.text_bbox[2]-r.text_bbox[0])/page.width,h:(r.text_bbox[3]-r.text_bbox[1])/page.height})),usage:page.usage,engine:page.engine||'Перевод → очистка → русский набор',cacheHit:page.cacheHit};
+  return {renderedBitmap,cacheImage,debug,warnings,typesetting:{engine:'staged-cyrillic-v2',layouts},inpaint:{requested:mode,strategy:mode==='moebius'?moebiusStrategy:'regions',modelCalls,execution:pageExecution,methods:[...methods],unpainted,regions:records},timings:{...page.timings,inpaintMs,typesetMs,renderMs:performance.now()-start},regions:page.regions.map(r=>({id:r.uid,text:r.ru_translation,original:r.source_text,x:r.text_bbox[0]/page.width,y:r.text_bbox[1]/page.height,w:(r.text_bbox[2]-r.text_bbox[0])/page.width,h:(r.text_bbox[3]-r.text_bbox[1])/page.height})),usage:page.usage,engine:page.engine||'Перевод → очистка → русский набор',cacheHit:page.cacheHit};
  }finally{bitmap.close();}
 }

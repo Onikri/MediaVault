@@ -44,3 +44,14 @@ test('whole-page renderer calls neural provider once, restores outside mask and 
  calls=0;const failed=await renderComicPage({blob:{},page,font:'serif',mode:'moebius',lama:async()=>{calls++;throw Error('runtime fetch failed');}});
  assert.equal(calls,1);assert.deepEqual(failed.renderedBitmap.data,image.data);assert.equal(failed.typesetting.layouts.length,0);assert.ok(failed.warnings.some(w=>w.startsWith('Moebius:')));
 });
+test('debug snapshot is captured after cleanup and before typesetting',async()=>{
+ const {image,page}=fixture();installCanvas(image);const Base=globalThis.OffscreenCanvas;
+ globalThis.OffscreenCanvas=class extends Base{
+  getContext(){const context=super.getContext();context.fillText=()=>{this.data[0]=17;};return context;}
+  async convertToBlob(){return new Blob([this.data]);}
+ };
+ const result=await renderComicPage({blob:{},page,font:'serif',mode:'moebius',captureDebug:true,lama:async()=>({provider:'fixture'})});
+ assert.equal(new Uint8Array(result.debug.cleanedImage)[0],255);
+ assert.equal(result.renderedBitmap.data[0],17);
+ assert.equal(result.debug.detected.regions.length,2);
+});

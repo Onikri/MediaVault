@@ -8,7 +8,7 @@ self.onmessage=event=>{queue=queue.catch(()=>{}).then(async()=>{
   if(event.data.operation==='direct-prepare'){self.postMessage({id,result:await prepareEnglishPage(blob,event.data.index,event.data.direction,event.data.inputMode)});return;}
   const status=value=>self.postMessage({id,status:value});
   const lama=mode==='moebius'?async(image,mask,progress)=>{const {inpaintMoebiusPage}=await import('./manga-moebius.js');return inpaintMoebiusPage(image,mask,progress);}:mode==='fast'?undefined:async(image,mask,progress)=>{const {inpaintLamaPatch}=await import('./manga-lama.js');return inpaintLamaPatch(image,mask,progress);};
-  const result=await renderComicPage({blob,page,font,mode,cache,lama,status});
-  self.postMessage({id,result},[result.renderedBitmap,...(result.cacheImage?[result.cacheImage]:[])]);
+  const result=await renderComicPage({blob,page,font,mode,cache,lama,status,captureDebug:event.data.captureDebug===true});
+  self.postMessage({id,result},[result.renderedBitmap,...(result.cacheImage?[result.cacheImage]:[]),...(result.debug?.cleanedImage?[result.debug.cleanedImage]:[])]);
  }catch(error){self.postMessage({id,error:error.message});}
 });};
