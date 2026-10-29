@@ -1,5 +1,6 @@
-import io,json,os,sys,tempfile,unittest,zipfile
+import io,json,os,sys,tempfile,unittest,zipfile,sqlite3
 from pathlib import Path
+from contextlib import closing
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 import suwayomi_bridge as bridge
@@ -9,6 +10,21 @@ ENV={'PUBLIC_URL':'https://media.example','SUWAYOMI_URL':'http://suwayomi:4567',
 class BridgeTests(unittest.TestCase):
     def setUp(self):self.env=patch.dict(os.environ,ENV);self.env.start();bridge._cache.clear()
     def tearDown(self):self.env.stop();bridge._cache.clear()
+    def test_failed_novelcool_extension_recovers_only_its_indexed_public_reader(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}):
+            path=Path(directory)/'manga-discovery.sqlite'
+            with closing(sqlite3.connect(path)) as db,db:
+                db.execute('CREATE TABLE titles(id TEXT,metadata TEXT)')
+                db.execute('INSERT INTO titles VALUES(?,?)',('suwayomi:2:1',json.dumps({'url':bridge.reference(1),'sourceUrl':'https://ru.novelcool.com/novel/Наруто.html'})))
+            class Fake:
+                def close(self):pass
+                def get(self,*a,**kw):raise SourceError('HTTP 404')
+            with patch.object(bridge,'Client',Fake),patch('manga_sources.inspect',return_value={'title':'Наруто','episodes':[]}) as native:
+                self.assertEqual(bridge.inspect(bridge.reference(1))['title'],'Наруто')
+                native.assert_called_once_with('https://ru.novelcool.com/novel/Наруто.html')
+            self.assertIsNone(bridge.indexed_reader(bridge.reference(1,4)))
+            with closing(sqlite3.connect(path)) as db,db:db.execute('UPDATE titles SET metadata=?',(json.dumps({'url':bridge.reference(1),'sourceUrl':'https://evil.example/novel/Наруто.html'}),))
+            self.assertIsNone(bridge.indexed_reader(bridge.reference(1)))
     def test_mangadex_extension_failure_uses_same_uuid_and_language_native_adapter(self):
         uuid='6b1eb93e-473a-4ab3-9922-1a66d2a29a4a'
         class Fake:

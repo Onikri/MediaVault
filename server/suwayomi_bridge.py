@@ -2,9 +2,10 @@
 Protocol: Suwayomi Server v2.4 REST v1 (MPL-2.0 upstream, no vendored code).
 """
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from pathlib import Path
 from urllib.parse import urlsplit,urljoin
-import json,os,re,threading,time
+import json,os,re,threading,time,sqlite3
 import requests
 from source_parser import SourceError,public_url
 
@@ -86,6 +87,28 @@ def cached(name,path,ttl):
 
 def sources():return [s for s in cached('sources','/source/list',30) if str(s.get('id'))!='0']
 def extensions():return cached('extensions','/extension/list',120)
+
+def indexed_reader(value):
+    """Recover a failed extension through the same indexed public reader URL."""
+    ids=parse_reference(value)
+    if not ids or ids[1] is not None:return None
+    path=Path(os.getenv('DATA_DIR','/data'))/'manga-discovery.sqlite'
+    if not path.is_file():return None
+    try:
+        with closing(sqlite3.connect('file:'+path.as_posix()+'?mode=ro',uri=True,timeout=1)) as db:
+            rows=db.execute('SELECT metadata FROM titles WHERE id LIKE ? LIMIT 8',('%:'+str(ids[0]),)).fetchall()
+        for row in rows:
+            item=json.loads(row[0]);canonical=item.get('sourceUrl','');url=urlsplit(canonical)
+            if item.get('url')==value and url.scheme=='https' and url.hostname=='ru.novelcool.com' and re.fullmatch(r'/novel/[^/]+\.html',url.path):return canonical
+    except (sqlite3.Error,ValueError,OSError,TypeError):pass
+    return None
+
+def inspect_indexed_reader(value):
+    canonical=indexed_reader(value)
+    if canonical:
+        from manga_sources import inspect as native_inspect
+        return native_inspect(canonical)
+    return None
 def status():
     if not configured():return {'configured':False,'ready':False,'message':'Дополнительные источники пока не подключены.'}
     try:
@@ -118,12 +141,18 @@ def inspect(value):
     if page is not None:raise SourceError('Открой главу, а не отдельную страницу.')
     client=Client()
     try:
-        data=client.get(f'/manga/{manga}',{'onlineFetch':'true' if chapter is None else 'false'},timeout=25)
+        try:data=client.get(f'/manga/{manga}',{'onlineFetch':'true' if chapter is None else 'false'},timeout=25)
+        except SourceError:
+            recovered=inspect_indexed_reader(value)
+            if recovered is not None:return recovered
+            raise
         source=data.get('source') or client.get('/source/'+str(data['sourceId']))
         lang=source.get('lang','')
         if lang not in {'ru','en','ja','ko'}:raise SourceError('Этот источник пока не поддерживает выбранный язык чтения.')
         try:chapters=client.get(f'/manga/{manga}/chapters',{'onlineFetch':'true' if chapter is None else 'false'},timeout=30)
         except SourceError:
+            recovered=inspect_indexed_reader(value)
+            if recovered is not None:return recovered
             # MangaDex can fail in its extension while its public API still
             # answers. Resolve the SAME title UUID and language, never another
             # title/provider. Native chapter URLs keep reading/download working.
