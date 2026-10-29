@@ -19,4 +19,5 @@ Path('.env').chmod(0o600)
 PY
 install -d -m 700 -o 1000 -g 1000 data data/temporary
 docker compose --file compose.yaml up --detach --build
+docker compose --file compose.yaml exec -T importer python -m novelcool_client
 printf '%s\n' 'MediaVault started. Add https://<SERVER_NAME>/oauth/callback to the Google OAuth web client redirects.'
