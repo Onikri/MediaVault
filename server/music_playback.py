@@ -25,7 +25,12 @@ def parse_recordings(html,title,artist):
             if re.fullmatch(r'[\w-]{11}',identity) and identity not in seen and name and duration:
                 seen.add(identity);combined=words(name+' '+author);title_score=len(t&combined)/max(1,len(t));artist_score=len(a&combined)/max(1,len(a)) if a else 1
                 score=title_score*.7+artist_score*.3
-                results.append({'id':identity,'title':name,'author':author,'duration':duration,'match':title_score>=.8 and artist_score>=.5,'score':round(score,3)})
+                author_words=words(author);official=bool(a) and a<=author_words and len(author_words-a)<=2
+                variants=words(name)-t
+                altered=bool(variants&{'instrumental','karaoke','cover','remix','sped','slowed','live','nightcore','инструментал','кавер'})
+                video=bool(variants&{'mv','official','video'}) and not bool(variants&{'lyric','lyrics'})
+                rank=score+(.15 if official else 0)+(.05 if official and video else 0)-(.6 if altered else 0)
+                results.append({'id':identity,'title':name,'author':author,'duration':duration,'match':title_score>=.8 and artist_score>=.5 and not altered,'score':round(rank,3)})
         stack.extend(reversed(list(node.values())))
     return sorted(results,key=lambda r:(r['match'],r['score']),reverse=True)[:8]
 def recordings(title,artist):

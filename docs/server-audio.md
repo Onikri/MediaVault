@@ -30,8 +30,10 @@ The Oracle image includes Node22 for yt-dlp's EJS runtime. yt-dlp and the Node
 image are version-pinned; updates are reviewed and deployed, rather than a live
 `pip install -U` mutating the running container. yt-dlp alone does not guarantee
 that YouTube will serve an Oracle datacenter IP. Verification, access restrictions
-and missing formats are reported as preparation failures. The official visible
-YouTube player remains an explicit alternative. Spotify keeps its own SDK and
+and missing formats are reported as preparation failures. On media preparation failures (HTTP502/504), the visible official YouTube
+player opens automatically with an explanation. It uses YouTube playback and
+advertising rules; it is not a server audio stream. Authentication and rate-limit
+errors stay actionable without switching providers. Spotify keeps its own SDK and
 account permissions. Collapsing server audio keeps playback running; collapsing
 the official YouTube embed still pauses its video.
 

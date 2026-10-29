@@ -100,6 +100,10 @@ class OnlinePlayback(unittest.TestCase):
   def row(identity,title,artist):return {'videoRenderer':{'videoId':identity,'title':{'runs':[{'text':title}]},'ownerText':{'runs':[{'text':artist}]},'lengthText':{'simpleText':'3:15'}}}
   raw='var ytInitialData = '+json.dumps({'contents':[row('abcdefghijk','Unrelated song','Someone'),row('01234567890','Otonoke / オトノケ — Official Video','Creepy Nuts')]})+';'
   r=parse_recordings(raw,'Otonoke','Creepy Nuts');self.assertEqual(r[0]['id'],'01234567890');self.assertTrue(r[0]['match']);self.assertNotIn('url',r[0])
+ def test_original_official_mv_ranks_before_lyric_uploads_and_instrumental_is_not_an_exact_match(self):
+  def row(identity,title,artist):return {'videoRenderer':{'videoId':identity,'title':{'simpleText':title},'ownerText':{'simpleText':artist},'lengthText':{'simpleText':'3:15'}}}
+  raw='var ytInitialData = '+json.dumps({'contents':[row('CB2_qBzSft8','English Lyric Video Creepy Nuts - Otonoke','Creepy Nuts'),row('VD5rOrHN1Dg','Otonoke (Instrumental)','Creepy Nuts'),row('FCoQMD_qVNo','Otonoke by Creepy Nuts lyrics','Someone'),row('tRwHpyOq4P4','MV Creepy Nuts オトノケ(Otonoke)','Creepy Nuts')]})+';'
+  result=parse_recordings(raw,'Otonoke','Creepy Nuts');self.assertEqual(result[0]['id'],'tRwHpyOq4P4');self.assertFalse(next(r for r in result if r['id']=='VD5rOrHN1Dg')['match'])
  def test_katana_reads_only_published_image_array_and_exact_search_cards(self):
   self.assertEqual(parse_pages("<script>var thzq=['https://images.example/1.jpg','https://images.example/2.jpg',];</script>",'https://mangakatana.com/manga/a/c1'),['https://images.example/1.jpg','https://images.example/2.jpg'])
   s=next(v for v in SITES if v.id=='mangakatana');rows=parse_search('<div id="book_list"><div class="item"><h3 class="title"><a href="/manga/demo.1">Demo</a></h3><img src="/cover.jpg"></div></div>',s.root,s);self.assertEqual(rows[0]['language'],'en');self.assertEqual(rows[0]['title'],'Demo')
