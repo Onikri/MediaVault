@@ -31,6 +31,18 @@ class IdentityTests(unittest.TestCase):
         self.assertTrue(match_title({'title':'Русское','ids':{'mal':1}},{'title':'English','ids':{'mal':'1'}})[0])
 
 class PlayerCatalogTests(unittest.TestCase):
+    def test_json_relay_retains_alloha_and_exact_published_voice_episode_table(self):
+        base='https://yummyanime.tv/engine/ajax/controller.php?mod=player&id=42&slot=0'
+        url='https://absciss.thealloha.club/?token_movie=public-film&token=public-embed'
+        page=parse_page(json.dumps({'status':True,'data':{'kind':'iframe','src':url}}),base)
+        self.assertEqual(page.players,[url])
+        from player_catalog import alloha_choices
+        table={'all':{'1':{'1':{'t10':{'id_translation':10,'translation':'Studio A'}},'3':{'t10':{'id_translation':10,'translation':'Studio A'},'t11':{'id_translation':11,'translation':'Studio B'}}},'2':{'1':{'t10':{'id_translation':10,'translation':'Studio A'}}}}}
+        text="<script>const fileList = JSON.parse('"+json.dumps(table)+"');</script>"
+        choices,seasons=alloha_choices(text,url+'&season=1')
+        self.assertEqual([s['number'] for s in seasons],[1,2]);self.assertEqual([e['number'] for e in choices[0]['episodes']],[1,3]);self.assertEqual([e['number'] for e in choices[1]['episodes']],[3])
+        self.assertIn('translation=11',choices[1]['episodes'][0]['url']);self.assertEqual(choices[0]['player'],'Alloha')
+
     def test_parser_retains_two_translations_of_one_episode(self):
         page=parse_page('<a href="/episode-1?translation=1">1 серия</a><a href="/episode-1?translation=2">1 серия</a>','https://example.com/show')
         self.assertEqual(len(page.episodes),2)

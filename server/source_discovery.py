@@ -98,6 +98,9 @@ def discover(selected,*,refresh=False,continuing=False):
         sites=[s for s in SITES if s.kind=='anime' and s.id not in {'sovet','anilibriafun','animevosttv'}]
         with ThreadPoolExecutor(max_workers=6) as pool:providers=list(pool.map(work,sites))
         sources=[s for p in providers for s in p.pop('sources')]
+        # A later timeout must not remove a previously verified player/translation.
+        for previous in known.values():
+            if not any(s['url']==previous['url'] for s in sources):sources.append(previous)
         result={'title':selected,'voices':group_voices(sources),'sources':sources,'providers':providers,'progress':sum(s.get('scannedPages',1) for s in sources),'pending':any(s.get('pending') for s in sources) or any(p.get('pending') for p in providers),'complete':all(p.get('complete',False) for p in providers),'checkedAt':int(time.time())}
         with _lock:
             if len(_cache)>=80:_cache.pop(next(iter(_cache)))
