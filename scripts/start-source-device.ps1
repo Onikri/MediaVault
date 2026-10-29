@@ -3,12 +3,18 @@ param(
     [string]$Python = 'D:\Programs\MediaVault\.venv\Scripts\python.exe'
 )
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'cache-env.ps1')
+$deviceCacheScript = Join-Path $PSScriptRoot 'cache-env.ps1'
+if (Test-Path -LiteralPath $deviceCacheScript) { . $deviceCacheScript }
 $deviceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $deviceCache = Join-Path $deviceRoot '.codex-local'
 $deviceLogs = Join-Path $deviceCache 'logs'
 $deviceSecrets = Join-Path $deviceCache 'secrets'
 New-Item -ItemType Directory -Force -Path $deviceLogs,$deviceSecrets | Out-Null
+$deviceTemporary = Join-Path $deviceCache 'tmp'
+New-Item -ItemType Directory -Force -Path $deviceTemporary | Out-Null
+$env:TEMP = $deviceTemporary
+$env:TMP = $deviceTemporary
+$env:PYTHONPYCACHEPREFIX = Join-Path $deviceCache 'cache\pycache'
 $deviceWorker = Join-Path $deviceRoot 'server\source_relay_worker.py'
 $deviceKey = Join-Path $deviceSecrets 'source-device-ed25519.key'
 $devicePidFile = Join-Path $deviceCache 'source-device.pid'
