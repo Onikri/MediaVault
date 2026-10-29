@@ -1,9 +1,10 @@
 """Short-lived, owner-created playback capabilities. No Drive writes or open proxy."""
 from dataclasses import dataclass,field
-import re,secrets,threading,time
+import asyncio,contextlib,re,secrets,threading,time
 import m3u8
 from urllib.parse import urljoin,urlsplit
-from fastapi import Depends,HTTPException,Header
+from fastapi import Depends,HTTPException,Header,Request
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response,StreamingResponse
 from pydantic import BaseModel,ConfigDict,Field
 from source_parser import PublicHttp,Resolver,SourceError,public_url
@@ -28,6 +29,13 @@ class Session:
             token=secrets.token_urlsafe(12);self.resources[token]=url;self.reverse[url]=token;return token
 
 sessions={};lock=threading.RLock()
+
+async def watch_disconnect(request,event):
+    # Unlike is_disconnected()'s nonblocking poll, an active receive task also
+    # observes disconnects through Starlette's buffered-body middleware.
+    while True:
+        if (await request.receive())['type']=='http.disconnect':
+            event.set();return
 def expire():
     now=time.monotonic()
     for key in list(sessions):
@@ -67,8 +75,7 @@ def install(app,owner):
     # /online/exports/{id} as an ordinary playback capability.
     from local_exports import install as install_exports
     install_exports(app,owner)
-    @app.post('/online/prepare')
-    def prepare(body:Prepare,subject=Depends(owner)):
+    def resolve(body,subject):
         http=PublicHttp(timeout=(4,12),deadline=time.monotonic()+45)
         try:
             if body.kind=='manga':
@@ -96,6 +103,24 @@ def install(app,owner):
             if manifest:s.manifests[resource]=manifest
             return {'id':token,'kind':'video','url':'/online/'+token+'/'+resource,'type':stream['type'],'expiresIn':7200,'preparationMs':round((time.monotonic()-started)*1000)}
         finally:http.close()
+
+    @app.post('/online/prepare')
+    async def prepare(body:Prepare,request:Request,subject=Depends(owner)):
+        # A hover preview can be cancelled while upstream parsing is still
+        # running. Do not leave its newly created two-hour capability occupying
+        # one of the owner's four slots after that browser has disconnected.
+        disconnected=asyncio.Event();watcher=asyncio.create_task(watch_disconnect(request,disconnected))
+        try:
+            data=await run_in_threadpool(resolve,body,subject)
+            if disconnected.is_set():
+                with lock:
+                    session=sessions.get(data['id'])
+                    if session and session.owner==subject:sessions.pop(data['id'],None)
+                raise HTTPException(499,'Подготовка просмотра отменена.')
+            return data
+        finally:
+            watcher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):await watcher
 
     @app.delete('/online/{token}')
     def close(token:str,subject=Depends(owner)):

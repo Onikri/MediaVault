@@ -10,6 +10,44 @@ from music_playback import parse_recordings
 from manga_sources import parse_pages,parse_search,SITES
 class OnlinePlayback(unittest.TestCase):
  def setUp(self):online.sessions.clear()
+ def test_real_socket_disconnect_through_buffered_body_middleware_releases_sessions(self):
+  import socket,threading,time,uvicorn
+  app=FastAPI()
+  @app.middleware('http')
+  async def buffered(request,next):
+   await request.body();return await next(request)
+  online.install(app,lambda:'socket-owner')
+  def inspect(*args):
+   time.sleep(.15)
+   return {'url':'https://source.example/chapter/1','language':'ru','pages':['https://images.example/1.png']}
+  sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
+  server=uvicorn.Server(uvicorn.Config(app,log_level='critical',lifespan='off'))
+  thread=threading.Thread(target=lambda:server.run(sockets=[sock]),daemon=True)
+  with patch('manga_sources.inspect',side_effect=inspect):
+   thread.start()
+   try:
+    for _ in range(300):
+     if server.started:break
+     time.sleep(.01)
+    self.assertTrue(server.started)
+    for _ in range(6):
+     body=json.dumps({'url':'https://source.example/chapter/1','kind':'manga'}).encode()
+     with socket.create_connection(('127.0.0.1',port),timeout=3) as connection:
+      connection.sendall(b'POST /online/prepare HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: '+str(len(body)).encode()+b'\r\n\r\n'+body);time.sleep(.05)
+     time.sleep(.25)
+     self.assertEqual(online.sessions,{})
+   finally:server.should_exit=True;thread.join(3)
+ def test_aborted_hover_preparations_do_not_fill_owner_playback_slots(self):
+  app=FastAPI();online.install(app,lambda:'A');client=TestClient(app)
+  data={'url':'https://source.example/chapter/1','language':'ru','pages':['https://images.example/1.png']}
+  async def disconnected(request,event):event.set()
+  with patch('manga_sources.inspect',return_value=data),patch('online_sessions.watch_disconnect',side_effect=disconnected):
+   for _ in range(8):
+    self.assertEqual(client.post('/online/prepare',json={'url':data['url'],'kind':'manga'}).status_code,499)
+    self.assertEqual(online.sessions,{})
+  with patch('manga_sources.inspect',return_value=data):
+   response=client.post('/online/prepare',json={'url':data['url'],'kind':'manga'})
+   self.assertEqual(response.status_code,200);self.assertEqual(len(online.sessions),1)
  def test_quality_cap_removes_only_higher_video_variants_preserving_alternate_audio(self):
   text='#EXTM3U\n#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="Ru",URI="ru.m3u8"\n#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=1280x720,AUDIO="a"\n720.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=4000000,RESOLUTION=1920x1080,AUDIO="a"\n1080.m3u8\n'
   links=[]
