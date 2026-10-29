@@ -1,7 +1,7 @@
 import io,json,os,sys,tempfile,unittest,zipfile,sqlite3
 from pathlib import Path
 from contextlib import closing
-from unittest.mock import patch
+from unittest.mock import patch,MagicMock
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 import suwayomi_bridge as bridge
 from source_parser import SourceError
@@ -39,6 +39,33 @@ class BridgeTests(unittest.TestCase):
         with patch.object(bridge,'Client',Fake),patch('manga_sources.inspect') as native:
             with self.assertRaises(SourceError):bridge.inspect(bridge.reference(1))
             native.assert_not_called()
+
+    def test_libgroup_title_and_saved_chapter_use_same_native_site_without_webview(self):
+        class Fake:
+            def close(self):pass
+            def get(self,path,params=None,**kwargs):
+                if path=='/manga/8':
+                    self.assert_cached=params=={'onlineFetch':'false'}
+                    return {'title':'Белый Кит','url':'/187444--mobidig','source':{'name':'HentaiLib','id':'4','lang':'ru','baseUrl':'https://hentailib.me'}}
+                if path=='/manga/8/chapters':return [{'index':2,'url':'/187444--mobidig/chapter?volume=1&number=2&branch_id=10'}]
+                raise AssertionError('Unexpected extension request '+path)
+        with patch.object(bridge,'Client',Fake),patch('manga_sources.inspect',return_value={'pages':['https://images.example/p.jpg']}) as native:
+            bridge.inspect(bridge.reference(8));self.assertEqual(native.call_args.args[0],'https://hentailib.me/ru/187444--mobidig')
+            bridge.inspect(bridge.reference(8,2));self.assertEqual(native.call_args.args[0],'https://hentailib.me/ru/187444--mobidig/read/v1/c2?bid=10')
+
+    def test_saved_dex_page_recovers_through_its_same_native_chapter(self):
+        uuid='68112dc1-2b80-4f20-beb8-2f2a8716a430'
+        class Fake:
+            def close(self):pass
+            def get(self,path,*args,**kwargs):
+                if path=='/manga/8':return {'title':'Example','url':'/manga/'+uuid,'source':{'name':'MangaDex','id':'2','lang':'en','baseUrl':'https://mangadex.org'}}
+                if path=='/manga/8/chapters':return [{'index':1,'url':'/chapter/'+uuid}]
+                raise SourceError('HTTP 500')
+        with patch.object(bridge,'Client',Fake),patch('manga_sources.inspect',return_value={'pages':['https://pages.example/1.jpg']}) as native,patch('source_parser.PublicHttp') as http:
+            response=http.return_value._open.return_value=(MagicMock(), 'https://pages.example/1.jpg')
+            response[0].iter_content.return_value=[b'\xff\xd8\xffimage-fixture']
+            raw,mime=bridge.page_image(bridge.reference(8,1,0))
+        self.assertEqual(mime,'image/jpeg');self.assertTrue(raw.startswith(b'\xff\xd8\xff'));self.assertEqual(native.call_args.args[0],'https://mangadex.org/chapter/'+uuid+'?lang=en');http.return_value.close.assert_called_once()
 
     def test_error_classification_is_bounded_and_never_returns_upstream_secrets(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -38,3 +38,10 @@ test('metadata and exact source matches merge with every selectable source retai
  const values=worldResults([meta],[a,b],'One Piece',['2']);assert.equal(values.length,1);assert.equal(values[0].sourceOnly,false);assert.equal(values[0].sources.length,2);assert.deepEqual(values[0].ids,{mal:'13'});
  assert.equal(worldResults([meta],[a],'One Piece',['2']).length,0);
 });
+
+
+test('verified Russian source and English MangaDex aliases share the title and retain source filters',()=>{
+ const lib={id:'lib',provider:'hentailib',sourceId:'4',kind:'manga',title:'Белый Кит',aliases:['Белый Кит','Moby Dick','모비딕'],identityTitles:['Белый Кит','mobidig'],year:2023,age:18,url:'https://hentailib.me/ru/187444--mobidig'};
+ const dex={id:'dex',provider:'mangadex',sourceId:'2',kind:'manga',title:'Moby Dick',aliases:['Moby Dick','모비딕','Белый Кит'],year:2023,age:18,url:'https://mangadex.org/title/fixture?lang=en'};
+ const rows=worldResults([],[lib,dex],'Белый кит');assert.equal(rows.length,1);assert.equal(rows[0].sources.length,2);assert.equal(rows[0].age,18);assert.equal(worldResults([],[lib,dex],'Белый кит',['2']).length,1);
+});

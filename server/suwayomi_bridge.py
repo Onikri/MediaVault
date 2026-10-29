@@ -4,7 +4,7 @@ Protocol: Suwayomi Server v2.4 REST v1 (MPL-2.0 upstream, no vendored code).
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from pathlib import Path
-from urllib.parse import urlsplit,urljoin
+from urllib.parse import urlsplit,urljoin,parse_qs
 import json,os,re,threading,time,sqlite3
 import requests
 from source_parser import SourceError,public_url
@@ -141,6 +141,19 @@ def inspect(value):
     if page is not None:raise SourceError('Открой главу, а не отдельную страницу.')
     client=Client()
     try:
+        # LibGroup can fail before chapter/page calls while initializing its
+        # Android WebView. Resolve its already indexed identity first and use
+        # that same site's public reader, including old saved bridge links.
+        try:
+            saved=client.get(f'/manga/{manga}',{'onlineFetch':'false'},timeout=8)
+            saved_source=saved.get('source') or client.get('/source/'+str(saved['sourceId']))
+            if native:=native_reader_url(client,saved,saved_source,manga,chapter):
+                from manga_sources import inspect as native_inspect
+                return native_inspect(native)
+        except SourceError:
+            # The normal path retains bounded retries and indexed NovelCool
+            # recovery for providers without a public catalogue adapter.
+            if 'native' in locals() and native:raise
         try:data=client.get(f'/manga/{manga}',{'onlineFetch':'true' if chapter is None else 'false'},timeout=25)
         except SourceError:
             recovered=inspect_indexed_reader(value)
@@ -180,11 +193,82 @@ def inspect(value):
         return {'provider':'suwayomi:'+str(source['id']),'providerName':source['name'],'title':data['title'],'aliases':[data['title']],'url':value,'kind':'manga','language':lang,'episodes':episodes,'pages':pages,'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({e['season'] for e in episodes})],'translations':sorted({e['translator'] for e in episodes if e['translator']}),'cover':'','description':data.get('description') or '','dubs':[],'releases':[],'truncated':len(chapters)>1500,**({'format':'manhwa','readingMode':'scroll'} if lang=='ko' else {})}
     finally:client.close()
 
+def native_reader_url(client,data,source,manga,chapter=None):
+    """Map only this cached source/title/chapter, never substitute a search hit."""
+    from manga_catalog_adapters import UUID,LIB_SITES
+    canonical=data.get('realUrl') or urljoin(source.get('baseUrl',''),data.get('url',''))
+    parsed=urlsplit(canonical);lang=source.get('lang')
+    lib=next((row for row in LIB_SITES.values() if parsed.hostname in {urlsplit(row[2]).hostname,row[0]+'.org'} and source.get('name')==row[1]),None)
+    dex=source.get('name')=='MangaDex' and parsed.hostname=='mangadex.org'
+    if parsed.scheme!='https' or lang not in LANGUAGES:return None
+    if not(lib or dex):
+        from manga_sources import site_for
+        site=site_for(canonical)
+        if not site or site.family not in {'pill','katana','poisk','hub','chan','buff'} or site_for(source.get('baseUrl',''))!=site:return None
+        if chapter is None:return canonical
+        rows=client.get(f'/manga/{manga}/chapters',{'onlineFetch':'false'},timeout=8)
+        row=next((r for r in rows if r.get('index')==chapter),None)
+        if row:
+            target=row.get('realUrl') or urljoin(site.root,row.get('url',''))
+            if site_for(target)==site:return target
+        raise SourceError('Не удалось сопоставить главу с исходной читалкой.')
+    if dex:
+        match=re.fullmatch(r'/(?:title|manga)/('+UUID+r')(?:/[^/]*)?/?',parsed.path)
+        if not match:return None
+        title_url='https://mangadex.org/title/'+match[1]+'?lang='+lang
+    else:
+        # Suwayomi stores LibGroup's /slug separately from its public /ru URL.
+        match=re.fullmatch(r'/(?:ru/(?:manga/)?)?([\w-]{1,250})/?',parsed.path)
+        if not match:return None
+        slug=match[1];title_url=lib[2]+'/ru/'+slug
+    if chapter is None:return title_url
+    rows=client.get(f'/manga/{manga}/chapters',{'onlineFetch':'false'},timeout=8)
+    row=next((r for r in rows if r.get('index')==chapter),None)
+    if row is None:raise SourceError('Сохранённая глава отсутствует в этом источнике. Обнови список глав.')
+    original=urlsplit(str(row.get('url') or ''))
+    if dex:
+        match=re.fullmatch(r'/chapter/('+UUID+r')/?',original.path)
+        if match:return 'https://mangadex.org/chapter/'+match[1]+'?lang='+lang
+    else:
+        args=parse_qs(original.query);volume=args.get('volume',[''])[0];number=args.get('number',[''])[0];bid=args.get('branch_id',[''])[0]
+        if original.path in {'/'+slug+'/chapter','/api/manga/'+slug+'/chapter'} and volume.isdigit() and re.fullmatch(r'\d{1,4}(?:\.\d{1,3})?',number):
+            return lib[2]+'/ru/'+slug+'/read/v'+volume+'/c'+number+('?bid='+bid if bid.isdigit() else '')
+        if original.path.startswith('/ru/'+slug+'/read/') and (not original.netloc or original.hostname==urlsplit(lib[2]).hostname):return lib[2]+original.path+('?'+original.query if original.query else '')
+    raise SourceError('Не удалось сопоставить сохранённую главу с её исходной ссылкой.')
+
 def page_image(value):
     ids=parse_reference(value)
     if not ids or ids[1] is None or ids[2] is None:raise SourceError('Некорректная ссылка на страницу.')
     manga,chapter,page=ids;client=Client()
-    try:return client.get(f'/manga/{manga}/chapter/{chapter}/page/{page}',{'updateProgress':'false'},timeout=25,image=True)
+    try:
+        try:return client.get(f'/manga/{manga}/chapter/{chapter}/page/{page}',{'updateProgress':'false'},timeout=25,image=True)
+        except SourceError:
+            saved=client.get(f'/manga/{manga}',{'onlineFetch':'false'},timeout=8)
+            source=saved.get('source') or client.get('/source/'+str(saved['sourceId']))
+            target=native_reader_url(client,saved,source,manga,chapter)
+            if not target:raise
+            from manga_sources import inspect as native_inspect
+            from manga_download import image_extension
+            from source_parser import PublicHttp
+            key='native-pages:'+target;now=time.monotonic()
+            with _lock:hit=_cache.get(key)
+            if hit and hit[0]>now:pages=hit[1]
+            else:
+                pages=native_inspect(target)['pages']
+                with _lock:_cache[key]=(now+300,pages)
+            if not 0<=page<len(pages):raise SourceError('Страница отсутствует в исходной главе.')
+            http=PublicHttp(timeout=(3,20));response=None
+            try:
+                response,_=http._open(pages[page],headers={'Referer':target});raw=bytearray()
+                for block in response.iter_content(65536):
+                    raw.extend(block)
+                    if len(raw)>30*1024*1024:raise SourceError('Страница превышает допустимый размер.')
+                extension=image_extension(raw[:32])
+                if not extension:raise SourceError('Источник вернул заглушку вместо страницы.')
+                return bytes(raw),'image/'+('jpeg' if extension=='jpg' else extension)
+            finally:
+                if response is not None:response.close()
+                http.close()
     finally:client.close()
 
 def search(title,language='all',format='all',offset=0,limit=8):

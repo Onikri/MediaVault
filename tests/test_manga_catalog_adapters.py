@@ -40,3 +40,21 @@ class MangaCatalogAdapters(unittest.TestCase):
   identity='68112dc1-2b80-4f20-beb8-2f2a8716a430';detail={'data':{'attributes':{'title':{'en':'Dandadan'},'contentRating':'safe'}}};feed={'total':1,'data':[{'id':'chapter','attributes':{'chapter':'1','pages':1,'externalUrl':'https://licensed.example/read'},'relationships':[]}]}
   with patch('manga_catalog_adapters.get',side_effect=[detail,feed]):value=inspect_catalog('https://mangadex.org/title/'+identity+'?lang=en',None)
   self.assertEqual(value['episodes'],[]);self.assertFalse(value['available'])
+
+ def test_hentailib_uses_its_own_site_header_and_image_server(self):
+  detail={'data':{'rus_name':'Белый Кит'}};chapter={'data':{'pages':[{'slug':1,'url':'/manga/p1.jpg'}]}};constants={'data':{'imageServers':[{'id':'compress','site_ids':[1],'url':'https://wrong.example'},{'id':'compress','site_ids':[4],'url':'https://right.example'}]}}
+  with patch('manga_catalog_adapters.get',side_effect=[detail,chapter,constants]) as calls:
+   value=inspect_catalog('https://hentailib.me/ru/187444--mobidig/read/v1/c1',None)
+  self.assertEqual(value['provider'],'hentailib');self.assertEqual(value['pages'],['https://right.example/manga/p1.jpg']);self.assertTrue(all(c.args[1].lib_site_id==4 for c in calls.call_args_list))
+ def test_dex_adult_catalog_is_searchable_and_retains_age_metadata(self):
+  row={'id':'fixture','attributes':{'title':{'en':'Example'},'availableTranslatedLanguages':['en'],'contentRating':'pornographic'},'relationships':[]}
+  with patch('manga_catalog_adapters.get',return_value={'data':[row]}) as call:
+   result=dex_search('Example','en',None)
+  self.assertEqual(result[0]['age'],18);self.assertIn('pornographic',call.call_args.args[0])
+ def test_dex_feed_keeps_all_ratings_and_at_home_url_has_one_slash(self):
+  uuid='68112dc1-2b80-4f20-beb8-2f2a8716a430'
+  chapter={'data':{'attributes':{'translatedLanguage':'en','chapter':'1'},'relationships':[]}}
+  with patch('manga_catalog_adapters.get',side_effect=[chapter,{'baseUrl':'https://pages.example/','chapter':{'hash':'hash','data':['1.jpg']}}]):value=inspect_catalog('https://mangadex.org/chapter/'+uuid,None)
+  self.assertEqual(value['pages'],['https://pages.example/data/hash/1.jpg'])
+  with patch('manga_catalog_adapters.get',side_effect=[{'data':{'attributes':{'title':{'en':'Example'},'contentRating':'pornographic'}}},{'data':[],'total':0}]) as call:inspect_catalog('https://mangadex.org/title/'+uuid+'?lang=en',None)
+  self.assertIn('pornographic',call.call_args.args[0])

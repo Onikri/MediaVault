@@ -4,10 +4,16 @@ MangaLib field layout checked against Keiyoushi LibGroup (Apache-2.0).
 Only openly accessible chapters are accepted. Availability is reported by caller.
 """
 import json,re,time
+from types import SimpleNamespace
 from urllib.parse import urlencode,urlsplit,parse_qs,quote
 from source_parser import PublicHttp,SourceError,public_url
 UUID=r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}'
 LIB='https://api.cdnlibs.org'
+LIB_SITES={1:('mangalib','MangaLib','https://mangalib.me'),4:('hentailib','HentaiLib','https://hentailib.me')}
+CONTENT_RATINGS=('safe','suggestive','erotica','pornographic')
+def lib_context(http,site_id):
+    if site_id not in LIB_SITES:raise SourceError('Неизвестный каталог LibGroup.')
+    return SimpleNamespace(timeout=getattr(http,'timeout',(3,7)),deadline=getattr(http,'deadline',None) or time.monotonic()+30,lib_site_id=site_id)
 
 def lib_identity(data):
     # The English alias can contain a franchise name on a different fan work.
@@ -27,8 +33,9 @@ def get(url,http):
         if urlsplit(url).hostname=='api.cdnlibs.org':
             # LibGroup identifies its public catalogue with a site header, not
             # only the search parameter. Without it this API returns HTTP403.
-            client.session.headers.update({'Site-Id':'1','Accept':'application/json'})
-            text,_,_=client.document(url,headers={'Referer':'https://mangalib.me/'})
+            site_id=getattr(http,'lib_site_id',1);root=LIB_SITES[site_id][2]
+            client.session.headers.update({'Site-Id':str(site_id),'Accept':'application/json'})
+            text,_,_=client.document(url,headers={'Referer':root+'/'})
         else:text,_,_=client.document(url)
         try:data=json.loads(text)
         except ValueError:raise SourceError('Читалка не предоставила данные.') from None
@@ -39,31 +46,34 @@ def names(attributes):
     return list(dict.fromkeys(v for row in [attributes.get('title',{}),*attributes.get('altTitles',[])] for v in row.values() if isinstance(v,str) and v.strip()))
 def dex_search(query,language,http):
     languages=['ru','en','ja','ko'] if language=='all' else [language if language in {'ru','en','ja','ko'} else 'ru']
-    params=[('title',query),('limit','25'),('includes[]','cover_art')]+[('availableTranslatedLanguage[]',l) for l in languages]+[('contentRating[]',r) for r in ['safe','suggestive','erotica']]
+    params=[('title',query),('limit','25'),('includes[]','cover_art')]+[('availableTranslatedLanguage[]',l) for l in languages]+[('contentRating[]',r) for r in CONTENT_RATINGS]
     rows=get('https://api.mangadex.org/manga?'+urlencode(params),http).get('data',[]);out=[]
     for row in rows:
         a=row.get('attributes',{});aliases=names(a)
-        if not aliases or a.get('contentRating')=='pornographic':continue
+        if not aliases:continue
         cover=next((v.get('attributes',{}).get('fileName') for v in row.get('relationships',[]) if v['type']=='cover_art'),None)
         for lang in languages:
             if lang not in a.get('availableTranslatedLanguages',[]):continue
             name=a.get('title',{}).get('ru') or next((v['ru'] for v in a.get('altTitles',[]) if v.get('ru')),aliases[0])
-            out.append({'provider':'mangadex','providerName':'MangaDex · '+lang.upper(),'title':name,'aliases':aliases,'kind':'manga','format':'manhwa' if a.get('originalLanguage')=='ko' else 'manhua' if a.get('originalLanguage') in {'zh','zh-hk'} else 'manga','readingMode':'scroll' if any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in a.get('tags',[])) else 'pages','language':lang,'year':a.get('year'),'url':'https://mangadex.org/title/'+row['id']+'?lang='+lang,'cover':'https://uploads.mangadex.org/covers/'+row['id']+'/'+cover+'.256.jpg' if cover else ''})
+            out.append({'provider':'mangadex','providerName':'MangaDex · '+lang.upper(),'title':name,'aliases':aliases,'kind':'manga','format':'manhwa' if a.get('originalLanguage')=='ko' else 'manhua' if a.get('originalLanguage') in {'zh','zh-hk'} else 'manga','readingMode':'scroll' if any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in a.get('tags',[])) else 'pages','language':lang,'year':a.get('year'),'adult':a.get('contentRating') in {'erotica','pornographic'},'age':18 if a.get('contentRating') in {'erotica','pornographic'} else None,'url':'https://mangadex.org/title/'+row['id']+'?lang='+lang,'cover':'https://uploads.mangadex.org/covers/'+row['id']+'/'+cover+'.256.jpg' if cover else ''})
     return out
 
 def dex_available(url,http):
     p=urlsplit(url);identity=p.path.split('/')[2];lang=parse_qs(p.query).get('lang',['ru'])[0]
-    data=get('https://api.mangadex.org/manga/'+identity+'/feed?'+urlencode({'translatedLanguage[]':lang,'limit':1,'includeExternalUrl':0}),http)
+    data=get('https://api.mangadex.org/manga/'+identity+'/feed?'+urlencode([('translatedLanguage[]',lang),('limit',1),('includeExternalUrl',0)]+[('contentRating[]',r) for r in CONTENT_RATINGS]),http)
     return any(v.get('attributes',{}).get('pages') and not v.get('attributes',{}).get('externalUrl') for v in data.get('data',[]))
 
-def lib_search(query,http):
-    data=get(LIB+'/api/manga?'+urlencode({'q':query,'site_id[]':1}),http);out=[]
+def lib_search(query,http,site_id=1,details=False):
+    http=lib_context(http,site_id);provider,provider_name,root=LIB_SITES[site_id]
+    data=get(LIB+'/api/manga?'+urlencode({'q':query,'site_id[]':site_id}),http);out=[]
     for a in data.get('data',[]):
         slug=str(a.get('slug_url') or '')
         if not re.fullmatch(r'[\w-]{1,250}',slug):continue
+        if details and query.casefold().strip() in {str(a.get('rus_name') or '').casefold(),str(a.get('eng_name') or '').casefold()}:
+            a={**a,**get(LIB+'/api/manga/'+slug+'?fields[]=otherNames&fields[]=eng_name',http).get('data',{})}
         aliases=list(dict.fromkeys(v for v in [a.get('rus_name'),a.get('eng_name'),a.get('name'),*(a.get('otherNames') or [])] if isinstance(v,str) and v))
         if not aliases:continue
-        out.append({'provider':'mangalib','providerName':'MangaLib','title':aliases[0],'aliases':aliases,'kind':'manga','language':'ru',**lib_identity(a),'url':'https://mangalib.me/ru/'+slug,'cover':a.get('cover',{}).get('default','')})
+        out.append({'provider':provider,'providerName':provider_name,'title':aliases[0],'aliases':aliases,'kind':'manga','language':'ru',**lib_identity(a),'format':{'Манхва':'manhwa','Манга':'manga','Маньхуа':'manhua'}.get((a.get('type') or {}).get('label'),'manga'),'adult':site_id==4,'age':18 if site_id==4 else None,'url':root+'/ru/'+slug,'cover':a.get('cover',{}).get('default','')})
     return out
 
 def inspect_catalog(url,http):
@@ -79,17 +89,16 @@ def inspect_catalog(url,http):
             if a.get('externalUrl'):raise SourceError('Эта глава доступна только на внешнем сайте.')
             language=a.get('translatedLanguage')
             if language not in {'ru','en','ja','ko'}:raise SourceError('Выбери доступный язык главы: RU, EN, JA или KO.')
-            server=get('https://api.mangadex.org/at-home/server/'+identity+'?forcePort443=true',http);part=server.get('chapter',{});base=public_url(server.get('baseUrl',''),resolve_dns=False)
+            server=get('https://api.mangadex.org/at-home/server/'+identity+'?forcePort443=true',http);part=server.get('chapter',{});base=public_url(server.get('baseUrl',''),resolve_dns=False).rstrip('/')
             pages=[base+'/data/'+quote(part['hash'],safe='')+'/'+quote(f,safe='') for f in part.get('data',[])][:1500]
             root=next((v['id'] for v in record.get('relationships',[]) if v['type']=='manga'),None)
             detail=get('https://api.mangadex.org/manga/'+root,http).get('data',{}) if root else {};title=(names(detail.get('attributes',{})) or ['Манга'])[0]
             chapters=[{'number':chapter_number(a.get('chapter') or '0'),'season':max(1,int(a.get('volume') or 1)) if str(a.get('volume') or 1).isdigit() else 1,'title':clean(a.get('title')),'url':url,'translator':'','language':language}];truncated=False
         else:
             detail=get('https://api.mangadex.org/manga/'+identity,http).get('data',{});a=detail.get('attributes',{});title=(names(a) or ['Манга'])[0]
-            if a.get('contentRating')=='pornographic':raise SourceError('Этот источник не поддерживается.')
             offset=0;total=1
             while offset<total and offset<1500:
-                data=get('https://api.mangadex.org/manga/'+identity+'/feed?'+urlencode({'translatedLanguage[]':language,'limit':100,'offset':offset,'order[volume]':'asc','order[chapter]':'asc','includes[]':'scanlation_group','includeExternalUrl':0}),http)
+                data=get('https://api.mangadex.org/manga/'+identity+'/feed?'+urlencode([('translatedLanguage[]',language),('limit',100),('offset',offset),('order[volume]','asc'),('order[chapter]','asc'),('includes[]','scanlation_group'),('includeExternalUrl',0)]+[('contentRating[]',r) for r in CONTENT_RATINGS]),http)
                 rows=data.get('data',[]);total=data.get('total',0)
                 for row in rows:
                     a=row.get('attributes',{});n=str(a.get('chapter') or '0')
@@ -101,6 +110,9 @@ def inspect_catalog(url,http):
             truncated=offset<total
         attributes=detail.get('attributes',{});format='manhwa' if attributes.get('originalLanguage')=='ko' else 'manhua' if attributes.get('originalLanguage') in {'zh','zh-hk'} else 'manga'
         return {**result('mangadex','MangaDex',title,url,language,chapters,pages,truncated),'format':format,'readingMode':'scroll' if format=='manhwa' or any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in attributes.get('tags',[])) else 'pages','aliases':names(attributes)}
+    config=next(((sid,*row) for sid,row in LIB_SITES.items() if p.hostname==urlsplit(row[2]).hostname or p.hostname==row[0]+'.org'),None)
+    if config is None:raise SourceError('Неизвестный каталог читалки.')
+    site_id,provider,provider_name,root=config;http=lib_context(http,site_id)
     match=re.fullmatch(r'/ru/(?:manga/)?([\w-]+)(?:/read/v(\d+)/c(\d+(?:\.\d+)?))?/?',p.path)
     if not match:raise SourceError('Нужна ссылка MangaLib на тайтл или главу.')
     slug,volume,number=match.groups();detail=get(LIB+'/api/manga/'+slug+'?fields[]=otherNames&fields[]=eng_name',http).get('data',{});title=detail.get('rus_name') or detail.get('name') or detail.get('eng_name') or slug
@@ -111,7 +123,7 @@ def inspect_catalog(url,http):
         data=get(LIB+'/api/manga/'+slug+'/chapter?'+urlencode(args),http).get('data',{})
         if (data.get('restricted_view') or {}).get('is_open') is False:raise SourceError('Глава закрыта или требует покупки.')
         constants=get(LIB+'/api/constants?fields[]=imageServers',http).get('data',{}).get('imageServers',[])
-        hosts=[v['url'] for v in constants if 1 in v.get('site_ids',[]) and v.get('id')=='compress'] or [v['url'] for v in constants if 1 in v.get('site_ids',[])]
+        hosts=[v['url'] for v in constants if site_id in v.get('site_ids',[]) and v.get('id')=='compress'] or [v['url'] for v in constants if site_id in v.get('site_ids',[])]
         if not hosts:raise SourceError('MangaLib не предоставил сервер страниц.')
         pages=[public_url(hosts[0].rstrip('/')+'/'+v['url'].lstrip('/'),resolve_dns=False) for v in sorted(data.get('pages',[]),key=lambda v:v.get('slug',0))][:1500]
         chapters=[{'number':chapter_number(number),'season':int(volume),'title':'Глава '+number,'url':url,'translator':'','language':'ru'}]
@@ -124,9 +136,9 @@ def inspect_catalog(url,http):
                 if (branch.get('restricted_view') or {}).get('is_open') is False:continue
                 bid=str(branch.get('branch_id') or '');suffix='?bid='+bid if bid.isdigit() else ''
                 team=', '.join(v.get('name','') for v in branch.get('teams',[]))
-                chapters.append({'number':chapter_number(n),'season':max(1,int(vol)),'title':clean(row.get('name')) or 'Глава '+n,'url':'https://mangalib.me/ru/'+slug+'/read/v'+vol+'/c'+n+suffix,'translator':team,'language':'ru'})
+                chapters.append({'number':chapter_number(n),'season':max(1,int(vol)),'title':clean(row.get('name')) or 'Глава '+n,'url':root+'/ru/'+slug+'/read/v'+vol+'/c'+n+suffix,'translator':team,'language':'ru'})
     aliases=list(dict.fromkeys(v.strip() for v in [detail.get('rus_name'),detail.get('eng_name'),detail.get('name'),*(detail.get('otherNames') or [])] if isinstance(v,str) and v.strip()))
-    return {**result('mangalib','MangaLib',title,url,'ru',chapters,pages,len(chapters)>=1500),'aliases':aliases,**lib_identity(detail)}
+    return {**result(provider,provider_name,title,url,'ru',chapters,pages,len(chapters)>=1500),'aliases':aliases,**lib_identity(detail)}
 
 def result(provider,name,title,url,language,chapters,pages,truncated=False):
     return {'provider':provider,'providerName':name,'title':str(title)[:300],'url':url,'kind':'manga','language':language,'episodes':chapters,'pages':pages,'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({c['season'] for c in chapters})],'dubs':[],'releases':[],'truncated':truncated,'available':bool(chapters),'translations':sorted({c['translator'] for c in chapters if c['translator']})}

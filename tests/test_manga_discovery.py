@@ -48,6 +48,29 @@ class NativeSourceFallbackTests(unittest.TestCase):
             with self.assertRaises(SourceError):discovery.search_source({**source,'name':'Other'},'Наруто')
             other.assert_not_called()
 
+    def test_dex_only_russian_query_resolves_official_alias_without_changing_provider(self):
+        source={'id':'2','name':'MangaDex','lang':'en'}
+        identity={'title':'Белый Кит','kind':'manga','identityTitles':['Белый Кит','mobidig'],'aliases':['Белый Кит','Moby Dick'],'year':2023}
+        candidate={'provider':'mangadex','title':'Moby Dick','aliases':['Moby Dick','모비딕'],'kind':'manga','year':2023,'url':'https://mangadex.org/title/fixture?lang=en','language':'en'}
+        with patch('manga_catalog_adapters.dex_search',side_effect=lambda q,*a:[candidate] if q=='Moby Dick' else []),patch('manga_catalog_adapters.lib_search',return_value=[identity]):
+            rows=discovery.search_source(source,'Белый кит')
+        self.assertEqual(len(rows),1);self.assertEqual(rows[0]['provider'],'mangadex');self.assertIn('Белый Кит',rows[0]['aliases'])
+    def test_explicit_upstream_aliases_are_kept_but_unrelated_popular_hits_are_rejected(self):
+        source={'id':'2','name':'Fixture','lang':'ru','baseUrl':'https://source.example'}
+        rows=[{'id':1,'title':'Белый Кит','url':'/whale','description':'**Альтернативные названия**:\n- Moby Dick\n- 모비딕'},{'id':2,'title':'Unrelated Popular Title','url':'/other'}]
+        with patch.object(discovery.bridge,'Client') as client,patch.dict(os.environ,ENV):
+            client.return_value.get.return_value={'mangaList':rows};result=discovery.search_source(source,'Белый кит')
+        self.assertEqual(len(result),1);self.assertIn('모비딕',result[0]['aliases'])
+
+    def test_failed_extension_uses_only_its_own_existing_html_adapter(self):
+        source={'id':'2','name':'MangaBuff','lang':'ru','baseUrl':'https://mangabuff.ru'}
+        page='<div class="cards__item"><a href="/manga/demo"><span class="cards__name">Белый Кит</span></a></div>'
+        with patch.object(discovery.bridge,'Client') as client,patch('source_parser.PublicHttp') as http:
+            client.return_value.get.side_effect=SourceError('HTTP 500')
+            http.return_value.document.return_value=(page,'https://mangabuff.ru/search?q=whale',{})
+            rows=discovery.search_source(source,'Белый кит')
+        self.assertEqual(len(rows),1);self.assertEqual(rows[0]['provider'],'mangabuff');self.assertEqual(rows[0]['url'],'https://mangabuff.ru/manga/demo');self.assertEqual(rows[0]['sourceId'],'2')
+
 class MangaDiscoveryTests(unittest.TestCase):
  def setUp(self):
     self.directory=tempfile.TemporaryDirectory();self.env=patch.dict(os.environ,ENV);self.env.start();self.sources=patch.object(discovery.bridge,'sources',return_value=SOURCES);self.sources.start();self.managers=[]
@@ -56,6 +79,17 @@ class MangaDiscoveryTests(unittest.TestCase):
     self.sources.stop();self.env.stop();self.directory.cleanup()
  def manager(self,**options):
     manager=discovery.Discovery(self.directory.name,**options);self.managers.append(manager);return manager
+ def test_found_title_aliases_requeue_empty_english_source_and_remain_indexed(self):
+    sources=[{'id':'1','name':'HentaiLib','lang':'ru'},{'id':'2','name':'MangaDex','lang':'en'}];seen=[]
+    def fetch(source,query):
+        seen.append((source['id'],source.get('_queries',[query])))
+        if source['id']=='1':return [{'id':'native-lib','sourceId':'1','kind':'manga','title':'Белый Кит','identityTitles':['Белый Кит'],'aliases':['Белый Кит','Moby Dick','모비딕'],'language':'ru','year':2023}]
+        return [{'id':'native-dex','sourceId':'2','kind':'manga','title':'Moby Dick','aliases':['Moby Dick','Белый Кит'],'language':'en'}] if 'Moby Dick' in source.get('_queries',[]) else []
+    with patch.object(discovery.bridge,'sources',return_value=sources):
+        manager=self.manager(fetch=fetch,workers=1);job=manager.start('A','Белый кит');result=wait_done(manager,'A',job['id'])
+    self.assertEqual({r['id'] for r in result['results']},{'native-lib','native-dex'});self.assertIn(('2',['Moby Dick','Белый Кит']),seen)
+    self.assertTrue(manager._indexed('moby dick','1'))
+
  def test_global_queue_reaches_every_source_with_four_shared_workers_and_partial_results(self):
     gate=threading.Event();lock=threading.Lock();active=peak=0;contacted=[]
     def fetch(source,query):
@@ -205,7 +239,7 @@ class MangaDiscoveryApiTests(unittest.TestCase):
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('B')).status_code,404)
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('A')).status_code,200)
                 self.assertEqual(client.post('/discovery/manga/search',headers=auth('A'),json={'query':'abc','sourceIds':['999']}).status_code,422)
-                self.assertEqual(client.get('/health').json()['version'],31);self.assertTrue(client.get('/health').json()['mangaGlobalDiscovery'])
+                self.assertEqual(client.get('/health').json()['version'],32);self.assertTrue(client.get('/health').json()['mangaGlobalDiscovery'])
         finally:manager.close()
 
 class VoiceSuggestionTests(unittest.TestCase):

@@ -10,6 +10,19 @@ from source_parser import SourceError,public_url
 import suwayomi_bridge as bridge
 
 LANGUAGES={'all','ru','en','ja','ko'}
+NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'MangaDex':0}
+def language_queries(values,language):
+    pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]'}[language]
+    return sorted(dict.fromkeys(values),key=lambda v:not bool(re.search(pattern,v,re.I)))[:2]
+def public_aliases(row):
+    values=[row.get('title'),*(row.get('aliases') or [])]
+    text=str(row.get('description') or '')[:20000]
+    match=re.search(r'(?:Альтернативные названия|Alternative (?:names|titles))\*?\*?\s*:\s*(.*)',text,re.I|re.S)
+    if match:
+        for line in match[1].splitlines()[:30]:
+            if re.match(r'^\s*[-•]\s+',line):values.append(re.sub(r'^\s*[-•]\s+','',line).strip())
+            elif line.strip():break
+    return list(dict.fromkeys(v.strip()[:300] for v in values if isinstance(v,str) and len(v.strip())>1))[:30]
 
 def normalize(value):
     return ' '.join(unicodedata.normalize('NFKC',value).casefold().split())
@@ -35,45 +48,89 @@ def result_row(source,row):
         try:cover=public_url(thumb,resolve_dns=False)
         except SourceError:pass
     language=source['lang'];sid=str(source['id'])
-    return {'id':f'suwayomi:{sid}:{identity}','kind':'manga','title':title.strip()[:500],'aliases':[title.strip()[:500]],
+    return {'id':f'suwayomi:{sid}:{identity}','kind':'manga','title':title.strip()[:500],'aliases':public_aliases(row),
             'provider':'suwayomi:'+sid,'providerName':source['name'],'sourceId':sid,'sourceUrl':canonical,
             'url':bridge.reference(identity),'sourceURL':bridge.reference(identity),'sourceOnly':True,
             'language':language,'cover':cover,'format':'manhwa' if language=='ko' else 'manga','ids':{},'genres':[],'tags':[],
             'adult':bool(source.get('isNsfw'))}
 
+def native_search_source(source,query):
+    from title_identity import aliases,match_title,normalized
+    from manga_catalog_adapters import lib_search,dex_search
+    from source_parser import PublicHttp
+    http=PublicHttp(timeout=(3,6),deadline=time.monotonic()+18)
+    selected=source.get('_title') or source.get('_alias_title');found={}
+    try:
+        terms=source.get('_queries',[query])
+        for term in terms:
+            rows=dex_search(term,source['lang'],http) if source['name']=='MangaDex' else lib_search(term,http,NATIVE_SOURCES[source['name']],details=True)
+            for row in rows:
+                candidate={**row,'aliases':row.get('identityTitles') or row.get('aliases') or [row['title']]}
+                matched=not selected or match_title(selected,candidate)[0]
+                # A matching publication year permits the documented English alias,
+                # while unrelated fan works with a franchise alias remain rejected.
+                if selected and not matched and selected.get('year') and selected['year']==row.get('year'):matched=match_title(selected,row)[0]
+                if not matched:continue
+                if selected:row={**row,'aliases':list(dict.fromkeys([*row.get('aliases',[]),selected['title']]))}
+                found[row['url']]=row
+            if found:break
+        if not found and source['name']=='MangaDex' and not selected and re.search(r'[а-яё]',query,re.I):
+            # Resolve public title aliases even with MangaDex-only filters. The
+            # result remains a MangaDex result, never a replacement provider.
+            for site_id in [4,1]:
+                for identity in lib_search(query,http,site_id,details=True):
+                    if normalized(query) not in {normalized(v) for v in identity.get('identityTitles',[])}:continue
+                    for term in language_queries(aliases(identity),'en'):
+                        if normalized(term)==normalized(query):continue
+                        for row in dex_search(term,source['lang'],http):
+                            if match_title(identity,row)[0]:found[row['url']]={**row,'aliases':list(dict.fromkeys([*row.get('aliases',[]),*aliases(identity)]))}
+                    if found:break
+                if found:break
+    finally:http.close()
+    sid=str(source['id'])
+    return [{**row,'id':'suwayomi:'+sid+':native:'+hashlib.sha256(row['url'].encode()).hexdigest()[:20],
+             'providerName':source['name'],'sourceId':sid,'sourceUrl':row['url'],'sourceURL':row['url'],
+             'sourceOnly':True,'ids':{},'genres':[],'tags':[]} for row in found.values()][:40]
+
 def search_source(source,query):
+    if source.get('name') in NATIVE_SOURCES:return native_search_source(source,query)
     client=bridge.Client()
     try:
         from title_identity import match_title
-        found={}
+        found={};selected=source.get('_title') or source.get('_alias_title')
         for term in source.get('_queries',[query]):
             data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=4)
             rows=data.get('mangaList',[])
             if not isinstance(rows,list):raise ValueError('Invalid source result')
             for row in rows[:40]:
-                if isinstance(row,dict) and (value:=result_row(source,row)) and (not source.get('_title') or match_title(source['_title'],value)[0]):found[value['id']]=value
+                if isinstance(row,dict) and (value:=result_row(source,row)):
+                    if selected:
+                        if not match_title(selected,value)[0]:continue
+                        value['aliases']=list(dict.fromkeys([*value['aliases'],selected['title']]))
+                    elif not any(normalize(term) in normalize(v) for v in value['aliases']):continue
+                    found[value['id']]=value
             if found:break
         return list(found.values())
     except SourceError:
-        if source.get('name')!='MangaLib' or source.get('lang')!='ru':raise
-        # The installed LibGroup extension may fail while initializing WebView.
-        # Use the same site's public API; retain the source ID for filters and
-        # return native URLs so inspection, reading and export use that adapter.
-        from manga_catalog_adapters import lib_search
+        # A failing extension must not make its still-readable public HTML
+        # catalogue disappear. Reuse only the adapter for the SAME source host.
+        from manga_sources import site_for,search_url,parse_search
         from source_parser import PublicHttp
-        http=PublicHttp(timeout=(3,7),deadline=time.monotonic()+9)
+        site=site_for(source.get('baseUrl',''))
+        if not site or site.family not in {'pill','katana','poisk','hub','chan','buff'}:raise
+        http=PublicHttp(timeout=(3,6),deadline=time.monotonic()+12)
         try:
             rows=[]
             for term in source.get('_queries',[query]):
-                rows=lib_search(term,http)
-                if source.get('_title'):
-                    rows=[row for row in rows if match_title(source['_title'],{'kind':'manga','title':row['title'],'aliases':row.get('identityTitles') or [row['title']]})[0]]
+                text,final,_=http.document(search_url(site,term))
+                if site_for(final)!=site:raise SourceError('Источник перенаправил поиск на другой сайт.')
+                for value in parse_search(text,final,site):
+                    if selected and not match_title(selected,value)[0]:continue
+                    if not selected and not any(normalize(term) in normalize(v) for v in value.get('aliases',[value['title']])):continue
+                    rows.append({**value,'id':'suwayomi:'+str(source['id'])+':native:'+hashlib.sha256(value['url'].encode()).hexdigest()[:20],'sourceId':str(source['id']),'sourceUrl':value['url'],'sourceURL':value['url'],'sourceOnly':True,'ids':{},'genres':[],'tags':[]})
                 if rows:break
+            return rows
         finally:http.close()
-        sid=str(source['id'])
-        return [{**row,'id':'suwayomi:'+sid+':native:'+hashlib.sha256(row['url'].encode()).hexdigest()[:20],
-                 'provider':'mangalib','providerName':source['name'],'sourceId':sid,'sourceUrl':row['url'],'sourceURL':row['url'],
-                 'sourceOnly':True,'ids':{},'genres':[],'tags':[],'adult':False} for row in rows[:40]]
     finally:client.close()
 
 class SearchLimit(ValueError):pass
@@ -173,7 +230,7 @@ class Discovery:
 
     @staticmethod
     def _cache_key(key,source):
-        return key if not source.get('_title') else key+'|title:'+hashlib.sha256(json.dumps(source['_title'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        return 'native-v2:'+key if not source.get('_title') else 'native-v2:'+key+'|title:'+hashlib.sha256(json.dumps(source['_title'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
     def _indexed(self,key,sid):
         # Parameterized escaped LIKE supports raw Japanese/Korean substring
@@ -209,12 +266,29 @@ class Discovery:
             self.condition.notify_all();return self._snapshot(owner,identity)
 
     def _take(self):
-        row=self.db.execute("SELECT w.*,j.query,j.owner FROM work w JOIN jobs j ON j.id=w.job WHERE w.state='queued' AND j.state='running' ORDER BY j.dispatched,j.created,w.rowid LIMIT 1").fetchone()
+        row=self.db.execute("SELECT w.*,j.query,j.owner FROM work w JOIN jobs j ON j.id=w.job WHERE w.state='queued' AND j.state='running' ORDER BY j.dispatched,j.created,CASE WHEN json_extract(w.source,'$.name') IN ('MangaLib','HentaiLib','MangaDex') THEN 0 ELSE 1 END,w.rowid LIMIT 1").fetchone()
         if row:
             with self.db:
                 self.db.execute("UPDATE work SET state='running' WHERE job=? AND source_id=?",(row['job'],row['source_id']))
                 self.db.execute('UPDATE jobs SET dispatched=? WHERE id=?',(self.clock(),row['job']))
         return row
+
+    def _expand_aliases(self,job,query,values):
+        from title_identity import aliases,normalized
+        for value in values:
+            canonical=value.get('identityTitles') or [value.get('title','')]
+            if normalized(query) not in {normalized(v) for v in canonical}:continue
+            names=aliases(value)
+            if not any(normalized(v)!=normalized(query) for v in names):continue
+            identity={k:value.get(k) for k in ('title','kind','aliases','year','ids','format')}
+            for work in self.db.execute('SELECT source_id,source,state FROM work WHERE job=?',(job,)).fetchall():
+                source=json.loads(work['source'])
+                if source.get('_title') or source.get('_alias_title'):continue
+                terms=language_queries(names,source['lang'])
+                if terms==source.get('_queries',[query]):continue
+                source['_queries']=terms;source['_alias_title']=identity
+                self.db.execute('UPDATE work SET source=?,state=? WHERE job=? AND source_id=?',(json.dumps(source,ensure_ascii=False),'running' if work['state']=='running' else 'queued',job,work['source_id']))
+            break
 
     def _worker(self):
         while True:
@@ -230,13 +304,20 @@ class Discovery:
             with self.condition,self.db:
                 job=self.db.execute('SELECT state FROM jobs WHERE id=?',(row['job'],)).fetchone()
                 if not job or job['state']!='running':continue
+                self._expand_aliases(row['job'],row['query'],values)
+                latest=self.db.execute('SELECT source FROM work WHERE job=? AND source_id=?',(row['job'],row['source_id'])).fetchone()
+                changed=latest and latest['source']!=row['source']
+                if changed:
+                    from title_identity import match_title
+                    expected=json.loads(latest['source']).get('_alias_title')
+                    if expected and not any(match_title(expected,v)[0] for v in values):state='queued'
                 encoded=json.dumps(values,ensure_ascii=False)
                 self.db.execute('UPDATE work SET state=?,results=? WHERE job=? AND source_id=?',(state,encoded,row['job'],row['source_id']))
                 # Failed upstream requests are not persisted as successful empty
                 # cache entries for other owners or refreshed searches.
                 if state=='done':
                     self.db.execute('INSERT OR REPLACE INTO query_cache VALUES(?,?,?,?)',(self._cache_key(normalize(row['query']),json.loads(row['source'])),row['source_id'],encoded,now+self.cache_ttl))
-                    for value in values:self.db.execute('INSERT OR REPLACE INTO titles VALUES(?,?,?,?,?,?)',(value['id'],row['source_id'],value['language'],normalize(value['title']),json.dumps(value,ensure_ascii=False),now))
+                    for value in values:self.db.execute('INSERT OR REPLACE INTO titles VALUES(?,?,?,?,?,?)',(value['id'],row['source_id'],value['language'],normalize(' '.join(public_aliases(value))),json.dumps(value,ensure_ascii=False),now))
                 remaining=self.db.execute("SELECT count(*) FROM work WHERE job=? AND state IN ('queued','running')",(row['job'],)).fetchone()[0]
                 self.db.execute('UPDATE jobs SET updated=?,state=? WHERE id=?',(now,'running' if remaining else 'done',row['job']))
                 self.condition.notify_all()
