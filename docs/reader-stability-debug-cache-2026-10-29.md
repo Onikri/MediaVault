@@ -6,8 +6,9 @@ change disposed the image URL and restarted translation. Pages now keep a
 stable resource, delay offscreen eviction, preserve their measured geometry,
 and do not cancel rendering merely because the observer changes.
 
-Scroll mode uses each source image's intrinsic width, shrinking to the viewport
+Webtoon/manhwa scroll mode uses each source image's intrinsic width, shrinking to the viewport
 without upscaling. The manga width setting does not change webtoon width.
+Ordinary manga retains its width controls, including in scroll mode.
 
 The warning-outline button beside translation opens a nonmodal debug panel:
 
