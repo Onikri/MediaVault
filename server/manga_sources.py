@@ -33,6 +33,7 @@ SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('man
        MangaSite('mangakatana','MangaKatana · EN','https://mangakatana.com','katana',languages=('en',)),
        MangaSite('mangadex','MangaDex','https://mangadex.org','dex',languages=('ru','en','ja','ko')),
        MangaSite('mangalib','MangaLib','https://mangalib.me','lib',('mangalib.org',)),
+       MangaSite('novelcool-ru','NovelCool','https://ru.novelcool.com','novelcool'),
        MangaSite('senmanga','Sen Manga · JA','https://raw.senmanga.com','sen',languages=('ja',),format='manga'),
        MangaSite('mangaraw','MangaRaw · JA','https://mangaraw.co.uk','mangaraw',languages=('ja',),format='manga'),
        MangaSite('naver-webtoon','Naver Webtoon · KO','https://comic.naver.com/webtoon','naver',languages=('ko',),format='manhwa'),
@@ -154,7 +155,7 @@ def search_title(title,language='auto',format='all'):
         return {'provider':site.id,'name':site.name,'status':status,'message':message,'results':results}
     # Current GroupLe search is JS/API-only; its HTML reader remains available
     # for direct links. Do not misrepresent an empty HTML search as a working API.
-    sites=[s for s in SITES if s.family!='grouple' and (language=='all' or (language if language!='auto' else 'ru') in s.languages) and (format not in {'manhwa','manhua','webtoon'} or not s.format or s.format==format or format=='webtoon' and s.format=='manhwa' or format=='manhwa' and s.format=='webtoon')]
+    sites=[s for s in SITES if s.family not in {'grouple','novelcool'} and (language=='all' or (language if language!='auto' else 'ru') in s.languages) and (format not in {'manhwa','manhua','webtoon'} or not s.format or s.format==format or format=='webtoon' and s.format=='manhwa' or format=='manhwa' and s.format=='webtoon')]
     with ThreadPoolExecutor(max_workers=min(12,len(sites) or 1)) as pool:providers=list(pool.map(work,sites))
     if language=='auto' and not any(p['results'] for p in providers):
         with ThreadPoolExecutor(max_workers=3) as pool:providers.extend(pool.map(work,[s for s in SITES if s.family in {'pill','katana','webtoons'}]))
@@ -215,6 +216,9 @@ def inspect(url,http=None):
     own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
     try:
         initial=site_for(url)
+        if initial and initial.family=='novelcool':
+            from manga_novelcool import inspect as inspect_novelcool
+            return inspect_novelcool(url,http)
         if initial and initial.family=='suwayomi':
             from suwayomi_bridge import inspect as inspect_bridge
             return inspect_bridge(url)

@@ -36,6 +36,16 @@ their completed search snapshots; private libraries and other source caches
 are preserved. Automatic selection can recover to the native adapter when it
 arrives after an initial failed source. An explicit user selection is preserved.
 
+Backend v18 adds a public NovelCool RU HTML reader. If its extension fails,
+the bridge resolves only the identical manga identifier's indexed public URL
+on `ru.novelcool.com`; it does not accept arbitrary fallback URLs. It parses
+volume/chapter labels, preserves chapter0 and fractions, and follows the site's
+ten-image reader pagination only within the selected chapter (maximum500pages).
+Next-chapter navigation and external redirects cannot become extra pages.
+The normal online reader and CBZ exporter consume these native chapter URLs.
+Live checks found686chapters for Naruto and58images across chapter1pagination;
+the actual website/image checks remain separate from sanitized HTML contracts.
+
 The Keiyoushi repository uses `https://github.com/keiyoushi/extensions/raw/repo/index.pb`; the legacy JSON index currently contains migration placeholders. On 2026-10-28, the local server returned **1435 extension packages**. This is not a count of verified working sites. Only a small RU/EN/JA/KO set is installed initially. Owners can add catalogued packages in **Import → Manga → More sources**. Source code runs inside the restricted Suwayomi container; arbitrary APK uploads are not exposed.
 
 Search fans out to installed sources with bounded concurrency and title-identity matching alongside native adapters. Manga IDs and source IDs are not interchangeable; source IDs stay strings. A chapter's source index is distinct from its printed number (including chapter0/extras). Identifier URLs under `/__manga/suwayomi/` are not HTTP proxy endpoints: the importer validates its own origin/path, maps numeric IDs to private Suwayomi routes, and checks actual image signatures and size limits. The browser gets only existing expiring, owner-created `/online/` capabilities. The same images can be packed into CBZ and encrypted for Drive. No chapter is downloaded to Drive merely to read online.
