@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import {worldResults,sourceTitle} from '../src/world-search.js';
 import {matchingMangaSources,sameMangaTitle} from '../src/manga-source-identity.js';
 
+test('real MangaLib franchise alias does not merge Sakura and Charasuke into Naruto',()=>{
+ const original={id:'lib:195',provider:'mangalib',providerName:'MangaLib',sourceId:'1',kind:'manga',title:'Наруто',aliases:['Наруто','Naruto'],identityTitles:['Наруто','Naruto'],year:1999,url:'https://mangalib.me/ru/195--naruto'};
+ const spinOff={...original,id:'lib:96636',title:'Сакура и Чараске',aliases:['Сакура и Чараске','Naruto','Наруто'],identityTitles:['Сакура и Чараске'],year:2017,url:'https://mangalib.me/ru/96636--sakura-i-caraske'};
+ const meta={...sourceTitle(original),id:'shikimori:11',sourceOnly:false,ids:{mal:'11'}};
+ const values=worldResults([meta],[original,spinOff],'Наруто');
+ assert.equal(values.length,2);const naruto=values.find(v=>v.ids.mal==='11');
+ assert.deepEqual(naruto.sources.map(v=>v.url),[original.url]);assert.ok(!naruto.aliases.includes(spinOff.title));
+ assert.equal(sameMangaTitle({...meta,year:null},{...spinOff,year:null}),false,'Canonical names also reject the franchise alias when year is unknown');
+});
+
 test('title source picker rejects unrelated popular results even when a provider ignores its query',()=>{
  const item={kind:'manga',title:'Моя геройская академия',aliases:['My Hero Academia','僕のヒーローアカデミア']};
  const rows=[{title:'Игрок максимального уровня',url:'https://example/1'},{title:'Гоблин 999 уровня',url:'https://example/2'},{title:'My Hero Academia',url:'https://example/3'},{title:'僕のヒーローアカデミア',url:'https://example/4'},{title:'My Hero Academia: Vigilantes',url:'https://example/5'}];

@@ -29,6 +29,12 @@ public reader referer. The global search retains MangaLib's installed source ID
 and falls back to this same-site adapter when LibGroup fails; native title and
 chapter URLs then support the existing reader and CBZ export. This does not
 substitute a different website or remove a failing source from the selector.
+Canonical source names and `releaseDateString` distinguish a work from fan works
+that reuse its franchise as an English alias. The one-time discovery-cache
+migration expires only ambiguous legacy MangaLib metadata/query entries and
+their completed search snapshots; private libraries and other source caches
+are preserved. Automatic selection can recover to the native adapter when it
+arrives after an initial failed source. An explicit user selection is preserved.
 
 The Keiyoushi repository uses `https://github.com/keiyoushi/extensions/raw/repo/index.pb`; the legacy JSON index currently contains migration placeholders. On 2026-10-28, the local server returned **1435 extension packages**. This is not a count of verified working sites. Only a small RU/EN/JA/KO set is installed initially. Owners can add catalogued packages in **Import → Manga → More sources**. Source code runs inside the restricted Suwayomi container; arbitrary APK uploads are not exposed.
 

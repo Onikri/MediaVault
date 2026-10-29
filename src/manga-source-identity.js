@@ -1,5 +1,5 @@
 const normalize=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
-const aliases=item=>[item.title,item.originalTitle,item.original_title,...Object.values(item.titles||{}),...item.aliases||[]].filter(v=>typeof v==='string').flatMap(v=>v.split(/\s\/\s|\s\|\s/)).map(normalize).filter(v=>v.length>1);
+const aliases=item=>(item.identityTitles?.length?item.identityTitles:[item.title,item.originalTitle,item.original_title,...Object.values(item.titles||{}),...item.aliases||[]]).filter(v=>typeof v==='string').flatMap(v=>v.split(/\s\/\s|\s\|\s/)).map(normalize).filter(v=>v.length>1);
 
 // A provider search result is a candidate, not evidence that it belongs to this title.
 export function sameMangaTitle(selected,candidate){
@@ -14,5 +14,5 @@ export function sameMangaTitle(selected,candidate){
 
 export function matchingMangaSources(item,rows,{attached=false}={}){
  if(!item)return [];
- return [...new Map(rows.filter(row=>row.url&&(attached&&!row.title||sameMangaTitle(item,row))).map(row=>[row.url,{...row,title:row.title||item.title}])).values()];
+ return [...new Map(rows.filter(row=>row.url&&(attached&&!row.title||sameMangaTitle(item,row))).map(row=>[row.url,{...row,title:row.title||item.title}])).values()].sort((a,b)=>Number(b.provider==='mangalib')-Number(a.provider==='mangalib'));
 }

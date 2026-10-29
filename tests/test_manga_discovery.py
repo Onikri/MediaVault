@@ -20,6 +20,20 @@ def wait_done(manager,owner,identity):
     raise AssertionError('Discovery job did not finish')
 
 class NativeSourceFallbackTests(unittest.TestCase):
+    def test_upgrade_expires_only_ambiguous_legacy_mangalib_public_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager=discovery.Discovery(directory,start_workers=False)
+            with manager.db:
+                manager.db.execute('INSERT INTO titles VALUES(?,?,?,?,?,?)',('legacy-lib','1','ru','naruto',json.dumps({'provider':'mangalib'}),time.time()))
+                for sid in ['1','2']:manager.db.execute('INSERT INTO query_cache VALUES(?,?,?,?)',('naruto',sid,'[]',time.time()+900))
+                manager.db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',('old-job','owner','signature','naruto','ru','done',time.time(),time.time(),time.time()+900,time.time()))
+                manager.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',('old-job','1','{}','done','[]',1))
+                manager.db.execute('PRAGMA user_version=0')
+            manager.close();manager=discovery.Discovery(directory,start_workers=False)
+            self.assertEqual(manager.db.execute('SELECT count(*) FROM titles').fetchone()[0],0)
+            self.assertEqual([r[0] for r in manager.db.execute('SELECT source_id FROM query_cache')],['2'])
+            self.assertEqual(manager.db.execute("SELECT state FROM jobs WHERE id='old-job'").fetchone()[0],'interrupted')
+            manager.close()
     def test_mangalib_extension_failure_keeps_source_selectable_through_its_public_api(self):
         source={'id':'6111047689498497237','name':'MangaLib','lang':'ru'}
         native={'title':'Наруто','aliases':['Naruto'],'kind':'manga','url':'https://mangalib.me/ru/195--naruto','language':'ru'}

@@ -529,7 +529,7 @@ def manga_inspect(body:MangaInspection,subject=Depends(owner)):
     value=inspect(body.url)
     if body.title:
         if len(json.dumps(body.title).encode())>50000:raise HTTPException(422,'Слишком большое описание манги.')
-        candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('aliases') or [])])),'kind':'manga'}
+        candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('identityTitles') or value.get('aliases') or [])])),'kind':'manga','year':value.get('year'),'ids':value.get('ids') or {}}
         if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
     return value
 

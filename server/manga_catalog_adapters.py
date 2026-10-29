@@ -8,6 +8,14 @@ from urllib.parse import urlencode,urlsplit,parse_qs,quote
 from source_parser import PublicHttp,SourceError,public_url
 UUID=r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}'
 LIB='https://api.cdnlibs.org'
+
+def lib_identity(data):
+    # The English alias can contain a franchise name on a different fan work.
+    # Canonical source names and the actual release year identify the work.
+    titles=list(dict.fromkeys(v.strip() for v in [data.get('rus_name'),data.get('name')] if isinstance(v,str) and v.strip()))
+    if not titles and isinstance(data.get('eng_name'),str):titles=[data['eng_name']]
+    year=re.search(r'\b(?:18|19|20)\d{2}\b',str(data.get('releaseDateString') or data.get('releaseDate') or ''))
+    return {'identityTitles':titles,'year':int(year[0]) if year else None}
 def api_url(value):
     p=urlsplit(value)
     allowed=(p.hostname=='api.mangadex.org' and re.fullmatch(rf'/(?:manga(?:/{UUID}(?:/feed)?)?|chapter/{UUID}|at-home/server/{UUID})',p.path)) or (p.hostname=='api.cdnlibs.org' and re.fullmatch(r'/api/(?:manga(?:/[\w-]+(?:/chapters|/chapter)?)?|constants)',p.path))
@@ -55,7 +63,7 @@ def lib_search(query,http):
         if not re.fullmatch(r'[\w-]{1,250}',slug):continue
         aliases=list(dict.fromkeys(v for v in [a.get('rus_name'),a.get('eng_name'),a.get('name'),*(a.get('otherNames') or [])] if isinstance(v,str) and v))
         if not aliases:continue
-        out.append({'provider':'mangalib','providerName':'MangaLib','title':aliases[0],'aliases':aliases,'kind':'manga','language':'ru','year':a.get('releaseDate'),'url':'https://mangalib.me/ru/'+slug,'cover':a.get('cover',{}).get('default','')})
+        out.append({'provider':'mangalib','providerName':'MangaLib','title':aliases[0],'aliases':aliases,'kind':'manga','language':'ru',**lib_identity(a),'url':'https://mangalib.me/ru/'+slug,'cover':a.get('cover',{}).get('default','')})
     return out
 
 def inspect_catalog(url,http):
@@ -118,7 +126,7 @@ def inspect_catalog(url,http):
                 team=', '.join(v.get('name','') for v in branch.get('teams',[]))
                 chapters.append({'number':chapter_number(n),'season':max(1,int(vol)),'title':clean(row.get('name')) or 'Глава '+n,'url':'https://mangalib.me/ru/'+slug+'/read/v'+vol+'/c'+n+suffix,'translator':team,'language':'ru'})
     aliases=list(dict.fromkeys(v.strip() for v in [detail.get('rus_name'),detail.get('eng_name'),detail.get('name'),*(detail.get('otherNames') or [])] if isinstance(v,str) and v.strip()))
-    return {**result('mangalib','MangaLib',title,url,'ru',chapters,pages,len(chapters)>=1500),'aliases':aliases}
+    return {**result('mangalib','MangaLib',title,url,'ru',chapters,pages,len(chapters)>=1500),'aliases':aliases,**lib_identity(detail)}
 
 def result(provider,name,title,url,language,chapters,pages,truncated=False):
     return {'provider':provider,'providerName':name,'title':str(title)[:300],'url':url,'kind':'manga','language':language,'episodes':chapters,'pages':pages,'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({c['season'] for c in chapters})],'dubs':[],'releases':[],'truncated':truncated,'available':bool(chapters),'translations':sorted({c['translator'] for c in chapters if c['translator']})}

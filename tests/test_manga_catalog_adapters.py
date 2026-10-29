@@ -2,9 +2,12 @@ import sys,unittest
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
-from manga_catalog_adapters import api_url,dex_search,inspect_catalog,get
+from manga_catalog_adapters import api_url,dex_search,inspect_catalog,get,lib_identity
 from source_parser import SourceError
 class MangaCatalogAdapters(unittest.TestCase):
+ def test_real_lib_franchise_alias_does_not_override_canonical_title_and_year(self):
+  value=lib_identity({'rus_name':'Сакура и Чараске','name':'Сакура и Чараске','eng_name':'Naruto','otherNames':['Наруто'],'releaseDateString':'2017 г.'})
+  self.assertEqual(value,{'identityTitles':['Сакура и Чараске'],'year':2017})
  def test_lib_inspection_keeps_original_aliases_for_english_metadata_identity(self):
   from title_identity import match_title
   with patch('manga_catalog_adapters.get',side_effect=[{'data':{'rus_name':'Наруто','eng_name':'Naruto','otherNames':['ナルト']}},{'data':[]}]):

@@ -90,6 +90,16 @@ class Discovery:
               CREATE INDEX IF NOT EXISTS titles_source_name ON titles(source_id,title_norm);
               CREATE INDEX IF NOT EXISTS titles_language_name ON titles(language,title_norm);
             ''')
+            if self.db.execute('PRAGMA user_version').fetchone()[0]<1:
+                stale=[];sources=set()
+                for row in self.db.execute('SELECT id,source_id,metadata FROM titles'):
+                    value=json.loads(row['metadata'])
+                    if value.get('provider')=='mangalib' and not value.get('identityTitles'):
+                        stale.append((row['id'],));sources.add(row['source_id'])
+                self.db.executemany('DELETE FROM titles WHERE id=?',stale)
+                self.db.executemany('DELETE FROM query_cache WHERE source_id=?',[(sid,) for sid in sources])
+                self.db.executemany("UPDATE jobs SET state='interrupted' WHERE id IN (SELECT job FROM work WHERE source_id=?)",[(sid,) for sid in sources])
+                self.db.execute('PRAGMA user_version=1')
             self.db.execute("UPDATE jobs SET state='interrupted',updated=? WHERE state='running'",(self.clock(),))
             self.db.execute("UPDATE work SET state='cancelled' WHERE state IN ('queued','running')")
         if start_workers:
