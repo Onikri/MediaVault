@@ -39,7 +39,7 @@ changes happen only after the corresponding button is pressed.
 It returns identifiers, title, artist, release/date, duration, confidence and a
 Cover Art Archive URL; it never downloads artwork or audio. Artwork loads directly
 from that provider. Spotify artwork also uses Spotify's returned remote URL.
-Missing/failed artwork uses a neutral music icon. Metadata does not overwrite
+When song artwork is unavailable, YouTube recordings use their official i.ytimg.com thumbnail URL. Failed artwork uses a neutral music icon. Metadata does not overwrite
 the YouTube video's title.
 
 The server cache is memory-only, limited to 256 small metadata entries for six

@@ -14,11 +14,12 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/music/search?**',r=>r.fulfill({json:{results:[{id:'01234567890',title:'Otonoke Official',author:'Creepy Nuts',match:true}]}}));
   await page.route('**/music/metadata?**',r=>r.fulfill({json:{found:true,title:'Otonoke',artists:['Creepy Nuts'],album:'Otonoke',date:'2024-10-04',cover:'',url:'https://musicbrainz.org/recording/11111111-1111-1111-1111-111111111111'}}));
+  await page.route('https://i.ytimg.com/**',r=>r.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a+kkAAAAASUVORK5CYII=','base64')}));
   await page.route('https://www.youtube-nocookie.com/**',r=>r.fulfill({contentType:'text/html',body:'Official YouTube iframe fixture'}));
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/music-nav-harness.html');
   await page.getByRole('button',{name:'Слушать Otonoke',exact:true}).click();await page.locator('.music-panel.is-expanded iframe').waitFor();await page.getByRole('button',{name:'Пауза в подробностях',exact:true}).waitFor();
   let box=await page.locator('.music-panel iframe').boundingBox();assert.ok(box.width>=200&&box.height>=200,'Official viewport stays >=200x200');
-  await page.getByRole('button',{name:'Свернуть музыкальный плеер',exact:true}).click();await page.locator('.music-panel').waitFor({state:'hidden'});assert.ok((await page.evaluate(()=>window.musicCalls)).includes('pause'),'Collapse pauses official video');
+  await page.getByRole('button',{name:'Свернуть музыкальный плеер',exact:true}).click();await page.locator('.music-panel').waitFor({state:'hidden'});assert.equal(await page.locator('.music-nav img').first().getAttribute('src'),'https://i.ytimg.com/vi/01234567890/hqdefault.jpg');assert.ok((await page.evaluate(()=>window.musicCalls)).includes('pause'),'Collapse pauses official video');
   if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();
   await page.getByRole('button',{name:'Продолжить в подробностях',exact:true}).click();await page.getByRole('button',{name:'Пауза в подробностях',exact:true}).waitFor();
   assert.equal((await page.evaluate(()=>window.musicCalls)).filter(x=>x==='create').length,1,'Expanding reuses the paused official embed');
