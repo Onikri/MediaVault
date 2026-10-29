@@ -8,9 +8,9 @@ class GooglePool:
  def __init__(self,pacer,key_file,settings):
   self.pacer=pacer;self.key_file=Path(key_file);self.settings=settings;self.workers={};self.gates={};self.groups={};self.cursor=0
  def records(self):
-  try:rows=(self.settings.setting('reader:google-keys') or {}).get('slots',[])
-  except Exception:rows=[]
-  if rows:return rows
+  try:value=self.settings.setting('reader:google-keys')
+  except Exception:return []
+  if value is not None:return value.get('slots',[])
   if self.key_file.is_file():return [{'slot':0,'key':self.key_file.read_text('utf-8-sig').strip(),'project':'','models':list(MODEL_IDS)}]
   return []
  def configured(self):return bool(self.records())

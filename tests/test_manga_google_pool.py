@@ -1,11 +1,17 @@
 """Concurrent routing contract only; no real Google inference."""
-import asyncio,sys,unittest
+import asyncio,sys,unittest,tempfile
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from manga_batch.pool import GooglePool
 from manga_batch.quota import QuotaPacer
 class PoolTests(unittest.IsolatedAsyncioTestCase):
+ async def test_explicitly_removed_keys_never_reactivate_the_legacy_file(self):
+  class Settings:
+   def setting(self,name):return {'slots':[]}
+  with tempfile.TemporaryDirectory() as directory:
+   key=Path(directory)/'key';key.write_text('fixture-legacy-key')
+   self.assertFalse(GooglePool(QuotaPacer(tpm=13000,rpm=14),key,Settings()).configured())
  async def test_independent_configured_credentials_split_three_pages(self):
   rows=[{'slot':i,'key':'fixture-'+str(i),'project':'project-'+str(i),'models':['gemini-3.5-flash-lite']} for i in range(3)]
   class Settings:
