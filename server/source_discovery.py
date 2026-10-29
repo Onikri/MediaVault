@@ -10,6 +10,29 @@ from source_parser import PublicHttp
 _cache={};_lock=threading.Lock();_slots=threading.BoundedSemaphore(2)
 _progress={}
 
+def voice_suggestions(query='',limit=30):
+    """Labels observed on real Russian source/player pages; never a studio list.
+
+    An unknown language stays unknown in the response, rather than fabricating
+    language verification for a Russian provider's player label.
+    """
+    query=' '.join(str(query).casefold().split())[:80];now=time.monotonic();groups={}
+    with _lock:
+        snapshots=[entry[1] for entry in _cache.values() if entry[0]>now]
+    for snapshot in snapshots:
+        for voice in snapshot.get('voices',[]):
+            name=voice.get('name','');kind=voice.get('kind','');language=voice.get('language','und')
+            if not name or kind in {'sub','subs','subtitle','subtitles'} or language not in {'ru','und'} or query not in name.casefold():continue
+            variants=[v for v in voice.get('variants',[]) if v.get('named',True) and v.get('sourceUrl')]
+            if not variants:continue
+            key=(name.casefold(),kind,language)
+            group=groups.setdefault(key,{'id':voice['id'],'name':name,'kind':kind,'language':language,'observed':True,'providers':set(),'sourceCount':0})
+            group['providers'].update(v.get('providerName') or v.get('provider','') for v in variants)
+            group['sourceCount']+=len(variants)
+    values=[{**v,'providers':sorted(v['providers'])} for v in groups.values()]
+    values.sort(key=lambda v:(not v['name'].casefold().startswith(query),v['name'].casefold()))
+    return {'query':query,'voices':values[:max(1,min(int(limit),50))],'total':len(values),'observedOnly':True}
+
 
 def discover(selected,*,refresh=False,continuing=False):
     if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')

@@ -9,3 +9,8 @@ test('reader preferences and music library are isolated by account',()=>{const s
 test('movie numeric IDs never become unrelated anime music',()=>{assert.equal(musicIdentityFor({section:'movie',metadataId:57334}),null);assert.equal(musicIdentityFor({section:'anime',metadataId:57334}),'57334');assert.equal(musicIdentityFor({section:'movie',collectionId:'film'},{storage:{collections:[{id:'film',metadata:{ids:{mal:'199'}}}]}}),'199');});
 
 test('translation text adapts to the speech bubble and reader size',()=>{const r={w:.16,h:.1,text:'Я не верю в НЛО и инопланетян.'};const small=translationFont(r,{width:390,height:585}),large=translationFont(r,{width:1000,height:1500});assert.ok(small>=9&&small<large);assert.ok(large<=18);assert.ok(translationFont({...r,text:'длинный перевод '.repeat(100)},{width:390,height:585})>=9);});
+
+test('service diagnostics are off by default and saved per reader profile',()=>{
+ const s=storage();assert.equal(sanitize().diagnostics,false);saveSettings('A',{diagnostics:true},s,'manga');
+ assert.equal(readSettings('A',s,{},'manga').diagnostics,true);assert.equal(readSettings('A',s,{},'webtoon').diagnostics,false);assert.equal(readSettings('B',s,{},'manga').diagnostics,false);
+});

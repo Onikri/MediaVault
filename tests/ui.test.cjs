@@ -49,7 +49,7 @@ async function run(){
     const response=await page.goto(base+(width===390?'#import':'#home'),{waitUntil:'domcontentloaded'});
     assert.equal(response.status(),200);
     if(width===390){
-      await page.getByRole('heading',{name:'Найти и сохранить',exact:true}).waitFor();
+      await page.getByRole('heading',{name:'Найди свою историю',exact:true}).waitFor();
       await page.goto(base+'#home',{waitUntil:'domcontentloaded'});
     }
     await page.getByRole('heading',{name:'Твоё пространство',exact:true}).waitFor();
@@ -66,8 +66,8 @@ async function run(){
     await page.screenshot({path:path.join(output,'react-'+width+'.png'),fullPage:true});
     const nav=width<900?page.getByRole('navigation',{name:'Мобильная навигация'}):page.getByRole('navigation',{name:'Основная навигация'});
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
-    await page.getByRole('heading',{name:'Моя библиотека',exact:true}).waitFor();
-    await page.getByRole('tab',{name:/Онлайн/}).click();await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы онлайн-библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Звук любимых историй'}).waitFor();await noOverflow('Online library');await page.getByRole('tab',{name:/Google Диск/}).click();
+    await page.getByRole('heading',{name:'Библиотека',exact:true}).waitFor();
+    await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы онлайн-библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Звук любимых историй'}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Моя коллекция',exact:true}).click();
     await page.locator('#searchInput').fill('Тестовый поиск');
     assert.equal(await page.locator('#searchInput').inputValue(),'Тестовый поиск');
     await page.getByRole('button',{name:width>=1100?'Раздел Манга':'Манга',exact:true}).click();
@@ -75,8 +75,8 @@ async function run(){
     await page.getByRole('button',{name:width>=1100?'Раздел Избранное':'Избранное',exact:true}).click();
     assert.ok((await page.locator(width>=1100?'.library-sidebar button[aria-label="Раздел Избранное"]':'.chip-active').textContent()).includes('Избранное'));
     await noOverflow('Library');
-    await nav.getByRole('button',{name:'Импорт',exact:true}).click();
-    await page.getByRole('heading',{name:'Найти и сохранить',exact:true}).waitFor();
+    await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
+    await page.getByRole('heading',{name:'Найди свою историю',exact:true}).waitFor();
     await page.getByRole('button',{name:'Фильтры каталога',exact:true}).click();
     await noOverflow('Catalogue filters');
     await page.locator('#catalogSearch').fill('Наруто');
@@ -87,7 +87,7 @@ async function run(){
     await page.locator('#catalogSearch').press('ArrowDown');
     await page.locator('#catalogSearch').press('Enter');
     await page.getByRole('heading',{name:'Naruto',exact:true}).waitFor();
-    assert.equal(await page.locator('#importVideoBtn').isDisabled(),true,'Locked users cannot start an import');
+    await page.getByRole('button',{name:'В Google Диск',exact:true}).click();assert.equal(await page.locator('#importVideoBtn').isDisabled(),true,'Locked users cannot start a Drive import');
     await noOverflow('Catalogue title detail');
     await page.getByRole('button',{name:'К результатам поиска'}).click();
     await noOverflow('Server import');

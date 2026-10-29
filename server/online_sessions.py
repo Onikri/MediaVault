@@ -63,6 +63,10 @@ class Prepare(BaseModel):
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
 
 def install(app,owner):
+    # Register before /online/{token}/{resource}, which otherwise captures
+    # /online/exports/{id} as an ordinary playback capability.
+    from local_exports import install as install_exports
+    install_exports(app,owner)
     @app.post('/online/prepare')
     def prepare(body:Prepare,subject=Depends(owner)):
         http=PublicHttp(timeout=(4,12),deadline=time.monotonic()+45)

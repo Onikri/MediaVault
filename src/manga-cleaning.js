@@ -44,3 +44,34 @@ export function compositeInkPatch(target,patch,modified,writeMask=patch.mask){
   target.data.set(modified.subarray(src,src+4),dst);
  }
 }
+
+// Native-resolution dynamic LaMa input: snap small ROIs rather than inflating
+// every bubble to 512x512. Never resize glyphs or pass arbitrary tensor shapes.
+export function lamaInputSize(width,height){
+ if(!Number.isInteger(width)||!Number.isInteger(height)||width<2||height<2)throw Error('Некорректный размер LaMa');
+ if(width>512||height>512)return null;
+ return {width:Math.max(128,Math.ceil(width/64)*64),height:Math.max(128,Math.ceil(height/64)*64)};
+}
+export function lamaInputTensors(image,mask,crop){
+ const plane=crop.w*crop.h,rgb=new Float32Array(3*plane),holes=new Float32Array(plane);
+ for(let y=0;y<crop.h;y++)for(let x=0;x<crop.w;x++){
+  const px=crop.x+x,py=crop.y+y,n=y*crop.w+x;
+  if(px>=0&&px<image.width&&py>=0&&py<image.height&&mask[py*image.width+px]){holes[n]=1;continue;}
+  const src=(Math.max(0,Math.min(image.height-1,py))*image.width+Math.max(0,Math.min(image.width-1,px)))*4;
+  rgb[n]=image.data[src]/255;rgb[plane+n]=image.data[src+1]/255;rgb[plane*2+n]=image.data[src+2]/255;
+ }
+ return {rgb,holes};
+}
+export function applyLamaOutput(image,mask,values,tile,done){
+ const {crop,commit}=tile,plane=crop.w*crop.h;
+ if(values.length!==plane*3)throw Error('Некорректный ответ LaMa');
+ // Preserve the original outside the glyph mask plus a two-pixel AA ring.
+ const ring=dilateInk(mask,image.width,image.height,2);
+ for(let y=Math.max(0,commit.y);y<Math.min(image.height,commit.y+commit.h);y++)for(let x=Math.max(0,commit.x);x<Math.min(image.width,commit.x+commit.w);x++){
+  const n=y*image.width+x;if(done[n]||!ring[n])continue;
+  const local=(y-crop.y)*crop.w+x-crop.x;if(local<0||local>=plane)continue;
+  const alpha=mask[n]?1:2/3;
+  for(let c=0;c<3;c++){const sample=values[c*plane+local];if(!Number.isFinite(sample))throw Error('LaMa вернула некорректные пиксели');image.data[n*4+c]=Math.round(alpha*Math.max(0,Math.min(255,sample*255))+(1-alpha)*image.data[n*4+c]);}
+  done[n]=1;
+ }
+}

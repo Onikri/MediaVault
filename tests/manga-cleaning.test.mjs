@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {prepareInkPatch,compositeInkPatch} from '../src/manga-cleaning.js';
+import {prepareInkPatch,compositeInkPatch,lamaInputSize,lamaInputTensors,applyLamaOutput} from '../src/manga-cleaning.js';
 import {fitComicText} from '../src/manga-typeset.js';
 import {googleStreamAccumulator,completedJsonRows} from '../src/google-stream.js';
 import {directRequest,callDirectGoogle} from '../src/manga-direct-api.js';
@@ -31,4 +31,16 @@ test('native Gemma uses the streaming endpoint, no forced JSON grammar, and stri
  let sent;const raw='data: '+JSON.stringify({candidates:[{content:{parts:[{text:'[[1,"Привет!",0,0]]'}]},finishReason:'STOP'}]})+'\n\n';
  const result=await callDirectGoogle([page],{key:'fixture',transport:async request=>{sent=request;request.onChunk(raw.slice(0,20));request.onChunk(raw.slice(20));return {status:200,text:raw};}});
  assert.match(sent.url,/:streamGenerateContent\?alt=sse$/);assert.equal(result.pages[0].regions[0].uid,'P10_B1');assert.equal(result.pages[0].regions[0].ru_translation,'Привет!');assert.ok(result.diagnostics.metrics.streamChars>0);assert.equal(result.diagnostics.metrics.completedRegions,1);
+});
+
+test('LaMa dynamic ROI keeps native pixels, edge padding, mask polarity and bounded writes',()=>{
+ assert.deepEqual(lamaInputSize(230,70),{width:256,height:128});assert.equal(lamaInputSize(600,70),null);
+ const page=image(12,10);rect(page,3,4,2,2,0);const mask=new Uint8Array(120);mask[4*12+3]=1;
+ const crop={x:-2,y:-2,w:16,h:16},input=lamaInputTensors(page,mask,crop),plane=256;
+ assert.equal(input.holes[6*16+5],1);assert.equal(input.rgb[6*16+5],0);assert.equal(input.rgb[0],1);assert.equal(input.holes[0],0);
+ const original=page.data.slice(),values=new Float32Array(plane*3).fill(.5);
+ applyLamaOutput(page,mask,values,{crop,commit:{x:0,y:0,w:12,h:10}},new Uint8Array(120));
+ assert.equal(page.data[(4*12+3)*4],128);assert.equal(page.data[0],original[0]);
+ for(let y=0;y<10;y++)for(let x=0;x<12;x++)if(Math.abs(x-3)>2||Math.abs(y-4)>2)assert.equal(page.data[(y*12+x)*4],original[(y*12+x)*4]);
+ assert.throws(()=>applyLamaOutput(page,mask,new Float32Array(3),{crop,commit:crop},new Uint8Array(120)));
 });

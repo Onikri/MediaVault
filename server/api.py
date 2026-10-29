@@ -194,6 +194,10 @@ async def lifespan(application):
     yield
     stopping.set()
     wakeup.set()
+    from manga_discovery import shutdown as shutdown_manga_discovery
+    shutdown_manga_discovery()
+    from local_exports import shutdown as shutdown_local_exports
+    shutdown_local_exports()
     if thread.is_alive():
         thread.join(timeout=2)
     # A live worker may still be finishing a bounded source request during shutdown.
@@ -202,7 +206,7 @@ async def lifespan(application):
 
 
 app = FastAPI(title="MediaVault import service", version="8.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
-app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
+app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "POST", "DELETE"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"], expose_headers=["Content-Disposition"])
 
 
 @app.middleware("http")
@@ -243,7 +247,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 15, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 16, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -431,6 +435,39 @@ class MangaDiscovery(TitleDiscovery):
     bridgeOffset:int=Field(default=0,ge=0,le=10000)
     bridgeLimit:int=Field(default=8,ge=1,le=16)
 
+class MangaGlobalSearch(StrictBody):
+    query:str=Field(min_length=2,max_length=160)
+    language:str=Field(default='all',pattern=r'^(all|ru|en|ja|ko)$')
+    sourceIds:list[str]|None=Field(default=None,max_length=1000)
+    refresh:bool=False
+
+def manga_discovery_call(action,*args):
+    from manga_discovery import SearchLimit,SearchMissing
+    try:return action(*args)
+    except SearchLimit as error:raise HTTPException(429,str(error)) from None
+    except SearchMissing as error:raise HTTPException(404,str(error)) from None
+    except ValueError as error:raise HTTPException(422,str(error)) from None
+
+@app.get('/discovery/manga/sources')
+def discovery_manga_sources(language:str='all',q:str='',subject=Depends(owner)):
+    from manga_discovery import source_list
+    return manga_discovery_call(source_list,language,q)
+
+@app.post('/discovery/manga/search',status_code=202)
+def discovery_manga_search(body:MangaGlobalSearch,subject=Depends(owner)):
+    from manga_discovery import manager
+    return manga_discovery_call(manager().start,subject,body.query,body.language,body.sourceIds,body.refresh)
+
+@app.get('/discovery/manga/search/{identity}')
+def discovery_manga_status(identity:str,subject=Depends(owner)):
+    from manga_discovery import manager
+    return manga_discovery_call(manager().status,subject,identity)
+
+@app.delete('/discovery/manga/search/{identity}')
+def discovery_manga_cancel(identity:str,subject=Depends(owner)):
+    from manga_discovery import manager
+    return manga_discovery_call(manager().cancel,subject,identity)
+
 @app.post('/manga/search')
 def manga_search(body:MangaDiscovery,subject=Depends(owner)):
     from manga_sources import search_title
@@ -516,6 +553,12 @@ def discover_voices(body: TitleDiscovery, subject=Depends(owner)):
         return discover(body.title,refresh=body.refresh,continuing=body.continuing)
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
+
+@app.get('/discovery/voices')
+def discovery_voice_suggestions(q:str='',subject=Depends(owner)):
+    from source_discovery import voice_suggestions
+    if len(q)>80:raise HTTPException(422,'Слишком длинный запрос озвучки.')
+    return voice_suggestions(q)
 
 
 @app.get('/sources/calendar')

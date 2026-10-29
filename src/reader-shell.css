@@ -6,3 +6,7 @@
 @media(prefers-reduced-motion:reduce){.reader-chrome,.reader-control{transition:none}.reader-panel,.reader-panel-backdrop,.reader-gesture-hint{animation:none}}
 
 .reader-quiet-status:has(details[open]){max-height:min(65dvh,500px);text-align:left;overscroll-behavior:contain}.reader-quiet-status .reader-request-body{font-size:10px}.reader-quiet-status .reader-request-diagnostics{width:100%}
+
+/* Keep controls near the page on wide displays, without reserving page height. */
+.reader-top{left:50%;right:auto;width:min(var(--reader-chrome-width,1200px),calc(100% - 36px));transform:translate(-50%,-12px)}.immersive-reader[data-chrome=true]>.reader-top{transform:translate(-50%,0)}
+@media(max-width:600px){.reader-top{left:50%;right:auto;width:calc(100% - 18px)}}

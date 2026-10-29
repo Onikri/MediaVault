@@ -4,7 +4,7 @@ import {ArrowLeft,ChevronLeft,ChevronRight,Settings2,Maximize,Minimize,List,Grid
 import './reader-shell.css';
 
 // Chrome overlays the reading surface. Opening a panel never resizes a page.
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,className='',status}){
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,className='',chromeWidth=1200,status}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({});
  const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[hint,setHint]=useState(true),[fullscreenError,setFullscreenError]=useState('');
  methods.current={onClose,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel};
@@ -45,7 +45,7 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
   if(paged){const bounds=e.currentTarget.getBoundingClientRect(),fraction=(e.clientX-bounds.left)/bounds.width;if(fraction<.26||fraction>.74){const forward=(fraction>.74)===(direction!=='rtl');if(forward&&canNext)onNext?.();if(!forward&&canPrevious)onPrevious?.();hide();return;}}
   setHint(false);visible?hide():show();
  }
- return <section id="viewer" ref={root} tabIndex={-1} className={'mv-viewer immersive-reader reader-theme-'+theme+' '+className+(inline?' mv-viewer-inline':'')} data-chrome={visible||!!activePanel} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={title}>
+ return <section id="viewer" ref={root} tabIndex={-1} className={'mv-viewer immersive-reader reader-theme-'+theme+' '+className+(inline?' mv-viewer-inline':'')} style={{'--reader-chrome-width':Math.max(320,Math.min(1800,Number(chromeWidth)||1200))+'px'}} data-chrome={visible||!!activePanel} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={title}>
   <div className="immersive-stage" onPointerDown={pointerDown} onPointerUp={pointerUp} onPointerCancel={()=>gesture.current=null} onPointerMove={e=>{if(e.pointerType==='mouse'&&!e.buttons){const r=e.currentTarget.getBoundingClientRect();if(e.clientY-r.top<65||r.bottom-e.clientY<65)show();}}}>{children}</div>
   <div className="reader-chrome reader-top" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
    <button className="reader-control" aria-label="Закрыть просмотр" onClick={onClose}><ArrowLeft size={20}/></button>

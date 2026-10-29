@@ -209,7 +209,7 @@ async function main() {
     if(url.pathname.startsWith('/metadata/'))return respond({data:[]});
     return respond({detail:'Not found'},404);
   });
-  await owner.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Импорт',exact:true}).click();
+  await owner.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Библиотека',exact:true}).click();
   await owner.locator('.import-settings-trigger').click();
   await owner.locator('#importServer').fill('https://import.example.com');
   await owner.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
@@ -223,7 +223,7 @@ async function main() {
   assert.deepEqual(googleConfiguration,{client_id:publicClientId,client_secret:fixtureClientSecret});
   assert.ok(!(await owner.evaluate(()=>JSON.stringify({...localStorage})) ).includes(fixtureClientSecret),'Private Google settings never enter browser storage');
   await owner.getByRole('button',{name:'Закрыть настройки импорта'}).click();
-  await owner.getByRole('tab',{name:'По ссылке',exact:true}).click();
+  await owner.getByRole('tab',{name:'По ссылке',exact:true}).click();await owner.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await owner.locator('#streamUrl').fill('https://source.example.com/season');
   await owner.getByRole('button',{name:'Проверить',exact:true}).click();
   await owner.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
@@ -243,7 +243,7 @@ async function main() {
   assert.equal(await owner.locator('#openColab').count(),0,'No manual notebook hand-off remains');
   await owner.getByRole('button',{name:'Остановить',exact:true}).click();
   await owner.getByText('Остановлено',{exact:true}).waitFor();
-  await owner.locator('#libraryNav').click();
+  await owner.locator('#collectionNav').click();
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===3);
   const delayedPattern='**/drive/v3/files/'+textItem.chunks[0].fileId+'?alt=media';
   let releaseDownload,downloadStarted,downloadFailed;
@@ -310,7 +310,7 @@ async function main() {
   await owner.locator('.history-item').filter({hasText:'private-note.txt'}).click();
   await owner.locator('.reader-prose').waitFor();
   await closeViewer(owner);
-  await owner.locator('#libraryNav').click();
+  await owner.locator('#collectionNav').click();
   assert.ok(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile viewport has no horizontal overflow');
   await owner.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
   await owner.screenshot({path:path.join(temp,'mobile-owner.png'),fullPage:true});
@@ -404,9 +404,9 @@ async function main() {
     if(url.pathname==='/sources/qualities')return respond({qualities:[1080,720],best:1080,original:false});
     return respond({data:[]});
   });
-  await fresh.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Импорт',exact:true}).click();
+  await fresh.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Библиотека',exact:true}).click();
   await fresh.locator('.import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
-  await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();
+  await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();await fresh.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await fresh.locator('#streamUrl').fill('https://source.example.com/titans');await fresh.getByRole('button',{name:'Проверить',exact:true}).click();await fresh.locator('#importDub').selectOption('https://source.example.com/studio');await fresh.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
   await fresh.locator('#serverCollection').fill('Атака титанов');await fresh.getByRole('button',{name:'Одна',exact:true}).click();await fresh.getByRole('combobox',{name:'Номер серии'}).selectOption('3');
   assert.equal(await fresh.locator('#importVideoBtn').isDisabled(),true);await fresh.locator('#importPrerequisites').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();
@@ -414,7 +414,7 @@ async function main() {
   assert.equal(await fresh.locator('#streamUrl').inputValue(),'https://source.example.com/titans');assert.equal(await fresh.locator('#importDub').inputValue(),'https://source.example.com/studio');assert.equal(await fresh.getByRole('combobox',{name:'Номер серии'}).inputValue(),'3');
   freshDriveConnected=true;await fresh.locator('#importPrerequisites').getByRole('button',{name:'Уже разрешил — проверить',exact:true}).click();await fresh.waitForFunction(()=>document.querySelector('#importVideoBtn')?.disabled===false);
   assert.equal(await fresh.locator('#serverCollection').inputValue(),'Атака титанов','Unlocking and Drive reconnect preserve the complete import choice');
-  await fresh.locator('#libraryNav').click();
+  await fresh.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Моя коллекция',exact:true}).click();
   await fresh.locator('#showFilesBtn').click();
   await fresh.waitForFunction(()=>document.querySelectorAll('.media-card').length===4);
   assert.equal(writes.length,writesBeforeDiscovery,'Opening a library does not need write access');
@@ -637,8 +637,8 @@ async function main() {
   await cachedPage.locator('#backToTitles').click();
   for(const [name,selector] of [['Маленькие плитки','.library-layout-compact'],['Список','.library-layout-list'],['Таблица','.library-table'],['Плитки','.library-layout-grid']]){await cachedPage.getByRole('button',{name,exact:true}).click();await cachedPage.locator(selector).waitFor();}
   await cachedPage.getByRole('button',{name:'Раздел Аниме',exact:true}).click();await cachedPage.locator('.title-card').click();await cachedPage.locator('.title-related button').click();await cachedPage.locator('.title-hero').waitFor();
-  await cachedPage.getByRole('button',{name:'Добавить в коллекцию',exact:true}).click();await cachedPage.locator('.catalog-detail .detail-hero').waitFor();
-  assert.equal(await cachedPage.locator('.detail-copy h2').innerText(),'Наруто');assert.ok((await cachedPage.locator('.detail-copy .eyebrow').innerText()).toLocaleLowerCase('ru').includes('манга'),'Related manga opens the exact title rather than starting an ambiguous name search');
+  await cachedPage.getByRole('button',{name:'Добавить в коллекцию',exact:true}).click();await cachedPage.locator('.world-title-hero').waitFor();
+  assert.equal(await cachedPage.locator('.world-title-hero h1').innerText(),'Наруто');assert.ok((await cachedPage.locator('.world-title-hero .eyebrow').innerText()).toLocaleLowerCase('ru').includes('манга'),'Related manga opens the exact title rather than starting an ambiguous name search');
   const sharedItem=organized.items.find(item=>item.collectionId===animeTitle.id&&item.category==='video');
   const sharedPage=await cachedContext.newPage();
   await sharedPage.goto(base+'?library='+catalogId+'#'+new URLSearchParams({episode:sharedItem.id,t:'1'}));await signIn(sharedPage);await sharedPage.locator('#passphrase').fill(PHRASE);await sharedPage.locator('#unlockBtn').click();

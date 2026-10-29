@@ -84,7 +84,7 @@ export class DirectChapter{
   signal?.throwIfAborted();const listeners=this.listeners.get(index)||new Set();if(status)listeners.add(status);this.listeners.set(index,listeners);
   const last=this.progress.get(index);if(last)status?.(last);
   try{
-   const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v2:'+this.config.inpaint+':'+font;
+   const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v3:'+this.config.inpaint+':'+font;
    if(this.config.cache&&!this.bypass.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
    const job=this.request(index,blob,background),stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
    this.notify(index,{phase:'cleaning',message:page.cacheHit?'Из кэша устройства · вставляем русский текст':'Лёгкая очистка и русский набор',completedRegions:0,totalRegions:page.regions.length,diagnostics:page.diagnostics});
