@@ -1,6 +1,11 @@
 // Directory handles, unlike cookies or file paths, carry browser-granted access.
 // Workers on this origin read the same handle. They never display permission UI.
 const DB='mediavault-model-folder',STORE='settings';
+export async function sharedArtifactResult(pending,noReturn,reload){
+ const result=await pending;
+ if(result===undefined&&!noReturn)return reload();
+ return result instanceof Response?result.clone():result;
+}
 async function database(){
  if(!globalThis.indexedDB)return null;
  return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onerror=()=>reject(r.error);r.onsuccess=()=>resolve(r.result);});

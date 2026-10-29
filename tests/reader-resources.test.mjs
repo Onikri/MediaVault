@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PageResource} from '../src/reader-page-resource.js';
-import {folderClient,modelFileName,readModelResponse} from '../src/model-folder.js';
+import {folderClient,modelFileName,readModelResponse,sharedArtifactResult} from '../src/model-folder.js';
 import {safeDiagnosticExport} from '../src/google-request-diagnostics.js';
 import {rendererPool} from '../src/reader-worker-pool.js';
 
@@ -58,4 +58,15 @@ test('idle renderer keeps model sessions across readers; busy or expired rendere
  pool.release(b,true);assert.equal(a.terminated,1);
  const c=pool.acquire();assert.notEqual(c,a);pool.release(c);expired();assert.equal(c.terminated,1);
  const d=pool.acquire();pool.release(d);pool.clear();assert.equal(d.terminated,1);
+});
+test('consumer waiting for a preload creates its result from completed cache',async()=>{
+ let finish,reads=0;
+ const preload=new Promise(resolve=>finish=resolve);
+ const consume=sharedArtifactResult(preload,false,async()=>{reads++;return new Response('verified cached model');});
+ assert.equal(reads,0);finish(undefined);
+ assert.equal(await(await consume).text(),'verified cached model');assert.equal(reads,1);
+ assert.equal(await sharedArtifactResult(Promise.resolve(undefined),true,()=>assert.fail('preload must not instantiate')),undefined);
+ const cached=new Response('shared model');
+ const [a,b]=await Promise.all([sharedArtifactResult(Promise.resolve(cached),false,()=>assert.fail()),sharedArtifactResult(Promise.resolve(cached),false,()=>assert.fail())]);
+ assert.equal(await a.text(),'shared model');assert.equal(await b.text(),'shared model');
 });

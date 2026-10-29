@@ -1,4 +1,4 @@
-import {readModelFile,writeModelFile,removeModelFile,readModelResponse,writableModelFolder} from "../../../src/model-folder.js";
+import {readModelFile,writeModelFile,removeModelFile,readModelResponse,writableModelFolder,sharedArtifactResult} from "../../../src/model-folder.js";
 import * as ort from "onnxruntime-web/all";
 import {createNativeSession} from "./native-onnx";
 import { resolveExecutionProvidersForModel } from "./hardware";
@@ -112,8 +112,13 @@ export async function downloadArtifactHF(
   const cacheName = isDirectUrl ? "direct-model-cache" : repoID;
 
   if (inFlightRequests.has(url)) {
-    const result = await inFlightRequests.get(url);
-    return result instanceof Response ? result.clone() : result;
+    const pending = inFlightRequests.get(url);
+    // A concurrent preload returns no session/Response. Its verified download
+    // is now cached; create the actual consumer result without fetching again.
+    return sharedArtifactResult(pending,noReturn,()=>{
+      if(inFlightRequests.get(url)===pending)inFlightRequests.delete(url);
+      return downloadArtifactHF(repoID,path,noReturn,options);
+    });
   }
 
   const requestPromise = (async () => {
