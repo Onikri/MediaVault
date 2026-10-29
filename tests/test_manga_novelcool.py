@@ -50,6 +50,17 @@ class NovelCoolTests(unittest.TestCase):
             self.assertEqual(http.calls,[first])
         for value in ['http://ru.novelcool.com/novel/A.html','https://evil.example/novel/A.html',BOOK+'?next=https://evil.example']:
             with self.assertRaises(SourceError):inspect(value,Http({}))
+    def test_advertised_pages_are_prefetched_but_output_follows_next_page_order(self):
+        first=ROOT+'/chapter/1-0/123-10-1.html';second=ROOT+'/chapter/1-0/123-10-11.html';third=ROOT+'/chapter/1-0/123-10-21.html'
+        heading='<a href="/novel/Наруто.html">Наруто</a>'+OPTIONS
+        navigation='<select class="sl-page"><option value="'+third+'">3</option><option value="'+second+'">2</option></select>'
+        rows={first:heading+navigation+'<img class="manga_pic" src="https://images.example/1.webp"><script>next_page="'+second+'"</script>',second:heading+'<img class="manga_pic" src="https://images.example/2.webp"><script>next_page="'+third+'"</script>',third:heading+'<img class="manga_pic" src="https://images.example/3.webp">'}
+        class Forkable(Http):
+            def fork(self):return self
+            def close(self):pass
+        http=Forkable(rows);value=inspect(CHAPTER,http)
+        self.assertEqual(value['pages'],['https://images.example/'+str(i)+'.webp' for i in [1,2,3]])
+        self.assertCountEqual(http.calls,[first,second,third])
     def test_page_limit_does_not_return_a_silently_truncated_chapter(self):
         first=ROOT+'/chapter/1-0/123-10-1.html'
         text='<a href="/novel/Наруто.html">Наруто</a>'+OPTIONS+''.join('<img class="manga_pic" src="https://images.example/'+str(i)+'.webp">' for i in range(501))

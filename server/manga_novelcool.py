@@ -1,5 +1,6 @@
 """Public NovelCool RU HTML reader. No script execution or account data."""
-import re
+import re,time
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlsplit,urljoin
 from bs4 import BeautifulSoup
 from source_parser import SourceError,public_url
@@ -8,7 +9,13 @@ HOST='ru.novelcool.com'
 
 def document(url,http):
     from manga_sources import guard
-    text,final,_=http.document(url)
+    from source_relay import relay,document as device_document
+    if relay.available():
+        deadline=getattr(http,'deadline',None)
+        timeout=min(28,deadline-time.monotonic()) if isinstance(deadline,(int,float)) else 28
+        if timeout<=0:raise SourceError('Источник не уложился во время проверки. Повтори запрос.')
+        text,final,_=device_document(url,timeout=timeout)
+    else:text,final,_=http.document(url)
     if urlsplit(final).hostname!=HOST:raise SourceError('NovelCool перенаправил чтение на другой сайт.')
     soup=BeautifulSoup(text,'html.parser');guard(soup)
     heading=soup.title.get_text(' ',strip=True) if soup.title else ''
@@ -45,6 +52,12 @@ def inspect(url,http):
     initial=urlsplit(url);identity=chapter_id(url)
     if initial.scheme!='https' or initial.hostname!=HOST or initial.query or initial.fragment or not (identity or re.fullmatch(r'/novel/[^/]+\.html',initial.path)):
         raise SourceError('Нужна публичная ссылка NovelCool RU на мангу или главу.')
+    if identity:
+        from source_relay import relay,chapter as device_chapter
+        if relay.available():
+            deadline=getattr(http,'deadline',None);timeout=min(28,deadline-time.monotonic()) if isinstance(deadline,(int,float)) else 28
+            if timeout<=0:raise SourceError('Источник не уложился во время проверки.')
+            return device_chapter(url,timeout=timeout)
     # This ten-image mode is linked by the site's own reader controls.
     if identity:url=url.rstrip('/').rsplit('/',1)[0]+'/'+identity+'-10-1.html'
     text,final,soup=document(url,http);entries=chapters(soup,final);pages=[]
@@ -53,6 +66,20 @@ def inspect(url,http):
         title=clean(book.get_text(' ',strip=True)) if book else ''
         entries=[row for row in entries if chapter_id(row['url'])==identity]
         if not entries:raise SourceError('NovelCool не подтвердил номер выбранной главы.')
+        # The reader advertises every pagination URL. Fetch these independently
+        # in a bounded pool instead of six sequential HTML round trips for a
+        # long chapter. Keep next_page traversal as the source of page order.
+        advertised=[];prefetched={}
+        for option in soup.select('select.sl-page option[value]'):
+            target=urljoin(final,option['value'])
+            if chapter_id(target)==identity and target!=final and target not in advertised:advertised.append(target)
+        if len(advertised)>49:raise SourceError('NovelCool превысил лимит страниц навигации.')
+        if advertised and hasattr(http,'fork'):
+            def fetch(target):
+                client=http.fork()
+                try:return target,document(target,client)
+                finally:client.close()
+            with ThreadPoolExecutor(max_workers=3) as pool:prefetched=dict(pool.map(fetch,advertised))
         seen=set()
         for _ in range(50):
             seen.add(final)
@@ -67,7 +94,7 @@ def inspect(url,http):
             if not next_url or next_url in seen:break
             if urlsplit(next_url).hostname!=HOST:raise SourceError('NovelCool передал страницу другого сайта.')
             if chapter_id(next_url)!=identity:break # next chapter is not a page
-            text,final,soup=document(next_url,http)
+            text,final,soup=prefetched.pop(next_url) if next_url in prefetched else document(next_url,http)
             if chapter_id(final)!=identity:raise SourceError('NovelCool подменил выбранную главу.')
         else:raise SourceError('NovelCool превысил лимит страниц навигации.')
         if not pages:raise SourceError('В этой главе NovelCool нет изображений манги.')

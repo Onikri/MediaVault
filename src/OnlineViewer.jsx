@@ -5,7 +5,7 @@ import VideoPlayer from './VideoPlayer.jsx';
 import MangaReader from './MangaReader.jsx';
 import {stopLmt} from './lmt-client.js';
 import './online.css';
-export default function OnlineViewer({entries,initial,kind,title,service,userId,onClose,language='ru',dub='',metadata,quality='best',inline=false}){
+export default function OnlineViewer({entries,initial,kind,title,service,userId,onClose,onEntryChange,language='ru',dub='',metadata,quality='best',inline=false}){
  useEffect(()=>()=>stopLmt(),[]);
  const [current,setCurrent]=useState(initial),[media,setMedia]=useState(null),[busy,setBusy]=useState(true),[error,setError]=useState('');
  const [retry,setRetry]=useState(0),[elapsed,setElapsed]=useState(0),[full,setFull]=useState(false),[fullscreenError,setFullscreenError]=useState('');
@@ -21,7 +21,7 @@ export default function OnlineViewer({entries,initial,kind,title,service,userId,
  },[current.url,kind,service.server,quality,retry]);
  useEffect(()=>{const close=()=>onClose();addEventListener('mediavault-locked',close);const old=document.body.style.overflow;if(!inline)document.body.style.overflow='hidden';return()=>{if(!inline)document.body.style.overflow=old;removeEventListener('mediavault-locked',close);};},[onClose,inline]);
  const catalog={items,storage:{collections:[{id:'online-title',name:title,section:kind==='manga'?'manga':'anime',metadata}]}};
- function choose(item){const e=entries.find(e=>e.url===item.sourceURL);if(e)setCurrent(e);}
+ function choose(item){const e=entries.find(e=>e.url===item.sourceURL);if(e){setCurrent(e);onEntryChange?.(e);}}
  const server=service.server.replace(/\/$/,'');
  const content=<section ref={host} className={'online-viewer'+(inline?' online-viewer-inline':'')} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={inline?(kind==='manga'?'Читалка на странице':'Плеер на странице'):'Онлайн без сохранения'}><header>{!inline&&<button className="icon-button" onClick={onClose} aria-label="Закрыть онлайн-просмотр"><ArrowLeft size={20}/></button>}<div><strong>{title}</strong><small>{current.title||'Онлайн'}{dub?' · '+dub:''}</small></div>{inline&&<div className="online-viewer-actions"><button type="button" className="icon-button" onClick={fullscreen} aria-label={full?'Вернуть на страницу':'Развернуть просмотр на весь экран'}>{full?<Minimize size={18}/>:<Maximize size={18}/>}</button><button type="button" className="icon-button" onClick={onClose} aria-label="Закрыть встроенный просмотр"><X size={18}/></button></div>}</header>{fullscreenError&&<p className="fine" role="status">{fullscreenError}</p>}{busy&&<p className="online-loading" role="status"><span className="loading-ring"/>Подключаем источник{elapsed?' · '+elapsed+' с':'…'}</p>}{error&&<div className="inline-error" role="alert"><p>{error}</p><button className="btn btn-secondary" onClick={()=>setRetry(v=>v+1)}>Повторить подключение</button></div>}{media&&selected&&(kind==='manga'?<MangaReader key={selected.id} item={{...selected,onlinePages:media.pages.map(p=>server+p)}} catalog={catalog} userId={userId} libraryId="online" onClose={onClose} onSelectItem={choose} readerService={service} retainLmt inline embedded={inline}/>:<VideoPlayer key={selected.id} item={{...selected,onlineType:media.type}} source={server+media.url} catalog={catalog} userId={userId} libraryId="online" onSelectItem={choose} onError={e=>setError(e.message)}/>)}</section>;
  return inline?content:createPortal(content,document.body);

@@ -51,6 +51,42 @@ instead received an HTTP200 response containing only a155-byte "404 Not Found"
 HTML placeholder. This source is not certified working from that VM; it remains
 selectable and its failure is reported. Do not report the device run as VM proof.
 
+## Public source device transport · v21
+
+When NovelCool serves an empty placeholder to Oracle but works on the owner's
+device, `server/source_relay_worker.py` supplies that same public site over an
+outbound HTTPS connection to the existing backend. The native adapter uses the
+live transport for HTML, reader images and complete CBZ files. It does not
+substitute MangaLib or another website for a manually selected NovelCool source.
+
+The worker creates an Ed25519 key inside `.codex-local/secrets/`; only its public
+key is installed on the VM in `/data/source-device-public-keys.json` as a mapping
+from device ID to base64 public key. Google sessions, Drive keys, browser cookies
+and source accounts are never passed to the worker. Every poll/result is signed
+over method, path, time, nonce, exact bytes and result metadata; replayed or
+expired signatures fail. Revoking a device removes its public-key entry.
+
+Only public NovelCool RU title/chapter paths and the observed `*.movietop.cc`
+comic-image paths are permitted. Both device and backend validate destinations;
+there is no arbitrary URL proxy, login forwarding, incoming PC port or retained
+page store. Twelve bounded in-memory tasks at most, three device workers, 28s
+HTML/image/chapter-metadata lifetime and12MiB image limit bound resource use.
+Chapter metadata is parsed entirely on the device in one task; advertised HTML
+parts are fetched three at a time while `next_page` preserves image order.
+Original-quality CBZ uses a single archive task (110s,64MiB). The backend verifies
+sequential image filenames, stored ZIP entries, image signatures and CRC before
+accepting the archive. Device temporary pages are deleted after packing.
+Results are uploaded
+in signed ordered256KiB chunks, preserving the existing512KiB Caddy/API request
+limits even for large HTML or page images. Completed/timed-out
+tasks discard their bytes. A missing device leaves the ordinary source request
+path available; its failure remains an error rather than an empty chapter list.
+
+Run `scripts/start-source-device.ps1` on this Windows checkout to launch the
+hidden worker. Its PID, logs, temporary data and signing key stay on drive D in
+`.codex-local`. The device must remain running/online to serve this route. Source
+transport contract tests are separate from real Oracle→device→reader/CBZ tests.
+
 The Keiyoushi repository uses `https://github.com/keiyoushi/extensions/raw/repo/index.pb`; the legacy JSON index currently contains migration placeholders. On 2026-10-28, the local server returned **1435 extension packages**. This is not a count of verified working sites. Only a small RU/EN/JA/KO set is installed initially. Owners can add catalogued packages in **Import → Manga → More sources**. Source code runs inside the restricted Suwayomi container; arbitrary APK uploads are not exposed.
 
 Search fans out to installed sources with bounded concurrency and title-identity matching alongside native adapters. Manga IDs and source IDs are not interchangeable; source IDs stay strings. A chapter's source index is distinct from its printed number (including chapter0/extras). Identifier URLs under `/__manga/suwayomi/` are not HTTP proxy endpoints: the importer validates its own origin/path, maps numeric IDs to private Suwayomi routes, and checks actual image signatures and size limits. The browser gets only existing expiring, owner-created `/online/` capabilities. The same images can be packed into CBZ and encrypted for Drive. No chapter is downloaded to Drive merely to read online.
