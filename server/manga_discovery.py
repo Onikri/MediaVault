@@ -62,7 +62,13 @@ def search_source(source,query):
         from manga_catalog_adapters import lib_search
         from source_parser import PublicHttp
         http=PublicHttp(timeout=(3,7),deadline=time.monotonic()+9)
-        try:rows=lib_search(query,http)
+        try:
+            rows=[]
+            for term in source.get('_queries',[query]):
+                rows=lib_search(term,http)
+                if source.get('_title'):
+                    rows=[row for row in rows if match_title(source['_title'],{'kind':'manga','title':row['title'],'aliases':row.get('identityTitles') or [row['title']]})[0]]
+                if rows:break
         finally:http.close()
         sid=str(source['id'])
         return [{**row,'id':'suwayomi:'+sid+':native:'+hashlib.sha256(row['url'].encode()).hexdigest()[:20],

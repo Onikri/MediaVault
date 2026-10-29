@@ -25,7 +25,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   await p.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();assert.equal(await p.locator('.title-source-option').count(),82);
   await p.getByText(/Поиск завершён: 770/).waitFor();assert.equal(await p.locator('.title-source-option').count(),82,'Empty final poll preserves attached and previously found sources');
   await p.getByRole('button',{name:'Toggle connection',exact:true}).click();assert.equal(await p.locator('.title-source-option').count(),82);assert.equal(await p.getByRole('button',{name:'Читать сейчас',exact:true}).count(),1,'Temporary service status does not discard inspected chapters');await p.getByRole('button',{name:'Toggle connection',exact:true}).click();
-  await p.getByLabel('Поиск по источникам',{exact:true}).fill('Rare');await p.getByText('25 глав · 3 томов',{exact:true}).waitFor();assert.equal(await p.locator('.title-source-option').count(),1,'Sources beyond first 70 are searchable');await p.getByLabel('Поиск по источникам',{exact:true}).fill('');
+  await p.getByLabel('Поиск по источникам',{exact:true}).fill('Rare');await p.getByText('25 глав · 3 тома',{exact:true}).waitFor();assert.equal(await p.locator('.title-source-option').count(),1,'Sources beyond first 70 are searchable');await p.getByLabel('Поиск по источникам',{exact:true}).fill('');
   assert.ok(await p.evaluate(()=>window.summaryPeak<=2));assert.ok(await p.evaluate(()=>window.started.some(b=>b.title.titles.ja==='正確な漫画')),'Title aliases go to the server');
   await p.getByLabel('Язык источника манги',{exact:true}).selectOption('en');assert.equal(await p.locator('.title-source-option').count(),41);
   await p.getByLabel('Язык источника манги',{exact:true}).selectOption('all');

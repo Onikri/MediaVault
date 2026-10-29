@@ -15,8 +15,10 @@ export default function useGlobalManga(query,kind,language,sourceIds,service,com
    try{const data=await live.current.request('/discovery/manga/search/'+job,{signal:controller.signal});receive(data);if(data.state==='running')pollTimer=setTimeout(poll,1000);}
    catch(error){if(!closed){failures++;setSnapshot(old=>({...old,error:error.message,state:failures<4?'running':'error'}));if(failures<4)pollTimer=setTimeout(poll,Math.min(5000,failures*1000));}}
   }
+  // Let creation return its job ID even after navigation so cleanup can cancel
+  // the server queue. Aborting this POST can leave an unknown job running.
   timer=setTimeout(async()=>{
-   try{const data=await live.current.request('/discovery/manga/search',{method:'POST',body:{query:query.trim(),language,...(sourceIds.length?{sourceIds}:{}),...(title&&Number(live.current.session?.serverVersion)>=29?{title}:{}),...(revision?{refresh:true}:{})},signal:AbortSignal.any([controller.signal,AbortSignal.timeout(20000)])});job=data.id;if(closed){live.current.request('/discovery/manga/search/'+job,{method:'DELETE'}).catch(()=>{});return;}receive(data);if(data.state==='running')pollTimer=setTimeout(poll,750);}
+   try{const data=await live.current.request('/discovery/manga/search',{method:'POST',body:{query:query.trim(),language,...(sourceIds.length?{sourceIds}:{}),...(title&&Number(live.current.session?.serverVersion)>=29?{title}:{}),...(revision?{refresh:true}:{})},signal:AbortSignal.timeout(20000)});job=data.id;if(closed){live.current.request('/discovery/manga/search/'+job,{method:'DELETE'}).catch(()=>{});return;}receive(data);if(data.state==='running')pollTimer=setTimeout(poll,750);}
    catch(error){if(!closed)setSnapshot({...empty,key,error:error.message,state:'error'});}
   },650);
   return()=>{closed=true;clearTimeout(timer);clearTimeout(pollTimer);controller.abort();if(job)live.current.request('/discovery/manga/search/'+job,{method:'DELETE'}).catch(()=>{});};
