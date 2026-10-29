@@ -4,8 +4,23 @@ from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from manga_batch.pool import GooglePool
-from manga_batch.quota import QuotaPacer
+from manga_batch.quota import QuotaPacer,Deferred
 class PoolTests(unittest.IsolatedAsyncioTestCase):
+ async def test_quota_retry_reuses_successful_parallel_siblings(self):
+  class Settings:
+   def setting(self,name):return {'slots':[{'slot':i,'key':'fixture-'+str(i)} for i in range(3)]}
+  calls={}
+  class Worker:
+   def __init__(self,*args,**kwargs):self.models=[]
+   async def translate(self,pages):
+    page=pages[0]['page'];calls[page]=calls.get(page,0)+1
+    if page==2 and calls[page]==1:raise Deferred(1)
+    return {pages[0]['regions'][0]['uid']:{'ru_translation':'Привет!'}},{'cloudMs':2,'inputTokens':100,'outputTokens':20}
+  pool=GooglePool(QuotaPacer(tpm=13000,rpm=14),'missing-fixture-file',Settings());pages=[{'page':i,'regions':[{'uid':'P'+str(i)+'_B1'}]} for i in range(1,4)]
+  with patch('google.genai.Client',return_value=object()),patch('manga_batch.pool.GemmaBatchTranslator',Worker):
+   with self.assertRaises(Deferred):await pool.translate(pages)
+   self.assertEqual(len(pool.partial),2);result,metadata=await pool.translate(pages)
+  self.assertEqual(calls,{1:1,2:2,3:1});self.assertEqual(len(result),3);self.assertEqual(metadata['inputTokens'],300);self.assertEqual(pool.partial,{})
  async def test_explicitly_removed_keys_never_reactivate_the_legacy_file(self):
   class Settings:
    def setting(self,name):return {'slots':[]}

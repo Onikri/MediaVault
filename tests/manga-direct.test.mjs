@@ -20,6 +20,11 @@ test('personal mode sends its page to the fixed Oracle gateway',async()=>{
  let sent;const {c}=chapter({config:translationConfig({engine:'direct',directViaOracle:true}),google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent={path,options};return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
  try{await c.render(new Blob(['page']),0,'auto',null,{},new AbortController().signal);assert.equal(sent.path,'/reader/google/generate');assert.equal(sent.options.body.model,'gemini-3.5-flash-lite');assert.ok(sent.options.body.key);assert.ok(!JSON.stringify(sent.options.body.request).includes(sent.options.body.key));}finally{c.close();}
 });
+
+test('online reader uses an Oracle credential slot without receiving the server key',async()=>{
+ const sent=[];const {c}=chapter({config:translationConfig({engine:'vm',directViaOracle:true}),serverSlots:[0],getKey:()=>'',google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent.push({path,body:options.body});return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
+ try{await c.render(new Blob(['page']),0,'auto',null,{},new AbortController().signal);assert.equal(sent[0].path,'/reader/google/generate');assert.equal(sent[0].body.slot,0);assert.equal(sent[0].body.key,undefined);assert.equal(sent[0].body.model,'gemini-3.5-flash-lite');}finally{c.close();}
+});
 test('direct mode is a separate compact cache variant without personal secrets',()=>{
  const c=translationConfig({engine:'direct',apiKey:'private-fixture'});assert.equal(c.engine,'direct');assert.equal(c.directModel,'gemini-3.5-flash-lite');assert.equal(c.inpaint,'hybrid');assert.equal(c.font,'auto');
  const variant=resultConfig(c);assert.equal(variant.direction,'rtl');assert.ok(!JSON.stringify(variant).includes('private-fixture'));assert.notDeepEqual(variant,resultConfig({...c,engine:'vm'}));assert.notDeepEqual(variant,resultConfig({...c,directModel:'gemma-4-31b-it'}));

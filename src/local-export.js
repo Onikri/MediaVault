@@ -1,4 +1,4 @@
-export async function exportLocally({entries,kind,quality='best',service,onProgress=()=>{},signal}){
+export async function exportLocally({entries,kind,referer,quality='best',service,onProgress=()=>{},signal}){
  if(!entries.length)throw Error('Выбери опубликованную главу или серию.');
  if(Number(service.session?.serverVersion)<16)throw Error('Для сохранения на устройство обнови сервер до версии 16.');
  const downloads=[];
@@ -6,7 +6,7 @@ export async function exportLocally({entries,kind,quality='best',service,onProgr
   signal?.throwIfAborted();let job;
   try{
    onProgress('Подготавливаем '+(index+1)+' / '+entries.length+'…');
-   job=await service.request('/online/exports',{method:'POST',body:{url:entries[index].url,kind,quality},signal});
+   job=await service.request('/online/exports',{method:'POST',body:{url:entries[index].url,kind,quality,...(kind==='video'&&referer?{referer}:{})},signal});
    while(['queued','running'].includes(job.state)){
     await new Promise((resolve,reject)=>{const stop=()=>{clearTimeout(timer);reject(signal.reason);};const timer=setTimeout(()=>{signal?.removeEventListener('abort',stop);resolve();},1000);signal?.addEventListener('abort',stop,{once:true});});
     job=await service.request('/online/exports/'+job.id,{signal});

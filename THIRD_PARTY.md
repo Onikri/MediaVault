@@ -254,3 +254,5 @@ Moebius (hustvl/Moebius, ECCV 2026) and the browser/ONNX port [simonw/moebius-we
 Ruslan Display, Marck Script, Press Start 2P and PT Serif are distributed under SIL OFL 1.1. Each bundled WOFF2 has its original license file. reader-fonts/manifest.json records immutable source URLs, SHA256 and verified Russian glyph coverage. Auto typography maps SFX, handwriting, system/game UI and narration to these fonts; earlier choices remain available.
 
 The owner can explicitly select Gemini models. Gemini API billing and project quotas apply separately from a Google AI Pro subscription. No paid model is used as an invisible fallback from Gemma.
+
+Moebius uses a separate `onnxruntime-web-moebius` package alias pinned to ONNX Runtime Web 1.27.0 (MIT), matching the upstream lockfile. Its WASM/MJS assets and license are bundled separately under `lmt/moebius-ort/`; detector and LaMa runtime versions are unchanged.

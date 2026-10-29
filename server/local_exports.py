@@ -45,7 +45,7 @@ def validate_request(url,kind,quality):
         site=site_for(url);host=urlsplit(url).hostname or ''
         player=any(p.matches(url) for p in (KodikPlayer,AniboomPlayer,AnimediaPlayer,SibnetPlayer,CvhPlayer,VkPlayer,AnilibriaPlayer,SovetRomanticaPlayer))
         cvh=host=='plapi.cdnvideohub.com' and bool(re.fullmatch(r'/api/v1/player/sv/video/\d+',urlsplit(url).path))
-        if not (site and site.kind=='anime' or player or cvh or host.endswith('.stravers.live')):raise ValueError('Выбери серию в поддерживаемом источнике или плеере.')
+        if not (site and site.kind=='anime' or player or cvh or host.endswith(('.stravers.live','.thealloha.club','.alloha.tv'))):raise ValueError('Выбери серию в поддерживаемом источнике или плеере.')
 
 @dataclass
 class Export:
@@ -57,6 +57,7 @@ class Export:
     created:float
     expires:float
     directory:Path
+    referer:str|None=None
     state:str='queued'
     progress:dict=field(default_factory=lambda:{'phase':'queued'})
     error:str=''
@@ -131,7 +132,7 @@ def produce(job,progress,maximum,reserve):
             result=download_chapter(job.url,job.directory,http,progress=update,quality=job.quality)
         else:
             from media_download import download_episode,pick_stream
-            page=Resolver(http).resolve(job.url);budget.check()
+            page=Resolver(http).resolve(job.url,referer=job.referer) if job.referer else Resolver(http).resolve(job.url);budget.check()
             stream=pick_stream(page.streams,job.quality)
             result=download_episode(stream,job.directory,http=http,quality=job.quality,progress=update,run=budget.run)
         budget.check()
@@ -173,18 +174,19 @@ class Exports:
         job=self.jobs.get(identity)
         if job is None or job.owner!=owner or job.expires<self.clock():raise ExportMissing()
         return job
-    def start(self,owner,url,kind,quality='best'):
+    def start(self,owner,url,kind,quality='best',referer=None):
         validate_request(url,kind,quality)
+        referer=public_url(referer,resolve_dns=False) if referer else None
         with self.condition:
             self._cleanup()
-            same=next((j for j in self.jobs.values() if j.owner==owner and j.url==url and j.kind==kind and j.quality==quality and j.state in {'queued','running','done'}),None)
+            same=next((j for j in self.jobs.values() if j.owner==owner and j.url==url and j.kind==kind and j.quality==quality and j.referer==referer and j.state in {'queued','running','done'}),None)
             if same:return self._snapshot(same)
             active=[j for j in self.jobs.values() if j.running or j.state=='queued']
             if len(active)>=4 or sum(j.owner==owner for j in active)>=2:raise ExportLimit('Дождись скачивания или останови предыдущее задание.')
             ready=[j for j in self.jobs.values() if j.state=='done']
             if len(ready)>=8 or sum(j.owner==owner for j in ready)>=4:raise ExportLimit('Скачай готовые файлы и убери их из списка перед новым заданием.')
             if shutil.disk_usage(self.root).free<self.reserve+32*1024**2:raise ExportLimit('На сервере недостаточно места для временного скачивания.')
-            identity=secrets.token_hex(16);now=self.clock();job=Export(identity,owner,url,kind,quality,now,now+self.ttl,self.root/identity)
+            identity=secrets.token_hex(16);now=self.clock();job=Export(identity,owner,url,kind,quality,now,now+self.ttl,self.root/identity,referer=referer)
             self.jobs[identity]=job;self.condition.notify_all();return self._snapshot(job)
     def status(self,owner,identity):
         with self.lock:self._cleanup();return self._snapshot(self._owned(owner,identity))
@@ -259,13 +261,14 @@ def manager():
 class ExportRequest(BaseModel):
     model_config=ConfigDict(extra='forbid')
     url:str=Field(min_length=1,max_length=8192)
+    referer:str|None=Field(default=None,max_length=8192)
     kind:str=Field(pattern='^(video|manga)$')
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
 
 def install(app,owner):
     @app.post('/online/exports',status_code=202)
     def create_export(body:ExportRequest,subject=Depends(owner)):
-        try:return manager().start(subject,body.url,body.kind,body.quality)
+        try:return manager().start(subject,body.url,body.kind,body.quality,referer=body.referer)
         except (ValueError,SourceError) as error:raise HTTPException(422,str(error)) from None
         except ExportLimit as error:raise HTTPException(429,str(error)) from None
     @app.get('/online/exports/file/{capability}')

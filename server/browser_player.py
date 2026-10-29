@@ -50,6 +50,7 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
         try:target=validate(value)
         except SourceError:return
         path=urlsplit(target).path.lower()
+        if urlsplit(target).hostname=='cdn.plyr.io' and path=='/static/blank.mp4':return
         if not path.endswith(('.mp4','.m3u8')):return
         captured[target]={'url':target,'type':'hls' if path.endswith('.m3u8') else 'mp4','quality':None,'headers':playback_headers(extra or headers)}
         done.set()
@@ -91,16 +92,36 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                 if 200<=value.status<300:record(value.url,value.request.headers)
             page.on('response',response)
             try:
-                await page.goto(url,wait_until='domcontentloaded',timeout=timeout*1000)
-                await _check_player_access(page)
-                await page.evaluate('document.querySelectorAll("video").forEach(v=>{v.muted=true;v.play().catch(()=>{});})')
+                # Alloha publishes an iframe player and deliberately has no
+                # top-level UI. Load it as an ordinary public embed, preserving
+                # the selected episode URL and the publisher's Referer.
+                framed=(urlsplit(url).hostname or '').endswith(('.stravers.live','.thealloha.club','.alloha.tv'))
+                if framed:
+                    if referer:
+                        validate(referer)
+                        await page.goto(referer,wait_until='domcontentloaded',timeout=timeout*1000)
+                        await _check_player_access(page)
+                        captured.clear();done.clear()
+                    await page.set_content('<iframe allow="autoplay" src="'+html.escape(url,quote=True)+'"></iframe>',wait_until='domcontentloaded',timeout=timeout*1000)
+                    element=await page.wait_for_selector('iframe');target=await element.content_frame()
+                    await target.wait_for_load_state('domcontentloaded',timeout=timeout*1000)
+                else:
+                    await page.goto(url,wait_until='domcontentloaded',timeout=timeout*1000);target=page
+                await _check_player_access(target)
+                await target.evaluate('document.querySelectorAll("video").forEach(v=>{v.muted=true;v.play().catch(()=>{});})')
+                if framed:
+                    control=target.locator('button[data-plyr="play"]').first
+                    try:
+                        await control.wait_for(state='visible',timeout=3000)
+                        await control.click(timeout=2000)
+                    except PlaywrightTimeout:pass
                 if not captured:
                     try:await asyncio.wait_for(done.wait(),timeout=timeout)
                     except asyncio.TimeoutError:pass
-                await _check_player_access(page)
+                await _check_player_access(target)
                 # A browser request usually exposes only the selected quality.
                 # Preserve every public source currently published in the DOM.
-                for source in await page.locator('video[src],video source[src]').evaluate_all('(nodes)=>nodes.map(n=>({url:n.src,quality:n.getAttribute("res")||n.getAttribute("data-quality")||n.getAttribute("label")}))'):
+                for source in await target.locator('video[src],video source[src]').evaluate_all('(nodes)=>nodes.map(n=>({url:n.src,quality:n.getAttribute("res")||n.getAttribute("data-quality")||n.getAttribute("label")}))'):
                     record(source['url'])
                     quality=re.fullmatch(r'(\d{1,4})p?',str(source.get('quality') or ''),re.I)
                     if source['url'] in captured and quality and 1<=int(quality[1])<=8640:captured[source['url']]['quality']=int(quality[1])

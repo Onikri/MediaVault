@@ -20,6 +20,14 @@ class FixtureHttp(PublicHttp):
 
 
 class PlayerContractTests(unittest.TestCase):
+    def test_iframe_html_request_retains_the_publisher_referer(self):
+        class Http:
+            def document(self,url,**kwargs):
+                self.headers=kwargs.get('headers');return '<video src="https://cdn.example.com/episode.mp4"></video>',url,{}
+        http=Http();resolver=Resolver(http)
+        page=resolver.resolve('https://embed.example.com/episode',referer='https://publisher.example.com/title')
+        self.assertEqual(http.headers,{'Referer':'https://publisher.example.com/title'})
+        self.assertEqual(page.streams[0]['url'],'https://cdn.example.com/episode.mp4')
     def test_all_eight_real_response_formats_return_media_and_required_headers(self):
         samples=[
             ('Aniboom','https://aniboom.one/embed/9G1MJ6NMV8z?episode=1&translation=30',{'/embed/':'aniboom_embed.html','master.m3u8':'aniboom_master.m3u8'}),

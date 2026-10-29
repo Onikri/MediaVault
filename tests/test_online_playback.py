@@ -10,6 +10,16 @@ from music_playback import parse_recordings
 from manga_sources import parse_pages,parse_search,SITES
 class OnlinePlayback(unittest.TestCase):
  def setUp(self):online.sessions.clear()
+ def test_online_preparation_keeps_the_selected_public_parent(self):
+  from types import SimpleNamespace
+  app=FastAPI();online.install(app,lambda:'fixture-owner');client=TestClient(app)
+  selected='https://embed.thealloha.club/?episode=3&translation=10';parent='https://yummyanime.tv/fixture-title.html'
+  with patch('online_sessions.Resolver') as resolver:
+   resolver.return_value.resolve.return_value=SimpleNamespace(streams=[{'url':'https://cdn.example.com/episode-3.mp4','type':'mp4','quality':720,'headers':{}}])
+   response=client.post('/online/prepare',json={'url':selected,'kind':'video','referer':parent})
+   self.assertEqual(response.status_code,200,response.text);resolver.return_value.resolve.assert_called_once_with(selected,referer=parent)
+   client.delete('/online/'+response.json()['id'])
+  with self.assertRaises(SourceError):client.post('/online/prepare',json={'url':selected,'kind':'video','referer':'http://127.0.0.1/private'})
  def test_real_socket_disconnect_through_buffered_body_middleware_releases_sessions(self):
   import socket,threading,time,uvicorn
   app=FastAPI()

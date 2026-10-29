@@ -77,7 +77,9 @@ export default function MangaReader({item,catalog,userId,libraryId,onClose,onSel
  useEffect(()=>{if(prefs.mode==='scroll'&&entries.length){const timer=setTimeout(()=>root.current?.querySelector('[data-page="'+savedPage.current+'"]')?.scrollIntoView({block:'start'}),60);return()=>clearTimeout(timer);}},[entries,prefs.mode]);
  const visibleRef=useRef(null);visibleRef.current=n=>{if(prefs.mode==='scroll')setPage(n);};const onVisible=useRef(n=>visibleRef.current(n)).current;
  const serviceRef=useRef(readerService);serviceRef.current=readerService;const backendRef=useRef(backendStatus);backendRef.current=backendStatus;
- const queueRef=useRef(null),vmRef=useRef(null),directRef=useRef(null),revision=JSON.stringify(resultConfig(lmt))+':gemma='+lmt.gemmaProfile+':render='+String(lmt.inpaint)+':prefetch='+String(lmt.directPrefetch===true)+':timeout='+lmt.directTimeoutMs+':'+vmGeneration;
+ const [serverSlots,setServerSlots]=useState(null),serverSlotsRef=useRef(null);serverSlotsRef.current=serverSlots;
+ useEffect(()=>{let closed=false;if(lmt.engine!=='vm'||item.chunks?.length&&!item.onlinePages?.length){setServerSlots(null);return;}setServerSlots(null);readerService?.request('/reader/google/keys').then(value=>{if(!closed)setServerSlots((value.slots||[]).map(row=>row.slot));}).catch(()=>{if(!closed)setServerSlots([]);});return()=>{closed=true;};},[item.id,lmt.engine,readerService?.server,readerService?.session?.serverVersion,vmGeneration]);
+ const queueRef=useRef(null),vmRef=useRef(null),directRef=useRef(null),revision=JSON.stringify(resultConfig(lmt))+':gemma='+lmt.gemmaProfile+':render='+String(lmt.inpaint)+':prefetch='+String(lmt.directPrefetch===true)+':timeout='+lmt.directTimeoutMs+':'+vmGeneration+':serverSlots='+JSON.stringify(serverSlots);
  useEffect(()=>{let closed=false;if(['lmt','direct'].includes(lmt.engine))return;const server=readerService?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl;if(!server)return;fetch(server+(lmt.engine==='vm'?'/api/v1/manga-translation/status':'/reader/lmt/status'),{signal:AbortSignal.timeout(10000)}).then(async r=>{if(!r.ok)throw Error('Полный LMT ещё не установлен на ВМ. Старый обработчик с метками больше не используется.');return r.json();}).then(v=>{if(!closed){setBackendStatus(lmt.engine==='vm'?{vm:v}:v);if(lmt.engine==='vm'&&v.policy)setLmt(old=>{if(old.vmPolicy===v.policy)return old;const updated={...old,vmPolicy:v.policy};saveLmt(userId,updated);return updated;});if(v.gemma?.promptVersion)setLmt(old=>old.gemmaPromptVersion===v.gemma.promptVersion?old:{...old,gemmaPromptVersion:v.gemma.promptVersion});}}).catch(e=>{if(!closed)setBackendStatus(lmt.engine==='vm'?{vm:{ready:false,message:'Пакетный сервис ещё не установлен на ВМ.'}}:{ready:false,message:e.message});});return()=>{closed=true;};},[readerService?.server,lmt.engine,userId]);
  useLayoutEffect(()=>{queueRef.current?.close();vmRef.current?.close();vmRef.current=null;directRef.current?.close();directRef.current=null;
   if(lmt.engine==='direct'){
@@ -85,8 +87,9 @@ export default function MangaReader({item,catalog,userId,libraryId,onClose,onSel
    return()=>{directRef.current?.close();directRef.current=null;stopLmt();};
   }
   if(lmt.engine==='vm'){
+   if(entries.length&&(!item.chunks?.length||item.onlinePages?.length)&&serverSlots?.length)directRef.current=new DirectChapter({entries,scope,keyScope:String(userId||'anonymous'),config:{...translationConfig(lmt),directViaOracle:true,contextKey:item.id},serverSlots,service:()=>serviceRef.current,direction:prefs.direction});
    if(entries.length&&lmt.vmPolicy&&!item.onlinePages?.length&&item.chunks?.length)vmRef.current=new VmChapter({model:lmt.directModel,item,names:entries.map(e=>e.name),direction:prefs.direction,scope,service:()=>serviceRef.current,cache:lmt.cache,policy:lmt.vmPolicy,canStart:()=>backendRef.current?.vm?.configured!==false});
-   return()=>{vmRef.current?.close();vmRef.current=null;};
+   return()=>{vmRef.current?.close();vmRef.current=null;directRef.current?.close();directRef.current=null;};
   }
   queueRef.current=new TranslationQueue(async({blob,config},signal,status)=>{
   signal.throwIfAborted();const cacheKey=await translationCacheKey(blob,config,scope);signal.throwIfAborted();
@@ -102,6 +105,8 @@ export default function MangaReader({item,catalog,userId,libraryId,onClose,onSel
   signal.throwIfAborted();const config={...translationConfig(lmtRef.current),pageIndex,contextKey:current.current.metadataId||current.current.collectionId||current.current.id};
   if(config.engine==='direct'){if(!directRef.current)throw Error('Быстрый переводчик запускается.');return directRef.current.render(blob,pageIndex,config.font,status,config,signal,background);}
   if(config.engine==='vm'){
+   if(directRef.current)return directRef.current.render(blob,pageIndex,config.font,status,config,signal,background);
+   if(!current.current.chunks?.length||current.current.onlinePages?.length)throw Error(serverSlotsRef.current===null?'Получаем настройки перевода с Oracle…':'Добавь серверный ключ Google в настройках перевода.');
    if(!vmRef.current&&!config.vmPolicy)throw Error('Получаем версию пакетного переводчика с ВМ…');
    if(!vmRef.current)throw Error('Быстрый перевод ВМ доступен для CBZ в библиотеке Drive. Для онлайн-главы выбери полностью локальный режим.');
    return vmRef.current.render(blob,pageIndex,config.font,status,config,signal);

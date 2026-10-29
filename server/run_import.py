@@ -228,7 +228,8 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                         path = download_text(entry["url"], temporary, resolver.http)
                         page = type("Chapter", (), {"title": entry["title"]})()
                     else:
-                        page = resolver.resolve(entry["url"])
+                        parent=job['sources'][0] if (urlsplit(entry['url']).hostname or '').endswith(('.stravers.live','.thealloha.club','.alloha.tv')) else None
+                        page = resolver.resolve(entry["url"],referer=parent) if parent else resolver.resolve(entry["url"])
                         streams=expand_stream_qualities(page.streams,resolver.http)
                         stream = pick_stream(streams, job["quality"])
                         path = downloader(stream, temporary, http=resolver.http, quality=job["quality"], progress=report)

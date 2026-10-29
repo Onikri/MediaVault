@@ -1,5 +1,5 @@
 // Adapted from simonw/moebius-web 080be6e737ec976130e260d34707d7d9b7f63d5b (Apache-2.0).
-import * as ort from "onnxruntime-web/webgpu";
+import * as ort from "onnxruntime-web-moebius/webgpu";
 import { makeDDIM, ddimStep } from "./ddim.ts";
 import { loadModelBytes, requestPersistentStorage } from "./modelcache.ts";
 import {
@@ -48,6 +48,8 @@ export class MoebiusPipeline {
 
   async load(modelBase: string, onProgress?: Progress) {
     if (!("gpu" in navigator)) throw new Error("Moebius требует WebGPU. Выбери LaMa или быстрый режим.");
+    // Keep the upstream-tested 1.27 runtime separate from the detector's
+    // newer ORT. The newer native WebGPU path exhausted memory in this graph.
     const ep: ("webgpu" | "wasm")[] = ["webgpu"];
     const opts: ort.InferenceSession.SessionOptions = {
       executionProviders: ep,
@@ -71,17 +73,23 @@ export class MoebiusPipeline {
     this.dec = await ort.InferenceSession.create(await get("vae_decoder.onnx", "VAE decoder", 2), opts);
     this.unet = await ort.InferenceSession.create(await get("unet.onnx", "UNet", 3), opts);
     // report whichever EP actually got selected for the unet
-    this.backend = ep[0];
+    this.backend = "webgpu";
+  }
+
+  async dispose(){
+    await Promise.allSettled([this.enc,this.dec,this.unet].filter(Boolean).map(session=>session.release()));
   }
 
   private async encode(chw: Float32Array): Promise<Float32Array> {
     const t = new ort.Tensor("float32", chw, [1, 3, IMG, IMG]);
     const { moments } = await this.enc.run({ image: t });
+    try{
     const m = moments.data as Float32Array;
     // take mean channels (first 4) * scaling_factor
     const out = new Float32Array(4 * LAT * LAT);
     for (let i = 0; i < out.length; i++) out[i] = m[i] * SCALING_FACTOR;
     return out;
+    }finally{moments.dispose();t.dispose();}
   }
 
   private async decode(latent: Float32Array): Promise<ImageData> {
@@ -89,7 +97,7 @@ export class MoebiusPipeline {
     for (let i = 0; i < latent.length; i++) scaled[i] = latent[i] / SCALING_FACTOR;
     const t = new ort.Tensor("float32", scaled, [1, 4, LAT, LAT]);
     const { image } = await this.dec.run({ latent: t });
-    return chwToImageData(image.data as Float32Array);
+    try{return chwToImageData(image.data as Float32Array);}finally{image.dispose();t.dispose();}
   }
 
   // Assemble the (2,9,64,64) CFG input from latents/mask/maskedLatent and run the UNet,
@@ -119,11 +127,13 @@ export class MoebiusPipeline {
     }
     const ts = new BigInt64Array([BigInt(t), BigInt(t)]);
 
-    const out = await this.unet.run({
+    const feeds={
       latent: new ort.Tensor("float32", nine2, [2, 9, LAT, LAT]),
       timesteps: new ort.Tensor("int64", ts, [2]),
       input_ids: new ort.Tensor("int64", ids, [2, HALF_IDS]),
-    });
+    };
+    const out = await this.unet.run(feeds);
+    try{
     const noise = out.noise.data as Float32Array;
     const n = 4 * plane;
     const cfg = new Float32Array(n);
@@ -133,6 +143,7 @@ export class MoebiusPipeline {
       cfg[i] = u + guidance * (c - u);
     }
     return cfg;
+    }finally{for(const value of Object.values(out))value.dispose();for(const value of Object.values(feeds))value.dispose();}
   }
 
   async run(

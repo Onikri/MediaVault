@@ -10,6 +10,7 @@ RUN --mount=type=secret,id=proxy_ca \
 RUN useradd --uid 1000 --create-home vault && mkdir /data && chown vault:vault /data
 COPY --from=node:22.22.0-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 COPY --chown=vault:vault --chmod=0644 *.py ./
+COPY --chown=vault:vault --chmod=0644 gemma-system.md ./
 USER vault
 EXPOSE 7860
 CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1", "--no-access-log"]
