@@ -42,7 +42,7 @@ def failure(detail):
 def extract(identity,refresh=False):
     now=time.monotonic()
     with lock:hit=cache.get(identity)
-    if not refresh and hit and hit[0]>now:return hit[1],int(hit[0]-now)
+    if not refresh and hit and hit[0]>now:return hit[1],int(hit[2]-now)
     if not slots.acquire(False):raise HTTPException(429,'Подготовка музыки занята. Повтори через несколько секунд.')
     process=None
     try:
@@ -66,12 +66,13 @@ def extract(identity,refresh=False):
         duration=data.get('duration')
         if not isinstance(duration,(int,float)) or not 0<duration<=7200:raise HTTPException(422,'Поддерживаются записи продолжительностью до двух часов.')
         url=audio_url(data.get('url',''));expiry=parse_qs(urlsplit(url).query).get('expire',[''])[0]
-        ttl=min(600,int(expiry)-int(time.time())-60) if expiry.isdigit() else 300
+        ttl=min(7200,int(expiry)-int(time.time())-60) if expiry.isdigit() else 300
         if ttl<30:raise HTTPException(502,'YouTube вернул истекающую ссылку. Повтори запрос.')
         value={'url':url,'headers':playback_headers(data.get('http_headers')),'mime':'audio/mp4' if data['ext']=='m4a' else 'audio/webm','duration':duration,'title':str(data.get('title') or 'YouTube')[:300]}
         with lock:
             if len(cache)>=64:cache.clear()
-            cache[identity]=(time.monotonic()+ttl,value)
+            created=time.monotonic()
+            cache[identity]=(created+min(600,ttl),value,created+ttl)
         return value,ttl
     finally:
         if process and process.poll() is None:process.kill();process.wait()

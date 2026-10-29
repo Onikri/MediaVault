@@ -62,7 +62,13 @@ class MusicAudio(unittest.TestCase):
   data={'id':IDENTITY,'title':'Fixture','duration':213,'url':CDN,'ext':'m4a','vcodec':'none','acodec':'mp4a','protocol':'https','http_headers':{'Authorization':'secret','Cookie':'secret','User-Agent':'public'}}
   with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}),patch.object(music,'audio_url',side_effect=lambda url:url),patch.object(music.subprocess,'Popen',side_effect=self.extract_fixture(data)) as spawn:
    value,ttl=music.extract(IDENTITY);music.extract(IDENTITY)
-   self.assertEqual(value['mime'],'audio/mp4');self.assertNotIn('Cookie',value['headers']);self.assertNotIn('Authorization',value['headers']);self.assertEqual(spawn.call_count,1);self.assertLessEqual(ttl,600)
+   self.assertEqual(value['mime'],'audio/mp4');self.assertNotIn('Cookie',value['headers']);self.assertNotIn('Authorization',value['headers']);self.assertEqual(spawn.call_count,1);self.assertGreater(ttl,600);self.assertLessEqual(ttl,3600)
+   # A ten-minute metadata refresh must not expire playback of a long recording.
+   cached=music.cache[IDENTITY];self.assertLessEqual(cached[0]-time.monotonic(),600);self.assertGreater(cached[2]-time.monotonic(),600)
+   with patch.object(music.time,'monotonic',return_value=cached[0]-1):
+    _,remaining=music.extract(IDENTITY);self.assertGreater(remaining,600)
+   with patch.object(music.time,'monotonic',return_value=cached[0]+1):music.extract(IDENTITY)
+   self.assertEqual(spawn.call_count,2,'Stale metadata is extracted again without cutting off existing playback')
    command=spawn.call_args.args[0];self.assertIn('--ignore-config',command);self.assertIn('--no-cache-dir',command);self.assertIn('--no-plugin-dirs',command);self.assertNotIn('shell',spawn.call_args.kwargs);self.assertEqual(command[-1],WATCH)
    self.assertEqual(list((Path(directory)/'temporary').iterdir()),[])
  def test_combined_video_live_and_overlong_tracks_are_rejected(self):

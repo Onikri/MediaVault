@@ -13,7 +13,9 @@ on disconnect. Only bounded extractor metadata is cached in memory; media bytes
 are streamed without persistent audio files. There are two extractor slots, a28s
 preparation deadline and the existing four playback capabilities per owner.
 Cancelled preparations release capabilities; close/track changes release the
-previous capability on the frontend. Expired links can be prepared again.
+previous capability on the frontend. Metadata refreshes after ten minutes;
+playback capabilities last up to two hours, bounded by the upstream signed URL
+expiry. Expired links can be prepared again.
 
 The Oracle image includes Node22 for yt-dlp's EJS runtime. yt-dlp and the Node
 image are version-pinned; updates are reviewed and deployed, rather than a live
