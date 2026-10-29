@@ -4,7 +4,7 @@ import {ArrowLeft,ChevronLeft,ChevronRight,Settings2,Maximize,Minimize,List,Grid
 import './reader-shell.css';
 
 // Chrome overlays the reading surface. Opening a panel never resizes a page.
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,className='',chromeWidth=1200,status}){
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({});
  const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[hint,setHint]=useState(true),[fullscreenError,setFullscreenError]=useState('');
  methods.current={onClose,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel};
@@ -20,8 +20,9 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
  async function fullscreen(){setFullscreenError('');try{if(document.fullscreenElement)await document.exitFullscreen();else if(root.current?.requestFullscreen)await root.current.requestFullscreen();else setFullscreenError('Используется полноэкранный режим читалки.');}catch{setFullscreenError('Браузер не разрешил системный полноэкранный режим.');}}
  useEffect(()=>{const key=e=>{
   const m=methods.current,dialog=document.activeElement?.closest('[role="dialog"]');
+  if(embedded&&!root.current?.contains(document.activeElement)&&document.fullscreenElement!==root.current&&!document.fullscreenElement?.contains(root.current))return;
   if(e.defaultPrevented||e.target.closest?.('input,textarea,select,[contenteditable=true]')||dialog&&dialog!==root.current&&!dialog.contains(root.current)||m.settingsOpen||m.panel)return;
-  if(e.key==='Tab'){
+  if(e.key==='Tab'&&!embedded){
    if(!visible){e.preventDefault();show();requestAnimationFrame(()=>root.current?.querySelector('.reader-top button')?.focus());return;}
    const controls=[...root.current.querySelectorAll('button:not(:disabled),input:not(:disabled),a[href]')].filter(node=>!node.closest('[inert]')&&node.getClientRects().length);
    const first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}return;
@@ -32,9 +33,10 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
    e.preventDefault();const delta=e.key===' '?1:(e.key==='ArrowRight'?1:-1)*(m.direction==='rtl'?-1:1);
    if(delta>0&&m.canNext)m.onNext?.();if(delta<0&&m.canPrevious)m.onPrevious?.();hide();
   }
- };addEventListener('keydown',key);return()=>removeEventListener('keydown',key);},[visible,show,hide]);
+ };addEventListener('keydown',key);return()=>removeEventListener('keydown',key);},[visible,show,hide,embedded]);
  function pointerDown(e){
   if(!e.isPrimary||e.button>0||e.target.closest('button,a,input,select,textarea,[role="button"]')){gesture.current=null;return;}
+  if(embedded)root.current?.focus({preventScroll:true});
   gesture.current={x:e.clientX,y:e.clientY,time:performance.now(),pointer:e.pointerType};
  }
  function pointerUp(e){
@@ -45,7 +47,7 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
   if(paged){const bounds=e.currentTarget.getBoundingClientRect(),fraction=(e.clientX-bounds.left)/bounds.width;if(fraction<.26||fraction>.74){const forward=(fraction>.74)===(direction!=='rtl');if(forward&&canNext)onNext?.();if(!forward&&canPrevious)onPrevious?.();hide();return;}}
   setHint(false);visible?hide():show();
  }
- return <section id="viewer" ref={root} tabIndex={-1} className={'mv-viewer immersive-reader reader-theme-'+theme+' '+className+(inline?' mv-viewer-inline':'')} style={{'--reader-chrome-width':Math.max(320,Math.min(1800,Number(chromeWidth)||1200))+'px'}} data-chrome={visible||!!activePanel} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={title}>
+ return <section id="viewer" ref={root} tabIndex={-1} className={'mv-viewer immersive-reader reader-theme-'+theme+' '+className+(inline?' mv-viewer-inline':'')+(embedded?' reader-embedded':'')} style={{'--reader-chrome-width':Math.max(320,Math.min(1800,Number(chromeWidth)||1200))+'px'}} data-chrome={visible||!!activePanel} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={title}>
   <div className="immersive-stage" onPointerDown={pointerDown} onPointerUp={pointerUp} onPointerCancel={()=>gesture.current=null} onPointerMove={e=>{if(e.pointerType==='mouse'&&!e.buttons){const r=e.currentTarget.getBoundingClientRect();if(e.clientY-r.top<65||r.bottom-e.clientY<65)show();}}}>{children}</div>
   <div className="reader-chrome reader-top" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
    <button className="reader-control" aria-label="Закрыть просмотр" onClick={onClose}><ArrowLeft size={20}/></button>

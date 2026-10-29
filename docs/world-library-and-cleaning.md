@@ -39,8 +39,18 @@ reading; automatic ranobe site parsing is not claimed.
 
 ## Title and chapter screens
 
-The online title view groups synopsis, facts, characters, credits, relations and
-immediate reading/playback. A source-only result opens even without a catalog ID.
+Online and collection titles share `TitlePage` and its stylesheet: backdrop,
+poster/hero, facts, section navigation, synopsis, ratings, characters, credits and
+relations. `WorldTitlePage` adapts remote metadata and supplies online reading/
+saving controls in the materials section. `TitleEpisodeCard` is also shared by
+collection episodes/chapters and online chapter previews. The materials section
+shows source, translation, season/volume and available episodes/chapters directly.
+Playing a selection mounts `OnlineViewer inline` inside this section. Its actual
+HTML media player or embedded manga reader can enter browser fullscreen and return
+to the same page. Page scrolling is not locked by inline playback, and reader
+keyboard shortcuts stay scoped to its focused surface. Saving to Drive/device is
+a secondary disclosure; closing it returns to the online selection. Collection-only writes
+(metadata, artwork, ratings and character enrichment) are disabled in online mode. A source-only result opens even without a catalog ID.
 Available attached sources bypass a second discovery search. Exact title matches
 can be inspected automatically; unrelated partial matches are not auto-opened.
 Hover/focus previews use real chapter page capabilities, released on close.
@@ -100,6 +110,12 @@ SFX classification switch is added. Existing vision translation categories can
 still guide later rendering.
 
 ## Validation
+
+The title source selector accepts exact normalized titles/aliases or agreeing
+external IDs, and rejects conflicting IDs, years and media kinds. Raw global
+search results remain candidates in the library; unrelated popular titles from
+an extension that ignores its query cannot become sources of the opened title.
+Refreshing sources starts a fresh discovery job instead of reusing its old cache.
 
 Node tests cover source-only merging, source restriction, masks/ROI geometry and
 reader settings. Python tests exercise real SQLite scheduling/cache/restart,
