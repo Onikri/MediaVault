@@ -36,5 +36,6 @@ class GooglePool:
    self.workers[identity]=GemmaBatchTranslator(pacer,self.key_file,client=client,models=[model])
   worker=self.workers[identity]
   async with gate:
+   worker.pacer=self.groups.setdefault(group,QuotaPacer(tpm=self.pacer.tpm,rpm=self.pacer.rpm))
    worker.models=[model]
    return await worker.translate(pages)
