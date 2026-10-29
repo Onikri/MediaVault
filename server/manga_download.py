@@ -35,6 +35,10 @@ def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
         target=Path(temporary)/f'page-{index:04d}'
         from suwayomi_bridge import parse_reference,page_image
         if parse_reference(url):target.write_bytes(page_image(url)[0])
+        elif site_for(final) and site_for(final).family=='novelcool':
+            from source_relay import relay,image as device_image
+            if relay.available():target.write_bytes(device_image(url,final)[0])
+            else:local.http.download(url,target,headers={'Referer':final},maximum=30*1024*1024)
         else:local.http.download(url,target,headers={'Referer':final},maximum=30*1024*1024)
         with target.open('rb') as source:extension=image_extension(source.read(32))
         if not extension:raise SourceError('Читалка вернула заглушку вместо изображения страницы.')

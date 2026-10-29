@@ -212,7 +212,7 @@ app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET",
 @app.middleware("http")
 async def limits(request: Request, call_next):
     if request.method == "POST":
-        maximum=14*1024*1024 if request.url.path=="/reader/translate" else 512*1024
+        maximum=14*1024*1024 if request.url.path=="/reader/translate" else 12*1024*1024 if request.url.path.startswith('/source-device/result/') else 512*1024
         if request.headers.get("origin") not in (None, ORIGIN):
             return JSONResponse({"detail": "Origin denied"}, status_code=403)
         try:
@@ -247,7 +247,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 18, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 19, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -657,3 +657,5 @@ from music_playback import install as install_music_playback
 install_music_playback(app)
 from music_artists import install as install_music_artists
 install_music_artists(app)
+from source_relay import install as install_source_relay
+install_source_relay(app)

@@ -8,7 +8,9 @@ HOST='ru.novelcool.com'
 
 def document(url,http):
     from manga_sources import guard
-    text,final,_=http.document(url)
+    from source_relay import relay,document as device_document
+    if relay.available():text,final,_=device_document(url)
+    else:text,final,_=http.document(url)
     if urlsplit(final).hostname!=HOST:raise SourceError('NovelCool перенаправил чтение на другой сайт.')
     soup=BeautifulSoup(text,'html.parser');guard(soup)
     heading=soup.title.get_text(' ',strip=True) if soup.title else ''

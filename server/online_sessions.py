@@ -121,6 +121,11 @@ def install(app,owner):
             if s.kind=='manga' and parse_reference(url):
                 raw,mime=page_image(url)
                 return Response(raw,media_type=mime,headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
+            if s.kind=='manga' and urlsplit(s.headers.get('Referer','')).hostname=='ru.novelcool.com':
+                from source_relay import relay,image as device_image
+                if relay.available():
+                    raw,_,headers=device_image(url,s.headers['Referer'])
+                    return Response(raw,media_type=headers['Content-Type'],headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
             response,final=http._open(url,headers=s.headers,byte_range=range_header or None)
             mime=response.headers.get('Content-Type','').split(';')[0].lower()
             common={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}
