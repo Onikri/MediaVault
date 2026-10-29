@@ -8,7 +8,33 @@ Upstream: https://github.com/Suwayomi/Suwayomi-Server (MPL-2.0; Android compatib
 
 After the existing importer has been updated to backend v14, the maintainer runs `python3 deploy/oracle/install-suwayomi.py` on the VM. It discovers the current Compose project, preserves existing overlays, adds `suwayomi.yaml`, checks the service, and recreates only the importer to enable its private adapter. It leaves Oracle shape/resources, Caddy routes, Drive/OAuth configuration, library encryption and existing ML workers intact. A failed readiness check leaves the importer unchanged; a failed importer check restores the previous Compose configuration. Logs and rollback information are private under `/opt/mediavault-suwayomi`.
 
-No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit1536MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. Browser/KCEF and challenge-solving services are disabled. A source requiring browser login, subscription or a challenge may remain unavailable.
+No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit2304MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. The official image launcher enables bundled ARM64 KCEF and Xvfb, which LibGroup uses even when reading browser storage for a public request. Challenge-solving services remain disabled. Actual account/subscription requirements remain distinct from a broken runtime.
+
+Existing deployments created with the direct Java/headless entrypoint need
+`sudo python3 deploy/oracle/enable-suwayomi-browser.py`. It checks the existing
+private pinned image and bundled browser, refuses active imports, saves private
+Compose/config backups, and recreates only Suwayomi. Failed readiness restores
+the original files and service. OAuth, Drive keys and installed extensions are
+preserved. Source-list readiness confirms the service, not successful website
+authentication; verify real search, chapters and image retrieval separately.
+
+Backend v17 also retries a failing MangaDex chapter-list adapter through the
+existing public MangaDex API, preserving the exact title UUID and language.
+Native chapter URLs then use the normal online/download path. Empty or removed
+chapters are reported separately from a server failure. The browser inspection
+budget covers the bounded server request instead of aborting it at20seconds.
+
+MangaLib's native public adapter supplies the mandatory `Site-Id:1` header and
+public reader referer. The global search retains MangaLib's installed source ID
+and falls back to this same-site adapter when LibGroup fails; native title and
+chapter URLs then support the existing reader and CBZ export. This does not
+substitute a different website or remove a failing source from the selector.
+Canonical source names and `releaseDateString` distinguish a work from fan works
+that reuse its franchise as an English alias. The one-time discovery-cache
+migration expires only ambiguous legacy MangaLib metadata/query entries and
+their completed search snapshots; private libraries and other source caches
+are preserved. Automatic selection can recover to the native adapter when it
+arrives after an initial failed source. An explicit user selection is preserved.
 
 The Keiyoushi repository uses `https://github.com/keiyoushi/extensions/raw/repo/index.pb`; the legacy JSON index currently contains migration placeholders. On 2026-10-28, the local server returned **1435 extension packages**. This is not a count of verified working sites. Only a small RU/EN/JA/KO set is installed initially. Owners can add catalogued packages in **Import → Manga → More sources**. Source code runs inside the restricted Suwayomi container; arbitrary APK uploads are not exposed.
 

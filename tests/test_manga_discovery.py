@@ -19,6 +19,35 @@ def wait_done(manager,owner,identity):
         time.sleep(.01)
     raise AssertionError('Discovery job did not finish')
 
+class NativeSourceFallbackTests(unittest.TestCase):
+    def test_upgrade_expires_only_ambiguous_legacy_mangalib_public_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager=discovery.Discovery(directory,start_workers=False)
+            with manager.db:
+                manager.db.execute('INSERT INTO titles VALUES(?,?,?,?,?,?)',('legacy-lib','1','ru','naruto',json.dumps({'provider':'mangalib'}),time.time()))
+                for sid in ['1','2']:manager.db.execute('INSERT INTO query_cache VALUES(?,?,?,?)',('naruto',sid,'[]',time.time()+900))
+                manager.db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',('old-job','owner','signature','naruto','ru','done',time.time(),time.time(),time.time()+900,time.time()))
+                manager.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',('old-job','1','{}','done','[]',1))
+                manager.db.execute('PRAGMA user_version=0')
+            manager.close();manager=discovery.Discovery(directory,start_workers=False)
+            self.assertEqual(manager.db.execute('SELECT count(*) FROM titles').fetchone()[0],0)
+            self.assertEqual([r[0] for r in manager.db.execute('SELECT source_id FROM query_cache')],['2'])
+            self.assertEqual(manager.db.execute("SELECT state FROM jobs WHERE id='old-job'").fetchone()[0],'interrupted')
+            manager.close()
+    def test_mangalib_extension_failure_keeps_source_selectable_through_its_public_api(self):
+        source={'id':'6111047689498497237','name':'MangaLib','lang':'ru'}
+        native={'title':'Наруто','aliases':['Naruto'],'kind':'manga','url':'https://mangalib.me/ru/195--naruto','language':'ru'}
+        with patch.object(discovery.bridge,'Client') as client,patch('manga_catalog_adapters.lib_search',return_value=[native]):
+            client.return_value.get.side_effect=SourceError('CEF initialization failed')
+            first=discovery.search_source(source,'Наруто');second=discovery.search_source(source,'Naruto')
+            self.assertEqual(first[0]['id'],second[0]['id']);self.assertEqual(first[0]['sourceId'],source['id'])
+            self.assertEqual(first[0]['url'],native['url']);self.assertEqual(first[0]['aliases'],['Naruto'])
+            self.assertEqual(first[0]['providerName'],'MangaLib');self.assertTrue(first[0]['sourceOnly'])
+        with patch.object(discovery.bridge,'Client') as client,patch('manga_catalog_adapters.lib_search') as other:
+            client.return_value.get.side_effect=SourceError('Other source failed')
+            with self.assertRaises(SourceError):discovery.search_source({**source,'name':'Other'},'Наруто')
+            other.assert_not_called()
+
 class MangaDiscoveryTests(unittest.TestCase):
  def setUp(self):
     self.directory=tempfile.TemporaryDirectory();self.env=patch.dict(os.environ,ENV);self.env.start();self.sources=patch.object(discovery.bridge,'sources',return_value=SOURCES);self.sources.start();self.managers=[]
@@ -149,7 +178,7 @@ class MangaDiscoveryApiTests(unittest.TestCase):
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('B')).status_code,404)
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('A')).status_code,200)
                 self.assertEqual(client.post('/discovery/manga/search',headers=auth('A'),json={'query':'abc','sourceIds':['999']}).status_code,422)
-                self.assertEqual(client.get('/health').json()['version'],16);self.assertTrue(client.get('/health').json()['mangaGlobalDiscovery'])
+                self.assertEqual(client.get('/health').json()['version'],17);self.assertTrue(client.get('/health').json()['mangaGlobalDiscovery'])
         finally:manager.close()
 
 class VoiceSuggestionTests(unittest.TestCase):

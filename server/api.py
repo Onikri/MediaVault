@@ -247,7 +247,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 16, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 17, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -529,7 +529,7 @@ def manga_inspect(body:MangaInspection,subject=Depends(owner)):
     value=inspect(body.url)
     if body.title:
         if len(json.dumps(body.title).encode())>50000:raise HTTPException(422,'Слишком большое описание манги.')
-        candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('aliases') or [])])),'kind':'manga'}
+        candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('identityTitles') or value.get('aliases') or [])])),'kind':'manga','year':value.get('year'),'ids':value.get('ids') or {}}
         if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
     return value
 

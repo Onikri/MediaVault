@@ -48,6 +48,20 @@ def search_source(source,query):
         rows=data.get('mangaList',[])
         if not isinstance(rows,list):raise ValueError('Invalid source result')
         return [value for row in rows[:40] if isinstance(row,dict) and (value:=result_row(source,row))]
+    except SourceError:
+        if source.get('name')!='MangaLib' or source.get('lang')!='ru':raise
+        # The installed LibGroup extension may fail while initializing WebView.
+        # Use the same site's public API; retain the source ID for filters and
+        # return native URLs so inspection, reading and export use that adapter.
+        from manga_catalog_adapters import lib_search
+        from source_parser import PublicHttp
+        http=PublicHttp(timeout=(3,7),deadline=time.monotonic()+9)
+        try:rows=lib_search(query,http)
+        finally:http.close()
+        sid=str(source['id'])
+        return [{**row,'id':'suwayomi:'+sid+':native:'+hashlib.sha256(row['url'].encode()).hexdigest()[:20],
+                 'provider':'mangalib','providerName':source['name'],'sourceId':sid,'sourceUrl':row['url'],'sourceURL':row['url'],
+                 'sourceOnly':True,'ids':{},'genres':[],'tags':[],'adult':False} for row in rows[:40]]
     finally:client.close()
 
 class SearchLimit(ValueError):pass
@@ -76,6 +90,16 @@ class Discovery:
               CREATE INDEX IF NOT EXISTS titles_source_name ON titles(source_id,title_norm);
               CREATE INDEX IF NOT EXISTS titles_language_name ON titles(language,title_norm);
             ''')
+            if self.db.execute('PRAGMA user_version').fetchone()[0]<1:
+                stale=[];sources=set()
+                for row in self.db.execute('SELECT id,source_id,metadata FROM titles'):
+                    value=json.loads(row['metadata'])
+                    if value.get('provider')=='mangalib' and not value.get('identityTitles'):
+                        stale.append((row['id'],));sources.add(row['source_id'])
+                self.db.executemany('DELETE FROM titles WHERE id=?',stale)
+                self.db.executemany('DELETE FROM query_cache WHERE source_id=?',[(sid,) for sid in sources])
+                self.db.executemany("UPDATE jobs SET state='interrupted' WHERE id IN (SELECT job FROM work WHERE source_id=?)",[(sid,) for sid in sources])
+                self.db.execute('PRAGMA user_version=1')
             self.db.execute("UPDATE jobs SET state='interrupted',updated=? WHERE state='running'",(self.clock(),))
             self.db.execute("UPDATE work SET state='cancelled' WHERE state IN ('queued','running')")
         if start_workers:

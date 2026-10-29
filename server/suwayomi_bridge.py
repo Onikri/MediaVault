@@ -47,7 +47,17 @@ class Client:
         try:
             response=self.session.get(self.root+'/api/v1'+path,params=params,timeout=(3,timeout),allow_redirects=False,stream=True)
             if path.startswith('/extension/install/') and response.status_code in {200,201}:return {'installed':True}
-            if response.status_code!=200:raise SourceError('Источник временно недоступен или требует настройки в каталоге.')
+            if response.status_code!=200:
+                # Classify bounded upstream text; never expose its HTML, stack,
+                # account settings or arbitrary response content to the browser.
+                raw=b''
+                for block in response.iter_content(4096):
+                    raw+=block[:4096-len(raw)]
+                    if len(raw)>=4096:break
+                text=raw.decode('utf-8',errors='replace').casefold()
+                if 'cef is disabled' in text:raise SourceError('Для этого расширения на сервере отключён браузер WebView. Требуется восстановить среду Suwayomi.')
+                if any(v in text for v in ['no chapters found','no chapter found']):raise SourceError('Источник отвечает, но не опубликовал открытые главы этого тайтла на выбранном языке.')
+                raise SourceError(f'Ошибка источника (HTTP {response.status_code}). Не удалось получить '+('страницу главы.' if image else 'данные читалки.'))
             chunks=[];size=0;limit=30*1024*1024 if image else 8*1024*1024
             for block in response.iter_content(65536):
                 size+=len(block)
@@ -112,7 +122,18 @@ def inspect(value):
         source=data.get('source') or client.get('/source/'+str(data['sourceId']))
         lang=source.get('lang','')
         if lang not in {'ru','en','ja','ko'}:raise SourceError('Этот источник пока не поддерживает выбранный язык чтения.')
-        chapters=client.get(f'/manga/{manga}/chapters',{'onlineFetch':'true' if chapter is None else 'false'},timeout=30)
+        try:chapters=client.get(f'/manga/{manga}/chapters',{'onlineFetch':'true' if chapter is None else 'false'},timeout=30)
+        except SourceError:
+            # MangaDex can fail in its extension while its public API still
+            # answers. Resolve the SAME title UUID and language, never another
+            # title/provider. Native chapter URLs keep reading/download working.
+            canonical=data.get('realUrl') or urljoin(source.get('baseUrl',''),data.get('url',''))
+            parsed=urlsplit(canonical)
+            if chapter is None and parsed.scheme=='https' and parsed.hostname=='mangadex.org' and re.fullmatch(r'/(?:title|manga)/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}(?:/[^/]*)?/?',parsed.path):
+                from manga_sources import inspect as native_inspect
+                identity=parsed.path.split('/')[2]
+                return native_inspect('https://mangadex.org/title/'+identity+'?lang='+lang)
+            raise
         episodes=[]
         for row in chapters[:1500]:
             number=row.get('chapterNumber');index=row.get('index')

@@ -2,9 +2,25 @@ import sys,unittest
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
-from manga_catalog_adapters import api_url,dex_search,inspect_catalog
+from manga_catalog_adapters import api_url,dex_search,inspect_catalog,get,lib_identity
 from source_parser import SourceError
 class MangaCatalogAdapters(unittest.TestCase):
+ def test_real_lib_franchise_alias_does_not_override_canonical_title_and_year(self):
+  value=lib_identity({'rus_name':'Сакура и Чараске','name':'Сакура и Чараске','eng_name':'Naruto','otherNames':['Наруто'],'releaseDateString':'2017 г.'})
+  self.assertEqual(value,{'identityTitles':['Сакура и Чараске'],'year':2017})
+ def test_lib_inspection_keeps_original_aliases_for_english_metadata_identity(self):
+  from title_identity import match_title
+  with patch('manga_catalog_adapters.get',side_effect=[{'data':{'rus_name':'Наруто','eng_name':'Naruto','otherNames':['ナルト']}},{'data':[]}]):
+   value=inspect_catalog('https://mangalib.me/ru/195--naruto',None)
+  self.assertEqual(value['aliases'],['Наруто','Naruto','ナルト'])
+  self.assertTrue(match_title({'title':'Naruto','kind':'manga'},value)[0])
+ def test_lib_public_api_identifies_catalogue_without_account_credentials(self):
+  with patch('manga_catalog_adapters.PublicHttp') as client:
+   instance=client.return_value;instance.session.headers={};instance.document.return_value=('{}','','')
+   get('https://api.cdnlibs.org/api/manga?q=Naruto',None)
+   self.assertEqual(instance.session.headers,{'Site-Id':'1','Accept':'application/json'})
+   instance.document.assert_called_once_with('https://api.cdnlibs.org/api/manga?q=Naruto',headers={'Referer':'https://mangalib.me/'})
+   self.assertNotIn('Authorization',instance.session.headers);self.assertNotIn('Cookie',instance.session.headers)
  def test_api_reader_cannot_request_unrelated_api_or_internal_address(self):
   for url in ['https://api.mangadex.org/auth/login','https://api.cdnlibs.org/api/auth/me','https://127.0.0.1/api/manga','https://evil.example/api/manga']:
    with self.assertRaises(SourceError):api_url(url)

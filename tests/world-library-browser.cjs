@@ -10,9 +10,10 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let vi
  const service={server:location.origin,status:'connected',session:{serverVersion:16},jobs:[],request:async(p,o={})=>{
  if(p.startsWith('/discovery/manga/sources'))return{sources:[{id:'1',name:'Source A',language:'ru'},{id:'2',name:'Source B',language:'ja'}]};
  if(p==='/discovery/manga/search'){window.searchBodies.push(o.body);return{id:String(++counter),state:'running',progress:{completed:0,total:770},results:[]};}
+ if(p.startsWith('/discovery/manga/search/')&&location.search.includes('fallback')&&o.method!=='DELETE'){window.fallbackPoll=(window.fallbackPoll||0)+1;const recovered=window.fallbackPoll>1;return{id:'fallback',state:recovered?'done':'running',progress:{completed:recovered?2:1,total:2},results:recovered?[result,{...result,provider:'mangalib',providerName:'MangaLib',url:'https://mangalib.me/ru/195--naruto'}]:[result]};}
  if(p.startsWith('/discovery/manga/search/')){if(o.method==='DELETE'){window.cancelled.push(p);return{state:'cancelled'};}return{id:p.split('/').at(-1),state:'done',progress:{completed:770,total:770,failed:2,cached:700},results:location.search?[{...result,title:'Игрок максимального уровня',aliases:['Игрок максимального уровня'],url:'https://media.example/wrong'},result]:[result]};}
  if(p==='/manga/search')return{results:[],providers:[]};
- if(p==='/manga/inspect'){window.inspected.push(o.body.url);return{provider:'suwayomi:1',providerName:'Source A',title:result.title,url:result.url,language:'ru',episodes:[1,2].map(n=>({url:result.url+'/c/'+n,number:n,season:1,title:'Глава '+n,language:'ru'})),seasons:[{number:1,name:'Том 1'}],translations:[]};}
+ if(p==='/manga/inspect'){window.inspected.push(o.body.url);if(location.search.includes('fallback')&&o.body.url===result.url)throw Error('HTTP 404 source unavailable');return{provider:'suwayomi:1',providerName:'Source A',title:result.title,url:result.url,language:'ru',episodes:[1,2].map(n=>({url:result.url+'/c/'+n,number:n,season:1,title:'Глава '+n,language:'ru'})),seasons:[{number:1,name:'Том 1'}],translations:[]};}
  if(p==='/online/prepare')return{id:'preview',pages:['/online/preview/p.png'],kind:'manga'};
  if(p.startsWith('/online/preview'))return{closed:true};
  if(p.endsWith('/status'))return{ready:true,availableExtensions:1435,sources:[]};
@@ -62,5 +63,15 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let vi
  await identity.getByRole('button',{name:'Обновить источники',exact:true}).click();
  await identity.waitForFunction(()=>window.searchBodies.some(b=>b.refresh===true));
  await identity.close();console.log('PASS metadata title excludes unrelated provider hits and source refresh bypasses cache');
+
+ const fallback=await browser.newPage({viewport:{width:1280,height:900}});
+ await fallback.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/world-harness.html?fallback=1');
+ await fallback.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();
+ assert.deepEqual(await fallback.evaluate(()=>window.inspected),['https://media.example/__manga/suwayomi/m/42','https://mangalib.me/ru/195--naruto']);
+ assert.equal(await fallback.getByLabel('Источник чтения').locator('option').count(),3,'Failed source remains selectable');
+ await fallback.getByLabel('Источник чтения').selectOption('https://media.example/__manga/suwayomi/m/42');
+ await fallback.getByRole('alert').filter({hasText:'HTTP 404'}).waitFor();
+ assert.equal(await fallback.getByLabel('Источник чтения').inputValue(),'https://media.example/__manga/suwayomi/m/42','Explicit source selection is never replaced');
+ await fallback.close();console.log('PASS automatic source failure recovers to native MangaLib while manual selection is preserved');
 
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();for(const name of['world-harness.html','world-harness.jsx'])await fs.rm(path.join(DIR,name),{force:true});});
