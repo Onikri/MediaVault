@@ -3,7 +3,7 @@ export default function useSourceDiscovery(item,service){
   const [data,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[revision,setRevision]=useState(0);
   useEffect(()=>{
     const controller=new AbortController();setData(null);setError('');setLoading(false);
-    if(!item||item.kind!=='anime'||!service.session?.serverVersion)return()=>controller.abort();
+    if(!item||item.kind!=='anime'||(!service.session?.serverVersion&&service.status!=='connected'))return()=>controller.abort();
     if(service.session?.serverVersion&&service.session.serverVersion<7){setError('Сервер импорта нужно обновить для полного списка озвучек и качеств.');return()=>controller.abort();}
     setLoading(true);
     const title=Object.fromEntries(['id','ids','title','titles','aliases','year','kind','format'].map(key=>[key,item[key]]));
@@ -21,6 +21,6 @@ export default function useSourceDiscovery(item,service){
       .catch(cause=>{if(!controller.signal.aborted)setError(cause.message);})
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
-  },[item?.id,item?.year,service.server,service.session?.serverVersion,revision]);
+  },[item?.id,item?.year,service.server,service.session?.serverVersion||service.status==='connected',revision]);
   return {data,loading,error,retry:()=>setRevision(r=>r+1)};
 }
