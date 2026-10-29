@@ -16,7 +16,12 @@ def api_url(value):
 def get(url,http):
     client=PublicHttp(validate=api_url,timeout=getattr(http,'timeout',(3,7)),deadline=getattr(http,'deadline',time.monotonic()+30))
     try:
-        text,_,_=client.document(url)
+        if urlsplit(url).hostname=='api.cdnlibs.org':
+            # LibGroup identifies its public catalogue with a site header, not
+            # only the search parameter. Without it this API returns HTTP403.
+            client.session.headers.update({'Site-Id':'1','Accept':'application/json'})
+            text,_,_=client.document(url,headers={'Referer':'https://mangalib.me/'})
+        else:text,_,_=client.document(url)
         try:data=json.loads(text)
         except ValueError:raise SourceError('Читалка не предоставила данные.') from None
         if not isinstance(data,dict):raise SourceError('Неизвестный формат данных читалки.')

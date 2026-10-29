@@ -48,6 +48,20 @@ def search_source(source,query):
         rows=data.get('mangaList',[])
         if not isinstance(rows,list):raise ValueError('Invalid source result')
         return [value for row in rows[:40] if isinstance(row,dict) and (value:=result_row(source,row))]
+    except SourceError:
+        if source.get('name')!='MangaLib' or source.get('lang')!='ru':raise
+        # The installed LibGroup extension may fail while initializing WebView.
+        # Use the same site's public API; retain the source ID for filters and
+        # return native URLs so inspection, reading and export use that adapter.
+        from manga_catalog_adapters import lib_search
+        from source_parser import PublicHttp
+        http=PublicHttp(timeout=(3,7),deadline=time.monotonic()+9)
+        try:rows=lib_search(query,http)
+        finally:http.close()
+        sid=str(source['id'])
+        return [{**row,'id':'suwayomi:'+sid+':native:'+hashlib.sha256(row['url'].encode()).hexdigest()[:20],
+                 'provider':'mangalib','providerName':source['name'],'sourceId':sid,'sourceUrl':row['url'],'sourceURL':row['url'],
+                 'sourceOnly':True,'ids':{},'genres':[],'tags':[],'adult':False} for row in rows[:40]]
     finally:client.close()
 
 class SearchLimit(ValueError):pass

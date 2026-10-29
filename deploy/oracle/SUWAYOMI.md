@@ -24,6 +24,12 @@ Native chapter URLs then use the normal online/download path. Empty or removed
 chapters are reported separately from a server failure. The browser inspection
 budget covers the bounded server request instead of aborting it at20seconds.
 
+MangaLib's native public adapter supplies the mandatory `Site-Id:1` header and
+public reader referer. The global search retains MangaLib's installed source ID
+and falls back to this same-site adapter when LibGroup fails; native title and
+chapter URLs then support the existing reader and CBZ export. This does not
+substitute a different website or remove a failing source from the selector.
+
 The Keiyoushi repository uses `https://github.com/keiyoushi/extensions/raw/repo/index.pb`; the legacy JSON index currently contains migration placeholders. On 2026-10-28, the local server returned **1435 extension packages**. This is not a count of verified working sites. Only a small RU/EN/JA/KO set is installed initially. Owners can add catalogued packages in **Import → Manga → More sources**. Source code runs inside the restricted Suwayomi container; arbitrary APK uploads are not exposed.
 
 Search fans out to installed sources with bounded concurrency and title-identity matching alongside native adapters. Manga IDs and source IDs are not interchangeable; source IDs stay strings. A chapter's source index is distinct from its printed number (including chapter0/extras). Identifier URLs under `/__manga/suwayomi/` are not HTTP proxy endpoints: the importer validates its own origin/path, maps numeric IDs to private Suwayomi routes, and checks actual image signatures and size limits. The browser gets only existing expiring, owner-created `/online/` capabilities. The same images can be packed into CBZ and encrypted for Drive. No chapter is downloaded to Drive merely to read online.

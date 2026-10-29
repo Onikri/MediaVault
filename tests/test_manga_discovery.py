@@ -19,6 +19,21 @@ def wait_done(manager,owner,identity):
         time.sleep(.01)
     raise AssertionError('Discovery job did not finish')
 
+class NativeSourceFallbackTests(unittest.TestCase):
+    def test_mangalib_extension_failure_keeps_source_selectable_through_its_public_api(self):
+        source={'id':'6111047689498497237','name':'MangaLib','lang':'ru'}
+        native={'title':'Наруто','aliases':['Naruto'],'kind':'manga','url':'https://mangalib.me/ru/195--naruto','language':'ru'}
+        with patch.object(discovery.bridge,'Client') as client,patch('manga_catalog_adapters.lib_search',return_value=[native]):
+            client.return_value.get.side_effect=SourceError('CEF initialization failed')
+            first=discovery.search_source(source,'Наруто');second=discovery.search_source(source,'Naruto')
+            self.assertEqual(first[0]['id'],second[0]['id']);self.assertEqual(first[0]['sourceId'],source['id'])
+            self.assertEqual(first[0]['url'],native['url']);self.assertEqual(first[0]['aliases'],['Naruto'])
+            self.assertEqual(first[0]['providerName'],'MangaLib');self.assertTrue(first[0]['sourceOnly'])
+        with patch.object(discovery.bridge,'Client') as client,patch('manga_catalog_adapters.lib_search') as other:
+            client.return_value.get.side_effect=SourceError('Other source failed')
+            with self.assertRaises(SourceError):discovery.search_source({**source,'name':'Other'},'Наруто')
+            other.assert_not_called()
+
 class MangaDiscoveryTests(unittest.TestCase):
  def setUp(self):
     self.directory=tempfile.TemporaryDirectory();self.env=patch.dict(os.environ,ENV);self.env.start();self.sources=patch.object(discovery.bridge,'sources',return_value=SOURCES);self.sources.start();self.managers=[]
