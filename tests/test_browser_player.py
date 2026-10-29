@@ -9,6 +9,16 @@ from browser_player import _extract, _render, observed_streams, browser_destinat
 from source_parser import SourceError
 
 class BrowserPlayerTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for a real iframe contract')
+    def test_alloha_uses_public_parent_and_play_button_and_never_returns_plyr_blank_video(self):
+        parent='https://publisher.example.com/title'
+        url='https://embed.thealloha.club/?season=1&episode=3&translation=10'
+        stream='https://cdn.example.com/selected-episode-3.m3u8'
+        markup='<video src="https://cdn.plyr.io/static/blank.mp4"></video><button data-plyr="play" onclick="fetch(\''+stream+'\')">Play</button><script>if(window===window.top)document.body.innerHTML="Not an iframe";</script>'
+        fixture={parent:('<html><body>Publisher</body></html>','text/html'),url:(markup,'text/html'),stream:('#EXTM3U','application/vnd.apple.mpegurl'),'https://cdn.plyr.io/static/blank.mp4':('blank','video/mp4')}
+        result=asyncio.run(_extract(url,parent,validate=lambda value:browser_destination(value,resolve_dns=False),fixture=fixture,timeout=4))
+        self.assertEqual([r['url'] for r in result],[stream])
+
     def test_websocket_streams_are_urls_not_arbitrary_scripts_or_private_addresses(self):
         text='{"file":"https:\\/\\/cdn.example.com/show.m3u8?token=public-source-signature","other":"javascript:alert(1)"}'
         self.assertEqual(observed_streams(text),['https://cdn.example.com/show.m3u8?token=public-source-signature'])

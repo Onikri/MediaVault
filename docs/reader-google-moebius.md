@@ -59,3 +59,37 @@ Russian glyph coverage, immutable source URLs and hashes are in the manifest.
 - Reproduce the optional neural test with `scripts/fetch-moebius-models.py` and
   `tests/moebius-real-browser.cjs`. Weights, result JSON and pictures stay in
   `.codex-local/`; they are not shipped with the source.
+
+## Completion checks
+
+The production importer now explicitly includes httpx and gemma-system.md. An
+isolated image health check precedes replacement; installing batch dependencies
+in CI no longer hides these two omissions in the production image.
+
+Online and local chapters without Drive chunks use the same device detector and
+Canvas pipeline with an authenticated Oracle credential slot. The server key is
+never exported, and opening a Drive translation session is unnecessary. Browser
+contracts cover this path at 390 and 1366 pixels.
+
+Moebius uses its upstream lockfile's ONNX Runtime 1.27.0 in a separate package and
+runtime directory. Detector/LaMa versions remain unchanged. The shared newer
+runtime failed with GPU allocation errors in the complete reader Worker. With
+the isolated runtime, actual Worker inference and Russian typesetting completed
+twice: first region 16,725 ms including 11,035 ms initialization; warm region
+2,548 ms inference. No artwork outside the region changed. Reproduce with
+`npm run test:moebius`; this optional hardware test uses real pinned weights and
+is separate from fixture Google responses.
+
+On the updated VM, the real detector and Gemini 3.5 Flash-Lite translated a
+synthetic English speech bubble: detection 679.92 ms, Google generation
+3,739.17 ms, 1,752 input / 128 output tokens; the complete check took 5,093 ms.
+This verifies the live provider and serialization, not multilingual quality.
+
+After deployment, Mangago's reported chapter 4 returned twenty valid pages and a
+10,547,379-byte CBZ containing twenty images with a clean ZIP CRC check. Kodik
+returned its actual HLS playlist. Alloha requires the publisher Referer and an
+iframe embedded at its public parent origin; the server now preserves both,
+activates the public Play control and ignores Plyr's static blank.mp4. A real
+selected Alloha episode returned an HLS stream, separately from eight fulfilled
+server-browser contracts. No device session or Google cookies are used by these
+source adapters.

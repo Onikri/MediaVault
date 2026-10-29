@@ -415,12 +415,12 @@ class Resolver:
     def __init__(self, http=None):
         self.http = http or PublicHttp()
 
-    def inspect(self, url):
+    def inspect(self, url, referer=None):
         url = public_url(url, resolve_dns=False)
         path = urlsplit(url).path.lower()
         if path.endswith((".mp4", ".m3u8")):
             return Page(streams=[{"url": url, "type": "hls" if path.endswith(".m3u8") else "mp4", "quality": None, "headers": {}}])
-        text, final, _ = self.http.document(url)
+        text, final, _ = self.http.document(url,headers={'Referer':referer}) if referer else self.http.document(url)
         return parse_page(text, final)
 
     def player(self, url, referer=None):
@@ -457,7 +457,7 @@ class Resolver:
             if len(matches) != 1:
                 raise SourceError('Выбранный перевод этой серии отсутствует. Другая озвучка автоматически не подставляется.')
             return self.resolve(matches[0]['url'], referer=final, depth=depth+1, visited=visited)
-        page = self.player(url, referer) or self.inspect(url)
+        page = self.player(url, referer) or self.inspect(url,referer)
         if page.streams:
             return page
         for embed in page.players:

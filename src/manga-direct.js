@@ -16,8 +16,8 @@ function waitFor(promise,signal){
 // One personal Google request at a time, exactly one page. The visible page
 // outranks queued prefetch; a slow adjacent Drive download never holds it up.
 export class DirectChapter{
- constructor({entries,scope,keyScope,config,direction='rtl',prepare,google=callDirectGoogle,cacheKey=translationCacheKey,readCache=getTranslation,writeCache=putTranslation,renderPage,getKey=directKey,service}){
-  Object.assign(this,{entries,scope,keyScope,config,direction,google,cacheKey,readCache,writeCache,getKey,service});
+ constructor({entries,scope,keyScope,config,direction='rtl',prepare,google=callDirectGoogle,cacheKey=translationCacheKey,readCache=getTranslation,writeCache=putTranslation,renderPage,getKey=directKey,service,serverSlots=[]}){
+  Object.assign(this,{entries,scope,keyScope,config,direction,google,cacheKey,readCache,writeCache,getKey,service,serverSlots});
   this.prepare=prepare||((blob,index,status,inputMode=config.directInput)=>inputMode!=='vision'&&DIRECT_DETECTORS.some(v=>v.id===config.directDetector&&v.model)?translateLmt(blob,{...config,directInput:inputMode,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({operation:'direct-prepare',blob,index,direction,inputMode},status));
   this.renderPage=renderPage||this.renderCanvas.bind(this);this.controller=new AbortController();this.jobs=new Map();this.listeners=new Map();this.progress=new Map();this.context=new Map();this.active=0;this.keyBusy=new Set();this.worker=null;this.renders=new Map();this.serial=0;this.bypass=new Set();
  }
@@ -38,13 +38,13 @@ export class DirectChapter{
   job.cacheMs=Math.round(performance.now()-cacheStart);return null;
  }
  async drain(){
-  const capacity=this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1;if(this.active>=Math.min(3,capacity)||this.controller.signal.aborted)return;this.active++;
+  const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1);if(this.active>=Math.min(3,capacity)||this.controller.signal.aborted)return;this.active++;
   try{while(!this.controller.signal.aborted){
    const pending=[...this.jobs.values()].filter(j=>j.state==='queued'),first=pending.find(j=>!j.background)||pending[0];if(!first)break;
    first.state='running';first.queueMs=Math.round(performance.now()-first.started);let group=[first];
    try{
     const hit=await this.cached(first);if(hit){this.finish(first,hit);continue;}
-    const available=this.getKey===directKey?await restoreDirectKeys(this.keyScope):[this.getKey(this.keyScope)];const key=available.find(k=>!this.keyBusy.has(k));if(key){this.keyBusy.add(key);first.keyLease=key;}if(!key)throw Error('Введи личный ключ Google AI Studio в настройках быстрого режима.');
+    const available=this.serverSlots.length?this.serverSlots.map(slot=>'oracle-slot:'+slot):this.getKey===directKey?await restoreDirectKeys(this.keyScope):[this.getKey(this.keyScope)];const key=available.find(k=>!this.keyBusy.has(k));if(key){this.keyBusy.add(key);first.keyLease=key;}if(!key)throw Error('Введи ключ Google AI Studio в настройках перевода.');
     const prepare=async job=>{
      this.notify(job.index,{phase:'detecting',message:this.config.directInput==='vision'?'Чистая страница · координаты и текст определит Google':DIRECT_DETECTORS.find(v=>v.id===this.config.directDetector)?.label||'Подготовка страницы'});
      const begin=performance.now();const page=await this.prepare(job.blob,job.index,message=>this.notify(job.index,{phase:'detecting',message}));
@@ -100,7 +100,9 @@ export class DirectChapter{
  async callGoogle(pages,options){
   const oracle=this.config.directViaOracle&&this.service?.();
   if(this.config.directViaOracle&&this.google===callDirectGoogle&&!oracle)throw Error('Для перевода личным ключом подключи Oracle в профиле.');
-  return this.google(pages,{...options,...(oracle?{gemmaProfile:'compat',transport:async({json,signal})=>{const data=await oracle.request('/reader/google/generate',{method:'POST',body:{key:options.key,model:options.model,request:JSON.parse(json)},signal});return {status:200,text:JSON.stringify(data)};}}:{})});
+  const slot=this.serverSlots.find(slot=>options.key==='oracle-slot:'+slot);
+  if(this.serverSlots.length&&!oracle)throw Error('Для серверных ключей нужен Oracle.');
+  return this.google(pages,{...options,...(oracle?{gemmaProfile:'compat',transport:async({json,signal})=>{const data=await oracle.request('/reader/google/generate',{method:'POST',body:{...(slot===undefined?{key:options.key}:{slot}),model:options.model,request:JSON.parse(json)},signal});return {status:200,text:JSON.stringify(data)};}}:{})});
  }
  async compare(blob,index,{signal,onProgress}={}){const key=this.getKey(this.keyScope)||(this.getKey===directKey?await restoreDirectKey(this.keyScope):'');return compareDirectInputs({blob,index,prepare:this.prepare,google:(pages,options)=>this.callGoogle(pages,options),key,config:this.config,direction:this.direction,signal:signal||this.controller.signal,onProgress});}
  prefetch(index){const count=this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1;if(!this.jobs.has(index-1)||!this.getKey(this.keyScope))return;for(let n=index;n<Math.min(this.entries.length,index+count);n++)if(!this.jobs.has(n))this.request(n,null,true);}

@@ -27,7 +27,8 @@
     "test:lmt": "node tests/lmt-browser.cjs && node tests/lmt-vision-browser.cjs",
     "test:fonts": "node tests/manga-fonts-browser.cjs",
     "test:gemma": "node tests/gemma-browser.cjs",
-    "test:vm": "node tests/manga-vm-browser.cjs",
+    "test:moebius": "node tests/moebius-worker-browser.cjs",
+    "test:vm": "node tests/manga-vm-browser.cjs && node tests/manga-online-translation-browser.cjs",
     "test:direct": "node tests/manga-direct-browser.cjs",
     "test:cleaning": "node tests/manga-cleaning-browser.cjs",
     "test:reader": "node tests/immersive-reader-browser.cjs",
@@ -47,6 +48,7 @@
     "lucide-react": "^0.468.0",
     "motion": "14.1.0",
     "onnxruntime-web": "^1.30.0",
+    "onnxruntime-web-moebius": "npm:onnxruntime-web@1.27.0",
     "pdfjs-dist": "5.4.296",
     "react": "19.3.1",
     "react-dom": "19.3.1"
