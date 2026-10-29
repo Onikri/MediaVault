@@ -6,12 +6,15 @@ export function youtubeIdentity(value){
 }
 export async function openYouTubeAudio(service,id,{signal,refresh=false}={}){
  if(!/^[\w-]{11}$/.test(id))throw Error('Некорректная запись YouTube.');
- const data=await service.request('/music/play',{method:'POST',body:{url:'https://www.youtube.com/watch?v='+id,refresh},signal});
+ return openMusicAudio(service,'https://www.youtube.com/watch?v='+id,{signal,refresh});
+}
+export async function openMusicAudio(service,url,{signal,refresh=false,remote=false}={}){
+ const data=await service.request(remote?'/music/remote':'/music/play',{method:'POST',body:{url,refresh},signal});
  const close=()=>service.request('/online/'+encodeURIComponent(data.id),{method:'DELETE'}).catch(()=>{});
- const origin=new URL(service.server).origin,url=new URL(data.streamUrl,origin);
- if(!/^[\w-]{30,80}$/.test(data.id||'')||url.origin!==origin||!new RegExp('^/online/'+data.id+'/[\\w-]{12,40}$').test(url.pathname)||url.search||url.hash||!['audio/mp4','audio/webm'].includes(data.mime)){
+ const origin=new URL(service.server).origin,stream=new URL(data.streamUrl,origin);
+ if(!/^[\w-]{30,80}$/.test(data.id||'')||stream.origin!==origin||!new RegExp('^/online/'+data.id+'/[\\w-]{12,40}$').test(stream.pathname)||stream.search||stream.hash||!(remote?['audio/mpeg','audio/mp4','audio/webm','audio/ogg','audio/flac','audio/wav','audio/aac']:['audio/mp4','audio/webm']).includes(data.mime)){
   if(/^[\w-]{30,80}$/.test(data.id||''))await close();throw Error('Сервер вернул некорректный аудиопоток.');
  }
  if(signal?.aborted){await close();signal.throwIfAborted();}
- return {...data,streamUrl:url.href,close};
+ return {...data,streamUrl:stream.href,close};
 }

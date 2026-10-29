@@ -157,6 +157,8 @@ def install(app,owner):
             if s.kind=='music':
                 if mime not in {'audio/mp4','audio/webm','video/mp4','video/webm','application/octet-stream'}:raise SourceError('YouTube вернул заглушку вместо аудио.')
                 mime=s.audio_mime
+            if s.kind=='music-file':
+                if mime!=s.audio_mime:raise SourceError('Аудиоисточник сменил тип файла.')
             if s.kind=='manga':
                 from manga_download import image_extension
                 parts=[];size=0
@@ -187,7 +189,7 @@ def install(app,owner):
                     for block in active.iter_content(128*1024):
                         if token not in sessions or s.expires<time.monotonic():break
                         total+=len(block)
-                        if total>(256*1024**2 if s.kind=='music' else 12*1024**3):break
+                        if total>(256*1024**2 if s.kind in {'music','music-file'} else 12*1024**3):break
                         yield block
                 finally:active.close();http.close();s.slots.release()
             return StreamingResponse(blocks(),status_code=status,media_type=mime,headers=common)

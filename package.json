@@ -32,7 +32,7 @@
     "test:cleaning": "node tests/manga-cleaning-browser.cjs",
     "test:reader": "node tests/immersive-reader-browser.cjs",
     "test:world": "node tests/world-library-browser.cjs",
-    "test:music-nav": "node tests/music-nav-browser.cjs && node tests/spotify-playback-browser.cjs && node tests/music-audio-browser.cjs"
+    "test:music-nav": "node tests/music-nav-browser.cjs && node tests/spotify-playback-browser.cjs && node tests/music-audio-browser.cjs && node tests/youtube-session-browser.cjs"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.86",

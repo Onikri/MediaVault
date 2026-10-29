@@ -1,9 +1,14 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {youtubeIdentity,openYouTubeAudio} from '../src/youtube-audio.js';
+import {youtubeIdentity,openYouTubeAudio,openMusicAudio} from '../src/youtube-audio.js';
 const id='dQw4w9WgXcQ',token='a'.repeat(43),resource='b'.repeat(16),server='https://media.example';
 test('YouTube input normalizes a single identity without trusting arbitrary hosts',()=>{
  for(const url of ['https://youtu.be/'+id+'?t=15','https://music.youtube.com/watch?v='+id,'https://www.youtube.com/shorts/'+id])assert.equal(youtubeIdentity(url),id);
  for(const url of ['https://youtube.com.evil/watch?v='+id,'http://youtube.com/watch?v='+id,'https://user:pass@youtube.com/watch?v='+id,'https://youtube.com/watch?v='+id+'&v=duplicate'])assert.equal(youtubeIdentity(url),null);
+});
+
+test('remote audio also uses an owner-created Oracle capability instead of the original URL',async()=>{
+ const calls=[],service={server,request:async(p,o)=>{calls.push([p,o]);return {id:token,streamUrl:'/online/'+token+'/'+resource,mime:'audio/mpeg'};}};
+ const lease=await openMusicAudio(service,'https://music.example/song.mp3',{remote:true});assert.equal(calls[0][0],'/music/remote');assert.equal(calls[0][1].body.url,'https://music.example/song.mp3');assert.equal(new URL(lease.streamUrl).origin,server);await lease.close();assert.equal(calls.at(-1)[0],'/online/'+token);
 });
 test('only same-server capabilities are accepted; abort and close release the session',async()=>{
  const calls=[],data={id:token,streamUrl:'/online/'+token+'/'+resource,mime:'audio/mp4'};

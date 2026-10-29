@@ -23,6 +23,7 @@ import {playMusic} from './music-player.js';
 import OnlineLibrary from './OnlineLibrary.jsx';
 import {ImportSettings} from './ImportParts.jsx';
 import MusicConnections from './MusicConnections.jsx';
+import YouTubeServerSession from './YouTubeServerSession.jsx';
 import './world-library.css';
 
 const sections=[{id:'anime',art:'video',name:'Аниме',formats:'ТАЙТЛЫ · СЕЗОНЫ · СЕРИИ',icon:'video'},
@@ -235,7 +236,7 @@ export default function App(){
         {state.notice&&<aside id="notice" className="notice-card"><span><Icon name={state.authConfigured?'lock':'cloud'} size={21}/></span><div><h3 className="notice-title">{state.authConfigured?state.notice.title:'Остался один шаг для входа'}</h3><p>{state.authConfigured?state.notice.text:'Нужно завершить настройку Google. Пока коллекция закрыта, твои файлы остаются в твоём Drive.'}</p>{!state.authConfigured&&<a className="text-link" href={guide} target="_blank" rel="noopener noreferrer">Как подключить Google<Icon name="arrow" size={15}/></a>}</div></aside>}
         {state.driveConnected&&!state.catalog&&<LibrarySetup state={state} libraryId={libraryId} setLibraryId={setLibraryId} passphrase={passphrase} setPassphrase={setPassphrase} again={again} setAgain={setAgain} onOpen={openLibrary} onFind={actions.findMyLibrary}/>}
         {state.catalog&&<section className="settings-card"><div className="section-heading"><h2 className="section-title">Твоя коллекция</h2><span className="status-pill connected"><Icon name="check" size={13}/> Открыта</span></div><div className="profile-stats"><div><strong>{items.length}</strong><span>{plural(items.length)}</span></div><div><strong>{formatSize(totalSize)}</strong><span>в твоём Drive</span></div><div><strong>{state.admin?'Владелец':'Зритель'}</strong><span>твой доступ</span></div></div><button className="btn btn-secondary" onClick={()=>go('collection')}>В мою коллекцию<Icon name="arrow" size={17}/></button></section>}
-        <MusicConnections userId={state.user?.sub}/><DeviceSettings state={state} actions={actions}/>
+        <YouTubeServerSession service={importService} enabled={!!(state.admin&&state.user)}/><MusicConnections userId={state.user?.sub}/><DeviceSettings state={state} actions={actions}/>
         <section className="settings-card about-card"><BrandMark/><div><h3>MediaVault</h3><p>Личная медиатека. Файлы шифруются перед сохранением в твоём Google Drive.</p><a className="text-link" href={guide} target="_blank" rel="noopener noreferrer">Помощь и настройка<Icon name="arrow" size={14}/></a></div></section>
         {state.user&&<button id="logoutBtn" className="btn btn-ghost logout-button" onClick={()=>{actions.logout();setPassphrase('');setAgain('');}}><Icon name="logout" size={18}/>Выйти из аккаунта</button>}
       </>}
