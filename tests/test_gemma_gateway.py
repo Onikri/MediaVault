@@ -47,6 +47,12 @@ class ProtocolTests(TestCase):
   self.assertEqual(body['generationConfig']['responseJsonSchema']['properties']['regions']['type'],'array')
 
 class QuotaTests(IsolatedAsyncioTestCase):
+ async def test_flash_burst_does_not_inherit_gemma_gap_but_retains_token_budget(self):
+  with tempfile.TemporaryDirectory() as root:
+   quota=Quotas(Path(root)/'flash.sqlite',lambda:1000.,minimum_interval=0)
+   for _ in range(3):await quota.reserve('flash',1000,lambda _:None)
+   self.assertEqual(quota.wait_seconds('flash',1000),0)
+   self.assertGreater(quota.wait_seconds('flash',12000),0)
  async def test_reservation_survives_restart_and_accounts_for_actual_usage(self):
   with tempfile.TemporaryDirectory() as root:
    clock=[1000.];path=Path(root)/'quota.sqlite';q=Quotas(path,lambda:clock[0])
@@ -66,7 +72,7 @@ class QuotaTests(IsolatedAsyncioTestCase):
    key=Path(root)/'key';key.write_text('fixture-key')
    client=httpx.AsyncClient(transport=httpx.MockTransport(handle),headers={'x-goog-api-key':'fixture-key'})
    with patch.dict(os.environ,{'GEMMA_API_KEY_FILE':str(key)}),patch('gemma_translate.httpx.AsyncClient',return_value=client):
-    result=await Gateway(root).translate(Batch(pages=[page()]),lambda _:None)
+    result=await Gateway(root).translate(Batch(pages=[page()],model='gemma-4-31b-it'),lambda _:None)
    self.assertEqual(result['pages'][0]['regions'][0]['translation'],'Привет')
    self.assertEqual([u['httpStatus'] for u in result['usage']],[503,200])
    self.assertEqual(sum(p.endswith(':generateContent') for p in calls),2)

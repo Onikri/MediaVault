@@ -10,6 +10,7 @@ from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 MODELS=('gemma-4-31b-it','gemma-4-26b-a4b-it')
+GOOGLE_MODELS=('gemini-3.5-flash-lite',*MODELS,'gemini-3.1-flash-lite','gemini-2.5-flash-lite')
 PROMPT=(Path(__file__).with_name('gemma-system.md')).read_text('utf-8')
 VERSION=hashlib.sha256(PROMPT.encode()).hexdigest()[:16]
 STYLES=['standard_comic','bold_scream','handwritten_sloppy','serif_serious','digital_box','sfx_art']
@@ -40,6 +41,7 @@ class Page(BaseModel):
 
 class Batch(BaseModel):
     model_config=ConfigDict(extra='forbid')
+    model:Literal[tuple(GOOGLE_MODELS)]='gemini-3.5-flash-lite'
     pages:list[Page]=Field(min_length=1,max_length=4)
     language:Literal['English','Japanese','Korean']='English'
     context:str=Field(default='',max_length=4000)
@@ -51,7 +53,7 @@ class Batch(BaseModel):
 
 def key_path():return Path(os.getenv('GEMMA_API_KEY_FILE','/run/secrets/gemma-api-key'))
 def status():
-    return {'ready':key_path().is_file(),'models':list(MODELS),'maxPages':4,'maxBoxes':65,
+    return {'ready':key_path().is_file(),'models':list(GOOGLE_MODELS),'maxPages':4,'maxBoxes':65,
             'inputTpm':14500,'rpm':15,'minIntervalSeconds':12,'promptVersion':VERSION,
             'message':'Gemma готова: страницы передаются Google через вашу ВМ.' if key_path().is_file() else 'На ВМ ещё не установлен ключ Google API.'}
 
@@ -129,8 +131,8 @@ def validate_reply(raw,pages):
 
 class Quotas:
     """Durable per-model reservations: input TPM, RPM, 12s gap, rolling daily cap."""
-    def __init__(self,path,clock=time.time):
-        self.clock=clock;self.path=str(path);self.lock=asyncio.Lock()
+    def __init__(self,path,clock=time.time,minimum_interval=12):
+        self.clock=clock;self.path=str(path);self.lock=asyncio.Lock();self.minimum_interval=minimum_interval
         with closing(sqlite3.connect(self.path)) as db,db:db.execute('CREATE TABLE IF NOT EXISTS requests(id INTEGER PRIMARY KEY,model TEXT,at REAL,tokens INTEGER)')
         Path(path).chmod(0o600)
     def wait_seconds(self,model,tokens):
@@ -138,7 +140,7 @@ class Quotas:
         with closing(sqlite3.connect(self.path)) as db,db:rows=db.execute('SELECT at,tokens FROM requests WHERE model=? AND at>? ORDER BY at',(model,now-86400)).fetchall()
         if tokens>14500:raise ValueError('Пакет превышает лимит токенов. Раздели страницы на меньшие части.')
         if len(rows)>=int(os.getenv('GEMMA_RPD','1500')):raise ValueError('Достигнут суточный бюджет Google. Повтори после восстановления квоты.')
-        wait=max(0,rows[-1][0]+12-now) if rows else 0
+        wait=max(0,rows[-1][0]+self.minimum_interval-now) if rows else 0
         minute=[r for r in rows if r[0]>now-61]
         if len(minute)>=15:wait=max(wait,minute[-15][0]+61-now)
         total=sum(r[1] for r in minute)
@@ -161,28 +163,33 @@ class Quotas:
 
 class Gateway:
     URL='https://generativelanguage.googleapis.com/v1beta/models/'
-    def __init__(self,directory):
-        self.quotas=Quotas(Path(directory)/'gemma-quota.sqlite');self.cooldowns={};self.model_locks={m:asyncio.Lock() for m in MODELS}
+    def __init__(self,directory,credentials=None):
+        self.credentials=credentials
+        self.quotas=Quotas(Path(directory)/'gemma-quota.sqlite');self.cooldowns={};self.model_locks={m:asyncio.Lock() for m in GOOGLE_MODELS}
     async def translate(self,batch,progress):
-        key=key_path().read_text('utf-8-sig').strip()
+        rows=self.credentials() if self.credentials else [];row=next((r for r in rows if batch.model in r.get('models',GOOGLE_MODELS)),None)
+        key=row['key'] if row else key_path().read_text('utf-8-sig').strip()
+        models=(batch.model,*[m for m in MODELS if m!=batch.model]) if batch.model.startswith('gemma-') else (batch.model,)
         if not key:raise ValueError('На ВМ не установлен ключ Google API.')
         output={};usage=[];started=time.perf_counter()
         async with httpx.AsyncClient(timeout=300,follow_redirects=False,headers={'x-goog-api-key':key}) as client:
             pending=list(packs(batch.pages))
             while pending:
                 pages=pending.pop(0);body=request_body(pages,batch.language,batch.context);candidates=[];too_large=False;truncated=False
+                if batch.model.startswith('gemini-2.5'):body['generationConfig']['thinkingConfig']={'thinkingBudget':0}
+                if batch.model.startswith('gemini-3.'):body['generationConfig'].pop('temperature',None)
                 # Count the full request PLUS a textual copy of the output schema.
                 # Some providers omit schema overhead in countTokens; the extra
                 # copy and margin make reservation conservative. Settle with usage.
                 count_body={**body,'contents':body['contents']+[{'role':'user','parts':[{'text':json.dumps(body['generationConfig']['responseJsonSchema'])}]}]}
-                for model in MODELS:
+                for model in models:
                     try:
                         count=await client.post(self.URL+model+':countTokens',json={'generateContentRequest':{'model':'models/'+model,**count_body}},timeout=20)
                         if count.status_code!=200:raise ValueError('Подсчёт токенов Google недоступен: HTTP '+str(count.status_code))
                         tokens=int(count.json()['totalTokens'])+256
                         if tokens>14500:too_large=True;continue
                         delay=max(self.cooldowns.get(model,0)-time.time(),self.quotas.wait_seconds(model,tokens))
-                        candidates.append((max(0,delay)+(180 if self.model_locks[model].locked() else 0),MODELS.index(model),model,tokens))
+                        candidates.append((max(0,delay)+(180 if self.model_locks[model].locked() else 0),models.index(model),model,tokens))
                     except (httpx.HTTPError,ValueError,KeyError,TypeError):continue
                 completed=False
                 for _,_,model,tokens in sorted(candidates):
@@ -216,7 +223,7 @@ class Gateway:
                             if n:left.append(p.model_copy(update={'regions':p.regions[:n]}))
                             if n<len(p.regions):right.append(p.model_copy(update={'regions':p.regions[n:]}))
                         pending[:0]=[left,right];progress('Уменьшаем пакет по лимиту токенов');continue
-                    raise ValueError('Обе модели Gemma временно недоступны или вернули неполный перевод. Оригинал сохранён; повтори страницу.')
+                    raise ValueError('Выбранная модель Google временно недоступна или вернули неполный перевод. Оригинал сохранён; повтори страницу.')
         return {'kind':'gemma-vision','engine':'Google Gemma 4 via own backend','promptVersion':VERSION,
                 'pages':[{'id':p.id,'width':p.width,'height':p.height,'regions':[{**r.model_dump(by_alias=True),**output[r.id]} for r in p.regions]} for p in batch.pages],
                 'usage':usage,'cloudMs':round((time.perf_counter()-started)*1000),'machineTranslation':True}

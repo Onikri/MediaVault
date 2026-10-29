@@ -16,7 +16,7 @@ export async function translateGemmaBatch(inputs,service,signal,status=()=>{}){
  if(!prepared.length)return results;
  const config=inputs[indices[0]].config,contextKey=config.contextKey||'chapter';
  const pages=prepared.map(({id,width,height,image,mime,regions})=>({id,width,height,image,mime,regions}));
- const {id}=await service.request('/reader/lmt/gemma/jobs',{method:'POST',body:{pages,language:config.language,context:memory.get(contextKey)||''},signal});
+ const {id}=await service.request('/reader/lmt/gemma/jobs',{method:'POST',body:{pages,model:config.directModel,language:config.language,context:memory.get(contextKey)||''},signal});
  let done=false;
  try{
   const until=Date.now()+15*60*1000;let result;

@@ -34,3 +34,7 @@ function lockKeys(){generation++;opening.clear();
 }
 globalThis.addEventListener?.('mediavault-locked',lockKeys);
 globalThis.addEventListener?.('mediavault-forgot-device',()=>{lockKeys();remembered.clear();});
+
+export const keySlotScope=(scope,index)=>index?scope+':key-'+(index+1):scope;
+export function directKeys(scope){return [0,1,2].map(i=>directKey(keySlotScope(scope,i))).filter(Boolean);}
+export async function restoreDirectKeys(scope){await Promise.all([0,1,2].map(i=>restoreDirectKey(keySlotScope(scope,i))));return directKeys(scope);}

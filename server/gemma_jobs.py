@@ -8,7 +8,8 @@ from gemma_translate import Batch,Gateway,VERSION,check_images,status
 class GemmaJobs:
     def __init__(self,directory,cache_class):
         root=Path(directory)/'gemma';root.mkdir(parents=True,exist_ok=True,mode=0o700)
-        self.gateway=Gateway(root);self.cache=cache_class(root/'results',limit=128*1024*1024)
+        from google_pool import saved
+        self.gateway=Gateway(root,credentials=saved);self.cache=cache_class(root/'results',limit=128*1024*1024)
         self.jobs={};self.queue=asyncio.Queue(maxsize=4);self.workers=[];self.submit_lock=asyncio.Lock()
     def cleanup(self):
         for key,j in list(self.jobs.items()):

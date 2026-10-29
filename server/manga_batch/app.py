@@ -29,7 +29,8 @@ async def lifespan(app):
     try:await asyncio.to_thread(detector.warm);app.state.detector_ready=True
     except Exception:app.state.detector_ready=False
     pacer=QuotaPacer(tpm=int(os.getenv('GEMMA_TPM_BUDGET','13000')),rpm=int(os.getenv('GEMMA_RPM_BUDGET','14')),independent=os.getenv('GEMMA_INDEPENDENT_POOLS')=='1')
-    provider=GemmaBatchTranslator(pacer,KEY);app.state.engine=RealtimeChapterOrchestrator(source,detector,provider,cache)
+    from .pool import GooglePool
+    provider=GooglePool(pacer,KEY,settings);app.state.engine=RealtimeChapterOrchestrator(source,detector,provider,cache)
     async def sweep():
         while True:
             await asyncio.sleep(60);await asyncio.to_thread(source.sweep)
@@ -60,6 +61,7 @@ class OpenChapter(BaseModel):
     item_id:str=Field(min_length=1,max_length=200)
     vault_key:SecretStr
     names:list[str]=Field(min_length=1,max_length=1500)
+    model:Literal[tuple(MODEL_IDS)]='gemini-3.5-flash-lite'
     direction:Literal['ltr','rtl']='rtl'
     currentPage:int=Field(default=1,ge=1,le=1500)
 class Touch(BaseModel):currentPage:int=Field(ge=1,le=1500)
@@ -71,7 +73,7 @@ async def session(id,subject):
 @app.get('/api/v1/manga-translation/status')
 async def status(request:Request):
     engine=request.app.state.engine
-    return {'ready':request.app.state.detector_ready and engine.translator.configured(),'configured':engine.translator.configured(),'detectorReady':request.app.state.detector_ready,'models':list(MODEL_IDS),'policy':POLICY,'maxPages':4,'maxBoxes':65,'prefetchPages':12,'serverInpaint':False,'progressVersion':1,'foregroundPages':1,'quota':engine.translator.pacer.snapshot(),'message':'Пакетный перевод Gemma 4 · JSON → устройство' if engine.translator.configured() else 'Установи ключ Google AI Studio в настройках ВМ.'}
+    return {'ready':request.app.state.detector_ready and engine.translator.configured(),'configured':engine.translator.configured(),'detectorReady':request.app.state.detector_ready,'models':list(MODEL_IDS),'policy':POLICY,'maxPages':4,'maxBoxes':65,'prefetchPages':12,'serverInpaint':False,'progressVersion':1,'foregroundPages':1,'quota':engine.translator.pacer.snapshot(),'message':'Пакетный перевод Google · JSON → устройство' if engine.translator.configured() else 'Установи ключ Google AI Studio в настройках ВМ.'}
 @app.post('/api/v1/manga-translation/key')
 async def configure(body:GoogleKey,request:Request,subject=Depends(owner)):
     key=body.key.get_secret_value().strip()
@@ -99,7 +101,7 @@ async def open_chapter(body:OpenChapter,request:Request,subject=Depends(owner)):
         key=base64.b64decode(body.vault_key.get_secret_value(),validate=True)
         if len(key)!=32:raise ValueError('Некорректный ключ библиотеки.')
         id,s=await asyncio.to_thread(source.open,subject,body.library_id,body.item_id,key,body.names)
-        s['direction']=body.direction
+        s['direction']=body.direction;s['model']=body.model
         return {'id':id,'manifest':s['manifest'],'policy':POLICY,'pageCount':len(s['names'])}
     except ValueError as e:raise HTTPException(422,str(e))
 @app.post('/api/v1/chapters/{id}/touch')

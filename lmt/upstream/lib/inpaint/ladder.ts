@@ -350,7 +350,9 @@ async function paintRectFallback(
   noiseSigma: number,
   alwaysInpaint = false,
 ): Promise<InpaintRegionResult> {
-  // No usable ink: rectangle Telea on the bbox, still decline-gated.
+  // No glyph mask is evidence of uncertainty, never permission to erase a box.
+  return {index:prep.index,method:"declined",route:"rect",deviation:999,thickness:0,ms:prep.ms()};
+  /* Legacy rectangle fallback deliberately disabled.
   const { rect, cropRgb, otherRects, index, ms } = prep;
   let ok = await runRung(
     page,
@@ -374,7 +376,7 @@ async function paintRectFallback(
     deviation: 999,
     thickness: 0,
     ms: ms(),
-  };
+  }; */
 }
 
 /**

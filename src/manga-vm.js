@@ -23,12 +23,12 @@ export async function parseSse(response,onEvent,signal,{idleTimeoutMs=30000,init
 export async function chapterFingerprint(item,names){const value=[item.id,item.size,item.chunks.map(c=>[c.fileId,c.iv]),names],digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value)));return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');}
 
 export class VmChapter {
- constructor({item,names,direction,scope,service,cache=true,policy,canStart=()=>true,streamIdleMs=30000}){
-  Object.assign(this,{item,names,direction,scope,service,cache,policy,canStart,streamIdleMs});this.controller=new AbortController();this.waiters=new Map();this.pages=new Map();this.streams=new Map();this.id=null;this.opening=null;this.fingerprint=chapterFingerprint(item,names);this.worker=null;this.renderJobs=new Map();this.serial=0;this.statusListeners=new Map();this.progress=new Map();
+ constructor({item,names,direction,scope,service,model,cache=true,policy,canStart=()=>true,streamIdleMs=30000}){
+  Object.assign(this,{item,names,direction,scope,service,model,cache,policy,canStart,streamIdleMs});this.controller=new AbortController();this.waiters=new Map();this.pages=new Map();this.streams=new Map();this.id=null;this.opening=null;this.fingerprint=chapterFingerprint(item,names);this.worker=null;this.renderJobs=new Map();this.serial=0;this.statusListeners=new Map();this.progress=new Map();
  }
  cacheId(page){return 'manga-json:'+this.scope+':'+this.manifest+':'+this.policy+':'+this.direction+':'+page;}
  async open(){
-  if(!this.opening)this.opening=(async()=>{const s=await this.service().openReaderChapter(this.item,this.names,this.direction,this.controller.signal);this.id=s.id;this.manifest=await this.fingerprint;if(this.manifest!==s.manifest)throw Error('Состав главы изменился. Открой её заново.');if(this.policy&&s.policy!==this.policy)throw Error('Версия перевода обновилась. Открой читалку заново.');this.policy=s.policy;})().catch(error=>{this.opening=null;if(this.id){const id=this.id;this.id=null;this.service().request('/api/v1/chapters/'+id,{method:'DELETE'}).catch(()=>{});}throw error;});
+  if(!this.opening)this.opening=(async()=>{const s=await this.service().openReaderChapter(this.item,this.names,this.direction,this.controller.signal,this.model);this.id=s.id;this.manifest=await this.fingerprint;if(this.manifest!==s.manifest)throw Error('Состав главы изменился. Открой её заново.');if(this.policy&&s.policy!==this.policy)throw Error('Версия перевода обновилась. Открой читалку заново.');this.policy=s.policy;})().catch(error=>{this.opening=null;if(this.id){const id=this.id;this.id=null;this.service().request('/api/v1/chapters/'+id,{method:'DELETE'}).catch(()=>{});}throw error;});
   return this.opening;
  }
  observe(page,callback){
@@ -87,16 +87,9 @@ export class VmChapter {
  touch(page){if(this.id)this.service().request('/api/v1/chapters/'+this.id+'/touch',{method:'POST',body:{currentPage:page},signal:this.controller.signal}).catch(()=>{});}
  async render(blob,index,font,status,config={},signal=this.controller.signal){
   const page=await this.json(index+1,status,signal);this.controller.signal.throwIfAborted();signal.throwIfAborted();status?.({phase:'cleaning',message:'Устройство · очищаем фон и набираем русский текст',retryAtMs:null,completedRegions:page.regions.length,totalRegions:page.regions.length});
-  if(config.inpaint==='quality'){
-   if(!config.allowDownloads)throw Error('Разреши загрузку LaMa или выбери быструю очистку без весов.');
-   const {translateLmt}=await import('./lmt-client.js');
-   const regions=page.regions.map(r=>({id:r.uid,bbox:r.text_bbox,layout_bbox:r.layout_bbox,class:r.detection_class}));
-   const prepared={id:'P'+page.page,width:page.width,height:page.height,regions,detectionMs:page.timings.detectionMs};
-   const translation={...prepared,regions:page.regions.map((r,i)=>({...regions[i],translation:r.ru_translation,source_text:r.source_text,status:r.ru_translation?'translated':'non_text',font_style:r.font_style,speech_style:r.speech_register,appearance:{bold:r.font_style==='bold_scream',italic:false,fill_color:'#151515',stroke_color:['sfx','sign','whisper_aside'].includes(r.text_category)?'#ffffff':'none',stroke_width:2,alignment:'center',rotation:0}}))};
-   return translateLmt(blob,{...config,mode:'gemma',operation:'gemma-render',prepared,translation},this.controller.signal,status);
-  }
+  if(['quality','moebius'].includes(config.inpaint)&&!config.allowDownloads)throw Error('Разреши загрузку выбранной модели восстановления.');
   if(!this.worker){this.worker=new Worker(new URL('./manga-canvas.worker.js',import.meta.url),{type:'module'});this.worker.onmessage=({data})=>{const j=this.renderJobs.get(data.id);if(j){if(data.status){j.status?.(data.status);return;}this.renderJobs.delete(data.id);data.error?j.reject(Error(data.error)):j.resolve(data.result);}};this.worker.onerror=()=>{for(const j of this.renderJobs.values())j.reject(Error('Обработчик страницы остановился.'));this.renderJobs.clear();this.worker?.terminate();this.worker=null;};}
-  const id=++this.serial;return new Promise((resolve,reject)=>{this.renderJobs.set(id,{resolve,reject,status});this.worker.postMessage({id,blob,page,font});});
+  const id=++this.serial;return new Promise((resolve,reject)=>{this.renderJobs.set(id,{resolve,reject,status});this.worker.postMessage({id,blob,page,font,mode:config.inpaint||'fast'});});
  }
  close(){this.controller.abort();this.worker?.terminate();for(const w of [...this.waiters.values(),...this.renderJobs.values()])w.reject(new DOMException('Читалка закрыта','AbortError'));this.waiters.clear();this.renderJobs.clear();this.statusListeners.clear();this.progress.clear();if(this.id)this.service().request('/api/v1/chapters/'+this.id,{method:'DELETE'}).catch(()=>{});}
 }

@@ -215,7 +215,7 @@ async def limits(request: Request, call_next):
         if request.headers.get("origin") not in (None, ORIGIN):
             return JSONResponse({"detail": "Origin denied"}, status_code=403)
     if request.method in {"POST","PUT","PATCH"}:
-        maximum=14*1024*1024 if request.url.path=="/reader/translate" else 2*1024*1024 if request.url.path=="/music/youtube/session" else 512*1024
+        maximum=20*1024*1024 if request.url.path=="/reader/google/generate" else 14*1024*1024 if request.url.path=="/reader/translate" else 2*1024*1024 if request.url.path=="/music/youtube/session" else 512*1024
         try:
             if int(request.headers.get("content-length", "0")) > maximum:
                 return JSONResponse({"detail": "Request too large"}, status_code=413)
@@ -248,7 +248,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 29, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 30, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -260,6 +260,9 @@ def authenticate(authorization: str = Header(default="")):
     return {"token": session_token(user["sub"]), "driveConnected": bool(store.setting("google:" + user["sub"])),
             "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://"))}
 
+
+import google_pool
+google_pool.install(app,owner,lambda:store)
 
 class GoogleOAuthConfiguration(StrictBody):
     client_id: str = Field(max_length=200)

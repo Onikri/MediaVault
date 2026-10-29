@@ -2,7 +2,7 @@ import {teleaInpaint} from '../lmt/upstream/lib/inpaint/telea.ts';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {fitComicText,styleFont} from './manga-typeset.js';
 import {prepareInkPatch,compositeInkPatch,dilateInk} from './manga-cleaning.js';
-export const READER_RENDER_VERSION=3;
+export const READER_RENDER_VERSION=4;
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
 export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{}}){
  const start=performance.now(),bitmap=await createImageBitmap(blob);
@@ -29,14 +29,14 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   for(const[i,plan]of plans.entries()){
    const region=plan.region;if(conflicts.has(i)){records.push({uid:region.uid,method:'declined',reason:'Пересекающиеся текстовые области'});continue;}
    status({phase:'cleaning',message:'Очистка областей · '+(i+1)+' / '+plans.length,cleanedRegions:records.filter(r=>r.painted).length,completedRegions:records.filter(r=>r.painted).length,totalRegions:plans.length});
-   const t=performance.now(),patch=prepareInkPatch(original,region.text_bbox);
+   const t=performance.now(),patch=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:mode!=='fast'});
    if(patch.declined){records.push({uid:region.uid,method:'declined',reason:patch.declined});continue;}
    const image=new ImageData(patch.data.slice(),patch.width,patch.height);let method,execution,write=patch.mask;
    try{
-    if(mode==='quality'||mode==='hybrid'&&!patch.flat){
+    if(mode==='quality'||mode==='moebius'||mode==='hybrid'&&!patch.flat){
      if(lamaUnavailable)throw Error(lamaUnavailable);if(!lama)throw Error('LaMa недоступна в этом обработчике');
      try{execution=await lama(image,patch.mask,message=>status({phase:'cleaning',message}));}catch(error){lamaUnavailable=error.message;throw error;}
-     method='lama';write=dilateInk(patch.mask,patch.width,patch.height,2);
+     method=mode==='moebius'?'moebius':'lama';write=dilateInk(patch.mask,patch.width,patch.height,2);
     }else if(patch.flat){
      for(let n=0;n<patch.mask.length;n++)if(patch.mask[n])for(let c=0;c<3;c++)image.data[n*4+c]=patch.background[c];method='adaptive-glyph-fill';
     }else{

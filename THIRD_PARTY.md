@@ -244,3 +244,13 @@ SIL Open Font License 1.1. Файлы WOFF2 поставляются с сайт
 - `src/manga-canvas.worker.js` импортирует Telea из Libre Manga Translator; новый изолированный Worker и `src/manga-typeset.js` распространяются под AGPL-3.0-or-later. Полный соответствующий исходник опубликован в этом репозитории; текст лицензии — `lmt/upstream/LICENSE`. Связь читалки с Worker — стандартные сообщения и ImageBitmap. Шрифты остаются под SIL OFL1.1.
 - Google Gen AI Python SDK `google-genai==2.33.0`, Apache-2.0: https://github.com/googleapis/python-genai . API-ключ принадлежит владельцу проекта и не включается в исходники/Pages. Используются только бесплатные Gemma4; платные Gemini fallback по умолчанию отсутствуют.
 - redis-py6.4.0 (MIT), https://github.com/redis/redis-py . Сервис использует отдельный официальный Redis7.4.6 image; лицензии Redis относятся к серверному контейнеру и поставляются upstream. Данные перевода шифруются до записи в Redis/SQLite.
+
+### Moebius
+
+Moebius (hustvl/Moebius, ECCV 2026) and the browser/ONNX port [simonw/moebius-web](https://github.com/simonw/moebius-web) use Apache-2.0. Adapted helpers in lmt/moebius retain attribution and the license. Source revision: 080be6e737ec976130e260d34707d7d9b7f63d5b. Model revision: 5bf1ef5d2861ec01a727183a3f95dc64f352120e. Weights are downloaded on demand and never committed. This is a separate neural model, not LaMa or MangaJaNai.
+
+### Additional Cyrillic lettering
+
+Ruslan Display, Marck Script, Press Start 2P and PT Serif are distributed under SIL OFL 1.1. Each bundled WOFF2 has its original license file. reader-fonts/manifest.json records immutable source URLs, SHA256 and verified Russian glyph coverage. Auto typography maps SFX, handwriting, system/game UI and narration to these fonts; earlier choices remain available.
+
+The owner can explicitly select Gemini models. Gemini API billing and project quotas apply separately from a Google AI Pro subscription. No paid model is used as an invisible fallback from Gemma.

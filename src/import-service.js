@@ -114,6 +114,6 @@ export function useImportService(state,actions){
   },[state.catalog,!!state.busy,session?.driveConnected,session?.serverVersion]);
   async function operation(id,op){const task=await client.request('/jobs/'+encodeURIComponent(id)+'/'+op,{method:'POST'});setJobs(old=>old.map(value=>value.id===id?task:value));return task;}
   return {server,setServer,status,error,session,jobs,active,connect,submit,refresh,configureGoogle,enrichLibrary,
-    openReaderChapter:(item,names,direction,signal)=>client.request('/api/v1/chapters',{method:'POST',body:{library_id:live.current.libraryId,item_id:item.id,vault_key:actions.getServerKey(),names,direction},signal}),
+    openReaderChapter:(item,names,direction,signal,model)=>client.request('/api/v1/chapters',{method:'POST',body:{library_id:live.current.libraryId,item_id:item.id,vault_key:actions.getServerKey(),names,direction,...(model?{model}:{})},signal}),
     request:client.request,cancel:id=>operation(id,'cancel'),resume:id=>operation(id,'resume')};
 }

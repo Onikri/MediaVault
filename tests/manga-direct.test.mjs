@@ -3,14 +3,25 @@ import assert from 'node:assert/strict';
 import {directRequest,validateDirectResponse,callDirectGoogle} from '../src/manga-direct-api.js';
 import {DirectChapter} from '../src/manga-direct.js';
 import {translationConfig,resultConfig} from '../src/manga-translation.js';
-import {directKey,setDirectKey} from '../src/manga-direct-key.js';
+import {directKey,setDirectKey,keySlotScope} from '../src/manga-direct-key.js';
 import {englishTextBoxes} from '../src/manga-fast-detect.js';
 import {compareDirectInputs} from '../src/manga-direct-comparison.js';
 import {geometryAgreement} from '../src/manga-vision-geometry.js';
 const page=n=>({id:'P'+n,page:n,width:600,height:850,mime:'image/webp',image:'fixture',detectionMs:3,regions:[{id:'P'+n+'_B1',bbox:[100,100,300,250]}]});
 const reply=rows=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(rows)}]}}]});
+
+test('three personal credentials lease three concurrent pages without exporting secrets',async()=>{
+ const scope='parallel-fixture';for(let i=0;i<3;i++)setDirectKey(keySlotScope(scope,i),'fixture-key-'+i);
+ let release;const held=new Promise(resolve=>release=resolve),seen=[];const {c}=chapter({keyScope:scope,getKey:directKey,google:async(pages,options)=>{seen.push(options.key);if(seen.length===3)release();await held;return {pages:validateDirectResponse(reply(pages.map(p=>({id:p.regions[0].id,ru:'Привет!'}))),pages)};}});
+ try{await Promise.all([0,1,2].map(index=>c.render(new Blob(['page-'+index]),index,'auto',null,{},new AbortController().signal)));assert.equal(new Set(seen).size,3);assert.equal(c.keyBusy.size,0);}finally{c.close();for(let i=0;i<3;i++)setDirectKey(keySlotScope(scope,i),'');}
+});
+
+test('personal mode sends its page to the fixed Oracle gateway',async()=>{
+ let sent;const {c}=chapter({config:translationConfig({engine:'direct',directViaOracle:true}),google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent={path,options};return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
+ try{await c.render(new Blob(['page']),0,'auto',null,{},new AbortController().signal);assert.equal(sent.path,'/reader/google/generate');assert.equal(sent.options.body.model,'gemini-3.5-flash-lite');assert.ok(sent.options.body.key);assert.ok(!JSON.stringify(sent.options.body.request).includes(sent.options.body.key));}finally{c.close();}
+});
 test('direct mode is a separate compact cache variant without personal secrets',()=>{
- const c=translationConfig({engine:'direct',apiKey:'private-fixture'});assert.equal(c.engine,'direct');assert.equal(c.directModel,'gemma-4-26b-a4b-it');assert.equal(c.inpaint,'hybrid');assert.equal(c.font,'auto');
+ const c=translationConfig({engine:'direct',apiKey:'private-fixture'});assert.equal(c.engine,'direct');assert.equal(c.directModel,'gemini-3.5-flash-lite');assert.equal(c.inpaint,'hybrid');assert.equal(c.font,'auto');
  const variant=resultConfig(c);assert.equal(variant.direction,'rtl');assert.ok(!JSON.stringify(variant).includes('private-fixture'));assert.notDeepEqual(variant,resultConfig({...c,engine:'vm'}));assert.notDeepEqual(variant,resultConfig({...c,directModel:'gemma-4-31b-it'}));
 });
 test('one compact single-image request, RTL context, no OCR transcription or expensive schema',()=>{
@@ -29,7 +40,7 @@ test('strict UID and Russian validation preserve exact local geometry and font s
 test('personal key travels only in Google header, quota errors do not retry or leak response',async()=>{
  const calls=[];const fetcher=async(url,request)=>{calls.push({url,request});return{ok:false,status:429,text:async()=>JSON.stringify({error:{message:'private-fixture'}})};};
  await assert.rejects(callDirectGoogle([page(1)],{key:'private-fixture',fetcher,gemmaProfile:'compat'}),e=>/Лимит/.test(e.message)&&!e.message.includes('private-fixture'));
- assert.equal(calls.length,1);assert.match(calls[0].url,/generativelanguage.googleapis.com\/v1beta\/models\/gemma-4-26b-a4b-it:generateContent$/);assert.equal(calls[0].request.headers['x-goog-api-key'],'private-fixture');assert.ok(!calls[0].request.body.includes('private-fixture'));assert.equal(calls[0].request.credentials,'omit');
+ assert.equal(calls.length,1);assert.match(calls[0].url,/generativelanguage.googleapis.com\/v1beta\/models\/gemini-3.5-flash-lite:generateContent$/);assert.equal(calls[0].request.headers['x-goog-api-key'],'private-fixture');assert.ok(!calls[0].request.body.includes('private-fixture'));assert.equal(calls[0].request.credentials,'omit');
 });
 test('Google call has a bounded deadline and reports timeout without background retries',async()=>{
  const keepAlive=setTimeout(()=>{},80);
