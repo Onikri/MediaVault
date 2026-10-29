@@ -90,6 +90,10 @@ try:
         except (subprocess.CalledProcessError,ValueError):pass
         time.sleep(2)
     else:raise RuntimeError('Release backend health check failed.')
+    if expected_version>=23:
+        # Public application identifiers, fetched from checksummed upstream
+        # source once and retained in the existing private data volume.
+        execute([*paused,'exec','-T','importer','python','-m','novelcool_client'],stdout=subprocess.DEVNULL)
     cid=command([*paused,'ps','-q','importer']);new=json.loads(command(['docker','inspect',cid]))[0]
     mount=next(m for m in new['Mounts'] if m['Destination']=='/data');after=state()
     if Path(mount['Source']).resolve()!=data or any(before[k]!=after[k] for k in ['settings','env','key']) or any(after['payloads'].get(k)!=v for k,v in before['payloads'].items()):raise RuntimeError('Preservation check failed.')

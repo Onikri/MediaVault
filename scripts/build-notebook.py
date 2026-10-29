@@ -7,7 +7,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ['server/source_parser.py', 'server/media_download.py', 'server/run_import.py',
          'server/vault_drive.py', 'server/player_catalog.py', 'server/player_compat.py', 'server/browser_player.py', 'server/public_page_data.py', 'server/requirements.txt','server/title_extras.py',
-         'server/manga_sources.py','server/manga_novelcool.py','server/source_relay.py','server/manga_raw_adapters.py','server/manga_webtoons.py','server/manga_catalog_adapters.py','server/manga_download.py','server/title_identity.py','server/suwayomi_bridge.py']
+         'server/manga_sources.py','server/manga_novelcool.py','server/novelcool_client.py','server/manga_raw_adapters.py','server/manga_webtoons.py','server/manga_catalog_adapters.py','server/manga_download.py','server/title_identity.py','server/suwayomi_bridge.py']
 # GitHub serves repository LF bytes even when a Windows checkout uses CRLF.
 HASHES = {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for name in FILES}
 
