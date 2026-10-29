@@ -9,6 +9,31 @@ ENV={'PUBLIC_URL':'https://media.example','SUWAYOMI_URL':'http://suwayomi:4567',
 class BridgeTests(unittest.TestCase):
     def setUp(self):self.env=patch.dict(os.environ,ENV);self.env.start();bridge._cache.clear()
     def tearDown(self):self.env.stop();bridge._cache.clear()
+    def test_mangadex_extension_failure_uses_same_uuid_and_language_native_adapter(self):
+        uuid='6b1eb93e-473a-4ab3-9922-1a66d2a29a4a'
+        class Fake:
+            def close(self):pass
+            def get(self,path,*a,**kw):
+                if path=='/manga/1':return {'title':'Наруто','realUrl':'https://mangadex.org/title/'+uuid+'/naruto','source':{'id':'2','lang':'ru','name':'MangaDex'}}
+                raise SourceError('HTTP 500')
+        with patch.object(bridge,'Client',Fake),patch('manga_sources.inspect',return_value={'episodes':[],'available':False}) as native:
+            self.assertFalse(bridge.inspect(bridge.reference(1))['available'])
+            native.assert_called_once_with('https://mangadex.org/title/'+uuid+'?lang=ru')
+        Fake.get=lambda *a,**kw: {'title':'Other','realUrl':'https://untrusted.example/title/'+uuid,'source':{'id':'2','lang':'ru','name':'MangaDex'}} if a[1]=='/manga/1' else (_ for _ in ()).throw(SourceError('HTTP 500'))
+        with patch.object(bridge,'Client',Fake),patch('manga_sources.inspect') as native:
+            with self.assertRaises(SourceError):bridge.inspect(bridge.reference(1))
+            native.assert_not_called()
+
+    def test_error_classification_is_bounded_and_never_returns_upstream_secrets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            auth=Path(directory)/'auth';auth.write_text(json.dumps({'username':'fixture','password':'fixture-private'}))
+            with patch.dict(os.environ,{'SUWAYOMI_AUTH_FILE':str(auth)}),patch('suwayomi_bridge.requests.Session') as session:
+                response=session.return_value.get.return_value;response.status_code=500
+                response.iter_content.return_value=iter([b'CEF is disabled private-provider-cookie=secret'])
+                client=bridge.Client()
+                with self.assertRaisesRegex(SourceError,'WebView') as failure:client.get('/source/list')
+                self.assertNotIn('secret',str(failure.exception))
+                response.close.assert_called_once();client.close()
     def test_identifiers_are_not_an_open_proxy(self):
         good='https://media.example/__manga/suwayomi/m/1/c/4/p/0'
         self.assertEqual(bridge.parse_reference(good),(1,4,0))
