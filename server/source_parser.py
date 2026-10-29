@@ -377,6 +377,15 @@ def parse_page(text, base):
     # Public inline player configuration; scripts are read as text, never executed.
     decoded = html.unescape(text).replace("\\/", "/").replace('\\"','"').replace("\\'", "'")
     decoded=re.sub(r'\\u00(26|3d|2f|3a)',lambda m:chr(int(m[1],16)),decoded,flags=re.I)
+    # Yummy's public iframe relay is a JSON envelope, not HTML. Only consume
+    # its declared iframe source; unrelated URL strings are not player links.
+    if urlsplit(base).hostname=='yummyanime.tv' and urlsplit(base).path=='/engine/ajax/controller.php':
+        try:
+            envelope=json.loads(text);payload=envelope.get('data',{})
+            if envelope.get('status') is True and payload.get('kind')=='iframe':
+                target=parser.link(payload.get('src',''))
+                if target:parser.result.players.append(target)
+        except (ValueError,TypeError,AttributeError):pass
     # DLE player switchers often publish iframe markup inside an escaped JS string.
     for match in re.finditer(r'''<iframe\b[^>]*\b(?:src|data-src)\s*=\s*["']([^"']+)["']''',decoded,re.I):
         target=parser.link(match[1])
@@ -464,7 +473,7 @@ class Resolver:
                     continue
                 raise
         host=urlsplit(url).hostname or ''
-        if host in {'jut.su','www.jut.su'} or host.endswith('.stravers.live'):
+        if host in {'jut.su','www.jut.su'} or host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):
             from browser_player import extract
             return Page(title=page.title,streams=extract(url,referer))
         raise SourceError("Публичный MP4/HLS-поток не найден. Вставь ссылку на доступную серию или поддерживаемый плеер.")

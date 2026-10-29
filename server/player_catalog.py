@@ -18,7 +18,7 @@ CVH_API='https://plapi.cdnvideohub.com/api/v1/player/sv'
 def player_name(url):
     host=urlsplit(url).hostname or ''
     if host in {'jut.su','www.jut.su'}:return 'Jut.su'
-    if host.endswith('.stravers.live'):return 'Alloha (динамический)'
+    if host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):return 'Alloha (динамический)'
     if host in KODIK:return 'Kodik'
     if 'aniboom' in host:return 'Aniboom'
     if 'sibnet' in host:return 'Sibnet'
@@ -45,6 +45,30 @@ def choice(name, url, *, identity='', kind='', language='und', player='', episod
             'name':label or 'Название перевода не указано','url':url,'player':player or player_name(url),
             'kind':translation_kind(label,kind),'language':language,'named':bool(label),
             'episodes':episodes or []}
+
+def alloha_choices(text,base):
+    """Read the published episode table and its actual translation IDs."""
+    import json
+    host=urlsplit(base).hostname or ''
+    if not host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):return [],[]
+    match=re.search(r"const\s+fileList\s*=\s*JSON\.parse\('((?:[^'\\]|\\.)*)'\)",text,re.S)
+    if not match:return [],[]
+    try:data=json.loads(match[1].replace("\\'","'").replace('\\\\','\\'))
+    except (ValueError,TypeError):return [],[]
+    groups={};seasons=[];parts=urlsplit(base);params=dict(parse_qsl(parts.query));selected=params.get('season')
+    def url(season,episode,translation):
+        return urlunsplit(parts._replace(query=urlencode({**params,'season':season,'episode':episode,'translation':translation}),fragment=''))
+    for season,episodes in (data.get('all') or {}).items():
+        if not str(season).isdigit() or not isinstance(episodes,dict):continue
+        seasons.append({'number':int(season),'name':'Сезон '+str(season),'url':None})
+        if selected and selected!=str(season):continue
+        for number,variants in episodes.items():
+            if not str(number).isdigit() or not isinstance(variants,dict):continue
+            for row in variants.values():
+                if not isinstance(row,dict) or not isinstance(row.get('id_translation'),int) or not row.get('translation'):continue
+                identity=str(row['id_translation']);entry={'number':int(number),'season':int(season),'url':url(season,number,identity),'title':'Серия '+str(number)}
+                group=groups.setdefault(identity,{'name':str(row['translation'])[:120],'entries':[]});group['entries'].append(entry)
+    return [choice(v['name'],v['entries'][0]['url'],identity='alloha:'+key,player='Alloha',language='ru',episodes=v['entries']) for key,v in groups.items()],seasons
 
 
 def animego_buttons(text,base):
