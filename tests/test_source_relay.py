@@ -47,6 +47,14 @@ class RelayTests(unittest.TestCase):
         self.connect()
         with self.assertRaisesRegex(SourceError,'не успело'):self.relay.fetch(BOOK,timeout=.01)
         self.assertEqual(self.relay.jobs,{})
+    def test_large_html_is_uploaded_in_ordered_signed_chunks_below_proxy_limit(self):
+        self.connect();result=[];raw=b'<html>'+b'x'*(module.CHUNK*2)+b'</html>'
+        thread=threading.Thread(target=lambda:result.append(self.relay.fetch(BOOK,timeout=3)));thread.start();task=self.relay.poll('device',timeout=1)
+        path='/source-device/result/'+task['id']
+        for offset in range(0,len(raw),module.CHUNK):
+            chunk=raw[offset:offset+module.CHUNK];meta=base64.b64encode(json.dumps({'ok':True,'url':BOOK,'offset':offset,'complete':offset+len(chunk)==len(raw)}).encode()).decode()
+            self.assertEqual(self.client.post(path,content=chunk,headers=self.signed(path,chunk,meta)).status_code,200)
+        thread.join(2);self.assertEqual(result[0][0],raw);self.assertEqual(self.relay.jobs,{})
     def test_remote_failure_wakes_waiter_without_exposing_device_error_details(self):
         self.connect();errors=[]
         def wait():
@@ -60,6 +68,14 @@ class RelayTests(unittest.TestCase):
             def document(self,*a,**kw):raise AssertionError('Oracle response must not replace device bytes')
         with patch.object(self.relay,'available',return_value=True),patch.object(module,'document',return_value=('<h1 class="bookinfo-title">Наруто</h1>',BOOK,{})) as device:
             self.assertEqual(inspect(BOOK,Http())['title'],'Наруто');device.assert_called_once_with(BOOK,timeout=28)
+    def test_existing_reader_capability_serves_device_image_without_direct_oracle_fetch(self):
+        import online_sessions as online
+        online.sessions.clear();app=FastAPI();online.install(app,lambda:'owner')
+        token,session=online.create('owner',{'Referer':BOOK},'manga');resource=session.resource(PIC)
+        with patch.object(self.relay,'available',return_value=True),patch.object(module,'image',return_value=(b'image fixture',PIC,{'Content-Type':'image/webp'})) as image,patch('online_sessions.PublicHttp._open') as direct:
+            response=TestClient(app).get('/online/'+token+'/'+resource)
+            self.assertEqual(response.status_code,200);self.assertEqual(response.content,b'image fixture');image.assert_called_once_with(PIC,BOOK);direct.assert_not_called()
+        online.sessions.clear()
     def test_device_html_uses_remaining_chapter_budget(self):
         from manga_novelcool import inspect
         from types import SimpleNamespace

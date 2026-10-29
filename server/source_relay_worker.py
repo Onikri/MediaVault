@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 import requests
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding,PrivateFormat,PublicFormat,NoEncryption
-from source_relay import allowed,message,MAXIMUM
+from source_relay import allowed,message,MAXIMUM,CHUNK
 from source_parser import PublicHttp,SourceError
 
 def load_key(path):
@@ -55,8 +55,12 @@ def run(server,identity,key,stop=None):
             if not task:continue
             try:raw,final=retrieve(task);info={'ok':True,'url':final}
             except Exception:raw=b'';info={'ok':False,'url':task['url']}
-            meta=base64.b64encode(json.dumps(info,separators=(',',':')).encode()).decode()
-            request('/source-device/result/'+task['id'],raw,meta)
+            # Existing Caddy caps requests at512KiB. Sign ordered binary chunks
+            # so full pages work without widening any general proxy limits.
+            for offset in range(0,max(1,len(raw)),CHUNK):
+                chunk=raw[offset:offset+CHUNK]
+                meta=base64.b64encode(json.dumps({**info,'offset':offset,'complete':offset+len(chunk)>=len(raw)},separators=(',',':')).encode()).decode()
+                request('/source-device/result/'+task['id'],chunk,meta)
             print(json.dumps({'sourceTask':task['kind'],'ok':info['ok'],'bytes':len(raw)}),flush=True)
         except (requests.RequestException,ValueError,KeyError) as error:
             if state!='reconnecting':print(json.dumps({'sourceDevice':'reconnecting','reason':type(error).__name__}),flush=True);state='reconnecting'

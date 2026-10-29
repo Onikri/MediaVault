@@ -14,6 +14,7 @@ class DeviceError(SourceError):
     def __init__(self,status,detail):self.status=status;self.detail=detail;super().__init__(detail)
 
 MAXIMUM=12*1024*1024
+CHUNK=256*1024
 def allowed(url,kind='document',resolve_dns=False):
     value=public_url(url,resolve_dns=resolve_dns);p=urlsplit(value)
     if kind=='document':
@@ -50,7 +51,7 @@ class Relay:
         with self.condition:
             if not self.available():raise SourceError('Транспорт чтения на устройстве не подключён.')
             if len(self.jobs)>=12:raise SourceError('Загрузка страниц занята. Повтори запрос.')
-            identity=secrets.token_urlsafe(24);job={'id':identity,'url':url,'kind':kind,'referer':referer,'device':None,'result':None,'error':None,'expires':self.clock()+timeout};self.jobs[identity]=job;self.condition.notify_all()
+            identity=secrets.token_urlsafe(24);job={'id':identity,'url':url,'kind':kind,'referer':referer,'device':None,'result':None,'error':None,'upload':bytearray(),'expires':self.clock()+timeout};self.jobs[identity]=job;self.condition.notify_all()
             end=time.monotonic()+timeout
             try:
                 while job['result'] is None and job['error'] is None:
@@ -75,11 +76,18 @@ class Relay:
         with self.condition:
             job=self.jobs.get(identity)
             if not job or job['device']!=device:raise DeviceError(404,'Task expired.')
-            if len(raw)>MAXIMUM:raise DeviceError(413,'Source response too large.')
+            if len(raw)>CHUNK:raise DeviceError(413,'Source chunk too large.')
             try:
                 info=json.loads(base64.b64decode(meta,validate=True));final=allowed(info['url'],job['kind'])
                 if final!=job['url']:raise ValueError()
-                if info.get('ok') is not True:job['error']='Устройство не получило публичную страницу источника.'
+                if info.get('ok') is not True:job['upload'].clear();job['error']='Устройство не получило публичную страницу источника.'
+                else:
+                    offset=info.get('offset',0);complete=info.get('complete',True)
+                    if type(offset) is not int or type(complete) is not bool or offset!=len(job['upload']) or len(job['upload'])+len(raw)>MAXIMUM:raise ValueError()
+                    job['upload'].extend(raw)
+                    if not complete:return
+                    raw=bytes(job['upload']);job['upload'].clear()
+                if job['error']:pass
                 elif job['kind']=='image':
                     from manga_download import image_extension
                     extension=image_extension(raw[:32])

@@ -51,7 +51,7 @@ instead received an HTTP200 response containing only a155-byte "404 Not Found"
 HTML placeholder. This source is not certified working from that VM; it remains
 selectable and its failure is reported. Do not report the device run as VM proof.
 
-## Public source device transport · v19
+## Public source device transport · v20
 
 When NovelCool serves an empty placeholder to Oracle but works on the owner's
 device, `server/source_relay_worker.py` supplies that same public site over an
@@ -70,7 +70,9 @@ Only public NovelCool RU title/chapter paths and the observed `*.movietop.cc`
 comic-image paths are permitted. Both device and backend validate destinations;
 there is no arbitrary URL proxy, login forwarding, incoming PC port or retained
 page store. Twelve bounded in-memory tasks at most, three device workers, 28s
-request lifetime and12MiB image limit bound resource use. Completed/timed-out
+request lifetime and12MiB image limit bound resource use. Results are uploaded
+in signed ordered256KiB chunks, preserving the existing512KiB Caddy/API request
+limits even for large HTML or page images. Completed/timed-out
 tasks discard their bytes. A missing device leaves the ordinary source request
 path available; its failure remains an error rather than an empty chapter list.
 
