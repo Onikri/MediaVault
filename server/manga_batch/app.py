@@ -73,7 +73,7 @@ async def session(id,subject):
 @app.get('/api/v1/manga-translation/status')
 async def status(request:Request):
     engine=request.app.state.engine
-    return {'ready':request.app.state.detector_ready and engine.translator.configured(),'configured':engine.translator.configured(),'detectorReady':request.app.state.detector_ready,'models':list(MODEL_IDS),'policy':POLICY,'maxPages':4,'maxBoxes':65,'prefetchPages':12,'serverInpaint':False,'progressVersion':1,'foregroundPages':1,'quota':engine.translator.pacer.snapshot(),'message':'Пакетный перевод Google · JSON → устройство' if engine.translator.configured() else 'Установи ключ Google AI Studio в настройках ВМ.'}
+    return {'ready':request.app.state.detector_ready and engine.translator.configured(),'configured':engine.translator.configured(),'detectorReady':request.app.state.detector_ready,'models':list(MODEL_IDS),'policy':POLICY,'maxPages':3,'maxBoxes':65,'prefetchPages':9,'serverInpaint':False,'progressVersion':1,'foregroundPages':3,'parallelBatches':3,'quota':engine.translator.pacer.snapshot(),'message':'Пакетный перевод Google · JSON → устройство' if engine.translator.configured() else 'Установи ключ Google AI Studio в настройках ВМ.'}
 @app.post('/api/v1/manga-translation/key')
 async def configure(body:GoogleKey,request:Request,subject=Depends(owner)):
     key=body.key.get_secret_value().strip()

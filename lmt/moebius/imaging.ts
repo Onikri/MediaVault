@@ -103,12 +103,13 @@ export function makeMaskedCHW(imgCHW: Float32Array, maskBin: Float32Array): Floa
 }
 
 // Downsample 512x512 binary mask -> 64x64 using PyTorch-nearest (top-left of each 8x8 block).
-export function maskToLatent(maskBin: Float32Array): Float32Array {
+export function maskToLatent(maskBin: Float32Array, maxPool = false): Float32Array {
   const out = new Float32Array(LAT * LAT);
   const ratio = IMG / LAT; // 8
   for (let y = 0; y < LAT; y++) {
     for (let x = 0; x < LAT; x++) {
       out[y * LAT + x] = maskBin[y * ratio * IMG + x * ratio];
+      if(maxPool)for(let dy=0;dy<ratio;dy++)for(let dx=0;dx<ratio;dx++)if(maskBin[(y*ratio+dy)*IMG+x*ratio+dx])out[y*LAT+x]=1;
     }
   }
   return out;

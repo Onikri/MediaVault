@@ -50,7 +50,7 @@ export class VmChapter {
    if(!this.canStart())throw Error('Добавь ключ Google AI Studio в настройках ВМ.');
    if(!this.id)this.notify(page,{phase:'opening',message:'Открываем главу на ВМ…'});await waitFor(this.open(),signal);signal.throwIfAborted();
    let waiter=this.waiters.get(page);if(!waiter){waiter={};waiter.promise=new Promise((resolve,reject)=>Object.assign(waiter,{resolve,reject}));waiter.promise.catch(()=>{});this.waiters.set(page,waiter);}
-   let stream=[...this.streams.values()].find(s=>page>=s.start&&page<s.start+12&&!s.failedPages.has(page));
+   let stream=[...this.streams.values()].find(s=>page>=s.start&&page<s.start+9&&!s.failedPages.has(page));
    if(!stream)stream=this.stream(page);waiter.streamId=stream.id;
    return await waitFor(waiter.promise,signal);
   }finally{unsubscribe();}
@@ -71,7 +71,7 @@ export class VmChapter {
      entry.failedPages.add(value.page);const w=this.waiters.get(value.page);
      if(w?.streamId===entry.id){w.reject(Error(value.message));this.waiters.delete(value.page);}
     }else if(type==='status'||type==='progress'){
-     if(Number.isInteger(value.page)){if(value.page>=start&&value.page<start+12)this.notify(value.page,value);}
+     if(Number.isInteger(value.page)){if(value.page>=start&&value.page<start+9)this.notify(value.page,value);}
      else broadcast(value);
     }else if(type==='ready')broadcast({phase:'queued',message:'ВМ приняла запрос · проверяем кэш и очередь'});
    },this.controller.signal,{idleTimeoutMs:this.streamIdleMs});
