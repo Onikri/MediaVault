@@ -8,11 +8,12 @@ import MangaImport from './MangaImport.jsx';
 import OnlineViewer from './OnlineViewer.jsx';
 import {exportLocally} from './local-export.js';
 import {selectedVideoEntries} from './import-selection-model.js';
+import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 
 export default function ImportSelection({state,service,item,manual=false,onSubmitted,onOpenLibrary,destination='drive',compact=false}){
   const localAbort=useRef(null);
  useEffect(()=>()=>localAbort.current?.abort(),[]);
- const [online,setOnline]=useState(false),[localProgress,setLocalProgress]=useState('');
+ const [online,setOnline]=useState(false),[playingEntry,setPlayingEntry]=useState(null),[localProgress,setLocalProgress]=useState(''),[episodeCount,setEpisodeCount]=useState(24);
   const [url,setUrl]=useState(''),[collection,setCollection]=useState(item?.title||''),[season,setSeason]=useState('1'),[manualKind,setManualKind]=useState('anime');
   const [found,setFound]=useState([]),[providers,setProviders]=useState([]),[inspection,setInspection]=useState(null),[dub,setDub]=useState('');
   const [mode,setMode]=useState('all'),[one,setOne]=useState(''),[first,setFirst]=useState('1'),[last,setLast]=useState('12'),[list,setList]=useState('');
@@ -31,7 +32,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
     return()=>{closed=true;setSearching(false);};
   },[item?.id,service.status]);
   async function inspect(value,voice='',selectedSeason=season){
-    const version=++generation.current;setUrl(value);setBusy('inspect');setError('');setDub(voice);
+    const version=++generation.current;setOnline(false);setPlayingEntry(null);setEpisodeCount(24);setUrl(value);setBusy('inspect');setError('');setDub(voice);
     try{
       let data,continuation,previousProgress=-1,stalled=0;
       do{
@@ -80,7 +81,18 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
     setBusy('submit');try{await service.submit(job);onSubmitted();}catch(cause){setError(cause.message);}finally{setBusy('');}
   }
   if(kind==='manga')return <MangaImport compact={compact} destination={destination} state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary}/>;
-  return <>{online&&<OnlineViewer quality={quality} kind="video" entries={onlineEntries.map(e=>({...e,season:Number(e.season||season)}))} initial={onlineEntries[0]} title={collection} service={service} userId={state.user?.sub} dub={variant?.name||inspection?.dubs?.find(d=>d.url===dub)?.name||''} metadata={item} onClose={()=>setOnline(false)}/>}<form className="import-selection import-compact" onSubmit={submit}>
+  const player=online&&<OnlineViewer inline={compact} quality={quality} kind="video" entries={(compact?published:onlineEntries).map(e=>({...e,season:Number(e.season||season)}))} initial={playingEntry||onlineEntries[0]} title={collection} service={service} userId={state.user?.sub} dub={variant?.name||inspection?.dubs?.find(d=>d.url===dub)?.name||''} metadata={item} onClose={()=>setOnline(false)}/>;
+  if(compact&&destination==='online')return <div className="title-playback-controls video-playback-controls">
+   {item?.kind==='anime'&&<VoicePicker discovery={discovery} selected={variant} onChoose={value=>{setVariant(value);setInspection(null);setDub('');setOnline(false);generation.current++;if(value)inspect(value.sourceUrl,value.url);}}/>}
+   {item?.kind!=='anime'&&found.length>0&&<label className="form-field input-label">Источник<select aria-label="Источник просмотра" className="field-input" value={url} onChange={e=>inspect(e.target.value)}><option value="">Выбери источник</option>{found.map(s=><option key={s.url} value={s.url}>{s.providerName}</option>)}</select></label>}
+   {busy==='inspect'&&<p className="fine" role="status">Загружаем опубликованные серии…</p>}
+   {!variant&&inspection?.dubs?.length>0&&<label className="form-field input-label">Перевод<select aria-label="Озвучка" className="field-input" value={dub} onChange={e=>inspect(url,e.target.value)}><option value="">Выбери озвучку</option>{inspection.dubs.map(d=><option key={d.url} value={d.url}>{d.name}</option>)}</select></label>}
+   {inspection&&<div className="title-playback-selectors">{inspection.seasons?.length>1&&<label className="form-field input-label">Сезон<select aria-label="Сезон просмотра" className="field-input" value={season} onChange={e=>{const s=inspection.seasons.find(s=>s.number===Number(e.target.value));setSeason(e.target.value);setOnline(false);if(s?.url)inspect(s.url,'',e.target.value);}}>{inspection.seasons.map(s=><option key={s.number} value={s.number}>{s.name||s.number}</option>)}</select></label>}<label className="form-field input-label">Качество<select aria-label="Качество просмотра" className="field-input" value={quality} onChange={e=>setQuality(e.target.value)}><option value="best">Лучшее доступное{qualityData?.best?' · '+qualityData.best+'p':''}</option>{(qualityData?.qualities||[]).map(h=><option key={h} value={String(h)}>До {h}p</option>)}</select></label></div>}
+   {error&&<p className="inline-error" role="alert">{error}</p>}{player}
+   {published.length>0?<><div className="section-heading"><h3>Серии</h3><span className="fine">{published.length}</span></div><div className="title-episode-grid">{published.slice(0,episodeCount).map(e=><TitleEpisodeCard key={e.url} number={e.number} title={e.title||'Серия '+e.number} detail={variant?.name||inspection?.dubs?.find(d=>d.url===dub)?.name||'Смотреть онлайн'} selected={playingEntry?.url===e.url} onClick={()=>{setPlayingEntry(e);setOne(String(e.number));setMode('single');setOnline(true);}} artwork={<div className="episode-preview-pending"><span>{String(e.number).padStart(2,'0')}</span></div>}/>)}</div>{published.length>episodeCount&&<button type="button" className="text-link" onClick={()=>setEpisodeCount(n=>n+24)}>Ещё серии</button>}{!online&&<button type="button" className="btn btn-primary title-start-playback" onClick={startOnline} disabled={!!busy||inspection.dubs?.length>0&&!dub}><Icon name="video" size={16}/>Смотреть сейчас</button>}</>:<div className="title-playback-empty"><Icon name="video" size={28}/><p>{discovery.loading?'Проверяем переводы и источники…':'Выбери перевод и источник, затем серию.'}</p></div>}
+   <details className="title-source-tools"><summary>Своя ссылка на источник</summary><div className="form-actions"><input className="field-input" aria-label="Своя ссылка на источник" type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://…"/><button type="button" className="btn btn-secondary" onClick={()=>inspect(url)} disabled={!url||!!busy}>Проверить</button></div></details>
+  </div>;
+  return <>{player}<form className="import-selection import-compact" onSubmit={submit}>
     <div className="import-form-heading"><span className="eyebrow">{destination==='online'?'Без ожидания импорта':'Настрой свою коллекцию'}</span><h3>{destination==='online'?'Открыть сейчас':'Что сохраним?'}</h3></div><ol className="import-step-rail" aria-label="Этапы выбора"><li data-active={!inspection}>Источник</li><li data-active={!!inspection}>Серии и перевод</li><li>{destination==='online'?'Просмотр':'Google Диск'}</li></ol>
 
     {manual&&<div className="form-field"><label className="input-label" htmlFor="manualKind">Тип произведения</label><select id="manualKind" className="field-input" value={manualKind} onChange={e=>{setManualKind(e.target.value);setInspection(null);}}>{kinds.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div>}

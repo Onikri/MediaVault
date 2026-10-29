@@ -87,7 +87,7 @@ async function run(){
     await page.locator('#catalogSearch').press('ArrowDown');
     await page.locator('#catalogSearch').press('Enter');
     await page.getByRole('heading',{name:'Naruto',exact:true}).waitFor();
-    await page.getByRole('button',{name:'В Google Диск',exact:true}).click();assert.equal(await page.locator('#importVideoBtn').isDisabled(),true,'Locked users cannot start a Drive import');
+    await page.getByText('Сохранить в коллекцию или на устройство',{exact:true}).click();await page.getByRole('button',{name:'В Google Диск',exact:true}).click();assert.equal(await page.locator('#importVideoBtn').isDisabled(),true,'Locked users cannot start a Drive import');
     await noOverflow('Catalogue title detail');
     await page.getByRole('button',{name:'К результатам поиска'}).click();
     await noOverflow('Server import');

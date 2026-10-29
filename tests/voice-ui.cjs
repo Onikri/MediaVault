@@ -41,6 +41,8 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
       return json([]);
     });
     await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/voice-harness.html');
+    assert.equal(await page.locator('#serverCollection').count(),0,'Online page does not show import naming fields');assert.equal(await page.locator('.title-save-menu').getAttribute('open'),null);
+    await page.getByText('Сохранить в коллекцию или на устройство',{exact:true}).click();await page.getByRole('button',{name:'В Google Диск',exact:true}).click();
     await page.locator('#voiceGroup option').nth(40).waitFor({state:'attached'});assert.equal(await page.locator('#voiceGroup option').count(),41);
     await page.locator('#voiceGroup').selectOption('studio-39');await page.locator('#voiceSource option').nth(14).waitFor({state:'attached'});assert.equal(await page.locator('#voiceSource option').count(),15);
     await page.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();await page.locator('.voice-source-details summary').click();await page.locator('#voiceSource').selectOption('variant-39-13');
@@ -52,7 +54,7 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
     const job=await page.evaluate(()=>window.submitted);assert.equal(job.version,3);assert.equal(job.quality,width===1280?'2160':'best');assert.equal(job.metadata.ids.mal,'57334');assert.equal(job.translation.player,'Kodik');assert.equal(job.dub,'Studio 39');assert.equal(job.translation.variantId,'variant-39-13');assert.deepEqual(job.entries.map(e=>e.number),[1,3]);
     assert.equal(discoveryCalls,2);assert.equal(inspectionCalls,4);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal overflow at '+width);
-    if(width===1280){const layout=await page.locator('.world-title-grid').boundingBox();assert.ok(layout.width>1000,'The dossier uses the desktop content width');}
+    if(width===1280){const layout=await page.locator('.online-title-page .title-page-columns').boundingBox();assert.ok(layout.width>1000,'The dossier uses the desktop content width');}
     await page.screenshot({path:path.join(ROOT,'test-output','voice-import-'+width+'.png'),fullPage:true});
     assert.deepEqual(errors,[]);assert.ok(!external.some(url=>url.includes('.mp4')||url.includes('kodikplayer.com')),'The UI never downloads source video');
     await context.close();console.log('PASS exact-title grouped voice import at '+width+'px');
