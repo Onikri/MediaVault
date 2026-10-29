@@ -59,7 +59,13 @@ class RelayTests(unittest.TestCase):
         class Http:
             def document(self,*a,**kw):raise AssertionError('Oracle response must not replace device bytes')
         with patch.object(self.relay,'available',return_value=True),patch.object(module,'document',return_value=('<h1 class="bookinfo-title">Наруто</h1>',BOOK,{})) as device:
-            self.assertEqual(inspect(BOOK,Http())['title'],'Наруто');device.assert_called_once_with(BOOK)
+            self.assertEqual(inspect(BOOK,Http())['title'],'Наруто');device.assert_called_once_with(BOOK,timeout=28)
+    def test_device_html_uses_remaining_chapter_budget(self):
+        from manga_novelcool import inspect
+        from types import SimpleNamespace
+        with patch.object(self.relay,'available',return_value=True),patch.object(module,'document') as device:
+            with self.assertRaises(SourceError):inspect(BOOK,SimpleNamespace(deadline=time.monotonic()-1))
+            device.assert_not_called()
 
 class WorkerTests(unittest.TestCase):
     def test_worker_revalidates_destination_before_network_and_keeps_key_on_device(self):

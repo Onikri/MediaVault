@@ -42,6 +42,7 @@ def run(server,identity,key,stop=None):
     parsed=urlsplit(server)
     if parsed.scheme!='https' or parsed.username or parsed.password or parsed.path not in ['','/'] or parsed.query or parsed.fragment:raise ValueError('Expected HTTPS backend origin')
     session=requests.Session();session.trust_env=False
+    state=None
     def request(path,raw=None,meta=''):
         method='GET' if raw is None else 'POST';stamp=str(int(time.time()));nonce=secrets.token_urlsafe(18)
         signature=base64.b64encode(key.sign(message(method,path,stamp,nonce,raw or b'',meta))).decode()
@@ -50,12 +51,15 @@ def run(server,identity,key,stop=None):
     while stop is None or not stop.is_set():
         try:
             task=request('/source-device/poll').get('task')
+            if state!='connected':print(json.dumps({'sourceDevice':'connected'}),flush=True);state='connected'
             if not task:continue
             try:raw,final=retrieve(task);info={'ok':True,'url':final}
             except Exception:raw=b'';info={'ok':False,'url':task['url']}
             meta=base64.b64encode(json.dumps(info,separators=(',',':')).encode()).decode()
             request('/source-device/result/'+task['id'],raw,meta)
-        except (requests.RequestException,ValueError,KeyError):
+            print(json.dumps({'sourceTask':task['kind'],'ok':info['ok'],'bytes':len(raw)}),flush=True)
+        except (requests.RequestException,ValueError,KeyError) as error:
+            if state!='reconnecting':print(json.dumps({'sourceDevice':'reconnecting','reason':type(error).__name__}),flush=True);state='reconnecting'
             if stop is None:time.sleep(2)
             else:stop.wait(2)
 

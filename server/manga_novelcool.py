@@ -1,5 +1,5 @@
 """Public NovelCool RU HTML reader. No script execution or account data."""
-import re
+import re,time
 from urllib.parse import urlsplit,urljoin
 from bs4 import BeautifulSoup
 from source_parser import SourceError,public_url
@@ -9,7 +9,11 @@ HOST='ru.novelcool.com'
 def document(url,http):
     from manga_sources import guard
     from source_relay import relay,document as device_document
-    if relay.available():text,final,_=device_document(url)
+    if relay.available():
+        deadline=getattr(http,'deadline',None)
+        timeout=min(28,deadline-time.monotonic()) if isinstance(deadline,(int,float)) else 28
+        if timeout<=0:raise SourceError('Источник не уложился во время проверки. Повтори запрос.')
+        text,final,_=device_document(url,timeout=timeout)
     else:text,final,_=http.document(url)
     if urlsplit(final).hostname!=HOST:raise SourceError('NovelCool перенаправил чтение на другой сайт.')
     soup=BeautifulSoup(text,'html.parser');guard(soup)

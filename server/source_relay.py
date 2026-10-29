@@ -93,8 +93,8 @@ class Relay:
 
 relay=Relay(Path(os.getenv('DATA_DIR','/data'))/'source-device-public-keys.json')
 
-def document(url,referer=''):
-    raw,final,headers=relay.fetch(url,'document',referer)
+def document(url,referer='',timeout=28):
+    raw,final,headers=relay.fetch(url,'document',referer,timeout)
     return raw.decode('utf-8',errors='replace'),final,headers
 
 def image(url,referer):
