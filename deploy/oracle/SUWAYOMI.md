@@ -43,8 +43,13 @@ volume/chapter labels, preserves chapter0 and fractions, and follows the site's
 ten-image reader pagination only within the selected chapter (maximum500pages).
 Next-chapter navigation and external redirects cannot become extra pages.
 The normal online reader and CBZ exporter consume these native chapter URLs.
-Live checks found686chapters for Naruto and58images across chapter1pagination;
-the actual website/image checks remain separate from sanitized HTML contracts.
+Live device checks found686chapters for Naruto and58images across chapter1
+pagination. A real CBZ contained58images,5881644bytes and valid ZIP CRCs; the
+search/read/archive pass took8375ms. These live checks are separate from the
+sanitized HTML contracts. Oracle's public HTTP client and ordinary Chromium
+instead received an HTTP200 response containing only a155-byte "404 Not Found"
+HTML placeholder. This source is not certified working from that VM; it remains
+selectable and its failure is reported. Do not report the device run as VM proof.
 
 The Keiyoushi repository uses `https://github.com/keiyoushi/extensions/raw/repo/index.pb`; the legacy JSON index currently contains migration placeholders. On 2026-10-28, the local server returned **1435 extension packages**. This is not a count of verified working sites. Only a small RU/EN/JA/KO set is installed initially. Owners can add catalogued packages in **Import → Manga → More sources**. Source code runs inside the restricted Suwayomi container; arbitrary APK uploads are not exposed.
 
