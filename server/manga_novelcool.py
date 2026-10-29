@@ -6,6 +6,16 @@ from source_parser import SourceError,public_url
 
 HOST='ru.novelcool.com'
 
+def document(url,http):
+    from manga_sources import guard
+    text,final,_=http.document(url)
+    if urlsplit(final).hostname!=HOST:raise SourceError('NovelCool перенаправил чтение на другой сайт.')
+    soup=BeautifulSoup(text,'html.parser');guard(soup)
+    heading=soup.title.get_text(' ',strip=True) if soup.title else ''
+    if re.fullmatch(r'404(?:\s+not\s+found)?',heading,re.I):
+        raise SourceError('NovelCool вернул серверу страницу «404 Not Found» вместо манги. Адрес виден в поиске, но этот ответ не содержит глав. Повтори подключение позже.')
+    return text,final,soup
+
 
 def chapter_id(url):
     parsed=urlsplit(url)
@@ -31,15 +41,13 @@ def chapters(soup,base):
 
 
 def inspect(url,http):
-    from manga_sources import guard,clean
+    from manga_sources import clean
     initial=urlsplit(url);identity=chapter_id(url)
     if initial.scheme!='https' or initial.hostname!=HOST or initial.query or initial.fragment or not (identity or re.fullmatch(r'/novel/[^/]+\.html',initial.path)):
         raise SourceError('Нужна публичная ссылка NovelCool RU на мангу или главу.')
     # This ten-image mode is linked by the site's own reader controls.
     if identity:url=url.rstrip('/').rsplit('/',1)[0]+'/'+identity+'-10-1.html'
-    text,final,_=http.document(url)
-    if urlsplit(final).hostname!=HOST:raise SourceError('NovelCool перенаправил чтение на другой сайт.')
-    soup=BeautifulSoup(text,'html.parser');guard(soup);entries=chapters(soup,final);pages=[]
+    text,final,soup=document(url,http);entries=chapters(soup,final);pages=[]
     if identity:
         book=next((a for a in soup.select('a[href]') if re.fullmatch(r'/novel/[^/]+\.html',urlsplit(urljoin(final,a.get('href',''))).path) and urlsplit(urljoin(final,a['href'])).hostname==HOST),None)
         title=clean(book.get_text(' ',strip=True)) if book else ''
@@ -59,9 +67,8 @@ def inspect(url,http):
             if not next_url or next_url in seen:break
             if urlsplit(next_url).hostname!=HOST:raise SourceError('NovelCool передал страницу другого сайта.')
             if chapter_id(next_url)!=identity:break # next chapter is not a page
-            text,final,_=http.document(next_url)
+            text,final,soup=document(next_url,http)
             if chapter_id(final)!=identity:raise SourceError('NovelCool подменил выбранную главу.')
-            soup=BeautifulSoup(text,'html.parser');guard(soup)
         else:raise SourceError('NovelCool превысил лимит страниц навигации.')
         if not pages:raise SourceError('В этой главе NovelCool нет изображений манги.')
     else:

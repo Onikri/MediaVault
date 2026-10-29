@@ -1,5 +1,6 @@
 """Sanitized HTML contracts; real website/image runs are recorded separately."""
-import sys,unittest
+import sys,unittest,tempfile,zipfile,io
+from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from manga_novelcool import inspect
@@ -15,6 +16,21 @@ class Http:
     def document(self,url):self.calls.append(url);return self.rows[url],url,{}
 
 class NovelCoolTests(unittest.TestCase):
+    def test_actual_oracle_soft_404_is_reported_as_a_failed_source_not_an_empty_work(self):
+        with self.assertRaisesRegex(SourceError,'404 Not Found'):
+            inspect(BOOK,Http({BOOK:'<html><title>404 Not Found</title><h1>404</h1>Apache/1.0.15</html>'}))
+    def test_cbz_uses_all_paginated_reader_images_instead_of_generic_single_html_page(self):
+        from manga_download import download_chapter
+        from PIL import Image
+        buffer=io.BytesIO();Image.new('RGB',(2,2),'white').save(buffer,'PNG');raw=buffer.getvalue()
+        pages=['https://images.example/1.png','https://images.example/2.png']
+        class Downloader:
+            def document(self,*a,**kw):raise AssertionError('Generic HTML parser loses pagination')
+            def download(self,url,target,**kw):Path(target).write_bytes(raw)
+        with tempfile.TemporaryDirectory() as directory,patch('manga_sources.inspect',return_value={'url':CHAPTER,'pages':pages}) as parser:
+            result=download_chapter(CHAPTER,directory,Downloader())
+            with zipfile.ZipFile(result) as archive:self.assertEqual(archive.namelist(),['0001.png','0002.png'])
+            parser.assert_called_once()
     def test_title_chapter_zero_fraction_and_volume_are_preserved(self):
         text='<h1 class="bookinfo-title">Наруто</h1><div class="chp-item"><a href="/chapter/1-0/123/" title="1 - 0 Начало"></a></div><div class="chp-item"><a href="/chapter/2-12.5/124/" title="2 - 12.5 Экстра"></a></div>'
         data=inspect(BOOK,Http({BOOK:text}))
