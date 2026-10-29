@@ -10,6 +10,31 @@ from source_parser import public_url,SourceError,playback_headers,PublicHttp
 slots=threading.BoundedSemaphore(2);lock=threading.RLock();cache={}
 FIELDS='id,title,duration,url,http_headers,ext,acodec,vcodec,protocol,is_live,live_status,availability,available_at'
 
+def remote_audio(value):
+    url=public_url(value)
+    if not slots.acquire(False):raise HTTPException(429,'Подготовка музыки занята. Повтори через несколько секунд.')
+    http=PublicHttp(timeout=(4,8),deadline=time.monotonic()+20);response=None
+    try:
+        response,final=http._open(url,byte_range='bytes=0-31')
+        mime=response.headers.get('Content-Type','').split(';')[0].lower()
+        signatures={'audio/mpeg':lambda p:p.startswith(b'ID3') or p[:1]==b'\xff',
+                    'audio/mp4':lambda p:p[4:8]==b'ftyp','audio/webm':lambda p:p.startswith(b'\x1a\x45\xdf\xa3'),
+                    'audio/ogg':lambda p:p.startswith(b'OggS'),'audio/flac':lambda p:p.startswith(b'fLaC'),
+                    'audio/wav':lambda p:p.startswith(b'RIFF') and p[8:12]==b'WAVE',
+                    'audio/aac':lambda p:p[:1]==b'\xff'}
+        match=re.fullmatch(r'bytes 0-31/([0-9]+)',response.headers.get('Content-Range',''))
+        if response.status_code!=206 or not match or not 32<=int(match[1])<=256*1024**2 or mime not in signatures:
+            raise SourceError('Нужна прямая ссылка на аудиофайл до 256 МБ с поддержкой перемотки.')
+        prefix=b''
+        for block in response.iter_content(32):
+            prefix+=block[:32-len(prefix)]
+            if len(prefix)>=32:break
+        if not signatures[mime](prefix):raise SourceError('Ссылка не предоставила аудиофайл.')
+        return {'url':final,'headers':{},'mime':mime,'duration':0,'title':''}
+    finally:
+        if response is not None:response.close()
+        http.close();slots.release()
+
 def wait_available(timestamp,deadline):
     # yt-dlp's downloader observes this site-supplied not-before timestamp.
     # Extracting URL-only metadata skips that downloader, so we must observe it.
@@ -18,7 +43,7 @@ def wait_available(timestamp,deadline):
         raise HTTPException(502,'YouTube вернул некорректное время готовности аудио.')
     delay=max(0,timestamp-time.time())
     if time.monotonic()+delay>deadline-5:
-        raise HTTPException(504,'YouTube требует более длительной подготовки. Открой официальный плеер или повтори позднее.')
+        raise HTTPException(504,'YouTube требует более длительной подготовки. Повтори запрос позднее.')
     if delay:time.sleep(delay+.05)
 
 def verify_audio(url,headers,ext,deadline):
@@ -35,7 +60,7 @@ def verify_audio(url,headers,ext,deadline):
         valid=prefix[4:8]==b'ftyp' if ext=='m4a' else prefix.startswith(b'\x1a\x45\xdf\xa3')
         if not valid:raise SourceError('Invalid audio header')
     except SourceError:
-        raise HTTPException(502,'YouTube не разрешил серверу прочитать аудио. Повтори подготовку или открой официальный плеер.') from None
+        raise HTTPException(502,'YouTube не разрешил серверу прочитать аудио. Повтори подготовку аудио позднее.') from None
     finally:
         if response is not None:response.close()
         http.close()
@@ -64,10 +89,10 @@ def audio_url(value):
 def failure(detail):
     lower=detail.lower()
     if 'not a bot' in lower or 'confirm you' in lower or 'sign in' in lower or '429' in lower:
-        return 'YouTube требует проверку серверного IP Oracle. Можно открыть официальный плеер YouTube.'
+        return 'YouTube требует проверку серверного IP Oracle. Серверный аудиопоток недоступен.'
     if 'private' in lower or 'members-only' in lower or 'unavailable' in lower or 'age' in lower:
         return 'Эта запись недоступна серверу без входа или имеет ограничения доступа.'
-    return 'YouTube не предоставил доступную аудиодорожку. Можно повторить запрос или открыть официальный плеер.'
+    return 'YouTube не предоставил доступную аудиодорожку. Повтори подготовку аудио позднее.'
 
 def extract(identity,refresh=False):
     now=time.monotonic();deadline=now+65
@@ -127,6 +152,22 @@ def install(app,owner):
             token,session=create(subject,data['headers'],'music');session.expires=time.monotonic()+ttl;session.audio_mime=data['mime']
             resource=session.resource(data['url'])
             return {'id':token,'streamUrl':'/online/'+token+'/'+resource,'mime':data['mime'],'duration':data['duration'],'title':data['title'],'expiresIn':ttl,'youtubeId':identity}
+        except BaseException:
+            if token:
+                with sessions_lock:sessions.pop(token,None)
+            raise
+        finally:
+            watcher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):await watcher
+
+    @app.post('/music/remote')
+    async def prepare_remote(body:Play,request:Request,subject=Depends(owner)):
+        disconnected=asyncio.Event();watcher=asyncio.create_task(watch_disconnect(request,disconnected));token=None
+        try:
+            data=await run_in_threadpool(remote_audio,body.url)
+            if disconnected.is_set():raise HTTPException(499,'Подготовка аудио отменена.')
+            token,session=create(subject,{},'music-file');session.audio_mime=data['mime']
+            return {'id':token,'streamUrl':'/online/'+token+'/'+session.resource(data['url']),'mime':data['mime'],'duration':0,'expiresIn':7200}
         except BaseException:
             if token:
                 with sessions_lock:sessions.pop(token,None)

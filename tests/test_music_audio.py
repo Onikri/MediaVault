@@ -103,5 +103,27 @@ class MusicAudio(unittest.TestCase):
     music.verify_audio(CDN,{},'m4a',time.monotonic()+10)
    self.assertEqual(caught.exception.status_code,502);self.assertNotIn('googlevideo',caught.exception.detail);client.return_value.close.assert_called_once()
    if failure=='html':response.close.assert_called_once()
+ def test_remote_file_requires_public_url_audio_signature_range_and_bounded_size(self):
+  response=MagicMock();response.status_code=206;response.headers={'Content-Type':'audio/mpeg','Content-Range':'bytes 0-31/1000'};response.iter_content.return_value=[b'ID3'+b'0'*29]
+  with patch.object(music,'public_url',return_value='https://music.example/song.mp3') as validate,patch.object(music,'PublicHttp') as client:
+   client.return_value._open.return_value=(response,'https://cdn.example/song.mp3');data=music.remote_audio('https://music.example/song.mp3')
+   self.assertEqual(data['url'],'https://cdn.example/song.mp3');self.assertEqual(data['mime'],'audio/mpeg');validate.assert_called_once();response.close.assert_called_once();client.return_value.close.assert_called_once()
+  for changes in [{'Content-Type':'text/html'},{'Content-Range':'bytes 0-31/999999999'},{'Content-Range':'invalid'}]:
+   response.headers={'Content-Type':'audio/mpeg','Content-Range':'bytes 0-31/1000',**changes}
+   with patch.object(music,'public_url',return_value='https://music.example/song.mp3'),patch.object(music,'PublicHttp') as client,self.assertRaises(SourceError):
+    client.return_value._open.return_value=(response,'https://cdn.example/song.mp3');music.remote_audio('https://music.example/song.mp3')
+  self.assertTrue(music.slots.acquire(False));music.slots.release()
+ def test_remote_file_api_auth_capability_and_cancellation(self):
+  app=FastAPI();online.install(app,lambda:'A');music.install(app,lambda:'A');client=TestClient(app)
+  with patch.object(music,'remote_audio',return_value=self.data()):
+   data=client.post('/music/remote',json={'url':'https://music.example/song.mp3'}).json()
+  self.assertEqual(online.sessions[data['id']].kind,'music-file');self.assertNotIn('music.example',json.dumps(data));client.delete('/online/'+data['id'])
+  def denied():raise HTTPException(401,'Sign in')
+  app=FastAPI();music.install(app,denied)
+  with patch.object(music,'remote_audio') as resolver:self.assertEqual(TestClient(app).post('/music/remote',json={'url':'https://music.example/song.mp3'}).status_code,401);resolver.assert_not_called()
+  async def disconnected(request,event):event.set()
+  with patch.object(online,'watch_disconnect',side_effect=disconnected),patch.object(music,'remote_audio',return_value=self.data()):
+   app=FastAPI();music.install(app,lambda:'A');self.assertEqual(TestClient(app).post('/music/remote',json={'url':'https://music.example/song.mp3'}).status_code,499)
+  self.assertEqual(online.sessions,{})
 
 if __name__=='__main__':unittest.main()

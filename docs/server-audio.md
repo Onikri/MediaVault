@@ -30,12 +30,14 @@ The Oracle image includes Node22 for yt-dlp's EJS runtime. yt-dlp and the Node
 image are version-pinned; updates are reviewed and deployed, rather than a live
 `pip install -U` mutating the running container. yt-dlp alone does not guarantee
 that YouTube will serve an Oracle datacenter IP. Verification, access restrictions
-and missing formats are reported as preparation failures. On media preparation failures (HTTP502/504), the visible official YouTube
-player opens automatically with an explanation. It uses YouTube playback and
-advertising rules; it is not a server audio stream. Authentication and rate-limit
-errors stay actionable without switching providers. Spotify keeps its own SDK and
-account permissions. Collapsing server audio keeps playback running; collapsing
-the official YouTube embed still pauses its video.
+and missing formats are reported as preparation failures. The music module has
+no YouTube iframe, iframe API, browser Spotify playback SDK or provider-player
+fallback. Songs selected from a Spotify playlist use their title and artist to
+resolve audio through Oracle as well. Playlist/account management remains a
+separate OAuth feature. Closing details or changing browser visibility does not
+pause audio. Details open only when the user requests them; errors stay compact
+and Play retries the Oracle preparation.
+
 
 Protocol references: [yt-dlp](https://github.com/yt-dlp/yt-dlp),
 [EJS runtime](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
@@ -45,3 +47,9 @@ proxy boundaries. `music-audio-browser.cjs` decodes real generated AAC and check
 seek/collapse/pause/cleanup at390px and1440px, with the resolver explicitly mocked.
 Actual YouTube extraction and streamed bytes from Oracle are checked separately;
 fixture success must never be described as successful YouTube playback.
+
+Direct external audio URLs use owner-authenticated POST `/music/remote`, not a
+browser connection to the media host. The server validates public HTTPS addresses
+and redirects, actual audio signatures/MIME, Range support and a256MiB file limit
+before granting a short-lived music-file capability. Local device files and
+already-decrypted personal-library media stay on the device.
