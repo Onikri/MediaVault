@@ -113,7 +113,9 @@ jobs:
             npm run test:lmt &&
             npm run test:gemma &&
             npm run test:trusted &&
-            npm run test:suwayomi
+            npm run test:suwayomi &&
+            npm run test:world &&
+            npm run test:music-nav
           } 2>&1 | tee test-output/browser-ci.log
           result=${PIPESTATUS[0]}
           {

@@ -53,6 +53,10 @@ def skip_times(identity,episode,duration):
         return {'intervals':parts,'source':'AniSkip'}
     except (HTTPException,SourceError,ValueError,TypeError):return {'intervals':[],'source':'AniSkip','message':'Разметки этой серии пока нет.'}
 def install(app):
+    @app.get('/music/metadata')
+    def song_metadata(title:str='',artist:str=''):
+        from music_metadata import metadata
+        return metadata(title,artist)
     @app.get('/music/search')
     def search(title:str='',artist:str=''):
         title=title.strip();artist=artist.strip()
