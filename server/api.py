@@ -248,7 +248,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 28, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 29, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -441,6 +441,7 @@ class MangaGlobalSearch(StrictBody):
     language:str=Field(default='all',pattern=r'^(all|ru|en|ja|ko)$')
     sourceIds:list[str]|None=Field(default=None,max_length=1000)
     refresh:bool=False
+    title:dict|None=None
 
 def manga_discovery_call(action,*args):
     from manga_discovery import SearchLimit,SearchMissing
@@ -457,7 +458,7 @@ def discovery_manga_sources(language:str='all',q:str='',subject=Depends(owner)):
 @app.post('/discovery/manga/search',status_code=202)
 def discovery_manga_search(body:MangaGlobalSearch,subject=Depends(owner)):
     from manga_discovery import manager
-    return manga_discovery_call(manager().start,subject,body.query,body.language,body.sourceIds,body.refresh)
+    return manga_discovery_call(manager().start,subject,body.query,body.language,body.sourceIds,body.refresh,body.title)
 
 @app.get('/discovery/manga/search/{identity}')
 def discovery_manga_status(identity:str,subject=Depends(owner)):
@@ -525,7 +526,8 @@ class MangaInspection(StrictBody):
 
 @app.post('/manga/inspect')
 def manga_inspect(body:MangaInspection,subject=Depends(owner)):
-    from manga_sources import inspect,title_aliases
+    from manga_sources import title_aliases
+    from manga_inspection import inspect
     from title_identity import match_title
     value=inspect(body.url)
     if body.title:
@@ -533,6 +535,11 @@ def manga_inspect(body:MangaInspection,subject=Depends(owner)):
         candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('identityTitles') or value.get('aliases') or [])])),'kind':'manga','year':value.get('year'),'ids':value.get('ids') or {}}
         if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
     return value
+
+@app.post('/manga/summary')
+def manga_summary(body:MangaInspection,subject=Depends(owner)):
+    value=manga_inspect(body,subject)
+    return {key:value.get(key) for key in ('provider','providerName','language','chapterCount','volumeCount','truncated')}
 
 
 class QualityInspection(StrictBody):

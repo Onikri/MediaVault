@@ -161,6 +161,33 @@ class MangaDiscoveryTests(unittest.TestCase):
         client.return_value.get.assert_called_once_with('/source/1/search',{'searchTerm':'One P','pageNum':1},timeout=4)
         self.assertEqual(results[0]['title'],'One Piece: Adventure');client.return_value.close.assert_called_once()
 
+class MangaTitleDiscoveryTests(unittest.TestCase):
+ def setUp(self):self.env=patch.dict(os.environ,ENV);self.env.start()
+ def tearDown(self):self.env.stop()
+ def test_chosen_title_uses_its_own_language_aliases_and_filters_other_titles(self):
+  selected={'kind':'manga','title':'English title','titles':{'ru':'Русское название','ja':'日本語の題名','ko':'한국어 제목'}}
+  with tempfile.TemporaryDirectory() as directory,patch.object(discovery.bridge,'sources',return_value=SOURCES):
+   manager=discovery.Discovery(directory,start_workers=False)
+   try:
+    job=manager.start('A','English title','all',title=selected)
+    rows=manager.db.execute('SELECT source FROM work WHERE job=?',(job['id'],)).fetchall()
+    by_lang={json.loads(r[0])['lang']:json.loads(r[0]) for r in rows}
+    self.assertEqual(by_lang['ru']['_queries'][0],'Русское название');self.assertEqual(by_lang['ja']['_queries'][0],'日本語の題名');self.assertEqual(by_lang['ko']['_queries'][0],'한국어 제목')
+    with patch.object(discovery.bridge,'Client') as client:
+     client.return_value.get.return_value={'mangaList':[{'id':1,'title':'Русское название'},{'id':2,'title':'Different manga'}]}
+     result=discovery.search_source(by_lang['ru'],'English title')
+     self.assertEqual([v['title'] for v in result],['Русское название'])
+   finally:manager.close()
+ def test_failed_refresh_preserves_indexed_source_metadata(self):
+  with tempfile.TemporaryDirectory() as directory,patch.object(discovery.bridge,'sources',return_value=SOURCES):
+   manager=discovery.Discovery(directory,fetch=fixture)
+   try:
+    first=wait_done(manager,'A',manager.start('A','One Piece','all',['1'])['id'])
+    manager.fetch=lambda *a:(_ for _ in ()).throw(SourceError('temporarily unavailable'))
+    refreshed=wait_done(manager,'A',manager.start('A','One Piece','all',['1'],refresh=True)['id'])
+    self.assertEqual(refreshed['progress']['failed'],1);self.assertEqual(len(refreshed['results']),1);self.assertTrue(refreshed['results'][0]['stale'])
+   finally:manager.close()
+
 class MangaDiscoveryApiTests(unittest.TestCase):
  def test_routes_are_owner_isolated_and_expose_versioned_capability(self):
     import api
@@ -178,7 +205,7 @@ class MangaDiscoveryApiTests(unittest.TestCase):
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('B')).status_code,404)
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('A')).status_code,200)
                 self.assertEqual(client.post('/discovery/manga/search',headers=auth('A'),json={'query':'abc','sourceIds':['999']}).status_code,422)
-                self.assertEqual(client.get('/health').json()['version'],28);self.assertTrue(client.get('/health').json()['mangaGlobalDiscovery'])
+                self.assertEqual(client.get('/health').json()['version'],29);self.assertTrue(client.get('/health').json()['mangaGlobalDiscovery'])
         finally:manager.close()
 
 class VoiceSuggestionTests(unittest.TestCase):

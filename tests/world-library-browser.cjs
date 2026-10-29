@@ -62,7 +62,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let vi
  const identity=await browser.newPage({viewport:{width:1280,height:900}});
  await identity.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/world-harness.html?identity=1');
  await identity.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();
- assert.deepEqual(await identity.getByLabel('Источник чтения').locator('option').allTextContents(),['Выбери источник','Source A · Русский']);
+ assert.equal(await identity.locator('.title-source-option').count(),1);assert.match(await identity.locator('.title-source-option').innerText(),/Source A/);
  assert.deepEqual(await identity.evaluate(()=>window.inspected),['https://media.example/__manga/suwayomi/m/42']);
  await identity.getByText('Другой источник или своя ссылка',{exact:true}).click();
  await identity.getByRole('button',{name:'Обновить источники',exact:true}).click();
@@ -73,10 +73,10 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let vi
  await fallback.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/world-harness.html?fallback=1');
  await fallback.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();
  assert.deepEqual(await fallback.evaluate(()=>window.inspected),['https://media.example/__manga/suwayomi/m/42','https://mangalib.me/ru/195--naruto']);
- assert.equal(await fallback.getByLabel('Источник чтения').locator('option').count(),3,'Failed source remains selectable');
- await fallback.getByLabel('Источник чтения').selectOption('https://media.example/__manga/suwayomi/m/42');
+ assert.equal(await fallback.locator('.title-source-option').count(),2,'Failed source remains selectable');
+ await fallback.locator('.title-source-option').filter({hasText:'Source A'}).click();
  await fallback.getByRole('alert').filter({hasText:'HTTP 404'}).waitFor();
- assert.equal(await fallback.getByLabel('Источник чтения').inputValue(),'https://media.example/__manga/suwayomi/m/42','Explicit source selection is never replaced');
+ assert.equal(await fallback.locator('.title-source-option').filter({hasText:'Source A'}).getAttribute('aria-pressed'),'true','Explicit source selection is never replaced');
  await fallback.close();console.log('PASS automatic source failure recovers to native MangaLib while manual selection is preserved');
 
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();for(const name of['world-harness.html','world-harness.jsx'])await fs.rm(path.join(DIR,name),{force:true});});
