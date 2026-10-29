@@ -211,10 +211,11 @@ app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET",
 
 @app.middleware("http")
 async def limits(request: Request, call_next):
-    if request.method == "POST":
-        maximum=14*1024*1024 if request.url.path=="/reader/translate" else 512*1024
+    if request.method in {"POST","PUT","PATCH","DELETE"}:
         if request.headers.get("origin") not in (None, ORIGIN):
             return JSONResponse({"detail": "Origin denied"}, status_code=403)
+    if request.method in {"POST","PUT","PATCH"}:
+        maximum=14*1024*1024 if request.url.path=="/reader/translate" else 2*1024*1024 if request.url.path=="/music/youtube/session" else 512*1024
         try:
             if int(request.headers.get("content-length", "0")) > maximum:
                 return JSONResponse({"detail": "Request too large"}, status_code=413)
