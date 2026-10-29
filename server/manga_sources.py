@@ -33,6 +33,7 @@ SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('man
        MangaSite('mangakatana','MangaKatana · EN','https://mangakatana.com','katana',languages=('en',)),
        MangaSite('mangadex','MangaDex','https://mangadex.org','dex',languages=('ru','en','ja','ko')),
        MangaSite('mangalib','MangaLib','https://mangalib.me','lib',('mangalib.org',)),
+       MangaSite('hentailib','HentaiLib','https://hentailib.me','lib',('hentailib.org',)),
        MangaSite('novelcool-ru','NovelCool','https://ru.novelcool.com','novelcool'),
        MangaSite('senmanga','Sen Manga · JA','https://raw.senmanga.com','sen',languages=('ja',),format='manga'),
        MangaSite('mangaraw','MangaRaw · JA','https://mangaraw.co.uk','mangaraw',languages=('ja',),format='manga'),
@@ -126,7 +127,7 @@ def search_title(title,language='auto',format='all'):
             for query in queries[:2]:
                 if site.family in {'dex','lib'}:
                     from manga_catalog_adapters import dex_search,lib_search
-                    candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http)
+                    candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http,4 if site.id=='hentailib' else 1)
                 elif site.family=='webtoons':
                     from manga_webtoons import search
                     candidates=search(query,site,http)
