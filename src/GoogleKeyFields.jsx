@@ -22,7 +22,7 @@ export default function GoogleKeySettings({scope,onApply,onSaveServer,service,se
  return <details className="reader-google-keys" open={!server}>
   <summary>{server?'Ключи Google на Oracle':'Личные ключи Google AI Studio'}{server&&status?' · '+status.keyCount+' подключено':''}</summary>
   <fieldset className="reader-google-key"><legend>До трёх ключей</legend>
-   <p className="reader-hint">До трёх страниц одновременно. Ключи одного проекта разделяют квоты. При ограничении Google очередь ожидает.</p>
+   <p className="reader-hint">По три страницы в запросе, до трёх запросов одновременно (9 страниц). Ключи одного проекта разделяют квоты. При ограничении Google очередь ожидает.</p>
    {keys.map((key,i)=><div className="reader-key-slot" key={i}>
     <label>{server?'Серверный ключ':'Личный ключ'} {i+1}
      <input aria-label={server?i?'Ключ Google AI Studio '+(i+1):'Ключ Google AI Studio':i?'Личный ключ быстрого перевода '+(i+1):'Личный ключ быстрого перевода'} type="password" autoComplete="new-password" spellCheck={false} value={key} placeholder={removed.includes(i)?'Будет удалён после сохранения':status?.slots?.some(s=>s.slot===i)?'Сохранён на Oracle · пустое поле сохраняет его':'Не добавлен'} onChange={e=>{dirty.current=true;setRemoved(old=>old.filter(n=>n!==i));setKeys(old=>old.map((v,n)=>n===i?e.target.value:v));}}/>

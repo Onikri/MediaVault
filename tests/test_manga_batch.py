@@ -136,6 +136,19 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
   values,meta=await provider.translate(pages[:1]);self.assertEqual(len(values),1);self.assertEqual(m.calls,['gemma-4-31b-it']*2)
   m=Models();provider=GemmaBatchTranslator(QuotaPacer(),'/unused',client=NS(aio=NS(models=m)))
   values,meta=await provider.translate(pages[:1]);self.assertEqual(meta['model'],'gemma-4-26b-a4b-it');self.assertEqual(len(values),1)
+ async def test_nine_page_window_queues_three_packs_of_three(self):
+  class Archive:
+   def acquire(self):pass
+   def release(self):pass
+  with tempfile.TemporaryDirectory() as directory:
+   cache=JsonCache(directory);engine=RealtimeChapterOrchestrator(None,None,None,cache);engine.start=lambda:None
+   try:
+    _,jobs=await engine.window({'scope':'fixture','manifest':'m','names':[str(i) for i in range(20)],'archive':Archive()},1)
+    self.assertEqual(len(jobs),9);groups=[]
+    while not engine.queue.empty():
+     priority,_,pack=engine.queue.get_nowait();groups.append((priority,[j['page'] for j in pack]));engine.queue.task_done()
+    self.assertEqual(groups,[(0,[1,2,3]),(1,[4,5,6]),(2,[7,8,9])])
+   finally:await engine.close();await cache.close()
  async def test_slow_multi_page_cloud_call_splits_and_validated_pages_reach_cache(self):
   class Archive:
    def acquire(self):pass
@@ -247,7 +260,7 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
     _,jobs=await engine.window(source,1);await asyncio.wait_for(entered.wait(),2)
     self.assertTrue(jobs[0]['future'].done());self.assertTrue(jobs[1]['future'].done());self.assertFalse(jobs[2]['future'].done())
     cached=await cache.get(engine.key(source,2),source['scope']);self.assertEqual(cached['regions'][0]['uid'],'P2_B1')
-    progress=engine.snapshot(jobs[2]);self.assertEqual(progress['phase'],'google');self.assertEqual(progress['attempt'],2);self.assertEqual(progress['totalRegions'],1);self.assertEqual(progress['completedRegions'],0)
+    progress=engine.snapshot(jobs[2]);self.assertEqual(progress['phase'],'google');self.assertEqual(progress['attempt'],3);self.assertEqual(progress['totalRegions'],1);self.assertEqual(progress['completedRegions'],0)
     self.assertNotIn('source_bytes',json.dumps(progress));release.set()
     with self.assertRaisesRegex(RuntimeError,'later-page'):await jobs[2]['future']
     self.assertEqual((await cache.get(engine.key(source,2),source['scope']))['page'],2)

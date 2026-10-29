@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Worker-safe fitting; every line is measured with the actual Cyrillic font.
 export function fitComicText(text,box,measure,{min=10,max=42,oval=true}={}){
- const [x,y,x2,y2]=box,w=(x2-x)*.8,h=(y2-y)*.8,words=String(text).normalize('NFC').trim().split(/\s+/);
+ const [x,y,x2,y2]=box,w=(x2-x)*.8,h=(y2-y)*.8,words=String(text).normalize('NFC').replace(/\.{3,}/g,'…').trim().split(/\s+/);
  const graphemes=value=>typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('ru',{granularity:'grapheme'}).segment(value)].map(x=>x.segment):Array.from(value);
  function tokens(size){
   const out=[];for(const word of words){
-   if(measure(word,size)<=w*(oval?.75:1)||!/^\p{L}+[,.!?…]?$/u.test(word)){out.push(word);continue;}
+   if(measure(word,size)<=w*(oval?.75:1)||!/^\p{L}+[,.!?…:;]*$/u.test(word)){out.push(word);continue;}
    const chars=graphemes(word);let part='';
    for(const c of chars){if(part&&measure(part+c+'-',size)>w*(oval?.75:1)){out.push(part+'-');part=c;}else part+=c;}if(part)out.push(part);
   }return out;

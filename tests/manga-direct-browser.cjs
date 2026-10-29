@@ -25,7 +25,7 @@ createRoot(document.getElementById('root')).render(<MangaReader item={item} cata
  for(const width of[390,1366]){
   const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage(),errors=[],requests=[],modelDownloads=[];let failNext=false;page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(90000);
   await page.addInitScript(detector=>{
-   if(!localStorage.getItem('mv_lmt_settings:direct-test'))localStorage.setItem('mv_lmt_settings:direct-test',JSON.stringify({version:7,engine:'direct',directViaOracle:false,directModel:'gemma-4-26b-a4b-it',directDetector:detector,directRenderVersion:2,inpaint:'fast',font:'auto',allowDownloads:true}));
+   if(!localStorage.getItem('mv_lmt_settings:direct-test'))localStorage.setItem('mv_lmt_settings:direct-test',JSON.stringify({version:9,engine:'direct',directBatchPages:1,directViaOracle:false,directModel:'gemma-4-26b-a4b-it',directDetector:detector,directRenderVersion:2,inpaint:'fast',font:'auto',allowDownloads:true}));
    localStorage.setItem('mediavault_reader_v2:direct-test',JSON.stringify({translate:true,diagnostics:true,mode:'pages',direction:'rtl',preload:2}));
    const NativeWorker=window.Worker;window.actualTimings=[];window.Worker=class extends NativeWorker{constructor(...args){super(...args);this.addEventListener('message',e=>{if(e.data.result?.timings)window.actualTimings.push(e.data.result.timings);});}};
   },process.env.DIRECT_DETECTOR||'en-fast');

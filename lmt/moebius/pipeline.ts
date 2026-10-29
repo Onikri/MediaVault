@@ -23,6 +23,7 @@ export interface Progress {
 }
 
 export interface RunOptions {
+  wholePage?: boolean;
   steps: number;
   guidance: number;
   seed: number;
@@ -158,7 +159,7 @@ export class MoebiusPipeline {
     const imgCHW = canvasToCHW(imageCanvas);
     const maskBin = maskCanvasToBinary(maskCanvas);
     const maskedCHW = makeMaskedCHW(imgCHW, maskBin);
-    const mask64 = maskToLatent(maskBin);
+    const mask64 = maskToLatent(maskBin,opts.wholePage===true);
 
     const maskedLat = await this.encode(maskedCHW);
     // (image latents themselves aren't needed when strength≈1; we start from pure noise)

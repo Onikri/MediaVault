@@ -1,10 +1,10 @@
 import {teleaInpaint} from '../lmt/upstream/lib/inpaint/telea.ts';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {fitComicText,styleFont} from './manga-typeset.js';
-import {prepareInkPatch,compositeInkPatch,dilateInk} from './manga-cleaning.js';
-export const READER_RENDER_VERSION=4;
+import {prepareInkPatch,preparePageInk,compositeInkPatch,dilateInk} from './manga-cleaning.js';
+export const READER_RENDER_VERSION=5;
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
-export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{}}){
+export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page'}){
  const start=performance.now(),bitmap=await createImageBitmap(blob);
  try{
   if(bitmap.width!==page.width||bitmap.height!==page.height||bitmap.width*bitmap.height>24_000_000)throw Error('Размер исходной страницы изменился.');
@@ -25,8 +25,25 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   }
   // Conflicting duplicate boxes must not be painted over one another.
   const conflicts=new Set();for(let i=0;i<plans.length;i++)for(let j=i+1;j<plans.length;j++)if(overlap(plans[i].region.text_bbox,plans[j].region.text_bbox)>.85){conflicts.add(i);conflicts.add(j);}
-  let lamaUnavailable=null;
-  for(const[i,plan]of plans.entries()){
+  let lamaUnavailable=null,modelCalls=0,pageExecution;
+  if(mode==='moebius'&&moebiusStrategy==='page'){
+   const t=performance.now(),eligible=[];
+   for(const[i,plan]of plans.entries())if(conflicts.has(i))records.push({uid:plan.region.uid,method:'declined',reason:'Пересекающиеся текстовые области'});else eligible.push(plan);
+   const merged=preparePageInk(original,eligible.map(p=>p.region)),safe=[];
+   for(const{region,patch}of merged.patches){const plan=eligible.find(p=>p.region===region);if(patch.declined)records.push({uid:region.uid,method:'declined',reason:patch.declined});else{plan.background=patch.background;safe.push(plan);}}
+   if(safe.length&&merged.maskedPixels){
+    status({phase:'cleaning',message:'Moebius · вся страница, общая маска · один проход',cleanedRegions:0,completedRegions:0,totalRegions:safe.length});
+    try{
+     if(!lama)throw Error('Moebius недоступен в этом обработчике');
+     modelCalls++;pageExecution=await lama(working,merged.mask,message=>status({phase:'cleaning',message}));
+     // Enforce the native mask at this boundary, regardless of provider output.
+     for(let n=0;n<merged.mask.length;n++)if(!merged.mask[n])working.data.set(original.data.subarray(n*4,n*4+4),n*4);
+     methods.add('moebius');for(const plan of safe){plan.painted=true;records.push({uid:plan.region.uid,method:'moebius',execution:pageExecution,painted:true,sharedPagePass:true});}
+    }catch(error){lamaUnavailable=error.message;working.data.set(original.data);for(const plan of safe)records.push({uid:plan.region.uid,method:'declined',reason:'Moebius: '+error.message});}
+   }
+   inpaintMs+=performance.now()-t;
+  }
+  for(const[i,plan]of (mode==='moebius'&&moebiusStrategy==='page'?[]:plans).entries()){
    const region=plan.region;if(conflicts.has(i)){records.push({uid:region.uid,method:'declined',reason:'Пересекающиеся текстовые области'});continue;}
    status({phase:'cleaning',message:'Очистка областей · '+(i+1)+' / '+plans.length,cleanedRegions:records.filter(r=>r.painted).length,completedRegions:records.filter(r=>r.painted).length,totalRegions:plans.length});
    const t=performance.now(),patch=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:mode!=='fast'});
@@ -35,7 +52,7 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    try{
     if(mode==='quality'||mode==='moebius'||mode==='hybrid'&&!patch.flat){
      if(lamaUnavailable)throw Error(lamaUnavailable);if(!lama)throw Error('LaMa недоступна в этом обработчике');
-     try{execution=await lama(image,patch.mask,message=>status({phase:'cleaning',message}));}catch(error){lamaUnavailable=error.message;throw error;}
+     try{modelCalls++;execution=await lama(image,patch.mask,message=>status({phase:'cleaning',message}));}catch(error){lamaUnavailable=error.message;throw error;}
      method=mode==='moebius'?'moebius':'lama';write=dilateInk(patch.mask,patch.width,patch.height,2);
     }else if(patch.flat){
      for(let n=0;n<patch.mask.length;n++)if(patch.mask[n])for(let c=0;c<3;c++)image.data[n*4+c]=patch.background[c];method='adaptive-glyph-fill';
@@ -58,9 +75,9 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   }
   const unpainted=records.filter(r=>!r.painted).length;
   if(unpainted)warnings.push('Очищено '+layouts.length+' из '+records.length+' областей. Остальные сохранены в оригинале; перевод доступен под страницей.');
-  if(lamaUnavailable)warnings.push('LaMa: '+lamaUnavailable);
+  if(lamaUnavailable)warnings.push((mode==='moebius'?'Moebius':'LaMa')+': '+lamaUnavailable);
   let cacheImage;if(cache&&!unpainted)cacheImage=await(await canvas.convertToBlob({type:'image/webp',quality:.94})).arrayBuffer();
   const renderedBitmap=canvas.transferToImageBitmap();
-  return {renderedBitmap,cacheImage,warnings,typesetting:{engine:'staged-cyrillic-v2',layouts},inpaint:{requested:mode,methods:[...methods],unpainted,regions:records},timings:{...page.timings,inpaintMs,typesetMs,renderMs:performance.now()-start},regions:page.regions.map(r=>({id:r.uid,text:r.ru_translation,original:r.source_text,x:r.text_bbox[0]/page.width,y:r.text_bbox[1]/page.height,w:(r.text_bbox[2]-r.text_bbox[0])/page.width,h:(r.text_bbox[3]-r.text_bbox[1])/page.height})),usage:page.usage,engine:page.engine||'Перевод → очистка → русский набор',cacheHit:page.cacheHit};
+  return {renderedBitmap,cacheImage,warnings,typesetting:{engine:'staged-cyrillic-v2',layouts},inpaint:{requested:mode,strategy:mode==='moebius'?moebiusStrategy:'regions',modelCalls,execution:pageExecution,methods:[...methods],unpainted,regions:records},timings:{...page.timings,inpaintMs,typesetMs,renderMs:performance.now()-start},regions:page.regions.map(r=>({id:r.uid,text:r.ru_translation,original:r.source_text,x:r.text_bbox[0]/page.width,y:r.text_bbox[1]/page.height,w:(r.text_bbox[2]-r.text_bbox[0])/page.width,h:(r.text_bbox[3]-r.text_bbox[1])/page.height})),usage:page.usage,engine:page.engine||'Перевод → очистка → русский набор',cacheHit:page.cacheHit};
  }finally{bitmap.close();}
 }

@@ -52,3 +52,9 @@ test('LaMa dynamic ROI keeps native pixels, edge padding, mask polarity and boun
  for(let y=0;y<10;y++)for(let x=0;x<12;x++)if(Math.abs(x-3)>2||Math.abs(y-4)>2)assert.equal(page.data[(y*12+x)*4],original[(y*12+x)*4]);
  assert.throws(()=>applyLamaOutput(page,mask,new Float32Array(3),{crop,commit:crop},new Uint8Array(120)));
 });
+
+
+test('narrow Japanese narration boxes accept Russian words with ellipses and repeated punctuation',()=>{
+ const measure=(s,n)=>s.length*n*.55,box=[651.27,124.61,704.89,281.17];
+ for(const text of ['сколько же прошло...','Подожди?!']){const fit=fitComicText(text,box,measure,{oval:false});assert.ok(fit.fits,text);assert.equal(fit.lines.join('').replaceAll('-','').replaceAll(' ',''),text.replaceAll(' ','').replace(/\.{3,}/g,'…'));}
+});

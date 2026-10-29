@@ -57,7 +57,7 @@ envfile=root/'service.env';envfile.write_text(''.join(k+'='+v+'\n' for k,v in en
 common=['--network',network,'--restart','unless-stopped','--cpus=2','--memory=2g','--memory-swap=2g','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges','--tmpfs','/tmp:rw,nosuid,nodev,size=32m,uid=1000,gid=1000','-v',str(storage)+':/data','-v',str(data)+':/importer:ro','-v',str(models)+':/models:ro','--env-file',str(envfile)]
 def exists(n):return subprocess.run(['docker','inspect',n],stdout=log,stderr=log).returncode==0
 def healthy(n):
-    code="import json,urllib.request;v=json.load(urllib.request.urlopen('http://127.0.0.1:7863/api/v1/manga-translation/status',timeout=5));assert v['detectorReady'] and v['maxPages']==4"
+    code="import json,urllib.request;v=json.load(urllib.request.urlopen('http://127.0.0.1:7863/api/v1/manga-translation/status',timeout=5));assert v['detectorReady'] and v['maxPages']==3"
     for _ in range(30):
         if subprocess.run(['docker','exec',n,'python','-c',code],stdout=log,stderr=log).returncode==0:return True
         time.sleep(2)

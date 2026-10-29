@@ -1,4 +1,4 @@
-"""Current-page priority, four-page/65-box batches and page-level singleflight."""
+"""Current-page priority, three-page/65-box batches and page-level singleflight."""
 from __future__ import annotations
 import asyncio, hashlib, itertools, json, time
 from .contracts import SCHEMA_VERSION, MODEL_IDS
@@ -11,7 +11,7 @@ from .progress import observing
 from PIL import Image, ImageOps
 import io
 
-POLICY=hashlib.sha256(json.dumps([SCHEMA_VERSION,MODEL_IDS,PROMPT_VERSION,MODEL_SHA256,.35,640,1280],separators=(',',':')).encode()).hexdigest()[:24]
+POLICY=hashlib.sha256(json.dumps([SCHEMA_VERSION,MODEL_IDS,PROMPT_VERSION,MODEL_SHA256,.35,640,1280,"three-pages-v1"],separators=(',',':')).encode()).hexdigest()[:24]
 
 class RealtimeChapterOrchestrator:
     def __init__(self,sources,detector,translator,cache,*,batch_timeout=45):
@@ -47,10 +47,10 @@ class RealtimeChapterOrchestrator:
     def key(self,s,page):return self.cache.identity(s['scope'],s['manifest'],page,POLICY+':'+s.get('direction','ltr')+':'+s.get('model','gemini-3.5-flash-lite'))
     async def window(self,s,current):
         hits=[];waiting=[];new=[]
-        for page in range(current,min(len(s['names'])+1,current+12)):
+        for page in range(current,min(len(s['names'])+1,current+9)):
             key=self.key(s,page);hit=await self.cache.get(key,s['scope'])
             if hit is not None:hits.append({**hit,'cacheHit':True});continue
-            priority=0 if page==current else 1+(page-current)//4
+            priority=(page-current)//3
             job=self.pending.get(key)
             if not job:
                 if len(self.pending)>=128:raise ValueError('Очередь перевода заполнена. Дождись текущих страниц.')
@@ -61,12 +61,11 @@ class RealtimeChapterOrchestrator:
             elif not job['started'] and priority<job['priority']:
                 job['priority']=priority;self.queue.put_nowait((priority,next(self.serial),[job]))
             waiting.append(job)
-        # The visible page starts alone. Prefetch retains batches of up to four;
-        # reading must not wait for three background pages or their retries.
+        # Three packs of three pages, with a separate credential lease per pack.
         for priority in sorted({j['priority'] for j in new}):
             same=[j for j in new if j['priority']==priority]
-            for offset in range(0,len(same),4):
-                group=same[offset:offset+4];self.queue.put_nowait((priority,next(self.serial),group))
+            for offset in range(0,len(same),3):
+                group=same[offset:offset+3];self.queue.put_nowait((priority,next(self.serial),group))
         self.start();return hits,waiting
     def requeue(self,jobs,seconds):
         async def later():
@@ -137,7 +136,7 @@ class RealtimeChapterOrchestrator:
             remaining=[r for r in p['regions'] if r['uid'] not in j.get('partial',{})]
             for offset in range(0,len(remaining),65):
                 rows=remaining[offset:offset+65]
-                if batch and (len(batch)>=4 or count+len(rows)>65):await flush()
+                if batch and (len(batch)>=3 or count+len(rows)>65):await flush()
                 batch.append(await fragment(p,rows));count+=len(rows)
         await flush()
         await self.publish_ready(jobs,pages,output)

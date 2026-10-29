@@ -59,6 +59,16 @@ export function compositeInkPatch(target,patch,modified,writeMask=patch.mask){
   target.data.set(modified.subarray(src,src+4),dst);
  }
 }
+// One native-resolution union. Preparing geometry never runs neural inference.
+export function preparePageInk(original,regions){
+ const mask=new Uint8Array(original.width*original.height),patches=[];
+ for(const region of regions){
+  const patch=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:true});
+  patches.push({region,patch});if(patch.declined)continue;
+  for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++)if(patch.mask[y*patch.width+x])mask[(patch.top+y)*original.width+patch.left+x]=1;
+ }
+ return {mask,patches,maskedPixels:mask.reduce((sum,n)=>sum+n,0)};
+}
 
 // Native-resolution dynamic LaMa input: snap small ROIs rather than inflating
 // every bubble to 512x512. Never resize glyphs or pass arbitrary tensor shapes.

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Permit owner-authenticated vision requests without widening other routes."""
 from pathlib import Path
-import json,os,subprocess,time
+import json,os,re,subprocess,time
 
 def configuration(original):
+ # Both request_body handlers otherwise wrap the same request: the smaller
+ # 512KB limit still wins even if a later handler declares 20MB.
+ original=re.sub(r"(@nonLmt not path /reader/lmt/\*)([ \t]*\n)",r"\1 /reader/google/generate\2",original)
  if 'handle /reader/google/generate' in original or '@readerGoogle path /reader/google/generate' in original:return original
  if '    handle /reader/lmt/* {' in original:
   route='''    handle /reader/google/generate {
