@@ -26,7 +26,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const [sourceIds,setSourceIds]=useState([]),[sourceLanguage,setSourceLanguage]=useState('all'),[sourceRevision,setSourceRevision]=useState(0),[voiceOptions,setVoiceOptions]=useState([]);
   const {items:metadataItems,statuses,loading:metadataLoading,retry}=useCatalog(query,kind,filters.year,service.server,page,composing,filters);
   const sourceTitles=useSourceTitles(query,kind,service,composing);
-  const globalManga=useGlobalManga(query,kind,sourceLanguage,sourceIds,service,composing,sourceRevision);
+  const globalManga=useGlobalManga(query,kind,sourceLanguage,sourceIds,service,composing||!!selected,sourceRevision);
   const items=useMemo(()=>worldResults(metadataItems,[...globalManga.results||[],...sourceTitles.results],query,kind==='manga'?sourceIds:[]),[metadataItems,globalManga.results,sourceTitles.results,query,sourceIds,kind]);
   const loading=metadataLoading||sourceTitles.loading||globalManga.state==='running';
   useEffect(()=>onItems?.(items),[items]);

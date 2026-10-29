@@ -44,10 +44,16 @@ def result_row(source,row):
 def search_source(source,query):
     client=bridge.Client()
     try:
-        data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':query,'pageNum':1},timeout=4)
-        rows=data.get('mangaList',[])
-        if not isinstance(rows,list):raise ValueError('Invalid source result')
-        return [value for row in rows[:40] if isinstance(row,dict) and (value:=result_row(source,row))]
+        from title_identity import match_title
+        found={}
+        for term in source.get('_queries',[query]):
+            data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=4)
+            rows=data.get('mangaList',[])
+            if not isinstance(rows,list):raise ValueError('Invalid source result')
+            for row in rows[:40]:
+                if isinstance(row,dict) and (value:=result_row(source,row)) and (not source.get('_title') or match_title(source['_title'],value)[0]):found[value['id']]=value
+            if found:break
+        return list(found.values())
     except SourceError:
         if source.get('name')!='MangaLib' or source.get('lang')!='ru':raise
         # The installed LibGroup extension may fail while initializing WebView.
@@ -56,7 +62,13 @@ def search_source(source,query):
         from manga_catalog_adapters import lib_search
         from source_parser import PublicHttp
         http=PublicHttp(timeout=(3,7),deadline=time.monotonic()+9)
-        try:rows=lib_search(query,http)
+        try:
+            rows=[]
+            for term in source.get('_queries',[query]):
+                rows=lib_search(term,http)
+                if source.get('_title'):
+                    rows=[row for row in rows if match_title(source['_title'],{'kind':'manga','title':row['title'],'aliases':row.get('identityTitles') or [row['title']]})[0]]
+                if rows:break
         finally:http.close()
         sid=str(source['id'])
         return [{**row,'id':'suwayomi:'+sid+':native:'+hashlib.sha256(row['url'].encode()).hexdigest()[:20],
@@ -117,9 +129,11 @@ class Discovery:
         for identity in stale:
             self.db.execute('DELETE FROM work WHERE job=?',(identity,));self.db.execute('DELETE FROM jobs WHERE id=?',(identity,))
 
-    def start(self,owner,query,language='all',source_ids=None,refresh=False):
+    def start(self,owner,query,language='all',source_ids=None,refresh=False,title=None):
         if not isinstance(query,str) or not 2<=len(query.strip())<=160 or any(unicodedata.category(c)=='Cc' for c in query):raise ValueError('Укажи запрос от 2 до 160 символов.')
         query=' '.join(query.split());key=normalize(query)
+        from title_identity import aliases
+        if title is not None and (not isinstance(title,dict) or title.get('kind')!='manga' or not aliases(title) or len(json.dumps(title).encode())>50000):raise ValueError('Выбери конкретную мангу из каталога.')
         if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
         if source_ids is not None and (not isinstance(source_ids,list) or not 1<=len(source_ids)<=1000 or any(not isinstance(v,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',v) for v in source_ids)):raise ValueError('Выбери хотя бы один установленный источник.')
         # Persist only public source identity, never an upstream response's
@@ -130,7 +144,15 @@ class Discovery:
         selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())
         preferred='ru' if re.search(r'[а-яё]',query,re.I) else 'ko' if re.search(r'[가-힣]',query) else 'ja' if re.search(r'[ぁ-ヿ一-鿿]',query) else 'en'
         selected.sort(key=lambda s:(s['lang']!=preferred,s['lang'],s['name'].casefold(),str(s['id'])))
-        signature=hashlib.sha256(json.dumps([key,language,[str(s['id']) for s in selected]],ensure_ascii=False).encode()).hexdigest()
+        if title:
+            # Use the selected title's own aliases in each source's language.
+            # Searching a romanized name alone misses Russian, Japanese and Korean editions.
+            clean_title={k:title.get(k) for k in ('kind','title','titles','aliases','ids','year')}
+            for source in selected:
+                pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]'}[source['lang']]
+                source['_queries']=sorted(aliases(title),key=lambda v:not bool(re.search(pattern,v,re.I)))[:2]
+                source['_title']=clean_title
+        signature=hashlib.sha256(json.dumps([key,language,[str(s['id']) for s in selected],title and aliases(title)],ensure_ascii=False).encode()).hexdigest()
         now=self.clock()
         with self.condition,self.db:
             self._prune(now)
@@ -140,7 +162,7 @@ class Discovery:
             identity=secrets.token_urlsafe(24)
             self.db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',(identity,owner,signature,query,language,'running' if selected else 'done',now,now,now+86400,now))
             for source in selected:
-                sid=str(source['id']);hit=None if refresh else self.db.execute('SELECT results FROM query_cache WHERE query=? AND source_id=? AND expires>?',(key,sid,now)).fetchone()
+                sid=str(source['id']);cache_key=self._cache_key(key,source);hit=None if refresh else self.db.execute('SELECT results FROM query_cache WHERE query=? AND source_id=? AND expires>?',(cache_key,sid,now)).fetchone()
                 # A stale metadata index is useful immediately, but is not counted
                 # as a fresh provider response and never suppresses its refresh.
                 seed=self._indexed(key,sid) if not hit else json.loads(hit['results'])
@@ -148,6 +170,10 @@ class Discovery:
             if selected and self.db.execute("SELECT count(*) FROM work WHERE job=? AND state='queued'",(identity,)).fetchone()[0]==0:self.db.execute("UPDATE jobs SET state='done' WHERE id=?",(identity,))
             self.condition.notify_all()
             return self._snapshot(owner,identity)
+
+    @staticmethod
+    def _cache_key(key,source):
+        return key if not source.get('_title') else key+'|title:'+hashlib.sha256(json.dumps(source['_title'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
     def _indexed(self,key,sid):
         # Parameterized escaped LIKE supports raw Japanese/Korean substring
@@ -199,7 +225,7 @@ class Discovery:
             try:
                 values=self.fetch(json.loads(row['source']),row['query']);state='done'
                 if not isinstance(values,list):raise ValueError('Invalid result')
-            except Exception:values=[];state='unavailable'
+            except Exception:values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
             now=self.clock()
             with self.condition,self.db:
                 job=self.db.execute('SELECT state FROM jobs WHERE id=?',(row['job'],)).fetchone()
@@ -209,7 +235,7 @@ class Discovery:
                 # Failed upstream requests are not persisted as successful empty
                 # cache entries for other owners or refreshed searches.
                 if state=='done':
-                    self.db.execute('INSERT OR REPLACE INTO query_cache VALUES(?,?,?,?)',(normalize(row['query']),row['source_id'],encoded,now+self.cache_ttl))
+                    self.db.execute('INSERT OR REPLACE INTO query_cache VALUES(?,?,?,?)',(self._cache_key(normalize(row['query']),json.loads(row['source'])),row['source_id'],encoded,now+self.cache_ttl))
                     for value in values:self.db.execute('INSERT OR REPLACE INTO titles VALUES(?,?,?,?,?,?)',(value['id'],row['source_id'],value['language'],normalize(value['title']),json.dumps(value,ensure_ascii=False),now))
                 remaining=self.db.execute("SELECT count(*) FROM work WHERE job=? AND state IN ('queued','running')",(row['job'],)).fetchone()[0]
                 self.db.execute('UPDATE jobs SET updated=?,state=? WHERE id=?',(now,'running' if remaining else 'done',row['job']))

@@ -12,7 +12,7 @@ export function createImportClient(server,googleToken,fetcher=fetch){
   async function request(path,{method='GET',body,auth=true,headers={},signal,raw=false}={}){
     if(!server)throw Error('Сервер импорта ещё не подключён.');
     if(auth&&!session)await authenticate();
-    const response=await fetcher(server+path,{method,signal:signal||AbortSignal.timeout(path==='/manga/inspect'?120000:['/sources/discover','/sources/calendar'].includes(path)?90000:path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
+    const response=await fetcher(server+path,{method,signal:signal||AbortSignal.timeout(['/manga/inspect','/manga/summary'].includes(path)?120000:path==='/manga/search'?45000:['/sources/discover','/sources/calendar'].includes(path)?90000:path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
     if(raw&&response.ok)return response;
     const result=await response.json().catch(()=>({}));
     if(!response.ok){if(response.status===401)session=null;throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status});}

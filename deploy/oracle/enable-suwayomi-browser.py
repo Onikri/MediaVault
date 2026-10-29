@@ -19,7 +19,9 @@ def browser_overlay(original):
     # its library preload. Starting java directly skips all three steps.
     service['entrypoint']=['tini','--']
     service['command']=['/home/suwayomi/startup_script.sh']
-    service.setdefault('environment',{}).update(KCEF_ENABLED='true',JAVA_TOOL_OPTIONS='-Xms128m -Xmx768m')
+    service.setdefault('environment',{}).update(KCEF_ENABLED='true',JAVA_TOOL_OPTIONS='-Xms128m -Xmx768m -Djava.io.tmpdir=/run/mediavault-jni --enable-native-access=ALL-UNNAMED')
+    mounts=service.setdefault('tmpfs',[])
+    if not any(m.split(':',1)[0]=='/run/mediavault-jni' for m in mounts):mounts.append('/run/mediavault-jni:rw,exec,nosuid,nodev,size=64m,uid=1000,gid=1000,mode=0700')
     service.update(mem_limit='2304m',memswap_limit='2304m',pids_limit=512)
     return updated
 

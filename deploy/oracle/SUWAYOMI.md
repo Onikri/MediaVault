@@ -125,3 +125,11 @@ sources use explicit provider fixtures. The browser contract checks individual a
 bulk installation, progress and continued search at360/1440px. Live Oracle/source
 results are recorded separately; test pages and private server logs stay outside
 Git in `.codex-local/`.
+
+## Native decompression on Oracle ARM64
+
+Run `sudo python3 deploy/oracle/enable-suwayomi-native.py` for existing installations. The Docker `/tmp` tmpfs prevents executable mappings, while Square Zstd extracts its bundled JNI library into `java.io.tmpdir`. This caused Mangago chapter retrieval to fail with `UnsatisfiedLinkError: failed to map segment from shared object`, then `NoClassDefFoundError: com.squareup.zstd.JniZstdKt` on subsequent requests.
+
+The repair adds a separate 64 MiB executable tmpfs at `/run/mediavault-jni`, accessible only to UID1000 (0700), and directs Java temporary files there. The existing `/tmp`, official pinned image/JAR, private network, database, extensions, account settings and other services are preserved. The operation checks for active imports, saves rollback files, verifies a fresh JVM initializes Zstd, and restores the previous configuration on failure. New installations and browser-runtime recovery include the same setting. The diagnostic bytecode is generated from the small documented Java equivalent because the official image intentionally omits the Java compiler.
+
+Upstream loader: [Square Zstd JVM native loading](https://github.com/square/zstd-kmp/blob/main/zstd-kmp/src/jvmMain/kotlin/com/squareup/zstd/JvmZstd.kt). Metadata/queue/browser fixtures do not establish actual chapter or image availability; verify the same chapter and image bytes after repairing the runtime.
