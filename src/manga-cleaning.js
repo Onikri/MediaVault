@@ -6,7 +6,7 @@ export function dilateInk(mask,w,h,radius=1){
   const xx=x+dx,yy=y+dy;if(xx>=0&&xx<w&&yy>=0&&yy<h)out[yy*w+xx]=1;
  }return out;
 }
-export function prepareInkPatch(original,box){
+export function prepareInkPatch(original,box,{category='dialogue',neural=false}={}){
  const {width:pw,height:ph}=original;
  if(!Array.isArray(box)||box.length!==4||!box.every(Number.isFinite))return {declined:'Некорректные координаты текста'};
  const [x1,y1,x2,y2]=box.map(Math.round);if(x1<0||y1<0||x2>pw||y2>ph||x2-x1<2||y2-y1<2)return {declined:'Область текста выходит за границы'};
@@ -31,12 +31,27 @@ export function prepareInkPatch(original,box){
   while(a<z){const n=queue[a++],x=n%w,y=(n/w)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
    const xx=x+dx,yy=y+dy,i=yy*w+xx;if(xx>=0&&xx<w&&yy>=0&&yy<h&&ink[i]&&!seen[i]){seen[i]=1;queue[z++]=i;}
   }}
-  if(z<3||z>area*.6)for(let n=0;n<z;n++)ink[queue[n]]=0;
+  let crossesArtwork=false;
+  for(let k=0;k<z&&!crossesArtwork;k++){
+   const n=queue[k],x=n%w,y=(n/w)|0;
+   if(x!==local[0]&&x!==local[2]-1&&y!==local[1]&&y!==local[3]-1)continue;
+   for(const[dx,dy]of [[-1,0],[1,0],[0,-1],[0,1]]){
+    const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=w||yy>=h||xx>=local[0]&&xx<local[2]&&yy>=local[1]&&yy<local[3])continue;
+    const p=(yy*w+xx)*4,luma=(data[p]+data[p+1]+data[p+2])/3;
+    if(paper<128?luma>paper+35:luma<paper-35)crossesArtwork=true;
+   }
+  }
+  if(z<3||z>area*.4||crossesArtwork)for(let n=0;n<z;n++)ink[queue[n]]=0;
  }
  const mask=dilateInk(ink,w,h,1),masked=mask.reduce((n,v)=>n+v,0),coverage=masked/(w*h);
  if(masked<3)return {declined:'Не выделена безопасная маска букв'};
  if(coverage>.6)return {declined:'Маска захватывает рисунок: область оставлена в оригинале',coverage};
- return {left,top,width:w,height:h,data,mask,background,coverage,flat:deviation<15,masked};
+ let interiorDeviation=0,known=0;
+ for(let y=local[1];y<local[3];y++)for(let x=local[0];x<local[2];x++){const n=y*w+x;if(mask[n])continue;for(let c=0;c<3;c++)interiorDeviation+=Math.abs(data[n*4+c]-background[c]);known++;}
+ const flat=deviation<12&&interiorDeviation/Math.max(1,known*3)<12;
+ const ambiguous=!flat&&(category==='sfx'||category==='sign')&&masked/area>.28;
+ if(ambiguous&&!neural)return {declined:'Спецэффект пересекает рисунок: для безопасного удаления выбери нейросетевое восстановление',coverage};
+ return {left,top,width:w,height:h,data,mask,background,coverage,flat,masked};
 }
 export function compositeInkPatch(target,patch,modified,writeMask=patch.mask){
  for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++)if(writeMask[y*patch.width+x]){

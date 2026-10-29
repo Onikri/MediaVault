@@ -2,6 +2,14 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {prepareInkPatch,compositeInkPatch,lamaInputSize,lamaInputTensors,applyLamaOutput} from '../src/manga-cleaning.js';
 import {fitComicText} from '../src/manga-typeset.js';
 import {googleStreamAccumulator,completedJsonRows} from '../src/google-stream.js';
+
+test('line boxes over SFX artwork never erase the crossing illustration or fill a rectangle',()=>{
+ const source=image(240,240);rect(source,80,10,10,210,30);rect(source,110,90,5,14,0);
+ const patch=prepareInkPatch(source,[65,65,165,165],{category:'sfx'});assert.ok(!patch.declined);
+ const target={...source,data:source.data.slice()},replacement=patch.data.slice();replacement.fill(255);compositeInkPatch(target,patch,replacement);
+ assert.equal(target.data[(100*240+85)*4],30);assert.equal(target.data[(95*240+112)*4],255);
+ const solid=image(240,240);rect(solid,65,65,100,100,0);assert.ok(prepareInkPatch(solid,[65,65,165,165],{category:'sfx'}).declined);
+});
 import {directRequest,callDirectGoogle} from '../src/manga-direct-api.js';
 const image=(width=180,height=120)=>({width,height,data:new Uint8ClampedArray(width*height*4).fill(255)});
 function rect(img,x,y,w,h,color=0){for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++){const n=(yy*img.width+xx)*4;for(let c=0;c<3;c++)img.data[n+c]=color;}}
@@ -27,9 +35,9 @@ test('Gemma stream frames split chunks, excludes thought text and observes compl
 });
 test('native Gemma uses the streaming endpoint, no forced JSON grammar, and strict ordinal mapping',async()=>{
  const page={id:'P10',page:10,width:100,height:100,mime:'image/webp',image:'YWJjZA==',regions:[{id:'P10_B1',bbox:[10,10,30,30]}]};
- const body=directRequest([page]);assert.equal(body.generationConfig.responseMimeType,undefined);assert.equal(body.generationConfig.thinkingConfig.thinkingLevel,'MINIMAL');assert.match(body.contents[0].parts[0].text,/tuples/);
+ const body=directRequest([page],{model:'gemma-4-26b-a4b-it'});assert.equal(body.generationConfig.responseMimeType,undefined);assert.equal(body.generationConfig.thinkingConfig.thinkingLevel,'MINIMAL');assert.match(body.contents[0].parts[0].text,/tuples/);
  let sent;const raw='data: '+JSON.stringify({candidates:[{content:{parts:[{text:'[[1,"Привет!",0,0]]'}]},finishReason:'STOP'}]})+'\n\n';
- const result=await callDirectGoogle([page],{key:'fixture',transport:async request=>{sent=request;request.onChunk(raw.slice(0,20));request.onChunk(raw.slice(20));return {status:200,text:raw};}});
+ const result=await callDirectGoogle([page],{key:'fixture',model:'gemma-4-26b-a4b-it',transport:async request=>{sent=request;request.onChunk(raw.slice(0,20));request.onChunk(raw.slice(20));return {status:200,text:raw};}});
  assert.match(sent.url,/:streamGenerateContent\?alt=sse$/);assert.equal(result.pages[0].regions[0].uid,'P10_B1');assert.equal(result.pages[0].regions[0].ru_translation,'Привет!');assert.ok(result.diagnostics.metrics.streamChars>0);assert.equal(result.diagnostics.metrics.completedRegions,1);
 });
 

@@ -43,8 +43,8 @@ class RealtimeChapterOrchestrator:
             self.update(j,'ready','Страница переведена')
             j['future'].set_result(value);j.pop('prepared',None);self.pending.pop(j['key'],None);j['source']['archive'].release()
     def start(self):
-        if not self.workers:self.workers=[asyncio.create_task(self.work()) for _ in range(2)]
-    def key(self,s,page):return self.cache.identity(s['scope'],s['manifest'],page,POLICY+':'+s.get('direction','ltr'))
+        if not self.workers:self.workers=[asyncio.create_task(self.work()) for _ in range(3)]
+    def key(self,s,page):return self.cache.identity(s['scope'],s['manifest'],page,POLICY+':'+s.get('direction','ltr')+':'+s.get('model','gemini-3.5-flash-lite'))
     async def window(self,s,current):
         hits=[];waiting=[];new=[]
         for page in range(current,min(len(s['names'])+1,current+12)):
@@ -83,7 +83,7 @@ class RealtimeChapterOrchestrator:
             image,regions,timings=self.detector.detect(data,job['page'],s.get('direction')=='rtl')
             try:
                 som,som_timings=compose(image,regions)
-                return {'source_bytes':data,'page':job['page'],'width':image.width,'height':image.height,'regions':regions,'som':som,'timings':{**timings,**som_timings,'driveMs':round(fetch_ms,2)}}
+                return {'model':s.get('model','gemini-3.5-flash-lite'),'source_bytes':data,'page':job['page'],'width':image.width,'height':image.height,'regions':regions,'som':som,'timings':{**timings,**som_timings,'driveMs':round(fetch_ms,2)}}
             finally:image.close()
         self.update(job,'waiting_detector','Ожидаем детектор текста на ВМ')
         async with self.detector_gate:

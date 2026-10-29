@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 SCHEMA_VERSION = 1
-MODEL_IDS = ('gemma-4-31b-it', 'gemma-4-26b-a4b-it')
+MODEL_IDS = ('gemma-4-31b-it', 'gemma-4-26b-a4b-it', 'gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
 
 class Translation(BaseModel):
     model_config = ConfigDict(extra='forbid')

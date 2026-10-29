@@ -34,4 +34,4 @@ export function fitComicText(text,box,measure,{min=10,max=42,oval=true}={}){
  while(lo<=hi){const mid=(lo+hi)>>1,r=attempt(mid);if(r){best=r;lo=mid+1;}else hi=mid-1;}
  return best||{fits:false,lines:[],fontSize:min};
 }
-export const styleFont=style=>({standard_comic:'comic-relief',bold_scream:'comic-relief',handwritten_sloppy:'pangolin',sfx_art:'neucha',serif_serious:'serif',digital_box:'mono'}[style]||'comic-relief');
+export const styleFont=style=>({standard_comic:'comic-relief',bold_scream:'comic-relief',handwritten_sloppy:'marck-script',sfx_art:'ruslan-display',serif_serious:'pt-serif',digital_box:'press-start'}[style]||'comic-relief');

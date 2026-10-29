@@ -42,5 +42,49 @@
     "sha256": "4f2204462210e97575a305bc2b6d1a2deb11f1898d3ade18b18323d3b58e469f",
     "russianGlyphsVerified": 71,
     "license": "SIL Open Font License 1.1"
+  },
+  {
+    "id": "ruslan-display",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/6157dfaa640ca5738b4d1a7070fe389c3036d7fc/ofl/ruslandisplay/RuslanDisplay-Regular.ttf",
+    "sourceSHA256": "6fb5f4db06869e886ca5da3760c547c6d3ebec82aebd3678f314e99ae3347b09",
+    "file": "ruslan-display.woff2",
+    "bytes": 14184,
+    "sha256": "151289eb292b64a509d19d1849f0ff1e0e41970e7cce0a9c4c4c577e64b24abe",
+    "russianGlyphsVerified": 66,
+    "license": "SIL Open Font License 1.1"
+  },
+  {
+    "id": "marck-script",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/6157dfaa640ca5738b4d1a7070fe389c3036d7fc/ofl/marckscript/MarckScript-Regular.ttf",
+    "sourceSHA256": "504de8cc6f919163bc9afb67b9bc208d258230c5e8d00cb82ec52474f9fafc3b",
+    "file": "marck-script.woff2",
+    "bytes": 27288,
+    "sha256": "66562780636bd6670c3b32cef097b5ac667d3e01d0b008c156f3980141e30ef2",
+    "russianGlyphsVerified": 66,
+    "license": "SIL Open Font License 1.1"
+  },
+  {
+    "id": "press-start",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/6157dfaa640ca5738b4d1a7070fe389c3036d7fc/ofl/pressstart2p/PressStart2P-Regular.ttf",
+    "sourceSHA256": "034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
+    "file": "press-start.woff2",
+    "bytes": 29704,
+    "sha256": "a327457deb83a5435fbd924ce5a74e9501c7079aceefb22598e6de3e57f31d30",
+    "russianGlyphsVerified": 66,
+    "license": "SIL Open Font License 1.1"
+  },
+  {
+    "id": "pt-serif",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/6157dfaa640ca5738b4d1a7070fe389c3036d7fc/ofl/ptserif/PT_Serif-Web-Regular.ttf",
+    "sourceSHA256": "a4951fade06ff8f09b7673aa81ffb65a8cd409e24d3289a6dc670bc4dda2557a",
+    "file": "pt-serif.woff2",
+    "bytes": 102504,
+    "sha256": "ccbacc1ab3bd0e691b17e24d6c5286455e0b2404507f4b6df249fec850bfbca1",
+    "russianGlyphsVerified": 66,
+    "license": "SIL Open Font License 1.1"
   }
 ]

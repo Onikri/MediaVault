@@ -66,7 +66,7 @@ class QuotaTests(IsolatedAsyncioTestCase):
    key=Path(root)/'key';key.write_text('fixture-key')
    client=httpx.AsyncClient(transport=httpx.MockTransport(handle),headers={'x-goog-api-key':'fixture-key'})
    with patch.dict(os.environ,{'GEMMA_API_KEY_FILE':str(key)}),patch('gemma_translate.httpx.AsyncClient',return_value=client):
-    result=await Gateway(root).translate(Batch(pages=[page()]),lambda _:None)
+    result=await Gateway(root).translate(Batch(pages=[page()],model='gemma-4-31b-it'),lambda _:None)
    self.assertEqual(result['pages'][0]['regions'][0]['translation'],'Привет')
    self.assertEqual([u['httpStatus'] for u in result['usage']],[503,200])
    self.assertEqual(sum(p.endswith(':generateContent') for p in calls),2)

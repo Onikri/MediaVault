@@ -1,5 +1,11 @@
 {$SERVER_NAME} {
     encode zstd gzip
+    handle /reader/google/generate {
+        request_body {
+            max_size 20MB
+        }
+        reverse_proxy importer:7860
+    }
     handle /api/v1/* {
         request_body {
             max_size 512KB
