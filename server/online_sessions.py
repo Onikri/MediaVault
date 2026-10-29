@@ -68,6 +68,7 @@ def rewrite_manifest(text,base,link,max_height=None):
 class Prepare(BaseModel):
     model_config=ConfigDict(extra='forbid')
     url:str=Field(max_length=8192)
+    referer:str|None=Field(default=None,max_length=8192)
     kind:str=Field(pattern='^(video|manga)$')
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
 
@@ -87,7 +88,8 @@ def install(app,owner):
                 return {'id':token,'kind':'manga','language':data['language'],'pages':['/online/'+token+'/'+s.resource(url) for url in data['pages'][:1500]],'expiresIn':7200}
             started=time.monotonic()
             from media_download import pick_stream
-            page=Resolver(http).resolve(body.url)
+            parent=public_url(body.referer,resolve_dns=False) if body.referer else None
+            page=Resolver(http).resolve(body.url,referer=parent) if parent else Resolver(http).resolve(body.url)
             # Keep the HLS master: playback adapts while segments arrive. Do not
             # probe every variant or download/transcode an episode before play.
             masters=[v for v in page.streams if v.get('type')=='hls' and not v.get('quality')]
