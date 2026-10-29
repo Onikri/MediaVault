@@ -45,5 +45,11 @@ class YouTubeAuth(unittest.TestCase):
    kwargs['stdout'].write(json.dumps({'id':'dQw4w9WgXcQ','title':'Fixture','duration':213,'url':'https://media.googlevideo.com/videoplayback?expire='+str(expiry),'ext':'m4a','vcodec':'none','protocol':'https','http_headers':{'Cookie':'fixture-secret-header'}}).encode());kwargs['stdout'].flush();p=MagicMock();p.poll.return_value=0;p.returncode=0;return p
   with patch.object(auth,'cookie_text',return_value=COOKIE),patch.dict(os.environ,{'DATA_DIR':self.temporary.name}),patch.object(music,'audio_url',side_effect=lambda u:u),patch.object(music,'verify_audio'),patch.object(music.subprocess,'Popen',side_effect=spawn):data,_=music.extract('dQw4w9WgXcQ',True)
   self.assertNotIn('Cookie',data['headers']);self.assertTrue(paths);self.assertFalse(paths[0].exists());self.assertEqual(list((Path(self.temporary.name)/'temporary').iterdir()),[])
+ def test_published_pages_can_preflight_session_upload_but_other_origins_cannot(self):
+  import api
+  client=TestClient(api.app)
+  headers={'Origin':api.ORIGIN,'Access-Control-Request-Method':'PUT','Access-Control-Request-Headers':'authorization,content-type'}
+  response=client.options('/music/youtube/session',headers=headers);self.assertEqual(response.status_code,200);self.assertIn('PUT',response.headers['access-control-allow-methods'])
+  response=client.options('/music/youtube/session',headers={**headers,'Origin':'https://untrusted.example'});self.assertEqual(response.status_code,400)
 
 if __name__=='__main__':unittest.main()
