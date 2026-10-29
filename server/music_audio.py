@@ -1,14 +1,44 @@
 """Owner-created, short-lived audio capabilities. No open URL proxy or files."""
-import asyncio,contextlib,json,os,re,shutil,subprocess,sys,tempfile,threading,time
+import asyncio,contextlib,json,math,os,re,subprocess,sys,tempfile,threading,time
 from pathlib import Path
 from urllib.parse import parse_qs,urlsplit
 from fastapi import Depends,HTTPException,Request
 from pydantic import BaseModel,ConfigDict,Field
 from starlette.concurrency import run_in_threadpool
-from source_parser import public_url,SourceError,playback_headers
+from source_parser import public_url,SourceError,playback_headers,PublicHttp
 
 slots=threading.BoundedSemaphore(2);lock=threading.RLock();cache={}
-FIELDS='id,title,duration,url,http_headers,ext,acodec,vcodec,protocol,is_live,live_status,availability'
+FIELDS='id,title,duration,url,http_headers,ext,acodec,vcodec,protocol,is_live,live_status,availability,available_at'
+
+def wait_available(timestamp,deadline):
+    # yt-dlp's downloader observes this site-supplied not-before timestamp.
+    # Extracting URL-only metadata skips that downloader, so we must observe it.
+    if timestamp is None:return
+    if isinstance(timestamp,bool) or not isinstance(timestamp,(int,float)) or not math.isfinite(timestamp):
+        raise HTTPException(502,'YouTube вернул некорректное время готовности аудио.')
+    delay=max(0,timestamp-time.time())
+    if time.monotonic()+delay>deadline-5:
+        raise HTTPException(504,'YouTube требует более длительной подготовки. Открой официальный плеер или повтори позднее.')
+    if delay:time.sleep(delay+.05)
+
+def verify_audio(url,headers,ext,deadline):
+    http=PublicHttp(validate=audio_url,timeout=(4,6),deadline=deadline);response=None
+    try:
+        response,_=http._open(url,headers=headers,byte_range='bytes=0-31')
+        mime=response.headers.get('Content-Type','').split(';')[0].lower()
+        if response.status_code!=206 or not re.fullmatch(r'bytes 0-31/[0-9]+',response.headers.get('Content-Range','')) or mime not in {'audio/mp4','audio/webm','video/mp4','video/webm','application/octet-stream'}:
+            raise SourceError('Invalid audio response')
+        prefix=b''
+        for block in response.iter_content(32):
+            prefix+=block[:32-len(prefix)]
+            if len(prefix)>=32:break
+        valid=prefix[4:8]==b'ftyp' if ext=='m4a' else prefix.startswith(b'\x1a\x45\xdf\xa3')
+        if not valid:raise SourceError('Invalid audio header')
+    except SourceError:
+        raise HTTPException(502,'YouTube не разрешил серверу прочитать аудио. Повтори подготовку или открой официальный плеер.') from None
+    finally:
+        if response is not None:response.close()
+        http.close()
 
 def youtube_id(value):
     if not isinstance(value,str) or len(value)>4096:raise SourceError('Нужна ссылка YouTube на одну запись.')
@@ -40,7 +70,7 @@ def failure(detail):
     return 'YouTube не предоставил доступную аудиодорожку. Можно повторить запрос или открыть официальный плеер.'
 
 def extract(identity,refresh=False):
-    now=time.monotonic()
+    now=time.monotonic();deadline=now+65
     with lock:hit=cache.get(identity)
     if not refresh and hit and hit[0]>now:return hit[1],int(hit[2]-now)
     if not slots.acquire(False):raise HTTPException(429,'Подготовка музыки занята. Повтори через несколько секунд.')
@@ -66,9 +96,12 @@ def extract(identity,refresh=False):
         duration=data.get('duration')
         if not isinstance(duration,(int,float)) or not 0<duration<=7200:raise HTTPException(422,'Поддерживаются записи продолжительностью до двух часов.')
         url=audio_url(data.get('url',''));expiry=parse_qs(urlsplit(url).query).get('expire',[''])[0]
+        headers=playback_headers(data.get('http_headers'))
+        wait_available(data.get('available_at'),deadline)
+        verify_audio(url,headers,data['ext'],deadline)
         ttl=min(7200,int(expiry)-int(time.time())-60) if expiry.isdigit() else 300
         if ttl<30:raise HTTPException(502,'YouTube вернул истекающую ссылку. Повтори запрос.')
-        value={'url':url,'headers':playback_headers(data.get('http_headers')),'mime':'audio/mp4' if data['ext']=='m4a' else 'audio/webm','duration':duration,'title':str(data.get('title') or 'YouTube')[:300]}
+        value={'url':url,'headers':headers,'mime':'audio/mp4' if data['ext']=='m4a' else 'audio/webm','duration':duration,'title':str(data.get('title') or 'YouTube')[:300]}
         with lock:
             if len(cache)>=64:cache.clear()
             created=time.monotonic()

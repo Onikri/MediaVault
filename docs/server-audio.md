@@ -11,11 +11,20 @@ Both initial CDN addresses and redirects must be public googlevideo.com
 Content-Range, Content-Length and Accept-Ranges and closes upstream connections
 on disconnect. Only bounded extractor metadata is cached in memory; media bytes
 are streamed without persistent audio files. There are two extractor slots, a28s
-preparation deadline and the existing four playback capabilities per owner.
+extractor deadline and a65s total preparation budget, plus the existing four
+playback capabilities per owner. The browser allows75s for preparation.
 Cancelled preparations release capabilities; close/track changes release the
 previous capability on the frontend. Metadata refreshes after ten minutes;
 playback capabilities last up to two hours, bounded by the upstream signed URL
 expiry. Expired links can be prepared again.
+
+URL extraction must preserve the selected format's `available_at`. YouTube may
+issue a signed URL before that URL can be read; the server observes its not-before
+timestamp just as yt-dlp's downloader does. Only then does it request bytes0–31
+and validate HTTP206, Content-Range, MIME and the M4A/WebM header. Denied URLs
+never enter the cache or become playback capabilities. This is not an account
+login or PO-token mechanism. Source implementation:
+[yt-dlp downloader](https://github.com/yt-dlp/yt-dlp/blob/2026.10.21/yt_dlp/downloader/common.py).
 
 The Oracle image includes Node22 for yt-dlp's EJS runtime. yt-dlp and the Node
 image are version-pinned; updates are reviewed and deployed, rather than a live

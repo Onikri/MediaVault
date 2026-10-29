@@ -60,7 +60,7 @@ class MusicAudio(unittest.TestCase):
   return start
  def test_extraction_uses_no_shell_cookie_or_download_and_caches_bounded_metadata(self):
   data={'id':IDENTITY,'title':'Fixture','duration':213,'url':CDN,'ext':'m4a','vcodec':'none','acodec':'mp4a','protocol':'https','http_headers':{'Authorization':'secret','Cookie':'secret','User-Agent':'public'}}
-  with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}),patch.object(music,'audio_url',side_effect=lambda url:url),patch.object(music.subprocess,'Popen',side_effect=self.extract_fixture(data)) as spawn:
+  with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}),patch.object(music,'audio_url',side_effect=lambda url:url),patch.object(music,'verify_audio'),patch.object(music.subprocess,'Popen',side_effect=self.extract_fixture(data)) as spawn:
    value,ttl=music.extract(IDENTITY);music.extract(IDENTITY)
    self.assertEqual(value['mime'],'audio/mp4');self.assertNotIn('Cookie',value['headers']);self.assertNotIn('Authorization',value['headers']);self.assertEqual(spawn.call_count,1);self.assertGreater(ttl,600);self.assertLessEqual(ttl,3600)
    # A ten-minute metadata refresh must not expire playback of a long recording.
@@ -78,5 +78,30 @@ class MusicAudio(unittest.TestCase):
  def test_extractor_errors_do_not_expose_raw_signed_urls_or_untrusted_diagnostics(self):
   text=music.failure('ERROR Sign in to confirm not a bot Cookie=private-secret '+CDN)
   self.assertNotIn('private-secret',text);self.assertNotIn('googlevideo',text);self.assertIn('Oracle',text)
+ def test_future_availability_is_observed_before_testing_or_caching_audio(self):
+  data={'id':IDENTITY,'title':'Fixture','duration':213,'url':CDN,'ext':'m4a','vcodec':'none','protocol':'https','available_at':1005}
+  events=[]
+  with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}),patch.object(music.time,'time',return_value=1000),patch.object(music.time,'sleep',side_effect=lambda delay:events.append(('wait',delay))),patch.object(music,'audio_url',side_effect=lambda url:url),patch.object(music,'verify_audio',side_effect=lambda *args:events.append(('probe',None))),patch.object(music.subprocess,'Popen',side_effect=self.extract_fixture(data)):
+   music.extract(IDENTITY);music.extract(IDENTITY)
+  self.assertEqual([e[0] for e in events],['wait','probe']);self.assertGreaterEqual(events[0][1],5)
+ def test_invalid_or_excessive_availability_never_sleeps_without_bound(self):
+  for timestamp in [True,'tomorrow',float('inf'),float('nan'),time.time()+120]:
+   with patch.object(music.time,'sleep') as sleep,self.assertRaises(HTTPException):music.wait_available(timestamp,time.monotonic()+65)
+   sleep.assert_not_called()
+ def test_preflight_checks_actual_audio_bytes_range_and_closes_upstream(self):
+  for ext,raw in [('m4a',b'\0\0\0\x20ftyp'+b'0'*24),('webm',b'\x1a\x45\xdf\xa3'+b'0'*28)]:
+   response=MagicMock();response.status_code=206;response.headers={'Content-Type':'application/octet-stream','Content-Range':'bytes 0-31/1000'};response.iter_content.return_value=[raw[:8],raw[8:]]
+   with patch.object(music,'PublicHttp') as client:
+    client.return_value._open.return_value=(response,CDN);music.verify_audio(CDN,{},ext,time.monotonic()+10)
+   response.close.assert_called_once();client.return_value.close.assert_called_once();self.assertEqual(client.return_value._open.call_args.kwargs['byte_range'],'bytes=0-31')
+ def test_denied_or_html_audio_is_not_cached_or_given_a_playback_capability(self):
+  for failure in ['denied','html']:
+   response=MagicMock();response.status_code=206;response.headers={'Content-Type':'text/html','Content-Range':'bytes 0-31/1000'}
+   with patch.object(music,'PublicHttp') as client,self.assertRaises(HTTPException) as caught:
+    if failure=='denied':client.return_value._open.side_effect=SourceError('HTTP403 '+CDN)
+    else:client.return_value._open.return_value=(response,CDN)
+    music.verify_audio(CDN,{},'m4a',time.monotonic()+10)
+   self.assertEqual(caught.exception.status_code,502);self.assertNotIn('googlevideo',caught.exception.detail);client.return_value.close.assert_called_once()
+   if failure=='html':response.close.assert_called_once()
 
 if __name__=='__main__':unittest.main()
