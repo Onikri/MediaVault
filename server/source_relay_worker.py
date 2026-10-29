@@ -1,11 +1,11 @@
 """Outbound public-source device worker; private signing key never leaves device."""
-import argparse,base64,json,os,secrets,threading,time
+import argparse,base64,json,os,secrets,tempfile,threading,time
 from pathlib import Path
 from urllib.parse import urlsplit
 import requests
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding,PrivateFormat,PublicFormat,NoEncryption
-from source_relay import allowed,message,MAXIMUM,CHUNK
+from source_relay import allowed,message,MAXIMUM,CHUNK,ARCHIVE_MAXIMUM
 from source_parser import PublicHttp,SourceError
 
 def load_key(path):
@@ -18,10 +18,25 @@ def load_key(path):
 
 def retrieve(task):
     url=allowed(task['url'],task['kind'],resolve_dns=True)
-    validate=lambda value:allowed(value,task['kind'],resolve_dns=True)
-    http=PublicHttp(validate=validate,timeout=(3,15),deadline=time.monotonic()+23)
+    def validate(value):
+        if task['kind']=='archive':
+            try:return allowed(value,'document',resolve_dns=True)
+            except SourceError:return allowed(value,'image',resolve_dns=True)
+        return allowed(value,task['kind'],resolve_dns=True)
+    http=PublicHttp(validate=validate,timeout=(3,15),deadline=time.monotonic()+(90 if task['kind']=='archive' else 23))
     try:
         headers={'Referer':allowed(task['referer'],resolve_dns=True)} if task.get('referer') else None
+        if task['kind']=='archive':
+            from manga_download import download_chapter
+            # cache-env places TEMP inside the checkout on drive D.
+            with tempfile.TemporaryDirectory(prefix='source-chapter-') as temporary:
+                path=download_chapter(url,temporary,http)
+                if path.stat().st_size>ARCHIVE_MAXIMUM:raise SourceError('Chapter exceeds transport limit')
+                return path.read_bytes(),url
+        if task['kind']=='chapter':
+            from manga_novelcool import inspect
+            data=inspect(url,http)
+            return json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),url
         if task['kind']=='document':
             text,final,_=http.document(url,headers=headers)
             if final!=url or '<title>404 Not Found</title>' in text:raise SourceError('Source response unavailable')

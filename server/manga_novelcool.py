@@ -51,6 +51,12 @@ def inspect(url,http):
     initial=urlsplit(url);identity=chapter_id(url)
     if initial.scheme!='https' or initial.hostname!=HOST or initial.query or initial.fragment or not (identity or re.fullmatch(r'/novel/[^/]+\.html',initial.path)):
         raise SourceError('Нужна публичная ссылка NovelCool RU на мангу или главу.')
+    if identity:
+        from source_relay import relay,chapter as device_chapter
+        if relay.available():
+            deadline=getattr(http,'deadline',None);timeout=min(28,deadline-time.monotonic()) if isinstance(deadline,(int,float)) else 28
+            if timeout<=0:raise SourceError('Источник не уложился во время проверки.')
+            return device_chapter(url,timeout=timeout)
     # This ten-image mode is linked by the site's own reader controls.
     if identity:url=url.rstrip('/').rsplit('/',1)[0]+'/'+identity+'-10-1.html'
     text,final,soup=document(url,http);entries=chapters(soup,final);pages=[]

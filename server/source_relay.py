@@ -3,7 +3,7 @@
 Only fixed reader/image hosts are allowed. No account headers, cookies, private
 addresses, arbitrary proxy destinations, or persistent manga bytes are accepted.
 """
-import base64,hashlib,json,os,re,secrets,threading,time
+import base64,hashlib,io,json,os,re,secrets,threading,time,zipfile
 from pathlib import Path
 from urllib.parse import urlsplit
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -15,10 +15,12 @@ class DeviceError(SourceError):
 
 MAXIMUM=12*1024*1024
 CHUNK=256*1024
+ARCHIVE_MAXIMUM=64*1024*1024
 def allowed(url,kind='document',resolve_dns=False):
     value=public_url(url,resolve_dns=resolve_dns);p=urlsplit(value)
-    if kind=='document':
+    if kind in {'document','chapter','archive'}:
         good=p.hostname=='ru.novelcool.com' and bool(re.fullmatch(r'/(?:novel/[^/]+\.html|chapter/[^/]+/\d+(?:-\d+(?:-\d+)?)?(?:\.html|/))',p.path))
+        if kind in {'chapter','archive'}:good=good and p.path.startswith('/chapter/')
     else:
         good=kind=='image' and p.hostname.endswith('.movietop.cc') and p.path.startswith('/comics/')
     if not good:raise SourceError('Этот адрес не входит в транспорт читалки.')
@@ -83,11 +85,26 @@ class Relay:
                 if info.get('ok') is not True:job['upload'].clear();job['error']='Устройство не получило публичную страницу источника.'
                 else:
                     offset=info.get('offset',0);complete=info.get('complete',True)
-                    if type(offset) is not int or type(complete) is not bool or offset!=len(job['upload']) or len(job['upload'])+len(raw)>MAXIMUM:raise ValueError()
+                    maximum=ARCHIVE_MAXIMUM if job['kind']=='archive' else MAXIMUM
+                    if type(offset) is not int or type(complete) is not bool or offset!=len(job['upload']) or len(job['upload'])+len(raw)>maximum:raise ValueError()
                     job['upload'].extend(raw)
                     if not complete:return
                     raw=bytes(job['upload']);job['upload'].clear()
                 if job['error']:pass
+                elif job['kind']=='chapter':
+                    if len(raw)>1024*1024:raise ValueError()
+                    data=json.loads(raw)
+                    if data.get('provider')!='novelcool-ru' or data.get('language')!='ru' or not isinstance(data.get('title'),str) or not 0<len(data['title'])<=300:raise ValueError()
+                    from manga_novelcool import chapter_id
+                    chapter_identity=chapter_id(job['url'])
+                    if chapter_id(data.get('url',''))!=chapter_identity:raise ValueError()
+                    pages=data.get('pages');entries=data.get('episodes')
+                    if not isinstance(pages,list) or not 0<len(pages)<=500 or not isinstance(entries,list) or len(entries)!=1 or not isinstance(entries[0],dict) or chapter_id(entries[0].get('url',''))!=chapter_identity:raise ValueError()
+                    for page in pages:allowed(page,'image')
+                    job['result']=(raw,final,{'Content-Type':'application/json'})
+                elif job['kind']=='archive':
+                    validate_archive(raw)
+                    job['result']=(raw,final,{'Content-Type':'application/vnd.comicbook+zip'})
                 elif job['kind']=='image':
                     from manga_download import image_extension
                     extension=image_extension(raw[:32])
@@ -96,10 +113,24 @@ class Relay:
                 else:
                     if len(raw)>4*1024*1024 or not raw:raise ValueError()
                     job['result']=(raw,final,{'Content-Type':'text/html; charset=utf-8'})
-            except (ValueError,KeyError,TypeError):raise DeviceError(422,'Invalid public source response.') from None
+            except (ValueError,KeyError,TypeError,SourceError):raise DeviceError(422,'Invalid public source response.') from None
             self.condition.notify_all()
 
 relay=Relay(Path(os.getenv('DATA_DIR','/data'))/'source-device-public-keys.json')
+
+def validate_archive(raw):
+    from manga_download import image_extension
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            entries=archive.infolist()
+            if not 1<=len(entries)<=500 or len({e.filename for e in entries})!=len(entries):raise ValueError()
+            for index,entry in enumerate(entries,1):
+                if not re.fullmatch(f'{index:04d}'+r'\.(?:jpg|png|webp|gif|avif)',entry.filename) or entry.compress_type!=zipfile.ZIP_STORED or not 0<entry.file_size<=30*1024*1024:raise ValueError()
+                # Reading stored entries checks CRC without decompression.
+                page=archive.read(entry)
+                if image_extension(page[:32])!=entry.filename.rsplit('.',1)[1]:raise ValueError()
+            return len(entries)
+    except (zipfile.BadZipFile,RuntimeError,NotImplementedError):raise ValueError('Invalid chapter archive') from None
 
 def document(url,referer='',timeout=28):
     raw,final,headers=relay.fetch(url,'document',referer,timeout)
@@ -107,6 +138,13 @@ def document(url,referer='',timeout=28):
 
 def image(url,referer):
     return relay.fetch(url,'image',referer)
+
+def chapter(url,timeout=28):
+    raw,_,_=relay.fetch(url,'chapter',timeout=timeout)
+    return json.loads(raw)
+
+def archive(url):
+    return relay.fetch(url,'archive',timeout=110)[0]
 
 def install(app):
     from fastapi import HTTPException,Request

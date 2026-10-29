@@ -17,6 +17,14 @@ def image_extension(header):
 
 def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
     if not site_for(url):raise SourceError('Эта читалка пока не поддерживается.')
+    if site_for(url).family=='novelcool' and quality=='best':
+        from source_relay import relay,archive as device_archive,validate_archive
+        if relay.available():
+            progress({'phase':'downloading','pagesLoaded':0,'pagesTotal':0})
+            raw=device_archive(url);count=validate_archive(raw)
+            output=Path(temporary)/'chapter.cbz';output.write_bytes(raw)
+            progress({'phase':'downloading','pagesLoaded':count,'pagesTotal':count})
+            return output
     if site_for(url).family in {'lib','dex','naver','mangaraw','sen','toonkor','webtoons','suwayomi','novelcool'}:
         from manga_sources import inspect
         data=inspect(url,http);final=data['url'];pages=data['pages']

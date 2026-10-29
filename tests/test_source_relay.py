@@ -12,6 +12,7 @@ import source_relay as module
 from source_parser import SourceError
 BOOK='https://ru.novelcool.com/novel/Наруто.html'
 PIC='https://ruwebp.movietop.cc/comics/pic2/1/1.webp'
+CHAPTER='https://ru.novelcool.com/chapter/1-1/123/'
 
 class RelayTests(unittest.TestCase):
     def setUp(self):
@@ -47,6 +48,44 @@ class RelayTests(unittest.TestCase):
         self.connect()
         with self.assertRaisesRegex(SourceError,'не успело'):self.relay.fetch(BOOK,timeout=.01)
         self.assertEqual(self.relay.jobs,{})
+    def test_complete_chapter_uses_one_task_and_preserves_page_order(self):
+        self.connect();result=[]
+        thread=threading.Thread(target=lambda:result.append(module.chapter(CHAPTER,timeout=3)));thread.start();task=self.relay.poll('device',timeout=1)
+        self.assertEqual(task['kind'],'chapter')
+        data={'provider':'novelcool-ru','language':'ru','title':'Наруто','url':CHAPTER,'pages':[PIC,PIC.replace('1.webp','2.webp')],'episodes':[{'url':CHAPTER}]}
+        raw=json.dumps(data).encode();meta=base64.b64encode(json.dumps({'ok':True,'url':CHAPTER}).encode()).decode()
+        self.relay.finish('device',task['id'],raw,meta);thread.join(2)
+        self.assertEqual(result,[data]);self.assertEqual(self.relay.jobs,{})
+    def test_wrong_chapter_and_unapproved_page_cannot_be_injected(self):
+        self.connect()
+        for url,pages in [(CHAPTER.replace('123','124'),[PIC]),(CHAPTER,['https://evil.example/a.png'])]:
+            self.relay.jobs['x']={'device':'device','url':CHAPTER,'kind':'chapter','upload':bytearray(),'error':None,'result':None}
+            data={'provider':'novelcool-ru','language':'ru','title':'Наруто','url':url,'pages':pages,'episodes':[{'url':CHAPTER}]}
+            meta=base64.b64encode(json.dumps({'ok':True,'url':CHAPTER}).encode()).decode()
+            with self.assertRaises(module.DeviceError):self.relay.finish('device','x',json.dumps(data).encode(),meta)
+            self.assertIsNone(self.relay.jobs['x']['result'])
+        self.relay.jobs.clear()
+    def test_archive_validates_image_order_crc_and_rejects_traversal_compression(self):
+        import zipfile
+        def packed(name,compression=zipfile.ZIP_STORED):
+            buffer=io.BytesIO()
+            with zipfile.ZipFile(buffer,'w',compression=compression) as archive:archive.writestr(name,b'\x89PNG\r\n\x1a\nfixture')
+            return buffer.getvalue()
+        self.assertEqual(module.validate_archive(packed('0001.png')),1)
+        for raw in [packed('../0001.png'),packed('0002.png'),packed('0001.png',zipfile.ZIP_DEFLATED),b'broken']:
+            with self.assertRaises(ValueError):module.validate_archive(raw)
+    def test_native_chapter_inspection_does_not_relay_each_pagination_document(self):
+        from manga_novelcool import inspect
+        with patch.object(self.relay,'available',return_value=True),patch.object(module,'chapter',return_value={'pages':[PIC]}) as chapter,patch.object(module,'document') as document:
+            self.assertEqual(inspect(CHAPTER,object())['pages'],[PIC]);chapter.assert_called_once_with(CHAPTER,timeout=28);document.assert_not_called()
+    def test_original_cbz_is_transferred_once_instead_of_each_image(self):
+        import zipfile
+        from manga_download import download_chapter
+        buffer=io.BytesIO()
+        with zipfile.ZipFile(buffer,'w') as archive:archive.writestr('0001.png',b'\x89PNG\r\n\x1a\nfixture')
+        with tempfile.TemporaryDirectory() as directory,patch.object(self.relay,'available',return_value=True),patch.object(module,'archive',return_value=buffer.getvalue()) as archive,patch.object(module,'image') as image:
+            path=download_chapter(CHAPTER,directory,object())
+            self.assertEqual(path.read_bytes(),buffer.getvalue());archive.assert_called_once_with(CHAPTER);image.assert_not_called()
     def test_large_html_is_uploaded_in_ordered_signed_chunks_below_proxy_limit(self):
         self.connect();result=[];raw=b'<html>'+b'x'*(module.CHUNK*2)+b'</html>'
         thread=threading.Thread(target=lambda:result.append(self.relay.fetch(BOOK,timeout=3)));thread.start();task=self.relay.poll('device',timeout=1)
