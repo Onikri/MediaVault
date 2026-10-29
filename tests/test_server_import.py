@@ -121,7 +121,7 @@ class ServerMediaTests(unittest.TestCase):
                 args += ['-hls_flags', 'single_file']
             args += ['-hls_segment_filename', str(directory / ('part.m4s' if kind == 'range' else 'part-%d.' + ('ts' if kind == 'ts' else 'm4s'))),
                      str(directory / 'index.m3u8')]
-            subprocess.run(args, check=True, capture_output=True)
+            subprocess.run(args, check=True, capture_output=True, cwd=directory)
             base = 'https://cdn.example.com/' + kind + '/'
             cls.fixtures[kind] = FixtureHttp({base + 'index.m3u8': (directory / 'index.m3u8').read_text()},
                                             {base + file.name: file.read_bytes() for file in directory.iterdir() if file.suffix != '.m3u8'})
