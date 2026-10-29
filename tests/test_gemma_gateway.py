@@ -47,6 +47,12 @@ class ProtocolTests(TestCase):
   self.assertEqual(body['generationConfig']['responseJsonSchema']['properties']['regions']['type'],'array')
 
 class QuotaTests(IsolatedAsyncioTestCase):
+ async def test_flash_burst_does_not_inherit_gemma_gap_but_retains_token_budget(self):
+  with tempfile.TemporaryDirectory() as root:
+   quota=Quotas(Path(root)/'flash.sqlite',lambda:1000.,minimum_interval=0)
+   for _ in range(3):await quota.reserve('flash',1000,lambda _:None)
+   self.assertEqual(quota.wait_seconds('flash',1000),0)
+   self.assertGreater(quota.wait_seconds('flash',12000),0)
  async def test_reservation_survives_restart_and_accounts_for_actual_usage(self):
   with tempfile.TemporaryDirectory() as root:
    clock=[1000.];path=Path(root)/'quota.sqlite';q=Quotas(path,lambda:clock[0])

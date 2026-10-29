@@ -9,6 +9,8 @@ each result still validates every region ID before it enters the cache.
 Quotas belong to Google AI Studio projects, not Google account subscriptions.
 Unknown projects share the conservative existing budget. Explicit identical
 project labels share a pacer. A 429 is not an immediate failover to another key.
+Gemma retains its twelve-second interval. Flash-Lite allows a three-request burst
+inside the same RPM/TPM/daily budget, without that Gemma-specific delay.
 Existing Gemma budgets, batch/image limits and available detector choices remain.
 Gemini 3.5 Flash-Lite is the default for new settings; an explicit previous model
 selection is preserved. Paid Gemini is never an invisible Gemma fallback.

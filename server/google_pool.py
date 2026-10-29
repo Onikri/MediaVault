@@ -2,7 +2,7 @@
 import asyncio,hashlib,json,time,weakref
 from pathlib import Path
 import httpx
-from fastapi import Depends,HTTPException
+from fastapi import Depends,HTTPException,Request
 from pydantic import BaseModel,Field,SecretStr,ConfigDict
 MODELS=('gemini-3.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
 SETTING='reader:google-keys';_store=lambda:None
@@ -35,11 +35,11 @@ def install(app,owner,get_store):
     global _store
     _store=get_store
     from gemma_translate import Quotas
-    quotas=None
-    def quota():
-        nonlocal quotas
-        if quotas is None:quotas=Quotas(Path(__import__('os').getenv('DATA_DIR','/data'))/'google-personal-quota.sqlite')
-        return quotas
+    quotas={}
+    def quota(model):
+        family='gemma' if model.startswith('gemma-') else 'gemini'
+        if family not in quotas:quotas[family]=Quotas(Path(__import__('os').getenv('DATA_DIR','/data'))/'google-personal-quota.sqlite',minimum_interval=12 if family=='gemma' else 0)
+        return quotas[family]
     locks=weakref.WeakValueDictionary();slots=asyncio.Semaphore(3)
     @app.get('/reader/google/keys')
     def status(subject=Depends(owner)):return safe_status(saved())
@@ -52,7 +52,7 @@ def install(app,owner,get_store):
                 key=s.key.get_secret_value().strip() if s.key is not None else previous.get(s.slot,{}).get('key','')
                 if not key:continue
                 if not 20<=len(key)<=512 or any(c.isspace() for c in key):raise HTTPException(422,'Проверь ключ '+str(s.slot+1)+'.')
-                response=await client.get('https://generativelanguage.googleapis.com/v1beta/models',headers={'x-goog-api-key':key})
+                response=await client.get('https://generativelanguage.googleapis.com/v1beta/models',params={'pageSize':1000},headers={'x-goog-api-key':key})
                 if response.status_code!=200:raise HTTPException(422,'Google не подтвердил ключ '+str(s.slot+1)+' · HTTP '+str(response.status_code))
                 names={m.get('name','').removeprefix('models/') for m in response.json().get('models',[])}
                 available=[m for m in MODELS if m in names]
@@ -64,7 +64,7 @@ def install(app,owner,get_store):
         store.setting(SETTING,{'slots':rows,'updated':time.time()})
         return safe_status(rows)
     @app.post('/reader/google/generate')
-    async def generate(body:Generate,subject=Depends(owner)):
+    async def generate(body:Generate,connection:Request,subject=Depends(owner)):
         if body.model not in MODELS:raise HTTPException(422,'Выбери поддерживаемую модель Google.')
         row=next((r for r in saved() if r['slot']==body.slot),{})
         key=body.key.get_secret_value().strip() if body.key else row.get('key','')
@@ -78,9 +78,10 @@ def install(app,owner,get_store):
         async with slots,lock,httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':key}) as client:
             count=await client.post(url+':countTokens',json={'generateContentRequest':{'model':'models/'+model,**request}})
             if count.status_code!=200:raise HTTPException(count.status_code,'Google не смог подсчитать токены · HTTP '+str(count.status_code))
-            try:tokens=int(count.json()['totalTokens'])+256;reservation=await quota().reserve(group+':'+model,tokens,lambda _:None)
+            try:tokens=int(count.json()['totalTokens'])+256;reservation=await quota(model).reserve(group+':'+model,tokens,lambda _:None)
             except (ValueError,KeyError):raise HTTPException(429,'Запрос превышает установленный бюджет Google.') from None
+            if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
             response=await client.post(url+':generateContent',json=request)
             if response.status_code!=200:raise HTTPException(response.status_code,'Google · HTTP '+str(response.status_code)+'. Запрос не перенаправлялся на другой ключ.')
-            result=response.json();quota().settle(reservation,result.get('usageMetadata',{}).get('promptTokenCount'))
+            result=response.json();quota(model).settle(reservation,result.get('usageMetadata',{}).get('promptTokenCount'))
             return result

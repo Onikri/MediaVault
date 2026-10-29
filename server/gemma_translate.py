@@ -131,8 +131,8 @@ def validate_reply(raw,pages):
 
 class Quotas:
     """Durable per-model reservations: input TPM, RPM, 12s gap, rolling daily cap."""
-    def __init__(self,path,clock=time.time):
-        self.clock=clock;self.path=str(path);self.lock=asyncio.Lock()
+    def __init__(self,path,clock=time.time,minimum_interval=12):
+        self.clock=clock;self.path=str(path);self.lock=asyncio.Lock();self.minimum_interval=minimum_interval
         with closing(sqlite3.connect(self.path)) as db,db:db.execute('CREATE TABLE IF NOT EXISTS requests(id INTEGER PRIMARY KEY,model TEXT,at REAL,tokens INTEGER)')
         Path(path).chmod(0o600)
     def wait_seconds(self,model,tokens):
@@ -140,7 +140,7 @@ class Quotas:
         with closing(sqlite3.connect(self.path)) as db,db:rows=db.execute('SELECT at,tokens FROM requests WHERE model=? AND at>? ORDER BY at',(model,now-86400)).fetchall()
         if tokens>14500:raise ValueError('Пакет превышает лимит токенов. Раздели страницы на меньшие части.')
         if len(rows)>=int(os.getenv('GEMMA_RPD','1500')):raise ValueError('Достигнут суточный бюджет Google. Повтори после восстановления квоты.')
-        wait=max(0,rows[-1][0]+12-now) if rows else 0
+        wait=max(0,rows[-1][0]+self.minimum_interval-now) if rows else 0
         minute=[r for r in rows if r[0]>now-61]
         if len(minute)>=15:wait=max(wait,minute[-15][0]+61-now)
         total=sum(r[1] for r in minute)
@@ -176,6 +176,8 @@ class Gateway:
             pending=list(packs(batch.pages))
             while pending:
                 pages=pending.pop(0);body=request_body(pages,batch.language,batch.context);candidates=[];too_large=False;truncated=False
+                if batch.model.startswith('gemini-2.5'):body['generationConfig']['thinkingConfig']={'thinkingBudget':0}
+                if batch.model.startswith('gemini-3.'):body['generationConfig'].pop('temperature',None)
                 # Count the full request PLUS a textual copy of the output schema.
                 # Some providers omit schema overhead in countTokens; the extra
                 # copy and margin make reservation conservative. Settle with usage.
