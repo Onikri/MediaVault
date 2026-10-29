@@ -12,7 +12,8 @@ IDENTITY='dQw4w9WgXcQ';WATCH='https://www.youtube.com/watch?v='+IDENTITY
 CDN='https://rr1---sn-example.googlevideo.com/videoplayback?expire='+str(int(time.time())+3600)
 
 class MusicAudio(unittest.TestCase):
- def setUp(self):music.cache.clear();online.sessions.clear()
+ def setUp(self):
+  music.cache.clear();online.sessions.clear();cookies=patch('youtube_auth.cookie_text',return_value='');cookies.start();self.addCleanup(cookies.stop)
  def test_only_exact_youtube_recordings_not_arbitrary_urls_or_options_are_accepted(self):
   for url in [WATCH,WATCH+'&list=ignored','https://youtu.be/'+IDENTITY+'?t=10','https://music.youtube.com/watch?v='+IDENTITY,'https://www.youtube.com/shorts/'+IDENTITY]:self.assertEqual(music.youtube_id(url),IDENTITY)
   for url in ['--exec=command','http://youtube.com/watch?v='+IDENTITY,'https://youtube.com.evil/watch?v='+IDENTITY,'https://user:pass@youtube.com/watch?v='+IDENTITY,'https://www.youtube.com/playlist?list=123',WATCH+'&v=abcdefghijk','https://youtube.com:444/watch?v='+IDENTITY]:

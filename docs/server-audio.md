@@ -4,7 +4,9 @@ POST `/music/play` accepts a single public HTTPS YouTube recording URL under the
 existing owner session. yt-dlp resolves an audio-only HTTPS M4A/WebM format. The
 browser receives only a short-lived `/online/<capability>/<resource>` URL,
 metadata and the real audio MIME type. No arbitrary `/stream?url=` endpoint is
-exposed. Google login tokens/cookies are not forwarded to yt-dlp or media hosts.
+exposed. Drive/Google API tokens are not forwarded to yt-dlp or media hosts. An owner can
+explicitly connect a YouTube session as described below; no browser profile is
+read automatically.
 
 Both initial CDN addresses and redirects must be public googlevideo.com
 `/videoplayback` URLs. The existing stream handler preserves Range/206,
@@ -53,3 +55,21 @@ browser connection to the media host. The server validates public HTTPS addresse
 and redirects, actual audio signatures/MIME, Range support and a256MiB file limit
 before granting a short-lived music-file capability. Local device files and
 already-decrypted personal-library media stay on the device.
+
+Owner authentication uses GET/PUT/DELETE `/music/youtube/session`. The profile
+accepts a user-selected Netscape cookies.txt export and immediately verifies
+Otonoke through the existing real audio preflight. Only unexpired youtube.com
+cookies are kept; other Google/website credentials are discarded. The session is
+AES-GCM encrypted using the existing private TaskStore. API replies contain only
+configuration status and a timestamp. yt-dlp receives a per-request0600 temporary
+copy in Linux container tmpfs, deleted on success, errors and timeouts; cookies
+never reach CDN requests. A container crash cannot persist that decrypted copy
+in the /data volume.
+Replacing/removing a session revokes cached YouTube URLs and music capabilities.
+Requests running across a session change fail rather than recaching old access.
+
+Upstream documents cookies as the supported yt-dlp login method; its old OAuth
+flow no longer works: [YouTube authentication](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies).
+A valid session must be supplied by the owner; a Google profile login to MediaVault
+alone does not authorize the server on YouTube. Fixture authentication tests are
+not evidence of actual authenticated Otonoke playback.

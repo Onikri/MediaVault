@@ -7,8 +7,23 @@ from pydantic import BaseModel,ConfigDict,Field
 from starlette.concurrency import run_in_threadpool
 from source_parser import public_url,SourceError,playback_headers,PublicHttp
 
-slots=threading.BoundedSemaphore(2);lock=threading.RLock();cache={}
+slots=threading.BoundedSemaphore(2);lock=threading.RLock();cache={};auth_epoch=0
 FIELDS='id,title,duration,url,http_headers,ext,acodec,vcodec,protocol,is_live,live_status,availability,available_at'
+
+@contextlib.contextmanager
+def private_youtube_auth(root):
+    from youtube_auth import cookie_text
+    cookies=cookie_text()
+    if not cookies:
+        yield [];return
+    # Linux runs keep the decrypted cookie jar in container tmpfs, so a crash
+    # cannot leave a plaintext copy in the persistent /data volume.
+    memory=Path('/dev/shm')
+    with tempfile.TemporaryDirectory(dir=memory if os.name=='posix' and memory.is_dir() else root,prefix='audio-session-') as directory:
+        cookie_path=Path(directory)/'youtube-cookies.txt'
+        descriptor=os.open(cookie_path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+        with os.fdopen(descriptor,'w',encoding='utf-8') as cookie_file:cookie_file.write(cookies)
+        yield ['--cookies',str(cookie_path)]
 
 def remote_audio(value):
     url=public_url(value)
@@ -89,23 +104,24 @@ def audio_url(value):
 def failure(detail):
     lower=detail.lower()
     if 'not a bot' in lower or 'confirm you' in lower or 'sign in' in lower or '429' in lower:
-        return 'YouTube требует проверку серверного IP Oracle. Серверный аудиопоток недоступен.'
+        return 'YouTube требует входа для IP Oracle. Подключи или обнови серверную сессию YouTube в профиле.'
     if 'private' in lower or 'members-only' in lower or 'unavailable' in lower or 'age' in lower:
         return 'Эта запись недоступна серверу без входа или имеет ограничения доступа.'
     return 'YouTube не предоставил доступную аудиодорожку. Повтори подготовку аудио позднее.'
 
 def extract(identity,refresh=False):
     now=time.monotonic();deadline=now+65
-    with lock:hit=cache.get(identity)
+    with lock:hit=cache.get(identity);epoch=auth_epoch
     if not refresh and hit and hit[0]>now:return hit[1],int(hit[2]-now)
     if not slots.acquire(False):raise HTTPException(429,'Подготовка музыки занята. Повтори через несколько секунд.')
     process=None
     try:
         root=Path(os.getenv('DATA_DIR','/data'))/'temporary';root.mkdir(parents=True,exist_ok=True)
-        # No shell, config, cookies, credential forwarding, plugins or media
-        # download. Files contain only bounded extractor metadata and disappear.
-        with tempfile.TemporaryDirectory(dir=root,prefix='audio-resolve-') as directory,open(Path(directory)/'result','w+b') as output,open(Path(directory)/'error','w+b') as error:
+        # No shell, browser-profile reads, credential forwarding or plugins.
+        # Explicit owner-supplied YouTube cookies use a private temporary copy.
+        with tempfile.TemporaryDirectory(dir=root,prefix='audio-resolve-') as directory,open(Path(directory)/'result','w+b') as output,open(Path(directory)/'error','w+b') as error,private_youtube_auth(root) as authentication:
             command=[sys.executable,'-m','yt_dlp','--ignore-config','--no-plugin-dirs','--no-cache-dir','--no-playlist','--no-warnings','--no-color','--socket-timeout','6','--retries','0','--extractor-retries','0','--js-runtimes','node','--skip-download','--print','%(.{'+FIELDS+'})j','-f','bestaudio[ext=m4a][protocol=https]/bestaudio[ext=webm][protocol=https]','--','https://www.youtube.com/watch?v='+identity]
+            command[command.index('--'):command.index('--')]=authentication
             process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=output,stderr=error)
             end=time.monotonic()+28
             while process.poll() is None:
@@ -128,6 +144,7 @@ def extract(identity,refresh=False):
         if ttl<30:raise HTTPException(502,'YouTube вернул истекающую ссылку. Повтори запрос.')
         value={'url':url,'headers':headers,'mime':'audio/mp4' if data['ext']=='m4a' else 'audio/webm','duration':duration,'title':str(data.get('title') or 'YouTube')[:300]}
         with lock:
+            if epoch!=auth_epoch:raise HTTPException(409,'Серверная сессия YouTube изменилась. Повтори подготовку аудио.')
             if len(cache)>=64:cache.clear()
             created=time.monotonic()
             cache[identity]=(created+min(600,ttl),value,created+ttl)
