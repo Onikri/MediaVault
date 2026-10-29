@@ -8,6 +8,7 @@ RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir -r requirements-service.txt; \
     else pip install --no-cache-dir -r requirements-service.txt; fi
 RUN useradd --uid 1000 --create-home vault && mkdir /data && chown vault:vault /data
+COPY --from=node:22.22.0-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 COPY --chown=vault:vault --chmod=0644 *.py ./
 USER vault
 EXPOSE 7860
