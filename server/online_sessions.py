@@ -16,6 +16,7 @@ class Session:
     expires:float
     kind:str='video'
     max_height:int|None=None
+    audio_mime:str=''
     manifests:dict=field(default_factory=dict)
     resources:dict=field(default_factory=dict)
     reverse:dict=field(default_factory=dict)
@@ -136,7 +137,11 @@ def install(app,owner):
         if not s or not url:raise HTTPException(410,'Онлайн-сеанс завершён. Открой серию или главу снова.')
         if range_header and not re.fullmatch(r'bytes=(?:\d+-\d*|-\d+)',range_header):raise HTTPException(416,'Некорректный диапазон.')
         if not s.slots.acquire(blocking=False):raise HTTPException(429,'Дождись загрузки предыдущих частей.')
-        http=PublicHttp(timeout=(5,20));response=None;handed=False
+        if s.kind=='music':
+            from music_audio import audio_url
+            http=PublicHttp(validate=audio_url,timeout=(5,20))
+        else:http=PublicHttp(timeout=(5,20))
+        response=None;handed=False
         try:
             with s.lock:cached=s.manifests.pop(resource,None)
             if cached and cached[2]>time.monotonic():
@@ -149,6 +154,9 @@ def install(app,owner):
             response,final=http._open(url,headers=s.headers,byte_range=range_header or None)
             mime=response.headers.get('Content-Type','').split(';')[0].lower()
             common={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}
+            if s.kind=='music':
+                if mime not in {'audio/mp4','audio/webm','video/mp4','video/webm','application/octet-stream'}:raise SourceError('YouTube вернул заглушку вместо аудио.')
+                mime=s.audio_mime
             if s.kind=='manga':
                 from manga_download import image_extension
                 parts=[];size=0
@@ -179,7 +187,7 @@ def install(app,owner):
                     for block in active.iter_content(128*1024):
                         if token not in sessions or s.expires<time.monotonic():break
                         total+=len(block)
-                        if total>12*1024**3:break
+                        if total>(256*1024**2 if s.kind=='music' else 12*1024**3):break
                         yield block
                 finally:active.close();http.close();s.slots.release()
             return StreamingResponse(blocks(),status_code=status,media_type=mime,headers=common)

@@ -1,4 +1,4 @@
-"""Public recording links for the official YouTube embed; never extract audio."""
+"""Public recording search/metadata; audio capabilities live in music_audio.py."""
 import json,re,threading,time,unicodedata
 from urllib.parse import urlencode
 from fastapi import HTTPException
@@ -36,7 +36,7 @@ def recordings(title,artist):
     http=PublicHttp(timeout=(4,12),deadline=now+20)
     try:
         html,_,_=http.document('https://www.youtube.com/results?'+urlencode({'search_query':title+' '+artist+' official audio','hl':'ru'}))
-        results=parse_recordings(html,title,artist);value={'results':results,'provider':'YouTube','playback':'official-embed','audioDownloaded':False}
+        results=parse_recordings(html,title,artist);value={'results':results,'provider':'YouTube','playback':'server-audio','audioDownloaded':False}
         with lock:
             if len(cache)>128:cache.clear()
             cache[key]=(now+(21600 if results else 60),value)
