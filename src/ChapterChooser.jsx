@@ -4,13 +4,12 @@ import {onlineClientId,keepOnlineLease} from './online-lease.js';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 export default function ChapterChooser({entries,value,onChoose,service,cards=false}){
  const [count,setCount]=useState(12),[preview,setPreview]=useState(null),[error,setError]=useState(''),lastFrame=useRef(0),generation=useRef(0),token=useRef(null),abort=useRef(null),live=useRef(service);live.current=service;
- const clientId=useRef(null);if(!clientId.current)clientId.current=onlineClientId('preview');
- useEffect(()=>preview&&token.current?keepOnlineLease(live.current,token.current,()=>{setPreview(null);token.current=null;}):undefined,[preview?.url]);
- async function close(){generation.current++;abort.current?.abort();setPreview(null);const id=token.current;token.current=null;if(id)await live.current.request('/online/'+id,{method:'DELETE',keepalive:true}).catch(()=>{});}
- useEffect(()=>()=>{generation.current++;abort.current?.abort();if(token.current)live.current.request('/online/'+token.current,{method:'DELETE',keepalive:true}).catch(()=>{});},[]);
+ const lease=useRef(null),clientId=useRef(null);if(!clientId.current)clientId.current=onlineClientId('preview');
+ async function close(){generation.current++;abort.current?.abort();setPreview(null);const id=token.current;token.current=null;const release=lease.current;lease.current=null;if(release)release();else if(id)await live.current.request('/online/'+id,{method:'DELETE',keepalive:true}).catch(()=>{});}
+ useEffect(()=>()=>{generation.current++;abort.current?.abort();lease.current?.();lease.current=null;},[]);
  useEffect(()=>{setCount(12);close();},[entries[0]?.url]);
  async function show(entry){if(service.status!=='connected'||preview?.url===entry.url)return;await close();const version=++generation.current,controller=new AbortController();abort.current=controller;setError('');
-  try{const data=await service.request('/online/prepare',{method:'POST',body:{url:entry.url,kind:'manga',clientId:clientId.current},signal:controller.signal});if(version!==generation.current){await service.request('/online/'+data.id,{method:'DELETE',keepalive:true}).catch(()=>{});return;}token.current=data.id;setPreview({url:entry.url,pages:data.pages||[],index:0});}
+  try{const data=await service.request('/online/prepare',{method:'POST',body:{url:entry.url,kind:'manga',clientId:clientId.current},signal:controller.signal});if(version!==generation.current){await service.request('/online/'+data.id,{method:'DELETE',keepalive:true}).catch(()=>{});return;}token.current=data.id;lease.current=keepOnlineLease(service,data.id,()=>{setPreview(null);token.current=null;lease.current?.();lease.current=null;});setPreview({url:entry.url,pages:data.pages||[],index:0});}
   catch(e){if(!controller.signal.aborted)setError('Превью недоступно. Главу можно открыть отдельно.');}
  }
  function movePreview(event){if(!preview||Date.now()-lastFrame.current<150)return;lastFrame.current=Date.now();const rect=event.currentTarget.getBoundingClientRect(),index=Math.min(preview.pages.length-1,Math.max(0,Math.floor((event.clientX-rect.left)/rect.width*preview.pages.length)));setPreview(p=>p?{...p,index}:p);}
