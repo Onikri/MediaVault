@@ -82,3 +82,7 @@ test('a cached foreground image still starts independent preparation and transla
  c.canvasTask=async()=>({cleanedImage:new ArrayBuffer(0),regions:[]});
  try{const result=await c.render(new Blob(['0']),0,'auto');assert.ok(result.cacheHit);await Promise.all([...c.jobs.values()].map(j=>j.promise));assert.deepEqual(sent,[[1,2],[3,4]]);assert.equal(c.snapshot().preparation.translated,4);}finally{c.close();}
 });
+
+test('background cleanup cannot replace an API failure or hide its retry state',()=>{
+ const c=new DirectChapter({entries:[],scope:'status',config:translationConfig({engine:'direct'})});try{c.notify(0,{phase:'error',message:'Google HTTP 429'});c.notify(0,{phase:'cleaning',message:'Background ready'});assert.equal(c.progress.get(0).phase,'error');assert.equal(c.progress.get(0).message,'Google HTTP 429');assert.equal(c.progress.get(0).backgroundCleanup.message,'Background ready');}finally{c.close();}
+});

@@ -25,6 +25,7 @@ import './reader-surface.css';
 function Page({index,entry,active,preload,translate,translator,onVisible,onError,font,revision,onProgress,language,retryVersion,retained,onDebug}){
  const resource=useRef(null),[nativeWidth,setNativeWidth]=useState(0);
  const host=useRef(null),[near,setNear]=useState(false),[source,setSource]=useState(''),[ratio,setRatio]=useState(0),[imageSize,setImageSize]=useState({width:0,height:0}),[regions,setRegions]=useState(null),[translated,setTranslated]=useState(''),[painted,setPainted]=useState(false),canvas=useRef(null),[message,setMessage]=useState(''),[translating,setTranslating]=useState(false),[attempt,setAttempt]=useState(0),[reveal,setReveal]=useState(false),hold=useRef(null),blob=useRef(null);
+ const runKey=JSON.stringify([revision,retryVersion,attempt,source,translate]),currentRun=useRef(runKey);currentRun.current=runKey;
  useEffect(()=>{const observer=new IntersectionObserver(e=>{setNear(e.some(x=>x.isIntersecting));},{rootMargin:preload?'100% 0px':'0px'});if(host.current)observer.observe(host.current);return()=>observer.disconnect();},[preload]);
  useEffect(()=>{const lease=new PageResource();resource.current=lease;return()=>{resource.current?.close();blob.current=null;};},[entry]);
  const demand=near||active;
@@ -38,18 +39,18 @@ function Page({index,entry,active,preload,translate,translator,onVisible,onError
  useEffect(()=>{
   if(!source||!translate||!translator)return;
   let closed=false;const abort=new AbortController(),startedAt=Date.now();
-  const report=(value,running=true)=>{if(closed)return;const progress=normalizeTranslationProgress(value);setMessage(progress.message);onProgress?.(index,{...progress,startedAt,updatedAt:Date.now(),running});};
+  const report=(value,running=true)=>{if(closed||currentRun.current!==runKey)return;const progress=normalizeTranslationProgress(value);setMessage(progress.message);onProgress?.(index,{...progress,startedAt,updatedAt:Date.now(),running});};
   setRegions(null);setTranslating(true);report({phase:'preparing',message:'Готовим перевод страницы…'});
   translator(blob.current,abort.signal,value=>report(value),index).then(async data=>{
-   if(closed){data.renderedBitmap?.close();return;}
+   if(closed||currentRun.current!==runKey){data.renderedBitmap?.close();return;}
    setTranslating(false);
    const bitmap=data.renderedBitmap||(data.renderedImage?await createImageBitmap(new Blob([data.renderedImage],{type:data.renderedMime||'image/webp'})):null);
-   if(closed){bitmap?.close();return;}
+   if(closed||currentRun.current!==runKey){bitmap?.close();return;}
    if(bitmap){if(canvas.current){const node=canvas.current;node.width=bitmap.width;node.height=bitmap.height;node.getContext('2d').drawImage(bitmap,0,0);setPainted(true);setTranslated('');}bitmap.close();}
    setRegions(data.regions||[]);onDebug?.(index,data.debug||null);
 
    report({phase:'ready',renderIncomplete:!!data.inpaint?.unpainted,message:(data.warnings||[]).join(' · ')||(data.cacheHit?'Готово · из кэша':!data.regions?.length?'Реплики не найдены · показан оригинал':'Перевод готов · фон восстановлен'),completedRegions:data.typesetting?.layouts?.length??data.regions?.length??0,totalRegions:data.regions?.filter(r=>r.text?.trim()).length||0,detected:data.detected,detectionReport:data.detectionReport,diagnostics:data.diagnostics,inpaint:data.inpaint,timings:data.timings},false);
-  }).catch(error=>{if(!closed){setTranslating(false);report({phase:'error',message:error.message,failureStage:error.stage||'translation'},false);}});
+  }).catch(error=>{if(!closed&&currentRun.current===runKey){setTranslating(false);report({phase:'error',message:error.message,failureStage:error.stage||'translation'},false);}});
   return()=>{closed=true;abort.abort();};
  },[source,translate,translator,attempt,revision,retryVersion]);
  useEffect(()=>{const observer=new IntersectionObserver(e=>{if(e.some(x=>x.isIntersecting))onVisible(index);},{rootMargin:'-10% 0px -60% 0px'});if(host.current)observer.observe(host.current);return()=>observer.disconnect();},[index,onVisible]);
