@@ -5,11 +5,12 @@ import * as ort from 'onnxruntime-web/all';
 import {downloadArtifactFromUrl} from './upstream/lib/utils.ts';
 import {detectPpLines} from './detection.js';
 let session,dict;
+export const PP_OCR_REC_URL='https://huggingface.co/Kellenok/PP-OCRv6_manga/resolve/62375557b5b0a4b2bc8e05484a97c7ea1df7229e/rec/manga_rec_v0.2.onnx';
 export async function recognizePpManga(source,boxes){
  const bitmap=await createImageBitmap(await(await fetch(source)).blob());
  try{
   const lines=await detectPpLines(bitmap);
-  session??=await downloadArtifactFromUrl('https://huggingface.co/Kellenok/PP-OCRv6_manga/resolve/62375557b5b0a4b2bc8e05484a97c7ea1df7229e/rec/manga_rec_v0.2.onnx','ppocrv6-rec',{gpu:false});
+  session??=await downloadArtifactFromUrl(PP_OCR_REC_URL,'ppocrv6-rec',{gpu:false});
   if(!dict){const r=await fetch(new URL('dicts/ppocrv6_dict.txt',location.href));if(!r.ok)throw Error('Не загружен словарь PP-OCRv6.');dict=['',...(await r.text()).trimEnd().split(/\r?\n/),' '];}
   const results=[];
   for(const box of boxes){

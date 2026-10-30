@@ -2,12 +2,13 @@
 // Actual local llama.cpp runtime. No page, dialogue or credential is uploaded.
 import {Wllama} from '@wllama/wllama/esm/index.js';
 import wasmUrl from '@wllama/wllama/esm/wasm/wllama.wasm?url';
-import {createSHA256} from 'hash-wasm';
+import {cachedGguf} from '../src/model-gguf.js';
+import {readModelFile} from '../src/model-folder.js';
 import {hymtModel,hymtUrl,hymtPrompt} from '../src/hymt-models.js';
 import {indexModel,indexUrl,indexPrompt} from '../src/index-models.js';
 const quiet={debug(){},log(){},warn(){},error(){}};
 export function createHymtTranslator({createEngine=()=>new Wllama({default:wasmUrl},{suppressNativeLog:true,logger:quiet,allowOffline:true,parallelDownloads:1}),resolveUrl=null}={}){
- let engine=null,identity='',verified=new Set(),busy=false;
+ let engine=null,identity='',busy=false;
  async function close(){const old=engine;engine=null;identity='';if(old)await old.exit().catch(()=>{});}
  async function load(config,progress){
   const indexed=config.deviceTranslator==='index',name=indexed?'Index Translate':'Hy-MT2',model=indexed?indexModel(config.hymtQuant):hymtModel(config.hymtQuant),compute=config.deviceCompute||'auto',key=model.sha+':'+compute;
@@ -17,20 +18,14 @@ export function createHymtTranslator({createEngine=()=>new Wllama({default:wasmU
   // No implicit latest-version compatibility scripts from a third-party CDN.
   engine.setCompat(null);
   try{
-   const url=resolveUrl?resolveUrl(model):(indexed?indexUrl:hymtUrl)(model),cached=(await engine.modelManager.getModels()).some(v=>v.url===url&&v.size===model.bytes);
+   const url=resolveUrl?resolveUrl(model):(indexed?indexUrl:hymtUrl)(model),disk=await readModelFile(url),cached=disk?.size===model.bytes||(await engine.modelManager.getModels()).some(v=>v.url===url&&v.size===model.bytes);
    if(!cached&&navigator.storage?.estimate){const space=await navigator.storage.estimate();if(space.quota&&space.quota-(space.usage||0)<model.bytes+64*1024*1024)throw Error('Недостаточно места в кэше браузера для выбранных весов. Освободи место или выбери Q4');}
    progress(name+' · загрузка весов '+(model.bytes/1e9).toFixed(2)+' ГБ, затем кэш устройства');
-   const source=await engine.modelManager.downloadModel(url,{progressCallback:({loaded,total})=>progress(name+' · '+Math.round(loaded/1e6)+' / '+Math.round((total||model.bytes)/1e6)+' МБ')});
-   if(source.size!==model.bytes)throw Error('Размер весов '+name+' не совпадает с манифестом. Очисти неполную загрузку и повтори.');
-   if(!verified.has(model.sha)){
-    progress(name+' · проверяем SHA-256 весов');const hash=await createSHA256();hash.init();
-    for(const blob of await source.open()){const reader=blob.stream().getReader();try{while(true){const{done,value}=await reader.read();if(done)break;hash.update(value);}}finally{reader.releaseLock();}}
-    if(hash.digest()!==model.sha){await source.remove();throw Error('Веса '+name+' не прошли проверку SHA-256.');}verified.add(model.sha);
-   }
+   const source=await cachedGguf(url,model,engine.modelManager,progress);
    const params={n_ctx:2048,n_batch:128,n_ubatch:64,n_parallel:1,n_threads:globalThis.crossOriginIsolated?Math.max(1,Math.min(4,navigator.hardwareConcurrency||1)):1,n_gpu_layers:compute==='cpu'?0:99999,seed:42,reasoning:false,warmup:false,default_template_kwargs:{enable_thinking:false}};
    progress(name+' · запускаем '+(compute==='cpu'?'CPU / WASM':'WebGPU или CPU / WASM'));
-   try{await engine.loadModel(source,params);}
-   catch(e){if(compute!=='auto')throw e;await close();engine=createEngine();engine.setCompat(null);progress(name+' · GPU недоступен, запускаем CPU / WASM');await engine.loadModel(source,{...params,n_gpu_layers:0});}
+   try{await engine.loadModel(await source.open(),params);}
+   catch(e){if(compute!=='auto')throw e;await close();engine=createEngine();engine.setCompat(null);progress(name+' · GPU недоступен, запускаем CPU / WASM');await engine.loadModel(await source.open(),{...params,n_gpu_layers:0});}
    identity=key;return engine;
   }catch(e){await close();throw Error(name+' на устройстве: '+(e.message||e)+'. Если не хватает памяти, выбери Q4 или перевод на ВМ.');}
  }

@@ -1,0 +1,28 @@
+{
+  "realGoogleInference": true,
+  "model": "gemini-3.5-flash-lite",
+  "sourcePages": 6,
+  "sheets": 1,
+  "blocks": 6,
+  "request": {
+    "status": 200,
+    "usage": {
+      "promptTokenCount": 1548,
+      "candidatesTokenCount": 297,
+      "totalTokenCount": 1845,
+      "promptTokensDetails": [
+        {
+          "modality": "IMAGE",
+          "tokenCount": 1056
+        },
+        {
+          "modality": "TEXT",
+          "tokenCount": 492
+        }
+      ],
+      "serviceTier": "standard"
+    },
+    "finishReason": "STOP"
+  },
+  "browserErrors": []
+}
