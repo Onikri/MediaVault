@@ -35,8 +35,8 @@ them from HTTP 410 session expiry.
   The cleanup timer was active and its last service execution succeeded.
 - Local Node suite: 183 passed. Production application and LMT builds passed.
 - Relevant Python Suwayomi suite: 24 passed. Full local Windows suite ran 362
-  tests, with four existing POSIX/SQLite portability errors and seven skips;
-  Linux CI runs the full suite before publishing.
+  tests, with four existing POSIX/SQLite portability errors and seven skips.
+  The full 362-test suite subsequently passed in Linux CI before publication.
 - Existing online browser contract suite passed at 320px and 1280px. Its fixtures
   are distinct from the real source/API/image checks above.
 
