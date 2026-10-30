@@ -31,7 +31,7 @@
     "test:moebius": "node tests/moebius-worker-browser.cjs",
     "test:vm": "node tests/manga-vm-browser.cjs && node tests/manga-online-translation-browser.cjs",
     "test:direct": "node tests/manga-direct-browser.cjs",
-    "test:cleaning": "node tests/manga-cleaning-browser.cjs",
+    "test:cleaning": "node tests/manga-cleaning-browser.cjs && node tests/manga-empty-review-browser.cjs",
     "test:blocks": "node tests/manga-blocks-browser.cjs",
     "test:reader": "node tests/immersive-reader-browser.cjs",
     "test:world": "node tests/world-library-browser.cjs && node tests/title-sources-browser.cjs",

@@ -63,7 +63,7 @@ export async function paintBlockSheets(sheets,pages){
  const bitmaps=new Map();try{
   for(const p of pages)bitmaps.set(p.page,await createImageBitmap(p.blob));
   for(const sheet of sheets){const canvas=new OffscreenCanvas(sheet.width,sheet.height),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
-   for(const{group,box}of sheet.placements){let y=box[1];for(const part of group.parts){const[x1,y1,x2,y2]=part.crop;ctx.drawImage(bitmaps.get(part.page),x1,y1,x2-x1,y2-y1,box[0],y,x2-x1,y2-y1);y+=y2-y1;}
+   for(const{group,box}of sheet.placements){let y=box[1];const scale=group.scale||1;for(const part of group.parts){const[x1,y1,x2,y2]=part.crop;ctx.drawImage(bitmaps.get(part.page),x1,y1,x2-x1,y2-y1,box[0],y,(x2-x1)*scale,(y2-y1)*scale);y+=(y2-y1)*scale;}
     ctx.fillStyle='#111';ctx.font='16px sans-serif';ctx.textBaseline='bottom';ctx.fillText(group.id+(group.parts.length>1?' · joined':''),box[0],box[1]-4);
     ctx.strokeStyle='#999';ctx.lineWidth=1;ctx.strokeRect(box[0]-1,box[1]-1,group.width+2,group.height+2);
    }

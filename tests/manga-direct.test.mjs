@@ -147,3 +147,15 @@ test('multi-page response rejects ambiguous ordinal tuples and unlabelled vision
  const rows=pages.map(p=>({page:p.id,box:[100,100,200,300],ru:'Привет'}));assert.equal(validateDirectResponse(reply(rows),pages).length,3);
  assert.throws(()=>validateDirectResponse(reply(rows.slice(0,2)),pages),/пропустил страницу/);
 });
+
+
+test('blank answers distinguish model-confirmed non-text from unresolved text',()=>{
+ const p=page(1);
+ for(const [e,want] of [[undefined,'unconfirmed'],['non_text','non_text'],['unreadable','unreadable'],['other','unconfirmed']]){
+  const row=validateDirectResponse(reply([{id:'P1_B1',ru:' ',e}]),[p])[0].regions[0];
+  assert.equal(row.empty_reason,want);assert.deepEqual(row.text_bbox,p.regions[0].bbox);
+ }
+ const request=directRequest([{...p,inputMode:'blocks'}],{reviewEmptyIds:['P1_B1']});
+ assert.match(request.contents[0].parts[0].text,/REVIEW of previously blank/);
+ assert.match(request.contents[0].parts[0].text,/non_text/);
+});

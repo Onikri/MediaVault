@@ -3,7 +3,7 @@ import {teleaInpaint} from '../lmt/upstream/lib/inpaint/telea.ts';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {fitComicText,styleFont,comicInkColor} from './manga-typeset.js';
 import {prepareInkPatch,preparePageInk,compositeInkPatch,dilateInk} from './manga-cleaning.js';
-export const READER_RENDER_VERSION=9;
+export const READER_RENDER_VERSION=10;
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
 function maskRuns(patch,pageWidth,mask=patch.mask){const runs=[];for(let y=0;y<patch.height;y++){let x=0;while(x<patch.width){while(x<patch.width&&!mask[y*patch.width+x])x++;const start=x;while(x<patch.width&&mask[y*patch.width+x])x++;if(x>start)runs.push((patch.top+y)*pageWidth+patch.left+start,(patch.top+y)*pageWidth+patch.left+x);}}return runs;}
 export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false,cleanOnly=false,preparedClean}){
@@ -13,6 +13,8 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   const canvas=new OffscreenCanvas(bitmap.width,bitmap.height),ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,0);
   const original=ctx.getImageData(0,0,canvas.width,canvas.height),working=new ImageData(original.data.slice(),original.width,original.height),plans=[],records=[],warnings=[],methods=new Set();let inpaintMs=0,typesetMs=0;
   const normalize=text=>String(text).normalize('NFC').replace(/[\u200b\u00ad]/g,'').replace(/\s+/g,' ').trim();
+  const unresolved=page.regions.filter(r=>!r.ru_translation?.trim()&&r.empty_reason!=='non_text');
+  if(!cleanOnly&&unresolved.length)warnings.push('Нет перевода для '+unresolved.length+' областей ('+unresolved.map(r=>r.uid).join(', ')+'). Их оригинал сохранён; повтори перевод страницы.'+(page.emptyReview?.error?' Проверка пропусков: '+page.emptyReview.error:''));
   // Plan and measure every caption before changing any pixel.
   for(const sourceRegion of page.regions){
    const region={...sourceRegion};
@@ -85,10 +87,14 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   if(cleanOnly)return {cleanedImage:await(await canvas.convertToBlob({type:'image/png'})).arrayBuffer(),width:page.width,height:page.height,mode,version:READER_RENDER_VERSION,inpaint:{modelCalls,execution:pageExecution,methods:[...methods]},regions:plans.map(p=>({...records.find(r=>r.uid===p.region.uid),uid:p.region.uid,box:p.region.text_bbox,painted:!!p.painted,runs:p.runs||[],...(p.inputRuns?{inputRuns:p.inputRuns}:{})})),timings:{inpaintMs}};
   let debug;
   if(captureDebug){
+   // Background cleanup covers every detected label, independently of JSON.
+   // Show that actual model input, not only the subset pasted into the final
+   // translated image. Unresolved originals remain visible in that final image.
+   if(preparedPixels)for(const region of preparedClean.regions){const runs=region.inputRuns||region.runs||[];for(let n=0;n<runs.length;n+=2)cleanupMask.fill(1,runs[n],runs[n+1]);}
    const mc=new OffscreenCanvas(original.width,original.height),pixels=new ImageData(original.width,original.height);
    for(let n=0;n<cleanupMask.length;n++)if(cleanupMask[n])pixels.data.set([255,70,35,180],n*4);
    mc.getContext('2d').putImageData(pixels,0,0);
-   debug={cleanedImage:await(await canvas.convertToBlob({type:'image/webp',quality:.95})).arrayBuffer(),maskImage:await(await mc.convertToBlob({type:'image/png'})).arrayBuffer(),detected:{width:page.width,height:page.height,regions:page.regions.map(r=>({id:r.uid,bbox:r.text_bbox}))},coordinatesKind:'translation'};
+   debug={cleanedImage:preparedPixels?preparedClean.cleanedImage:await(await canvas.convertToBlob({type:'image/webp',quality:.95})).arrayBuffer(),cleanedMime:preparedPixels?'image/png':'image/webp',backgroundCleanup:!!preparedPixels,cleanupRegions:(preparedPixels?preparedClean.regions:records).map(r=>({uid:r.uid,painted:!!r.painted,reason:r.reason,translated:!!page.regions.find(p=>p.uid===r.uid)?.ru_translation?.trim()})),unresolved:unresolved.map(r=>r.uid),maskImage:await(await mc.convertToBlob({type:'image/png'})).arrayBuffer(),detected:{width:page.width,height:page.height,regions:page.regions.map(r=>({id:r.uid,bbox:r.text_bbox}))},coordinatesKind:'translation'};
   }
   // Typography is the last phase. Cleanup never reads these newly drawn glyphs.
   // Explicit readable fallback: never claim a failed cleanup succeeded. Paint
@@ -105,7 +111,7 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   const unpainted=records.filter(r=>!r.painted).length;
   if(unpainted)warnings.push('Фон восстановлен для '+records.filter(r=>r.painted).length+' из '+records.length+' областей. При неудачной очистке перевод показан с белой подложкой.');
   if(lamaUnavailable)warnings.push((mode==='moebius'?'Moebius':mode==='migan'?'MI-GAN':'LaMa')+': '+lamaUnavailable);
-  let cacheImage;if(cache&&!unpainted)cacheImage=await(await canvas.convertToBlob({type:'image/webp',quality:.94})).arrayBuffer();
+  let cacheImage;if(cache&&!unpainted&&!unresolved.length)cacheImage=await(await canvas.convertToBlob({type:'image/webp',quality:.94})).arrayBuffer();
   const renderedBitmap=canvas.transferToImageBitmap();
   return {renderedBitmap,cacheImage,debug,warnings,typesetting:{engine:'staged-cyrillic-ru-v3',layouts},inpaint:{requested:mode,strategy:mode==='moebius'?moebiusStrategy:'regions',modelCalls,execution:pageExecution,prepared:preparedClean?{cacheHit:!!preparedClean.cacheHit,inpaint:preparedClean.inpaint,timings:preparedClean.timings}:undefined,methods:[...methods],unpainted,regions:records},timings:{...page.timings,inpaintMs,typesetMs,renderMs:performance.now()-start},regions:page.regions.map(r=>({id:r.uid,text:r.ru_translation,original:r.source_text,x:r.text_bbox[0]/page.width,y:r.text_bbox[1]/page.height,w:(r.text_bbox[2]-r.text_bbox[0])/page.width,h:(r.text_bbox[3]-r.text_bbox[1])/page.height})),usage:page.usage,engine:page.engine||'Перевод → очистка → русский набор',cacheHit:page.cacheHit};
  }finally{bitmap.close();}

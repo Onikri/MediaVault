@@ -1,0 +1,27 @@
+{
+  "chapter": 5,
+  "page": 17,
+  "detected": 14,
+  "omittedId": "P17_B2",
+  "box": [
+    125,
+    144,
+    366,
+    539
+  ],
+  "actualDetector": "RT-DETR Comic v4 INT8",
+  "translation": "Controlled blank response reproducing the screenshot; no Google API call",
+  "cleanup": "Actual fast algorithm",
+  "cleaned": true,
+  "method": "telea",
+  "maskedPixelsInMissingRegion": 33716,
+  "unresolvedOriginalPreserved": true,
+  "backgroundMask": true,
+  "unresolved": [
+    "P17_B2"
+  ],
+  "warnings": [
+    "Нет перевода для 1 областей (P17_B2). Их оригинал сохранён; повтори перевод страницы."
+  ],
+  "limitation": "The omitted translation was a controlled empty response. Gemini recovery quality was not measured."
+}
