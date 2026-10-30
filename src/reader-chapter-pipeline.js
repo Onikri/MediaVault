@@ -18,10 +18,11 @@ export function labelPackets(pages,limit=100){
  while(remaining){let budget=limit;out.push(pages.map((p,i)=>{const regions=p.regions.slice(counts[i],counts[i]+budget);counts[i]+=regions.length;budget-=regions.length;remaining-=regions.length;return {...p,regions};}));}return out;
 }
 export class ChapterPreparation{
- constructor(chapter){this.c=chapter;this.tasks=chapter.entries.map(()=>deferred());this.sources=chapter.entries.map(()=>deferred());this.cleaned=chapter.entries.map(()=>deferred());this.held=new Map();this.getting=new Map();this.memory=new Map();this.next=0;this.nextSource=0;this.done=0;this.downloaded=0;this.started=false;}
+ constructor(chapter){this.c=chapter;this.tasks=chapter.entries.map(()=>deferred());this.sources=chapter.entries.map(()=>deferred());this.cleaned=chapter.entries.map(()=>deferred());this.held=new Map();this.getting=new Map();this.memory=new Map();this.scanPending=new Set(chapter.entries.map((_,i)=>i));this.cleanPending=new Set(this.scanPending);this.nextSource=0;this.done=0;this.downloaded=0;this.cleanDone=new Set();this.cleanFailed=new Set();this.started=false;}
  start(){if(this.started)return;this.started=true;for(let n=0;n<(this.c.config.saveData?1:4);n++)this.load();for(let n=0;n<(this.c.config.saveData?1:2);n++)this.scan();this.cleanLoop();}
  async load(){const c=this.c;while(!c.controller.signal.aborted){const index=this.nextSource++;if(index>=this.sources.length)return;try{const blob=c.jobs.get(index)?.blob||await c.entries[index].async('blob');c.controller.signal.throwIfAborted();this.sources[index].resolve({blob});this.downloaded++;}catch(error){this.sources[index].reject(error);}}}
- async scan(){const c=this.c;while(!c.controller.signal.aborted){const index=this.next++;if(index>=this.tasks.length)return;
+ take(pending){const focus=this.c.focusWindow||[],index=focus.find(i=>pending.has(i))??pending.values().next().value;pending.delete(index);return index;}
+ async scan(){const c=this.c;while(!c.controller.signal.aborted&&this.scanPending.size){const index=this.take(this.scanPending);
   try{
    const cell=await this.sources[index].promise,blob=cell.blob;delete cell.blob;c.controller.signal.throwIfAborted();
    const key=await c.cacheKey(blob,{...c.config,engine:'direct',directBatchPages:2,directModel:'gemini-3.5-flash-lite',directInput:c.config.directInput==='blocks'?'annotated':c.config.directInput,font:'auto',inpaint:'fast'},c.scope)+':detected-v3:'+index;
@@ -39,19 +40,20 @@ export class ChapterPreparation{
    const page=stored?JSON.parse(await stored.text()):this.memory.get(index)||await c.prepare(blob,index);const source={...page,page:index+1,blob};this.held.set(index,source);while(this.held.size>9)this.held.delete(this.held.keys().next().value);return source;
   })();this.getting.set(index,task);task.finally(()=>this.getting.delete(index)).catch(()=>{});}return this.getting.get(index);
  }
- async cleanLoop(){const c=this.c;for(let index=0;index<this.tasks.length&&!c.controller.signal.aborted;index++)try{
-  const meta=await this.tasks[index].promise,stage='clean-v7-'+(c.config.inpaint||'fast'),hit=await readChapterBlob(c.scope,meta.key,index,stage);
-  if(hit){this.c.notify(index,{phase:'cleaning',message:'Подготовленный фон найден в кэше'});this.cleaned[index].resolve({key:meta.key,stage,fromCache:true});continue;}
-  const source=await this.get(index);if(!source.regions.length){this.cleaned[index].resolve(null);continue;}
-  const result=await c.canvasTask({channel:'clean',operation:'clean-prepare',blob:source.blob,allowDownloads:c.config.allowDownloads===true,mode:c.config.inpaint||'fast',page:{width:source.width,height:source.height,regions:source.regions.map(r=>({uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox||r.bbox,text_category:'text'}))}},value=>c.notify(index,{...value,phase:'cleaning',message:value.message||'Фон готовится параллельно переводу'}));
-  c.notify(index,{phase:'cleaning',message:'Фон подготовлен · ожидаем перевод'});const saved=await writeChapterBlob(c.scope,meta.key,index,stage,await encodeCleanPage(result));this.cleaned[index].resolve(saved?{key:meta.key,stage}:{result});
- }catch(error){this.cleaned[index].reject(error);}}
+ async cleanLoop(){const c=this.c;while(this.cleanPending.size&&!c.controller.signal.aborted){const index=this.take(this.cleanPending);try{
+  const meta=await this.tasks[index].promise,stage='clean-v8-'+(c.config.inpaint||'fast'),hit=await readChapterBlob(c.scope,meta.key,index,stage);
+  if(hit){const summary=await decodeCleanPage(hit);if(summary.regions?.some(r=>!r.painted))this.cleanFailed.add(index);else this.cleanDone.add(index);this.c.notify(index,{phase:'cleaning',message:'Подготовленный фон найден в кэше'});this.cleaned[index].resolve({key:meta.key,stage,fromCache:true});continue;}
+  const source=await this.get(index);if(!source.regions.length){this.cleanDone.add(index);this.cleaned[index].resolve(null);continue;}
+  const result=await c.canvasTask({channel:'clean',operation:'clean-prepare',blob:source.blob,allowDownloads:c.config.allowDownloads===true,mode:c.config.inpaint||'fast',page:{width:source.width,height:source.height,regions:source.regions.map(r=>({uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox||r.bbox,text_category:'text'}))}},value=>{this.cleanProgress={page:index+1,message:value.message||'Фон готовится параллельно переводу'};c.notify(index,{...value,phase:'cleaning',message:this.cleanProgress.message});});
+  if(result.regions?.some(r=>!r.painted))this.cleanFailed.add(index);else this.cleanDone.add(index);
+  this.cleanProgress=null;c.notify(index,{phase:'cleaning',message:'Фон подготовлен · ожидаем перевод'});const saved=result.regions?.some(r=>!r.painted)?false:await writeChapterBlob(c.scope,meta.key,index,stage,await encodeCleanPage(result));this.cleaned[index].resolve(saved?{key:meta.key,stage}:{result});
+ }catch(error){this.cleanProgress=null;this.cleanFailed.add(index);this.cleaned[index].reject(error);}}}
  async cleanFor(index){this.start();const value=await this.cleaned[index].promise;if(!value)return null;if(value.result)return value.result;const hit=await readChapterBlob(this.c.scope,value.key,index,value.stage);return hit?{...await decodeCleanPage(hit),cacheHit:!!value.fromCache}:null;}
  retryClean(index){
-  const next=deferred();this.cleaned[index]=next;
-  (async()=>{const c=this.c,meta=await this.tasks[index].promise,stage='clean-v7-'+(c.config.inpaint||'fast');await removeChapterBlob(c.scope,meta.key,index,stage);const source=await this.get(index);
+  const next=deferred();this.cleanDone.delete(index);this.cleanFailed.delete(index);this.cleaned[index]=next;
+  (async()=>{const c=this.c,meta=await this.tasks[index].promise,stage='clean-v8-'+(c.config.inpaint||'fast');await removeChapterBlob(c.scope,meta.key,index,stage);const source=await this.get(index);
    const result=await c.canvasTask({channel:'clean',operation:'clean-prepare',blob:source.blob,allowDownloads:c.config.allowDownloads===true,mode:c.config.inpaint||'fast',page:{width:source.width,height:source.height,regions:source.regions.map(r=>({uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox||r.bbox,text_category:'text'}))}},value=>c.notify(index,value));
-   const saved=await writeChapterBlob(c.scope,meta.key,index,stage,await encodeCleanPage(result));next.resolve(saved?{key:meta.key,stage}:{result});
+   if(result.regions?.some(r=>!r.painted))this.cleanFailed.add(index);else this.cleanDone.add(index);const saved=result.regions?.some(r=>!r.painted)?false:await writeChapterBlob(c.scope,meta.key,index,stage,await encodeCleanPage(result));next.resolve(saved?{key:meta.key,stage}:{result});
   })().catch(next.reject);
  }
  release(index){this.held.delete(index);this.memory.delete(index);}
@@ -66,17 +68,18 @@ export async function drainOrderedChapter(c){
  try{
   c.preparation.start();
   while(!c.controller.signal.aborted){
+   if(c.priorityBarrier){if(inFlight.size){await Promise.allSettled([...inFlight]);continue;}c.priorityBarrier=false;}
    if(inFlight.size>=3||(c.activePages||0)+c.batchSize()>9&&inFlight.size){await Promise.race(inFlight);continue;}
-   const pending=[...c.jobs.values()].filter(j=>j.state==='queued').sort((a,b)=>a.index-b.index);if(!pending.length)break;
-   const first=pending[0],group=[],sources=[];let key;
+   const pending=c.pendingJobs();if(!pending.length)break;
+   const first=pending[0],group=[],sources=[],epoch=c.priorityEpoch,priority=c.priorityPages.has(first.index);let key;
    try{
     const blocks=c.config.directInput==='blocks',max=blocks?9-(c.activePages||0):c.packetRange(first.index).count;let pixels=0,regions=0;
     if(!blocks&&(c.activePages||0)+max>9&&inFlight.size){await Promise.race(inFlight);continue;}
     for(const job of pending){
-     if(group.length>=max||group.length&&job.index!==group.at(-1).index+1)break;
+     if(c.priorityPages.has(job.index)!==priority||group.length>=max||group.length&&job.index!==group.at(-1).index+1)break;
      const source=await c.preparation.get(job.index);
      if(blocks&&sources.length&&(pixels+source.width*source.height>BLOCK_LIMITS.pixels||regions+source.regions.length>100))break;
-     job.state='running';group.push(job);sources.push(source);job.prepared=source;job.blob=source.blob;pixels+=source.width*source.height;regions+=source.regions.length;
+     job.state='running';c.pageStates.set(job.index,{page:job.index+1,state:'running'});group.push(job);sources.push(source);job.prepared=source;job.blob=source.blob;pixels+=source.width*source.height;regions+=source.regions.length;
      if(blocks&&packBlockSheets(linkPageBlocks(sources,{direction:c.direction,webtoon:c.config.webtoon})).length>1)break;
     }
     if(!group.length)continue;
@@ -86,9 +89,10 @@ export async function drainOrderedChapter(c){
     // Wait for a free credential; rotate slots instead of repeatedly choosing #1.
     const available=c.serverSlots.length?c.serverSlots.map(slot=>'oracle-slot:'+slot):c.getKey===directKey?await restoreDirectKeys(c.keyScope):[c.getKey(c.keyScope)];
     if(!available.length||!available.some(Boolean))throw Error('Добавь ключ Google в настройках перевода.');
-    while(!key){for(let n=0;n<available.length;n++){const i=((c.keyCursor||0)+n)%available.length;if(available[i]&&!c.keyBusy.has(available[i])){key=available[i];c.keyCursor=(i+1)%available.length;break;}}if(!key){if(!inFlight.size)throw Error('Нет свободного ключа перевода');await Promise.race(inFlight);}}
-    c.keyBusy.add(key);const slot=available.indexOf(key);for(const job of active){job.keySlot=c.serverSlots.length?c.serverSlots[slot]+1:slot+1;job.serverKey=!!c.serverSlots.length;}
+    while(!key){for(let n=0;n<available.length;n++){const i=((c.keyCursor||0)+n)%available.length;if(available[i]&&!c.keyBusy.has(available[i])&&(!priority||!c.priorityKey||available[i]===c.priorityKey)&&(priority||available[i]!==c.priorityKey)){key=available[i];c.keyCursor=(i+1)%available.length;break;}}if(!key){if(!inFlight.size)throw Error('Нет свободного ключа перевода');await Promise.race(inFlight);}}
+    if(priority)c.priorityKey=key;c.keyBusy.add(key);const slot=available.indexOf(key);for(const job of active){job.keySlot=c.serverSlots.length?c.serverSlots[slot]+1:slot+1;job.serverKey=!!c.serverSlots.length;}
     await c.pacer.reserve(key,c.controller.signal);
+    if(epoch!==c.priorityEpoch){c.keyBusy.delete(key);key=null;for(const job of group)job.state='queued';continue;}
     const local=sources.filter(p=>active.some(j=>j.index+1===p.page));
     if(!blocks&&local.length===1&&c.entries.length>1){const neighbour=local[0].page<c.entries.length?local[0].page:local[0].page-2;try{local.push(await c.preparation.get(neighbour));local.sort((a,b)=>a.page-b.page);}catch{}}
     c.activePages=(c.activePages||0)+active.length;const leasedKey=key;

@@ -9,7 +9,7 @@ import {HYMT_MODELS} from './hymt-models.js';
 import {MANGA_FONTS} from '../reader-fonts/catalog.js';
 import {translationConfig,migrateTranslationSettings} from './manga-translation.js';
 import {DIRECT_DETECTORS,DIRECT_INPUTS} from './manga-direct-profiles.js';
-export function readLmt(user){try{const v=JSON.parse(localStorage.getItem('mv_lmt_settings:'+user)||'{}');if(!v||typeof v!=='object')return translationConfig();delete v.apiKey;if(v.model?.startsWith('Llama-'))delete v.model;return migrateTranslationSettings(v);}catch{return translationConfig();}}
+export function readLmt(user){try{const v=JSON.parse(localStorage.getItem('mv_lmt_settings:'+user)||'{"engine":"direct","version":10,"inpaint":"fast","directRenderVersion":2}');if(!v||typeof v!=='object')return translationConfig({engine:'direct',inpaint:'fast',directRenderVersion:2});delete v.apiKey;if(v.model?.startsWith('Llama-'))delete v.model;return migrateTranslationSettings(v);}catch{return translationConfig({engine:'direct',inpaint:'fast',directRenderVersion:2});}}
 export function saveLmt(user,value){try{const{apiKey,...safe}=value;localStorage.setItem('mv_lmt_settings:'+user,JSON.stringify(safe));}catch{}}
 export default function LmtSettings({value,onChange,backendStatus,onClearCache,onConfigureVm,directKeyScope,onDirectKeyChange,service,showDiagnostics=false}){
  const v=translationConfig(value),set=patch=>onChange(translationConfig({...v,...patch})),backend=v.engine==='backend',gemma=v.engine==='vm',direct=v.engine==='direct',visual=gemma||direct;

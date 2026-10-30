@@ -1,8 +1,9 @@
+import {paperBubble,verticalLettering} from './manga-layout.js';
 import {teleaInpaint} from '../lmt/upstream/lib/inpaint/telea.ts';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {fitComicText,styleFont,comicInkColor} from './manga-typeset.js';
 import {prepareInkPatch,preparePageInk,compositeInkPatch,dilateInk} from './manga-cleaning.js';
-export const READER_RENDER_VERSION=7;
+export const READER_RENDER_VERSION=8;
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
 function maskRuns(patch,pageWidth,mask=patch.mask){const runs=[];for(let y=0;y<patch.height;y++){let x=0;while(x<patch.width){while(x<patch.width&&!mask[y*patch.width+x])x++;const start=x;while(x<patch.width&&mask[y*patch.width+x])x++;if(x>start)runs.push((patch.top+y)*pageWidth+patch.left+start,(patch.top+y)*pageWidth+patch.left+x);}}return runs;}
 export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false,cleanOnly=false,preparedClean}){
@@ -13,9 +14,11 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   const original=ctx.getImageData(0,0,canvas.width,canvas.height),working=new ImageData(original.data.slice(),original.width,original.height),plans=[],records=[],warnings=[],methods=new Set();let inpaintMs=0,typesetMs=0;
   const normalize=text=>String(text).normalize('NFC').replace(/[\u200b\u00ad]/g,'').replace(/\s+/g,' ').trim();
   // Plan and measure every caption before changing any pixel.
-  for(const region of page.regions){
+  for(const sourceRegion of page.regions){
+   const region={...sourceRegion};
    const text=normalize(region.ru_translation||'');if(!cleanOnly&&!text)continue;
-   const box=region.layout_bbox||region.bubble_bbox||region.text_bbox;
+   let box=region.layout_bbox||region.bubble_bbox||region.text_bbox;
+   if(!cleanOnly&&!region.flow&&!region.bubble_bbox&&(!region.layout_bbox||JSON.stringify(region.layout_bbox)===JSON.stringify(region.text_bbox))){const bubble=paperBubble(original,region.text_bbox);if(bubble){box=bubble.box;region.bubble_bbox=box;region.layout_bbox=box;}}
    const valid=b=>Array.isArray(b)&&b.length===4&&b.every(Number.isFinite)&&b[0]>=0&&b[1]>=0&&b[2]<=page.width&&b[3]<=page.height&&b[2]>b[0]&&b[3]>b[1];
    if(!valid(box)||!valid(region.text_bbox)){records.push({uid:region.uid,method:'declined',reason:'Некорректная область вёрстки'});continue;}
    if(cleanOnly){plans.push({region,box});continue;}
@@ -23,9 +26,10 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    try{family=idFont==='serif'?'Georgia, serif':idFont==='mono'?'monospace':await loadMangaFont(idFont);}catch{family='system-ui';warnings.push('Шрифт не загрузился: использован системный шрифт.');}
    const flow=region.flow;
    if(flow&&(![flow.width,flow.height,flow.offsetY].every(Number.isFinite)||flow.width<=0||flow.height<=0||flow.offsetY<0||flow.offsetY+box[3]-box[1]>flow.height+1)){records.push({uid:region.uid,method:'declined',reason:'Некорректная связанная область'});continue;}
-   const fit=fitComicText(text,flow?[0,0,flow.width,flow.height]:box,(value,size)=>{ctx.font=`${weight} ${size}px ${family}`;return ctx.measureText(value).width;},{oval:!flow&&!!region.bubble_bbox});
+   const vertical=!flow&&verticalLettering(box,page.height,region.text_category,!!region.bubble_bbox),fitBox=flow?[0,0,flow.width,flow.height]:vertical?[0,0,box[3]-box[1],box[2]-box[0]]:box;
+   const fit=fitComicText(text,fitBox,(value,size)=>{ctx.font=`${weight} ${size}px ${family}`;return ctx.measureText(value).width;},{oval:!flow&&!!region.bubble_bbox,max:Math.min(96,Math.max(42,Math.round(Math.sqrt((box[2]-box[0])*(box[3]-box[1]))/3)))});
    if(!fit.fits){records.push({uid:region.uid,method:'declined',reason:'Перевод не помещается; исходные буквы сохранены'});continue;}
-   plans.push({region,text,box,idFont,family,weight,fit});
+   plans.push({region,text,box,idFont,family,weight,fit,vertical});
   }
   // Conflicting duplicate boxes must not be painted over one another.
   const conflicts=new Set();for(let i=0;i<plans.length;i++)for(let j=i+1;j<plans.length;j++)if(overlap(plans[i].region.text_bbox,plans[j].region.text_bbox)>.85){conflicts.add(i);conflicts.add(j);}
@@ -93,9 +97,10 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   const layouts=[];for(const p of plans)if(p.painted||p.fallback){
    const t=performance.now(),{box,fit}=p,ink=comicInkColor(working,box),dark=!p.fallback&&ink.dark,complex=p.fallback||ink.outline||['sfx','sign','whisper_aside'].includes(p.region.text_category);
    ctx.save();ctx.beginPath();ctx.rect(box[0]-(p.fallback?3:0),box[1]-(p.fallback?3:0),box[2]-box[0]+(p.fallback?6:0),box[3]-box[1]+(p.fallback?6:0));ctx.clip();ctx.font=`${p.weight} ${fit.fontSize}px ${p.family}`;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=dark?'#fff':'#151515';ctx.lineJoin='round';
-   const cx=(box[0]+box[2])/2,cy=p.region.flow?box[1]-p.region.flow.offsetY+(p.region.flow.height-fit.blockH)/2:(box[1]+box[3]-fit.blockH)/2;
+   let cx=(box[0]+box[2])/2,cy=p.region.flow?box[1]-p.region.flow.offsetY+(p.region.flow.height-fit.blockH)/2:(box[1]+box[3]-fit.blockH)/2;
+   if(p.vertical){ctx.translate(cx,(box[1]+box[3])/2);ctx.rotate(Math.PI/2);cx=0;cy=-fit.blockH/2;}
    for(const[n,line]of fit.lines.entries()){if(complex){ctx.strokeStyle=dark?'#151515':'#fff';ctx.lineWidth=p.fallback?Math.max(6,fit.fontSize*.18):Math.max(2,fit.fontSize*.16);ctx.strokeText(line,cx,cy+n*fit.lineH);}ctx.fillText(line,cx,cy+n*fit.lineH);}
-   ctx.restore();typesetMs+=performance.now()-t;layouts.push({uid:p.region.uid,font:p.idFont,fontSize:fit.fontSize,lines:fit.lines.length,color:dark?'#fff':'#151515',backgroundLuma:ink.luma,fallback:!!p.fallback,fits:true});
+   ctx.restore();typesetMs+=performance.now()-t;layouts.push({uid:p.region.uid,font:p.idFont,fontSize:fit.fontSize,lines:fit.lines.length,color:dark?'#fff':'#151515',backgroundLuma:ink.luma,fallback:!!p.fallback,vertical:!!p.vertical,layoutBox:box,fits:true});
   }
   const unpainted=records.filter(r=>!r.painted).length;
   if(unpainted)warnings.push('Фон восстановлен для '+records.filter(r=>r.painted).length+' из '+records.length+' областей. При неудачной очистке перевод показан с белой подложкой.');

@@ -23,7 +23,7 @@ export class DirectChapter{
   Object.assign(this,{entries,scope,keyScope,config,direction,google,cacheKey,readCache,writeCache,getKey,service,serverSlots});
   this.prepare=prepare||((blob,index,status,inputMode=config.directInput)=>{const type=inputMode==='blocks'?'annotated':inputMode;return type!=='vision'&&DIRECT_DETECTORS.some(v=>v.id===config.directDetector&&v.model)?translateLmt(blob,{...config,directInput:type,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({channel:'prepare',operation:'direct-prepare',blob,index,direction,inputMode:type},status);});
   this.renderPage=renderPage||this.renderCanvas.bind(this);this.controller=new AbortController();this.jobs=new Map();this.listeners=new Map();this.progress=new Map();this.context=new Map();this.active=0;this.keyBusy=new Set();this.worker=null;this.renders=new Map();this.serial=0;this.bypass=new Set();
-  this.pacer=pacer||sharedRequestPacer;this.preparation=new ChapterPreparation(this);
+  this.translatedPages=new Set();this.pageStates=new Map();this.priorityPages=new Set();this.focusWindow=[];this.priorityEpoch=0;this.focusIndex=0;this.pacer=pacer||sharedRequestPacer;this.preparation=new ChapterPreparation(this);
  }
  notify(index,value){const old=this.progress.get(index)||{};value=value.phase==='cleaning'&&old.phase==='translating'&&this.jobs.get(index)?.state==='running'?{...old,backgroundCleanup:value}:{...old,...value};this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
  request(index,blob,background=false){
@@ -31,8 +31,8 @@ export class DirectChapter{
   if(job){if(!background)job.background=false;return job;}
   job={index,blob,background,state:'queued',started:performance.now()};
   job.promise=new Promise((resolve,reject)=>Object.assign(job,{resolve,reject}));job.promise.catch(()=>{});
-  this.jobs.set(index,job);this.notify(index,{phase:'queued',message:background?'Готовим следующую страницу заранее':'Быстрый режим · готовим страницу на устройстве'});
-  if(!background&&this.config.chapterPipeline!==false&&!this.chapterStarted){this.chapterStarted=true;for(let n=0;n<this.entries.length;n++)if(!this.jobs.has(n))this.request(n,null,true);}
+  this.jobs.set(index,job);this.pageStates.set(index,{page:index+1,state:'queued'});this.notify(index,{phase:'queued',message:background?'Готовим следующую страницу заранее':'Быстрый режим · готовим страницу на устройстве'});
+  if(!background&&this.config.chapterPipeline!==false&&!this.chapterStarted){this.chapterStarted=true;if(index>=this.batchSize())this.focus(index,true);for(let n=0;n<this.entries.length;n++)if(!this.jobs.has(n))this.request(n,null,true);}
   if(!background&&this.config.chapterPipeline!==false){const{count,start}=this.packetRange(index);for(let n=start;n<Math.min(start+count,this.entries.length);n++)if(!this.jobs.has(n))this.request(n,null,true);}
   if(!background&&this.config.directInput!=='blocks'&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(3,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n))this.request(n,null,true);}
   queueMicrotask(()=>this.drain());return job;
@@ -100,14 +100,14 @@ export class DirectChapter{
    }catch(error){for(const job of group)if(job.state!=='done')this.fail(job,error);}finally{if(first.keyLease)this.keyBusy.delete(first.keyLease);}
   }}finally{this.active--;if([...this.jobs.values()].some(j=>j.state==='queued')&&!this.controller.signal.aborted)queueMicrotask(()=>this.drain());}
  }
- finish(job,page){this.bypass.delete(job.index);this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);job.state='done';job.blob=null;if(job.prepared)job.prepared={...job.prepared,image:undefined,blob:undefined};job.resolve(page);for(const old of [...this.jobs.values()].filter(j=>j.state==='done').slice(0,-12)){this.jobs.delete(old.index);this.progress.delete(old.index);}}
- fail(job,error){this.jobs.delete(job.index);const raw=job.diagnostics||error.diagnostics,diagnostics=raw?{...raw,local:{...raw.local,totalMs:Math.round(performance.now()-job.started)}}:undefined;job.reject(error);this.notify(job.index,{phase:'error',message:error.message,diagnostics});}
+ finish(job,page){this.translatedPages.add(job.index);this.pageStates.set(job.index,{page:job.index+1,state:'done',keySlot:job.keySlot,serverKey:job.serverKey});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.bypass.delete(job.index);this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);job.state='done';job.blob=null;if(job.prepared)job.prepared={...job.prepared,image:undefined,blob:undefined};job.resolve(page);for(const old of [...this.jobs.values()].filter(j=>j.state==='done').slice(0,-12)){this.jobs.delete(old.index);this.progress.delete(old.index);}}
+ fail(job,error){this.pageStates.set(job.index,{page:job.index+1,state:'failed'});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.jobs.delete(job.index);const raw=job.diagnostics||error.diagnostics,diagnostics=raw?{...raw,local:{...raw.local,totalMs:Math.round(performance.now()-job.started)}}:undefined;job.reject(error);this.notify(job.index,{phase:'error',message:error.message,diagnostics});}
  async render(blob,index,font,status,config={},signal,background=false){
   const renderStarted=performance.now(),fromMemory=this.jobs.get(index)?.state==='done';
   signal?.throwIfAborted();const listeners=this.listeners.get(index)||new Set();if(status)listeners.add(status);this.listeners.set(index,listeners);
   const last=this.progress.get(index);if(last)status?.(last);
   try{
-   const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v7:'+(config.inpaint||this.config.inpaint)+':'+font;
+   const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v8:'+(config.inpaint||this.config.inpaint)+':'+font;
    if(this.config.cache&&!this.bypass.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage&&!config.captureDebug)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
    const job=this.request(index,blob,background),stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
    if(config.captureDebug&&!page.detected){
@@ -136,7 +136,10 @@ export class DirectChapter{
  }
  async compare(blob,index,{signal,onProgress}={}){const key=this.getKey(this.keyScope)||(this.getKey===directKey?await restoreDirectKey(this.keyScope):'');return compareDirectInputs({blob,index,prepare:this.prepare,google:(pages,options)=>this.callGoogle(pages,options),key,config:this.config,direction:this.direction,signal:signal||this.controller.signal,onProgress});}
  prefetch(index){const count=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1);if(!this.jobs.has(index-1))return;for(let n=index;n<Math.min(this.entries.length,index+count*this.batchSize());n++)if(!this.jobs.has(n))this.request(n,null,true);}
- snapshot(){return {active:this.active,queued:[...this.jobs.values()].filter(j=>j.state==='queued').length,buffer:9,inFlightPages:this.activePages||0,preparation:{downloaded:this.preparation.downloaded,detected:this.preparation.done,total:this.entries.length},jobs:[...this.jobs.values()].sort((a,b)=>a.index-b.index).map(j=>({page:j.index+1,state:j.state,keySlot:j.keySlot,serverKey:j.serverKey}))};}
+ focus(index,force=false){const jump=force||Math.abs(index-this.focusIndex)>1;this.focusIndex=index;if(!jump)return;const start=this.entries.length-index<this.batchSize()?this.packetRange(index).start:index;this.focusWindow=Array.from({length:Math.min(4,this.entries.length-start)},(_,n)=>start+n);this.priorityPages=new Set(this.focusWindow.filter(n=>n<this.entries.length&&!this.translatedPages.has(n)));this.priorityEpoch++;this.priorityBarrier=true;this.priorityKey=null;this.drain();}
+ pendingJobs(){const priorityBusy=this.priorityKey&&this.keyBusy.has(this.priorityKey);return [...this.jobs.values()].filter(j=>j.state==='queued').sort((a,b)=>{const pa=this.priorityPages.has(a.index),pb=this.priorityPages.has(b.index);return pa!==pb?(pa?(priorityBusy?1:-1):(priorityBusy?-1:1)):a.index-b.index;});}
+ snapshot(){return {credentialMode:this.config.engine==='vm'?'server':'personal',focusPage:this.focusIndex+1,priorityPages:[...this.priorityPages].map(n=>n+1),active:this.active,queued:[...this.jobs.values()].filter(j=>j.state==='queued').length,buffer:9,inFlightPages:this.activePages||0,preparation:{downloaded:this.preparation.downloaded,detected:this.preparation.done,cleaned:this.preparation.cleanDone.size,cleanFailed:this.preparation.cleanFailed.size,cleanup:this.preparation.cleanProgress,translated:this.translatedPages.size,total:this.entries.length},jobs:Array.from({length:this.entries.length},(_,i)=>{const job=this.jobs.get(i);return job?{page:i+1,state:job.state,keySlot:job.keySlot,serverKey:job.serverKey}:this.pageStates.get(i)||{page:i+1,state:'queued'};})};}
+
  renderCanvas(blob,page,font,status,options={}){
   return this.canvasTask({blob,page,font,captureDebug:options.captureDebug===true,mode:options.inpaint||this.config.inpaint||'hybrid',cache:this.config.cache,preparedClean:options.preparedClean,allowDownloads:options.allowDownloads??this.config.allowDownloads},status);
  }

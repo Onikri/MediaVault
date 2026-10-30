@@ -91,3 +91,14 @@ test('narrow Japanese narration boxes accept Russian words with ellipses and rep
  const measure=(s,n)=>s.length*n*.55,box=[651.27,124.61,704.89,281.17];
  for(const text of ['сколько же прошло...','Подожди?!']){const fit=fitComicText(text,box,measure,{oval:false});assert.ok(fit.fits,text);assert.equal(fit.lines.join('').replaceAll('-','').replaceAll(' ',''),text.replaceAll(' ','').replace(/\.{3,}/g,'…'));}
 });
+
+import {paperBubble,verticalLettering} from '../src/manga-layout.js';
+test('an enclosed paper bubble expands a narrow text box but an open page never becomes a bubble',()=>{
+ const original=image(500,600);rect(original,80,60,340,480,0);rect(original,85,65,330,470,250);rect(original,235,200,10,100,0);const b=paperBubble(original,[232,195,250,305]);assert.ok(b);assert.ok(b.box[2]-b.box[0]>250);assert.ok(b.box[3]-b.box[1]>400);assert.equal(paperBubble(image(500,600),[232,195,250,305]),null);
+ assert.equal(verticalLettering([100,20,160,550],600,'sfx'),true);assert.equal(verticalLettering([100,20,160,550],600,'dialogue',true),false);
+});
+test('MI-GAN adds a small glyph halo, while fast cleanup never creates a full-height text band',()=>{
+ const original=image(220,400);for(let y=0;y<400;y++)for(let x=0;x<220;x++)if((x+y)%7===0)rect(original,x,y,1,1,140);for(let y=60;y<280;y+=28)rect(original,98,y,12,16,0);
+ const migan=prepareInkPatch(original,[94,54,115,290],{neural:true,model:'migan'});assert.ok(!migan.declined);assert.ok(migan.margin>=2&&migan.margin<=3);assert.equal(migan.maskKind,'outlined-glyphs');
+ const fast=prepareInkPatch(original,[94,54,115,290]);assert.notEqual(fast.maskKind,'text-band');
+});

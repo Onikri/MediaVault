@@ -1,3 +1,4 @@
+import {paperBubble} from './manga-layout.js';
 // A region owns only its glyph mask. All masks are derived from the immutable
 // original; one region can never erase Russian text inserted into another.
 export function dilateInk(mask,w,h,radius=1){
@@ -47,26 +48,16 @@ export function prepareInkPatch(original,box,{category='dialogue',neural=false,m
   const dst=(y*w+x)*4,src=((top+y)*pw+left+x)*4;data.set(original.data.subarray(src,src+4),dst);
   if(x>=local[0]-4&&x<local[2]+4&&y>=local[1]-4&&y<local[3]+4&&(x<local[0]||x>=local[2]||y<local[1]||y>=local[3])&&data[dst+3]>127)for(let c=0;c<3;c++)border[c].push(data[dst+c]);
  }
- const background=border.map(a=>a.sort((a,b)=>a-b)[a.length>>1]??255),paper=background.reduce((a,b)=>a+b)/3;
+ const bubble=!neural?paperBubble(original,box):null,background=bubble?.background||border.map(a=>a.sort((a,b)=>a-b)[a.length>>1]??255),paper=background.reduce((a,b)=>a+b)/3;
  const deviation=border.reduce((s,a,c)=>s+a.reduce((n,v)=>n+Math.abs(v-background[c]),0)/Math.max(1,a.length),0)/3;
- // A narrow text strip on artwork (common vertical Japanese captions) cannot
- // be segmented reliably by ink polarity: white outlines join the background.
- // Telea can safely bridge this small complete hole from the surrounding art.
- const bw=x2-x1,bh=y2-y1;
- if(!neural&&deviation>18&&Math.max(bw/bh,bh/bw)>2.4&&bw*bh<pw*ph*.15){
-  const mask=new Uint8Array(w*h),a=Math.max(0,local[0]-4),b=Math.min(w,local[2]+4),c=Math.max(0,local[1]-4),d=Math.min(h,local[3]+4);
-  for(let y=c;y<d;y++)mask.fill(1,y*w+a,y*w+b);
-  protectRules(mask,data,w,h,local,[a,c,b,d]);const masked=mask.reduce((n,v)=>n+v,0),coverage=masked/(w*h);
-  if(coverage<.58)return {left,top,width:w,height:h,data,mask,background,coverage,flat:false,masked,maskKind:'text-band'};
- }
  // Contrast in both directions includes white outlines and dark letter cores.
  // Keep neural masks on the glyphs; a filled text rectangle destroys too much
  // drawing context on SFX over hair/halftones.
- if(model==='moebius'){
-  const margin=Math.min(8,Math.max(3,Math.ceil(Math.max(pw,ph)/512*1.5))+(category==='sfx'||category==='sign'?2:0));
-  const glyphs=contrastGlyphs(data,w,h,local),mask=dilateInk(glyphs,w,h,margin),bounds=[Math.max(0,local[0]-margin),Math.max(0,local[1]-margin-2),Math.min(w,local[2]+margin),Math.min(h,local[3]+margin)];
+ if(model==='moebius'||model==='migan'){
+  const margin=model==='migan'?Math.min(3,Math.max(2,Math.round(Math.max(pw,ph)/1200))):Math.min(8,Math.max(3,Math.ceil(Math.max(pw,ph)/512*1.5))+(category==='sfx'||category==='sign'?2:0));
+  const glyphs=contrastGlyphs(data,w,h,local),mask=fillInkHoles(dilateInk(glyphs,w,h,margin),w,h,Math.max(24,(x2-x1)*(y2-y1)*.12)),bounds=[Math.max(0,local[0]-margin),Math.max(0,local[1]-margin-2),Math.min(w,local[2]+margin),Math.min(h,local[3]+margin)];
   // Extra top coverage catches upper diacritics and anti-aliased outlines.
-  for(let y=2;y<h;y++)for(let x=0;x<w;x++)if(mask[y*w+x]){mask[(y-1)*w+x]=1;mask[(y-2)*w+x]=1;}
+  for(let y=2;y<h;y++)for(let x=0;x<w;x++)if(mask[y*w+x]){mask[(y-1)*w+x]=1;if(model==='moebius')mask[(y-2)*w+x]=1;}
   // Do not extend the safety margin through a long panel/bubble rule outside
   // the detected text. In particular preserve nearby vertical panel frames.
   protectRules(mask,data,w,h,local,bounds);
@@ -100,12 +91,12 @@ export function prepareInkPatch(original,box,{category='dialogue',neural=false,m
   if(z<3||z>area*.4||crossesArtwork)for(let n=0;n<z;n++)ink[queue[n]]=0;
  }
  if(!neural&&(deviation>=12||['sfx','sign','whisper_aside'].includes(category)))ink.set(contrastGlyphs(data,w,h,local));
- const mask=dilateInk(ink,w,h,1),masked=mask.reduce((n,v)=>n+v,0),coverage=masked/(w*h);
+ const mask=fillInkHoles(dilateInk(ink,w,h,!neural&&deviation>=12?2:1),w,h,Math.max(24,area*.12)),masked=mask.reduce((n,v)=>n+v,0),coverage=masked/(w*h);
  if(masked<3)return {declined:'Не выделена безопасная маска букв'};
  if(coverage>.6)return {declined:'Маска захватывает рисунок: область оставлена в оригинале',coverage};
  let interiorDeviation=0,known=0;
  for(let y=local[1];y<local[3];y++)for(let x=local[0];x<local[2];x++){const n=y*w+x;if(mask[n])continue;for(let c=0;c<3;c++)interiorDeviation+=Math.abs(data[n*4+c]-background[c]);known++;}
- const flat=deviation<12&&interiorDeviation/Math.max(1,known*3)<12;
+ const flat=!!bubble||deviation<12&&interiorDeviation/Math.max(1,known*3)<12;
  const ambiguous=!flat&&(category==='sfx'||category==='sign')&&masked/area>.28;
  if(ambiguous&&!neural)return {declined:'Спецэффект пересекает рисунок: для безопасного удаления выбери нейросетевое восстановление',coverage};
  return {left,top,width:w,height:h,data,mask,background,coverage,flat,masked};
@@ -156,4 +147,12 @@ export function applyLamaOutput(image,mask,values,tile,done){
   for(let c=0;c<3;c++){const sample=values[c*plane+local];if(!Number.isFinite(sample))throw Error('LaMa вернула некорректные пиксели');image.data[n*4+c]=Math.round(alpha*Math.max(0,Math.min(255,sample*255))+(1-alpha)*image.data[n*4+c]);}
   done[n]=1;
  }
+}
+
+export function fillInkHoles(mask,w,h,maxArea){
+ const out=mask.slice(),seen=new Uint8Array(mask.length),queue=new Int32Array(mask.length);
+ for(let seed=0;seed<mask.length;seed++)if(!mask[seed]&&!seen[seed]){let a=0,z=1,border=false;queue[0]=seed;seen[seed]=1;
+  while(a<z){const n=queue[a++],x=n%w,y=(n/w)|0;if(!x||!y||x===w-1||y===h-1)border=true;for(const i of [x?n-1:-1,x<w-1?n+1:-1,y?n-w:-1,y<h-1?n+w:-1])if(i>=0&&!mask[i]&&!seen[i]){seen[i]=1;queue[z++]=i;}}
+  if(!border&&z<=maxArea)for(let k=0;k<z;k++)out[queue[k]]=1;
+ }return out;
 }

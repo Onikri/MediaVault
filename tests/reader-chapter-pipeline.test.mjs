@@ -12,7 +12,7 @@ test('chapter downloads/detects ahead independently, sends ordered pairs on rota
   google:async(pages,options)=>{sent.push({pages:pages.map(p=>p.page),key:options.key});await cloud;return{pages:pages.map(p=>({page:p.page,width:100,height:100,regions:p.regions.map(r=>({uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox,ru_translation:'Привет'}))}))};},renderPage:async(blob,page)=>({regions:page.regions,timings:{}})});
  c.canvasTask=async message=>{assert.equal(message.operation,'clean-prepare');cleaned.push(message.page.regions[0].uid);return{cleanedImage:new Uint8Array([1,2,3]).buffer,regions:[]};};
  try{
-  c.request(9,null);const jobs=[...c.jobs.values()];for(const j of jobs)j.promise.then(()=>resolved.push(j.index));
+  c.request(0,null);const jobs=[...c.jobs.values()];for(const j of jobs)j.promise.then(()=>resolved.push(j.index));
   for(let n=0;n<30&&detected.length<9;n++)await tick();assert.equal(downloads.length,10);assert.equal(detected.length,9);assert.equal(sent.length,0);
   firstReady();for(let n=0;n<30&&sent.length<3;n++)await tick();assert.deepEqual(sent.map(p=>p.pages),[[1,2],[3,4],[5,6]]);assert.equal(cleaned.length,10);assert.equal(resolved.length,0);assert.ok(c.activePages<=9);
   cloudReady();await Promise.all(jobs.map(j=>j.promise));assert.deepEqual(sent.map(p=>p.pages),[[1,2],[3,4],[5,6],[7,8],[9,10]]);assert.deepEqual(sent.map(p=>p.key),['oracle-slot:0','oracle-slot:1','oracle-slot:2','oracle-slot:0','oracle-slot:1']);assert.equal(c.keyBusy.size,0);
@@ -45,4 +45,30 @@ test('dense two-page input retains two images in each label-budget shard',()=>{
 
 test('concurrent reservations for one credential are serialized',async()=>{
  let now=0;const p=new RequestPacer({now:()=>now,wait:async ms=>{now+=ms;}});await Promise.all(Array.from({length:4},()=>p.reserve('one')));assert.deepEqual(p.starts.get('one'),[0,4000,8000,12000]);
+});
+
+test('a distant navigation finishes active packets, prioritizes four pages on one credential, then resumes and retains all stage totals',async()=>{
+ const sent=[],release=[];const c=new DirectChapter({entries:Array.from({length:16},(_,i)=>({async:async()=>new Blob([String(i)])})),scope:'focus',config:translationConfig({engine:'vm',cache:false}),serverSlots:[0,1,2],service:()=>({}),pacer:{reserve:async()=>{}},cacheKey:async b=>b.text(),prepare:async(b,i)=>({id:'P'+(i+1),page:i+1,width:100,height:100,image:'x',mime:'image/png',regions:[{id:'P'+(i+1)+'_B1',bbox:[10,10,50,50]}]}),google:async(pages,o)=>{sent.push({pages:pages.map(p=>p.page),key:o.key});await new Promise(r=>release.push(r));return {pages:pages.map(p=>({page:p.page,width:100,height:100,regions:[]}))};}});
+ c.canvasTask=async()=>({cleanedImage:new ArrayBuffer(0),regions:[]});
+ try{c.request(0,null);const jobs=[...c.jobs.values()];for(let n=0;n<100&&sent.length<3;n++)await tick();assert.equal(sent.length,3);c.focus(10);await tick();assert.equal(sent.length,3,'active packets are allowed to finish');release.splice(0).forEach(r=>r());for(let n=0;n<100&&sent.length<6;n++)await tick();assert.deepEqual(sent[3].pages,[11,12]);
+ for(let n=0;n<100&&c.translatedPages.size<16;n++){release.splice(0).forEach(r=>r());await tick();}await Promise.all(jobs.map(j=>j.promise));
+ const priority=sent.filter(p=>p.pages.some(n=>[11,12,13,14].includes(n)));assert.deepEqual(priority.map(p=>p.pages),[[11,12],[13,14]]);assert.equal(priority[0].key,priority[1].key);assert.equal(new Set(sent.flatMap(p=>p.pages)).size,16);assert.equal(sent.flatMap(p=>p.pages).length,16);
+ const snapshot=c.snapshot();assert.equal(snapshot.jobs.length,16);assert.equal(snapshot.preparation.translated,16);assert.equal(snapshot.preparation.cleaned,16);assert.equal(snapshot.credentialMode,'server');
+ }finally{release.splice(0).forEach(r=>r());c.close();}
+});
+
+import {setDirectKey,keySlotScope} from '../src/manga-direct-key.js';
+test('personal mode rotates device credentials through Oracle without loading or using VM slots',async()=>{
+ const scope='personal-isolation',values=['fixture-device-one','fixture-device-two','fixture-device-three'],bodies=[];
+ values.forEach((key,i)=>setDirectKey(keySlotScope(scope,i),key));
+ const service={request:async(path,o)=>{assert.equal(path,'/reader/google/generate');bodies.push(o.body);return{};}};
+ const c=new DirectChapter({entries:Array.from({length:6},(_,i)=>({async:async()=>new Blob([String(i)])})),scope,keyScope:scope,config:translationConfig({engine:'direct',directViaOracle:true,cache:false}),service:()=>service,pacer:{reserve:async()=>{}},cacheKey:async b=>b.text(),prepare:async(b,i)=>({page:i+1,id:'P'+(i+1),width:100,height:100,regions:[{id:'P'+(i+1)+'_B1',bbox:[1,1,20,20]}]}),google:async(pages,o)=>{await o.transport({json:'{}',signal:o.signal});return{pages:pages.map(p=>({page:p.page,width:100,height:100,regions:[]}))};}});
+ c.canvasTask=async()=>({cleanedImage:new ArrayBuffer(0),regions:[]});
+ try{c.request(0,null);await Promise.all([...c.jobs.values()].map(j=>j.promise));assert.equal(bodies.length,3);assert.deepEqual(bodies.map(b=>b.key),values);assert.ok(bodies.every(b=>b.slot===undefined));assert.equal(c.snapshot().credentialMode,'personal');}finally{c.close();values.forEach((key,i)=>setDirectKey(keySlotScope(scope,i),''));}
+});
+
+test('background cleanup follows a changed focus after its active page finishes, even if translation is already cached',async()=>{
+ let release;const gate=new Promise(r=>release=r),cleaned=[];const c=new DirectChapter({entries:Array.from({length:16},(_,i)=>({async:async()=>new Blob([String(i)])})),scope:'cleanup-focus',config:translationConfig({engine:'direct',cache:false}),cacheKey:async b=>b.text(),prepare:async(b,i)=>({page:i+1,width:100,height:100,regions:[{id:'P'+(i+1)+'_B1',bbox:[1,1,20,20]}]})});
+ c.canvasTask=async m=>{const n=Number(m.page.regions[0].uid.match(/P(\d+)/)[1])-1;cleaned.push(n);if(n===0)await gate;return{regions:[],cleanedImage:new ArrayBuffer(0)};};
+ try{c.preparation.start();for(let n=0;n<100&&!cleaned.length;n++)await tick();c.focus(10);release();for(let n=0;n<100&&cleaned.length<16;n++)await tick();assert.deepEqual(cleaned.slice(0,5),[0,10,11,12,13]);assert.equal(c.preparation.cleanDone.size,16);}finally{release();c.close();}
 });
