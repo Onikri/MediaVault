@@ -49,7 +49,7 @@ SITES = (
     Site('animejoy','AnimeJoy','https://animejoy.ru',('animejoy.ru',),'.shortstory','.ntitle a, .ntitle, h2'),
     Site('sovet','SovetRomantica','https://sovetromantica.com',('sovetromantica.com',),'.anime--block__desu','.anime--block__name'),
     Site('animedia','Animedia','https://amd.online',('amd.online','animedia.online'),'.shortstory, .poster, .movie-item','.title, h2, h3','/index.php'),
-    Site('anidub','AniDub','https://anidub.life',('anidub.life','anime.anidub.life','online.anidub.life','v14.anidub.digital'),'.shortstory, .poster, .short','.title, h2, h3'),
+    Site('anidub','AniDub','https://anidub.life',('anidub.life','anime.anidub.life','online.anidub.life','v14.anidub.digital'),'.th-item, .shortstory, .poster, .short','.th-title, .title, h2, h3'),
     Site('anistar','AniStar','https://anistar.org',('anistar.org',),'.shortstory, .shortstoryContent','.shortstoryHead a, h2, h3'),
     Site('shiza','SHIZA Project','https://shiza-project.com',('shiza-project.com',),'.shortstory, .release, .post, a[href*="/releases/"]','h2, h3, .title'),
     Site('animejet','AnimeJet','https://animejet.org',('animejet.org',),'.movie-item, .shortstory, .poster','.movie-item__title, h2, h3'),
@@ -67,6 +67,8 @@ SITES = (
     Site('animevosttv','AnimeVost catalogue','https://animevost.tv',('animevost.tv',),'.shortstory, .movie-item','h2, h3, .movie-item__title'),
     Site('freeanime','FreeAnime','https://freeanime.ru',('freeanime.ru','www.freeanime.ru'),'.shortstory, .poster, .movie-item, .short-item, .th-item, article','.poster__title, .th-title, .short-title, .title, h2, h3',search_method='POST'),
     Site('anixart','AniXart','https://anixart.site',('anixart.site','www.anixart.site'),'.shortstory, .poster, .movie-item, .short-item, .th-item, article','.poster__title, .th-title, .short-title, .title, h2, h3','/index.php'),
+    Site('animegoonline','AnimeGO Online','https://animego.online',('animego.online',),'a.poster-item','.animego-online-poster-item__title'),
+    Site('anigoonline','Anigoo Online','https://www.anigoonline.ru',('anigoonline.ru','www.anigoonline.ru'),'article.short','a.short__title'),
     Site("readmanga", "ReadManga", "https://readmanga.live", ("readmanga.live", "mintmanga.live"), ".tile, .manga-list-item", "h3, .title", "/search", "manga"),
 )
 BY_ID = {site.id: site for site in SITES}
@@ -102,8 +104,10 @@ def parse_search(site, text, base, query=""):
         cards=[a for a in content.select('a[href]') if re.fullmatch(r'/(?:[^/?#]+/)*\d+-[^/?#]+\.html',urlsplit(urljoin(base,a['href'])).path)]
     for card in cards:
         heading = card.select_one(site.title)
-        anchor = heading.find_parent("a") if heading else None
-        anchor = anchor or card.select_one("a[href]") or (card if card.name == "a" else None)
+        anchor = (heading if heading.name=='a' and heading.get('href') else heading.find_parent("a",href=True)) if heading else None
+        # An anchor-card can contain a nested year/category link in malformed
+        # DLE HTML. Its own href is the release, not the first descendant href.
+        anchor = anchor or (card if card.name == "a" and card.get('href') else card.select_one("a[href]"))
         if not anchor:
             continue
         url = link(anchor.get("href"), base)
@@ -144,7 +148,7 @@ def player_choices(text, base):
     if alloha:return alloha,seasons
     soup = BeautifulSoup(text, "html.parser")
     choices = []
-    for select in soup.select(".serial-translations-box select, select[name*=translation], select[data-type=translation]"):
+    for select in soup.select(".serial-translations-box select, .movie-translations-box select, select[name*=translation], select[data-type=translation]"):
         for option in select.select("option"):
             kind = option.get("data-media-type") or option.get("data-type", "serial")
             identity = option.get("data-media-id") or option.get("data-id")
@@ -155,7 +159,8 @@ def player_choices(text, base):
                 root = urlsplit(base)
                 target = f"https://{root.netloc}/{kind}/{identity}/{digest}/720p"
             if target and (identity or target != base):
-                choices.append({"id": str(option.get("value") or identity), "name": clean(option.get("data-title") or option.get_text(" "), 120), "url": target})
+                choices.append({"id": str(option.get("value") or identity), "name": clean(option.get("data-title") or option.get_text(" "), 120), "url": target,
+                                'kind':option.get('data-translation-type') or ''})
     seasons = []
     for option in soup.select(".serial-seasons-box option, select[name*=season] option"):
         number = option.get("value", "")

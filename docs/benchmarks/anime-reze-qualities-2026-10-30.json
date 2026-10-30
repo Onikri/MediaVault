@@ -1,0 +1,134 @@
+{
+  "observedAt": "2026-10-30T20:41:53.270975+00:00",
+  "location": "Windows workstation; VM SSH unavailable",
+  "title": "Chainsaw Man Movie: Reze-hen",
+  "players": [
+    {
+      "player": "Alloha",
+      "qualities": [
+        2160,
+        1440,
+        1080,
+        720,
+        480,
+        360
+      ],
+      "playlists": [
+        {
+          "qualityLabel": 480,
+          "resolutions": [
+            [
+              854,
+              358
+            ]
+          ]
+        },
+        {
+          "qualityLabel": 2160,
+          "resolutions": [
+            [
+              3840,
+              1604
+            ]
+          ]
+        },
+        {
+          "qualityLabel": 1440,
+          "resolutions": [
+            [
+              2560,
+              1070
+            ]
+          ]
+        },
+        {
+          "qualityLabel": 1080,
+          "resolutions": [
+            [
+              1920,
+              802
+            ]
+          ]
+        },
+        {
+          "qualityLabel": 720,
+          "resolutions": [
+            [
+              1280,
+              536
+            ]
+          ]
+        },
+        {
+          "qualityLabel": 360,
+          "resolutions": [
+            [
+              640,
+              268
+            ]
+          ]
+        }
+      ],
+      "bestSample": {
+        "http": 206,
+        "sampleBytes": 1024,
+        "manifest": true
+      }
+    },
+    {
+      "player": "Kodik",
+      "qualities": [
+        720,
+        480,
+        360
+      ],
+      "playlists": [
+        {
+          "qualityLabel": 360,
+          "resolutions": []
+        },
+        {
+          "qualityLabel": 480,
+          "resolutions": []
+        },
+        {
+          "qualityLabel": 720,
+          "resolutions": []
+        }
+      ],
+      "bestSample": {
+        "http": 206,
+        "sampleBytes": 1024,
+        "manifest": true
+      }
+    }
+  ],
+  "discovery": {
+    "checkedProviders": 25,
+    "confirmedSources": [
+      {
+        "provider": "yummy",
+        "variants": 19
+      },
+      {
+        "provider": "animedia",
+        "variants": 2
+      },
+      {
+        "provider": "animegoonline",
+        "variants": 19
+      },
+      {
+        "provider": "anigoonline",
+        "variants": 15
+      }
+    ],
+    "providersWithoutConfirmedPlayers": [
+      "animevost",
+      "anidub",
+      "anixart"
+    ],
+    "translations": 21,
+    "variants": 55
+  }
+}

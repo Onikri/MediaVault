@@ -30,7 +30,12 @@ def season_of(value):
 
 def base_title(value):
     text=re.split(r'\s+(?:смотреть|watch)\b',str(value).casefold())[0]
+    text=re.sub(r'\s+все серии(?: и сезоны)?\s*$', '',text)
+    # Release counters are decoration, not part of the work's title. Removing
+    # only the trailing published counter keeps numbered sequels distinct.
+    text=re.sub(r'\s*\[\s*\d+[^\]]*(?:из|серия|серий|эпизод)[^\]]*\]\s*$', '',text)
     text=re.sub(r'\([^)]*(?:серий|эпизод|озвуч|субтит|20\d\d|19\d\d)[^)]*\)', '',text)
+    text=re.sub(r'\(\s*(?:фильм|movie|ova|ona)\s*\)', '',text)
     text=re.sub(r'(?:\d+(?:st|nd|rd|th)?\s*(?:-?й\s*)?(?:сезон|season)|(?:сезон|season|tv|тв|part)\s*[-:]?\s*\d+)','',text)
     return normalized(re.sub(r'\s+\d{1,2}\s*$','',text))
 

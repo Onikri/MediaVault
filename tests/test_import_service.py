@@ -46,6 +46,31 @@ class StoreTests(unittest.TestCase):
 
 
 class SiteAdapterTests(unittest.TestCase):
+    def test_film_players_keep_published_kodik_and_alloha_translation_ids(self):
+        from urllib.parse import parse_qs,urlsplit
+        from player_catalog import alloha_choices
+        movie='https://kodikplayer.com/video/10/hash0/720p'
+        html='<div class="movie-translations-box"><select><option value="609" data-media-type="video" data-media-id="113534" data-media-hash="hash1" data-title="AniDUB" data-translation-type="voice">AniDUB</option><option value="5" data-media-type="video" data-media-id="123" data-media-hash="hash2" data-title="Русские субтитры" data-translation-type="subtitles">Русские субтитры</option></select></div>'
+        rows,_=player_choices(html,movie)
+        self.assertEqual([v['url'] for v in rows],['https://kodikplayer.com/video/113534/hash1/720p','https://kodikplayer.com/video/123/hash2/720p'])
+        self.assertEqual(rows[1]['kind'],'subtitles')
+        data={'type':'movie','active':{'typeList':'theatrical'},'all':{'theatrical':{'t66':{'WEB-DL':{'id_translation':66,'translation':'Дублированный'}},'t79':{'WEB-DL':{'id_translation':79,'translation':'Субтитры'}}},'directors':{'t66':{'WEB-DL':{'id_translation':66,'translation':'Other cut'}}}}}
+        text="<script>const fileList = JSON.parse('"+json.dumps(data)+"');</script>"
+        rows,seasons=alloha_choices(text,'https://embed.thealloha.club/?token_movie=fixture&token=public')
+        self.assertEqual([v['name'] for v in rows],['Дублированный','Субтитры']);self.assertEqual(seasons,[])
+        self.assertEqual(rows[1]['kind'],'subtitles')
+        self.assertEqual(parse_qs(urlsplit(rows[1]['episodes'][0]['url']).query),{'token_movie':['fixture'],'token':['public'],'translation':['79']})
+
+    def test_new_catalogues_and_anidub_link_to_release_instead_of_year_or_poster_alt(self):
+        from title_identity import match_title
+        for identity,markup in [
+            ('anidub','<div class="th-item"><a href="/123-reze.html"><img alt="Poster"><div class="th-title">Человек-бензопила: Резе</div><a href="/xfsearch/year/2025/">2025</a></a></div>'),
+            ('animegoonline','<a class="poster-item" href="/123-reze.html"><img alt="Постер к аниме"><div class="animego-online-poster-item__title">Человек-бензопила: Резе</div><span>2025</span></a>'),
+            ('anigoonline','<article class="short"><a class="mask" href="/123-reze.html"></a><a class="short__title" href="/123-reze.html">Человек-бензопила: Резе</a><span>2025</span></article>')]:
+            site=BY_ID[identity];rows=parse_search(site,markup,site.root)
+            self.assertEqual(len(rows),1);self.assertEqual(rows[0]['url'],site.root+'/123-reze.html')
+            self.assertTrue(match_title({'title':'Человек-бензопила: Резе','year':2025},rows[0])[0])
+
     def test_public_player_relay_and_modern_kodik_choices_preserve_the_selected_voice(self):
         root='https://yummyanime.tv/70-naruto.html'
         relay='https://yummyanime.tv/engine/ajax/controller.php?mod=player&id=70&slot=1'

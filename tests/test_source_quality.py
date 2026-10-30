@@ -10,6 +10,11 @@ from run_import import validate_job,run_job
 
 
 class SourceQualityTests(unittest.TestCase):
+    def test_quality_inspection_preserves_public_parent(self):
+        from unittest.mock import Mock
+        resolver=Mock();resolver.http=object();resolver.resolve.return_value=Page(streams=[{'quality':2160,'type':'mp4','url':'https://cdn.example.com/4k.mp4'}])
+        self.assertEqual(inspect_qualities('https://embed.example.com/film',referer='https://catalog.example.com/film',resolver=resolver)['best'],2160)
+        resolver.resolve.assert_called_once_with('https://embed.example.com/film',referer='https://catalog.example.com/film')
     def test_all_published_heights_are_returned_without_signed_urls_or_a_1080_cap(self):
         heights=[144,240,360,480,720,1080,1440,2160,4320]
         class Http:pass

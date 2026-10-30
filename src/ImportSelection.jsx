@@ -53,12 +53,12 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
     if(!qualityEpisode||!['anime','movie','tv'].includes(kind)||service.status!=='connected')return()=>controller.abort();
     if(service.session?.serverVersion&&service.session.serverVersion<7){setQualityError('Для полного списка качеств обнови сервер импорта.');return()=>controller.abort();}
     setQualityLoading(true);
-    service.request('/sources/qualities',{method:'POST',body:{url:qualityEpisode},signal:controller.signal})
+    service.request('/sources/qualities',{method:'POST',body:{url:qualityEpisode,...(url&&service.session?.serverVersion>=34?{referer:url}:{})},signal:controller.signal})
       .then(data=>{if(!controller.signal.aborted)setQualityData(data);})
       .catch(cause=>{if(!controller.signal.aborted)setQualityError(cause.message);})
       .finally(()=>{if(!controller.signal.aborted)setQualityLoading(false);});
     return()=>controller.abort();
-  },[qualityEpisode,kind,service.status,service.session?.serverVersion,qualityRevision]);
+  },[qualityEpisode,url,kind,service.status,service.session?.serverVersion,qualityRevision]);
   let onlineEntries=[],selectionError='';try{onlineEntries=selectedVideoEntries(published,episodeText);}catch(e){selectionError=e.message;}
   function startOnline(){if(!inspection||!onlineEntries.length||selectionError){setError(selectionError||'Выбери опубликованные серии для просмотра.');return;}if(inspection.dubs?.length&&!dub){setError('Выбери озвучку.');return;}setOnline(true);}
   async function submit(event){

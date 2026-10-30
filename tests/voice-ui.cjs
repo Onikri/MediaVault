@@ -9,7 +9,7 @@ const ROOT=path.resolve(__dirname,'..'),entry=path.join(ROOT,'test-output','voic
 import React from 'react';import {createRoot} from 'react-dom/client';import {TitleDetails} from '/src/CatalogBrowser.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/discovery-polish.css';
 const item={id:'shikimori:57334',provider:'shikimori',providerId:'57334',providers:['shikimori'],title:'Дандадан',titles:{ru:'Дандадан',en:'Dandadan'},aliases:['Дандадан','Dandadan'],year:2024,kind:'anime',format:'TV',genres:['Комедия'],tags:['Школа'],links:[],releases:[],ids:{mal:'57334'},description:'Проверка точного тайтла и переводов.',cover:''};
 window.MEDIA_VAULT_CONFIG={};
-const service={server:'https://fixture.example',status:'connected',session:{driveConnected:true},request:async(path,options={})=>{
+const service={server:'https://fixture.example',status:'connected',session:{driveConnected:true,serverVersion:34},request:async(path,options={})=>{
  if(!path.startsWith('/sources/'))return {};
  const response=await fetch('https://fixture.example'+path,{method:options.method||'GET',body:options.body?JSON.stringify(options.body):undefined,signal:options.signal});return response.json();},
  submit:async job=>{window.submitted=job;}};
@@ -37,7 +37,7 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
         assert.equal(data.continuation,'public-inspection-continuation');
         return json({provider:'source',dubs:[{id:'a',name:'Studio 39',url:data.dub_url}],seasons:[{number:1,name:'Сезон 1'}],episodes:[1,3].map(number=>({number,url:'https://kodikplayer.com/seria/'+number+'/hash/720p',season:1})),releases:[]});
       }
-      if(url.pathname==='/sources/qualities')return json({qualities:[4320,2160,1440,1080,720,480,360,240,144],best:4320,original:false});
+      if(url.pathname==='/sources/qualities'){assert.equal(req.postDataJSON().referer,'https://source.example/dandadan');return json({qualities:[4320,2160,1440,1080,720,480,360,240,144],best:4320,original:false});}
       return json([]);
     });
     await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/voice-harness.html');

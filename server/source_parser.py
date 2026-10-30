@@ -37,6 +37,7 @@ BLOCKED = re.compile(
     r"[\"'](?:subscription_required|requires_subscription|requires_authentication)[\"']\s*:\s*true",
     re.I,
 )
+PLAYER_RELAY_HOSTS={'yummyanime.tv','animego.online'}
 
 
 def public_url(value, *, resolve_dns=True, allow_api=False):
@@ -263,7 +264,10 @@ class PageParser(HTMLParser):
 
     def link(self, value):
         try:
-            return public_url(urljoin(self.base, html.unescape(value).replace("\\/", "/")), resolve_dns=False)
+            target=public_url(urljoin(self.base, html.unescape(value).replace("\\/", "/")), resolve_dns=False)
+            # This published iframe is AnimeVost's advertisement, not a series.
+            if urlsplit(target).hostname=='animevost.org' and urlsplit(target).path.startswith('/html5banner/'):return None
+            return target
         except SourceError:
             return None
 
@@ -293,14 +297,14 @@ class PageParser(HTMLParser):
         # The site's published player-relay.js loads these exact public slots.
         # Read the same GET response as the iframe; no search/developer API,
         # session, key or generated player ID is used.
-        if urlsplit(self.base).hostname == "yummyanime.tv":
+        if urlsplit(self.base).hostname in PLAYER_RELAY_HOSTS:
             identity = attrs.get("data-player-anime-id", "")
             if re.fullmatch(r"\d{1,10}", identity):
                 self.yummy_player_id = identity
             slot = attrs.get("data-player-slot", "")
             if self.yummy_player_id and re.fullmatch(r"\d{1,2}", slot):
                 query = urlencode({"mod": "player", "id": self.yummy_player_id, "slot": slot})
-                self.result.players.append("https://yummyanime.tv/engine/ajax/controller.php?" + query)
+                self.result.players.append('https://'+urlsplit(self.base).hostname+'/engine/ajax/controller.php?' + query)
         if tag == "div":
             self.containers.append(attrs.get("class", ""))
         if tag == "title":
@@ -379,7 +383,7 @@ def parse_page(text, base):
     decoded=re.sub(r'\\u00(26|3d|2f|3a)',lambda m:chr(int(m[1],16)),decoded,flags=re.I)
     # Yummy's public iframe relay is a JSON envelope, not HTML. Only consume
     # its declared iframe source; unrelated URL strings are not player links.
-    if urlsplit(base).hostname=='yummyanime.tv' and urlsplit(base).path=='/engine/ajax/controller.php':
+    if urlsplit(base).hostname in PLAYER_RELAY_HOSTS and urlsplit(base).path=='/engine/ajax/controller.php':
         try:
             envelope=json.loads(text);payload=envelope.get('data',{})
             if envelope.get('status') is True and payload.get('kind')=='iframe':

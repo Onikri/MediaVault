@@ -70,4 +70,20 @@ class BrowserPlayerTests(unittest.TestCase):
         result=asyncio.run(_extract(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture={url:(markup,'text/html')},timeout=1))
         self.assertEqual(sorted(s['quality'] for s in result),heights)
 
+    @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for quality menu contract')
+    def test_alloha_quality_menu_exposes_every_real_stream_without_changing_audio_or_episode(self):
+        parent='https://publisher.example.com/film'
+        url='https://embed.thealloha.club/?translation=66'
+        heights=[360,480,720,1080,1440,2160]
+        def stream(q):return 'https://cdn.example.com/translation-66-'+str(q)+'.m3u8'
+        markup='<video></video><button data-allplay="play" onclick="fetch(\''+stream(480)+'\')">Play</button>'
+        markup+=''.join('<button data-allplay="quality" value="'+str(q)+'" aria-checked="'+str(q==480).lower()+'" onclick="fetch(\''+stream(q)+'\')">'+str(q)+'</button>' for q in heights)
+        # A menu label with no stream must never manufacture a CDN URL.
+        markup+='<button data-allplay="quality" value="4320">8K unavailable</button>'
+        markup+='<button data-allplay="audio" onclick="fetch(\'https://cdn.example.com/wrong-translation.m3u8\')">Other audio</button>'
+        fixture={parent:('<html>Film</html>','text/html'),url:(markup,'text/html'),**{stream(q):('#EXTM3U','application/vnd.apple.mpegurl') for q in heights}}
+        result=asyncio.run(_extract(url,parent,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=4))
+        self.assertEqual(sorted(s['quality'] for s in result),heights)
+        self.assertEqual({s['url'] for s in result},{stream(q) for q in heights})
+
 if __name__=='__main__':unittest.main()

@@ -20,6 +20,17 @@ class FixtureHttp(PublicHttp):
 
 
 class PlayerContractTests(unittest.TestCase):
+    def test_animego_online_relays_use_only_published_slot_ids_and_ignore_banner(self):
+        root='https://animego.online/123-reze.html'
+        markup='<div data-player-anime-id="123"><div data-player-slot="1"></div></div>'
+        relay='https://animego.online/engine/ajax/controller.php?mod=player&id=123&slot=1'
+        self.assertEqual(parse_page(markup,root).players,[relay])
+        target='https://kodikplayer.com/video/123/hash/720p'
+        import json
+        self.assertEqual(parse_page(json.dumps({'status':True,'data':{'kind':'iframe','src':target}}),relay).players,[target])
+        banner='<iframe src="/html5banner/loliland/vide/index7.html"></iframe>'
+        self.assertEqual(parse_page(banner,'https://animevost.org/123-reze.html').players,[])
+
     def test_iframe_html_request_retains_the_publisher_referer(self):
         class Http:
             def document(self,url,**kwargs):

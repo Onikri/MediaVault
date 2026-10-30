@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
+import re
 from title_identity import aliases, match_title
 from site_adapters import SITES, search_site, inspect_source
 from player_catalog import group_voices
@@ -46,9 +47,14 @@ def discover(selected,*,refresh=False,continuing=False):
         known={s['url']:s for s in hit[1]['sources'] if s.get('complete',True)} if hit and hit[0]>time.monotonic() else {}
     if not _slots.acquire(blocking=False):raise ValueError('Поиск источников уже выполняется. Повтори через несколько секунд.')
     try:
-        queries=list(dict.fromkeys(aliases(selected)))[:2]
+        names=aliases(selected)
+        # Search engines rarely match a catalogue's full localized film title.
+        # Broaden the query only; all results still pass exact title/year/ID.
+        stems=[v.split(':',1)[0].split('. Фильм',1)[0].strip() for v in names if re.search(r'[а-яё]',v,re.I)]
+        keywords=[v.split()[-1].strip(' .:!?') for v in names if ':' in v and re.search(r'[а-яё]',v,re.I)]
+        queries=list(dict.fromkeys([*names[:2],*[v for v in keywords if len(v)>=4],*[v for v in stems if len(v)>=4]]))[:4]
         def work(site):
-            http=PublicHttp(timeout=(2,4),deadline=time.monotonic()+12)
+            http=PublicHttp(timeout=(2,4),deadline=time.monotonic()+15)
             try:
                 matches=[{**s,'kind':selected.get('kind','anime'),'matchEvidence':s.get('matchEvidence','exact_title')} for s in (hit[1]['sources'] if hit and hit[0]>time.monotonic() else []) if s.get('provider')==site.id]
                 status='empty';message='Точное совпадение тайтла и сезона не найдено.'
@@ -59,6 +65,7 @@ def discover(selected,*,refresh=False,continuing=False):
                         accepted,evidence=match_title(selected,candidate)
                         if accepted and not any(m['url']==candidate['url'] for m in matches):
                             matches.append({**candidate,'matchEvidence':evidence})
+                    if matches:break  # Leave the request budget for its players.
                 inspected=[];provider_pending=False
                 for candidate in matches:
                     if candidate['url'] not in known and http.deadline and time.monotonic()>=http.deadline:
@@ -91,7 +98,11 @@ def discover(selected,*,refresh=False,continuing=False):
                         inspected.append({**value,'title':candidate['title'],'providerName':site.name,'matchEvidence':candidate['matchEvidence']})
                     except Exception:
                         status='unavailable';message='Страница найдена, плееры временно не ответили.'
-                return {'provider':site.id,'name':site.name,'status':'ok' if any(v.get('dubs') for v in inspected) else 'no_players' if inspected else 'no_match' if matches or status in {'ok','empty'} else status,'pending':provider_pending,'complete':not provider_pending and all(v.get('complete',True) for v in inspected) and status!='unavailable','message':message,'sources':inspected}
+                count=sum(len(v.get('dubs',[])) for v in inspected)
+                provider_status='ok' if count else 'no_players' if inspected else status if status in {'unavailable','unverified'} else 'no_match'
+                if count:message='Найдено вариантов плееров: '+str(count)+'. Доступность серии проверяется перед просмотром.'
+                elif inspected:message='Тайтл найден, но доступные плееры не подтверждены.'
+                return {'provider':site.id,'name':site.name,'status':provider_status,'pending':provider_pending,'complete':not provider_pending and all(v.get('complete',True) for v in inspected) and status!='unavailable','message':message,'sources':inspected}
             except Exception:
                 return {'provider':site.id,'name':site.name,'status':'unavailable','message':'Источник не ответил или изменил разметку.','sources':[]}
             finally:http.close()

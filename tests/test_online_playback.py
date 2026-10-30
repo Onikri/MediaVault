@@ -10,6 +10,17 @@ from music_playback import parse_recordings
 from manga_sources import parse_pages,parse_search,SITES
 class OnlinePlayback(unittest.TestCase):
  def setUp(self):online.sessions.clear()
+ def test_alloha_labelled_4k_master_is_selected_instead_of_480_boot_stream(self):
+  from types import SimpleNamespace
+  app=FastAPI();online.install(app,lambda:'fixture-owner');client=TestClient(app)
+  streams=[{'url':'https://cdn.example.com/'+str(q)+'.m3u8','type':'hls','quality':q,'headers':{}} for q in [480,2160,1440,1080,720,360]]
+  with patch('online_sessions.Resolver') as resolver,patch('online_sessions.PublicHttp') as http:
+   resolver.return_value.resolve.return_value=SimpleNamespace(streams=streams)
+   http.return_value.document.side_effect=lambda url,**_:('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=3840x1604\n4k.m3u8\n',url,{})
+   r=client.post('/online/prepare',json={'url':'https://embed.thealloha.club/?translation=66','kind':'video'})
+   self.assertEqual(r.status_code,200,r.text)
+   http.return_value.document.assert_called_once_with('https://cdn.example.com/2160.m3u8',headers={})
+   self.assertIn('https://cdn.example.com/2160.m3u8',online.sessions[r.json()['id']].resources.values())
  def test_online_preparation_keeps_the_selected_public_parent(self):
   from types import SimpleNamespace
   app=FastAPI();online.install(app,lambda:'fixture-owner');client=TestClient(app)

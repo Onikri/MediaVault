@@ -29,7 +29,7 @@ import requests
 from metadata_catalog import metadata
 from run_import import run_job, validate_job
 from site_adapters import inspect_source, search_sources, voice_availability
-from source_parser import SourceError
+from source_parser import SourceError,public_url
 from task_store import TaskStore
 from vault_drive import ADMIN_EMAIL_SHA256, GoogleDriveAdapter, VaultDrive, VaultError
 
@@ -248,7 +248,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 33, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 34, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -547,12 +547,14 @@ def manga_summary(body:MangaInspection,subject=Depends(owner)):
 
 class QualityInspection(StrictBody):
     url: str = Field(max_length=8192)
+    referer: str|None = Field(default=None,max_length=8192)
 
 
 @app.post('/sources/qualities')
 def source_qualities(body: QualityInspection, subject=Depends(owner)):
     from source_quality import inspect_qualities
-    return inspect_qualities(body.url)
+    if body.referer:public_url(body.referer,resolve_dns=False)
+    return inspect_qualities(body.url,**({'referer':body.referer} if body.referer else {}))
 
 
 @app.post('/sources/discover')

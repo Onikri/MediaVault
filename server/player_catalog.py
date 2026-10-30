@@ -56,6 +56,22 @@ def alloha_choices(text,base):
     try:data=json.loads(match[1].replace("\\'","'").replace('\\\\','\\'))
     except (ValueError,TypeError):return [],[]
     groups={};seasons=[];parts=urlsplit(base);params=dict(parse_qsl(parts.query));selected=params.get('season')
+    if data.get('type')=='movie':
+        # Films publish a different table (cut / translation / release quality).
+        # Keep the currently published cut; switching cut IDs would change the
+        # selected film version. Numeric translation= is the public selector.
+        cut=(data.get('active') or {}).get('typeList')
+        variants=(data.get('all') or {}).get(cut,{})
+        for releases in variants.values() if isinstance(variants,dict) else []:
+            if not isinstance(releases,dict):continue
+            for row in releases.values():
+                if not isinstance(row,dict) or not isinstance(row.get('id_translation'),int) or not row.get('translation'):continue
+                identity=str(row['id_translation']);label=str(row['translation'])[:120]
+                target=urlunsplit(parts._replace(query=urlencode({**params,'translation':identity}),fragment=''))
+                language='uk' if re.search(r'украин|укр\.',label,re.I) else 'und'
+                groups.setdefault(identity,choice(label,target,identity='alloha:'+identity,player='Alloha',language=language,
+                    episodes=[{'number':1,'season':1,'url':target,'title':'Фильм'}]))
+        return list(groups.values()),[]
     def url(season,episode,translation):
         return urlunsplit(parts._replace(query=urlencode({**params,'season':season,'episode':episode,'translation':translation}),fragment=''))
     for season,episodes in (data.get('all') or {}).items():
@@ -200,7 +216,7 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             item['referer']=url
             current_choices.append(item)
         for value in current_choices:
-            item=value if 'player' in value else choice(value['name'],value['url'],identity=value['id'])
+            item=value if 'player' in value else choice(value['name'],value['url'],identity=value['id'],kind=value.get('kind',''))
             item.setdefault('referer',url)
             key=(item['url'],item['name'],item.get('kind'))
             if key not in choice_seen:choices.append(item);choice_seen.add(key)
@@ -253,14 +269,14 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
     # Shikimori anime IDs use the MAL namespace.
     if ids.get('shikimori') and not ids.get('mal'):ids['mal']=ids['shikimori']
     year=None
-    for node in soup.select('[data-year], .year, [itemprop="datePublished"], meta[property="video:release_date"], meta[property="og:release_date"]'):
+    for node in soup.select('[data-year], .year, .amd-meta a[href*="/anime/god/"], .fmeta a[href*="/xfsearch/year/"], [itemprop="datePublished"], meta[property="video:release_date"], meta[property="og:release_date"]'):
         value=node.get('data-year') or node.get('content') or node.get_text(' ',strip=True)
         matched=re.search(r'\b((?:19|20)\d{2})\b',value)
         if matched:year=int(matched[1]);break
     if year is None:
-        for node in soup.select('li, tr, dt, .info-item, .finfo-item'):
+        for node in soup.select('li, tr, dt, p, .info-item, .finfo-item'):
             value=node.get_text(' ',strip=True)
-            matched=re.match(r'^(?:Год(?:\s+(?:выхода|выпуска))?|Year)\s*:?\s*((?:19|20)\d{2})\b',value,re.I)
+            matched=re.fullmatch(r'(?:Год(?:\s+(?:выхода|выпуска))?|Year)\s*:?\s*((?:19|20)\d{2})(?:\s*г\.?)?',value,re.I)
             if matched:year=int(matched[1]);break
     releases=[{'date':e.get('datetime'),'label':e.parent.get_text(' ',strip=True)[:180]} for e in soup.select('.episode time[datetime], .release time[datetime], .schedule time[datetime], [data-episode] time[datetime]')][:100]
     state['episodes']=episodes;state['seasons']=seasons

@@ -138,6 +138,22 @@ class PosterTests(unittest.TestCase):
 if __name__=='__main__':unittest.main()
 
 class AggregationTests(unittest.TestCase):
+    def test_film_labels_and_release_counters_do_not_change_identity(self):
+        from title_identity import match_title
+        selected={'title':'Человек-бензопила: Резе','aliases':['Chainsaw Man Movie: Reze-hen'],'year':2025,'kind':'anime'}
+        for text in ['Человек-бензопила: Резе (Фильм)','Человек-бензопила: Резе все серии смотреть онлайн бесплатно','Человек-бензопила: Резе / Chainsaw Man Movie: Reze-hen [1 из 1]']:
+            self.assertTrue(match_title(selected,{'title':text,'kind':'anime','year':2025})[0],text)
+        for text in ['Человек-бензопила','Человек-бензопила: Резе 2','Код Гиас: Вернувшийся Розе']:
+            self.assertFalse(match_title(selected,{'title':text,'kind':'anime','year':2025})[0],text)
+
+    def test_page_year_comes_from_release_metadata_not_navigation_list(self):
+        from site_adapters import inspect_source
+        root='https://catalog.example.com/reze'
+        nav='<nav><li>Год <a href="/1971/">1971</a> <a href="/2025/">2025</a></li></nav>'
+        class Http:
+            def document(self,url,**kwargs):return nav+'<h1>Человек-бензопила: Резе</h1><p><strong>Год выхода: </strong>2025</p>',url,{}
+        self.assertEqual(inspect_source(root,http=Http())['year'],2025)
+
     def test_discovery_groups_only_confirmed_exact_work_and_never_inspects_unrelated_hits(self):
         import source_discovery as discovery
         from site_adapters import BY_ID
