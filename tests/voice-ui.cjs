@@ -15,7 +15,7 @@ const service={server:'https://fixture.example',status:'connected',session:{driv
  submit:async job=>{window.submitted=job;}};
 createRoot(document.getElementById('root')).render(React.createElement('main',{style:{padding:'18px',maxWidth:'1180px',margin:'auto'}},React.createElement(TitleDetails,{value:item,destination:'drive',state:{admin:true,user:{sub:'owner'},catalog:{items:[]},libraryId:'catalog-123',busy:''},service,onBack:()=>{},onSubmitted:()=>{window.sent=true}})));
 </script></html>`);
-  const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+  const {createServer}=await import('vite');vite=await createServer({root:ROOT,cacheDir:path.join(ROOT,'.codex-local/cache/vite-voices'),optimizeDeps:{entries:[entry]},logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
   browser=await chromium.launch({headless:true,args:['--no-sandbox'],executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium'});
   for(const width of [320,1280]){
     const context=await browser.newContext({viewport:{width,height:950},serviceWorkers:'block'}),page=await context.newPage(),errors=[],external=[];
