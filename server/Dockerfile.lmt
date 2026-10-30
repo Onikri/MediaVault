@@ -20,7 +20,7 @@ RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir -r requirements-lmt.txt; \
     else pip install --no-cache-dir -r requirements-lmt.txt; fi
 COPY --from=build /assets /assets
-COPY server/lmt_service.py server/lmt_runtime.py server/lmt_onnx.py server/lmt_translate.py server/gemma_translate.py server/gemma_jobs.py server/gemma-system.md ./
+COPY server/lmt_service.py server/lmt_runtime.py server/lmt_onnx.py server/lmt_translate.py server/gemma_translate.py server/gemma_jobs.py server/gemma-system.md server/google_pool.py server/reader_network.py ./
 RUN useradd --uid 1000 --create-home vault && mkdir /data && chown vault:vault /data
 USER 1000:1000
 CMD ["uvicorn","lmt_service:app","--host","0.0.0.0","--port","7861","--workers","1","--no-access-log"]
