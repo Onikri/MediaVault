@@ -3,7 +3,7 @@ import {teleaInpaint} from '../lmt/upstream/lib/inpaint/telea.ts';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {fitComicText,styleFont,comicInkColor} from './manga-typeset.js';
 import {prepareInkPatch,preparePageInk,compositeInkPatch,dilateInk} from './manga-cleaning.js';
-export const READER_RENDER_VERSION=8;
+export const READER_RENDER_VERSION=9;
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
 function maskRuns(patch,pageWidth,mask=patch.mask){const runs=[];for(let y=0;y<patch.height;y++){let x=0;while(x<patch.width){while(x<patch.width&&!mask[y*patch.width+x])x++;const start=x;while(x<patch.width&&mask[y*patch.width+x])x++;if(x>start)runs.push((patch.top+y)*pageWidth+patch.left+start,(patch.top+y)*pageWidth+patch.left+x);}}return runs;}
 export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false,cleanOnly=false,preparedClean}){
@@ -58,7 +58,7 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    const region=plan.region;if(conflicts.has(i)){records.push({uid:region.uid,method:'declined',reason:'Пересекающиеся текстовые области'});continue;}
    const ready=preparedPixels&&preparedClean.regions.find(r=>r.uid===region.uid&&JSON.stringify(r.box)===JSON.stringify(region.text_bbox));
    if(ready){
-    if(ready.painted){for(let n=0;n<ready.runs.length;n+=2){const a=ready.runs[n],b=ready.runs[n+1];working.data.set(preparedPixels.subarray(a*4,b*4),a*4);if(cleanupMask)cleanupMask.fill(1,a,b);}plan.painted=true;methods.add(ready.method);}
+    if(ready.painted){for(let n=0;n<ready.runs.length;n+=2){const a=ready.runs[n],b=ready.runs[n+1];working.data.set(preparedPixels.subarray(a*4,b*4),a*4);}if(cleanupMask){const runs=ready.inputRuns||ready.runs;for(let n=0;n<runs.length;n+=2)cleanupMask.fill(1,runs[n],runs[n+1]);}plan.painted=true;methods.add(ready.method);}
     records.push({...ready,prepared:true});continue;
    }
    status({phase:'cleaning',message:'Очистка областей · '+(i+1)+' / '+plans.length,cleanedRegions:records.filter(r=>r.painted).length,completedRegions:records.filter(r=>r.painted).length,totalRegions:plans.length});
@@ -70,19 +70,19 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
     if(mode==='quality'||mode==='moebius'||mode==='migan'||mode==='hybrid'&&!patch.flat){
      if(lamaUnavailable)throw Error(lamaUnavailable);if(!lama)throw Error('LaMa недоступна в этом обработчике');
      try{modelCalls++;execution=await lama(image,patch.mask,message=>status({phase:'cleaning',message}));}catch(error){lamaUnavailable=error.message;throw error;}
-     method=mode==='moebius'?'moebius':mode==='migan'?'migan':'lama';write=dilateInk(patch.mask,patch.width,patch.height,2);
+     method=mode==='moebius'?'moebius':mode==='migan'?'migan':'lama';write=mode==='quality'||mode==='hybrid'?dilateInk(patch.mask,patch.width,patch.height,2):patch.mask;
     }else if(patch.flat){
      for(let n=0;n<patch.mask.length;n++)if(patch.mask[n])for(let c=0;c<3;c++)image.data[n*4+c]=patch.background[c];method='adaptive-glyph-fill';
     }else{
      // Telea only receives a bounded mask with plenty of known context.
      if(patch.coverage>.6)throw Error('Недостаточно фона для Telea');teleaInpaint(image,patch.mask,3);method='telea';
     }
-    compositeInkPatch(working,patch,image.data,write);plan.painted=true;if(cleanOnly)plan.runs=maskRuns(patch,original.width,write);plan.background=patch.background;methods.add(method);records.push({uid:region.uid,method,execution,painted:true,maskKind:patch.maskKind||'glyphs',coverage:patch.coverage,ms:performance.now()-t});
+    compositeInkPatch(working,patch,image.data,write);plan.painted=true;if(cleanOnly){plan.runs=maskRuns(patch,original.width,write);if(write!==patch.mask)plan.inputRuns=maskRuns(patch,original.width,patch.mask);}plan.background=patch.background;methods.add(method);records.push({uid:region.uid,method,execution,painted:true,maskKind:patch.maskKind||'glyphs',coverage:patch.coverage,ms:performance.now()-t});
    }catch(error){records.push({uid:region.uid,method:'declined',reason:'Не удалось очистить область: '+error.message,ms:performance.now()-t});}
    inpaintMs+=performance.now()-t;
   }
   ctx.putImageData(working,0,0);
-  if(cleanOnly)return {cleanedImage:await(await canvas.convertToBlob({type:'image/png'})).arrayBuffer(),width:page.width,height:page.height,mode,version:READER_RENDER_VERSION,inpaint:{modelCalls,execution:pageExecution,methods:[...methods]},regions:plans.map(p=>({...records.find(r=>r.uid===p.region.uid),uid:p.region.uid,box:p.region.text_bbox,painted:!!p.painted,runs:p.runs||[]})),timings:{inpaintMs}};
+  if(cleanOnly)return {cleanedImage:await(await canvas.convertToBlob({type:'image/png'})).arrayBuffer(),width:page.width,height:page.height,mode,version:READER_RENDER_VERSION,inpaint:{modelCalls,execution:pageExecution,methods:[...methods]},regions:plans.map(p=>({...records.find(r=>r.uid===p.region.uid),uid:p.region.uid,box:p.region.text_bbox,painted:!!p.painted,runs:p.runs||[],...(p.inputRuns?{inputRuns:p.inputRuns}:{})})),timings:{inpaintMs}};
   let debug;
   if(captureDebug){
    const mc=new OffscreenCanvas(original.width,original.height),pixels=new ImageData(original.width,original.height);

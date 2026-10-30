@@ -2,7 +2,8 @@
 // gutter reaches the search boundary and is never accepted as a speech bubble.
 export function paperBubble(image,box){
  const {width:pw,height:ph,data}=image,[x1,y1,x2,y2]=box.map(Math.round),bw=x2-x1,bh=y2-y1;
- const px=Math.min(pw*.5,Math.max(180,bw*3)),py=Math.min(ph*.5,Math.max(260,bh*1.2));
+ let px=Math.min(pw*.5,Math.max(180,bw*2)),py=Math.min(ph*.5,Math.max(260,bh*1.2));
+ while((bw+px*2)*(bh+py*2)>700000&&(px>48||py>48)){px=Math.max(48,px*.85);py=Math.max(48,py*.85);}
  const left=Math.max(0,Math.floor(x1-px)),top=Math.max(0,Math.floor(y1-py)),right=Math.min(pw,Math.ceil(x2+px)),bottom=Math.min(ph,Math.ceil(y2+py)),w=right-left,h=bottom-top;
  if(w*h>700000||bw<2||bh<2)return null;
  const seen=new Uint8Array(w*h),queue=new Int32Array(w*h),light=(x,y)=>{const n=((top+y)*pw+left+x)*4;return(data[n]+data[n+1]+data[n+2])/3>222&&Math.max(data[n],data[n+1],data[n+2])-Math.min(data[n],data[n+1],data[n+2])<40;};let best=null;

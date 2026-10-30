@@ -1,0 +1,199 @@
+{
+  "chapter": 5,
+  "pages": [
+    9,
+    10
+  ],
+  "sourceTitle": "ATM Ojisan: Isekai de Moteki ga Tomaranai!",
+  "detector": "actual RT-DETR Comic v4 INT8",
+  "translations": "Controlled Russian fixture, no Google API calls; results do not measure translation quality.",
+  "methodology": "Cleanup uses detector regions before text-role classification, then the same translated regions are typeset over the prepared background. Before uses 82ef800 renderer/cleaning with the current common hyphenation/font library.",
+  "desktopOnly": true,
+  "physicalPhoneBenchmark": false,
+  "cases": [
+    {
+      "page": 9,
+      "variant": "fast-before",
+      "wallMs": 889.9,
+      "unpainted": 0,
+      "fontSizes": [
+        42,
+        34,
+        38,
+        42
+      ],
+      "verticalRegions": 0,
+      "actualNeuralInference": false,
+      "modelCalls": 0
+    },
+    {
+      "page": 9,
+      "variant": "fast",
+      "wallMs": 851.7,
+      "unpainted": 0,
+      "fontSizes": [
+        50,
+        34,
+        38,
+        96
+      ],
+      "verticalRegions": 1,
+      "actualNeuralInference": false,
+      "modelCalls": 0
+    },
+    {
+      "page": 9,
+      "variant": "migan-r2",
+      "wallMs": 6406.5,
+      "unpainted": 0,
+      "fontSizes": [
+        50,
+        34,
+        38,
+        96
+      ],
+      "verticalRegions": 1,
+      "actualNeuralInference": true,
+      "modelCalls": 4
+    },
+    {
+      "page": 9,
+      "variant": "migan-r3",
+      "wallMs": 5334.6,
+      "unpainted": 0,
+      "fontSizes": [
+        50,
+        34,
+        38,
+        96
+      ],
+      "verticalRegions": 1,
+      "actualNeuralInference": true,
+      "modelCalls": 4
+    },
+    {
+      "page": 10,
+      "variant": "fast-before",
+      "wallMs": 934.2,
+      "unpainted": 0,
+      "fontSizes": [
+        42,
+        42,
+        31,
+        42,
+        42,
+        42,
+        41,
+        42,
+        42,
+        28,
+        40
+      ],
+      "verticalRegions": 0,
+      "actualNeuralInference": false,
+      "modelCalls": 0
+    },
+    {
+      "page": 10,
+      "variant": "fast",
+      "wallMs": 920.1,
+      "unpainted": 0,
+      "fontSizes": [
+        53,
+        54,
+        45,
+        67,
+        69,
+        88,
+        41,
+        45,
+        55,
+        28,
+        40
+      ],
+      "verticalRegions": 0,
+      "actualNeuralInference": false,
+      "modelCalls": 0
+    },
+    {
+      "page": 10,
+      "variant": "migan-r2",
+      "wallMs": 13590.1,
+      "unpainted": 0,
+      "fontSizes": [
+        53,
+        54,
+        45,
+        67,
+        69,
+        88,
+        41,
+        45,
+        55,
+        28,
+        40
+      ],
+      "verticalRegions": 0,
+      "actualNeuralInference": true,
+      "modelCalls": 11
+    },
+    {
+      "page": 10,
+      "variant": "migan-r3",
+      "wallMs": 13417.7,
+      "unpainted": 0,
+      "fontSizes": [
+        53,
+        54,
+        45,
+        67,
+        69,
+        88,
+        41,
+        45,
+        55,
+        28,
+        40
+      ],
+      "verticalRegions": 0,
+      "actualNeuralInference": true,
+      "modelCalls": 11
+    }
+  ],
+  "observations": {
+    "bubbleFontPx": {
+      "glyphBoxOnly": 31,
+      "expandedEnclosedBubble": 45
+    },
+    "tallSfxFontPx": 96,
+    "miganRadiusDecision": "Keep native glyph margins 2–3 px by source resolution (2 px for these 1920px pages). Extra 1px dilation did not consistently improve scene restoration and produced larger artifacts in the coloured sample.",
+    "fast": "Full rectangular text bands are removed. Original black glyph centres in outlined card labels are now covered; residual texture smoothing remains.",
+    "neuralQuality": "MI-GAN can generate grey islands on halftones even with >99.9% of original dark glyph pixels covered. Neither this observation nor a completed model call establishes perfect restoration.",
+    "moebius": "Native CPU reference uses the production mask/ROI and is not a WebGPU performance or quality certification."
+  },
+  "moebiusReference": {
+    "actualNeuralInference": true,
+    "model": "Moebius-0.22B",
+    "provider": "CPUExecutionProvider",
+    "browserWebGPU": false,
+    "inferenceRect": {
+      "x": 0,
+      "y": 0,
+      "w": 1350,
+      "h": 1920
+    },
+    "inferenceMs": 52200.93,
+    "maskedPixels": 393421,
+    "changedInsideMask": 391281,
+    "outsideMaskChanges": 0
+  },
+  "miganWorkerRegression": {
+    "actualNeuralInference": true,
+    "provider": "wasm",
+    "reusedMaskMatches": true,
+    "reusedModelCalls": 0,
+    "outsideChanges": 0
+  },
+  "officialInputContract": "https://github.com/Picsart-AI-Research/MI-GAN#for-developers",
+  "privateImagesCommitted": false
+}

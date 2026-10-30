@@ -41,7 +41,7 @@ export class ChapterPreparation{
   })();this.getting.set(index,task);task.finally(()=>this.getting.delete(index)).catch(()=>{});}return this.getting.get(index);
  }
  async cleanLoop(){const c=this.c;while(this.cleanPending.size&&!c.controller.signal.aborted){const index=this.take(this.cleanPending);try{
-  const meta=await this.tasks[index].promise,stage='clean-v8-'+(c.config.inpaint||'fast'),hit=await readChapterBlob(c.scope,meta.key,index,stage);
+  const meta=await this.tasks[index].promise,stage='clean-v9-'+(c.config.inpaint||'fast'),hit=await readChapterBlob(c.scope,meta.key,index,stage);
   if(hit){const summary=await decodeCleanPage(hit);if(summary.regions?.some(r=>!r.painted))this.cleanFailed.add(index);else this.cleanDone.add(index);this.c.notify(index,{phase:'cleaning',message:'Подготовленный фон найден в кэше'});this.cleaned[index].resolve({key:meta.key,stage,fromCache:true});continue;}
   const source=await this.get(index);if(!source.regions.length){this.cleanDone.add(index);this.cleaned[index].resolve(null);continue;}
   const result=await c.canvasTask({channel:'clean',operation:'clean-prepare',blob:source.blob,allowDownloads:c.config.allowDownloads===true,mode:c.config.inpaint||'fast',page:{width:source.width,height:source.height,regions:source.regions.map(r=>({uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox||r.bbox,text_category:'text'}))}},value=>{this.cleanProgress={page:index+1,message:value.message||'Фон готовится параллельно переводу'};c.notify(index,{...value,phase:'cleaning',message:this.cleanProgress.message});});
@@ -51,7 +51,7 @@ export class ChapterPreparation{
  async cleanFor(index){this.start();const value=await this.cleaned[index].promise;if(!value)return null;if(value.result)return value.result;const hit=await readChapterBlob(this.c.scope,value.key,index,value.stage);return hit?{...await decodeCleanPage(hit),cacheHit:!!value.fromCache}:null;}
  retryClean(index){
   const next=deferred();this.cleanDone.delete(index);this.cleanFailed.delete(index);this.cleaned[index]=next;
-  (async()=>{const c=this.c,meta=await this.tasks[index].promise,stage='clean-v8-'+(c.config.inpaint||'fast');await removeChapterBlob(c.scope,meta.key,index,stage);const source=await this.get(index);
+  (async()=>{const c=this.c,meta=await this.tasks[index].promise,stage='clean-v9-'+(c.config.inpaint||'fast');await removeChapterBlob(c.scope,meta.key,index,stage);const source=await this.get(index);
    const result=await c.canvasTask({channel:'clean',operation:'clean-prepare',blob:source.blob,allowDownloads:c.config.allowDownloads===true,mode:c.config.inpaint||'fast',page:{width:source.width,height:source.height,regions:source.regions.map(r=>({uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox||r.bbox,text_category:'text'}))}},value=>c.notify(index,value));
    if(result.regions?.some(r=>!r.painted))this.cleanFailed.add(index);else this.cleanDone.add(index);const saved=result.regions?.some(r=>!r.painted)?false:await writeChapterBlob(c.scope,meta.key,index,stage,await encodeCleanPage(result));next.resolve(saved?{key:meta.key,stage}:{result});
   })().catch(next.reject);

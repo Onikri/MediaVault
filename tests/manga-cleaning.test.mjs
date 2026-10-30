@@ -107,3 +107,7 @@ test('hyphenated Russian names can fill a speech bubble without single-letter st
  const text='М-мельтина-сан!!',fit=fitComicText(text,[0,0,240,440],(value,size)=>value.length*size*.55,{oval:true,max:90});assert.ok(fit.fits);assert.ok(fit.fontSize>=30);assert.ok(fit.lines.length>=2);assert.ok(fit.lines.every(line=>!line.includes('--')&&!/^[А-ЯЁа-яё]-$/.test(line)));
  assert.ok(!russianBreaks(text).includes(2),'a single stutter letter is never moved to a separate line');
 });
+
+test('a tall bubble on a full-resolution manga page is searched within the pixel budget rather than rejected',()=>{
+ const source=image(1350,1920);rect(source,105,15,270,500,0);rect(source,110,20,260,490,255);rect(source,195,90,100,330,0);const bubble=paperBubble(source,[155,61,320,435]);assert.ok(bubble);assert.ok(bubble.box[2]-bubble.box[0]>220);
+});
