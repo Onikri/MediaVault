@@ -10,14 +10,16 @@ class ReaderNetwork:
    if row['updated']<now-600:self.jobs.pop(key,None)
   while len(self.jobs)>=64:self.jobs.pop(next(iter(self.jobs)))
   identity=secrets.token_urlsafe(12);self.jobs[identity]={'subject':subject,'slot':slot,'personal':personal,'model':model,'phase':'queued','updated':now};return identity
- def update(self,identity,phase,http_status=None):
+ def update(self,identity,phase,http_status=None,*,retry_after=None,slot=None):
   row=self.jobs.get(identity)
   if row is not None:
    row.update(phase=phase,updated=time.time())
    if http_status is not None:row['httpStatus']=http_status
+   if retry_after is not None:row['retryAfterSeconds']=retry_after
+   if slot is not None:row['slot']=slot
  def snapshot(self,subject):
   rows=[{k:v for k,v in row.items() if k!='subject'} for row in self.jobs.values() if row['subject']==subject and row['updated']>time.time()-600]
-  return {'egressIP':self.address,'ipCheckedAt':self.checked or None,'jobs':rows,'active':sum(r['phase'] in {'counting','translating','quota'} for r in rows),'queued':sum(r['phase']=='queued' for r in rows)}
+  return {'egressIP':self.address,'ipCheckedAt':self.checked or None,'jobs':rows,'active':sum(r['phase'] in {'counting','translating'} for r in rows),'queued':sum(r['phase'] in {'queued','quota'} for r in rows)}
  async def observe_address(self):
   if time.time()-self.checked<900:return
   self.checked=time.time()

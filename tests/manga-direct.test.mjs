@@ -159,3 +159,10 @@ test('blank answers distinguish model-confirmed non-text from unresolved text',(
  assert.match(request.contents[0].parts[0].text,/REVIEW of previously blank/);
  assert.match(request.contents[0].parts[0].text,/non_text/);
 });
+
+
+test('server response reports the actual leased slot without a server credential in the client',async()=>{
+ const response=reply([{id:'P1_B1',ru:'Привет!'}]);response.mediavaultGateway={slot:2,personal:false,maxParallel:3};
+ const result=await callDirectGoogle([page(1)],{key:'oracle-slot:0',gemmaProfile:'compat',transport:async()=>({status:200,text:JSON.stringify(response)})});
+ assert.equal(result.diagnostics.gateway.slot,2);assert.equal(result.diagnostics.gateway.personal,false);assert.equal(result.pages[0].regions[0].ru_translation,'Привет!');
+});

@@ -76,7 +76,7 @@ export async function callDirectGoogle(pages,{key,model=DIRECT_MODELS[0],directi
   const response=await sender({url:diagnostic.endpoint,key,json:JSON.stringify(body),signal,timeoutMs:totalTimeout,idleTimeoutMs:native?timeoutMs:0,onEvent:event,onChunk:stream?chunk=>stream.feed(chunk):undefined,fetcher:fetcher||globalThis.fetch});
   signal?.throwIfAborted();const parseStart=performance.now();let data;
   try{data=stream?stream.finish(response.text):JSON.parse(response.text);}catch{diagnostic={...diagnostic,httpStatus:response.status,response:{nonJsonBody:redactGoogle(response.text,key)},metrics:{...diagnostic.metrics,parseMs:Math.round(performance.now()-parseStart)}};throw Error('Google вернул не JSON (HTTP '+response.status+').');}
-  diagnostic={...diagnostic,httpStatus:response.status,response:redactGoogle(data,key),metrics:{...diagnostic.metrics,parseMs:Math.round(performance.now()-parseStart)}};
+  diagnostic={...diagnostic,httpStatus:response.status,...(data.mediavaultGateway?{gateway:data.mediavaultGateway}:{}),response:redactGoogle(data,key),metrics:{...diagnostic.metrics,parseMs:Math.round(performance.now()-parseStart)}};
   if(response.status<200||response.status>=300||data.error){
    const api=redactGoogle(data.error||{},key),labels={400:'Google отклонил параметры запроса',401:'Google отклонил ключ',403:'Нет доступа к модели или API',404:'Модель недоступна для этого ключа',429:'Лимит личного проекта Google'},title=labels[response.status]||(response.status>=500?'Google временно перегружен':'Ошибка Google');
    diagnostic={...diagnostic,googleError:api,retryAfter:response.retryAfter||null};

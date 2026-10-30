@@ -1,5 +1,5 @@
 """Owner-controlled Google credentials and a fixed, quota-paced Oracle gateway."""
-import asyncio,hashlib,json,time,weakref
+import asyncio,hashlib,json,time
 from pathlib import Path
 import httpx
 from fastapi import Depends,HTTPException,Request
@@ -27,76 +27,101 @@ class KeyPool(BaseModel):
 class Generate(BaseModel):
     model_config=ConfigDict(extra='forbid')
     key:SecretStr|None=None
-    slot:int=Field(default=0,ge=0,le=2)
+    slot:int|None=Field(default=None,ge=0,le=2)
     model:str
     request:dict
 
 def install(app,owner,get_store):
     global _store
     _store=get_store
-    from gemma_translate import Quotas
-    quotas={}
-    def quota(model):
-        family='gemma' if model.startswith('gemma-') else 'gemini'
-        if family not in quotas:quotas[family]=Quotas(Path(__import__('os').getenv('DATA_DIR','/data'))/'google-personal-quota.sqlite',minimum_interval=12 if family=='gemma' else 0)
-        return quotas[family]
-    locks=weakref.WeakValueDictionary();slots=asyncio.Semaphore(3)
+    from google_gateway_limits import GoogleGatewayLimits,GatewayLimited
     from reader_network import ReaderNetwork
-    network=ReaderNetwork()
+    from os import getenv
+    limits=None;network=ReaderNetwork()
+    def state():
+        nonlocal limits
+        if limits is None:
+            directory=getattr(_store(),'directory',None) or getenv('DATA_DIR')
+            if not directory:raise HTTPException(503,'Хранилище сервера не готово.')
+            limits=GoogleGatewayLimits(Path(directory)/'google-gateway.sqlite')
+        return limits
+    def status_rows():
+        rows=saved();result=safe_status(rows)
+        for slot,row in zip(result['slots'],rows):slot['runtime']=state().snapshot(row)
+        result['quotaNote']='Остаток RPM — оценка по запросам этой ВМ. Точная оставшаяся квота Google неизвестна; cooldown и ограничения получены из ответов API.'
+        return result
     @app.get('/reader/google/diagnostics')
     async def diagnostics(subject=Depends(owner)):
         await network.observe_address()
-        return {**network.snapshot(subject),'keys':safe_status(saved())['slots']}
+        metadata=status_rows()
+        return {**network.snapshot(subject),'keys':metadata['slots'],'quotaNote':metadata['quotaNote']}
     @app.get('/reader/google/keys')
-    def status(subject=Depends(owner)):return safe_status(saved())
+    async def status(subject=Depends(owner)):return status_rows()
     @app.post('/reader/google/keys')
     async def configure(body:KeyPool,subject=Depends(owner)):
         if len({s.slot for s in body.slots})!=len(body.slots):raise HTTPException(422,'Повторяется номер ключа.')
-        previous={r['slot']:r for r in saved()};rows=[]
+        previous={r['slot']:r for r in saved()}
         async with httpx.AsyncClient(timeout=15,follow_redirects=False) as client:
-            for s in body.slots:
+            async def check(s):
                 key=s.key.get_secret_value().strip() if s.key is not None else previous.get(s.slot,{}).get('key','')
-                if not key:continue
+                if not key:return None
                 if not 20<=len(key)<=512 or any(c.isspace() for c in key):raise HTTPException(422,'Проверь ключ '+str(s.slot+1)+'.')
                 response=await client.get('https://generativelanguage.googleapis.com/v1beta/models',params={'pageSize':1000},headers={'x-goog-api-key':key})
                 if response.status_code!=200:raise HTTPException(422,'Google не подтвердил ключ '+str(s.slot+1)+' · HTTP '+str(response.status_code))
                 names={m.get('name','').removeprefix('models/') for m in response.json().get('models',[])}
                 available=[m for m in MODELS if m in names]
                 if not available:raise HTTPException(422,'Для ключа '+str(s.slot+1)+' нет поддерживаемых моделей.')
-                rows.append({'slot':s.slot,'key':key,'project':s.project,'models':available})
+                return {'slot':s.slot,'key':key,'project':s.project,'models':available}
+            rows=[r for r in await asyncio.gather(*(check(s) for s in body.slots)) if r]
         if len({r['key'] for r in rows})!=len(rows):raise HTTPException(422,'Один и тот же ключ добавлен несколько раз.')
         store=_store()
         if store is None:raise HTTPException(503,'Хранилище сервера не готово.')
         store.setting(SETTING,{'slots':rows,'updated':time.time()})
-        return safe_status(rows)
+        return status_rows()
     @app.post('/reader/google/generate')
     async def generate(body:Generate,connection:Request,subject=Depends(owner)):
         if body.model not in MODELS:raise HTTPException(422,'Выбери поддерживаемую модель Google.')
-        row=next((r for r in saved() if r['slot']==body.slot),{})
-        key=body.key.get_secret_value().strip() if body.key else row.get('key','')
-        if not key:raise HTTPException(422,'Добавь ключ Google AI Studio.')
-        # Unknown projects share one budget; adding keys never invents new quotas.
-        group=hashlib.sha256((row.get('project') or 'shared-project').encode()).hexdigest()[:16] if not body.key else 'personal-shared'
-        lock=locks.setdefault((subject,fingerprint(key)),asyncio.Lock())
         request=body.request
         if set(request)-{'systemInstruction','contents','generationConfig','safetySettings'} or not isinstance(request.get('contents'),list) or len(json.dumps(request))>18*1024*1024:raise HTTPException(422,'Некорректный запрос перевода.')
-        model=body.model;url='https://generativelanguage.googleapis.com/v1beta/models/'+model
-        activity=network.begin(subject,body.slot,model,personal=bool(body.key))
+        rows=saved();personal=body.key is not None
+        if personal:
+            key=body.key.get_secret_value().strip()
+            if not key or len(key)>512 or any(c.isspace() for c in key):raise HTTPException(422,'Проверь личный ключ Google.')
+            known=next((r for r in rows if r['key']==key),{})
+            rows=[{'slot':None,'key':key,'project':known.get('project') or 'personal-shared'}]
+        else:
+            rows=[r for r in rows if body.model in r.get('models',MODELS)]
+        if not rows:raise HTTPException(422,'Добавь серверный ключ Google для выбранной модели.')
+        model=body.model;activity=network.begin(subject,body.slot,model,personal=personal);lease=None;response=None;status_code=0;usage=None
         try:
-            async with slots,lock,httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':key}) as client:
-                network.update(activity,'counting')
-                count=await client.post(url+':countTokens',json={'generateContentRequest':{'model':'models/'+model,**request}})
-                if count.status_code!=200:raise HTTPException(count.status_code,'Google не смог подсчитать токены · HTTP '+str(count.status_code))
-                try:tokens=int(count.json()['totalTokens'])+256;reservation=await quota(model).reserve(group+':'+model,tokens,lambda _:network.update(activity,'quota'))
-                except (ValueError,KeyError):raise HTTPException(429,'Запрос превышает установленный бюджет Google.') from None
-                if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
-                network.update(activity,'translating')
-                response=await client.post(url+':generateContent',json=request)
-                if response.status_code!=200:raise HTTPException(response.status_code,'Google · HTTP '+str(response.status_code)+'. Запрос не перенаправлялся на другой ключ.')
-                network.update(activity,'done',response.status_code)
-                result=response.json();quota(model).settle(reservation,result.get('usageMetadata',{}).get('promptTokenCount'))
-                return result
+            lease=await state().acquire(rows,model,preferred=body.slot,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),disconnected=connection.is_disconnected)
+            row,call=lease
+            network.update(activity,'translating',slot=row.get('slot'))
+            if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
+            # Exactly the same request body as personal mode. No countTokens
+            # round trip or unrelated Gemma TPM budget on Gemini vision calls.
+            async with httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':row['key']}) as client:
+                response=await client.post('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',json=request)
+            status_code=response.status_code
+            if status_code!=200:
+                from google_gateway_limits import provider_limit
+                delay,_=provider_limit(response,time.time())
+                raise HTTPException(status_code,'Google · HTTP '+str(status_code)+((' · повтор через '+str(int(delay)+1)+' с') if delay else ''),headers={'Retry-After':str(int(delay)+1)} if delay else None)
+            try:result=response.json()
+            except ValueError:raise HTTPException(502,'Google вернул некорректный JSON.') from None
+            usage=result.get('usageMetadata',{})
+            result['mediavaultGateway']={'slot':row.get('slot'),'personal':personal,'maxParallel':3}
+            network.update(activity,'done',status_code)
+            return result
+        except GatewayLimited as error:
+            network.update(activity,'error',429,retry_after=error.seconds)
+            raise HTTPException(429,'Все доступные ключи ожидают квоту Google · повтор через '+str(error.seconds)+' с',headers={'Retry-After':str(error.seconds)}) from None
         except HTTPException as error:
-            network.update(activity,'error',error.status_code);raise
+            status_code=error.status_code;network.update(activity,'error',status_code);raise
+        except httpx.HTTPError:
+            status_code=502;network.update(activity,'error',status_code)
+            raise HTTPException(502,'Не удалось получить ответ Google. Готовые страницы сохранены.') from None
         except BaseException:
-            network.update(activity,'cancelled' if await connection.is_disconnected() else 'error');raise
+            status_code=499 if await connection.is_disconnected() else 500;network.update(activity,'cancelled' if status_code==499 else 'error',status_code);raise
+        finally:
+            if lease:state().finish(row,model,call,status_code,usage,response)

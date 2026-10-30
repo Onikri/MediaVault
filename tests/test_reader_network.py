@@ -15,3 +15,9 @@ class ReaderNetworkTests(unittest.TestCase):
   self.assertEqual(len(network.jobs),64)
   for row in network.jobs.values():row['updated']=time.time()-601
   self.assertEqual(network.snapshot('owner')['jobs'],[])
+
+ def test_waiting_for_quota_is_queued_and_actual_server_slot_is_reported(self):
+  network=ReaderNetwork();identity=network.begin('owner',0,'model');network.update(identity,'quota',retry_after=20)
+  value=network.snapshot('owner');self.assertEqual(value['active'],0);self.assertEqual(value['queued'],1);self.assertEqual(value['jobs'][0]['retryAfterSeconds'],20)
+  network.update(identity,'translating',slot=2);self.assertEqual(network.snapshot('owner')['jobs'][0]['slot'],2)
+  network.update(identity,'error',429);self.assertEqual(network.snapshot('owner')['queued'],0)
