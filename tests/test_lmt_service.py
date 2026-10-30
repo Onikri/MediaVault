@@ -11,6 +11,10 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from fastapi import HTTPException
 from lmt_service import EncryptedCache,Processor,Options,owner
 class CacheTests(TestCase):
+ def test_intermediate_debug_images_are_memory_only(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   c=EncryptedCache(tmp);c.write('debug',{'renderedImage':'page','debug':{'cleanedImage':'intermediate'}})
+   self.assertNotIn('debug',c.read('debug'))
  def test_ciphertext_scoped_to_image_user_model_font(self):
   with tempfile.TemporaryDirectory() as tmp:
    c=EncryptedCache(tmp);o=Options().model_dump();k=c.identity('u1',b'page',o);r={'renderedImage':'webp','regions':[{'text':'Привет'}]};c.write(k,r)

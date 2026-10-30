@@ -10,7 +10,7 @@ export default function ReaderRequestDiagnostics({value:d,now}){
  async function copy(){try{await navigator.clipboard.writeText(JSON.stringify(safeDiagnosticExport(d),null,2));setMessage('Отчёт скопирован. API-ключ исключён.');}catch{setMessage('Не удалось скопировать. Выдели JSON ниже.');}}
  return <details className="reader-request-diagnostics"><summary>Запрос Google и подробные метрики</summary><div className="reader-request-body">
   <p><strong>{d.model}</strong> · {d.protocol||'JSON'} · {d.pages} стр. · {d.boxes} блоков · HTTP {d.httpStatus||'не получен'}</p>
-  <p>Разметка: {d.inputMode==='vision'?'Google сам определяет координаты':d.inputMode==='coordinates'?'координаты + чистая страница':'рамки и метки'} · детектор {d.detector}. Получено областей: {d.outputBoxes??'—'}.</p>
+  <p>Разметка: {d.inputMode==='blocks'?'Листы текстовых блоков':d.inputMode==='vision'?'Google сам определяет координаты':d.inputMode==='coordinates'?'координаты + чистая страница':'рамки и метки'} · детектор {d.detector}. Получено областей: {d.outputBoxes??'—'}.</p>
   <p>JSON запроса: <strong>{bytes(d.requestBytes)}</strong> / {bytes(d.limitBytes)} inline-данных. Максимум ответа: {d.requestBody?.generationConfig?.maxOutputTokens} токенов. Квота запросов и токенов в минуту зависит от проекта Google.</p>
   {d.modelInputLimit&&<p>Лимиты модели по документации: вход {d.modelInputLimit.toLocaleString('ru-RU')} токенов, выход {d.modelOutputLimit?.toLocaleString('ru-RU')}. Это размер контекста, не минутная квота ключа.</p>}
   {m.chunks>0&&<p>Поток: {m.chunks} событий · {m.streamChars||0} символов · {m.completedRegions||0} завершённых реплик. Новые данные подтверждают работу запроса.</p>}

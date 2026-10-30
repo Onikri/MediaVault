@@ -21,6 +21,6 @@ export default function ReaderModelStorage({config}){
   {busy&&!(progress?.total>0)&&<progress aria-label="Подготовка модели"/>}
   {progress?.total>0&&<progress aria-label="Загрузка модели" value={progress.loaded} max={progress.total}/>}
   {message&&<p role="status">{message}</p>}
-  <p className="reader-hint">В пакете — выбранный детектор и инпейнт для режима Google. Веса проверяются по SHA-256. Разрешение на папку хранится в IndexedDB; браузер может запросить его повторно. Cookies не используются. API-ключи и страницы манги в папку моделей не записываются.</p>
+  <p className="reader-hint">В пакете — выбранный детектор и инпейнт; для локального Hy-MT2 / Index также OCR и переводчик. Веса проверяются по SHA-256. Разрешение на папку хранится в IndexedDB; браузер может запросить его повторно. Cookies не используются. API-ключи и страницы манги в папку моделей не записываются.</p>
  </fieldset>;
 }

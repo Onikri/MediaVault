@@ -38,6 +38,7 @@ class Options(BaseModel):
     inpaint: Literal['quality','fast'] = 'quality'
     font: Literal['comic-relief','pangolin','neucha','system'] = 'comic-relief'
     translator: Literal['hymt2','index'] = 'hymt2'
+    captureDebug: bool = False
 
 class Body(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -66,6 +67,7 @@ class EncryptedCache:
     def write(self,key,value):
         if value.get('kind')=='gemma-vision' and any(r.get('status')=='unreadable' for p in value.get('pages',[]) for r in p.get('regions',[])):return
         if value.get('kind')!='gemma-vision' and (not value.get('renderedImage') or value.get('warnings') or value.get('inpaint',{}).get('unpainted')): return
+        value={k:v for k,v in value.items() if k!='debug'}
         iv=secrets.token_bytes(12);raw=iv+self.cipher.encrypt(iv,json.dumps(value,ensure_ascii=False).encode(),key.encode())
         p=self.directory/(key+'.cache');tmp=p.with_suffix('.part');tmp.write_bytes(raw);tmp.chmod(0o600);tmp.replace(p)
         files=sorted(self.directory.glob('*.cache'),key=lambda f:f.stat().st_mtime);total=sum(f.stat().st_size for f in files)
@@ -94,7 +96,7 @@ class Processor:
             if j['key']==key and j['subject']==subject and j['state'] in {'queued','running','done'}:return job_id
         if self.queue.full() or len(self.jobs)>=16:raise HTTPException(429,'Очередь перевода заполнена. Подожди текущую страницу.')
         job_id=secrets.token_urlsafe(24)
-        hit=await asyncio.to_thread(self.cache.read,key)
+        hit=None if options.get('captureDebug') else await asyncio.to_thread(self.cache.read,key)
         self.jobs[job_id]={'key':key,'subject':subject,'data':b'' if hit else data,'options':options,'updated':time.monotonic(),
             'state':'done' if hit else 'queued','status':'Готово · из кэша ВМ' if hit else 'В очереди на ВМ',**({'result':{**hit,'cacheHit':True}} if hit else {})}
         if not hit:

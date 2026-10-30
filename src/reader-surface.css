@@ -2,4 +2,8 @@
 @keyframes reader-surface-in{from{opacity:.65;transform:translateX(5px)}to{opacity:1;transform:none}}@media(max-width:600px){.reader-prose{padding:27px 22px;font-size:var(--book-size)}.reader-epub{max-width:100%}}@media(prefers-reduced-motion:reduce){.immersive-reader .immersive-stage .reader-content{scroll-behavior:auto}.immersive-reader .reader-page{animation:none}}
 
 /* Native webtoon width is intrinsic and independent of manga width controls. */
-.immersive-reader .reader-mode-scroll.reader-native-width .reader-page{width:min(var(--source-width,var(--reader-width)),100%)}
+.immersive-reader .reader-native-width .reader-page{width:min(var(--source-width,100%),100%)}
+.immersive-reader .reader-fit-page.reader-mode-pages.reader-native-width .reader-page .reader-image-stack>img:not(.reader-translated-overlay){max-width:100%;max-height:100dvh}
+.immersive-reader .reader-mode-spread.reader-native-width .reader-page{width:min(var(--source-width,100%),50%);flex:0 1 auto}
+.reader-block-toggle{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #ffffff26;border-radius:8px;color:inherit;background:transparent;cursor:pointer}
+.reader-block-toggle[aria-pressed=true]{background:#c8984826;color:#e4c38e;border-color:#c89848}

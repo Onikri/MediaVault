@@ -9,10 +9,10 @@ export function validateServer(value){
 function storedServer(){try{return validateServer(window.MEDIA_VAULT_CONFIG?.importServerUrl||localStorage.getItem('mediavault_import_server')||'');}catch{return '';}}
 export function createImportClient(server,googleToken,fetcher=fetch){
   let session=null,signing=null;
-  async function request(path,{method='GET',body,auth=true,headers={},signal,raw=false}={}){
+  async function request(path,{method='GET',body,auth=true,headers={},signal,raw=false,keepalive=false}={}){
     if(!server)throw Error('Сервер импорта ещё не подключён.');
-    if(auth&&!session)await authenticate();
-    const response=await fetcher(server+path,{method,signal:signal||AbortSignal.timeout(['/manga/inspect','/manga/summary'].includes(path)?120000:path==='/manga/search'?45000:['/sources/discover','/sources/calendar'].includes(path)?90000:path==='/sources/search'||path.startsWith('/sources/search?')?65000:path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
+    if(auth&&!session){if(keepalive)throw Error('Сессия уже закрыта.');await authenticate();}
+    const response=await fetcher(server+path,{method,keepalive,signal:signal||AbortSignal.timeout(['/manga/inspect','/manga/summary'].includes(path)?120000:path==='/manga/search'?45000:['/sources/discover','/sources/calendar'].includes(path)?90000:path==='/sources/search'||path.startsWith('/sources/search?')?65000:path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
     if(raw&&response.ok)return response;
     const result=await response.json().catch(()=>({}));
     if(!response.ok){if(response.status===401)session=null;throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status});}

@@ -14,6 +14,7 @@ export function migrateTranslationSettings(value={}){
 }
 export function resultConfig(value){
  const v=translationConfig(value);
+ if(v.directInput==='blocks'&&['vm','direct'].includes(v.engine))return {version:1,engine:v.engine,inputMode:'blocks',model:v.directModel,language:v.language,direction:v.direction||'rtl',detector:'algorithmic-blocks-v1',webtoon:!!v.webtoon,font:v.font,inpaint:'fast',typesetter:'seam-flow-v1'};
  if(v.engine==='direct')return {version:3,batchPages:v.directBatchPages,engine:'direct',inputMode:v.directInput,model:v.directModel,language:v.language,direction:v.direction||'rtl',detector:v.directInput==='vision'?'google':v.directDetector,inpaint:'fast',font:v.font,typesetter:'worker-cyrillic-oval-v1',prompt:v.language==='English'?'compact-en-ru-v1':'compact-multilingual-ru-v2'};
  if(v.engine==='vm')return {version:TRANSLATION_VERSION,engine:'vm',model:v.directModel,language:v.language,direction:v.direction||'rtl',inpaint:v.inpaint,font:v.font,policy:v.vmPolicy||'',typesetter:'worker-cyrillic-oval-v2'};
 
@@ -27,9 +28,9 @@ const delay=(ms,signal)=>new Promise((resolve,reject)=>{const abort=()=>{clearTi
 export async function translateBackend(blob,config,service,signal,status){
  if(service?.status!=='connected')throw Error('Для перевода на ВМ подключи свой профиль к серверу. На устройстве можно переводить без ВМ.');
  const bytes=await blob.arrayBuffer();signal.throwIfAborted();if(bytes.byteLength>10*1024*1024)throw Error('Страница превышает 10 МБ.');
- const options=resultConfig(config);delete options.version;delete options.engine;delete options.mode;delete options.typesetter;
+ const options=resultConfig(config);if(config.captureDebug)options.captureDebug=true;delete options.version;delete options.engine;delete options.mode;delete options.typesetter;
  const {id}=await service.request('/reader/lmt/jobs',{method:'POST',body:{image:bytesBase64(bytes),options},signal});let completed=false;
- try{const until=Date.now()+15*60*1000;while(Date.now()<until){signal.throwIfAborted();const task=await service.request('/reader/lmt/jobs/'+id,{signal});status?.(task.status||'Обрабатываем страницу на ВМ…');if(task.state==='done'){completed=true;return requireRenderedPage({...task.result,renderedImage:fromBase64(task.result.renderedImage)});}if(['error','cancelled'].includes(task.state))throw Error(task.status||'Перевод остановлен.');await delay(900,signal);}throw Error('Перевод занял больше 15 минут. Проверь состояние ВМ.');}
+ try{const until=Date.now()+15*60*1000;while(Date.now()<until){signal.throwIfAborted();const task=await service.request('/reader/lmt/jobs/'+id,{signal});status?.(task.status||'Обрабатываем страницу на ВМ…');if(task.state==='done'){completed=true;return requireRenderedPage({...task.result,renderedImage:fromBase64(task.result.renderedImage),...(task.result.debug?.cleanedImage?{debug:{...task.result.debug,cleanedImage:fromBase64(task.result.debug.cleanedImage)}}:{})});}if(['error','cancelled'].includes(task.state))throw Error(task.status||'Перевод остановлен.');await delay(900,signal);}throw Error('Перевод занял больше 15 минут. Проверь состояние ВМ.');}
  finally{if(!completed)service.request('/reader/lmt/jobs/'+id+'/cancel',{method:'POST'}).catch(()=>{});}
 }
 // One shared worker: visible pages outrank queued prefetch. A page leaving the

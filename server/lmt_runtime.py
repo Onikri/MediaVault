@@ -128,10 +128,10 @@ class LmtRuntime:
             return await self.page.evaluate('''async ({image,config}) => {
                 const bytes=Uint8Array.from(atob(image),c=>c.charCodeAt(0));
                 const result=await window.mangaTranslate(bytes.buffer,config,s=>window.mvProgress(s));
-                for(const key of ['renderedImage','cleanedImage'])if(result[key]){
-                    const data=new Uint8Array(result[key]);let text='';
+                for(const object of [result,result.debug||{}])for(const key of ['renderedImage','cleanedImage'])if(object[key]){
+                    const data=new Uint8Array(object[key]);let text='';
                     for(let i=0;i<data.length;i+=8192)text+=String.fromCharCode(...data.subarray(i,i+8192));
-                    result[key]=btoa(text);
+                    object[key]=btoa(text);
                 }
                 return result;
             }''', {'image': base64.b64encode(data).decode(), 'config': config})

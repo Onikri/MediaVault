@@ -19,7 +19,9 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    if(!valid(box)||!valid(region.text_bbox)){records.push({uid:region.uid,method:'declined',reason:'Некорректная область вёрстки'});continue;}
    const idFont=font==='auto'?styleFont(region.font_style):font,weight=region.font_style==='bold_scream'?700:400;let family;
    try{family=idFont==='serif'?'Georgia, serif':idFont==='mono'?'monospace':await loadMangaFont(idFont);}catch{family='system-ui';warnings.push('Шрифт не загрузился: использован системный шрифт.');}
-   const fit=fitComicText(text,box,(value,size)=>{ctx.font=`${weight} ${size}px ${family}`;return ctx.measureText(value).width;},{oval:!!region.bubble_bbox});
+   const flow=region.flow;
+   if(flow&&(![flow.width,flow.height,flow.offsetY].every(Number.isFinite)||flow.width<=0||flow.height<=0||flow.offsetY<0||flow.offsetY+box[3]-box[1]>flow.height+1)){records.push({uid:region.uid,method:'declined',reason:'Некорректная связанная область'});continue;}
+   const fit=fitComicText(text,flow?[0,0,flow.width,flow.height]:box,(value,size)=>{ctx.font=`${weight} ${size}px ${family}`;return ctx.measureText(value).width;},{oval:!flow&&!!region.bubble_bbox});
    if(!fit.fits){records.push({uid:region.uid,method:'declined',reason:'Перевод не помещается; исходные буквы сохранены'});continue;}
    plans.push({region,text,box,idFont,family,weight,fit});
   }
@@ -70,7 +72,7 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   const layouts=[];for(const p of plans)if(p.painted){
    const t=performance.now(),dark=p.background.reduce((a,v)=>a+v,0)<384,complex=['sfx','sign','whisper_aside'].includes(p.region.text_category),{box,fit}=p;
    ctx.save();ctx.beginPath();ctx.rect(box[0],box[1],box[2]-box[0],box[3]-box[1]);ctx.clip();ctx.font=`${p.weight} ${fit.fontSize}px ${p.family}`;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=dark?'#fff':'#151515';ctx.lineJoin='round';
-   const cx=(box[0]+box[2])/2,cy=(box[1]+box[3]-fit.blockH)/2;
+   const cx=(box[0]+box[2])/2,cy=p.region.flow?box[1]-p.region.flow.offsetY+(p.region.flow.height-fit.blockH)/2:(box[1]+box[3]-fit.blockH)/2;
    for(const[n,line]of fit.lines.entries()){if(complex){ctx.strokeStyle=dark?'#151515':'#fff';ctx.lineWidth=Math.max(2,fit.fontSize*.16);ctx.strokeText(line,cx,cy+n*fit.lineH);}ctx.fillText(line,cx,cy+n*fit.lineH);}
    ctx.restore();typesetMs+=performance.now()-t;layouts.push({uid:p.region.uid,font:p.idFont,fontSize:fit.fontSize,lines:fit.lines.length,fits:true});
   }

@@ -6,9 +6,9 @@ change disposed the image URL and restarted translation. Pages now keep a
 stable resource, delay offscreen eviction, preserve their measured geometry,
 and do not cancel rendering merely because the observer changes.
 
-Webtoon/manhwa scroll mode uses each source image's intrinsic width, shrinking to the viewport
-without upscaling. The manga width setting does not change webtoon width.
-Ordinary manga retains its width controls, including in scroll mode.
+As of October 30, both manga and webtoon/manhwa use each source image's
+intrinsic width, shrinking to the viewport without upscaling. See
+[the blocks update](reader-blocks-2026-10-30.md) for the current behaviour.
 
 The warning-outline button beside translation opens a nonmodal debug panel:
 
@@ -31,10 +31,11 @@ can be restored through the settings button. No filesystem access prompt runs
 inside a worker. Directory files are keyed by full source URL/revision and
 checked against the existing SHA-256 manifests before use.
 
-Preloading covers the chosen detector and inpaint model in Google modes, not
-all offline OCR/LLM combinations. Moebius and the upstream LMT downloader both
-read the directory cache. Incomplete streamed downloads are rejected. Download
-percentages represent byte counts only when a total is provided.
+Preloading covers the chosen detector and inpaint model in Google modes.
+The October 30 update adds OCR and GGUF packs for local Hy-MT2 and Index;
+experimental WebLLM retains its own browser cache. Moebius and the upstream
+LMT downloader read the directory cache. Incomplete streamed downloads are
+rejected. Download percentages represent observed byte counts and known sizes.
 
 One idle canvas worker is retained for two minutes to reuse loaded sessions
 between readers. A busy renderer is terminated on close. The idle renderer

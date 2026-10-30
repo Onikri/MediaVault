@@ -5,6 +5,7 @@ import {directKey,restoreDirectKey,directKeys,restoreDirectKeys} from './manga-d
 import {DIRECT_DETECTORS} from './manga-direct-profiles.js';
 import {compareDirectInputs} from './manga-direct-comparison.js';
 import {translationCacheKey,getTranslation,putTranslation} from './translation-cache.js';
+import {drainBlockChapter} from './manga-block-chapter.js';
 
 const cancelled=()=>new DOMException('Читалка закрыта','AbortError');
 function waitFor(promise,signal){
@@ -19,7 +20,7 @@ function waitFor(promise,signal){
 export class DirectChapter{
  constructor({entries,scope,keyScope,config,direction='rtl',prepare,google=callDirectGoogle,cacheKey=translationCacheKey,readCache=getTranslation,writeCache=putTranslation,renderPage,getKey=directKey,service,serverSlots=[]}){
   Object.assign(this,{entries,scope,keyScope,config,direction,google,cacheKey,readCache,writeCache,getKey,service,serverSlots});
-  this.prepare=prepare||((blob,index,status,inputMode=config.directInput)=>inputMode!=='vision'&&DIRECT_DETECTORS.some(v=>v.id===config.directDetector&&v.model)?translateLmt(blob,{...config,directInput:inputMode,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({operation:'direct-prepare',blob,index,direction,inputMode},status));
+  this.prepare=prepare||((blob,index,status,inputMode=config.directInput)=>inputMode==='blocks'?this.canvasTask({operation:'blocks-prepare',blob,index,direction,language:config.language},status):inputMode!=='vision'&&DIRECT_DETECTORS.some(v=>v.id===config.directDetector&&v.model)?translateLmt(blob,{...config,directInput:inputMode,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({operation:'direct-prepare',blob,index,direction,inputMode},status));
   this.renderPage=renderPage||this.renderCanvas.bind(this);this.controller=new AbortController();this.jobs=new Map();this.listeners=new Map();this.progress=new Map();this.context=new Map();this.active=0;this.keyBusy=new Set();this.worker=null;this.renders=new Map();this.serial=0;this.bypass=new Set();
  }
  notify(index,value){this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
@@ -29,18 +30,26 @@ export class DirectChapter{
   job={index,blob,background,state:'queued',started:performance.now()};
   job.promise=new Promise((resolve,reject)=>Object.assign(job,{resolve,reject}));job.promise.catch(()=>{});
   this.jobs.set(index,job);this.notify(index,{phase:'queued',message:background?'Готовим следующую страницу заранее':'Быстрый режим · готовим страницу на устройстве'});
-  if(!background&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(3,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n))this.request(n,null,true);}
+  if(!background&&this.config.directInput!=='blocks'&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(3,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n))this.request(n,null,true);}
   queueMicrotask(()=>this.drain());return job;
  }
  batchSize(){return this.config.directBatchPages===1?1:3;}
- async jsonCacheId(blob,index){return await this.cacheKey(blob,{...this.config,direction:this.direction,font:'auto',inpaint:'fast'},this.scope)+':chapter='+encodeURIComponent(this.config.contextKey||'chapter')+':page='+index;}
+ async jsonCacheId(blob,index){
+  const config={...this.config,direction:this.direction,font:'auto',inpaint:'fast'};let neighbours='';
+  if(config.directInput==='blocks'&&config.webtoon){
+   const keys=[];for(const n of[index-1,index+1])if(this.entries[n]){const adjacent=await waitFor(this.entries[n].async('blob'),AbortSignal.any([this.controller.signal,AbortSignal.timeout(30000)]));keys.push(await this.cacheKey(adjacent,config,this.scope));}
+   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(keys.join('\n')));neighbours=':edges='+Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+  }
+  return await this.cacheKey(blob,config,this.scope)+':chapter='+encodeURIComponent(this.config.contextKey||'chapter')+':page='+index+neighbours;
+ }
  async cached(job){
-  const sourceStart=performance.now(),blob=job.blob||await waitFor(this.entries[job.index].async('blob'),AbortSignal.any([this.controller.signal,AbortSignal.timeout(30000)]));job.sourceReadMs=Math.round(performance.now()-sourceStart);const cacheStart=performance.now();this.controller.signal.throwIfAborted();job.blob=blob;
+  const sourceStart=performance.now(),blob=job.blob||await waitFor(this.entries[job.index].async('blob'),AbortSignal.any([this.controller.signal,AbortSignal.timeout(job.sourceTimeoutMs||30000)]));job.sourceReadMs=Math.round(performance.now()-sourceStart);const cacheStart=performance.now();this.controller.signal.throwIfAborted();job.blob=blob;
   job.cacheId=await this.jsonCacheId(blob,job.index);
   if(this.config.cache&&!this.bypass.has(job.index)){const hit=await this.readCache(job.cacheId,this.scope);if(hit?.kind==='manga-json'&&hit.page)return {...hit.page,cacheHit:true};}
   job.cacheMs=Math.round(performance.now()-cacheStart);return null;
  }
  async drain(){
+  if(this.config.directInput==='blocks')return drainBlockChapter(this);
   const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1);if(this.active>=Math.min(3,capacity)||this.controller.signal.aborted)return;this.active++;
   try{while(!this.controller.signal.aborted){
    const pending=[...this.jobs.values()].filter(j=>j.state==='queued'),first=pending.find(j=>!j.background)||pending[0];if(!first)break;
@@ -102,7 +111,7 @@ export class DirectChapter{
    this.notify(index,{detected:page.detected,phase:'cleaning',message:page.cacheHit?'Из кэша устройства · вставляем русский текст':'Лёгкая очистка и русский набор',completedRegions:0,totalRegions:page.regions.length,diagnostics:page.diagnostics});
    const painting=this.renderPage(blob,page,font,value=>this.notify(index,{...value,completedRegions:value.cleanedRegions||0,totalRegions:page.regions.filter(r=>r.ru_translation?.trim()).length,diagnostics:page.diagnostics}),config).then(result=>{if(signal?.aborted){result.renderedBitmap?.close();throw signal.reason;}return result;});
    let result;try{result=await waitFor(painting,signal);}catch(error){error.stage='render';throw error;}signal?.throwIfAborted();
-   result.detected=page.detected;
+   result.detected=page.detected;result.detectionReport=page.detectionReport;
    if(this.config.cache&&result.cacheImage){const {renderedBitmap,cacheImage,diagnostics,debug,...save}=result;await this.writeCache(renderCacheId,this.scope,{...save,renderedImage:cacheImage,renderedMime:'image/webp'});}delete result.cacheImage;
    result.timings={...result.timings,directTotalMs:Math.round(performance.now()-(fromMemory?renderStarted:job.started))};
    if(page.diagnostics)result.diagnostics={...page.diagnostics,stage:'ready',cleanup:result.inpaint,typesetting:result.typesetting,local:{...page.diagnostics.local,inpaintMs:result.timings.inpaintMs,typesetMs:result.timings.typesetMs,renderMs:result.timings.renderMs,totalMs:result.timings.directTotalMs}};
