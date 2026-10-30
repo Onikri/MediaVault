@@ -1,0 +1,83 @@
+{
+  "actualGoogleInference": true,
+  "model": "gemini-3.5-flash-lite",
+  "pagesPerRequest": 2,
+  "serverVersion": 33,
+  "configuredKeys": 3,
+  "unauthorizedKeyReadBlocked": true,
+  "overlappingHttpsRequests": true,
+  "observedParallelGoogleCalls": 3,
+  "results": [
+    {
+      "requestedSlot": 0,
+      "httpStatus": 200,
+      "milliseconds": 5249,
+      "actualSlot": 0,
+      "validTwoPageRussian": true,
+      "usage": {
+        "promptTokenCount": 2167,
+        "candidatesTokenCount": 65,
+        "totalTokenCount": 2232,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 55
+          },
+          {
+            "modality": "IMAGE",
+            "tokenCount": 2112
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    },
+    {
+      "requestedSlot": 1,
+      "httpStatus": 200,
+      "milliseconds": 6989,
+      "actualSlot": 1,
+      "validTwoPageRussian": true,
+      "usage": {
+        "promptTokenCount": 2167,
+        "candidatesTokenCount": 80,
+        "totalTokenCount": 2247,
+        "promptTokensDetails": [
+          {
+            "modality": "IMAGE",
+            "tokenCount": 2112
+          },
+          {
+            "modality": "TEXT",
+            "tokenCount": 55
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    },
+    {
+      "requestedSlot": 2,
+      "httpStatus": 200,
+      "milliseconds": 7250,
+      "actualSlot": 2,
+      "validTwoPageRussian": true,
+      "usage": {
+        "promptTokenCount": 2167,
+        "candidatesTokenCount": 80,
+        "totalTokenCount": 2247,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 55
+          },
+          {
+            "modality": "IMAGE",
+            "tokenCount": 2112
+          }
+        ],
+        "serviceTier": "standard"
+      }
+    }
+  ],
+  "provenance": "Actual Google Gemini vision translation through the authenticated production Oracle HTTPS gateway. Two generated English test images per request. Three independent server profiles. No browser/API fixture for these three calls.",
+  "limitations": "Positive inference test only; quota/cooldown failures and restart recovery were tested separately with deterministic fixtures. This does not measure remaining Google project quota or manga translation quality."
+}
