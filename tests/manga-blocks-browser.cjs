@@ -4,7 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
 let browser,vite;
 (async()=>{
  const root=path.resolve(__dirname,'..'),out=path.join(root,'.codex-local','test-output');await fs.mkdir(out,{recursive:true});
- await fs.writeFile(path.join(out,'blocks.html'),'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/test-output/blocks.jsx"></script></html>');
+ await fs.writeFile(path.join(out,'blocks.html'),'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/.codex-local/test-output/blocks.jsx"></script></html>');
  await fs.writeFile(path.join(out,'blocks.jsx'),`
 import React from 'react';import{createRoot}from'react-dom/client';import JSZip from'jszip';import MangaReader from'/src/MangaReader.jsx';import'/src/styles.css';
 window.sent=[];const c=document.createElement('canvas');c.width=600;c.height=900;const x=c.getContext('2d');x.fillStyle='white';x.fillRect(0,0,600,900);x.fillStyle='black';x.font='bold 25px sans-serif';x.fillText('HELLO MY FRIEND',160,180);x.fillText('PLEASE WAIT HERE',150,215);const seam=new URLSearchParams(location.search).has('seam'),zip=new JSZip();
@@ -21,8 +21,8 @@ createRoot(document.getElementById('root')).render(<MangaReader item={item} cata
   const context=await browser.newContext({viewport:{width,height:950}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{window.renderedRecords=[];const NativeWorker=window.Worker;window.Worker=class extends NativeWorker{constructor(...args){super(...args);this.addEventListener('message',e=>{if(e.data.result?.typesetting)window.renderedRecords.push(e.data.result.typesetting);});}};localStorage.setItem('mv_lmt_settings:blocks-browser',JSON.stringify({version:9,engine:'vm',directInput:'blocks',directModel:'gemini-3.5-flash-lite',inpaint:'fast',font:'auto',cache:true}));for(const profile of['manga','webtoon'])localStorage.setItem('mediavault_reader_v3:blocks-browser:'+profile,JSON.stringify({translate:true,diagnostics:true,mode:profile==='webtoon'?'scroll':'pages',fit:'width',direction:profile==='webtoon'?'ltr':'rtl',preload:0}));});
   await page.route('https://fixture.example/**',r=>r.fulfill({json:{ready:true,configured:true,policy:'fixture-policy'},headers:{'access-control-allow-origin':'*'}}));
-  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/blocks.html'+(webtoon?'?webtoon=1'+(seam?'&seam=1':''):''));
-  await page.waitForFunction(()=>document.querySelector('[data-page="0"] canvas.reader-translated-overlay')?.dataset.ready==='true',{timeout:45000});
+  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/blocks.html'+(webtoon?'?webtoon=1'+(seam?'&seam=1':''):''));
+  await page.waitForFunction(()=>document.querySelector('[data-page="0"] canvas.reader-translated-overlay')?.dataset.ready==='true',null,{timeout:45000});
   const sent=await page.evaluate(()=>window.sent);assert.equal(sent.length,1);const parts=sent[0].request.contents[0].parts;
   assert.equal(parts.filter(p=>p.inlineData).length,1,'six original pages share one sheet image');
   const mapping=JSON.parse(parts.find(p=>p.text?.startsWith('{')).text);assert.equal(mapping.regions.length,seam?1:6);assert.ok(mapping.regions.every(r=>/^P[1-6]_B1$/.test(r.id)));if(seam){await page.waitForFunction(()=>window.renderedRecords.length>=2);const layouts=await page.evaluate(()=>window.renderedRecords.map(r=>r.layouts[0]));assert.ok(layouts.every(Boolean));assert.equal(layouts[0].fontSize,layouts[1].fontSize,'joined paragraph uses the same layout across the seam');}assert.ok(mapping.originalWidth>=600);
