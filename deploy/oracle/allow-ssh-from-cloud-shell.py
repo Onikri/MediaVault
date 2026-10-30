@@ -18,7 +18,9 @@ def cli(args, region):
                             capture_output=True, text=True, timeout=120)
     if result.returncode:
         match = re.search(r'"code"\s*:\s*"([\w-]+)"', result.stderr)
-        raise RepairError('OCI: ' + (match[1] if match else 'request failed'))
+        option = re.search(r'No such option:\s*(--[a-z-]+)', result.stderr)
+        reason = match[1] if match else 'unsupported option ' + option[1] if option else 'request failed'
+        raise RepairError('OCI: ' + reason + ' at ' + ' '.join(args[:3]) + ' (exit ' + str(result.returncode) + ')')
     return json.loads(result.stdout)
 
 
@@ -54,10 +56,20 @@ def repair(public_ip, source, region, *, request=cli, backup=None):
     source = str(ipaddress.ip_network(source, strict=True))
     if ipaddress.ip_network(source).version != 4 or ipaddress.ip_network(source).prefixlen != 32:
         raise RepairError('Use exactly one IPv4 address (/32).')
-    inventory = request(['search', 'resource', 'structured-search', '--query-text',
-                         "query instance resources where lifecycleState = 'RUNNING'", '--all'], region)['data']
+    # Resource Search has --limit/--page, unlike the list commands' --all.
+    items=[];page=None;seen_pages=set()
+    while True:
+        args=['search', 'resource', 'structured-search', '--query-text',
+              "query instance resources where lifecycleState = 'RUNNING'", '--limit', '1000']
+        if page:args+=['--page',page]
+        result=request(args,region)
+        items.extend(result['data'].get('items',[]))
+        page=result.get('opc-next-page')
+        if not page:break
+        if page in seen_pages:raise RepairError('OCI repeated a search page; nothing changed.')
+        seen_pages.add(page)
     matches = []
-    for item in inventory.get('items', []):
+    for item in items:
         identity = item.get('identifier', '')
         if not re.fullmatch(r'ocid1\.instance\.[a-zA-Z0-9.-]+', identity):
             continue

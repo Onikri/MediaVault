@@ -12,7 +12,10 @@ class SshRepairTests(unittest.TestCase):
         calls=[]
         def cli(args, region):
             calls.append(args)
-            if args[0]=='search':return {'data':{'items':[{'identifier':'ocid1.instance.oc1.example'}]}}
+            if args[0]=='search':
+                self.assertNotIn('--all',args)
+                self.assertEqual(args[args.index('--limit')+1],'1000')
+                return {'data':{'items':[{'identifier':'ocid1.instance.oc1.example'}]}}
             if args[:3]==['compute','instance','list-vnics']:
                 return {'data':[{'public-ip':public,'subnet-id':'subnet','nsg-ids':['nsg'] if nsg else []}]}
             if args[:3]==['network','subnet','get']:return {'data':{'security-list-ids':['list']}}
@@ -42,3 +45,24 @@ class SshRepairTests(unittest.TestCase):
     def test_wrong_vm_or_broad_source_cannot_be_modified(self):
         with self.assertRaises(repair.RepairError):self.run_repair(public='198.51.100.1')
         with self.assertRaises(repair.RepairError):repair.repair('141.144.225.42','0.0.0.0/0','eu-frankfurt-1',request=lambda *_:self.fail('Must not call OCI'))
+
+    def test_cli_error_identifies_step_without_echoing_authentication(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        error=SimpleNamespace(returncode=2,stderr='Error: No such option: --all\nAuthorization: private-token',stdout='')
+        with patch.object(repair.subprocess,'run',return_value=error),self.assertRaises(repair.RepairError) as caught:
+            repair.cli(['search','resource','structured-search','--all'],'eu-frankfurt-1')
+        text=str(caught.exception)
+        self.assertIn('unsupported option --all at search resource structured-search',text)
+        self.assertNotIn('private-token',text)
+
+    def test_search_pagination_finishes_before_any_change(self):
+        calls=[]
+        def cli(args,region):
+            calls.append(args)
+            if '--page' not in args:return {'data':{'items':[]},'opc-next-page':'next-page'}
+            self.assertEqual(args[-2:],['--page','next-page'])
+            return {'data':{'items':[]}}
+        with self.assertRaises(repair.RepairError):
+            repair.repair('141.144.225.42','192.0.2.10/32','eu-frankfurt-1',request=cli)
+        self.assertEqual(len(calls),2)
