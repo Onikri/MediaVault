@@ -44,6 +44,21 @@ def browser_destination(url,*,resolve_dns=True):
     return public_url(re.sub(r'^wss:', 'https:',url),resolve_dns=resolve_dns,allow_api=True)
 
 
+def published_quality_streams(values,headers,*,validate=browser_destination):
+    """Read only the active Alloha audio source's explicit quality/URL map."""
+    if not isinstance(values,dict) or len(values)>64:return []
+    streams=[]
+    for quality,value in values.items():
+        if not re.fullmatch(r'\d{2,4}',str(quality)) or not 1<=int(quality)<=8640 or not isinstance(value,str):continue
+        try:target=validate(value)
+        except SourceError:continue
+        path=urlsplit(target).path.lower()
+        if not path.endswith(('.m3u8','.mp4')):continue
+        streams.append({'url':target,'type':'hls' if path.endswith('.m3u8') else 'mp4',
+                        'quality':int(quality),'headers':playback_headers(headers)})
+    return sorted(streams,key=lambda s:s['quality'],reverse=True)
+
+
 async def _check_player_access(page):
     if BLOCKED.search((await page.content())[:2*1024*1024]):raise SourceError('Источник требует проверку браузера или вход. Выбери другой источник.')
     plus=page.locator('.tab_need_plus')
@@ -143,6 +158,13 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     except asyncio.TimeoutError:pass
                 await _check_player_access(target)
                 if framed:
+                    # The initialized active audio source publishes the complete
+                    # signed ladder. Its own quality keys are authoritative:
+                    # delayed WS responses during menu clicks cannot relabel it.
+                    values=await target.evaluate("() => typeof player==='undefined' ? null : player.currentSource?.quality || null")
+                    initial_headers=next(iter(captured.values()))['headers'] if captured else headers
+                    published=published_quality_streams(values,initial_headers,validate=validate)
+                    if published:return published
                     # Modern Alloha serves a different signed one-quality HLS
                     # master for each menu choice. The initial 480p request is
                     # not a master containing every resolution. Activate only

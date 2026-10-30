@@ -2,8 +2,9 @@
 
 Alloha's film player initially requests its saved/default 480p selection. Its
 signed HLS master contains only that selection, not the complete quality ladder.
-The source browser now activates each quality button actually published by the
-selected episode, collects its real response, and preserves its menu label.
+The source browser reads the initialized active audio source's explicit signed
+quality/URL map. This avoids associating delayed WebSocket responses with the
+next quality selection. Older players fall back to their published quality buttons.
 It does not synthesize CDN addresses or switch translations/audio. The boot
 stream cannot override the labelled 2160p stream when online playback picks best.
 Requests keep the publisher Referer during quality inspection (server version 34)
@@ -47,3 +48,8 @@ unit tests, voice/online browser suites and the production build pass. The
 existing POSIX service.key permission assertion cannot run unchanged on Windows;
 the complete Linux suite is required in CI before release. No ML inference is
 part of this playback change.
+
+Live VM verification initially exposed an intermittent 1440p maximum caused by
+menu-response timing. The active source map is authoritative and does not switch
+audio tracks. A dedicated Chromium fixture verifies all six quality URLs before
+any high-resolution media request has completed.
