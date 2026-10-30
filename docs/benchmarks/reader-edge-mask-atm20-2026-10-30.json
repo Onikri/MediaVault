@@ -1,0 +1,30 @@
+{
+  "chapter": 20,
+  "page": 2,
+  "actualDetector": "RT-DETR Comic v4 INT8",
+  "detectedRegions": 10,
+  "region": "P2_B9",
+  "sourceBox": [
+    995,
+    1532.86,
+    1299.59,
+    1920
+  ],
+  "cleanup": "Actual algorithmic fast/Telea; no neural inpainting in this regression",
+  "before": {
+    "declined": true,
+    "coverage": 0.630538596038639,
+    "reason": "Masked fraction exceeded the 60% context guard at the bottom page edge"
+  },
+  "after": {
+    "coverage": 0.5049189057672621,
+    "masked": 109988,
+    "flat": false
+  },
+  "cleaning": {
+    "uid": "P2_B9",
+    "painted": true,
+    "method": "telea"
+  },
+  "limitation": "Only this real source page and deterministic synthetic edges were compared; no Google translation-quality claim."
+}

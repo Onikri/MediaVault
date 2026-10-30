@@ -23,3 +23,19 @@ test('service diagnostics are off by default and saved per reader profile',()=>{
  const s=storage();assert.equal(sanitize().diagnostics,false);saveSettings('A',{diagnostics:true},s,'manga');
  assert.equal(readSettings('A',s,{},'manga').diagnostics,true);assert.equal(readSettings('A',s,{},'webtoon').diagnostics,false);assert.equal(readSettings('B',s,{},'manga').diagnostics,false);
 });
+
+
+import {ChapterLease} from '../src/reader-chapter-lease.js';
+test('a prefetched Drive range archive transfers its lifetime when its chapter becomes active',async()=>{
+ const zip=new JSZip();zip.file('padding.bin',new Uint8Array(100000));zip.file('1.png',new Uint8Array([1,2,3]));zip.file('2.png',new Uint8Array([4,5,6]));const blob=await zip.generateAsync({type:'blob',compression:'STORE'}),item={id:'21',size:blob.size,chunks:[{}]};let reads=0;
+ const readRange=async(item,a,b,{signal})=>{signal.throwIfAborted();reads++;return blob.slice(a,b);};
+ const prefetch=new ChapterLease(item.id,'account:drive',signal=>openChapter(item,()=>assert.fail('No whole-chapter fallback expected'),readRange,signal));await prefetch.promise;
+ prefetch.releasePrefetch('21');const active=new AbortController(),pages=await prefetch.adopt(active.signal);await Promise.resolve();assert.equal(prefetch.controller.signal.aborted,false);
+ assert.deepEqual([...new Uint8Array(await(await pages[0].async()).arrayBuffer())],[1,2,3]);assert.ok(reads>=3);
+ active.abort();await assert.rejects(pages[1].async(),e=>e.name==='AbortError');assert.equal(prefetch.controller.signal.aborted,true);
+});
+
+test('cancelled, unused and wrong-account chapter prefetches cannot be adopted',async()=>{
+ const lease=new ChapterLease('21','account:A',async()=>[]);assert.equal(lease.matches('21','account:B'),false);lease.releasePrefetch('20');assert.equal(lease.matches('21','account:A'),false);assert.throws(()=>lease.adopt(new AbortController().signal),e=>e.name==='AbortError');
+ const orphan=new ChapterLease('21','account:A',async()=>[]);orphan.releasePrefetch('21');await Promise.resolve();assert.equal(orphan.controller.signal.aborted,true);
+});

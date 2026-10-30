@@ -38,11 +38,11 @@ function protectRules(mask,data,w,h,local,bounds){
    if(count>=Math.max(32,(bounds[2]-bounds[0])*.85))for(let x=bounds[0];x<bounds[2];x++)for(let dy=-1;dy<=1;dy++)if(y+dy>=0&&y+dy<h)mask[(y+dy)*w+x]=0;
   }
 }
-export function prepareInkPatch(original,box,{category='dialogue',neural=false,model}={}){
+export function prepareInkPatch(original,box,{category='dialogue',neural=false,model,contextPad}={}){
  const {width:pw,height:ph}=original;
  if(!Array.isArray(box)||box.length!==4||!box.every(Number.isFinite))return {declined:'Некорректные координаты текста'};
  const [x1,y1,x2,y2]=box.map(Math.round);if(x1<0||y1<0||x2>pw||y2>ph||x2-x1<2||y2-y1<2)return {declined:'Область текста выходит за границы'};
- const pad=neural?24:Math.max(24,Math.min(48,Math.round(Math.min(x2-x1,y2-y1)*.6))),left=Math.max(0,x1-pad),top=Math.max(0,y1-pad),w=Math.min(pw,x2+pad)-left,h=Math.min(ph,y2+pad)-top;
+ const pad=neural?24:contextPad||Math.max(24,Math.min(48,Math.round(Math.min(x2-x1,y2-y1)*.6))),left=Math.max(0,x1-pad),top=Math.max(0,y1-pad),w=Math.min(pw,x2+pad)-left,h=Math.min(ph,y2+pad)-top;
  const local=[x1-left,y1-top,x2-left,y2-top],data=new Uint8ClampedArray(w*h*4),border=[[],[],[]];
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
   const dst=(y*w+x)*4,src=((top+y)*pw+left+x)*4;data.set(original.data.subarray(src,src+4),dst);
@@ -93,6 +93,9 @@ export function prepareInkPatch(original,box,{category='dialogue',neural=false,m
  if(!neural&&(deviation>=12||['sfx','sign','whisper_aside'].includes(category)))ink.set(contrastGlyphs(data,w,h,local));
  const mask=fillInkHoles(dilateInk(ink,w,h,!neural&&deviation>=12?2:1),w,h,Math.max(24,area*.12)),masked=mask.reduce((n,v)=>n+v,0),coverage=masked/(w*h);
  if(masked<3)return {declined:'Не выделена безопасная маска букв'};
+ // Dense lettering at an image edge loses context on one side. Keep the glyph
+ // mask and the 60% Telea guard; retry once with more real surrounding pixels.
+ if(coverage>.6&&!neural&&!contextPad&&(x1<pad||y1<pad||pw-x2<pad||ph-y2<pad))return prepareInkPatch(original,box,{category,neural,model,contextPad:96});
  if(coverage>.6)return {declined:'Маска захватывает рисунок: область оставлена в оригинале',coverage};
  let interiorDeviation=0,known=0;
  for(let y=local[1];y<local[3];y++)for(let x=local[0];x<local[2];x++){const n=y*w+x;if(mask[n])continue;for(let c=0;c<3;c++)interiorDeviation+=Math.abs(data[n*4+c]-background[c]);known++;}

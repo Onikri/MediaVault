@@ -121,3 +121,12 @@ test('joined bubble captions keep separate horizontal, vertical and diagonal let
   for(let i=0;i<out.length;i++){const r=out[i].layout_bbox,t=boxes[i];assert.ok(r[0]<=t[0]&&r[1]<=t[1]&&r[2]>=t[2]&&r[3]>=t[3]);assert.ok(out[i].partitioned);}
  }
 });
+
+
+test('dense text clipped at a page edge gets more real Telea context without lifting the mask guard',()=>{
+ const source=image(500,600);for(let y=304;y<600;y+=18)for(let x=9;x<220;x+=12)rect(source,x,y,9,Math.min(15,600-y),0);
+ for(let y=296;y<600;y++)for(let x=225;x<229;x++)rect(source,x,y,1,1,(x+y)%2?0:255);
+ const patch=prepareInkPatch(source,[5,300,225,600],{model:'fast',category:'text'});assert.ok(!patch.declined);assert.equal(patch.width,321);assert.ok(patch.coverage<.6&&patch.masked>50000);assert.equal(patch.top,204);
+ const snapshot=source.data.slice(),target={...source,data:source.data.slice()},modified=patch.data.slice();modified.fill(255);compositeInkPatch(target,patch,modified);assert.deepEqual(source.data,snapshot);assert.equal(target.data[(310*500+450)*4],snapshot[(310*500+450)*4]);
+ const solid=image(500,600);rect(solid,5,300,220,300,0);assert.ok(prepareInkPatch(solid,[5,300,225,600],{model:'fast'}).declined);
+});
