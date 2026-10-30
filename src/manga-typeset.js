@@ -4,13 +4,15 @@ import russian from 'hyphen/ru/index.js';
 const splitCache=new Map();
 export function russianBreaks(word){
  if(splitCache.has(word))return splitCache.get(word);
- const match=/^([А-ЯЁа-яё]+)([,.!?…:;]*)$/u.exec(word),points=[];
+ const match=/^([А-ЯЁа-яё]+(?:-[А-ЯЁа-яё]+)*)([,.!?…:;]*)$/u.exec(word),points=[];
  if(match){
   const core=match[1],parts=russian.hyphenateSync(core).split('\u00ad');let at=0;
   for(const part of parts.slice(0,-1)){
-   at+=part.length;const left=core.slice(0,at),right=core.slice(at);
+   at+=part.length;const left=core.slice(0,at).replaceAll('-',''),right=core.slice(at).replaceAll('-','');
    if(left.length>=2&&right.length>=2&&/[аеёиоуыэюя]/i.test(left)&&/[аеёиоуыэюя]/i.test(right)&&!/^[ьъыЙй]/i.test(right))points.push(at);
   }
+  for(let i=1;i<core.length;i++)if(core[i-1]==='-'&&!points.includes(i)){const left=core.slice(0,i).replaceAll('-',''),right=core.slice(i).replaceAll('-','');if(left.length>=2&&right.length>=2&&/[аеёиоуыэюя]/i.test(left)&&/[аеёиоуыэюя]/i.test(right))points.push(i);}
+  points.sort((a,b)=>a-b);
  }
  if(splitCache.size>2048)splitCache.clear();splitCache.set(word,points);return points;
 }
@@ -35,8 +37,8 @@ export function fitComicText(text,box,measure,{min=10,max=42,oval=true}={}){
      const word=pending||words[index],next=line?line+' '+word:word;
      if(measure(next,size)<=width){line=next;pending='';index++;continue;}
      if(line)break; // prefer wrapping an entire word to the next row
-     const point=russianBreaks(word).filter(at=>measure(word.slice(0,at)+'-',size)<=width).at(-1);
-     if(point){line=word.slice(0,point)+'-';pending=word.slice(point);}break;
+     const point=russianBreaks(word).filter(at=>measure(word.slice(0,at)+(word[at-1]==='-'?'':'-'),size)<=width).at(-1);
+     if(point){line=word.slice(0,point)+(word[point-1]==='-'?'':'-');pending=word.slice(point);}break;
     }
     if(!line){failed=true;break;}lines.push(line);
    }

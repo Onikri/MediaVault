@@ -102,3 +102,8 @@ test('MI-GAN adds a small glyph halo, while fast cleanup never creates a full-he
  const migan=prepareInkPatch(original,[94,54,115,290],{neural:true,model:'migan'});assert.ok(!migan.declined);assert.ok(migan.margin>=2&&migan.margin<=3);assert.equal(migan.maskKind,'outlined-glyphs');
  const fast=prepareInkPatch(original,[94,54,115,290]);assert.notEqual(fast.maskKind,'text-band');
 });
+
+test('hyphenated Russian names can fill a speech bubble without single-letter stutter lines or duplicated hyphens',()=>{
+ const text='М-мельтина-сан!!',fit=fitComicText(text,[0,0,240,440],(value,size)=>value.length*size*.55,{oval:true,max:90});assert.ok(fit.fits);assert.ok(fit.fontSize>=30);assert.ok(fit.lines.length>=2);assert.ok(fit.lines.every(line=>!line.includes('--')&&!/^[А-ЯЁа-яё]-$/.test(line)));
+ assert.ok(!russianBreaks(text).includes(2),'a single stutter letter is never moved to a separate line');
+});

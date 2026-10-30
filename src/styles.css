@@ -774,3 +774,5 @@ button { border: 0; }
 @media(max-width:480px){.manga-source-filters{flex-wrap:wrap}.manga-source-filters label:first-child,.manga-source-filters select{width:100%}.manga-source-manager-body{padding:0 12px 14px}}
 
 .reader-top-actions .reader-control[aria-pressed="true"]{background:#d6b18c38;color:#f1be88;box-shadow:inset 0 0 0 1px #d6b18c77}
+
+.toast{pointer-events:none}.toast button{pointer-events:auto}
