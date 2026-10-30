@@ -21,7 +21,9 @@ def browser_paths():
     # /data is the VM checkout's mounted data directory. Chromium/Playwright
     # scratch profiles stay below its .codex-local, never in a user profile.
     root=Path(os.environ.get('DATA_DIR') or Path(__file__).resolve().parents[1])/'.codex-local'
-    for name,folder in [('TMPDIR','browser-tmp'),('XDG_CACHE_HOME','browser-cache')]:
+    # Chromium's Unix SingletonSocket has a 108-byte pathname limit. Keep the
+    # scratch component short even in the longer hosted-CI checkout path.
+    for name,folder in [('TMPDIR','t'),('XDG_CACHE_HOME','browser-cache')]:
         os.environ.setdefault(name,str(root/folder))
         Path(os.environ[name]).mkdir(parents=True,exist_ok=True)
 
