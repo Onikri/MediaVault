@@ -239,7 +239,7 @@ class MangaDiscoveryApiTests(unittest.TestCase):
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('B')).status_code,404)
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('A')).status_code,200)
                 self.assertEqual(client.post('/discovery/manga/search',headers=auth('A'),json={'query':'abc','sourceIds':['999']}).status_code,422)
-                self.assertEqual(client.get('/health').json()['version'],32);self.assertTrue(client.get('/health').json()['mangaGlobalDiscovery'])
+                health=client.get('/health').json();self.assertEqual(health['version'],33);self.assertTrue(health['mangaGlobalDiscovery']);self.assertEqual(health['googleGatewayVersion'],2);self.assertEqual(health['googleParallelKeys'],3)
         finally:manager.close()
 
 class VoiceSuggestionTests(unittest.TestCase):
