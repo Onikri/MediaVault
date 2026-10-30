@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './shim.js';
+import {serializePipeline} from './pipeline-queue.js';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {resolveMangaOcr} from '../src/ocr-profiles.js';
 import {validateConfig} from './config.js';
 import {getCachedSegmentation} from './upstream/lib/detections/segmentation.ts';
-const contexts=new Map();let running=false;
+const contexts=new Map();
 async function pipeline(bytes,config,progress){
  if(config.operation==='gemma-prepare'||config.operation==='gemma-render'){
   const{prepareGemmaPage,renderGemmaPage}=await import('./gemma-device.js');
@@ -61,9 +62,10 @@ globalThis.mangaTranslate=pipeline;
 // Private diagnostics/benchmarks use the exact production detection runner.
 globalThis.mangaDetect=async(bytes,config)=>{const source=URL.createObjectURL(new Blob([bytes]));try{const{detectManga}=await import('./detection.js');return await detectManga(source,config);}finally{URL.revokeObjectURL(source);}};
 globalThis.mangaPpOcr=async(bytes,boxes)=>{const source=URL.createObjectURL(new Blob([bytes]));try{return await(await import('./ppocrv6.js')).recognizePpManga(source,boxes);}finally{URL.revokeObjectURL(source);}};
+const queuedPipeline=serializePipeline(pipeline);
 addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==parent||event.data?.type!=='mv-lmt-connect'||event.ports.length!==1)return;
- const port=event.ports[0];port.onmessage=async({data})=>{if(data.type!=='translate')return;if(running){port.postMessage({id:data.id,error:'Предыдущая страница ещё обрабатывается.'});return;}running=true;
-  try{const result=await pipeline(data.bytes,data.config,status=>port.postMessage({id:data.id,status}));port.postMessage({id:data.id,result},result.renderedImage?[result.renderedImage]:[]);}catch(e){port.postMessage({id:data.id,error:e.message||String(e)});}finally{running=false;}
+ const port=event.ports[0];port.onmessage=async({data})=>{if(data.type!=='translate')return;
+  try{const result=await queuedPipeline(data.bytes,data.config,status=>port.postMessage({id:data.id,status}));port.postMessage({id:data.id,result},result.renderedImage?[result.renderedImage]:[]);}catch(e){port.postMessage({id:data.id,error:e.message||String(e)});}
  };port.start();port.postMessage({ready:true,webgpu:!!navigator.gpu});
 });

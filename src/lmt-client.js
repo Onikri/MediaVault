@@ -25,7 +25,7 @@ async function connect(){
  const url=new URL('lmt/index.html',new URL(import.meta.env.BASE_URL,location.href));
  // HTML has a stable path on Pages. Tie it to this hashed app bundle so a
  // freshly updated selector cannot start an older, cached translation engine.
- url.searchParams.set('engine',TRANSLATION_VERSION+':'+new URL(import.meta.url).pathname);
+ url.searchParams.set('engine',TRANSLATION_VERSION+':fifo-v1:'+new URL(import.meta.url).pathname);
  frame.src=url.href;document.body.append(frame);return ready;
 }
 export async function translateLmt(blob,config,signal,status){
