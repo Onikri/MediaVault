@@ -37,14 +37,15 @@ function Page({index,entry,active,preload,translate,translator,onVisible,onError
  useEffect(()=>()=>{if(translated)URL.revokeObjectURL(translated);},[translated]);
  useEffect(()=>{
   if(!source||!translate||!translator)return;
-  let closed=false,rendered;const abort=new AbortController(),startedAt=Date.now();
+  let closed=false;const abort=new AbortController(),startedAt=Date.now();
   const report=(value,running=true)=>{if(closed)return;const progress=normalizeTranslationProgress(value);setMessage(progress.message);onProgress?.(index,{...progress,startedAt,updatedAt:Date.now(),running});};
   setRegions(null);setTranslating(true);report({phase:'preparing',message:'Готовим перевод страницы…'});
-  translator(blob.current,abort.signal,value=>report(value),index).then(data=>{
+  translator(blob.current,abort.signal,value=>report(value),index).then(async data=>{
    if(closed){data.renderedBitmap?.close();return;}
    setTranslating(false);
-   if(data.renderedBitmap&&canvas.current){const b=data.renderedBitmap,node=canvas.current;node.width=b.width;node.height=b.height;node.getContext('2d').drawImage(b,0,0);b.close();setPainted(true);}
-   if(data.renderedImage){rendered=URL.createObjectURL(new Blob([data.renderedImage],{type:data.renderedMime||'image/webp'}));setTranslated(rendered);}
+   const bitmap=data.renderedBitmap||(data.renderedImage?await createImageBitmap(new Blob([data.renderedImage],{type:data.renderedMime||'image/webp'})):null);
+   if(closed){bitmap?.close();return;}
+   if(bitmap){if(canvas.current){const node=canvas.current;node.width=bitmap.width;node.height=bitmap.height;node.getContext('2d').drawImage(bitmap,0,0);setPainted(true);setTranslated('');}bitmap.close();}
    setRegions(data.regions||[]);onDebug?.(index,data.debug||null);
 
    report({phase:'ready',renderIncomplete:!!data.inpaint?.unpainted,message:(data.warnings||[]).join(' · ')||(data.cacheHit?'Готово · из кэша':!data.regions?.length?'Реплики не найдены · показан оригинал':'Перевод готов · фон восстановлен'),completedRegions:data.typesetting?.layouts?.length??data.regions?.length??0,totalRegions:data.regions?.filter(r=>r.text?.trim()).length||0,detected:data.detected,detectionReport:data.detectionReport,diagnostics:data.diagnostics,inpaint:data.inpaint,timings:data.timings},false);

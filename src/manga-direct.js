@@ -108,9 +108,10 @@ export class DirectChapter{
   signal?.throwIfAborted();const listeners=this.listeners.get(index)||new Set();if(status)listeners.add(status);this.listeners.set(index,listeners);
   const last=this.progress.get(index);if(last)status?.(last);
   try{
+   const job=this.request(index,blob,background);
    const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v8:'+(config.inpaint||this.config.inpaint)+':'+font;
    if(this.config.cache&&!this.bypass.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage&&!config.captureDebug)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
-   const job=this.request(index,blob,background),stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
+   const stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
    if(config.captureDebug&&!page.detected){
     const source=await this.prepare(blob,index,message=>this.notify(index,{phase:'detecting',message}));
     page.detected={width:source.width,height:source.height,regions:source.regions.map(r=>({id:r.id,bbox:r.bbox}))};
