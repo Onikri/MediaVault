@@ -5,7 +5,7 @@ umask 077
 revision="${1:?Pass the reviewed 40-character Git commit}"
 [[ "$revision" =~ ^[a-f0-9]{40}$ ]] || { echo 'Expected an immutable commit SHA.' >&2; exit 2; }
 python3 - "$@" <<'PY'
-import hashlib, json, os, shutil, sqlite3, subprocess, sys, tarfile, time
+import contextlib, hashlib, json, os, shutil, sqlite3, subprocess, sys, tarfile, time
 from pathlib import Path
 revision=sys.argv[1]
 resume_active=len(sys.argv)==3 and sys.argv[2]=='--resume-active-jobs'
@@ -30,7 +30,7 @@ health_code='import json,urllib.request; print(json.dumps(json.load(urllib.reque
 before_health=json.loads(command(['docker','exec',old['Id'],'python','-c',health_code]))
 if before_health.get('application')!='MediaVault':raise SystemExit('The selected importer is not MediaVault.')
 def state():
-    with sqlite3.connect('file:'+str(database)+'?mode=ro',uri=True) as db:
+    with contextlib.closing(sqlite3.connect('file:'+str(database)+'?mode=ro',uri=True)) as db:
         active=db.execute("SELECT count(*) FROM tasks WHERE status IN ('queued','running','cancelling')").fetchone()[0]
         tasks=db.execute('SELECT count(*) FROM tasks').fetchone()[0]
         cancelling=db.execute("SELECT count(*) FROM tasks WHERE status='cancelling'").fetchone()[0]
@@ -42,7 +42,8 @@ initial=state()
 if initial['cancelling'] or initial['active'] and not resume_active:raise SystemExit('Wait for current imports to finish before updating.')
 release=Path('/opt/mediavault-releases')/revision
 release.mkdir(parents=True,exist_ok=True)
-log=Path('/var/tmp/mediavault-update-'+revision[:12]+'.log')
+log=work/'.codex-local'/'logs'/('mediavault-update-'+revision[:12]+'.log')
+log.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
 image='mediavault-importer:'+revision[:12]
 with log.open('w') as output:
     if not (release/'.git').exists():

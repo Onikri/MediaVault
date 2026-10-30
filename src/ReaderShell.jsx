@@ -4,7 +4,7 @@ import {ArrowLeft,ChevronLeft,ChevronRight,Settings2,Maximize,Minimize,List,Grid
 import './reader-shell.css';
 
 // Chrome overlays the reading surface. Opening a panel never resizes a page.
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status}){
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({});
  const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[hint,setHint]=useState(true),[fullscreenError,setFullscreenError]=useState('');
  methods.current={onClose,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel};
@@ -64,6 +64,7 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
    {status&&<div className="reader-quiet-status">{status}</div>}{fullscreenError&&<small role="status">{fullscreenError}</small>}
   </div>
   {hint&&!visible&&!activePanel&&<div className="reader-gesture-hint" aria-hidden="true">Касание центра — меню{paged?' · По краям — листать':''}</div>}
+  {debug}
   <Dialog.Root open={!!activePanel} onOpenChange={open=>!open&&closePanel()}><Dialog.Portal container={full?root.current:undefined}><Dialog.Overlay className="reader-panel-backdrop"/><Dialog.Content className={'reader-panel reader-panel-'+activePanel} data-reader-panel onCloseAutoFocus={e=>{e.preventDefault();root.current?.focus({preventScroll:true});}}>
    <header><div><small>Твоё пространство для чтения</small><Dialog.Title>{activePanel==='settings'?'Настройки читалки':activePanel==='contents'?'Главы и тома':'Превью страниц'}</Dialog.Title></div><Dialog.Close className="reader-control" aria-label={activePanel==='settings'?'Закрыть настройки читалки':'Закрыть панель читалки'}><X size={20}/></Dialog.Close></header>
    <Dialog.Description className="sr-only">Настройки и навигация. Закрой панель, чтобы вернуться к чтению.</Dialog.Description>

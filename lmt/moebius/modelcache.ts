@@ -6,6 +6,7 @@
 // cache.put() directly. So we download the bytes once, build a fresh Response, and store it
 // under the stable URL. Subsequent loads (and future sessions) read straight from the cache.
 
+import {readModelFile,writeModelFile,removeModelFile} from "../../src/model-folder.js";
 const CACHE_NAME = "moebius-onnx-v1";
 const HASHES: Record<string,string> = {
  "unet.onnx":"e3f90f52f72378339b990459fadb29a68d3c7b5c6851545ba42774f489160b08",
@@ -49,6 +50,12 @@ export async function loadModelBytes(
   url: string,
   onProgress?: DownloadProgress,
 ): Promise<Uint8Array> {
+  const disk = await readModelFile(url);
+  if(disk){
+    const bytes=new Uint8Array(await disk.arrayBuffer());
+    try{await verify(url,bytes);}catch(error){await removeModelFile(url);throw error;}
+    onProgress?.(bytes.length,bytes.length,true);return bytes;
+  }
   const cache = await openCache();
 
   if (cache) {
@@ -56,6 +63,7 @@ export async function loadModelBytes(
     if (hit) {
       const buf = await hit.arrayBuffer();
       try{await verify(url,new Uint8Array(buf));}catch(error){await cache.delete(url);throw error;}
+      await writeModelFile(url,buf).catch(()=>false);
       onProgress?.(buf.byteLength, buf.byteLength, true);
       return new Uint8Array(buf);
     }
@@ -85,6 +93,7 @@ export async function loadModelBytes(
   }
 
   await verify(url,bytes);
+  await writeModelFile(url,bytes).catch(()=>false);
   if (cache) {
     try {
       // build a fresh (non-redirected) Response so it can be stored under the stable URL

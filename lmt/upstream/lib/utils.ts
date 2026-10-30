@@ -1,3 +1,4 @@
+import {readModelFile,writeModelFile,removeModelFile,readModelResponse,writableModelFolder,sharedArtifactResult} from "../../../src/model-folder.js";
 import * as ort from "onnxruntime-web/all";
 import {createNativeSession} from "./native-onnx";
 import { resolveExecutionProvidersForModel } from "./hardware";
@@ -80,21 +81,21 @@ export function downloadArtifactHF(
   repoID: string,
   path: `${string}.onnx`,
   noReturn?: boolean,
-  options?: { gpu?: boolean },
+  options?: { gpu?: boolean; onProgress?: (loaded:number,total:number)=>void },
 ): Promise<ort.InferenceSession>;
 
 export function downloadArtifactHF(
   repoID: string,
   path: string,
   noReturn?: boolean,
-  options?: { gpu?: boolean },
+  options?: { gpu?: boolean; onProgress?: (loaded:number,total:number)=>void },
 ): Promise<Response>;
 
 export async function downloadArtifactHF(
   repoID: string,
   path: string,
   noReturn?: boolean,
-  options?: { gpu?: boolean },
+  options?: { gpu?: boolean; onProgress?: (loaded:number,total:number)=>void },
 ): Promise<ort.InferenceSession | Response | undefined> {
   const isDirectUrl =
     path.startsWith("http://") ||
@@ -111,8 +112,13 @@ export async function downloadArtifactHF(
   const cacheName = isDirectUrl ? "direct-model-cache" : repoID;
 
   if (inFlightRequests.has(url)) {
-    const result = await inFlightRequests.get(url);
-    return result instanceof Response ? result.clone() : result;
+    const pending = inFlightRequests.get(url);
+    // A concurrent preload returns no session/Response. Its verified download
+    // is now cached; create the actual consumer result without fetching again.
+    return sharedArtifactResult(pending,noReturn,()=>{
+      if(inFlightRequests.get(url)===pending)inFlightRequests.delete(url);
+      return downloadArtifactHF(repoID,path,noReturn,options);
+    });
   }
 
   const requestPromise = (async () => {
@@ -125,11 +131,18 @@ export async function downloadArtifactHF(
     // Cache-first: silent per-load update checks were removed. Updates are
     // manual via CHECK_MODEL_UPDATES / UPDATE_CACHED_MODEL (updates.ts).
     let response = await cache.match(url);
+    const disk=await readModelFile(url);
+    if(disk){
+      const buffer=await disk.arrayBuffer(),expected=getExpectedSha256(path,url);
+      if(expected&&!await verifyBufferSha256(buffer,expected)){await removeModelFile(url);throw Error('Model folder checksum mismatch');}
+      response=new Response(buffer,{headers:{'Content-Type':'application/octet-stream','Content-Length':String(buffer.byteLength)}});
+      await cache.put(url,response.clone());
+    }
 
     if (!response) {
       const fetched = await fetch(url);
       if (!fetched.ok) throw new Error(`Failed to download model from ${url} (${fetched.status} ${fetched.statusText})`);
-      const buffer = await fetched.arrayBuffer();
+      const buffer = options?.onProgress?await readModelResponse(fetched,options.onProgress):await fetched.arrayBuffer();
 
       const expectedSha256 = getExpectedSha256(path, url);
       if (expectedSha256) {
@@ -148,6 +161,11 @@ export async function downloadArtifactHF(
       await cache.put(url, response.clone());
     }
 
+    if(!disk&&response&&await writableModelFolder()){
+      const copy=await response.clone().arrayBuffer(),expected=getExpectedSha256(path,url);
+      if(expected&&!await verifyBufferSha256(copy,expected)){await cache.delete(url);throw Error('Cached model checksum mismatch');}
+      await writeModelFile(url,copy).catch(()=>false);
+    }
     if (noReturn) return;
 
     if (path.endsWith(".onnx") || url.endsWith(".onnx") || url.includes(".onnx?")) {
@@ -187,7 +205,7 @@ export async function downloadArtifactHF(
 export async function downloadArtifactFromUrl(
   url: string,
   cacheKey: string = "direct-model-cache",
-  options?: { gpu?: boolean },
+  options?: { gpu?: boolean; onProgress?: (loaded:number,total:number)=>void },
 ): Promise<ort.InferenceSession> {
   const res = await downloadArtifactHF(cacheKey, url, false, options);
   return res as unknown as ort.InferenceSession;

@@ -41,6 +41,12 @@ def install(app,owner,get_store):
         if family not in quotas:quotas[family]=Quotas(Path(__import__('os').getenv('DATA_DIR','/data'))/'google-personal-quota.sqlite',minimum_interval=12 if family=='gemma' else 0)
         return quotas[family]
     locks=weakref.WeakValueDictionary();slots=asyncio.Semaphore(3)
+    from reader_network import ReaderNetwork
+    network=ReaderNetwork()
+    @app.get('/reader/google/diagnostics')
+    async def diagnostics(subject=Depends(owner)):
+        await network.observe_address()
+        return {**network.snapshot(subject),'keys':safe_status(saved())['slots']}
     @app.get('/reader/google/keys')
     def status(subject=Depends(owner)):return safe_status(saved())
     @app.post('/reader/google/keys')
@@ -75,13 +81,22 @@ def install(app,owner,get_store):
         request=body.request
         if set(request)-{'systemInstruction','contents','generationConfig','safetySettings'} or not isinstance(request.get('contents'),list) or len(json.dumps(request))>18*1024*1024:raise HTTPException(422,'Некорректный запрос перевода.')
         model=body.model;url='https://generativelanguage.googleapis.com/v1beta/models/'+model
-        async with slots,lock,httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':key}) as client:
-            count=await client.post(url+':countTokens',json={'generateContentRequest':{'model':'models/'+model,**request}})
-            if count.status_code!=200:raise HTTPException(count.status_code,'Google не смог подсчитать токены · HTTP '+str(count.status_code))
-            try:tokens=int(count.json()['totalTokens'])+256;reservation=await quota(model).reserve(group+':'+model,tokens,lambda _:None)
-            except (ValueError,KeyError):raise HTTPException(429,'Запрос превышает установленный бюджет Google.') from None
-            if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
-            response=await client.post(url+':generateContent',json=request)
-            if response.status_code!=200:raise HTTPException(response.status_code,'Google · HTTP '+str(response.status_code)+'. Запрос не перенаправлялся на другой ключ.')
-            result=response.json();quota(model).settle(reservation,result.get('usageMetadata',{}).get('promptTokenCount'))
-            return result
+        activity=network.begin(subject,body.slot,model,personal=bool(body.key))
+        try:
+            async with slots,lock,httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':key}) as client:
+                network.update(activity,'counting')
+                count=await client.post(url+':countTokens',json={'generateContentRequest':{'model':'models/'+model,**request}})
+                if count.status_code!=200:raise HTTPException(count.status_code,'Google не смог подсчитать токены · HTTP '+str(count.status_code))
+                try:tokens=int(count.json()['totalTokens'])+256;reservation=await quota(model).reserve(group+':'+model,tokens,lambda _:network.update(activity,'quota'))
+                except (ValueError,KeyError):raise HTTPException(429,'Запрос превышает установленный бюджет Google.') from None
+                if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
+                network.update(activity,'translating')
+                response=await client.post(url+':generateContent',json=request)
+                if response.status_code!=200:raise HTTPException(response.status_code,'Google · HTTP '+str(response.status_code)+'. Запрос не перенаправлялся на другой ключ.')
+                network.update(activity,'done',response.status_code)
+                result=response.json();quota(model).settle(reservation,result.get('usageMetadata',{}).get('promptTokenCount'))
+                return result
+        except HTTPException as error:
+            network.update(activity,'error',error.status_code);raise
+        except BaseException:
+            network.update(activity,'cancelled' if await connection.is_disconnected() else 'error');raise

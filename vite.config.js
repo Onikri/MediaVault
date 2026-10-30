@@ -17,6 +17,7 @@ const runtimeFiles = [
 ];
 
 export default defineConfig({
+  cacheDir: resolve(projectRoot,'.codex-local/cache/vite'),
   base: './',
   publicDir: false,
   // Test output can be a junction into the private D: task cache. Keep HTML

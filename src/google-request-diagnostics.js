@@ -17,7 +17,7 @@ export function redactGoogle(value,key=''){
 }
 export function safeDiagnosticExport(d){
  if(!d)return null;
- const {requestBody,...safe}=d;return safe;
+ const {requestBody,...safe}=d;return redactGoogle(safe);
 }
 
 // XHR exposes request-upload events that Fetch does not expose. Upload elapsed

@@ -6,6 +6,7 @@ export const DIRECT_DETECTORS=[
  {id:'ppocrv6-det',model:'ppocrv6-det',label:'PP-OCRv6 Manga · строки текста'},
 ];
 export const DIRECT_INPUTS=[
+ {id:'blocks',label:'Блоки · читаемые листы из нескольких страниц'},
  {id:'annotated',label:'Рамки и метки · локальный детектор'},
  {id:'coordinates',label:'Чистая страница + координаты детектора'},
  {id:'vision',label:'Google сам находит текст и координаты'},

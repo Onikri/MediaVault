@@ -55,6 +55,15 @@ function chapter(extra={}){
  const calls=[],cache=new Map();
  const c=new DirectChapter({entries:Array.from({length:8},()=>({async:async()=>new Blob(['fixture'])})),scope:'profile:library',keyScope:'profile',config:translationConfig({engine:'direct',directBatchPages:1}),prepare:async(blob,i)=>page(i+1),google:async(pages)=>{calls.push(pages.map(p=>p.page));return {pages:validateDirectResponse(reply(pages.map(p=>({id:p.regions[0].id,ru:'Привет, друг!',f:0,k:0}))),pages)};},cacheKey:async(blob,c,scope)=>scope+':'+await blob.text(),readCache:async()=>null,writeCache:async(id,scope,value)=>cache.set(id,value),renderPage:async(blob,p)=>({regions:p.regions,timings:p.timings}),getKey:()=> 'fixture-personal',...extra});return {c,calls,cache};
 }
+test('debug capture reuses translated JSON, reports real detector geometry and never exposes a credential',async()=>{
+ const{c,calls}=chapter();const signal=new AbortController().signal;
+ try{
+  await c.render(new Blob(['same-page']),0,'auto',null,{},signal);
+  const debug=await c.render(new Blob(['same-page']),0,'auto',null,{captureDebug:true},signal);
+  assert.equal(calls.length,1);assert.deepEqual(debug.detected.regions[0].bbox,[100,100,300,250]);
+  assert.ok(!JSON.stringify(c.snapshot()).includes('fixture-personal'));
+ }finally{c.close();}
+});
 test('each page has its own request and repeated reading avoids another Google call',async()=>{
  const {c,calls,cache}=chapter(),s=new AbortController().signal,status=[];
  const a=await c.render(new Blob(['first']),0,'auto',x=>status.push(x),{},s);

@@ -15,6 +15,7 @@ class Session:
     headers:dict
     expires:float
     kind:str='video'
+    client_id:str=''
     max_height:int|None=None
     audio_mime:str=''
     manifests:dict=field(default_factory=dict)
@@ -29,7 +30,8 @@ class Session:
             if len(self.resources)>=8000:raise SourceError('Слишком много частей в потоке.')
             token=secrets.token_urlsafe(12);self.resources[token]=url;self.reverse[url]=token;return token
 
-sessions={};lock=threading.RLock()
+sessions={};lock=threading.RLock();preparations={}
+LEASE_SECONDS=120
 
 async def watch_disconnect(request,event):
     # Unlike is_disconnected()'s nonblocking poll, an active receive task also
@@ -41,11 +43,17 @@ def expire():
     now=time.monotonic()
     for key in list(sessions):
         if sessions[key].expires<now:del sessions[key]
-def create(owner,headers,kind='video'):
+    for key,value in list(preparations.items()):
+        if value[1]<now:preparations.pop(key,None)
+def create(owner,headers,kind='video',client_id='',reservation=None):
     with lock:
         expire()
+        if client_id:
+            if reservation is not None and preparations.get((owner,client_id),(None,))[0]!=reservation:raise HTTPException(409,'Открывается другая глава.')
+            for key,s in list(sessions.items()):
+                if s.owner==owner and s.client_id==client_id:sessions.pop(key,None)
         if len(sessions)>=24 or sum(s.owner==owner for s in sessions.values())>=4:raise HTTPException(429,'Закрой предыдущий онлайн-просмотр и повтори.')
-        token=secrets.token_urlsafe(32);session=Session(owner,headers,time.monotonic()+7200,kind);sessions[token]=session;return token,session
+        token=secrets.token_urlsafe(32);session=Session(owner,headers,time.monotonic()+(LEASE_SECONDS if client_id else 7200),kind,client_id);sessions[token]=session;return token,session
 
 def rewrite_manifest(text,base,link,max_height=None):
     if not text.lstrip().startswith('#EXTM3U'):raise SourceError('Источник не предоставил HLS.')
@@ -71,21 +79,23 @@ class Prepare(BaseModel):
     referer:str|None=Field(default=None,max_length=8192)
     kind:str=Field(pattern='^(video|manga)$')
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
+    client_id:str=Field(default='',alias='clientId',max_length=100,pattern=r'^[A-Za-z0-9:_-]*$')
 
 def install(app,owner):
     # Register before /online/{token}/{resource}, which otherwise captures
     # /online/exports/{id} as an ordinary playback capability.
     from local_exports import install as install_exports
     install_exports(app,owner)
-    def resolve(body,subject):
+    def resolve(body,subject,reservation=None):
         http=PublicHttp(timeout=(4,12),deadline=time.monotonic()+45)
+        token=None
         try:
             if body.kind=='manga':
                 from manga_sources import inspect
                 data=inspect(body.url,http)
                 if not data['pages']:raise SourceError('Выбери конкретную опубликованную главу.')
-                token,s=create(subject,{'Referer':data['url']},'manga')
-                return {'id':token,'kind':'manga','language':data['language'],'pages':['/online/'+token+'/'+s.resource(url) for url in data['pages'][:1500]],'expiresIn':7200}
+                token,s=create(subject,{'Referer':data['url']},'manga',body.client_id,reservation)
+                return {'id':token,'kind':'manga','language':data['language'],'pages':['/online/'+token+'/'+s.resource(url) for url in data['pages'][:1500]],'expiresIn':LEASE_SECONDS}
             started=time.monotonic()
             from media_download import pick_stream
             parent=public_url(body.referer,resolve_dns=False) if body.referer else None
@@ -100,11 +110,15 @@ def install(app,owner):
             if stream['type']=='hls':
                 text,final,_=http.document(stream['url'],headers=stream.get('headers'));rewrite_manifest(text,final,lambda v:v,max_height)
                 manifest=(text,final,time.monotonic()+30)
-            token,s=create(subject,stream.get('headers') or {})
+            token,s=create(subject,stream.get('headers') or {},client_id=body.client_id,reservation=reservation)
             s.max_height=max_height
             resource=s.resource(stream['url'])
             if manifest:s.manifests[resource]=manifest
-            return {'id':token,'kind':'video','url':'/online/'+token+'/'+resource,'type':stream['type'],'expiresIn':7200,'preparationMs':round((time.monotonic()-started)*1000)}
+            return {'id':token,'kind':'video','url':'/online/'+token+'/'+resource,'type':stream['type'],'expiresIn':LEASE_SECONDS,'preparationMs':round((time.monotonic()-started)*1000)}
+        except BaseException:
+            if token:
+                with lock:sessions.pop(token,None)
+            raise
         finally:http.close()
 
     @app.post('/online/prepare')
@@ -112,9 +126,15 @@ def install(app,owner):
         # A hover preview can be cancelled while upstream parsing is still
         # running. Do not leave its newly created two-hour capability occupying
         # one of the owner's four slots after that browser has disconnected.
+        reservation=secrets.token_urlsafe(16)
+        if body.client_id:
+            with lock:
+                expire()
+                if len(preparations)>=128 and (subject,body.client_id) not in preparations:raise HTTPException(429,'Слишком много подключений. Повтори через минуту.')
+                preparations[(subject,body.client_id)]=(reservation,time.monotonic()+60)
         disconnected=asyncio.Event();watcher=asyncio.create_task(watch_disconnect(request,disconnected))
         try:
-            data=await run_in_threadpool(resolve,body,subject)
+            data=await run_in_threadpool(resolve,body,subject,reservation)
             if disconnected.is_set():
                 with lock:
                     session=sessions.get(data['id'])
@@ -122,6 +142,9 @@ def install(app,owner):
                 raise HTTPException(499,'Подготовка просмотра отменена.')
             return data
         finally:
+            if body.client_id:
+                with lock:
+                    if preparations.get((subject,body.client_id),(None,))[0]==reservation:preparations.pop((subject,body.client_id),None)
             watcher.cancel()
             with contextlib.suppress(asyncio.CancelledError):await watcher
 
@@ -132,10 +155,19 @@ def install(app,owner):
             if s and s.owner==subject:del sessions[token]
         return {'closed':True}
 
+    @app.post('/online/{token}/heartbeat')
+    def heartbeat(token:str,subject=Depends(owner)):
+        with lock:
+            expire();s=sessions.get(token)
+            if not s or s.owner!=subject:raise HTTPException(410,'Онлайн-сеанс завершён. Открой главу снова.')
+            s.expires=time.monotonic()+LEASE_SECONDS
+        return {'expiresIn':LEASE_SECONDS}
+
     @app.get('/online/{token}/{resource}')
     def stream(token:str,resource:str,range_header:str=Header(default='',alias='Range')):
         with lock:
             expire();s=sessions.get(token);url=s.resources.get(resource) if s else None
+            if s and url and s.client_id:s.expires=time.monotonic()+LEASE_SECONDS
         if not s or not url:raise HTTPException(410,'Онлайн-сеанс завершён. Открой серию или главу снова.')
         if range_header and not re.fullmatch(r'bytes=(?:\d+-\d*|-\d+)',range_header):raise HTTPException(416,'Некорректный диапазон.')
         if not s.slots.acquire(blocking=False):raise HTTPException(429,'Дождись загрузки предыдущих частей.')

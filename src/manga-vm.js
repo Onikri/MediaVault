@@ -1,3 +1,4 @@
+import {acquireRenderer,releaseRenderer} from './reader-worker-pool.js';
 import {getTranslation,putTranslation} from './translation-cache.js';
 
 function abortReason(signal){return signal?.reason||new DOMException('Операция отменена','AbortError');}
@@ -88,8 +89,8 @@ export class VmChapter {
  async render(blob,index,font,status,config={},signal=this.controller.signal){
   const page=await this.json(index+1,status,signal);this.controller.signal.throwIfAborted();signal.throwIfAborted();status?.({phase:'cleaning',message:'Устройство · очищаем фон и набираем русский текст',retryAtMs:null,completedRegions:page.regions.length,totalRegions:page.regions.length});
   if(['quality','moebius'].includes(config.inpaint)&&!config.allowDownloads)throw Error('Разреши загрузку выбранной модели восстановления.');
-  if(!this.worker){this.worker=new Worker(new URL('./manga-canvas.worker.js',import.meta.url),{type:'module'});this.worker.onmessage=({data})=>{const j=this.renderJobs.get(data.id);if(j){if(data.status){j.status?.(data.status);return;}this.renderJobs.delete(data.id);data.error?j.reject(Error(data.error)):j.resolve(data.result);}};this.worker.onerror=()=>{for(const j of this.renderJobs.values())j.reject(Error('Обработчик страницы остановился.'));this.renderJobs.clear();this.worker?.terminate();this.worker=null;};}
-  const id=++this.serial;return new Promise((resolve,reject)=>{this.renderJobs.set(id,{resolve,reject,status});this.worker.postMessage({id,blob,page,font,mode:config.inpaint||'fast'});});
+  if(!this.worker){this.worker=acquireRenderer();this.worker.onmessage=({data})=>{const j=this.renderJobs.get(data.id);if(j){if(data.status){j.status?.(data.status);return;}this.renderJobs.delete(data.id);data.error?j.reject(Error(data.error)):j.resolve(data.result);}};this.worker.onerror=()=>{for(const j of this.renderJobs.values())j.reject(Error('Обработчик страницы остановился.'));this.renderJobs.clear();this.worker?.terminate();this.worker=null;};}
+  const id=++this.serial;return new Promise((resolve,reject)=>{this.renderJobs.set(id,{resolve,reject,status});this.worker.postMessage({id,blob,page,font,mode:config.inpaint||'fast',captureDebug:config.captureDebug===true});});
  }
- close(){this.controller.abort();this.worker?.terminate();for(const w of [...this.waiters.values(),...this.renderJobs.values()])w.reject(new DOMException('Читалка закрыта','AbortError'));this.waiters.clear();this.renderJobs.clear();this.statusListeners.clear();this.progress.clear();if(this.id)this.service().request('/api/v1/chapters/'+this.id,{method:'DELETE'}).catch(()=>{});}
+ close(){this.controller.abort();releaseRenderer(this.worker,this.renderJobs.size>0);this.worker=null;for(const w of [...this.waiters.values(),...this.renderJobs.values()])w.reject(new DOMException('Читалка закрыта','AbortError'));this.waiters.clear();this.renderJobs.clear();this.statusListeners.clear();this.progress.clear();if(this.id)this.service().request('/api/v1/chapters/'+this.id,{method:'DELETE'}).catch(()=>{});}
 }

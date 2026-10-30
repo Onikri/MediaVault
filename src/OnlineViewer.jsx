@@ -4,12 +4,14 @@ import {ArrowLeft,Maximize,Minimize,X} from 'lucide-react';
 import VideoPlayer from './VideoPlayer.jsx';
 import MangaReader from './MangaReader.jsx';
 import {stopLmt} from './lmt-client.js';
+import {onlineClientId,keepOnlineLease} from './online-lease.js';
 import './online.css';
 export default function OnlineViewer({entries,initial,kind,title,service,userId,onClose,onEntryChange,language='ru',dub='',metadata,quality='best',inline=false,sourceUrl}){
  useEffect(()=>()=>stopLmt(),[]);
  const [current,setCurrent]=useState(initial),[media,setMedia]=useState(null),[busy,setBusy]=useState(true),[error,setError]=useState('');
  const [retry,setRetry]=useState(0),[elapsed,setElapsed]=useState(0),[full,setFull]=useState(false),[fullscreenError,setFullscreenError]=useState('');
- const host=useRef(null);
+ const host=useRef(null),clientId=useRef(null);if(!clientId.current)clientId.current=onlineClientId('viewer');
+ useEffect(()=>media?.id?keepOnlineLease(service,media.id,()=>setRetry(v=>v+1)):undefined,[media?.id,service.server]);
  useEffect(()=>{setCurrent(initial);if(inline){const frame=requestAnimationFrame(()=>{if(!document.fullscreenElement)host.current?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});});return()=>cancelAnimationFrame(frame);}},[initial?.url,inline]);
  useEffect(()=>{const change=()=>setFull(document.fullscreenElement===host.current);document.addEventListener('fullscreenchange',change);return()=>document.removeEventListener('fullscreenchange',change);},[]);
  async function fullscreen(){setFullscreenError('');try{if(document.fullscreenElement)await document.exitFullscreen();else if(host.current?.requestFullscreen)await host.current.requestFullscreen();else setFullscreenError('Полный экран недоступен в этом браузере.');}catch{setFullscreenError('Браузер не разрешил полный экран.');}}
@@ -17,7 +19,7 @@ export default function OnlineViewer({entries,initial,kind,title,service,userId,
  const items=entries.map(e=>({id:'online:'+e.url,name:title+' · '+(e.title||'Серия '+e.number),category:kind==='manga'?'manga':'video',section:kind==='manga'?'manga':'anime',episode:e.number,season:e.season||1,collectionId:'online-title',metadata:{ids:metadata?.ids,format:metadata?.format},readingMode:metadata?.readingMode,metadataId:metadata?.ids?.mal,dub,sourceURL:e.url,translationInfo:{language},episodeTitle:e.title}));
  const selected=items.find(e=>e.sourceURL===current.url)||items[0],generation=useRef(0),live=useRef(service);live.current=service;
  useEffect(()=>{const version=++generation.current,abort=new AbortController();let token;setMedia(null);setBusy(true);setError('');
-  service.request('/online/prepare',{method:'POST',body:{url:current.url,kind,...(kind==='video'?{quality,...(sourceUrl?{referer:sourceUrl}:{})}:{})},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(45000)])}).then(data=>{token=data.id;if(version!==generation.current||abort.signal.aborted){live.current.request('/online/'+token,{method:'DELETE'}).catch(()=>{});return;}setMedia(data);}).catch(e=>{if(!abort.signal.aborted)setError(e.name==='TimeoutError'?'Источник не ответил за 45 секунд. Повтори подключение или выбери другой источник.':e.message);}).finally(()=>{if(!abort.signal.aborted)setBusy(false);});return()=>{generation.current++;abort.abort();if(token)live.current.request('/online/'+token,{method:'DELETE'}).catch(()=>{});};
+  service.request('/online/prepare',{method:'POST',body:{url:current.url,kind,clientId:clientId.current,...(kind==='video'?{quality,...(sourceUrl?{referer:sourceUrl}:{})}:{})},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(45000)])}).then(data=>{token=data.id;if(version!==generation.current||abort.signal.aborted){live.current.request('/online/'+token,{method:'DELETE',keepalive:true}).catch(()=>{});return;}setMedia(data);}).catch(e=>{if(!abort.signal.aborted)setError(e.name==='TimeoutError'?'Источник не ответил за 45 секунд. Повтори подключение или выбери другой источник.':e.message);}).finally(()=>{if(!abort.signal.aborted)setBusy(false);});return()=>{generation.current++;abort.abort();if(token)live.current.request('/online/'+token,{method:'DELETE',keepalive:true}).catch(()=>{});};
  },[current.url,kind,service.server,quality,retry,sourceUrl]);
  useEffect(()=>{const close=()=>onClose();addEventListener('mediavault-locked',close);const old=document.body.style.overflow;if(!inline)document.body.style.overflow='hidden';return()=>{if(!inline)document.body.style.overflow=old;removeEventListener('mediavault-locked',close);};},[onClose,inline]);
  const catalog={items,storage:{collections:[{id:'online-title',name:title,section:kind==='manga'?'manga':'anime',metadata}]}};

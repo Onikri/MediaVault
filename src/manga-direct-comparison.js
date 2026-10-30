@@ -9,7 +9,7 @@ export async function compareDirectInputs({blob,index,prepare,google,key,config,
  signal?.throwIfAborted();const prepStart=performance.now(),marked=await prepare(blob,index,()=>{},'annotated');
  signal?.throwIfAborted();const raw=await prepare(blob,index,()=>{},'vision'),prepareMs=Math.round(performance.now()-prepStart);
  const inputs={annotated:marked,coordinates:{...raw,inputMode:'coordinates',regions:marked.regions,detector:marked.detector,detectionMs:marked.detectionMs},vision:raw};
- for(const variant of DIRECT_INPUTS){
+ for(const variant of DIRECT_INPUTS.filter(v=>v.id!=='blocks')){
   signal?.throwIfAborted();const start=performance.now();let row={input:variant.id,label:variant.label,state:'running'};
   onProgress({message:variant.label,results:[...results,row]});
   try{

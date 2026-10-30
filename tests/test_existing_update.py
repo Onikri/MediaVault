@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -21,7 +22,7 @@ class ExistingUpdateTests(unittest.TestCase):
         for name,value in [('.env','private-fixture'),('compose.yaml','services: {}'),('release-v51.yaml','services: {}'),('Caddyfile','fixture')]:
             (work/name).write_text(value)
         (data/'service.key').write_bytes(b'private-fixture-key')
-        with sqlite3.connect(data/'tasks.sqlite') as db:
+        with contextlib.closing(sqlite3.connect(data/'tasks.sqlite')) as db,db:
             db.executescript('CREATE TABLE tasks (id TEXT,status TEXT,data BLOB); CREATE TABLE settings (name TEXT,value BLOB);')
             db.execute('INSERT INTO tasks VALUES (?,?,?)',('task-fixture','running' if active else 'done',b'encrypted-task-fixture'))
             db.execute('INSERT INTO settings VALUES (?,?)',('oauth-fixture',b'encrypted-fixture'))
@@ -78,10 +79,10 @@ class ExistingUpdateTests(unittest.TestCase):
             maintenance=str(work/('maintenance-'+REVISION[:12]+'.yaml'))
             self.assertEqual(len(ups),2)
             self.assertIn(maintenance,ups[0]);self.assertNotIn(maintenance,ups[1])
-            with sqlite3.connect(data/'tasks.sqlite') as db:
+            with contextlib.closing(sqlite3.connect(data/'tasks.sqlite')) as db,db:
                 self.assertEqual(db.execute('SELECT status FROM tasks').fetchone()[0],'running')
             archive=next((root/'backups').glob('*/private-data.tar.gz'))
-            self.assertEqual(archive.stat().st_mode&0o777,0o600)
+            if os.name!='nt':self.assertEqual(archive.stat().st_mode&0o777,0o600)
             with tarfile.open(archive) as saved:
                 self.assertEqual(saved.extractfile('data/service.key').read(),b'private-fixture-key')
                 self.assertIn('data/tasks.sqlite',saved.getnames())
