@@ -111,3 +111,13 @@ test('hyphenated Russian names can fill a speech bubble without single-letter st
 test('a tall bubble on a full-resolution manga page is searched within the pixel budget rather than rejected',()=>{
  const source=image(1350,1920);rect(source,105,15,270,500,0);rect(source,110,20,260,490,255);rect(source,195,90,100,330,0);const bubble=paperBubble(source,[155,61,320,435]);assert.ok(bubble);assert.ok(bubble.box[2]-bubble.box[0]>220);
 });
+
+
+import {partitionComicLayouts} from '../src/manga-layout.js';
+test('joined bubble captions keep separate horizontal, vertical and diagonal lettering cells',()=>{
+ for(const boxes of [[[40,80,110,220],[180,80,260,220]],[[90,35,160,110],[90,180,160,280]],[[170,30,240,130],[70,180,140,280]]]){
+  const input=boxes.map((text_bbox,i)=>({uid:'B'+i,text_bbox,layout_bbox:[20,20,290,310],bubble_bbox:[20,20,290,310]})),snapshot=JSON.stringify(input),out=partitionComicLayouts(input),a=out[0].layout_bbox,b=out[1].layout_bbox;
+  assert.ok(Math.min(a[2],b[2])<=Math.max(a[0],b[0])||Math.min(a[3],b[3])<=Math.max(a[1],b[1]));assert.equal(JSON.stringify(input),snapshot);
+  for(let i=0;i<out.length;i++){const r=out[i].layout_bbox,t=boxes[i];assert.ok(r[0]<=t[0]&&r[1]<=t[1]&&r[2]>=t[2]&&r[3]>=t[3]);assert.ok(out[i].partitioned);}
+ }
+});

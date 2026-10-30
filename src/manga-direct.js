@@ -110,7 +110,7 @@ export class DirectChapter{
   const last=this.progress.get(index);if(last)status?.(last);
   try{
    const job=this.request(index,blob,background);
-   const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v10:'+(config.inpaint||this.config.inpaint)+':'+font;
+   const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v11:'+(config.inpaint||this.config.inpaint)+':'+font;
    if(this.config.cache&&!this.bypass.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage&&!config.captureDebug)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
    const stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
    if(config.captureDebug&&!page.detected){

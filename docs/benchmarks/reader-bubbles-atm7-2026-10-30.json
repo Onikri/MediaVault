@@ -1,0 +1,409 @@
+{
+  "chapter": 7,
+  "actualDetector": "RT-DETR Comic v4 INT8",
+  "translation": "Controlled Russian fixture; no Google inference",
+  "results": [
+    {
+      "page": 11,
+      "detected": 10,
+      "beforeCollisions": 1,
+      "afterCollisions": 0,
+      "partitioned": [
+        "P11_B1",
+        "P11_B2"
+      ],
+      "layouts": [
+        {
+          "uid": "P11_B1",
+          "font": "serif",
+          "fontSize": 27,
+          "lines": 7,
+          "color": "#151515",
+          "backgroundLuma": 254,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            1040.365,
+            81,
+            1223,
+            358
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B2",
+          "font": "serif",
+          "fontSize": 30,
+          "lines": 7,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            842,
+            193,
+            1037.365,
+            498
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B3",
+          "font": "serif",
+          "fontSize": 24,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            1059.89,
+            576.32,
+            1231.42,
+            816.9
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B4",
+          "font": "serif",
+          "fontSize": 25,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            513.11,
+            575.57,
+            666.2,
+            795.46
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B5",
+          "font": "serif",
+          "fontSize": 18,
+          "lines": 7,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            95.33,
+            825.06,
+            210.64,
+            1007.91
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B6",
+          "font": "serif",
+          "fontSize": 27,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            695.1,
+            906.61,
+            870,
+            1148.83
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B7",
+          "font": "serif",
+          "fontSize": 21,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            402.28,
+            962.54,
+            560.96,
+            1150.23
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B8",
+          "font": "serif",
+          "fontSize": 12,
+          "lines": 5,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            145.4,
+            1046.73,
+            226.8,
+            1133.91
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B9",
+          "font": "serif",
+          "fontSize": 36,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            986.98,
+            1223.72,
+            1243.04,
+            1564.39
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P11_B10",
+          "font": "serif",
+          "fontSize": 45,
+          "lines": 5,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            133.85,
+            1383.85,
+            427.15,
+            1779.05
+          ],
+          "fits": true
+        }
+      ]
+    },
+    {
+      "page": 12,
+      "detected": 12,
+      "beforeCollisions": 3,
+      "afterCollisions": 0,
+      "partitioned": [
+        "P12_B4",
+        "P12_B5",
+        "P12_B6",
+        "P12_B7",
+        "P12_B9",
+        "P12_B12"
+      ],
+      "layouts": [
+        {
+          "uid": "P12_B1",
+          "font": "serif",
+          "fontSize": 23,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 244,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            539.16,
+            90.81,
+            707.6,
+            317.62
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B2",
+          "font": "serif",
+          "fontSize": 32,
+          "lines": 7,
+          "color": "#151515",
+          "backgroundLuma": 224,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            106.53,
+            218.08,
+            283,
+            595.05
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B3",
+          "font": "serif",
+          "fontSize": 22,
+          "lines": 7,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            1036.88,
+            641.77,
+            1158.41,
+            896.09
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B4",
+          "font": "serif",
+          "fontSize": 30,
+          "lines": 5,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            321.19625,
+            685,
+            580,
+            937
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B5",
+          "font": "serif",
+          "fontSize": 27,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            118,
+            670.86,
+            313.34,
+            945.78
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B6",
+          "font": "serif",
+          "fontSize": 23,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 254,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            1073.5125,
+            999,
+            1232,
+            1214
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B7",
+          "font": "serif",
+          "fontSize": 24,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 254,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            885,
+            1061,
+            1070.5125,
+            1319
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B8",
+          "font": "serif",
+          "fontSize": 31,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            127.75,
+            1020.47,
+            308.79,
+            1306.42
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B9",
+          "font": "serif",
+          "fontSize": 21,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 254,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            556,
+            1372,
+            721,
+            1566.545
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B10",
+          "font": "serif",
+          "fontSize": 25,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            117.02,
+            1363.34,
+            278.84,
+            1587.41
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B11",
+          "font": "serif",
+          "fontSize": 22,
+          "lines": 6,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            1069,
+            1562,
+            1238,
+            1784
+          ],
+          "fits": true
+        },
+        {
+          "uid": "P12_B12",
+          "font": "serif",
+          "fontSize": 20,
+          "lines": 5,
+          "color": "#151515",
+          "backgroundLuma": 255,
+          "fallback": false,
+          "vertical": false,
+          "layoutBox": [
+            545,
+            1569.545,
+            721,
+            1774
+          ],
+          "fits": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,9 @@
-import {paperBubble,verticalLettering} from './manga-layout.js';
+import {comicLayouts,verticalLettering} from './manga-layout.js';
 import {teleaInpaint} from '../lmt/upstream/lib/inpaint/telea.ts';
 import {loadMangaFont} from '../reader-fonts/catalog.js';
 import {fitComicText,styleFont,comicInkColor} from './manga-typeset.js';
 import {prepareInkPatch,preparePageInk,compositeInkPatch,dilateInk} from './manga-cleaning.js';
-export const READER_RENDER_VERSION=10;
+export const READER_RENDER_VERSION=11;
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
 function maskRuns(patch,pageWidth,mask=patch.mask){const runs=[];for(let y=0;y<patch.height;y++){let x=0;while(x<patch.width){while(x<patch.width&&!mask[y*patch.width+x])x++;const start=x;while(x<patch.width&&mask[y*patch.width+x])x++;if(x>start)runs.push((patch.top+y)*pageWidth+patch.left+start,(patch.top+y)*pageWidth+patch.left+x);}}return runs;}
 export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false,cleanOnly=false,preparedClean}){
@@ -16,11 +16,10 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   const unresolved=page.regions.filter(r=>!r.ru_translation?.trim()&&r.empty_reason!=='non_text');
   if(!cleanOnly&&unresolved.length)warnings.push('Нет перевода для '+unresolved.length+' областей ('+unresolved.map(r=>r.uid).join(', ')+'). Их оригинал сохранён; повтори перевод страницы.'+(page.emptyReview?.error?' Проверка пропусков: '+page.emptyReview.error:''));
   // Plan and measure every caption before changing any pixel.
-  for(const sourceRegion of page.regions){
+  for(const sourceRegion of cleanOnly?page.regions:comicLayouts(original,page.regions)){
    const region={...sourceRegion};
    const text=normalize(region.ru_translation||'');if(!cleanOnly&&!text)continue;
    let box=region.layout_bbox||region.bubble_bbox||region.text_bbox;
-   if(!cleanOnly&&!region.flow&&!region.bubble_bbox&&(!region.layout_bbox||JSON.stringify(region.layout_bbox)===JSON.stringify(region.text_bbox))){const bubble=paperBubble(original,region.text_bbox);if(bubble){box=bubble.box;region.bubble_bbox=box;region.layout_bbox=box;}}
    const valid=b=>Array.isArray(b)&&b.length===4&&b.every(Number.isFinite)&&b[0]>=0&&b[1]>=0&&b[2]<=page.width&&b[3]<=page.height&&b[2]>b[0]&&b[3]>b[1];
    if(!valid(box)||!valid(region.text_bbox)){records.push({uid:region.uid,method:'declined',reason:'Некорректная область вёрстки'});continue;}
    if(cleanOnly){plans.push({region,box});continue;}

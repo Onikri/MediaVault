@@ -25,6 +25,7 @@ export function comicInkColor(image,box){
 }
 export function fitComicText(text,box,measure,{min=10,max=42,oval=true}={}){
  const [x,y,x2,y2]=box,w=(x2-x)*.8,h=(y2-y)*.8,words=String(text).normalize('NFC').replace(/\.{3,}/g,'…').trim().split(/\s+/);
+ const measured=new Map(),rawMeasure=measure;measure=(value,size)=>{const key=size+'|'+value;if(!measured.has(key))measured.set(key,rawMeasure(value,size));return measured.get(key);};
  function attempt(size){
   const lineH=size*1.16,maxLines=Math.min(40,Math.max(1,Math.floor(h/lineH)));
   for(let count=1;count<=maxLines;count++){
@@ -51,8 +52,10 @@ export function fitComicText(text,box,measure,{min=10,max=42,oval=true}={}){
   }
   return null;
  }
- let lo=min,hi=Math.min(max,Math.floor(h/1.16)),best=null;
- while(lo<=hi){const mid=(lo+hi)>>1,r=attempt(mid);if(r){best=r;lo=mid+1;}else hi=mid-1;}
- return best||{fits:false,lines:[],fontSize:min};
+ // Oval row widths and syllable wrapping are discrete: a failed size does not
+ // prove every larger size fails. Search bounded candidates from large to small
+ // and memoize glyph measurements across the candidate line counts.
+ for(let size=Math.min(max,Math.floor(h/1.16));size>=min;size--){const fit=attempt(size);if(fit)return fit;}
+ return {fits:false,lines:[],fontSize:min};
 }
 export const styleFont=style=>({standard_comic:'comic-relief',bold_scream:'comic-relief',handwritten_sloppy:'marck-script',handwritten_soft:'pangolin',handwritten_narrow:'neucha',sfx_art:'ruslan-display',serif_serious:'pt-serif',digital_box:'press-start'}[style]||'comic-relief');
