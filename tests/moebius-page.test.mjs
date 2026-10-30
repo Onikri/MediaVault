@@ -28,7 +28,7 @@ test('union mask contains all safe regions without modifying original',()=>{
 });
 // Canvas contract only: the neural comparisons use real ONNX inference separately.
 function installCanvas(image){
- globalThis.ImageData=class{constructor(data,width,height){Object.assign(this,{data,width,height});}};
+ globalThis.ImageData=class{constructor(data,width,height){if(typeof data==='number'){height=width;width=data;data=new Uint8ClampedArray(width*height*4);}Object.assign(this,{data,width,height});}};
  globalThis.createImageBitmap=async()=>({...image,close(){}});
  globalThis.OffscreenCanvas=class{
   constructor(w,h){this.width=w;this.height=h;this.data=image.data.slice();}
@@ -42,7 +42,7 @@ test('whole-page renderer calls neural provider once, restores outside mask and 
  assert.equal(calls,1);assert.equal(result.inpaint.modelCalls,1);assert.equal(result.typesetting.layouts.length,2);
  for(let n=0;n<union.length;n++)if(!union[n])assert.equal(result.renderedBitmap.data[n*4],image.data[n*4]);
  calls=0;const failed=await renderComicPage({blob:{},page,font:'serif',mode:'moebius',lama:async()=>{calls++;throw Error('runtime fetch failed');}});
- assert.equal(calls,1);assert.deepEqual(failed.renderedBitmap.data,image.data);assert.equal(failed.typesetting.layouts.length,0);assert.ok(failed.warnings.some(w=>w.startsWith('Moebius:')));
+ assert.equal(calls,1);assert.deepEqual(failed.renderedBitmap.data,image.data);assert.equal(failed.typesetting.layouts.length,2);assert.ok(failed.typesetting.layouts.every(r=>r.fallback&&r.color==='#151515'));assert.ok(failed.warnings.some(w=>w.startsWith('Moebius:')));
 });
 test('debug snapshot is captured after cleanup and before typesetting',async()=>{
  const {image,page}=fixture();installCanvas(image);const Base=globalThis.OffscreenCanvas;

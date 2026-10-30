@@ -8,6 +8,7 @@
  * Key can be file path (e.g. 'languages/latin/rec.onnx') or filename.
  */
 export const KNOWN_MODEL_SHA256: Record<string, string> = {
+  "migan_pipeline_v2.onnx": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b",
   "korean_PP-OCRv5_mobile_rec.onnx": "322f140154c820fcb83c3d24cfe42c9ec70dd1a1834163306a7338136e4f1eaa",
   "ppocrv5_korean_dict.txt": "a88071c68c01707489baa79ebe0405b7beb5cca229f4fc94cc3ef992328802d7",
   // Script gate (ogkalu/image-script-identification)

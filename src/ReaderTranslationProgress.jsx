@@ -5,7 +5,7 @@ export default function ReaderTranslationProgress({progress,fallback,onRetry,onR
  const[now,setNow]=useState(Date.now);
  useEffect(()=>{if(!progress?.running)return;setNow(Date.now());const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[progress?.running,progress?.startedAt]);
  const details=translationProgressDetails(progress,now);
- const message=showDiagnostics?progress?.message||fallback:progress?.phase==='error'?progress.message:progress?.renderIncomplete?'Часть областей сохранена в оригинале':progress?.running?({cleaning:'Восстанавливаем фон…',rendering:'Готовим русскую страницу…',translating:'Переводим страницу…'}[progress.phase]||'Переводим страницу…'):null;
+ const message=showDiagnostics?progress?.message||fallback:progress?.phase==='error'?progress.message:progress?.renderIncomplete?'Часть перевода показана с белой подложкой':progress?.running?({cleaning:'Восстанавливаем фон…',rendering:'Готовим русскую страницу…',translating:'Переводим страницу…'}[progress.phase]||'Переводим страницу…'):null;
  if(!message&&!showDiagnostics)return null;
  return <div className={'reader-live-progress'+(progress?.phase==='error'?' reader-live-progress-error':'')} aria-label="Состояние перевода">
   <span role="status" aria-live="polite">{message}</span>

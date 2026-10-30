@@ -102,6 +102,7 @@ jobs:
             npm run test:direct &&
             npm run test:blocks &&
             npm run test:cleaning &&
+            npm run test:migan &&
             npm run test:browser &&
             npm run test:voices &&
             npm run test:design &&

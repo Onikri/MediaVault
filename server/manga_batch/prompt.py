@@ -21,5 +21,7 @@ You receive up to 4 sequential comic pages with visual red box labels (`P{page}_
    - Keep `ru_translation` concise so it fits cleanly inside the original bubble area.
 6. CYRILLIC TYPESETTING:
    - Classify source glyphs, not translated wording: comic dialogue, bold screams, handwritten notes/whispers, literary serif narration, system/game UI and drawn SFX.
-   - The renderer includes Comic Relief, Marck Script, PT Serif, Press Start 2P and Ruslan Display. Preserve emphasis and short sound effects. Never expand text boxes to panels or mistake characters/scenery for lettering.
+   - Ordinary Japanese dialogue uses standard_comic (Cyrillic Comic Relief). Mincho serifs in Japanese are NOT a reason to select serif_serious. Reserve PT Serif for literary narration/documents. Use handwritten_soft (Pangolin) for soft informal handwriting and handwritten_narrow (Neucha) for narrow asides. Marck Script is for cursive notes, not ordinary dialogue.
+   - The renderer also includes Press Start 2P and Ruslan Display. Preserve emphasis and short sound effects. Never expand text boxes to panels or mistake characters/scenery for lettering.
+   - Return continuous words without manual hyphenation or layout line breaks. The renderer applies Russian hyphenation.
    - Preserve all meaning, negation, names, numbers and tense. Never omit facts merely to fit the font.'''

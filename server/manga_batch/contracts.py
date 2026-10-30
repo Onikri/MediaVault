@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MODEL_IDS = ('gemma-4-31b-it', 'gemma-4-26b-a4b-it', 'gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
 
 class Translation(BaseModel):
@@ -11,7 +11,7 @@ class Translation(BaseModel):
     uid: str = Field(pattern=r'^P[1-9][0-9]{0,5}_B[1-9][0-9]{0,3}$')
     source_lang: Literal['en','ja','ko','zh']
     text_category: Literal['dialogue','thought','narration','whisper_aside','sfx','system_ui','sign']
-    font_style: Literal['standard_comic','bold_scream','handwritten_sloppy','serif_serious','digital_box','sfx_art']
+    font_style: Literal['standard_comic','bold_scream','handwritten_sloppy','serif_serious','digital_box','sfx_art','handwritten_soft','handwritten_narrow']
     speech_register: Literal['casual_slang','neutral_conversational','formal_business','archaic_noble','panicked_broken']
     speaker_gender: Literal['male','female','neutral','unknown']
     connected_to_uid: str | None = None

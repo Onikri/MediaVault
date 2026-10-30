@@ -3,9 +3,9 @@ import {directRequest,callDirectGoogle} from '../src/manga-direct-api.js';
 import {requestDiagnostics,redactGoogle,xhrGoogle,INLINE_REQUEST_LIMIT} from '../src/google-request-diagnostics.js';
 import {translationConfig} from '../src/manga-translation.js';
 const page={id:'P1',page:1,width:600,height:850,mime:'image/webp',image:'YWJjZA==',regions:[{id:'P1_B1',bbox:[10,20,80,100]}]};
-test('Flash Lite models use correct minimal thinking controls; old two-page preferences migrate to one',()=>{
+test('Flash Lite models use correct minimal thinking controls; chapter preparation is enabled with paired requests',()=>{
  for(const model of ['gemini-3.5-flash-lite','gemini-3.1-flash-lite']){const b=directRequest([page],{model});assert.deepEqual(b.generationConfig.thinkingConfig,{thinkingLevel:'MINIMAL'});assert.equal(b.generationConfig.temperature,undefined);assert.equal(translationConfig({engine:'direct',directModel:model,directPair:true}).directPair,false);}
- assert.deepEqual(directRequest([page],{model:'gemini-2.5-flash-lite'}).generationConfig.thinkingConfig,{thinkingBudget:0});assert.equal(translationConfig().directPrefetch,false);
+ assert.deepEqual(directRequest([page],{model:'gemini-2.5-flash-lite'}).generationConfig.thinkingConfig,{thinkingBudget:0});assert.equal(translationConfig().directPrefetch,true);
 });
 test('diagnostics include actual UTF-8 JSON/image byte counts and original local coordinates',()=>{
  const body=directRequest([page]),d=requestDiagnostics([page],body,'gemma-4-31b-it');assert.equal(d.requestBytes,Buffer.byteLength(JSON.stringify(body)));assert.equal(d.images[0].bytes,4);assert.equal(d.limitBytes,INLINE_REQUEST_LIMIT);assert.deepEqual(d.coordinates[0].regions[0].text_bbox,page.regions[0].bbox);assert.match(d.requestPreview.contents[0].parts[2].inlineData.data,/base64: 8/);assert.equal(d.requestBody,body);

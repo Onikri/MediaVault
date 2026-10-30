@@ -17,12 +17,12 @@ test('three personal credentials lease three concurrent pages without exporting 
 });
 
 test('personal mode sends its page to the fixed Oracle gateway',async()=>{
- let sent;const {c}=chapter({config:translationConfig({engine:'direct',directViaOracle:true,directBatchPages:1}),google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent={path,options};return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
+ let sent;const {c}=chapter({entries:[{async:async()=>new Blob(['last page'])}],config:translationConfig({engine:'direct',directViaOracle:true,directBatchPages:2}),google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent={path,options};return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
  try{await c.render(new Blob(['page']),0,'auto',null,{},new AbortController().signal);assert.equal(sent.path,'/reader/google/generate');assert.equal(sent.options.body.model,'gemini-3.5-flash-lite');assert.ok(sent.options.body.key);assert.ok(!JSON.stringify(sent.options.body.request).includes(sent.options.body.key));}finally{c.close();}
 });
 
 test('online reader uses an Oracle credential slot without receiving the server key',async()=>{
- const sent=[];const {c}=chapter({config:translationConfig({engine:'vm',directViaOracle:true,directBatchPages:1}),serverSlots:[0],getKey:()=>'',google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent.push({path,body:options.body});return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
+ const sent=[];const {c}=chapter({entries:[{async:async()=>new Blob(['last page'])}],config:translationConfig({engine:'vm',directViaOracle:true,directBatchPages:2}),serverSlots:[0],getKey:()=>'',google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent.push({path,body:options.body});return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
  try{await c.render(new Blob(['page']),0,'auto',null,{},new AbortController().signal);assert.equal(sent[0].path,'/reader/google/generate');assert.equal(sent[0].body.slot,0);assert.equal(sent[0].body.key,undefined);assert.equal(sent[0].body.model,'gemini-3.5-flash-lite');}finally{c.close();}
 });
 test('direct mode is a separate compact cache variant without personal secrets',()=>{
@@ -53,7 +53,7 @@ test('Google call has a bounded deadline and reports timeout without background 
 });
 function chapter(extra={}){
  const calls=[],cache=new Map();
- const c=new DirectChapter({entries:Array.from({length:8},()=>({async:async()=>new Blob(['fixture'])})),scope:'profile:library',keyScope:'profile',config:translationConfig({engine:'direct',directBatchPages:1}),prepare:async(blob,i)=>page(i+1),google:async(pages)=>{calls.push(pages.map(p=>p.page));return {pages:validateDirectResponse(reply(pages.map(p=>({id:p.regions[0].id,ru:'Привет, друг!',f:0,k:0}))),pages)};},cacheKey:async(blob,c,scope)=>scope+':'+await blob.text(),readCache:async()=>null,writeCache:async(id,scope,value)=>cache.set(id,value),renderPage:async(blob,p)=>({regions:p.regions,timings:p.timings}),getKey:()=> 'fixture-personal',...extra});return {c,calls,cache};
+ const c=new DirectChapter({entries:Array.from({length:8},()=>({async:async()=>new Blob(['fixture'])})),scope:'profile:library',keyScope:'profile',config:{...translationConfig({engine:'direct'}),directBatchPages:1,chapterPipeline:false},prepare:async(blob,i)=>page(i+1),google:async(pages)=>{calls.push(pages.map(p=>p.page));return {pages:validateDirectResponse(reply(pages.map(p=>({id:p.regions[0].id,ru:'Привет, друг!',f:0,k:0}))),pages)};},cacheKey:async(blob,c,scope)=>scope+':'+await blob.text(),readCache:async()=>null,writeCache:async(id,scope,value)=>cache.set(id,value),renderPage:async(blob,p)=>({regions:p.regions,timings:p.timings}),getKey:()=> 'fixture-personal',pacer:{reserve:async()=>{}},...extra});return {c,calls,cache};
 }
 test('debug capture reuses translated JSON, reports real detector geometry and never exposes a credential',async()=>{
  const{c,calls}=chapter();const signal=new AbortController().signal;
@@ -73,7 +73,7 @@ test('each page has its own request and repeated reading avoids another Google c
 test('slow adjacent source does not delay current page; explicit single-page mode stays single',async()=>{
  const {c,calls}=chapter({entries:[{async:async()=>new Blob(['first'])},{async:()=>new Promise(()=>{})}]});
  await c.render(new Blob(['first']),0,'auto',null,{},new AbortController().signal);assert.deepEqual(calls,[[1]]);c.close();
- const b=chapter({config:translationConfig({engine:'direct',directPair:false,directBatchPages:1})});await b.c.render(new Blob(['first']),0,'auto',null,{},new AbortController().signal);assert.deepEqual(b.calls,[[1]]);b.c.close();
+ const b=chapter({config:{...translationConfig({engine:'direct'}),directBatchPages:1,chapterPipeline:false}});await b.c.render(new Blob(['first']),0,'auto',null,{},new AbortController().signal);assert.deepEqual(b.calls,[[1]]);b.c.close();
 });
 test('cache is reusable before asking for a key; bad model result can be manually retried',async()=>{
  const hit={kind:'manga-json',page:{...page(1),regions:[]}};const {c,calls}=chapter({getKey:()=>'',readCache:async()=>hit});await c.render(new Blob(['first']),0,'auto',null,{},new AbortController().signal);assert.equal(calls.length,0);c.close();
@@ -125,18 +125,18 @@ test('unsafe Google geometry fails closed before any eraser receives it',()=>{
  assert.equal(geometryAgreement([[0,0,10,10]],[[0,0,10,10],[50,50,60,60]]).matched,1);
 });
 test('vision pages with zero local regions still reach Google and can be rendered',async()=>{
- let prepares=0;const {c,calls}=chapter({config:translationConfig({engine:'direct',directInput:'vision',directBatchPages:1}),prepare:async()=>{prepares++;return {...page(1),inputMode:'vision',regions:[]};},google:async pages=>{calls.push(pages);return {pages:validateDirectResponse(reply([{box:[100,100,200,300],ru:'Привет!'}]),pages)};}});
+ let prepares=0;const {c,calls}=chapter({entries:[{async:async()=>new Blob(['last page'])}],config:translationConfig({engine:'direct',directInput:'vision',directBatchPages:2}),prepare:async()=>{prepares++;return {...page(1),inputMode:'vision',regions:[]};},google:async pages=>{calls.push(pages);return {pages:validateDirectResponse(reply([{box:[100,100,200,300],ru:'Привет!'}]),pages)};}});
  const result=await c.render(new Blob(['image']),0,'auto',null,{},new AbortController().signal);assert.equal(prepares,1);assert.equal(calls.length,1);assert.equal(result.regions[0].ru_translation,'Привет!');c.close();
 });
 test('comparison shares source and local geometry, makes three explicit requests without touching reader cache',async()=>{
- const seen=[],base=page(1);const result=await compareDirectInputs({blob:new Blob(['image']),index:0,key:'fixture',config:translationConfig({engine:'direct',directBatchPages:1}),prepare:async(blob,i,status,inputMode)=>({...base,inputMode,detector:inputMode==='vision'?'google':'en-fast',regions:inputMode==='vision'?[]:base.regions,image:inputMode==='vision'?'raw-image':'marked-image'}),google:async(pages,options)=>{seen.push({pages,context:options.context});return {pages:validateDirectResponse(reply(pages[0].inputMode==='vision'?[{box:[100,100,200,300],ru:'Привет!'}]:[{id:'P1_B1',ru:'Привет!'}]),pages),diagnostics:{requestBytes:1000,metrics:{uploadMs:1}},usage:{promptTokenCount:400}};}});
+ const seen=[],base=page(1);const result=await compareDirectInputs({blob:new Blob(['image']),index:0,key:'fixture',config:{...translationConfig({engine:'direct'}),directBatchPages:1,chapterPipeline:false},prepare:async(blob,i,status,inputMode)=>({...base,inputMode,detector:inputMode==='vision'?'google':'en-fast',regions:inputMode==='vision'?[]:base.regions,image:inputMode==='vision'?'raw-image':'marked-image'}),google:async(pages,options)=>{seen.push({pages,context:options.context});return {pages:validateDirectResponse(reply(pages[0].inputMode==='vision'?[{box:[100,100,200,300],ru:'Привет!'}]:[{id:'P1_B1',ru:'Привет!'}]),pages),diagnostics:{requestBytes:1000,metrics:{uploadMs:1}},usage:{promptTokenCount:400}};}});
  assert.deepEqual(seen.map(r=>r.pages[0].inputMode),['annotated','coordinates','vision']);assert.deepEqual(seen[0].pages[0].regions,seen[1].pages[0].regions);assert.equal(seen[1].pages[0].image,seen[2].pages[0].image);assert.ok(seen.every(r=>r.context===''));assert.equal(result.results.length,3);assert.ok(result.results.every(r=>r.state==='done'));assert.ok(!JSON.stringify(result).includes('fixture'));assert.ok(!JSON.stringify(result).includes('raw-image'));
 });
 
 
 test('three Oracle slots process nine pages as three concurrent packs, keeping every UID',async()=>{
  let release;const barrier=new Promise(resolve=>release=resolve),seen=[];
- const {c}=chapter({entries:Array.from({length:9},()=>({async:async()=>new Blob(['fixture'])})),config:translationConfig({engine:'direct'}),serverSlots:[0,1,2],service:()=>({}),google:async(pages,options)=>{seen.push({pages:pages.map(p=>p.page),key:options.key});if(seen.length===3)release();await barrier;return {pages:validateDirectResponse(reply(pages.flatMap(p=>p.regions.map(r=>({id:r.id,ru:'Страница '+p.page})))),pages)};}});
+ const {c}=chapter({entries:Array.from({length:9},()=>({async:async()=>new Blob(['fixture'])})),pacer:{reserve:async()=>{}},config:translationConfig({engine:'direct',directBatchPages:3}),serverSlots:[0,1,2],service:()=>({}),google:async(pages,options)=>{seen.push({pages:pages.map(p=>p.page),key:options.key});if(seen.length===3)release();await barrier;return {pages:validateDirectResponse(reply(pages.flatMap(p=>p.regions.map(r=>({id:r.id,ru:'Страница '+p.page})))),pages)};}});
  try{const jobs=Array.from({length:9},(_,i)=>c.request(i,null,i!==0));const result=await Promise.all(jobs.map(j=>j.promise));assert.deepEqual(seen.map(s=>s.pages).sort((a,b)=>a[0]-b[0]),[[1,2,3],[4,5,6],[7,8,9]]);assert.equal(new Set(seen.map(s=>s.key)).size,3);assert.deepEqual(result.map(p=>p.regions[0].uid),Array.from({length:9},(_,i)=>'P'+(i+1)+'_B1'));assert.equal(c.keyBusy.size,0);}finally{c.close();}
 });
 

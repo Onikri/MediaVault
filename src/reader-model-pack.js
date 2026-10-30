@@ -6,7 +6,7 @@ export async function prepareReaderModels(config,status){
  const {downloadArtifactHF}=await import('../lmt/upstream/lib/utils.ts');
  const files=[];
  const detector=local?({'comic-bubble':'rtdetr','comic-text-detector':'ctd'}[config.detector]||config.detector):config.directDetector;
- if(local||!['vision','blocks'].includes(config.directInput)){
+ if(local||config.directInput!=='vision'){
   if(detector==='rtdetr')files.push([DefaultConfig.rtdetrModelRepo,'detector-v4-s_int8.onnx']);
   if(detector==='ctd')files.push([DefaultConfig.comicTextDetectorUrl,'']);
   if(detector==='yolo26n-manga')files.push(['https://huggingface.co/mednasserallah/manga-panel-detector-yolo26n-onnx/resolve/f6b7f3cb2bada1ec7d8b16501f9c984890811445/manga_panel_detector_fp32_1024.onnx','']);
@@ -27,6 +27,7 @@ export async function prepareReaderModels(config,status){
   status({message:'Проверка / загрузка '+(path||repo.split('/').at(-1)),loaded:0,total:0});
   await downloadArtifactHF(path?repo:'',path||repo,true,{onProgress:(loaded,total)=>status({loaded,total,message:'Загрузка '+(path||repo.split('/').at(-1))+(total?' · '+Math.round(loaded/total*100)+'%':'')})});count++;
  }
+ if(config.inpaint==='migan'){const {loadMiganBytes}=await import('./manga-migan.js');await loadMiganBytes(message=>status({loaded:0,total:0,message}));count++;}
  if(config.inpaint==='moebius'){
   const {loadModelBytes}=await import('../lmt/moebius/modelcache.ts');
   for(const name of ['vae_encoder.onnx','vae_decoder.onnx','unet.onnx']){

@@ -25,8 +25,8 @@ export default defineConfig({
   resolve: {preserveSymlinks: true},
   // The standalone AGPL engine is built separately; don't eagerly prebundle
   // its multi-megabyte ONNX/WebLLM graph when starting the main React app.
-  optimizeDeps: {entries: ['index.html']},
-  server: {port: 8080, strictPort: true,watch:{ignored:path=>path.replaceAll('\\','/').startsWith(resolve(projectRoot,'.codex-local').replaceAll('\\','/')+'/')}},
+  optimizeDeps: {entries: ['index.html'],include:['hyphen/ru/index.js']},
+  server: {port: 8080, strictPort: true,watch:{ignored:path=>['.codex-local','test-output'].some(dir=>path.replaceAll('\\','/').startsWith(resolve(projectRoot,dir).replaceAll('\\','/')+'/'))}},
   preview: {port: 8080, strictPort: true},
   esbuild: {jsx: 'automatic'},
   worker: {format: 'es'},

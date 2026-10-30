@@ -1,0 +1,138 @@
+{
+  "googlePairs": {
+    "realGoogleInference": true,
+    "model": "gemini-3.5-flash-lite",
+    "sourcePages": 6,
+    "configuredServerKeys": 1,
+    "maxParallel": 1,
+    "packets": [
+      {
+        "pages": [
+          1,
+          2
+        ],
+        "images": 2
+      },
+      {
+        "pages": [
+          3,
+          4
+        ],
+        "images": 2
+      },
+      {
+        "pages": [
+          5,
+          6
+        ],
+        "images": 2
+      }
+    ],
+    "observedRequests": [
+      {
+        "slot": 0,
+        "httpStatus": 200,
+        "phase": "done"
+      },
+      {
+        "slot": 0,
+        "httpStatus": 200,
+        "phase": "done"
+      },
+      {
+        "slot": 0,
+        "httpStatus": 200,
+        "phase": "done"
+      }
+    ],
+    "provenance": "The browser harness passed packet order, two-image payload, three HTTP200 response and zero browser-error assertions. Its final expectation of three distinct server keys failed because the actual deployment has one configured key; this read-only audit confirms the actual key configuration and responses."
+  },
+  "googleBlocks": {
+    "realGoogleInference": true,
+    "model": "gemini-3.5-flash-lite",
+    "sourcePages": 6,
+    "sheets": 1,
+    "blocks": 6,
+    "request": {
+      "status": 200,
+      "usage": {
+        "promptTokenCount": 1712,
+        "candidatesTokenCount": 339,
+        "totalTokenCount": 2051,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 656
+          },
+          {
+            "modality": "IMAGE",
+            "tokenCount": 1056
+          }
+        ],
+        "serviceTier": "standard"
+      },
+      "finishReason": "STOP"
+    },
+    "browserErrors": []
+  },
+  "miganBrowser": {
+    "realNeuralInference": true,
+    "reusedCalls": 0,
+    "reusedLayouts": 1,
+    "methods": [
+      "migan"
+    ],
+    "unpainted": 0,
+    "layouts": [
+      {
+        "uid": "P1_B1",
+        "font": "comic-relief",
+        "fontSize": 24,
+        "lines": 1,
+        "color": "#151515",
+        "backgroundLuma": 238,
+        "fallback": false,
+        "fits": true
+      }
+    ],
+    "execution": {
+      "model": "MI-GAN-512-Places2",
+      "provider": "wasm",
+      "threads": 1,
+      "calls": 1,
+      "startupMs": 1599.9000000059605,
+      "waitForSessionMs": 1599.9000000059605,
+      "inferenceMs": 1555.800000011921,
+      "totalMs": 3157.800000011921,
+      "inputSizes": [
+        [
+          153,
+          79
+        ]
+      ]
+    },
+    "maskBytes": 2854,
+    "outsideChanges": 0
+  },
+  "moebiusNativeCPU": {
+    "actualNeuralInference": true,
+    "model": "Moebius-0.22B",
+    "provider": "CPUExecutionProvider",
+    "browserWebGPU": false,
+    "inferenceRect": {
+      "x": 56,
+      "y": 0,
+      "w": 87,
+      "h": 230
+    },
+    "inferenceMs": 53167.73,
+    "maskedPixels": 5534,
+    "changedInsideMask": 5518,
+    "outsideMaskChanges": 0
+  },
+  "moebiusBrowserWebGPU": {
+    "completed": false,
+    "reason": "GPU buffer allocation failed; no browser WebGPU performance claim"
+  },
+  "phoneHardwareBenchmark": false
+}

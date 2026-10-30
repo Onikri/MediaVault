@@ -256,3 +256,9 @@ Ruslan Display, Marck Script, Press Start 2P and PT Serif are distributed under 
 The owner can explicitly select Gemini models. Gemini API billing and project quotas apply separately from a Google AI Pro subscription. No paid model is used as an invisible fallback from Gemma.
 
 Moebius uses a separate `onnxruntime-web-moebius` package alias pinned to ONNX Runtime Web 1.27.0 (MIT), matching the upstream lockfile. Its WASM/MJS assets and license are bundled separately under `lmt/moebius-ort/`; detector and LaMa runtime versions are unchanged.
+
+### MI-GAN and Russian hyphenation
+
+- MI-GAN, Picsart AI Research / Andranik Sargsyan: https://github.com/Picsart-AI-Research/MI-GAN . Code and author-provided weights are MIT; both original notices are in `lmt/licenses/MI-GAN-*-MIT.txt`. The author-linked ONNX pipeline is pinned to `andraniksargsyan/migan` revision `406830d0fa60666da0071c342ad2fbc8f30c5c64`, `migan_pipeline_v2.onnx`, SHA-256 `6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b`. Weights are not redistributed in Git or Pages. The browser adapter performs actual ONNX inference with the official uint8 NCHW/inverted-mask contract.
+- `hyphen` 1.14.1, Yevhen Tiurin, ISC: https://github.com/ytiurin/hyphen . Only the Russian pattern module is bundled for canvas line breaking. Original notice: `lmt/licenses/hyphen-ISC.txt`.
+- The chapter pipeline, cleanup/renderer integration and worker changes remain published as corresponding integration source alongside the AGPL Libre Manga Translator attribution.

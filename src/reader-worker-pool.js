@@ -9,7 +9,10 @@ export function rendererPool({create,delay=120000,schedule=setTimeout,cancel=cle
   clear,
  };
 }
-const pool=rendererPool({create:()=>new Worker(new URL('./manga-canvas.worker.js',import.meta.url),{type:'module'})});
-globalThis.addEventListener?.('pagehide',()=>pool.clear());
-export const acquireRenderer=()=>pool.acquire();
-export const releaseRenderer=(worker,busy)=>pool.release(worker,busy);
+const create=()=>new Worker(new URL('./manga-canvas.worker.js',import.meta.url),{type:'module'});
+// A warm inpainting model must never be handed to the lightweight detector
+// worker, which would cause the next cleanup worker to load a second copy.
+const pools={worker:rendererPool({create}),prepareWorker:rendererPool({create}),cleanWorker:rendererPool({create})};
+globalThis.addEventListener?.('pagehide',()=>Object.values(pools).forEach(pool=>pool.clear()));
+export const acquireRenderer=(role='worker')=>pools[role].acquire();
+export const releaseRenderer=(worker,busy,role='worker')=>pools[role].release(worker,busy);

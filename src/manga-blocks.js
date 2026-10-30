@@ -10,7 +10,7 @@ export function readingOrder(regions,direction='rtl'){
 export function linkPageBlocks(pages,{direction='rtl',webtoon=false}={}){
  const groups=[],byId=new Map();
  for(const page of pages)for(const r of readingOrder(page.regions,direction)){
-  const part={page:page.page,id:r.id,bbox:[...r.bbox],width:page.width,height:page.height};
+  const part={page:page.page,id:r.id,bbox:[...r.bbox],width:page.width,height:page.height,layout_bbox:r.layout_bbox||r.bbox,bubble_bbox:r.bubble_bbox};
   const group={id:r.id,parts:[part]};groups.push(group);byId.set(r.id,group);
  }
  if(webtoon)for(let n=0;n<pages.length-1;n++){
@@ -35,26 +35,28 @@ export function linkPageBlocks(pages,{direction='rtl',webtoon=false}={}){
  }return groups;
 }
 export function packBlockSheets(groups,limits=BLOCK_LIMITS){
- const sheets=[];let sheet;
- const fresh=(w=limits.width,h=limits.height)=>{sheet={id:'S'+(sheets.length+1),page:sheets.length+1,width:w,height:h,inputMode:'blocks',detector:'algorithmic-blocks',regions:[],placements:[],x:limits.gap,y:limits.gap,rowH:0};sheets.push(sheet);};
- for(const group of groups){const w=Math.ceil(group.width),h=Math.ceil(group.height),slotH=h+limits.label;
-  if(w+2*limits.gap>4096||slotH+2*limits.gap>8192||w*h>limits.pixels)throw Error('Текстовый блок слишком велик для читаемого листа. Раздели исходную страницу.');
-  if(!sheet)fresh(Math.max(limits.width,w+2*limits.gap),Math.max(limits.height,slotH+2*limits.gap));
-  if(sheet.x+w+limits.gap>sheet.width){sheet.x=limits.gap;sheet.y+=sheet.rowH+limits.gap;sheet.rowH=0;}
-  if(sheet.regions.length>=limits.regions||sheet.y+slotH+limits.gap>sheet.height)fresh(Math.max(limits.width,w+2*limits.gap),Math.max(limits.height,slotH+2*limits.gap));
-  const box=[sheet.x,sheet.y+limits.label,sheet.x+w,sheet.y+slotH];
-  sheet.regions.push({id:group.id,bbox:box});sheet.placements.push({group,box});sheet.x+=w+limits.gap;sheet.rowH=Math.max(sheet.rowH,slotH);
+ const sheets=[];let sheet,free=[];
+ const fresh=(w,h)=>{sheet={id:'S'+(sheets.length+1),page:sheets.length+1,width:Math.max(limits.width,w+2*limits.gap),height:Math.max(limits.height,h+2*limits.gap),inputMode:'blocks',regions:[],placements:[],usedY:limits.gap};sheets.push(sheet);free=[{x:limits.gap,y:limits.gap,w:sheet.width-2*limits.gap,h:sheet.height-2*limits.gap}];};
+ for(const group of groups){
+  const w=Math.ceil(group.width),h=Math.ceil(group.height)+limits.label;
+  if(w+2*limits.gap>4096||h+2*limits.gap>8192||w*h>limits.pixels)throw Error('Текстовый блок слишком велик для читаемого листа. Раздели исходную страницу.');
+  if(!sheet)fresh(w,h);
+  let candidates=free.map((r,i)=>({...r,i})).filter(r=>r.w>=w&&r.h>=h).sort((a,b)=>a.y-b.y||a.w*a.h-b.w*b.h||a.x-b.x);
+  if(sheet.regions.length>=limits.regions||!candidates.length){fresh(w,h);candidates=[{...free[0],i:0}];}
+  const r=candidates[0];free.splice(r.i,1);
+  const right=r.w-w-limits.gap,bottom=r.h-h-limits.gap;
+  if(right>0)free.push({x:r.x+w+limits.gap,y:r.y,w:right,h:r.h});
+  if(bottom>0)free.push({x:r.x,y:r.y+h+limits.gap,w,h:bottom});
+  const box=[r.x,r.y+limits.label,r.x+w,r.y+h];sheet.regions.push({id:group.id,bbox:box});sheet.placements.push({group,box});sheet.usedY=Math.max(sheet.usedY,box[3]+limits.gap);
  }
- // Crop unused white paper. No raster rescaling and no fixed page count.
- for(const s of sheets){s.height=s.y+s.rowH+limits.gap;delete s.x;delete s.y;delete s.rowH;}
- return sheets;
+ for(const s of sheets){s.height=s.usedY;delete s.usedY;}return sheets;
 }
 export function unpackBlockTranslations(translated,sheets,pages){
  const expected=new Map(sheets.flatMap(s=>s.placements.map(p=>[p.group.id,p.group]))),rows=new Map();
  for(const sheet of translated)for(const r of sheet.regions){if(!expected.has(r.uid)||rows.has(r.uid))throw Error('Ответ не совпадает с ID блоков. Оригинал сохранён.');rows.set(r.uid,r);}
  if(rows.size!==expected.size)throw Error('Переведены не все блоки. Оригинал сохранён.');
  const result=new Map(pages.map(p=>[p.page,{page:p.page,width:p.width,height:p.height,regions:[],detected:{width:p.width,height:p.height,regions:p.regions.map(r=>({id:r.id,bbox:r.bbox})),seams:[]},timings:{detectionMs:p.detectionMs,ocrMs:0}}]));
- for(const [id,group]of expected){const row=rows.get(id);for(const part of group.parts){const page=result.get(part.page);page.regions.push({...row,uid:part.id,text_bbox:part.bbox,layout_bbox:part.crop,...(group.parts.length>1?{flow:{id,width:group.width,height:group.height,offsetY:part.offsetY}}:{})});if(group.parts.length>1)page.detected.seams.push({id,parts:group.parts.map(p=>({page:p.page,bbox:p.bbox}))});}}
+ for(const [id,group]of expected){const row=rows.get(id);for(const part of group.parts){const page=result.get(part.page);page.regions.push({...row,uid:part.id,text_bbox:part.bbox,layout_bbox:part.layout_bbox||part.bbox,...(part.bubble_bbox?{bubble_bbox:part.bubble_bbox}:{}),...(group.parts.length>1?{flow:{id,width:group.width,height:group.height,offsetY:part.offsetY}}:{})});if(group.parts.length>1)page.detected.seams.push({id,parts:group.parts.map(p=>({page:p.page,bbox:p.bbox}))});}}
  return [...result.values()];
 }
 export async function paintBlockSheets(sheets,pages){
@@ -65,7 +67,7 @@ export async function paintBlockSheets(sheets,pages){
     ctx.fillStyle='#111';ctx.font='16px sans-serif';ctx.textBaseline='bottom';ctx.fillText(group.id+(group.parts.length>1?' · joined':''),box[0],box[1]-4);
     ctx.strokeStyle='#999';ctx.lineWidth=1;ctx.strokeRect(box[0]-1,box[1]-1,group.width+2,group.height+2);
    }
-   const blob=await canvas.convertToBlob({type:'image/png'}),bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));sheet.image=btoa(binary);sheet.mime=blob.type;sheet.sentWidth=sheet.width;sheet.sentHeight=sheet.height;
+   const blob=await canvas.convertToBlob({type:'image/png'}),bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));sheet.detector=pages[0]?.detector||'local';sheet.image=btoa(binary);sheet.mime=blob.type;sheet.sentWidth=sheet.width;sheet.sentHeight=sheet.height;
   }return sheets;
  }finally{for(const bitmap of bitmaps.values())bitmap.close();}
 }

@@ -13,7 +13,7 @@ MODELS=('gemma-4-31b-it','gemma-4-26b-a4b-it')
 GOOGLE_MODELS=('gemini-3.5-flash-lite',*MODELS,'gemini-3.1-flash-lite','gemini-2.5-flash-lite')
 PROMPT=(Path(__file__).with_name('gemma-system.md')).read_text('utf-8')
 VERSION=hashlib.sha256(PROMPT.encode()).hexdigest()[:16]
-STYLES=['standard_comic','bold_scream','handwritten_sloppy','serif_serious','digital_box','sfx_art']
+STYLES=['standard_comic','bold_scream','handwritten_sloppy','serif_serious','digital_box','sfx_art','handwritten_soft','handwritten_narrow']
 SPEECH=['casual_slang','neutral_conversational','formal_business','archaic_noble','panicked_broken']
 
 class Region(BaseModel):
