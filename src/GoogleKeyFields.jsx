@@ -7,7 +7,7 @@ export default function GoogleKeySettings({scope,onApply,onSaveServer,service,se
  const [remember,setRemember]=useState(()=>remembersDeviceKey(scope)),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
  useEffect(()=>{let closed=false;
   if(server)service?.request('/reader/google/keys').then(value=>{if(!closed){setStatus(value);setProjects([0,1,2].map(i=>value.slots?.find(s=>s.slot===i)?.project||''));}}).catch(()=>{if(!closed)setMessage('Не удалось загрузить настройки ключей с Oracle.');});
-  else restoreDirectKeys(scope).then(()=>{if(!closed&&!dirty.current)setKeys([0,1,2].map(i=>directKey(keySlotScope(scope,i))));});
+  else restoreDirectKeys(scope).then(()=>{if(!closed&&!dirty.current){setKeys([0,1,2].map(i=>directKey(keySlotScope(scope,i))));setRemember([0,1,2].some(i=>remembersDeviceKey(keySlotScope(scope,i))));}});
   return()=>{closed=true;};
  },[scope,server,service?.server]);
  async function save(){setBusy(true);setMessage('');try{

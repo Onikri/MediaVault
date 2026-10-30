@@ -72,3 +72,7 @@ test('background cleanup follows a changed focus after its active page finishes,
  c.canvasTask=async m=>{const n=Number(m.page.regions[0].uid.match(/P(\d+)/)[1])-1;cleaned.push(n);if(n===0)await gate;return{regions:[],cleanedImage:new ArrayBuffer(0)};};
  try{c.preparation.start();for(let n=0;n<100&&!cleaned.length;n++)await tick();c.focus(10);release();for(let n=0;n<100&&cleaned.length<16;n++)await tick();assert.deepEqual(cleaned.slice(0,5),[0,10,11,12,13]);assert.equal(c.preparation.cleanDone.size,16);}finally{release();c.close();}
 });
+
+test('diagnostics preserve the original personal slot when only slot three is configured',()=>{
+ const scope='sparse-slots';setDirectKey(keySlotScope(scope,2),'fixture-third');const c=new DirectChapter({entries:[],scope,keyScope:scope,config:translationConfig({engine:'direct'})});try{assert.equal(c.personalSlot('fixture-third'),2);}finally{c.close();setDirectKey(keySlotScope(scope,2),'');}
+});

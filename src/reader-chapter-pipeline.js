@@ -90,7 +90,7 @@ export async function drainOrderedChapter(c){
     const available=c.serverSlots.length?c.serverSlots.map(slot=>'oracle-slot:'+slot):c.getKey===directKey?await restoreDirectKeys(c.keyScope):[c.getKey(c.keyScope)];
     if(!available.length||!available.some(Boolean))throw Error('Добавь ключ Google в настройках перевода.');
     while(!key){for(let n=0;n<available.length;n++){const i=((c.keyCursor||0)+n)%available.length;if(available[i]&&!c.keyBusy.has(available[i])&&(!priority||!c.priorityKey||available[i]===c.priorityKey)&&(priority||available[i]!==c.priorityKey)){key=available[i];c.keyCursor=(i+1)%available.length;break;}}if(!key){if(!inFlight.size)throw Error('Нет свободного ключа перевода');await Promise.race(inFlight);}}
-    if(priority)c.priorityKey=key;c.keyBusy.add(key);const slot=available.indexOf(key);for(const job of active){job.keySlot=c.serverSlots.length?c.serverSlots[slot]+1:slot+1;job.serverKey=!!c.serverSlots.length;}
+    if(priority)c.priorityKey=key;c.keyBusy.add(key);const slot=available.indexOf(key);for(const job of active){job.keySlot=c.serverSlots.length?c.serverSlots[slot]+1:c.personalSlot(key)+1;job.serverKey=!!c.serverSlots.length;}
     await c.pacer.reserve(key,c.controller.signal);
     if(epoch!==c.priorityEpoch){c.keyBusy.delete(key);key=null;for(const job of group)job.state='queued';continue;}
     const local=sources.filter(p=>active.some(j=>j.index+1===p.page));

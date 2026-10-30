@@ -1,7 +1,7 @@
 import {acquireRenderer,releaseRenderer} from './reader-worker-pool.js';
 import {translateLmt} from './lmt-client.js';
 import {callDirectGoogle} from './manga-direct-api.js';
-import {directKey,restoreDirectKey,directKeys,restoreDirectKeys} from './manga-direct-key.js';
+import {directKey,restoreDirectKey,directKeys,restoreDirectKeys,keySlotScope} from './manga-direct-key.js';
 import {DIRECT_DETECTORS} from './manga-direct-profiles.js';
 import {compareDirectInputs} from './manga-direct-comparison.js';
 import {translationCacheKey,getTranslation,putTranslation} from './translation-cache.js';
@@ -37,6 +37,7 @@ export class DirectChapter{
   if(!background&&this.config.directInput!=='blocks'&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(3,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n))this.request(n,null,true);}
   queueMicrotask(()=>this.drain());return job;
  }
+ personalSlot(key){return this.getKey===directKey?([0,1,2].find(i=>directKey(keySlotScope(this.keyScope,i))===key)??0):0;}
  batchSize(){return this.config.directBatchPages===1?1:this.config.directBatchPages===3?3:2;}
  packetRange(index){let count=this.config.chapterPipeline===false?1:this.config.directInput==='blocks'?9:this.batchSize();if(count===2&&this.entries.length>1&&this.entries.length%2&&index>=this.entries.length-3)return{count:3,start:this.entries.length-3};return{count,start:Math.floor(index/count)*count};}
  async jsonCacheId(blob,index){
