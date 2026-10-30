@@ -77,6 +77,16 @@ class BridgeTests(unittest.TestCase):
                 with self.assertRaisesRegex(SourceError,'WebView') as failure:client.get('/source/list')
                 self.assertNotIn('secret',str(failure.exception))
                 response.close.assert_called_once();client.close()
+    def test_storage_errors_do_not_recommend_reopening_a_healthy_session(self):
+        with tempfile.TemporaryDirectory() as directory:
+            auth=Path(directory)/'auth';auth.write_text(json.dumps({'username':'fixture','password':'fixture-private'}))
+            with patch.dict(os.environ,{'SUWAYOMI_AUTH_FILE':str(auth)}),patch('suwayomi_bridge.requests.Session') as session:
+                client=bridge.Client();response=session.return_value.get.return_value;response.status_code=500
+                for message in ['No space left on device','java.io.IOException: Disk quota exceeded']:
+                    response.iter_content.return_value=iter([(message+' private-cookie=secret').encode()])
+                    with self.assertRaisesRegex(SourceError,'заполнен кэш') as failure:client.get('/manga/1/chapter/2/page/0',image=True)
+                    self.assertNotIn('secret',str(failure.exception));self.assertNotIn('HTTP 500',str(failure.exception))
+                client.close()
     def test_identifiers_are_not_an_open_proxy(self):
         good='https://media.example/__manga/suwayomi/m/1/c/4/p/0'
         self.assertEqual(bridge.parse_reference(good),(1,4,0))

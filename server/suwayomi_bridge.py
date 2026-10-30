@@ -56,6 +56,7 @@ class Client:
                     raw+=block[:4096-len(raw)]
                     if len(raw)>=4096:break
                 text=raw.decode('utf-8',errors='replace').casefold()
+                if any(v in text for v in ['no space left on device','disk quota exceeded']):raise SourceError('На сервере источников заполнен кэш страниц. Требуется очистка кэша; повторное открытие главы не поможет.')
                 if 'cef is disabled' in text:raise SourceError('Для этого расширения на сервере отключён браузер WebView. Требуется восстановить среду Suwayomi.')
                 if any(v in text for v in ['no chapters found','no chapter found']):raise SourceError('Источник отвечает, но не опубликовал открытые главы этого тайтла на выбранном языке.')
                 raise SourceError(f'Ошибка источника (HTTP {response.status_code}). Не удалось получить '+('страницу главы.' if image else 'данные читалки.'))

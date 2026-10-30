@@ -29,7 +29,7 @@ def browser_overlay(original):
 def main():
     if os.geteuid()!=0:raise RuntimeError('Run with sudo on the existing VM.')
     root=Path('/opt/mediavault-suwayomi')
-    backup=root/('browser-backup-'+time.strftime('%Y%m%dT%H%M%SZ',time.gmtime()))
+    backup=root/'.codex-local/backups'/('browser-'+time.strftime('%Y%m%dT%H%M%SZ',time.gmtime()))
     backup.mkdir(parents=True,mode=0o700)
     log=(backup/'operation.log').open('a')
     def get(args):return subprocess.check_output(args,text=True,stderr=log).strip()
