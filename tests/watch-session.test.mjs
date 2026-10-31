@@ -32,3 +32,24 @@ test('source fallback keeps the chosen studio and exact episode',()=>{
  const voice={variants:[{id:'x',player:'Kodik',episodes:[{number:1}]},{id:'y',player:'Alloha',episodes:[{number:7}]},{id:'z',player:'Kodik',episodes:[{number:7}]}]};
  assert.deepEqual(variantsFor(voice,7,new Set(['y'])).map(v=>v.id),['z','x']);
 });
+
+import {bestQualityRow,qualityHeights,streamBufferPolicy,contiguousBufferEnd} from '../src/watch-quality.js';
+test('quality matching compares real mirrors and keeps chosen audio separate from best video',()=>{
+ const rows=[{voiceId:'a',variant:{id:'kodik'},qualities:[720,480]},{voiceId:'a',variant:{id:'alloha'},qualities:[1440,1080,480]},{voiceId:'sub',variant:{id:'raw'},qualities:[2160,1080]}];
+ assert.equal(bestQualityRow(rows,{voiceId:'a'}).variant.id,'alloha');
+ assert.equal(bestQualityRow(rows,{voiceId:'a',quality:'720'}).variant.id,'kodik');
+ assert.equal(bestQualityRow(rows,{voiceId:'a',anyVoice:true}).voiceId,'sub');
+ assert.equal(bestQualityRow(rows,{voiceId:'a',quality:'2160'}),undefined);
+ assert.equal(bestQualityRow(rows,{voiceId:'a',failed:new Set(['alloha'])}).variant.id,'kodik');
+ assert.deepEqual(qualityHeights(rows),[2160,1440,1080,720,480]);
+});
+test('ahead buffering respects data saver, device memory, preview isolation and independent audio',()=>{
+ const normal=streamBufferPolicy(),small=streamBufferPolicy({memory:4}),saver=streamBufferPolicy({saveData:true}),preview=streamBufferPolicy({preview:true}),audio=streamBufferPolicy({audioOnly:true});
+ assert.equal(normal.maxBufferLength,120);assert.equal(normal.maxMaxBufferLength,180);assert.equal(normal.maxBufferSize,120e6);
+ assert.equal(small.maxBufferLength,60);assert.ok(saver.maxMaxBufferLength<=30);assert.equal(preview.maxMaxBufferLength,12);assert.equal(preview.backBufferLength,0);
+ assert.equal(audio.maxBufferLength,120);assert.ok(audio.maxBufferSize<=40e6);assert.ok(normal.abrBandWidthUpFactor<normal.abrBandWidthFactor);
+});
+test('buffer display counts the current continuous range rather than disconnected future seek ranges',()=>{
+ const ranges={length:2,start:i=>[0,100][i],end:i=>[30,130][i]};
+ assert.equal(contiguousBufferEnd(ranges,12),30);assert.equal(contiguousBufferEnd(ranges,50),50);assert.equal(contiguousBufferEnd(ranges,110),130);
+});

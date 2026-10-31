@@ -10,6 +10,24 @@ from run_import import validate_job,run_job
 
 
 class SourceQualityTests(unittest.TestCase):
+    def test_metadata_cache_coalesces_simultaneous_probes_and_returns_independent_lists(self):
+        import threading,time
+        from concurrent.futures import ThreadPoolExecutor
+        from unittest.mock import patch
+        import source_quality
+        entered=threading.Event()
+        def probe(*args,**kwargs):
+            entered.set();time.sleep(.05)
+            return {'qualities':[2160,1080],'best':2160,'original':False,'streamCount':2}
+        with patch('source_quality.inspect_qualities',side_effect=probe) as mocked:
+            with ThreadPoolExecutor(3) as pool:
+                pending=[pool.submit(source_quality.cached_qualities,'https://unique-cache.example.com/film',referer='https://catalog.example.com/') for _ in range(3)]
+                results=[p.result() for p in pending]
+            self.assertEqual(mocked.call_count,1)
+            results[0]['qualities'].clear()
+            self.assertEqual(results[1]['qualities'],[2160,1080])
+            self.assertNotIn('https://',str(results))
+
     def test_quality_inspection_preserves_public_parent(self):
         from unittest.mock import Mock
         resolver=Mock();resolver.http=object();resolver.resolve.return_value=Page(streams=[{'quality':2160,'type':'mp4','url':'https://cdn.example.com/4k.mp4'}])

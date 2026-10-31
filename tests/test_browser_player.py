@@ -9,6 +9,24 @@ from browser_player import _extract, _render, observed_streams, browser_destinat
 from source_parser import SourceError
 
 class BrowserPlayerTests(unittest.TestCase):
+    def test_immediate_playback_reuses_quality_probe_without_mixing_translations_or_mutable_results(self):
+        from unittest.mock import patch
+        import browser_player
+        url='https://embed.example.com/cache-contract?translation=66'
+        source={'url':'https://cdn.example.com/real.m3u8','type':'hls','quality':1080}
+        async def probe(*args,metadata=None,**kwargs):
+            metadata['subtitles']=[{'url':'https://cdn.example.com/ru.vtt'}]
+            return [dict(source)]
+        with patch('browser_player._extract',side_effect=probe) as mocked:
+            one=browser_player.extract(url,'https://publisher.example.com/')
+            one[0]['quality']=1
+            two=browser_player.extract(url,'https://publisher.example.com/',details=True)
+            self.assertEqual(two['streams'][0]['quality'],1080)
+            self.assertEqual(len(two['subtitles']),1)
+            self.assertEqual(mocked.call_count,1)
+            browser_player.extract(url+'&episode=2','https://publisher.example.com/')
+            self.assertEqual(mocked.call_count,2)
+
     def test_active_quality_map_validates_each_url_and_never_retains_credentials(self):
         values={'2160':'https://cdn.example.com/4k.m3u8','480':'https://cdn.example.com/480.m3u8',
                 '1080':'https://127.0.0.1/private.m3u8','720':'javascript:alert(1)','bad':'https://cdn.example.com/fake.mp4'}

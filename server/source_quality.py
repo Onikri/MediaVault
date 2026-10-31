@@ -2,6 +2,36 @@
 from source_parser import PublicHttp,Resolver,SourceError
 from media_download import expand_stream_qualities
 import time
+import threading
+from collections import OrderedDict
+
+_cache=OrderedDict()
+_pending={}
+_lock=threading.Lock()
+
+def cached_qualities(url,*,referer=None):
+    """Short-lived metadata cache, coalesced per published source, never CDN links."""
+    key=(url,referer)
+    while True:
+        with _lock:
+            old=_cache.get(key)
+            if old and old[0]>time.monotonic():
+                _cache.move_to_end(key)
+                return {**old[1],'qualities':list(old[1]['qualities'])}
+            waiting=_pending.get(key)
+            if waiting is None:
+                event=threading.Event();_pending[key]=event
+                break
+        if not waiting.wait(50):raise SourceError('Проверка качества ещё выполняется. Повтори позднее.')
+    try:
+        result=inspect_qualities(url,**({'referer':referer} if referer else {}))
+        with _lock:
+            _cache[key]=(time.monotonic()+120,result)
+            while len(_cache)>128:_cache.popitem(last=False)
+        return {**result,'qualities':list(result['qualities'])}
+    finally:
+        with _lock:
+            _pending.pop(key,None);event.set()
 
 def inspect_qualities(url,*,referer=None,http=None,resolver=None):
     own=http is None and resolver is None

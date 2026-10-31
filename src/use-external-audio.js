@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import useVideoStream from './use-video-stream.js';
 export default function useExternalAudio(main,source,type,volume,muted,offset=0,onError){
  const ref=useRef(null),[ready,setReady]=useState(false),report=useRef(onError);report.current=onError;
- useVideoStream(ref,source,type,error=>report.current?.(error),{preview:true});
+ useVideoStream(ref,source,type,error=>report.current?.(error),{audioOnly:true});
  useEffect(()=>{const video=main.current,audio=ref.current;setReady(false);if(!source||!video||!audio)return;
   let closed=false;
   const seek=()=>{if(Number.isFinite(audio.duration)&&Math.abs(audio.currentTime-video.currentTime-offset)>.4)try{audio.currentTime=Math.max(0,Math.min(audio.duration,video.currentTime+offset));}catch{}};

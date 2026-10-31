@@ -10,11 +10,15 @@ import re
 import shutil
 import threading
 import time
+import copy
+from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import urlsplit
 from source_parser import SourceError, public_url, playback_headers, BLOCKED
 
 _slots=threading.BoundedSemaphore(1)
+_playback_cache=OrderedDict()
+_cache_lock=threading.Lock()
 
 
 def browser_paths():
@@ -216,12 +220,30 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
 def extract(url,referer=None,*,details=False):
     if os.environ.get('MEDIA_VAULT_BROWSER_PLAYERS','1')!='1':
         raise SourceError('Динамические плееры отключены на этом сервере.')
-    if not _slots.acquire(timeout=10):raise SourceError('Серверный браузер занят другим плеером. Повтори позднее.')
+    key=(url,referer)
+    def cached():
+        with _cache_lock:
+            old=_playback_cache.get(key)
+            if old and old[0]>time.monotonic():
+                _playback_cache.move_to_end(key)
+                return copy.deepcopy(old[1])
+    value=cached()
+    if value is not None:return value if details else value['streams']
+    if not _slots.acquire(timeout=15):raise SourceError('Серверный браузер занят другим плеером. Повтори позднее.')
     try:
+        value=cached()
+        if value is not None:return value if details else value['streams']
         try:
-            metadata={} if details else None
+            metadata={}
             streams=asyncio.run(_extract(url,referer,metadata=metadata))
-            return {'streams':streams,**metadata} if details else streams
+            value={'streams':streams,**metadata}
+            if streams:
+                with _cache_lock:
+                    # Short signed-source lifetime, VM memory only. Quality
+                    # inspection and immediate playback share one browser run.
+                    _playback_cache[key]=(time.monotonic()+45,copy.deepcopy(value))
+                    while len(_playback_cache)>64:_playback_cache.popitem(last=False)
+            return value if details else streams
         except SourceError:raise
         except Exception:raise SourceError('Не удалось открыть динамический плеер на сервере.') from None
     finally:_slots.release()

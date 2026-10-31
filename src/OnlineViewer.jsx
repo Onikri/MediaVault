@@ -10,6 +10,7 @@ import {onlineEpisodeId} from './watch-session.js';
 export default function OnlineViewer({entries,initial,kind,title,service,userId,onClose,onEntryChange,language='ru',dub='',metadata,quality='best',inline=false,sourceUrl,identity,voiceId,controls,onPreview,previews,onUnavailable}){
  useEffect(()=>()=>stopLmt(),[]);
  const [playbackQuality,setPlaybackQuality]=useState(quality);
+ useEffect(()=>setPlaybackQuality(quality),[quality]);
  const unavailable=useRef(onUnavailable);unavailable.current=onUnavailable;
  const [current,setCurrent]=useState(initial),[media,setMedia]=useState(null),[busy,setBusy]=useState(true),[error,setError]=useState('');
  const [retry,setRetry]=useState(0),[elapsed,setElapsed]=useState(0),[full,setFull]=useState(false),[fullscreenError,setFullscreenError]=useState('');

@@ -64,6 +64,9 @@
 .watch-episode-grid .title-episode-card>strong{font-size:11px;margin-top:7px}.watch-episode-grid .title-episode-card>small{font-size:10px;color:#8f9baa}
 .watch-episode-grid .title-episode-card[aria-pressed=true] .title-episode-art{outline:2px solid var(--title-accent,#e7b28d);outline-offset:-2px}
 .watch-personal-note{font-size:10px;color:#7e8b99;margin-top:16px}
+.watch-quality-note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:-4px 0 16px;color:#9daab8;font-size:11px}
+.watch-quality-note label{display:flex;gap:8px;align-items:center;cursor:pointer}.watch-quality-note input{accent-color:var(--title-accent,#e7b28d)}
+.watch-selection{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(120px,1fr)}.watch-selection label{width:100%}
 .online-watch .online-viewer-inline{margin:0;scroll-margin-top:110px}.online-watch .online-viewer-inline>header{padding:10px 12px}
 .online-watch .online-viewer-inline>header strong{display:none}.online-watch .online-viewer-inline>header small{margin:0;font-size:11px}
 .online-watch .online-viewer-inline .mv-player-shelf{display:none}.online-watch .mv-player-overview h1{font-size:clamp(17px,2vw,25px)}

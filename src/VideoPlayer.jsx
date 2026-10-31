@@ -14,6 +14,7 @@ import {startNeuralUpscaler} from './neural-upscaler.js';
 import Soundtrack from './Soundtrack.jsx';
 import TimelinePreview from './TimelinePreview.jsx';
 import useVideoStream from './use-video-stream.js';
+import {contiguousBufferEnd} from './watch-quality.js';
 import useEpisodeMusic from './use-episode-music.js';
 import {playMusic} from './music-player.js';
 import {youtubeSearch,spotifySearch} from './music-library.js';
@@ -62,7 +63,7 @@ function VolumeGlyph({value,muted}){
 export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose}){
   const ownRef=useRef(null),canvasRef=useRef(null),stageRef=useRef(null),railRef=useRef(null);
   const videoRef=mediaRef||ownRef;
-  const streaming=useVideoStream(videoRef,source,item.onlineType,onError);
+  const streaming=useVideoStream(videoRef,source,item.onlineType,onError,{quality:onlineControls?.quality||'best'});
   const reducedMotion=useReducedMotion();
   useEffect(()=>{const pause=()=>videoRef.current?.pause();addEventListener('mediavault-music-playing',pause);return()=>removeEventListener('mediavault-music-playing',pause);},[]);
   const [prefs,setPrefs]=useState(getPrefs);
@@ -223,7 +224,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
     setTime(video.currentTime);snapshot.current={time:video.currentTime,duration:video.duration};
     if(onPreview&&previewCaptured.current!==item.id&&video.currentTime>=1){const image=captureEpisodePreview(video);if(image){previewCaptured.current=item.id;onPreview(item.episode,image);}}
     const ranges=video.buffered;
-    if(ranges.length)setBuffered(ranges.end(ranges.length-1));
+    setBuffered(contiguousBufferEnd(ranges,video.currentTime));
     if(prefs.autoSkip){const skip=[effectiveOpening,ending].find(v=>v&&video.currentTime>=v.start&&video.currentTime<v.end-.2);if(skip)seek(skip.end);}
     if(Math.abs(video.currentTime-lastStored.current)>=5){
       lastStored.current=video.currentTime;
@@ -327,8 +328,8 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       <div className="mv-player-ambient" aria-hidden="true"/>
       <div className="mv-player-panorama" aria-hidden="true">{prefs.parallax&&scene.image&&<><img src={scene.image} alt=""/>{scene.near&&<img className="mv-relief-near" src={scene.near} alt=""/>}</>}</div>
       <div className="mv-player-stage">
-        <video ref={videoRef} src={streaming.hls?undefined:source||undefined} crossOrigin="anonymous" playsInline preload="metadata" muted={muted||!!onlineControls?.audio&&!audioError}
-          onLoadedMetadata={loaded} onLoadedData={()=>{const image=captureEpisodePreview(videoRef.current);if(onPreview&&image){previewCaptured.current=item.id;onPreview(item.episode,image);}}} onTimeUpdate={onTime}
+        <video ref={videoRef} src={streaming.hls?undefined:source||undefined} crossOrigin="anonymous" playsInline preload="auto" muted={muted||!!onlineControls?.audio&&!audioError}
+          onLoadedMetadata={loaded} onLoadedData={()=>{const image=captureEpisodePreview(videoRef.current);if(onPreview&&image){previewCaptured.current=item.id;onPreview(item.episode,image);}}} onTimeUpdate={onTime} onProgress={()=>{const v=videoRef.current;if(v)setBuffered(contiguousBufferEnd(v.buffered,v.currentTime));}}
           onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);if(videoRef.current?.readyState>=1)writeProgress(userId,libraryId,item,videoRef.current?.currentTime||0,videoRef.current?.duration);}}
           onDurationChange={loaded} onEnded={ended}
           onError={()=>{if(source)diagnoseVideoFailure({video:videoRef.current,source}).then(message=>onError?.(Error(message))).catch(()=>{});}}
@@ -351,7 +352,8 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       </div>
       <AnimatePresence>
       {settingsOpen&&<PlayerSettings anchor={settingsButton} initialPage={settingsTab} onClose={()=>openPanel('watch')}>{{
-        watch:<div className="mv-player-settings">        <label>Качество{!streaming.levels.length&&onlineControls?.qualities?.length?<select aria-label="Качество" value={onlineControls.quality} onChange={e=>onlineControls.onQuality(e.target.value)}><option value="best">Лучшее · автоматически</option>{onlineControls.qualities.map(q=><option key={q} value={q}>{q}p</option>)}</select>:streaming.levels.length?<select aria-label="Качество" value={streaming.level} onChange={e=>streaming.setLevel(Number(e.target.value))}><option value={-1}>Лучшее · автоматически</option>{streaming.levels.map(l=><option key={l.index} value={l.index}>{l.height}p</option>)}</select>:<select aria-label="Качество" value={item.id} disabled={!episode?.variants.some(v=>v.item.id!==item.id&&v.label===episode.variants.find(x=>x.item.id===item.id)?.label)} onChange={e=>choose(episode.variants.find(v=>v.item.id===e.target.value)?.item,true)}>{episode?.variants.filter(v=>v.item.id===item.id||v.label===episode.variants.find(x=>x.item.id===item.id)?.label).map(v=><option key={v.item.id} value={v.item.id}>{v.item.quality||v.item.resolution||(v.item.id===item.id&&videoRef.current?.videoHeight?videoRef.current.videoHeight+'p':'Исходное')}</option>)}</select>}</label>
+        watch:<div className="mv-player-settings">        <label>Качество{!streaming.levels.length&&onlineControls?.qualities?.length?<select aria-label="Качество" value={onlineControls.quality} onChange={e=>onlineControls.onQuality(e.target.value)}><option value="best">Лучшее · автоматически</option>{onlineControls.qualities.map(q=><option key={q} value={q}>{q}p</option>)}</select>:streaming.levels.length?<select aria-label="Качество" value={streaming.level} onChange={e=>{const value=e.target.value;if(value.startsWith('source:'))onlineControls.onQuality(value.slice(7));else if(value==='-1'&&onlineControls?.quality&&onlineControls.quality!=='best')onlineControls.onQuality('best');else streaming.setLevel(Number(value));}}><option value={-1}>Лучшее · автоматически</option>{streaming.levels.map(l=><option key={l.index} value={l.index}>{l.height}p</option>)}{(onlineControls?.qualities||[]).filter(q=>!streaming.levels.some(l=>l.height===q)).map(q=><option key={'source:'+q} value={'source:'+q}>{q}p</option>)}</select>:<select aria-label="Качество" value={item.id} disabled={!episode?.variants.some(v=>v.item.id!==item.id&&v.label===episode.variants.find(x=>x.item.id===item.id)?.label)} onChange={e=>choose(episode.variants.find(v=>v.item.id===e.target.value)?.item,true)}>{episode?.variants.filter(v=>v.item.id===item.id||v.label===episode.variants.find(x=>x.item.id===item.id)?.label).map(v=><option key={v.item.id} value={v.item.id}>{v.item.quality||v.item.resolution||(v.item.id===item.id&&videoRef.current?.videoHeight?videoRef.current.videoHeight+'p':'Исходное')}</option>)}</select>}</label>
+        <p className="player-setting-help" role="status">Загружено вперёд: {Math.max(0,Math.round(buffered-time))} с · качество в авто снижается при нехватке скорости.</p>
         {onlineControls?.voices?.length>0&&<label>Озвучка<select aria-label="Озвучка в плеере" value={onlineControls.voiceId||''} onChange={e=>onlineControls.onVoice(e.target.value)}>{onlineControls.voices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label>}
         {onlineControls?.audio&&<><p className="player-setting-help">Видео сохраняет выбранное качество. Звук синхронизируется из отдельного потока; он также использует сеть.</p><label>Сдвиг звука · {Number(prefs.audioOffset)||0} с<input aria-label="Сдвиг звука" type="range" min="-30" max="30" step="0.1" value={Number(prefs.audioOffset)||0} onChange={e=>changePrefs({audioOffset:Number(e.target.value)})}/></label></>}
         {(onlineControls?.trackBusy||onlineControls?.trackError||audioError)&&<p className="player-setting-help" role="status">{audioError||onlineControls.trackError||'Подключаем дорожку…'}</p>}
