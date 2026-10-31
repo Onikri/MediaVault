@@ -19,8 +19,8 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   const palette=()=>page.evaluate(()=>Object.fromEntries(['canvas','surface','surface-raised','blossom','petal'].map(k=>[k,document.documentElement.style.getPropertyValue('--color-'+k)])));
   const fits=async name=>{await page.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth+1,{},{timeout:2000}).catch(async()=>{console.error(await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1).slice(0,15).map(e=>({c:e.className,w:e.getBoundingClientRect().width,r:e.getBoundingClientRect().right}))));await page.screenshot({path:path.join(dir,'overflow-'+width+'.png'),fullPage:true});});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' fits '+width);};
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/blossom-harness.html');
-  await page.locator('.hero-stage h1').waitFor();await page.evaluate(()=>document.fonts.ready);await fits('Home');
-  assert.equal((await palette()).blossom,'#ee3c35');assert.equal(await page.locator('.category-grid .producer-card').count(),5);
+  await page.locator('.hero-stage.is-revealed').waitFor();await page.evaluate(()=>document.fonts.ready);await fits('Home');
+  const defaultDecoration=await page.locator('.studio-shape').first().evaluate(e=>getComputedStyle(e).backgroundImage);assert.equal((await palette()).blossom,'#ee3c35');assert.equal(await page.locator('.category-grid .producer-card').count(),5);
   await page.screenshot({path:path.join(dir,'home-'+width+'.png'),fullPage:true});
   await page.locator('#profileBtn').click();await page.locator('#appearanceSettings').waitFor();
   await page.getByRole('button',{name:'Бордо',exact:true}).click();await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--color-blossom')!=='#ee3c35');
@@ -31,7 +31,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   await page.getByLabel('Изображение фона',{exact:true}).setInputFiles({name:'blue.png',mimeType:'image/png',buffer:Buffer.from(image,'base64')});
   await page.getByRole('button',{name:'Вернуть Blossom',exact:true}).waitFor();
   await page.waitForFunction(()=>{const hex=document.documentElement.style.getPropertyValue('--color-blossom');return parseInt(hex.slice(5,7),16)>parseInt(hex.slice(1,3),16);});
-  const blue=await palette();assert.notEqual(blue.canvas,burgundy.canvas);
+  const blue=await palette();assert.notEqual(blue.canvas,burgundy.canvas);await page.locator('.brand.logo').click();await page.locator('.studio-shape').first().waitFor();await page.locator('.hero-stage.is-revealed').waitFor();assert.notEqual(await page.locator('.studio-shape').first().evaluate(e=>getComputedStyle(e).backgroundImage),defaultDecoration,'Decorative panels follow the whole palette');await page.screenshot({path:path.join(dir,'background-'+width+'.png'),fullPage:true});await page.locator('#profileBtn').click();await page.locator('#appearanceSettings').waitFor();
   await page.reload();await page.getByRole('button',{name:'Вернуть Blossom',exact:true}).waitFor();await page.waitForFunction(seed=>document.documentElement.style.getPropertyValue('--color-blossom')===seed,blue.blossom);
   await page.evaluate(()=>dispatchEvent(new CustomEvent('mediavault:backdrop-palette',{detail:'#d82a3c'})));
   await page.waitForFunction(seed=>document.documentElement.style.getPropertyValue('--color-surface')!==seed,blue.surface);

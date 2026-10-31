@@ -165,3 +165,5 @@ Integration tokens: catalog sidebar 247px; mobile header breakpoint 1000px
 table collection modes remain operable. Player/reader chrome adopts the palette;
 video pixels, manga paper, translation canvases and subtitle colors retain their
 content-specific behavior. All new integration tokens are in design-tokens.json.
+
+Decorative category-panel gradients also follow derived palette roles in custom/background themes; manual Blossom keeps the supplied reference gradient exactly.

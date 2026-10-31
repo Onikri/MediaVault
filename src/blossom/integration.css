@@ -213,3 +213,7 @@ html[data-blossom] .blossom-search-dialog .search-hit strong{overflow:hidden;tex
 html[data-blossom] .blossom-search-dialog .search-poster{background:var(--color-red-deep)}
 html[data-blossom] .blossom-search-dialog .search-footer{flex:none}
 @media(max-width:640px){html[data-blossom] .blossom-search-dialog{top:80px;max-height:calc(100dvh - 100px)}}
+
+/* Keep the supplied artwork treatment in Blossom; tonal decoration follows other themes. */
+html[data-blossom][data-palette-variant=dynamic] .studio-shape{background:radial-gradient(circle at 70% 24%,color-mix(in srgb,var(--color-blossom) 51%,transparent),transparent 44%),linear-gradient(115deg,var(--color-burgundy),var(--color-crimson))}
+html[data-blossom][data-palette-variant=dynamic] .anime-fallback-title{color:var(--color-petal)}
