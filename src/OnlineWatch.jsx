@@ -37,7 +37,7 @@ export default function OnlineWatch({item,profile=item,discovery,service,userId}
    catch(e){signal.throwIfAborted();last=e;}
   }throw last||Error('Эта серия не ответила ни в одном источнике выбранной озвучки.');
  }
- useEffect(()=>{if(!voice)return;const abort=new AbortController();setBusy(true);setError('');
+ useEffect(()=>{if(!voice)return;const abort=new AbortController();setBusy(true);setVariant(null);setError('');
   resolve(voice,episode,abort.signal).then(value=>{if(abort.signal.aborted)return;setEntries(value.entries);setSeasons(value.seasons);setVariant(value.variant);const selected=value.entries.find(e=>Number(e.number)===Number(episode))||value.entries[0];setEpisode(Number(selected.number));persist({voiceId:voice.id,episode:Number(selected.number),season});}).catch(e=>{if(!abort.signal.aborted){setVariant(null);setError(e.message);}}).finally(()=>!abort.signal.aborted&&setBusy(false));
   return()=>abort.abort();
  },[voice?.id,season,attempt,service.server]);

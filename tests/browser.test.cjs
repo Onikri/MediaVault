@@ -470,7 +470,7 @@ async function main() {
   await owner.getByText('Из твоего Drive',{exact:true}).waitFor();
   await owner.getByText(titleFixture.description,{exact:true}).waitFor();
   assert.equal(await owner.locator('.title-hero').getByRole('heading',{name:'Наруто',exact:true}).count(),1);
-  assert.ok(await owner.locator('.title-hero-facts').innerText().then(t=>t.includes('Хаято Датэ')&&t.includes('Манга')));
+  assert.ok(await owner.locator('.title-sidebar .title-facts').innerText().then(t=>t.includes('Хаято Датэ')&&t.includes('Манга')),'Compact header retains director and source in the information card');
   await owner.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
   await owner.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
   await owner.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
