@@ -6,6 +6,7 @@ import './fonts.css';
 import './motion.css';
 import './reference.css';
 import './integration.css';
+import './composition.css';
 // Set the design scope before React mounts, avoiding a legacy-layout first frame.
 if(typeof document!=='undefined')applyPalette(chosenPalette(readAppearance()));
 const ThemeContext=createContext<any>(null);
@@ -25,7 +26,7 @@ export function ThemeProvider({children}:{children:ReactNode}){
 export function AppearanceSettings(){
  const theme=useContext(ThemeContext),[error,setError]=useState(''),[busy,setBusy]=useState(false);if(!theme)return null;
  const {settings,update}=theme;
- return <section className="settings-card appearance-settings" id="appearanceSettings" aria-label="Оформление"><header className="section-head"><div><p className="section-number">BLOSSOM / ОФОРМЛЕНИЕ</p><h2>Твоя палитра<span className="headline-dot">.</span></h2></div><button className="circle-button" aria-label="Сбросить оформление" onClick={()=>update({mode:'manual',preset:'blossom',custom:null})}><RotateCcw size={17}/></button></header>
+ return <section className="settings-card appearance-settings" id="appearanceSettings" aria-label="Оформление"><header className="section-head"><div><p className="section-number">ОФОРМЛЕНИЕ</p><h2>Палитра<span className="headline-dot">.</span></h2></div><button className="circle-button" aria-label="Сбросить оформление" onClick={()=>update({mode:'manual',preset:'blossom',custom:null})}><RotateCcw size={17}/></button></header>
  <div className="appearance-swatches" role="group" aria-label="Палитры интерфейса">{presets.map(p=><button type="button" key={p.id} aria-pressed={settings.mode==='manual'&&!settings.custom&&settings.preset===p.id} onClick={()=>update({mode:'manual',preset:p.id,custom:null})}><span className="swatch" style={{background:p.seed}}><i style={{background:BLOSSOM.canvas}}/><i style={{background:BLOSSOM.petal}}/></span><strong>{p.name}</strong></button>)}</div>
  <label className="appearance-color">Свой основной цвет<input type="color" aria-label="Основной цвет интерфейса" value={settings.custom||presets.find(p=>p.id===settings.preset)?.seed||'#ee3c35'} onChange={e=>update({mode:'manual',custom:e.target.value})}/></label>
  <label className="appearance-auto"><input type="checkbox" checked={settings.mode==='background'} onChange={e=>update({mode:e.target.checked?'background':'manual'})}/><span><strong>Палитра из фона</strong><small>Цвета всего интерфейса подстраиваются под текущий фон страницы. Контраст текста сохраняется.</small></span></label>

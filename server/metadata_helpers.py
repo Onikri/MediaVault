@@ -28,11 +28,12 @@ def localize(provider,value,kind):
         try:
             found=get_json('https://shikimori.io/api/'+('mangas' if kind=='manga' else 'animes'),params={'ids':','.join(dict.fromkeys(missing)),'limit':50})
             with lock:
-                for x in found:names[(kind,str(x['id']))]=(time.monotonic()+21600,{'title':x.get('russian'),'description':x.get('description')})
+                for x in found:names[(kind,str(x['id']))]=(time.monotonic()+21600,{'title':x.get('russian'),'description':x.get('description'),'episodesAired':x.get('episodes_aired')})
                 while len(names)>2048:names.pop(next(iter(names)))
         except Exception:pass
     for identity,item in pairs:
         with lock:local=names.get((kind,identity),(0,{}))[1]
+        if provider=='jikan' and local.get('episodesAired') is not None:item['episodes_aired']=local['episodesAired']
         if local.get('title'):
             if provider=='kitsu':item.setdefault('titles',{})['ru_ru']=local['title']
             else:item['russian']=local['title']

@@ -3,6 +3,8 @@ import {Heart,Star} from 'lucide-react';
 import type {Anime} from '../types/anime';
 import {buildTrailerUrl,extractYouTubeId} from '../utils/trailer';
 import {coverOf,scoreLabel,subtitle} from '../utils/display';
+import Artwork from '../../Artwork.jsx';
+import {useAnimeSupplement} from '../useAnimeSupplement';
 import {AnimeHoverPreview} from './AnimeHoverPreview';
 
 // AniView archive adapter: data, navigation and favorites belong to MediaVault.
@@ -14,13 +16,14 @@ export interface AnimeCardProps {
 export function AnimeCard({anime,compact=false,index=0,onOpen,href,onFavorite,favorite=false,artwork,detail,extra,className='',openLabel,category,titleName}:AnimeCardProps){
  const [hovered,setHovered]=useState(false),[mounted,setMounted]=useState(false),[anchor,setAnchor]=useState<DOMRect|null>(null);
  const timer=useRef<ReturnType<typeof setTimeout>|null>(null),root=useRef<HTMLElement>(null);
- const id=extractYouTubeId(anime.trailer?.embed_url)||anime.trailer?.youtube_id||null;
+ const [failedImages,setFailedImages]=useState<string[]>([]),original=coverOf(anime),broken=!!original&&failedImages.includes(original);const supplement=useAnimeSupplement(anime,hovered&&!anime.trailer?.embed_url&&!anime.trailer?.youtube_id||broken||!original,category||'anime');
+ const id=extractYouTubeId(supplement.trailer)||anime.trailer?.youtube_id||null;
  const trailer=buildTrailerUrl(id,{autoplay:true,mute:true,loop:true,controls:false});
- const image=coverOf(anime),hasScore=typeof anime.score==='number'&&Number.isFinite(anime.score);
+ const image=[original,supplement.cover].find(url=>url&&!failedImages.includes(url)),hasScore=typeof anime.score==='number'&&Number.isFinite(anime.score);
  function enter(){if(timer.current)clearTimeout(timer.current);setAnchor(root.current?.getBoundingClientRect()||null);timer.current=setTimeout(()=>{setHovered(true);if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&!navigator.connection?.saveData)setMounted(true);},300);}
  function leave(){if(timer.current)clearTimeout(timer.current);setHovered(false);setMounted(false);}
  useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current);},[]);
- const contents=<><div className="anime-cover" aria-hidden="true">{artwork??(image?<img src={image} alt="" loading="lazy" referrerPolicy="no-referrer"/>:null)}<span className="anime-fallback-title">{anime.title}</span></div>
+ const contents=<><div className="anime-cover" aria-hidden="true">{artwork??(image?<img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailedImages(values=>[...values,image])}/>:<Artwork kind={category||'video'}/>)}</div>
   {mounted&&trailer&&<div className={'anime-card-video '+(hovered?'is-visible':'')}><iframe title={anime.title+' · трейлер'} src={trailer} tabIndex={-1} allow="autoplay; encrypted-media" referrerPolicy="strict-origin-when-cross-origin"/></div>}
   {hasScore&&<span className="card-score"><Star size={14} fill="currentColor"/>{scoreLabel(anime.score)}</span>}<div className="card-cover-shade"/>
   <div className="card-caption"><h3 className="media-name">{anime.title}</h3><span className="media-meta">{detail??subtitle(anime)}</span>{extra}</div></>;

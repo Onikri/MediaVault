@@ -68,7 +68,7 @@ async function run(){
     const nav={getByRole:(_,options)=>({click:()=>navigateApp(page,options.name)})};
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
     await page.getByRole('heading',{name:'Библиотека',exact:true}).waitFor();
-    await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы онлайн-библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Звук любимых историй'}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Моя коллекция',exact:true}).click();
+    await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы онлайн-библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Музыка',exact:true}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Моя коллекция',exact:true}).click();
     await page.locator('#searchInput').fill('Тестовый поиск');
     assert.equal(await page.locator('#searchInput').inputValue(),'Тестовый поиск');
     await page.getByRole('button',{name:width>=1100?'Раздел Манга':'Манга',exact:true}).click();
@@ -106,7 +106,7 @@ async function run(){
     await page.screenshot({path:path.join(output,'setup-'+width+'.png'),fullPage:true});
     await nav.getByRole('button',{name:'История',exact:true}).click();
     await page.getByRole('heading',{name:'Недавно открытое',exact:true}).waitFor();
-    await page.getByRole('heading',{name:'Здесь продолжится твоя история',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'История пуста',exact:true}).waitFor();
     await noOverflow('History');
     assert.deepEqual(errors,[],'No runtime errors at '+width+'px');
     await context.close();

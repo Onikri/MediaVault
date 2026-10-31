@@ -135,35 +135,33 @@ Always respect `prefers-reduced-motion: reduce` by disabling nonessential motion
 **Use `COMPONENTS.md` for API contracts, `SKILL.md` for agent instructions and `docs/RECOVERY_AUDIT.md` for file-by-file traceability.**
 
 
-## MediaVault integration (2026-10-31)
+## MediaVault owner revision (2026-10-31)
 
-The supplied artwork, Manrope/DM Sans, ink/petal/crimson defaults, card ratio,
-300 ms hover delay, 500 ms poster motion, floating header and responsive rail/grid
-remain the design source. `reference.css` here is the unmodified supplied CSS;
-`src/blossom/reference.css` uses semantic variables in place of repeated exact
-palette literals and self-hosts the fonts/artwork. Existing media functionality,
-authentication, routing and data providers remain MediaVault's.
+The later owner instructions take precedence over the archive's flower/green/burgundy
+surfaces and demo copy. Production uses neutral graphite #0C0C0F, #131316,
+#19191E, #24242B with cherry #EE3C35, coral #FF6655 and ivory #F0E8E5.
+Manual presets alter accents while preserving graphite. Optional background mode
+samples actual title/home imagery or the chosen wallpaper, retaining contrast.
 
-Appearance is a local preference in Profile → Оформление. Blossom is the exact
-default; Burgundy and Petal use the supplied seeds #AB1023 and #D7B8AC. A custom
-seed or background mode derives the whole palette: canvas, soft canvas, surface,
-raised surface, text, muted text, accent and action colors. Sampling is 64 × 36;
-canvas/surface/raised mix fractions are .08/.12/.15. Neutral images remain neutral.
-Derived body contrast is ≥ 7:1 and muted/link/action contrast ≥ 4.5:1. Palette
-transitions use the supplied 300 ms expressive motion; reduced motion disables it.
-The exact supplied palette is preserved in manual Blossom mode.
+Preserve the supplied pill navigation, rounded hero, 3:4 posters, typography,
+hover timing and reduced-motion rules. Navigation is transparent over the hero
+and becomes a compact opaque pill on scroll, with no outline. MediaVault's
+server/profile/music actions remain. No demo router or catalog is shipped.
 
-Background priority: current title artwork/frame → selected wallpaper → supplied
-Blossom artwork. Leaving a title releases its color. No private title pixels are
-persisted for theming. Explicit wallpaper uploads stay in browser IndexedDB on
-this device; max 20 MiB, longest side 2560px, WebP quality .9. They are never sent
-to a server. Preferences use localStorage. No new cloud/account dependency.
+Home presents real seasonal and popular metadata, a poster and trailer carousel.
+No decorative category ProducerCards or promotional slogans. Header search spans
+online anime, manga/novels, books, music and film metadata, never private Drive
+files. Russian Shikimori names and multilingual provider aliases are preserved.
+Public Jikan data is cached and rate-limited; the archive's Tenrai-compatible
+fallback is used during outages. Catalog views: large, compact, list and table.
 
-Integration tokens: catalog sidebar 247px; mobile header breakpoint 1000px
-(to retain MediaVault's server/music/profile controls), search width 550px and
-100px top (80px on phones), navbar glide 430ms, page transition 450ms. Compact/list/
-table collection modes remain operable. Player/reader chrome adopts the palette;
-video pixels, manga paper, translation canvases and subtitle colors retain their
-content-specific behavior. All new integration tokens are in design-tokens.json.
+Title pages contain one rounded media hero with poster, description, tags and
+watch/read/save actions. Content below it uses a main column and a narrow facts/
+ratings column: playback, characters, stills, release dates, music, trailers,
+relations and watch order. The video screen remains 16:9 and inside its grid.
+Metadata must never overlap playback. Music rows are compact with a More menu.
+Scroll containers retain rounded edges and thin rounded scrollbars.
 
-Decorative category-panel gradients also follow derived palette roles in custom/background themes; manual Blossom keeps the supplied reference gradient exactly.
+All data controllers, encrypted Drive storage, authentication, reader, import,
+translation and media playback remain MediaVault's. Original mature anime
+placeholders are generic fallback art, not fabricated posters. See PLACEHOLDERS.md.

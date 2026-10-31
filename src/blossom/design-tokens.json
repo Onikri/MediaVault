@@ -1,24 +1,27 @@
 {
   "$schema": "https://design-tokens.github.io/community-group/format/",
-  "name": "AniView Blossom / Source-derived and photo-inspired",
-  "version": "1.0.0",
+  "name": "AniView Blossom / MediaVault graphite revision",
+  "version": "1.1.0",
   "color": {
     "canvas": {
       "$type": "color",
-      "$value": "#11191C",
-      "description": "dark stem of reference flower"
+      "$value": "#0C0C0F",
+      "description": "Owner-requested neutral graphite revision, 2026-10-31"
     },
     "canvasSoft": {
       "$type": "color",
-      "$value": "#181F21"
+      "$value": "#131316",
+      "description": "Owner-requested neutral graphite revision, 2026-10-31"
     },
     "surface": {
       "$type": "color",
-      "$value": "#251B20"
+      "$value": "#19191E",
+      "description": "Owner-requested neutral graphite revision, 2026-10-31"
     },
     "surfaceRaised": {
       "$type": "color",
-      "$value": "#332126"
+      "$value": "#24242B",
+      "description": "Owner-requested neutral graphite revision, 2026-10-31"
     },
     "brand": {
       "$type": "color",
@@ -44,16 +47,18 @@
     },
     "textPrimary": {
       "$type": "color",
-      "$value": "#E6DDD8",
-      "description": "off-white petals"
+      "$value": "#F0E8E5",
+      "description": "Owner-requested neutral graphite revision, 2026-10-31"
     },
     "textSecondary": {
       "$type": "color",
-      "$value": "#D7B8AC"
+      "$value": "#B9B4BD",
+      "description": "Owner-requested neutral graphite revision, 2026-10-31"
     },
     "textMuted": {
       "$type": "color",
-      "$value": "#B9A6A4"
+      "$value": "#8F8B91",
+      "description": "Owner-requested neutral graphite revision, 2026-10-31"
     }
   },
   "radius": {

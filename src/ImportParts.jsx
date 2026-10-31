@@ -5,6 +5,7 @@ import Icon from './Icons.jsx';
 import Artwork from './Artwork.jsx';
 import {useArtwork} from './title-artwork.js';
 import {providers} from './catalog.js';
+import {jikan} from './media-metadata.js';
 import GoogleOAuthSetup from './GoogleOAuthSetup.jsx';
 
 export const kinds=[['anime','Аниме'],['manga','Манга'],['movie','Фильмы'],['ranobe','Ранобэ'],['tv','Сериалы']];
@@ -17,7 +18,7 @@ export function Poster({item}){
     const server=window.MEDIA_VAULT_CONFIG?.importServerUrl,id=item.ids?.mal;
     if(!visible||!server||!id||source&&!failed||replacement?.id===item.id)return;
     const abort=new AbortController();
-    fetch(server+'/metadata/posters?'+new URLSearchParams({ids:id,kind:item.kind==='anime'?'anime':'manga'}),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(12000)])}).then(r=>r.ok?r.json():{}).then(data=>{if(!abort.signal.aborted)setReplacement({id:item.id,url:data[id]?.cover||item.cover});}).catch(()=>{});
+    fetch(server+'/metadata/posters?'+new URLSearchParams({ids:id,kind:item.kind==='anime'?'anime':'manga'}),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(12000)])}).then(r=>r.ok?r.json():{}).then(async data=>{let cover=data[id]?.cover;if(!cover||failed)try{const extra=await jikan((item.kind==='anime'?'anime':'manga')+'/'+id+'/full',{server,signal:abort.signal});cover=extra.data?.images?.webp?.large_image_url||extra.data?.images?.jpg?.large_image_url||cover;}catch{}if(!abort.signal.aborted)setReplacement({id:item.id,url:cover||item.cover});}).catch(()=>{});
     return()=>abort.abort();
   },[item.id,item.ids?.mal,item.kind,visible,source,failed,replacement]);
   return source&&!failed?<img ref={anchor} src={source} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<Artwork ref={anchor} kind={['manga','ranobe'].includes(item.kind)?'manga':'video'}/>;

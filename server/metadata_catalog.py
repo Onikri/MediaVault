@@ -16,13 +16,16 @@ from source_parser import SourceError
 
 USER_AGENT = "MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal catalogue)"
 MEDIA_FIELDS = """id idMal type format status title{romaji english native} synonyms description
- coverImage{large} genres tags{name isAdult} isAdult episodes chapters volumes seasonYear season
+ coverImage{large} bannerImage trailer{id site thumbnail} averageScore genres tags{name isAdult} isAdult episodes chapters volumes seasonYear season
  startDate{year month day} endDate{year month day} siteUrl nextAiringEpisode{episode airingAt}
  airingSchedule(perPage:50,notYetAired:true){nodes{episode airingAt}}"""
 _cache, _lock = OrderedDict(), threading.RLock()
 
 
 def get_json(url, *, params=None, body=None):
+    if url.startswith('https://api.jikan.moe/v4/') and not body:
+        from jikan_metadata import jikan_json
+        return jikan_json(url.split('/v4/',1)[1],params)
     try:
         with requests.Session() as session:
             session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/vnd.api+json" if urlsplit(url).hostname=='kitsu.io' else "application/json"})

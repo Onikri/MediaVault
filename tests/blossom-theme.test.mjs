@@ -11,12 +11,12 @@ test('private files without a metadata profile remain usable without invented ca
  assert.equal(blossomRecord({name:'filename.mp4'},{title:'Русское название',score:8.5}).score,8.5);
 });
 
-test('default and manual palettes retain the supplied Blossom identity',()=>{
- assert.equal(BLOSSOM.canvas,'#11191c');assert.equal(BLOSSOM.blossom,'#ee3c35');assert.equal(BLOSSOM.petal,'#e6ddd8');
+test('graphite surfaces and cherry accents remain stable in manual palettes',()=>{
+ assert.equal(BLOSSOM.canvas,'#0c0c0f');assert.equal(BLOSSOM.blossom,'#ee3c35');assert.equal(BLOSSOM.petal,'#f0e8e5');
  assert.deepEqual(chosenPalette(sanitizeAppearance(),'#0000ff'),BLOSSOM);
  const manual=sanitizeAppearance({custom:'#2a72cc'});
  assert.deepEqual(chosenPalette(manual,'#ff0000'),chosenPalette(manual,'#00ff00'));
- assert.notEqual(chosenPalette(manual).canvas,BLOSSOM.canvas);
+ assert.equal(chosenPalette(manual).canvas,BLOSSOM.canvas);
 });
 test('background mode changes surfaces, accents and text without losing contrast',()=>{
  const blue=chosenPalette({mode:'background'},'#205de0'),red=chosenPalette({mode:'background'},'#d82a3c');

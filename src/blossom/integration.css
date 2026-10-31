@@ -194,7 +194,7 @@ html[data-blossom] .library-layout-list .media-card{padding:0;border:0;backgroun
 html[data-blossom] .library-layout-list .anime-card.media-open{display:block}
 @media(max-width:640px){html[data-blossom] .hero-stage{margin-left:calc(50% - 50vw + 5px);width:calc(100vw - 10px);border-radius:25px;min-height:670px;height:min(710px,95vh)}html[data-blossom] .media-grid.library-layout-compact{grid-template-columns:repeat(3,minmax(0,1fr))}}
 html[data-blossom] .category-grid>.category-card{display:block}
-html[data-blossom] .anime-cover>svg{display:none}
+html[data-blossom] .anime-cover>svg{display:block}
 html[data-blossom] .anime-cover:has(svg):not(:has(img)) .anime-fallback-title{display:block}
 html[data-blossom] .benefit-card>span:first-child{color:var(--color-blossom-light);background:color-mix(in srgb,var(--color-blossom) 10.0%,transparent)}
 

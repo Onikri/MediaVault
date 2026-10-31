@@ -248,7 +248,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 38, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 39, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -363,6 +363,18 @@ def title_platform_ratings(identity:str='',kind:str='anime'):
 def anime_browse(kind:str='',value:str='',identity:str='',label:str='',page:int=1):
     from anime_browse import browse
     return browse(kind,value,identity,label,page)
+
+@app.get('/metadata/anime-home')
+def anime_home():
+    from jikan_metadata import home_feed
+    return home_feed()
+
+
+@app.get('/metadata/jikan-data')
+def jikan_data(request:Request,path:str='',q:str='',page:int=1,limit:int=16):
+    from jikan_metadata import jikan_json
+    return jikan_json(path,{**dict(request.query_params),'q':q,'page':page,'limit':limit})
+
 
 @app.get("/metadata/{provider}")
 def catalogue(provider: str, q: str = "", kind: str = "anime", page: int = 1, identity: str | None = None, year: int | None = None, part: str = '',genre:str='',tag:str=''):

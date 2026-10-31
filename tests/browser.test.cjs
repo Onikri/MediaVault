@@ -3,7 +3,7 @@ const navigateApp=require('./app-navigation.cjs');
 // Run: npm run test:browser (builds the production React app; requires Chromium).
 const assert = require('node:assert/strict');
 const {revealReader}=require('./reader-controls.cjs');
-async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.locator('#closeViewer').click();}
+async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
@@ -627,10 +627,10 @@ async function main() {
   assert.equal(russianMetadataRequests.length,metadataBeforeCache,'Cached title pages make no external metadata requests');assert.deepEqual(externalArt,[],'Cached art decrypts from Drive without returning to the image source');
   const sceneErrors=[];cachedPage.on('pageerror',error=>sceneErrors.push(error.message));
   await cachedPage.setViewportSize({width:1280,height:900});await cachedPage.mouse.move(20,200);
-  await cachedPage.waitForFunction(()=>parseFloat(document.querySelector('.title-scene')?.style.getPropertyValue('--scene-x')) < -1);
+  assert.equal(await cachedPage.locator('.title-scene-images').evaluate(e=>getComputedStyle(e).transform),'none','Inline title backdrop does not create a second moving frame');
   await cachedPage.evaluate(()=>window.scrollTo({top:400,behavior:'instant'}));
-  await cachedPage.waitForFunction(()=>parseFloat(document.querySelector('.title-scene')?.style.getPropertyValue('--scene-y')) < -1);
-  assert.deepEqual(sceneErrors,[],'Pointer and scroll parallax run without animation errors');
+  assert.equal(await cachedPage.locator('.title-scene-images').evaluate(e=>getComputedStyle(e).transform),'none');
+  assert.deepEqual(sceneErrors,[],'Contained title backdrop remains stable during pointer movement and scrolling');
   for(const width of [320,390,768,1280,1600]){
     await cachedPage.setViewportSize({width,height:900});assert.ok(await cachedPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Title dossier fits '+width);
     await cachedPage.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));

@@ -13,7 +13,7 @@ export function imageURL(value){
   if(!value||typeof value!=='string'||/(?:\/|_)(?:404|missing|no[_-]?image)(?:[.\/_-]|$)/i.test(value))return '';
   try{const url=new URL(value,ORIGIN);return url.protocol==='https:'&&!url.username&&!url.password?url.href:'';}catch{return '';}
 }
-export const translated={tv:'Аниме',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',webtoon:'Вебтун',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
+export const translated={'finished airing':'Завершён','currently airing':'Выходит','not yet aired':'Анонсирован',finished:'Завершён',publishing:'Выходит',tv:'Аниме',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',webtoon:'Вебтун',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
 export const translate=(value,fallback='Не указано')=>translated[String(value||'').toLowerCase()]||(hasRussian(value)?String(value):fallback);
 export function importedProfile(value){
   if(!value||!Object.keys(value).length)return null;

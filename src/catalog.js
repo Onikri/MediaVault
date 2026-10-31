@@ -56,17 +56,17 @@ export function normalizeCatalog(provider,data,kind='anime'){
   }
   if(provider==='anilist')return list(data.data?.Media||data.data?.Page?.media).map(a=>record(provider,a.id,kind,{
     titles:{ru:a.russian,en:a.title?.english,native:a.title?.native},title:a.title?.romaji,aliases:[a.title?.romaji,...(a.synonyms||[])],description:a.description,cover:a.coverImage?.large,
-    year:a.seasonYear||a.startDate?.year,startDate:fuzzyDate(a.startDate),endDate:fuzzyDate(a.endDate),
+    score:Number(a.averageScore)?Number(a.averageScore)/10:null,trailer:a.trailer?.site==='youtube'?{youtube_id:a.trailer.id}:null,background:a.bannerImage||'',year:a.seasonYear||a.startDate?.year,startDate:fuzzyDate(a.startDate),endDate:fuzzyDate(a.endDate),
     format:a.format,genres:a.genres,tags:(a.tags||[]).map(t=>t.name),age:a.isAdult?18:null,episodes:a.episodes,chapters:a.chapters,volumes:a.volumes,status:a.status,
     releases:[...(a.airingSchedule?.nodes||[]),...(a.nextAiringEpisode?[a.nextAiringEpisode]:[])].map(e=>({episode:e.episode,date:e.airingAt,kind:'original',provider:'anilist'})),
     ids:a.idMal?{mal:String(a.idMal)}:{},links:[{provider,url:a.siteUrl}]}));
   if(provider==='shikimori')return list(data).filter(a=>a?.id!=null&&(a.name||a.russian)).map(a=>record(provider,a.id,kind,{titles:{ru:a.russian,en:a.name,native:a.japanese?.[0]},aliases:[...(a.synonyms||[]),...(a.english||[]),...(a.japanese||[])],description:a.description,
-    cover:imageURL(a.image?.original||''),format:a.kind,genres:(a.genres||[]).map(g=>g.russian||g.name),episodes:a.episodes,chapters:a.chapters,volumes:a.volumes,
+    cover:imageURL(a.image?.original||''),score:Number(a.score)||null,episodesAired:a.episodes_aired??null,format:a.kind,genres:(a.genres||[]).map(g=>g.russian||g.name),episodes:a.episodes,chapters:a.chapters,volumes:a.volumes,
     status:a.status,startDate:a.aired_on,endDate:a.released_on,age:ageOf(a.rating),ageLabel:a.rating,ids:{mal:String(a.id)},links:[{provider,url:imageURL(a.url||'')}]}));
-  if(provider==='jikan')return list(data.data).map(a=>record(provider,a.mal_id,kind,{titles:{ru:a.russian,en:a.title_english,native:a.title_japanese},title:a.title,aliases:(a.titles||[]).map(t=>t.title),description:a.synopsis,
+  if(provider==='jikan')return list(data.data).filter(a=>a&&/^\d+$/.test(String(a.mal_id))&&(a.title||a.title_english||a.russian)).map(a=>record(provider,a.mal_id,kind,{titles:{ru:a.russian,en:a.title_english,native:a.title_japanese},title:a.title,aliases:(a.titles||[]).map(t=>t.title),description:a.synopsis,
     cover:a.images?.webp?.large_image_url||a.images?.jpg?.large_image_url,format:a.type,year:a.year,genres:(a.genres||[]).map(g=>g.name),tags:[...(a.themes||[]),...(a.demographics||[])].map(t=>t.name),
     age:ageOf(a.rating),ageLabel:a.rating,episodes:a.episodes,chapters:a.chapters,volumes:a.volumes,status:a.status,startDate:a.aired?.from||a.published?.from,endDate:a.aired?.to||a.published?.to,
-    broadcast:a.broadcast?.string,ids:{mal:String(a.mal_id)},links:[{provider,url:a.url}]}));
+    score:Number(a.score)||null,trailer:a.trailer||null,episodesAired:a.episodes_aired??null,broadcast:a.broadcast?.string,ids:{mal:String(a.mal_id)},links:[{provider,url:a.url}]}));
   if(provider==='tvmaze')return list(data).map(value=>value.show||value).filter(a=>a.id).map(a=>record(provider,a.id,a.genres?.includes('Anime')?'anime':'tv',{
     title:a.name,description:a.summary,cover:a.image?.original||a.image?.medium,format:a.type,genres:a.genres,status:a.status,startDate:a.premiered,endDate:a.ended,
     ids:a.externals?.imdb?{imdb:a.externals.imdb}:{},episodes:a._embedded?.episodes?.length||null,
@@ -91,7 +91,7 @@ export function mergeCatalog(values){
     current.genres=unique([...current.genres,...item.genres]);current.tags=unique([...current.tags,...item.tags]);current.links=[...current.links,...item.links];current.ids={...current.ids,...item.ids};
     current.releases=[...current.releases,...item.releases].filter((e,i,a)=>a.findIndex(x=>x.date===e.date&&x.episode===e.episode)===i);
     if(item.titles.ru){current.titles={...current.titles,...item.titles};current.title=item.titles.ru;current.description=item.description||current.description;}
-    for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','startDate','endDate'])if(current[key]==null||current[key]==='')current[key]=item[key];
+    for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','startDate','endDate','score','trailer','background','episodesAired'])if(current[key]==null||current[key]==='')current[key]=item[key];
   }
   return result;
 }
@@ -122,7 +122,7 @@ export function providerUrl(provider,{query='',kind='anime',page=1,identity,year
   throw Error('Для этого каталога нужно подключить сервер импорта.');
 }
 
-const aniFields='id idMal title{romaji english native} synonyms description coverImage{large} format status genres tags{name} isAdult episodes chapters volumes seasonYear startDate{year month day} endDate{year month day} siteUrl nextAiringEpisode{episode airingAt} airingSchedule(perPage:50,notYetAired:true){nodes{episode airingAt}}';
+const aniFields='id idMal title{romaji english native} synonyms description coverImage{large} bannerImage trailer{id site thumbnail} averageScore format status genres tags{name} isAdult episodes chapters volumes seasonYear startDate{year month day} endDate{year month day} siteUrl nextAiringEpisode{episode airingAt} airingSchedule(perPage:50,notYetAired:true){nodes{episode airingAt}}';
 export async function fetchCatalog(provider,options,fetcher=fetch){
   options.signal?.throwIfAborted();
   const url=providerUrl(provider,options),abort=new AbortController(),signal=options.signal;

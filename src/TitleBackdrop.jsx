@@ -4,6 +4,7 @@ import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ChevronLeft,ChevronRight,Pause,Play} from 'lucide-react';
 import {useArtwork} from './title-artwork.js';
 import {scenePalette} from './palette.js';
+import {buildTrailerUrl,extractYouTubeId} from './blossom/utils/trailer.ts';
 import {seedFromPixels} from './blossom/theme.js';
 
 function Slide({url,profile,actions,libraryId,onPalette}){
@@ -12,9 +13,11 @@ function Slide({url,profile,actions,libraryId,onPalette}){
     try{const canvas=document.createElement('canvas');canvas.width=64;canvas.height=36;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(event.currentTarget,0,0,64,36);const pixels=ctx.getImageData(0,0,64,36).data;onPalette({...scenePalette(pixels),seed:seedFromPixels(pixels)});}catch{}
   }}/>:null;
 }
-export default function TitleBackdrop({profile,actions,libraryId,onPalette,suspended=false}){
-  const reduced=useReducedMotion(),[index,setIndex]=useState(0),[paused,setPaused]=useState(false),root=useRef(null),position=useRef({x:0,y:0});
+export default function TitleBackdrop({profile,actions,libraryId,onPalette,suspended=false,inline=false,trailer=null}){
+  const reduced=useReducedMotion(),[index,setIndex]=useState(0),[paused,setPaused]=useState(false),[manualPlay,setManualPlay]=useState(false),[hidden,setHidden]=useState(document.hidden),root=useRef(null),position=useRef({x:0,y:0});
+  useEffect(()=>{const update=()=>setHidden(document.hidden);document.addEventListener('visibilitychange',update);return()=>document.removeEventListener('visibilitychange',update);},[]);
   const slides=[...new Set([...(profile.backgrounds||[]),...(profile.screenshots||[]),profile.background])].filter(url=>url&&url!==profile.cover).slice(0,6);
+  if(!slides.length&&profile.cover)slides.push(profile.cover);
   const signature=slides.join('|');
   useEffect(()=>{setIndex(0);},[signature]);
   useEffect(()=>{
@@ -23,16 +26,17 @@ export default function TitleBackdrop({profile,actions,libraryId,onPalette,suspe
     return()=>clearInterval(timer);
   },[paused,reduced,suspended,signature]);
   useEffect(()=>{
-    if(reduced||suspended)return;let raf=0,x=position.current.x,y=position.current.y,targetX=x,targetY=y,last=performance.now();
+    if(reduced||suspended||inline)return;let raf=0,x=position.current.x,y=position.current.y,targetX=x,targetY=y,last=performance.now();
     const schedule=()=>{if(!raf&&Math.abs(targetX-x)+Math.abs(targetY-y)>.02){last=performance.now();raf=requestAnimationFrame(tick);}};
     const pointer=event=>{if(event.pointerType==='touch')return;targetX=(event.clientX/innerWidth-.5)*14;schedule();};
     const scroll=()=>{targetY=Math.min(40,scrollY*.045);schedule();};
     const tick=now=>{raf=0;const factor=1-Math.exp(-Math.min(50,now-last)/140);last=now;x+=(targetX-x)*factor;y+=(targetY-y)*factor;position.current={x,y};root.current?.style.setProperty('--scene-x',x+'px');root.current?.style.setProperty('--scene-y',-y+'px');if(Math.abs(targetX-x)+Math.abs(targetY-y)>.02)schedule();};
     window.addEventListener('pointermove',pointer,{passive:true});window.addEventListener('scroll',scroll,{passive:true});scroll();schedule();
     return()=>{cancelAnimationFrame(raf);window.removeEventListener('pointermove',pointer);window.removeEventListener('scroll',scroll);};
-  },[reduced,suspended]);
-  const host=document.getElementById('scene-root');
-  return <>{host&&createPortal(<div ref={root} className="title-scene" aria-hidden="true"><div className="title-scene-images"><AnimatePresence initial={false}>{slides.length>0&&<Slide key={slides[index%slides.length]} url={slides[index%slides.length]} profile={profile} actions={actions} libraryId={libraryId} onPalette={onPalette}/>}</AnimatePresence></div><div className="title-scene-shade"/></div>,host)}
-    {slides.length>1&&<div className="title-scene-controls" role="group" aria-label="Фон страницы"><button aria-label="Предыдущий фон" onClick={()=>setIndex(value=>(value-1+slides.length)%slides.length)}><ChevronLeft size={14}/></button><span>Кадр {index%slides.length+1} / {slides.length}</span><button aria-label={paused?'Продолжить смену фона':'Остановить смену фона'} aria-pressed={paused} onClick={()=>setPaused(!paused)}>{paused?<Play size={12}/>:<Pause size={12}/>}</button><button aria-label="Следующий фон" onClick={()=>setIndex(value=>(value+1)%slides.length)}><ChevronRight size={14}/></button></div>}
+  },[reduced,suspended,inline]);
+  const host=document.getElementById('scene-root'),videoId=extractYouTubeId(trailer),video=videoId&&!paused&&!suspended&&!hidden&&(!reduced||manualPlay)&&!navigator.connection?.saveData?buildTrailerUrl(videoId,{autoplay:true,mute:true,controls:false}):null;
+  const scene=<div ref={root} className="title-scene" aria-hidden="true"><div className="title-scene-images"><AnimatePresence initial={false}>{slides.length>0&&<Slide key={slides[index%slides.length]} url={slides[index%slides.length]} profile={profile} actions={actions} libraryId={libraryId} onPalette={onPalette}/>}</AnimatePresence></div>{video&&<div className="title-background-video"><iframe src={video} title="Фоновый трейлер тайтла" tabIndex={-1} allow="autoplay; encrypted-media"/></div>}<div className="title-scene-shade"/></div>;
+  return <>{inline?scene:host&&createPortal(scene,host)}
+    {(slides.length>1||videoId)&&<div className="title-scene-controls" role="group" aria-label="Фон страницы">{slides.length>1&&<><button aria-label="Предыдущий фон" onClick={()=>setIndex(value=>(value-1+slides.length)%slides.length)}><ChevronLeft size={14}/></button><span>Кадр {index%slides.length+1} / {slides.length}</span></>}<button aria-label={paused?'Продолжить смену фона':'Остановить смену фона'} aria-pressed={paused} onClick={()=>{setManualPlay(true);setPaused(!paused);}}>{paused?<Play size={12}/>:<Pause size={12}/>}</button>{slides.length>1&&<button aria-label="Следующий фон" onClick={()=>setIndex(value=>(value+1)%slides.length)}><ChevronRight size={14}/></button>}</div>}
   </>;
 }

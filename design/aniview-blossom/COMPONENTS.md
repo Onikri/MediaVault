@@ -97,27 +97,14 @@ Start/end date filters are applied at **year granularity** for offline seed reco
 - Configure CORS/content policy for external images and YouTube embeds if hosting behind strict CSP.
 - Avoid marketing a newly authored replacement as byte-identical decompiled source.
 
+## MediaVault adapters
 
-## MediaVault adapter APIs
-
-These TSX adapters live under `src/blossom/components/`. They keep the supplied
-component anatomy; callbacks replace the demo router and seeded catalog.
-
-| Component | Production inputs / responsibilities |
-| --- | --- |
-| AnimatedNavbar | links, active, onNavigate, onSearch, brand, children; existing hash navigation and account/server/music controls; Ctrl/Cmd K; collapsed menu |
-| SearchDialog | service, onChoose, onBrowse, onClose; existing useCatalog/useSourceTitles; IME-safe keyboard selection; Radix focus trap and dismissal; no sample records |
-| AnimeCard | anime, artwork, onOpen/href, onFavorite/favorite, detail/extra; same card for encrypted private items and live search; real scores only |
-| AnimeGrid | children, className, id; catalog, collection and entity pages; retains grid/compact/list modes |
-| AnimeCarousel | children, title, kicker, onMore; actual recently opened/new library items; snap rail and arrows |
-| HeroBanner | title, description, artwork, onOpen; supplied flower by default, optional local wallpaper |
-| ProducerCard | name, subtitle, index, onOpen, children; supplied studio anatomy adapted to five existing media sections |
-| FilterSidebar | open, onReset, children; existing controlled catalog filters and providers |
-| SkeletonGrid | count; async catalog loading, no fabricated counts |
-| ThemeProvider / AppearanceSettings | shared semantic palette and local wallpaper/preferences, integrated into the existing profile |
-
-Data adapters do not add Jikan demo data, replace the vault, change online API
-sessions or start downloads. Existing title details, watch controls, music,
-reader, server import, privacy and account actions retain their implementations.
-Keyboard focus, reduced-motion, disabled/error/loading/empty states and
-360/768/1280px layouts are verified with browser contract tests.
+`AnimatedNavbar` keeps MediaVault navigation and account/server/music callbacks.
+`HeroBanner` accepts real artwork, trailer, poster, metadata and carousel controls;
+its title variant hosts the contained cinematic title layout. `AnimeCard` and
+`AnimeGrid` accept real catalog/private records through `media-adapter.js`.
+`SearchDialog` shares the online mixed-search controller with `GlobalCatalog`.
+`CatalogViewControls` and `CatalogResultsTable` preserve the same selected record
+across large/compact/list/table presentations. `HomeDiscover` and `ReleaseTimeline`
+use public metadata, exact release dates and explicit empty states. These adapters
+do not replace encryption, import, reader, translation or playback controllers.

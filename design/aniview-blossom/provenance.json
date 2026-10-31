@@ -1,6 +1,13 @@
 {
-  "archive": "AniView_Blossom_React_TypeScript_Complete.zip",
-  "archiveSha256": "4698ce6771fd745205d1b3b4e96de2f8c0f6288a8e295c1bf9a90d643c9f91ab",
+  "archive": "AniView_Blossom_Source.zip",
+  "archiveSha256": "cb1ab7231881006fc4629cacf1777be7a56b2bdbf9ae3b1de3f2e1641db34fe1",
   "integration": "Editable TSX adapters retain the supplied structure and visual contracts; MediaVault retains its data, routing and actions.",
-  "licenseDeclaration": "Supplied SKILL.md declares MIT; no original minified runtime chunks are included in the application."
+  "licenseDeclaration": "Supplied SKILL.md declares MIT; no original minified runtime chunks are included in the application.",
+  "previousArchive": "AniView_Blossom_React_TypeScript_Complete.zip",
+  "ownerOverrides": [
+    "Neutral graphite surfaces; cherry/coral/ivory accents",
+    "Source navbar geometry with MediaVault actions",
+    "Real seasonal hero and title media; no promotional filler",
+    "Original mature anime placeholders; preserve functional controllers"
+  ]
 }
