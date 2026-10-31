@@ -165,3 +165,10 @@ Scroll containers retain rounded edges and thin rounded scrollbars.
 All data controllers, encrypted Drive storage, authentication, reader, import,
 translation and media playback remain MediaVault's. Original mature anime
 placeholders are generic fallback art, not fabricated posters. See PLACEHOLDERS.md.
+
+
+Owner refinement: expanded navigation spans up to 1600px, contracts to 1168px
+on scroll, and has no painted container or pseudo-element at the top. Only the
+scrolled inner pill has a surface. Hover never paints a second active shape.
+Online title cards use the same title-card component/classes and adaptive poster
+size as the private collection; genres remain available in filters/details/hover.
