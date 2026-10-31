@@ -217,3 +217,8 @@ html[data-blossom] .blossom-search-dialog .search-footer{flex:none}
 /* Keep the supplied artwork treatment in Blossom; tonal decoration follows other themes. */
 html[data-blossom][data-palette-variant=dynamic] .studio-shape{background:radial-gradient(circle at 70% 24%,color-mix(in srgb,var(--color-blossom) 51%,transparent),transparent 44%),linear-gradient(115deg,var(--color-burgundy),var(--color-crimson))}
 html[data-blossom][data-palette-variant=dynamic] .anime-fallback-title{color:var(--color-petal)}
+
+/* Nested player/content grids must shrink with the title column on narrow screens. */
+html[data-blossom] .title-page-main{min-width:0;grid-template-columns:minmax(0,1fr)}
+html[data-blossom] .title-page-main>section,html[data-blossom] .title-sidebar>section{min-width:0;max-width:100%}
+html[data-blossom] .title-description>.section-heading{flex-wrap:wrap}
