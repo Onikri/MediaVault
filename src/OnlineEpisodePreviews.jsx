@@ -19,7 +19,8 @@ async function frame(source,type,signal){
    if(type==='hls')import('hls.js').then(({default:Hls})=>{
     if(signal.aborted||stopped){fail();return;}
     if(!Hls.isSupported()){video.src=source;return;}
-    hls=new Hls({startLevel:0,autoLevelCapping:0,maxBufferLength:4,maxMaxBufferLength:8,backBufferLength:0});
+    hls=new Hls({autoStartLoad:false,startLevel:0,maxBufferLength:4,maxMaxBufferLength:8,backBufferLength:0});
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>{hls.autoLevelCapping=0;hls.startLoad();});
     hls.on(Hls.Events.ERROR,(_,data)=>{if(data.fatal)fail();});hls.loadSource(source);hls.attachMedia(video);
    }).catch(reject);
    else video.src=source;

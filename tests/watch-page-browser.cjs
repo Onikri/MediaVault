@@ -19,7 +19,7 @@ let vite,browser,lastPage;
  const {createServer}=await import('vite');vite=await createServer({root:ROOT,cacheDir:path.join(ROOT,'.codex-local/cache/vite-watch'),logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});
  for(const width of [390,1440]){
-  const context=await browser.newContext({viewport:{width,height:1000},reducedMotion:'reduce'}),page=await context.newPage(),errors=[],requests=[];let leases=0;
+  const context=await browser.newContext({viewport:{width,height:1000},reducedMotion:'reduce'}),page=await context.newPage(),errors=[],requests=[],previewLeases=new Set(),previewHighLevels=[];let leases=0;
   lastPage=page;page.on('pageerror',e=>{errors.push(e.message);console.error('UI_ERROR',e.stack);});
   const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'*'};
   await page.route('https://fixture.example/**',async route=>{
@@ -29,11 +29,11 @@ let vite,browser,lastPage;
    if(url.pathname==='/sources/inspect'){
     const b=req.postDataJSON(),studio=b.dub_url.endsWith('/b')?'b':'a';return json({episodes:Array.from({length:12},(_,i)=>({number:i+1,season:1,url:'https://source.example/'+studio+'/'+(i+1)}))});
    }
-   if(url.pathname==='/online/prepare'){const b=req.postDataJSON();requests.push(b);const id='lease'+(++leases);return json({id,type:'hls',url:'/online/'+id+'/master.m3u8',qualities:[720,360],expiresIn:120,subtitles:[{id:'ru',name:'Русские',language:'ru',url:'/online/'+id+'/sub.vtt'}]});}
+   if(url.pathname==='/online/prepare'){const b=req.postDataJSON();requests.push(b);const id='lease'+(++leases);if(b.clientId?.startsWith('previews-'))previewLeases.add(id);return json({id,type:'hls',url:'/online/'+id+'/master.m3u8',qualities:[720,360],expiresIn:120,subtitles:[{id:'ru',name:'Русские',language:'ru',url:'/online/'+id+'/sub.vtt'}]});}
    if(url.pathname.endsWith('/heartbeat')||req.method()==='DELETE')return json({closed:true,expiresIn:120});
    if(url.pathname.endsWith('/master.m3u8'))return route.fulfill({contentType:'application/vnd.apple.mpegurl',headers:cors,body:'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=640x360,NAME="360p"\n360.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=1280x720,NAME="720p"\n720.m3u8\n'});
    if(url.pathname.endsWith('/sub.vtt'))return route.fulfill({contentType:'text/vtt',headers:cors,body:'WEBVTT\n\n00:00:01.000 --> 00:00:30.000\nНезависимые субтитры\n'});
-   if(/\/(?:360|720)(?:\.m3u8|-\d+\.ts)$/.test(url.pathname)){const file=path.basename(url.pathname),body=await fs.readFile(path.join(DIR,file));return route.fulfill({contentType:file.endsWith('.ts')?'video/mp2t':'application/vnd.apple.mpegurl',headers:cors,body});}
+   if(/\/(?:360|720)(?:\.m3u8|-\d+\.ts)$/.test(url.pathname)){const file=path.basename(url.pathname),body=await fs.readFile(path.join(DIR,file));if(previewLeases.has(url.pathname.split('/')[2])&&file.startsWith('720'))previewHighLevels.push(file);return route.fulfill({contentType:file.endsWith('.ts')?'video/mp2t':'application/vnd.apple.mpegurl',headers:cors,body});}
    if(url.pathname.startsWith('/music/timings/'))return json({intervals:[{type:'op',start:2,end:6,source:'AniSkip'}]});
    if(url.pathname.startsWith('/music/anime/'))return json({tracks:[]});
    return json({ratings:[],items:[]});
@@ -45,6 +45,7 @@ let vite,browser,lastPage;
   const colors=await page.getByLabel('Озвучка для просмотра').evaluate(n=>({background:getComputedStyle(n).backgroundColor,color:getComputedStyle(n).color,scheme:getComputedStyle(n).colorScheme}));
   assert.equal(colors.scheme,'dark');assert.notEqual(colors.background,colors.color);
   await page.waitForFunction(()=>[...document.querySelectorAll('.watch-episode-grid img')].length===12&&[...document.querySelectorAll('.watch-episode-grid img')].every(n=>n.src.startsWith('data:image/')),{},{timeout:30000});
+  assert.deepEqual(previewHighLevels,[],'Background previews must not fetch higher-quality video');
   await page.screenshot({path:path.join(DIR,'title-idle-'+width+'.png'),fullPage:true});
   await page.locator('.watch-episode-grid .title-episode-card').nth(1).click();
   const video=page.locator('.mv-player-stage>video').first();await page.waitForFunction(()=>document.querySelector('.mv-player-stage>video')?.readyState>=2);
