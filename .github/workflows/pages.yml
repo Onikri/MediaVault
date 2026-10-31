@@ -97,6 +97,8 @@ jobs:
           mkdir -p test-output
           set +e
           {
+            npm run test:design &&
+            npm run test:watch &&
             npm run test:ui &&
             npm run test:vm &&
             npm run test:direct &&
@@ -105,12 +107,10 @@ jobs:
             npm run test:migan &&
             npm run test:browser &&
             npm run test:voices &&
-            npm run test:design &&
             npm run test:manga &&
             npm run test:reader &&
             npm run test:music &&
             npm run test:online &&
-            npm run test:watch &&
             npm run test:translation &&
             npm run test:gpu &&
             npm run test:lmt &&

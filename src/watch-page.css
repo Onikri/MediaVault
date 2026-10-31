@@ -15,6 +15,11 @@
 .watch-title-page .title-hero-actions{order:5;margin-top:20px}
 .watch-title-page .title-page-columns{display:grid;grid-template-columns:minmax(0,1fr) 294px;gap:22px;align-items:start;margin-top:20px}
 .watch-title-page .title-page-main,.watch-title-page .title-sidebar{min-width:0;display:grid;gap:20px;align-content:start}
+.watch-title-page .title-hero-copy>*{min-width:0;max-width:100%}
+.watch-title-page .title-hero-actions .btn{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.watch-title-page .title-sidebar .credits-grid{grid-template-columns:minmax(0,1fr)}
+.watch-title-page .credits-grid>button>span:last-child{min-width:0;overflow-wrap:anywhere}
+.watch-title-page .title-sidebar .section-heading{flex-wrap:wrap;gap:8px}
 .watch-title-page .title-page-main>section+section{margin-top:0}
 .watch-title-page .title-page-main>section:not(.title-playback),.watch-title-page .title-sidebar>section{padding:22px;border:1px solid #ffffff0b;border-radius:12px;background:#161d25ed;backdrop-filter:none;margin:0;min-width:0}
 .watch-title-page .title-page-main>.online-title-materials{padding:20px;background:#151c24}
