@@ -1,0 +1,81 @@
+/* Collection uses the same surfaces and control anatomy as the online catalog. */
+html[data-blossom] .blossom-navbar .header-inner{height:60px;min-height:60px;padding-block:8px;align-items:center}
+html[data-blossom] .blossom-navbar .brand.logo{height:44px;padding-block:0;line-height:1;align-items:center}
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link{height:36px;padding-block:0;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+html[data-blossom] .blossom-navbar .header-actions{align-items:center}
+html[data-blossom] .blossom-navbar .mobile-toggle{display:none}
+html[data-blossom] .blossom-navbar .header-search{height:36px;min-height:36px;padding-block:0;line-height:1}
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.search-bar{min-height:50px;margin-bottom:18px;padding:0 16px;border:0;border-radius:16px;background:var(--color-canvas-soft);box-shadow:none}
+html[data-blossom] .app-shell[data-view=collection] #searchInput{height:50px;background:transparent}
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.chip-row{flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none;padding-bottom:3px}
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.chip-row>.chip{flex:0 0 auto;min-height:32px;padding:8px 13px;border:0;border-radius:100px;background:var(--color-canvas-soft);font-size:11px;white-space:nowrap}
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.chip-row>.chip-active{background:var(--color-surface-raised);color:var(--color-petal)}
+html[data-blossom] .library-workspace{grid-template-columns:247px minmax(0,1fr);gap:28px;align-items:start}
+html[data-blossom] .library-sidebar.blossom-catalog-sidebar{padding:20px;border:0;border-radius:21px;background:var(--color-surface);max-height:calc(100dvh - 125px);overflow:auto;scrollbar-gutter:stable}
+html[data-blossom] .library-sidebar .filter-heading{margin-bottom:20px}
+html[data-blossom] .library-sidebar .filter-heading h2{font-size:18px;letter-spacing:-.025em;font-weight:700;text-transform:none}
+html[data-blossom] .library-sidebar>nav{display:grid;gap:3px}
+html[data-blossom] .library-sidebar>nav>button{min-height:39px;padding:9px 11px;border:0;border-radius:12px;font-size:12px;color:var(--color-on-muted)}
+html[data-blossom] .library-sidebar>nav>button.is-active{color:var(--color-petal);background:var(--color-surface-raised)}
+html[data-blossom] .library-sidebar>nav>button>small{font-size:10px;margin-left:auto;opacity:.65}
+html[data-blossom] .library-sidebar .library-sidebar-filters{margin-top:24px;padding-top:20px;border-top:1px solid var(--color-border);gap:18px}
+html[data-blossom] .library-sidebar-filters h3{font-size:12px;font-weight:600;margin:0 0 2px}
+html[data-blossom] .library-sidebar-filters label{font-size:11px;color:var(--color-blossom-light);gap:7px}
+html[data-blossom] .library-sidebar-filters select{min-height:44px;border-radius:15px;background:var(--color-canvas-soft);border:1px solid var(--color-border);padding:10px 12px;color:var(--color-petal);font-size:11px}
+html[data-blossom] .library-drive-note{margin-top:24px;padding-top:19px;border-color:var(--color-border);font-size:10px}
+html[data-blossom] .library-toolbar{padding:0;margin:0 0 17px;border:0;background:transparent;font-size:13px}
+html[data-blossom] .library-toolbar .sort-label select{border:0;border-radius:100px;background:var(--color-canvas-soft);padding:8px 13px;font-size:11px}
+html[data-blossom] .title-browser-toolbar{margin-bottom:22px;gap:12px}
+html[data-blossom] .title-browser-toolbar .import-tabs{display:inline-flex;flex:0 0 auto;width:auto;align-items:center;gap:3px;padding:3px;margin:0;border:0;border-radius:100px;background:var(--color-canvas-soft)}
+html[data-blossom] .title-browser-toolbar .import-tabs>button{min-height:32px;padding:8px 15px;border:0;border-radius:100px;font-size:11px;background:transparent;box-shadow:none;color:var(--color-on-muted)}
+html[data-blossom] .title-browser-toolbar .import-tabs>button[data-state=active]{background:var(--color-surface-raised);color:var(--color-petal)}
+html[data-blossom] .title-browser-toolbar .import-tabs>button::after{content:none}
+html[data-blossom] .catalog-views.library-layouts{gap:3px;padding:3px;margin-left:auto;border:0;border-radius:100px;background:var(--color-canvas-soft)}
+html[data-blossom] .catalog-views.library-layouts>button{width:33px;height:32px;min-height:0;padding:0;border:0;border-radius:100px}
+html[data-blossom] .catalog-views.library-layouts>button[aria-pressed=true]{background:var(--color-surface-raised);color:var(--color-petal)}
+html[data-blossom] .library-count{font-size:10px;opacity:.7}
+html[data-blossom] .admin-bar{margin:0 0 24px;padding:0;border:0;border-radius:0;box-shadow:none;background:transparent}
+html[data-blossom] .admin-bar::before,html[data-blossom] .admin-bar::after{content:none}
+html[data-blossom] .admin-bar .admin-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:0;padding:0;min-height:36px}
+html[data-blossom] .admin-actions>.btn{min-height:36px;padding:9px 13px;border:0;border-radius:100px;font-size:11px;box-shadow:none}
+html[data-blossom] .admin-actions>.btn-secondary{background:var(--color-canvas-soft);color:var(--color-petal)}
+html[data-blossom] .admin-actions>.btn-primary{background:var(--color-crimson);color:var(--color-petal)}
+html[data-blossom] .admin-actions>.icon-button{width:36px;height:36px;min-height:0;border:0;background:transparent}
+html[data-blossom] .admin-bar .upload-options{margin:10px 0 0;padding:0;border:0;background:transparent}
+html[data-blossom] .admin-bar .upload-options>summary{width:fit-content;padding:6px 0;font-size:10px;color:var(--color-on-muted)}
+html[data-blossom] .admin-bar .local-upload-settings,html[data-blossom] .admin-bar .invite-panel{margin-top:12px;padding:20px;border:0;border-radius:21px;background:var(--color-surface)}
+html[data-blossom] .admin-bar .field-input{min-height:44px;border-radius:15px}
+html[data-blossom] #uploadQueue:empty{display:none}
+html[data-blossom] .admin-bar .upload-row{padding:13px 15px;border:0;border-radius:16px;background:var(--color-surface)}
+html[data-blossom] .admin-bar .upload-row .progress-track{height:3px;background:var(--color-surface-raised)}
+html[data-blossom] .anime-preview.is-portal{z-index:170;padding:20px;border:0;border-radius:24px;background:var(--color-surface-raised);box-shadow:0 16px 48px #0005;max-height:calc(100dvh - 24px);overflow:hidden;pointer-events:none}
+html[data-blossom] .anime-preview .preview-head{gap:12px;align-items:start}
+html[data-blossom] .anime-preview h3{font-size:18px;line-height:1.3;font-weight:750;letter-spacing:-.025em}
+html[data-blossom] .anime-preview .score-pill{display:inline-flex;gap:5px;align-items:center;background:#050507;padding:5px 8px;border-radius:100px;color:var(--color-petal);font-size:11px;flex:none}
+html[data-blossom] .anime-preview .preview-synopsis{font-size:12px;line-height:1.7;-webkit-line-clamp:4;margin:12px 0 15px}
+html[data-blossom] .anime-preview .preview-chips{margin-bottom:17px;gap:7px}
+html[data-blossom] .anime-preview .preview-chips>span{font-size:11px;padding:6px 8px;border:1px solid var(--color-border);border-radius:8px}
+html[data-blossom] .anime-preview .preview-chips>span+span{background:var(--color-crimson);border-color:transparent}
+html[data-blossom] .anime-preview .preview-specs{display:grid;grid-template-columns:82px minmax(0,1fr);gap:8px 12px;margin:0;font-size:11px;line-height:1.6}
+html[data-blossom] .anime-preview .preview-specs dt{font-weight:750;color:var(--color-on-muted);text-transform:uppercase}
+html[data-blossom] .anime-preview .preview-specs dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:1099px){html[data-blossom] .library-workspace{grid-template-columns:247px minmax(0,1fr)}}
+@media(max-width:1000px){html[data-blossom] .blossom-navbar .mobile-toggle{display:inline-grid}}
+@media(min-width:1100px){html[data-blossom] .app-shell[data-view=collection]>.app-main>.chip-row{display:none}}
+@media(max-width:767px){
+ html[data-blossom] .library-workspace{display:block}
+ html[data-blossom] .library-sidebar.blossom-catalog-sidebar{display:block;position:static;max-height:none;padding:16px;margin:0 0 20px;scrollbar-gutter:auto}
+ html[data-blossom] .library-sidebar .filter-heading{display:none}
+ html[data-blossom] .library-sidebar>nav,html[data-blossom] .library-sidebar .library-drive-note{display:none}
+ html[data-blossom] .library-sidebar .library-sidebar-filters{margin:0;padding:0;border:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+ html[data-blossom] .library-sidebar-filters h3{grid-column:1/-1;font-size:11px}
+ html[data-blossom] .library-sidebar-filters label{font-size:9px}
+ html[data-blossom] .library-sidebar-filters select{padding:8px 5px;font-size:9px;min-height:38px;border-radius:12px}
+ html[data-blossom] .admin-actions>.btn{font-size:10px;padding:9px 11px}
+ html[data-blossom] .title-browser-toolbar{gap:10px}
+}
+@media(max-width:640px){
+ html[data-blossom] .blossom-navbar .header-inner{height:56px;min-height:56px;padding-block:8px}
+ html[data-blossom] .blossom-navbar .brand.logo{height:40px}
+ html[data-blossom] .blossom-navbar .header-search{height:32px;min-height:32px}
+}

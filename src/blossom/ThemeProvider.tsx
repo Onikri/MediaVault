@@ -7,6 +7,7 @@ import './motion.css';
 import './reference.css';
 import './integration.css';
 import './composition.css';
+import './collection.css';
 // Set the design scope before React mounts, avoiding a legacy-layout first frame.
 if(typeof document!=='undefined')applyPalette(chosenPalette(readAppearance()));
 const ThemeContext=createContext<any>(null);

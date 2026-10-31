@@ -21,6 +21,6 @@ export default function MusicConnections({track,compact=false}){
   {!track&&playlist&&<button disabled={busy} onClick={()=>run(async()=>setValues(await playlistTracks(provider,playlist)))}>Открыть песни плейлиста</button>}
   {values.length>0&&<div className="music-account-tracks">{values.map(v=><button key={v.id} onClick={()=>playMusic(v,values)}>{v.title}</button>)}<small>Первые 50 записей плейлиста.</small></div>}
   {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
-  <p className="music-connection-note">Google-вход в MediaVault не подключает YouTube автоматически. Подключение даёт доступ к плейлистам; Premium YouTube не определяется этим API и отсутствие рекламы не гарантируется. Токены находятся только в памяти вкладки.</p>
+  <details className="music-connection-note"><summary>О подключении</summary><p>Google-вход в MediaVault не подключает YouTube автоматически. Подключение даёт доступ к плейлистам; Premium YouTube не определяется этим API и отсутствие рекламы не гарантируется. Токены находятся только в памяти вкладки.</p></details>
  </section>;
 }

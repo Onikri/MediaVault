@@ -172,3 +172,30 @@ on scroll, and has no painted container or pseudo-element at the top. Only the
 scrolled inner pill has a surface. Hover never paints a second active shape.
 Online title cards use the same title-card component/classes and adaptive poster
 size as the private collection; genres remain available in filters/details/hover.
+
+
+## Collection and music refinement (2026-10-31)
+
+The approved online library is the common reference for collection controls:
+247px sidebar, 28px grid gap, matte 21px modules, borderless pill view switch,
+pill title/file tabs and compact upload actions. Both poster grids reserve equal
+space. On phones the section pills scroll horizontally and duplicate sidebar
+navigation is hidden; the three filters remain available.
+
+The navbar has a fixed 60px inner height (56px on phones). Brand, active page,
+search, account controls and the 36px music transport share its vertical center.
+Expanded-at-top transparency and contracted scroll state are retained.
+
+All title cards expose the same hover dossier, even without a list synopsis.
+Exact-ID Russian Shikimori details and Jikan cover/trailer data load in parallel
+on demand, with bounded shared public caches. Tooltips are portaled, measured,
+clamped to the viewport and associated with their triggering link/button.
+
+The music island originates at its own navbar trigger, follows navbar resizing
+and opens above a bottom dock. Its collapsed transport is at most 172px, or an icon on
+phones; the expanded view is at most 356px. Content height is measured and
+bounded by the viewport. Audio is outside this layout and continues while the
+island collapses, changes view or navigates. Playback, queue and platform-account
+views are separate. Click outside/Escape collapse it; Escape restores focus.
+Motion uses a fixed-width inner layout, translated outer bounds and reduced-
+motion fallbacks. No provider playback/authentication mechanism was replaced.

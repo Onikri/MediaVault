@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {musicIslandLayout} from '../src/music-island.js';
+test('island follows its trigger as the navbar contracts',()=>{
+ const view={width:1440,height:900},anchor={left:1320,right:1356,top:20,bottom:56,width:36,height:36};
+ const first=musicIslandLayout(anchor,view,230),second=musicIslandLayout({...anchor,left:1200,right:1236},view,230);
+ assert.equal(first.top,66);assert.equal(first.left-second.left,120);
+ assert.equal(first.closedLeft,1320);assert.equal(first.closedWidth,36);assert.equal(first.height,230);
+});
+test('mobile, landscape and long settings remain inside the viewport',()=>{
+ for(const view of [{width:320,height:740},{width:390,height:844},{width:844,height:320}]){
+  const box=musicIslandLayout({left:view.width-50,right:view.width-18,top:20,bottom:52,width:32,height:32},view,1200);
+  assert.ok(box.left>=12&&box.top>=12);assert.ok(box.left+box.width<=view.width-12);
+  assert.ok(box.top+box.height<=view.height-12);assert.ok(box.height<=box.maxHeight);
+ }
+});
+test('a floating bottom transport opens upwards without moving its trigger',()=>{
+ const box=musicIslandLayout({left:1000,right:1172,top:730,bottom:766,width:172,height:36},{width:1200,height:790},245,'dock');
+ assert.equal(box.top,475);assert.equal(box.closedTop,730);assert.equal(box.closedWidth,172);
+});

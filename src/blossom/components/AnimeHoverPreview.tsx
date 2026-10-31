@@ -1,24 +1,23 @@
-import { createPortal } from 'react-dom';
-import { Captions, Star, Tv } from 'lucide-react';
-import type { Anime } from '../types/anime';
-import { safeSynopsis, scoreLabel } from '../utils/display';
-
-export interface AnimeHoverPreviewProps { anime:Anime; anchor:DOMRect | null; open:boolean }
-/**
- * Portaled to document.body so horizontally scrollable carousel rails do not
- * clip the preview, approximating the Radix HoverCard portal in the Vite chunk.
- */
-export function AnimeHoverPreview({anime,anchor,open}:AnimeHoverPreviewProps) {
-  if(!anchor || !open) return null;
-  const width=Math.min(325,window.innerWidth-24);
-  const chooseLeft=window.innerWidth-anchor.right < width+18;
-  const rawLeft=chooseLeft?anchor.left-width-13:anchor.right+13;
-  const left=Math.min(Math.max(12,rawLeft),window.innerWidth-width-12);
-  const top=Math.min(Math.max(220,anchor.top+anchor.height/2),window.innerHeight-230);
-  return createPortal(<aside className="anime-preview is-portal is-open" style={{left,top,width}} role="tooltip">
-    <div className="preview-head"><h3>{anime.title}</h3><span className="score-pill"><Star size={14} fill="currentColor"/> {scoreLabel(anime.score)}</span></div>
-    <p className="preview-synopsis">{safeSynopsis(anime)}</p>
-    <div className="preview-chips">{anime.type&&<span><Tv size={14}/>{anime.type}</span>}{anime.episodes&&<span><Captions size={14}/> {anime.episodes} сер.</span>}</div>
-    <dl className="preview-specs"><dt>ОРИГИНАЛ</dt><dd>{anime.title_japanese || '—'}</dd><dt>ВЫПУСК</dt><dd>{anime.aired?.string || anime.year || '—'}</dd><dt>СТАТУС</dt><dd>{anime.status || '—'}</dd><dt>ЖАНРЫ</dt><dd>{anime.genres?.map(genre=>genre.name).join(', ')||'—'}</dd></dl>
-  </aside>,document.body);
+import {createPortal} from 'react-dom';
+import {useLayoutEffect,useRef,useState} from 'react';
+import {Captions,Star,Tv} from 'lucide-react';
+import type {Anime} from '../types/anime';
+import {safeSynopsis,scoreLabel} from '../utils/display';
+export interface AnimeHoverPreviewProps {anime:Anime;anchor:DOMRect|null;open:boolean;busy?:boolean;id?:string}
+// Portaled so catalog grids and horizontal rails never clip the detail card.
+export function AnimeHoverPreview({anime,anchor,open,busy=false,id}:AnimeHoverPreviewProps){
+ const root=useRef<HTMLElement>(null),[position,setPosition]=useState({left:12,top:12,width:325});
+ useLayoutEffect(()=>{
+  if(!open||!anchor||!root.current)return;
+  const update=()=>{const width=Math.min(350,innerWidth-24),height=Math.min(root.current?.offsetHeight||320,innerHeight-24),right=anchor.right+13,left=right+width<=innerWidth-12?right:anchor.left-width-13,next={width,left:Math.max(12,Math.min(left,innerWidth-width-12)),top:Math.max(12,Math.min(anchor.top+(anchor.height-height)/2,innerHeight-height-12))};setPosition(old=>old.left===next.left&&old.top===next.top&&old.width===next.width?old:next);};
+  update();const observer=new ResizeObserver(update);observer.observe(root.current);return()=>observer.disconnect();
+ },[open,anchor?.left,anchor?.top,anchor?.height,anchor?.right]);
+ if(!anchor||!open)return null;
+ const scored=typeof anime.score==='number'&&Number.isFinite(anime.score),summary=safeSynopsis(anime);
+ return createPortal(<aside ref={root} id={id} className="anime-preview is-portal is-open" style={{...position,transform:'none'}} role="tooltip">
+  <div className="preview-head"><h3>{anime.title}</h3>{scored&&<span className="score-pill"><Star size={13} fill="currentColor"/>{scoreLabel(anime.score)}</span>}</div>
+  <p className="preview-synopsis">{summary||(busy?'Загружаем описание…':'Описание пока не предоставлено каталогом.')}</p>
+  <div className="preview-chips">{anime.type&&<span><Tv size={14}/>{anime.type}</span>}{anime.episodes&&<span><Captions size={14}/>{anime.episodes} сер.</span>}</div>
+  <dl className="preview-specs"><dt>Оригинал</dt><dd>{anime.title_japanese||'—'}</dd><dt>Выпуск</dt><dd>{anime.aired?.string||anime.year||'—'}</dd><dt>Статус</dt><dd>{anime.status||'—'}</dd><dt>Жанры</dt><dd>{anime.genres?.map(g=>g.name).join(', ')||'—'}</dd></dl>
+ </aside>,document.body);
 }

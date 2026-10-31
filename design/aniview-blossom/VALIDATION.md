@@ -8,7 +8,7 @@ No demo router, seeded catalog or old minified runtime was integrated.
 Local validation on 2026-10-31:
 
 - Production Vite and standalone LMT builds pass.
-- 236 Node tests pass, including public metadata single-flight/cancellation,
+- 239 Node tests pass, including public metadata single-flight/cancellation,
   original Russian metadata preservation, multilingual identity/ranking,
   book/music mapping, theme persistence and contrast.
 - 25 relevant Python tests pass: bounded public Jikan gateway, fallback/cache,
@@ -36,3 +36,16 @@ separate. No live Google login, physical-phone test or ML model inference is
 claimed. No translator/inpaint weights, encrypted settings or server key pool
 were changed. Task sources, logs, generated originals and screenshots remain
 inside the project .codex-local directory.
+
+
+Collection/music refinement validation:
+
+- A catalog row with no synopsis gets an exact-ID Russian hover description;
+  the measured dossier stays inside the viewport.
+- Collection and online catalog reserve equal grid width, and share view-control
+  geometry. Navbar center alignment is asserted for empty and playing music.
+- Island geometry covers navbar contraction, phones, landscape and bottom docks.
+- Browser audio tests decode/seek a real AAC fixture under the actual themed
+  navbar, continue playing after collapse and release the backend lease on close.
+  Provider resolution and account responses are mocks; no real OAuth or ML
+  inference is claimed.
