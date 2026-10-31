@@ -9,6 +9,16 @@ from browser_player import _extract, _render, observed_streams, browser_destinat
 from source_parser import SourceError
 
 class BrowserPlayerTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for delayed active source contract')
+    def test_parent_boot_stream_cannot_replace_delayed_selected_audio_quality_map(self):
+        import json
+        parent='https://publisher.example.com/delayed-film';url='https://embed.thealloha.club/?translation=66&delayed=1'
+        source={'1080':'https://cdn.example.com/selected-1080.m3u8','480':'https://cdn.example.com/selected-480.m3u8'}
+        markup='<video></video><script>window.player={currentSource:null};fetch("https://cdn.example.com/boot-360.m3u8");setTimeout(()=>player.currentSource={audioId:"selected",quality:'+json.dumps(source)+'},350);</script>'
+        fixture={parent:('<html>Film</html>','text/html'),url:(markup,'text/html'),'https://cdn.example.com/boot-360.m3u8':('#EXTM3U','application/vnd.apple.mpegurl')}
+        result=asyncio.run(_extract(url,parent,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=1))
+        self.assertEqual({s['url'] for s in result},set(source.values()))
+
     def test_immediate_playback_reuses_quality_probe_without_mixing_translations_or_mutable_results(self):
         from unittest.mock import patch
         import browser_player

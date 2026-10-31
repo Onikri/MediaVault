@@ -161,6 +161,15 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     try:await asyncio.wait_for(done.wait(),timeout=timeout)
                     except asyncio.TimeoutError:pass
                 await _check_player_access(target)
+                if framed:
+                    # The publisher's boot request can finish before this
+                    # iframe initializes its selected audio source. Never
+                    # mistake that response for the active quality ladder.
+                    try:
+                        await target.wait_for_function("() => typeof player!=='undefined' && player.currentSource?.quality && Object.keys(player.currentSource.quality).length>0",timeout=min(5000,timeout*1000))
+                    except PlaywrightTimeout:
+                        modern=await target.evaluate("() => typeof player!=='undefined' && 'currentSource' in player")
+                        if modern:raise SourceError('Плеер ещё не загрузил выбранную озвучку. Повтори подключение.') from None
                 if metadata is not None:
                     tracks=await target.locator('video track[src]').evaluate_all('(nodes)=>nodes.map(n=>({url:n.src,name:n.label,language:n.srclang}))')
                     metadata['subtitles']=[]
