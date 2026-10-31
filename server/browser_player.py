@@ -65,7 +65,7 @@ async def _check_player_access(page):
     if await plus.count() and await plus.first.is_visible():raise SourceError('Эта серия закрыта ограничением JutPlus. Нужна общедоступная серия или другой источник.')
 
 
-async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,timeout=12):
+async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,timeout=12,metadata=None):
     try:from playwright.async_api import async_playwright,TimeoutError as PlaywrightTimeout
     except ImportError:raise SourceError('Для динамического плеера обнови серверный образ с Chromium.') from None
     executable=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium') or shutil.which('google-chrome')
@@ -157,6 +157,13 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     try:await asyncio.wait_for(done.wait(),timeout=timeout)
                     except asyncio.TimeoutError:pass
                 await _check_player_access(target)
+                if metadata is not None:
+                    tracks=await target.locator('video track[src]').evaluate_all('(nodes)=>nodes.map(n=>({url:n.src,name:n.label,language:n.srclang}))')
+                    metadata['subtitles']=[]
+                    for track in tracks[:30]:
+                        try:track['url']=validate(track['url'])
+                        except SourceError:continue
+                        if urlsplit(track['url']).path.lower().endswith('.vtt'):metadata['subtitles'].append(track)
                 if framed:
                     # The initialized active audio source publishes the complete
                     # signed ladder. Its own quality keys are authoritative:
@@ -206,12 +213,15 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
         finally:await browser.close()
 
 
-def extract(url,referer=None):
+def extract(url,referer=None,*,details=False):
     if os.environ.get('MEDIA_VAULT_BROWSER_PLAYERS','1')!='1':
         raise SourceError('Динамические плееры отключены на этом сервере.')
     if not _slots.acquire(timeout=10):raise SourceError('Серверный браузер занят другим плеером. Повтори позднее.')
     try:
-        try:return asyncio.run(_extract(url,referer))
+        try:
+            metadata={} if details else None
+            streams=asyncio.run(_extract(url,referer,metadata=metadata))
+            return {'streams':streams,**metadata} if details else streams
         except SourceError:raise
         except Exception:raise SourceError('Не удалось открыть динамический плеер на сервере.') from None
     finally:_slots.release()

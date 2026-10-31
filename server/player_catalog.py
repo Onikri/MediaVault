@@ -46,7 +46,7 @@ def choice(name, url, *, identity='', kind='', language='und', player='', episod
             'kind':translation_kind(label,kind),'language':language,'named':bool(label),
             'episodes':episodes or []}
 
-def alloha_choices(text,base):
+def alloha_choices(text,base,*,season=None):
     """Read the published episode table and its actual translation IDs."""
     import json
     host=urlsplit(base).hostname or ''
@@ -55,7 +55,7 @@ def alloha_choices(text,base):
     if not match:return [],[]
     try:data=json.loads(match[1].replace("\\'","'").replace('\\\\','\\'))
     except (ValueError,TypeError):return [],[]
-    groups={};seasons=[];parts=urlsplit(base);params=dict(parse_qsl(parts.query));selected=params.get('season')
+    groups={};seasons=[];parts=urlsplit(base);params=dict(parse_qsl(parts.query));selected=str(season) if season is not None else params.get('season')
     if data.get('type')=='movie':
         # Films publish a different table (cut / translation / release quality).
         # Keep the currently published cut; switching cut IDs would change the
@@ -205,6 +205,8 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
         published=animego_episode_pages(document,url)
         buttons=animego_buttons(document,url)
         current_choices,current_seasons=player_choices(document,url)
+        if season is not None and player_name(url)=='Alloha (динамический)':
+            current_choices,current_seasons=alloha_choices(document,url,season=season)
         seasons.extend(current_seasons)
         if not episodes and current.episodes:episodes=current.episodes
         for item in buttons:
@@ -234,6 +236,13 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             diagnostics.append({'status':'unavailable','message':'Слишком глубокая цепочка вложенных страниц; список переводов неполный.'})
     # A selected variant must still be published by this source, including nested players.
     selected=next((item for item in choices if item['url']==dub_url),None) if dub_url else None
+    if selected is None and dub_url and season is not None and player_name(dub_url)=='Alloha (динамический)':
+        # A season change keeps the exact published film tokens and translation;
+        # only the season/episode selectors may differ from the original choice.
+        def same_voice(target):
+            parts=urlsplit(target)
+            return parts.scheme,parts.netloc,parts.path,sorted((k,v) for k,v in parse_qsl(parts.query) if k not in {'season','episode'})
+        selected=next((item for item in choices if item.get('player')=='Alloha' and same_voice(item['url'])==same_voice(dub_url)),None)
     if dub_url and selected is None and not pending:raise SourceError('Выбранная озвучка больше не найдена на странице. Обнови список.')
     if selected:
         episodes=selected.get('episodes') or []

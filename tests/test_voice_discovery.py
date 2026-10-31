@@ -42,6 +42,10 @@ class PlayerCatalogTests(unittest.TestCase):
         choices,seasons=alloha_choices(text,url+'&season=1')
         self.assertEqual([s['number'] for s in seasons],[1,2]);self.assertEqual([e['number'] for e in choices[0]['episodes']],[1,3]);self.assertEqual([e['number'] for e in choices[1]['episodes']],[3])
         self.assertIn('translation=11',choices[1]['episodes'][0]['url']);self.assertEqual(choices[0]['player'],'Alloha')
+        second=inspect_catalog(url,text,url,Http({}),dub_url=choices[0]['url'],season=2)
+        self.assertEqual([(e['season'],e['number']) for e in second['episodes']],[(2,1)])
+        self.assertIn('translation=10',second['episodes'][0]['url'])
+        with self.assertRaises(SourceError):inspect_catalog(url,text,url,Http({}),dub_url=choices[0]['url'].replace('translation=10','translation=99'),season=2)
 
     def test_parser_retains_two_translations_of_one_episode(self):
         page=parse_page('<a href="/episode-1?translation=1">1 серия</a><a href="/episode-1?translation=2">1 серия</a>','https://example.com/show')

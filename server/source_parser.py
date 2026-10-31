@@ -248,6 +248,7 @@ class Page:
     streams: list = field(default_factory=list)
     players: list = field(default_factory=list)
     episodes: list = field(default_factory=list)
+    subtitles: list = field(default_factory=list)
 
 
 class PageParser(HTMLParser):
@@ -479,5 +480,6 @@ class Resolver:
         host=urlsplit(url).hostname or ''
         if host in {'jut.su','www.jut.su'} or host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):
             from browser_player import extract
-            return Page(title=page.title,streams=extract(url,referer))
+            result=extract(url,referer,details=True)
+            return Page(title=page.title,streams=result['streams'],subtitles=result.get('subtitles',[]))
         raise SourceError("Публичный MP4/HLS-поток не найден. Вставь ссылку на доступную серию или поддерживаемый плеер.")

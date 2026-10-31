@@ -16,11 +16,14 @@ class OnlinePlayback(unittest.TestCase):
   streams=[{'url':'https://cdn.example.com/'+str(q)+'.m3u8','type':'hls','quality':q,'headers':{}} for q in [480,2160,1440,1080,720,360]]
   with patch('online_sessions.Resolver') as resolver,patch('online_sessions.PublicHttp') as http:
    resolver.return_value.resolve.return_value=SimpleNamespace(streams=streams)
+   http.return_value.fork.return_value=http.return_value
    http.return_value.document.side_effect=lambda url,**_:('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=3840x1604\n4k.m3u8\n',url,{})
    r=client.post('/online/prepare',json={'url':'https://embed.thealloha.club/?translation=66','kind':'video'})
    self.assertEqual(r.status_code,200,r.text)
-   http.return_value.document.assert_called_once_with('https://cdn.example.com/2160.m3u8',headers={})
+   self.assertEqual(http.return_value.document.call_count,6)
+   http.return_value.document.assert_any_call('https://cdn.example.com/2160.m3u8',headers={})
    self.assertIn('https://cdn.example.com/2160.m3u8',online.sessions[r.json()['id']].resources.values())
+   self.assertEqual(r.json()['qualities'],[2160,1440,1080,720,480,360])
  def test_online_preparation_keeps_the_selected_public_parent(self):
   from types import SimpleNamespace
   app=FastAPI();online.install(app,lambda:'fixture-owner');client=TestClient(app)
@@ -83,6 +86,8 @@ class OnlinePlayback(unittest.TestCase):
   app=FastAPI();online.install(app,lambda:'A');client=TestClient(app)
   with patch('online_sessions.PublicHttp._open') as fetch:
    response=client.get('/online/'+token+'/'+key)
+   repeated=client.get('/online/'+token+'/'+key)
+  self.assertEqual(repeated.text,response.text)
   fetch.assert_not_called();self.assertEqual(response.status_code,200);self.assertIn('/online/'+token+'/',response.text);self.assertNotIn('source.example',response.text)
  def test_prepare_checks_one_master_without_preloading_video_or_all_qualities(self):
   from types import SimpleNamespace

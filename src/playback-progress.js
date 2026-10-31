@@ -8,7 +8,7 @@ export function writeProgress(user,library,item,time,duration,storage){
   try{
     storage=storage||globalThis.localStorage;
     const done=Number.isFinite(duration)&&duration>0&&duration-time<10;
-    const value={itemId:item.id,time:Math.max(0,Math.floor(time)),duration:Number.isFinite(duration)?duration:null,updatedAt:Date.now(),done};
+    const value={itemId:item.id,time:Math.max(0,Math.floor(time)),duration:Number.isFinite(duration)?duration:null,updatedAt:Date.now(),done,episode:item.episode,season:item.season,voiceId:item.voiceId,dub:item.dub};
     if(time<1||done)storage.removeItem(key(user,library,item.id));else storage.setItem(key(user,library,item.id),JSON.stringify(value));
     if(item.collectionId){const group=key(user,library,'collection:'+item.collectionId);if(done||time<1){if(readProgress(user,library,'collection:'+item.collectionId,storage)?.itemId===item.id)storage.removeItem(group);}else storage.setItem(group,JSON.stringify(value));}
   }catch{}

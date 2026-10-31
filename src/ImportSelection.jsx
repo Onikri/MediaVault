@@ -9,8 +9,9 @@ import OnlineViewer from './OnlineViewer.jsx';
 import {exportLocally} from './local-export.js';
 import {selectedVideoEntries} from './import-selection-model.js';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
+import OnlineWatch from './OnlineWatch.jsx';
 
-export default function ImportSelection({state,service,item,manual=false,onSubmitted,onOpenLibrary,destination='drive',compact=false}){
+export default function ImportSelection({state,service,item,manual=false,onSubmitted,onOpenLibrary,destination='drive',compact=false,profile}){
   const localAbort=useRef(null);
  useEffect(()=>()=>localAbort.current?.abort(),[]);
  const [online,setOnline]=useState(false),[playingEntry,setPlayingEntry]=useState(null),[localProgress,setLocalProgress]=useState(''),[episodeCount,setEpisodeCount]=useState(24);
@@ -82,6 +83,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
   }
   if(kind==='manga')return <MangaImport compact={compact} destination={destination} state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary}/>;
   const player=online&&<OnlineViewer sourceUrl={url} inline={compact} onEntryChange={e=>{setPlayingEntry(e);setOne(String(e.number));}} quality={quality} kind="video" entries={(compact?published:onlineEntries).map(e=>({...e,season:Number(e.season||season)}))} initial={playingEntry||onlineEntries[0]} title={collection} service={service} userId={state.user?.sub} dub={variant?.name||inspection?.dubs?.find(d=>d.url===dub)?.name||''} metadata={item} onClose={()=>setOnline(false)}/>;
+  if(compact&&destination==='online'&&kind==='anime')return <OnlineWatch item={item} profile={profile||item} discovery={discovery} service={service} userId={state.user?.sub}/>;
   if(compact&&destination==='online')return <div className="title-playback-controls video-playback-controls">
    {item?.kind==='anime'&&<VoicePicker discovery={discovery} selected={variant} onChoose={value=>{setVariant(value);setInspection(null);setDub('');setOnline(false);generation.current++;if(value)inspect(value.sourceUrl,value.url);}}/>}
    {item?.kind!=='anime'&&found.length>0&&<label className="form-field input-label">Источник<select aria-label="Источник просмотра" className="field-input" value={url} onChange={e=>inspect(e.target.value)}><option value="">Выбери источник</option>{found.map(s=><option key={s.url} value={s.url}>{s.providerName}</option>)}</select></label>}

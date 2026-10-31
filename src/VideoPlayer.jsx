@@ -19,6 +19,8 @@ import PlayerSettings,{SettingsGlyph} from './PlayerSettings.jsx';
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {startMobileGpu} from './mobile-gpu-upscaler.js';
 import {startFsr} from './fsr-upscaler.js';
+import useExternalAudio from './use-external-audio.js';
+import {captureEpisodePreview} from './episode-preview-cache.js';
 
 const PREF_KEY='mediavault_player_preferences_v1';
 const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,upscaler:'auto',deviceProfile:'auto',neuralMode:'balanced',subSize:24,subOffset:8};
@@ -54,7 +56,7 @@ function VolumeGlyph({value,muted}){
     <path className="volume-wave" style={{opacity:level===0?1:0}} d="m14 10 6 6m0-6-6 6"/>
   </svg>;
 }
-export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange}){
+export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview}){
   const ownRef=useRef(null),canvasRef=useRef(null),stageRef=useRef(null),railRef=useRef(null);
   const videoRef=mediaRef||ownRef;
   const streaming=useVideoStream(videoRef,source,item.onlineType,onError);
@@ -65,6 +67,11 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   useEffect(()=>()=>clearTimeout(seekTimer.current),[]);
   const [time,setTime]=useState(0),[duration,setDuration]=useState(0),[buffered,setBuffered]=useState(0);
   const [playing,setPlaying]=useState(false),[muted,setMuted]=useState(false);
+  const [audioError,setAudioError]=useState('');
+  const external=useExternalAudio(videoRef,audioError?'':onlineControls?.audio?.url,onlineControls?.audio?.type,Number(prefs.volume),muted,Number(prefs.audioOffset)||0,e=>setAudioError(e.message));
+  useEffect(()=>setAudioError(''),[onlineControls?.audio?.url]);
+  const snapshot=useRef({time:0,duration:0}),previewCaptured=useRef('');
+  useEffect(()=>{const save=()=>{const v=snapshot.current;if(v.time>0)writeProgress(userId,libraryId,item,v.time,v.duration);};const hidden=()=>{if(document.visibilityState==='hidden')save();};addEventListener('pagehide',save);document.addEventListener('visibilitychange',hidden);return()=>{save();removeEventListener('pagehide',save);document.removeEventListener('visibilitychange',hidden);};},[item.id,source,userId,libraryId]);
   const [isFullscreen,setIsFullscreen]=useState(false),[isPip,setIsPip]=useState(false);
   useEffect(()=>{const v=videoRef.current;const enter=()=>setIsPip(true),leave=()=>setIsPip(false);v?.addEventListener('enterpictureinpicture',enter);v?.addEventListener('leavepictureinpicture',leave);return()=>{v?.removeEventListener('enterpictureinpicture',enter);v?.removeEventListener('leavepictureinpicture',leave);};},[]);
   useEffect(()=>{const update=()=>setIsFullscreen(document.fullscreenElement===stageRef.current);document.addEventListener('fullscreenchange',update);return()=>document.removeEventListener('fullscreenchange',update);},[]);
@@ -78,6 +85,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const settingsOpen=panel==='settings';
   const scene=usePlayerAtmosphere(videoRef,source,playing,stageRef);
   const [subtitle,setSubtitle]=useState('off'),[availableTracks,setAvailableTracks]=useState([]);
+  useEffect(()=>{streaming.setSubtitle(subtitle.startsWith('hls:')?Number(subtitle.slice(4)):-1);},[subtitle,source,streaming.subtitles]);
   const [audioTracks,setAudioTracks]=useState([]),[activeAudio,setActiveAudio]=useState(0);
   const [subtitleText,setSubtitleText]=useState(''),[gpuActive,setGpuActive]=useState(false);
   const [gpuWarning,setGpuWarning]=useState('');
@@ -160,7 +168,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
     const refresh=()=>setSubtitleText(tracks.filter(track=>track.mode==='hidden')
       .flatMap(track=>Array.from(track.activeCues||[]).map(cue=>cue.text)).join('\n'));
     tracks.forEach((track,index)=>{
-      track.mode=(subtitle===(track.label==='Загруженные субтитры'?'local':'native:'+index))?'hidden':'disabled';
+      if(!subtitle.startsWith('hls:'))track.mode=(subtitle===(track.label==='Загруженные субтитры'?'local':'native:'+index))?'hidden':'disabled';
       track.addEventListener?.('cuechange',refresh);
     });
     refresh();
@@ -206,7 +214,8 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   };
   function onTime(){
     const video=videoRef.current;if(!video)return;
-    setTime(video.currentTime);
+    setTime(video.currentTime);snapshot.current={time:video.currentTime,duration:video.duration};
+    if(onPreview&&previewCaptured.current!==item.id&&video.currentTime>=1){const image=captureEpisodePreview(video);if(image){previewCaptured.current=item.id;onPreview(item.episode,image);}}
     const ranges=video.buffered;
     if(ranges.length)setBuffered(ranges.end(ranges.length-1));
     if(prefs.autoSkip){const skip=[effectiveOpening,ending].find(v=>v&&video.currentTime>=v.start&&video.currentTime<v.end-.2);if(skip)seek(skip.end);}
@@ -218,6 +227,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   function loaded(){
     const video=videoRef.current;if(!video)return;
     setDuration(Number.isFinite(video.duration)?video.duration:0);
+    snapshot.current={time:video.currentTime,duration:video.duration};
     video.playbackRate=Number(prefs.speed)||1;video.volume=Math.max(0,Math.min(1,Number(prefs.volume)));
     if(!source||!Number.isFinite(video.duration)||video.duration<=0)return;
     if(!resumeApplied.current){
@@ -226,6 +236,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       if(shared!==null){sessionStorage.removeItem('mediavault_pending_time_'+item.id);const point=Number(shared);if(Number.isFinite(point))seek(point);}
       else{const point=readResume(keyFor(userId,libraryId,item.id));if(point>0&&point<video.duration-12)seek(point);}
     }
+    snapshot.current={time:video.currentTime,duration:video.duration};
   }
   function choose(nextItem,keepTime=false){
     if(!nextItem||nextItem.id===item.id)return;
@@ -234,7 +245,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   }
   function nextEpisode(){choose(next);}
   function ended(){
-    setPlaying(false);writeProgress(userId,libraryId,item,0,videoRef.current?.duration);
+    snapshot.current={time:0,duration:videoRef.current?.duration};setPlaying(false);writeProgress(userId,libraryId,item,0,videoRef.current?.duration);
     if(prefs.autoNext)nextEpisode();
   }
   function toggle(){const video=videoRef.current;if(!video)return;
@@ -309,12 +320,13 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       <div className="mv-player-ambient" aria-hidden="true"/>
       <div className="mv-player-panorama" aria-hidden="true">{scene.image&&<img src={scene.image} alt=""/>}</div>
       <div className="mv-player-stage">
-        <video ref={videoRef} src={streaming.hls?undefined:source||undefined} crossOrigin="anonymous" playsInline preload="metadata" muted={muted}
-          onLoadedMetadata={loaded} onTimeUpdate={onTime}
-          onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);writeProgress(userId,libraryId,item,videoRef.current?.currentTime||0,videoRef.current?.duration);}}
+        <video ref={videoRef} src={streaming.hls?undefined:source||undefined} crossOrigin="anonymous" playsInline preload="metadata" muted={muted||!!onlineControls?.audio&&!audioError}
+          onLoadedMetadata={loaded} onLoadedData={()=>{const image=captureEpisodePreview(videoRef.current);if(onPreview&&image){previewCaptured.current=item.id;onPreview(item.episode,image);}}} onTimeUpdate={onTime}
+          onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);if(videoRef.current?.readyState>=1)writeProgress(userId,libraryId,item,videoRef.current?.currentTime||0,videoRef.current?.duration);}}
           onDurationChange={loaded} onEnded={ended}
           onError={()=>{if(source)diagnoseVideoFailure({video:videoRef.current,source}).then(message=>onError?.(Error(message))).catch(()=>{});}}
-          aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}</video>
+          aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}{onlineControls?.externalCaptions?.map(t=><track key={t.url} kind="subtitles" src={t.url} srcLang={t.language||'ru'} label={t.name}/>)}</video>
+        {onlineControls?.audio&&<video ref={external.ref} className="mv-external-audio" src={onlineControls?.audio?.type==='hls'?undefined:onlineControls?.audio?.url} crossOrigin="anonymous" playsInline preload="metadata" aria-hidden="true" onError={()=>{if(onlineControls?.audio)setAudioError('Отдельная озвучка не ответила. Включён исходный звук.');}}/>}
         <canvas key={engine+':'+deviceProfile+':'+prefs.neuralMode+':'+gpuAttempt} ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
         {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:(hiddenControls?prefs.subOffset:Math.max(22,prefs.subOffset))+'%'}} aria-live="off">{subtitleText}</div>}
       </div>
@@ -332,7 +344,10 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       </div>
       <AnimatePresence>
       {settingsOpen&&<PlayerSettings onClose={()=>openPanel('watch')}>{{
-        watch:<div className="mv-player-settings">        <label>Качество{streaming.levels.length?<select aria-label="Качество" value={streaming.level} onChange={e=>streaming.setLevel(Number(e.target.value))}><option value={-1}>Автоматически</option>{streaming.levels.map(l=><option key={l.index} value={l.index}>{l.height}p</option>)}</select>:<select aria-label="Качество" value={item.id} disabled={!episode?.variants.some(v=>v.item.id!==item.id&&v.label===episode.variants.find(x=>x.item.id===item.id)?.label)} onChange={e=>choose(episode.variants.find(v=>v.item.id===e.target.value)?.item,true)}>{episode?.variants.filter(v=>v.item.id===item.id||v.label===episode.variants.find(x=>x.item.id===item.id)?.label).map(v=><option key={v.item.id} value={v.item.id}>{v.item.quality||v.item.resolution||(v.item.id===item.id&&videoRef.current?.videoHeight?videoRef.current.videoHeight+'p':'Исходное')}</option>)}</select>}</label>
+        watch:<div className="mv-player-settings">        <label>Качество{!streaming.levels.length&&onlineControls?.qualities?.length?<select aria-label="Качество" value={onlineControls.quality} onChange={e=>onlineControls.onQuality(e.target.value)}><option value="best">Лучшее · автоматически</option>{onlineControls.qualities.map(q=><option key={q} value={q}>{q}p</option>)}</select>:streaming.levels.length?<select aria-label="Качество" value={streaming.level} onChange={e=>streaming.setLevel(Number(e.target.value))}><option value={-1}>Лучшее · автоматически</option>{streaming.levels.map(l=><option key={l.index} value={l.index}>{l.height}p</option>)}</select>:<select aria-label="Качество" value={item.id} disabled={!episode?.variants.some(v=>v.item.id!==item.id&&v.label===episode.variants.find(x=>x.item.id===item.id)?.label)} onChange={e=>choose(episode.variants.find(v=>v.item.id===e.target.value)?.item,true)}>{episode?.variants.filter(v=>v.item.id===item.id||v.label===episode.variants.find(x=>x.item.id===item.id)?.label).map(v=><option key={v.item.id} value={v.item.id}>{v.item.quality||v.item.resolution||(v.item.id===item.id&&videoRef.current?.videoHeight?videoRef.current.videoHeight+'p':'Исходное')}</option>)}</select>}</label>
+        {onlineControls?.voices?.length>0&&<label>Озвучка<select aria-label="Озвучка в плеере" value={onlineControls.voiceId||''} onChange={e=>onlineControls.onVoice(e.target.value)}>{onlineControls.voices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label>}
+        {onlineControls?.audio&&<><p className="player-setting-help">Видео сохраняет выбранное качество. Звук синхронизируется из отдельного потока; он также использует сеть.</p><label>Сдвиг звука · {Number(prefs.audioOffset)||0} с<input aria-label="Сдвиг звука" type="range" min="-30" max="30" step="0.1" value={Number(prefs.audioOffset)||0} onChange={e=>changePrefs({audioOffset:Number(e.target.value)})}/></label></>}
+        {(onlineControls?.trackBusy||onlineControls?.trackError||audioError)&&<p className="player-setting-help" role="status">{audioError||onlineControls.trackError||'Подключаем дорожку…'}</p>}
         {episode?.variants.length>1&&<label>Озвучка<select value={item.id} onChange={event=>choose(episode.variants.find(v=>v.item.id===event.target.value)?.item,true)}>{episode.variants.map(v=><option key={v.item.id} value={v.item.id}>{v.label}</option>)}</select></label>}
         <label>Скорость<select value={prefs.speed} onChange={event=>changePrefs({speed:Number(event.target.value)})}>
           {[0.5,0.75,1,1.25,1.5,1.75,2].map(v=><option key={v} value={v}>{v}×</option>)}</select></label>
@@ -342,7 +357,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
           onChange={event=>changePrefs({autoNext:event.target.checked})}/> Следующий эпизод автоматически</label>
         <label className="mv-player-check"><input type="checkbox" checked={prefs.autoSkip}
           onChange={event=>changePrefs({autoSkip:event.target.checked})}/> Пропускать опенинг и эндинг</label>
-        <div className="mv-player-intro"><span>Опенинг: {opening?clock(opening.start)+' – '+clock(opening.end):'не размечен'}</span>
+        <div className="mv-player-intro"><span>Опенинг: {effectiveOpening?clock(effectiveOpening.start)+' – '+clock(effectiveOpening.end)+(effectiveOpening.source?' · '+effectiveOpening.source:''):'разметки пока нет'}</span>
           <div><button onClick={()=>setOpeningDraft(time)}>Начало {openingDraft!==null?'('+clock(openingDraft)+')':''}</button>
           <button disabled={openingDraft===null} onClick={markEnd}>Конец</button>
           <button disabled={!opening} onClick={()=>setIntro(null)}>Очистить</button></div>
@@ -353,10 +368,12 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
         {neuralStats&&prefs.gpu&&<small>{engineName}: {neuralStats.width}×{neuralStats.height} · {neuralStats.fps} кадр/с · {neuralStats.latency} мс{(neuralStats.adapter||neuralStats.renderer)?' · '+(neuralStats.adapter||neuralStats.renderer):''}{neuralStats.software?' · программный рендерер браузера':''}</small>}
         {gpuWarning&&<button onClick={()=>retryGpu(mobileDevice?'mobile':prefs.upscaler)}>Повторить на новом GPU-контексте</button>}
         <fieldset className="player-colors"><legend>Цвет изображения</legend><div className="chip-row">{[['Оригинал',1,1,1],['Аниме · сочнее',1.18,1.06,1.01],['Мягкий',1.06,.97,1.03]].map(([name,saturation,contrast,brightness])=><button key={name} onClick={()=>color({saturation,contrast,brightness})}>{name}</button>)}</div>{[['saturation','Насыщенность',.5,1.6],['contrast','Контраст',.8,1.3],['brightness','Яркость',.8,1.2]].map(([id,label,min,max])=><label key={id}>{label}<input aria-label={label+' изображения'} type="range" min={min} max={max} step=".01" value={colors[id]??1} onChange={e=>color({[id]:Number(e.target.value)})}/><small>{Math.round((colors[id]??1)*100)}%</small></label>)}</fieldset><p className="player-setting-help">Запрашивается высокопроизводительный GPU. Конкретную видеокарту выбирает браузер и ОС; сайт не может принудительно включить дискретную карту.</p><p className="player-setting-help">Мобильный режим обрабатывает текстуру видео в WebGL без нейросети на CPU. Anime4K оставлен для мощных GPU. Если браузер отключил аппаратное ускорение, сайт не может включить видеокарту за него. Мини-окно показывает исходник.</p></div>,
-        captions:<div className="mv-player-settings">        <label>Субтитры<select value={subtitle} onChange={event=>setSubtitle(event.target.value)}>
+        captions:<div className="mv-player-settings">        <label>Субтитры<select aria-label="Субтитры" value={subtitle} onChange={event=>setSubtitle(event.target.value)}>
           <option value="off">Выключены</option>
+          {streaming.subtitles.map(t=><option key={'hls:'+t.index} value={'hls:'+t.index}>{t.name}</option>)}
           {availableTracks.map(track=><option key={track.id} value={track.id}>{track.name}</option>)}
         </select></label>
+        {onlineControls?.captionVoices?.length>0&&<label>Подключить из другой версии<select aria-label="Источник субтитров" value={onlineControls.subtitleId||''} onChange={e=>onlineControls.onCaptionVoice(e.target.value)}><option value="">Дорожки текущего видео</option>{onlineControls.captionVoices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label>}
         <label>Размер субтитров<input aria-label="Размер субтитров" type="range" min="16" max="40" step="2"
           value={prefs.subSize} onChange={event=>changePrefs({subSize:Number(event.target.value)})}/></label>
         <label>Отступ субтитров<input aria-label="Отступ субтитров" type="range" min="3" max="22" step="1"
@@ -370,7 +387,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {engineName}{engine==='mobile'||engine==='lanczos'||String(engine).startsWith('fsr')?'':' ×2'}{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
       <div className="mv-player-console" onPointerEnter={revealControls}>
-        <div className="mv-player-timeline" onPointerMove={e=>{if(!seekable||!source||navigator.connection?.saveData)return;const r=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));clearTimeout(seekTimer.current);const value={time:fraction*duration,left:Math.max(14,Math.min(86,fraction*100))};seekTimer.current=setTimeout(()=>setHoverSeek(value),200);}} onPointerLeave={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}} onPointerCancel={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}}>{hoverSeek&&<TimelinePreview source={source} type={item.onlineType} point={hoverSeek.time} left={hoverSeek.left}/>}{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
+        <div className="mv-player-timeline" onPointerMove={e=>{if(!seekable||!source||navigator.connection?.saveData)return;const r=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));clearTimeout(seekTimer.current);const value={time:fraction*duration,left:Math.max(14,Math.min(86,fraction*100))};seekTimer.current=setTimeout(()=>setHoverSeek(value),200);}} onPointerLeave={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}} onPointerCancel={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}}><span className="mv-timeline-markers" aria-label="Разметка опенинга и эндинга">{[effectiveOpening,ending].filter(Boolean).map((v,i)=><i key={i} title={(i===0?'Опенинг':'Эндинг')+' · '+clock(v.start)+' – '+clock(v.end)} style={{left:(duration?v.start/duration*100:0)+'%',width:(duration?(v.end-v.start)/duration*100:0)+'%'}}/>)}</span>{hoverSeek&&<TimelinePreview source={source} type={item.onlineType} point={hoverSeek.time} left={hoverSeek.left}/>}{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
           value={Math.min(previewTime,seekable?duration:1)} disabled={!seekable} step="0.1" onChange={event=>seek(Number(event.target.value))}
           style={{'--played':progress+'%','--buffered':Math.max(progress,seekable?buffered/duration*100:0)+'%'}}/></div>
         <div className="mv-player-controls">

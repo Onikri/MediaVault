@@ -106,15 +106,28 @@ def install(app,owner):
             stream=masters[0] if masters else pick_stream(page.streams,body.quality)
             max_height=None if body.quality=='best' else int(body.quality)
             manifest=None
+            generated=False
             # Check the first manifest now, before granting a playback capability.
             if stream['type']=='hls':
-                text,final,_=http.document(stream['url'],headers=stream.get('headers'));rewrite_manifest(text,final,lambda v:v,max_height)
-                manifest=(text,final,time.monotonic()+30)
+                from adaptive_playback import adaptive_master
+                text=adaptive_master(page.streams,http,max_height) if not masters else None
+                generated=text is not None
+                if not generated:text,final,_=http.document(stream['url'],headers=stream.get('headers'))
+                else:final=stream['url']
+                rewrite_manifest(text,final,lambda v:v,None if generated else max_height)
+                manifest=(text,final,float('inf') if generated else time.monotonic()+30)
             token,s=create(subject,stream.get('headers') or {},client_id=body.client_id,reservation=reservation)
-            s.max_height=max_height
+            s.max_height=None if generated else max_height
             resource=s.resource(stream['url'])
             if manifest:s.manifests[resource]=manifest
-            return {'id':token,'kind':'video','url':'/online/'+token+'/'+resource,'type':stream['type'],'expiresIn':LEASE_SECONDS,'preparationMs':round((time.monotonic()-started)*1000)}
+            captions=[]
+            for i,track in enumerate(getattr(page,'subtitles',[])):
+                if str(track.get('url','')).split('?',1)[0].lower().endswith('.vtt'):
+                    captions.append({'id':str(i),'name':str(track.get('name') or 'Субтитры')[:100],
+                                     'language':str(track.get('language') or 'und')[:12],'url':'/online/'+token+'/'+s.resource(track['url'])})
+            return {'id':token,'kind':'video','url':'/online/'+token+'/'+resource,'type':stream['type'],'subtitles':captions,
+                    'qualities':sorted({int(v['quality']) for v in page.streams if str(v.get('quality','')).isdigit()},reverse=True),
+                    'expiresIn':LEASE_SECONDS,'preparationMs':round((time.monotonic()-started)*1000)}
         except BaseException:
             if token:
                 with lock:sessions.pop(token,None)
@@ -177,7 +190,7 @@ def install(app,owner):
         else:http=PublicHttp(timeout=(5,20))
         response=None;handed=False
         try:
-            with s.lock:cached=s.manifests.pop(resource,None)
+            with s.lock:cached=s.manifests.get(resource)
             if cached and cached[2]>time.monotonic():
                 data=rewrite_manifest(cached[0],cached[1],lambda value:'/online/'+token+'/'+s.resource(value),s.max_height)
                 return Response(data,media_type='application/vnd.apple.mpegurl',headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})

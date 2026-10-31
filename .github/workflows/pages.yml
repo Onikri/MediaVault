@@ -110,6 +110,7 @@ jobs:
             npm run test:reader &&
             npm run test:music &&
             npm run test:online &&
+            npm run test:watch &&
             npm run test:translation &&
             npm run test:gpu &&
             npm run test:lmt &&

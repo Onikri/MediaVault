@@ -6,6 +6,8 @@ export function inEpisodes(values,episode){
 export default function useEpisodeMusic(identity,episode,duration){
  const [data,setData]=useState({tracks:[],intervals:[]});
  useEffect(()=>{setData({tracks:[],intervals:[]});const server=window.MEDIA_VAULT_CONFIG?.importServerUrl;if(!identity||!episode||!duration||!server)return;const a=new AbortController();
-  Promise.all([fetch(server+'/music/anime/'+identity,{signal:a.signal}).then(r=>r.ok?r.json():{}),fetch(server+'/music/timings/'+identity+'/'+episode+'?duration='+Math.round(duration),{signal:a.signal}).then(r=>r.ok?r.json():{})]).then(([songs,timing])=>{if(!a.signal.aborted)setData({tracks:(songs.tracks||[]).filter(t=>inEpisodes(t.episodes,Number(episode))),intervals:timing.intervals||[]});}).catch(()=>{});return()=>a.abort();
+  const load=url=>fetch(url,{signal:a.signal}).then(r=>r.ok?r.json():{}).catch(()=>({}));
+  load(server+'/music/anime/'+identity).then(songs=>{if(!a.signal.aborted)setData(old=>({...old,tracks:(songs.tracks||[]).filter(t=>inEpisodes(t.episodes,Number(episode)))}));});
+  load(server+'/music/timings/'+identity+'/'+episode+'?duration='+Math.round(duration)).then(timing=>{if(!a.signal.aborted)setData(old=>({...old,intervals:timing.intervals||[]}));});return()=>a.abort();
  },[identity,episode,Math.round(duration)]);return data;
 }
