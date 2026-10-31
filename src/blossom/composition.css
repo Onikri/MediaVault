@@ -234,3 +234,5 @@ html[data-blossom] .media-grid.library-layout-list{grid-template-columns:minmax(
  html[data-blossom] .blossom-catalog-content .catalog-grid.catalog-layout-list,
  html[data-blossom] .media-grid.library-layout-list{grid-template-columns:minmax(0,1fr);gap:12px}
 }
+
+@media(prefers-reduced-motion:reduce){html[data-blossom] .blossom-navbar,html[data-blossom] .blossom-navbar .header-inner,html[data-blossom] .blossom-navbar .nav-glide{transition:none}}
