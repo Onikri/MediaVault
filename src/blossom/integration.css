@@ -43,8 +43,8 @@ html[data-blossom] .header-search kbd{font-size:9px;opacity:.55;margin-left:5px}
 html[data-blossom] .header-actions .icon-button,html[data-blossom] .header-actions .avatar-button{width:34px;height:34px;border-radius:50%;color:var(--color-petal-shadow);background:transparent}
 html[data-blossom] .header-actions .avatar-button{background:var(--color-surface-raised)}
 html[data-blossom] .online-dot{border-color:var(--color-canvas)}
-html[data-blossom] .mobile-nav{background:var(--color-surface);border-radius:var(--radius-lg);margin-top:8px;max-height:0;visibility:hidden}
-html[data-blossom] .mobile-nav.is-open{max-height:400px;visibility:visible}
+html[data-blossom] .mobile-nav{background:var(--color-surface);border-radius:var(--radius-lg);margin-top:8px;max-height:0}
+html[data-blossom] .mobile-nav.is-open{max-height:400px}
 html[data-blossom] .mobile-nav-link{display:flex;align-items:center;gap:11px;background:transparent;color:var(--color-petal);text-align:left}
 html[data-blossom] .mobile-nav-link.active{background:color-mix(in srgb,var(--color-blossom) 18.0%,transparent);color:var(--color-blossom-light)}
 /* Supplied media stage and editorial rhythm. */
