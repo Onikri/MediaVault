@@ -97,6 +97,7 @@ jobs:
           mkdir -p test-output
           set +e
           {
+            npm run test:blossom &&
             npm run test:design &&
             npm run test:watch &&
             npm run test:ui &&
@@ -148,6 +149,7 @@ jobs:
           name: mediavault-visual-tests
           path: |
             test-output/*.png
+            .codex-local/test-output/blossom/*.png
             .codex-local/test-output/watch/*.png
             .codex-local/test-output/navigation/*.png
           include-hidden-files: true

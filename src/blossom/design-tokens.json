@@ -1,0 +1,187 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "name": "AniView Blossom / Source-derived and photo-inspired",
+  "version": "1.0.0",
+  "color": {
+    "canvas": {
+      "$type": "color",
+      "$value": "#11191C",
+      "description": "dark stem of reference flower"
+    },
+    "canvasSoft": {
+      "$type": "color",
+      "$value": "#181F21"
+    },
+    "surface": {
+      "$type": "color",
+      "$value": "#251B20"
+    },
+    "surfaceRaised": {
+      "$type": "color",
+      "$value": "#332126"
+    },
+    "brand": {
+      "$type": "color",
+      "$value": "#EE3C35",
+      "description": "bright red flower background"
+    },
+    "brandLight": {
+      "$type": "color",
+      "$value": "#FF6655"
+    },
+    "brandDeep": {
+      "$type": "color",
+      "$value": "#89051D",
+      "description": "dark burgundy in lower petals/background"
+    },
+    "brandMedium": {
+      "$type": "color",
+      "$value": "#AB1023"
+    },
+    "brandShadow": {
+      "$type": "color",
+      "$value": "#4E0414"
+    },
+    "textPrimary": {
+      "$type": "color",
+      "$value": "#E6DDD8",
+      "description": "off-white petals"
+    },
+    "textSecondary": {
+      "$type": "color",
+      "$value": "#D7B8AC"
+    },
+    "textMuted": {
+      "$type": "color",
+      "$value": "#B9A6A4"
+    }
+  },
+  "radius": {
+    "sm": {
+      "$type": "dimension",
+      "$value": "8px"
+    },
+    "md": {
+      "$type": "dimension",
+      "$value": "13px"
+    },
+    "lg": {
+      "$type": "dimension",
+      "$value": "19px"
+    },
+    "xl": {
+      "$type": "dimension",
+      "$value": "27px"
+    },
+    "pill": {
+      "$type": "dimension",
+      "$value": "999px"
+    }
+  },
+  "motion": {
+    "fast": {
+      "$type": "duration",
+      "$value": "180ms"
+    },
+    "standard": {
+      "$type": "duration",
+      "$value": "300ms"
+    },
+    "cardImage": {
+      "$type": "duration",
+      "$value": "500ms"
+    },
+    "long": {
+      "$type": "duration",
+      "$value": "700ms"
+    },
+    "hoverTrailerDelay": {
+      "$type": "duration",
+      "$value": "300ms"
+    },
+    "ease": {
+      "$type": "cubicBezier",
+      "$value": [
+        0.22,
+        1,
+        0.36,
+        1
+      ]
+    }
+  },
+  "layout": {
+    "maxContent": {
+      "$type": "dimension",
+      "$value": "1268px"
+    },
+    "headerTop": {
+      "$type": "dimension",
+      "$value": "16px"
+    },
+    "animeCardRatio": {
+      "$type": "number",
+      "$value": 0.75
+    },
+    "desktopCatalogCols": {
+      "$type": "number",
+      "$value": 6
+    },
+    "desktopCarouselCols": {
+      "$type": "number",
+      "$value": 7
+    }
+  },
+  "appearance": {
+    "presets": [
+      "blossom",
+      "burgundy",
+      "petal"
+    ],
+    "defaultMode": "manual",
+    "backgroundSampling": {
+      "width": 64,
+      "height": 36,
+      "surfaceMix": 0.12,
+      "canvasMix": 0.08,
+      "raisedMix": 0.15,
+      "textContrast": 7,
+      "mutedContrast": 4.5
+    },
+    "transition": {
+      "$type": "duration",
+      "$value": "300ms"
+    },
+    "wallpaper": {
+      "maxBytes": 20971520,
+      "maxDimension": 2560,
+      "format": "image/webp",
+      "quality": 0.9
+    }
+  },
+  "integration": {
+    "catalogSidebar": {
+      "$type": "dimension",
+      "$value": "247px"
+    },
+    "mobileHeaderBreakpoint": {
+      "$type": "dimension",
+      "$value": "1000px"
+    },
+    "searchWidth": {
+      "$type": "dimension",
+      "$value": "550px"
+    },
+    "searchTop": {
+      "$type": "dimension",
+      "$value": "100px"
+    },
+    "navGlide": {
+      "$type": "duration",
+      "$value": "430ms"
+    },
+    "pageTransition": {
+      "$type": "duration",
+      "$value": "450ms"
+    }
+  }
+}

@@ -4,11 +4,12 @@ import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ChevronLeft,ChevronRight,Pause,Play} from 'lucide-react';
 import {useArtwork} from './title-artwork.js';
 import {scenePalette} from './palette.js';
+import {seedFromPixels} from './blossom/theme.js';
 
 function Slide({url,profile,actions,libraryId,onPalette}){
   const src=useArtwork(url,profile,actions.readArtwork,libraryId),reduced=useReducedMotion();
   return src?<motion.img src={src} alt="" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={{duration:reduced?0:1.8,ease:'easeInOut'}} onLoad={event=>{
-    try{const canvas=document.createElement('canvas');canvas.width=64;canvas.height=36;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(event.currentTarget,0,0,64,36);onPalette(scenePalette(ctx.getImageData(0,0,64,36).data));}catch{}
+    try{const canvas=document.createElement('canvas');canvas.width=64;canvas.height=36;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(event.currentTarget,0,0,64,36);const pixels=ctx.getImageData(0,0,64,36).data;onPalette({...scenePalette(pixels),seed:seedFromPixels(pixels)});}catch{}
   }}/>:null;
 }
 export default function TitleBackdrop({profile,actions,libraryId,onPalette,suspended=false}){

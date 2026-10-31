@@ -1,3 +1,4 @@
+const navigateApp=require('./app-navigation.cjs');
 // Local integration test: Google Identity and Drive are fake providers; no live credentials.
 // Run: npm run test:browser (builds the production React app; requires Chromium).
 const assert = require('node:assert/strict');
@@ -149,9 +150,9 @@ async function main() {
   const ownerContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'allow'});
   ownerContext.setDefaultTimeout(20000);
   await installProvider(ownerContext,OWNER);
-  const owner=await ownerContext.newPage();
+  const owner=await ownerContext.newPage();owner.on('pageerror',error=>console.error('App runtime:',error.message));
   await owner.goto(base);
-  await owner.getByRole('heading',{name:'Твоё пространство',exact:true}).waitFor();
+  await owner.locator('.hero-stage h1').waitFor();
   await owner.screenshot({path:path.join(temp,'mobile-home.png'),fullPage:true});
   await signIn(owner);
   assert.equal(await owner.locator('#createBtn').isVisible(),true);
@@ -172,7 +173,7 @@ async function main() {
   ]);
   try{await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===3,null,{timeout:30000});}
   catch(error){
-    console.error('Upload state:',await owner.locator('#uploadQueue').innerText(),await owner.locator('#toast').allTextContents());
+    console.error('Upload state:',await owner.locator('#uploadQueue').allTextContents(),await owner.locator('#toast').allTextContents());
     throw error;
   }
   const catalog=await decryptCatalog(files.get(catalogId));
@@ -209,7 +210,7 @@ async function main() {
     if(url.pathname.startsWith('/metadata/'))return respond({data:[]});
     return respond({detail:'Not found'},404);
   });
-  await owner.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Библиотека',exact:true}).click();
+  await navigateApp(owner,'Библиотека');
   await owner.locator('.import-settings-trigger').click();
   await owner.locator('#importServer').fill('https://import.example.com');
   await owner.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
@@ -243,7 +244,7 @@ async function main() {
   assert.equal(await owner.locator('#openColab').count(),0,'No manual notebook hand-off remains');
   await owner.getByRole('button',{name:'Остановить',exact:true}).click();
   await owner.getByText('Остановлено',{exact:true}).waitFor();
-  await owner.locator('#collectionNav').click();
+  await navigateApp(owner,'Моя коллекция');
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===3);
   const delayedPattern='**/drive/v3/files/'+textItem.chunks[0].fileId+'?alt=media';
   let releaseDownload,downloadStarted,downloadFailed;
@@ -306,12 +307,12 @@ async function main() {
   await owner.getByRole('button',{name:'Всё',exact:true}).click();
   await owner.getByRole('combobox',{name:'Порядок материалов'}).selectOption('name');
   assert.deepEqual(await owner.locator('.media-name').allTextContents(),['private-image.png','private-note.txt','private-video.mp4'],'Name sort orders the library');
-  await owner.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'История',exact:true}).click();
+  await navigateApp(owner,'История');
   assert.equal(await owner.locator('.history-item').count(),3,'History records the three opened files');
   await owner.locator('.history-item').filter({hasText:'private-note.txt'}).click();
   await owner.locator('.reader-prose').waitFor();
   await closeViewer(owner);
-  await owner.locator('#collectionNav').click();
+  await navigateApp(owner,'Моя коллекция');
   assert.ok(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile viewport has no horizontal overflow');
   await owner.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
   await owner.screenshot({path:path.join(temp,'mobile-owner.png'),fullPage:true});
@@ -405,7 +406,7 @@ async function main() {
     if(url.pathname==='/sources/qualities')return respond({qualities:[1080,720],best:1080,original:false});
     return respond({data:[]});
   });
-  await fresh.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Библиотека',exact:true}).click();
+  await navigateApp(fresh,'Библиотека');
   await fresh.locator('.import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
   await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();await fresh.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await fresh.locator('#streamUrl').fill('https://source.example.com/titans');await fresh.getByRole('button',{name:'Проверить',exact:true}).click();await fresh.locator('#importDub').selectOption('https://source.example.com/studio');await fresh.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
@@ -415,7 +416,7 @@ async function main() {
   assert.equal(await fresh.locator('#streamUrl').inputValue(),'https://source.example.com/titans');assert.equal(await fresh.locator('#importDub').inputValue(),'https://source.example.com/studio');assert.equal(await fresh.getByRole('combobox',{name:'Номер серии'}).inputValue(),'3');
   freshDriveConnected=true;await fresh.locator('#importPrerequisites').getByRole('button',{name:'Уже разрешил — проверить',exact:true}).click();await fresh.waitForFunction(()=>document.querySelector('#importVideoBtn')?.disabled===false);
   assert.equal(await fresh.locator('#serverCollection').inputValue(),'Атака титанов','Unlocking and Drive reconnect preserve the complete import choice');
-  await fresh.getByRole('navigation',{name:'Мобильная навигация'}).getByRole('button',{name:'Моя коллекция',exact:true}).click();
+  await navigateApp(fresh,'Моя коллекция');
   await fresh.locator('#showFilesBtn').click();
   await fresh.waitForFunction(()=>document.querySelectorAll('.media-card').length===4);
   assert.equal(writes.length,writesBeforeDiscovery,'Opening a library does not need write access');

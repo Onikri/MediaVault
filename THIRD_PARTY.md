@@ -262,3 +262,21 @@ Moebius uses a separate `onnxruntime-web-moebius` package alias pinned to ONNX R
 - MI-GAN, Picsart AI Research / Andranik Sargsyan: https://github.com/Picsart-AI-Research/MI-GAN . Code and author-provided weights are MIT; both original notices are in `lmt/licenses/MI-GAN-*-MIT.txt`. The author-linked ONNX pipeline is pinned to `andraniksargsyan/migan` revision `406830d0fa60666da0071c342ad2fbc8f30c5c64`, `migan_pipeline_v2.onnx`, SHA-256 `6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b`. Weights are not redistributed in Git or Pages. The browser adapter performs actual ONNX inference with the official uint8 NCHW/inverted-mask contract.
 - `hyphen` 1.14.1, Yevhen Tiurin, ISC: https://github.com/ytiurin/hyphen . Only the Russian pattern module is bundled for canvas line breaking. Original notice: `lmt/licenses/hyphen-ISC.txt`.
 - The chapter pipeline, cleanup/renderer integration and worker changes remain published as corresponding integration source alongside the AGPL Libre Manga Translator attribution.
+
+
+### AniView Blossom interface and UI fonts
+
+The owner-supplied `AniView_Blossom_React_TypeScript_Complete.zip` provides the
+Blossom design language, reconstructed React/TypeScript components and flower
+artwork. Its SKILL.md declares MIT. Source provenance, original supplied design
+instructions, component contract and corresponding editable integration source
+are published under `design/aniview-blossom/` and `src/blossom/`. This is a
+MediaVault integration of the supplied functional reconstruction; it is not a
+claim of exact recovery of the original author's missing TSX/minified chunks.
+
+Manrope (Mikhail Sharanda and contributors) and DM Sans (Colophon Foundry and
+contributors), SIL Open Font License 1.1, are self-hosted variable fonts from the
+Google Fonts repository: https://github.com/google/fonts/tree/main/ofl/manrope
+and https://github.com/google/fonts/tree/main/ofl/dmsans . Original OFL notices
+are bundled beside the fonts in `src/blossom/fonts/`. No runtime Google Fonts
+request is required. Existing reader font/model licensing remains unchanged.

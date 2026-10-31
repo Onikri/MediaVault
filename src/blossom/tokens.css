@@ -1,0 +1,17 @@
+:root {
+  color-scheme: dark;
+  /* Extracted from supplied flower photo; exact sample rather than inherited site purple. */
+  --color-canvas:#11191c;--color-canvas-soft:#181f21;--color-surface:#251b20;
+  --color-surface-raised:#332126;--color-on-surface:#e6ddd8;
+  --color-on-muted:#b9a6a4;--color-quiet:#7c7775;
+  --color-blossom:#ee3c35;--color-blossom-light:#ff6655;
+  --color-burgundy:#89051d;--color-crimson:#ab1023;--color-red-deep:#4e0414;
+  --color-petal:#e6ddd8;--color-petal-shadow:#d7b8ac;
+  --color-border:rgba(230,221,216,.13);
+  --font-ui:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-display:'Manrope','DM Sans',system-ui,sans-serif;
+  --radius-sm:8px;--radius-md:13px;--radius-lg:19px;--radius-xl:27px;
+  --ease-expressive:cubic-bezier(.22,1,.36,1);
+  --motion-fast:180ms;--motion-standard:300ms;--motion-image:500ms;--motion-slow:700ms;
+  font-family:var(--font-ui);font-synthesis:none;
+}

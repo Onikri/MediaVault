@@ -1,0 +1,16 @@
+@property --color-canvas{syntax:"<color>";inherits:true;initial-value:#11191c}
+@property --color-canvas-soft{syntax:"<color>";inherits:true;initial-value:#181f21}
+@property --color-surface{syntax:"<color>";inherits:true;initial-value:#251b20}
+@property --color-surface-raised{syntax:"<color>";inherits:true;initial-value:#332126}
+@property --color-on-surface{syntax:"<color>";inherits:true;initial-value:#e6ddd8}
+@property --color-on-muted{syntax:"<color>";inherits:true;initial-value:#b9a6a4}
+@property --color-quiet{syntax:"<color>";inherits:true;initial-value:#7c7775}
+@property --color-blossom{syntax:"<color>";inherits:true;initial-value:#ee3c35}
+@property --color-blossom-light{syntax:"<color>";inherits:true;initial-value:#ff6655}
+@property --color-burgundy{syntax:"<color>";inherits:true;initial-value:#89051d}
+@property --color-crimson{syntax:"<color>";inherits:true;initial-value:#ab1023}
+@property --color-red-deep{syntax:"<color>";inherits:true;initial-value:#4e0414}
+@property --color-petal{syntax:"<color>";inherits:true;initial-value:#e6ddd8}
+@property --color-petal-shadow{syntax:"<color>";inherits:true;initial-value:#d7b8ac}
+html[data-blossom]{transition:--color-canvas 300ms cubic-bezier(.22,1,.36,1),--color-canvas-soft 300ms cubic-bezier(.22,1,.36,1),--color-surface 300ms cubic-bezier(.22,1,.36,1),--color-surface-raised 300ms cubic-bezier(.22,1,.36,1),--color-on-surface 300ms cubic-bezier(.22,1,.36,1),--color-on-muted 300ms cubic-bezier(.22,1,.36,1),--color-quiet 300ms cubic-bezier(.22,1,.36,1),--color-blossom 300ms cubic-bezier(.22,1,.36,1),--color-blossom-light 300ms cubic-bezier(.22,1,.36,1),--color-burgundy 300ms cubic-bezier(.22,1,.36,1),--color-crimson 300ms cubic-bezier(.22,1,.36,1),--color-red-deep 300ms cubic-bezier(.22,1,.36,1),--color-petal 300ms cubic-bezier(.22,1,.36,1),--color-petal-shadow 300ms cubic-bezier(.22,1,.36,1)}
+@media(prefers-reduced-motion:reduce){html[data-blossom]{transition:none}html[data-blossom] *,html[data-blossom] *:before,html[data-blossom] *:after{animation-delay:0s!important}}

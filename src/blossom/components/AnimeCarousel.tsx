@@ -1,0 +1,6 @@
+import {useRef,type ReactNode} from 'react';
+import {ArrowLeft,ArrowRight,ChevronRight} from 'lucide-react';
+export function AnimeCarousel({title,kicker,children,onMore,moreLabel='Смотреть всё'}:{title:string;kicker?:string;children:ReactNode;onMore?:()=>void;moreLabel?:string}){
+ const rail=useRef<HTMLDivElement>(null);const move=(direction:number)=>rail.current?.scrollBy({left:direction*rail.current.clientWidth*.72,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+ return <section className="carousel-section"><header className="section-head"><div>{kicker&&<p className="section-number">{kicker}</p>}<h2>{title}<span className="headline-dot">.</span></h2></div>{onMore&&<button className="view-more" onClick={onMore}>{moreLabel}<span><ChevronRight size={16}/></span></button>}</header><div ref={rail} className="carousel-rail">{children}</div><div className="carousel-controls"><span className="carousel-caption">ЛИСТАЙ ДАЛЬШЕ</span><button className="circle-button" aria-label={'Предыдущие · '+title} onClick={()=>move(-1)}><ArrowLeft size={19}/></button><button className="circle-button" aria-label={'Следующие · '+title} onClick={()=>move(1)}><ArrowRight size={19}/></button></div></section>;
+}

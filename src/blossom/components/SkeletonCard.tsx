@@ -1,0 +1,2 @@
+export function SkeletonCard(){return <div className="skeleton-card" aria-label="Загружаем произведения"><div className="skeleton-poster skeleton-shimmer"/><div className="skeleton-line skeleton-shimmer"/><div className="skeleton-line short skeleton-shimmer"/></div>}
+export function SkeletonGrid({count=12}:{count?:number}){return <div className="anime-grid" aria-busy="true">{Array.from({length:count},(_,index)=><SkeletonCard key={index}/>)}</div>}

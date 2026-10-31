@@ -1,0 +1,6 @@
+import {useEffect,useState,type ReactNode} from 'react';
+import {ArrowRight} from 'lucide-react';
+export function HeroBanner({title,description,onOpen,artwork,kicker='ВСЁ, ЧТО ТЫ ЛЮБИШЬ',children}:{title:ReactNode;description:ReactNode;onOpen:()=>void;artwork?:string;kicker?:string;children?:ReactNode}){
+ const [visible,setVisible]=useState(false);useEffect(()=>{const t=setTimeout(()=>setVisible(true),100);return()=>clearTimeout(t);},[]);
+ return <section className={'hero-stage '+(visible?'is-revealed':'')} aria-label="Твоя медиатека"><div className="hero-photo" style={artwork?{backgroundImage:`url("${artwork.replace(/["\\]/g,'')}")`}:undefined}/>{!artwork&&<div className="hero-flower" aria-hidden="true"/>}<div className="hero-vignette"/><div className="hero-content"><span className="eyebrow"><span className="eyebrow-line"/>{kicker}</span><span className="hero-poster-tag">MEDIA<span> / </span>VAULT</span><h1>{title}</h1><p>{description}</p><div className="hero-bottom"><button className="hero-cta" onClick={onOpen}>Открыть библиотеку<ArrowRight size={17}/></button>{children}</div></div><div className="hero-vertical-mark" aria-hidden="true">ANIME / MANGA / MUSIC</div><div className="hero-art-label" aria-hidden="true">BLOSSOM EDITION</div></section>;
+}

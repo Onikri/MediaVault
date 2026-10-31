@@ -1,3 +1,4 @@
+const navigateApp=require('./app-navigation.cjs');
 // Responsive smoke test for the restored React interface. Google is a fake provider.
 // Run after npm run build; no account credentials or external catalog are needed.
 const assert=require('node:assert/strict');
@@ -52,19 +53,19 @@ async function run(){
       await page.getByRole('heading',{name:'Найди свою историю',exact:true}).waitFor();
       await page.goto(base+'#home',{waitUntil:'domcontentloaded'});
     }
-    await page.getByRole('heading',{name:'Твоё пространство',exact:true}).waitFor();
+    await page.locator('.hero-stage h1').waitFor();
     const noOverflow=async view=>{
-      const size=await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth,
+      const size=await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth,layout:[...document.querySelectorAll('.app-main,.hero-stage')].map(e=>({class:e.className,width:e.getBoundingClientRect().width,left:e.getBoundingClientRect().left,margin:getComputedStyle(e).margin,padding:getComputedStyle(e).padding,transform:getComputedStyle(e).transform})),
         overflow:[...document.querySelectorAll('body *')].map(element=>({element:element.tagName+'.'+element.className,
           right:Math.round(element.getBoundingClientRect().right),width:Math.round(element.getBoundingClientRect().width)}))
           .filter(rect=>rect.width>0&&rect.right>innerWidth+1).slice(0,12)}));
       assert.ok(size.scroll<=size.viewport+1,view+' has no overflow at '+width+'px: '+JSON.stringify(size));
     };
     await noOverflow('Home');
-    assert.equal(await page.locator('.bottom-nav').isVisible(),width<900);
-    assert.equal(await page.locator('.desktop-nav').isVisible(),width>=900);
+    assert.equal(await page.locator('.mobile-toggle').isVisible(),width<=1000);
+    assert.equal(await page.locator('.desktop-nav').isVisible(),width>1000);
     await page.screenshot({path:path.join(output,'react-'+width+'.png'),fullPage:true});
-    const nav=width<900?page.getByRole('navigation',{name:'Мобильная навигация'}):page.getByRole('navigation',{name:'Основная навигация'});
+    const nav={getByRole:(_,options)=>({click:()=>navigateApp(page,options.name)})};
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
     await page.getByRole('heading',{name:'Библиотека',exact:true}).waitFor();
     await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы онлайн-библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Звук любимых историй'}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Моя коллекция',exact:true}).click();
@@ -76,13 +77,13 @@ async function run(){
     assert.ok((await page.locator(width>=1100?'.library-sidebar button[aria-label="Раздел Избранное"]':'.chip-active').textContent()).includes('Избранное'));
     await noOverflow('Library');
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
-    await page.getByRole('heading',{name:'Найди свою историю',exact:true}).waitFor();
-    await page.getByRole('button',{name:'Фильтры каталога',exact:true}).click();
+    await page.getByRole('heading',{name:'Библиотека',exact:true}).waitFor();
+    const filtersToggle=page.getByRole('button',{name:'Фильтры каталога',exact:true});if(await filtersToggle.getAttribute('aria-expanded')!=='true')await filtersToggle.click();
     await noOverflow('Catalogue filters');
     await page.locator('#catalogSearch').fill('Наруто');
-    await page.getByRole('option').first().waitFor();
+    await page.locator('#catalogPredictions').getByRole('option').first().waitFor();
     const popup=await page.locator('#catalogPredictions').boundingBox();
-    const navBox=await page.locator('.bottom-nav').boundingBox();
+    const navBox=null;
     assert.ok(popup.y>=0&&popup.y+popup.height<=860-(navBox?.height||0),'Autocomplete stays inside the visible area at '+width+'px');
     await page.locator('#catalogSearch').press('ArrowDown');
     await page.locator('#catalogSearch').press('Enter');

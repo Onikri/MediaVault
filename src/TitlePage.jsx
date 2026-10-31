@@ -21,6 +21,7 @@ import {readReading} from './reading-progress.js';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import './watch-page.css';
 import {browseHref,animeSeason} from './anime-navigation.js';
+import {publishBackdrop} from './blossom/theme.js';
 import './player-refinement.css';
 import EpisodeMotionPreview from './EpisodeMotionPreview.jsx';
 
@@ -46,6 +47,8 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   const [profile,setProfile]=useState(online?onlineProfile:saved||title.profile||null),[busy,setBusy]=useState(''),[error,setError]=useState(''),[candidates,setCandidates]=useState([]),[search,setSearch]=useState(title.name);
   const [character,setCharacter]=useState(null),[characterBusy,setCharacterBusy]=useState(false),[characterError,setCharacterError]=useState('');
   const [palette,setPalette]=useState(null),[playing,setPlaying]=useState(false);
+  useEffect(()=>()=>publishBackdrop(null),[title.id]);
+  function backgroundPalette(value){setPalette(value);publishBackdrop(value);}
   const [characterLimit,setCharacterLimit]=useState(6);
   const [part,setPart]=useState(''),[ratingBusy,setRatingBusy]=useState(false);
   const abort=useRef(null),saveInProgress=useRef(false),live=useRef(state);live.current=state;
@@ -111,8 +114,8 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   const factValue=(label,value)=>label==='Студия'?(p.studios||[]).map(name=><a key={name} href={browseHref('studio','',p.studioRefs?.find(s=>s.name===name)?.id||'',name)}>{name}</a>):label==='Режиссёры'?(p.directors||[]).map(name=><a key={name} href={browseHref('person','',p.staff?.find(s=>s.name===name)?.id||'',name)}>{name}</a>):label==='Выпуск'&&isAnimePage?<a href={browseHref('year',String(p.year),'',String(p.year))}>{value}</a>:value;
   const ownRating=p.userRatings?.[state.user?.sub]||0;
   const artProps={profile:p,actions,libraryId:state.libraryId};
-  return <article className={'title-page'+(online?' online-title-page':'')+(title.category==='video'?' watch-title-page':'')} style={palette?{'--title-rgb':palette.base,'--accent':palette.accentCSS,'--title-accent':palette.accentCSS}:undefined}>
-    <TitleBackdrop profile={p} actions={actions} libraryId={state.libraryId} onPalette={setPalette} suspended={playing}/>
+  return <article className={'title-page'+(online?' online-title-page':'')+(title.category==='video'?' watch-title-page':'')} style={palette?{'--title-rgb':palette.base}:undefined}>
+    <TitleBackdrop profile={p} actions={actions} libraryId={state.libraryId} onPalette={backgroundPalette} suspended={playing}/>
     <button id={online?undefined:'backToTitles'} className="text-link title-page-back" onClick={onBack}><ArrowLeft size={16}/>{backLabel}</button>
     <section className="title-hero" ref={hero}>
       <div className="title-hero-shade"/>

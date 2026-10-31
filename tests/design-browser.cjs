@@ -13,7 +13,7 @@ let vite,browser;
  const harness=path.join(dir,'design-harness.html');
  await fs.writeFile(harness,`<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="scene-root"></div><div id="root"></div><script type="module">
  import React,{useState} from 'react';import{createRoot}from'react-dom/client';
- import TitlePage from '/src/TitlePage.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/discovery-polish.css';
+ import {ThemeProvider} from '/src/blossom/ThemeProvider.tsx';import TitlePage from '/src/TitlePage.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/discovery-polish.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:'https://fixture.example'};window.artworkReads=[];
  const art=id=>({id,fileId:id,iv:'fixture',mime:'image/png'}),cover='https://art.test/cover',person='https://art.test/person';
  const profile={version:4,sourceId:'57334',sourceURL:'https://shikimori.io/animes/57334',title:'Дандадан',year:2024,format:'Аниме',description:'Двое школьников сталкиваются с необъяснимым. История о дружбе и сверхъестественном.',genres:['Комедия','Сверхъестественное'],characters:[],related:[],screenshots:[],staff:[{id:'41',name:'Фуга Ямасиро',role:'Режиссёр',image:person}],trailers:[{id:'X_SnV_SdO4k',title:'Тизер',image:cover}],cover,artwork:{[cover]:art('cover'),[person]:art('person')}};
@@ -22,7 +22,7 @@ let vite,browser;
  const catalog={items,storage:{collections:[{id:'g',name:'Дандадан',section:'anime',parts:[]}]},titleProfiles:{'anime:g':profile}};
  const actions={readArtwork:async asset=>{window.artworkReads.push(asset.fileId);return new Blob([Uint8Array.from(atob('${png}'),c=>c.charCodeAt(0))],{type:'image/png'});},prepareStream:async()=>'/test-output/design-video.mp4',readWhole:async()=>new Blob(),error:e=>{window.lastPlayerError=e.message;},saveTitleProfile:async()=>profile};
  function Demo(){const[user,setUser]=useState('user-a'),[selected,setSelected]=useState(null);return <><header className="app-header"><div className="header-inner"><b>MediaVault</b><button id="switchUser" onClick={()=>{setSelected(null);setUser(x=>x==='user-a'?'user-b':'user-a');}}>Сменить пользователя</button><span id="activeUser">{user}</span></div></header><main className="app-main"><TitlePage key={user} title={title} state={{catalog,user:{sub:user},libraryId:'library',admin:false}} actions={actions} onBack={()=>{}} onPlay={setSelected} selected={selected} onRelated={()=>{}} onClosePlayer={()=>setSelected(null)}/></main></>};
- createRoot(document.getElementById('root')).render(<Demo/>);
+ createRoot(document.getElementById('root')).render(<ThemeProvider><Demo/></ThemeProvider>);
  </script></html>`);
  const html=await fs.readFile(harness,'utf8'),embedded=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
  await fs.writeFile(path.join(dir,'design-harness.jsx'),embedded);await fs.writeFile(harness,html.replace(/<script type="module">[\s\S]*?<\/script>/,'<script type="module" src="/test-output/design-harness.jsx"></script>'));
