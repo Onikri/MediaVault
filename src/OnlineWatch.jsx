@@ -5,6 +5,8 @@ import OnlineEpisodePreviews from './OnlineEpisodePreviews.jsx';
 import {readWatch,saveWatch,orderedVoices,variantsFor,onlineEpisodeId} from './watch-session.js';
 import {readEpisodePreview,saveEpisodePreview} from './episode-preview-cache.js';
 import './watch-page.css';
+import EpisodeMotionPreview from './EpisodeMotionPreview.jsx';
+import {voiceEpisodeCount} from './anime-navigation.js';
 
 export default function OnlineWatch({item,profile=item,discovery,service,userId}){
  const identity=String(item.ids?.mal||item.id),saved=useRef(readWatch(userId,identity));
@@ -12,6 +14,7 @@ export default function OnlineWatch({item,profile=item,discovery,service,userId}
  const [voiceId,setVoiceId]=useState(saved.current.voiceId||''),[episode,setEpisode]=useState(saved.current.episode||1),[season,setSeason]=useState(saved.current.season||1);
  const [audioId,setAudioId]=useState(saved.current.audioId||''),[subtitleId,setSubtitleId]=useState(saved.current.subtitleId||'');
  const [entries,setEntries]=useState([]),[seasons,setSeasons]=useState([]),[variant,setVariant]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[playing,setPlaying]=useState(false),[count,setCount]=useState(24);
+ const [hovering,setHovering]=useState(false);
  const [previews,setPreviews]=useState({}),[audio,setAudio]=useState(null),[captions,setCaptions]=useState([]),[trackError,setTrackError]=useState(''),[trackBusy,setTrackBusy]=useState(false);
  const trackClient=useRef('watch-'+crypto.randomUUID());
  const failed=useRef(new Set()),cache=useRef(new Map()),seasonUrls=useRef(new Map()),tracked=useRef('');
@@ -75,8 +78,8 @@ export default function OnlineWatch({item,profile=item,discovery,service,userId}
   captionVoices:voices.filter(v=>v.kind==='subtitles').map(v=>({id:v.id,name:v.name})),subtitleId,
   onCaptionVoice:id=>{setSubtitleId(id);persist({subtitleId:id});},audio,externalCaptions:captions,trackBusy,trackError};
  return <div className="online-watch">
-  <OnlineEpisodePreviews entries={visibleEntries} active={!playing&&!busy} service={service} sourceUrl={variant?.sourceUrl} identity={identity} season={season} userId={userId} onPreview={preview}/>
-  <div className="watch-selection"><label>Озвучка<select aria-label="Озвучка для просмотра" value={voice?.id||''} onChange={e=>changeVoice(e.target.value)} disabled={!voices.length}><option value="" disabled>{discovery.loading?'Ищем озвучки…':'Выбери озвучку'}</option>{voices.map(v=><option key={v.id} value={v.id}>{v.name}{v.kind==='subtitles'?' · субтитры':''}{saved.current.usage?.[v.id]?' · твой выбор':''}</option>)}</select></label>
+  <OnlineEpisodePreviews entries={visibleEntries} active={!playing&&!busy&&!hovering} service={service} sourceUrl={variant?.sourceUrl} identity={identity} season={season} userId={userId} onPreview={preview}/>
+  <div className="watch-selection"><label>Озвучка<select aria-label="Озвучка для просмотра" value={voice?.id||''} onChange={e=>changeVoice(e.target.value)} disabled={!voices.length}><option value="" disabled>{discovery.loading?'Ищем озвучки…':'Выбери озвучку'}</option>{voices.map(v=><option key={v.id} value={v.id}>{v.name}{voiceEpisodeCount(v,season)?' · '+voiceEpisodeCount(v,season)+' сер.':''}{v.kind==='subtitles'?' · субтитры':''}{saved.current.usage?.[v.id]?' · твой выбор':''}</option>)}</select></label>
    <span className="watch-auto-quality">Качество: лучшее · авто</span>
   </div>
   {playing&&current&&variant?<OnlineViewer entries={entries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={variant.sourceUrl} dub={voice?.name} metadata={{...profile,ids:item.ids}} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} onClose={()=>setPlaying(false)} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
@@ -86,7 +89,7 @@ export default function OnlineWatch({item,profile=item,discovery,service,userId}
   {error&&<div className="inline-error" role="alert">{error}<button className="text-link" onClick={()=>{failed.current.clear();setAttempt(n=>n+1);}}>Повторить</button></div>}
   {discovery.error&&<p className="fine">{discovery.error}<button className="text-link" onClick={discovery.retry}>Повторить поиск</button></p>}
   <div className="watch-episodes-heading"><h3>Серии</h3><span>{entries.length||''}</span>{seasons.length>1&&<select aria-label="Сезон просмотра" value={season} onChange={e=>{setPlaying(false);setSeason(Number(e.target.value));setEpisode(1);setPreviews({});failed.current.clear();persist({season:Number(e.target.value),episode:1});}}>{seasons.map(s=><option key={s.number} value={s.number}>{s.name||'Сезон '+s.number}</option>)}</select>}</div>
-  <div className="watch-episode-grid">{entries.slice(0,count).map(e=>{const art=previews[e.number]||profile.episodeImages?.[String(e.number)]||profile.cover;return <TitleEpisodeCard key={e.number} number={e.number} title={'Серия '+e.number} detail={e.title&&e.title!=='Серия '+e.number?e.title:undefined} selected={playing&&Number(e.number)===episode} onClick={()=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});setPlaying(true);}} artwork={art?<img src={art} alt={previews[e.number]?'Кадр серии '+e.number:'Обложка тайтла'} loading="lazy" referrerPolicy="no-referrer"/>:null}/>;})}</div>
+  <div className="watch-episode-grid">{entries.slice(0,count).map(e=>{const art=previews[e.number]||profile.episodeImages?.[String(e.number)]||profile.cover;return <TitleEpisodeCard key={e.number} number={e.number} title={'Серия '+e.number} detail={e.title&&e.title!=='Серия '+e.number?e.title:undefined} selected={playing&&Number(e.number)===episode} onClick={()=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});setPlaying(true);}} artwork={<EpisodeMotionPreview cacheKey={onlineEpisodeId(identity,e.season||season,e.number)+':'+(userId||'anonymous')} onActive={setHovering} prepare={async signal=>{const d=await service.request('/online/prepare',{method:'POST',body:{url:e.url,referer:variant.sourceUrl,kind:'video',quality:'best',clientId:'motion-'+crypto.randomUUID()},signal});return {url:service.server.replace(/\/$/,'')+d.url,type:d.type,close:()=>service.request('/online/'+d.id,{method:'DELETE',keepalive:true}).catch(()=>{})};}}>{art?<img src={art} alt={previews[e.number]?'Кадр серии '+e.number:'Обложка тайтла'} loading='lazy' referrerPolicy='no-referrer'/>:null}</EpisodeMotionPreview>}/>;})}</div>
   {entries.length>count&&<button className="text-link" onClick={()=>setCount(n=>n+24)}>Ещё серии</button>}
   {!!saved.current.usage&&<p className="watch-personal-note">«Твой выбор» — история просмотров на этом устройстве.</p>}
  </div>;

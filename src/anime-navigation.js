@@ -1,0 +1,4 @@
+export const browseHref=(kind,value='',identity='',label='')=>'#'+new URLSearchParams({browse:kind,...(value?{value}:{}),...(identity?{identity}:{}),...(label?{label}:{})});
+export function browseRoute(hash=location.hash){const p=new URLSearchParams(hash.slice(1));return ['genre','year','season','status','studio','person','character'].includes(p.get('browse'))?Object.fromEntries(p):null;}
+export function animeSeason(date){const m=String(date||'').match(/^(\d{4})-(\d{2})/);if(!m||Number(m[2])<1||Number(m[2])>12)return null;const index=Math.floor((Number(m[2])-1)/3);return {value:['winter','spring','summer','fall'][index]+'_'+m[1],label:['Зима','Весна','Лето','Осень'][index]+' '+m[1]};}
+export function voiceEpisodeCount(voice,season=1){return new Set((voice?.variants||[]).flatMap(v=>v.episodes||[]).filter(e=>!e.season||Number(e.season)===Number(season)).map(e=>Number(e.number)).filter(n=>Number.isFinite(n)&&n>0)).size;}

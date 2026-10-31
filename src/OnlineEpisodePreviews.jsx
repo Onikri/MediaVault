@@ -4,17 +4,17 @@ import {onlineEpisodeId} from './watch-session.js';
 
 // One low-quality decoder and one short-lived lease at a time. Starting actual
 // playback aborts this work immediately, so thumbnails never compete with it.
-async function frame(source,type,signal){
+export async function frame(source,type,signal,multiple=false,onPartial){
  const video=document.createElement('video');video.muted=true;video.playsInline=true;video.crossOrigin='anonymous';video.preload='auto';
  let hls,timer,abortListener,stopped=false;
  try{
   return await new Promise((resolve,reject)=>{
-   let target=0;
+   let target=0,index=0,targets=[],images=[];
    const fail=()=>resolve('');
-   const capture=()=>{if(video.readyState>=2&&Math.abs(video.currentTime-target)<1)resolve(captureEpisodePreview(video));};
-   video.onloadedmetadata=()=>{target=Math.min(30,Math.max(0,(video.duration||0)*.08));if(target>0)video.currentTime=target;};
+   const capture=()=>{if(video.readyState<2||Math.abs(video.currentTime-target)>=1)return;const image=captureEpisodePreview(video);if(!image)return;images.push(image);if(images.length>1)onPartial?.([...images]);if(++index>=targets.length)resolve(multiple?images:images[0]);else{target=targets[index];video.currentTime=target;}};
+   video.onloadedmetadata=()=>{targets=(multiple?[.08,.27,.47,.68]:[.08]).map(f=>Math.max(0,Math.min((video.duration||0)-.1,(video.duration||0)*f)));target=targets[0];if(target>0)video.currentTime=target;};
    video.onseeked=capture;video.onloadeddata=capture;video.onerror=fail;
-   abortListener=fail;signal.addEventListener('abort',fail,{once:true});timer=setTimeout(fail,15000);
+   abortListener=fail;signal.addEventListener('abort',fail,{once:true});timer=setTimeout(fail,multiple?30000:15000);
    if(signal.aborted){fail();return;}
    if(type==='hls')import('hls.js').then(({default:Hls})=>{
     if(signal.aborted||stopped){fail();return;}

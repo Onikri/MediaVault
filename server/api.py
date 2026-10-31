@@ -248,7 +248,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 35, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 36, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -358,6 +358,11 @@ def title_watch_order(identity: str = ''):
 def title_platform_ratings(identity:str='',kind:str='anime'):
     from title_ratings import ratings
     return ratings(identity,kind)
+
+@app.get('/metadata/anime-browse')
+def anime_browse(kind:str='',value:str='',identity:str='',label:str='',page:int=1):
+    from anime_browse import browse
+    return browse(kind,value,identity,label,page)
 
 @app.get("/metadata/{provider}")
 def catalogue(provider: str, q: str = "", kind: str = "anime", page: int = 1, identity: str | None = None, year: int | None = None, part: str = '',genre:str='',tag:str=''):

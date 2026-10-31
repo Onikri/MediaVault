@@ -149,6 +149,7 @@ jobs:
           path: |
             test-output/*.png
             .codex-local/test-output/watch/*.png
+            .codex-local/test-output/navigation/*.png
           include-hidden-files: true
           if-no-files-found: ignore
 

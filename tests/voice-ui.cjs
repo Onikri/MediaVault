@@ -41,8 +41,8 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
       return json([]);
     });
     await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/voice-harness.html');
-    assert.equal(await page.locator('#serverCollection').count(),0,'Online page does not show import naming fields');assert.equal(await page.locator('.title-save-menu').getAttribute('open'),null);
-    await page.getByText('Сохранить в коллекцию или на устройство',{exact:true}).click();await page.getByRole('button',{name:'В Google Диск',exact:true}).click();
+    assert.equal(await page.locator('#serverCollection').count(),0,'Online page does not show import naming fields');assert.equal(await page.getByRole('button',{name:'Сохранить на Google Диск',exact:true}).count(),1);
+    await page.getByRole('button',{name:'Сохранить на Google Диск',exact:true}).click();
     await page.locator('#voiceGroup option').nth(40).waitFor({state:'attached'});assert.equal(await page.locator('#voiceGroup option').count(),41);
     await page.locator('#voiceGroup').selectOption('studio-39');await page.locator('#voiceSource option').nth(14).waitFor({state:'attached'});assert.equal(await page.locator('#voiceSource option').count(),15);
     await page.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();await page.locator('.voice-source-details summary').click();await page.locator('#voiceSource').selectOption('variant-39-13');

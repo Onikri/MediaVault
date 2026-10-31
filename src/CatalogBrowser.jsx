@@ -13,11 +13,15 @@ import SourceFilter from './SourceFilter.jsx';
 import {worldResults} from './world-search.js';
 import WorldTitlePage from './WorldTitlePage.jsx';
 import './world-library.css';
+import AnimeExplore from './AnimeExplore.jsx';
+import {browseRoute} from './anime-navigation.js';
 const noTitles=Object.freeze([]);
 
 export function TitleDetails(props){return <WorldTitlePage {...props}/>;}
 
 export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpenLibrary,initialQuery,initialKind,initialTarget,initialItem,destination}){
+  const [explore,setExplore]=useState(()=>browseRoute());
+  useEffect(()=>{const update=()=>{setExplore(browseRoute());if(browseRoute())setSelected(null);};addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);
   const preset=initialTarget||initialItem;
   const [query,setQuery]=useState(initialQuery||''),[kind,setKind]=useState(initialKind||'anime'),[selected,setSelected]=useState(preset||null);
   const [filters,setFilters]=useState({year:'',genre:'',tag:'',format:'',age:''}),[voice,setVoice]=useState(''),[showFilters,setShowFilters]=useState(false),[page,setPage]=useState(1),[composing,setComposing]=useState(false);
@@ -40,6 +44,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const spelling=visible.find(item=>item.searchSpelling)?.searchSpelling;
   const unavailable=Object.values(statuses).includes('unavailable');
   if(selected)return <TitleDetails destination={destination} onOpenLibrary={onOpenLibrary} value={selected} service={service} state={state} onBack={()=>setSelected(null)} onSubmitted={onSubmitted} onRelated={r=>setSelected({id:'related:'+r.kind+':'+r.id,provider:'shikimori',providerId:String(r.ids?.mal||r.id),providers:['shikimori'],kind:r.kind,title:r.title,titles:{},aliases:[r.title],genres:[],tags:[],links:[],ids:{mal:String(r.ids?.mal||r.id)},releases:[],cover:r.cover,format:r.format})}/>;
+  if(explore)return <AnimeExplore route={explore} service={service} onChoose={choose} onBack={()=>{location.hash='library';setExplore(null);}}/>;
   return <><section className="world-catalog-intro"><span className="eyebrow">ОБЩАЯ БИБЛИОТЕКА</span><h2>Найди свою историю</h2><p>Смотри и читай онлайн. Сохраняй любимое в личную коллекцию.</p></section>
     <div className="catalog-kind-row" aria-label="Тип произведения">{kinds.map(([id,label])=><button key={id} className={'chip'+(kind===id?' chip-active':'')} onClick={()=>{setKind(id);setVoice('');setSourceIds([]);setFilters({year:'',genre:'',tag:'',format:'',age:''});setPage(1);}}>{label}</button>)}</div>
     <CatalogSearch query={query} onQuery={value=>{setQuery(value);setPage(1);}} suggestions={suggestions} loading={loading} showFilters={showFilters} onToggleFilters={()=>setShowFilters(value=>!value)} onChoose={choose} onComposing={setComposing}/>

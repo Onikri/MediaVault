@@ -25,6 +25,7 @@ import {ImportSettings} from './ImportParts.jsx';
 import MusicConnections from './MusicConnections.jsx';
 import YouTubeServerSession from './YouTubeServerSession.jsx';
 import './world-library.css';
+import {browseRoute} from './anime-navigation.js';
 
 const sections=[{id:'anime',art:'video',name:'Аниме',formats:'ТАЙТЛЫ · СЕЗОНЫ · СЕРИИ',icon:'video'},
   {id:'manga',art:'manga',name:'Манга',formats:'ТАЙТЛЫ · ТОМА · ГЛАВЫ',icon:'manga'},
@@ -103,7 +104,7 @@ export default function App(){
   const importService=useImportService(state,actions);
   useLibraryProfiles(state,actions,importService.server,importService.active);
   const reduced=useReducedMotion();
-  const [view,setView]=useState(()=>new URLSearchParams(location.hash.slice(1)).has('title')?'collection':['home','library','collection','import','history','profile'].includes(location.hash.slice(1))?location.hash.slice(1):'home');
+  const [view,setView]=useState(()=>browseRoute()?'library':new URLSearchParams(location.hash.slice(1)).has('title')?'collection':['home','library','collection','import','history','profile'].includes(location.hash.slice(1))?location.hash.slice(1):'home');
   const [libraryDialog,setLibraryDialog]=useState(false),[libraryIntent,setLibraryIntent]=useState('online');
   const [importTarget,setImportTarget]=useState(null);
   const [importQuery,setImportQuery]=useState(''),[importKind,setImportKind]=useState('anime');
@@ -150,7 +151,7 @@ export default function App(){
   }
   useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});},[view]);
   useEffect(()=>{
-    const change=()=>{if(restoreRoute(location.hash))return;const next=location.hash.slice(1);if(['home','library','collection','import','history','profile'].includes(next)){setView(next);setActiveTitle(null);setSelected(null);}};
+    const change=()=>{if(browseRoute()){setView('library');setCategory('anime');setActiveTitle(null);setSelected(null);return;}if(restoreRoute(location.hash))return;const next=location.hash.slice(1);if(['home','library','collection','import','history','profile'].includes(next)){setView(next);setActiveTitle(null);setSelected(null);}};
     window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);
   },[]);
   useEffect(()=>{
