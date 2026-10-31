@@ -30,3 +30,28 @@
 .watch-title-page .title-sidebar .title-character-grid>button>img,.watch-title-page .title-sidebar .title-character-grid>button>svg{display:block;width:100%;height:auto;aspect-ratio:2/2.5;max-height:185px;object-fit:cover;border-radius:0}
 .watch-title-page .title-sidebar .title-character-grid>button>span{display:grid;gap:4px;padding:9px;text-align:left}.watch-title-page .title-sidebar .title-character-grid strong{font-size:11px;line-height:1.45}.watch-title-page .title-sidebar .title-character-grid small{font-size:9px;line-height:1.5;color:#8f9fad}.character-more{margin-top:13px;font-size:11px}
 .song-profile{background:linear-gradient(130deg,#dde5eb12,transparent),#18212bec!important;border:1px solid #ffffff28!important;border-radius:18px;backdrop-filter:blur(28px)}
+/* Player controls: small anchored surfaces and a single paused image. */
+.title-hero-actions .title-save-actions{display:inline-flex;gap:7px;margin:0;align-items:center}
+.title-hero-actions .title-save-actions button{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid #ffffff24;border-radius:9px;background:#ffffff06;color:#d5dde5;cursor:pointer}
+.title-hero-actions .title-save-actions button:hover,.title-hero-actions .title-save-actions [aria-pressed=true]{background:#ffffff12;color:#efc6a5}
+.online-watch .online-video-frameless{min-height:0;aspect-ratio:16/9;position:relative;overflow:visible;background:#0b1015}
+.online-watch .online-video-frameless>.online-loading{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;margin:0}
+.online-watch .online-video-frameless>.inline-error{position:absolute;inset:0;display:grid;place-content:center;padding:24px;margin:0}
+.online-watch .online-video-frameless>.mv-player{width:100%}
+.mv-player .mv-player-stage{transform:none;transition:filter .18s ease;transform-origin:center}
+.mv-player:not(.is-playing):not(.parallax-off) .mv-player-stage{transform:translate3d(var(--pan-x,0px),var(--pan-y,0px),0) scale(1.008)}
+.player-popover{padding:12px;border-radius:12px;background:#20272eea;backdrop-filter:blur(12px);border-color:#ffffff24;box-shadow:0 12px 32px #0005,inset 0 1px #ffffff0b;contain:layout style}
+.player-popover .mv-player-drawer-head{margin-bottom:8px}.player-popover .mv-player-drawer-head h2{display:flex;align-items:baseline;gap:8px;font-size:13px}.player-popover .mv-player-drawer-head h2 small{font-size:9px;font-weight:400;color:#8f9aa5}
+.player-popover .player-settings-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;padding-bottom:8px;border-bottom:1px solid #ffffff10}
+.player-popover .player-settings-tabs button{height:32px;padding:7px;display:grid;place-items:center;border:0;background:transparent;border-radius:7px}
+.player-popover .player-settings-tabs button[aria-selected=true]{background:#ffffff10;box-shadow:inset 0 -2px #d7b49a;color:#efd0b8}
+.player-popover .player-settings-tabs button span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.player-popover .player-settings-page{padding-top:8px}.player-popover .mv-player-settings{gap:7px}
+.player-popover select{min-height:32px;border-color:#ffffff17;background:#ffffff06}.player-popover .player-setting-help{font-size:10px;line-height:1.45}
+.player-popover .soundtrack-compact .section-heading{margin-bottom:6px;padding-right:20px}.player-popover .soundtrack-track{min-height:42px;padding:7px 0}.player-popover .soundtrack-track>div:nth-child(2){display:grid;gap:2px;line-height:1.2}.player-popover .soundtrack-track strong{font-size:12px;order:0}.player-popover .soundtrack-track small{font-size:10px;max-width:100%;color:#9ba8b4}.player-popover .soundtrack-track small:after{content:none}
+.player-popover .soundtrack-actions button{min-width:28px;min-height:30px;background:none}.player-popover .soundtrack-actions button:hover{background:#ffffff10}.player-popover .soundtrack-actions svg{width:15px}
+.mv-playback-status{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:12px;z-index:12;pointer-events:none;color:#dce2e7;text-align:center;font-size:12px;background:#0b10152e}
+.mv-playback-status button{pointer-events:auto;padding:9px 14px;border-radius:8px;border:1px solid #ffffff32;background:#20272e;color:#f2f4f7}
+.mv-playback-status .loading-ring{width:28px;height:28px}
+@media(prefers-reduced-motion:reduce),(pointer:coarse){.mv-player:not(.is-playing):not(.parallax-off) .mv-player-stage{transform:none}}
+.player-popover.mv-player-drawer,.player-popover.mv-player-music{background:#242b33f8;backdrop-filter:blur(10px)}

@@ -8,10 +8,12 @@ export function SettingsGlyph(){
 }
 const pages=[['watch','Просмотр',SlidersHorizontal],['image','Изображение',Sparkles],['effects','Атмосфера',Sun],['captions','Субтитры',Subtitles],['intro','Пропуск',SkipForward],['actions','Действия',Share2]];
 export default function PlayerSettings({onClose,children,anchor,initialPage='watch'}){
+  const [height,setHeight]=useState(innerHeight);
+  useEffect(()=>{const resize=()=>setHeight(innerHeight);addEventListener('resize',resize);return()=>removeEventListener('resize',resize);},[]);
   const [page,setPage]=useState(initialPage),[part,setPart]=useState(0),root=useRef(null),reduced=useReducedMotion();
   useEffect(()=>setPage(initialPage),[initialPage]);
   const flatten=nodes=>Children.toArray(nodes).flatMap(n=>typeof n==='string'?[]:n.type===Fragment?flatten(n.props.children):n.type==='fieldset'?flatten(n.props.children).filter(c=>c.type!=='legend'):[n]);
-  const rows=flatten(children[page]?.props.children),size=innerHeight<500?2:innerHeight<700?3:6,count=Math.ceil(rows.length/size);
+  const rows=flatten(children[page]?.props.children),size=height<500?2:height<700?3:5,count=Math.ceil(rows.length/size);
   useEffect(()=>setPart(0),[page]);
   useEffect(()=>{
     const previous=document.activeElement;root.current?.querySelector('[role=tab][aria-selected=true]')?.focus({preventScroll:true});
@@ -27,9 +29,9 @@ export default function PlayerSettings({onClose,children,anchor,initialPage='wat
     }
   }
   return <PlayerPopover anchor={anchor} label="Настройки просмотра" className="mv-player-drawer player-settings-glass" onClose={onClose}><div ref={root} id="player-settings" onKeyDown={keyboard}>
-    <header className="mv-player-drawer-head"><h2>Настройки</h2><button aria-label="Закрыть настройки" onClick={onClose}><X size={17}/></button></header>
-    <div className="player-settings-tabs" role="tablist" aria-label="Разделы настроек">{pages.map(([id,label,Icon],index)=><button role="tab" key={id} id={'settings-tab-'+id} aria-controls={'settings-page-'+id} aria-selected={page===id} tabIndex={page===id?0:-1} onClick={()=>setPage(id)} onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?pages.length-1:(index+(event.key==='ArrowRight'?1:-1)+pages.length)%pages.length;setPage(pages[next][0]);root.current.querySelector('#settings-tab-'+pages[next][0])?.focus();}}}><Icon size={17}/><span>{label}</span></button>)}</div>
-    {pages.map(([id])=><div role="tabpanel" id={'settings-page-'+id} aria-labelledby={'settings-tab-'+id} key={id} hidden={page!==id} className="player-settings-page"><div className="mv-player-settings">{flatten(children[id]?.props.children).map((child,i)=><div className="player-setting-row" key={i} hidden={id===page&&Math.floor(i/size)!==Math.min(part,count-1)}>{child}</div>)}</div></div>)}
+    <header className="mv-player-drawer-head"><h2>{pages.find(p=>p[0]===page)?.[1]}<small>Настройки</small></h2><button aria-label="Закрыть настройки" onClick={onClose}><X size={17}/></button></header>
+    <div className="player-settings-tabs" role="tablist" aria-label="Разделы настроек">{pages.map(([id,label,Icon],index)=><button role="tab" title={label} key={id} id={'settings-tab-'+id} aria-controls={'settings-page-'+id} aria-selected={page===id} tabIndex={page===id?0:-1} onClick={()=>setPage(id)} onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?pages.length-1:(index+(event.key==='ArrowRight'?1:-1)+pages.length)%pages.length;setPage(pages[next][0]);root.current.querySelector('#settings-tab-'+pages[next][0])?.focus();}}}><Icon size={17}/><span>{label}</span></button>)}</div>
+    <div role="tabpanel" id={'settings-page-'+page} aria-labelledby={'settings-tab-'+page} className="player-settings-page"><div className="mv-player-settings">{rows.slice(Math.max(0,Math.min(part,count-1))*size,(Math.max(0,Math.min(part,count-1))+1)*size).map((child,i)=><div className="player-setting-row" key={page+':'+part+':'+i}>{child}</div>)}</div></div>
     {count>1&&<nav className="player-page-dots" aria-label="Страницы настроек"><button disabled={part===0} onClick={()=>setPart(n=>n-1)} aria-label="Предыдущие настройки">‹</button>{Array.from({length:count},(_,i)=><button key={i} aria-label={'Страница настроек '+(i+1)} aria-current={part===i?'page':undefined} onClick={()=>setPart(i)}><i/></button>)}<button disabled={part>=count-1} onClick={()=>setPart(n=>n+1)} aria-label="Следующие настройки">›</button></nav>}
     <footer className="player-settings-shortcuts"><span><kbd>Пробел</kbd> пауза</span><span><kbd>←</kbd><kbd>→</kbd> 10 сек.</span><span><kbd>F</kbd> экран</span></footer>
   </div></PlayerPopover>;

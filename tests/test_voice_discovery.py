@@ -61,6 +61,13 @@ class PlayerCatalogTests(unittest.TestCase):
         self.assertEqual(len(main['variants']),2)
         self.assertEqual({v['player'] for v in main['variants']},{'Kodik','Aniboom'})
 
+    def test_anilibria_published_names_share_mirrors_and_preserve_legacy_preference_ids(self):
+        a=choice('Anilibria','https://embed.thealloha.club/show',player='Alloha',language='ru')
+        b=choice('AniLibria.TV','https://kodikplayer.com/serial/1/h/720p',player='Kodik')
+        groups=group_voices([{'url':'https://site.example/show','dubs':[a,b]}])
+        self.assertEqual(len(groups),1);self.assertEqual(len(groups[0]['variants']),2)
+        self.assertEqual(groups[0]['language'],'ru');self.assertTrue(groups[0]['aliases'])
+
     def test_animego_selects_each_episodes_actual_button(self):
         root='https://animego.org/anime/show-70';relay='https://animego.org/player/70'
         def buttons(ep,studio='A'):

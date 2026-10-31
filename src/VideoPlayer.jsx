@@ -2,7 +2,8 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {Music2,Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown,Clapperboard} from 'lucide-react';
 import './player.css';
 import './player-refinement.css';
-import {flushSync} from 'react-dom';
+import usePlaybackHealth from './use-playback-health.js';
+import useSmoothTimeline from './use-smooth-timeline.js';
 import PlayerPopover from './PlayerPopover.jsx';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {readProgress,writeProgress} from './playback-progress.js';
@@ -60,9 +61,12 @@ function VolumeGlyph({value,muted}){
     <path className="volume-wave" style={{opacity:level===0?1:0}} d="m14 10 6 6m0-6-6 6"/>
   </svg>;
 }
-export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose}){
+export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose,autoPlay=false}){
+  const timeline=useRef(null),clockDrawn=useRef(0),keyboardHandler=useRef(null);
   const ownRef=useRef(null),canvasRef=useRef(null),stageRef=useRef(null),railRef=useRef(null);
   const videoRef=mediaRef||ownRef;
+  const health=usePlaybackHealth(videoRef,source,onError,autoPlay);
+  useSmoothTimeline(videoRef,timeline,source);
   const streaming=useVideoStream(videoRef,source,item.onlineType,onError,{quality:onlineControls?.quality||'best'});
   const reducedMotion=useReducedMotion();
   useEffect(()=>{const pause=()=>videoRef.current?.pause();addEventListener('mediavault-music-playing',pause);return()=>removeEventListener('mediavault-music-playing',pause);},[]);
@@ -81,22 +85,22 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   useEffect(()=>{const update=()=>setIsFullscreen(document.fullscreenElement===stageRef.current);document.addEventListener('fullscreenchange',update);return()=>document.removeEventListener('fullscreenchange',update);},[]);
   const [panel,setPanel]=useState('watch'),[localTrack,setLocalTrack]=useState('');
   const [controlsVisible,setControlsVisible]=useState(true);
-  const hideTimer=useRef(null);
+  const hideTimer=useRef(null),lastReveal=useRef(0);
   const [musicOpen,setMusicOpen]=useState(false),[theater,setTheater]=useState(false),[settingsTab,setSettingsTab]=useState('watch');const settingsButton=useRef(null),musicButton=useRef(null);
   useEffect(()=>{document.body.classList.toggle('player-theater',theater);return()=>document.body.classList.remove('player-theater');},[theater]);
-  function cinema(){const change=()=>flushSync(()=>setTheater(v=>!v));if(document.startViewTransition&&!reducedMotion)document.startViewTransition(change);else change();}
+  function cinema(){setTheater(v=>!v);}
 
   const musicIdentity=musicIdentityFor(item,catalog);
-  const episodeMusic=useEpisodeMusic(musicIdentity,item.episode||Number(item.name?.match(/(?:серия|episode)[ _-]*(\d+)/i)?.[1])||1,duration);
+  const episodeMusic=useEpisodeMusic(musicIdentity,item.episode||Number(item.name?.match(/(?:серия|episode)[ _-]*(\d+)/i)?.[1])||1,duration,onlineControls?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl);
   const [dismissedCue,setDismissedCue]=useState('');
   const settingsOpen=panel==='settings';
-  const scene=usePlayerAtmosphere(videoRef,source,playing,stageRef,prefs.parallax);
+  const scene=usePlayerAtmosphere(videoRef,source,playing,stageRef,prefs.parallax,prefs.ambient);
   const [subtitle,setSubtitle]=useState('off'),[availableTracks,setAvailableTracks]=useState([]);
   useEffect(()=>{streaming.setSubtitle(subtitle.startsWith('hls:')?Number(subtitle.slice(4)):-1);},[subtitle,source,streaming.subtitles]);
   const [audioTracks,setAudioTracks]=useState([]),[activeAudio,setActiveAudio]=useState(0);
   const [subtitleText,setSubtitleText]=useState(''),[gpuActive,setGpuActive]=useState(false);
   const [gpuWarning,setGpuWarning]=useState('');
-  const [neuralStats,setNeuralStats]=useState(null);
+  const [neuralStats,setNeuralStats]=useState(null),statsClock=useRef(0);
   const [gpuAttempt,setGpuAttempt]=useState(0);
   const mobileDevice=/Android|iPhone|iPad/i.test(navigator.userAgent)||matchMedia('(any-pointer: coarse)').matches;
   const deviceProfile=prefs.deviceProfile==='auto'?(mobileDevice?'phone':'desktop'):prefs.deviceProfile;
@@ -108,8 +112,11 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   function retryGpu(value=prefs.upscaler){setGpuAttempt(n=>n+1);changePrefs({gpu:value!=='off',...(value!=='off'?{upscaler:value}:{})});}
   const [opening,setOpening]=useState(()=>getOpening(item,libraryId));
   const [openingDraft,setOpeningDraft]=useState(null);
-  const effectiveOpening=opening||episodeMusic.intervals.find(v=>v.type==='op');
-  const ending=openingBounds(item.ending)||episodeMusic.intervals.find(v=>v.type==='ed');
+  const [introOffset,setIntroOffset]=useState(()=>{try{return Number(localStorage.getItem(openerKey(libraryId,item.id)+':offset'))||0;}catch{return 0;}});
+  useEffect(()=>{try{setIntroOffset(Number(localStorage.getItem(openerKey(libraryId,item.id)+':offset'))||0);}catch{setIntroOffset(0);}},[item.id,libraryId]);
+  const shifted=episodeMusic.intervals.map(v=>({...v,start:Math.max(0,v.start+introOffset),end:Math.min(duration,v.end+introOffset)})).filter(v=>v.end>v.start);
+  const effectiveOpening=opening||shifted.find(v=>v.type==='op');
+  const ending=openingBounds(item.ending)||shifted.find(v=>v.type==='ed');
   const activeTheme=effectiveOpening&&time>=effectiveOpening.start&&time<effectiveOpening.end?'OP':ending&&time>=ending.start&&time<ending.end?'ED':null;
   const songCandidates=episodeMusic.tracks.filter(t=>t.type===activeTheme),currentSong=songCandidates.length===1?songCandidates[0]:null;
   const lastStored=useRef(-1),resumeApplied=useRef(false),subtitleInput=useRef(null);
@@ -121,6 +128,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const index=episodes.indexOf(episode);
   const next=episodes[index+1]?.variants[0]?.item;
   function revealControls(){
+    const now=performance.now();if(controlsVisible&&now-lastReveal.current<150)return;lastReveal.current=now;
     setControlsVisible(true);clearTimeout(hideTimer.current);
     hideTimer.current=setTimeout(()=>setControlsVisible(false),3000);
   }
@@ -131,7 +139,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
     if(rail&&card)rail.scrollTo({left:rail.scrollLeft+card.getBoundingClientRect().left-rail.getBoundingClientRect().left-(rail.clientWidth-card.clientWidth)/2,behavior:'instant'});
   },[item.id]);
   function scrollEpisodes(offset){railRef.current?.scrollBy({left:offset,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
-  function openPanel(value){setPanel(value);revealControls();}
+  function openPanel(value){if(value==='episodes'&&onlineControls?.externalEpisodeList){stageRef.current?.closest('.online-watch')?.querySelector('.watch-episode-grid')?.scrollIntoView({behavior:reducedMotion?'instant':'smooth',block:'center'});setPanel('watch');revealControls();return;}setPanel(value);revealControls();}
   const changePrefs=(change)=>{
     setPrefs(prev=>{
       const updated={...prev,...change};
@@ -195,7 +203,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
         const start=engine==='fsr'||engine==='fsr-soft'?startFsr:engine==='mobile'||engine==='lanczos'?startMobileGpu:engine==='fsrcnn'?startNeuralUpscaler:(await import('./anime4k-runtime.js')).startAnime4K;
         stop=await start(videoRef.current,canvas,{
           mode:prefs.neuralMode,profile:engine,deviceProfile,
-          onStats:stats=>{if(!disposed)setNeuralStats(stats);},
+          onStats:stats=>{const now=performance.now();if(!disposed&&now-statsClock.current>=1000){statsClock.current=now;setNeuralStats(stats);}},
           onFailure:error=>{
             if(disposed)return;
             failed=true;
@@ -221,7 +229,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   };
   function onTime(){
     const video=videoRef.current;if(!video)return;
-    setTime(video.currentTime);snapshot.current={time:video.currentTime,duration:video.duration};
+    if(Math.abs(video.currentTime-clockDrawn.current)>=.5||video.paused){clockDrawn.current=video.currentTime;setTime(video.currentTime);}snapshot.current={time:video.currentTime,duration:video.duration};
     if(onPreview&&previewCaptured.current!==item.id&&video.currentTime>=1){const image=captureEpisodePreview(video);if(image){previewCaptured.current=item.id;onPreview(item.episode,image);}}
     const ranges=video.buffered;
     setBuffered(contiguousBufferEnd(ranges,video.currentTime));
@@ -290,8 +298,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
     if(nextBounds){setIntro(nextBounds);setOpeningDraft(null);}
     else onError?.(Error('Конец опенинга должен быть позже его начала.'));
   }
-  useEffect(()=>{
-    const handler=event=>{
+  keyboardHandler.current=event=>{
       if(event.key==='Escape'&&panel!=='watch'){event.preventDefault();event.stopImmediatePropagation();openPanel('watch');stageRef.current?.querySelector('[aria-label="Настройки плеера"]')?.focus();return;}
       if(panel!=='watch')return;
       if(!stageRef.current?.contains(document.activeElement)&&document.fullscreenElement!==stageRef.current)return;
@@ -308,9 +315,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
         default:break;
       }
     };
-    window.addEventListener('keydown',handler,true);
-    return()=>window.removeEventListener('keydown',handler,true);
-  });
+  useEffect(()=>{const handler=e=>keyboardHandler.current?.(e);window.addEventListener('keydown',handler,true);return()=>window.removeEventListener('keydown',handler,true);},[]);
   const gestures=usePlayerGestures({videoRef,volume:muted?0:prefs.volume,setVolume:value=>{setMuted(false);changePrefs({volume:value});},openPanel,toggle,reveal:revealControls});
   const actions=usePlayerActions({videoRef,canvasRef,item,gpuActive});
   const previewTime=gestures.feedback?.type==='seek'?gestures.feedback.value:time;
@@ -319,14 +324,14 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const seekable=duration>0&&Number.isFinite(duration);
   const skipRange=[effectiveOpening,ending].find(v=>v&&time>=v.start&&time<v.end);
   const canSkip=!!skipRange;
-  const hiddenControls=playing&&panel==='watch'&&!controlsVisible;
+  const hiddenControls=playing&&panel==='watch'&&!musicOpen&&!controlsVisible;
   const progress=seekable?Math.min(100,previewTime/duration*100):0;
   return <div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.parallax?' parallax-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
     style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls}>
     <div className="mv-player-screen">
       <div className="mv-player-ambient" aria-hidden="true"/>
-      <div className="mv-player-panorama" aria-hidden="true">{prefs.parallax&&scene.image&&<><img src={scene.image} alt=""/>{scene.near&&<img className="mv-relief-near" src={scene.near} alt=""/>}</>}</div>
+
       <div className="mv-player-stage">
         <video ref={videoRef} src={streaming.hls?undefined:source||undefined} crossOrigin="anonymous" playsInline preload="auto" muted={muted||!!onlineControls?.audio&&!audioError}
           onLoadedMetadata={loaded} onLoadedData={()=>{const image=captureEpisodePreview(videoRef.current);if(onPreview&&image){previewCaptured.current=item.id;onPreview(item.episode,image);}}} onTimeUpdate={onTime} onProgress={()=>{const v=videoRef.current;if(v)setBuffered(contiguousBufferEnd(v.buffered,v.currentTime));}}
@@ -338,6 +343,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
         <canvas key={engine+':'+deviceProfile+':'+prefs.neuralMode+':'+gpuAttempt} ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
         {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:(hiddenControls?prefs.subOffset:Math.max(22,prefs.subOffset))+'%'}} aria-live="off">{subtitleText}</div>}
       </div>
+      {health.visible&&<div className="mv-playback-status" role="status">{health.phase==='blocked'?<button onClick={health.retry}>Нажми, чтобы воспроизвести</button>:health.phase==='failed'?<button onClick={onlineControls?.retryStream||health.retry}>Повторить воспроизведение</button>:<><span className="loading-ring"/>{health.phase==='loading'?'Запускаем видео…':'Подгружаем видео…'}</>}</div>}
       {panel==='watch'&&<div className="mv-player-touch-surface" {...gestures.surface} aria-hidden="true"/>}
       <AnimatePresence>{gestures.feedback&&gestures.feedback.type!=='seek'&&<motion.output className="mv-player-gesture-hud" style={{x:'-50%',y:'-50%'}} initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:.95}} aria-live="off">
         {gestures.feedback.type==='seek'?<><strong>{clock(gestures.feedback.value)}</strong><small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></>:gestures.feedback.type==='brightness'?<><Sun size={25}/><strong>{Math.round(gestures.feedback.value*100)}%</strong></>:gestures.feedback.type==='volume'?<><VolumeGlyph value={effectiveVolume}/><strong>{Math.round(effectiveVolume*100)}%</strong></>:<>{gestures.feedback.type==='episodes'?<ChevronsUp size={26}/>:<ChevronsDown size={26}/>}<small>{gestures.feedback.type==='episodes'?'Эпизоды':'Настройки'}</small></>}
@@ -368,7 +374,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
           onChange={event=>changePrefs({autoSkip:event.target.checked})}/> Пропускать опенинг и эндинг</label>
 
 </div>,
-        intro:<div className="mv-player-settings">        <div className="mv-player-intro"><span>Опенинг: {effectiveOpening?clock(effectiveOpening.start)+' – '+clock(effectiveOpening.end)+(effectiveOpening.source?' · '+effectiveOpening.source:''):'разметки пока нет'}</span>
+        intro:<div className="mv-player-settings"><p className="player-setting-help" role="status">{episodeMusic.timingState==='loading'?'Ищем разметку AniSkip…':episodeMusic.timingState==='ready'?'Разметка AniSkip найдена'+(episodeMusic.intervals.some(v=>v.needsReview)?' · другая длительность релиза, проверь начало.':'.'):episodeMusic.timingMessage||'Нет разметки. Можно отметить опенинг вручную.'}</p><button className="mv-player-settings-action" onClick={episodeMusic.retry}>Найти разметку опенинга</button>{episodeMusic.intervals.length>0&&<label>Сдвиг меток · {introOffset} с<input aria-label="Сдвиг меток опенинга" type="range" min="-60" max="60" step=".5" value={introOffset} onChange={e=>{const value=Number(e.target.value);setIntroOffset(value);try{localStorage.setItem(openerKey(libraryId,item.id)+':offset',String(value));}catch{}}}/></label>}        <div className="mv-player-intro"><span>Опенинг: {effectiveOpening?clock(effectiveOpening.start)+' – '+clock(effectiveOpening.end)+(effectiveOpening.source?' · '+effectiveOpening.source:''):'разметки пока нет'}</span>
           <div><button onClick={()=>setOpeningDraft(time)}>Начало {openingDraft!==null?'('+clock(openingDraft)+')':''}</button>
           <button disabled={openingDraft===null} onClick={markEnd}>Конец</button>
           <button disabled={!opening} onClick={()=>setIntro(null)}>Очистить</button></div>
@@ -398,7 +404,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
       {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {engineName}{engine==='mobile'||engine==='lanczos'||String(engine).startsWith('fsr')?'':' ×2'}{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
       <div className="mv-player-console" onPointerEnter={revealControls}>
-        <div className="mv-player-timeline" onPointerMove={e=>{if(!seekable||!source||navigator.connection?.saveData)return;const r=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));clearTimeout(seekTimer.current);const value={time:fraction*duration,left:Math.max(14,Math.min(86,fraction*100))};seekTimer.current=setTimeout(()=>setHoverSeek(value),200);}} onPointerLeave={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}} onPointerCancel={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}}><span className="mv-timeline-markers" aria-label="Разметка опенинга и эндинга">{[effectiveOpening,ending].filter(Boolean).map((v,i)=><i key={i} title={(i===0?'Опенинг':'Эндинг')+' · '+clock(v.start)+' – '+clock(v.end)} style={{left:(duration?v.start/duration*100:0)+'%',width:(duration?(v.end-v.start)/duration*100:0)+'%'}}/>)}</span>{hoverSeek&&<TimelinePreview source={source} type={item.onlineType} point={hoverSeek.time} left={hoverSeek.left}/>}{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
+        <div className="mv-player-timeline" onPointerMove={e=>{if(!seekable||!source||navigator.connection?.saveData)return;const r=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));clearTimeout(seekTimer.current);const value={time:fraction*duration,left:Math.max(14,Math.min(86,fraction*100))};seekTimer.current=setTimeout(()=>setHoverSeek(value),200);}} onPointerLeave={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}} onPointerCancel={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}}><span className="mv-timeline-markers" aria-label="Разметка опенинга и эндинга">{[effectiveOpening,ending].filter(Boolean).map((v,i)=><i key={i} title={(i===0?'Опенинг':'Эндинг')+' · '+clock(v.start)+' – '+clock(v.end)} style={{left:(duration?v.start/duration*100:0)+'%',width:(duration?(v.end-v.start)/duration*100:0)+'%'}}/>)}</span>{hoverSeek&&<TimelinePreview source={source} type={item.onlineType} point={hoverSeek.time} left={hoverSeek.left}/>}{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input ref={timeline} aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
           value={Math.min(previewTime,seekable?duration:1)} disabled={!seekable} step="0.1" onChange={event=>seek(Number(event.target.value))}
           style={{'--played':progress+'%','--buffered':Math.max(progress,seekable?buffered/duration*100:0)+'%'}}/></div>
         <div className="mv-player-controls">
@@ -418,7 +424,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
     </div>
     <input ref={subtitleInput} type="file" accept=".srt,.vtt,text/vtt" hidden onChange={attachSubtitle}/>
     <AnimatePresence>{musicOpen&&<PlayerPopover anchor={musicButton} label="Музыка из аниме" className="mv-player-music" onClose={()=>setMusicOpen(false)}><button className="icon-button" aria-label="Закрыть музыку" onClick={()=>setMusicOpen(false)}><X size={17}/></button><Soundtrack identity={musicIdentity} userId={userId} compact/></PlayerPopover>}</AnimatePresence>
-    {episodes.length>1&&<section className="mv-player-shelf" inert={settingsOpen} aria-label="Эпизоды сезона">
+    {episodes.length>1&&!onlineControls?.externalEpisodeList&&<section className="mv-player-shelf" inert={settingsOpen} aria-label="Эпизоды сезона">
       <div className="mv-player-shelf-heading">{panel==='episodes'&&<button aria-label="Закрыть эпизоды" onClick={()=>openPanel('watch')}><X size={20}/></button>}<div className="mv-player-season-title">{seasons.length>1?<label><span className="sr-only">Сезон</span><select value={season?.id||''} onChange={event=>choose(seasons.find(s=>s.id===event.target.value)?.episodes[0]?.variants[0]?.item)}>{seasons.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>:<span>{season?.name}</span>}<button className="mv-player-expand-episodes" aria-label="Развернуть эпизоды" onClick={()=>openPanel(panel==='episodes'?'watch':'episodes')}>{season?.episodes.length} эпизодов <ChevronsUp size={12}/></button></div><div><button aria-label="Предыдущие эпизоды" onClick={()=>scrollEpisodes(-360)}><ChevronLeft size={18}/></button><button aria-label="Следующие эпизоды" onClick={()=>scrollEpisodes(360)}><ChevronRight size={18}/></button></div></div>
       <div className="mv-player-rail" ref={railRef}>{season?.episodes.map((ep,i)=>{
         const current=ep===episode;

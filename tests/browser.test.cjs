@@ -276,8 +276,9 @@ async function main() {
   assert.equal(await owner.locator('video').evaluate(video=>video.paused),false,
     'Video starts after pressing custom player Play button');
   await owner.locator('.mv-player-controls button[aria-label="Пауза"]').click();
-  await owner.waitForFunction(()=>document.querySelector('.mv-player-panorama img')?.src.startsWith('data:image/jpeg'));
-  assert.notEqual(await owner.locator('.mv-player').evaluate(el=>el.style.getPropertyValue('--scene-rgb')),'218 139 91','A decoded frame supplies the pause artwork and its palette');
+  assert.equal(await owner.locator('.mv-player-panorama img').count(),0,'Paused video does not duplicate the decoded frame');
+  await owner.waitForFunction(()=>document.querySelector('.mv-player')?.style.getPropertyValue('--scene-rgb')!=='150 157 166');
+  assert.notEqual(await owner.locator('.mv-player').evaluate(el=>el.style.getPropertyValue('--scene-rgb')),'150 157 166','A decoded frame supplies ambient colors without a JPEG copy');
   await owner.getByRole('button',{name:'Загрузить файл целиком (резервный режим)'}).click();
   await owner.waitForFunction(()=>{
     const video=document.querySelector('#viewerContent video');
@@ -540,7 +541,7 @@ async function main() {
   assert.equal(await cinema.locator('.mv-player-rail').evaluate(el=>getComputedStyle(el).display),'grid','Center swipe expands the existing episode rail');
   await cinema.getByRole('button',{name:'Закрыть эпизоды'}).click();
   await swipe(.5,0,90);
-  await cinema.getByRole('heading',{name:'Настройки',exact:true}).waitFor();
+  await cinema.getByRole('dialog',{name:'Настройки просмотра',exact:true}).waitFor();
   await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
   await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
   await cinema.locator('video').evaluate(v=>v.currentTime=0);
@@ -558,7 +559,7 @@ async function main() {
     assert.equal(await cinema.locator('.mv-player-card').count(),2,'One episode rail');
     assert.equal(await cinema.locator('.mv-player-card.is-current .mv-player-card-art').evaluate(el=>getComputedStyle(el).outlineStyle),'none','No decorative selection frame');
     await cinema.getByRole('button',{name:'Настройки плеера'}).click();
-    await cinema.getByRole('heading',{name:'Настройки',exact:true}).waitFor();
+    await cinema.getByRole('dialog',{name:'Настройки просмотра',exact:true}).waitFor();
     await cinema.screenshot({path:path.join(output,'player-settings-'+width+'.png'),animations:'disabled'});
     assert.ok(await cinema.locator('.mv-player-drawer').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Settings fit '+width);
     await owner.keyboard.press('Escape');

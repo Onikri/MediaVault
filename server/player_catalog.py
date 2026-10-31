@@ -35,7 +35,8 @@ def translation_kind(name, explicit=''):
 
 
 def normalized_studio(value):
-    return re.sub(r'[\W_]+','',unicodedata.normalize('NFKC',value).casefold())
+    key=re.sub(r'[\W_]+','',unicodedata.normalize('NFKC',value).casefold())
+    return 'anilibria' if key in {'anilibria','anilibriatv','aniliberty','anilibertytv'} else key
 
 
 def choice(name, url, *, identity='', kind='', language='und', player='', episodes=None):
@@ -150,10 +151,15 @@ def group_voices(inspections):
             label=voice['name'];kind=voice.get('kind') or translation_kind(label)
             language=voice.get('language') or 'und'
             name_key=normalized_studio(label)
-            if not voice.get('named',True):name_key=source['url']+voice['url']
+            old_key=(re.sub(r'[\W_]+','',unicodedata.normalize('NFKC',label).casefold()),kind,language)
+            if name_key=='anilibria' and language=='und':language='ru'
+            if not voice.get('named',True):
+                name_key=source['url']+voice['url'];old_key=(name_key,kind,old_key[2])
             key=(name_key,kind,language)
             identifier=hashlib.sha256(repr(key).encode()).hexdigest()[:24]
             group=groups.setdefault(key,{'id':identifier,'name':label,'kind':kind,'language':language,'variants':[]})
+            legacy=hashlib.sha256(repr(old_key).encode()).hexdigest()[:24]
+            if legacy!=identifier and legacy not in group.setdefault('aliases',[]):group['aliases'].append(legacy)
             variant={**voice,'sourceUrl':source['url'],'sourceTitle':source.get('title',''),
                      'provider':source.get('provider','public'),'providerName':source.get('providerName') or source.get('provider','public')}
             variant['id']=hashlib.sha256((variant['sourceUrl']+'|'+voice['url']+'|'+voice['id']).encode()).hexdigest()[:24]

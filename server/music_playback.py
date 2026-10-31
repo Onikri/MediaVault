@@ -47,16 +47,7 @@ def recordings(title,artist):
             cache[key]=(now+(21600 if results else 60),value)
         return value
     finally:http.close();slot.release()
-def skip_times(identity,episode,duration):
-    try:
-        data=get_json(f'https://api.aniskip.com/v2/skip-times/{identity}/{episode}',params=[('types[]','op'),('types[]','ed'),('episodeLength',round(duration))])
-        parts=[]
-        for v in data.get('results',[]):
-            interval=v.get('interval') or {};start=interval.get('startTime');end=interval.get('endTime')
-            if v.get('skipType') in {'op','ed'} and isinstance(start,(int,float)) and isinstance(end,(int,float)) and 0<=start<end<=duration+2:
-                parts.append({'type':v['skipType'],'start':start,'end':min(end,duration),'source':'AniSkip'})
-        return {'intervals':parts,'source':'AniSkip'}
-    except (HTTPException,SourceError,ValueError,TypeError):return {'intervals':[],'source':'AniSkip','message':'Разметки этой серии пока нет.'}
+from anime_skip import skip_times
 def install(app):
     @app.get('/music/metadata')
     def song_metadata(title:str='',artist:str=''):

@@ -1,11 +1,12 @@
 import {useEffect,useRef,useState} from 'react';
 import {variantsFor} from './watch-session.js';
-export default function useWatchQualities({voices,voiceId,episode,season,server,inspect,service,attempt}){
+export default function useWatchQualities({voices,voiceId,episode,season,server,inspect,service,attempt,scope=''}){
  const cache=useRef(new Map()),[state,setState]=useState({key:'',rows:[],done:0,total:0,busy:false});
  const key=server+':'+season+':'+episode+':'+voiceId;
  useEffect(()=>{
   const abort=new AbortController(),signal=abort.signal;
-  const groups=[...voices].sort((a,b)=>Number(b.id===voiceId)-Number(a.id===voiceId));
+  if(!scope)return()=>abort.abort();
+  const groups=(scope==='selected'?voices.filter(v=>v.id===voiceId):[...voices]).sort((a,b)=>Number(b.id===voiceId)-Number(a.id===voiceId));
   const tasks=groups.flatMap(group=>variantsFor(group,episode).map(variant=>({group,variant}))),rows=[];
   setState({key,rows:[],done:0,total:tasks.length,busy:!!tasks.length});
   // One discovery probe at a time: dynamic public players share a bounded VM browser.
@@ -20,6 +21,6 @@ export default function useWatchQualities({voices,voiceId,episode,season,server,
    }catch{if(signal.aborted)return;/* Unknown is not the same as unavailable. */}
    done++;setState({key,rows:[...rows],done,total:tasks.length,busy:done<tasks.length});
   }})();return()=>abort.abort();
- },[voices,voiceId,episode,season,server,attempt]);
+ },[voices,voiceId,episode,season,server,attempt,scope]);
  return state.key===key?state:{key,rows:[],done:0,total:0,busy:true};
 }

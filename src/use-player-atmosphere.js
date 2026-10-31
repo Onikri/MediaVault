@@ -1,51 +1,32 @@
 import {useEffect,useRef,useState} from 'react';
-import {reliefLayer} from './frame-relief.js';
 
-// Read only decoded frames already held by the player. No extra media requests.
-export default function usePlayerAtmosphere(videoRef,source,playing,rootRef,enabled=true){
-  const [scene,setScene]=useState({image:'',color:'218 139 91'});
-  const raf=useRef(0),target=useRef([0,0]),isPlaying=useRef(playing);isPlaying.current=playing;
-  useEffect(()=>{
-    const video=videoRef.current;if(!video||!source)return;
-    setScene(old=>({...old,image:'',near:''}));
-    let cancelled=false,timer,frame;
-    const sample=()=>{
-      if(cancelled||video.readyState<2||!video.videoWidth)return;
-      try{
-        const canvas=document.createElement('canvas');canvas.width=Math.min(video.videoWidth,video.paused?1280:320);canvas.height=Math.round(canvas.width*video.videoHeight/video.videoWidth);
-        const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(video,0,0,canvas.width,canvas.height);
-        const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-        let r=0,g=0,b=0,weight=0;
-        for(let i=0;i<pixels.length;i+=64){
-          const max=Math.max(pixels[i],pixels[i+1],pixels[i+2]),min=Math.min(pixels[i],pixels[i+1],pixels[i+2]);
-          if(max<35||min>225)continue;
-          const w=(max-min)/255+.05;r+=pixels[i]*w;g+=pixels[i+1]*w;b+=pixels[i+2]*w;weight+=w;
-        }
-        // Black opening frames keep the last usable preview instead of replacing it.
-        const color=weight>30?[r,g,b].map(v=>Math.round(Math.min(235,Math.max(65,v/weight*1.25)))).join(' '):null;
-        setScene(previous=>({image:video.paused?canvas.toDataURL('image/jpeg',.86):previous.image,near:video.paused&&enabled?reliefLayer(canvas):previous.near,color:color||previous.color}));
-      }catch{} // Tainted cross-origin video keeps native playback and the default palette.
-    };
-    const deferred=()=>{clearTimeout(timer);timer=setTimeout(sample,80);};
-    const paused=()=>{setScene(old=>({...old,image:'',near:''}));deferred();};
-    // Throttle continuous sampling; pause/seek always get a fresh still.
-    let last=0;
-    const tick=()=>{const now=performance.now();if(now-last>3500){sample();last=now;}if(!cancelled)frame=video.requestVideoFrameCallback(tick);};
-    if(video.requestVideoFrameCallback)frame=video.requestVideoFrameCallback(tick);
-    video.addEventListener('loadeddata',deferred);video.addEventListener('pause',paused);video.addEventListener('seeked',paused);
-    deferred();
-    return()=>{cancelled=true;clearTimeout(timer);if(frame)video.cancelVideoFrameCallback?.(frame);video.removeEventListener('loadeddata',deferred);video.removeEventListener('pause',paused);video.removeEventListener('seeked',paused);};
-  },[source,videoRef,enabled]);
-  useEffect(()=>{
-    const root=rootRef.current;if(!root||!enabled||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-    let x=0,y=0,last=performance.now();
-    const schedule=()=>{if(!raf.current){last=performance.now();raf.current=requestAnimationFrame(animate);}};
-    const move=event=>{if(event.pointerType==='touch'||isPlaying.current)return;const box=root.getBoundingClientRect();target.current=[(event.clientX-box.left)/box.width*2-1,(event.clientY-box.top)/box.height*2-1];schedule();};
-    const reset=()=>{target.current=[0,0];schedule();};
-    const animate=now=>{raf.current=0;if(isPlaying.current)target.current=[0,0];const factor=1-Math.exp(-Math.min(50,now-last)/150);last=now;x+=(target.current[0]-x)*factor;y+=(target.current[1]-y)*factor;root.style.setProperty('--pan-x',x*8+'px');root.style.setProperty('--pan-y',y*5+'px');if(Math.abs(target.current[0]-x)+Math.abs(target.current[1]-y)>.002)raf.current=requestAnimationFrame(animate);};
-    const video=videoRef.current;
-    root.addEventListener('pointermove',move);root.addEventListener('pointerleave',reset);video?.addEventListener('play',reset);
-    return()=>{cancelAnimationFrame(raf.current);raf.current=0;root.removeEventListener('pointermove',move);root.removeEventListener('pointerleave',reset);video?.removeEventListener('play',reset);root.style.setProperty('--pan-x','0px');root.style.setProperty('--pan-y','0px');};
-  },[rootRef,enabled]);
-  return scene;
+// Ambient samples are tiny and infrequent. Paused motion moves the actual video:
+// no JPEG copies, segmentation edges, duplicate frames or a second decoder.
+export default function usePlayerAtmosphere(videoRef,source,playing,rootRef,enabled=true,ambient=true){
+ const [scene,setScene]=useState({color:'150 157 166'}),isPlaying=useRef(playing);isPlaying.current=playing;
+ useEffect(()=>{
+  const video=videoRef.current;if(!video||!source||!ambient)return;
+  let timer,closed=false;const canvas=document.createElement('canvas');canvas.width=16;canvas.height=9;
+  const context=canvas.getContext('2d',{willReadFrequently:true});
+  const sample=()=>{if(closed||document.hidden||video.readyState<2||!video.videoWidth)return;
+   try{context.drawImage(video,0,0,16,9);const p=context.getImageData(0,0,16,9).data;let r=0,g=0,b=0,n=0;
+    for(let i=0;i<p.length;i+=4){if(Math.max(p[i],p[i+1],p[i+2])<28)continue;r+=p[i];g+=p[i+1];b+=p[i+2];n++;}
+    if(n){const color=[r,g,b].map(v=>Math.round(Math.max(45,Math.min(215,v/n)))).join(' ');setScene(old=>old.color===color?old:{color});}
+   }catch{clearInterval(timer);}
+  };
+  const defer=()=>{if(!closed)sample();};video.addEventListener('loadeddata',defer);video.addEventListener('pause',defer);video.addEventListener('seeked',defer);
+  timer=setInterval(sample,5000);sample();return()=>{closed=true;clearInterval(timer);video.removeEventListener('loadeddata',defer);video.removeEventListener('pause',defer);video.removeEventListener('seeked',defer);};
+ },[source,videoRef,ambient]);
+ useEffect(()=>{
+  const root=rootRef.current;if(!root||!enabled||matchMedia('(prefers-reduced-motion: reduce), (pointer: coarse)').matches)return;
+  let frame=0,target=[0,0],x=0,y=0,box;
+  const draw=()=>{frame=0;if(isPlaying.current)target=[0,0];x+=(target[0]-x)*.16;y+=(target[1]-y)*.16;root.style.setProperty('--pan-x',x*2+'px');root.style.setProperty('--pan-y',y*1.2+'px');if(Math.abs(target[0]-x)+Math.abs(target[1]-y)>.01)frame=requestAnimationFrame(draw);};
+  const schedule=()=>{if(!frame)frame=requestAnimationFrame(draw);};
+  const enter=()=>{box=root.getBoundingClientRect();};
+  const move=e=>{if(isPlaying.current||e.pointerType==='touch')return;if(!box)enter();target=[Math.max(-1,Math.min(1,(e.clientX-box.left)/box.width*2-1)),Math.max(-1,Math.min(1,(e.clientY-box.top)/box.height*2-1))];schedule();};
+  const reset=()=>{target=[0,0];box=null;schedule();};
+  const video=videoRef.current;root.addEventListener('pointerenter',enter);root.addEventListener('pointermove',move);root.addEventListener('pointerleave',reset);video?.addEventListener('play',reset);
+  return()=>{cancelAnimationFrame(frame);root.removeEventListener('pointerenter',enter);root.removeEventListener('pointermove',move);root.removeEventListener('pointerleave',reset);video?.removeEventListener('play',reset);root.style.setProperty('--pan-x','0px');root.style.setProperty('--pan-y','0px');};
+ },[rootRef,enabled]);
+ return scene;
 }

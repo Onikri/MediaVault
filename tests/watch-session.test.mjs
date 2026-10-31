@@ -53,3 +53,9 @@ test('buffer display counts the current continuous range rather than disconnecte
  const ranges={length:2,start:i=>[0,100][i],end:i=>[30,130][i]};
  assert.equal(contiguousBufferEnd(ranges,12),30);assert.equal(contiguousBufferEnd(ranges,50),50);assert.equal(contiguousBufferEnd(ranges,110),130);
 });
+
+test('fast playback prefers a direct mirror and restores a renamed studio preference',()=>{
+ const voice={variants:[{id:'browser',player:'Alloha',episodes:[{number:1}]},{id:'direct',player:'Kodik',episodes:[]}]};
+ assert.equal(variantsFor(voice,1)[0].id,'direct');
+ assert.equal(orderedVoices([{id:'other',name:'А'},{id:'new',aliases:['old'],name:'Б'}],{voiceId:'old'})[0].id,'new');
+});

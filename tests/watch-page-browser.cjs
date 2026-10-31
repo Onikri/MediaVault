@@ -20,7 +20,7 @@ let vite,browser,lastPage;
  const {createServer}=await import('vite');vite=await createServer({root:ROOT,cacheDir:path.join(ROOT,'.codex-local/cache/vite-watch'),logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});
  for(const width of [390,1440]){
-  const context=await browser.newContext({viewport:{width,height:1000},reducedMotion:'reduce'}),page=await context.newPage(),errors=[],requests=[],previewLeases=new Set(),previewHighLevels=[];let leases=0,networkDown=false;
+  const context=await browser.newContext({viewport:{width,height:1000},reducedMotion:'reduce'}),page=await context.newPage(),errors=[],requests=[],previewLeases=new Set(),previewHighLevels=[];let leases=0,networkDown=false,holdQuality=true,releaseQuality;let qualityRequests=0;
   lastPage=page;page.on('pageerror',e=>{errors.push(e.message);console.error('UI_ERROR',e.stack);});
   const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'*'};
   await page.route('https://fixture.example/**',async route=>{
@@ -30,7 +30,7 @@ let vite,browser,lastPage;
    if(url.pathname==='/sources/inspect'){
     const b=req.postDataJSON(),studio=b.dub_url.split('/').at(-1);return json({episodes:Array.from({length:12},(_,i)=>({number:i+1,season:1,url:'https://source.example/'+studio+'/'+(i+1)}))});
    }
-   if(url.pathname==='/sources/qualities'){const b=req.postDataJSON(),qualities=b.url.includes('/b/')?[2160,720,360]:b.url.includes('/a-hd/')?[1080,720,360]:[720,360];return json({qualities,best:qualities[0],original:false});}
+   if(url.pathname==='/sources/qualities'){qualityRequests++;if(holdQuality)await new Promise(resolve=>releaseQuality=resolve);const b=req.postDataJSON(),qualities=b.url.includes('/b/')?[2160,720,360]:b.url.includes('/a-hd/')?[1080,720,360]:[720,360];return json({qualities,best:qualities[0],original:false});}
    if(url.pathname==='/online/prepare'){const b=req.postDataJSON();requests.push(b);const id='lease'+(++leases);if(b.clientId?.startsWith('previews-'))previewLeases.add(id);return json({id,type:'hls',url:'/online/'+id+'/master.m3u8',qualities:[720,360],expiresIn:120,subtitles:[{id:'ru',name:'Русские',language:'ru',url:'/online/'+id+'/sub.vtt'}]});}
    if(url.pathname.endsWith('/heartbeat')||req.method()==='DELETE')return json({closed:true,expiresIn:120});
    if(url.pathname.endsWith('/master.m3u8'))return route.fulfill({contentType:'application/vnd.apple.mpegurl',headers:cors,body:'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=640x360,NAME="360p"\n360.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=1280x720,NAME="720p"\n720.m3u8\n'});
@@ -50,11 +50,16 @@ let vite,browser,lastPage;
   assert.deepEqual(previewHighLevels,[],'Background previews must not fetch higher-quality video');
   await page.screenshot({path:path.join(DIR,'title-idle-'+width+'.png'),fullPage:true});
   await page.emulateMedia({reducedMotion:'no-preference'});await page.locator('.watch-episode-grid .title-episode-card').first().hover();await page.locator('.episode-motion-frame').first().waitFor();const motionFrame=await page.locator('.episode-motion-frame').first().getAttribute('src');await page.waitForFunction(src=>document.querySelector('.episode-motion-frame')?.src!==src,motionFrame);await page.mouse.move(0,0);await page.emulateMedia({reducedMotion:'reduce'});
+  await page.getByRole('button',{name:'Найти другие качества',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.watch-quality-note')?.textContent.includes('Проверяем качества'));
+  await page.locator('.watch-episode-grid .title-episode-card').first().click();await page.waitForFunction(()=>{const v=document.querySelector('.mv-player-stage>video');return v?.readyState>=2&&!v.paused&&v.currentTime>.2;},{},{timeout:6000});
+  assert.equal(qualityRequests,1,'Playback starts while the quality probe is still unresolved');holdQuality=false;releaseQuality?.();
+  await page.getByRole('button',{name:'Настройки плеера',exact:true}).click();await page.getByRole('tab',{name:'Действия',exact:true}).click();await page.locator('#settings-page-actions').getByRole('button',{name:'Закрыть встроенный просмотр',exact:true}).click();
+  await page.getByRole('button',{name:'Найти другие качества',exact:true}).click();
   await page.getByLabel('Качество просмотра').locator('option[value="2160"]').waitFor({state:'attached'});
   await page.getByLabel('Качество просмотра').selectOption('2160');assert.equal(await page.getByLabel('Озвучка для просмотра').inputValue(),'b');
   await page.getByLabel('Лучшее видео из всех озвучек · звук отдельно',{exact:true}).check();await page.getByLabel('Озвучка для просмотра').selectOption('a');
   await page.getByLabel('Лучшее видео из всех озвучек · звук отдельно',{exact:true}).uncheck();assert.equal(await page.getByLabel('Качество просмотра').inputValue(),'best','Returning to a lower-quality studio clears an incompatible filter');
-  await page.getByLabel('Лучшее видео из всех озвучек · звук отдельно',{exact:true}).check();
+  await page.getByLabel('Лучшее видео из всех озвучек · звук отдельно',{exact:true}).check();await page.waitForFunction(()=>document.querySelector('.watch-quality-note')?.textContent.includes('Доступно до 2160p'));
   await page.locator('.watch-episode-grid .title-episode-card').nth(1).click();
   const video=page.locator('.mv-player-stage>video').first();await page.waitForFunction(()=>document.querySelector('.mv-player-stage>video')?.readyState>=2);
   await page.waitForFunction(()=>{const v=document.querySelector('.mv-player-stage>video');return v?.buffered.length&&v.buffered.end(0)>85;},{},{timeout:30000});
@@ -65,7 +70,7 @@ let vite,browser,lastPage;
   await page.locator('.mv-player').focus();await page.keyboard.press('k');await page.waitForFunction(()=>!document.querySelector('.mv-player-stage>video').paused);
   await video.evaluate(v=>{v.currentTime=3;});await page.getByRole('button',{name:'Пропустить опенинг',exact:false}).waitFor();
   await page.getByRole('button',{name:'Пропустить опенинг',exact:false}).click();assert.ok(await video.evaluate(v=>v.currentTime)>=6);
-  assert.equal(await page.locator('.online-video-frameless>header').isVisible(),false);await page.getByRole('button',{name:'Режим кинотеатра',exact:true}).click();assert.equal(await page.locator('body').evaluate(n=>n.classList.contains('player-theater')),true);await page.getByRole('button',{name:'Режим кинотеатра',exact:true}).click();
+  assert.equal(await page.locator('.online-video-frameless>header').isVisible(),false);assert.equal(await page.locator('.mv-player-panorama img,.mv-relief-near').count(),0,'Pause keeps one image instead of duplicating the frame');await page.getByRole('button',{name:'Режим кинотеатра',exact:true}).click();assert.equal(await page.locator('body').evaluate(n=>n.classList.contains('player-theater')),true);await page.getByRole('button',{name:'Режим кинотеатра',exact:true}).click();
   await page.getByRole('button',{name:'Настройки плеера',exact:true}).click();assert.ok(await page.locator('.player-popover').evaluate(n=>n.scrollHeight<=n.clientHeight+1));
   await page.waitForFunction(()=>+getComputedStyle(document.querySelector('.player-popover')).opacity>=.99);await page.locator('.player-popover').screenshot({path:path.join(DIR,'settings-'+width+'.png')});await page.getByLabel('Качество',{exact:true}).selectOption('0');await page.getByLabel('Качество',{exact:true}).selectOption('-1');
   const before=await video.evaluate(v=>({source:v.currentSrc,time:v.currentTime}));
