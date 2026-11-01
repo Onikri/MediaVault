@@ -21,12 +21,24 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   if(width>=900){
    const nav=page.locator('.music-nav.has-track'),before=await nav.boundingBox();
    await page.locator('.music-nav .music-bar').hover();
-   await page.waitForTimeout(420);
+   await page.waitForTimeout(430);
    const after=await nav.boundingBox(),island=await page.locator('.music-nav .music-bar').boundingBox();
    assert.equal(Math.round(before.width),Math.round(after.width),'hover must not reflow navbar');
-   assert.ok(island.width>before.width+70,'music island should expand on hover');
+   assert.equal(Math.round(island.height),Math.round(before.height),'music island stays in one row');
+   assert.ok(island.width>before.width+70,'music island expands only horizontally');
    assert.equal(await page.locator('.music-nav .music-dock-title small').textContent(),'Creepy Nuts');
-   assert.ok(await page.getByRole('slider',{name:'Громкость музыки в шапке'}).count());
+   assert.ok(await page.locator('.music-bar-transport .music-dock-timeline').isVisible(),'timeline replaces song metadata on hover');
+   const knob=page.getByRole('slider',{name:'Громкость музыки в шапке'});
+   const volumeBefore=Number(await knob.getAttribute('aria-valuenow'));
+   await knob.hover();await page.mouse.wheel(0,-120);
+   await page.waitForFunction(v=>Number(document.querySelector('.music-volume-knob')?.getAttribute('aria-valuenow'))>v,volumeBefore);
+   await page.mouse.move(4,400);await page.waitForTimeout(420);
+   const closed=await page.locator('.music-nav .music-bar').boundingBox();
+   assert.equal(Math.round(closed.width),Math.round(before.width),'island collapses after pointer leaves');
+   assert.equal(Math.round(closed.height),Math.round(before.height),'island never grows vertically');
+   await page.locator('.music-nav .music-play').focus();await page.mouse.move(4,500);await page.waitForTimeout(420);
+   const afterFocused=await page.locator('.music-nav .music-bar').boundingBox();
+   assert.equal(Math.round(afterFocused.width),Math.round(before.width),'mouse focus must not keep island expanded');
   }else assert.equal(await page.locator('.music-nav>.music-bar').isVisible(),false,'mobile navbar uses the icon');
   if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();await page.getByText('Подключи сервер Oracle в профиле для воспроизведения музыки.',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Музыкальные аккаунты и плейлисты',exact:true}).click();await page.getByRole('combobox',{name:'Музыкальная платформа',exact:true}).selectOption('spotify');await page.getByText('Приложение Spotify',{exact:true}).click();await page.getByRole('textbox',{name:'Spotify Client ID',exact:true}).waitFor();
