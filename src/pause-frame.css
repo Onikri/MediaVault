@@ -1,5 +1,5 @@
-.pause-depth-shadow{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;pointer-events:none;opacity:0;transition:opacity .8s ease}
-.pause-depth-shadow.is-ready{opacity:1}
+.pause-depth-shadow{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;pointer-events:none;opacity:0;transition:none}
+.pause-depth-shadow.is-ready{opacity:1;transition:opacity .8s ease}
 .pause-frame-ui{position:absolute;inset:0;z-index:5;pointer-events:none}
 .pause-frame-tools{position:absolute;right:16px;top:16px;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:7px;max-width:calc(100% - 32px);font-size:10px;color:#fff9}
 .pause-frame-tools button,.pause-character{pointer-events:auto!important;display:inline-flex;align-items:center;gap:6px;padding:8px 11px!important;background:#16161cbb!important;color:#f5f1ed!important;border-radius:100px;backdrop-filter:blur(12px);font-size:11px!important;line-height:1.4}
