@@ -277,3 +277,10 @@ html[data-blossom] .connection-settings-status{display:flex;flex-wrap:wrap;gap:1
 html[data-blossom] .connection-settings-status .is-ready{color:var(--color-blossom-light)}
 @media(max-width:1000px){html[data-blossom] .blossom-navbar .header-center-search{left:50%}}
 @media(max-width:640px){html[data-blossom] .blossom-navbar .header-center-search .header-search{width:32px;min-width:32px;height:32px;min-height:32px;padding:6px}html[data-blossom] .blossom-navbar .header-center-search .header-search span,html[data-blossom] .blossom-navbar .header-center-search .header-search kbd{display:none}}
+
+/* Reclaim horizontal breathing room for the truly centered search: navigation
+   must not sit under the search control on conventional laptop widths. */
+@media(min-width:1001px) and (max-width:1600px){
+ html[data-blossom] .blossom-navbar .header-brand-area{gap:clamp(8px,.9vw,14px)}
+ html[data-blossom] .blossom-navbar .desktop-nav .nav-link{padding-inline:clamp(7px,.65vw,11px);font-size:12px}
+}
