@@ -55,8 +55,13 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    await page.mouse.move(knob.x+knob.width/2,knob.y+knob.height/2);
    await page.mouse.down();
    await page.mouse.move(knob.x+knob.width/2+85,knob.y+knob.height/2,{steps:12});
+   await page.locator('.music-seek-surface').waitFor({state:'visible'});
+   assert.ok(await page.locator('.music-dot-matrix circle').count()>40,'seek time uses real dot-matrix glyphs');
+   assert.equal(await page.locator('.music-seek-marker').count(),1,'precise white seek divider is visible');
+   const during=await page.locator('audio').evaluate(a=>a.currentTime);
    await page.mouse.up();
-   await page.waitForFunction(()=>document.querySelector('audio')?.currentTime>=5);
+   await page.waitForFunction(v=>document.querySelector('audio')?.currentTime>v+2,during);
+   await page.locator('.music-seek-surface').waitFor({state:'detached'});
    await play.click();assert.equal(await page.locator('audio').evaluate(a=>a.paused),true,'Expanded play control pauses audio');
    await play.click();await page.waitForFunction(()=>!document.querySelector('audio').paused);
    await page.getByRole('button',{name:'Закрыть тестовую музыкальную очередь',exact:true}).click();
