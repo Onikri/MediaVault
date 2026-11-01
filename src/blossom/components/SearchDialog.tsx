@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useId,useMemo,useRef,useState} from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
+import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ArrowUpRight,Clock,LoaderCircle,Search,X} from 'lucide-react';
 import {useGlobalSearch,SEARCH_KINDS} from '../../use-global-search.js';
@@ -54,11 +54,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
   if(event.key==='Backspace'&&event.currentTarget.selectionStart===0&&event.currentTarget.selectionEnd===0&&!query&&chips.length){event.preventDefault();const last=chips.at(-1)!;if(marked===last)removeChip(last);else setMarked(last);return;}
   if(event.key==='ArrowLeft'&&event.currentTarget.selectionStart===0&&!query&&chips.length){event.preventDefault();setMarked(chips.at(-1)!);}
  };
- return <Dialog.Root open modal={false} onOpenChange={value=>{if(!value)close();}}>
- <Dialog.Portal forceMount>
- <Dialog.Content asChild forceMount onEscapeKeyDown={event=>{event.preventDefault();if(marked){setMarked(null);return;}if(query){setQuery('');setActiveId(null);return;}close();}} aria-describedby={id+'-help'}>
- <motion.div className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{opacity:0,y:-2}} animate={{opacity:closing?0:1,y:closing?-4:0}} transition={{duration:reduce?0:.16}}>
-  <Dialog.Title className="sr-only">Поиск в библиотеке</Dialog.Title>
+ return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{opacity:0,y:-2}} animate={{opacity:closing?0:1,y:closing?-4:0}} transition={{duration:reduce?0:.16}}>
   <motion.div className="morph-search-bar" onPointerDown={focusField}
    initial={reduce?false:{width:geometry.seedWidth,height:geometry.seedHeight}}
    animate={{width:closing?geometry.seedWidth:'100%',height:closing?geometry.seedHeight:56}}
@@ -109,8 +105,5 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
     </motion.div>
    </motion.div>}
   </AnimatePresence>
- </motion.div>
- </Dialog.Content>
- </Dialog.Portal>
- </Dialog.Root>;
+ </motion.div>,document.body);
 }
