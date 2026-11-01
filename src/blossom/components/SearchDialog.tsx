@@ -82,8 +82,8 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
     <motion.div className="morph-search-panel-content" initial={reduce?false:{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:reduce?0:.18,delay:reduce?0:.12}}>
      <div className="morph-search-panel-heading"><span>{query.trim()?'Suggestions':'Recent'}</span>{!query.trim()&&recents.length>0&&<button type="button" onClick={()=>forget()}>Clear</button>}</div>
      <div className="morph-search-panel-rows" ref={panelRows} style={{minHeight:panelFloor||undefined}}>
-      <div id={id+'-suggestions'} role="listbox" aria-label={query.trim()?'Подсказки':'Недавние запросы'} className="morph-search-suggestion-list">
-       {suggestions.map((row,i)=><motion.button key={row.id} type="button" role="option" aria-selected={rowCursor===i}
+      <div id={id+'-suggestions'} role="group" aria-label={query.trim()?'Подсказки':'Недавние запросы'} className="morph-search-suggestion-list">
+       {suggestions.map((row,i)=><motion.button key={row.id} type="button" aria-current={rowCursor===i?'true':undefined}
         className={'morph-search-suggestion'+(rowCursor===i?' is-selected':'')}
         onMouseEnter={()=>setRowCursor(i)} onClick={()=>row.kind==='recent'?(setQuery(row.label),input.current?.focus()):addChip(row.label)}>
         {rowCursor===i&&<motion.span layoutId="morph-search-cursor" className="morph-search-suggestion-highlight" transition={SWAP}/>}
