@@ -59,7 +59,8 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   await page.getByRole('combobox',{name:'Поиск произведения'}).fill('Naruto');await dialog.getByRole('option').first().waitFor();await fits('Search');
   const position=await page.locator('.morph-search-dialog').boundingBox(),bar=await page.locator('.header-center-search').boundingBox();
   assert.ok(Math.abs(position.x+position.width/2-bar.x-bar.width/2)<2,'morph search stays centered under navbar search');
-  assert.ok(position.y>=bar.y-2&&position.y<bar.y+bar.height+4,'morph search emerges from centered navbar pill');
+  const expandedBar=await page.locator('.morph-search-bar').boundingBox();
+  assert.ok(Math.abs(expandedBar.y+expandedBar.height/2-(bar.y+bar.height/2))<2,'morph search and trigger share the same vertical center');
   const field=await page.locator('.morph-search-bar').boundingBox(),inner=await page.locator('.blossom-navbar .header-inner').boundingBox();
   assert.ok(field.width<=341&&field.x>=inner.x-1&&field.x+field.width<=inner.x+inner.width+1,'expanded search remains inside navbar width');
   assert.ok(Math.abs((field.y-inner.y)-(inner.y+inner.height-field.y-field.height))<1.6,'expanded search has equal top and bottom insets');
