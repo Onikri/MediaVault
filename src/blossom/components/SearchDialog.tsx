@@ -55,7 +55,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
  };
  return <Dialog.Root open modal={false} onOpenChange={value=>{if(!value)close();}}>
  <Dialog.Portal forceMount>
- <Dialog.Content asChild forceMount onEscapeKeyDown={event=>{event.preventDefault();close();}} aria-describedby={id+'-help'}>
+ <Dialog.Content asChild forceMount onEscapeKeyDown={event=>{event.preventDefault();if(marked){setMarked(null);return;}if(query){setQuery('');setActiveId(null);return;}close();}} aria-describedby={id+'-help'}>
  <motion.div className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{opacity:0,y:-2}} animate={{opacity:closing?0:1,y:closing?-4:0}} transition={{duration:reduce?0:.16}}>
   <Dialog.Title className="sr-only">Поиск в библиотеке</Dialog.Title>
   <motion.div className="morph-search-bar" onPointerDown={focusField}
