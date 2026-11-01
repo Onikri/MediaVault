@@ -49,3 +49,21 @@ Collection/music refinement validation:
   navbar, continue playing after collapse and release the backend lease on close.
   Provider resolution and account responses are mocks; no real OAuth or ML
   inference is claimed.
+
+## Music catalogue recovery (2026-11-01)
+
+The title soundtrack route now uses AnimeThemes' public GraphQL schema, preserving
+exact MAL resource matching and existing AnimeThemes track IDs. MyAnimeList/Jikan
+full-title credits provide a separately labelled fallback when the primary is
+unavailable or has no songs. Concurrent readers share one catalogue request;
+previously received public credits remain available through upstream failures.
+No audio downloads, account cookies or translation keys are involved in catalogue
+lookups. UI errors are recoverable, display the server detail, and identify the
+actual credit provider rather than always claiming AnimeThemes.
+
+Validation: 239 Node tests, 42 relevant Python tests, production build, soundtrack
+error/retry and playlist browser contracts at 320/1280, and actual HTMLAudioElement
+AAC decode/seek/lifecycle at 390/1440 with fixture resolver responses. Separately,
+real Oracle diagnostics received exact-ID credits for MAL 5114 through Jikan and
+the current AnimeThemes GraphQL response, and real Otonoke playback returned
+HTTP 206 audio/mp4 bytes. No live Google/Spotify OAuth or ML inference was tested.

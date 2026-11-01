@@ -18,10 +18,14 @@ class ReaderMusicTests(unittest.TestCase):
   joined=reader.merge_bubbles(rows);self.assertEqual(len(joined),2);self.assertEqual(joined[0]['original'],'PRESIDENT OBAMA HAS ALREADY');self.assertEqual(reader.translation_input(joined[0]['original']),'President obama has already')
   hyphens=reader.merge_bubbles([{'x':.1,'y':.1,'w':.1,'h':.02,'original':'PARA-'},{'x':.1,'y':.12,'w':.1,'h':.02,'original':'NORMAL'}]);self.assertEqual(hyphens[0]['original'],'PARANORMAL')
  def test_music_requires_exact_catalogue_mapping_and_never_downloads_audio(self):
-  rows={'anime':[{'slug':'wrong','resources':[{'site':'MyAnimeList','external_id':2}],'animethemes':[{'id':1,'type':'OP','song':{'title':'Wrong'}}]},{'slug':'real','resources':[{'site':'MyAnimeList','external_id':99}],'animethemes':[{'id':2,'type':'OP','song':{'title':'Real','artists':[{'name':'Artist'}]},'animethemeentries':[{'episodes':'1-12','nsfw':False}]}]}]}
+  rows={'data':{'findAnimeByExternalSite':[
+   {'slug':'wrong','resources':{'nodes':[{'site':'MAL','externalId':2}]},'animethemes':[]},
+   {'slug':'real','resources':{'nodes':[{'site':'MAL','externalId':99}]},'animethemes':[{'id':2,'type':'OP','song':{'title':{'romaji':'Real'},'performances':[{'artist':{'name':{'main':'Artist'}}}]},'animethemeentries':[{'episodes':'1-12','nsfw':False}]}]}]}}
   anime_music._cache.clear()
-  with patch('anime_music.get_json',return_value=rows):r=anime_music.songs('99')
-  self.assertEqual([v['title'] for v in r['tracks']],['Real']);self.assertFalse(r['audioDownloaded']);self.assertIsNone(r['tracks'][0]['timing'])
+  with patch('anime_music.get_json',return_value=rows) as fetch:r=anime_music.songs('99')
+  self.assertEqual([v['title'] for v in r['tracks']],['Real']);self.assertEqual(r['tracks'][0]['artists'],['Artist']);self.assertFalse(r['audioDownloaded']);self.assertIsNone(r['tracks'][0]['timing'])
+  self.assertEqual(fetch.call_args.args[0],anime_music.GRAPHQL);self.assertEqual(fetch.call_args.kwargs['body']['variables'],{'ids':[99]})
+
  def test_english_reader_uses_published_images_and_exact_chapter_links(self):
   self.assertEqual(parse_pages('<img class="js-page" data-src="https://images.example/1.jpeg">','https://mangapill.com/chapters/11-x/a'),['https://images.example/1.jpeg'])
   rows=parse_chapters('<a href="/chapters/11-1/a-chapter-1.5">Chapter 1.5</a>','https://mangapill.com/manga/11/a');self.assertEqual(rows[0]['number'],1.5)
