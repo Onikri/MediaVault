@@ -59,7 +59,7 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
  const canPlay=!!track&&!busy&&(!!source||serverAudio&&!!selected);
  const timeline=(detail=false)=><div className="music-dock-timeline"><span>{clock(time)}</span><input type="range" min="0" max={duration||1} step="0.1" value={Math.min(time,duration||1)} disabled={!duration} style={{'--music-progress':(duration>0?Math.min(100,time/duration*100):0)+'%'}} aria-label={detail?'Позиция музыки в подробностях':'Позиция музыки'} onChange={e=>seek(e.target.value)}/><span>{clock(duration)}</span></div>;
  const controls=(detail=false)=><div className="music-dock-controls"><button aria-label="Предыдущая песня" disabled={!state?.index} onClick={()=>stepMusic(-1)}><SkipBack size={16}/></button><button className="music-play" aria-label={detail?(playing?'Пауза в подробностях':'Продолжить в подробностях'):(playing?'Пауза музыки':'Продолжить музыку')} onClick={toggle} disabled={!canPlay}>{playing?<Pause size={18}/>:<Play size={18}/>}</button><button aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={16}/></button></div>;
- const bar=track?<div className={'music-bar'+(playing?' is-playing':'')}>
+ const bar=track?<div className={'music-bar'+(playing?' is-playing':'')} onPointerLeave={event=>{const focused=document.activeElement;if(event.pointerType==='mouse'&&focused&&event.currentTarget.contains(focused))focused.blur();}}>
  <div className="music-bar-primary">
   <button className="music-disc" aria-label="Открыть музыкальный плеер" aria-expanded={expanded} onClick={()=>expanded?collapse():setExpanded(true)}>{art}</button>
   <div className="music-bar-middle">
