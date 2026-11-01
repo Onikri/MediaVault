@@ -64,7 +64,13 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   const field=await page.locator('.morph-search-bar').boundingBox(),inner=await page.locator('.blossom-navbar .header-inner').boundingBox();
   assert.ok(field.width<=341&&field.x>=inner.x-1&&field.x+field.width<=inner.x+inner.width+1,'expanded search remains inside navbar width');
   assert.ok(Math.abs((field.y-inner.y)-(inner.y+inner.height-field.y-field.height))<1.6,'expanded search has equal top and bottom insets');
-  assert.equal(await page.locator('.morph-search-bar').evaluate(el=>getComputedStyle(el).borderTopWidth),'0px','search has no border');
+  const originalGlass=await page.locator('.morph-search-bar').evaluate(el=>({border:getComputedStyle(el).borderTopWidth,background:getComputedStyle(el).backgroundColor,blur:getComputedStyle(el).backdropFilter,texture:getComputedStyle(el).backgroundImage}));
+  assert.equal(originalGlass.border,'1px','original MorphingSearchChips keeps its subtle glass hairline');
+  assert.ok(originalGlass.background.includes('0.55')||originalGlass.background.includes('0.549'),'search uses original 55% translucent glass');
+  assert.ok(originalGlass.blur.includes('blur(20px)')&&originalGlass.blur.includes('saturate(1.6)'),'original 20px saturating glass blur is preserved');
+  assert.equal(originalGlass.texture,'none','search has no replacement noise texture');
+  assert.equal(await dialog.locator('kbd').count(),0,'search displays no hotkey legends');
+  assert.equal(await page.locator('.header-center-search kbd').count(),0,'navbar search displays no hotkey legend');
   if(width===1280){await page.waitForTimeout(400);const navLinkAfter=(await page.locator('.desktop-nav .nav-link').first().boundingBox()).width;assert.ok(navLinkAfter<navLinkBefore,'text navigation shrinks when search opens');}
   assert.equal(await page.locator('.morph-search-backdrop').count(),0,'search uses original floating glass panel without modal backdrop');
   await page.screenshot({path:path.join(dir,'search-'+width+'.png')});await page.keyboard.press('Escape');
