@@ -132,6 +132,7 @@ body:has(.immersive-reader:not(.reader-embedded)) .music-nav{visibility:hidden;p
  .music-nav.has-track{flex:0 0 32px;width:32px;min-width:32px;height:36px}
  .music-dock-compact.has-track{width:184px;min-width:184px;height:38px}
  .music-dock-compact.has-track>.music-nav-toggle{display:none}
- .music-dock-compact>.music-bar{width:184px}
+ .music-nav:not(.music-dock-compact)>.music-bar{display:none}
+ .music-dock-compact>.music-bar{display:block;width:184px}
 }
 @media(prefers-reduced-motion:reduce){.music-nav .music-bar,.music-nav .music-bar-secondary,.music-nav .music-disc img,.music-nav .music-expand svg,.music-dock-timeline input[type=range],.music-volume input[type=range]{transition:none!important}}
