@@ -88,7 +88,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
      value={query} placeholder="Поиск" onChange={e=>{setQuery(e.target.value);setActiveId(null);setRowCursor(0);}} onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)}
      onKeyDown={onInputKey}/>
    {state.loading?<LoaderCircle className="morph-search-spinner" size={18} aria-label="Поиск выполняется"/>:null}
-   {(query||chips.length)>0?<button className="morph-search-clear" type="button" aria-label="Очистить запрос" onClick={()=>{setQuery('');setChips([]);input.current?.focus();}}><X size={17}/></button>:<kbd>Ctrl K</kbd>}
+   {(query||chips.length)>0&&<button className="morph-search-clear" type="button" aria-label="Очистить запрос" onClick={()=>{setQuery('');setChips([]);input.current?.focus();}}><X size={17}/></button>}
    <button className="morph-search-close" type="button" aria-label="Закрыть поиск" onClick={close}><X size={18}/></button>
   </motion.div>
   <AnimatePresence>
@@ -118,7 +118,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
        </div>
       </div>}
      </div>
-     <footer className="morph-search-footer" id={id+'-help'}><span><kbd>↑ ↓</kbd> Выбрать · <kbd>↵</kbd> Открыть · <kbd>Esc</kbd> Закрыть</span>{searchText.length>=2&&<button type="button" onClick={browse}>Полный поиск <ArrowUpRight size={13}/></button>}</footer>
+     <footer className="morph-search-footer" id={id+'-help'}><span className="morph-search-footer-caption">Поиск по медиатеке</span>{searchText.length>=2&&<button type="button" onClick={browse}>Полный поиск <ArrowUpRight size={13}/></button>}</footer>
     </motion.div>
    </motion.div>}
   </AnimatePresence>
