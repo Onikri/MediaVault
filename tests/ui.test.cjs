@@ -68,7 +68,7 @@ async function run(){
     const nav={getByRole:(_,options)=>({click:()=>navigateApp(page,options.name)})};
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
     await page.getByRole('heading',{name:'Библиотека',exact:true}).waitFor();
-    await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы онлайн-библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Музыка',exact:true}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Моя коллекция',exact:true}).click();
+    await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы онлайн-библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Музыка',exact:true}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Коллекция',exact:true}).click();
     await page.locator('#searchInput').fill('Тестовый поиск');
     assert.equal(await page.locator('#searchInput').inputValue(),'Тестовый поиск');
     await page.getByRole('button',{name:width>=1100?'Раздел Манга':'Манга',exact:true}).click();
