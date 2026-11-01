@@ -40,7 +40,7 @@ const sections=[{id:'anime',art:'video',name:'Аниме',formats:'ТАЙТЛЫ 
   {id:'ranobe',art:'book',name:'Ранобэ',formats:'ТАЙТЛЫ · ТОМА',icon:'book'},
   {id:'book',art:'book',name:'Книги',formats:'АВТОРЫ · КНИГИ',icon:'book'},
   {id:'music',art:'audio',name:'Музыка',formats:'АЛЬБОМЫ · ТРЕКИ',icon:'audio'}];
-const navigation=[{id:'home',label:'Главная',icon:'home'},{id:'library',label:'Библиотека',icon:'library'},{id:'collection',label:'Моя коллекция',icon:'cloud'},
+const navigation=[{id:'home',label:'Главная',icon:'home'},{id:'library',label:'Библиотека',icon:'library'},{id:'collection',label:'Коллекция',icon:'cloud'},
   {id:'history',label:'История',icon:'history'},{id:'profile',label:'Профиль',icon:'user'}];
 const filters=[{id:'all',label:'Всё'},...Object.entries(SECTION_LABELS).map(([id,label])=>({id,label}))];
 const guide='https://github.com/Onikri/MediaVault/blob/main/README.md';
