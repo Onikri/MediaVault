@@ -239,7 +239,7 @@ html[data-blossom] .media-grid.library-layout-list{grid-template-columns:minmax(
 
 
 /* Navbar alignment: fixed hitboxes, balanced spacing and artwork-safe layering. */
-html[data-blossom] .blossom-navbar{z-index:120;isolation:isolate}
+html[data-blossom] .blossom-navbar{z-index:60;isolation:isolate}
 html[data-blossom] .blossom-navbar .header-inner{box-sizing:border-box;gap:14px}
 html[data-blossom] .blossom-navbar .header-brand-area{flex:1 1 auto;gap:clamp(10px,1.4vw,22px);min-width:0}
 html[data-blossom] .blossom-navbar .brand.logo{position:relative;z-index:1;flex:none;transform:none;line-height:1.25}
