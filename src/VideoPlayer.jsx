@@ -10,6 +10,7 @@ import {readProgress,writeProgress} from './playback-progress.js';
 import usePlayerGestures from './use-player-gestures.js';
 import usePlayerActions from './use-player-actions.js';
 import usePlayerAtmosphere from './use-player-atmosphere.js';
+import PauseFrameEffects from './PauseFrameEffects.jsx';
 import {buildPlaybackLibrary,openingBounds,toWebVtt} from './player-model.js';
 import {startNeuralUpscaler} from './neural-upscaler.js';
 import Soundtrack from './Soundtrack.jsx';
@@ -28,9 +29,9 @@ import useExternalAudio from './use-external-audio.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 
 const PREF_KEY='mediavault_player_preferences_v1';
-const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,upscaler:'auto',deviceProfile:'auto',neuralMode:'balanced',subSize:24,subOffset:8,parallax:true,ambient:true};
+const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,upscaler:'auto',deviceProfile:'auto',neuralMode:'balanced',subSize:24,subOffset:8,depthShadow:true,depthModelAllowed:false,shadowStrength:.82,characterAuto:false,ambient:true};
 function getPrefs(){
-  try{return {...DEFAULTS,...JSON.parse(localStorage.getItem(PREF_KEY)||'{}')};}catch{return DEFAULTS;}
+  try{const saved=JSON.parse(localStorage.getItem(PREF_KEY)||'{}');return {...DEFAULTS,...saved,depthShadow:saved.depthShadow??saved.parallax??true};}catch{return DEFAULTS;}
 }
 function clock(seconds){
   if(!Number.isFinite(seconds)||seconds<0)return '00:00';
@@ -94,7 +95,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const episodeMusic=useEpisodeMusic(musicIdentity,item.episode||Number(item.name?.match(/(?:серия|episode)[ _-]*(\d+)/i)?.[1])||1,duration,onlineControls?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl);
   const [dismissedCue,setDismissedCue]=useState('');
   const settingsOpen=panel==='settings';
-  const scene=usePlayerAtmosphere(videoRef,source,playing,stageRef,prefs.parallax,prefs.ambient);
+  const scene=usePlayerAtmosphere(videoRef,source,prefs.ambient);
   const [subtitle,setSubtitle]=useState('off'),[availableTracks,setAvailableTracks]=useState([]);
   useEffect(()=>{streaming.setSubtitle(subtitle.startsWith('hls:')?Number(subtitle.slice(4)):-1);},[subtitle,source,streaming.subtitles]);
   const [audioTracks,setAudioTracks]=useState([]),[activeAudio,setActiveAudio]=useState(0);
@@ -326,7 +327,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
   const canSkip=!!skipRange;
   const hiddenControls=playing&&panel==='watch'&&!musicOpen&&!controlsVisible;
   const progress=seekable?Math.min(100,previewTime/duration*100):0;
-  return <div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.parallax?' parallax-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
+  return <div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
     style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls}>
     <div className="mv-player-screen">
@@ -341,6 +342,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
           aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}{onlineControls?.externalCaptions?.map(t=><track key={t.url} kind="subtitles" src={t.url} srcLang={t.language||'ru'} label={t.name}/>)}</video>
         {onlineControls?.audio&&<video ref={external.ref} className="mv-external-audio" src={onlineControls?.audio?.type==='hls'?undefined:onlineControls?.audio?.url} crossOrigin="anonymous" playsInline preload="metadata" aria-hidden="true" onError={()=>{if(onlineControls?.audio)setAudioError('Отдельная озвучка не ответила. Включён исходный звук.');}}/>}
         <canvas key={engine+':'+deviceProfile+':'+prefs.neuralMode+':'+gpuAttempt} ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
+        <PauseFrameEffects key={item.id} videoRef={videoRef} source={source} paused={!playing} enabled={prefs.depthShadow} modelAllowed={prefs.depthModelAllowed} onAllowModel={()=>changePrefs({depthModelAllowed:true})} strength={prefs.shadowStrength} autoRecognize={prefs.characterAuto} visible={panel==='watch'&&!musicOpen}/>
         {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:(hiddenControls?prefs.subOffset:Math.max(22,prefs.subOffset))+'%'}} aria-live="off">{subtitleText}</div>}
       </div>
       {health.visible&&<div className="mv-playback-status" role="status">{health.phase==='blocked'?<button onClick={health.retry}>Нажми, чтобы воспроизвести</button>:health.phase==='failed'?<button onClick={onlineControls?.retryStream||health.retry}>Повторить воспроизведение</button>:<><span className="loading-ring"/>{health.phase==='loading'?'Запускаем видео…':'Подгружаем видео…'}</>}</div>}
@@ -379,7 +381,7 @@ export default function VideoPlayer({item,source,catalog,libraryId,userId,mediaR
           <button disabled={openingDraft===null} onClick={markEnd}>Конец</button>
           <button disabled={!opening} onClick={()=>setIntro(null)}>Очистить</button></div>
         </div></div>,
-        effects:<div className="mv-player-settings"><label className="mv-player-check"><input type="checkbox" checked={prefs.parallax} onChange={e=>changePrefs({parallax:e.target.checked})}/>Параллакс стоп-кадра</label><label className="mv-player-check"><input type="checkbox" checked={prefs.ambient} onChange={e=>changePrefs({ambient:e.target.checked})}/>Ambient-подсветка</label><label className="mv-player-check"><input type="checkbox" checked={theater} onChange={cinema}/>Кинотеатр · затемнить страницу</label></div>,
+        effects:<div className="mv-player-settings"><label className="mv-player-check"><input type="checkbox" checked={prefs.depthShadow} onChange={e=>changePrefs({depthShadow:e.target.checked})}/>Тень по глубине на паузе</label><label>Интенсивность тени<input aria-label="Интенсивность тени на паузе" type="range" min=".2" max=".95" step=".05" value={prefs.shadowStrength} onChange={e=>changePrefs({shadowStrength:Number(e.target.value)})}/></label><label className="mv-player-check"><input type="checkbox" checked={prefs.characterAuto} onChange={e=>changePrefs({characterAuto:e.target.checked})}/>Распознавать персонажей на паузе</label><p className="player-setting-help">Глубина считается на устройстве. AnimeTrace получает стоп-кадр только по кнопке «Персонажи» или при включённом распознавании.</p><label className="mv-player-check"><input type="checkbox" checked={prefs.ambient} onChange={e=>changePrefs({ambient:e.target.checked})}/>Ambient-подсветка</label><label className="mv-player-check"><input type="checkbox" checked={theater} onChange={cinema}/>Кинотеатр · затемнить страницу</label></div>,
         image:<div className="mv-player-settings"><label>Устройство<select aria-label="Профиль устройства" value={prefs.deviceProfile||'auto'} onChange={event=>{setGpuAttempt(n=>n+1);changePrefs({deviceProfile:event.target.value});}}><option value="auto">Автоматически</option><option value="phone">Телефон / Android</option><option value="tablet">Планшет</option><option value="desktop">Компьютер</option></select></label><label>Улучшение<select aria-label="Алгоритм улучшения" value={prefs.gpu?(prefs.upscaler||'auto'):'off'} onChange={event=>retryGpu(event.target.value)}><option value="off">Выключено</option><option value="auto">Авто · {deviceProfile==='desktop'?'Anime4K':'мобильный GPU'}</option><option value="mobile">Мобильный GPU · лёгкий</option><option value="anime4k">Anime4K ×2 · мощный GPU</option><option value="anime4k-l">Anime4K L ×2 · дискретный GPU</option><option value="anime4k-vl">Anime4K VL ×2 · высокая нагрузка</option><option value="anime4k-ul">Anime4K UL ×2 · максимальная нагрузка</option><option value="lanczos">Lanczos3 · без нейросети</option><option value="fsr">AMD FSR1 · EASU + RCAS</option><option value="fsr-soft">AMD FSR1 · мягкая резкость</option><option value="fsrcnn">FSRCNN ×2 · WebGPU</option></select></label>
         {prefs.gpu&&<label>Нагрузка<select aria-label="Режим улучшения" value={prefs.neuralMode||'balanced'} onChange={event=>changePrefs({neuralMode:event.target.value})}><option value="performance">Экономный</option><option value="balanced">Баланс</option><option value="quality">Качество</option></select></label>}
         {neuralStats&&prefs.gpu&&<small>{engineName}: {neuralStats.width}×{neuralStats.height} · {neuralStats.fps} кадр/с · {neuralStats.latency} мс{(neuralStats.adapter||neuralStats.renderer)?' · '+(neuralStats.adapter||neuralStats.renderer):''}{neuralStats.software?' · программный рендерер браузера':''}</small>}

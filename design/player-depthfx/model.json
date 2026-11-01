@@ -1,0 +1,15 @@
+{
+  "source": "onnx-community/depth-anything-v2-small",
+  "revision": "4472b7362082ad9968fee890ca0f1e5aca36b93d",
+  "file": "onnx/model_quantized.onnx",
+  "bytes": 27258801,
+  "sha256": "fcf51f1b230362b28690bb9d1809bf0431f29cad20534e3f589bd7285547f20d",
+  "license": "Apache-2.0",
+  "runtime": "ONNX Runtime Web / WASM, worker",
+  "input": "RGB Float32 NCHW, ImageNet normalization, max side 392, multiples of 14",
+  "ownerReference": {
+    "file": "depthfx_studio.html",
+    "sha256": "106fa47fe2bbf8f8b3171ada6cb8303ee3186525747f128f95d17d20d2b629e3"
+  },
+  "weightsRedistributed": false
+}

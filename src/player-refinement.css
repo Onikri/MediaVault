@@ -40,7 +40,7 @@
 .online-watch .online-video-frameless>.inline-error{position:absolute;inset:0;display:grid;place-content:center;padding:24px;margin:0}
 .online-watch .online-video-frameless>.mv-player{width:100%}
 .mv-player .mv-player-stage{transform:none;transition:filter .18s ease;transform-origin:center}
-.mv-player:not(.is-playing):not(.parallax-off) .mv-player-stage{transform:translate3d(var(--pan-x,0px),var(--pan-y,0px),0) scale(1.008)}
+
 .player-popover{padding:12px;border-radius:12px;background:color-mix(in srgb,var(--color-surface) 91.76%,transparent);backdrop-filter:blur(12px);border-color:color-mix(in srgb,var(--color-petal) 14.12%,transparent);box-shadow:0 12px 32px color-mix(in srgb,var(--color-canvas) 33.33%,transparent),inset 0 1px color-mix(in srgb,var(--color-petal) 4.31%,transparent);contain:layout style}
 .player-popover .mv-player-drawer-head{margin-bottom:8px}.player-popover .mv-player-drawer-head h2{display:flex;align-items:baseline;gap:8px;font-size:13px}.player-popover .mv-player-drawer-head h2 small{font-size:9px;font-weight:400;color:var(--color-on-muted)}
 .player-popover .player-settings-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;padding-bottom:8px;border-bottom:1px solid color-mix(in srgb,var(--color-petal) 6.27%,transparent)}

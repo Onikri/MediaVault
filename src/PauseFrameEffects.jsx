@@ -1,0 +1,93 @@
+import {useEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
+import {ScanFace,RotateCcw,X} from 'lucide-react';
+import {depthSize,shadowCutoff,depthSurface,videoRect} from './pause-depth-model.js';
+import {depthRenderer} from './pause-depth-renderer.js';
+import {recognizeCharacters} from './character-recognition.js';
+import './pause-frame.css';
+
+export default function PauseFrameEffects({videoRef,source,paused,enabled,modelAllowed=false,onAllowModel,strength=.82,autoRecognize=false,visible=true}){
+ const canvas=useRef(null),worker=useRef(null),busy=useRef(false),sequence=useRef(0),frame=useRef(null),cache=useRef(new Map()),renderer=useRef(null),recognition=useRef(null),cooldown=useRef(0),idleTimer=useRef(null),settings=useRef({strength,enabled});settings.current={strength,enabled};
+ const [view,setView]=useState({phase:'idle'}),[chars,setChars]=useState({phase:'idle',values:[]}),[selected,setSelected]=useState(null),[host,setHost]=useState(null),[rect,setRect]=useState(null),[retry,setRetry]=useState(0);
+ const terminate=()=>{worker.current?.terminate();worker.current=null;busy.current=false;};
+ useEffect(()=>()=>{clearTimeout(idleTimer.current);terminate();recognition.current?.abort();},[]);
+ useEffect(()=>{cache.current.clear();frame.current=null;setSelected(null);setView({phase:'idle'});setChars({phase:'idle',values:[]});},[source]);
+ useEffect(()=>{
+  const video=videoRef.current,screen=video?.closest('.mv-player-screen');if(!video||!screen)return;setHost(screen);
+  const update=()=>{if(video.videoWidth)setRect(videoRect(screen.clientWidth,screen.clientHeight,video.videoWidth,video.videoHeight));};
+  update();const observer=new ResizeObserver(update);observer.observe(screen);video.addEventListener('loadedmetadata',update);
+  return()=>{observer.disconnect();video.removeEventListener('loadedmetadata',update);};
+ },[videoRef,source]);
+ async function recognize(current=frame.current,automatic=false){
+  if(!current||!videoRef.current?.paused)return;
+  const hit=cache.current.get(current.key)?.characters;if(hit){setChars({phase:'ready',values:hit});return;}
+  if(Date.now()<cooldown.current){if(!automatic)setChars(old=>({...old,phase:'error',message:'Подожди несколько секунд перед новым кадром.'}));return;}
+  recognition.current?.abort();const abort=new AbortController();recognition.current=abort;const id=sequence.current;
+  cooldown.current=Date.now()+10000;setChars({phase:'loading',values:[]});
+  try{
+   const blob=await new Promise((resolve,reject)=>current.image.toBlob(value=>value?resolve(value):reject(Error('Не удалось прочитать стоп-кадр.')),'image/jpeg',.82));
+   if(abort.signal.aborted||id!==sequence.current)return;
+   const values=await recognizeCharacters(blob,{signal:abort.signal});
+   if(abort.signal.aborted||id!==sequence.current)return;
+   cache.current.set(current.key,{...cache.current.get(current.key),characters:values});while(cache.current.size>4)cache.current.delete(cache.current.keys().next().value);setChars({phase:'ready',values});
+  }catch(error){if(!abort.signal.aborted&&id===sequence.current)setChars({phase:'error',values:[],message:error.name==='TimeoutError'?'AnimeTrace не ответил вовремя.':/[А-Яа-яЁё]/.test(error.message||'')?error.message:'Не удалось связаться с AnimeTrace.'});}
+ }
+ useEffect(()=>{
+  const video=videoRef.current;if(!video||!source)return;let timer,closed=false;clearTimeout(idleTimer.current);if((!enabled||!modelAllowed)&&busy.current)terminate();
+  if(!paused){sequence.current++;recognition.current?.abort();setView({phase:'idle'});setChars({phase:'idle',values:[]});setSelected(null);frame.current=null;
+   if(busy.current)terminate();else idleTimer.current=setTimeout(terminate,15000);return;
+  }
+  const capture=()=>{
+   clearTimeout(timer);timer=setTimeout(()=>{
+    if(closed||document.hidden||!video.paused||video.readyState<2||!video.videoWidth)return;
+    const id=++sequence.current,key=source+':'+video.currentTime.toFixed(3)+':'+video.videoWidth+'x'+video.videoHeight;
+    recognition.current?.abort();frame.current=null;setSelected(null);renderer.current?.surface(null);setView({phase:enabled?'capture':'idle'});setChars({phase:'idle',values:[]});
+    try{
+     const scale=Math.min(1,960/Math.max(video.videoWidth,video.videoHeight)),image=document.createElement('canvas');image.width=Math.max(1,Math.round(video.videoWidth*scale));image.height=Math.max(1,Math.round(video.videoHeight*scale));
+     const context=image.getContext('2d',{willReadFrequently:true});context.drawImage(video,0,0,image.width,image.height);context.getImageData(0,0,1,1);
+     frame.current={key,image};const hit=cache.current.get(key);if(hit?.characters)setChars({phase:'ready',values:hit.characters});
+     if(autoRecognize)recognize(frame.current,true);
+     if(!enabled||!modelAllowed){setView({phase:'idle'});return;}
+     if(hit?.depth){setView({phase:'ready',...hit.depth});return;}
+     if(busy.current)terminate();if(!worker.current)worker.current=new Worker(new URL('./pause-depth.worker.js',import.meta.url),{type:'module'});
+     const size=depthSize(image.width,image.height),small=document.createElement('canvas');small.width=size.width;small.height=size.height;const ctx=small.getContext('2d');ctx.drawImage(image,0,0,size.width,size.height);const pixels=ctx.getImageData(0,0,size.width,size.height).data;
+     busy.current=true;setView({phase:'initialize'});
+     worker.current.onmessage=({data})=>{
+      if(closed||data.id!==sequence.current)return;
+      if(data.type==='status')setView(data);
+      if(data.type==='error'){busy.current=false;setView({phase:'error',message:data.message});}
+      if(data.type==='result'){busy.current=false;const depth={data:new Uint8Array(data.depth),width:data.width,height:data.height,inferenceMs:data.inferenceMs};cache.current.set(key,{...cache.current.get(key),depth});while(cache.current.size>4)cache.current.delete(cache.current.keys().next().value);setView({phase:'ready',...depth});}
+     };
+     worker.current.onerror=()=>{if(!closed&&id===sequence.current){terminate();setView({phase:'error',message:'Не удалось запустить модель глубины.'});}};
+     worker.current.postMessage({id,...size,pixels:pixels.buffer},[pixels.buffer]);
+    }catch(error){setView({phase:'error',message:error.name==='SecurityError'?'Источник не разрешает анализ стоп-кадра.':error.message});}
+   },180);
+  };
+  const invalidate=()=>{sequence.current++;recognition.current?.abort();frame.current=null;setSelected(null);setView({phase:'idle'});setChars({phase:'idle',values:[]});};
+  capture();video.addEventListener('loadeddata',capture);video.addEventListener('seeked',capture);video.addEventListener('seeking',invalidate);document.addEventListener('visibilitychange',capture);
+  return()=>{closed=true;sequence.current++;clearTimeout(timer);recognition.current?.abort();video.removeEventListener('loadeddata',capture);video.removeEventListener('seeked',capture);video.removeEventListener('seeking',invalidate);document.removeEventListener('visibilitychange',capture);};
+ },[source,paused,enabled,modelAllowed,autoRecognize,retry,videoRef]);
+ useEffect(()=>{
+  if(!paused||!enabled||view.phase!=='ready'||!canvas.current)return;
+  const element=canvas.current,video=videoRef.current,scale=960/Math.max(video.videoWidth,video.videoHeight);element.width=Math.round(video.videoWidth*scale);element.height=Math.round(video.videoHeight*scale);
+  let render;try{render=depthRenderer(element,view.width,view.height);render.depth(view.data);renderer.current=render;}catch(error){setView({phase:'error',message:error.message});return;}
+  let raf=0,last=0,elapsed=0;const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  const draw=now=>{raf=0;if(document.hidden)return;if(!last)last=now;if(now-last>=40||reduced.matches){elapsed+=(now-last)/1000;last=now;render.draw(reduced.matches ? .48 : shadowCutoff(elapsed),settings.current.strength);}if(!reduced.matches)raf=requestAnimationFrame(draw);};
+  const restart=()=>{cancelAnimationFrame(raf);last=0;if(!document.hidden){render.draw(reduced.matches ? .48 : shadowCutoff(elapsed),settings.current.strength);raf=requestAnimationFrame(draw);}};
+  document.addEventListener('visibilitychange',restart);reduced.addEventListener('change',restart);restart();
+  return()=>{cancelAnimationFrame(raf);document.removeEventListener('visibilitychange',restart);reduced.removeEventListener('change',restart);renderer.current=null;render.dispose();};
+ },[paused,enabled,view.phase,view.data]);
+ useEffect(()=>{if(renderer.current&&view.phase==='ready'){renderer.current.surface(selected?depthSurface(view.data,view.width,view.height,selected.box):null);renderer.current.draw(undefined,strength);}},[selected,view.data,strength]);
+ const loading=enabled&&!['idle','ready','error'].includes(view.phase),message=view.phase==='download'?'Глубина · загрузка '+Math.min(100,Math.round(view.loaded/view.total*100))+'%':view.phase==='inference'?'Глубина · анализ кадра…':'Глубина · запуск модели…';
+ return <><canvas ref={canvas} className={'pause-depth-shadow'+(paused&&enabled&&view.phase==='ready'?' is-ready':'')} aria-hidden="true" data-model="Depth Anything V2 Small"/>{paused&&visible&&host&&createPortal(<div className="pause-frame-ui">
+   <div className="pause-frame-tools" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+    <button type="button" className="pause-recognize" disabled={chars.phase==='loading'||!frame.current} onClick={()=>recognize()} aria-label="Распознать персонажей на стоп-кадре" title="Передать этот стоп-кадр в AnimeTrace"><ScanFace size={15}/>{chars.phase==='loading'?'Ищем персонажей…':'Персонажи'}</button>
+    {enabled&&!modelAllowed&&<button onClick={onAllowModel} aria-label="Загрузить модель глубины">Глубина · 27 МБ</button>}
+    {loading&&modelAllowed&&<span className="pause-depth-status" role="status">{message}</span>}
+    {view.phase==='error'&&enabled&&<button className="pause-depth-status" onClick={()=>setRetry(n=>n+1)} title={view.message} aria-label="Повторить карту глубины"><RotateCcw size={13}/>{view.message}</button>}
+    {chars.phase==='error'&&<span role="status">{chars.message}</span>}{chars.phase==='ready'&&!chars.values.length&&<span role="status">Персонажи не распознаны</span>}
+    {chars.values.length>0&&<button aria-label="Скрыть персонажей" onClick={()=>{setChars({phase:'idle',values:[]});setSelected(null);}}><X size={14}/></button>}
+   </div>
+   {rect&&chars.values.map(character=>{const name=character.candidates[0],x=Math.max(0,Math.min(rect.width-150,(character.box[0]+character.box[2])*.5*rect.width-60)),y=Math.max(50,Math.min(rect.height-120,character.box[3]*rect.height+9));return <button key={character.id} className={'pause-character'+(selected?.id===character.id?' is-selected':'')} style={{left:rect.left+x,top:rect.top+y}} aria-pressed={selected?.id===character.id} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(old=>old?.id===character.id?null:character);}} title={character.candidates.map(c=>c.name+' · '+c.work).join('\n')}><strong>{character.uncertain?'Персонаж не уточнён':name.name}</strong><small>{character.uncertain?'Несколько вариантов · см. подсказку':'AnimeTrace'}</small></button>;})}
+  </div>,host)}</>;
+}

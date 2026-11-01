@@ -280,3 +280,15 @@ Google Fonts repository: https://github.com/google/fonts/tree/main/ofl/manrope
 and https://github.com/google/fonts/tree/main/ofl/dmsans . Original OFL notices
 are bundled beside the fonts in `src/blossom/fonts/`. No runtime Google Fonts
 request is required. Existing reader font/model licensing remains unchanged.
+
+### DepthFX pause effect
+
+`src/pause-depth-*` adapts the owner's supplied DepthFX Studio shadow shader and
+waveform. Provenance, model revision, checksum, limitations, data flow and actual
+inference evidence are recorded in `design/player-depthfx/README.md`. The selected
+Depth Anything V2 Small weights and their ONNX Community conversion are Apache-2.0;
+weights are downloaded separately, verified and not redistributed in Git/Pages.
+The adapter uses the existing MIT ONNX Runtime Web. AnimeTrace is an external
+public API, not a bundled recognition model or copied interface; no website assets
+or provider images are redistributed. Its public API documentation and terms are
+linked in the integration document.

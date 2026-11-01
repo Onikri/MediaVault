@@ -1,0 +1,16 @@
+.pause-depth-shadow{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;pointer-events:none;opacity:0;transition:opacity .8s ease}
+.pause-depth-shadow.is-ready{opacity:1}
+.pause-frame-ui{position:absolute;inset:0;z-index:5;pointer-events:none}
+.pause-frame-tools{position:absolute;right:16px;top:16px;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:7px;max-width:calc(100% - 32px);font-size:10px;color:#fff9}
+.pause-frame-tools button,.pause-character{pointer-events:auto!important;display:inline-flex;align-items:center;gap:6px;padding:8px 11px!important;background:#16161cbb!important;color:#f5f1ed!important;border-radius:100px;backdrop-filter:blur(12px);font-size:11px!important;line-height:1.4}
+.pause-frame-tools button:hover,.pause-character:hover,.pause-character.is-selected{background:#2c2932e8!important;color:#fff!important}
+.pause-depth-status{display:inline-flex;align-items:center;gap:5px;font-size:10px;max-width:220px}
+.pause-frame-tools>span{max-width:260px;text-shadow:0 1px 3px #000}
+.pause-character{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:min(190px,50%);border-radius:12px!important;text-align:left;transition:opacity .25s,background .2s;animation:pause-character-in .3s ease both}
+.pause-character strong{font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pause-character small{font-size:9px;color:#fffb;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pause-character.is-selected{box-shadow:inset 0 0 0 1px #ffd0b280}
+.mv-player-stage{transform:none!important}
+@keyframes pause-character-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){.pause-frame-tools{right:10px;top:10px;gap:5px;max-width:calc(100% - 20px)}.pause-frame-tools button{padding:7px 9px!important}.pause-depth-status{max-width:160px}.pause-character{max-width:45%;padding:6px 8px!important}.pause-character small{max-width:140px}}
+@media(prefers-reduced-motion:reduce){.pause-depth-shadow,.pause-character{transition:none;animation:none}}
