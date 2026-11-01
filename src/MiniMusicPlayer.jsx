@@ -136,7 +136,7 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
  </div>
  <div className="music-bar-full" aria-hidden={!navFull}>
   <button ref={circle} className="music-full-play" aria-label={playing?'Пауза музыки':'Продолжить музыку'} disabled={!canPlay} onPointerDown={onCircleDown} onPointerMove={onCircleMove} onPointerUp={onCircleUp} onPointerCancel={onCircleUp} onClick={()=>{if(circleSkipClick.current){circleSkipClick.current=false;return;}toggle();}} style={{'--volume-percent':Math.round(volume*100)+'%'}}>
-   <span className="music-full-ring" aria-hidden="true"/>{playing?<Pause size={19}/>:<Play size={19}/>}
+   <span className="music-full-ring" aria-hidden="true"/>{playing?<Pause size={24}/>:<Play size={24}/>}
   </button>
   <div className="music-full-copy"><span className="music-full-title">{displayTitle}</span><strong className="music-full-lyric" aria-live="off">{error?'Проблема с аудио · повтори Play':activeLyric}</strong></div>
   <button className="music-full-next" aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={21}/></button>
@@ -144,8 +144,8 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
    {scrubPreview&&<motion.div key="seek" className="music-seek-surface" role="status" aria-label={'Перемотка '+clock(scrubPreview.time)} initial={{opacity:0,scaleY:.75}} animate={{opacity:1,scaleY:1}} exit={{opacity:0,scaleY:.78}} transition={{type:'spring',stiffness:420,damping:30,mass:.65}}>
     <motion.div className="music-seek-fill" initial={{width:'0%'}} animate={{width:scrubPreview.progress+'%'}} transition={{type:'spring',stiffness:480,damping:34,mass:.4}}/>
     <motion.span className="music-seek-marker" initial={{left:'0%'}} animate={{left:scrubPreview.progress+'%'}} transition={{type:'spring',stiffness:480,damping:34,mass:.4}}/>
-    <motion.span className="music-seek-triangle" initial={{x:-104,scale:.6,opacity:1}} animate={{x:0,scale:1.3,opacity:0}} transition={{type:'spring',stiffness:390,damping:28,mass:.55}}><Play size={19}/></motion.span>
-    <motion.span className="music-seek-clock" initial={{opacity:0,scale:.77,filter:'blur(4px)'}} animate={{opacity:1,scale:1,filter:'blur(0px)'}} exit={{opacity:0,scale:.78,filter:'blur(4px)'}} transition={{type:'spring',stiffness:450,damping:30,delay:.1}}><DotMatrixClock value={clock(scrubPreview.time)}/></motion.span>
+    <motion.span className="music-seek-triangle" initial={{x:-18,scale:.85,opacity:1}} animate={{x:0,scale:.45,opacity:0}} transition={{type:'spring',stiffness:390,damping:28,mass:.55}}><Play size={19}/></motion.span>
+    <motion.span className="music-seek-clock" initial={{opacity:0,scale:.64,filter:'blur(4px)'}} animate={{opacity:1,scale:1,filter:'blur(0px)'}} exit={{opacity:0,scale:.78,filter:'blur(4px)'}} transition={{type:'spring',stiffness:450,damping:30,delay:.1}}><DotMatrixClock value={clock(scrubPreview.time)}/></motion.span>
    </motion.div>}
   </AnimatePresence>
  </div>
