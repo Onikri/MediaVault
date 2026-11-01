@@ -18,6 +18,16 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   let providerRequests=0;await page.route(/https:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\//,r=>{providerRequests++;return r.abort();});
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/music-nav-harness.html');
   await page.getByRole('button',{name:'Слушать Otonoke',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.music-dock-error')?.textContent);assert.equal(await page.locator('.music-panel').getAttribute('aria-hidden'),'true');assert.equal(await page.locator('iframe').count(),0);assert.equal(providerRequests,0);
+  if(width>=900){
+   const nav=page.locator('.music-nav.has-track'),before=await nav.boundingBox();
+   await page.locator('.music-nav .music-bar').hover();
+   await page.waitForTimeout(420);
+   const after=await nav.boundingBox(),island=await page.locator('.music-nav .music-bar').boundingBox();
+   assert.equal(Math.round(before.width),Math.round(after.width),'hover must not reflow navbar');
+   assert.ok(island.width>before.width+70,'music island should expand on hover');
+   assert.equal(await page.locator('.music-nav .music-dock-title small').textContent(),'Creepy Nuts');
+   assert.ok(await page.getByRole('slider',{name:'Громкость музыки в шапке'}).count());
+  }else assert.equal(await page.locator('.music-nav>.music-bar').isVisible(),false,'mobile navbar uses the icon');
   if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();await page.getByText('Подключи сервер Oracle в профиле для воспроизведения музыки.',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Музыкальные аккаунты и плейлисты',exact:true}).click();await page.getByRole('combobox',{name:'Музыкальная платформа',exact:true}).selectOption('spotify');await page.getByText('Приложение Spotify',{exact:true}).click();await page.getByRole('textbox',{name:'Spotify Client ID',exact:true}).waitFor();
   assert.equal(await page.locator('input[type=password]').count(),0);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
