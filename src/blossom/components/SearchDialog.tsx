@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useId,useMemo,useRef,useState} from 'react';
+import {useCallback,useEffect,useId,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ArrowUpRight,Clock,LoaderCircle,Search,X} from 'lucide-react';
@@ -16,12 +16,18 @@ const KEY='mediavault_search_recents_v1';
 const typeLabel=(kind:string)=>Object.fromEntries(SEARCH_KINDS)[kind]||'Сериал';
 const same=(a:string,b:string)=>a.trim().toLocaleLowerCase()===b.trim().toLocaleLowerCase();
 function coordinates(){
- const width=Math.min(560,Math.max(280,window.innerWidth-24)),target=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();
- return {width,left:(window.innerWidth-width)/2,top:target?.top??18,seedWidth:target?.width??112,seedHeight:target?.height??38};
+ const target=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();
+ const inner=document.querySelector('.blossom-navbar .header-inner') as HTMLElement|null;
+ const r=inner?.getBoundingClientRect();
+ const padding=inner?Math.max(parseFloat(getComputedStyle(inner).paddingLeft)||0,parseFloat(getComputedStyle(inner).paddingRight)||0):10;
+ const width=Math.min(340,Math.max(180,(r?.width??window.innerWidth-20)-2*padding-8));
+ const height=Math.min(44,(r?.height??58)-10);
+ const centre=r?r.left+r.width/2:window.innerWidth/2;
+ return {width,left:centre-width/2,top:r?r.top+(r.height-height)/2:(target?.top??18),height,seedWidth:target?.width??112,seedHeight:target?.height??38};
 }
 function Highlight({text,query}:{text:string,query:string}){const at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;return at<0?<>{text}</>:<>{text.slice(0,at)}<strong>{text.slice(at,at+query.length)}</strong>{text.slice(at+query.length)}</>;}
 export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,onClose:()=>void,onChoose:(item:any)=>void,onBrowse:(query:string,kind:string)=>void}){
- const reduce=useReducedMotion(),[geometry]=useState(coordinates),id=useId();
+ const reduce=useReducedMotion(),[geometry,setGeometry]=useState(coordinates),id=useId();
  const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[composing,setComposing]=useState(false),[closing,setClosing]=useState(false);
  const [chips,setChips]=useState<string[]>([]),[marked,setMarked]=useState<string|null>(null),[activeId,setActiveId]=useState<string|null>(null),[rowCursor,setRowCursor]=useState(0),[panelFloor,setPanelFloor]=useState(0);
  const [recents,setRecents]=useState<string[]>(()=>{try{const saved=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(saved)?saved.filter((v):v is string=>typeof v==='string').slice(0,5):[];}catch{return[];}});
@@ -40,7 +46,18 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
  const addChip=(text:string)=>{const v=text.trim();if(!v)return;setChips(old=>old.some(c=>same(c,v))?old:[...old,v]);setQuery('');setMarked(null);remember(v);setRowCursor(0);input.current?.focus();};
  const removeChip=(text:string)=>{setChips(old=>old.filter(c=>c!==text));setMarked(null);input.current?.focus();};
  const forget=(text?:string)=>persist(text?recents.filter(v=>v!==text):[]);
- useEffect(()=>{const header=document.querySelector('.blossom-navbar');header?.classList.add('is-search-open');input.current?.focus({preventScroll:true});return()=>header?.classList.remove('is-search-open');},[]);
+ useLayoutEffect(()=>{
+  const header=document.querySelector('.blossom-navbar');
+  header?.classList.add('is-search-open');
+  dispatchEvent(new Event('mediavault:search-open'));
+  const update=()=>setGeometry(previous=>{const next=coordinates();return Object.keys(next).every(key=>previous[key as keyof typeof previous]===next[key as keyof typeof next])?previous:next;});
+  update();
+  const observer=new ResizeObserver(update);
+  const inner=header?.querySelector('.header-inner');if(inner)observer.observe(inner);
+  window.addEventListener('resize',update);
+  input.current?.focus({preventScroll:true});
+  return()=>{observer.disconnect();window.removeEventListener('resize',update);header?.classList.remove('is-search-open');dispatchEvent(new Event('mediavault:search-close'));};
+ },[]);
  useEffect(()=>{if(!closing)return;const t=setTimeout(()=>{if(!finished.current){finished.current=true;onClose();}},450);return()=>clearTimeout(t);},[closing,onClose]);
  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key!=='Escape'||event.isComposing)return;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();if(marked){setMarked(null);return;}if(query){setQuery('');setActiveId(null);return;}close();};document.addEventListener('keydown',escape,true);return()=>document.removeEventListener('keydown',escape,true);},[marked,query,close]);
  useEffect(()=>{if(closing)return;const handler=(event:PointerEvent)=>{const root=document.querySelector('.morph-search-dialog');const trigger=document.querySelector('.header-center-search');if(root?.contains(event.target as Node)||trigger?.contains(event.target as Node))return;close();};document.addEventListener('pointerdown',handler,true);return()=>document.removeEventListener('pointerdown',handler,true);},[closing,close]);
@@ -57,7 +74,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
  return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{opacity:0,y:-2}} animate={{opacity:closing?0:1,y:closing?-4:0}} transition={{duration:reduce?0:.16}}>
   <motion.div className="morph-search-bar" onPointerDown={focusField}
    initial={reduce?false:{width:geometry.seedWidth,height:geometry.seedHeight}}
-   animate={{width:closing?geometry.seedWidth:'100%',height:closing?geometry.seedHeight:56}}
+   animate={{width:closing?geometry.seedWidth:'100%',height:closing?geometry.seedHeight:geometry.height}}
    transition={reduce?{duration:0}:(closing?EXIT:ENTER)}>
    <Search size={20} aria-hidden="true"/>
    <div className="morph-search-chips">
