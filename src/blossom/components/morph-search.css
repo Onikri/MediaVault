@@ -14,7 +14,7 @@ html[data-blossom] .morph-search-bar{
  display:flex;align-items:center;justify-content:stretch;gap:9px;
  padding:0 10px 0 16px;border-radius:28px;
  border:1px solid rgba(246,246,255,.085);
- background:rgba(34,35,43,.64);
+ background:rgba(34,35,43,.55);
  backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
  box-shadow:inset 0 1px rgba(255,255,255,.06),0 24px 60px -24px rgba(0,0,0,.45);
  cursor:text;
@@ -43,7 +43,7 @@ html[data-blossom] .morph-search-panel{
  position:relative;z-index:1;flex:none;width:100%;margin:8px 0 0;
  max-width:100%;max-height:calc(100dvh - 120px);overflow:hidden;border-radius:28px;
  border:1px solid rgba(246,246,255,.085);
- background:rgba(33,34,42,.70);
+ background:rgba(33,34,42,.55);
  backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
  box-shadow:inset 0 1px rgba(255,255,255,.06),0 24px 60px -24px rgba(0,0,0,.45);
 }
@@ -85,27 +85,19 @@ html[data-blossom] .morph-search-spinner{flex:none;color:#b9baca;animation:morph
 @media(max-width:640px){html[data-blossom] .blossom-search-dialog.morph-search-dialog{max-width:calc(100vw - 24px)}html[data-blossom] .morph-search-bar{padding-left:12px;gap:6px}html[data-blossom] .morph-search-bar input{font-size:14px;min-width:65px}html[data-blossom] .morph-search-footer{font-size:9px}html[data-blossom] .morph-search-footer kbd{display:none}}
 @media(prefers-reduced-motion:reduce){html[data-blossom] .morph-search-spinner{animation:none}}
 
-
-/* Centered, smaller and truly inset from the navbar edges: only this panel
-   crosses below the navbar; the expanding input remains inside its vertical grid. */
-html[data-blossom] .blossom-search-dialog.morph-search-dialog{overflow:visible;border:0!important;background:transparent;box-shadow:none}
-html[data-blossom] .morph-search-bar{
- border:0!important;outline:0;box-shadow:0 12px 25px rgba(0,0,0,.16);
- background-color:rgb(40 40 47 / .92);
- background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='144'%20height='144'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='.88'%20numOctaves='3'%20seed='7'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'%20opacity='.10'/%3E%3C/svg%3E"),linear-gradient(158deg,rgba(255,255,255,.047),rgba(12,13,18,.1));
- background-blend-mode:soft-light,normal;
- background-size:144px 144px,cover;
- border-radius:999px;
- max-height:calc(100% - 0px);
+/* The reference MorphingSearchChips glass is deliberately translucent, not
+   solid graphite. Keep its 20px blur, 1.6 saturation, inset top highlight,
+   hairline glass edge and spring-grown card; no added grain/gradient. */
+html[data-blossom] .morph-search-bar,html[data-blossom] .morph-search-panel{
+  background-image:none;
+  border:1px solid rgba(246,246,255,.08);
+  backdrop-filter:blur(20px) saturate(1.6);
+  -webkit-backdrop-filter:blur(20px) saturate(1.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 24px 60px -24px rgba(0,0,0,.45);
+  border-radius:28px;
 }
-html[data-blossom] .morph-search-panel{
- border:0!important;outline:0;border-radius:24px;
- background-color:rgb(38 38 45 / .95);
- background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='144'%20height='144'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='.88'%20numOctaves='3'%20seed='7'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'%20opacity='.10'/%3E%3C/svg%3E"),linear-gradient(150deg,rgba(255,255,255,.046),rgba(9,10,14,.10));
- background-size:144px 144px,cover;background-blend-mode:soft-light,normal;
- box-shadow:0 24px 65px rgba(0,0,0,.36);
- margin-top:7px;
-}
+html[data-blossom] .morph-search-bar{background-color:rgba(34,35,43,.55)}
+html[data-blossom] .morph-search-panel{background-color:rgba(33,34,42,.55);margin-top:8px}
 html[data-blossom] .morph-search-chip-active{border:0}
-html[data-blossom] .morph-search-bar>button{border:0;box-shadow:none}
+html[data-blossom] .morph-search-footer-caption{color:#a9aab5}
 @media(max-width:640px){html[data-blossom] .morph-search-bar{padding-inline:10px}}
