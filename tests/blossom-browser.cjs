@@ -35,7 +35,9 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   const topChrome=await page.locator('.blossom-navbar .header-inner').evaluate(e=>{const s=getComputedStyle(e);return {background:s.backgroundColor,border:s.borderTopWidth,shadow:s.boxShadow,before:getComputedStyle(e,'::before').content};});
   assert.equal(topChrome.background,'rgba(0, 0, 0, 0)');assert.equal(topChrome.border,'0px');assert.equal(topChrome.shadow,'none');assert.equal(topChrome.before,'none');
   if(width===1280){const header=page.locator('.blossom-navbar'),expanded=await header.boundingBox(),active=page.locator('.desktop-nav [aria-current="page"]');await active.hover();assert.equal(await active.evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)','Hover cannot paint a second active shape');const a=await active.boundingBox(),pill=await page.locator('.nav-glide').boundingBox();assert.ok(Math.abs(a.width-pill.width)<1&&Math.abs(a.height-pill.height)<1,'One pill follows the full active button');await page.evaluate(()=>scrollTo(0,180));await page.locator('.blossom-navbar.is-scrolled').waitFor();await page.waitForFunction(w=>document.querySelector('.blossom-navbar').getBoundingClientRect().width<w-20,expanded.width);assert.ok((await header.boundingBox()).width<expanded.width,'Navbar contracts on scroll');await page.screenshot({path:path.join(dir,'navbar-scrolled.png')});await page.evaluate(()=>scrollTo(0,0));await page.locator('.blossom-navbar:not(.is-scrolled)').waitFor();}
+  assert.equal(await page.locator('.blossom-navbar .import-settings-trigger').count(),0,'connections no longer occupy navbar');
   await page.locator('#profileBtn').click();await page.locator('#appearanceSettings').waitFor();
+  await page.locator('.connection-settings-card .import-settings-trigger').waitFor();
   await page.getByRole('button',{name:'Бордо',exact:true}).click();await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--color-blossom')!=='#ee3c35');
   const burgundy=await palette();assert.equal(burgundy.surface,'#19191e');
   await page.reload();await page.locator('#appearanceSettings').waitFor();assert.deepEqual(await palette(),burgundy);
@@ -54,7 +56,13 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   await page.keyboard.press('Control+k');const dialog=page.getByRole('dialog',{name:'Поиск в библиотеке'});await dialog.waitFor();
   assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).evaluate(e=>document.activeElement===e),true);
   await page.getByRole('combobox',{name:'Поиск произведения'}).fill('Naruto');await dialog.getByRole('option').first().waitFor();await fits('Search');
-  await page.screenshot({path:path.join(dir,'search-'+width+'.png')});await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+  const position=await page.locator('.morph-search-dialog').boundingBox(),bar=await page.locator('.header-center-search').boundingBox();
+  assert.ok(Math.abs(position.x+position.width/2-bar.x-bar.width/2)<2,'morph search stays centered under navbar search');
+  assert.ok(position.y>=bar.y-2&&position.y<bar.y+bar.height+4,'morph search emerges from centered navbar pill');
+  assert.equal(await page.locator('.morph-search-backdrop').count(),0,'search uses original floating glass panel without modal backdrop');
+  await page.screenshot({path:path.join(dir,'search-'+width+'.png')});await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).inputValue(),'','first Escape clears the query like MorphingSearchChips');
+  await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
   await navigateApp(page,'Библиотека');await page.locator('.catalog-grid .anime-card').first().waitFor();await fits('Catalog');
   await page.screenshot({path:path.join(dir,'catalog-'+width+'.png'),fullPage:true});
   if(width===1280){await page.locator('.catalog-grid .anime-card').first().hover();const tip=page.getByRole('tooltip');await tip.waitFor();await tip.getByText('Описание из каталога для проверки интерфейса.',{exact:true}).waitFor();const box=await tip.boundingBox();assert.ok(box.x>=0&&box.y>=0&&box.y+box.height<=960,'Hydrated preview stays inside viewport');await page.screenshot({path:path.join(dir,'catalog-tooltip.png')});await page.mouse.move(0,0);}
