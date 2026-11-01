@@ -1,0 +1,64 @@
+/* Morphing search adapted from the supplied MorphingSearchChips interaction:
+   a glass seed grows from the navbar search pill and folds back on dismissal. */
+html[data-blossom] .blossom-search-backdrop.morph-search-backdrop{position:fixed;inset:0;z-index:310;background:color-mix(in srgb,var(--color-canvas) 68%,transparent);backdrop-filter:blur(11px);-webkit-backdrop-filter:blur(11px);animation:morph-search-backdrop-in .22s both;transition:opacity .16s}
+html[data-blossom] .morph-search-backdrop.is-closing{opacity:0;pointer-events:none}
+@keyframes morph-search-backdrop-in{from{opacity:0}to{opacity:1}}
+html[data-blossom] .blossom-search-dialog.morph-search-dialog{position:fixed;z-index:311;top:82px;right:24px;left:auto;translate:none;box-sizing:border-box;max-width:calc(100vw - 24px);max-height:calc(100dvh - 104px);min-height:0;width:auto;display:flex;flex-direction:column;overflow:hidden;padding:0;border:1px solid color-mix(in srgb,var(--color-petal) 9%,transparent);border-radius:26px;background:color-mix(in srgb,var(--color-surface) 71%,transparent);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);box-shadow:inset 0 1px 0 #ffffff12,0 28px 70px -24px #000c;animation:none;outline:none}
+html[data-blossom] .morph-search-bar{display:flex;align-items:center;gap:12px;flex:none;min-height:62px;padding:11px 15px;color:var(--color-on-muted);border-bottom:1px solid color-mix(in srgb,var(--color-petal) 8%,transparent)}
+html[data-blossom] .morph-search-bar>svg:first-child{flex:none;color:var(--color-blossom-light)}
+html[data-blossom] .morph-search-bar input{font:500 15px/1.4 var(--font-body,inherit);flex:1;width:100%;min-width:0;min-height:38px;outline:0;border:0;background:none;color:var(--color-petal);box-shadow:none}
+html[data-blossom] .morph-search-bar input::placeholder{color:var(--color-quiet)}
+html[data-blossom] .morph-search-bar kbd{white-space:nowrap;padding:5px 7px;border:1px solid color-mix(in srgb,var(--color-petal) 13%,transparent);border-radius:7px;font-size:10px;color:var(--color-on-muted)}
+html[data-blossom] .morph-search-bar button{display:inline-grid;place-items:center;flex:none;width:30px;height:30px;border:0;border-radius:50%;color:var(--color-on-muted);background:transparent;cursor:pointer;transition:background .18s,color .18s}
+html[data-blossom] .morph-search-bar button:hover{background:color-mix(in srgb,var(--color-blossom) 18%,transparent);color:var(--color-petal)}
+html[data-blossom] .morph-search-spinner{flex:none;color:var(--color-blossom-light);animation:morph-search-spin 1s linear infinite}
+@keyframes morph-search-spin{to{transform:rotate(360deg)}}
+html[data-blossom] .morph-search-filters{display:flex;align-items:center;gap:5px;flex:none;overflow-x:auto;max-width:100%;padding:10px 12px;scrollbar-width:none;border-bottom:1px solid color-mix(in srgb,var(--color-petal) 7%,transparent)}
+html[data-blossom] .morph-search-filters::-webkit-scrollbar{display:none}
+html[data-blossom] .morph-search-chip{position:relative;flex:none;padding:8px 12px;border:0;border-radius:100px;background:transparent;color:var(--color-on-muted);font-size:11px;font-weight:650;white-space:nowrap;cursor:pointer;transition:color .2s}
+html[data-blossom] .morph-search-chip span:last-child{position:relative;z-index:1}
+html[data-blossom] .morph-search-chip[aria-pressed=true]{color:var(--color-petal)}
+html[data-blossom] .morph-search-chip:hover{color:var(--color-petal)}
+html[data-blossom] .morph-search-chip-active{position:absolute;inset:0;border-radius:100px;background:color-mix(in srgb,var(--color-blossom) 25%,transparent);border:1px solid color-mix(in srgb,var(--color-blossom) 26%,transparent)}
+html[data-blossom] .morph-search-list{flex:1 1 auto;min-height:96px;max-height:min(435px,48dvh);padding:9px 10px 12px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--color-quiet) transparent}
+html[data-blossom] .morph-search-section{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:8px 12px 10px;font-size:10px;color:var(--color-on-muted);font-weight:600}
+html[data-blossom] .morph-search-section button{background:none;border:0;color:var(--color-blossom-light);font-size:10px;cursor:pointer}
+html[data-blossom] .morph-search-recent{display:flex;align-items:center;border-radius:14px;transition:background .16s}
+html[data-blossom] .morph-search-recent:hover{background:color-mix(in srgb,var(--color-petal) 5%,transparent)}
+html[data-blossom] .morph-search-recent button{background:none;border:0;color:var(--color-on-muted);cursor:pointer}
+html[data-blossom] .morph-search-recent button:first-child{display:flex;align-items:center;gap:12px;min-height:44px;flex:1;min-width:0;text-align:left;padding:8px 11px;color:var(--color-petal);font-size:12px}
+html[data-blossom] .morph-search-recent button:first-child svg{color:var(--color-on-muted);flex:none}
+html[data-blossom] .morph-search-recent button:last-child{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:100px;margin-right:6px}
+html[data-blossom] .morph-search-recent button:last-child:hover{background:var(--color-surface-raised);color:var(--color-petal)}
+html[data-blossom] .morph-search-result{display:grid;width:100%;min-height:63px;grid-template-columns:36px minmax(0,1fr) 20px;align-items:center;gap:13px;padding:7px 10px;border:0;border-radius:16px;text-align:left;background:transparent;color:var(--color-petal);cursor:pointer;transition:background-color .16s,color .16s}
+html[data-blossom] .morph-search-result:hover,html[data-blossom] .morph-search-result.is-active{background:color-mix(in srgb,var(--color-petal) 8%,transparent)}
+html[data-blossom] .morph-search-result.is-active{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-blossom) 20%,transparent)}
+html[data-blossom] .morph-search-result>svg{color:var(--color-on-muted)}
+html[data-blossom] .morph-search-poster{display:block;width:36px;height:49px;border-radius:9px;overflow:hidden;background:linear-gradient(140deg,var(--color-crimson),var(--color-red-deep))}
+html[data-blossom] .morph-search-poster img{width:100%;height:100%;object-fit:cover}
+html[data-blossom] .morph-search-result-meta{display:block;min-width:0}
+html[data-blossom] .morph-search-result-meta strong{display:block;font-size:12px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-blossom] .morph-search-result-meta mark{color:inherit;background:color-mix(in srgb,var(--color-blossom) 33%,transparent);border-radius:3px}
+html[data-blossom] .morph-search-result-meta small{display:block;font-size:10px;color:var(--color-on-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:5px}
+html[data-blossom] .morph-search-result-meta b{font-weight:600;color:var(--color-blossom-light)}
+html[data-blossom] .morph-search-empty{padding:25px 14px;margin:0;line-height:1.65;font-size:12px;text-align:center;color:var(--color-on-muted)}
+html[data-blossom] .morph-search-progress{font-size:11px;color:var(--color-on-muted);padding:9px 12px}
+html[data-blossom] .morph-search-footer{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:45px;padding:8px 15px;background:color-mix(in srgb,var(--color-canvas) 35%,transparent);border-top:1px solid color-mix(in srgb,var(--color-petal) 8%,transparent);color:var(--color-on-muted);font-size:10px}
+html[data-blossom] .morph-search-footer kbd{display:inline-block;border:1px solid color-mix(in srgb,var(--color-petal) 12%,transparent);padding:3px 5px;border-radius:5px;color:var(--color-petal);font:inherit}
+html[data-blossom] .morph-search-footer button{display:inline-flex;align-items:center;gap:5px;flex:none;white-space:nowrap;padding:6px 9px;border:0;border-radius:100px;background:color-mix(in srgb,var(--color-blossom) 15%,transparent);color:var(--color-petal);font-size:10px;cursor:pointer}
+html[data-blossom] .morph-search-dialog :is(button,input):focus-visible{outline:2px solid var(--color-blossom-light);outline-offset:2px}
+@media(max-width:640px){
+ html[data-blossom] .blossom-search-dialog.morph-search-dialog{top:70px;right:12px;max-height:calc(100dvh - 85px);max-width:calc(100vw - 24px)}
+ html[data-blossom] .morph-search-bar{min-height:56px;padding:8px 12px;gap:8px}
+ html[data-blossom] .morph-search-bar input{font-size:13px}
+ html[data-blossom] .morph-search-bar kbd{display:none}
+ html[data-blossom] .morph-search-filters{padding:8px 10px}
+ html[data-blossom] .morph-search-chip{padding:7px 10px}
+ html[data-blossom] .morph-search-list{max-height:55dvh}
+ html[data-blossom] .morph-search-footer{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){
+ html[data-blossom] .blossom-search-backdrop.morph-search-backdrop{animation:none;transition:none}
+ html[data-blossom] .morph-search-spinner{animation:none}
+ html[data-blossom] .morph-search-chip,html[data-blossom] .morph-search-result,html[data-blossom] .morph-search-recent,html[data-blossom] .morph-search-bar button{transition:none}
+}
