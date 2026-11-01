@@ -84,3 +84,28 @@ html[data-blossom] .morph-search-spinner{flex:none;color:#b9baca;animation:morph
 @keyframes morph-search-spin{to{transform:rotate(360deg)}}
 @media(max-width:640px){html[data-blossom] .blossom-search-dialog.morph-search-dialog{max-width:calc(100vw - 24px)}html[data-blossom] .morph-search-bar{padding-left:12px;gap:6px}html[data-blossom] .morph-search-bar input{font-size:14px;min-width:65px}html[data-blossom] .morph-search-footer{font-size:9px}html[data-blossom] .morph-search-footer kbd{display:none}}
 @media(prefers-reduced-motion:reduce){html[data-blossom] .morph-search-spinner{animation:none}}
+
+
+/* Centered, smaller and truly inset from the navbar edges: only this panel
+   crosses below the navbar; the expanding input remains inside its vertical grid. */
+html[data-blossom] .blossom-search-dialog.morph-search-dialog{overflow:visible;border:0!important;background:transparent;box-shadow:none}
+html[data-blossom] .morph-search-bar{
+ border:0!important;outline:0;box-shadow:0 12px 25px rgba(0,0,0,.16);
+ background-color:rgb(40 40 47 / .92);
+ background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='144'%20height='144'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='.88'%20numOctaves='3'%20seed='7'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'%20opacity='.10'/%3E%3C/svg%3E"),linear-gradient(158deg,rgba(255,255,255,.047),rgba(12,13,18,.1));
+ background-blend-mode:soft-light,normal;
+ background-size:144px 144px,cover;
+ border-radius:999px;
+ max-height:calc(100% - 0px);
+}
+html[data-blossom] .morph-search-panel{
+ border:0!important;outline:0;border-radius:24px;
+ background-color:rgb(38 38 45 / .95);
+ background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='144'%20height='144'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='.88'%20numOctaves='3'%20seed='7'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'%20opacity='.10'/%3E%3C/svg%3E"),linear-gradient(150deg,rgba(255,255,255,.046),rgba(9,10,14,.10));
+ background-size:144px 144px,cover;background-blend-mode:soft-light,normal;
+ box-shadow:0 24px 65px rgba(0,0,0,.36);
+ margin-top:7px;
+}
+html[data-blossom] .morph-search-chip-active{border:0}
+html[data-blossom] .morph-search-bar>button{border:0;box-shadow:none}
+@media(max-width:640px){html[data-blossom] .morph-search-bar{padding-inline:10px}}
