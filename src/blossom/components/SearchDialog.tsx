@@ -17,13 +17,13 @@ const typeLabel=(kind:string)=>Object.fromEntries(SEARCH_KINDS)[kind]||'Сери
 const same=(a:string,b:string)=>a.trim().toLocaleLowerCase()===b.trim().toLocaleLowerCase();
 function coordinates(){
  const target=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();
- const inner=document.querySelector('.blossom-navbar .header-inner') as HTMLElement|null;
- const r=inner?.getBoundingClientRect();
- const padding=inner?Math.max(parseFloat(getComputedStyle(inner).paddingLeft)||0,parseFloat(getComputedStyle(inner).paddingRight)||0):10;
- const width=Math.min(340,Math.max(180,(r?.width??window.innerWidth-20)-2*padding-8));
- const height=Math.min(44,(r?.height??58)-10);
- const centre=r?r.left+r.width/2:window.innerWidth/2;
- return {width,left:centre-width/2,top:r?r.top+(r.height-height)/2:(target?.top??18),height,seedWidth:target?.width??112,seedHeight:target?.height??38};
+ const slot=document.querySelector('.blossom-navbar .header-center-search')?.getBoundingClientRect();
+ const inner=document.querySelector('.blossom-navbar .header-inner')?.getBoundingClientRect();
+ const width=Math.max(42,Math.min(340,slot?.width??target?.width??160));
+ const height=Math.min(44,(inner?.height??58)-10);
+ const left=slot?.left??((window.innerWidth-width)/2);
+ const top=inner?inner.top+(inner.height-height)/2:(target?.top??18);
+ return {width,left,top,height,seedWidth:target?.width??112,seedHeight:target?.height??38};
 }
 function Highlight({text,query}:{text:string,query:string}){const at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;return at<0?<>{text}</>:<>{text.slice(0,at)}<strong>{text.slice(at,at+query.length)}</strong>{text.slice(at+query.length)}</>;}
 export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,onClose:()=>void,onChoose:(item:any)=>void,onBrowse:(query:string,kind:string)=>void}){
@@ -54,9 +54,10 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
   update();
   const observer=new ResizeObserver(update);
   const inner=header?.querySelector('.header-inner');if(inner)observer.observe(inner);
-  window.addEventListener('resize',update);
+  const slot=header?.querySelector('.header-center-search');if(slot)observer.observe(slot);
+  window.addEventListener('resize',update);window.addEventListener('scroll',update,{passive:true});
   input.current?.focus({preventScroll:true});
-  return()=>{observer.disconnect();window.removeEventListener('resize',update);header?.classList.remove('is-search-open');dispatchEvent(new Event('mediavault:search-close'));};
+  return()=>{observer.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update);header?.classList.remove('is-search-open');dispatchEvent(new Event('mediavault:search-close'));};
  },[]);
  useEffect(()=>{if(!closing)return;const t=setTimeout(()=>{if(!finished.current){finished.current=true;onClose();}},450);return()=>clearTimeout(t);},[closing,onClose]);
  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key!=='Escape'||event.isComposing)return;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();if(marked){setMarked(null);return;}if(query){setQuery('');setActiveId(null);return;}close();};document.addEventListener('keydown',escape,true);return()=>document.removeEventListener('keydown',escape,true);},[marked,query,close]);
