@@ -151,3 +151,65 @@ body:has(.immersive-reader:not(.reader-embedded)) .music-nav{visibility:hidden;p
  .music-dock-compact>.music-bar{display:block;width:184px}
 }
 @media(prefers-reduced-motion:reduce){.music-nav .music-bar,.music-nav .music-disc img,.music-nav .music-bar-transport,.music-nav .music-bar-volume,.music-nav .music-volume-ring,.music-nav .music-volume-ring-fill,.music-dock-timeline input[type=range],.music-volume input[type=range]{transition:none!important}}
+
+
+/* Navbar integration: the existing pill itself grows into the right quarter.
+   Hover never changes its pigment, and expanded content is a single row. */
+.music-nav .music-bar-full{position:absolute;inset:0;display:flex;align-items:center;gap:8px;padding:5px 12px;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(3px);transition:opacity .18s ease,transform .32s ease,visibility 0s .22s}
+.music-nav.has-track .music-bar.is-nav-expanded{right:var(--nav-full-right,0px);top:var(--nav-full-top,-10px);width:var(--nav-full-width,340px);height:var(--nav-full-height,58px);border-radius:30px 999px 999px 30px;z-index:40;background:color-mix(in srgb,var(--color-canvas) 92%,#000);border-color:color-mix(in srgb,var(--color-petal) 9%,transparent);box-shadow:none;transition:width .5s cubic-bezier(.2,.8,.2,1),right .5s cubic-bezier(.2,.8,.2,1),top .5s cubic-bezier(.2,.8,.2,1),height .5s cubic-bezier(.2,.8,.2,1),border-radius .5s ease}
+.music-nav .music-bar.is-nav-expanded .music-bar-primary{opacity:0;visibility:hidden;pointer-events:none}
+.music-nav .music-bar.is-nav-expanded .music-bar-full{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition-delay:.12s,0s,0s}
+.music-nav .music-bar.is-hovered:not(.is-nav-expanded),.music-nav .music-bar.is-keyboard-open:not(.is-nav-expanded){background:color-mix(in srgb,var(--color-canvas) 92%,#000)}
+.music-nav .music-full-play{position:relative;flex:none;min-width:38px;width:38px;height:38px;min-height:38px;border-radius:50%;padding:8px;color:var(--color-petal);touch-action:none;user-select:none;cursor:grab;background:color-mix(in srgb,var(--color-petal) 7%,transparent)}
+.music-nav .music-full-play:active{cursor:grabbing}
+.music-nav .music-full-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(var(--color-blossom-light) var(--volume-percent,80%),color-mix(in srgb,var(--color-petal) 19%,transparent) 0);mask:radial-gradient(transparent 62%,black 65%);-webkit-mask:radial-gradient(transparent 62%,black 65%);pointer-events:none}
+.music-nav .music-full-copy{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;min-width:0;flex:1;overflow:hidden;pointer-events:none}
+.music-nav .music-full-title{font-size:9px;line-height:1.25;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.67;font-weight:500}
+.music-nav .music-full-lyric{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(11px,.95vw,14px);font-weight:750;text-align:center;color:var(--color-petal);line-height:1.25}
+.music-nav .music-full-next{flex:none;width:32px;min-width:32px;height:38px;min-height:38px;padding:6px;color:var(--color-petal)}
+.blossom-navbar.is-player-expanded .music-nav{z-index:40}
+@media(min-width:901px){.music-nav .music-bar{transition:width .32s cubic-bezier(.22,1,.36,1),height .5s cubic-bezier(.2,.8,.2,1),right .5s cubic-bezier(.2,.8,.2,1),top .5s cubic-bezier(.2,.8,.2,1),border-radius .5s ease,box-shadow .32s}}
+@media(prefers-reduced-motion:reduce){.music-nav .music-bar.is-nav-expanded,.music-nav .music-bar-full{transition:none}}
+
+
+/* Expanded player only: the accepted compact pill's material and geometry above
+   remain unmodified. No frame on the expanded surface or the Play control. */
+.music-nav.has-track .music-bar.is-nav-expanded{
+  border:0;outline:0;box-shadow:none;border-radius:999px;overflow:hidden;
+  background:color-mix(in srgb,var(--color-canvas) 92%,#000);
+}
+.music-nav .music-bar-full{isolation:isolate;overflow:hidden;border-radius:inherit}
+.music-nav .music-full-play{
+  min-width:48px;width:48px;height:48px;min-height:48px;
+  background:color-mix(in srgb,var(--color-canvas) 72%,#000 28%);
+  border:0;box-shadow:none;outline:0;
+  padding:12px;color:var(--color-petal);
+  transition:background .18s ease,transform .25s cubic-bezier(.2,.8,.2,1),opacity .18s ease;
+}
+.music-nav .music-full-play:hover,.music-nav .music-full-play:focus{
+  border:0;box-shadow:none;outline:0;
+  background:color-mix(in srgb,var(--color-canvas) 72%,#000 28%);
+}
+.music-nav .music-full-play:focus-visible{outline:2px solid var(--color-blossom-light);outline-offset:-3px}
+.music-nav .music-full-next{border:0;box-shadow:none;outline:0}
+.music-nav .music-bar.is-scrubbing .music-full-play{opacity:.08;transform:scale(.86)}
+.music-nav .music-bar.is-scrubbing .music-full-copy,
+.music-nav .music-bar.is-scrubbing .music-full-next{opacity:.12;transition:opacity .16s ease}
+.music-nav .music-seek-surface{position:absolute;inset:0;z-index:5;overflow:hidden;pointer-events:none;transform-origin:46px 50%;background-color:color-mix(in srgb,var(--color-canvas) 68%,var(--color-petal) 32%);border-radius:inherit}
+.music-nav .music-seek-fill{position:absolute;left:0;top:0;bottom:0;min-width:0;max-width:100%;background-color:var(--color-blossom);background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='144'%20height='144'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='.88'%20numOctaves='3'%20seed='7'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'%20opacity='.10'/%3E%3C/svg%3E");background-size:144px 144px;background-blend-mode:soft-light}
+.music-nav .music-seek-marker{position:absolute;top:6px;bottom:6px;width:2px;margin-left:-1px;border-radius:2px;background:#fff;box-shadow:0 0 12px #ffffff5b}
+.music-nav .music-seek-clock,.music-nav .music-seek-triangle{position:absolute;top:0;bottom:0;left:6px;width:62px;display:flex;align-items:center;justify-content:center;color:#fff}
+.music-nav .music-seek-clock{filter:drop-shadow(0 1px 4px #0006)}
+.music-nav .music-seek-triangle{z-index:1}
+.music-nav .music-dot-matrix{width:55px;max-width:100%;height:20px;max-height:50%;overflow:visible;fill:currentColor}
+.music-nav .music-bar-primary .music-dock-timeline input[type=range],
+.music-nav .music-bar-transport .music-dock-timeline input[type=range]{
+ border:0!important;outline:0!important;box-shadow:none!important;
+ background:linear-gradient(to right,var(--color-blossom-light) 0,var(--color-blossom-light) var(--music-progress,0%),color-mix(in srgb,var(--color-petal) 30%,var(--color-canvas)) var(--music-progress,0%),color-mix(in srgb,var(--color-petal) 30%,var(--color-canvas)) 100%)!important;
+ border-radius:999px;height:3px;
+}
+.music-nav .music-dock-timeline input[type=range]::-webkit-slider-thumb{appearance:none!important;-webkit-appearance:none!important;width:0!important;height:0!important;border:0!important;opacity:0!important;box-shadow:none!important}
+.music-nav .music-dock-timeline input[type=range]::-moz-range-thumb{width:0!important;height:0!important;border:0!important;opacity:0!important;box-shadow:none!important}
+.music-nav .music-dock-timeline input[type=range]:hover,.music-nav .music-dock-timeline input[type=range]:focus-visible{height:3px!important}
+
+@media(prefers-reduced-motion:reduce){.music-nav .music-bar.is-scrubbing .music-full-play,.music-nav .music-bar.is-scrubbing .music-full-copy{transition:none}}

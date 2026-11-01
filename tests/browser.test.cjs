@@ -211,7 +211,10 @@ async function main() {
     return respond({detail:'Not found'},404);
   });
   await navigateApp(owner,'Библиотека');
-  await owner.locator('.import-settings-trigger').click();
+  // Connection settings live in Profile rather than taking a slot in the navbar.
+  assert.equal(await owner.locator('.blossom-navbar .import-settings-trigger').count(),0,'navbar has no connection icon');
+  await owner.locator('#profileBtn').click();
+  await owner.locator('.connection-settings-card .import-settings-trigger').click();
   await owner.locator('#importServer').fill('https://import.example.com');
   await owner.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
   await owner.getByText('Фоновое сохранение подключено',{exact:true}).waitFor();
@@ -224,6 +227,7 @@ async function main() {
   assert.deepEqual(googleConfiguration,{client_id:publicClientId,client_secret:fixtureClientSecret});
   assert.ok(!(await owner.evaluate(()=>JSON.stringify({...localStorage})) ).includes(fixtureClientSecret),'Private Google settings never enter browser storage');
   await owner.getByRole('button',{name:'Закрыть настройки импорта'}).click();
+  await navigateApp(owner,'Библиотека');
   await owner.getByRole('tab',{name:'По ссылке',exact:true}).click();await owner.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await owner.locator('#streamUrl').fill('https://source.example.com/season');
   await owner.getByRole('button',{name:'Проверить',exact:true}).click();
@@ -244,7 +248,7 @@ async function main() {
   assert.equal(await owner.locator('#openColab').count(),0,'No manual notebook hand-off remains');
   await owner.getByRole('button',{name:'Остановить',exact:true}).click();
   await owner.getByText('Остановлено',{exact:true}).waitFor();
-  await navigateApp(owner,'Моя коллекция');
+  await navigateApp(owner,'Коллекция');
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===3);
   const delayedPattern='**/drive/v3/files/'+textItem.chunks[0].fileId+'?alt=media';
   let releaseDownload,downloadStarted,downloadFailed;
@@ -312,7 +316,7 @@ async function main() {
   await owner.locator('.history-item').filter({hasText:'private-note.txt'}).click();
   await owner.locator('.reader-prose').waitFor();
   await closeViewer(owner);
-  await navigateApp(owner,'Моя коллекция');
+  await navigateApp(owner,'Коллекция');
   assert.ok(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile viewport has no horizontal overflow');
   await owner.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
   await owner.screenshot({path:path.join(temp,'mobile-owner.png'),fullPage:true});
@@ -407,8 +411,9 @@ async function main() {
     return respond({data:[]});
   });
   await navigateApp(fresh,'Библиотека');
-  await fresh.locator('.import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
-  await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();await fresh.getByRole('button',{name:'В Google Диск',exact:true}).click();
+  await fresh.locator('#profileBtn').click();
+  await fresh.locator('.connection-settings-card .import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
+  await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await navigateApp(fresh,'Библиотека');await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();await fresh.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await fresh.locator('#streamUrl').fill('https://source.example.com/titans');await fresh.getByRole('button',{name:'Проверить',exact:true}).click();await fresh.locator('#importDub').selectOption('https://source.example.com/studio');await fresh.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
   await fresh.locator('#serverCollection').fill('Атака титанов');await fresh.getByRole('button',{name:'Одна',exact:true}).click();await fresh.getByRole('combobox',{name:'Номер серии'}).selectOption('3');
   assert.equal(await fresh.locator('#importVideoBtn').isDisabled(),true);await fresh.locator('#importPrerequisites').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();
@@ -416,7 +421,7 @@ async function main() {
   assert.equal(await fresh.locator('#streamUrl').inputValue(),'https://source.example.com/titans');assert.equal(await fresh.locator('#importDub').inputValue(),'https://source.example.com/studio');assert.equal(await fresh.getByRole('combobox',{name:'Номер серии'}).inputValue(),'3');
   freshDriveConnected=true;await fresh.locator('#importPrerequisites').getByRole('button',{name:'Уже разрешил — проверить',exact:true}).click();await fresh.waitForFunction(()=>document.querySelector('#importVideoBtn')?.disabled===false);
   assert.equal(await fresh.locator('#serverCollection').inputValue(),'Атака титанов','Unlocking and Drive reconnect preserve the complete import choice');
-  await navigateApp(fresh,'Моя коллекция');
+  await navigateApp(fresh,'Коллекция');
   await fresh.locator('#showFilesBtn').click();
   await fresh.waitForFunction(()=>document.querySelectorAll('.media-card').length===4);
   assert.equal(writes.length,writesBeforeDiscovery,'Opening a library does not need write access');

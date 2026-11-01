@@ -1,5 +1,6 @@
 import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
+import {AnimatePresence,motion} from 'motion/react';
 import {X,Play,Pause,Music2,Heart,ExternalLink,SkipBack,SkipForward,Volume2,ListMusic,ChevronDown,Headphones,Settings2,ArrowLeft} from 'lucide-react';
 import {musicSnapshot,subscribeMusic,closeMusic,stepMusic,playMusic} from './music-player.js';
 import {toggleTrack,tracks} from './music-library.js';
@@ -10,6 +11,26 @@ import {musicIslandLayout} from './music-island.js';
 import './music-dock.css';
 const clock=value=>{const n=Math.max(0,Math.floor(Number(value)||0));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');};
 const imageURL=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}};
+
+const DOT_GLYPHS={
+ '0':['01110','10001','10011','10101','11001','10001','01110'],
+ '1':['00100','01100','00100','00100','00100','00100','01110'],
+ '2':['01110','10001','00001','00010','00100','01000','11111'],
+ '3':['11110','00001','00001','01110','00001','00001','11110'],
+ '4':['10010','10010','10010','11111','00010','00010','00010'],
+ '5':['11111','10000','10000','11110','00001','00001','11110'],
+ '6':['01110','10000','10000','11110','10001','10001','01110'],
+ '7':['11111','00001','00010','00100','01000','01000','01000'],
+ '8':['01110','10001','10001','01110','10001','10001','01110'],
+ '9':['01110','10001','10001','01111','00001','00001','01110'],
+ ':':['000','010','010','000','010','010','000']
+};
+function DotMatrixClock({value}){
+ const symbols=Array.from(value);let x=1;const dots=[];
+ symbols.forEach((ch,index)=>{const matrix=DOT_GLYPHS[ch]||DOT_GLYPHS['0'];matrix.forEach((line,y)=>{Array.from(line).forEach((bit,j)=>{if(bit==='1')dots.push(<circle key={index+'-'+y+'-'+j} cx={x+j*5.5} cy={3+y*5.5} r="1.65"/>);});});x+=(matrix[0].length+1)*5.5;});
+ return <svg className="music-dot-matrix" viewBox={'0 0 '+x+' 42'} role="img" aria-label={value} preserveAspectRatio="xMidYMid meet">{dots}</svg>;
+}
+
 export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveItem,placement='dock',service}){
  const [audioRetry,setAudioRetry]=useState(0);
  const state=useSyncExternalStore(subscribeMusic,musicSnapshot),track=state?.track,native=!!track&&['library','file'].includes(track.source),remote=track?.source==='url',youtube=!!track&&!native&&!remote,nav=placement==='nav',serverAudio=(youtube||remote)&&!!service?.request,audioBacked=native||serverAudio;
@@ -18,6 +39,29 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
  const audio=useRef(null),scope=useRef(userId),gesture=useRef(null),methods=useRef({prepareStream,readWhole,resolveItem});methods.current={prepareStream,readWhole,resolveItem};
  const volumeKnob=useRef(null),volumeDrag=useRef(null),volumeMoved=useRef(false),previousVolume=useRef(.8);
  const [barHovered,setBarHovered]=useState(false),[barKeyboard,setBarKeyboard]=useState(false);
+ const [navFull,setNavFull]=useState(false),[navMorphBox,setNavMorphBox]=useState({width:340,right:0,top:-10,height:58});
+ const circle=useRef(null),circleGesture=useRef(null),circleSkipClick=useRef(false);
+ const [scrubPreview,setScrubPreview]=useState(null);
+ const activeLyric=(()=>{const arr=track?.syncedLyrics||track?.lyrics;if(!Array.isArray(arr))return 'Текст песни пока недоступен';const line=arr.filter(x=>Number(x.time??x.start??0)<=time).at(-1);return typeof line==='string'?line:(line?.text||line?.line||'Текст песни пока недоступен');})();
+ useLayoutEffect(()=>{if(!nav||!track)return;const measure=()=>{const h=(trigger.current?.closest('.header-inner')||trigger.current?.closest('header'))?.getBoundingClientRect(),t=trigger.current?.getBoundingClientRect();if(!h||!t)return;setNavMorphBox(old=>{const next={width:Math.max(296,Math.min(420,Math.round(h.width*.25))),right:Math.round(h.right-t.right),top:Math.round(h.top-t.top),height:Math.round(h.height)};return Object.keys(next).every(k=>old[k]===next[k])?old:next;});};measure();const ob=new ResizeObserver(measure);const h=(trigger.current?.closest('.header-inner')||trigger.current?.closest('header'));if(h)ob.observe(h);addEventListener('resize',measure);return()=>{ob.disconnect();removeEventListener('resize',measure);};},[nav,!!track]);
+ useEffect(()=>{if(!nav)return;dispatchEvent(new CustomEvent('mediavault:music-expanded',{detail:navFull&&!!track}));return()=>dispatchEvent(new CustomEvent('mediavault:music-expanded',{detail:false}));},[nav,navFull,!!track]);
+ useEffect(()=>{if(!track)setNavFull(false);},[!!track]);
+ useEffect(()=>{if(!navFull)return;const key=e=>{if(e.key==='Escape'){e.preventDefault();setNavFull(false);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[navFull]);
+ useEffect(()=>{const el=circle.current;if(!el||!navFull)return;const wheel=e=>{e.preventDefault();setVolume(v=>Math.max(0,Math.min(1,Math.round((v+(e.deltaY<0?.05:-.05))*100)/100)));};el.addEventListener('wheel',wheel,{passive:false});return()=>el.removeEventListener('wheel',wheel);},[navFull]);
+ const onCircleDown=e=>{if(e.button!==0)return;circleSkipClick.current=false;circleGesture.current={id:e.pointerId,x:e.clientX,y:e.clientY,t:time,v:volume,mode:null,preview:time};e.currentTarget.setPointerCapture(e.pointerId);};
+ const onCircleMove=e=>{const g=circleGesture.current;if(!g||g.id!==e.pointerId)return;const dx=e.clientX-g.x,dy=e.clientY-g.y;
+  if(!g.mode&&Math.hypot(dx,dy)>9)g.mode=Math.abs(dx)>=Math.abs(dy)?'seek':'volume';
+  if(!g.mode)return;
+  circleSkipClick.current=true;
+  if(g.mode==='volume'){setVolume(Math.max(0,Math.min(1,Math.round((g.v-dy/130)*100)/100)));return;}
+  if(duration>0){const next=Math.max(0,Math.min(duration,g.t+dx/150*duration));g.preview=next;setScrubPreview({time:next,progress:next/duration*100});}
+ };
+ const onCircleUp=e=>{const g=circleGesture.current;if(!g||g.id!==e.pointerId)return;
+  circleGesture.current=null;if(g.mode==='seek'&&duration>0)seek(g.preview);
+  setScrubPreview(null);
+  if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
+ };
+
  const barElement=useRef(null),keyboardNavigation=useRef(false);
  // A captured pointer may suppress React pointerleave, so determine hover from
  // global pointer coordinates rather than the button's event bubbling.
@@ -73,11 +117,11 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
  const canPlay=!!track&&!busy&&(!!source||serverAudio&&!!selected);
  const timeline=(detail=false)=><div className="music-dock-timeline"><span>{clock(time)}</span><input type="range" min="0" max={duration||1} step="0.1" value={Math.min(time,duration||1)} disabled={!duration} style={{'--music-progress':(duration>0?Math.min(100,time/duration*100):0)+'%'}} aria-label={detail?'Позиция музыки в подробностях':'Позиция музыки'} onChange={e=>seek(e.target.value)}/><span>{clock(duration)}</span></div>;
  const controls=(detail=false)=><div className="music-dock-controls"><button aria-label="Предыдущая песня" disabled={!state?.index} onClick={()=>stepMusic(-1)}><SkipBack size={16}/></button><button className="music-play" aria-label={detail?(playing?'Пауза в подробностях':'Продолжить в подробностях'):(playing?'Пауза музыки':'Продолжить музыку')} onClick={toggle} disabled={!canPlay}>{playing?<Pause size={18}/>:<Play size={18}/>}</button><button aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={16}/></button></div>;
- const bar=track?<div ref={barElement} className={'music-bar'+(playing?' is-playing':'')+(barHovered?' is-hovered':'')+(barKeyboard?' is-keyboard-open':'')} onPointerLeave={event=>{if(event.pointerType==='mouse'){setBarHovered(false);setBarKeyboard(false);const focused=document.activeElement;if(focused&&event.currentTarget.contains(focused))focused.blur();}}} onFocusCapture={event=>{if(keyboardNavigation.current&&event.target.matches(':focus-visible'))setBarKeyboard(true);}} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setBarKeyboard(false);}}>
+ const bar=track?<div ref={barElement} style={{'--nav-full-width':navMorphBox.width+'px','--nav-full-right':-navMorphBox.right+'px','--nav-full-top':navMorphBox.top+'px','--nav-full-height':navMorphBox.height+'px'}} className={'music-bar'+(playing?' is-playing':'')+(barHovered?' is-hovered':'')+(barKeyboard?' is-keyboard-open':'')+(nav&&navFull?' is-nav-expanded':'')+(scrubPreview?' is-scrubbing':'')} onClick={event=>{if(navFull&&!(event.target.closest('button,input,a')))setNavFull(false);}} onPointerLeave={event=>{if(event.pointerType==='mouse'){setBarHovered(false);setBarKeyboard(false);const focused=document.activeElement;if(focused&&event.currentTarget.contains(focused))focused.blur();}}} onFocusCapture={event=>{if(keyboardNavigation.current&&event.target.matches(':focus-visible'))setBarKeyboard(true);}} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setBarKeyboard(false);}}>
  <div className="music-bar-primary">
-  <button className="music-disc" aria-label="Открыть музыкальный плеер" aria-expanded={expanded} onClick={()=>expanded?collapse():setExpanded(true)}>{art}</button>
+  <button className="music-disc" aria-label="Открыть музыкальный плеер" aria-expanded={nav&&track?navFull:expanded} onClick={()=>nav&&track?setNavFull(x=>!x):expanded?collapse():setExpanded(true)}>{art}</button>
   <div className="music-bar-middle">
-   <button className="music-dock-title" onClick={()=>expanded?collapse():setExpanded(true)} aria-label={'О песне '+track.title}><strong>{displayTitle}</strong><small title={error||undefined}>{track.artists?.join(', ')||metadata?.artists?.join(', ')||(busy?'Подготавливаем аудио…':native?'Личная коллекция':'Аудио через Oracle')}</small></button>
+   <button className="music-dock-title" onClick={()=>nav&&track?setNavFull(x=>!x):expanded?collapse():setExpanded(true)} aria-label={'О песне '+track.title}><strong>{displayTitle}</strong><small title={error||undefined}>{track.artists?.join(', ')||metadata?.artists?.join(', ')||(busy?'Подготавливаем аудио…':native?'Личная коллекция':'Аудио через Oracle')}</small></button>
    <div className="music-bar-transport">{timeline()}</div>
   </div>
   <div className="music-bar-actions">
@@ -87,8 +131,23 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
      <svg viewBox="0 0 36 36" className="music-volume-ring" aria-hidden="true"><circle cx="18" cy="18" r="14" className="music-volume-ring-track"/><circle cx="18" cy="18" r="14" className="music-volume-ring-fill" pathLength="100" strokeDasharray={Math.round(volume*100)+' 100'} transform="rotate(-90 18 18)"/></svg><Volume2 size={14}/>
     </button>
    </div>
-   <button className="music-expand" aria-label="Подробности музыки" aria-expanded={expanded} onClick={()=>expanded?collapse():setExpanded(true)}><ChevronDown size={16}/></button>
+   <button className="music-expand" aria-label="Подробности музыки" aria-expanded={nav&&track?navFull:expanded} onClick={()=>nav&&track?setNavFull(x=>!x):expanded?collapse():setExpanded(true)}><ChevronDown size={16}/></button>
   </div>
+ </div>
+ <div className="music-bar-full" aria-hidden={!navFull}>
+  <button ref={circle} className="music-full-play" aria-label={playing?'Пауза музыки':'Продолжить музыку'} disabled={!canPlay} onPointerDown={onCircleDown} onPointerMove={onCircleMove} onPointerUp={onCircleUp} onPointerCancel={onCircleUp} onClick={()=>{if(circleSkipClick.current){circleSkipClick.current=false;return;}toggle();}} style={{'--volume-percent':Math.round(volume*100)+'%'}}>
+   <span className="music-full-ring" aria-hidden="true"/>{playing?<Pause size={24}/>:<Play size={24}/>}
+  </button>
+  <div className="music-full-copy"><span className="music-full-title">{displayTitle}</span><strong className="music-full-lyric" aria-live="off">{error?'Проблема с аудио · повтори Play':activeLyric}</strong></div>
+  <button className="music-full-next" aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={21}/></button>
+  <AnimatePresence initial={false}>
+   {scrubPreview&&<motion.div key="seek" className="music-seek-surface" role="status" aria-label={'Перемотка '+clock(scrubPreview.time)} initial={{opacity:0,scaleY:.75}} animate={{opacity:1,scaleY:1}} exit={{opacity:0,scaleY:.78}} transition={{type:'spring',stiffness:420,damping:30,mass:.65}}>
+    <motion.div className="music-seek-fill" initial={{width:'0%'}} animate={{width:scrubPreview.progress+'%'}} transition={{type:'spring',stiffness:480,damping:34,mass:.4}}/>
+    <motion.span className="music-seek-marker" initial={{left:'0%'}} animate={{left:scrubPreview.progress+'%'}} transition={{type:'spring',stiffness:480,damping:34,mass:.4}}/>
+    <motion.span className="music-seek-triangle" initial={{x:-18,scale:.85,opacity:1}} animate={{x:0,scale:.45,opacity:0}} transition={{type:'spring',stiffness:390,damping:28,mass:.55}}><Play size={19}/></motion.span>
+    <motion.span className="music-seek-clock" initial={{opacity:0,scale:.64,filter:'blur(4px)'}} animate={{opacity:1,scale:1,filter:'blur(0px)'}} exit={{opacity:0,scale:.78,filter:'blur(4px)'}} transition={{type:'spring',stiffness:450,damping:30,delay:.1}}><DotMatrixClock value={clock(scrubPreview.time)}/></motion.span>
+   </motion.div>}
+  </AnimatePresence>
  </div>
 </div>:null;
  const panel=<aside ref={island} className={'music-dock music-panel music-island'+(expanded?' is-expanded':'')+(playing?' is-playing':'')+(native?' is-native':' is-youtube')+(nav?' is-nav-panel':'')} style={{left:0,top:0,width:expanded?islandBox.width:islandBox.closedWidth,height:expanded?islandBox.height:islandBox.closedHeight,transform:`translate3d(${expanded?islandBox.left:islandBox.closedLeft}px,${expanded?islandBox.top:islandBox.closedTop}px,0)`, '--island-content-width':islandBox.width+'px','--island-content-height':islandBox.maxHeight+'px'}} inert={!expanded} aria-hidden={!expanded} role="dialog" aria-modal="false" aria-label="Музыкальный мини-плеер" onPointerDown={e=>{gesture.current={y:e.clientY,id:e.pointerId};}} onPointerUp={e=>{if(gesture.current?.id===e.pointerId&&e.clientY-gesture.current.y>70&&!e.target.closest('input,select,button,.music-dock-queue,.music-connections'))collapse();gesture.current=null;}}>

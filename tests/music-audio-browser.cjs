@@ -5,10 +5,10 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
  await fs.mkdir(DIR,{recursive:true});const audioPath=path.join(DIR,'music-server-fixture.m4a');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','sine=frequency=440:duration=16','-c:a','aac','-movflags','+faststart','-threads','1','-y',audioPath]);const audio=await fs.readFile(audioPath);
  await fs.writeFile(path.join(DIR,'music-audio-harness.html'),'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/test-output/music-audio-harness.jsx"></script></html>');
  await fs.writeFile(path.join(DIR,'music-audio-harness.jsx'),`
- import React from'react';import{createRoot}from'react-dom/client';import {ThemeProvider} from '/src/blossom/ThemeProvider.tsx';import {AnimatedNavbar} from '/src/blossom/components/AnimatedNavbar.tsx';import MiniMusicPlayer from'/src/MiniMusicPlayer.jsx';import{OnlineMusic}from'/src/OnlineLibrary.jsx';import'/src/styles.css';
+ import React from'react';import{createRoot}from'react-dom/client';import {ThemeProvider} from '/src/blossom/ThemeProvider.tsx';import {AnimatedNavbar} from '/src/blossom/components/AnimatedNavbar.tsx';import MiniMusicPlayer from'/src/MiniMusicPlayer.jsx';import{closeMusic}from'/src/music-player.js';import{OnlineMusic}from'/src/OnlineLibrary.jsx';import'/src/styles.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:location.origin};
  const service={server:location.origin,request:async(path,options={})=>{const response=await fetch(path,{method:options.method||'GET',body:options.body?JSON.stringify(options.body):undefined,headers:{'Content-Type':'application/json'},signal:options.signal});const result=await response.json();if(!response.ok)throw Object.assign(Error(result.detail),{status:response.status});return result;}};
- createRoot(document.getElementById('root')).render(<ThemeProvider><div className="app-shell"><AnimatedNavbar links={[{id:'home',label:'Главная'},{id:'library',label:'Библиотека'},{id:'collection',label:'Моя коллекция'},{id:'history',label:'История'}]} active="home" onNavigate={()=>{}} onSearch={()=>{}} brand={<button className="brand logo">MediaVault</button>}><MiniMusicPlayer service={service} placement="nav" userId="audio-owner"/><button className="avatar-button" aria-label="Профиль">Г</button></AnimatedNavbar><main className="app-main"><OnlineMusic userId="audio-owner"/></main></div></ThemeProvider>);
+ createRoot(document.getElementById('root')).render(<ThemeProvider><div className="app-shell"><AnimatedNavbar links={[{id:'home',label:'Главная'},{id:'library',label:'Библиотека'},{id:'collection',label:'Коллекция'},{id:'history',label:'История'}]} active="home" onNavigate={()=>{}} onSearch={()=>{}} brand={<button className="brand logo">MediaVault</button>}><MiniMusicPlayer service={service} placement="nav" userId="audio-owner"/><button className="avatar-button" aria-label="Профиль">Г</button></AnimatedNavbar><main className="app-main"><OnlineMusic userId="audio-owner"/><button aria-label="Закрыть тестовую музыкальную очередь" onClick={closeMusic}>Завершить</button></main></div></ThemeProvider>);
  `);
  const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});
  for(const width of[390,1440]){
@@ -23,17 +23,70 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   await page.getByLabel('Ссылка на аудио',{exact:true}).fill('https://youtu.be/dQw4w9WgXcQ');await page.getByRole('button',{name:'Открыть',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('audio.music-audio')?.currentTime>.15);
   assert.equal(prepared[0].url,'https://www.youtube.com/watch?v=dQw4w9WgXcQ');assert.equal(await page.locator('iframe').count(),0);
-  if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();
-  await page.waitForFunction(()=>{const e=document.querySelector('.music-island');return e&&Math.abs(e.getBoundingClientRect().height-parseFloat(e.style.height))<1&&Math.abs(e.getBoundingClientRect().x-new DOMMatrixReadOnly(e.style.transform).m41)<1&&Math.abs(e.getBoundingClientRect().y-new DOMMatrixReadOnly(e.style.transform).m42)<1;});const panel=await page.locator('.music-island').boundingBox(),trigger=await page.locator('.music-nav').boundingBox();assert.ok(panel.height<320&&Math.abs(panel.y-trigger.y-trigger.height-10)<1,'Playing island follows the navbar trigger');assert.ok(panel.x>=12&&panel.x+panel.width<=width-12,'Island fits viewport');const offset=await page.locator('.music-nav').evaluate(e=>{const a=e.getBoundingClientRect(),b=e.closest('.header-inner').getBoundingClientRect();return Math.abs(a.y+a.height/2-b.y-b.height/2);});assert.ok(offset<.6,'Playing transport keeps navbar vertically centered');await page.screenshot({path:path.join(DIR,'music-island-playing-'+width+'.png')});
-  await page.getByRole('button',{name:'Свернуть музыкальный плеер',exact:true}).click();const before=await page.locator('audio').evaluate(a=>a.currentTime);await page.waitForTimeout(300);assert.ok(await page.locator('audio').evaluate((a,n)=>!a.paused&&a.currentTime>n,before),'Collapsed server audio keeps playing');
-  if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();
-  const slider=page.getByLabel('Позиция музыки в подробностях',{exact:true});await slider.fill('8');await page.waitForFunction(()=>document.querySelector('audio')?.currentTime>=7.9);
-  await page.getByRole('button',{name:'Пауза в подробностях',exact:true}).click();assert.equal(await page.locator('audio').evaluate(a=>a.paused),true);
-  await page.getByRole('button',{name:'Продолжить в подробностях',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('audio').paused);
-  await page.getByRole('button',{name:'Закрыть музыкальный плеер',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('audio'));assert.equal(closed.length,1,'Close releases backend capability');
-  await page.getByLabel('Ссылка на аудио',{exact:true}).fill('https://music.example/song.mp3');await page.getByRole('button',{name:'Открыть',exact:true}).click();await page.waitForFunction(()=>document.querySelector('audio.music-audio')?.currentTime>.15);assert.equal(remotePrepared,1);assert.ok(await page.locator('audio').evaluate(a=>new URL(a.currentSrc).origin===location.origin),'Remote file bytes come from Oracle');if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();await page.getByRole('button',{name:'Закрыть музыкальный плеер',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('audio'));await page.getByLabel('Ссылка на аудио',{exact:true}).fill('https://youtu.be/dQw4w9WgXcQ');
+  if(width<900){
+    if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();
+    await page.waitForFunction(()=>{const e=document.querySelector('.music-island');return e&&Math.abs(e.getBoundingClientRect().height-parseFloat(e.style.height))<1&&Math.abs(e.getBoundingClientRect().x-new DOMMatrixReadOnly(e.style.transform).m41)<1&&Math.abs(e.getBoundingClientRect().y-new DOMMatrixReadOnly(e.style.transform).m42)<1;});const panel=await page.locator('.music-island').boundingBox(),trigger=await page.locator('.music-nav').boundingBox();assert.ok(panel.height<320&&Math.abs(panel.y-trigger.y-trigger.height-10)<1,'Playing island follows the navbar trigger');assert.ok(panel.x>=12&&panel.x+panel.width<=width-12,'Island fits viewport');const offset=await page.locator('.music-nav').evaluate(e=>{const a=e.getBoundingClientRect(),b=e.closest('.header-inner').getBoundingClientRect();return Math.abs(a.y+a.height/2-b.y-b.height/2);});assert.ok(offset<.6,'Playing transport keeps navbar vertically centered');await page.screenshot({path:path.join(DIR,'music-island-playing-'+width+'.png')});
+    await page.getByRole('button',{name:'Свернуть музыкальный плеер',exact:true}).click();const before=await page.locator('audio').evaluate(a=>a.currentTime);await page.waitForTimeout(300);assert.ok(await page.locator('audio').evaluate((a,n)=>!a.paused&&a.currentTime>n,before),'Collapsed server audio keeps playing');
+    if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();
+    const slider=page.getByLabel('Позиция музыки в подробностях',{exact:true});await slider.fill('8');await page.waitForFunction(()=>document.querySelector('audio')?.currentTime>=7.9);
+    await page.getByRole('button',{name:'Пауза в подробностях',exact:true}).click();assert.equal(await page.locator('audio').evaluate(a=>a.paused),true);
+    await page.getByRole('button',{name:'Продолжить в подробностях',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('audio').paused);
+    await page.getByRole('button',{name:'Закрыть музыкальный плеер',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('audio'));assert.equal(closed.length,1,'Close releases backend capability');
+  }else{
+   // Desktop: expanded music is the navbar itself; no separate floating island.
+   await page.getByRole('button',{name:'Открыть музыкальный плеер',exact:true}).click();
+   await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor();
+   await page.waitForTimeout(540);
+   const full=await page.locator('.music-nav .music-bar').boundingBox(),header=await page.locator('.blossom-navbar .header-inner').boundingBox();
+   assert.equal(Math.round(full.height),Math.round(header.height),'Expanded transport fills navbar height');
+   assert.ok(full.width>=296&&full.width<header.width*.36,'Expanded transport occupies right quarter');
+   assert.ok(Math.abs(full.x+full.width-header.x-header.width)<2,'Expanded transport aligns with navbar right edge');
+   await page.locator('.music-nav .music-bar.is-nav-expanded').click({position:{x:130,y:8}});
+   await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor({state:'detached'});
+   const before=await page.locator('audio').evaluate(a=>a.currentTime);
+   await page.waitForTimeout(300);
+   assert.ok(await page.locator('audio').evaluate((a,n)=>!a.paused&&a.currentTime>n,before),'Collapsed navbar audio keeps playing');
+   await page.getByRole('button',{name:'Открыть музыкальный плеер',exact:true}).click();
+   const play=page.locator('.music-nav .music-full-play');await play.waitFor({state:'visible'});
+   const volumeBefore=await page.locator('audio').evaluate(a=>a.volume);
+   await play.hover();await page.mouse.wheel(0,-120);
+   await page.waitForFunction(v=>document.querySelector('audio')?.volume>v,volumeBefore);
+   const knob=await play.boundingBox();
+   await page.mouse.move(knob.x+knob.width/2,knob.y+knob.height/2);
+   await page.mouse.down();
+   await page.mouse.move(knob.x+knob.width/2+85,knob.y+knob.height/2,{steps:12});
+   await page.locator('.music-seek-surface').waitFor({state:'visible'});
+   const playBox=await play.boundingBox(),clockBox=await page.locator('.music-dot-matrix').boundingBox();
+   assert.ok(await play.evaluate(el=>parseFloat(getComputedStyle(el).width)>=46),'expanded Play is larger than the compact controller even during gesture scale');
+   assert.ok(clockBox.width<=60,'dot-matrix timestamp stays small');
+   assert.ok(Math.abs((playBox.x+playBox.width/2)-(clockBox.x+clockBox.width/2))<5,'dot-matrix time replaces Play at the same horizontal position');
+   assert.ok(await page.locator('.music-dot-matrix circle').count()>40,'seek time uses real dot-matrix glyphs');
+   assert.equal(await page.locator('.music-seek-marker').count(),1,'precise white seek divider is visible');
+   const during=await page.locator('audio').evaluate(a=>a.currentTime);
+   await page.mouse.up();
+   await page.waitForFunction(v=>document.querySelector('audio')?.currentTime>v+2,during);
+   await page.locator('.music-seek-surface').waitFor({state:'detached'});
+   await play.click();assert.equal(await page.locator('audio').evaluate(a=>a.paused),true,'Expanded play control pauses audio');
+   await play.click();await page.waitForFunction(()=>!document.querySelector('audio').paused);
+   await page.getByRole('button',{name:'Закрыть тестовую музыкальную очередь',exact:true}).click();
+   await page.waitForFunction(()=>!document.querySelector('audio'));
+   assert.equal(closed.length,1,'Closing the track releases backend capability');
+  }
+  await page.getByLabel('Ссылка на аудио',{exact:true}).fill('https://music.example/song.mp3');await page.getByRole('button',{name:'Открыть',exact:true}).click();await page.waitForFunction(()=>document.querySelector('audio.music-audio')?.currentTime>.15);assert.equal(remotePrepared,1);assert.ok(await page.locator('audio').evaluate(a=>new URL(a.currentSrc).origin===location.origin),'Remote file bytes come from Oracle');if(width<900){await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();await page.getByRole('button',{name:'Закрыть музыкальный плеер',exact:true}).click();}else await page.getByRole('button',{name:'Закрыть тестовую музыкальную очередь',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('audio'));await page.getByLabel('Ссылка на аудио',{exact:true}).fill('https://youtu.be/dQw4w9WgXcQ');
   failing=true;await page.getByRole('button',{name:'Открыть',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.music-dock-error')?.textContent);assert.equal(await page.locator('.music-panel').getAttribute('aria-hidden'),'true','Failure keeps the player minimized');assert.equal(await page.locator('iframe').count(),0);assert.equal(youtubeRequests,0,'No YouTube API, video or embed is loaded');
-  if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();await page.getByText('YouTube requires server verification',{exact:true}).waitFor();await page.getByText('Аудио через Oracle недоступно',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Продолжить в подробностях',exact:true}).isEnabled(),true,'Play remains an actionable server retry');const attempts=prepared.length;failureStatus=401;await page.getByRole('button',{name:'Продолжить в подробностях',exact:true}).click();await page.waitForFunction(n=>document.querySelector('.music-dock-error')?.textContent&&document.querySelector('.music-play')?.disabled===false,attempts);assert.equal(prepared.length,attempts+1,'Play retries Oracle');assert.equal(await page.locator('iframe').count(),0);
+  if(width<900){
+   if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();await page.getByText('YouTube requires server verification',{exact:true}).waitFor();await page.getByText('Аудио через Oracle недоступно',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Продолжить в подробностях',exact:true}).isEnabled(),true,'Play remains an actionable server retry');const attempts=prepared.length;failureStatus=401;await page.getByRole('button',{name:'Продолжить в подробностях',exact:true}).click();await page.waitForFunction(n=>document.querySelector('.music-dock-error')?.textContent&&document.querySelector('.music-play')?.disabled===false,attempts);assert.equal(prepared.length,attempts+1,'Play retries Oracle');assert.equal(await page.locator('iframe').count(),0);
+  }else{
+   await page.getByRole('button',{name:'Открыть музыкальный плеер',exact:true}).click();
+   await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor();
+   await page.locator('.music-nav .music-full-lyric').getByText('Проблема с аудио · повтори Play',{exact:true}).waitFor();
+   const play=page.locator('.music-nav .music-full-play');
+   assert.equal(await play.isEnabled(),true,'Expanded Play remains available for provider retry');
+   const attempts=prepared.length;failureStatus=401;await play.click();
+   await page.waitForFunction(n=>document.querySelector('.music-dock-error')?.textContent&&document.querySelector('.music-full-play')?.disabled===false,attempts);
+   assert.equal(prepared.length,attempts+1,'Expanded Play retries Oracle');
+   assert.equal(await page.locator('iframe').count(),0);
+  }
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await page.screenshot({path:path.join(DIR,'music-audio-'+width+'.png')});await page.close();console.log('PASS pasted YouTube URL, real audio decode/seek, collapsed playback, cleanup, compact errors and server retry at '+width+'px');
  }
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();for(const name of['music-audio-harness.html','music-audio-harness.jsx'])await fs.rm(path.join(DIR,name),{force:true});});

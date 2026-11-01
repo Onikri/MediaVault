@@ -1,62 +1,126 @@
-import {useCallback,useEffect,useRef,useState} from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
+import {useCallback,useEffect,useId,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ArrowUpRight,Clock,LoaderCircle,Search,X} from 'lucide-react';
 import {useGlobalSearch,SEARCH_KINDS} from '../../use-global-search.js';
 import {Poster} from '../../ImportParts.jsx';
 import './morph-search.css';
 
-const SPRING={type:'spring',stiffness:380,damping:28,mass:.8} as const;
-const RECENT_KEY='mediavault_search_recents_v1';
+/* MorphingSearchChips port: the original 56px glass bar, centered panel,
+   spring-grown glass surface, animated chips, recents and list cursor.
+   Live MediaVault catalog results remain available below the suggestions. */
+const ENTER={type:'spring',stiffness:380,damping:28,mass:.8} as const;
+const EXIT={type:'spring',stiffness:520,damping:40,mass:.6} as const;
+const SWAP={type:'spring',stiffness:420,damping:34,mass:.7} as const;
+const KEY='mediavault_search_recents_v1';
 const typeLabel=(kind:string)=>Object.fromEntries(SEARCH_KINDS)[kind]||'Сериал';
-const sameTerm=(a:string,b:string)=>a.trim().toLocaleLowerCase()===b.trim().toLocaleLowerCase();
-function searchGeometry(){
- if(typeof window==='undefined')return {width:600,seedWidth:112,seedHeight:40,x:0,y:-24};
- const width=Math.max(280,Math.min(620,window.innerWidth-24)),right=window.innerWidth<=640?12:24,top=window.innerWidth<=640?70:82;
- const trigger=document.querySelector('.blossom-navbar .header-search')?.getBoundingClientRect();
- return {width,seedWidth:trigger?.width||112,seedHeight:trigger?.height||40,
-  x:trigger?trigger.right-(window.innerWidth-right):0,y:trigger?trigger.top-top:-24};
+const same=(a:string,b:string)=>a.trim().toLocaleLowerCase()===b.trim().toLocaleLowerCase();
+function coordinates(){
+ const target=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();
+ const inner=document.querySelector('.blossom-navbar .header-inner') as HTMLElement|null;
+ const r=inner?.getBoundingClientRect();
+ const padding=inner?Math.max(parseFloat(getComputedStyle(inner).paddingLeft)||0,parseFloat(getComputedStyle(inner).paddingRight)||0):10;
+ const width=Math.min(340,Math.max(180,(r?.width??window.innerWidth-20)-2*padding-8));
+ const height=Math.min(44,(r?.height??58)-10);
+ const centre=r?r.left+r.width/2:window.innerWidth/2;
+ return {width,left:centre-width/2,top:r?r.top+(r.height-height)/2:(target?.top??18),height,seedWidth:target?.width??112,seedHeight:target?.height??38};
 }
-function Highlight({text,query}:{text:string;query:string}){
- const at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;
- return at<0?<>{text}</>:<>{text.slice(0,at)}<mark>{text.slice(at,at+query.length)}</mark>{text.slice(at+query.length)}</>;
-}
-export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any;onClose:()=>void;onChoose:(item:any)=>void;onBrowse:(query:string,kind:string)=>void}){
- const reduced=useReducedMotion(),[geometry]=useState(searchGeometry);
- const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[activeId,setActiveId]=useState<string|null>(null),[composing,setComposing]=useState(false),[closing,setClosing]=useState(false);
- const [recents,setRecents]=useState<string[]>(()=>{try{const stored=JSON.parse(localStorage.getItem(RECENT_KEY)||'[]');return Array.isArray(stored)?stored.filter((term):term is string=>typeof term==='string').slice(0,5):[];}catch{return [];}});
- const input=useRef<HTMLInputElement>(null),closeHandled=useRef(false);
- const state=useGlobalSearch(query,kind,service,composing),items=state.items.slice(0,24),index=Math.max(0,items.findIndex((x:any)=>x.id===activeId));
- const remember=useCallback((term:string)=>{const value=term.trim();if(!value)return;setRecents(old=>{const next=[value,...old.filter(x=>!sameTerm(x,value))].slice(0,5);try{localStorage.setItem(RECENT_KEY,JSON.stringify(next));}catch{}return next;});},[]);
- const forget=useCallback((term?:string)=>setRecents(old=>{const next=term?old.filter(x=>x!==term):[];try{localStorage.setItem(RECENT_KEY,JSON.stringify(next));}catch{}return next;}),[]);
- const close=useCallback(()=>{if(closeHandled.current)return;if(reduced){closeHandled.current=true;onClose();}else setClosing(true);},[onClose,reduced]);
- const choose=(item:any)=>{remember(query||item.title);onChoose(item);};
- const browse=()=>{remember(query);onBrowse(query,kind);};
- useEffect(()=>{if(closing)return;input.current?.focus({preventScroll:true});},[closing]);
- const start={opacity:0,width:geometry.seedWidth,height:geometry.seedHeight,x:geometry.x,y:geometry.y,borderRadius:28};
- const expanded={opacity:1,width:geometry.width,height:'auto',x:0,y:0,borderRadius:26};
- const transition=reduced?{duration:0}:SPRING;
- return <Dialog.Root open onOpenChange={next=>{if(!next)close();}}>
-  <Dialog.Portal forceMount>
-   <Dialog.Overlay className={'dialog-backdrop blossom-search-backdrop morph-search-backdrop'+(closing?' is-closing':'')}/>
-   <Dialog.Content asChild forceMount aria-describedby="blossomSearchHelp">
-    <motion.div className="search-dialog blossom-search-dialog morph-search-dialog" initial={reduced?expanded:start} animate={closing?{...start,transition:{type:'spring',stiffness:520,damping:40,mass:.6}}:expanded} transition={transition} style={{transformOrigin:'right top'}} onAnimationComplete={()=>{if(closing&&!closeHandled.current){closeHandled.current=true;onClose();}}}>
-     <Dialog.Title className="sr-only">Поиск в библиотеке</Dialog.Title>
-     <div className="morph-search-bar">
-      <Search size={20} aria-hidden="true"/>
-      <input ref={input} autoFocus autoComplete="off" maxLength={160} role="combobox" aria-expanded={items.length>0} aria-controls="blossomSearchHits" aria-activedescendant={items.length?'blossom-hit-'+index:undefined} value={query} aria-label="Поиск произведения" placeholder="Аниме, манга, книги, музыка…" onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)} onChange={event=>{setQuery(event.target.value);setActiveId(null);}} onKeyDown={event=>{if(event.nativeEvent.isComposing||composing)return;if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const next=activeId==null?0:Math.max(0,Math.min(items.length-1,index+(event.key==='ArrowDown'?1:-1)));setActiveId(items[next]?.id||null);document.getElementById('blossom-hit-'+next)?.scrollIntoView({block:'nearest'});}else if(event.key==='Enter'){event.preventDefault();if(items[index])choose(items[index]);else if(query.trim().length>=2)browse();}}}/>
-      {state.loading?<LoaderCircle className="morph-search-spinner" size={17} aria-label="Поиск выполняется"/>:query?<button type="button" aria-label="Очистить запрос" className="morph-search-clear" onClick={()=>{setQuery('');setActiveId(null);input.current?.focus();}}><X size={16}/></button>:<kbd>Ctrl K</kbd>}
-      <Dialog.Close asChild><button className="morph-search-close" type="button" aria-label="Закрыть поиск" onClick={event=>{event.preventDefault();close();}}><X size={18}/></button></Dialog.Close>
+function Highlight({text,query}:{text:string,query:string}){const at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;return at<0?<>{text}</>:<>{text.slice(0,at)}<strong>{text.slice(at,at+query.length)}</strong>{text.slice(at+query.length)}</>;}
+export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,onClose:()=>void,onChoose:(item:any)=>void,onBrowse:(query:string,kind:string)=>void}){
+ const reduce=useReducedMotion(),[geometry,setGeometry]=useState(coordinates),id=useId();
+ const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[composing,setComposing]=useState(false),[closing,setClosing]=useState(false);
+ const [chips,setChips]=useState<string[]>([]),[marked,setMarked]=useState<string|null>(null),[activeId,setActiveId]=useState<string|null>(null),[rowCursor,setRowCursor]=useState(0),[panelFloor,setPanelFloor]=useState(0);
+ const [recents,setRecents]=useState<string[]>(()=>{try{const saved=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(saved)?saved.filter((v):v is string=>typeof v==='string').slice(0,5):[];}catch{return[];}});
+ const input=useRef<HTMLInputElement>(null),finished=useRef(false),panelRows=useRef<HTMLDivElement>(null);
+ const searchText=query.trim()||chips.at(-1)||'';
+ const state=useGlobalSearch(searchText,kind,service,composing),items=state.items.slice(0,24),index=Math.max(0,items.findIndex((x:any)=>x.id===activeId));
+ const suggestions=useMemo(()=>!query.trim()?recents.map(label=>({id:'recent:'+label,label,kind:'recent'})): [
+  {id:'query:'+query.trim(),label:query.trim(),kind:'query'},
+  ...recents.filter(v=>v.toLowerCase().includes(query.trim().toLowerCase())&&!same(v,query)).slice(0,5).map(label=>({id:'recent:'+label,label,kind:'recent'}))
+ ],[recents,query]);
+ const persist=useCallback((next:string[])=>{setRecents(next);try{localStorage.setItem(KEY,JSON.stringify(next));}catch{}},[]);
+ const remember=useCallback((term:string)=>{const value=term.trim();if(value)persist([value,...recents.filter(v=>!same(value,v))].slice(0,5));},[recents,persist]);
+ const close=useCallback(()=>{if(finished.current||closing)return;if(reduce){finished.current=true;onClose();}else setClosing(true);},[closing,onClose,reduce]);
+ const choose=(item:any)=>{remember(searchText||item.title);onChoose(item);};
+ const browse=()=>{if(searchText)remember(searchText);onBrowse(searchText,kind);};
+ const addChip=(text:string)=>{const v=text.trim();if(!v)return;setChips(old=>old.some(c=>same(c,v))?old:[...old,v]);setQuery('');setMarked(null);remember(v);setRowCursor(0);input.current?.focus();};
+ const removeChip=(text:string)=>{setChips(old=>old.filter(c=>c!==text));setMarked(null);input.current?.focus();};
+ const forget=(text?:string)=>persist(text?recents.filter(v=>v!==text):[]);
+ useLayoutEffect(()=>{
+  const header=document.querySelector('.blossom-navbar');
+  header?.classList.add('is-search-open');
+  dispatchEvent(new Event('mediavault:search-open'));
+  const update=()=>setGeometry(previous=>{const next=coordinates();return Object.keys(next).every(key=>previous[key as keyof typeof previous]===next[key as keyof typeof next])?previous:next;});
+  update();
+  const observer=new ResizeObserver(update);
+  const inner=header?.querySelector('.header-inner');if(inner)observer.observe(inner);
+  window.addEventListener('resize',update);
+  input.current?.focus({preventScroll:true});
+  return()=>{observer.disconnect();window.removeEventListener('resize',update);header?.classList.remove('is-search-open');dispatchEvent(new Event('mediavault:search-close'));};
+ },[]);
+ useEffect(()=>{if(!closing)return;const t=setTimeout(()=>{if(!finished.current){finished.current=true;onClose();}},450);return()=>clearTimeout(t);},[closing,onClose]);
+ useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key!=='Escape'||event.isComposing)return;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();if(marked){setMarked(null);return;}if(query){setQuery('');setActiveId(null);return;}close();};document.addEventListener('keydown',escape,true);return()=>document.removeEventListener('keydown',escape,true);},[marked,query,close]);
+ useEffect(()=>{if(closing)return;const handler=(event:PointerEvent)=>{const root=document.querySelector('.morph-search-dialog');const trigger=document.querySelector('.header-center-search');if(root?.contains(event.target as Node)||trigger?.contains(event.target as Node))return;close();};document.addEventListener('pointerdown',handler,true);return()=>document.removeEventListener('pointerdown',handler,true);},[closing,close]);
+ useEffect(()=>{if(!panelRows.current||closing)return;const update=()=>setPanelFloor(old=>Math.max(old,panelRows.current?.offsetHeight||0));update();const ro=new ResizeObserver(update);ro.observe(panelRows.current);return()=>ro.disconnect();},[query,kind,closing,items.length]);
+ const focusField=(event:React.PointerEvent)=>{if((event.target as Element).closest('button,input,a'))return;event.preventDefault();input.current?.focus();};
+ const onInputKey=(event:React.KeyboardEvent<HTMLInputElement>)=>{
+  if(composing||event.nativeEvent.isComposing||event.keyCode===229)return;
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();if(marked){setMarked(null);return;}if(query){setQuery('');return;}close();return;}
+  if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();if(items.length){const next=activeId==null?0:Math.max(0,Math.min(items.length-1,index+(event.key==='ArrowDown'?1:-1)));setActiveId(items[next]?.id||null);document.getElementById(id+'-hit-'+next)?.scrollIntoView({block:'nearest'});}else setRowCursor(x=>(x+(event.key==='ArrowDown'?1:-1)+suggestions.length)%Math.max(1,suggestions.length));return;}
+  if(event.key==='Enter'){event.preventDefault();if(items[index])choose(items[index]);else if(query.trim())addChip(query);else if(suggestions[rowCursor])addChip(suggestions[rowCursor].label);return;}
+  if(event.key==='Backspace'&&event.currentTarget.selectionStart===0&&event.currentTarget.selectionEnd===0&&!query&&chips.length){event.preventDefault();const last=chips.at(-1)!;if(marked===last)removeChip(last);else setMarked(last);return;}
+  if(event.key==='ArrowLeft'&&event.currentTarget.selectionStart===0&&!query&&chips.length){event.preventDefault();setMarked(chips.at(-1)!);}
+ };
+ return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{opacity:0,y:-2}} animate={{opacity:closing?0:1,y:closing?-4:0}} transition={{duration:reduce?0:.16}}>
+  <motion.div className="morph-search-bar" onPointerDown={focusField}
+   initial={reduce?false:{width:geometry.seedWidth,height:geometry.seedHeight}}
+   animate={{width:closing?geometry.seedWidth:'100%',height:closing?geometry.seedHeight:geometry.height}}
+   transition={reduce?{duration:0}:(closing?EXIT:ENTER)}>
+   <Search size={20} aria-hidden="true"/>
+   <div className="morph-search-chips">
+    <AnimatePresence initial={false} mode="popLayout">
+     {chips.map(chip=><motion.span key={chip} layout="position" className={'morph-search-token'+(marked===chip?' is-marked':'')}
+      initial={reduce?false:{opacity:0,scale:.6,filter:'blur(4px)'}} animate={{opacity:1,scale:1,filter:'blur(0px)'}} exit={{opacity:0,scale:.6,filter:'blur(4px)'}} transition={reduce?{duration:0}:SWAP}><span title={chip}>{chip}</span><button type="button" aria-label={'Удалить фильтр '+chip} onClick={()=>removeChip(chip)}><X size={13}/></button></motion.span>)}
+    </AnimatePresence>
+   </div>
+   <motion.input ref={input} layout="position" transition={reduce?{duration:0}:SWAP} role="combobox" type="text" autoComplete="off" spellCheck={false} enterKeyHint="search" maxLength={160}
+     aria-label="Поиск произведения" aria-expanded={!closing} aria-controls={id+'-suggestions'} aria-autocomplete="list"
+     value={query} placeholder="Поиск" onChange={e=>{setQuery(e.target.value);setActiveId(null);setRowCursor(0);}} onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)}
+     onKeyDown={onInputKey}/>
+   {state.loading?<LoaderCircle className="morph-search-spinner" size={18} aria-label="Поиск выполняется"/>:null}
+   {(query||chips.length)>0&&<button className="morph-search-clear" type="button" aria-label="Очистить запрос" onClick={()=>{setQuery('');setChips([]);input.current?.focus();}}><X size={17}/></button>}
+   <button className="morph-search-close" type="button" aria-label="Закрыть поиск" onClick={close}><X size={18}/></button>
+  </motion.div>
+  <AnimatePresence>
+   {!closing&&<motion.div key="panel" className="morph-search-panel" initial={reduce?false:{width:112,height:40,y:-28,opacity:0}} animate={{width:'100%',height:'auto',y:0,opacity:1}} exit={reduce?{opacity:0}:{width:112,height:40,y:-28,opacity:0,transition:EXIT}} transition={reduce?{duration:0}:ENTER}>
+    <motion.div className="morph-search-panel-content" initial={reduce?false:{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:reduce?0:.18,delay:reduce?0:.12}}>
+     <div className="morph-search-panel-heading"><span>{query.trim()?'Suggestions':'Recent'}</span>{!query.trim()&&recents.length>0&&<button type="button" onClick={()=>forget()}>Clear</button>}</div>
+     <div className="morph-search-panel-rows" ref={panelRows} style={{minHeight:panelFloor||undefined}}>
+      <div id={id+'-suggestions'} role="group" aria-label={query.trim()?'Подсказки':'Недавние запросы'} className="morph-search-suggestion-list">
+       {suggestions.map((row,i)=><motion.button key={row.id} type="button" aria-current={rowCursor===i?'true':undefined}
+        className={'morph-search-suggestion'+(rowCursor===i?' is-selected':'')}
+        onMouseEnter={()=>setRowCursor(i)} onClick={()=>row.kind==='recent'?(setQuery(row.label),input.current?.focus()):addChip(row.label)}>
+        {rowCursor===i&&<motion.span layoutId="morph-search-cursor" className="morph-search-suggestion-highlight" transition={SWAP}/>}
+        {row.kind==='recent'?<Clock size={16}/>:<Search size={16}/>}<span><Highlight text={row.label} query={query.trim()}/></span>
+        {row.kind==='recent'&&<span className="morph-search-remove-recent" role="button" tabIndex={-1} aria-label={'Удалить запрос '+row.label} onClick={e=>{e.stopPropagation();forget(row.label);}}><X size={14}/></span>}
+       </motion.button>)}
+       {!suggestions.length&&!query.trim()&&<p className="morph-search-empty">Начни вводить название — поиск по каталогам MediaVault.</p>}
+      </div>
+      <div className="morph-search-filters" role="group" aria-label="Где искать">{SEARCH_KINDS.map(([k,label])=><button key={k} className="morph-search-chip" type="button" aria-pressed={kind===k} onClick={()=>{setKind(k);setActiveId(null);}}>{kind===k&&<motion.span className="morph-search-chip-active" layoutId="morph-search-active-category" transition={SWAP}/>}<span>{label}</span></button>)}</div>
+      {searchText.length>=2&&<div className="morph-search-results">
+       <div className="morph-search-panel-heading"><span>Результаты поиска</span>{items.length>0&&<span>{items.length}{state.loading?' +':''}</span>}</div>
+       <div id="blossomSearchHits" className="morph-search-results-list" role="listbox" aria-label="Результаты поиска" aria-busy={state.loading}>
+        <AnimatePresence initial={false}>{items.map((item:any,i:number)=><motion.button key={item.id} id={id+'-hit-'+i} role="option" aria-selected={index===i} type="button" className={'morph-search-result'+(index===i?' is-active':'')} onMouseEnter={()=>setActiveId(item.id)} onClick={()=>choose(item)} initial={reduce?false:{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}} transition={{duration:reduce?0:.18,delay:reduce?0:Math.min(i,5)*.025}}>
+         <span className="morph-search-poster"><Poster item={item}/></span><span className="morph-search-result-meta"><strong><Highlight text={item.title} query={searchText}/></strong><small>{typeLabel(item.kind)}{[item.year,item.authors?.join(', ')||item.artists?.join(', '),item.format].filter(Boolean).map(v=>' · '+v)}</small></span><ArrowUpRight size={17}/>
+        </motion.button>)}</AnimatePresence>
+        {!state.loading&&!items.length&&<p className="morph-search-empty" role="status">Совпадений нет. Попробуй другое название.</p>}
+        {state.loading&&<p className="morph-search-progress" role="status">Каталоги дополняют результаты…</p>}
+       </div>
+      </div>}
      </div>
-     <div className="morph-search-filters" role="group" aria-label="Где искать">{SEARCH_KINDS.map(([id,label])=><button key={id} type="button" className="morph-search-chip" aria-pressed={kind===id} onClick={()=>{setKind(id);setActiveId(null);}}>{kind===id&&<motion.span layoutId="morph-search-active-category" className="morph-search-chip-active" transition={transition}/>}<span>{label}</span></button>)}</div>
-     <div className="morph-search-list" id="blossomSearchHits" role="listbox" aria-label="Результаты поиска" aria-busy={state.loading}>
-      {!query.trim()&&<><div className="morph-search-section"><span>Недавние запросы</span>{recents.length>0&&<button type="button" onClick={()=>forget()}>Очистить</button>}</div>{recents.length>0?recents.map(term=><div className="morph-search-recent" key={term}><button type="button" onClick={()=>{setQuery(term);setActiveId(null);input.current?.focus();}}><Clock size={15}/><span>{term}</span></button><button type="button" aria-label={'Удалить запрос '+term} onClick={()=>forget(term)}><X size={14}/></button></div>):<p className="morph-search-empty">Введи минимум два символа — поиск работает по онлайн-каталогам MediaVault.</p>}</>}
-      {query.trim()&&query.trim().length<2&&<p className="morph-search-empty">Введи хотя бы два символа.</p>}
-      {query.trim().length>=2&&<><div className="morph-search-section"><span>{state.loading?'Ищем материалы…':'Результаты поиска'}</span>{items.length>0&&<span>{items.length}{state.loading?' +':''}</span>}</div><AnimatePresence initial={false}>{items.map((item:any,i:number)=><motion.button key={item.id} type="button" role="option" aria-selected={index===i} id={'blossom-hit-'+i} onMouseEnter={()=>setActiveId(item.id)} onClick={()=>choose(item)} className={'morph-search-result'+(index===i?' is-active':'')} initial={reduced?false:{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}} transition={{duration:reduced?0:.2,delay:reduced?0:Math.min(i,5)*.025}}><span className="morph-search-poster"><Poster item={item}/></span><span className="morph-search-result-meta"><strong><Highlight text={item.title} query={query.trim()}/></strong><small><b>{typeLabel(item.kind)}</b>{[item.year,item.authors?.join(', ')||item.artists?.join(', '),item.format].filter(Boolean).map(v=>' · '+v)}</small></span><ArrowUpRight size={17}/></motion.button>)}</AnimatePresence>{!state.loading&&!items.length&&<p className="morph-search-empty" role="status">Совпадений нет. Попробуй другое название.</p>}{state.loading&&<p className="morph-search-progress" role="status">Каталоги дополняют результаты…</p>}</>}
-     </div>
-     <footer className="morph-search-footer" id="blossomSearchHelp"><span><kbd>↑ ↓</kbd> Выбрать · <kbd>↵</kbd> Открыть · <kbd>Esc</kbd> Закрыть</span>{query.trim().length>=2&&<button type="button" onClick={browse}>Полный поиск <ArrowUpRight size={13}/></button>}</footer>
+     <footer className="morph-search-footer" id={id+'-help'}><span className="morph-search-footer-caption">Поиск по медиатеке</span>{searchText.length>=2&&<button type="button" onClick={browse}>Полный поиск <ArrowUpRight size={13}/></button>}</footer>
     </motion.div>
-   </Dialog.Content>
-  </Dialog.Portal>
- </Dialog.Root>;
+   </motion.div>}
+  </AnimatePresence>
+ </motion.div>,document.body);
 }

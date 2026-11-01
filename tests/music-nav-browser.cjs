@@ -20,12 +20,14 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   await page.getByRole('button',{name:'Слушать Otonoke',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.music-dock-error')?.textContent);assert.equal(await page.locator('.music-panel').getAttribute('aria-hidden'),'true');assert.equal(await page.locator('iframe').count(),0);assert.equal(providerRequests,0);
   if(width>=900){
    const nav=page.locator('.music-nav.has-track'),before=await nav.boundingBox();
+   const backgroundBefore=await page.locator('.music-nav .music-bar').evaluate(el=>getComputedStyle(el).backgroundColor);
    await page.locator('.music-nav .music-bar').hover();
    await page.waitForTimeout(430);
    const after=await nav.boundingBox(),island=await page.locator('.music-nav .music-bar').boundingBox();
    assert.equal(Math.round(before.width),Math.round(after.width),'hover must not reflow navbar');
    assert.equal(Math.round(island.height),Math.round(before.height),'music island stays in one row');
    assert.ok(island.width>before.width+70,'music island expands only horizontally');
+   assert.equal(await page.locator('.music-nav .music-bar').evaluate(el=>getComputedStyle(el).backgroundColor),backgroundBefore,'hover must not change player color');
    assert.equal(await page.locator('.music-nav .music-dock-title small').textContent(),'Creepy Nuts');
    assert.ok(await page.locator('.music-bar-transport .music-dock-timeline').isVisible(),'timeline replaces song metadata on hover');
    const knob=page.getByRole('slider',{name:'Громкость музыки в шапке'});
@@ -40,10 +42,27 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    const diagnostic=await page.locator('.music-nav .music-bar').evaluate(el=>({className:el.className,width:getComputedStyle(el).width,focus:document.activeElement?.getAttribute('aria-label'),hover:el.matches(':hover')}));
    assert.equal(Math.round(closed.width),Math.round(before.width),'island collapses after pointer leaves: '+JSON.stringify(diagnostic));
    assert.equal(Math.round(closed.height),Math.round(before.height),'island never grows vertically');
+   await page.locator('.music-nav .music-disc').first().click();
+   await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor();
+   await page.waitForTimeout(540);
+   const full=await page.locator('.music-nav .music-bar').boundingBox(),header=await page.locator('header').boundingBox();
+   assert.ok(full.width>=296,'expanded island becomes approximately the right quarter of navbar');
+   assert.equal(Math.round(full.height),Math.round(header.height),'expanded island fills navbar height');
+   assert.ok(Math.abs(full.x+full.width-header.x-header.width)<2,'expanded island touches right edge of navbar');
+   assert.equal(await page.locator('.music-bar-full').getAttribute('aria-hidden'),'false');
+   await page.locator('.music-bar-full .music-full-copy').click({force:true});
+   await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor({state:'detached'});
   }else assert.equal(await page.locator('.music-nav>.music-bar').isVisible(),false,'mobile navbar uses the icon');
-  if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();await page.getByText('Подключи сервер Oracle в профиле для воспроизведения музыки.',{exact:true}).waitFor();
-  await page.getByRole('button',{name:'Музыкальные аккаунты и плейлисты',exact:true}).click();await page.getByRole('combobox',{name:'Музыкальная платформа',exact:true}).selectOption('spotify');await page.getByText('Приложение Spotify',{exact:true}).click();await page.getByRole('textbox',{name:'Spotify Client ID',exact:true}).waitFor();
-  assert.equal(await page.locator('input[type=password]').count(),0);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
+  if(width<900){
+   await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();
+   await page.getByText('Подключи сервер Oracle в профиле для воспроизведения музыки.',{exact:true}).waitFor();
+   await page.getByRole('button',{name:'Музыкальные аккаунты и плейлисты',exact:true}).click();
+   await page.getByRole('combobox',{name:'Музыкальная платформа',exact:true}).selectOption('spotify');
+   await page.getByText('Приложение Spotify',{exact:true}).click();
+   await page.getByRole('textbox',{name:'Spotify Client ID',exact:true}).waitFor();
+   assert.equal(await page.locator('input[type=password]').count(),0);
+  }
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
   await page.screenshot({path:path.join(DIR,'music-nav-'+width+'.png')});await context.close();console.log('PASS minimized navbar music, no provider widget, server requirement and configured-account UI at '+width+'px');
  }
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();for(const f of['music-nav-harness.html','music-nav-harness.jsx'])await fs.rm(path.join(DIR,f),{force:true});});
