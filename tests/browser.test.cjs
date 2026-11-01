@@ -211,7 +211,10 @@ async function main() {
     return respond({detail:'Not found'},404);
   });
   await navigateApp(owner,'Библиотека');
-  await owner.locator('.import-settings-trigger').click();
+  // Connection settings live in Profile rather than taking a slot in the navbar.
+  assert.equal(await owner.locator('.blossom-navbar .import-settings-trigger').count(),0,'navbar has no connection icon');
+  await owner.locator('#profileBtn').click();
+  await owner.locator('.connection-settings-card .import-settings-trigger').click();
   await owner.locator('#importServer').fill('https://import.example.com');
   await owner.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
   await owner.getByText('Фоновое сохранение подключено',{exact:true}).waitFor();
@@ -224,6 +227,7 @@ async function main() {
   assert.deepEqual(googleConfiguration,{client_id:publicClientId,client_secret:fixtureClientSecret});
   assert.ok(!(await owner.evaluate(()=>JSON.stringify({...localStorage})) ).includes(fixtureClientSecret),'Private Google settings never enter browser storage');
   await owner.getByRole('button',{name:'Закрыть настройки импорта'}).click();
+  await navigateApp(owner,'Библиотека');
   await owner.getByRole('tab',{name:'По ссылке',exact:true}).click();await owner.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await owner.locator('#streamUrl').fill('https://source.example.com/season');
   await owner.getByRole('button',{name:'Проверить',exact:true}).click();
