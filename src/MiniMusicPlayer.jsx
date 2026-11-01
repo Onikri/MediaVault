@@ -106,7 +106,7 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
   <button ref={circle} className="music-full-play" aria-label={playing?'Пауза музыки':'Продолжить музыку'} disabled={!canPlay} onPointerDown={onCircleDown} onPointerMove={onCircleMove} onPointerUp={onCircleUp} onPointerCancel={onCircleUp} onClick={()=>{if(circleSkipClick.current){circleSkipClick.current=false;return;}toggle();}} style={{'--volume-percent':Math.round(volume*100)+'%'}}>
    <span className="music-full-ring" aria-hidden="true"/>{playing?<Pause size={19}/>:<Play size={19}/>}
   </button>
-  <div className="music-full-copy"><span className="music-full-title">{displayTitle}</span><strong className="music-full-lyric" aria-live="off">{activeLyric}</strong></div>
+  <div className="music-full-copy"><span className="music-full-title">{displayTitle}</span><strong className="music-full-lyric" aria-live="off">{error?'Аудио через Oracle недоступно':activeLyric}</strong></div>
   <button className="music-full-next" aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={21}/></button>
  </div>
 </div>:null;
