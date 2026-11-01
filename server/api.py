@@ -80,8 +80,10 @@ def google_identity(token):
         if user.get("email_verified") is not True or not user.get("email") or not user.get("sub"):
             raise HTTPException(403, "Google не подтвердил аккаунт.")
         return user
-    except (requests.RequestException, ValueError):
-        raise HTTPException(401, "Google не подтвердил вход. Подключи аккаунт на сайте заново.") from None
+    except (requests.RequestException, ValueError) as cause:
+        if getattr(getattr(cause, 'response', None), 'status_code', None) in {401, 403}:
+            raise HTTPException(401, "Google не подтвердил вход. Подключи аккаунт на сайте заново.") from None
+        raise HTTPException(503, "Google временно не подтвердил вход. Повтори немного позже.") from None
 
 
 def google_user(token):

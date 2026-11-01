@@ -58,7 +58,7 @@ async function userFromToken(token){
 }
 
 function createController(get,patch){
-  let mounted=false,epoch=0,tokenTimer=null,toastTimer=null,worker=null,registration=null,salt=null,serverKey=null,restoring=null;
+  let mounted=false,epoch=0,tokenTimer=null,toastTimer=null,worker=null,registration=null,salt=null,serverKey=null,restoring=null,reconnectRequired=false;
   const tokenAlive=()=>!!get().token&&Date.now()<get().tokenExpiresAt;
   const libraryStatus=()=>get().catalog?
     (get().admin?"Администратор":"Зритель")+" · библиотека открыта":
@@ -88,12 +88,21 @@ function createController(get,patch){
     toast(cause?.message||String(cause),true);
     console.error(cause);
   }
+  function renewalFailed(cause,expectedToken){
+    if(cause?.name==='AbortError')return;
+    if(cause?.status===401||cause?.status===403){reconnectRequired=true;expireDrive(expectedToken);patch({deviceError:cause.message,remembered:false});return;}
+    // A timeout/offline VM is not a revoked Google grant. Keep the profile,
+    // signing key and any still-valid token; retry without a Google popup.
+    patch({deviceError:'Временный сбой подключения. Вход будет восстановлен автоматически.'});
+    clearTimeout(tokenTimer);const expected=epoch;
+    tokenTimer=setTimeout(()=>{if(expected!==epoch||!mounted||!privacyPreferences().remember)return;if(!get().user&&!get().busy)restoreLogin();else renewSession().catch(error=>renewalFailed(error,expectedToken));},15000);
+  }
   function scheduleExpiry(){
     clearTimeout(tokenTimer);
     const current=get();
     if(!current.token)return;
     tokenTimer=setTimeout(()=>{
-      if(privacyPreferences().remember)renewSession().catch(()=>expireDrive(current.token));
+      if(privacyPreferences().remember)renewSession().catch(cause=>renewalFailed(cause,current.token));
       else expireDrive(current.token);
     },Math.max(privacyPreferences().remember?5000:0,current.tokenExpiresAt-Date.now()-(privacyPreferences().remember?120000:15000)));
   }
@@ -554,7 +563,7 @@ function createController(get,patch){
     const expected=epoch;
     await rememberGoogleSession(server,driveToken(),get().user);
     if(expected!==epoch||!privacyPreferences().remember){await forgetGoogleSession().catch(()=>{});throw cancelled();}
-    patch({remembered:true,deviceError:''});
+    reconnectRequired=false;patch({remembered:true,deviceError:''});
     await saveTrustedCurrent();return true;
   }
   async function rememberAccount(){return run('remember',async()=>{savePrivacyPreferences(true);patch({remembering:true});return rememberAccountInternal();});}
@@ -562,10 +571,10 @@ function createController(get,patch){
     if(restoring)return restoring;
     const expected=epoch;
     restoring=(async()=>{
-      const result=await restoreGoogleSession();if(!result)throw Error('На этом устройстве пока не сохранён вход.');
+      const result=await restoreGoogleSession();if(!result)throw Object.assign(Error('На этом устройстве пока не сохранён вход.'),{status:401});
       const user=await userFromToken(result.access_token);assertEpoch(expected);
       if(get().user&&user.sub!==get().user.sub)throw Error('Сохранён другой аккаунт. Войди через Google.');
-      patch({user,admin:(await hashEmail(user.email))===configuration().adminEmailSha256,remembered:true,deviceError:''});
+      reconnectRequired=false;patch({user,admin:(await hashEmail(user.email))===configuration().adminEmailSha256,remembered:true,deviceError:''});
       acceptDriveToken(result);await syncWorker();return true;
     })();
     try{return await restoring;}finally{restoring=null;}
@@ -575,7 +584,7 @@ function createController(get,patch){
     return run('restore',async expected=>{
       patch({restoring:true});
       try{await renewSession();await discoverLibrary(expected);await tryTrustedLibrary(expected);return true;}
-      catch(cause){if(expected===epoch)patch({deviceError:cause.message||'Не удалось открыть сохранённую библиотеку. Введи секретную фразу один раз.'});return false;}
+      catch(cause){if(expected===epoch){patch({deviceError:cause.message||'Не удалось открыть сохранённую библиотеку. Введи секретную фразу один раз.'});if(cause?.status===401||cause?.status===403)reconnectRequired=true;else renewalFailed(cause);}return false;}
       finally{if(expected===epoch)patch({restoring:false});}
     });
   }
@@ -589,7 +598,7 @@ function createController(get,patch){
       if(!payload&&get().token&&!tokenAlive())expireDrive();
     }
     if(event.data?.type==="DRIVE_AUTH_REQUIRED"){
-      if(privacyPreferences().remember)renewSession().catch(()=>expireDrive());else expireDrive();
+      if(privacyPreferences().remember)renewSession().catch(cause=>renewalFailed(cause));else expireDrive();
     }
   }
   function onControllerChange(){
@@ -597,7 +606,7 @@ function createController(get,patch){
     patch({workerReady:false});
     if(workerSession())syncWorker().catch(error);
   }
-  function onFocus(){if(get().token&&!tokenAlive()){if(privacyPreferences().remember)renewSession().catch(()=>expireDrive());else expireDrive();}}
+  function onFocus(){if(get().busy)return;if(privacyPreferences().remember){if(!reconnectRequired&&(!get().token||!tokenAlive())){if(!get().user&&!get().busy)restoreLogin();else renewSession().catch(cause=>renewalFailed(cause));}}else if(get().token&&!tokenAlive())expireDrive();}
   function mount(){
     mounted=true;
     navigator.serviceWorker?.addEventListener("message",onMessage);

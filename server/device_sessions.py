@@ -92,6 +92,20 @@ def install(app, api):
             result['url'] = api.oauth_url(user['sub'], device_id=identity, readonly=not admin)
         return result
 
+    @app.post('/devices/reconnect')
+    def reconnect(body: Device, authorization: str = Header(default='')):
+        if not authorization.startswith('Bearer '):
+            raise HTTPException(401, 'Сначала войди через Google.')
+        user = api.google_identity(authorization[7:])
+        value = api.store.setting('device:' + body.id)
+        if not value or value.get('sub') != user['sub']:
+            raise HTTPException(403, 'Это устройство не принадлежит аккаунту.')
+        # Re-consent repairs a revoked grant on the same signing key. Never
+        # allocate another device merely because its Google grant expired.
+        url = api.oauth_url(user['sub'], device_id=body.id, readonly=not value.get('admin'))
+        api.store.setting('device:' + body.id, {**value, 'ready': False, 'expires': time.time() + 600})
+        return {'id': body.id, 'ready': False, 'url': url}
+
     @app.post('/devices/challenge')
     def challenge(body: Device):
         device(body.id)
@@ -114,14 +128,20 @@ def install(app, api):
         from google.auth.transport.requests import Request
         credentials = Credentials(token=None, refresh_token=saved['refresh_token'], token_uri='https://oauth2.googleapis.com/token',
                                   client_id=api.CLIENT_ID, client_secret=api.client_secret())
+        from google.auth.exceptions import RefreshError
         try:
             transport = Request()
             credentials.refresh(lambda *args, **kwargs: transport(*args, **{**kwargs, 'timeout': 12}))
-            user = api.google_identity(credentials.token)
-            if user['sub'] != value['sub']:
-                raise ValueError()
+        except RefreshError as cause:
+            revoked = any(isinstance(arg, dict) and arg.get('error') == 'invalid_grant' for arg in cause.args)
+            if revoked:
+                raise HTTPException(401, 'Google отозвал сохранённый вход. Подключи аккаунт ещё раз.') from None
+            raise HTTPException(503, 'Google временно не обновил вход. Повторим подключение автоматически.') from None
         except Exception:
-            raise HTTPException(401, 'Google отозвал сохранённый вход. Подключи аккаунт ещё раз.') from None
+            raise HTTPException(503, 'Не удалось связаться с Google. Повторим подключение автоматически.') from None
+        user = api.google_identity(credentials.token)
+        if user['sub'] != value['sub']:
+            raise HTTPException(401, 'Сохранён другой аккаунт. Войди через Google.')
         scopes = saved.get('scope') or ('openid email profile https://www.googleapis.com/auth/drive' if value.get('admin') else 'openid email profile https://www.googleapis.com/auth/drive.readonly')
         return {'access_token': credentials.token, 'expires_in': 3500, 'scope': scopes, 'user': user}
 

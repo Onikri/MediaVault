@@ -87,3 +87,27 @@ class DeviceSessions(unittest.TestCase):
     def test_expired_device_requires_new_google_login(self):
         identity=self.register();value=api.store.setting('device:'+identity);value['expires']=0;api.store.setting('device:'+identity,value)
         self.assertEqual(self.client.post('/devices/challenge',json={'id':identity}).status_code,401)
+
+    def test_reconnect_repairs_same_device_even_at_limit_without_replacing_signing_key(self):
+        identities=[self.register() for _ in range(10)];identity=identities[-1]
+        before=api.store.setting('device:'+identity)
+        response=self.client.post('/devices/reconnect',json={'id':identity},headers={'Authorization':'Bearer valid-google-login'})
+        self.assertEqual(response.status_code,200,response.text);self.assertEqual(response.json()['id'],identity)
+        self.assertIn('accounts.google.com',response.json()['url']);self.assertFalse(response.json()['ready'])
+        self.assertEqual(api.store.setting('device:'+identity)['key'],before['key'])
+        self.assertEqual(api.store.setting('device-index:'+self.identity['sub'])['ids'],identities)
+
+    def test_reconnect_requires_live_google_identity_and_matching_account(self):
+        identity=self.register()
+        self.assertEqual(self.client.post('/devices/reconnect',json={'id':identity}).status_code,401)
+        self.identity={**self.identity,'sub':'someone-else'}
+        self.assertEqual(self.client.post('/devices/reconnect',json={'id':identity},headers={'Authorization':'Bearer another-user'}).status_code,403)
+
+    def test_transport_outages_are_retryable_but_revoked_grants_require_consent(self):
+        from google.auth.exceptions import RefreshError,TransportError
+        identity=self.register()
+        for cause,expected in [(TransportError('offline'),503),(RefreshError('revoked',{'error':'invalid_grant'}),401),(RefreshError('temporary',{'error':'temporarily_unavailable'},retryable=True),503)]:
+            with patch('google.oauth2.credentials.Credentials.refresh',side_effect=cause):
+                response=self.client.post('/devices/restore',json=self.proof(identity))
+            self.assertEqual(response.status_code,expected,response.text)
+            self.assertTrue(api.store.setting('device:'+identity)['ready'])

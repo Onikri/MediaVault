@@ -14,7 +14,12 @@ export async function rememberGoogleSession(server,token,user){
   let record=await deviceStore('get','auth');
   if(record?.sub===user.sub&&record.server===server){
     if(record.pendingURL&&record.pendingUntil>Date.now())return finishConsent(record);
-    try{await request(server,'/devices/restore',await proof(record));return record;}catch(error){if(error.status!==401&&error.status!==404)throw error;}
+    try{await request(server,'/devices/restore',await proof(record));return record;}catch(error){
+      if(error.status!==401)throw error;
+      const repaired=await request(server,'/devices/reconnect',{id:record.id},token);
+      record={...record,pendingURL:repaired.url,pendingUntil:Date.now()+540000};
+      await deviceStore('put','auth',record);return finishConsent(record);
+    }
   }
   const keys=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
   const registered=await request(server,'/devices/register',{public_key:await crypto.subtle.exportKey('jwk',keys.publicKey)},token);

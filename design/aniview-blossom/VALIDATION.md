@@ -67,3 +67,27 @@ AAC decode/seek/lifecycle at 390/1440 with fixture resolver responses. Separatel
 real Oracle diagnostics received exact-ID credits for MAL 5114 through Jikan and
 the current AnimeThemes GraphQL response, and real Otonoke playback returned
 HTTP 206 audio/mp4 bytes. No live Google/Spotify OAuth or ML inference was tested.
+
+## Remembered Google grant recovery and system audit (2026-11-01)
+
+Live Oracle refresh of the saved Google grant returned `invalid_grant`; ten ready
+remembered-device records depended on that grant. This is a revoked/expired Google
+grant, not a missing preference cookie. A newly authenticated user now repairs the
+existing device ID via explicit Google consent instead of allocating another slot.
+The server checks account ownership before issuing that consent URL. Temporary
+refresh/network failures return 503 and retain local device keys; the browser retries
+and recovers on focus, including after an unsuccessful initial restoration.
+
+Validation: device-signature/replay/account-isolation/reconnect-at-limit tests;
+React + real IndexedDB signing-key recovery with fixture Google and device HTTP;
+239 Node tests and production build. Full Windows Python discovery ran 412 tests,
+with four pre-existing POSIX permission/geteuid/open-file cleanup incompatibilities
+and ten skips; Linux CI is authoritative for that suite. Live checks cover the eight
+running containers, public metadata/music, authenticated Suwayomi (1633 sources)
+and manga discovery (770), and translation readiness (not new neural inference or
+paid Google translation). There were no recent importer tracebacks. The LLM has a
+historical OOM flag but is currently running, using about 2 GiB of its 3 GiB limit.
+Ten import tasks wait for Google consent; 39 are complete. Removing 22 unreferenced
+old importer images and old build layers increased free disk from ~804 to ~3192 MiB;
+current/rollback images, volumes, credentials, private data and models were retained.
+The revoked grant still requires one interactive user consent after this release.
