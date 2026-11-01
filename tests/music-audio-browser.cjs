@@ -57,7 +57,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    await page.mouse.move(knob.x+knob.width/2+85,knob.y+knob.height/2,{steps:12});
    await page.locator('.music-seek-surface').waitFor({state:'visible'});
    const playBox=await play.boundingBox(),clockBox=await page.locator('.music-dot-matrix').boundingBox();
-   assert.ok(playBox.width>=46,'expanded Play is larger than the compact controller');
+   assert.ok(await play.evaluate(el=>parseFloat(getComputedStyle(el).width)>=46),'expanded Play is larger than the compact controller even during gesture scale');
    assert.ok(clockBox.width<=60,'dot-matrix timestamp stays small');
    assert.ok(Math.abs((playBox.x+playBox.width/2)-(clockBox.x+clockBox.width/2))<5,'dot-matrix time replaces Play at the same horizontal position');
    assert.ok(await page.locator('.music-dot-matrix circle').count()>40,'seek time uses real dot-matrix glyphs');
