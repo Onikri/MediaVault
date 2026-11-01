@@ -124,17 +124,17 @@ body:has(.immersive-reader:not(.reader-embedded)) .music-nav{visibility:hidden;p
 .music-nav .music-volume-knob:focus-visible{outline:2px solid var(--color-blossom-light);outline-offset:0}
 .music-nav .music-bar.is-playing .music-disc{box-shadow:0 0 0 2px color-mix(in srgb,var(--color-blossom) 42%,transparent)}
 @media(hover:hover) and (pointer:fine){
- .music-nav.has-track .music-bar:hover{width:min(344px,calc(100vw - 24px));border-color:color-mix(in srgb,var(--color-blossom) 22%,transparent);background:var(--color-surface);box-shadow:0 14px 40px #0007}
- .music-nav.has-track .music-bar:hover .music-dock-title{opacity:0;transform:translateX(-8px);pointer-events:none}
- .music-nav.has-track .music-bar:hover .music-bar-transport{opacity:1;transform:none;pointer-events:auto}
- .music-nav.has-track .music-bar:hover .music-bar-volume{flex-basis:30px;opacity:1;pointer-events:auto}
- .music-nav.has-track .music-bar:hover .music-disc img{transform:scale(1.06)}
+ .music-nav.has-track .music-bar.is-hovered{width:min(344px,calc(100vw - 24px));border-color:color-mix(in srgb,var(--color-blossom) 22%,transparent);background:var(--color-surface);box-shadow:0 14px 40px #0007}
+ .music-nav.has-track .music-bar.is-hovered .music-dock-title{opacity:0;transform:translateX(-8px);pointer-events:none}
+ .music-nav.has-track .music-bar.is-hovered .music-bar-transport{opacity:1;transform:none;pointer-events:auto}
+ .music-nav.has-track .music-bar.is-hovered .music-bar-volume{flex-basis:30px;opacity:1;pointer-events:auto}
+ .music-nav.has-track .music-bar.is-hovered .music-disc img{transform:scale(1.06)}
 }
 /* Keyboard navigation opens the controls, but ordinary clicked focus never does. */
-.music-nav.has-track .music-bar:has(:focus-visible){width:min(344px,calc(100vw - 24px));background:var(--color-surface)}
-.music-nav.has-track .music-bar:has(:focus-visible) .music-dock-title{opacity:0;pointer-events:none}
-.music-nav.has-track .music-bar:has(:focus-visible) .music-bar-transport{opacity:1;transform:none;pointer-events:auto}
-.music-nav.has-track .music-bar:has(:focus-visible) .music-bar-volume{flex-basis:30px;opacity:1;pointer-events:auto}
+.music-nav.has-track .music-bar.is-keyboard-open{width:min(344px,calc(100vw - 24px));background:var(--color-surface)}
+.music-nav.has-track .music-bar.is-keyboard-open .music-dock-title{opacity:0;pointer-events:none}
+.music-nav.has-track .music-bar.is-keyboard-open .music-bar-transport{opacity:1;transform:none;pointer-events:auto}
+.music-nav.has-track .music-bar.is-keyboard-open .music-bar-volume{flex-basis:30px;opacity:1;pointer-events:auto}
 /* Thin progress fills; the knob is deliberately not a linear volume slider. */
 .music-dock-timeline input[type=range],.music-volume input[type=range]{appearance:none;-webkit-appearance:none;height:3px;border:0;padding:0;border-radius:100px;background:linear-gradient(var(--color-blossom-light),var(--color-blossom-light)) left center / var(--music-progress,0%) 100% no-repeat,linear-gradient(#ffffff36,#ffffff36) left center / 100% 100% no-repeat;transition:height .18s ease}
 .music-dock-timeline input[type=range]:not(:disabled):hover,.music-volume input[type=range]:hover,.music-dock-timeline input[type=range]:focus-visible,.music-volume input[type=range]:focus-visible{height:5px}
