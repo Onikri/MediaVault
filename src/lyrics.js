@@ -1,3 +1,4 @@
+import {musicIdentity} from './music-identity.js';
 // Real timestamps only: standard LRC is line-synced, Enhanced LRC/TTML can be word-synced.
 const stamp=value=>{const s=String(value||'').trim();if(/^\d+(?:\.\d+)?s$/.test(s))return Number(s.slice(0,-1));if(/^\d+(?:\.\d+)?ms$/.test(s))return Number(s.slice(0,-2))/1000;const p=s.split(':').map(Number);return p.length>=2&&p.length<=3&&p.every(Number.isFinite)?p.reduce((a,n)=>a*60+n,0):NaN;};
 const valid=n=>Number.isFinite(n)&&n>=0&&n<=7200;
@@ -29,4 +30,4 @@ export function lyricIndex(lines,time){let low=0,high=lines.length-1,best=-1;whi
 export const normalizeLyrics=lines=>finish(lines.map(l=>({start:Number(l.time??l.start),end:l.end,text:l.text??l.line??'',words:l.words||[]})));
 export function lyricFragments(line){let cursor=0;const parts=[];for(let i=0;i<line.words.length;i++){const w=line.words[i],at=line.text.indexOf(w.text,cursor);if(at<0)return [{text:line.text}];if(at>cursor)parts.push({text:line.text.slice(cursor,at)});parts.push({text:w.text,word:i});cursor=at+w.text.length;}if(cursor<line.text.length)parts.push({text:line.text.slice(cursor)});return parts;}
 export const lyricName=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
-export function matchLyricRecord(rows,track){const titles=[track.title,...track.aliases||[]].map(lyricName),artists=(track.artists||[]).map(lyricName);return rows.filter(r=>{const m=Object.fromEntries(r.metadata||[]);return (m.musicName||[]).some(t=>titles.includes(lyricName(t)))&&(m.artists||[]).some(a=>artists.includes(lyricName(a)))&&/^[\w-]+\.ttml$/.test(r.rawLyricFile||'');}).reverse().slice(0,3);}
+export function matchLyricRecord(rows,track){const identity=musicIdentity(track),titles=identity.titles.map(lyricName),artists=identity.artists.map(lyricName);return rows.filter(r=>{const m=Object.fromEntries(r.metadata||[]);return (m.musicName||[]).some(t=>titles.includes(lyricName(t)))&&(m.artists||[]).some(a=>artists.includes(lyricName(a)))&&/^[\w-]+\.ttml$/.test(r.rawLyricFile||'');}).reverse().slice(0,3);}

@@ -470,3 +470,19 @@ html[data-blossom] .blossom-navbar .header-center-search .header-search:hover,
 html[data-blossom] .blossom-navbar .header-center-search .header-search:focus-visible{background:var(--nav-search-accent);color:var(--nav-search-ink,#fff);box-shadow:none}
 html[data-blossom] .blossom-navbar .header-actions{align-items:center;margin-block:0}
 @media(max-width:640px){html[data-blossom] .blossom-navbar .header-inner{min-height:56px;padding-block:9px}html[data-blossom] .blossom-navbar .header-center-search .header-search{height:38px;min-height:38px}}
+
+/* Content-grid alignment; the top state deliberately spreads beyond the grid. */
+html[data-blossom] .blossom-navbar{width:min(1600px,calc(100% - 24px))}
+html[data-blossom] .blossom-navbar.is-scrolled{width:min(1268px,calc(100% - 72px))}
+html[data-blossom] .blossom-navbar .brand.logo{color:var(--color-crimson)}
+html[data-blossom] .blossom-navbar .header-inner{transition:none}
+html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:340px}
+@media(min-width:641px) and (max-width:1120px){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:max(180px,20vw)}}
+@media(min-width:1121px) and (max-width:1350px){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:300px}}
+@media(max-width:900px){html[data-blossom] .blossom-navbar.is-scrolled{width:calc(100% - 40px)}}
+@media(max-width:640px){
+ html[data-blossom] .blossom-navbar.is-scrolled{width:calc(100% - 28px)}
+ html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{position:absolute;left:10px;right:10px;top:50%;width:auto;max-width:none;transform:translateY(-50%)}
+}
+
+html[data-blossom] .blossom-navbar.is-search-expanded .header-actions{transform:none;transition:opacity .2s}

@@ -41,3 +41,5 @@ test('monochrome backgrounds stay neutral instead of falling back to an unrelate
 });
 
 test('Search accent uses a readable foreground in bright, dark and wallpaper palettes',()=>{for(const seed of ['#ffffff','#000000','#ee3c35','#ffe680','#00ff00','#3355ff','#d7b8ac','#888888']){const p=searchPalette(seed);assert.ok(contrast(rgb(p.foreground),rgb(p.background))>=4.5,seed);}});
+
+test('Search preserves the exact primary button accent without another red mixture',()=>{for(const color of [BLOSSOM.crimson,'#ffffff','#123456'])assert.equal(searchPalette(color).background,color);});

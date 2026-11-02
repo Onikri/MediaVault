@@ -129,3 +129,5 @@ html[data-blossom] .morph-search-bar input,
 html[data-blossom] .morph-search-bar button{color:var(--nav-search-ink,#fff)}
 html[data-blossom] .morph-search-bar input::placeholder{color:color-mix(in srgb,var(--nav-search-ink,#fff) 75%,transparent)}
 html[data-blossom] .morph-search-bar .morph-search-token{background:color-mix(in srgb,var(--nav-search-ink,#fff) 13%,transparent);color:var(--nav-search-ink,#fff)}
+
+.morph-search-panel{width:100%}

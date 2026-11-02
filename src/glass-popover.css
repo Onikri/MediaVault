@@ -1,0 +1,9 @@
+/* One surface shared by the global search and music details. */
+html[data-blossom] .morph-search-panel,
+html[data-blossom] .music-panel.music-island{
+ background:rgba(33,34,42,.62);
+ backdrop-filter:blur(20px) saturate(1.6);
+ -webkit-backdrop-filter:blur(20px) saturate(1.6);
+ border:0;box-shadow:0 18px 50px #0005;border-radius:28px;
+ transform-origin:top center;
+}

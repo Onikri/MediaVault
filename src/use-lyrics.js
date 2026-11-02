@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import {parseLrc,parseTtml,matchLyricRecord,normalizeLyrics} from './lyrics.js';
+import {searchLrcLyrics} from './lyric-search.js';
 const BASE='https://raw.githubusercontent.com/amll-dev/amll-ttml-db/main/',INDEX=BASE+'metadata/raw-lyrics-index.jsonl';let indexPromise;
 const cache=new Map();
 async function readBounded(response,max){if(!response.ok)throw Error();if(Number(response.headers.get('Content-Length'))>max)throw Error();const text=await response.text();if(text.length>max)throw Error();return text;}
@@ -16,10 +17,10 @@ export default function useLyrics(track,duration,enabled=true){
   if(supplied?.lines.length){setData({...supplied,phase:'ready',source:'Встроенный текст'});return;}
   if(!duration||!track.title||!track.artists?.length){setData({phase:duration?'empty':'loading',lines:[]});return;}
   const hit=cache.get(key);if(hit&&!retry){setData(hit);return;}
-  const abort=new AbortController(),signal=abort.signal;let found=false,word=false;
+  const abort=new AbortController(),signal=abort.signal;let found=false,quality=0;
   setData({phase:'loading',lines:[]});
-  const accept=value=>{if(signal.aborted||word||!value.lines.length)return;if(value.lines.at(-1).start>duration+2)return;value.lines=value.lines.map(l=>({...l,end:Math.min(l.end,duration)}));word=value.precision==='word';found=true;const result={...value,phase:'ready'};cache.set(key,result);while(cache.size>32)cache.delete(cache.keys().next().value);setData(result);};
-  const lrclib=(async()=>{const params=new URLSearchParams({track_name:track.title,artist_name:track.artists.join(', '),duration:String(Math.round(duration))});const response=await fetch('https://lrclib.net/api/get?'+params,{credentials:'omit',priority:'low',signal:AbortSignal.any([signal,AbortSignal.timeout(8000)])});if(!response.ok)return;const r=await response.json();if(Math.abs(Number(r.duration)-duration)>2||!r.syncedLyrics)return;accept({...parseLrc(r.syncedLyrics),source:'LRCLIB',url:'https://lrclib.net/'});})();
+  const accept=value=>{if(!value||signal.aborted||(!value.lines.length&&!value.plainText))return;const rank=value.precision==='word'?3:value.lines.length?2:1;if(rank<=quality||value.lines.at(-1)?.start>duration+2)return;value.lines=value.lines.map(l=>({...l,end:Math.min(l.end,duration)}));quality=rank;found=true;const result={...value,phase:'ready'};cache.set(key,result);while(cache.size>32)cache.delete(cache.keys().next().value);setData(result);};
+  const lrclib=searchLrcLyrics(track,duration,{signal}).then(accept);
   const amll=(async()=>{const records=matchLyricRecord(await index(),track);for(const record of records){signal.throwIfAborted();const url=BASE+'raw-lyrics/'+record.rawLyricFile,text=await readBounded(await fetch(url,{credentials:'omit',priority:'low',signal:AbortSignal.any([signal,AbortSignal.timeout(7000)])}),1000000),parsed=parseTtml(text),end=parsed.lines.at(-1)?.end||0;if(parsed.precision==='word'&&end<=duration+2&&duration-end<30){accept({...parsed,source:'AMLL TTML DB',url:'https://github.com/amll-dev/amll-ttml-db/blob/main/raw-lyrics/'+record.rawLyricFile});break;}}})();
   Promise.allSettled([lrclib,amll]).then(results=>{if(!signal.aborted&&!found)setData({phase:results.every(r=>r.status==='rejected')?'error':'empty',lines:[]});});
   return()=>abort.abort();

@@ -5,6 +5,8 @@ import {ArrowUpRight,Clock,LoaderCircle,Search,X} from 'lucide-react';
 import {useGlobalSearch,SEARCH_KINDS} from '../../use-global-search.js';
 import {Poster} from '../../ImportParts.jsx';
 import './morph-search.css';
+import '../../glass-popover.css';
+import {GLASS_ENTER,GLASS_HIDDEN,GLASS_VISIBLE} from '../../glass-motion.js';
 
 /* MorphingSearchChips port: the original 56px glass bar, centered panel,
    spring-grown glass surface, animated chips, recents and list cursor.
@@ -17,11 +19,10 @@ const typeLabel=(kind:string)=>Object.fromEntries(SEARCH_KINDS)[kind]||'Сери
 const same=(a:string,b:string)=>a.trim().toLocaleLowerCase()===b.trim().toLocaleLowerCase();
 function coordinates(){
  const target=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();
- const slot=document.querySelector('.blossom-navbar .header-center-search')?.getBoundingClientRect();
  const inner=document.querySelector('.blossom-navbar .header-inner')?.getBoundingClientRect();
- const width=Math.max(42,Math.min(340,slot?.width??target?.width??160));
- const height=Math.min(44,(inner?.height??58)-10);
- const left=slot?.left??((window.innerWidth-width)/2);
+ const width=Math.min(340,window.innerWidth<=640?(inner?.width??window.innerWidth)-20:window.innerWidth<=1120?Math.max(180,window.innerWidth*.2):window.innerWidth<=1350?300:340);
+ const height=38;
+ const left=inner?inner.left+(inner.width-width)/2:(window.innerWidth-width)/2;
  const top=inner?inner.top+(inner.height-height)/2:(target?.top??18);
  return {width,left,top,height,seedWidth:target?.width??112,seedHeight:target?.height??38};
 }
@@ -74,8 +75,8 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
  };
  return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{opacity:0,y:-2}} animate={{opacity:closing?0:1,y:closing?-4:0}} transition={{duration:reduce?0:.16}}>
   <motion.div className="morph-search-bar" onPointerDown={focusField}
-   initial={reduce?false:{width:geometry.seedWidth,height:geometry.seedHeight}}
-   animate={{width:closing?geometry.seedWidth:'100%',height:closing?geometry.seedHeight:geometry.height}}
+   initial={false}
+   animate={{width:'100%',height:geometry.height}}
    transition={reduce?{duration:0}:(closing?EXIT:ENTER)}>
    <Search size={20} aria-hidden="true"/>
    <div className="morph-search-chips">
@@ -93,9 +94,9 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
    <button className="morph-search-close" type="button" aria-label="Закрыть поиск" onClick={close}><X size={18}/></button>
   </motion.div>
   <AnimatePresence>
-   {!closing&&<motion.div key="panel" className="morph-search-panel" initial={reduce?false:{width:112,height:40,y:-28,opacity:0}} animate={{width:'100%',height:'auto',y:0,opacity:1}} exit={reduce?{opacity:0}:{width:112,height:40,y:-28,opacity:0,transition:EXIT}} transition={reduce?{duration:0}:ENTER}>
+   {!closing&&<motion.div key="panel" className="morph-search-panel" initial={reduce?false:GLASS_HIDDEN} animate={GLASS_VISIBLE} exit={GLASS_HIDDEN} transition={reduce?{duration:0}:GLASS_ENTER}>
     <motion.div className="morph-search-panel-content" initial={reduce?false:{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:reduce?0:.18,delay:reduce?0:.12}}>
-     <div className="morph-search-panel-heading"><span>{query.trim()?'Suggestions':'Recent'}</span>{!query.trim()&&recents.length>0&&<button type="button" onClick={()=>forget()}>Clear</button>}</div>
+     <div className="morph-search-panel-heading"><span>{query.trim()?'Подсказки':'Недавние'}</span>{!query.trim()&&recents.length>0&&<button type="button" onClick={()=>forget()}>Очистить</button>}</div>
      <div className="morph-search-panel-rows" ref={panelRows} style={{minHeight:panelFloor||undefined}}>
       <div id={id+'-suggestions'} role="group" aria-label={query.trim()?'Подсказки':'Недавние запросы'} className="morph-search-suggestion-list">
        {suggestions.map((row,i)=><motion.button key={row.id} type="button" aria-current={rowCursor===i?'true':undefined}

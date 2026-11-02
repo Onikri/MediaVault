@@ -25,7 +25,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   assert.equal(prepared[0].url,'https://www.youtube.com/watch?v=dQw4w9WgXcQ');assert.equal(await page.locator('iframe').count(),0);
   if(width<900){
     if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();
-    await page.waitForFunction(()=>{const e=document.querySelector('.music-island');return e&&Math.abs(e.getBoundingClientRect().height-parseFloat(e.style.height))<1&&Math.abs(e.getBoundingClientRect().x-new DOMMatrixReadOnly(e.style.transform).m41)<1&&Math.abs(e.getBoundingClientRect().y-new DOMMatrixReadOnly(e.style.transform).m42)<1;});const panel=await page.locator('.music-island').boundingBox(),trigger=await page.locator('.music-nav').boundingBox();assert.ok(panel.height<320&&Math.abs(panel.y-trigger.y-trigger.height-10)<1,'Playing island follows the navbar trigger');assert.ok(panel.x>=12&&panel.x+panel.width<=width-12,'Island fits viewport');const offset=await page.locator('.music-nav').evaluate(e=>{const a=e.getBoundingClientRect(),b=e.closest('.header-inner').getBoundingClientRect();return Math.abs(a.y+a.height/2-b.y-b.height/2);});assert.ok(offset<.6,'Playing transport keeps navbar vertically centered');await page.screenshot({path:path.join(DIR,'music-island-playing-'+width+'.png')});
+    await page.waitForFunction(()=>{const e=document.querySelector('.music-island');return e&&Math.abs(e.getBoundingClientRect().height-parseFloat(e.style.height))<1&&Math.abs(e.getBoundingClientRect().x-parseFloat(e.style.left))<1&&Math.abs(e.getBoundingClientRect().y-parseFloat(e.style.top))<1;});const panel=await page.locator('.music-island').boundingBox(),trigger=await page.locator('.music-nav').boundingBox();assert.ok(panel.height<320&&Math.abs(panel.y-trigger.y-trigger.height-10)<1,'Playing island follows the navbar trigger');assert.ok(panel.x>=12&&panel.x+panel.width<=width-12,'Island fits viewport');const offset=await page.locator('.music-nav').evaluate(e=>{const a=e.getBoundingClientRect(),b=e.closest('.header-inner').getBoundingClientRect();return Math.abs(a.y+a.height/2-b.y-b.height/2);});assert.ok(offset<.6,'Playing transport keeps navbar vertically centered');await page.screenshot({path:path.join(DIR,'music-island-playing-'+width+'.png')});
     await page.getByRole('button',{name:'Свернуть музыкальный плеер',exact:true}).click();const before=await page.locator('audio').evaluate(a=>a.currentTime);await page.waitForTimeout(300);assert.ok(await page.locator('audio').evaluate((a,n)=>!a.paused&&a.currentTime>n,before),'Collapsed server audio keeps playing');
     if(width<900)await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();else await page.getByRole('button',{name:'Подробности музыки',exact:true}).click();
     const slider=page.getByLabel('Позиция музыки в подробностях',{exact:true});await slider.fill('8');await page.waitForFunction(()=>document.querySelector('audio')?.currentTime>=7.9);
@@ -38,8 +38,8 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor();
    await page.waitForTimeout(540);
    const full=await page.locator('.music-nav .music-bar').boundingBox(),header=await page.locator('.blossom-navbar .header-inner').boundingBox();
-   assert.equal(Math.round(full.height),Math.round(header.height),'Expanded transport fills navbar height');
-   assert.ok(full.width>=296&&full.width<header.width*.36,'Expanded transport occupies right quarter');
+   assert.equal(Math.round(full.height),38,'Expanded transport matches the logo capsule height');
+   assert.ok(full.width>=400&&full.width<=520,'Expanded transport leaves room for a complete status line');
    assert.ok(Math.abs(full.x+full.width-header.x-header.width)<2,'Expanded transport aligns with navbar right edge');
    await page.locator('.music-nav .music-bar.is-nav-expanded').click({position:{x:130,y:8}});
    await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor({state:'detached'});
@@ -57,7 +57,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    await page.mouse.move(knob.x+knob.width/2+85,knob.y+knob.height/2,{steps:12});
    await page.locator('.music-seek-surface').waitFor({state:'visible'});
    const playBox=await play.boundingBox(),clockBox=await page.locator('.music-dot-matrix').boundingBox();
-   assert.ok(await play.evaluate(el=>parseFloat(getComputedStyle(el).width)>=46),'expanded Play is larger than the compact controller even during gesture scale');
+   assert.ok(await play.evaluate(el=>parseFloat(getComputedStyle(el).width)===38),'expanded Play matches the search circle even during gesture scale');
    assert.ok(clockBox.width<=60,'dot-matrix timestamp stays small');
    assert.ok(Math.abs((playBox.x+playBox.width/2)-(clockBox.x+clockBox.width/2))<5,'dot-matrix time replaces Play at the same horizontal position');
    assert.ok(await page.locator('.music-dot-matrix circle').count()>40,'seek time uses real dot-matrix glyphs');
