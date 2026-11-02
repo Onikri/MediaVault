@@ -5,7 +5,7 @@ its smoothstep depth cutoff, Hermite S-curve, light-mask exponent 1.25, falloff 
 and sinusoidal animation into an alpha-only WebGL overlay. It does not displace
 UVs, move/duplicate the video, add a second video decoder, or reconstruct texture.
 The first pass starts fully transparent behind the scene and advances for six
-seconds to cutoff .62. Subsequent ten-second breaths stay in the smaller .44–.62
+seconds to cutoff .70. Subsequent ten-second breaths stay in the smaller .26–.70
 range, keeping the far background shaded. Reduced-motion uses a static cutoff
 and hidden tabs stop drawing. Selected characters lift the shadow over a
 depth-connected surface, with a soft fill rather than a bright contour/halo.

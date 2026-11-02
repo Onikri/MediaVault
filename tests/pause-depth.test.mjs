@@ -8,8 +8,8 @@ import{recognizePauseFrame,mergeFrameCharacters}from'../src/pause-recognition.js
 test('First depth pass starts transparent behind the background, then settles into a smaller continuous breath',()=>{
  assert.ok(shadowCutoff(0)<-.209);assert.ok(shadowCutoff(1)<shadowCutoff(3));assert.ok(shadowCutoff(3)<shadowCutoff(6));
  assert.ok(Math.abs(shadowCutoff(6-1e-5)-shadowCutoff(6+1e-5))<1e-6);
- assert.ok(Math.abs(shadowCutoff(6)-.62)<1e-8);assert.ok(Math.abs(shadowCutoff(11)-.44)<1e-8);
- assert.ok(shadowCutoff(6)-shadowCutoff(0)>4*(shadowCutoff(6)-shadowCutoff(11)));
+ assert.ok(Math.abs(shadowCutoff(6)-.70)<1e-8);assert.ok(Math.abs(shadowCutoff(11)-.26)<1e-8);
+ assert.ok(shadowCutoff(6)-shadowCutoff(0)>2*(shadowCutoff(6)-shadowCutoff(11)));
 });
 const geminiRows=characters=>({candidates:[{content:{parts:[{text:JSON.stringify({characters})}]}}]});
 test('Full-frame search detects characters independently of face candidates and validates body/face geometry',()=>{

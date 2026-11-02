@@ -122,3 +122,10 @@ html[data-blossom] .morph-search-filters{border-top:0;border-bottom:0;background
 html[data-blossom] .morph-search-footer{border-top:0}
 html[data-blossom] .morph-search-token,html[data-blossom] .morph-search-chip-active{border:0!important;box-shadow:none}
 html[data-blossom] .morph-search-chip{box-shadow:none!important}
+/* The expanded field keeps exactly the search trigger's accent. */
+html[data-blossom] .morph-search-bar{background:var(--nav-search-accent);border-color:transparent;box-shadow:none;color:#fff}
+html[data-blossom] .morph-search-bar>svg:first-child,
+html[data-blossom] .morph-search-bar input,
+html[data-blossom] .morph-search-bar button{color:#fff}
+html[data-blossom] .morph-search-bar input::placeholder{color:rgb(255 255 255 / .75)}
+html[data-blossom] .morph-search-bar .morph-search-token{background:rgb(255 255 255 / .13);color:#fff}

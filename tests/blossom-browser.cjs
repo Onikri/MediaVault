@@ -71,7 +71,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   assert.ok(field.y>=inner.y-1&&field.y+field.height<=inner.y+inner.height+1,'search bar never leaves navbar; panel is the only layer below');
   const originalGlass=await page.locator('.morph-search-bar').evaluate(el=>({border:getComputedStyle(el).borderTopWidth,background:getComputedStyle(el).backgroundColor,blur:getComputedStyle(el).backdropFilter,texture:getComputedStyle(el).backgroundImage}));
   assert.equal(originalGlass.border,'0px','search glass has no frame');
-  assert.ok(originalGlass.texture.includes('linear-gradient')&&!originalGlass.texture.includes('url('),'search glass uses palette accent instead of noisy border');
+  assert.equal(originalGlass.texture,'none','Search uses one accent surface, without extra red gradients');assert.equal(originalGlass.background,await page.locator('.header-search').evaluate(el=>getComputedStyle(el).backgroundColor),'Expanded search retains the trigger accent');
   assert.ok(originalGlass.blur.includes('blur(20px)')&&originalGlass.blur.includes('saturate(1.6)'),'20px saturating glass blur is preserved');
   const slotExpanded=await page.locator('.blossom-navbar .header-center-search').boundingBox();
   assert.ok(slotExpanded.width>originalSlot.width+30,'center search grows within responsive navbar slot');

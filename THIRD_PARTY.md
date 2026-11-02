@@ -292,3 +292,13 @@ The adapter uses the existing MIT ONNX Runtime Web. AnimeTrace is an external
 public API, not a bundled recognition model or copied interface; no website assets
 or provider images are redistributed. Its public API documentation and terms are
 linked in the integration document.
+
+### Synchronized song lyrics
+
+Word-timed TTML is fetched on demand from the AMLL TTML DB (CC0-1.0 repository):
+https://github.com/amll-dev/amll-ttml-db . The player retains the source link.
+LRCLIB https://lrclib.net/docs supplies line-timed LRC when available. No lyric
+database or third-party lyric text is embedded in Git/Pages. The original parser
+supports user-provided Enhanced LRC and TTML; plain line timings are not presented
+as word alignment. Runtime metadata matching, limits and validation are documented
+in `design/player-comfort/README.md`.

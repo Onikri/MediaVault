@@ -45,9 +45,9 @@ test('quality matching compares real mirrors and keeps chosen audio separate fro
 });
 test('ahead buffering respects data saver, device memory, preview isolation and independent audio',()=>{
  const normal=streamBufferPolicy(),small=streamBufferPolicy({memory:4}),saver=streamBufferPolicy({saveData:true}),preview=streamBufferPolicy({preview:true}),audio=streamBufferPolicy({audioOnly:true});
- assert.equal(normal.maxBufferLength,120);assert.equal(normal.maxMaxBufferLength,180);assert.equal(normal.maxBufferSize,120e6);
- assert.equal(small.maxBufferLength,60);assert.ok(saver.maxMaxBufferLength<=30);assert.equal(preview.maxMaxBufferLength,12);assert.equal(preview.backBufferLength,0);
- assert.equal(audio.maxBufferLength,120);assert.ok(audio.maxBufferSize<=40e6);assert.ok(normal.abrBandWidthUpFactor<normal.abrBandWidthFactor);
+ assert.equal(normal.maxBufferLength,75);assert.equal(normal.maxMaxBufferLength,90);assert.equal(normal.maxBufferSize,64*1024*1024);
+ assert.equal(small.maxBufferLength,40);assert.ok(saver.maxMaxBufferLength<=30);assert.equal(preview.maxMaxBufferLength,12);assert.equal(preview.backBufferLength,0);
+ assert.equal(audio.maxBufferLength,75);assert.ok(audio.maxBufferSize<=40e6);assert.ok(normal.abrBandWidthUpFactor<normal.abrBandWidthFactor);
 });
 test('buffer display counts the current continuous range rather than disconnected future seek ranges',()=>{
  const ranges={length:2,start:i=>[0,100][i],end:i=>[30,130][i]};

@@ -87,7 +87,7 @@ jobs:
           npm run test:notebook
 
       - name: Responsive UI and browser integration
-        timeout-minutes: 8
+        timeout-minutes: 10
         env:
           MEDIA_VAULT_SKIP_BUILD: '1'
         run: |

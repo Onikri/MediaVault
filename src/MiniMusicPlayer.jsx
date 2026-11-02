@@ -1,7 +1,7 @@
-import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useMotionValue} from 'motion/react';
-import {X,Play,Pause,Music2,Heart,ExternalLink,SkipBack,SkipForward,Volume2,ListMusic,ChevronDown,Headphones,Settings2,ArrowLeft} from 'lucide-react';
+import {X,Play,Pause,Music2,Heart,ExternalLink,SkipBack,SkipForward,Volume2,ListMusic,ChevronDown,Headphones,Settings2,ArrowLeft,Captions} from 'lucide-react';
 import {musicSnapshot,subscribeMusic,closeMusic,stepMusic,playMusic} from './music-player.js';
 import {toggleTrack,tracks} from './music-library.js';
 import {disconnectMusic} from './music-connectors.js';
@@ -9,6 +9,10 @@ import MusicConnections from './MusicConnections.jsx';
 import {openYouTubeAudio,openMusicAudio} from './youtube-audio.js';
 import {musicIslandLayout} from './music-island.js';
 import './music-dock.css';
+import useLyrics from './use-lyrics.js';
+import SyncedLyrics from './SyncedLyrics.jsx';
+import {parseLrc,parseTtml} from './lyrics.js';
+import './lyrics.css';
 const clock=value=>{const n=Math.max(0,Math.floor(Number(value)||0));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');};
 const imageURL=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}};
 
@@ -43,7 +47,14 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
  const circle=useRef(null),circleGesture=useRef(null),circleSkipClick=useRef(false);
  const [scrubPreview,setScrubPreview]=useState(null);
  const scrubPosition=useMotionValue('0%');
- const activeLyric=(()=>{const arr=track?.syncedLyrics||track?.lyrics;if(!Array.isArray(arr))return 'Текст песни пока недоступен';const line=arr.filter(x=>Number(x.time??x.start??0)<=time).at(-1);return typeof line==='string'?line:(line?.text||line?.line||'Текст песни пока недоступен');})();
+ const [lyricsEnabled,setLyricsEnabled]=useState(()=>{try{return localStorage.getItem('mediavault_lyrics_enabled')!=='false';}catch{return true;}}),[manualLyrics,setManualLyrics]=useState(null),[lyricOffset,setLyricOffset]=useState(0),[lyricError,setLyricError]=useState(''),[lyricsOpen,setLyricsOpen]=useState(false),lyricFile=useRef(null);
+ const lyricTrack=useMemo(()=>track?{...track,aliases:[...track.aliases||[],metadata?.title].filter(Boolean)}:null,[track,metadata?.title]);
+ const lyricKey=track?.id+':'+selected,automaticLyrics=useLyrics(lyricTrack,duration,lyricsEnabled&&audioBacked),lyricData=manualLyrics?.key===lyricKey?manualLyrics.data:automaticLyrics;
+ useEffect(()=>{try{setLyricOffset(Number(localStorage.getItem('mv_lyric_offset:'+lyricKey))||0);}catch{setLyricOffset(0);}setLyricError('');},[lyricKey]);
+ const shiftLyrics=value=>{setLyricOffset(value);try{localStorage.setItem('mv_lyric_offset:'+lyricKey,String(value));}catch{}};
+ async function importLyrics(event){const file=event.target.files?.[0];event.target.value='';if(!file)return;try{if(file.size>1000000)throw Error('Файл текста превышает 1 МБ.');const text=await file.text(),parsed=/\.(ttml|xml)$/i.test(file.name)?parseTtml(text):parseLrc(text);if(!parsed.lines.length)throw Error('В файле нет временной разметки.');setManualLyrics({key:lyricKey,data:{...parsed,phase:'ready',source:'Твой файл'}});setLyricError('');}catch(e){setLyricError(e.message);}}
+ const activeLyric=<SyncedLyrics data={lyricData} audioRef={audio} playing={playing} offset={lyricOffset} enabled={lyricsEnabled}/>;
+
  useLayoutEffect(()=>{if(!nav||!track)return;const measure=()=>{const h=(trigger.current?.closest('.header-inner')||trigger.current?.closest('header'))?.getBoundingClientRect(),t=trigger.current?.getBoundingClientRect();if(!h||!t)return;setNavMorphBox(old=>{const next={width:Math.max(296,Math.min(420,Math.round(h.width*.25))),right:Math.round(h.right-t.right),top:Math.round(h.top-t.top),height:Math.round(h.height)};return Object.keys(next).every(k=>old[k]===next[k])?old:next;});};measure();const ob=new ResizeObserver(measure);const h=(trigger.current?.closest('.header-inner')||trigger.current?.closest('header'));if(h)ob.observe(h);addEventListener('resize',measure);return()=>{ob.disconnect();removeEventListener('resize',measure);};},[nav,!!track]);
  useEffect(()=>{if(!nav)return;dispatchEvent(new CustomEvent('mediavault:music-expanded',{detail:navFull&&!!track}));return()=>dispatchEvent(new CustomEvent('mediavault:music-expanded',{detail:false}));},[nav,navFull,!!track]);
  useEffect(()=>{if(!track)setNavFull(false);},[!!track]);
@@ -144,6 +155,7 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
    <span className="music-full-ring" aria-hidden="true"/>{playing?<Pause size={24}/>:<Play size={24}/>}
   </button>
   <div className="music-full-copy"><span className="music-full-title">{displayTitle}</span><strong className="music-full-lyric" aria-live="off">{error?'Проблема с аудио · повтори Play':activeLyric}</strong></div>
+  <button className="music-full-lyrics" aria-label="Текст песни и синхронизация" title="Текст и сдвиг синхронизации" onClick={()=>{setExpanded(true);setConnections(false);setQueue(false);setLyricsOpen(true);}}><Captions size={18}/></button>
   <button className="music-full-next" aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={21}/></button>
   <AnimatePresence initial={false}>
    {scrubPreview&&<motion.div key="seek" className="music-seek-surface" role="status" aria-label={'Перемотка '+clock(scrubPreview.time)} initial={{opacity:0,scaleY:.75}} animate={{opacity:1,scaleY:1}} exit={{opacity:0,scaleY:.78}} transition={{type:'spring',stiffness:420,damping:30,mass:.65}}>
@@ -165,6 +177,7 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
    {busy&&<p className="music-provider-note" role="status">Подготавливаем аудио…</p>}
    {youtube&&<div className="music-dock-recording">{results.length>0&&<details open={!selected||undefined}><summary>Выбрать запись</summary><label>Запись<select aria-label="Запись YouTube" value={selected} onChange={e=>{setSelected(e.target.value);setError('');}}><option value="">Выбрать запись</option>{results.map(r=><option value={r.id} key={r.id}>{r.title} · {r.author}</option>)}</select></label></details>}{error&&<><p className="music-provider-note">Аудио через Oracle недоступно</p><button type="button" disabled={busy} onClick={()=>setAudioRetry(v=>v+1)}>Повторить подготовку аудио</button></>}</div>}
    {queue&&<div className="music-dock-queue"><strong>Далее в очереди</strong>{state.queue.map((t,i)=><button key={t.id} aria-current={i===state.index} onClick={()=>playMusic(t,state.queue)}><span>{i+1}</span>{t.title}{i===state.index&&<span className="music-equalizer" aria-hidden="true"><i/><i/><i/></span>}</button>)}</div>}
+   <details className="music-lyrics-settings" open={lyricsOpen} onToggle={e=>setLyricsOpen(e.currentTarget.open)}><summary>Текст песни <small>{lyricData.precision==='word'?'По словам':lyricData.lines?.length?'По строкам':'Не найден'}</small></summary><div><label><input type="checkbox" checked={lyricsEnabled} onChange={e=>{setLyricsEnabled(e.target.checked);try{localStorage.setItem('mediavault_lyrics_enabled',String(e.target.checked));}catch{}}}/>Синхронизировать текст</label><div className="music-panel-lyrics">{activeLyric}</div><label>Сдвиг текста · {lyricOffset>0?'+':''}{lyricOffset.toFixed(1)} с<input aria-label="Сдвиг текста песни" type="range" min="-15" max="15" step=".1" value={lyricOffset} onChange={e=>shiftLyrics(Number(e.target.value))}/></label><div className="music-lyric-actions"><button onClick={()=>lyricFile.current?.click()}>Загрузить LRC / TTML</button><button onClick={()=>{setManualLyrics(null);automaticLyrics.retry();}}>Повторить поиск</button></div><input hidden ref={lyricFile} type="file" accept=".lrc,.ttml,.xml" onChange={importLyrics}/>{lyricData.source&&<small>{lyricData.url?<a href={lyricData.url} target="_blank" rel="noopener noreferrer">{lyricData.source}</a>:lyricData.source}{lyricData.precision==='line'?' · источник содержит только времена строк':''}</small>}{lyricError&&<small role="status">{lyricError}</small>}</div></details>
    {metadata?.found&&<details className="music-song-details"><summary>О записи</summary><span>{metadata.album}</span>{metadata.date&&<small>{metadata.date}</small>}<a href={metadata.url} target="_blank" rel="noopener noreferrer">MusicBrainz <ExternalLink size={11}/></a></details>}
   </>:<div className="music-empty"><div className="music-empty-heading"><span className="music-disc"><Music2 size={20}/></span><div><strong>Выбери музыку</strong><p>Опенинги, эндинги и твои записи</p></div></div>{tracks(userId).length>0?<div className="music-recent">{tracks(userId).slice(0,4).map(t=><button key={t.id} onClick={()=>playMusic(t,tracks(userId))}><span><strong>{t.title}</strong><small>{t.artists?.join(', ')}</small></span><Play size={14}/></button>)}</div>:<p className="music-empty-note">Запусти песню из коллекции или со страницы аниме.</p>}</div>}
   {error&&!connections&&<p className="music-dock-error" role="status">{error}</p>}

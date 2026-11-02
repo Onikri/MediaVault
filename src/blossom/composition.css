@@ -457,3 +457,16 @@ html[data-blossom] .blossom-navbar .desktop-nav .nav-link:focus-visible{
  html[data-blossom] .blossom-navbar.is-search-expanded .header-brand-area .brand.logo{font-size:16px;padding-inline:12px}
  html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link{font-size:9.5px;padding-inline:1px}
 }
+/* One accent belongs to search; navigation and the brand stay neutral. */
+html[data-blossom]{--nav-search-accent:color-mix(in srgb,var(--color-blossom) 84%,#16161a)}
+html[data-blossom] .blossom-navbar .header-inner{min-height:58px;padding-block:10px;align-items:center}
+html[data-blossom] .blossom-navbar .header-brand-area,
+html[data-blossom] .blossom-navbar .desktop-nav{height:38px;min-height:38px;align-items:center}
+html[data-blossom] .blossom-navbar .brand.logo{height:38px;min-height:38px;padding-block:0;display:inline-flex;align-items:center;background:rgb(var(--canvas-rgb,16 16 20)/.88);color:var(--color-petal);box-sizing:border-box}
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link{height:38px;min-height:38px;padding-block:0;margin-block:0;line-height:1}
+html[data-blossom] .blossom-navbar .nav-glide{top:0;height:38px;background:color-mix(in srgb,var(--color-petal) 11%,transparent)}
+html[data-blossom] .blossom-navbar .header-center-search .header-search,
+html[data-blossom] .blossom-navbar .header-center-search .header-search:hover,
+html[data-blossom] .blossom-navbar .header-center-search .header-search:focus-visible{background:var(--nav-search-accent);color:#fff;box-shadow:none}
+html[data-blossom] .blossom-navbar .header-actions{align-items:center;margin-block:0}
+@media(max-width:640px){html[data-blossom] .blossom-navbar .header-inner{min-height:56px;padding-block:9px}html[data-blossom] .blossom-navbar .header-center-search .header-search{height:38px;min-height:38px}}
