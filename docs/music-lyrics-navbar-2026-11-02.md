@@ -92,3 +92,32 @@ handoff at 390/1440 px. No new ML inference or VM service change is involved.
 The track-switch regression also verifies that React cleanup cannot remove a newly
 committed audio source. Stream state belongs to the queue request, so the next
 audio element never mounts with the previous song URL.
+
+
+## Continuous cover/search morph and music leases
+
+The mini/lyric strip now keeps the same cover button and image node mounted.
+Only its circular geometry changes (30 to 38 px); text/transport arrangements
+fade independently. The cover is clipped to a circle, pointer events stay on the
+button, and YouTube's baked thumbnail letterboxing is cropped with a 1.34 zoom.
+Search retains its painted surface while its width contracts symmetrically to
+38 px with a fixed 19 px corner radius. Unmount occurs after the width animation,
+so there is no opacity gap before the header trigger returns.
+
+A user screenshot identified the actual music failure as HTTP 429 from exhausted
+online-session slots. Music preparation now replaces that owner's stale music
+slot for the same tab, migrates legacy unscoped music slots, and leaves video,
+manga and other owners' sessions intact. New music leases expire after 120 seconds
+without a heartbeat; the client renews every 40 seconds and releases on pagehide.
+A tab identity survives reload via sessionStorage. Server version 40 advertises
+support, and the frontend omits the new request field on older servers.
+
+A regression test fills the owner's quota with three legacy music sessions and
+one video, then switches music twelve times. Exactly one music session remains;
+the video and another owner's session remain present. Live Oracle checks also
+returned actual MP4 audio bytes for Ai no Prison; a real Chromium decoder played
+that recording through the search/preparation flow (247.873016 s duration).
+These live checks use a separate diagnostic owner, so they do not reproduce the
+user's exhausted owner quota; the regression test covers that specific condition.
+Error detail is now shown at the top of the music panel and in the strip, rather
+than being hidden beneath lyrics settings.

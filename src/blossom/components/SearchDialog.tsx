@@ -73,11 +73,11 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
   if(event.key==='Backspace'&&event.currentTarget.selectionStart===0&&event.currentTarget.selectionEnd===0&&!query&&chips.length){event.preventDefault();const last=chips.at(-1)!;if(marked===last)removeChip(last);else setMarked(last);return;}
   if(event.key==='ArrowLeft'&&event.currentTarget.selectionStart===0&&!query&&chips.length){event.preventDefault();setMarked(chips.at(-1)!);}
  };
- return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{opacity:0,y:-2}} animate={{opacity:closing?0:1,y:closing?-4:0}} transition={{duration:reduce?0:.16}}>
+ return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={false} animate={{opacity:1,y:0}}>
   <motion.div className="morph-search-bar" onPointerDown={focusField}
-   initial={false}
-   animate={{width:'100%',height:geometry.height}}
-   transition={reduce?{duration:0}:(closing?EXIT:ENTER)}>
+   initial={reduce?false:{width:38,height:38}}
+   animate={{width:closing?38:geometry.width,height:38,borderRadius:19}}
+   transition={{duration:reduce?0:.32,ease:[.22,1,.36,1]}} onAnimationComplete={()=>{if(closing&&!finished.current){finished.current=true;onClose();}}}>
    <Search size={20} aria-hidden="true"/>
    <div className="morph-search-chips">
     <AnimatePresence initial={false} mode="popLayout">

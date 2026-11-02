@@ -157,18 +157,26 @@ class Play(BaseModel):
     model_config=ConfigDict(extra='forbid')
     url:str=Field(max_length=4096)
     refresh:bool=False
+    client_id:str=Field(default='',alias='clientId',max_length=100,pattern=r'^[A-Za-z0-9:_-]*$')
 
 def install(app,owner):
     from online_sessions import create,sessions,lock as sessions_lock,watch_disconnect
+    def music_session(subject,headers,kind,client_id):
+        # Replace only this owner's abandoned music slot, never video/manga.
+        client_id=client_id or 'music:legacy'
+        with sessions_lock:
+            for key,value in list(sessions.items()):
+                if value.owner==subject and value.kind in {'music','music-file'} and (not value.client_id or value.client_id==client_id):sessions.pop(key,None)
+            return create(subject,headers,kind,client_id)
     @app.post('/music/play')
     async def play(body:Play,request:Request,subject=Depends(owner)):
         identity=youtube_id(body.url);disconnected=asyncio.Event();watcher=asyncio.create_task(watch_disconnect(request,disconnected));token=None
         try:
             data,ttl=await run_in_threadpool(extract,identity,body.refresh)
             if disconnected.is_set():raise HTTPException(499,'Подготовка аудио отменена.')
-            token,session=create(subject,data['headers'],'music');session.expires=time.monotonic()+ttl;session.audio_mime=data['mime']
+            token,session=music_session(subject,data['headers'],'music',body.client_id);session.audio_mime=data['mime']
             resource=session.resource(data['url'])
-            return {'id':token,'streamUrl':'/online/'+token+'/'+resource,'mime':data['mime'],'duration':data['duration'],'title':data['title'],'expiresIn':ttl,'youtubeId':identity}
+            return {'id':token,'streamUrl':'/online/'+token+'/'+resource,'mime':data['mime'],'duration':data['duration'],'title':data['title'],'expiresIn':120,'youtubeId':identity}
         except BaseException:
             if token:
                 with sessions_lock:sessions.pop(token,None)
@@ -183,8 +191,8 @@ def install(app,owner):
         try:
             data=await run_in_threadpool(remote_audio,body.url)
             if disconnected.is_set():raise HTTPException(499,'Подготовка аудио отменена.')
-            token,session=create(subject,{},'music-file');session.audio_mime=data['mime']
-            return {'id':token,'streamUrl':'/online/'+token+'/'+session.resource(data['url']),'mime':data['mime'],'duration':0,'expiresIn':7200}
+            token,session=music_session(subject,{},'music-file',body.client_id);session.audio_mime=data['mime']
+            return {'id':token,'streamUrl':'/online/'+token+'/'+session.resource(data['url']),'mime':data['mime'],'duration':0,'expiresIn':120}
         except BaseException:
             if token:
                 with sessions_lock:sessions.pop(token,None)

@@ -17,3 +17,5 @@ test('only same-server capabilities are accepted; abort and close release the se
  data.streamUrl='https://evil.example/stream';await assert.rejects(openYouTubeAudio(service,id));assert.equal(calls.at(-1)[0],'/online/'+token);
  data.streamUrl='/online/'+token+'/'+resource;const abort=new AbortController();abort.abort();await assert.rejects(openYouTubeAudio(service,id,{signal:abort.signal}));assert.equal(calls.at(-1)[0],'/online/'+token);
 });
+
+test('music retry reuses a tab identity and releases capabilities with keepalive',async()=>{const calls=[],service={server,session:{serverVersion:40},request:async(p,o)=>{calls.push([p,o]);return {id:token,streamUrl:'/online/'+token+'/'+resource,mime:'audio/mp4',expiresIn:120};}};const a=await openYouTubeAudio(service,id);await a.close();const b=await openYouTubeAudio(service,id);await b.close();const plays=calls.filter(([p])=>p==='/music/play');assert.equal(plays[0][1].body.clientId,plays[1][1].body.clientId);assert.match(plays[0][1].body.clientId,/^music:/);assert.equal(calls.at(-1)[1].keepalive,true);});

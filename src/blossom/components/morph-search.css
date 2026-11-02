@@ -131,3 +131,10 @@ html[data-blossom] .morph-search-bar input::placeholder{color:color-mix(in srgb,
 html[data-blossom] .morph-search-bar .morph-search-token{background:color-mix(in srgb,var(--nav-search-ink,#fff) 13%,transparent);color:var(--nav-search-ink,#fff)}
 
 .morph-search-panel{width:100%}
+
+html[data-blossom] .morph-search-bar{overflow:hidden;flex-shrink:0;padding:0 10px 0 45px;border-radius:19px}
+html[data-blossom] .morph-search-bar>svg:first-child{position:absolute;left:16px;top:9px;transition:left .32s}
+html[data-blossom] .is-closing .morph-search-bar{padding:0}
+html[data-blossom] .is-closing .morph-search-bar>svg:first-child{left:9px}
+html[data-blossom] .morph-search-bar>:not(svg:first-child){transition:opacity .12s}
+html[data-blossom] .is-closing .morph-search-bar>:not(svg:first-child){opacity:0;pointer-events:none}

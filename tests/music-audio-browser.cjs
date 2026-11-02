@@ -79,7 +79,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   }else{
    await page.getByRole('button',{name:'Открыть музыкальный плеер',exact:true}).click();
    await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor();
-   await page.locator('.music-nav .music-full-lyric').getByText('Проблема с аудио · повтори Play',{exact:true}).waitFor();
+   await page.locator('.music-nav .music-full-lyric').getByText(/Ошибка аудио/).waitFor();
    const play=page.locator('.music-nav .music-full-play');
    assert.equal(await play.isEnabled(),true,'Expanded Play remains available for provider retry');
    const attempts=prepared.length;failureStatus=401;await play.click();

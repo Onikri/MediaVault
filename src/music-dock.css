@@ -314,3 +314,24 @@ body:has(.immersive-reader:not(.reader-embedded)) .music-nav{visibility:hidden;p
 @media(prefers-reduced-motion:reduce){.music-progress-fill{transition:none}.music-progress-fill:after{animation:none}.music-nav .music-full-lyrics svg{transition:none}}
 
 .music-dock button:focus-visible{outline:0;background:color-mix(in srgb,var(--color-petal) 12%,transparent)}
+
+/* One persistent cover, outside the two changing text/control arrangements. */
+.music-nav .music-bar>.music-shared-cover{position:absolute;z-index:4;left:5px;top:4px;width:30px;min-width:30px;height:30px;min-height:30px;padding:0;border:0;border-radius:50%;overflow:hidden;clip-path:circle(50%);isolation:isolate;opacity:1;visibility:visible;transform:none;transition:width .32s cubic-bezier(.22,1,.36,1),height .32s cubic-bezier(.22,1,.36,1),left .32s cubic-bezier(.22,1,.36,1),top .32s cubic-bezier(.22,1,.36,1)}
+.music-nav .music-bar.is-nav-expanded>.music-shared-cover{left:0;top:0;width:38px;min-width:38px;height:38px;min-height:38px}
+.music-nav .music-bar-primary{padding-left:35px}
+.music-nav .music-bar-full{padding-left:43px;transform:none;transition:opacity .2s,visibility 0s}
+.music-nav .music-bar.is-nav-expanded .music-bar-full{transition-delay:0s}
+.music-shared-cover .music-full-art{z-index:0;border-radius:inherit;overflow:hidden;clip-path:circle(50%)}
+.music-shared-cover .music-full-art img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.music-shared-cover .is-video-thumbnail img{transform:scale(1.34)}
+.music-cover-control{position:absolute;inset:0;display:grid;place-items:center;z-index:2;opacity:0;transition:opacity .2s;pointer-events:none;color:rgb(255 255 255 / .75);filter:drop-shadow(0 1px 3px #0008)}
+.music-cover-control svg{fill:rgb(255 255 255 / .45)}
+.is-nav-expanded>.music-shared-cover .music-cover-control{opacity:1}
+.music-shared-cover .music-full-ring{z-index:3;pointer-events:none}
+.music-bar:not(.is-nav-expanded)>.music-shared-cover .music-full-ring{opacity:0}
+.music-nav .music-bar.is-scrubbing>.music-shared-cover{opacity:.08}
+@media(prefers-reduced-motion:reduce){.music-nav .music-bar>.music-shared-cover{transition:none}}
+
+.music-nav.has-track .music-bar .music-shared-cover .is-video-thumbnail img{transform:scale(1.34)}
+
+.music-shared-cover>*{pointer-events:none}

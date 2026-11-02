@@ -114,6 +114,22 @@ class MusicAudio(unittest.TestCase):
    with patch.object(music,'public_url',return_value='https://music.example/song.mp3'),patch.object(music,'PublicHttp') as client,self.assertRaises(SourceError):
     client.return_value._open.return_value=(response,'https://cdn.example/song.mp3');music.remote_audio('https://music.example/song.mp3')
   self.assertTrue(music.slots.acquire(False));music.slots.release()
+ def test_music_replaces_own_stale_slots_without_touching_other_playback(self):
+  video_id,_=online.create('A',{},'video')
+  other_id,_=online.create('B',{},'music')
+  for _ in range(3):online.create('A',{},'music')
+  app=FastAPI();online.install(app,lambda:'A');music.install(app,lambda:'A');client=TestClient(app)
+  previous=None
+  with patch.object(music,'remote_audio',return_value=self.data()):
+   for _ in range(12):
+    response=client.post('/music/remote',json={'url':'https://music.example/song.mp3','clientId':'music:tab-A'})
+    self.assertEqual(response.status_code,200);data=response.json()
+    if previous:self.assertNotIn(previous,online.sessions)
+    previous=data['id'];self.assertEqual(data['expiresIn'],120)
+    self.assertIn(video_id,online.sessions);self.assertIn(other_id,online.sessions)
+    self.assertEqual(sum(v.owner=='A' and v.kind.startswith('music') for v in online.sessions.values()),1)
+   self.assertEqual(client.post('/online/'+previous+'/heartbeat').status_code,200)
+
  def test_remote_file_api_auth_capability_and_cancellation(self):
   app=FastAPI();online.install(app,lambda:'A');music.install(app,lambda:'A');client=TestClient(app)
   with patch.object(music,'remote_audio',return_value=self.data()):
