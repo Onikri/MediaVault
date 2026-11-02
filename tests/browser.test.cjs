@@ -504,11 +504,11 @@ async function main() {
   await cinema.getByRole('tab',{name:'Изображение',exact:true}).click();
   await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('anime4k');
   await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width>0&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
-  assert.equal(await cinema.locator('canvas').evaluate(c=>c.width),64,'Anime4K WebGL shaders upscale the 32px decoded fixture to 64px');
+  assert.equal(await cinema.locator('.mv-player-canvas').evaluate(c=>c.width),64,'Anime4K WebGL shaders upscale the 32px decoded fixture to 64px');
   await cinema.getByRole('combobox',{name:'Профиль устройства'}).selectOption('tablet');
   await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('mobile');
   await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width===64&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
-  await cinema.locator('canvas').evaluate(canvas=>canvas.dispatchEvent(new Event('webglcontextlost',{cancelable:true})));
+  await cinema.locator('.mv-player-canvas').evaluate(canvas=>canvas.dispatchEvent(new Event('webglcontextlost',{cancelable:true})));
   await owner.waitForFunction(()=>document.querySelector('.mv-player-warning')?.textContent.includes('Контекст GPU'));
   await cinema.getByRole('button',{name:'Повторить на новом GPU-контексте'}).click();
   await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width===64&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');

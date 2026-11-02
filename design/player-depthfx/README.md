@@ -58,4 +58,31 @@ depth connectivity and malformed/ambiguous provider answers. The browser contrac
 uses a fixture depth worker/API with real video decoding, WebGL and React at
 390/1280 px, testing explicit download/recognition, cancellation and seek/resume.
 Full-player visual previews use recorded real depth/API data, not fresh inference.
-No paid translation API or Oracle model deployment is involved in this feature.
+Depth inference does not use a paid API or require an Oracle model deployment.
+
+## Russian names and ambiguous characters
+
+Shikimori's Russian character names are joined to AniList native/Latin aliases
+by normalized full names (AniList character IDs are not assumed to be MAL IDs).
+Only Russian labels are displayed. On ambiguity or a missing Russian name,
+bounded crops containing the detected face and surrounding body context are sent
+in one request to `gemini-3.5-flash-lite`. The prompt labels each crop and target
+face, includes the anime title/aliases, known season/episode, playback timecode,
+AnimeTrace candidates and the Russian roster, and explicitly permits unresolved
+answers. Unknown episode/season values are not invented. Gemini names are checked
+for Cyrillic output; malformed or duplicate IDs cannot silently replace a label.
+
+This reuses `/reader/google/generate`: personal translation mode supplies one
+existing account-scoped key; VM mode leaves key selection to the existing server
+pool. Shared per-key quota/cooldown leases still apply. No credential enters the
+recognition API, public labels, logs or persistent frame caches. Resume/seek aborts
+the verifier and stale replies are discarded. Missing keys/API failures preserve
+playback and any catalogue-backed names, with an actionable status message.
+
+One actual Gemini 3.5 Flash Lite call through the VM pool identified the ambiguous
+armour crop from the supplied recording as `Альфонс Элрик` in 2.22 seconds (HTTP
+200). The real native-alias lookup localized Edward as `Эдвард Элрик`. Browser
+contract tests separately use fixture APIs to verify Russian rendering, crop
+submission, the exact model/episode/timecode, and VM key isolation at 390/1280 px.
+API implementation references: https://ai.google.dev/gemini-api/docs/image-understanding
+and https://ai.google.dev/gemini-api/docs/structured-output .
