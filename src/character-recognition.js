@@ -4,7 +4,7 @@ export function parseCharacters(value){
  if(![0,200,17720].includes(value?.code)||!Array.isArray(value.data))throw Error('AnimeTrace не смог распознать кадр. Попробуй позже.');
  return value.data.slice(0,8).flatMap((v,i)=>{
   const b=v.box;if(!Array.isArray(b)||b.length!==4||!b.every(Number.isFinite)||b.some(n=>n<0||n>1)||b[2]<=b[0]||b[3]<=b[1])return [];
-  const candidates=(Array.isArray(v.character)?v.character:[]).slice(0,3).flatMap(c=>typeof c.character==='string'&&c.character.trim()?[{name:c.character.trim().slice(0,120),work:typeof c.work==='string'?c.work.slice(0,160):''}]:[]);
+  const candidates=(Array.isArray(v.character)?v.character:[]).slice(0,8).flatMap(c=>typeof c.character==='string'&&c.character.trim()?[{name:c.character.trim().slice(0,120),work:typeof c.work==='string'?c.work.slice(0,160):''}]:[]);
   return candidates.length?[{id:String(i),box:b,candidates,uncertain:!!v.not_confident||new Set((v.character||[]).map(c=>c.character)).size>1}]:[];
  });
 }
