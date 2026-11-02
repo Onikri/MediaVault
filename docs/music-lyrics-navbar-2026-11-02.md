@@ -39,3 +39,56 @@ sizes. Provider responses in browser tests are fixtures; HLS/audio bytes are
 actually decoded, and TTML word progress uses supplied fixture timestamps. The
 live LRCLIB check above is separate. No new ML inference is part of this change.
 The frontend deployment does not require a VM restart or server key changes.
+
+
+## Follow-up: fixed transport and title-section handoff
+
+The hovered mini transport is now the size reference: **344 × 38 px**. The lyric
+strip and its details retain that width and right edge; they do not cover the
+profile button. Free space on the strip toggles its mode, while playback buttons
+and range inputs keep their own actions. The muted accent fill shows the actual
+elapsed fraction across the whole strip. A captured horizontal Play drag maps
+absolute cursor position to time, independently of the previous song position;
+vertical drag and wheel still adjust volume, shown by the ring. The time preview
+uses 11 px tabular text. Icon hover targets are square circles, and expand/collapse
+arrows switch with a spring. All music accents reference the same theme variable
+as Search and primary collection actions.
+
+Closed Search is always a 38 px circle, including after closing/reopening and
+scroll changes. Navbar dimensions no longer have conflicting collection-specific
+rules. Desktop capsule left/top/bottom insets are 10 px (9 px on phones).
+
+`TitleNavigation` owns one extensible section registry. A matching-width capsule
+aligns under the brand; crossing the header transfers it with a brief stretched
+capsule animation into the brand position. There is no second sticky band. The
+header label follows the current section, including the last section at the
+bottom of the document, and opens a keyboard-operable section menu. Reverse
+scroll restores the brand. `extraSections` lets integrations add a section without
+adding another navigation implementation.
+
+Lyric search also separates bilingual title aliases such as `Otonoke (オトノケ)`.
+It tries keyword indexing as well as structured fields, with at most two requests
+in flight and a total budget of two retries respecting HTTP Retry-After (bounded
+by the shared 12-second timeout). Duplicate normalized metadata no longer
+restarts a lookup. The provider returned real `503 ServerOverloaded` replies
+during this investigation; these are reported as temporary errors. A matching
+song within a small video-padding tolerance can show plain text without applying
+incorrect timings. Wrong artists, covers, substantially different durations and
+versions remain rejected.
+
+Live LRCLIB lookups on 2026-11-02 (metadata only; lyrics not stored in source):
+
+| Song | Artist | Audio duration tested | Result ID | Record duration | Precision |
+| --- | --- | --- | --- | --- | --- |
+| Otonoke (オトノケ) | Creepy Nuts | 195 s | 26522663 | 195.709396 s | Line |
+| THE DAY | Porno Graffitti | 243 s | 1064565 | 242 s | Line |
+| Peace Sign (ピースサイン) | Kenshi Yonezu | 237 s | 3873102 | 236 s | Line |
+
+Browser provider replies remain fixtures, separate from those live lookups.
+The focused tests decode actual audio/HLS, check cursor/seek-boundary agreement,
+profile visibility, circular targets, matching panel edges, and scroll/menu
+handoff at 390/1440 px. No new ML inference or VM service change is involved.
+
+The track-switch regression also verifies that React cleanup cannot remove a newly
+committed audio source. Stream state belongs to the queue request, so the next
+audio element never mounts with the previous song URL.

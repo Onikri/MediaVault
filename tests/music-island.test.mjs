@@ -18,3 +18,6 @@ test('a floating bottom transport opens upwards without moving its trigger',()=>
  const box=musicIslandLayout({left:1000,right:1172,top:730,bottom:766,width:172,height:36},{width:1200,height:790},245,'dock');
  assert.equal(box.top,475);assert.equal(box.closedTop,730);assert.equal(box.closedWidth,172);
 });
+
+import {cursorMusicTime} from '../src/music-timeline.js';
+test('absolute cursor position selects time independently of the previous song position',()=>{const rect={left:200,width:344};assert.equal(cursorMusicTime(372,rect,200),100);assert.equal(cursorMusicTime(0,rect,200),0);assert.equal(cursorMusicTime(600,rect,200),200);assert.equal(cursorMusicTime(300,rect,0),0);});

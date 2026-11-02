@@ -55,7 +55,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   await page.getByRole('button',{name:'Вернуть Blossom',exact:true}).click();await fits('Profile');await page.screenshot({path:path.join(dir,'profile-'+width+'.png'),fullPage:true});
   const originalSlot=await page.locator('.blossom-navbar .header-center-search').boundingBox();
   const originalSearch=await page.getByRole('button',{name:'Найти в библиотеке'}).boundingBox();
-  assert.ok(width<=640||originalSearch.width>=120,'navbar starts with a small SEARCH FIELD rather than only a magnifying glass');
+  assert.ok(Math.abs(originalSearch.width-38)<1,'closed search is a circle in every navbar state');
   const navLinkBefore=width===1280?(await page.locator('.desktop-nav .nav-link').first().boundingBox()).width:0;
   const actionsBefore=width>640?(await page.locator('.blossom-navbar .header-actions').boundingBox()).x:0;
   await page.keyboard.press('Control+k');const dialog=page.getByRole('dialog',{name:'Поиск в библиотеке'});await dialog.waitFor();
@@ -92,7 +92,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
    await page.evaluate(()=>scrollTo(0,480));
    await page.waitForFunction(()=>document.querySelector('.blossom-navbar')?.classList.contains('is-scrolled'));
    const compactSearch=await page.locator('.header-center-search .header-search').boundingBox();
-   assert.ok(compactSearch.width>=120,'scrolled navbar retains its compact search field rather than an icon');
+   assert.ok(Math.abs(compactSearch.width-38)<1,'scrolled search restores the same circle');
    await page.keyboard.press('Control+k');const scrolled=page.getByRole('dialog',{name:'Поиск в библиотеке'});await scrolled.waitFor();
    const scrolledBar=await page.locator('.morph-search-bar').boundingBox(),scrolledInner=await page.locator('.blossom-navbar .header-inner').boundingBox();
    assert.ok(scrolledBar.x>=scrolledInner.x-1&&scrolledBar.x+scrolledBar.width<=scrolledInner.x+scrolledInner.width+1,'scrolled search remains inside the narrowed navbar');

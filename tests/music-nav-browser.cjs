@@ -48,13 +48,13 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor();
    await page.waitForTimeout(540);
    const full=await page.locator('.music-nav .music-bar').boundingBox(),header=await page.locator('header').boundingBox();
-   assert.ok(full.width>=296,'expanded island becomes approximately the right quarter of navbar');
+   assert.ok(Math.abs(full.width-island.width)<2,'lyric strip matches the hovered mini-player width');
    assert.equal(Math.round(full.height),38,'expanded island matches logo/search capsule height');
-   assert.ok(Math.abs(full.x+full.width-header.x-header.width)<2,'expanded island touches right edge of navbar');
+   assert.ok(Math.abs(full.x+full.width-before.x-before.width)<2,'expanded island retains the mini-player right edge');
    assert.equal(await page.locator('.music-bar-full').getAttribute('aria-hidden'),'false');
    const expandedMaterial=await page.locator('.music-nav .music-bar').evaluate(el=>({border:getComputedStyle(el).borderTopWidth,blur:getComputedStyle(el).backdropFilter,background:getComputedStyle(el).backgroundColor}));
    assert.equal(expandedMaterial.border,'0px','large player has no visible outline');
-   assert.ok(expandedMaterial.blur.includes('blur(24px)'),'expanded navbar music is dark glass rather than solid black');
+   assert.ok(expandedMaterial.blur==='none','expanded navbar music uses a dark contrasting surface');
    await page.locator('.music-bar-full .music-full-copy').click({force:true});
    await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor({state:'detached'});
   }else assert.equal(await page.locator('.music-nav>.music-bar').isVisible(),false,'mobile navbar uses the icon');

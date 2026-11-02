@@ -1,0 +1,21 @@
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
+import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
+import {ChevronDown,Home} from 'lucide-react';
+import {useTitleNavigation,jumpTitleSection} from './title-navigation-store.js';
+import {GLASS_ENTER,GLASS_HIDDEN,GLASS_VISIBLE} from './glass-motion.js';
+import './title-capsule.css';
+export function TitleSectionCapsule({sections,active,navbar=false,width,onHome,disabled=false}){
+ const [open,setOpen]=useState(false),[box,setBox]=useState({left:12,top:80,width:244}),anchor=useRef(null),menu=useRef(null),reduce=useReducedMotion();
+ useEffect(()=>{if(disabled)setOpen(false);},[disabled]);
+ useEffect(()=>{const close=()=>setOpen(false);addEventListener('mediavault:search-open',close);return()=>removeEventListener('mediavault:search-open',close);},[]);
+ const label=sections.find(s=>s.id===active)?.label||sections[0]?.label||'Разделы';
+ useLayoutEffect(()=>{if(!open)return;const update=()=>{const r=anchor.current?.getBoundingClientRect();if(r)setBox({left:Math.max(12,Math.min(r.left,innerWidth-256)),top:r.bottom+10,width:Math.min(244,innerWidth-24)});};update();addEventListener('resize',update);addEventListener('scroll',update,{passive:true});return()=>{removeEventListener('resize',update);removeEventListener('scroll',update);};},[open]);
+ useEffect(()=>{if(!open)return;const close=e=>{if(!menu.current?.contains(e.target)&&!anchor.current?.contains(e.target))setOpen(false);};const key=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setOpen(false);anchor.current?.focus();}if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const buttons=[...menu.current?.querySelectorAll('[role=menuitem]')||[]],at=buttons.indexOf(document.activeElement),next=e.key==='Home'?0:e.key==='End'?buttons.length-1:(at+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next]?.focus();}};document.addEventListener('pointerdown',close);const a=anchor.current,m=menu.current;a?.addEventListener('keydown',key);m?.addEventListener('keydown',key);(m?.querySelector('[aria-current=location]')||m?.querySelector('button'))?.focus({preventScroll:true});return()=>{document.removeEventListener('pointerdown',close);a?.removeEventListener('keydown',key);m?.removeEventListener('keydown',key);};},[open]);
+ return <><button ref={anchor} disabled={disabled} type="button" className={(navbar?'brand logo ':'')+'title-section-capsule'} style={{width}} title={label} aria-label="Разделы тайтла" aria-haspopup="menu" aria-expanded={open} onClick={()=>setOpen(v=>!v)}><AnimatePresence initial={false} mode="wait"><motion.span key={active} initial={reduce?false:{opacity:0,y:7}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-7}} transition={{duration:reduce?0:.12}}>{label}</motion.span></AnimatePresence><ChevronDown size={13} style={{transform:open?'rotate(180deg)':undefined}}/></button>{createPortal(<AnimatePresence>{open&&<motion.div ref={menu} className="title-section-menu" role="menu" aria-label="Навигация по тайтлу" style={{...box,position:'fixed'}} initial={reduce?false:GLASS_HIDDEN} animate={GLASS_VISIBLE} exit={GLASS_HIDDEN} transition={reduce?{duration:0}:GLASS_ENTER}>{sections.map(s=><button type="button" role="menuitem" key={s.id} aria-current={active===s.id?'location':undefined} onClick={()=>{jumpTitleSection(s.id);setOpen(false);anchor.current?.focus({preventScroll:true});}}>{s.label}</button>)}{onHome&&<button type="button" role="menuitem" className="title-section-home" onClick={()=>{setOpen(false);onHome();}}><Home size={14}/>На главную</button>}</motion.div>}</AnimatePresence>,document.body)}</>;
+}
+export function NavbarTitleBrand({fallback,onHome}){
+ const state=useTitleNavigation(),[width,setWidth]=useState(144);
+ useLayoutEffect(()=>{if(state?.merged)return;const node=document.querySelector('.header-brand-area .brand.logo');if(!node)return;const update=()=>setWidth(node.getBoundingClientRect().width);update();const observer=new ResizeObserver(update);observer.observe(node);return()=>observer.disconnect();},[!!state?.merged]);
+ return state?.merged?<TitleSectionCapsule navbar sections={state.sections} active={state.active} width={width} onHome={onHome}/>:fallback;
+}

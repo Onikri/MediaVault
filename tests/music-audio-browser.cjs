@@ -39,8 +39,8 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    await page.waitForTimeout(540);
    const full=await page.locator('.music-nav .music-bar').boundingBox(),header=await page.locator('.blossom-navbar .header-inner').boundingBox();
    assert.equal(Math.round(full.height),38,'Expanded transport matches the logo capsule height');
-   assert.ok(full.width>=400&&full.width<=520,'Expanded transport leaves room for a complete status line');
-   assert.ok(Math.abs(full.x+full.width-header.x-header.width)<2,'Expanded transport aligns with navbar right edge');
+   assert.ok(Math.abs(full.width-344)<2,'Expanded transport matches the reference mini-player width');
+   assert.ok(Math.abs(full.x+full.width-(await page.locator('.music-nav').boundingBox()).x-(await page.locator('.music-nav').boundingBox()).width)<2,'Expanded transport keeps its own right edge');
    await page.locator('.music-nav .music-bar.is-nav-expanded').click({position:{x:130,y:8}});
    await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor({state:'detached'});
    const before=await page.locator('audio').evaluate(a=>a.currentTime);
@@ -56,11 +56,11 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    await page.mouse.down();
    await page.mouse.move(knob.x+knob.width/2+85,knob.y+knob.height/2,{steps:12});
    await page.locator('.music-seek-surface').waitFor({state:'visible'});
-   const playBox=await play.boundingBox(),clockBox=await page.locator('.music-dot-matrix').boundingBox();
+   const playBox=await play.boundingBox(),clockBox=await page.locator('.music-seek-time').boundingBox();
    assert.ok(await play.evaluate(el=>parseFloat(getComputedStyle(el).width)===38),'expanded Play matches the search circle even during gesture scale');
    assert.ok(clockBox.width<=60,'dot-matrix timestamp stays small');
    assert.ok(Math.abs((playBox.x+playBox.width/2)-(clockBox.x+clockBox.width/2))<5,'dot-matrix time replaces Play at the same horizontal position');
-   assert.ok(await page.locator('.music-dot-matrix circle').count()>40,'seek time uses real dot-matrix glyphs');
+   assert.equal(await page.locator('.music-seek-time').evaluate(n=>getComputedStyle(n).fontSize),'11px','seek time uses compact navbar typography');
    assert.equal(await page.locator('.music-seek-marker').count(),1,'precise white seek divider is visible');
    const during=await page.locator('audio').evaluate(a=>a.currentTime);
    await page.mouse.up();

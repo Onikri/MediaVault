@@ -6,12 +6,16 @@
 .music-lyrics-settings>div{display:grid;gap:12px;padding:8px 0}
 .music-lyrics-settings label{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .music-lyrics-settings label:has(input[type=checkbox]){justify-content:flex-start;gap:9px}
-.music-lyrics-settings input{accent-color:var(--color-blossom)}
+.music-lyrics-settings input{accent-color:var(--nav-search-accent,var(--color-crimson))}
 .music-lyrics-settings input[type=range]:focus-visible{outline:2px solid color-mix(in srgb,var(--color-petal) 65%,transparent);outline-offset:3px;border-radius:99px}
-.music-lyrics-settings input[type=range]{width:125px;accent-color:var(--color-blossom)}
+.music-lyrics-settings input[type=range]{width:125px;accent-color:var(--nav-search-accent,var(--color-crimson))}
 .music-panel-lyrics{padding:12px 0;min-height:44px;font-size:16px;font-weight:550;text-wrap:balance}
 .music-lyric-actions{display:flex;flex-wrap:wrap;gap:8px}.music-lyric-actions button{padding:8px 10px!important;border-radius:9px!important;background:color-mix(in srgb,var(--color-petal) 6%,transparent)!important;font-size:10px!important}
 .music-lyrics-settings a{color:inherit;text-decoration:underline;text-underline-offset:3px}
-.music-nav .music-full-lyrics{flex:none;display:grid;place-items:center;width:30px;min-width:30px;height:38px;min-height:38px;padding:5px;border:0!important;box-shadow:none!important;border-radius:50%;color:var(--color-petal);background:transparent}
 .music-nav .music-full-lyrics:hover{background:color-mix(in srgb,var(--color-petal) 9%,transparent)}
 .music-nav .music-bar.is-scrubbing .music-full-lyrics{opacity:.12}
+
+.music-lyrics-settings input[type=range]{appearance:none;height:3px;border:0;box-shadow:none;background:linear-gradient(var(--nav-search-accent,var(--color-crimson)),var(--nav-search-accent,var(--color-crimson))) left center / 50% 100% no-repeat,linear-gradient(#ffffff36,#ffffff36)}
+.music-lyrics-settings input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;border:0;border-radius:50%;background:var(--nav-search-accent,var(--color-crimson))}
+
+.music-lyrics-settings input[type=range]:focus-visible{outline:0}

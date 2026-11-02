@@ -1,13 +1,14 @@
 import {useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useMotionValue,useReducedMotion} from 'motion/react';
-import {X,Play,Pause,Music2,Heart,ExternalLink,SkipBack,SkipForward,Volume2,ListMusic,ChevronDown,Headphones,Settings2,ArrowLeft,Maximize2} from 'lucide-react';
+import {X,Play,Pause,Music2,Heart,ExternalLink,SkipBack,SkipForward,Volume2,ListMusic,ChevronDown,Headphones,Settings2,ArrowLeft,Maximize2,Minimize2} from 'lucide-react';
 import {musicSnapshot,subscribeMusic,closeMusic,stepMusic,playMusic} from './music-player.js';
 import {toggleTrack,tracks} from './music-library.js';
 import {disconnectMusic} from './music-connectors.js';
 import MusicConnections from './MusicConnections.jsx';
 import {openYouTubeAudio,openMusicAudio} from './youtube-audio.js';
 import {musicIslandLayout} from './music-island.js';
+import {cursorMusicTime} from './music-timeline.js';
 import './music-dock.css';
 import useLyrics from './use-lyrics.js';
 import SyncedLyrics from './SyncedLyrics.jsx';
@@ -19,35 +20,17 @@ import {GLASS_ENTER,GLASS_HIDDEN,GLASS_VISIBLE} from './glass-motion.js';
 const clock=value=>{const n=Math.max(0,Math.floor(Number(value)||0));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');};
 const imageURL=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}};
 
-const DOT_GLYPHS={
- '0':['01110','10001','10011','10101','11001','10001','01110'],
- '1':['00100','01100','00100','00100','00100','00100','01110'],
- '2':['01110','10001','00001','00010','00100','01000','11111'],
- '3':['11110','00001','00001','01110','00001','00001','11110'],
- '4':['10010','10010','10010','11111','00010','00010','00010'],
- '5':['11111','10000','10000','11110','00001','00001','11110'],
- '6':['01110','10000','10000','11110','10001','10001','01110'],
- '7':['11111','00001','00010','00100','01000','01000','01000'],
- '8':['01110','10001','10001','01110','10001','10001','01110'],
- '9':['01110','10001','10001','01111','00001','00001','01110'],
- ':':['000','010','010','000','010','010','000']
-};
-function DotMatrixClock({value}){
- const symbols=Array.from(value);let x=1;const dots=[];
- symbols.forEach((ch,index)=>{const matrix=DOT_GLYPHS[ch]||DOT_GLYPHS['0'];matrix.forEach((line,y)=>{Array.from(line).forEach((bit,j)=>{if(bit==='1')dots.push(<circle key={index+'-'+y+'-'+j} cx={x+j*5.5} cy={3+y*5.5} r="1.65"/>);});});x+=(matrix[0].length+1)*5.5;});
- return <svg className="music-dot-matrix" viewBox={'0 0 '+x+' 42'} role="img" aria-label={value} preserveAspectRatio="xMidYMid meet">{dots}</svg>;
-}
-
 export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveItem,placement='dock',service}){
  const reduce=useReducedMotion();
  const [audioRetry,setAudioRetry]=useState(0);
  const state=useSyncExternalStore(subscribeMusic,musicSnapshot),track=state?.track,native=!!track&&['library','file'].includes(track.source),remote=track?.source==='url',youtube=!!track&&!native&&!remote,nav=placement==='nav',serverAudio=(youtube||remote)&&!!service?.request,audioBacked=native||serverAudio;
- const [results,setResults]=useState([]),[selection,setSelection]=useState(null),[source,setSource]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[playing,setPlaying]=useState(false),[saved,setSaved]=useState(false),[time,setTime]=useState(0),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[queue,setQueue]=useState(false),[expanded,setExpanded]=useState(false),[connections,setConnections]=useState(false),[metadata,setMetadata]=useState(null),[failedCover,setFailedCover]=useState('');
+ const [results,setResults]=useState([]),[selection,setSelection]=useState(null),[stream,setStream]=useState({request:null,url:''}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[playing,setPlaying]=useState(false),[saved,setSaved]=useState(false),[time,setTime]=useState(0),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[queue,setQueue]=useState(false),[expanded,setExpanded]=useState(false),[connections,setConnections]=useState(false),[metadata,setMetadata]=useState(null),[failedCover,setFailedCover]=useState('');
+ const source=stream.request===state?.request?stream.url:'';const setSource=url=>setStream({request:state?.request,url});
  const selected=selection&&selection.request===state?.request?selection.id:'';const setSelected=id=>setSelection({id,request:state?.request});
  const audio=useRef(null),scope=useRef(userId),gesture=useRef(null),methods=useRef({prepareStream,readWhole,resolveItem});methods.current={prepareStream,readWhole,resolveItem};
  const volumeKnob=useRef(null),volumeDrag=useRef(null),volumeMoved=useRef(false),previousVolume=useRef(.8);
  const [barHovered,setBarHovered]=useState(false),[barKeyboard,setBarKeyboard]=useState(false);
- const [navFull,setNavFull]=useState(false),[navMorphBox,setNavMorphBox]=useState({width:340,right:0,top:-10,height:58});
+ const [navFull,setNavFull]=useState(false);
  const circle=useRef(null),circleGesture=useRef(null),circleSkipClick=useRef(false);
  const [scrubPreview,setScrubPreview]=useState(null);
  const scrubPosition=useMotionValue('0%');
@@ -60,20 +43,19 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
  async function importLyrics(event){const file=event.target.files?.[0];event.target.value='';if(!file)return;try{if(file.size>1000000)throw Error('Файл текста превышает 1 МБ.');const text=await file.text(),parsed=/\.(ttml|xml)$/i.test(file.name)?parseTtml(text):parseLrc(text);if(!parsed.lines.length)throw Error('В файле нет временной разметки.');setManualLyrics({key:lyricKey,data:{...parsed,phase:'ready',source:'Твой файл'}});setLyricError('');}catch(e){setLyricError(e.message);}}
  const activeLyric=<SyncedLyrics data={lyricData} audioRef={audio} playing={playing} offset={lyricOffset} enabled={lyricsEnabled}/>;
 
- useLayoutEffect(()=>{if(!nav||!track)return;const measure=()=>{const h=(trigger.current?.closest('.header-inner')||trigger.current?.closest('header'))?.getBoundingClientRect(),t=trigger.current?.getBoundingClientRect();if(!h||!t)return;setNavMorphBox(old=>{const next={width:Math.min(innerWidth-24,Math.max(360,Math.min(520,Math.round(h.width*.36)))),right:Math.round(h.right-t.right),top:Math.round(h.top+(h.height-38)/2-t.top),height:38};return Object.keys(next).every(k=>old[k]===next[k])?old:next;});};measure();const ob=new ResizeObserver(measure);const h=(trigger.current?.closest('.header-inner')||trigger.current?.closest('header'));if(h)ob.observe(h);addEventListener('resize',measure);return()=>{ob.disconnect();removeEventListener('resize',measure);};},[nav,!!track]);
  useEffect(()=>{if(!nav)return;dispatchEvent(new CustomEvent('mediavault:music-expanded',{detail:navFull&&!!track}));return()=>dispatchEvent(new CustomEvent('mediavault:music-expanded',{detail:false}));},[nav,navFull,!!track]);
  useEffect(()=>{const hide=()=>{setNavFull(false);setExpanded(false);};addEventListener('mediavault:search-open',hide);return()=>removeEventListener('mediavault:search-open',hide);},[]);
  useEffect(()=>{if(!track)setNavFull(false);},[!!track]);
  useEffect(()=>{if(!navFull)return;const key=e=>{if(e.key==='Escape'){e.preventDefault();setNavFull(false);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[navFull]);
  useEffect(()=>{const el=circle.current;if(!el||!navFull)return;const wheel=e=>{e.preventDefault();setVolume(v=>Math.max(0,Math.min(1,Math.round((v+(e.deltaY<0?.05:-.05))*100)/100)));};el.addEventListener('wheel',wheel,{passive:false});return()=>el.removeEventListener('wheel',wheel);},[navFull]);
- const onCircleDown=e=>{if(e.button!==0)return;circleSkipClick.current=false;circleGesture.current={id:e.pointerId,x:e.clientX,y:e.clientY,t:time,v:volume,mode:null,preview:time};e.currentTarget.setPointerCapture(e.pointerId);};
+ const onCircleDown=e=>{if(e.button!==0)return;circleSkipClick.current=false;circleGesture.current={id:e.pointerId,x:e.clientX,y:e.clientY,t:time,v:volume,rect:barElement.current?.getBoundingClientRect(),mode:null,preview:time};e.currentTarget.setPointerCapture(e.pointerId);};
  const onCircleMove=e=>{const g=circleGesture.current;if(!g||g.id!==e.pointerId)return;const dx=e.clientX-g.x,dy=e.clientY-g.y;
   if(!g.mode&&Math.hypot(dx,dy)>9)g.mode=Math.abs(dx)>=Math.abs(dy)?'seek':'volume';
   if(!g.mode)return;
   circleSkipClick.current=true;
   if(g.mode==='volume'){setVolume(Math.max(0,Math.min(1,Math.round((g.v-dy/130)*100)/100)));return;}
   if(duration>0){
-   const next=Math.max(0,Math.min(duration,g.t+dx/150*duration));g.preview=next;
+   const next=cursorMusicTime(e.clientX,g.rect,duration);g.preview=next;
    scrubPosition.set((next/duration*100)+'%');
    const second=Math.floor(next);
    if(g.lastSecond!==second){g.lastSecond=second;setScrubPreview({time:next});}
@@ -99,7 +81,7 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
   return()=>{document.removeEventListener('pointermove',onMove,true);document.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);};
  },[!!track,nav]);
  const trigger=useRef(null),island=useRef(null),content=useRef(null),[islandBox,setIslandBox]=useState(()=>musicIslandLayout(null,{width:innerWidth,height:innerHeight},180,placement));
- useLayoutEffect(()=>{let frame=0;const update=()=>{frame=0;const rect=(nav&&navFull?barElement.current:trigger.current)?.getBoundingClientRect();if(!rect)return;const next=musicIslandLayout(rect,{width:innerWidth,height:innerHeight},content.current?.scrollHeight||180,placement,nav&&navFull?rect.width:356);setIslandBox(old=>Object.keys(next).every(key=>old[key]===next[key])?old:next);};const schedule=()=>{if(!frame)frame=requestAnimationFrame(update);};update();const observer=new ResizeObserver(schedule);if(trigger.current)observer.observe(trigger.current);if(barElement.current)observer.observe(barElement.current);if(content.current)observer.observe(content.current);const header=trigger.current?.closest('.site-header');if(header)observer.observe(header);addEventListener('scroll',schedule,true);addEventListener('resize',schedule);return()=>{cancelAnimationFrame(frame);observer.disconnect();removeEventListener('scroll',schedule,true);removeEventListener('resize',schedule);};},[placement,expanded,connections,queue,!!track,navFull]);
+ useLayoutEffect(()=>{let frame=0;const update=()=>{frame=0;const rect=(nav&&navFull?barElement.current:trigger.current)?.getBoundingClientRect();if(!rect)return;const next=musicIslandLayout(rect,{width:innerWidth,height:innerHeight},content.current?.scrollHeight||180,placement,nav&&navFull?rect.width:344);setIslandBox(old=>Object.keys(next).every(key=>old[key]===next[key])?old:next);};const schedule=()=>{if(!frame)frame=requestAnimationFrame(update);};update();const observer=new ResizeObserver(schedule);if(trigger.current)observer.observe(trigger.current);if(barElement.current)observer.observe(barElement.current);if(content.current)observer.observe(content.current);const header=trigger.current?.closest('.site-header');if(header)observer.observe(header);addEventListener('scroll',schedule,true);addEventListener('resize',schedule);return()=>{cancelAnimationFrame(frame);observer.disconnect();removeEventListener('scroll',schedule,true);removeEventListener('resize',schedule);};},[placement,expanded,connections,queue,!!track,navFull]);
  useEffect(()=>{if(!expanded)return;const outside=e=>{if(!island.current?.contains(e.target)&&!trigger.current?.contains(e.target))collapse();};document.addEventListener('pointerdown',outside);return()=>document.removeEventListener('pointerdown',outside);},[expanded]);
  useEffect(()=>{if(scope.current!==userId){scope.current=userId;closeMusic();disconnectMusic();setExpanded(false);}},[userId]);
  useEffect(()=>{if(!track){setPlaying(false);return;}const abort=new AbortController();let objectURL;setResults([]);setSelected('');setSource('');setError('');setPlaying(false);setTime(0);setDuration(0);setSaved(tracks(userId).some(t=>t.id===track.id));setBusy(true);setMetadata(null);setFailedCover('');setAudioRetry(0);setExpanded(false);
@@ -117,10 +99,13 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
   (remote?openMusicAudio(service,selected,{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(25000)]),remote:true}):openYouTubeAudio(service,selected,{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(75000)]),refresh:audioRetry>0})).then(data=>{lease=data;if(abort.signal.aborted){data.close();return;}setSource(data.streamUrl);setDuration(data.duration||0);setMetadata(old=>({...old,youtubeTitle:data.title||track.title}));}).catch(e=>{if(!abort.signal.aborted){setSource('');setTime(0);setDuration(0);setPlaying(false);setError(e.message);}}).finally(()=>{if(!abort.signal.aborted)setBusy(false);});
   return()=>{abort.abort();lease?.close();};
  },[serverAudio,selected,state?.request,audioRetry,service?.server]);
- useEffect(()=>{const node=audio.current;if(!audioBacked||!node||!source)return;node.volume=volume;node.play().catch(()=>setPlaying(false));return()=>{node.pause();node.removeAttribute('src');node.load();};},[source,audioBacked,state?.request]);
+ // React has already committed the next src when the previous effect cleans up.
+ // Clearing that attribute here can erase the new song before metadata loads.
+ useEffect(()=>{const node=audio.current;if(!audioBacked||!node||!source)return;node.volume=volume;node.play().catch(()=>setPlaying(false));return()=>node.pause();},[source,audioBacked,state?.request]);
  useEffect(()=>{if(audio.current)audio.current.volume=volume;},[volume]);
  function pause(){audio.current?.pause();setPlaying(false);}
  function collapse(restore=false){setExpanded(false);setConnections(false);setQueue(false);if(restore===true)requestAnimationFrame(()=>[...(trigger.current?.querySelectorAll('button')||[])].find(button=>button.getClientRects().length&&!button.disabled)?.focus({preventScroll:true}));}
+ function toggleBarMode(){if(navFull)collapse();setNavFull(v=>!v);}
  function toggle(){if(!source){if(serverAudio&&selected&&!busy)setAudioRetry(v=>v+1);return;}const node=audio.current;if(!node)return;if(node.paused)node.play().catch(()=>setError('Нажми Play ещё раз, чтобы разрешить звук.'));else node.pause();}
  function seek(value){const n=Number(value);setTime(n);if(audio.current)audio.current.currentTime=n;}
  const clampVolume=value=>Math.max(0,Math.min(1,Math.round(value*100)/100));
@@ -140,11 +125,11 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
  const canPlay=!!track&&!busy&&(!!source||serverAudio&&!!selected);
  const timeline=(detail=false)=><div className="music-dock-timeline"><span>{clock(time)}</span><input type="range" min="0" max={duration||1} step="0.1" value={Math.min(time,duration||1)} disabled={!duration} style={{'--music-progress':(duration>0?Math.min(100,time/duration*100):0)+'%'}} aria-label={detail?'Позиция музыки в подробностях':'Позиция музыки'} onChange={e=>seek(e.target.value)}/><span>{clock(duration)}</span></div>;
  const controls=(detail=false)=><div className="music-dock-controls"><button aria-label="Предыдущая песня" disabled={!state?.index} onClick={()=>stepMusic(-1)}><SkipBack size={16}/></button><button className="music-play" aria-label={detail?(playing?'Пауза в подробностях':'Продолжить в подробностях'):(playing?'Пауза музыки':'Продолжить музыку')} onClick={toggle} disabled={!canPlay}>{playing?<Pause size={18}/>:<Play size={18}/>}</button><button aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={16}/></button></div>;
- const bar=track?<div ref={barElement} style={{'--nav-full-width':navMorphBox.width+'px','--nav-full-right':-navMorphBox.right+'px','--nav-full-top':navMorphBox.top+'px','--nav-full-height':navMorphBox.height+'px'}} className={'music-bar'+(playing?' is-playing':'')+(barHovered?' is-hovered':'')+(barKeyboard?' is-keyboard-open':'')+(nav&&navFull?' is-nav-expanded':'')+(scrubPreview?' is-scrubbing':'')} onClick={event=>{if(navFull&&!(event.target.closest('button,input,a')))setNavFull(false);}} onPointerLeave={event=>{if(event.pointerType==='mouse'){setBarHovered(false);setBarKeyboard(false);const focused=document.activeElement;if(focused&&event.currentTarget.contains(focused))focused.blur();}}} onFocusCapture={event=>{if(keyboardNavigation.current&&event.target.matches(':focus-visible'))setBarKeyboard(true);}} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setBarKeyboard(false);}}>
+ const bar=track?<div ref={barElement} className={'music-bar'+(playing?' is-playing':'')+(barHovered?' is-hovered':'')+(barKeyboard?' is-keyboard-open':'')+(nav&&navFull?' is-nav-expanded':'')+(scrubPreview?' is-scrubbing':'')} onClick={event=>{if(nav&&!event.target.closest('button,input,a,[role=slider]'))toggleBarMode();}} onPointerLeave={event=>{if(event.pointerType==='mouse'){setBarHovered(false);setBarKeyboard(false);const focused=document.activeElement;if(focused&&event.currentTarget.contains(focused))focused.blur();}}} onFocusCapture={event=>{if(keyboardNavigation.current&&event.target.matches(':focus-visible'))setBarKeyboard(true);}} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setBarKeyboard(false);}}>
  <div className="music-bar-primary">
-  <button className="music-disc" aria-label="Открыть музыкальный плеер" aria-expanded={nav&&track?navFull:expanded} onClick={()=>nav&&track?setNavFull(x=>!x):expanded?collapse():setExpanded(true)}>{art}</button>
+  <button className="music-disc" aria-label="Открыть музыкальный плеер" aria-expanded={nav&&track?navFull:expanded} onClick={()=>nav&&track?toggleBarMode():expanded?collapse():setExpanded(true)}>{art}</button>
   <div className="music-bar-middle">
-   <button className="music-dock-title" onClick={()=>nav&&track?setNavFull(x=>!x):expanded?collapse():setExpanded(true)} aria-label={'О песне '+track.title}><strong>{displayTitle}</strong><small title={error||undefined}>{identity.artist||metadata?.artists?.join(', ')||(busy?'Подготавливаем аудио…':native?'Личная коллекция':'Аудио через Oracle')}</small></button>
+   <button className="music-dock-title" onClick={()=>nav&&track?toggleBarMode():expanded?collapse():setExpanded(true)} aria-label={'О песне '+track.title}><strong>{displayTitle}</strong><small title={error||undefined}>{identity.artist||metadata?.artists?.join(', ')||(busy?'Подготавливаем аудио…':native?'Личная коллекция':'Аудио через Oracle')}</small></button>
    <div className="music-bar-transport">{timeline()}</div>
   </div>
   <div className="music-bar-actions">
@@ -157,18 +142,19 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
   </div>
  </div>
  <div className="music-bar-full" aria-hidden={!navFull}>
-  <button ref={circle} className="music-full-play" aria-label={playing?'Пауза музыки':'Продолжить музыку'} disabled={!canPlay} onPointerDown={onCircleDown} onPointerMove={onCircleMove} onPointerUp={onCircleUp} onPointerCancel={onCircleUp} onClick={()=>{if(circleSkipClick.current){circleSkipClick.current=false;return;}toggle();}} style={{'--volume-percent':Math.round(volume*100)+'%'}}>
+  <div className="music-progress-fill" aria-hidden="true" style={{transform:`scaleX(${duration?Math.max(0,Math.min(1,(scrubPreview?.time??time)/duration)):0})`}}/>
+  <button ref={circle} className="music-full-play" aria-label={playing?'Пауза музыки':'Продолжить музыку'} disabled={!canPlay} onPointerDown={onCircleDown} onPointerMove={onCircleMove} onPointerUp={onCircleUp} onPointerCancel={onCircleUp} onClick={()=>{if(circleSkipClick.current){circleSkipClick.current=false;return;}toggle();}} title={'Громкость '+Math.round(volume*100)+'% · колесо или вертикальный жест'} style={{'--volume-percent':Math.round(volume*100)+'%'}}>
    <span className="music-full-art" aria-hidden="true">{art}</span><span className="music-full-ring" aria-hidden="true"/>{playing?<Pause size={24}/>:<Play size={24}/>}
   </button>
   <div className="music-full-copy"><span className="music-full-title">{displayTitle}</span><strong className="music-full-lyric" aria-live="off">{error?'Проблема с аудио · повтори Play':activeLyric}</strong></div>
-  <button className="music-full-lyrics" aria-label="Развернуть музыкальный плеер" title="Развернуть музыкальный плеер" onClick={()=>{setExpanded(true);setConnections(false);setQueue(false);setLyricsOpen(true);}}><Maximize2 size={18}/></button>
+  <button className="music-full-lyrics" aria-label={expanded?'Свернуть музыкальный плеер':'Развернуть музыкальный плеер'} title={expanded?'Свернуть музыкальный плеер':'Развернуть музыкальный плеер'} aria-expanded={expanded} onClick={()=>{if(expanded)collapse();else{setExpanded(true);setConnections(false);setQueue(false);setLyricsOpen(true);}}}><motion.span key={String(expanded)} initial={reduce?false:{opacity:0,scale:.65,rotate:-35}} animate={{opacity:1,scale:1,rotate:0}} transition={GLASS_ENTER}>{expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>}</motion.span></button>
   <button className="music-full-next" aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={21}/></button>
   <AnimatePresence initial={false}>
    {scrubPreview&&<motion.div key="seek" className="music-seek-surface" role="status" aria-label={'Перемотка '+clock(scrubPreview.time)} initial={{opacity:0,scaleY:.75}} animate={{opacity:1,scaleY:1}} exit={{opacity:0,scaleY:.78}} transition={{type:'spring',stiffness:420,damping:30,mass:.65}}>
     <motion.div className="music-seek-fill" style={{width:scrubPosition}}/>
     <motion.span className="music-seek-marker" style={{left:scrubPosition}}/>
     <motion.span className="music-seek-triangle" initial={{x:-18,scale:.85,opacity:1}} animate={{x:0,scale:.45,opacity:0}} transition={{type:'spring',stiffness:390,damping:28,mass:.55}}><Play size={19}/></motion.span>
-    <motion.span className="music-seek-clock" initial={{opacity:0,scale:.64,filter:'blur(4px)'}} animate={{opacity:1,scale:1,filter:'blur(0px)'}} exit={{opacity:0,scale:.78,filter:'blur(4px)'}} transition={{type:'spring',stiffness:450,damping:30,delay:.1}}><DotMatrixClock value={clock(scrubPreview.time)}/></motion.span>
+    <motion.span className="music-seek-clock" initial={{opacity:0,scale:.64,filter:'blur(4px)'}} animate={{opacity:1,scale:1,filter:'blur(0px)'}} exit={{opacity:0,scale:.78,filter:'blur(4px)'}} transition={{type:'spring',stiffness:450,damping:30,delay:.1}}><span className="music-seek-time">{clock(scrubPreview.time)}</span></motion.span>
    </motion.div>}
   </AnimatePresence>
  </div>
@@ -183,7 +169,7 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
    {busy&&<p className="music-provider-note" role="status">Подготавливаем аудио…</p>}
    {youtube&&<div className="music-dock-recording">{results.length>0&&<details open={!selected||undefined}><summary>Выбрать запись</summary><label>Запись<select aria-label="Запись YouTube" value={selected} onChange={e=>{setSelected(e.target.value);setError('');}}><option value="">Выбрать запись</option>{results.map(r=><option value={r.id} key={r.id}>{r.title} · {r.author}</option>)}</select></label></details>}{error&&<><p className="music-provider-note">Аудио через Oracle недоступно</p><button type="button" disabled={busy} onClick={()=>setAudioRetry(v=>v+1)}>Повторить подготовку аудио</button></>}</div>}
    {queue&&<div className="music-dock-queue"><strong>Далее в очереди</strong>{state.queue.map((t,i)=><button key={t.id} aria-current={i===state.index} onClick={()=>playMusic(t,state.queue)}><span>{i+1}</span>{t.title}{i===state.index&&<span className="music-equalizer" aria-hidden="true"><i/><i/><i/></span>}</button>)}</div>}
-   <details className="music-lyrics-settings" open={lyricsOpen} onToggle={e=>setLyricsOpen(e.currentTarget.open)}><summary>Текст песни <small>{lyricData.precision==='word'?'По словам':lyricData.lines?.length?'По строкам':lyricData.plainText?'Без синхронизации':'Не найден'}</small></summary><div><label><input type="checkbox" checked={lyricsEnabled} onChange={e=>{setLyricsEnabled(e.target.checked);try{localStorage.setItem('mediavault_lyrics_enabled',String(e.target.checked));}catch{}}}/>Синхронизировать текст</label><div className="music-panel-lyrics">{lyricData.plainText?<p className="music-plain-lyrics">{lyricData.plainText}</p>:activeLyric}</div><label>Сдвиг текста · {lyricOffset>0?'+':''}{lyricOffset.toFixed(1)} с<input aria-label="Сдвиг текста песни" type="range" min="-15" max="15" step=".1" value={lyricOffset} onChange={e=>shiftLyrics(Number(e.target.value))}/></label><div className="music-lyric-actions"><button onClick={()=>lyricFile.current?.click()}>Загрузить LRC / TTML</button><button onClick={()=>{setManualLyrics(null);automaticLyrics.retry();}}>Повторить поиск</button></div><input hidden ref={lyricFile} type="file" accept=".lrc,.ttml,.xml" onChange={importLyrics}/>{lyricData.source&&<small>{lyricData.url?<a href={lyricData.url} target="_blank" rel="noopener noreferrer">{lyricData.source}</a>:lyricData.source}{lyricData.precision==='line'?' · источник содержит только времена строк':''}</small>}{lyricError&&<small role="status">{lyricError}</small>}</div></details>
+   <details className="music-lyrics-settings" open={lyricsOpen} onToggle={e=>setLyricsOpen(e.currentTarget.open)}><summary>Текст песни <small>{lyricData.precision==='word'?'По словам':lyricData.lines?.length?'По строкам':lyricData.plainText?'Без синхронизации':'Не найден'}</small></summary><div><label><input type="checkbox" checked={lyricsEnabled} onChange={e=>{setLyricsEnabled(e.target.checked);try{localStorage.setItem('mediavault_lyrics_enabled',String(e.target.checked));}catch{}}}/>Синхронизировать текст</label><div className="music-panel-lyrics">{lyricData.plainText?<p className="music-plain-lyrics">{lyricData.plainText}</p>:activeLyric}</div><label>Сдвиг текста · {lyricOffset>0?'+':''}{lyricOffset.toFixed(1)} с<input aria-label="Сдвиг текста песни" type="range" min="-15" max="15" step=".1" value={lyricOffset} onChange={e=>shiftLyrics(Number(e.target.value))}/></label><div className="music-lyric-actions"><button onClick={()=>lyricFile.current?.click()}>Загрузить LRC / TTML</button><button onClick={()=>{setManualLyrics(null);automaticLyrics.retry();}}>Повторить поиск</button></div><input hidden ref={lyricFile} type="file" accept=".lrc,.ttml,.xml" onChange={importLyrics}/>{lyricData.source&&<small>{lyricData.url?<a href={lyricData.url} target="_blank" rel="noopener noreferrer">{lyricData.source}</a>:lyricData.source}{lyricData.timingMismatch?' · длительность видео отличается; показан текст без синхронизации':lyricData.precision==='line'?' · источник содержит только времена строк':''}</small>}{lyricError&&<small role="status">{lyricError}</small>}</div></details>
    {metadata?.found&&<details className="music-song-details"><summary>О записи</summary><span>{metadata.album}</span>{metadata.date&&<small>{metadata.date}</small>}<a href={metadata.url} target="_blank" rel="noopener noreferrer">MusicBrainz <ExternalLink size={11}/></a></details>}
   </>:<div className="music-empty"><div className="music-empty-heading"><span className="music-disc"><Music2 size={20}/></span><div><strong>Выбери музыку</strong><p>Опенинги, эндинги и твои записи</p></div></div>{tracks(userId).length>0?<div className="music-recent">{tracks(userId).slice(0,4).map(t=><button key={t.id} onClick={()=>playMusic(t,tracks(userId))}><span><strong>{t.title}</strong><small>{t.artists?.join(', ')}</small></span><Play size={14}/></button>)}</div>:<p className="music-empty-note">Запусти песню из коллекции или со страницы аниме.</p>}</div>}
   {error&&!connections&&<p className="music-dock-error" role="status">{error}</p>}

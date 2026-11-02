@@ -10,12 +10,13 @@ export function musicIdentity(track={}){
   for(let n=0;n<8;n++){let next=title;for(const artist of ordered){const escaped=artist.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');next=next.replace(new RegExp('^'+escaped+'(?:\\s*[-–—:|/]+\\s*|\\s+)','i'),'').replace(new RegExp('(?:\\s*[-–—:|/]+\\s*|\\s+)[(（]?'+escaped+'[)）]?$','i'),'').trim();}next=next.replace(/^[\s\-–—:|/]+|[\s\-–—:|/]+$/g,'').replace(/\s+/g,' ');if(next===title)break;title=next;}
   return service(title)||text(value);
  };
- const titles=unique([track.title,...track.aliases||[]].map(cleanTitle)).slice(0,5),displayArtist=artists.find(a=>/[A-Za-z]/.test(a)&&!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(a))||artists[0]||'';
+ const titleForms=value=>{const full=cleanTitle(value),parts=[...full.matchAll(/[（(]([^）)]+)[）)]/g)].map(m=>text(m[1]));const alternate=parts.filter(p=>!versions(p)&&/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(p)!==/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(full.replace(/[（(][^）)]+[）)]/g,'')));const base=alternate.length?full.replace(/[（(][^）)]+[）)]/g,'').trim():full;return [base,...alternate,full];};
+ const titles=unique([track.title,...track.aliases||[]].flatMap(titleForms)).slice(0,6),displayArtist=artists.find(a=>/[A-Za-z]/.test(a)&&!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(a))||artists[0]||'';
  return {title:titles[0]||text(track.title),titles,artists,artist:displayArtist,album:text(track.album),year:String(track.year||track.date||'').slice(0,4),aliases:titles.slice(1)};
 }
 const versions=v=>['cover','live','remix','instrumental','slowed','sped','nightcore','tv size','tv-size','short','karaoke'].filter(w=>text(v).toLowerCase().includes(w)).sort().join('|');
-export function rankLyricRecord(record,identity,duration){
- if(!record||record.instrumental||!Number.isFinite(Number(record.duration))||Math.abs(Number(record.duration)-duration)>2.5)return -1;
+export function rankLyricRecord(record,identity,duration,{allowVideoPadding=false}={}){
+ if(!record||record.instrumental||!Number.isFinite(Number(record.duration))||Math.abs(Number(record.duration)-duration)>(allowVideoPadding?Math.min(20,Math.max(10,duration*.08)):2.5))return -1;
  const row=musicIdentity({title:record.trackName,artists:[record.artistName]}),titleMatch=identity.titles.some(t=>musicName(t)===musicName(row.title)),artistMatch=row.artists.some(a=>identity.artists.some(b=>musicName(a)===musicName(b)));
  if(!titleMatch||!artistMatch||versions(record.trackName)!==versions(identity.title))return -1;
  return 200-Math.abs(Number(record.duration)-duration)*5+(record.syncedLyrics?40:record.plainLyrics?5:-300)+(identity.album&&musicName(identity.album)===musicName(record.albumName)?10:0);

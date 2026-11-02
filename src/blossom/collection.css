@@ -1,10 +1,6 @@
 /* Collection uses the same surfaces and control anatomy as the online catalog. */
-html[data-blossom] .blossom-navbar .header-inner{height:60px;min-height:60px;padding-block:8px;align-items:center}
-html[data-blossom] .blossom-navbar .brand.logo{height:44px;padding-block:0;line-height:1;align-items:center}
-html[data-blossom] .blossom-navbar .desktop-nav .nav-link{height:36px;padding-block:0;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 html[data-blossom] .blossom-navbar .header-actions{align-items:center}
 html[data-blossom] .blossom-navbar .mobile-toggle{display:none}
-html[data-blossom] .blossom-navbar .header-search{height:36px;min-height:36px;padding-block:0;line-height:1}
 html[data-blossom] .app-shell[data-view=collection]>.app-main>.search-bar{min-height:50px;margin-bottom:18px;padding:0 16px;border:0;border-radius:16px;background:var(--color-canvas-soft);box-shadow:none}
 html[data-blossom] .app-shell[data-view=collection] #searchInput{height:50px;background:transparent}
 html[data-blossom] .app-shell[data-view=collection]>.app-main>.chip-row{flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none;padding-bottom:3px}
@@ -75,7 +71,4 @@ html[data-blossom] .anime-preview .preview-specs dd{margin:0;overflow-wrap:anywh
  html[data-blossom] .title-browser-toolbar{gap:10px}
 }
 @media(max-width:640px){
- html[data-blossom] .blossom-navbar .header-inner{height:56px;min-height:56px;padding-block:8px}
- html[data-blossom] .blossom-navbar .brand.logo{height:40px}
- html[data-blossom] .blossom-navbar .header-search{height:32px;min-height:32px}
 }
