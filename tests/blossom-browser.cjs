@@ -61,7 +61,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   await page.keyboard.press('Control+k');const dialog=page.getByRole('dialog',{name:'Поиск в библиотеке'});await dialog.waitFor();
   assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).evaluate(e=>document.activeElement===e),true);
   await page.getByRole('combobox',{name:'Поиск произведения'}).fill('Naruto');await dialog.getByRole('option').first().waitFor();await fits('Search');
-  const position=await page.locator('.morph-search-dialog').boundingBox(),bar=await page.locator('.header-center-search').boundingBox();
+  const position=await page.locator('.morph-search-dialog').boundingBox(),bar=await page.locator(width<=640?'.blossom-navbar .header-inner':'.header-center-search').boundingBox();
   assert.ok(Math.abs(position.x+position.width/2-bar.x-bar.width/2)<2,'morph search stays centered under navbar search');
   const expandedBar=await page.locator('.morph-search-bar').boundingBox();
   assert.ok(Math.abs(expandedBar.y+expandedBar.height/2-(bar.y+bar.height/2))<2,'morph search and trigger share the same vertical center');
@@ -74,8 +74,8 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   assert.equal(originalGlass.texture,'none','Search uses one accent surface, without extra red gradients');assert.equal(originalGlass.background,await page.locator('.header-search').evaluate(el=>getComputedStyle(el).backgroundColor),'Expanded search retains the trigger accent');
   assert.ok(originalGlass.blur.includes('blur(20px)')&&originalGlass.blur.includes('saturate(1.6)'),'20px saturating glass blur is preserved');
   const slotExpanded=await page.locator('.blossom-navbar .header-center-search').boundingBox();
-  assert.ok(slotExpanded.width>originalSlot.width+30,'center search grows within responsive navbar slot');
-  if(width<=640)assert.ok(slotExpanded.width>=width-65,'mobile search borrows the navbar space after outer controls yield');
+  assert.ok((width<=640?field.width:slotExpanded.width)>originalSlot.width+30,'expanded search borrows enough responsive navbar space');
+  if(width<=640)assert.ok(field.width>=width-65,'mobile search borrows the navbar space after outer controls yield');
   if(width>640){const actionsAfter=await page.locator('.blossom-navbar .header-actions').boundingBox();
    assert.ok(actionsAfter.x>=actionsBefore-2,'right music and profile controls do not overlap opening search');
    assert.ok(slotExpanded.x+slotExpanded.width<=actionsAfter.x+2,'expanded search keeps a separate right-hand lane');

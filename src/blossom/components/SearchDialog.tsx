@@ -24,7 +24,7 @@ function coordinates(){
  const height=38;
  const left=inner?inner.left+(inner.width-width)/2:(window.innerWidth-width)/2;
  const top=inner?inner.top+(inner.height-height)/2:(target?.top??18);
- return {width,left,top,height,seedWidth:target?.width??112,seedHeight:target?.height??38};
+ return {width,left,top,height,anchorX:target?target.left+target.width/2-left-width/2:0,seedWidth:target?.width??112,seedHeight:target?.height??38};
 }
 function Highlight({text,query}:{text:string,query:string}){const at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;return at<0?<>{text}</>:<>{text.slice(0,at)}<strong>{text.slice(at,at+query.length)}</strong>{text.slice(at+query.length)}</>;}
 export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,onClose:()=>void,onChoose:(item:any)=>void,onBrowse:(query:string,kind:string)=>void}){
@@ -73,7 +73,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
   if(event.key==='Backspace'&&event.currentTarget.selectionStart===0&&event.currentTarget.selectionEnd===0&&!query&&chips.length){event.preventDefault();const last=chips.at(-1)!;if(marked===last)removeChip(last);else setMarked(last);return;}
   if(event.key==='ArrowLeft'&&event.currentTarget.selectionStart===0&&!query&&chips.length){event.preventDefault();setMarked(chips.at(-1)!);}
  };
- return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={false} animate={{opacity:1,y:0}}>
+ return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{x:geometry.anchorX}} animate={{opacity:1,y:0,x:closing?geometry.anchorX:0}} transition={{duration:reduce?0:.32,ease:[.22,1,.36,1]}}>
   <motion.div className="morph-search-bar" onPointerDown={focusField}
    initial={reduce?false:{width:38,height:38}}
    animate={{width:closing?38:geometry.width,height:38,borderRadius:19}}

@@ -519,3 +519,8 @@ html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search>butt
  flex:0 0 38px;width:38px;min-width:38px;max-width:38px;height:38px;min-height:38px;max-height:38px;border-radius:999px;transition:background-color .2s,color .2s;
 }
 html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search>button.header-search{visibility:hidden;pointer-events:none}
+
+/* Keep the mobile anchor in its normal layout while the portal morphs to it. */
+@media(max-width:640px){
+ html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{position:relative;inset:auto;transform:none;width:38px;min-width:38px;max-width:38px;margin-left:auto;justify-self:center}
+}
