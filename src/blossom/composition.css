@@ -467,6 +467,6 @@ html[data-blossom] .blossom-navbar .desktop-nav .nav-link{height:38px;min-height
 html[data-blossom] .blossom-navbar .nav-glide{top:0;height:38px;background:color-mix(in srgb,var(--color-petal) 11%,transparent)}
 html[data-blossom] .blossom-navbar .header-center-search .header-search,
 html[data-blossom] .blossom-navbar .header-center-search .header-search:hover,
-html[data-blossom] .blossom-navbar .header-center-search .header-search:focus-visible{background:var(--nav-search-accent);color:#fff;box-shadow:none}
+html[data-blossom] .blossom-navbar .header-center-search .header-search:focus-visible{background:var(--nav-search-accent);color:var(--nav-search-ink,#fff);box-shadow:none}
 html[data-blossom] .blossom-navbar .header-actions{align-items:center;margin-block:0}
 @media(max-width:640px){html[data-blossom] .blossom-navbar .header-inner{min-height:56px;padding-block:9px}html[data-blossom] .blossom-navbar .header-center-search .header-search{height:38px;min-height:38px}}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {BLOSSOM,chosenPalette,paletteFromSeed,readAppearance,rgb,sanitizeAppearance,seedFromPixels} from '../src/blossom/theme.js';
+import {BLOSSOM,searchPalette,chosenPalette,paletteFromSeed,readAppearance,rgb,sanitizeAppearance,seedFromPixels} from '../src/blossom/theme.js';
 import {contrast} from '../src/palette.js';
 import {blossomRecord} from '../src/blossom/media-adapter.js';
 
@@ -39,3 +39,5 @@ test('monochrome backgrounds stay neutral instead of falling back to an unrelate
  for(const shade of [0,80,128,255])assert.equal(seedFromPixels(Uint8ClampedArray.from(Array.from({length:32},()=>[shade,shade,shade,255]).flat())),'#'+shade.toString(16).padStart(2,'0').repeat(3));
  assert.match(seedFromPixels(new Uint8ClampedArray()),/^#[\da-f]{6}$/);
 });
+
+test('Search accent uses a readable foreground in bright, dark and wallpaper palettes',()=>{for(const seed of ['#ffffff','#000000','#ee3c35','#ffe680','#00ff00','#3355ff','#d7b8ac','#888888']){const p=searchPalette(seed);assert.ok(contrast(rgb(p.foreground),rgb(p.background))>=4.5,seed);}});
