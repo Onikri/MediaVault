@@ -62,9 +62,9 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    assert.ok(Math.abs((playBox.x+playBox.width/2)-(clockBox.x+clockBox.width/2))<5,'dot-matrix time replaces Play at the same horizontal position');
    assert.equal(await page.locator('.music-seek-time').evaluate(n=>getComputedStyle(n).fontSize),'11px','seek time uses compact navbar typography');
    assert.equal(await page.locator('.music-seek-marker').count(),1,'precise white seek divider is visible');
-   const during=await page.locator('audio').evaluate(a=>a.currentTime);
+   const seekBar=await page.locator('.music-bar').boundingBox(),audioDuration=await page.locator('audio').evaluate(a=>a.duration),expected=Math.max(0,Math.min(1,(knob.x+knob.width/2+85-seekBar.x)/seekBar.width))*audioDuration;
    await page.mouse.up();
-   await page.waitForFunction(v=>document.querySelector('audio')?.currentTime>v+2,during);
+   await page.waitForFunction(v=>Math.abs(document.querySelector('audio')?.currentTime-v)<.75,expected);
    await page.locator('.music-seek-surface').waitFor({state:'detached'});
    await play.click();assert.equal(await page.locator('audio').evaluate(a=>a.paused),true,'Expanded play control pauses audio');
    await play.click();await page.waitForFunction(()=>!document.querySelector('audio').paused);
