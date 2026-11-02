@@ -17,20 +17,31 @@ export function normalizeDepth(values){
  if(span<1e-7)throw Error('В стоп-кадре недостаточно различимой глубины.');
  return Uint8Array.from(values,v=>Math.round(Math.max(0,Math.min(1,(v-low)/span))*255));
 }
-export const shadowCutoff=seconds=>.48+.16*Math.sin(seconds*Math.PI*2/12-Math.PI/2);
+// First pass starts behind the entire scene (zero shadow), advances over 6 s,
+// then breathes in a smaller range without illuminating the far background again.
+export const shadowCutoff=seconds=>{const t=Math.max(0,seconds);if(t<6){const p=t/6;return -.24+.86*p*p*(3-2*p);}return .53+.09*Math.cos((t-6)*Math.PI*2/10);};
 export function videoRect(width,height,videoWidth,videoHeight){
  const scale=Math.min(width/videoWidth,height/videoHeight),w=videoWidth*scale,h=videoHeight*scale;
  return {left:(width-w)/2,top:(height-h)/2,width:w,height:h};
 }
 // A depth-connected surface seeded inside a returned character box. This is a
 // relative-depth highlight, not a claim of semantic/full-body segmentation.
-export function depthSurface(depth,width,height,box){
- const [x1,y1,x2,y2]=box,sx=Math.min(width-1,Math.max(0,Math.floor((x1+x2)*.5*width))),sy=Math.min(height-1,Math.max(0,Math.floor((y1+y2)*.5*height))),seed=depth[sy*width+sx];
- const mask=new Uint8Array(depth.length),seen=new Uint8Array(depth.length),queue=new Int32Array(depth.length);let head=0,tail=1;queue[0]=sy*width+sx;seen[queue[0]]=1;
- const minX=Math.max(0,Math.floor((x1-(x2-x1)*.9)*width)),maxX=Math.min(width-1,Math.ceil((x2+(x2-x1)*.9)*width));
- const minY=Math.max(0,Math.floor((y1-(y2-y1)*.8)*height)),maxY=Math.min(height-1,Math.ceil((y2+(y2-y1)*6)*height));
+export function depthSurface(depth,width,height,box,bounds){
+ const [x1,y1,x2,y2]=box,sx=Math.min(width-1,Math.max(0,Math.floor((x1+x2)*.5*width))),sy=Math.min(height-1,Math.max(0,Math.floor((y1+y2)*.5*height)));
+ const samples=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const index=Math.max(0,Math.min(height-1,sy+dy))*width+Math.max(0,Math.min(width-1,sx+dx));samples.push({index,value:depth[index]});}samples.sort((a,b)=>a.value-b.value);const seed=samples[4].value,start=samples[4].index;
+ const mask=new Uint8Array(depth.length),seen=new Uint8Array(depth.length),queue=new Int32Array(depth.length);let head=0,tail=1;queue[0]=start;seen[queue[0]]=1;
+ const minX=Math.max(0,Math.floor((bounds?bounds[0]:x1-(x2-x1)*.9)*width)),maxX=Math.min(width-1,Math.ceil((bounds?bounds[2]:x2+(x2-x1)*.9)*width));
+ const minY=Math.max(0,Math.floor((bounds?bounds[1]:y1-(y2-y1)*.8)*height)),maxY=Math.min(height-1,Math.ceil((bounds?bounds[3]:y2+(y2-y1)*6)*height));
  while(head<tail){const n=queue[head++],x=n%width,y=Math.floor(n/width);if(x<minX||x>maxX||y<minY||y>maxY||Math.abs(depth[n]-seed)>38)continue;const feather=Math.max(3,(x2-x1)*width*.2),fade=Math.min(1,(x-minX)/feather,(maxX-x)/feather,(y-minY)/feather,(maxY-y)/feather);mask[n]=Math.round(Math.max(0,fade)*255);
   for(const k of [x>0?n-1:-1,x+1<width?n+1:-1,y>0?n-width:-1,y+1<height?n+width:-1])if(k>=0&&!seen[k]){seen[k]=1;queue[tail++]=k;}
  }
  return mask;
+}
+export function characterAtDepthPoint(characters,masks,width,height,x,y){
+ if(x<0||y<0||x>1||y>1)return null;let best=null,score=-Infinity;
+ for(const c of characters){const b=c.bodyBox||[Math.max(0,c.box[0]-(c.box[2]-c.box[0])*.5),c.box[1],Math.min(1,c.box[2]+(c.box[2]-c.box[0])*.5),Math.min(1,c.box[3]+(c.box[3]-c.box[1])*5)];if(x<b[0]||x>b[2]||y<b[1]||y>b[3])continue;
+  const mask=masks.get(c.id),opacity=mask?mask[Math.min(height-1,Math.floor(y*height))*width+Math.min(width-1,Math.floor(x*width))]/255:1;if(opacity<.12)continue;
+  const distance=Math.hypot((x-(b[0]+b[2])/2)/Math.max(.01,b[2]-b[0]),(y-(b[1]+b[3])/2)/Math.max(.01,b[3]-b[1])),value=opacity-distance*.2;
+  if(value>score){score=value;best=c;}
+ }return best;
 }

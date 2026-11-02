@@ -4,8 +4,10 @@ The owner supplied `depthfx_studio.html` and a screen recording. MediaVault adap
 its smoothstep depth cutoff, Hermite S-curve, light-mask exponent 1.25, falloff .38,
 and sinusoidal animation into an alpha-only WebGL overlay. It does not displace
 UVs, move/duplicate the video, add a second video decoder, or reconstruct texture.
-The 12-second cycle moves through relative depth; reduced-motion uses a static
-cutoff and hidden tabs stop drawing. Selected characters lift the shadow over a
+The first pass starts fully transparent behind the scene and advances for six
+seconds to cutoff .62. Subsequent ten-second breaths stay in the smaller .44–.62
+range, keeping the far background shaded. Reduced-motion uses a static cutoff
+and hidden tabs stop drawing. Selected characters lift the shadow over a
 depth-connected surface, with a soft fill rather than a bright contour/halo.
 Depth alone cannot guarantee semantic instance boundaries, especially where two
 characters stand at the same distance. Selection is a depth-surface aid, not SAM.
@@ -33,16 +35,26 @@ seconds of playback. Turning the effect off preserves ordinary video playback.
 ## Characters
 
 The official AnimeTrace API (https://www.animetrace.com/api-docs/) supplies bounded
-normalized boxes and candidate names. Enabled/default model IDs come from its
-model-list endpoint instead of a hardcoded model name. The default operation is
-an explicit pause-frame button; optional automatic recognition is separately
-controlled in player settings, debounced and limited to one request per 10 s.
-Only a downscaled JPEG frame is sent, without cookies, Google tokens or source
-URLs. Results are not treated as certain when multiple distinct names are offered,
-even if the provider's `not_confident` flag is false. No confidence percentage or
-unrecognized name is invented. Seeking, changing episodes and resuming invalidate
-outstanding results. Public recognition is external and may be unavailable; depth
-rendering and playback continue independently.
+normalized face boxes and candidate names. Enabled/default model IDs come from
+its model-list endpoint. A separate Gemini full-frame pass can find profiles,
+armour, occluded faces and people missed by that face detector. The pause button
+starts the face request in parallel, allows at most 350 ms for preliminary hints,
+then sends one Google request for the whole downscaled frame and any available
+ambiguous crops. Later face results can still provide names while Google works.
+The Russian roster and face model list warm on pause using metadata only; image
+upload still requires the button or separately enabled automatic recognition.
+Manual calls have a two-second click guard plus the shared Google quota limiter;
+automatic calls retain a ten-second guard. Complete frame results use the bounded
+memory cache. Unavailable Google service preserves available face results without
+caching that incomplete fallback as a final answer. A face API failure/empty
+answer cannot prevent Gemini from searching the frame. One face request is bounded
+to five seconds, Google to twelve; these are failure deadlines, not promised speed.
+Google's normalized `[ymin,xmin,ymax,xmax]` body/face boxes are validated and
+converted to the player's normalized coordinates. Invalid boxes and duplicates
+are rejected. Ambiguity remains explicit; no confidence percentage is invented.
+Resume, seek and episode changes cancel and invalidate outstanding work. Only the
+JPEG and bounded anime context are sent, without Google OAuth tokens/source URLs
+in the provider payload. Playback and depth rendering remain independent.
 
 ## Validation
 
@@ -64,13 +76,13 @@ Depth inference does not use a paid API or require an Oracle model deployment.
 
 Shikimori's Russian character names are joined to AniList native/Latin aliases
 by normalized full names (AniList character IDs are not assumed to be MAL IDs).
-Only Russian labels are displayed. On ambiguity or a missing Russian name,
-bounded crops containing the detected face and surrounding body context are sent
-in one request to `gemini-3.5-flash-lite`. The prompt labels each crop and target
-face, includes the anime title/aliases, known season/episode, playback timecode,
-AnimeTrace candidates and the Russian roster, and explicitly permits unresolved
-answers. Unknown episode/season values are not invented. Gemini names are checked
-for Cyrillic output; malformed or duplicate IDs cannot silently replace a label.
+Only Russian labels are displayed. `gemini-3.5-flash-lite` receives the complete
+frame plus up to three available ambiguous crops. The prompt includes anime
+title/aliases, known season/episode, playback timecode, preliminary AnimeTrace
+candidates and the Russian roster, and explicitly permits unresolved answers.
+Unknown episode/season values are not invented. Gemini names are checked for
+Cyrillic output and boxes remain tied to visible figures, not every character in
+the roster. The whole-frame search runs even without detected faces.
 
 This reuses `/reader/google/generate`: personal translation mode supplies one
 existing account-scoped key; VM mode leaves key selection to the existing server
@@ -86,3 +98,24 @@ contract tests separately use fixture APIs to verify Russian rendering, crop
 submission, the exact model/episode/timecode, and VM key isolation at 390/1280 px.
 API implementation references: https://ai.google.dev/gemini-api/docs/image-understanding
 and https://ai.google.dev/gemini-api/docs/structured-output .
+
+## Hover refinement and current measurements
+
+Each coarse body box limits a depth-connected flood from a robust face/upper-body
+seed. A 3x3 median handles single-pixel depth noise. Masks are built once per depth
+map/recognition result, not on pointer moves. Body hover tests these masks and
+resolves overlapping coarse boxes by surface interior; labels support hover,
+keyboard focus and click-to-pin. The GPU fades the selected mask in/out over about
+160 ms without changing the breathing phase or running another model. This is
+still relative-depth selection, not guaranteed semantic segmentation: adjacent
+figures at equal depth can share parts of the surface.
+
+Two real full-frame requests with **no face hints** recognized Edward and Alphonse
+on the supplied recording frames (including armour with no visible face). VM
+gateway round trips were 1.84 and 1.90 s, separate slots, 2,487/2,535 total tokens.
+The client allows 350 ms for hints and adds image encoding/network time; quota,
+congestion and provider latency can exceed a 3–4 s target. This small sample is not
+a general recognition benchmark. Visual QA uses recorded real depth and Gemini
+answers; browser contract tests use fixtures and real WebGL readback to verify
+zero alpha on the very first pass, later darkening, mask lifting, body hover,
+fallbacks, key isolation, caching and cancellation at 390/1280 px.

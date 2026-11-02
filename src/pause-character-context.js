@@ -16,6 +16,10 @@ export function localizeCharacters(values,roster){
  });
 }
 const rosters=new Map();
+export function cachedCharacterRoster(context){
+ const existing=(context.characters||[]).map(c=>({nameRu:russianName(c.name),aliases:[c.name,...c.aliases||[]]})).filter(c=>c.nameRu),hit=rosters.get(String(context.malId));
+ return [...existing,...(hit&&hit.until>Date.now()?hit.values:[])];
+}
 export async function characterRoster(context,{server,signal}={}){
  const existing=(context.characters||[]).map(c=>({nameRu:russianName(c.name),aliases:[c.name,...c.aliases||[]]})).filter(c=>c.nameRu);
  if(!context.malId)return existing;
