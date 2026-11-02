@@ -53,7 +53,11 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   await page.getByRole('button',{name:'Сбросить оформление',exact:true}).click();assert.equal((await palette()).canvas,'#0c0c0f');
   await page.evaluate(()=>dispatchEvent(new CustomEvent('mediavault:backdrop-palette',{detail:'#0000ff'})));assert.equal((await palette()).blossom,'#ee3c35','Manual theme ignores changing title backgrounds');
   await page.getByRole('button',{name:'Вернуть Blossom',exact:true}).click();await fits('Profile');await page.screenshot({path:path.join(dir,'profile-'+width+'.png'),fullPage:true});
+  const originalSlot=await page.locator('.blossom-navbar .header-center-search').boundingBox();
+  const originalSearch=await page.getByRole('button',{name:'Найти в библиотеке'}).boundingBox();
+  assert.ok(width<=640||originalSearch.width>=120,'navbar starts with a small SEARCH FIELD rather than only a magnifying glass');
   const navLinkBefore=width===1280?(await page.locator('.desktop-nav .nav-link').first().boundingBox()).width:0;
+  const actionsBefore=width>640?(await page.locator('.blossom-navbar .header-actions').boundingBox()).x:0;
   await page.keyboard.press('Control+k');const dialog=page.getByRole('dialog',{name:'Поиск в библиотеке'});await dialog.waitFor();
   assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).evaluate(e=>document.activeElement===e),true);
   await page.getByRole('combobox',{name:'Поиск произведения'}).fill('Naruto');await dialog.getByRole('option').first().waitFor();await fits('Search');
@@ -65,13 +69,17 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   assert.ok(field.width<=341&&field.x>=inner.x-1&&field.x+field.width<=inner.x+inner.width+1,'expanded search remains inside navbar width');
   assert.ok(Math.abs((field.y-inner.y)-(inner.y+inner.height-field.y-field.height))<1.6,'expanded search has equal top and bottom insets');
   const originalGlass=await page.locator('.morph-search-bar').evaluate(el=>({border:getComputedStyle(el).borderTopWidth,background:getComputedStyle(el).backgroundColor,blur:getComputedStyle(el).backdropFilter,texture:getComputedStyle(el).backgroundImage}));
-  assert.equal(originalGlass.border,'1px','original MorphingSearchChips keeps its subtle glass hairline');
-  assert.ok(originalGlass.background.includes('0.55')||originalGlass.background.includes('0.549'),'search uses original 55% translucent glass');
-  assert.ok(originalGlass.blur.includes('blur(20px)')&&originalGlass.blur.includes('saturate(1.6)'),'original 20px saturating glass blur is preserved');
-  assert.equal(originalGlass.texture,'none','search has no replacement noise texture');
+  assert.equal(originalGlass.border,'0px','search glass has no frame');
+  assert.ok(originalGlass.texture.includes('linear-gradient')&&!originalGlass.texture.includes('url('),'search glass uses palette accent instead of noisy border');
+  assert.ok(originalGlass.blur.includes('blur(20px)')&&originalGlass.blur.includes('saturate(1.6)'),'20px saturating glass blur is preserved');
+  const slotExpanded=await page.locator('.blossom-navbar .header-center-search').boundingBox();
+  assert.ok(slotExpanded.width>originalSlot.width+30||width<=640,'center search grows within responsive navbar slot');
+  if(width>640){const actionsAfter=await page.locator('.blossom-navbar .header-actions').boundingBox();
+   assert.ok(actionsAfter.x>=actionsBefore-2,'right music and profile controls do not overlap opening search');
+   assert.ok(slotExpanded.x+slotExpanded.width<=actionsAfter.x+2,'expanded search keeps a separate right-hand lane');}
   assert.equal(await dialog.locator('kbd').count(),0,'search displays no hotkey legends');
   assert.equal(await page.locator('.header-center-search kbd').count(),0,'navbar search displays no hotkey legend');
-  if(width===1280){await page.waitForTimeout(400);const navLinkAfter=(await page.locator('.desktop-nav .nav-link').first().boundingBox()).width;assert.ok(navLinkAfter<navLinkBefore,'text navigation shrinks when search opens');}
+  if(width===1280){await page.waitForTimeout(400);const navLinkAfter=(await page.locator('.desktop-nav .nav-link').first().boundingBox()).width;assert.ok(navLinkAfter<navLinkBefore,'text navigation shrinks when search opens');const first=await page.locator('.desktop-nav .nav-link').first().boundingBox();const item=await page.locator('.desktop-nav').boundingBox();assert.ok(Math.abs(first.y+first.height/2-item.y-item.height/2)<1,'navigation links stay vertically centered');}
   assert.equal(await page.locator('.morph-search-backdrop').count(),0,'search uses original floating glass panel without modal backdrop');
   await page.screenshot({path:path.join(dir,'search-'+width+'.png')});await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).inputValue(),'','first Escape clears the query like MorphingSearchChips');
