@@ -422,3 +422,21 @@ html[data-blossom] .blossom-navbar .desktop-nav{
   --search-slot:278px;
  }
 }
+
+
+/* Focus is shown by gentle tonal lift, never by drawn frames in the navbar. */
+html[data-blossom] .blossom-navbar .header-search,
+html[data-blossom] .blossom-navbar .header-search:hover,
+html[data-blossom] .blossom-navbar .header-search:focus-visible,
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link,
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link:focus-visible,
+html[data-blossom] .blossom-navbar .avatar-button,
+html[data-blossom] .blossom-navbar .avatar-button:focus-visible{
+ border:0!important;outline:0!important;box-shadow:none!important;
+}
+html[data-blossom] .blossom-navbar .header-search:focus-visible{
+ background-color:color-mix(in srgb,var(--color-blossom) 30%,rgb(34 35 43 / .72));
+}
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link:focus-visible{
+ background:color-mix(in srgb,var(--color-blossom) 17%,transparent);
+}
