@@ -401,3 +401,24 @@ html[data-blossom] .blossom-navbar .desktop-nav{
  html[data-blossom] .blossom-navbar .header-inner,
  html[data-blossom] .blossom-navbar .header-actions{transition:none}
 }
+
+
+/* Small phones cannot fit three visible clusters plus a real input.
+   Temporarily yield the left/right slots to the focused search, then restore. */
+@media(max-width:640px){
+ html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{
+  width:calc(100% - 20px);max-width:none;min-width:0;
+ }
+ html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search .header-search{
+  width:100%;max-width:100%;min-width:0;
+ }
+ html[data-blossom] .blossom-navbar.is-search-expanded .header-brand-area,
+ html[data-blossom] .blossom-navbar.is-search-expanded .header-actions{
+  opacity:0;visibility:hidden;pointer-events:none;
+ }
+}
+@media(min-width:1200px) and (max-width:1350px){
+ html[data-blossom] .blossom-navbar.is-scrolled.is-search-expanded .header-inner{
+  --search-slot:278px;
+ }
+}
