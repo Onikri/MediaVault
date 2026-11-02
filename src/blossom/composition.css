@@ -512,3 +512,10 @@ html[data-blossom] .blossom-navbar.is-player-expanded .header-center-search{opac
  html[data-blossom] .blossom-navbar .header-actions{order:2;flex:none}
  html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{position:absolute;top:50%;left:9px;right:9px;transform:translateY(-50%);margin:0}
 }
+
+/* The portal owns the expanded field. Its trigger never stretches with the slot. */
+html[data-blossom] .blossom-navbar .header-center-search>button.header-search,
+html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search>button.header-search{
+ flex:0 0 38px;width:38px;min-width:38px;max-width:38px;height:38px;min-height:38px;max-height:38px;border-radius:999px;transition:background-color .2s,color .2s;
+}
+html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search>button.header-search{visibility:hidden;pointer-events:none}
