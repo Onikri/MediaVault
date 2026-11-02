@@ -1,6 +1,6 @@
 import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
-import {AnimatePresence,motion} from 'motion/react';
+import {AnimatePresence,motion,useMotionValue} from 'motion/react';
 import {X,Play,Pause,Music2,Heart,ExternalLink,SkipBack,SkipForward,Volume2,ListMusic,ChevronDown,Headphones,Settings2,ArrowLeft} from 'lucide-react';
 import {musicSnapshot,subscribeMusic,closeMusic,stepMusic,playMusic} from './music-player.js';
 import {toggleTrack,tracks} from './music-library.js';
@@ -42,6 +42,7 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
  const [navFull,setNavFull]=useState(false),[navMorphBox,setNavMorphBox]=useState({width:340,right:0,top:-10,height:58});
  const circle=useRef(null),circleGesture=useRef(null),circleSkipClick=useRef(false);
  const [scrubPreview,setScrubPreview]=useState(null);
+ const scrubPosition=useMotionValue('0%');
  const activeLyric=(()=>{const arr=track?.syncedLyrics||track?.lyrics;if(!Array.isArray(arr))return 'Текст песни пока недоступен';const line=arr.filter(x=>Number(x.time??x.start??0)<=time).at(-1);return typeof line==='string'?line:(line?.text||line?.line||'Текст песни пока недоступен');})();
  useLayoutEffect(()=>{if(!nav||!track)return;const measure=()=>{const h=(trigger.current?.closest('.header-inner')||trigger.current?.closest('header'))?.getBoundingClientRect(),t=trigger.current?.getBoundingClientRect();if(!h||!t)return;setNavMorphBox(old=>{const next={width:Math.max(296,Math.min(420,Math.round(h.width*.25))),right:Math.round(h.right-t.right),top:Math.round(h.top-t.top),height:Math.round(h.height)};return Object.keys(next).every(k=>old[k]===next[k])?old:next;});};measure();const ob=new ResizeObserver(measure);const h=(trigger.current?.closest('.header-inner')||trigger.current?.closest('header'));if(h)ob.observe(h);addEventListener('resize',measure);return()=>{ob.disconnect();removeEventListener('resize',measure);};},[nav,!!track]);
  useEffect(()=>{if(!nav)return;dispatchEvent(new CustomEvent('mediavault:music-expanded',{detail:navFull&&!!track}));return()=>dispatchEvent(new CustomEvent('mediavault:music-expanded',{detail:false}));},[nav,navFull,!!track]);
@@ -54,10 +55,15 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
   if(!g.mode)return;
   circleSkipClick.current=true;
   if(g.mode==='volume'){setVolume(Math.max(0,Math.min(1,Math.round((g.v-dy/130)*100)/100)));return;}
-  if(duration>0){const next=Math.max(0,Math.min(duration,g.t+dx/150*duration));g.preview=next;setScrubPreview({time:next,progress:next/duration*100});}
+  if(duration>0){
+   const next=Math.max(0,Math.min(duration,g.t+dx/150*duration));g.preview=next;
+   scrubPosition.set((next/duration*100)+'%');
+   const second=Math.floor(next);
+   if(g.lastSecond!==second){g.lastSecond=second;setScrubPreview({time:next});}
+  }
  };
  const onCircleUp=e=>{const g=circleGesture.current;if(!g||g.id!==e.pointerId)return;
-  circleGesture.current=null;if(g.mode==='seek'&&duration>0)seek(g.preview);
+  circleGesture.current=null;if(g.mode==='seek'&&duration>0&&e.type!=='pointercancel')seek(g.preview);
   setScrubPreview(null);
   if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
  };
@@ -131,7 +137,6 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
      <svg viewBox="0 0 36 36" className="music-volume-ring" aria-hidden="true"><circle cx="18" cy="18" r="14" className="music-volume-ring-track"/><circle cx="18" cy="18" r="14" className="music-volume-ring-fill" pathLength="100" strokeDasharray={Math.round(volume*100)+' 100'} transform="rotate(-90 18 18)"/></svg><Volume2 size={14}/>
     </button>
    </div>
-   <button className="music-expand" aria-label="Подробности музыки" aria-expanded={nav&&track?navFull:expanded} onClick={()=>nav&&track?setNavFull(x=>!x):expanded?collapse():setExpanded(true)}><ChevronDown size={16}/></button>
   </div>
  </div>
  <div className="music-bar-full" aria-hidden={!navFull}>
@@ -142,8 +147,8 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
   <button className="music-full-next" aria-label="Следующая песня" disabled={!state||state.index>=state.queue.length-1} onClick={()=>stepMusic(1)}><SkipForward size={21}/></button>
   <AnimatePresence initial={false}>
    {scrubPreview&&<motion.div key="seek" className="music-seek-surface" role="status" aria-label={'Перемотка '+clock(scrubPreview.time)} initial={{opacity:0,scaleY:.75}} animate={{opacity:1,scaleY:1}} exit={{opacity:0,scaleY:.78}} transition={{type:'spring',stiffness:420,damping:30,mass:.65}}>
-    <motion.div className="music-seek-fill" initial={{width:'0%'}} animate={{width:scrubPreview.progress+'%'}} transition={{type:'spring',stiffness:480,damping:34,mass:.4}}/>
-    <motion.span className="music-seek-marker" initial={{left:'0%'}} animate={{left:scrubPreview.progress+'%'}} transition={{type:'spring',stiffness:480,damping:34,mass:.4}}/>
+    <motion.div className="music-seek-fill" style={{width:scrubPosition}}/>
+    <motion.span className="music-seek-marker" style={{left:scrubPosition}}/>
     <motion.span className="music-seek-triangle" initial={{x:-18,scale:.85,opacity:1}} animate={{x:0,scale:.45,opacity:0}} transition={{type:'spring',stiffness:390,damping:28,mass:.55}}><Play size={19}/></motion.span>
     <motion.span className="music-seek-clock" initial={{opacity:0,scale:.64,filter:'blur(4px)'}} animate={{opacity:1,scale:1,filter:'blur(0px)'}} exit={{opacity:0,scale:.78,filter:'blur(4px)'}} transition={{type:'spring',stiffness:450,damping:30,delay:.1}}><DotMatrixClock value={clock(scrubPreview.time)}/></motion.span>
    </motion.div>}

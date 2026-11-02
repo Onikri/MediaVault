@@ -213,3 +213,58 @@ body:has(.immersive-reader:not(.reader-embedded)) .music-nav{visibility:hidden;p
 .music-nav .music-dock-timeline input[type=range]:hover,.music-nav .music-dock-timeline input[type=range]:focus-visible{height:3px!important}
 
 @media(prefers-reduced-motion:reduce){.music-nav .music-bar.is-scrubbing .music-full-play,.music-nav .music-bar.is-scrubbing .music-full-copy{transition:none}}
+
+
+/* Navbar music: no strokes, one material in idle and hover. Compact player
+   keeps its current geometry/art; the former expand slot is always a knob. */
+.music-nav .music-bar,
+.music-nav.has-track .music-bar.is-hovered:not(.is-nav-expanded),
+.music-nav.has-track .music-bar.is-keyboard-open:not(.is-nav-expanded){
+ border:0!important;outline:0;box-shadow:none!important;
+ background:color-mix(in srgb,var(--color-canvas) 92%,#000);
+}
+.music-nav .music-bar-volume,
+.music-nav.has-track .music-bar.is-hovered .music-bar-volume,
+.music-nav.has-track .music-bar.is-keyboard-open .music-bar-volume{
+ flex:0 0 30px;width:30px;opacity:1;overflow:visible;pointer-events:auto;
+}
+.music-nav .music-bar-actions .music-volume-knob{
+ background:transparent;border:0!important;box-shadow:none!important;
+}
+.music-nav .music-bar-actions button{outline:0;border:0!important;box-shadow:none!important}
+.music-nav .music-bar-actions button:focus-visible{background:color-mix(in srgb,var(--color-blossom) 25%,transparent);outline:0}
+/* Dark translucent glass integrated with the existing navbar's surface. */
+.music-nav.has-track .music-bar.is-nav-expanded,
+.music-nav.has-track .music-bar.is-nav-expanded.is-hovered{
+ background:linear-gradient(145deg,rgba(255,255,255,.024),rgba(0,0,0,.045)),rgb(var(--surface-rgb)/.73);
+ backdrop-filter:blur(24px) saturate(1.35);
+ -webkit-backdrop-filter:blur(24px) saturate(1.35);
+ box-shadow:none!important;border:0!important;outline:0;
+ border-radius:999px;
+}
+.music-nav .music-bar-full{border:0}
+.music-nav .music-full-play,.music-nav .music-full-play:hover{
+ border:0!important;box-shadow:none!important;
+ background:color-mix(in srgb,var(--color-canvas) 76%,#000);
+}
+.music-nav .music-full-play:focus-visible,.music-nav .music-volume-knob:focus-visible{
+ outline:0!important;background:color-mix(in srgb,var(--color-blossom) 16%,var(--color-canvas));
+}
+.music-nav .music-full-next{border:0!important;outline:0;box-shadow:none!important}
+/* During an active gesture the seek fill and white marker match pointer
+   coordinates immediately; springs are reserved for entering and exiting. */
+.music-nav .music-seek-fill,.music-nav .music-seek-marker{
+ transition:none!important;will-change:width,left;
+}
+.music-nav .music-seek-surface{background-color:rgb(var(--surface-rgb)/.93)}
+.music-nav .music-seek-fill{background-color:var(--color-blossom)}
+.music-nav .music-dot-matrix{width:55px;height:20px}
+.music-nav .music-bar-transport .music-dock-timeline input[type=range]{
+ border:0!important;outline:0!important;box-shadow:none!important;
+}
+.music-nav .music-bar-transport .music-dock-timeline input[type=range]::-webkit-slider-thumb{
+ -webkit-appearance:none!important;appearance:none!important;opacity:0!important;width:0!important;height:0!important;border:0!important;
+}
+.music-nav .music-bar-transport .music-dock-timeline input[type=range]::-moz-range-thumb{
+ opacity:0!important;width:0!important;height:0!important;border:0!important;
+}

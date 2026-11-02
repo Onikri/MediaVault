@@ -30,7 +30,9 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    assert.equal(await page.locator('.music-nav .music-bar').evaluate(el=>getComputedStyle(el).backgroundColor),backgroundBefore,'hover must not change player color');
    assert.equal(await page.locator('.music-nav .music-dock-title small').textContent(),'Creepy Nuts');
    assert.ok(await page.locator('.music-bar-transport .music-dock-timeline').isVisible(),'timeline replaces song metadata on hover');
+   assert.equal(await page.locator('.music-nav .music-expand').count(),0,'mini player no longer wastes a slot on an expand button');
    const knob=page.getByRole('slider',{name:'Громкость музыки в шапке'});
+   assert.ok(await knob.isVisible(),'volume knob takes the permanent mini-player action slot');
    const volumeBefore=Number(await knob.getAttribute('aria-valuenow'));
    await knob.hover();await page.mouse.wheel(0,-120);
    await page.waitForFunction(v=>Number(document.querySelector('.music-volume-knob')?.getAttribute('aria-valuenow'))>v,volumeBefore);
@@ -50,6 +52,9 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    assert.equal(Math.round(full.height),Math.round(header.height),'expanded island fills navbar height');
    assert.ok(Math.abs(full.x+full.width-header.x-header.width)<2,'expanded island touches right edge of navbar');
    assert.equal(await page.locator('.music-bar-full').getAttribute('aria-hidden'),'false');
+   const expandedMaterial=await page.locator('.music-nav .music-bar').evaluate(el=>({border:getComputedStyle(el).borderTopWidth,blur:getComputedStyle(el).backdropFilter,background:getComputedStyle(el).backgroundColor}));
+   assert.equal(expandedMaterial.border,'0px','large player has no visible outline');
+   assert.ok(expandedMaterial.blur.includes('blur(24px)'),'expanded navbar music is dark glass rather than solid black');
    await page.locator('.music-bar-full .music-full-copy').click({force:true});
    await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor({state:'detached'});
   }else assert.equal(await page.locator('.music-nav>.music-bar').isVisible(),false,'mobile navbar uses the icon');
