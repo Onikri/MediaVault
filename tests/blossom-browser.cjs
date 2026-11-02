@@ -68,12 +68,14 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   const field=await page.locator('.morph-search-bar').boundingBox(),inner=await page.locator('.blossom-navbar .header-inner').boundingBox();
   assert.ok(field.width<=341&&field.x>=inner.x-1&&field.x+field.width<=inner.x+inner.width+1,'expanded search remains inside navbar width');
   assert.ok(Math.abs((field.y-inner.y)-(inner.y+inner.height-field.y-field.height))<1.6,'expanded search has equal top and bottom insets');
+  assert.ok(field.y>=inner.y-1&&field.y+field.height<=inner.y+inner.height+1,'search bar never leaves navbar; panel is the only layer below');
   const originalGlass=await page.locator('.morph-search-bar').evaluate(el=>({border:getComputedStyle(el).borderTopWidth,background:getComputedStyle(el).backgroundColor,blur:getComputedStyle(el).backdropFilter,texture:getComputedStyle(el).backgroundImage}));
   assert.equal(originalGlass.border,'0px','search glass has no frame');
   assert.ok(originalGlass.texture.includes('linear-gradient')&&!originalGlass.texture.includes('url('),'search glass uses palette accent instead of noisy border');
   assert.ok(originalGlass.blur.includes('blur(20px)')&&originalGlass.blur.includes('saturate(1.6)'),'20px saturating glass blur is preserved');
   const slotExpanded=await page.locator('.blossom-navbar .header-center-search').boundingBox();
-  assert.ok(slotExpanded.width>originalSlot.width+30||width<=640,'center search grows within responsive navbar slot');
+  assert.ok(slotExpanded.width>originalSlot.width+30,'center search grows within responsive navbar slot');
+  if(width<=640)assert.ok(slotExpanded.width>=width-65,'mobile search borrows the navbar space after outer controls yield');
   if(width>640){const actionsAfter=await page.locator('.blossom-navbar .header-actions').boundingBox();
    assert.ok(actionsAfter.x>=actionsBefore-2,'right music and profile controls do not overlap opening search');
    assert.ok(slotExpanded.x+slotExpanded.width<=actionsAfter.x+2,'expanded search keeps a separate right-hand lane');}
@@ -84,6 +86,16 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   await page.screenshot({path:path.join(dir,'search-'+width+'.png')});await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).inputValue(),'','first Escape clears the query like MorphingSearchChips');
   await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+  if(width===1280){
+   await page.evaluate(()=>scrollTo(0,480));
+   await page.waitForFunction(()=>document.querySelector('.blossom-navbar')?.classList.contains('is-scrolled'));
+   const compactSearch=await page.locator('.header-center-search .header-search').boundingBox();
+   assert.ok(compactSearch.width>=120,'scrolled navbar retains its compact search field rather than an icon');
+   await page.keyboard.press('Control+k');const scrolled=page.getByRole('dialog',{name:'Поиск в библиотеке'});await scrolled.waitFor();
+   const scrolledBar=await page.locator('.morph-search-bar').boundingBox(),scrolledInner=await page.locator('.blossom-navbar .header-inner').boundingBox();
+   assert.ok(scrolledBar.x>=scrolledInner.x-1&&scrolledBar.x+scrolledBar.width<=scrolledInner.x+scrolledInner.width+1,'scrolled search remains inside the narrowed navbar');
+   await page.keyboard.press('Escape');await scrolled.waitFor({state:'hidden'});await page.evaluate(()=>scrollTo(0,0));
+  }
   await navigateApp(page,'Библиотека');await page.locator('.catalog-grid .anime-card').first().waitFor();await fits('Catalog');
   await page.screenshot({path:path.join(dir,'catalog-'+width+'.png'),fullPage:true});
   if(width===1280){await page.locator('.catalog-grid .anime-card').first().hover();const tip=page.getByRole('tooltip');await tip.waitFor();await tip.getByText('Описание из каталога для проверки интерфейса.',{exact:true}).waitFor();const box=await tip.boundingBox();assert.ok(box.x>=0&&box.y>=0&&box.y+box.height<=960,'Hydrated preview stays inside viewport');await page.screenshot({path:path.join(dir,'catalog-tooltip.png')});await page.mouse.move(0,0);}
