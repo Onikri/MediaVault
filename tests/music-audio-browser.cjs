@@ -1,9 +1,9 @@
 // Real HTMLAudioElement decoding/seek/lifecycle; resolver and YouTube are fixtures.
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{execFileSync}=require('node:child_process'),{chromium}=require('playwright');
-const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let browser,vite;
+const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-output/music-audio');let browser,vite;
 (async()=>{
- await fs.mkdir(DIR,{recursive:true});const audioPath=path.join(DIR,'music-server-fixture.m4a');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','sine=frequency=440:duration=16','-c:a','aac','-movflags','+faststart','-threads','1','-y',audioPath]);const audio=await fs.readFile(audioPath);
- await fs.writeFile(path.join(DIR,'music-audio-harness.html'),'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/test-output/music-audio-harness.jsx"></script></html>');
+ await fs.mkdir(DIR,{recursive:true});const audioPath=path.join(DIR,'music-server-fixture.m4a');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','sine=frequency=440:duration=45','-c:a','aac','-movflags','+faststart','-threads','1','-y',audioPath]);const audio=await fs.readFile(audioPath);
+ await fs.writeFile(path.join(DIR,'music-audio-harness.html'),'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/.codex-local/test-output/music-audio/music-audio-harness.jsx"></script></html>');
  await fs.writeFile(path.join(DIR,'music-audio-harness.jsx'),`
  import React from'react';import{createRoot}from'react-dom/client';import {ThemeProvider} from '/src/blossom/ThemeProvider.tsx';import {AnimatedNavbar} from '/src/blossom/components/AnimatedNavbar.tsx';import MiniMusicPlayer from'/src/MiniMusicPlayer.jsx';import{closeMusic}from'/src/music-player.js';import{OnlineMusic}from'/src/OnlineLibrary.jsx';import'/src/styles.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:location.origin};
@@ -17,9 +17,9 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   await page.route('**/music/play',async route=>{prepared.push(route.request().postDataJSON());await route.fulfill(failing?{status:failureStatus,json:{detail:'YouTube requires server verification'}}:{json:{id:token,streamUrl:'/online/'+token+'/'+resource,mime:'audio/mp4',duration:16,title:'Server audio fixture'}});});
   let remotePrepared=0;await page.route('**/music/remote',async route=>{remotePrepared++;assert.equal(route.request().postDataJSON().url,'https://music.example/song.mp3');await route.fulfill({json:{id:token,streamUrl:'/online/'+token+'/'+resource,mime:'audio/mp4',duration:16}});});
   await page.route('**/music/metadata?**',r=>r.fulfill({json:{found:false}}));
-  await page.route('https://i.ytimg.com/**',r=>r.abort());let youtubeRequests=0;await page.route(/https:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\//,r=>{youtubeRequests++;return r.abort();});
+  await page.route('https://i.ytimg.com/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><path fill="black" d="M0 0h480v360H0z"/><path fill="#809e6a" d="M0 45h480v270H0z"/><path fill="#cfb785" d="M200 75h80v210h-80z"/></svg>'}));let youtubeRequests=0;await page.route(/https:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\//,r=>{youtubeRequests++;return r.abort();});
   await page.route('**/online/**',async route=>{if(route.request().method()==='DELETE'){closed.push(route.request().url());return route.fulfill({json:{closed:true}});}const range=route.request().headers().range,match=range?.match(/bytes=(\d+)-(\d*)/),start=match?Number(match[1]):0,end=match&&match[2]?Math.min(Number(match[2]),audio.length-1):audio.length-1;return route.fulfill({status:match?206:200,contentType:'audio/mp4',headers:{'Accept-Ranges':'bytes','Content-Length':String(end-start+1),...(match?{'Content-Range':'bytes '+start+'-'+end+'/'+audio.length}:{})},body:audio.subarray(start,end+1)});});
-  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/music-audio-harness.html');
+  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/music-audio/music-audio-harness.html');
   await page.getByLabel('Ссылка на аудио',{exact:true}).fill('https://youtu.be/dQw4w9WgXcQ');await page.getByRole('button',{name:'Открыть',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('audio.music-audio')?.currentTime>.15);
   assert.equal(prepared[0].url,'https://www.youtube.com/watch?v=dQw4w9WgXcQ');assert.equal(await page.locator('iframe').count(),0);
@@ -33,6 +33,35 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
     await page.getByRole('button',{name:'Продолжить в подробностях',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('audio').paused);
     await page.getByRole('button',{name:'Закрыть музыкальный плеер',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('audio'));assert.equal(closed.length,1,'Close releases backend capability');
   }else{
+   // Real audio stays mounted while the same cover grows about its existing center.
+   await page.locator('.music-bar').hover();await page.waitForTimeout(450);
+   await page.locator('.music-shared-cover img').waitFor();
+   await page.waitForFunction(()=>document.querySelector('.music-shared-cover img')?.naturalWidth===480);
+   await page.evaluate(()=>{window.__audio=document.querySelector('audio');window.__cover=document.querySelector('.music-shared-cover');window.__image=window.__cover.querySelector('img');});
+   const sampleMorph=async action=>{
+    const audioBefore=await page.locator('audio').evaluate(a=>a.currentTime);
+    await page.evaluate(()=>{window.__coverFrames=[];const end=performance.now()+650;function frame(now){const node=document.querySelector('.music-shared-cover'),disc=node?.querySelector('.music-cover-scale'),r=disc?.getBoundingClientRect();if(r)window.__coverFrames.push({x:r.x+r.width/2,y:r.y+r.height/2,size:r.width,same:node===window.__cover&&node.querySelector('img')===window.__image,visible:getComputedStyle(node).opacity==='1'&&getComputedStyle(node).visibility==='visible'});if(now<end)requestAnimationFrame(frame);}requestAnimationFrame(frame);});
+    await action();await page.waitForTimeout(700);
+    const rows=await page.evaluate(()=>window.__coverFrames),start=rows[0];
+    assert.ok(rows.length>8&&rows.every(r=>r.same&&r.visible&&Math.abs(r.x-start.x)<.6&&Math.abs(r.y-start.y)<.6&&r.size>29.5&&r.size<39),'One visible cover keeps its screen center throughout the spring '+JSON.stringify(rows));
+    assert.ok(await page.locator('audio').evaluate((a,t)=>a===window.__audio&&!a.paused&&a.currentTime>t+.3,audioBefore),'Mode changes never replace or interrupt audio');
+   };
+   await sampleMorph(()=>page.locator('.music-shared-cover').click());
+   assert.ok(await page.locator('.music-cover-scale').evaluate(n=>Math.abs(n.getBoundingClientRect().width-38)<.1));
+   const vinyl=page.locator('.music-shared-cover .music-artwork-vinyl');
+   await page.locator('audio').evaluate(a=>a.pause());
+   await page.waitForFunction(()=>getComputedStyle(document.querySelector('.music-shared-cover .music-artwork-vinyl')).animationPlayState==='paused');
+   await page.waitForTimeout(40);const angleTime=await vinyl.evaluate(n=>n.getAnimations()[0].currentTime);
+   await page.waitForTimeout(160);assert.ok(Math.abs((await vinyl.evaluate(n=>n.getAnimations()[0].currentTime))-angleTime)<1,'Pause preserves the vinyl angle');
+   await page.locator('audio').evaluate(a=>a.play());await page.waitForTimeout(100);
+   assert.ok(await vinyl.evaluate((n,t)=>n.getAnimations()[0].currentTime>t+30,angleTime),'Playback resumes rotation without resetting it');
+   assert.equal(await page.locator('.music-shared-cover img').evaluate(n=>getComputedStyle(n).transform),'matrix(1.34, 0, 0, 1.34, 0, 0)','Baked-in letterbox bands are cropped');
+   await page.screenshot({path:path.join(DIR,'music-cover-expanded.png')});
+   await sampleMorph(()=>page.locator('.music-bar-full').click({position:{x:130,y:8}}));
+   assert.ok(await page.locator('.music-cover-scale').evaluate(n=>Math.abs(n.getBoundingClientRect().width-30)<.1));
+   await page.emulateMedia({reducedMotion:'reduce'});await page.locator('.music-shared-cover').click();
+   assert.equal(await vinyl.evaluate(n=>getComputedStyle(n).animationName),'none','Reduced motion disables rotation');
+   await page.locator('.music-bar-full').click({position:{x:130,y:8}});await page.emulateMedia({reducedMotion:'no-preference'});
    // Desktop: expanded music is the navbar itself; no separate floating island.
    await page.getByRole('button',{name:'Открыть музыкальный плеер',exact:true}).click();
    await page.locator('.music-nav .music-bar.is-nav-expanded').waitFor();

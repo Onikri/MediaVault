@@ -21,3 +21,14 @@ test('a floating bottom transport opens upwards without moving its trigger',()=>
 
 import {cursorMusicTime} from '../src/music-timeline.js';
 test('absolute cursor position selects time independently of the previous song position',()=>{const rect={left:200,width:344};assert.equal(cursorMusicTime(372,rect,200),100);assert.equal(cursorMusicTime(0,rect,200),0);assert.equal(cursorMusicTime(600,rect,200),200);assert.equal(cursorMusicTime(300,rect,0),0);});
+
+import {musicArtworkCrop} from '../src/music-artwork.js';
+
+test('only letterboxed YouTube artwork is zoomed, never square albums or wide frames',()=>{
+ assert.equal(musicArtworkCrop('https://i.ytimg.com/vi/id/hqdefault.jpg'),1.34);
+ assert.equal(musicArtworkCrop('https://i.ytimg.com/vi/id/custom.webp',480,360),1.34);
+ assert.equal(musicArtworkCrop('https://i.ytimg.com/vi/id/maxresdefault.jpg',1280,720),1);
+ assert.equal(musicArtworkCrop('https://i.ytimg.com/vi/id/album.jpg',512,512),1);
+ assert.equal(musicArtworkCrop('https://album.example/cover.jpg',480,360),1);
+ assert.equal(musicArtworkCrop(''),1);
+});
