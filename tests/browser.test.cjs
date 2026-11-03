@@ -552,9 +552,9 @@ async function main() {
   await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
   // Keep the two-second fixture alive while CDP round trips exercise tap toggles.
   // A slow runner may otherwise finish playback before the next assertion polls.
-  await cinema.locator('video').evaluate(v=>{v.loop=true;v.currentTime=0;});
+  await cinema.locator('video').evaluate(v=>{v.loop=true;v.currentTime=0;window.tapTrace=[];for(const type of ['pointerdown','pointerup','click','play','pause','ended'])v.addEventListener(type,e=>{if(window.tapTrace.length<30)window.tapTrace.push({type:e.type,pointer:e.pointerType,paused:v.paused,time:v.currentTime,coarse:matchMedia('(any-pointer:coarse)').matches});});});
   await swipe(.5,0,0);
-  await owner.waitForFunction(()=>document.querySelector('video').paused===false);
+  await owner.waitForFunction(()=>document.querySelector('video').paused===false).catch(async error=>{console.error('Touch event trace',await owner.evaluate(()=>window.tapTrace));await cinema.screenshot({path:path.join(PROJECT,'test-output','player-touch-failure.png')});throw error;});
   await swipe(.5,0,0);
   await owner.waitForFunction(()=>document.querySelector('video').paused===true);
   await cinema.locator('video').evaluate(v=>v.loop=false);

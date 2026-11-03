@@ -12,7 +12,10 @@ export default function usePlayerGestures({videoRef,volume,setVolume,openPanel,t
   const clearLater=()=>{clearTimeout(dismiss.current);dismiss.current=setTimeout(()=>setFeedback(null),850);};
   useEffect(()=>()=>clearTimeout(dismiss.current),[]);
   const down=event=>{
-    if(event.pointerType!=='touch'||!matchMedia('(pointer: coarse), (any-pointer: coarse)').matches)return;
+    if(event.pointerType!=='touch')return;
+    // A touch event is authoritative, including hybrid mouse/touch devices.
+    // Cancel the video's native compatibility click; finish() owns this gesture.
+    event.preventDefault();
     if(active.current){active.current=null;suppressClick.current=performance.now()+600;setFeedback(null);return;}
     const box=event.currentTarget.getBoundingClientRect();
     active.current={id:event.pointerId,x:event.clientX,y:event.clientY,zone:(event.clientX-box.left)/box.width,width:box.width,height:box.height,time:videoRef.current?.currentTime||0,volume,brightness,mode:null};
@@ -40,6 +43,7 @@ export default function usePlayerGestures({videoRef,volume,setVolume,openPanel,t
   };
   const finish=(event,cancel=false)=>{
     const g=active.current;if(!g||g.id!==event.pointerId)return;
+    event.preventDefault();
     active.current=null;suppressClick.current=performance.now()+600;
     if(!cancel){
       if(g.mode==='seek'&&Number.isFinite(g.target))videoRef.current.currentTime=g.target;
@@ -48,5 +52,5 @@ export default function usePlayerGestures({videoRef,volume,setVolume,openPanel,t
     }
     clearLater();
   };
-  return {brightness,feedback,surface:{onPointerDown:down,onPointerMove:move,onPointerUp:event=>finish(event),onPointerCancel:event=>finish(event,true),onLostPointerCapture:event=>finish(event,true),onClick:event=>{if(performance.now()<suppressClick.current)return;reveal();toggle();}}};
+  return {brightness,feedback,surface:{onPointerDown:down,onPointerMove:move,onPointerUp:event=>finish(event),onPointerCancel:event=>finish(event,true),onLostPointerCapture:event=>finish(event,true),onClick:event=>{event.preventDefault();if(performance.now()<suppressClick.current)return;reveal();toggle();}}};
 }

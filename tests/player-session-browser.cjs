@@ -41,13 +41,18 @@ let browser,vite,last;
   assert.equal(await page.evaluate(()=>window.originalVideo===window.player.media),true);
   if(width===390){
    const touch=await page.context().newCDPSession(page);await touch.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});await touch.send('Emulation.setCPUThrottlingRate',{rate:4});
+   // A real touch must work on hybrid devices even when media queries prefer a mouse.
+   await page.evaluate(()=>{window.originalMatchMedia=window.matchMedia;window.matchMedia=query=>{const result=window.originalMatchMedia.call(window,query);if(query.includes('pointer'))Object.defineProperty(result,'matches',{value:false});return result;};});
    await page.evaluate(()=>window.player.pause());
+   const rect=await video.boundingBox(),vx=rect.x+rect.width*.85,vy=rect.y+rect.height*.5;
+   await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:vx,y:vy}]});await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:vx,y:vy-40}]});await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+   assert.ok(await video.evaluate(v=>v.volume>.4),'Touch volume works independently of pointer media queries');
    for(let i=0;i<4;i++){
     const r=await video.boundingBox(),x=r.x+r.width*.5,y=r.y+r.height*.3;
     await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     await page.waitForFunction(expected=>window.player.getSnapshot().playing===expected,i%2===0);
    }
-   await touch.send('Emulation.setCPUThrottlingRate',{rate:1});await touch.send('Emulation.setTouchEmulationEnabled',{enabled:false});
+   await page.evaluate(()=>window.matchMedia=window.originalMatchMedia);await touch.send('Emulation.setCPUThrottlingRate',{rate:1});await touch.send('Emulation.setTouchEmulationEnabled',{enabled:false});
   }
   await page.evaluate(()=>window.player.pause());await page.locator('.mv-player').focus();await page.keyboard.press('k');await page.waitForFunction(()=>window.player.getSnapshot().playing);
   await page.evaluate(()=>window.player.theater(true));await page.locator('#unmount').evaluate(n=>n.click());await page.waitForFunction(()=>!document.querySelector('.mv-player'));assert.equal(await page.locator('.player-theater-dimmed').count(),0);

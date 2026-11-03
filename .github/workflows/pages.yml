@@ -97,6 +97,7 @@ jobs:
           mkdir -p test-output
           set +e
           {
+            npm run test:browser &&
             npm run test:blossom &&
             npm run test:design &&
             npm run test:watch &&
@@ -106,7 +107,6 @@ jobs:
             npm run test:blocks &&
             npm run test:cleaning &&
             npm run test:migan &&
-            npm run test:browser &&
             npm run test:voices &&
             npm run test:manga &&
             npm run test:reader &&
