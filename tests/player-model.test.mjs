@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {episodeNumber,voiceLabel,buildPlaybackLibrary,openingBounds,toWebVtt} from '../src/player-model.js';
+import {playerUiReducer} from '../src/player-session.js';
+
+test('player has one active panel; opening settings replaces music without changing theater',()=>{
+ let state={panel:'watch',settingsTab:'watch',theater:true};
+ state=playerUiReducer(state,{type:'music',value:true});assert.equal(state.panel,'music');
+ state=playerUiReducer(state,{type:'panel',value:'settings'});assert.equal(state.panel,'settings');assert.equal(state.theater,true);
+ state=playerUiReducer(state,{type:'settingsTab',value:'captions'});assert.equal(state.settingsTab,'captions');
+ state=playerUiReducer(state,{type:'theater',value:v=>!v});assert.equal(state.theater,false);assert.equal(state.panel,'settings');
+ assert.equal(playerUiReducer(state,{type:'unknown'}),state);
+});
 
 test('groups anime by title and season, and variants by episode without modifying the catalog',()=>{
   const catalog={storage:{collections:[{id:'t1',name:'Пример аниме',parts:[

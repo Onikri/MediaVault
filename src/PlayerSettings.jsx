@@ -2,18 +2,18 @@ import {Children,Fragment,useEffect,useRef,useState} from 'react';
 import {motion,useReducedMotion} from 'motion/react';
 import {SlidersHorizontal,Sparkles,Subtitles,Share2,X,Sun,SkipForward} from 'lucide-react';
 import PlayerPopover from './PlayerPopover.jsx';
+import {usePlayerSpace} from './player-session.js';
 
 export function SettingsGlyph(){
   return <svg className="settings-glyph" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><g><circle className="slider-knob knob-top" cx="8" cy="6" r="2.5"/><circle className="slider-knob knob-middle" cx="16" cy="12" r="2.5"/><circle className="slider-knob knob-bottom" cx="15" cy="18" r="2.5"/></g></svg>;
 }
 const pages=[['watch','Просмотр',SlidersHorizontal],['image','Изображение',Sparkles],['effects','Атмосфера',Sun],['captions','Субтитры',Subtitles],['intro','Пропуск',SkipForward],['actions','Действия',Share2]];
 export default function PlayerSettings({onClose,children,anchor,initialPage='watch'}){
-  const [height,setHeight]=useState(innerHeight);
-  useEffect(()=>{const resize=()=>setHeight(innerHeight);addEventListener('resize',resize);return()=>removeEventListener('resize',resize);},[]);
+  const height=usePlayerSpace();
   const [page,setPage]=useState(initialPage),[part,setPart]=useState(0),root=useRef(null),reduced=useReducedMotion();
   useEffect(()=>setPage(initialPage),[initialPage]);
   const flatten=nodes=>Children.toArray(nodes).flatMap(n=>typeof n==='string'?[]:n.type===Fragment?flatten(n.props.children):n.type==='fieldset'?flatten(n.props.children).filter(c=>c.type!=='legend'):[n]);
-  const rows=flatten(children[page]?.props.children),size=height<500?2:height<760?3:5,count=Math.ceil(rows.length/size);
+  const rows=flatten(children[page]?.props.children),size=height<300?1:height<440?2:height<600?3:5,count=Math.ceil(rows.length/size);
   useEffect(()=>setPart(0),[page]);
   useEffect(()=>{
     const previous=document.activeElement;root.current?.querySelector('[role=tab][aria-selected=true]')?.focus({preventScroll:true});

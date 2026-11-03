@@ -1,3 +1,4 @@
+import {usePlayerSpace} from './player-session.js';
 import {useEffect,useState} from 'react';
 import {Music2,Plus,Check,ExternalLink,X,Headphones,Play,Info,MoreHorizontal} from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -8,7 +9,8 @@ import ArtistInfo from './ArtistInfo.jsx';
 import {playMusic} from './music-player.js';
 const cache=new Map();
 export function TrackList({values,userId,compact=false,hideAnimeTitle=false}){
- const [page,setPage]=useState(0),size=innerHeight<500?2:4;const filtered=values.filter(t=>t.artists?.length||!values.some(x=>x!==t&&x.type===t.type&&x.title.toLowerCase()===t.title.toLowerCase()&&x.artists?.length));const visible=compact?filtered.slice(page*size,(page+1)*size):filtered;
+ const height=usePlayerSpace(),[page,setPage]=useState(0),size=compact?Math.max(1,Math.min(4,Math.floor((height-110)/54))):4;
+ useEffect(()=>setPage(0),[size]);const filtered=values.filter(t=>t.artists?.length||!values.some(x=>x!==t&&x.type===t.type&&x.title.toLowerCase()===t.title.toLowerCase()&&x.artists?.length));const visible=compact?filtered.slice(page*size,(page+1)*size):filtered;
  const [saved,setSaved]=useState(()=>tracks(userId)),[exporting,setExporting]=useState(null),[provider,setProvider]=useState('youtube'),[lists,setLists]=useState([]),[recordings,setRecordings]=useState([]),[playlist,setPlaylist]=useState(''),[recording,setRecording]=useState(''),[client,setClient]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(false),[profile,setProfile]=useState(null);
  useEffect(()=>{const update=()=>setSaved(tracks(userId));update();addEventListener('mediavault-music',update);return()=>removeEventListener('mediavault-music',update);},[userId]);
  function start(t){setExporting(t);setLists([]);setRecordings([]);setPlaylist('');setRecording('');setError('');setDone(false);}

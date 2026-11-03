@@ -1,0 +1,29 @@
+/* Every interactive layer uses the same player coordinate system. */
+.mv-player .player-popover{position:absolute;z-index:12;box-sizing:border-box;overflow:hidden;border:0;max-width:calc(100% - 16px);min-height:0}
+.mv-player .player-popover-scrim{position:absolute;inset:0;z-index:11;background:rgb(0 0 0 / .12)}
+.mv-player .mv-player-console{padding:40px clamp(10px,1.2vw,18px) 12px}
+.mv-player-stage>video.mv-player-media{z-index:auto;touch-action:none}
+.mv-player .player-popover #player-settings{display:flex;flex-direction:column;min-height:0;max-height:inherit}
+.mv-player .player-popover .player-settings-page{min-height:0;overflow:auto;scrollbar-width:thin;flex:1;padding-top:8px}
+.mv-player .player-popover .player-settings-tabs,.mv-player .player-popover .mv-player-drawer-head{flex:none}
+.mv-player .player-popover .player-page-dots{flex:none;margin-top:5px}
+.mv-player .is-player-constrained{padding:8px;border-radius:14px}
+.mv-player .is-player-constrained .mv-player-drawer-head{margin-bottom:5px;min-height:24px}
+.mv-player .is-player-constrained .mv-player-drawer-head button{height:24px;width:24px}
+.mv-player .is-player-constrained .player-settings-tabs{grid-template-columns:repeat(6,minmax(0,1fr));gap:2px;padding-bottom:4px}
+.mv-player .is-player-constrained .player-settings-tabs button{flex-direction:column;justify-content:center;gap:2px;padding:3px 1px;min-height:32px;height:auto}
+.mv-player .is-player-constrained .player-settings-tabs button>span{font-size:8px;line-height:1.1;overflow-wrap:anywhere}
+.mv-player .is-player-constrained .player-setting-help{margin-block:2px;font-size:10px}
+.mv-player .is-player-constrained .player-settings-shortcuts{display:none}
+.mv-player .is-player-constrained .player-page-dots button{min-height:22px;min-width:22px}
+.player-theater-dimmed{opacity:.16!important;pointer-events:none!important;transition:opacity .25s ease}
+.mv-player.is-theater{box-shadow:0 0 80px rgb(var(--scene-rgb)/.16)}
+.mv-title-layout.player-theater-layout{grid-template-columns:minmax(0,1fr)!important}
+.mv-title-layout.player-theater-layout>.title-sidebar{display:none}
+.player-extension-overlay{position:absolute;inset:0;z-index:4;pointer-events:none}
+.player-extension-overlay>*{pointer-events:auto}
+.player-extension-slot:empty{display:none}
+@media(prefers-reduced-motion:reduce){.player-theater-dimmed{transition:none}}
+
+.mv-player .player-popover #player-settings{max-height:calc(var(--player-menu-height) - 32px)}
+.mv-player .is-player-constrained #player-settings{max-height:calc(var(--player-menu-height) - 16px)}
