@@ -84,3 +84,13 @@
 .watch-player-configuration .watch-selection{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:0}
 .watch-player-configuration .watch-quality-note{display:grid;gap:10px;margin:14px 0 0}
 .watch-player-configuration select{width:100%;min-width:0}
+
+/* The episode browser belongs to the same player, outside its video surface. */
+.mv-player-episode-browser{padding:18px clamp(12px,2vw,24px) 24px;background:var(--color-canvas);color:var(--color-on-surface)}
+.mv-player-episode-browser .watch-episodes-heading{margin-top:0}
+.online-viewer.is-switching{position:relative}
+.online-viewer.is-switching>.online-loading{position:absolute;inset:12px auto auto 50%;transform:translateX(-50%);z-index:2;min-height:0;margin:0;padding:10px 16px;border-radius:24px;background:var(--color-surface);pointer-events:none;white-space:nowrap;font-size:12px}
+
+.mv-player.episodes-open .mv-player-episode-browser{position:absolute;inset:0;z-index:10;overflow:auto;background:var(--color-surface);scrollbar-width:thin}
+.mv-player .mv-player-close-episodes{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:8px;border-radius:18px}
+.mv-player:fullscreen:not(.episodes-open) .mv-player-episode-browser{display:none}

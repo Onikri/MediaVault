@@ -85,6 +85,8 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const seasons=library.seasons;
   const episodes=seasons.flatMap(season=>season.episodes);
   const season=seasons.find(part=>part.episodes.some(ep=>ep.variants.some(v=>v.item.id===item.id)));
+  const [browsedSeasonId,setBrowsedSeasonId]=useState('');
+  const shelfSeason=seasons.find(s=>s.id===browsedSeasonId)||season;
   const episode=season?.episodes.find(ep=>ep.variants.some(v=>v.item.id===item.id));
   const characterContext=useMemo(()=>pauseContext({...item,episode:episode?.number||item.episode},catalog,library.title,season?.name),[item,catalog,library.title,season?.name,episode?.number]);
   const index=episodes.indexOf(episode);
@@ -102,7 +104,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     if(rail&&card)rail.scrollTo({left:rail.scrollLeft+card.getBoundingClientRect().left-rail.getBoundingClientRect().left-(rail.clientWidth-card.clientWidth)/2,behavior:'instant'});
   },[item.id]);
   function scrollEpisodes(offset){railRef.current?.scrollBy({left:offset,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
-  function openPanel(value){if(value==='episodes'&&onlineControls?.externalEpisodeList){stageRef.current?.closest('.online-watch')?.querySelector('.watch-episode-grid')?.scrollIntoView({behavior:reducedMotion?'instant':'smooth',block:'center'});setPanel('watch');revealControls();return;}setPanel(value);revealControls();}
+  function openPanel(value){if(value==='episodes'&&onlineControls?.externalEpisodeList&&!onlineControls?.episodeBrowser){stageRef.current?.closest('.online-watch')?.querySelector('.watch-episode-grid')?.scrollIntoView({behavior:reducedMotion?'instant':'smooth',block:'center'});setPanel('watch');revealControls();return;}setPanel(value);revealControls();}
   const changePrefs=(change)=>{
     setPrefs(prev=>{
       const updated={...prev,...change};
@@ -291,6 +293,6 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const hiddenControls=playing&&panel==='watch'&&!musicOpen&&!controlsVisible;
   const progress=seekable?Math.min(100,previewTime/duration*100):0;
   return {
-    timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,item,source,nextEpisode,previous,setTheater
+    timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,item,source,nextEpisode,previous,setTheater
   };
 }
