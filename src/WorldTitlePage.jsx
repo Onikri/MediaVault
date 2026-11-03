@@ -15,7 +15,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  useEffect(()=>{
   const abort=new AbortController();setItem(value);setProfile(null);setTarget('online');setLoading(true);
   const tasks=[];
-  if(!value.sourceOnly&&value.providerId&&!['openlibrary','youtube'].includes(value.provider))tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem(mergeCatalog([value,...rows])[0]);}));
+  if(!value.sourceOnly&&value.providerId&&!['openlibrary','youtube'].includes(value.provider))tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem({...mergeCatalog([...rows,value])[0],id:value.id});}));
   if(value.ids?.mal)tasks.push(loadTitleProfile(value.ids.mal,value.kind,{server:service.server,signal:abort.signal}).then(data=>{if(!abort.signal.aborted)setProfile(data);}));
   Promise.allSettled(tasks).then(()=>{if(!abort.signal.aborted)setLoading(false);});return()=>abort.abort();
  },[value.id,service.server,destination]);
