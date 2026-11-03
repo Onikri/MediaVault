@@ -37,3 +37,19 @@ test('a video with extra intro can show the same song text without inventing mat
  assert.equal(r.precision,'plain');assert.equal(r.timingMismatch,true);assert.ok(r.plainText);assert.deepEqual(r.lines,[]);
 });
 test('provider outage is an error rather than a false claim that lyrics do not exist',async()=>{await assert.rejects(searchLrcLyrics(track,153,{fetcher:async()=>new Response('',{status:503})}),/временно недоступен/);});
+import {searchRelayLyrics} from '../src/lyric-relay.js';
+
+test('authenticated relay receives structured aliases and preserves real word timing',async()=>{
+ let request;
+ const service={request:async(path,options)=>{request={path,...options};return {phase:'ready',source:'Musixmatch',url:'https://www.musixmatch.com/lyrics/example',lines:[{start:1,end:4,text:'Fixture words',words:[{start:1,end:2,text:'Fixture '},{start:2,end:4,text:'words'}]}]};}};
+ const result=await searchRelayLyrics({title:'米津玄師 Kenshi Yonezu – IRIS OUT Kenshi Yonezu (米津玄師)',artists:['Kenshi Yonezu (米津玄師)']},153,service,{refresh:true});
+ assert.equal(request.path,'/music/lyrics');assert.equal(request.method,'POST');assert.equal(request.body.titles[0],'IRIS OUT');assert.ok(request.body.artists.includes('米津玄師'));
+ assert.equal(request.body.rich,true);assert.equal(request.body.refresh,true);assert.equal(result.precision,'word');assert.equal(result.lines[0].words[1].start,2);
+});
+
+test('relay distinguishes restricted and instrumental results from misses and errors',async()=>{
+ for(const phase of ['empty','restricted','instrumental','error','busy']){
+  const result=await searchRelayLyrics({title:'Otonoke',artists:['Creepy Nuts']},187,{request:async()=>({phase,url:'javascript:alert(1)'})});
+  assert.equal(result.phase,phase);assert.deepEqual(result.lines,[]);assert.equal(result.url,'');
+ }
+});

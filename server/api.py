@@ -193,7 +193,9 @@ async def lifespan(application):
     thread = threading.Thread(target=worker, daemon=True, name="media-import")
     if os.getenv("MEDIA_VAULT_DISABLE_WORKER") != "1":
         thread.start()
+    await lyrics_relay.start()
     yield
+    await lyrics_relay.close()
     stopping.set()
     wakeup.set()
     from manga_discovery import shutdown as shutdown_manga_discovery
@@ -250,7 +252,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 40, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 41, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -689,6 +691,9 @@ from music_playback import install as install_music_playback
 install_music_playback(app)
 from music_audio import install as install_music_audio
 install_music_audio(app,owner)
+from music_lyrics import LyricsRelay,install as install_music_lyrics
+lyrics_relay=LyricsRelay()
+install_music_lyrics(app,owner,lyrics_relay)
 from youtube_auth import install as install_youtube_auth
 install_youtube_auth(app,owner,lambda:store)
 from music_artists import install as install_music_artists
