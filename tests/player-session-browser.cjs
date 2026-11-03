@@ -39,6 +39,16 @@ let browser,vite,last;
   await page.locator('#module').click();assert.deepEqual(await page.evaluate(()=>[window.counts.stop,window.counts.abort]),[1,1]);assert.equal(await page.locator('#extension-seek').count(),0);
   const events=await page.evaluate(()=>window.counts.play);await page.evaluate(async()=>{window.player.pause();await window.player.play();});assert.equal(await page.evaluate(()=>window.counts.play),events,'Removed modules have no media listeners');
   assert.equal(await page.evaluate(()=>window.originalVideo===window.player.media),true);
+  if(width===390){
+   const touch=await page.context().newCDPSession(page);await touch.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});await touch.send('Emulation.setCPUThrottlingRate',{rate:4});
+   await page.evaluate(()=>window.player.pause());
+   for(let i=0;i<4;i++){
+    const r=await video.boundingBox(),x=r.x+r.width*.5,y=r.y+r.height*.3;
+    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await page.waitForFunction(expected=>window.player.getSnapshot().playing===expected,i%2===0);
+   }
+   await touch.send('Emulation.setCPUThrottlingRate',{rate:1});await touch.send('Emulation.setTouchEmulationEnabled',{enabled:false});
+  }
   await page.evaluate(()=>window.player.pause());await page.locator('.mv-player').focus();await page.keyboard.press('k');await page.waitForFunction(()=>window.player.getSnapshot().playing);
   await page.evaluate(()=>window.player.theater(true));await page.locator('#unmount').evaluate(n=>n.click());await page.waitForFunction(()=>!document.querySelector('.mv-player'));assert.equal(await page.locator('.player-theater-dimmed').count(),0);
   assert.deepEqual(errors,[]);console.log('PASS React player identity, native hit target, local menus, theater, commands and extension lifecycle '+width);await page.close();

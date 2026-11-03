@@ -550,11 +550,14 @@ async function main() {
   await cinema.getByRole('dialog',{name:'Настройки просмотра',exact:true}).waitFor();
   await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
   await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
-  await cinema.locator('video').evaluate(v=>v.currentTime=0);
+  // Keep the two-second fixture alive while CDP round trips exercise tap toggles.
+  // A slow runner may otherwise finish playback before the next assertion polls.
+  await cinema.locator('video').evaluate(v=>{v.loop=true;v.currentTime=0;});
   await swipe(.5,0,0);
   await owner.waitForFunction(()=>document.querySelector('video').paused===false);
   await swipe(.5,0,0);
   await owner.waitForFunction(()=>document.querySelector('video').paused===true);
+  await cinema.locator('video').evaluate(v=>v.loop=false);
   await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:false});
 
   const output=path.join(PROJECT,'test-output');await fs.mkdir(output,{recursive:true});
