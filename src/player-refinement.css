@@ -35,7 +35,7 @@
 .title-hero-actions .title-save-actions{display:inline-flex;gap:7px;margin:0;align-items:center}
 .title-hero-actions .title-save-actions button{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid color-mix(in srgb,var(--color-petal) 14.12%,transparent);border-radius:9px;background:color-mix(in srgb,var(--color-petal) 2.35%,transparent);color:var(--color-petal);cursor:pointer}
 .title-hero-actions .title-save-actions button:hover,.title-hero-actions .title-save-actions [aria-pressed=true]{background:color-mix(in srgb,var(--color-petal) 7.06%,transparent);color:var(--color-blossom)}
-.online-watch .online-video-frameless{min-height:0;aspect-ratio:16/9;position:relative;overflow:visible;background:var(--color-canvas)}
+.online-watch .online-video-frameless{min-height:0;aspect-ratio:auto;position:relative;overflow:visible;background:var(--color-canvas)}
 .online-watch .online-video-frameless>.online-loading{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;margin:0}
 .online-watch .online-video-frameless>.inline-error{position:absolute;inset:0;display:grid;place-content:center;padding:24px;margin:0}
 .online-watch .online-video-frameless>.mv-player{width:100%}
@@ -56,3 +56,5 @@
 .mv-playback-status .loading-ring{width:28px;height:28px}
 @media(prefers-reduced-motion:reduce),(pointer:coarse){.mv-player:not(.is-playing):not(.parallax-off) .mv-player-stage{transform:none}}
 .player-popover.mv-player-drawer,.player-popover.mv-player-music{background:color-mix(in srgb,var(--color-surface) 97.25%,transparent);backdrop-filter:blur(10px)}
+
+.online-watch .online-video-frameless:not(:has(.mv-player)){aspect-ratio:16/9}

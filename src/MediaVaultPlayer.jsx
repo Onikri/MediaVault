@@ -66,7 +66,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       <div id="player-panel-watch" className="mv-player-watch" aria-hidden={playing||panel!=='watch'}>
         <div className="mv-player-overview">
           <h1>{library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,'')}</h1>
-          <p>{season?.name}<span> / </span>{episode?.label}</p>{episode?.description&&/[а-яё]/i.test(episode.description)&&<p className="mv-episode-description">{episode.description}</p>}
+          <p>{onlineControls?.seasonName||season?.name}<span> / </span>{episode?.label}</p>{episode?.description&&/[а-яё]/i.test(episode.description)&&<p className="mv-episode-description">{episode.description}</p>}
         {readResume(keyFor(userId,libraryId,item.id))>0&&<button className="mv-resume" onClick={()=>{seek(readResume(keyFor(userId,libraryId,item.id)));videoRef.current?.play().catch(onError);}}>Продолжить просмотр · {clock(readResume(keyFor(userId,libraryId,item.id)))}</button>}</div>
       </div>
       <AnimatePresence>

@@ -1,8 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {variantsFor} from './watch-session.js';
-export default function useWatchQualities({voices,voiceId,episode,season,server,inspect,service,attempt,scope=''}){
+export default function useWatchQualities({voices,voiceId,episode,season,server,inspect,service,attempt,scope='',identity=''}){
  const cache=useRef(new Map()),[state,setState]=useState({key:'',rows:[],done:0,total:0,busy:false});
- const key=server+':'+season+':'+episode+':'+voiceId;
+ const key=server+':'+identity+':'+season+':'+episode+':'+voiceId;
  useEffect(()=>{
   const abort=new AbortController(),signal=abort.signal;
   if(!scope)return()=>abort.abort();
@@ -21,6 +21,6 @@ export default function useWatchQualities({voices,voiceId,episode,season,server,
    }catch{if(signal.aborted)return;/* Unknown is not the same as unavailable. */}
    done++;setState({key,rows:[...rows],done,total:tasks.length,busy:done<tasks.length});
   }})();return()=>abort.abort();
- },[voices,voiceId,episode,season,server,attempt,scope]);
+ },[voices,voiceId,episode,season,server,attempt,scope,identity]);
  return state.key===key?state:{key,rows:[],done:0,total:0,busy:true};
 }

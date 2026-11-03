@@ -27,9 +27,11 @@ def watch_order(identity):
         for value in values:
             if art.get(value['id'],{}).get('title'):value['title']=art[value['id']]['title']
             if art.get(value['id'],{}).get('cover'):value['cover']=art[value['id']]['cover']
+            value['aliases']=art.get(value['id'],{}).get('aliases',[])
     except Exception:pass
     values.sort(key=lambda n:(n['date'] or float('inf'),n['id']))
-    result={'items':values,'links':edges,'mode':'release','source':'Shikimori','message':'Порядок выхода. Альтернативные адаптации и ответвления не образуют единственную обязательную хронологию.'}
+    from franchise_seasons import main_seasons
+    result={'version':2,'seasons':main_seasons(identity,values,edges),'items':values,'links':edges,'mode':'release','source':'Shikimori','message':'Порядок выхода. Альтернативные адаптации и ответвления не образуют единственную обязательную хронологию.'}
 
     with _lock:
         _cache[identity]=(time.monotonic()+21600,result)
