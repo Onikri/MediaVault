@@ -19,7 +19,7 @@ html[data-blossom] .morph-search-bar{
  box-shadow:inset 0 1px rgba(255,255,255,.06),0 24px 60px -24px rgba(0,0,0,.45);
  cursor:text;
 }
-html[data-blossom] .morph-search-bar>svg:first-child{color:#a5a5b3;flex:none}
+html[data-blossom] .morph-search-bar>.morph-search-icon{color:#a5a5b3;flex:none}
 html[data-blossom] .morph-search-bar input{
  flex:1;min-width:96px;width:100%;max-width:100%;height:38px;margin:0;padding:0;border:0;
  background:none!important;box-shadow:none!important;outline:0!important;color:#f2f2f5;font-size:16px;
@@ -124,7 +124,7 @@ html[data-blossom] .morph-search-token,html[data-blossom] .morph-search-chip-act
 html[data-blossom] .morph-search-chip{box-shadow:none!important}
 /* The expanded field keeps exactly the search trigger's accent. */
 html[data-blossom] .morph-search-bar{background:var(--nav-search-accent);border-color:transparent;box-shadow:none;color:var(--nav-search-ink,#fff)}
-html[data-blossom] .morph-search-bar>svg:first-child,
+html[data-blossom] .morph-search-bar>.morph-search-icon,
 html[data-blossom] .morph-search-bar input,
 html[data-blossom] .morph-search-bar button{color:var(--nav-search-ink,#fff)}
 html[data-blossom] .morph-search-bar input::placeholder{color:color-mix(in srgb,var(--nav-search-ink,#fff) 75%,transparent)}
@@ -133,8 +133,7 @@ html[data-blossom] .morph-search-bar .morph-search-token{background:color-mix(in
 .morph-search-panel{width:100%}
 
 html[data-blossom] .morph-search-bar{overflow:hidden;flex-shrink:0;padding:0 10px 0 45px;border-radius:19px}
-html[data-blossom] .morph-search-bar>svg:first-child{position:absolute;left:16px;top:9px;transition:left .32s}
+html[data-blossom] .morph-search-bar>.morph-search-icon{position:absolute;left:16px;top:10px;width:18px;height:18px;display:grid;place-items:center}
 html[data-blossom] .is-closing .morph-search-bar{padding:0}
-html[data-blossom] .is-closing .morph-search-bar>svg:first-child{left:9px}
-html[data-blossom] .morph-search-bar>:not(svg:first-child){transition:opacity .12s}
-html[data-blossom] .is-closing .morph-search-bar>:not(svg:first-child){opacity:0;pointer-events:none}
+html[data-blossom] .morph-search-bar>:not(.morph-search-icon){transition:opacity .12s}
+html[data-blossom] .is-closing .morph-search-bar>:not(.morph-search-icon){opacity:0;pointer-events:none}

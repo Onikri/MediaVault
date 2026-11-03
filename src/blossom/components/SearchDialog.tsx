@@ -11,20 +11,19 @@ import {GLASS_ENTER,GLASS_HIDDEN,GLASS_VISIBLE} from '../../glass-motion.js';
 /* MorphingSearchChips port: the original 56px glass bar, centered panel,
    spring-grown glass surface, animated chips, recents and list cursor.
    Live MediaVault catalog results remain available below the suggestions. */
-const ENTER={type:'spring',stiffness:380,damping:28,mass:.8} as const;
-const EXIT={type:'spring',stiffness:520,damping:40,mass:.6} as const;
 const SWAP={type:'spring',stiffness:420,damping:34,mass:.7} as const;
 const KEY='mediavault_search_recents_v1';
 const typeLabel=(kind:string)=>Object.fromEntries(SEARCH_KINDS)[kind]||'Сериал';
 const same=(a:string,b:string)=>a.trim().toLocaleLowerCase()===b.trim().toLocaleLowerCase();
+// Coordinates are local to the navbar. Scrolling moves the same surface with
+// its button; a viewport portal would chase the animated header one frame late.
 function coordinates(){
  const target=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();
  const inner=document.querySelector('.blossom-navbar .header-inner')?.getBoundingClientRect();
  const width=Math.min(340,window.innerWidth<=640?(inner?.width??window.innerWidth)-20:window.innerWidth<=1120?Math.max(180,window.innerWidth*.2):window.innerWidth<=1350?300:340);
- const height=38;
- const left=inner?inner.left+(inner.width-width)/2:(window.innerWidth-width)/2;
- const top=inner?inner.top+(inner.height-height)/2:(target?.top??18);
- return {width,left,top,height,anchorX:target?target.left+target.width/2-left-width/2:0,seedWidth:target?.width??112,seedHeight:target?.height??38};
+ const height=38,left=((inner?.width??window.innerWidth)-width)/2;
+ const top=inner?(inner.height-height)/2:(target?.top??18);
+ return {width,left,top,height,anchorX:target?target.left+target.width/2-(inner?.left??0)-left-width/2:0,seedWidth:target?.width??38};
 }
 function Highlight({text,query}:{text:string,query:string}){const at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;return at<0?<>{text}</>:<>{text.slice(0,at)}<strong>{text.slice(at,at+query.length)}</strong>{text.slice(at+query.length)}</>;}
 export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,onClose:()=>void,onChoose:(item:any)=>void,onBrowse:(query:string,kind:string)=>void}){
@@ -56,11 +55,11 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
   const observer=new ResizeObserver(update);
   const inner=header?.querySelector('.header-inner');if(inner)observer.observe(inner);
   const slot=header?.querySelector('.header-center-search');if(slot)observer.observe(slot);
-  window.addEventListener('resize',update);window.addEventListener('scroll',update,{passive:true});
+  window.addEventListener('resize',update);
   input.current?.focus({preventScroll:true});
-  return()=>{observer.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update);header?.classList.remove('is-search-open');dispatchEvent(new Event('mediavault:search-close'));};
+  return()=>{observer.disconnect();window.removeEventListener('resize',update);header?.classList.remove('is-search-open');dispatchEvent(new Event('mediavault:search-close'));};
  },[]);
- useEffect(()=>{if(!closing)return;const t=setTimeout(()=>{if(!finished.current){finished.current=true;onClose();}},450);return()=>clearTimeout(t);},[closing,onClose]);
+ useEffect(()=>{if(!closing)return;const t=setTimeout(()=>{if(!finished.current){finished.current=true;onClose();}},400);return()=>clearTimeout(t);},[closing,onClose]);
  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key!=='Escape'||event.isComposing)return;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();if(marked){setMarked(null);return;}if(query){setQuery('');setActiveId(null);return;}close();};document.addEventListener('keydown',escape,true);return()=>document.removeEventListener('keydown',escape,true);},[marked,query,close]);
  useEffect(()=>{if(closing)return;const handler=(event:PointerEvent)=>{const root=document.querySelector('.morph-search-dialog');const trigger=document.querySelector('.header-center-search');if(root?.contains(event.target as Node)||trigger?.contains(event.target as Node))return;close();};document.addEventListener('pointerdown',handler,true);return()=>document.removeEventListener('pointerdown',handler,true);},[closing,close]);
  useEffect(()=>{if(!panelRows.current||closing)return;const update=()=>setPanelFloor(old=>Math.max(old,panelRows.current?.offsetHeight||0));update();const ro=new ResizeObserver(update);ro.observe(panelRows.current);return()=>ro.disconnect();},[query,kind,closing,items.length]);
@@ -73,12 +72,12 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
   if(event.key==='Backspace'&&event.currentTarget.selectionStart===0&&event.currentTarget.selectionEnd===0&&!query&&chips.length){event.preventDefault();const last=chips.at(-1)!;if(marked===last)removeChip(last);else setMarked(last);return;}
   if(event.key==='ArrowLeft'&&event.currentTarget.selectionStart===0&&!query&&chips.length){event.preventDefault();setMarked(chips.at(-1)!);}
  };
- return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'search-dialog blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{top:geometry.top,left:geometry.left,width:geometry.width,transformOrigin:'top center'}} initial={reduce?false:{x:geometry.anchorX}} animate={{opacity:1,y:0,x:closing?geometry.anchorX:0}} transition={{duration:reduce?0:.32,ease:[.22,1,.36,1]}}>
+ return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{position:document.querySelector('.blossom-navbar .header-inner')?'absolute':'fixed',top:geometry.top,left:geometry.left,width:geometry.width}} initial={false}>
   <motion.div className="morph-search-bar" onPointerDown={focusField}
-   initial={reduce?false:{width:38,height:38}}
-   animate={{width:closing?38:geometry.width,height:38,borderRadius:19}}
+   initial={reduce?false:{width:geometry.seedWidth,height:38,x:geometry.anchorX}}
+   animate={{width:closing?geometry.seedWidth:geometry.width,height:38,borderRadius:19,x:closing?geometry.anchorX:0}}
    transition={{duration:reduce?0:.32,ease:[.22,1,.36,1]}} onAnimationComplete={()=>{if(closing&&!finished.current){finished.current=true;onClose();}}}>
-   <Search size={20} aria-hidden="true"/>
+   <motion.span className="morph-search-icon" aria-hidden="true" initial={reduce?false:{left:10}} animate={{left:closing?10:16}} transition={{duration:reduce?0:.32,ease:[.22,1,.36,1]}}><Search size={18}/></motion.span>
    <div className="morph-search-chips">
     <AnimatePresence initial={false} mode="popLayout">
      {chips.map(chip=><motion.span key={chip} layout="position" className={'morph-search-token'+(marked===chip?' is-marked':'')}
@@ -124,5 +123,5 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
     </motion.div>
    </motion.div>}
   </AnimatePresence>
- </motion.div>,document.body);
+ </motion.div>,document.querySelector('.blossom-navbar .header-inner')||document.body);
 }
