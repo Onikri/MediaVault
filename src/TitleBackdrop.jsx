@@ -4,7 +4,7 @@ import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ChevronLeft,ChevronRight,Pause,Play} from 'lucide-react';
 import {useArtwork} from './title-artwork.js';
 import {scenePalette} from './palette.js';
-import {buildTrailerUrl,extractYouTubeId,issueYouTubeCommand} from './blossom/utils/trailer.ts';
+import {validateServer} from './import-service.js';
 import {seedFromPixels} from './blossom/theme.js';
 
 function Slide({url,profile,actions,libraryId,onPalette}){
@@ -13,9 +13,9 @@ function Slide({url,profile,actions,libraryId,onPalette}){
     try{const canvas=document.createElement('canvas');canvas.width=64;canvas.height=36;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(event.currentTarget,0,0,64,36);const pixels=ctx.getImageData(0,0,64,36).data;onPalette({...scenePalette(pixels),seed:seedFromPixels(pixels)});}catch{}
   }}/>:null;
 }
-export default function TitleBackdrop({profile,actions,libraryId,onPalette,suspended=false,inline=false,trailer=null,sceneStyle}){
+export default function TitleBackdrop({profile,actions,libraryId,onPalette,suspended=false,inline=false,trailer=null,sceneStyle,server,identity}){
   const reduced=useReducedMotion(),[index,setIndex]=useState(0),[paused,setPaused]=useState(false),[manualPlay,setManualPlay]=useState(false),[hidden,setHidden]=useState(document.hidden),root=useRef(null),frame=useRef(null),position=useRef({x:0,y:0});
-  const [visible,setVisible]=useState(true),[mediaPlaying,setMediaPlaying]=useState(false),[started,setStarted]=useState(false);
+  const [visible,setVisible]=useState(true),[mediaPlaying,setMediaPlaying]=useState(false),[video,setVideo]=useState(null),[videoPhase,setVideoPhase]=useState('');
   useEffect(()=>{const update=()=>setHidden(document.hidden);document.addEventListener('visibilitychange',update);return()=>document.removeEventListener('visibilitychange',update);},[]);
   useEffect(()=>{const node=root.current;if(!node)return;const observer=new IntersectionObserver(entries=>setVisible(entries[0]?.isIntersecting!==false));observer.observe(node);return()=>observer.disconnect();},[]);
   useEffect(()=>{const update=event=>{if(event&&!event.target?.matches?.('video.mv-player-media'))return;const page=root.current?.closest('.title-page');setMediaPlaying(!!page&&[...page.querySelectorAll('video.mv-player-media')].some(v=>!v.paused&&!v.ended));};update();for(const type of ['play','pause','ended','emptied'])document.addEventListener(type,update,true);return()=>{for(const type of ['play','pause','ended','emptied'])document.removeEventListener(type,update,true);};},[]);
@@ -38,13 +38,27 @@ export default function TitleBackdrop({profile,actions,libraryId,onPalette,suspe
     window.addEventListener('pointermove',pointer,{passive:true});window.addEventListener('scroll',scroll,{passive:true});scroll();schedule();
     return()=>{cancelAnimationFrame(raf);window.removeEventListener('pointermove',pointer);window.removeEventListener('scroll',scroll);};
   },[reduced,suspended,inline]);
-  const host=document.getElementById('scene-root'),videoId=extractYouTubeId(trailer),allowed=!!videoId&&(!reduced||manualPlay)&&!navigator.connection?.saveData,shouldPlay=allowed&&!paused&&!stopped;
-  useEffect(()=>{setStarted(false);},[videoId]);
-  useEffect(()=>{if(shouldPlay)setStarted(true);},[shouldPlay,videoId]);
-  const video=started&&allowed?buildTrailerUrl(videoId,{autoplay:true,mute:true,controls:false}):null;
-  useEffect(()=>{issueYouTubeCommand(frame.current,shouldPlay?'playVideo':'pauseVideo');},[shouldPlay,video]);
-  const scene=<div ref={root} className="title-scene" aria-hidden="true"><motion.div className="title-scene-images" style={sceneStyle}><AnimatePresence initial={false}>{slides.length>0&&<Slide key={slides[index%slides.length]} url={slides[index%slides.length]} profile={profile} actions={actions} libraryId={libraryId} onPalette={onPalette}/>}</AnimatePresence></motion.div>{video&&<motion.div className="title-background-video" style={sceneStyle}><iframe ref={frame} src={video} onLoad={()=>issueYouTubeCommand(frame.current,shouldPlay?'playVideo':'pauseVideo')} title="Фоновый трейлер тайтла" tabIndex={-1} allow="autoplay; encrypted-media"/></motion.div>}<div className="title-scene-shade"/></div>;
+  let address='';try{address=validateServer(server||window.MEDIA_VAULT_CONFIG?.importServerUrl||localStorage.getItem('mediavault_import_server')||'');}catch{}
+  const host=document.getElementById('scene-root'),videoId=/^[1-9]\d{0,8}$/.test(String(identity||''))?String(identity):'',allowed=!!videoId&&(!reduced||manualPlay)&&(!navigator.connection?.saveData||manualPlay),shouldPlay=allowed&&!paused&&!stopped;
+  useEffect(()=>{
+    setVideo(null);setVideoPhase('');if(!allowed||!address)return;
+    const controller=new AbortController();let timer=0;
+    async function poll(){
+      try{
+        const response=await fetch(address+'/backgrounds/'+videoId,{signal:controller.signal});
+        if(response.status===429){timer=setTimeout(poll,2500);return;}
+        if(!response.ok)throw Error();const data=await response.json();
+        if(controller.signal.aborted)return;
+        setVideoPhase(data.status);
+        if(data.status==='ready'&&data.url==='/backgrounds/'+videoId+'/video')setVideo(address+data.url);
+        else timer=setTimeout(poll,data.status==='preparing'?1500:15000);
+      }catch{if(!controller.signal.aborted){setVideoPhase('unavailable');timer=setTimeout(poll,15000);}}
+    }
+    poll();return()=>{controller.abort();clearTimeout(timer);};
+  },[videoId,address,allowed]);
+  useEffect(()=>{const node=frame.current;if(!node)return;if(shouldPlay)node.play().catch(()=>{});else node.pause();},[shouldPlay,video]);
+  const scene=<div ref={root} className="title-scene" aria-hidden="true"><motion.div className="title-scene-images" style={sceneStyle}><AnimatePresence initial={false}>{slides.length>0&&<Slide key={slides[index%slides.length]} url={slides[index%slides.length]} profile={profile} actions={actions} libraryId={libraryId} onPalette={onPalette}/>}</AnimatePresence></motion.div>{video&&<motion.div className="title-background-video" style={sceneStyle}><video ref={frame} src={video} autoPlay={shouldPlay} muted loop playsInline preload="auto" onCanPlay={()=>{if(shouldPlay)frame.current?.play().catch(()=>{});}} onError={()=>{setVideoPhase('unavailable');setVideo(null);}} title="Видеофон тайтла" tabIndex={-1}/></motion.div>}<div className="title-scene-shade"/></div>;
   return <>{inline?scene:host&&createPortal(scene,host)}
-    {(slides.length>1||videoId)&&<div className="title-scene-controls" role="group" aria-label="Фон страницы">{slides.length>1&&<><button aria-label="Предыдущий фон" onClick={()=>setIndex(value=>(value-1+slides.length)%slides.length)}><ChevronLeft size={14}/></button><span>Кадр {index%slides.length+1} / {slides.length}</span></>}<button aria-label={paused?'Продолжить смену фона':'Остановить смену фона'} aria-pressed={paused} onClick={()=>{setManualPlay(true);setPaused(!paused);}}>{paused?<Play size={12}/>:<Pause size={12}/>}</button>{slides.length>1&&<button aria-label="Следующий фон" onClick={()=>setIndex(value=>(value+1)%slides.length)}><ChevronRight size={14}/></button>}</div>}
+    {(slides.length>1||videoId)&&<div className="title-scene-controls" role="group" aria-label="Фон страницы">{allowed&&videoPhase==='preparing'&&<span role="status">Готовим видеофон…</span>}{allowed&&videoPhase==='unavailable'&&<span role="status">Видеофон недоступен</span>}{slides.length>1&&<><button aria-label="Предыдущий фон" onClick={()=>setIndex(value=>(value-1+slides.length)%slides.length)}><ChevronLeft size={14}/></button><span>Кадр {index%slides.length+1} / {slides.length}</span></>}<button aria-label={paused?'Продолжить смену фона':'Остановить смену фона'} aria-pressed={paused} onClick={()=>{setManualPlay(true);setPaused(!paused);}}>{paused?<Play size={12}/>:<Pause size={12}/>}</button>{slides.length>1&&<button aria-label="Следующий фон" onClick={()=>setIndex(value=>(value+1)%slides.length)}><ChevronRight size={14}/></button>}</div>}
   </>;
 }

@@ -1,3 +1,4 @@
+import {readOnlineTitle,onlineTitleLocation} from './title-route.js';
 import {CatalogViewControls} from './blossom/components/CatalogViewControls.tsx';
 import {CatalogResultsTable} from './blossom/components/CatalogResultsTable.tsx';
 import {AnimeGrid} from './blossom/components/AnimeGrid.tsx';
@@ -5,7 +6,7 @@ import {AnimeCard} from './blossom/components/AnimeCard.tsx';
 import {FilterSidebar} from './blossom/components/FilterSidebar.tsx';
 import {SkeletonGrid} from './blossom/components/SkeletonCard.tsx';
 import {blossomRecord} from './blossom/media-adapter.js';
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{useEffect,useLayoutEffect,useMemo,useState} from 'react';
 import {motion,useReducedMotion} from 'motion/react';
 import Icon from './Icons.jsx';
 import {genreLabels,matchesFilters,providers} from './catalog.js';
@@ -30,11 +31,11 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const [layout,setLayout]=useState(()=>{try{const value=localStorage.getItem('mediavault_catalog_view_v2');return ['grid','compact','list','table'].includes(value)?value:'grid';}catch{return 'grid';}});
   const changeLayout=value=>{setLayout(value);try{localStorage.setItem('mediavault_catalog_view_v2',value);}catch{}};
   const [explore,setExplore]=useState(()=>browseRoute());
-  useEffect(()=>{const update=()=>{setExplore(browseRoute());if(browseRoute())setSelected(null);};addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);
+  useEffect(()=>{const update=()=>{setExplore(browseRoute());const route=readOnlineTitle();if(route)setSelected(route);else if(browseRoute()||location.hash==='#library')setSelected(null);};addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);
   const preset=initialTarget||initialItem;
-  const [query,setQuery]=useState(initialQuery||''),[kind,setKind]=useState(initialKind||'anime'),[selected,setSelected]=useState(preset||null);
+  const [query,setQuery]=useState(initialQuery||''),[kind,setKind]=useState(initialKind||'anime'),[selected,setSelected]=useState(()=>readOnlineTitle()||preset||null);
   const [filters,setFilters]=useState({year:'',genre:'',tag:'',format:'',age:''}),[voice,setVoice]=useState(''),[showFilters,setShowFilters]=useState(()=>matchMedia('(min-width: 641px)').matches),[page,setPage]=useState(1),[composing,setComposing]=useState(false);
-  useEffect(()=>{if(preset)setSelected(preset);},[preset]);
+  useEffect(()=>{if(preset){setSelected(preset);onlineTitleLocation(preset,true);}},[preset]);
   const reduced=useReducedMotion();
   const [sourceIds,setSourceIds]=useState([]),[sourceLanguage,setSourceLanguage]=useState('all'),[sourceRevision,setSourceRevision]=useState(0),[voiceOptions,setVoiceOptions]=useState([]);
   const {items:metadataItems,statuses,loading:metadataLoading,retry}=useCatalog(query,kind,filters.year,service.server,page,composing,filters);
@@ -49,10 +50,11 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const genres=[...new Set([...Object.values(genreLabels),...items.flatMap(item=>item.genres.map(localLabel))])].sort((a,b)=>a.localeCompare(b,'ru'));
   const formats=[...new Set(items.map(item=>item.format).filter(Boolean))];
   const suggestions=visible.slice(0,7),filter=(key,value)=>{setFilters(old=>({...old,[key]:value}));setPage(1);};
-  function choose(item){setSelected(item);}
+  function choose(item){setSelected(item);onlineTitleLocation(item);}
+  useLayoutEffect(()=>{if(!selected)return;scrollTo({top:0,behavior:'instant'});const frame=requestAnimationFrame(()=>scrollTo({top:0,behavior:'instant'}));return()=>cancelAnimationFrame(frame);},[selected?.id]);
   const spelling=visible.find(item=>item.searchSpelling)?.searchSpelling;
   const unavailable=Object.values(statuses).includes('unavailable');
-  if(selected)return <TitleDetails destination={destination} onOpenLibrary={onOpenLibrary} value={selected} service={service} state={state} onBack={()=>setSelected(null)} onSubmitted={onSubmitted} onRelated={r=>setSelected({id:'related:'+r.kind+':'+r.id,provider:'shikimori',providerId:String(r.ids?.mal||r.id),providers:['shikimori'],kind:r.kind,title:r.title,titles:{},aliases:[r.title],genres:[],tags:[],links:[],ids:{mal:String(r.ids?.mal||r.id)},releases:[],cover:r.cover,format:r.format})}/>;
+  if(selected)return <TitleDetails destination={destination} onOpenLibrary={onOpenLibrary} value={selected} service={service} state={state} onBack={()=>{setSelected(null);location.hash='library';}} onSubmitted={onSubmitted} onRelated={r=>choose({id:'related:'+r.kind+':'+r.id,provider:'shikimori',providerId:String(r.ids?.mal||r.id),providers:['shikimori'],kind:r.kind,title:r.title,titles:{},aliases:[r.title],genres:[],tags:[],links:[],ids:{mal:String(r.ids?.mal||r.id)},releases:[],cover:r.cover,format:r.format})}/>;
   if(explore)return <AnimeExplore route={explore} service={service} onChoose={choose} onBack={()=>{location.hash='library';setExplore(null);}}/>;
   return <><section className="world-catalog-intro"><span className="eyebrow">ОБЩАЯ БИБЛИОТЕКА</span><h2>Найди свою историю</h2><p>Смотри и читай онлайн. Сохраняй любимое в личную коллекцию.</p></section>
     <div className="catalog-kind-row" aria-label="Тип произведения">{kinds.map(([id,label])=><button key={id} className={'chip'+(kind===id?' chip-active':'')} onClick={()=>{setKind(id);setVoice('');setSourceIds([]);setFilters({year:'',genre:'',tag:'',format:'',age:''});setPage(1);}}>{label}</button>)}</div>

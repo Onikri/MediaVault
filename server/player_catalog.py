@@ -148,7 +148,9 @@ def group_voices(inspections):
     groups={}
     for source in inspections:
         for voice in source.get('dubs',[]):
-            label=voice['name'];kind=voice.get('kind') or translation_kind(label)
+            label=voice['name']
+            if not voice.get('named',True) or re.search(r'^(?:неизвестн|unknown|название перевода не указано|озвучка не указана|(?:серия|episode)\s*\d)',label,re.I):continue
+            kind=voice.get('kind') or translation_kind(label)
             language=voice.get('language') or 'und'
             name_key=normalized_studio(label)
             old_key=(re.sub(r'[\W_]+','',unicodedata.normalize('NFKC',label).casefold()),kind,language)

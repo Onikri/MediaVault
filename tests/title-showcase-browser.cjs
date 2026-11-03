@@ -1,4 +1,4 @@
-// Real React, geometry, scrolling and media decoding. Artwork/YouTube are fixtures.
+// Real React, geometry, scrolling and media decoding. Artwork/catalogue video are fixtures.
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 let browser,vite,last;
 (async()=>{
@@ -7,8 +7,8 @@ let browser,vite,last;
  await fs.writeFile(path.join(dir,'index.html'),'<meta name="viewport" content="width=device-width"><div id="root"></div><script type="module" src="'+base+'fixture.jsx"></script>');
  await fs.writeFile(path.join(dir,'fixture.jsx'),`
  import React from'react';import{createRoot}from'react-dom/client';import{ThemeProvider}from'/src/blossom/ThemeProvider.tsx';import{AnimatedNavbar}from'/src/blossom/components/AnimatedNavbar.tsx';import TitlePage from'/src/TitlePage.jsx';import PlaybackReveal from'/src/PlaybackReveal.jsx';import Player from'/src/MediaVaultPlayer.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/import-layout.css';
- window.MEDIA_VAULT_CONFIG={};window.commands=[];window.addEventListener('message',e=>{try{const d=JSON.parse(e.data);if(d.fixtureCommand)window.commands.push(d.fixtureCommand);}catch{}});
- const profile={title:'Атака титанов',year:2013,score:8.58,status:'Завершён',format:'ТВ-сериал',episodes:25,duration:24,genres:['Экшен','Драма'],description:'С давних времён человечество ведёт борьбу с титанами. Это огромные существа, которые не обладают особым интеллектом. Остатки человечества укрылись за высокими стенами. Однажды привычный мир меняется, и Эрен решает узнать, что находится за его пределами.',cover:'https://art.fixture/poster.svg',backgrounds:['https://art.fixture/scene.svg'],characters:[],trailers:[{url:'https://www.youtube.com/watch?v=abcdefghijk',image:'https://art.fixture/scene.svg'}]};
+ window.MEDIA_VAULT_CONFIG={importServerUrl:'https://api.fixture'};window.commands=[];window.addEventListener('message',e=>{try{const d=JSON.parse(e.data);if(d.fixtureCommand)window.commands.push(d.fixtureCommand);}catch{}});
+ const profile={sourceId:'16498',source:'shikimori',origin:'Манга',rating:'R-17',age:17,studio:'Wit Studio',title:'Атака титанов',year:2013,score:8.58,status:'Завершён',format:'ТВ-сериал',episodes:25,duration:24,genres:['Экшен','Драма'],description:'С давних времён человечество ведёт борьбу с титанами. Это огромные существа, которые не обладают особым интеллектом. Остатки человечества укрылись за высокими стенами. Однажды привычный мир меняется, и Эрен решает узнать, что находится за его пределами.',cover:'https://art.fixture/poster.svg',backgrounds:['https://art.fixture/scene.svg'],characters:[],trailers:[{url:'https://www.youtube.com/watch?v=abcdefghijk',image:'https://art.fixture/scene.svg'}]};
  const item={id:'fixture',name:'Серия 1',category:'video'};
  createRoot(document.getElementById('root')).render(<ThemeProvider><div className="app-shell" data-view="library"><AnimatedNavbar links={[{id:'home',label:'Главная'},{id:'library',label:'Библиотека'},{id:'collection',label:'Коллекция'}]} active="library" onSearch={()=>{}} onNavigate={()=>{}} brand={<button className="brand logo">MediaVault</button>}><button className="avatar-button">Г</button></AnimatedNavbar><main className="app-main"><TitlePage title={{id:'fixture',name:profile.title,section:'anime',category:'video',items:[],parts:[],online:true}} state={{user:{sub:'fixture'},catalog:{items:[]}}} actions={{}} online onlineProfile={profile} onBack={()=>{}} onRelated={()=>{}} materials={<><h2>Смотреть</h2><PlaybackReveal><Player item={item} source="${base}fixture.mp4" catalog={{items:[item]}} userId="fixture" apiRef={api=>window.player=api}/></PlaybackReveal></>}/></main></div></ThemeProvider>);
  `);
@@ -17,7 +17,11 @@ let browser,vite,last;
  for(const width of [390,768,1440]){
   const page=await browser.newPage({viewport:{width,height:900}}),errors=[];last=page;page.setDefaultTimeout(8000);page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});
   await page.route('https://art.fixture/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><defs><linearGradient id="s" x2="0" y2="1"><stop stop-color="#b2b9bb"/><stop offset="1" stop-color="#23373c"/></linearGradient></defs><path fill="url(#s)" d="M0 0h1600v900H0z"/><circle fill="#d9cfb2" cx="1100" cy="240" r="120"/><path fill="#28363b" d="M0 700l280-350 160 280 350-400 260 470 200-230 350 230v200H0z"/></svg>'}));
-  await page.route('https://www.youtube.com/embed/**',r=>r.fulfill({contentType:'text/html',body:'<script>addEventListener("message",e=>{try{const d=JSON.parse(e.data);parent.postMessage(JSON.stringify({fixtureCommand:d.func}),"*");}catch{}});</script>'}));
+  await page.route('https://api.fixture/**',async r=>{
+   if(r.request().url().endsWith('/backgrounds/16498'))return r.fulfill({json:{status:'ready',url:'/backgrounds/16498/video'}});
+   if(r.request().url().endsWith('/backgrounds/16498/video'))return r.fulfill({contentType:'video/mp4',body:await fs.readFile(path.join(dir,'fixture.mp4'))});
+   return r.fulfill({json:{data:{},tracks:[],ratings:[]}});
+  });
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');
   await page.waitForFunction(()=>window.player?.media.readyState>=2);await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(200);
   const hero=await page.locator('.title-showcase').boundingBox(),poster=await page.locator('.title-poster').boundingBox(),copy=await page.locator('.title-hero-copy').boundingBox(),nav=await page.locator('.title-navigation-anchor').boundingBox();
@@ -27,18 +31,21 @@ let browser,vite,last;
   if(width>640)assert.ok(Math.abs(poster.y-copy.y)<1&&poster.x+poster.width<copy.x,'Poster and copy align at their top edges');else assert.ok(copy.y>=poster.y+poster.height+20,'Phone stacks the same content group');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal overflow');
   await page.screenshot({path:path.join(dir,'showcase-'+width+'.png'),fullPage:false});
-  await page.locator('.title-background-video iframe').waitFor();await page.waitForFunction(()=>window.commands.includes('playVideo'));
-  await page.evaluate(()=>{window.originalFrame=document.querySelector('.title-background-video iframe');window.originalVideo=window.player.media;});
+  await page.locator('.title-background-video video').waitFor();await page.waitForFunction(()=>document.querySelector('.title-background-video video')?.currentTime>.1);
+  await page.evaluate(()=>{window.originalFrame=document.querySelector('.title-background-video video');window.originalPath=document.querySelector('.title-playback-mask path').getAttribute('d');window.originalVideo=window.player.media;});
   assert.ok((await page.locator('.title-playback-reveal').evaluate(n=>getComputedStyle(n).clipPath)).includes('url('),'Playback enters through the SVG mask');
   await page.evaluate(()=>scrollTo(0,document.querySelector('.title-showcase').getBoundingClientRect().height+150));
-  await page.waitForFunction(()=>window.commands.includes('pauseVideo'));await page.locator('.title-playback-reveal.is-revealed').waitFor();
-  assert.equal(await page.locator('.title-playback-reveal').evaluate(n=>getComputedStyle(n).clipPath),'none','Working media has no clipping');
+  await page.waitForFunction(()=>document.querySelector('.title-background-video video').paused);
+  await page.waitForFunction(()=>document.querySelector('.title-playback-mask path').getAttribute('d')!==window.originalPath);
+  if(width>=1150){const info=await page.locator('.title-showcase .title-facts').boundingBox();assert.ok(info.x>copy.x+copy.width-1,'Information sits to the right of the description');}
+  assert.notEqual(await page.locator('.title-showcase-poster-layer').evaluate(n=>getComputedStyle(n).transform),'none','Foreground participates in the scroll composition');
   await page.evaluate(()=>{window.player.media.loop=true;window.player.play();});await page.waitForFunction(()=>window.player.media.currentTime>.2);
   const before=await page.evaluate(()=>window.player.media.currentTime);await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(350);
   assert.ok(await page.evaluate(t=>window.originalVideo===window.player.media&&!window.player.media.paused&&window.player.media.currentTime>t,before),'Scroll and reveal preserve the playing media');
-  assert.ok(await page.evaluate(()=>window.originalFrame===document.querySelector('.title-background-video iframe')),'Background pauses without remounting');
-  await page.evaluate(()=>{window.commands=[];window.player.pause();});await page.waitForFunction(()=>window.commands.includes('playVideo'));
-  await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.locator('.title-showcase').waitFor();await page.waitForFunction(()=>window.player?.media.readyState>=2);assert.equal(await page.locator('.title-background-video iframe').count(),0,'Reduced motion starts without autoplay');assert.equal(await page.locator('.title-playback-reveal').evaluate(n=>getComputedStyle(n).clipPath),'none');
+  assert.ok(await page.evaluate(()=>window.originalFrame===document.querySelector('.title-background-video video')),'Background pauses without remounting');
+  await page.waitForFunction(()=>document.querySelector('.title-playback-mask path').getAttribute('d')===window.originalPath);
+  await page.evaluate(()=>{window.commands=[];window.player.pause();});await page.waitForFunction(()=>!document.querySelector('.title-background-video video').paused);
+  await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.locator('.title-showcase').waitFor();await page.waitForFunction(()=>window.player?.media.readyState>=2);assert.equal(await page.locator('.title-background-video video').count(),0,'Reduced motion starts without autoplay');assert.equal(await page.locator('.title-playback-reveal').evaluate(n=>getComputedStyle(n).clipPath),'none');
   assert.deepEqual(errors,[]);await page.close();console.log('PASS first-screen composition, SVG reveal, media continuity, background suspension and reduced motion '+width);
  }
 })().catch(async e=>{console.error(e);await last?.screenshot({path:'.codex-local/test-output/title-showcase/failure.png'}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

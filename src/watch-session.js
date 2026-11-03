@@ -4,7 +4,7 @@ export function readWatch(user,title,storage=globalThis.localStorage){try{return
 export function saveWatch(user,title,change,storage=globalThis.localStorage){try{const value={...readWatch(user,title,storage),...change,updatedAt:Date.now()};storage.setItem(watchKey(user,title),JSON.stringify(value));return value;}catch{return change;}}
 export function onlineEpisodeId(identity,season,episode){return 'online:'+identity+':s'+(season||1)+':e'+episode;}
 export function orderedVoices(voices,saved={}){
- return [...voices].filter(v=>v.language!=='en'&&v.language!=='uk').sort((a,b)=>
+ return [...voices].filter(v=>v.language!=='en'&&v.language!=='uk'&&!/^(?:неизвестн|unknown|название перевода не указано|озвучка не указана|(?:серия|episode)\s*\d)/i.test(v.name)).sort((a,b)=>
   Number(!!(b.id===saved.voiceId||b.aliases?.includes(saved.voiceId)))-Number(!!(a.id===saved.voiceId||a.aliases?.includes(saved.voiceId)))||(saved.usage?.[b.id]||0)-(saved.usage?.[a.id]||0)||
   Number(a.kind==='subtitles')-Number(b.kind==='subtitles')||a.name.localeCompare(b.name,'ru'));
 }

@@ -1,3 +1,4 @@
+import {readOnlineTitle} from './title-route.js';
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {motion,useReducedMotion} from 'motion/react';
 import ServerImport from './ServerImport.jsx';
@@ -103,11 +104,11 @@ function MediaVaultApp(){
   const importService=useImportService(state,actions);
   useLibraryProfiles(state,actions,importService.server,importService.active);
   const reduced=useReducedMotion();
-  const [view,setView]=useState(()=>browseRoute()?'library':new URLSearchParams(location.hash.slice(1)).has('title')?'collection':['home','library','collection','import','history','profile'].includes(location.hash.slice(1))?location.hash.slice(1):'home');
+  const [view,setView]=useState(()=>readOnlineTitle()||browseRoute()?'library':new URLSearchParams(location.hash.slice(1)).has('title')?'collection':['home','library','collection','import','history','profile'].includes(location.hash.slice(1))?location.hash.slice(1):'home');
   const [libraryDialog,setLibraryDialog]=useState(false),[libraryIntent,setLibraryIntent]=useState('online');
   const [importTarget,setImportTarget]=useState(null);
   const [importQuery,setImportQuery]=useState(''),[importKind,setImportKind]=useState('anime');
-  const [category,setCategory]=useState('all');
+  const [category,setCategory]=useState(()=>readOnlineTitle()?.kind||'all');
   const [searchOpen,setSearchOpen]=useState(false),[catalogSearch,setCatalogSearch]=useState({revision:0,item:null,query:''});
   const [query,setQuery]=useState('');
   const [sort,setSort]=useState('newest');
@@ -149,9 +150,10 @@ function MediaVaultApp(){
     const title=routedTitle(catalog,params.get('title'));
     if(title){setView('collection');setSelected(current=>title.items.some(item=>item.id===current?.id)?current:null);setActiveTitle(title);titleLocation(title,true);return true;}return false;
   }
+  useEffect(()=>{const previous=window.history.scrollRestoration;window.history.scrollRestoration='manual';return()=>{window.history.scrollRestoration=previous;};},[]);
   useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});},[view]);
   useEffect(()=>{
-    const change=()=>{if(browseRoute()){setView('library');setCategory('anime');setActiveTitle(null);setSelected(null);return;}if(restoreRoute(location.hash))return;const next=location.hash.slice(1);if(['home','library','collection','import','history','profile'].includes(next)){setView(next);setActiveTitle(null);setSelected(null);}};
+    const change=()=>{if(readOnlineTitle()){setView('library');setCategory(readOnlineTitle().kind);return;}if(browseRoute()){setView('library');setCategory('anime');setActiveTitle(null);setSelected(null);return;}if(restoreRoute(location.hash))return;const next=location.hash.slice(1);if(['home','library','collection','import','history','profile'].includes(next)){setView(next);setActiveTitle(null);setSelected(null);}};
     window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);
   },[]);
   useEffect(()=>{

@@ -1,10 +1,11 @@
 """Authenticated, bounded lyrics relay. Provider secrets never reach the browser."""
 import asyncio,contextlib,json,os,sqlite3,time
 from pathlib import Path
+from urllib.parse import quote
 import httpx
 from fastapi import Depends
 from pydantic import BaseModel,ConfigDict,Field
-from lyric_identity import identity,cache_key,match
+from lyric_identity import identity,cache_key,match,version
 
 MOBILE='https://apic-appmobile.musixmatch.com/ws/1.1/'
 OFFICIAL='https://api.musixmatch.com/ws/1.1/'
@@ -152,6 +153,7 @@ class LyricsRelay:
     async def lrclib(self,query):
         rows=[];failed=False
         queries=[('get',{'track_name':query['titles'][0],'artist_name':query['artists'][0],'duration':round(query['duration'])})]
+        queries += [('search',{'track_name':t,'artist_name':a}) for t in query['titles'][:2] for a in query['artists'][:3]]
         queries += [('search',{'q':t+' '+a}) for t in query['titles'][:2] for a in query['artists'][:3]]
         # No title-only fuzzy result is accepted without matching artist/version.
         async def fetch_one(endpoint,params):
@@ -175,6 +177,13 @@ class LyricsRelay:
                         'timingMismatch':matched['timingMismatch'],'identity':{'title':row.get('trackName'),'artist':row.get('artistName'),'duration':row.get('duration')}}
         return {'phase':'error' if failed else 'empty'}
 
+    async def lyrics_ovh(self,query):
+        if version(query['titles'][0]):return {'phase':'empty'}
+        artist=next((a for a in query['artists'] if a.isascii()),query['artists'][0])
+        data=await self.get_json('https://api.lyrics.ovh/v1/'+quote(artist,safe='')+'/'+quote(query['titles'][0],safe=''),{})
+        text=str((data or {}).get('lyrics') or '')[:100000]
+        return {'phase':'ready' if text else 'empty','plainText':text,'source':'Lyrics.ovh','url':'https://lyrics.ovh/','precision':'plain'}
+
     @staticmethod
     def rank(value):
         return 3 if value.get('precision')=='word' else 2 if value.get('lrc') else 1 if value.get('plainText') else 0
@@ -184,10 +193,15 @@ class LyricsRelay:
         async def delayed():
             await asyncio.sleep(.3)
             return await self.lrclib(query)
+        async def plain_fallback():
+            await asyncio.sleep(.8)
+            if best and self.rank(best)>=2:return {'phase':'empty'}
+            return await self.lyrics_ovh(query)
         try:
             async with asyncio.timeout(self.budget if budget is None else budget):
                 async with self.slots:
-                    tasks={asyncio.create_task(self.musixmatch(query)),asyncio.create_task(delayed())}
+                    mxm_task=asyncio.create_task(self.musixmatch(query))
+                    tasks={mxm_task,asyncio.create_task(delayed()),asyncio.create_task(plain_fallback())}
                     while tasks:
                         done,tasks=await asyncio.wait(tasks,return_when=asyncio.FIRST_COMPLETED)
                         for task in done:
@@ -196,7 +210,7 @@ class LyricsRelay:
                             except (httpx.HTTPError,ValueError,TypeError,KeyError):statuses.append('error');continue
                             statuses.append(value.get('phase'))
                             if not best or self.rank(value)>self.rank(best):best=value
-                        if best and self.rank(best)==3:break
+                        if best and (self.rank(best)==3 or self.rank(best)>=2 and mxm_task.done()):break
         except TimeoutError:statuses.append('timeout')
         finally:
             for task in tasks:task.cancel()
@@ -210,7 +224,7 @@ class LyricsRelay:
         start=time.monotonic()
         query={**query,**identity(query['titles'],query['artists'])}
         if not query['titles'] or not query['artists']:return {'phase':'empty','lines':[]}
-        key=cache_key(query)
+        key='v2:'+cache_key(query)
         def read():
             with self.db() as db:row=db.execute('SELECT payload FROM lyrics WHERE k=? AND expires>?',(key,time.time())).fetchone()
             return json.loads(row[0]) if row else None

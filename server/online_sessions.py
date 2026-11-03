@@ -126,7 +126,7 @@ def install(app,owner):
                     captions.append({'id':str(i),'name':str(track.get('name') or 'Субтитры')[:100],
                                      'language':str(track.get('language') or 'und')[:12],'url':'/online/'+token+'/'+s.resource(track['url'])})
             return {'id':token,'kind':'video','url':'/online/'+token+'/'+resource,'type':stream['type'],'subtitles':captions,
-                    'qualities':sorted({int(v['quality']) for v in page.streams if str(v.get('quality','')).isdigit()},reverse=True),
+                    'sourceIntervals':getattr(page,'skip_segments',[]),'qualities':sorted({int(v['quality']) for v in page.streams if str(v.get('quality','')).isdigit()},reverse=True),
                     'expiresIn':LEASE_SECONDS,'preparationMs':round((time.monotonic()-started)*1000)}
         except BaseException:
             if token:

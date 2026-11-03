@@ -1,5 +1,6 @@
 """On-demand public catalogue trailers for the native player; no iframe embeds."""
 import json
+import os
 from pathlib import Path
 import re
 import secrets
@@ -43,13 +44,13 @@ def prepare(anime_id,video_id,directory):
 
 def public(job):return {k:job[k] for k in ('id','status','message') if k in job}
 
-def download(token,url,directory):
+def download(token,url,directory,release_slot=True):
     target=directory/(token+'.%(ext)s')
     try:
         import playwright
         node=Path(playwright.__file__).parent/'driver'/'node'
         runtime=['--js-runtimes','node:'+str(node)] if node.is_file() else []
-        result=subprocess.run([sys.executable,'-m','yt_dlp','--ignore-config','--no-playlist','--no-progress','--no-part','--quiet','--no-warnings',
+        result=subprocess.run([sys.executable,'-m','yt_dlp','--ignore-config','--cache-dir',str(directory/'.yt-dlp'),'--no-playlist','--no-progress','--no-part','--quiet','--no-warnings',
             '--socket-timeout','12','--retries','1','--fragment-retries','1','--max-filesize','100M','--match-filter','duration <= 600 & !is_live',
             '--merge-output-format','mp4','-f','best[height<=720][ext=mp4][vcodec!=none][acodec!=none]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][vcodec!=none][acodec!=none]',
             '-o',str(target),*runtime,'--',url],capture_output=True,timeout=120,check=False)
@@ -67,7 +68,8 @@ def download(token,url,directory):
     except Exception:
         for path in directory.glob(token+'.*'):path.unlink(missing_ok=True)
         with lock:jobs[token].update({'status':'unavailable','message':'Источник пока не отдаёт этот ролик. Попробуй другой трейлер или повтори позже.','updated':time.time()})
-    finally:slots.release()
+    finally:
+        if release_slot:slots.release()
 
 def install(app,data_dir):
     class Request(BaseModel):
@@ -75,7 +77,7 @@ def install(app,data_dir):
         anime_id:str=Field(pattern=r'^\d{1,12}$')
         video_id:str=Field(pattern=r'^\d{1,12}$')
     @app.post('/trailers/prepare')
-    def begin(body:Request):return prepare(body.anime_id,body.video_id,Path(data_dir)/'temporary-trailers')
+    def begin(body:Request):return prepare(body.anime_id,body.video_id,Path(os.environ.get('TRAILER_CACHE_DIR',str(Path(__file__).resolve().parent/'.codex-local'/'trailers'))))
     @app.get('/trailers/status/{token}')
     def status(token:str):
         with lock:job=jobs.get(token)

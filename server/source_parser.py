@@ -249,6 +249,7 @@ class Page:
     players: list = field(default_factory=list)
     episodes: list = field(default_factory=list)
     subtitles: list = field(default_factory=list)
+    skip_segments: list = field(default_factory=list)
 
 
 class PageParser(HTMLParser):
@@ -443,7 +444,13 @@ class Resolver:
                 streams = [{"url": stream.url, "type": stream.kind.value, "quality": stream.quality,
                             "headers": playback_headers(stream.headers)} for stream in result.streams
                            if stream.kind.value in {"mp4", "hls"}]
-                return Page(title=result.title or "", streams=streams)
+                segments=[]
+                for segment in getattr(result,'skip_segments',[]) or []:
+                    start,end=getattr(segment,'start',None),getattr(segment,'end',None)
+                    kind=getattr(segment,'kind',None)
+                    if isinstance(start,(int,float)) and isinstance(end,(int,float)) and 0<=start<end<=86400 and kind in {'opening','ending'}:
+                        segments.append({'type':'op' if kind=='opening' else 'ed','start':start,'end':end,'source':'Kodik' if player_type is KodikPlayer else player_type.__name__})
+                return Page(title=result.title or "", streams=streams,skip_segments=segments)
         return None
 
     def resolve(self, url, *, referer=None, depth=0, visited=None):

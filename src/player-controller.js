@@ -75,8 +75,9 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const [introOffset,setIntroOffset]=useState(()=>{try{return Number(localStorage.getItem(openerKey(libraryId,item.id)+':offset'))||0;}catch{return 0;}});
   useEffect(()=>{try{setIntroOffset(Number(localStorage.getItem(openerKey(libraryId,item.id)+':offset'))||0);}catch{setIntroOffset(0);}},[item.id,libraryId]);
   const shifted=episodeMusic.intervals.map(v=>({...v,start:Math.max(0,v.start+introOffset),end:Math.min(duration,v.end+introOffset)})).filter(v=>v.end>v.start);
-  const effectiveOpening=opening||shifted.find(v=>v.type==='op');
-  const ending=openingBounds(item.ending)||shifted.find(v=>v.type==='ed');
+  const sourceIntervals=(onlineControls?.sourceIntervals||[]).filter(v=>['op','ed'].includes(v.type)&&Number.isFinite(v.start)&&Number.isFinite(v.end)&&v.start>=0&&v.end>v.start&&v.end<=duration+1);
+  const effectiveOpening=opening||sourceIntervals.find(v=>v.type==='op')||shifted.find(v=>v.type==='op');
+  const ending=openingBounds(item.ending)||sourceIntervals.find(v=>v.type==='ed')||shifted.find(v=>v.type==='ed');
   const activeTheme=effectiveOpening&&time>=effectiveOpening.start&&time<effectiveOpening.end?'OP':ending&&time>=ending.start&&time<ending.end?'ED':null;
   const songCandidates=episodeMusic.tracks.filter(t=>t.type===activeTheme),currentSong=songCandidates.length===1?songCandidates[0]:null;
   const lastStored=useRef(-1),resumeApplied=useRef(false),subtitleInput=useRef(null);

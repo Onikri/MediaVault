@@ -32,7 +32,7 @@ export default function useLyrics(track,duration,enabled=true,service){
     if(!found)setData({...value,lines:[]});
     // Show the first server result immediately. AMLL may enrich line timing
     // to word timing, but never holds up the initial result.
-    if(found&&value.precision!=='word')amll().catch(()=>{});
+    if(value.phase!=='instrumental'&&value.phase!=='restricted'&&value.precision!=='word')amll().catch(()=>{});
    }).catch(error=>{if(!signal.aborted){if(error.status===404)direct();else{setData({phase:'error',lines:[]});amll().catch(()=>{});}}});
   }else direct();
   return()=>abort.abort();
