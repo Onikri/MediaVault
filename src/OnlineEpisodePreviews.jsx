@@ -1,6 +1,6 @@
 import {useEffect,useRef} from 'react';
 import {captureEpisodePreview,readEpisodePreview} from './episode-preview-cache.js';
-import {onlineEpisodeId} from './watch-session.js';
+import {episodePreviewKey} from './watch-session.js';
 
 // One low-quality decoder and one short-lived lease at a time. Starting actual
 // playback aborts this work immediately, so thumbnails never compete with it.
@@ -28,18 +28,18 @@ export async function frame(source,type,signal,multiple=false,onPartial){
  }finally{stopped=true;clearTimeout(timer);signal.removeEventListener('abort',abortListener);hls?.destroy();video.pause();video.removeAttribute('src');video.load();}
 }
 
-export default function OnlineEpisodePreviews({entries,active,service,sourceUrl,identity,season,userId,onPreview}){
+export default function OnlineEpisodePreviews({entries,active,service,sourceUrl,sourceId,identity,season,userId,onPreview}){
  const client=useRef('previews-'+crypto.randomUUID()),publish=useRef(onPreview);publish.current=onPreview;
  useEffect(()=>{
   if(!active||!sourceUrl||navigator.connection?.saveData)return;
   const abort=new AbortController();
   (async()=>{for(const entry of entries){
    if(abort.signal.aborted)return;
-   const key=onlineEpisodeId(identity,entry.season||season,entry.number)+':'+(userId||'anonymous');
+   const key=episodePreviewKey(identity,entry.season||season,entry.number,sourceId,userId);
    const cached=await readEpisodePreview(key);if(cached){publish.current(entry.number,cached);continue;}
    let lease;
    try{
-    const data=await service.request('/online/prepare',{method:'POST',body:{url:entry.url,referer:sourceUrl,kind:'video',quality:'best',clientId:client.current},signal:abort.signal});lease=data.id;
+    const data=await service.request('/online/prepare',{method:'POST',body:{url:entry.url,referer:sourceUrl,kind:'video',quality:'360',clientId:client.current},signal:abort.signal});lease=data.id;
     if(abort.signal.aborted)continue;
     const image=await frame(service.server.replace(/\/$/,'')+data.url,data.type,abort.signal);
     if(image&&!abort.signal.aborted)publish.current(entry.number,image);
@@ -47,6 +47,6 @@ export default function OnlineEpisodePreviews({entries,active,service,sourceUrl,
    finally{if(lease)service.request('/online/'+lease,{method:'DELETE',keepalive:true}).catch(()=>{});}
   }})();
   return()=>abort.abort();
- },[entries,active,sourceUrl,identity,season,userId,service.server]);
+ },[entries,active,sourceUrl,sourceId,identity,season,userId,service.server]);
  return null;
 }

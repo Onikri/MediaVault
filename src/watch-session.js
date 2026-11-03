@@ -12,3 +12,6 @@ export function variantsFor(voice,episode,failed=new Set()){
  const rank=v=>{const known=v.episodes?.length,found=v.episodes?.some(e=>Number(e.number)===Number(episode));return (known&&!found?10:0)+(v.player==='Kodik'?0:v.player==='Alloha'?2:1);};
  return [...(voice?.variants||[])].filter(v=>!failed.has(v.id)).sort((a,b)=>rank(a)-rank(b));
 }
+
+// Public source identity (not a media URL) isolates thumbnails from different mirrors.
+export function episodePreviewKey(identity,season,episode,source,user){return onlineEpisodeId(identity,season,episode)+':source:'+encodeURIComponent(source||'default')+':'+encodeURIComponent(user||'anonymous');}

@@ -59,3 +59,9 @@ test('fast playback prefers a direct mirror and restores a renamed studio prefer
  assert.equal(variantsFor(voice,1)[0].id,'direct');
  assert.equal(orderedVoices([{id:'other',name:'А'},{id:'new',aliases:['old'],name:'Б'}],{voiceId:'old'})[0].id,'new');
 });
+
+test('preview identity isolates season, episode, public source and account',async()=>{
+ const {episodePreviewKey:key}=await import('../src/watch-session.js');
+ const base=key('16498',1,2,'kodik-17','user-a');
+ for(const other of [key('16498',2,2,'kodik-17','user-a'),key('16498',1,3,'kodik-17','user-a'),key('16498',1,2,'alloha-17','user-a'),key('16498',1,2,'kodik-17','user-b')])assert.notEqual(base,other);
+});
