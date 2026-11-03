@@ -50,11 +50,11 @@ def prepare(anime_id,video_id,directory):
         old=next((v for v in jobs.values() if v.get('anime')==anime_id and v.get('video')==video_id),None)
         if old and (old['status']!='ready' or Path(old.get('path','')).is_file()):return public(old)
         if not slots.acquire(blocking=False):raise HTTPException(429,'Сервер готовит другие трейлеры. Повтори через минуту.')
-        token=secrets.token_urlsafe(24);jobs[token]={'id':token,'anime':anime_id,'video':video_id,'status':'preparing','updated':time.time()}
+        token=secrets.token_urlsafe(24);jobs[token]={'id':token,'anime':anime_id,'video':video_id,'youtubeId':youtube_id(video['url']),'status':'preparing','updated':time.time()}
         thread=threading.Thread(target=download,args=(token,video['url'],directory),daemon=True,name='public-trailer');thread.start()
         return public(jobs[token])
 
-def public(job):return {k:job[k] for k in ('id','status','message') if k in job}
+def public(job):return {k:job[k] for k in ('id','status','message','youtubeId') if k in job and (k!='youtubeId' or job.get('status')=='browser')}
 
 def download(token,url,directory,release_slot=True):
     target=directory/(token+'.%(ext)s')
@@ -67,6 +67,10 @@ def download(token,url,directory,release_slot=True):
             '--merge-output-format','mp4','-f','best[height<=720][ext=mp4][vcodec!=none][acodec!=none]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][vcodec!=none][acodec!=none]',
             '-o',str(target),*runtime,'--',url],capture_output=True,timeout=120,check=False)
         paths=[p for p in directory.glob(token+'.*') if p.suffix in {'.mp4','.webm','.mkv','.mov'}]
+        if result.returncode and b'Sign in to confirm' in result.stderr and re.fullmatch(r'[\w-]{11}',jobs[token].get('youtubeId','')):
+            for path in directory.glob(token+'.*'):path.unlink(missing_ok=True)
+            with lock:jobs[token].update(status='browser',updated=time.time())
+            return
         if result.returncode or not paths or not 0<paths[0].stat().st_size<=MAX_BYTES:raise ValueError()
         path=paths[0]
         probe=subprocess.run(['ffprobe','-v','error','-show_entries','format=duration:stream=codec_type','-of','json',str(path)],capture_output=True,timeout=10,check=False)

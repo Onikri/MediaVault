@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {Play,X,Film,ExternalLink} from 'lucide-react';
 import MediaVaultPlayer from './MediaVaultPlayer.jsx';
+import YouTubeEmbed from './YouTubeEmbed.jsx';
 import {extractYouTubeId} from './blossom/utils/trailer.ts';
 
 function TrailerVideo({video,profile,server,userId,onPlaybackChange}){
@@ -12,6 +13,7 @@ function TrailerVideo({video,profile,server,userId,onPlaybackChange}){
   async function status(job){
    if(abort.signal.aborted)return;
    if(job.status==='ready'){setData({url:server+'/trailers/stream/'+job.id});return;}
+   if(job.status==='browser'&&/^[\w-]{11}$/.test(job.youtubeId||'')){setData({embedId:job.youtubeId});return;}
    if(job.status==='unavailable')throw Error(job.message||'Источник не отдал ролик.');
    timer=setTimeout(()=>fetch(server+'/trailers/status/'+job.id,{signal:abort.signal}).then(r=>r.ok?r.json():Promise.reject(Error('Подготовка ролика истекла.'))).then(status).catch(failed),1000);
   }
@@ -21,7 +23,7 @@ function TrailerVideo({video,profile,server,userId,onPlaybackChange}){
   return()=>{abort.abort();clearTimeout(timer);};
  },[video.id,video.url,profile.sourceId,server,retry]);
  const item={id:'trailer:'+profile.sourceId+':'+video.id,name:video.title,category:'video',section:'anime',onlineType:'mp4',metadataId:profile.sourceId,preview:video.image};
- return data?<MediaVaultPlayer item={item} source={data.url} userId={userId} libraryId="trailers" autoPlay catalog={{items:[item]}} onPlaybackChange={onPlaybackChange}/>:<div className="trailer-preparation" role="status"><Film size={28}/><p>{error||'Готовим проморолик…'}</p>{error&&<button className="btn btn-secondary" onClick={()=>setRetry(n=>n+1)}>Повторить</button>}</div>;
+ return data?.embedId?<YouTubeEmbed videoId={data.embedId} title={video.title} autoplay onState={state=>onPlaybackChange?.(state===1)} onError={()=>onPlaybackChange?.(false)}/>:data?<MediaVaultPlayer item={item} source={data.url} userId={userId} libraryId="trailers" autoPlay catalog={{items:[item]}} onPlaybackChange={onPlaybackChange}/>:<div className="trailer-preparation" role="status"><Film size={28}/><p>{error||'Готовим проморолик…'}</p>{error&&<button className="btn btn-secondary" onClick={()=>setRetry(n=>n+1)}>Повторить</button>}</div>;
 }
 export default function Trailers({profile,renderArtwork,onPlaybackChange,server=window.MEDIA_VAULT_CONFIG?.importServerUrl,userId}){
  const[selected,setSelected]=useState(null);

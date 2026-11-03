@@ -10,7 +10,7 @@ from source_parser import SourceError
 
 cache=OrderedDict();pending={};lock=threading.RLock();slots=threading.BoundedSemaphore(4)
 FIELDS=[('age','Возраст',r'Age|Возраст',False),('height','Рост',r'Height|Рост',False),
- ('birthday','День рождения',r'Birthday|Birth date|Date of birth|День рождения|Дата рождения',False),
+ ('birthday','День рождения',r'Birthday|Birthdate|Birth date|Date of birth|День рождения|Дата рождения',False),
  ('gender','Пол',r'Gender|Sex|Пол',False),('weight','Вес',r'Weight|Вес',False),
  ('mother','Мать',r'Mother|Мать|Мама',True),('father','Отец',r'Father|Отец|Папа',True),
  ('status','Статус',r'Status|Статус',True),
@@ -32,7 +32,7 @@ def build(identity,base,details):
         for key,label,pattern,spoiler in FIELDS:
             match=re.search(r'(?im)^\s*(?:'+pattern+r')\s*[:：]\s*([^\n\r]+)',text)
             if not match or key in seen:continue
-            value=match[1].strip().strip('*')[:250]
+            value=match[1].strip().strip('*').rstrip(' ,;')[:250]
             if value.casefold() in {'unknown','unknown.','n/a','none','неизвестно','не указан'}:continue
             attributes.append({'key':key,'label':label,'value':TRANSLATE.get(value.casefold(),value),'spoiler':spoiler,'source':source,'url':url});seen.add(key)
     appearances=[]

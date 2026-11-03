@@ -62,10 +62,20 @@ class AccelerationTests(unittest.TestCase):
 
 class CharacterTests(unittest.TestCase):
  def test_only_explicit_facts_with_attribution_and_spoilers(self):
-  result=character_profile.build('42',{'id':42,'russian':'Герой','description':'Рост: 175 см'}, {'mal_id':42,'name':'Hero','about':'Age: 19\nHeight: 180 cm\nGender: Male\nMother: Example\nStatus: Alive\nFirst appearance: Episode 2','anime':[{'anime':{'mal_id':1,'title':'Show'},'role':'Main'}]})
+  result=character_profile.build('42',{'id':42,'russian':'Герой','description':'Рост: 175 см'}, {'mal_id':42,'name':'Hero','about':'Birthdate: March 30\nAge: 19,\nHeight: 180 cm\nGender: Male\nMother: Example\nStatus: Alive\nFirst appearance: Episode 2','anime':[{'anime':{'mal_id':1,'title':'Show'},'role':'Main'}]})
   values={r['key']:r for r in result['attributes']}
-  self.assertEqual(values['height']['value'],'175 см');self.assertEqual(values['gender']['value'],'Мужской');self.assertTrue(values['mother']['spoiler']);self.assertTrue(values['debut']['spoiler']);self.assertNotIn('father',values);self.assertEqual(result['appearances'][0]['id'],'1');self.assertTrue(all(v['url'] for v in values.values()))
+  self.assertEqual(values['height']['value'],'175 см');self.assertEqual(values['birthday']['value'],'March 30');self.assertEqual(values['age']['value'],'19');self.assertEqual(values['gender']['value'],'Мужской');self.assertTrue(values['mother']['spoiler']);self.assertTrue(values['debut']['spoiler']);self.assertNotIn('father',values);self.assertEqual(result['appearances'][0]['id'],'1');self.assertTrue(all(v['url'] for v in values.values()))
  def test_wrong_character_is_rejected_and_missing_attributes_remain_missing(self):
   for base,extra in [({'id':43},{}),({}, {'mal_id':43})]:
    with self.assertRaises(SourceError):character_profile.build('42',base,extra)
   self.assertEqual(character_profile.build('42',{'id':42},{})['attributes'],[])
+
+class TrailerHostTests(unittest.TestCase):
+ def test_youtube_confirmation_uses_only_catalogue_verified_embed_id(self):
+  import sys,trailer_service
+  token='confirmed-fixture';trailer_service.jobs[token]={'id':token,'status':'preparing','youtubeId':'abcdefghijk'}
+  with tempfile.TemporaryDirectory() as folder,patch.dict(sys.modules,{'playwright':SimpleNamespace(__file__=__file__)}),patch.object(trailer_service.subprocess,'run',return_value=SimpleNamespace(returncode=1,stderr=b'Sign in to confirm you are not a bot')):
+   try:
+    trailer_service.download(token,'https://www.youtube.com/watch?v=abcdefghijk',Path(folder),release_slot=False)
+    public=trailer_service.public(trailer_service.jobs[token]);self.assertEqual(public['status'],'browser');self.assertEqual(public['youtubeId'],'abcdefghijk')
+   finally:trailer_service.jobs.pop(token,None)
