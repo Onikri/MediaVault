@@ -3,7 +3,7 @@ import {motion,useReducedMotion,useIsPresent} from 'motion/react';
 import {PlayerContext} from './player-session.js';
 export default function PlayerPopover({anchor,label,children,className='',onClose}){
  const player=useContext(PlayerContext),close=useRef(onClose);close.current=onClose;
- const root=useRef(null),reduced=useReducedMotion(),present=useIsPresent();
+ const root=useRef(null),restoreFocus=useRef(true),reduced=useReducedMotion(),present=useIsPresent();
  const [box,setBox]=useState({position:'absolute',left:8,top:8,width:320,maxHeight:300,transformOrigin:'bottom right'});
  useEffect(()=>{
   const previous=document.activeElement;if(!root.current?.contains(previous))root.current?.focus({preventScroll:true});
@@ -15,9 +15,10 @@ export default function PlayerPopover({anchor,label,children,className='',onClos
    if(e.shiftKey&&(document.activeElement===first||document.activeElement===root.current)){e.preventDefault();last.focus();}
    else if(!e.shiftKey&&(document.activeElement===last||document.activeElement===root.current)){e.preventDefault();first.focus();}
   };
-  const node=root.current;node?.addEventListener('keydown',key);
-  return()=>{node?.removeEventListener('keydown',key);const target=anchor?.current||previous;if(target?.isConnected)target.focus?.({preventScroll:true});};
- },[anchor]);
+  const outside=e=>{const host=player?.root||root.current?.closest('.mv-player');if(host&&!host.contains(e.target)){restoreFocus.current=false;close.current();}};
+  const node=root.current;node?.addEventListener('keydown',key);document.addEventListener('pointerdown',outside,true);
+  return()=>{node?.removeEventListener('keydown',key);document.removeEventListener('pointerdown',outside,true);const target=anchor?.current||previous;if(restoreFocus.current&&target?.isConnected)target.focus?.({preventScroll:true});};
+ },[anchor,player]);
  useLayoutEffect(()=>{
   let frame=0;
   const host=player?.root||root.current?.closest('.mv-player');

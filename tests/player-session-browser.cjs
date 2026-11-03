@@ -28,6 +28,7 @@ let browser,vite,last;
   const offset=()=>menu.evaluate(n=>{const p=n.closest('.mv-player').getBoundingClientRect(),r=n.getBoundingClientRect();return {x:r.x-p.x,y:r.y-p.y,width:r.width,height:r.height,inside:r.x>=p.x&&r.right<=p.right+1&&r.y>=p.y&&r.bottom<=p.bottom+1};});
   const before=await offset();await page.evaluate(()=>scrollBy(0,80));await page.waitForTimeout(100);const after=await offset();assert.ok(before.inside&&after.inside);assert.ok(Math.abs(before.y-after.y)<1,'Menu scrolls with its player, not with the viewport');
   await page.keyboard.press('Escape');await menu.waitFor({state:'hidden'});
+  await page.getByRole('button',{name:'Настройки плеера',exact:true}).click();await menu.waitFor();await page.locator('#rerender').click();await menu.waitFor({state:'hidden'});assert.equal(await page.locator('#rerender').evaluate(n=>document.activeElement===n),true,'An outside click closes the local menu without stealing focus');
   await page.evaluate(()=>window.player.theater(true));await page.waitForFunction(()=>document.querySelector('.player-theater-dimmed'));
   assert.equal(await video.evaluate(n=>{for(let p=n;p;p=p.parentElement)if(+getComputedStyle(p).opacity<.99)return false;return true;}),true,'Theater never dims an ancestor of its video');
   await page.waitForFunction(()=>+getComputedStyle(document.querySelector('#outside')).opacity<=.161);
