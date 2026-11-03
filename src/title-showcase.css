@@ -1,0 +1,51 @@
+/* A first-screen scene followed by the normal document. Typography, palette,
+   controls and rounded surfaces remain the supplied AniView design system. */
+html[data-blossom] .title-page .title-feature.title-showcase{
+ display:flex;flex-direction:column;justify-content:flex-end;gap:0;
+ width:calc(100vw - 16px);max-width:none;margin:0 0 0 calc(50% - 50vw + 8px);
+ min-height:calc(100svh - 12px);height:auto;box-sizing:border-box;
+ padding:clamp(250px,32svh,420px) max(24px,calc((100vw - 1248px)/2)) 64px;
+ isolation:isolate;border-radius:0 0 30px 30px;
+}
+html[data-blossom] .title-showcase-content{
+ display:grid;grid-template-columns:clamp(250px,23vw,330px) minmax(0,1fr);
+ align-items:start;gap:clamp(28px,3.2vw,52px);width:100%;min-width:0;
+ position:relative;z-index:1;
+}
+html[data-blossom] .title-showcase .title-showcase-content>.title-poster{
+ width:100%;align-self:start;aspect-ratio:3/4;margin:0;grid-column:auto;grid-row:auto;
+}
+html[data-blossom] .title-showcase .title-showcase-content>.title-hero-copy{grid-column:auto;grid-row:auto;max-width:850px;padding:0}
+html[data-blossom] .title-showcase .title-hero-description{font-size:14px;line-height:1.8;color:var(--color-on-surface);opacity:.88}
+html[data-blossom] .title-showcase .title-scene{z-index:0}
+html[data-blossom] .title-showcase .title-scene-images{inset:-110px -10px;transform-origin:50% 50%}
+html[data-blossom] .title-showcase .title-scene-shade{
+ background:linear-gradient(180deg,rgb(var(--canvas-rgb)/.7),rgb(var(--canvas-rgb)/.55) 14%,transparent 34%),linear-gradient(0deg,var(--color-canvas) 0%,rgb(var(--canvas-rgb)/.84) 16%,rgb(var(--canvas-rgb)/.5) 48%,rgb(var(--canvas-rgb)/.12) 76%),linear-gradient(90deg,rgb(var(--canvas-rgb)/.35),transparent 78%);
+}
+html[data-blossom] .title-showcase .title-background-video{inset:-110px 0;container-type:size}
+html[data-blossom] .title-showcase .title-background-video iframe{
+ inset:auto;left:50%;top:50%;width:max(100cqw,177.778cqh);height:max(100cqh,56.25cqw);
+ transform:translate(-50%,-50%) scale(1.03);
+}
+html[data-blossom] .title-showcase .title-scene-controls{right:24px;bottom:18px}
+html[data-blossom] .title-page .title-page-back{left:0;top:100px}
+.title-playback-reveal{position:relative;min-width:0;transform-origin:50% 30%}
+.title-playback-mask{position:absolute;pointer-events:none}
+.title-playback-reveal.is-revealed{clip-path:none;transform:none}
+@media(max-width:1000px){
+ html[data-blossom] .title-showcase-content{grid-template-columns:220px minmax(0,1fr);gap:28px}
+ html[data-blossom] .title-page .title-feature.title-showcase{padding-inline:28px}
+}
+@media(max-width:640px){
+ html[data-blossom] .title-page .title-feature.title-showcase{
+  min-height:calc(100svh - 5px);padding:clamp(230px,33svh,340px) 24px 64px;
+  border-radius:0 0 24px 24px;
+ }
+ html[data-blossom] .title-showcase-content{grid-template-columns:minmax(0,1fr);gap:24px}
+ html[data-blossom] .title-showcase .title-showcase-content>.title-poster{width:clamp(150px,40vw,210px);border-radius:14px}
+ html[data-blossom] .title-showcase .title-showcase-content>.title-hero-copy{display:flex;grid-column:auto;grid-row:auto}
+ html[data-blossom] .title-showcase .title-hero-copy>.eyebrow{margin-bottom:12px}
+ html[data-blossom] .title-showcase .title-hero-copy h1{font-size:32px;line-height:1.1}
+ html[data-blossom] .title-showcase .title-hero-description{font-size:13px;-webkit-line-clamp:6}
+ html[data-blossom] .title-page .title-page-back{top:88px}
+}
