@@ -1,5 +1,5 @@
 """Exact-title search and translation aggregation with bounded, isolated source requests."""
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor,as_completed
 import threading
 import time
 import re
@@ -35,7 +35,7 @@ def voice_suggestions(query='',limit=30):
     return {'query':query,'voices':values[:max(1,min(int(limit),50))],'total':len(values),'observedOnly':True}
 
 
-def discover(selected,*,refresh=False,continuing=False):
+def _discover(selected,*,refresh=False,continuing=False):
     if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')
     key=repr((selected.get('ids'),aliases(selected),selected.get('year'),selected.get('kind')))
     with _lock:
@@ -107,14 +107,65 @@ def discover(selected,*,refresh=False,continuing=False):
                 return {'provider':site.id,'name':site.name,'status':'unavailable','message':'Источник не ответил или изменил разметку.','sources':[]}
             finally:http.close()
         sites=[s for s in SITES if s.kind=='anime' and s.id not in {'sovet','anilibriafun','animevosttv'}]
-        with ThreadPoolExecutor(max_workers=6) as pool:providers=list(pool.map(work,sites))
-        sources=[s for p in providers for s in p.pop('sources')]
-        # A later timeout must not remove a previously verified player/translation.
-        for previous in known.values():
-            if not any(s['url']==previous['url'] for s in sources):sources.append(previous)
-        result={'title':selected,'voices':group_voices(sources),'sources':sources,'providers':providers,'progress':sum(s.get('scannedPages',1) for s in sources),'pending':any(s.get('pending') for s in sources) or any(p.get('pending') for p in providers),'complete':all(p.get('complete',False) for p in providers),'checkedAt':int(time.time())}
+        providers=[]
+        def snapshot(unfinished=False):
+            sources=[s for p in providers for s in p.get('sources',[])]
+            for previous in known.values():
+                if not any(s['url']==previous['url'] for s in sources):sources.append(previous)
+            return {'title':selected,'voices':group_voices(sources),'sources':sources,
+                'providers':[{k:v for k,v in p.items() if k!='sources'} for p in providers],
+                'progress':len(providers)+sum(s.get('scannedPages',1) for s in sources),
+                'pending':unfinished or any(s.get('pending') for s in sources) or any(p.get('pending') for p in providers),
+                'complete':not unfinished and all(p.get('complete',False) for p in providers),'checkedAt':int(time.time())}
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures=[pool.submit(work,site) for site in sites]
+            for future in as_completed(futures):
+                providers.append(future.result());result=snapshot(len(providers)<len(sites))
+                with _lock:_cache[key]=(time.monotonic()+(300 if result['sources'] else 30),result)
+                with _jobs_lock:job=_jobs.get(key)
+                if job and result['voices']:job['changed'].set()
+        result=snapshot()
         with _lock:
             if len(_cache)>=80:_cache.pop(next(iter(_cache)))
-            _cache[key]=(time.monotonic()+(300 if sources else 30),result)
+            _cache[key]=(time.monotonic()+(300 if result['sources'] else 30),result)
+        from source_index import save
+        save(key,result)
         return result
     finally:_slots.release()
+
+
+_jobs={};_jobs_lock=threading.RLock()
+
+def discover(selected,*,refresh=False,continuing=False):
+    if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')
+    key=repr((selected.get('ids'),aliases(selected),selected.get('year'),selected.get('kind')))
+    with _lock:hit=_cache.get(key)
+    with _jobs_lock:
+        job=_jobs.get(key)
+        if job is None and (not refresh or continuing) and hit and hit[0]>time.monotonic() and not hit[1].get('pending'):return hit[1]
+        if job is None:
+            if len(_jobs)>=2:
+                if hit:return {**hit[1],'pending':True,'complete':False,'refreshing':True}
+                raise ValueError('Поиск других тайтлов уже выполняется. Повтори через несколько секунд.')
+            if not hit and not refresh:
+                from source_index import load
+                old=load(key)
+                if old:
+                    hit=(time.monotonic()+30,{**old,'title':selected})
+                    with _lock:_cache[key]=hit
+            job=_jobs[key]={'changed':threading.Event(),'done':threading.Event()}
+            def run():
+                try:_discover(selected,refresh=True,continuing=continuing or bool(hit))
+                except Exception:job['error']=True
+                finally:
+                    job['done'].set();job['changed'].set()
+                    with _jobs_lock:_jobs.pop(key,None)
+            threading.Thread(target=run,daemon=True,name='voice-discovery').start()
+    if hit and hit[1].get('voices'):return {**hit[1],'pending':True,'complete':False,'refreshing':True}
+    # Fast providers can unlock playback before slow providers finish. Subsequent
+    # polling joins the same job; it never starts a second catalogue crawl.
+    job['changed'].wait(1.5)
+    with _lock:current=_cache.get(key)
+    if current:return {**current[1],'refreshing':not job['done'].is_set()}
+    if job.get('error'):raise ValueError('Источники пока не ответили. Повтори поиск.')
+    return {'title':selected,'voices':[],'sources':[],'providers':[],'progress':0,'pending':not job['done'].is_set(),'complete':job['done'].is_set(),'checkedAt':int(time.time())}

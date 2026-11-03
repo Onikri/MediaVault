@@ -79,9 +79,12 @@ class Prepare(BaseModel):
     referer:str|None=Field(default=None,max_length=8192)
     kind:str=Field(pattern='^(video|manga)$')
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
+    refresh:bool=False
     client_id:str=Field(default='',alias='clientId',max_length=100,pattern=r'^[A-Za-z0-9:_-]*$')
 
 def install(app,owner):
+    from playback_resolver import PlaybackResolver
+    resolver_cache=PlaybackResolver();app.state.playback_resolver=resolver_cache
     # Register before /online/{token}/{resource}, which otherwise captures
     # /online/exports/{id} as an ordinary playback capability.
     from local_exports import install as install_exports
@@ -99,7 +102,8 @@ def install(app,owner):
             started=time.monotonic()
             from media_download import pick_stream
             parent=public_url(body.referer,resolve_dns=False) if body.referer else None
-            page=Resolver(http).resolve(body.url,referer=parent) if parent else Resolver(http).resolve(body.url)
+            page,source_cached=resolver_cache.page(subject,body.url,parent,lambda:Resolver(http).resolve(body.url,referer=parent) if parent else Resolver(http).resolve(body.url),refresh=body.refresh)
+            resolved_at=time.monotonic()
             # Keep the HLS master: playback adapts while segments arrive. Do not
             # probe every variant or download/transcode an episode before play.
             masters=[v for v in page.streams if v.get('type')=='hls' and not v.get('quality')]
@@ -110,9 +114,9 @@ def install(app,owner):
             # Check the first manifest now, before granting a playback capability.
             if stream['type']=='hls':
                 from adaptive_playback import adaptive_master
-                text=adaptive_master(page.streams,http,max_height) if not masters else None
+                text=adaptive_master(page.streams,http,max_height,document=lambda client,url,headers=None:resolver_cache.document(client,url,headers,refresh=body.refresh)) if not masters else None
                 generated=text is not None
-                if not generated:text,final,_=http.document(stream['url'],headers=stream.get('headers'))
+                if not generated:text,final,_=resolver_cache.document(http,stream['url'],headers=stream.get('headers'),refresh=body.refresh)
                 else:final=stream['url']
                 rewrite_manifest(text,final,lambda v:v,None if generated else max_height)
                 manifest=(text,final,float('inf') if generated else time.monotonic()+30)
@@ -127,7 +131,7 @@ def install(app,owner):
                                      'language':str(track.get('language') or 'und')[:12],'url':'/online/'+token+'/'+s.resource(track['url'])})
             return {'id':token,'kind':'video','url':'/online/'+token+'/'+resource,'type':stream['type'],'subtitles':captions,
                     'sourceIntervals':getattr(page,'skip_segments',[]),'qualities':sorted({int(v['quality']) for v in page.streams if str(v.get('quality','')).isdigit()},reverse=True),
-                    'expiresIn':LEASE_SECONDS,'preparationMs':round((time.monotonic()-started)*1000)}
+                    'expiresIn':LEASE_SECONDS,'preparationMs':round((time.monotonic()-started)*1000),'performance':{'resolveMs':round((resolved_at-started)*1000),'manifestMs':round((time.monotonic()-resolved_at)*1000),'sourceCached':source_cached}}
         except BaseException:
             if token:
                 with lock:sessions.pop(token,None)

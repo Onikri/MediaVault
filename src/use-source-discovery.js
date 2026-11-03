@@ -14,7 +14,8 @@ export default function useSourceDiscovery(item,service){
         if(controller.signal.aborted)return;
         setData(old=>{if(!old)return value;const sources=[...new Map([...(old.sources||[]),...(value.sources||[])].map(s=>[s.url,s])).values()],voices=new Map((old.voices||[]).map(v=>[v.id,v]));for(const v of value.voices||[]){const before=voices.get(v.id);voices.set(v.id,before?{...v,variants:[...new Map([...before.variants,...v.variants].map(r=>[r.id,r])).values()]}:v);}return {...value,sources,voices:[...voices.values()]};});continuing=!!value.pending;
         stalled=continuing&&value.progress===previousProgress?stalled+1:0;previousProgress=value.progress;
-        if(stalled>=3)throw Error('Часть источников перестала отвечать. Найденные переводы сохранены; можно повторить проверку позже.');
+        if(stalled>=90)throw Error('Часть источников перестала отвечать. Найденные переводы сохранены; можно повторить проверку позже.');
+        if(continuing)await new Promise(resolve=>{const timer=setTimeout(done,600);function done(){clearTimeout(timer);controller.signal.removeEventListener('abort',done);resolve();}controller.signal.addEventListener('abort',done,{once:true});});
       }while(continuing);
     };
     search()

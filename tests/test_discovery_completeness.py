@@ -14,7 +14,7 @@ class DiscoveryCompletenessTests(unittest.TestCase):
         def inspect(url,**kwargs):
             return {'title':'Exact show','url':url,'year':2024,'dubs':[choice('Studio '+url[-1],'https://kodikplayer.com/serial/'+url[-1]+'/hash/720p')],'complete':True}
         with patch.object(source_discovery,'SITES',[SimpleNamespace(id='fixture',name='Fixture',kind='anime')]),patch.object(source_discovery,'search_site',return_value={'status':'ok','results':candidates}),patch.object(source_discovery,'inspect_source',side_effect=inspect) as parser:
-            result=source_discovery.discover(selected,refresh=True)
+            result=source_discovery._discover(selected,refresh=True)
         self.assertEqual(parser.call_count,7)
         self.assertEqual(len(result['voices']),7)
         self.assertTrue(result['complete'])
@@ -43,9 +43,9 @@ class DiscoveryCompletenessTests(unittest.TestCase):
         def inspect(url,**kwargs):
             return {**candidate,'dubs':[choice('Studio '+str(i),'https://kodikplayer.com/serial/'+str(i)+'/hash/720p') for i in range(count[0])],'complete':True}
         with patch.object(source_discovery,'SITES',[SimpleNamespace(id='fixture',name='Fixture',kind='anime')]),patch.object(source_discovery,'search_site',return_value={'status':'ok','results':[candidate]}),patch.object(source_discovery,'inspect_source',side_effect=inspect) as parser:
-            first=source_discovery.discover(selected,refresh=True)
+            first=source_discovery._discover(selected,refresh=True)
             count[0]=2
-            continued=source_discovery.discover(selected,refresh=True,continuing=True)
-            refreshed=source_discovery.discover(selected,refresh=True)
+            continued=source_discovery._discover(selected,refresh=True,continuing=True)
+            refreshed=source_discovery._discover(selected,refresh=True)
         self.assertEqual(len(first['voices']),1);self.assertEqual(len(continued['voices']),1)
         self.assertEqual(len(refreshed['voices']),2);self.assertEqual(parser.call_count,2)

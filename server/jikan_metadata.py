@@ -10,7 +10,7 @@ from source_parser import SourceError
 BASES = ('https://api.jikan.moe/v4', 'https://api.tenrai.org/v1')
 _cache, _pending, _failed_until, _next_request = OrderedDict(), {}, {}, {}
 _lock = threading.RLock()
-_PATH = re.compile(r'(?:anime|manga)(?:/[1-9]\d{0,11}(?:/(?:full|pictures|videos|characters|staff|relations|episodes))?)?|top/(?:anime|manga)|seasons/(?:now|upcoming|20\d{2}/(?:winter|spring|summer|fall))|schedules')
+_PATH = re.compile(r'(?:anime|manga)(?:/[1-9]\d{0,11}(?:/(?:full|pictures|videos|characters|staff|relations|episodes))?)?|top/(?:anime|manga)|seasons/(?:now|upcoming|20\d{2}/(?:winter|spring|summer|fall))|schedules|(?:characters|people)/[1-9]\d{0,11}(?:/full)?')
 _PARAMS = {'q','page','limit','sfw','order_by','sort','filter','type','status','start_date','end_date','genres'}
 
 

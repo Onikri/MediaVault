@@ -30,12 +30,24 @@ def prune(directory):
         if path.is_file():total-=path.stat().st_size;path.unlink(missing_ok=True)
 
 def prepare(anime_id,video_id,directory):
-    details=metadata('shikimori',identity=anime_id,kind='anime')
-    video=next((v for v in trailers_from_details(details) if v['id']==video_id),None)
+    from source_parser import SourceError
+    from metadata_catalog import get_json
+    def youtube_id(url):
+        match=re.search(r'(?:youtu\.be/|[?&]v=|/embed/)([\w-]{11})(?:[?&/]|$)',url)
+        return match[1] if match else ''
+    try:details=metadata('shikimori',identity=anime_id,kind='anime')
+    except SourceError:details={}
+    video=next((v for v in trailers_from_details(details) if v['id']==video_id or youtube_id(v['url'])==video_id),None)
+    if not video and re.fullmatch(r'[\w-]{11}',video_id):
+        try:
+            data=get_json('https://api.jikan.moe/v4/anime/'+anime_id+'/videos').get('data') or {}
+            row=next((r for r in data.get('promo',[]) if (r.get('trailer') or {}).get('youtube_id')==video_id),None)
+            if row:video={'url':'https://www.youtube.com/watch?v='+video_id}
+        except SourceError:pass
     if not video:raise HTTPException(404,'Каталог больше не предоставляет этот трейлер.')
     with lock:
         directory.mkdir(parents=True,exist_ok=True);prune(directory)
-        old=next((v for v in jobs.values() if v['anime']==anime_id and v['video']==video_id),None)
+        old=next((v for v in jobs.values() if v.get('anime')==anime_id and v.get('video')==video_id),None)
         if old and (old['status']!='ready' or Path(old.get('path','')).is_file()):return public(old)
         if not slots.acquire(blocking=False):raise HTTPException(429,'Сервер готовит другие трейлеры. Повтори через минуту.')
         token=secrets.token_urlsafe(24);jobs[token]={'id':token,'anime':anime_id,'video':video_id,'status':'preparing','updated':time.time()}
@@ -75,7 +87,7 @@ def install(app,data_dir):
     class Request(BaseModel):
         model_config=ConfigDict(extra='forbid')
         anime_id:str=Field(pattern=r'^\d{1,12}$')
-        video_id:str=Field(pattern=r'^\d{1,12}$')
+        video_id:str=Field(pattern=r'^[A-Za-z0-9_-]{1,32}$')
     @app.post('/trailers/prepare')
     def begin(body:Request):return prepare(body.anime_id,body.video_id,Path(os.environ.get('TRAILER_CACHE_DIR',str(Path(__file__).resolve().parent/'.codex-local'/'trailers'))))
     @app.get('/trailers/status/{token}')

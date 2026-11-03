@@ -5,6 +5,8 @@ const CHUNK_SIZE=4*1024*1024;
 const CHUNK_LIMIT=160;
 // A worker may control several tabs with different libraries or accounts.
 const sessions=new Map();
+const cipherMemory=new Map(),cipherPending=new Map();
+let sessionSequence=0;
 const pendingSessions=new Map();
 const encoder=new TextEncoder();
 function b64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
@@ -18,7 +20,7 @@ self.addEventListener("activate",event=>{
 });
 function readSession(data){
   if(data?.type!=="SESSION"||!data.key||typeof data.token!=="string"||!Array.isArray(data.items))return null;
-  return {token:data.token,key:data.key,items:new Map(data.items.map(item=>[item.id,item]))};
+  return {tag:++sessionSequence,token:data.token,key:data.key,items:new Map(data.items.map(item=>[item.id,item]))};
 }
 self.addEventListener("message",event=>{
   const clientId=event.source?.id;
@@ -33,6 +35,7 @@ self.addEventListener("message",event=>{
   }
   if(event.data?.type==="CLEAR_SESSION"){
     sessions.delete(clientId);
+    for(const key of cipherMemory.keys())if(key.startsWith(clientId+"|"))cipherMemory.delete(key);
     pendingSessions.get(clientId)?.finish(null);
   }
 });
@@ -77,10 +80,10 @@ self.addEventListener("fetch",event=>{
     let id;
     try{id=decodeURIComponent(url.pathname.slice(prefix.length));}
     catch{event.respondWith(new Response("Некорректный адрес",{status:400}));return;}
-    event.respondWith(serveRange(event.request,id,event.clientId));
+    event.respondWith(serveRange(event.request,id,event.clientId,promise=>{try{event.waitUntil?.(promise);}catch{promise.catch(()=>{});}}));
   }
 });
-async function encryptedBlock(session,fileId,signal,clientId){
+async function downloadEncrypted(session,fileId,signal,clientId,background){
   let cache=null;
   try{cache=await caches.open(STORAGE_CACHE);}catch{}
   const cacheKey="https://mediavault.invalid/cipher/"+encodeURIComponent(fileId);
@@ -107,17 +110,50 @@ async function encryptedBlock(session,fileId,signal,clientId){
   }
   if(!data)throw Error("Google Drive не прислал данные");
   // Cache failures, including an exhausted iOS quota, must not break playback.
-  if(cache)try{
-    await cache.put(cacheKey,new Response(data,{headers:{"Content-Type":"application/octet-stream"}}));
-    const keys=await cache.keys();
-    if(keys.length>CHUNK_LIMIT)for(const key of keys.slice(0,keys.length-CHUNK_LIMIT))await cache.delete(key);
-  }catch(error){console.debug("CacheStorage unavailable",error);}
+  if(cache){
+    const store=(async()=>{try{
+      await cache.put(cacheKey,new Response(data,{headers:{"Content-Type":"application/octet-stream"}}));
+      const keys=await cache.keys();
+      if(keys.length>CHUNK_LIMIT)for(const key of keys.slice(0,keys.length-CHUNK_LIMIT))await cache.delete(key);
+    }catch{}})();
+    background?.(store);
+  }
   return data;
 }
-async function chunkPlain(session,item,n,signal,clientId){
+// Only ciphertext is shared/cached. Each Range independently authenticates and
+// decrypts its bytes with the requesting tab's key; one cancelled Range cannot
+// cancel another subscriber to the same Drive download.
+async function encryptedBlock(session,fileId,signal,clientId,background){
+  if(signal?.aborted)throw new DOMException("Запрос отменён","AbortError");
+  const key=clientId+"|"+session.tag+"|"+fileId,hit=cipherMemory.get(key);
+  if(hit&&hit.until>Date.now()){cipherMemory.delete(key);cipherMemory.set(key,hit);return hit.data;}
+  cipherMemory.delete(key);
+  let task=cipherPending.get(key);
+  if(!task){
+    task={controller:new AbortController(),users:0};
+    task.promise=downloadEncrypted(session,fileId,task.controller.signal,clientId,background).then(data=>{
+      if(sessions.get(clientId)===session){
+        cipherMemory.set(key,{data,until:Date.now()+60000});
+        while(cipherMemory.size>4)cipherMemory.delete(cipherMemory.keys().next().value);
+      }
+      return data;
+    }).finally(()=>{if(cipherPending.get(key)===task)cipherPending.delete(key);});
+    cipherPending.set(key,task);
+  }
+  task.users++;
+  return new Promise((resolve,reject)=>{
+    let done=false;
+    function finish(error,data){if(done)return;done=true;signal?.removeEventListener('abort',abort);task.users--;if(task.users===0&&cipherPending.get(key)===task){cipherPending.delete(key);task.controller.abort();}error?reject(error):resolve(data);}
+    const abort=()=>finish(new DOMException("Запрос отменён","AbortError"));
+    signal?.addEventListener('abort',abort,{once:true});
+    task.promise.then(data=>finish(null,data),error=>finish(error));
+    if(signal?.aborted)abort();
+  });
+}
+async function chunkPlain(session,item,n,signal,clientId,background){
   const chunk=item.chunks[n];
   if(!chunk)throw Error("Не найден зашифрованный блок");
-  const encrypted=await encryptedBlock(session,chunk.fileId,signal,clientId);
+  const encrypted=await encryptedBlock(session,chunk.fileId,signal,clientId,background);
   return crypto.subtle.decrypt({name:"AES-GCM",iv:b64(chunk.iv),
     additionalData:encoder.encode(item.id+":"+n)},session.key,encrypted);
 }
@@ -139,7 +175,7 @@ function parseRange(header,size){
   }
   return {start,end};
 }
-function decryptedStream(session,item,start,end,request,clientId){
+function decryptedStream(session,item,start,end,request,clientId,background){
   let n=Math.floor(start/CHUNK_SIZE),cancelled=false;
   const last=Math.floor(end/CHUNK_SIZE);
   const aborter=new AbortController();
@@ -150,7 +186,7 @@ function decryptedStream(session,item,start,end,request,clientId){
   return new ReadableStream({
     async pull(controller){
       try{
-        const raw=new Uint8Array(await chunkPlain(session,item,n,aborter.signal,clientId));
+        const raw=new Uint8Array(await chunkPlain(session,item,n,aborter.signal,clientId,background));
         if(cancelled)return;
         if(aborter.signal.aborted)throw new DOMException("Запрос отменён","AbortError");
         const offset=n*CHUNK_SIZE;
@@ -164,7 +200,7 @@ function decryptedStream(session,item,start,end,request,clientId){
     cancel(){cancelled=true;abort();cleanup();}
   },{highWaterMark:0});
 }
-async function serveRange(request,id,clientId){
+async function serveRange(request,id,clientId,background){
   try{
     if(request.method!=="GET"&&request.method!=="HEAD")
       return new Response(null,{status:405,headers:{Allow:"GET, HEAD"}});
@@ -181,7 +217,7 @@ async function serveRange(request,id,clientId){
     const headers={"Content-Type":item.mime||"application/octet-stream",
       "Accept-Ranges":"bytes","Content-Length":String(end-start+1),"Cache-Control":"no-store"};
     if(range)headers["Content-Range"]="bytes "+start+"-"+end+"/"+size;
-    const body=request.method==="HEAD"?null:decryptedStream(session,item,start,end,request,clientId);
+    const body=request.method==="HEAD"?null:decryptedStream(session,item,start,end,request,clientId,background);
     return new Response(body,{status:range?206:200,headers});
   }catch(error){
     return new Response("Ошибка расшифровки или Google Drive: "+error.message,{status:503,

@@ -26,7 +26,7 @@ async function fixture(id="movie",size=2*CHUNK_SIZE+137){
   const item={id,size,mime:"video/mp4",chunks};
   return {plain,remote,key,item,session:{type:"SESSION",token:"token-"+id,key,items:[item]}};
 }
-function worker(remote,clients=new Map(),status=200){
+function worker(remote,clients=new Map(),status=200,delay=0){
   const handlers={},downloads=[];
   const context=vm.createContext({console,TextEncoder,TextDecoder,URL,Request,Response,
     Uint8Array,ReadableStream,AbortController,DOMException,MessageChannel,Map,crypto:webcrypto,atob,
@@ -34,6 +34,7 @@ function worker(remote,clients=new Map(),status=200){
     fetch:async(url,options)=>{
       const id=decodeURIComponent(new URL(url).pathname.split("/").pop());
       downloads.push({id,authorization:options.headers.Authorization});
+      if(delay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,delay);options.signal.addEventListener("abort",()=>{clearTimeout(timer);reject(new DOMException("Aborted","AbortError"));},{once:true});});
       if(status!==200)return new Response("failure",{status});
       const bytes=remote.get(id);
       return bytes?new Response(bytes.slice()):new Response("missing",{status:404});
@@ -152,4 +153,16 @@ test("Drive 401 asks only the originating tab to reconnect",async()=>{
   assert.equal(notificationsA.length,1);
   assert.equal(notificationsA[0].type,"DRIVE_AUTH_REQUIRED");
   assert.equal(notificationsB.length,0);
+});
+
+test("concurrent overlapping ranges share one encrypted download and subsequent seeks reuse ciphertext",async()=>{
+ const w=unlocked(),responses=await Promise.all([w.request('bytes=0-127'),w.request('bytes=32-191')]);
+ await Promise.all([assertBytes(responses[0],media.plain.slice(0,128),206,contentRange(0,127)),assertBytes(responses[1],media.plain.slice(32,192),206,contentRange(32,191))]);
+ assert.equal(w.downloads.length,1);
+ await assertBytes(await w.request('bytes=1000-1127'),media.plain.slice(1000,1128),206,contentRange(1000,1127));assert.equal(w.downloads.length,1);
+});
+
+test("cancelling one Range preserves another consumer of the same Drive block",async()=>{
+ const w=worker(media.remote,new Map(),200,50);w.session('tab-a',media.session);
+ const [a,b]=await Promise.all([w.request('bytes=0-127'),w.request('bytes=32-191')]);const reader=a.body.getReader();const abandoned=reader.read();const remaining=assertBytes(b,media.plain.slice(32,192),206,contentRange(32,191));await new Promise(resolve=>setTimeout(resolve,10));await reader.cancel();await abandoned;await remaining;assert.equal(w.downloads.length,1);
 });

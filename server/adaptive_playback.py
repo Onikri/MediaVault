@@ -6,20 +6,20 @@ import m3u8
 from source_parser import SourceError
 
 
-def adaptive_master(streams,http,max_quality=None):
+def adaptive_master(streams,http,max_quality=None,document=None):
     choices={int(s['quality']):s for s in streams if s.get('type')=='hls' and str(s.get('quality','')).isdigit()
              and (max_quality is None or int(s['quality'])<=max_quality)}
     if len(choices)<2:return None
     def read(pair):
         quality,stream=pair;client=http.fork() if hasattr(http,'fork') else http
         try:
-            text,final,_=client.document(stream['url'],headers=stream.get('headers'))
+            text,final,_=document(client,stream['url'],headers=stream.get('headers')) if document else client.document(stream['url'],headers=stream.get('headers'))
             if not text.lstrip().startswith('#EXTM3U'):raise SourceError('Источник не предоставил HLS.')
             return quality,stream,m3u8.loads(text,uri=final),final
         finally:
             if client is not http:client.close()
     # Failures must not silently remove a published quality from the menu.
-    with ThreadPoolExecutor(max_workers=3 if hasattr(http,'fork') else 1) as pool:
+    with ThreadPoolExecutor(max_workers=6 if hasattr(http,'fork') else 1) as pool:
         rows=list(pool.map(read,sorted(choices.items())))
     master=m3u8.M3U8();master.is_variant=True
     for quality,stream,playlist,final in rows:

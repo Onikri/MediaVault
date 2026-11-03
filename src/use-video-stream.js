@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {streamBufferPolicy,initialStreamLevel,bitrateBufferPolicy} from './watch-quality.js';
-export default function useVideoStream(ref,source,type,onError,{preview=false,audioOnly=false,quality='best'}={}){
+export default function useVideoStream(ref,source,type,onError,{preview=false,audioOnly=false,quality='best',startPosition=0}={}){
  const engine=useRef(null),report=useRef(onError),requested=useRef(quality);report.current=onError;requested.current=quality;
  const [levels,setLevels]=useState([]),[level,setLevelState]=useState(-1),[audio,setAudio]=useState([]),[subtitles,setSubtitles]=useState([]);
  const hls=type==='hls'||/\.m3u8(?:\?|$)/i.test(source||'');
@@ -11,7 +11,7 @@ export default function useVideoStream(ref,source,type,onError,{preview=false,au
    const buffer=streamBufferPolicy({preview,audioOnly,saveData:!!connection?.saveData,memory:navigator.deviceMemory||8});
    instance=new Hls({autoStartLoad:false,testBandwidth:false,...buffer,renderTextTracksNatively:true});engine.current=instance;let recovery=0;
    instance.on(Hls.Events.LEVEL_SWITCHING,(_,data)=>{const limits=bitrateBufferPolicy(buffer,instance.levels[data.level]?.bitrate);instance.config.maxBufferLength=limits.maxBufferLength;instance.config.maxMaxBufferLength=limits.maxMaxBufferLength;});
-   instance.on(Hls.Events.MANIFEST_PARSED,()=>{const rows=instance.levels.map((l,i)=>({index:i,height:Number.parseInt(l.attrs?.NAME||l.name)||l.height,bitrate:l.bitrate}));setLevels(rows);instance.startLevel=initialStreamLevel(rows,{preview,audioOnly,saveData:!!connection?.saveData,downlink:connection?.downlink,memory:navigator.deviceMemory||8});if(preview||audioOnly)instance.autoLevelCapping=0;if(requested.current!=='best'){const selected=rows.find(l=>l.height===Number(requested.current));if(selected){instance.startLevel=selected.index;instance.loadLevel=selected.index;setLevelState(selected.index);}}instance.startLoad();});
+   instance.on(Hls.Events.MANIFEST_PARSED,()=>{const rows=instance.levels.map((l,i)=>({index:i,height:Number.parseInt(l.attrs?.NAME||l.name)||l.height,bitrate:l.bitrate}));setLevels(rows);instance.startLevel=initialStreamLevel(rows,{preview,audioOnly,saveData:!!connection?.saveData,downlink:connection?.downlink,memory:navigator.deviceMemory||8});if(preview||audioOnly)instance.autoLevelCapping=0;if(requested.current!=='best'){const selected=rows.find(l=>l.height===Number(requested.current));if(selected){instance.startLevel=selected.index;instance.loadLevel=selected.index;setLevelState(selected.index);}}instance.startLoad(Math.max(0,Number(startPosition)||0));});
    instance.on(Hls.Events.FRAG_BUFFERED,()=>{recovery=0;});
    instance.on(Hls.Events.AUDIO_TRACKS_UPDATED,()=>setAudio(instance.audioTracks.map((a,i)=>({index:i,name:a.name||a.lang||'Дорожка '+(i+1)}))));
    instance.on(Hls.Events.SUBTITLE_TRACKS_UPDATED,()=>setSubtitles(instance.subtitleTracks.map((a,i)=>({index:i,name:a.name||a.lang||'Субтитры '+(i+1)}))));

@@ -252,7 +252,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 43, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 44, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -575,7 +575,7 @@ class QualityInspection(StrictBody):
 def source_qualities(body: QualityInspection, subject=Depends(owner)):
     from source_quality import cached_qualities
     if body.referer:public_url(body.referer,resolve_dns=False)
-    return cached_qualities(body.url,**({'referer':body.referer} if body.referer else {}))
+    return cached_qualities(body.url,resolver_cache=getattr(app.state,'playback_resolver',None),subject=subject,**({'referer':body.referer} if body.referer else {}))
 
 
 @app.post('/sources/discover')
@@ -704,3 +704,6 @@ install_title_background(app, os.getenv("DATA_DIR", "/data"))
 
 from chapter_thumbnails import install as install_chapter_thumbnails
 install_chapter_thumbnails(app, owner)
+
+from character_profile import install as install_character_profile
+install_character_profile(app)

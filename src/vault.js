@@ -59,6 +59,7 @@ async function userFromToken(token){
 
 function createController(get,patch){
   let mounted=false,epoch=0,tokenTimer=null,toastTimer=null,worker=null,registration=null,salt=null,serverKey=null,restoring=null,reconnectRequired=false;
+  let workerSynced=null,workerSyncing=null;
   const tokenAlive=()=>!!get().token&&Date.now()<get().tokenExpiresAt;
   const libraryStatus=()=>get().catalog?
     (get().admin?"Администратор":"Зритель")+" · библиотека открыта":
@@ -71,6 +72,7 @@ function createController(get,patch){
     toastTimer=setTimeout(clearToast,6500);
   }
   function clearWorkerSession(){
+    workerSynced=null;workerSyncing=null;
     navigator.serviceWorker?.controller?.postMessage({type:"CLEAR_SESSION"});
   }
   function expireDrive(expectedToken){
@@ -149,28 +151,29 @@ function createController(get,patch){
     const payload=workerSession();
     if(!payload){if(required)throw Error("Подключи Drive и открой библиотеку.");return null;}
     const expected=epoch;
+    const same=value=>value&&value.worker===worker&&value.epoch===expected&&value.token===payload.token&&value.key===payload.key&&value.items===payload.items;
     try{
-      worker=matchingWorker()||await registerWorker();
-      assertEpoch(expected);
+      worker=matchingWorker()||await registerWorker();assertEpoch(expected);
       if(!worker)throw Error("Потоковое воспроизведение недоступно. Используй резервный режим.");
-      await new Promise((resolve,reject)=>{
-        const channel=new MessageChannel();
-        const finish=(cause)=>{
-          clearTimeout(timer);channel.port1.close();channel.port2.close();
-          cause?reject(cause):resolve();
-        };
-        const timer=setTimeout(()=>finish(Error("Потоковый обработчик не ответил. Обнови страницу.")),5000);
-        channel.port1.onmessage=event=>finish(event.data?.ready?null:Error("Потоковый обработчик отклонил сеанс."));
-        try{worker.postMessage(payload,[channel.port2]);}catch(cause){finish(cause);}
-      });
-      assertEpoch(expected);
-      patch({workerReady:true});
-      return worker;
+      if(same(workerSynced)&&get().workerReady)return worker;
+      if(same(workerSyncing))return await workerSyncing.promise;
+      const operation={worker,epoch:expected,token:payload.token,key:payload.key,items:payload.items};
+      operation.promise=(async()=>{
+        await new Promise((resolve,reject)=>{
+          const channel=new MessageChannel();let finished=false;
+          const finish=cause=>{if(finished)return;finished=true;clearTimeout(timer);channel.port1.close();channel.port2.close();cause?reject(cause):resolve();};
+          const timer=setTimeout(()=>finish(Error("Потоковый обработчик не ответил. Обнови страницу.")),5000);
+          channel.port1.onmessage=event=>finish(event.data?.ready?null:Error("Потоковый обработчик отклонил сеанс."));
+          try{operation.worker.postMessage(payload,[channel.port2]);}catch(cause){finish(cause);}
+        });
+        assertEpoch(expected);workerSynced=operation;patch({workerReady:true});return operation.worker;
+      })();
+      workerSyncing=operation;
+      try{return await operation.promise;}finally{if(workerSyncing===operation)workerSyncing=null;}
     }catch(cause){
       if(expected===epoch)patch({workerReady:false});
       if(required||cause?.name==="AbortError")throw cause;
-      console.warn("Потоковый обработчик недоступен:",cause);
-      return null;
+      console.warn("Потоковый обработчик недоступен:",cause);return null;
     }
   }
   async function askToken(scope){

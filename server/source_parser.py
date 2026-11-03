@@ -96,9 +96,21 @@ def playback_headers(headers=None):
     return result
 
 
+class _SourcePoolAdapter(requests.adapters.HTTPAdapter):
+    # Pool TLS/TCP connections, not Session objects, cookies or credentials.
+    # The process owns this adapter; closing one short-lived Session must not
+    # destroy connections currently used by another source request.
+    def close(self):pass
+
+_SOURCE_POOL=_SourcePoolAdapter(pool_connections=48,pool_maxsize=12,pool_block=False,max_retries=0)
+
+
 class PublicHttp:
     def __init__(self, *, session=None, validate=public_url, timeout=(6, 20), deadline=None):
         self.session = session or requests.Session()
+        if session is None:
+            self.session.mount('https://',_SOURCE_POOL)
+            self.session.mount('http://',_SOURCE_POOL)
         self.validate = validate
         self.timeout = timeout
         self.deadline = deadline

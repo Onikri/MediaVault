@@ -9,7 +9,7 @@ _cache=OrderedDict()
 _pending={}
 _lock=threading.Lock()
 
-def cached_qualities(url,*,referer=None):
+def cached_qualities(url,*,referer=None,resolver_cache=None,subject=None):
     """Short-lived metadata cache, coalesced per published source, never CDN links."""
     key=(url,referer)
     while True:
@@ -24,7 +24,7 @@ def cached_qualities(url,*,referer=None):
                 break
         if not waiting.wait(50):raise SourceError('Проверка качества ещё выполняется. Повтори позднее.')
     try:
-        result=inspect_qualities(url,**({'referer':referer} if referer else {}))
+        result=inspect_qualities(url,resolver_cache=resolver_cache,subject=subject,**({'referer':referer} if referer else {}))
         with _lock:
             _cache[key]=(time.monotonic()+120,result)
             while len(_cache)>128:_cache.popitem(last=False)
@@ -33,12 +33,13 @@ def cached_qualities(url,*,referer=None):
         with _lock:
             _pending.pop(key,None);event.set()
 
-def inspect_qualities(url,*,referer=None,http=None,resolver=None):
+def inspect_qualities(url,*,referer=None,http=None,resolver=None,resolver_cache=None,subject=None):
     own=http is None and resolver is None
     http=http or (resolver.http if resolver else PublicHttp(timeout=(5,10),deadline=time.monotonic()+45))
     resolver=resolver or Resolver(http)
     try:
-        page=resolver.resolve(url,referer=referer) if referer else resolver.resolve(url)
+        load=lambda:resolver.resolve(url,referer=referer) if referer else resolver.resolve(url)
+        page=resolver_cache.page(subject,url,referer,load)[0] if resolver_cache else load()
         streams=expand_stream_qualities(page.streams,http)
         heights={int(s['quality']) for s in streams if s.get('quality') and str(s['quality']).isdigit()}
         original=any(not s.get('quality') and s['type']=='mp4' for s in page.streams)

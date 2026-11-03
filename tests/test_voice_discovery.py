@@ -177,7 +177,7 @@ class AggregationTests(unittest.TestCase):
             visited.append(url)
             return {'url':url,'title':'Дандадан','ids':{'mal':'57334'},'year':2024,'provider':'fixture', 'dubs':[choice('Studio A','https://kodikplayer.com/serial/1/h/720p')], 'episodes':[{'number':1,'url':url}]}
         with patch.object(discovery,'SITES',[BY_ID['yummy'],BY_ID['animego']]),patch.object(discovery,'search_site',side_effect=search),patch.object(discovery,'inspect_source',side_effect=inspect):
-            result=discovery.discover(selected)
+            result=discovery._discover(selected)
         self.assertEqual(len(result['voices']),1)
         self.assertEqual(len(result['voices'][0]['variants']),2)
         self.assertTrue(all('dandadan' in url for url in visited))
