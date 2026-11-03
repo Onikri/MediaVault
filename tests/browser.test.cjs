@@ -522,8 +522,11 @@ async function main() {
   const touchSession=await ownerContext.newCDPSession(owner);
   await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
   const swipe=async(zone,dx,dy)=>{
-    const rect=await cinema.locator('.mv-player-touch-surface').boundingBox();
-    const x=rect.x+rect.width*zone,y=rect.y+Math.min(rect.height*.3,200);
+    const {x,y}=await cinema.locator('.mv-player-touch-surface').evaluate((el,zone)=>{
+      const rect=el.getBoundingClientRect(),x=rect.x+rect.width*zone;
+      for(const fraction of [.3,.4,.5,.6]){const y=rect.y+Math.min(rect.height*fraction,200);if(document.elementFromPoint(x,y)===el)return {x,y};}
+      throw Error('No unobstructed video point for the touch gesture');
+    },zone);
     await touchSession.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
     const original=await cinema.locator('video').evaluate(v=>v.currentTime);
     for(let i=1;i<=6;i++){
