@@ -29,7 +29,7 @@ let browser,vite,last;
   await page.locator('.immersive-reader').dispatchEvent('reader-show-chrome');await page.getByRole('button',{name:'Настройки читалки',exact:true}).click();
   const panel=page.locator('.reader-panel');await panel.getByRole('button',{name:'Вписать целиком',exact:true}).click();
   await page.locator('.reader-fit-page').waitFor();assert.equal(await panel.getByRole('button',{name:'Вписать целиком',exact:true}).getAttribute('aria-pressed'),'true');
-  await panel.getByRole('button',{name:'Вебтун',exact:true}).click();await page.locator('.reader-mode-scroll').waitFor();assert.equal(await page.locator('.reader-page').count(),3);
+  await panel.getByRole('button',{name:'Вебтун',exact:true}).click();await page.locator('.reader-mode-scroll').waitFor();assert.equal(await page.locator('.reader-page').count(),3);assert.equal(await page.getByRole('slider',{name:'Перейти к странице'}).getAttribute('aria-orientation'),'vertical');
   await panel.getByRole('button',{name:'Разворот',exact:true}).click();await page.getByRole('button',{name:'Закрыть настройки читалки',exact:true}).click();
   await page.locator('.immersive-reader').dispatchEvent('reader-show-chrome');const chrome=await page.locator('.reader-top').boundingBox();assert.equal(await page.locator('.reader-bottom-float').evaluate(n=>getComputedStyle(n).borderTopWidth),'0px');assert.ok(chrome.width<=1101&&chrome.x>=0&&chrome.x+chrome.width<=width+1);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(dir,'reader-'+width+'.png')});

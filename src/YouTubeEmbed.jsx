@@ -13,7 +13,7 @@ export default function YouTubeEmbed({videoId,title='YouTube',autoplay=false,bac
  const id=youtubeID(videoId);
  useEffect(()=>{
   if(!id)return;let closed=false,player;setError('');
-  youtubeAPI().then(YT=>{if(closed||!frame.current)return;player=new YT.Player(frame.current,{events:{onReady:e=>{if(closed)return;if(controller)controller.current=e.target;callbacks.current.onReady?.(e.target);},onStateChange:e=>!closed&&callbacks.current.onState?.(e.data),onError:e=>{if(closed)return;const message=[101,150].includes(e.data)?'Автор запретил воспроизведение на других сайтах. Открой запись на YouTube.':'YouTube не смог воспроизвести эту запись.';setError(message);callbacks.current.onError?.(message);}}});}).catch(e=>{if(!closed)setError(e.message);});
+  youtubeAPI().then(YT=>{if(closed||!frame.current)return;player=new YT.Player(frame.current,{events:{onReady:e=>{if(closed)return;if(controller)controller.current=e.target;callbacks.current.onReady?.(e.target);},onStateChange:e=>!closed&&callbacks.current.onState?.(e.data),onError:e=>{if(closed)return;const message=[101,150].includes(e.data)?'Автор запретил воспроизведение на других сайтах. Открой запись на YouTube.':'YouTube не смог воспроизвести эту запись.';setError(message);callbacks.current.onError?.(message);}}});}).catch(e=>{if(!closed){setError(e.message);callbacks.current.onError?.(e.message);}});
   return()=>{closed=true;if(controller)controller.current=null;try{player?.destroy();}catch{}};
  },[id]);
  if(!id)return null;

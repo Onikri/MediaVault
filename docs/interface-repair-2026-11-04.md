@@ -1,0 +1,11 @@
+# Interface regression repair — 2026-11-04
+
+- The external filter sidebar no longer reserves a second nested catalogue column. Actual App layouts checked at 390, 1024 and 1669 px.
+- Showcase geometry belongs to TitleShowcase, including rooms. Rooms use the shared poster/copy/information layout and do not shrink within the application flex root. Rounded lower edge and scroll/pointer parallax remain shared.
+- Every title places its existing play/read/import action, favorites and available save actions below the poster. Existing continuation and save handlers are retained.
+- Player settings are 320 px wide with a stable compact content area, centered icon tabs and pagination. The opening spring originates at the settings trigger. Settings remain inside the same React player.
+- Home uses the shared native/YouTube background loader. The YouTube iframe explicitly sends an origin referrer despite the document no-referrer policy. An errored iframe is removed; the native background for the same title continues. Tests simulate error153; they do not establish availability of every upstream trailer.
+- Native backgrounds inspect three small frames at most to identify stable symmetric black bars. Cropping affects the background only, never the playback media. Dark or asymmetric frames retain their full image.
+- Webtoon progress is vertical on the right; manga progress remains horizontal. Mode illustrations depict a page slide, spread turn, fit and continuous strip, respecting reduced motion.
+
+Validation: production build; background-crop Node test; actual React home background decode/crop with a fixture MP4 and simulated YouTube failure; actual nested library grid; first-screen showcase at five viewport sizes, reverse reveal and media continuity; profile/reader at two sizes; real FastAPI WebSocket/Range relay with two browser participants, permissions, pause/seek and compact stable settings; six Python watch-room tests. Catalogue, artwork and media are fixtures in browser regression tests. No ML inference was run for this UI-only change (`ROOMS_ONLY=1`); model/runtime integration is unchanged. Live VM health returns API49 and the sampled title background is ready. No server deployment required.

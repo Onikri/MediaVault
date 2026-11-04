@@ -8,3 +8,8 @@
 @media(prefers-reduced-motion:reduce){.reader-panel{animation:none}.immersive-reader[data-chrome] .reader-chrome{transition:none}}
 
 .immersive-reader[data-chrome] .reader-control:focus-visible{outline:2px solid var(--color-blossom,#ee3c35);outline-offset:2px}
+.immersive-reader[data-chrome] .reader-progress-rail{position:absolute;top:50%;right:12px;left:auto;bottom:auto;width:25px;height:min(46vh,340px);padding:12px 11px;border-radius:100px;display:grid;place-items:center;transform:translate(8px,-50%);opacity:0;visibility:hidden}
+.immersive-reader[data-chrome=true] .reader-progress-rail{transform:translate(0,-50%);opacity:1;visibility:visible}
+.immersive-reader[data-chrome] .reader-progress-rail .reader-progress-slider{writing-mode:vertical-lr;direction:ltr;width:3px;height:100%;margin:0;touch-action:none}
+.immersive-reader[data-chrome] .reader-progress-rail .reader-progress-slider::-webkit-slider-thumb{width:11px;height:4px}
+.immersive-reader[data-chrome] .reader-progress-rail .reader-progress-slider::-moz-range-thumb{width:11px;height:4px}

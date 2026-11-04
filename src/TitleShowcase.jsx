@@ -14,7 +14,7 @@ export default function TitleShowcase({background,children}){
  const posterY=useTransform(scrollYProgress,[0,1],[0,-165]),copyY=useTransform(scrollYProgress,[0,1],[0,-75]),infoY=useTransform(scrollYProgress,[0,1],[0,-35]);
  const posterX=useTransform(x,value=>-value*.35);
  const opacity=useTransform(scrollYProgress,[0,.6,1],[1,1,.3]),parts=Children.toArray(children);
- return <section ref={root} className="hero-stage title-hero title-feature title-showcase is-revealed" onPointerMove={event=>{if(!reduce&&event.pointerType==='mouse'){const r=event.currentTarget.getBoundingClientRect();pointer.set((event.clientX-r.left-r.width/2)/r.width*28);}}} onPointerLeave={()=>pointer.set(0)}>
+ return <section ref={root} className={'hero-stage title-hero title-feature title-showcase is-revealed'+(!parts[2]?' without-info':'')} onPointerMove={event=>{if(!reduce&&event.pointerType==='mouse'){const r=event.currentTarget.getBoundingClientRect();pointer.set((event.clientX-r.left-r.width/2)/r.width*28);}}} onPointerLeave={()=>pointer.set(0)}>
   {background(reduce?undefined:{y,x,scale})}
   <div ref={content} className="title-showcase-content">
    <motion.div className="title-showcase-poster-layer" style={reduce?undefined:{y:posterY,x:posterX,opacity}}>{parts[0]}</motion.div>

@@ -13,7 +13,7 @@ export default function PlayerSettings({onClose,children,anchor,initialPage='wat
   const [page,setPage]=useState(initialPage),[part,setPart]=useState(0),root=useRef(null),reduced=useReducedMotion();
   useEffect(()=>setPage(initialPage),[initialPage]);
   const flatten=nodes=>Children.toArray(nodes).flatMap(n=>typeof n==='string'||n.props.hidden?[]:n.type===Fragment||['watch-player-configuration','watch-selection','watch-quality-note'].includes(n.props.className)?flatten(n.props.children):n.type==='fieldset'?flatten(n.props.children).filter(c=>c.type!=='legend'):[n]);
-  const rows=flatten(children[page]?.props.children),size=height<300?1:height<440?2:height<600?3:5,count=Math.ceil(rows.length/size);
+  const rows=flatten(children[page]?.props.children),size=height<240?1:height<330?2:4,count=Math.ceil(rows.length/size);
   useEffect(()=>setPart(0),[page]);
   useEffect(()=>{
     const previous=document.activeElement;root.current?.querySelector('[role=tab][aria-selected=true]')?.focus({preventScroll:true});

@@ -6,7 +6,7 @@ import ReaderModePicker from './ReaderModePicker.jsx';
 import './reader-morph.css';
 
 // Chrome overlays the reading surface. Opening a panel never resizes a page.
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode}){
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='horizontal'}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({});
  const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[hint,setHint]=useState(true),[fullscreenError,setFullscreenError]=useState('');
  methods.current={onClose,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel};
@@ -62,9 +62,10 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
     <span className="reader-page-count" aria-live="polite">{progress?.label||`${progress?.current||0} / ${progress?.total||0}`}</span>
     <button className="reader-control" aria-label="Вперёд" disabled={!canNext} onClick={onNext}><ChevronRight size={22}/></button>
    </div>
-   {onPage&&progress?.total>1&&<input className="reader-progress-slider" type="range" aria-label="Перейти к странице" min="1" max={progress.total} value={Math.min(progress.total,progress.current||1)} onChange={e=>onPage(Number(e.target.value)-1)}/>}
+   {progressOrientation!=='vertical'&&onPage&&progress?.total>1&&<input className="reader-progress-slider" type="range" aria-label="Перейти к странице" min="1" max={progress.total} value={Math.min(progress.total,progress.current||1)} onChange={e=>onPage(Number(e.target.value)-1)}/>}
    {status&&<div className="reader-quiet-status">{status}</div>}{fullscreenError&&<small role="status">{fullscreenError}</small>}
   </div>
+  {progressOrientation==='vertical'&&onPage&&progress?.total>1&&<div className="reader-chrome reader-progress-rail" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}><input className="reader-progress-slider" type="range" aria-label="Перейти к странице" aria-orientation="vertical" min="1" max={progress.total} value={Math.min(progress.total,progress.current||1)} onChange={e=>onPage(Number(e.target.value)-1)}/></div>}
   {hint&&!visible&&!activePanel&&<div className="reader-gesture-hint" aria-hidden="true">Касание центра — меню{paged?' · По краям — листать':''}</div>}
   {debug}
   <Dialog.Root open={!!activePanel} onOpenChange={open=>!open&&closePanel()}><Dialog.Portal container={full?root.current:undefined}><Dialog.Overlay className="reader-panel-backdrop"/><Dialog.Content className={'reader-panel reader-panel-'+activePanel} data-reader-panel onCloseAutoFocus={e=>{e.preventDefault();root.current?.focus({preventScroll:true});}}>
