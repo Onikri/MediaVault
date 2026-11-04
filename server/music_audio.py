@@ -16,10 +16,9 @@ def private_youtube_auth(root):
     cookies=cookie_text()
     if not cookies:
         yield [];return
-    # Linux runs keep the decrypted cookie jar in container tmpfs, so a crash
-    # cannot leave a plaintext copy in the persistent /data volume.
-    memory=Path('/dev/shm')
-    with tempfile.TemporaryDirectory(dir=memory if os.name=='posix' and memory.is_dir() else root,prefix='audio-session-') as directory:
+    # The deployment maps DATA_DIR inside the checkout's private .codex-local.
+    # Only the subprocess receives this mode0600 copy; it is always removed.
+    with tempfile.TemporaryDirectory(dir=root,prefix='audio-session-') as directory:
         cookie_path=Path(directory)/'youtube-cookies.txt'
         descriptor=os.open(cookie_path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
         with os.fdopen(descriptor,'w',encoding='utf-8') as cookie_file:cookie_file.write(cookies)
@@ -103,7 +102,9 @@ def audio_url(value):
 
 def failure(detail):
     lower=detail.lower()
-    if 'not a bot' in lower or 'confirm you' in lower or 'sign in' in lower or '429' in lower:
+    if '429' in lower and not any(v in lower for v in ['sign in','not a bot','confirm you']):
+        return 'YouTube временно ограничил запросы с сервера. Сохранённая сессия не удалена; повтори позднее.'
+    if 'not a bot' in lower or 'confirm you' in lower or 'sign in' in lower:
         return 'YouTube требует входа для IP Oracle. Подключи или обнови серверную сессию YouTube в профиле.'
     if 'private' in lower or 'members-only' in lower or 'unavailable' in lower or 'age' in lower:
         return 'Эта запись недоступна серверу без входа или имеет ограничения доступа.'
@@ -120,7 +121,7 @@ def extract(identity,refresh=False):
         # No shell, browser-profile reads, credential forwarding or plugins.
         # Explicit owner-supplied YouTube cookies use a private temporary copy.
         with tempfile.TemporaryDirectory(dir=root,prefix='audio-resolve-') as directory,open(Path(directory)/'result','w+b') as output,open(Path(directory)/'error','w+b') as error,private_youtube_auth(root) as authentication:
-            command=[sys.executable,'-m','yt_dlp','--ignore-config','--no-plugin-dirs','--no-cache-dir','--no-playlist','--no-warnings','--no-color','--socket-timeout','6','--retries','0','--extractor-retries','0','--js-runtimes','node','--skip-download','--print','%(.{'+FIELDS+'})j','-f','bestaudio[ext=m4a][protocol=https]/bestaudio[ext=webm][protocol=https]','--','https://www.youtube.com/watch?v='+identity]
+            command=[sys.executable,'-m','yt_dlp','--ignore-config','--no-plugin-dirs','--no-cache-dir','--no-playlist','--no-color','--socket-timeout','6','--retries','0','--extractor-retries','0','--js-runtimes','node','--skip-download','--print','%(.{'+FIELDS+'})j','-f','bestaudio[ext=m4a][protocol=https]/bestaudio[ext=webm][protocol=https]','--','https://www.youtube.com/watch?v='+identity]
             command[command.index('--'):command.index('--')]=authentication
             process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=output,stderr=error)
             end=time.monotonic()+28
@@ -129,6 +130,8 @@ def extract(identity,refresh=False):
                     process.kill();process.wait();raise HTTPException(504,'YouTube не ответил за время подготовки. Повтори запрос.')
                 time.sleep(.05)
             error.seek(0);diagnostic=error.read(256*1024).decode(errors='replace')
+            from youtube_auth import playback_diagnostic
+            playback_diagnostic(diagnostic)
             if process.returncode:raise HTTPException(502,failure(diagnostic))
             output.seek(0)
             try:data=json.loads(output.read(4*1024**2))

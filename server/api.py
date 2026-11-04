@@ -119,6 +119,12 @@ def drive_error_message(error):
     return None
 
 
+def import_auth_error(error):
+    from google.auth.exceptions import RefreshError
+    if isinstance(error,RefreshError):return not getattr(error,'retryable',False)
+    if isinstance(error,VaultError):return str(error).startswith('Подключи Google Drive к серверу')
+    return isinstance(error,HTTPException) and error.status_code in {401,403} and any(v in str(error.detail).casefold() for v in ('google','drive'))
+
 def worker():
     last_cleanup = 0
     while not stopping.is_set():
@@ -173,7 +179,7 @@ def worker():
         except Exception as error:
             if store.get(task_id)["status"] == "cancelling":
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
-            elif error.__class__.__module__.startswith("google.auth") or isinstance(error, HTTPException):
+            elif import_auth_error(error):
                 store.update(task_id, status="waiting_auth", progress={"message": "Серверу нужно повторное разрешение Google. Завершённые серии сохранены."})
             else:
                 message = drive_error_message(error) or (str(error) if isinstance(error, (SourceError, VaultError)) else "Импорт остановился. Завершённые файлы в Drive сохранены; задание можно продолжить.")

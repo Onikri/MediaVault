@@ -38,6 +38,14 @@ def normalize_cookies(raw):
         raise HTTPException(422,'В файле нет действующей авторизованной сессии YouTube. Войди на YouTube перед экспортом.')
     return '# Netscape HTTP Cookie File\n'+'\n'.join(rows)+'\n'
 
+def playback_diagnostic(detail):
+    text=detail.lower()
+    if not ('cookie' in text and any(v in text for v in ('no longer valid','rotated','expired'))):return
+    store=_store()
+    if store is not None:
+        value=credentials()
+        if value:store.setting(SETTING,{**value,'needsRefresh':True,'checked':time.time()})
+
 class CookieSession(BaseModel):
     cookies:SecretStr
 
@@ -55,7 +63,7 @@ def install(app,owner,get_store):
     @app.get('/music/youtube/session')
     def status(subject=Depends(owner)):
         value=credentials()
-        return {'configured':bool(value),'updated':value.get('updated') if value else None}
+        return {'configured':bool(value),'updated':value.get('updated') if value else None,'needsRefresh':bool(value and value.get('needsRefresh'))}
 
     @app.put('/music/youtube/session')
     def connect(body:CookieSession,subject=Depends(owner)):

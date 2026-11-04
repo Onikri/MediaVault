@@ -1,0 +1,9 @@
+# Player/import recovery, first stage — 2026-11-04
+
+Live diagnosis found30 waiting_auth imports and no running work. They retain their records/keys for explicit resume, but no longer consume the30-slot active queue capacity. Only genuine Google credential failures request reconsent; upstream HTTP errors and retryable Google transport failures no longer masquerade as login failures.
+
+The encrypted YouTube session is present. Its stored expiry timestamps are still future, but yt-dlp reports that the cookies were rotated/no longer valid. Public test-recording metadata extraction succeeded; that is not proof of a valid authenticated account. The profile now reports the rotated-session state after preparation, preserving the saved credentials until explicitly replaced/deleted. Rate limiting is distinguished from login challenges. Private subprocess cookie files stay in the project-mapped temporary folder with mode0600 and are removed; no raw diagnostics or cookies are returned.
+
+Timeline pointer capture maps the first press/drag directly to absolute time and updates the thumb immediately. Enlarged hit area; empty control-gradient areas no longer intercept video gestures. Removed duplicate continue prompt on pause. Preview timestamp overlaps the frame's upper edge; one-second demand-driven buckets retain a bounded cache. Stronger showcase depth/zoom preserves reduced-motion support. No bulk1260-frame extraction was enabled without benchmarking.
+
+Validation:27 Python audio/session/import tests; actual React player at390/1440 with a new first-click seek assertion, native media identity, menus/theater, extension lifecycle and real touch gestures; production build. Browser video is a fixture; no ML inference changed. This is the first stage of the broader player/reader/rooms/calendar/profile request, not completion of the remaining UI/features.

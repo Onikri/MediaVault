@@ -21,6 +21,14 @@ class YouTubeAuth(unittest.TestCase):
   result=self.client.put('/music/youtube/session',json={'cookies':COOKIE});self.assertEqual(result.status_code,200);self.assertNotIn('fixture-youtube-session',result.text)
   self.assertTrue(self.client.get('/music/youtube/session').json()['configured']);self.assertEqual(auth.cookie_text(),COOKIE)
   raw=self.store.database.execute('SELECT value FROM settings WHERE name=?',(auth.SETTING,)).fetchone()[0];self.assertNotIn(b'fixture-youtube-session',raw)
+ def test_rotated_cookie_diagnostic_preserves_credentials_and_exposes_no_values(self):
+  self.client.put('/music/youtube/session',json={'cookies':COOKIE})
+  auth.playback_diagnostic('WARNING: YouTube cookies are no longer valid; rotated Cookie=private-value')
+  status=self.client.get('/music/youtube/session').json()
+  self.assertTrue(status['needsRefresh']);self.assertNotIn('private-value',json.dumps(status))
+  self.assertEqual(auth.cookie_text(),COOKIE)
+  self.client.put('/music/youtube/session',json={'cookies':COOKIE})
+  self.assertFalse(self.client.get('/music/youtube/session').json()['needsRefresh'])
  def test_only_youtube_cookies_are_kept(self):
   raw=COOKIE+'.google.com\tTRUE\t/\tTRUE\t0\tSID\tfixture-unrelated-google-session\n#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tfixture-http-only\n'
   normalized=auth.normalize_cookies(raw);self.assertNotIn('fixture-unrelated-google-session',normalized);self.assertIn('fixture-http-only',normalized)

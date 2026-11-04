@@ -191,7 +191,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const seek=seconds=>{
     if(roomControl){if(roomControl.canControl)roomControl.command('seek',Number(seconds));return;}
     const media=videoRef.current;
-    if(media&&Number.isFinite(media.duration))media.currentTime=Math.max(0,Math.min(seconds,media.duration));
+    if(media&&Number.isFinite(media.duration)){const target=Math.max(0,Math.min(Number(seconds)||0,media.duration));setTime(target);clockDrawn.current=target;media.currentTime=target;}
   };
   function onTime(){
     const video=videoRef.current;if(!video)return;

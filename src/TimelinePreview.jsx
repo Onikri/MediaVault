@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import useVideoStream from './use-video-stream.js';
 const clock=t=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
 export default function TimelinePreview({source,type,point,left}){
- const video=useRef(null),cache=useRef(new Map()),[image,setImage]=useState(''),[failed,setFailed]=useState(false),target=Math.max(0,Math.floor(point/2)*2);
+ const video=useRef(null),cache=useRef(new Map()),[image,setImage]=useState(''),[failed,setFailed]=useState(false),target=Math.max(0,Math.floor(point));
  useVideoStream(video,source,type,()=>setFailed(true),{preview:true});
  useEffect(()=>{let closed=false,timer;setImage(cache.current.get(target)||'');if(cache.current.has(target))return;const v=video.current;if(!v)return;
   function seek(){try{if(Number.isFinite(v.duration)&&v.duration>0)v.currentTime=Math.min(target,v.duration-.05);}catch{}}

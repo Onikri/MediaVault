@@ -47,3 +47,12 @@ html[data-blossom] .online-library-workspace>.library-workspace-main{min-width:0
 @media(max-width:760px){html[data-blossom] .online-library-workspace{display:block}html[data-blossom] .online-library-workspace>.library-sidebar{display:block;width:100%;box-sizing:border-box}html[data-blossom] .online-library-workspace>.library-sidebar>nav{display:flex;flex-wrap:nowrap;overflow:auto}html[data-blossom] .online-library-workspace .catalog-filters{min-width:0}html[data-blossom] .online-library-workspace .catalog-filters label{min-width:0}}
 .source-adult-toggle{padding:6px 10px;margin:6px 0 10px;border:0;border-radius:100px;background:var(--color-canvas-soft);color:var(--color-on-muted);font-size:11px}
 .source-adult-toggle[aria-pressed=true]{background:var(--color-blossom);color:var(--color-petal)}
+/* Timeline previews keep their complete frame; time is a small overlapping label. */
+.mv-player .mv-timeline-frame{padding:0;border:0;border-radius:10px;overflow:visible;background:var(--color-canvas-soft)}
+.mv-player .mv-timeline-frame>img{display:block;width:100%;height:auto;margin:0;aspect-ratio:16/9;object-fit:cover;border-radius:10px}
+.mv-player .mv-timeline-frame>small{position:absolute;top:0;left:50%;transform:translate(-50%,-50%);padding:3px 8px;margin:0;border-radius:100px;background:var(--color-canvas);color:var(--color-petal);font-size:10px;line-height:1.3}
+.mv-player .mv-player-timeline input[type=range]{height:16px;background:none;position:relative;z-index:1;touch-action:none}
+.mv-player .mv-player-timeline input[type=range]::-webkit-slider-runnable-track{height:3px;background:linear-gradient(90deg,var(--color-blossom) 0 var(--played),#ffffff4d var(--played) var(--buffered),#ffffff23 var(--buffered) 100%)}
+.mv-player .mv-player-timeline input[type=range]::-webkit-slider-thumb{margin-top:-3px}
+.mv-player .mv-player-console{pointer-events:none}
+.mv-player .mv-player-console .mv-player-controls,.mv-player .mv-player-console .mv-player-timeline{pointer-events:auto}

@@ -74,8 +74,8 @@ class TaskStore:
             existing = self.database.execute("SELECT id FROM tasks WHERE owner=? AND idempotency=?", (owner, idempotency)).fetchone()
             if existing:
                 return self.get(existing[0], owner)
-            if self.database.execute("SELECT count(*) FROM tasks WHERE status IN ('queued','running','waiting_auth')").fetchone()[0] >= 30:
-                raise ValueError("В очереди уже 30 заданий. Дождись завершения или отмени лишние.")
+            if self.database.execute("SELECT count(*) FROM tasks WHERE status IN ('queued','running','cancelling')").fetchone()[0] >= 30:
+                raise ValueError("В активной очереди уже 30 заданий. Ожидающие входа Google не занимают места. Дождись завершения или отмени лишние.")
             task_id, now = str(uuid.uuid4()), time.time()
             self.database.execute("INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?)", (
                 task_id, owner, "queued", now, now, self.seal(data, task_id),

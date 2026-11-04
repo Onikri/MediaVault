@@ -41,6 +41,11 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   const room=useHostRoom(api,characterService,item,source,characterContext,!roomControl,onlineControls);
   useImperativeHandle(apiRef,()=>api,[api]);
   usePlayerExtensions(api,extensions,onError);
+  function seekAtPointer(event){
+    const node=event.currentTarget;if(node.disabled||!seekable)return;
+    const bounds=node.getBoundingClientRect();event.preventDefault();event.stopPropagation();
+    seek(Math.max(0,Math.min(1,(event.clientX-bounds.left)/bounds.width))*duration);
+  }
   usePlayerMediaSession(api);
   return <PlayerContext.Provider value={api}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
     style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
@@ -72,7 +77,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
         <div className="mv-player-overview">
           <h1>{library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,'')}</h1>
           <p>{onlineControls?.seasonName||season?.name}<span> / </span>{episode?.label}</p>{episode?.description&&/[а-яё]/i.test(episode.description)&&<p className="mv-episode-description">{episode.description}</p>}
-        {readResume(keyFor(userId,libraryId,item.id))>0&&<button className="mv-resume" onClick={()=>{seek(readResume(keyFor(userId,libraryId,item.id)));videoRef.current?.play().catch(onError);}}>Продолжить просмотр · {clock(readResume(keyFor(userId,libraryId,item.id)))}</button>}</div>
+        </div>
       </div>
       <AnimatePresence>
       {settingsOpen&&<PlayerSettings anchor={settingsButton} initialPage={settingsTab} onClose={()=>openPanel('watch')}>{{
@@ -124,6 +129,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
       <div className="mv-player-console" onPointerEnter={revealControls}>
         <div className="mv-player-timeline" onPointerMove={e=>{if(!seekable||!source||navigator.connection?.saveData)return;const r=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));clearTimeout(seekTimer.current);const value={time:fraction*duration,left:Math.max(14,Math.min(86,fraction*100))};seekTimer.current=setTimeout(()=>setHoverSeek(value),200);}} onPointerLeave={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}} onPointerCancel={()=>{clearTimeout(seekTimer.current);setHoverSeek(null);}}><span className="mv-timeline-markers" aria-label="Разметка опенинга и эндинга">{[effectiveOpening,ending].filter(Boolean).map((v,i)=><i key={i} title={(i===0?'Опенинг':'Эндинг')+' · '+clock(v.start)+' – '+clock(v.end)} style={{left:(duration?v.start/duration*100:0)+'%',width:(duration?(v.end-v.start)/duration*100:0)+'%'}}/>)}</span>{hoverSeek&&<TimelinePreview source={source} type={item.onlineType} point={hoverSeek.time} left={hoverSeek.left}/>}{gestures.feedback?.type==='seek'&&<output className="mv-player-seek-preview" style={{left:Math.max(8,Math.min(92,progress))+'%'}}>{clock(previewTime)} <small>{gestures.feedback.delta>=0?'+':'−'}{Math.abs(Math.round(gestures.feedback.delta))} сек.</small></output>}<input ref={timeline} aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1}
+          onPointerDown={event=>{if(event.button===0&&!event.currentTarget.disabled){event.currentTarget.setPointerCapture(event.pointerId);seekAtPointer(event);}}} onPointerMove={event=>{if(event.currentTarget.hasPointerCapture(event.pointerId))seekAtPointer(event);}} onPointerUp={event=>{if(event.currentTarget.hasPointerCapture(event.pointerId)){seekAtPointer(event);event.currentTarget.releasePointerCapture(event.pointerId);}}}
           value={Math.min(previewTime,seekable?duration:1)} disabled={!seekable||!!roomControl&&!roomControl.canControl} step="0.1" onChange={event=>seek(Number(event.target.value))}
           style={{'--played':progress+'%','--buffered':Math.max(progress,seekable?buffered/duration*100:0)+'%'}}/></div>
         <div className="mv-player-controls">
