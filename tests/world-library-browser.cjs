@@ -39,7 +39,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let vi
   await page.getByRole('heading',{name:'Новый тайтл только в источнике',exact:true}).waitFor();
   await page.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();assert.equal(await page.locator('.title-save-menu').getAttribute('open'),null,'Saving is a secondary disclosure');
   assert.equal(await page.getByRole('button',{name:'Проверить следующие источники',exact:true}).count(),0);
-  await page.getByText('Сохранить в коллекцию или на устройство',{exact:true}).click();await page.getByRole('button',{name:'На устройство',exact:true}).click();await page.getByRole('button',{name:'Сохранить на устройство',exact:true}).waitFor();
+  await page.getByText('Сохранить в коллекцию или на устройство',{exact:true}).click();await page.getByRole('button',{name:'На устройство',exact:true}).click();await page.locator('#importMangaBtn').filter({hasText:'Сохранить на устройство'}).waitFor();
   await page.getByRole('button',{name:'В Google Диск',exact:true}).click();await page.getByRole('button',{name:'Добавить 2 главы в коллекцию',exact:true}).waitFor();
   await page.getByRole('button',{name:'Онлайн',exact:true}).click();await page.getByText('Сохранить в коллекцию или на устройство',{exact:true}).click();
   await page.getByRole('button',{name:'Читать сейчас',exact:true}).click();await page.locator('.reader-embedded .reader-page-image img').first().waitFor();

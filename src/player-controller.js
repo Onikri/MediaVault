@@ -229,7 +229,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     snapshot.current={time:0,duration:videoRef.current?.duration};setPlaying(false);writeProgress(userId,libraryId,item,0,videoRef.current?.duration);
     if(prefs.autoNext)nextEpisode();
   }
-  function toggle(){const video=videoRef.current;if(!video)return;if(roomControl){if(roomControl.canControl)roomControl.command(video.paused?'play':'pause');if(video.paused)video.play().catch(onError);return;}
+  function toggle(){const video=videoRef.current;if(!video)return;if(roomControl){if(roomControl.canControl)roomControl.command(video.paused?'play':'pause');if(video.paused&&roomControl.playing)video.play().catch(e=>{if(e.name!=='AbortError')onError?.(e);});return;}
     if(video.paused){openPanel('watch');video.play().catch(onError);}else video.pause();
   }
   function fullscreen(){

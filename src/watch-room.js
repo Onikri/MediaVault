@@ -49,7 +49,7 @@ export function useHostRoom(api,service,item,source,context,enabled=true,configu
    socket.current=roomSocket(current.service.server,value.id,value.token,data=>{
     if(data.type==='state'){
      setState(data.room);const video=live.current.api.media;
-     if(video&&data.room.held!==stateRef.current?.held){applying.current=performance.now()+500;if(data.room.held)video.pause();else if(data.room.playing)video.play().catch(()=>{});}
+     if(video&&data.room.held!==stateRef.current?.held){applying.current=performance.now()+500;if(data.room.held){if(!video.paused)video.pause();}else if(data.room.playing&&video.paused)video.play().catch(()=>{});}
     }else if(data.type==='command'){
      applying.current=performance.now()+500;
      if(data.action==='seek')live.current.api.seek(data.position);else if(data.action==='play')live.current.api.play()?.catch(()=>{});else if(data.action==='pause')live.current.api.pause();
@@ -58,7 +58,7 @@ export function useHostRoom(api,service,item,source,context,enabled=true,configu
    },status=>{setConnected(status==='connected');if(status==='connected')setTimeout(()=>publish(true),100);});
   }catch(e){setError(e.message);}finally{setBusy(false);}
  }
- function publish(intent=false){const value=live.current.api.getSnapshot();send({type:'state',position:value.time,duration:value.duration,rate:live.current.api.media?.playbackRate||1,playing:value.playing,intent});}
+ function publish(intent=false){const value=live.current.api.getSnapshot();send({type:'state',position:value.time,duration:value.duration,rate:live.current.api.media?.playbackRate||1,playing:intent?value.playing:(stateRef.current?.playing??value.playing),intent});}
  useEffect(()=>{
   if(!info)return;const media=api.media;if(!media)return;
   const update=e=>{if(performance.now()<applying.current)return;publish(['play','pause','seeked','ratechange'].includes(e.type));};
@@ -76,10 +76,4 @@ export function useHostRoom(api,service,item,source,context,enabled=true,configu
  return {password,setPassword,info,state,error,busy,connected,create,close,settings:value=>send({type:'settings',...value}),copy:async()=>{try{await navigator.clipboard.writeText(roomLink(info.id));}catch{setError('Скопируй ссылку из поля комнаты.');}}};
 }
 
-export function applyRoomState(media,state,{force=false,canPlay=true}={}){
- if(!media||!state||!Number.isFinite(state.position))return;
- const target=Math.max(0,Math.min(state.duration||1e9,state.position));
- if(Number.isFinite(media.duration)&&media.readyState>=1&&Math.abs(media.currentTime-target)>(force?.15:1.1))media.currentTime=target;
- const drift=target-media.currentTime;media.playbackRate=Math.abs(drift)<.12?state.rate:Math.max(.25,Math.min(3,state.rate+(drift>0?.035:-.035)));
- if(state.playing&&canPlay)media.play().catch(()=>{});else media.pause();
-}
+export {applyRoomState} from './room-playback.js';
