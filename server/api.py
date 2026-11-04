@@ -31,6 +31,7 @@ from run_import import run_job, validate_job
 from site_adapters import inspect_source, search_sources, voice_availability
 from source_parser import SourceError,public_url
 from task_store import TaskStore
+import drive_grants
 from vault_drive import ADMIN_EMAIL_SHA256, GoogleDriveAdapter, VaultDrive, VaultError
 
 
@@ -136,14 +137,15 @@ def worker():
             wakeup.wait(5)
             wakeup.clear()
             continue
-        task_id, vault = task["id"], None
+        task_id, vault,credential = task["id"], None,None
         if task["created"] < time.time() - 7 * 86400:
             store.update(task_id, status="cancelled", progress={"message": "Срок хранения задания истёк."}, forget_key=True)
             continue
         try:
             store.update(task_id, progress={"phase": "preparing"})
             data = task["data"]
-            vault = VaultDrive(GoogleDriveAdapter.from_adc(drive_credentials(task["owner"])))
+            credential=drive_credentials(task["owner"])
+            vault = VaultDrive(GoogleDriveAdapter.from_adc(credential))
             library_id=data.get('library_id') or data['job']['library_id']
             vault.unlock_key(library_id, base64.b64decode(data["vault_key"], validate=True))
             if not task['progress'].get('recover_needed',True):vault._manifest_cache=[]
@@ -180,6 +182,7 @@ def worker():
             if store.get(task_id)["status"] == "cancelling":
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
             elif import_auth_error(error):
+                if credential is not None:drive_grants.rejected(store,task["owner"],getattr(credential,'refresh_token',None))
                 store.update(task_id, status="waiting_auth", progress={"message": "Серверу нужно повторное разрешение Google. Завершённые серии сохранены."})
             else:
                 message = drive_error_message(error) or (str(error) if isinstance(error, (SourceError, VaultError)) else "Импорт остановился. Завершённые файлы в Drive сохранены; задание можно продолжить.")
@@ -258,7 +261,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 49, "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 49, "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -267,9 +270,11 @@ def authenticate(authorization: str = Header(default="")):
     if not authorization.startswith("Bearer ") or len(authorization) > 8192:
         raise HTTPException(401, "Нужен вход через Google.")
     user = google_user(authorization[7:])
-    return {"token": session_token(user["sub"]), "driveConnected": bool(store.setting("google:" + user["sub"])),
+    return {"token": session_token(user["sub"]), "driveConnected": drive_grants.status(store,user["sub"])["connected"], "driveNeedsConsent":drive_grants.status(store,user["sub"])["needsConsent"],
             "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://"))}
 
+
+drive_grants.install(app,owner,lambda:store,drive_credentials)
 
 import google_pool
 google_pool.install(app,owner,lambda:store)
@@ -338,7 +343,7 @@ def oauth_callback(state: str = "", code: str = "", error: str = ""):
     refresh = tokens.get("refresh_token") or old.get("refresh_token")
     if not refresh:
         raise HTTPException(400, "Google не выдал фоновый доступ. Повтори подключение с подтверждением разрешений.")
-    store.setting(destination, {"refresh_token": refresh, 'scope': tokens.get('scope', '')})
+    store.setting(destination, {"refresh_token": refresh, 'scope': tokens.get('scope', ''),'needs_consent':False,'checked_at':time.time()})
     if pending.get('device'):
         device = store.setting('device:' + pending['device'])
         if not device or device['sub'] != user['sub']:
@@ -649,7 +654,7 @@ def submit(body: ImportTask, subject=Depends(owner), idempotency_key: str = Head
         raise HTTPException(422, "Некорректный ключ открытой библиотеки.") from None
     if not re.fullmatch(r"[\w-]{16,100}", idempotency_key, re.ASCII):
         raise HTTPException(422, "Нужен уникальный идентификатор запроса.")
-    if not store.setting("google:" + subject):
+    if not drive_grants.status(store,subject)["connected"]:
         raise HTTPException(409, "Подключи Google Drive к серверу один раз перед первым импортом.")
     try:
         task = store.add(subject, {"job": body.job, "vault_key": body.vault_key}, idempotency_key)
@@ -661,7 +666,7 @@ def submit(body: ImportTask, subject=Depends(owner), idempotency_key: str = Head
 
 @app.get("/jobs")
 def tasks(subject=Depends(owner)):
-    return {"jobs": store.list(subject)}
+    return {"jobs": store.list(subject),"driveConnection":drive_grants.status(store,subject)}
 
 
 class Enrichment(StrictBody):
@@ -676,7 +681,7 @@ def enrich_library(body: Enrichment,subject=Depends(owner),idempotency_key: str=
         if len(base64.b64decode(body.vault_key.get_secret_value(),validate=True))!=32:raise ValueError()
     except ValueError:raise HTTPException(422,'Некорректный ключ библиотеки.') from None
     if not re.fullmatch(r'[\w-]{16,100}',idempotency_key,re.ASCII):raise HTTPException(422,'Нужен идентификатор синхронизации.')
-    if not store.setting('google:'+subject):raise HTTPException(409,'Подключи фоновый доступ к Drive.')
+    if not drive_grants.status(store,subject)['connected']:raise HTTPException(409,'Обнови фоновый доступ Google Drive на ВМ в профиле.')
     try:task=store.add(subject,{'kind':'enrich','library_id':body.library_id,'vault_key':body.vault_key.get_secret_value(),'title_id':body.title_id},idempotency_key)
     except ValueError as error:raise HTTPException(429,str(error)) from None
     wakeup.set();return task
@@ -700,6 +705,7 @@ def cancel(task_id: str, subject=Depends(owner)):
 
 @app.post("/jobs/{task_id}/resume")
 def resume(task_id: str, subject=Depends(owner)):
+    if not drive_grants.status(store,subject)['connected']:raise HTTPException(409,'Обнови фоновый доступ Google Drive на ВМ в профиле.')
     value = task(task_id, subject)
     if value["status"] not in {"failed", "waiting_auth"}:
         raise HTTPException(409, "Это задание сейчас нельзя продолжить.")

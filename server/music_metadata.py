@@ -17,15 +17,21 @@ def select_recording(data,title,artist):
         if not _uuid.fullmatch(identity):continue
         artists=[c.get('artist',{}).get('name') for c in row.get('artist-credit',[]) if isinstance(c,dict)]
         artists=[x for x in artists if isinstance(x,str) and x]
-        title_score=len(wanted&words(name))/max(1,len(wanted));artist_score=len(performer&words(' '.join(artists)))/max(1,len(performer)) if performer else 1
+        aliases=[]
+        for credit in row.get('artist-credit',[]):
+            if not isinstance(credit,dict):continue
+            data=credit.get('artist') or {}
+            aliases += [credit.get('name'),data.get('sort-name'),*[a.get('name') for a in data.get('aliases',[]) if isinstance(a,dict)]]
+        aliases=list(dict.fromkeys(x for x in aliases if isinstance(x,str) and x and x not in artists))
+        title_score=len(wanted&words(name))/max(1,len(wanted));artist_score=len(performer&words(' '.join([*artists,*aliases])))/max(1,len(performer)) if performer else 1
         if title_score<.8 or artist_score<.5:continue
-        candidates.append((title_score*.7+artist_score*.3,row,artists))
+        candidates.append((title_score*.7+artist_score*.3,row,artists,aliases))
     if not candidates:return {'found':False,'provider':'MusicBrainz','artworkDownloaded':False}
-    score,row,artists=max(candidates,key=lambda x:x[0]);releases=sorted(row.get('releases',[]),key=lambda r:(r.get('status')!='Official',r.get('date') or '9999'))
+    score,row,artists,aliases=max(candidates,key=lambda x:x[0]);releases=sorted(row.get('releases',[]),key=lambda r:(r.get('status')!='Official',r.get('date') or '9999'))
     release=next((r for r in releases if _uuid.fullmatch(r.get('id',''))),{})
     group=release.get('release-group') or {};group_id=group.get('id','')
     cover=('https://coverartarchive.org/release-group/'+group_id+'/front-250') if _uuid.fullmatch(group_id) else ('https://coverartarchive.org/release/'+release['id']+'/front-250' if release else '')
-    return {'found':True,'id':row['id'],'title':str(row['title'])[:300],'artists':artists[:12],
+    return {'found':True,'id':row['id'],'title':str(row['title'])[:300],'artists':artists[:12],'artistAliases':aliases[:12],
         'album':str(release.get('title',''))[:300],'date':str(release.get('date',''))[:16],
         'durationMs':row.get('length') if isinstance(row.get('length'),int) else None,
         'cover':cover,'url':'https://musicbrainz.org/recording/'+row['id'],'provider':'MusicBrainz',

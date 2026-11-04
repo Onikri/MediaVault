@@ -133,3 +133,12 @@ class OnlinePlayback(unittest.TestCase):
  def test_katana_reads_only_published_image_array_and_exact_search_cards(self):
   self.assertEqual(parse_pages("<script>var thzq=['https://images.example/1.jpg','https://images.example/2.jpg',];</script>",'https://mangakatana.com/manga/a/c1'),['https://images.example/1.jpg','https://images.example/2.jpg'])
   s=next(v for v in SITES if v.id=='mangakatana');rows=parse_search('<div id="book_list"><div class="item"><h3 class="title"><a href="/manga/demo.1">Demo</a></h3><img src="/cover.jpg"></div></div>',s.root,s);self.assertEqual(rows[0]['language'],'en');self.assertEqual(rows[0]['title'],'Demo')
+
+class PreviewLeasePriority(unittest.TestCase):
+ def setUp(self):online.sessions.clear();online.preparations.clear()
+ def test_playback_evicts_only_owners_preview_slots_and_keeps_music_and_manga(self):
+  music,_=online.create('A',{},kind='music');manga,_=online.create('A',{},kind='manga');foreign,_=online.create('B',{},kind='preview')
+  previews=[online.create('A',{},kind='preview')[0] for _ in range(2)]
+  video,_=online.create('A',{},kind='video')
+  self.assertIn(video,online.sessions);self.assertIn(music,online.sessions);self.assertIn(manga,online.sessions);self.assertIn(foreign,online.sessions)
+  self.assertTrue(all(p not in online.sessions for p in previews))

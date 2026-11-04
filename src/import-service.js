@@ -30,7 +30,7 @@ export function createImportClient(server,googleToken,fetcher=fetch){
     })();
     try{return await signing;}finally{signing=null;}
   }
-  return {request,authenticate,reset:()=>{session=null;},getSession:()=>session};
+  return {request,authenticate,patchSession:change=>{if(session)session={...session,...change};return session;},reset:()=>{session=null;},getSession:()=>session};
 }
 
 export function useImportService(state,actions){
@@ -53,7 +53,8 @@ export function useImportService(state,actions){
         const access=(!cached||force||(!cached.driveConnected&&Date.now()>nextSessionCheck))?await client.authenticate():cached;
         nextSessionCheck=Date.now()+30000;
         const response=await client.request('/jobs');
-        if(!closed){setSession(access);setJobs(response.jobs||[]);setStatus('connected');setError('');}
+        const connection=response.driveConnection,nextAccess=connection?client.patchSession({driveConnected:connection.connected,driveNeedsConsent:connection.needsConsent}):access;
+        if(!closed){setSession(nextAccess);setJobs(response.jobs||[]);setStatus('connected');setError('');}
       }catch(cause){if(!closed){setStatus('error');setError(cause.message);}}
       checking=false;if(!closed)timer=setTimeout(update,4500);
     }

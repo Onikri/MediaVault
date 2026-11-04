@@ -34,3 +34,10 @@ class MusicMetadataTests(unittest.TestCase):
   self.assertEqual(music.select_recording({'recordings':[row]},'Otonoke','Creepy Nuts')['cover'],'')
   for title,artist in [('', ''),('x'*251,''),('Song','x'*301)]:
    with self.assertRaises(HTTPException):music.metadata(title,artist)
+
+class CatalogueAliasTests(unittest.TestCase):
+ def test_verified_native_artist_sort_name_matches_the_supplied_latin_artist(self):
+  row={'id':ID,'title':'the WORLD','length':227000,'artist-credit':[{'name':'ナイトメア','artist':{'name':'ナイトメア','sort-name':'Nightmare'}}]}
+  value=music.select_recording({'recordings':[row]},'the WORLD','NIGHTMARE')
+  self.assertTrue(value['found']);self.assertIn('Nightmare',value['artistAliases']);self.assertEqual(value['durationMs'],227000)
+  self.assertFalse(music.select_recording({'recordings':[row]},'the WORLD','Other band')['found'])

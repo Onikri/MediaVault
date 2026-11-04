@@ -52,6 +52,9 @@ def create(owner,headers,kind='video',client_id='',reservation=None):
             if reservation is not None and preparations.get((owner,client_id),(None,))[0]!=reservation:raise HTTPException(409,'Открывается другая глава.')
             for key,s in list(sessions.items()):
                 if s.owner==owner and s.client_id==client_id:sessions.pop(key,None)
+        if kind!='preview':
+            for key,value in list(sessions.items()):
+                if value.owner==owner and value.kind=='preview':sessions.pop(key,None)
         if len(sessions)>=24 or sum(s.owner==owner for s in sessions.values())>=4:raise HTTPException(429,'Закрой предыдущий онлайн-просмотр и повтори.')
         token=secrets.token_urlsafe(32);session=Session(owner,headers,time.monotonic()+(LEASE_SECONDS if client_id else 7200),kind,client_id);sessions[token]=session;return token,session
 
@@ -122,7 +125,7 @@ def install(app,owner):
                 else:final=stream['url']
                 rewrite_manifest(text,final,lambda v:v,None if generated else max_height)
                 manifest=(text,final,float('inf') if generated else time.monotonic()+30)
-            token,s=create(subject,stream.get('headers') or {},client_id=body.client_id,reservation=reservation)
+            token,s=create(subject,stream.get('headers') or {},kind='preview' if body.purpose=='preview' else 'video',client_id=body.client_id,reservation=reservation)
             s.max_height=None if generated else max_height
             resource=s.resource(stream['url'])
             if manifest:s.manifests[resource]=manifest
@@ -150,7 +153,10 @@ def install(app,owner):
             with lock:
                 expire()
                 if len(preparations)>=128 and (subject,body.client_id) not in preparations:raise HTTPException(429,'Слишком много подключений. Повтори через минуту.')
-                preparations[(subject,body.client_id)]=(reservation,time.monotonic()+60)
+                if body.kind=='video' and body.purpose=='playback':
+                    for key,value in list(preparations.items()):
+                        if key[0]==subject and len(value)>2 and value[2]=='preview':preparations.pop(key,None)
+                preparations[(subject,body.client_id)]=(reservation,time.monotonic()+60,body.purpose)
         disconnected=asyncio.Event();watcher=asyncio.create_task(watch_disconnect(request,disconnected))
         try:
             data=await run_in_threadpool(resolve,body,subject,reservation)

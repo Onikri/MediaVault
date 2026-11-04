@@ -14,7 +14,7 @@ class PlaybackResolver:
     def clear(self):
         with self.lock:self.cache.clear()
 
-    def get(self,key,loader,ttl=20,refresh=False,preview=False):
+    def get(self,key,loader,ttl=90,refresh=False,preview=False):
         with self.lock:
             if refresh:self.cache.pop(key,None)
             old=self.cache.get(key)
@@ -35,8 +35,11 @@ class PlaybackResolver:
             if not acquired:raise SourceError('Сервер готовит другие потоки. Повтори подключение.')
             value=loader()
             lifetime=ttl
-            # Explicit signed-link expiry may shorten, never extend, our 20s TTL.
-            streams=getattr(value,'streams',[]) or []
+            # Explicit signed-link expiry may shorten, never extend, our bounded TTL.
+            streams=list(getattr(value,'streams',[]) or [])
+            if isinstance(key,tuple) and key[0]=='manifest':
+                streams.append({'url':key[1]})
+                if '#EXT-X-ENDLIST' not in value[0] and '#EXT-X-STREAM-INF' not in value[0]:lifetime=min(lifetime,5)
             for stream in streams:
                 query=parse_qs(urlsplit(stream.get('url','')).query)
                 for name in ('expires','expire','exp'):
@@ -56,4 +59,4 @@ class PlaybackResolver:
 
     def document(self,http,url,headers=None,refresh=False):
         key=('manifest',url,tuple(sorted((headers or {}).items())))
-        return self.get(key,lambda:http.document(url,headers=headers),ttl=15,refresh=refresh,preview=getattr(http,'preview',False))[0]
+        return self.get(key,lambda:http.document(url,headers=headers),ttl=90,refresh=refresh,preview=getattr(http,'preview',False))[0]

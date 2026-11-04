@@ -1,3 +1,4 @@
+import usePlaybackWarmup from './use-playback-warmup.js';
 import useSeasonSource from './use-season-source.js';
 import {episodeDetail,useFranchiseSeasons,catalogueSeasonHint} from './franchise-seasons.js';
 import PlayerSettings from './PlayerSettings.jsx';
@@ -161,6 +162,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   {displayEntries.length>count&&<button className="text-link" onClick={()=>setCount(n=>n+24)}>Ещё серии</button>}
 </section>;
  const idleCurrent=browsingCatalog?foreign.row?.entries[0]:current,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
+ const warmCurrent=usePlaybackWarmup({entry:idleCurrent,sourceUrl:idleVariant?.sourceUrl,quality,service,enabled:!playing&&!idleBusy,anchor:sourceButton});
  const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name})),voiceId:audioId||voice?.id,
   onVoice:id=>{const value=id===voice?.id?'':id;setAudioId(value);persist({audioId:value});},
   captionVoices:voices.filter(v=>v.kind==='subtitles').map(v=>({id:v.id,name:v.name})),subtitleId,
@@ -169,7 +171,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   <OnlineEpisodePreviews entries={previewEntries} active={!playing&&!busy&&!browseBusy&&!foreignBusy&&!hovering} service={service} sourceUrl={displayVariant?.sourceUrl} sourceId={displayVariant?.id} identity={displayIdentity} season={displaySeason} userId={userId} onPreview={(number,image)=>preview(number,image,displaySeason,displayVariant?.id,displayIdentity)}/>
   <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
    :<div className="watch-idle mv-player watch-player-idle" style={profile.cover?{'--watch-poster':`url("${profile.cover.replace(/["\\]/g,'')}")`}:undefined}>
-    {idleBusy?<div className="watch-skeleton" role="status"><span/>Подбираем озвучки, качества и серии…</div>:<button className="watch-play" disabled={!idleCurrent||!idleVariant} onClick={()=>browsingCatalog?startCatalogPlayback(idleCurrent.number):startPlayback()}><span aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4v16l13-8z"/></svg></span>{idleCurrent?'Смотреть · серия '+idleCurrent.number:'Выбери озвучку'}</button>}
+    {idleBusy?<div className="watch-skeleton" role="status"><span/>Подбираем озвучки, качества и серии…</div>:<button className="watch-play" onPointerEnter={warmCurrent} onFocus={warmCurrent} disabled={!idleCurrent||!idleVariant} onClick={()=>browsingCatalog?startCatalogPlayback(idleCurrent.number):startPlayback()}><span aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4v16l13-8z"/></svg></span>{idleCurrent?'Смотреть · серия '+idleCurrent.number:'Выбери озвучку'}</button>}
     <button ref={sourceButton} type="button" className="watch-idle-settings" aria-label="Настройки просмотра" onClick={()=>setSourceSettings(v=>!v)}><Settings2 size={20}/></button>{sourceSettings&&<PlayerSettings anchor={sourceButton} initialPage="watch" onClose={()=>setSourceSettings(false)}>{{watch:configuration}}</PlayerSettings>}
    </div>}</PlaybackReveal>
   {!playing&&episodeBrowser}

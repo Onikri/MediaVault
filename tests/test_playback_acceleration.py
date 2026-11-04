@@ -92,3 +92,17 @@ class TrailerHostTests(unittest.TestCase):
     trailer_service.download(token,'https://www.youtube.com/watch?v=abcdefghijk',Path(folder),release_slot=False)
     public=trailer_service.public(trailer_service.jobs[token]);self.assertEqual(public['status'],'browser');self.assertEqual(public['youtubeId'],'abcdefghijk')
    finally:trailer_service.jobs.pop(token,None)
+
+class PreviewPriorityTests(unittest.TestCase):
+ def test_vod_manifest_warming_is_reused_after_the_old_fifteen_second_window(self):
+  cache=PlaybackResolver();http=SimpleNamespace(document=lambda *a,**k:('#EXTM3U\n#EXTINF:5,\npart.ts\n#EXT-X-ENDLIST\n',a[0],{}))
+  cache.document(http,'https://cdn.example/episode.m3u8')
+  key=next(iter(cache.cache));expires,value=cache.cache[key];self.assertGreater(expires-time.monotonic(),80)
+  http.document=lambda *a,**k: self.fail('Warm VOD must not probe again')
+  self.assertIn('ENDLIST',cache.document(http,'https://cdn.example/episode.m3u8')[0])
+ def test_live_manifest_and_signed_expiry_never_inherit_the_long_vod_lifetime(self):
+  cache=PlaybackResolver();http=SimpleNamespace(document=lambda *a,**k:('#EXTM3U\n#EXTINF:5,\nlive.ts\n',a[0],{}))
+  cache.document(http,'https://cdn.example/live.m3u8');self.assertLess(next(iter(cache.cache.values()))[0]-time.monotonic(),6)
+  http.document=lambda *a,**k:('#EXTM3U\n#EXT-X-ENDLIST\n',a[0],{})
+  cache.document(http,'https://cdn.example/video.m3u8?expires=1000000000')
+  self.assertFalse(any('expires=' in key[1] for key in cache.cache))

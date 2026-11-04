@@ -12,7 +12,7 @@ export async function frame(source,type,signal,multiple=false,onPartial){
    let target=0,index=0,targets=[],images=[];
    const fail=()=>resolve('');
    const capture=()=>{if(video.readyState<2||Math.abs(video.currentTime-target)>=1)return;const image=captureEpisodePreview(video);if(!image)return;images.push(image);if(images.length>1)onPartial?.([...images]);if(++index>=targets.length)resolve(multiple?images:images[0]);else{target=targets[index];video.currentTime=target;}};
-   video.onloadedmetadata=()=>{targets=(multiple?[.08,.27,.47,.68]:[.08]).map(f=>Math.max(0,Math.min((video.duration||0)-.1,(video.duration||0)*f)));target=targets[0];if(target>0)video.currentTime=target;};
+   video.onloadedmetadata=()=>{targets=(multiple?[Math.min(2,(video.duration||0)*.02),(video.duration||0)*.27,(video.duration||0)*.47,(video.duration||0)*.68]:[Math.min(2,(video.duration||0)*.02)]).map(t=>Math.max(0,Math.min((video.duration||0)-.1,t)));target=targets[0];if(target>0)video.currentTime=target;};
    video.onseeked=capture;video.onloadeddata=capture;video.onerror=fail;
    abortListener=fail;signal.addEventListener('abort',fail,{once:true});timer=setTimeout(fail,multiple?30000:15000);
    if(signal.aborted){fail();return;}

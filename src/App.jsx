@@ -1,3 +1,4 @@
+import DriveServerStatus from './DriveServerStatus.jsx';
 import HistoryTimeline from './HistoryTimeline.jsx';
 import ProfileAvatar from './ProfileAvatar.jsx';
 import './interface-refinement.css';
@@ -242,7 +243,7 @@ function MediaVaultApp(){
         <section className="settings-card about-card"><BrandMark/><div><h3>MediaVault</h3><p>Личная медиатека. Файлы шифруются перед сохранением в твоём Google Drive.</p><a className="text-link" href={guide} target="_blank" rel="noopener noreferrer">Помощь и настройка<Icon name="arrow" size={14}/></a></div></section>
 </>,
         appearance:<AppearanceSettings/>,
-        connections:<><section className="settings-card connection-settings-card"><h2>Подключения и импорт</h2><p className="fine">Настройки соединения с сервером и Google Диском доступны только в профиле.</p><ImportSettings service={importService} state={state} onConnect={showLibrarySetup}/>{state.user&&importService.status==='connected'&&<button className="btn btn-secondary" onClick={()=>importService.connect().catch(actions.error)}>Обновить фоновый доступ Drive на ВМ</button>}<div className="connection-settings-status" role="status"><span className={importService.status==='connected'?'is-ready':''}>{importService.status==='connected'?'Сервер подключён':'Сервер не подключён'}</span><span>{state.driveConnected?'Google Диск подключён':'Google Диск не подключён'}</span></div></section><YouTubeServerSession service={importService} enabled={!!(state.admin&&state.user)}/><MusicConnections userId={state.user?.sub}/><KodikConnection service={importService}/></>,
+        connections:<><section className="settings-card connection-settings-card"><h2>Подключения и импорт</h2><p className="fine">Настройки соединения с сервером и Google Диском доступны только в профиле.</p><ImportSettings service={importService} state={state} onConnect={showLibrarySetup}/><div className="connection-settings-status" role="status"><span className={importService.status==='connected'?'is-ready':''}>{importService.status==='connected'?'Сервер подключён':'Сервер не подключён'}</span><span>{state.driveConnected?'Браузер: Google Диск подключён':'Браузер: Google Диск не подключён'}</span></div></section><DriveServerStatus service={importService} enabled={!!(state.admin&&state.user)}/><YouTubeServerSession service={importService} enabled={!!(state.admin&&state.user)}/><MusicConnections userId={state.user?.sub}/><KodikConnection service={importService}/></>,
         privacy:<DeviceSettings state={state} actions={actions}/>
       }}/>}
     </motion.main>
