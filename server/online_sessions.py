@@ -248,3 +248,5 @@ def install(app,owner):
             if not handed:
                 if response is not None:response.close()
                 http.close();s.slots.release()
+
+    app.state.online_stream=stream

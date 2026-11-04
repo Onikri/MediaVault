@@ -210,7 +210,7 @@ async def lifespan(application):
 
 
 app = FastAPI(title="MediaVault import service", version="8.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
-app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"], expose_headers=["Content-Disposition"])
+app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "HEAD", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Range"], expose_headers=["Content-Disposition","Content-Range","Accept-Ranges","Content-Length"])
 
 
 @app.middleware("http")
@@ -252,7 +252,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 47, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 48, "watchRooms":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -267,6 +267,10 @@ def authenticate(authorization: str = Header(default="")):
 
 import google_pool
 google_pool.install(app,owner,lambda:store)
+import watch_rooms
+watch_rooms.install(app,owner)
+import title_upscale_model
+title_upscale_model.install(app)
 
 class GoogleOAuthConfiguration(StrictBody):
     client_id: str = Field(max_length=200)

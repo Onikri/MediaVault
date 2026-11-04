@@ -19,7 +19,7 @@ export function normalizeDepth(values){
 }
 // First pass starts behind the entire scene (zero shadow), advances over 6 s,
 // then breathes in a smaller range without illuminating the far background again.
-export const shadowCutoff=seconds=>{const t=Math.max(0,seconds);if(t<6){const p=t/6;return -.24+.94*p*p*(3-2*p);}return .48+.22*Math.cos((t-6)*Math.PI*2/10);};
+export const shadowCutoff=(seconds,{period=10,amplitude=.22}={})=>{const t=Math.max(0,seconds),a=Math.max(.08,Math.min(.35,Number(amplitude)||.22));if(t<6){const p=t/6;return -.24+(.72+a)*p*p*(3-2*p);}return .48+a*Math.cos((t-6)*Math.PI*2/Math.max(4,Math.min(20,Number(period)||10)));};
 export function videoRect(width,height,videoWidth,videoHeight){
  const scale=Math.min(width/videoWidth,height/videoHeight),w=videoWidth*scale,h=videoHeight*scale;
  return {left:(width-w)/2,top:(height-h)/2,width:w,height:h};

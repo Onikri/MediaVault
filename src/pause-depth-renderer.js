@@ -10,7 +10,7 @@ export function depthRenderer(canvas,width,height){
  for(int i=0;i<4;i++){float n=texture2D(depthTex,uv+offsets[i]).r;float w=.15*(1.0-smoothstep(.04,.15,abs(n-d)));sum+=n*w;weights+=w;}d=sum/weights;
  float t=smoothstep(cutoff-.209,cutoff+.209,d);float light=pow(t*t*(3.0-2.0*t),1.25);float shadow=(1.0-light)*strength;
  float m=texture2D(maskTex,uv).r*.5; m+=(texture2D(maskTex,uv+vec2(texel.x,0)).r+texture2D(maskTex,uv-vec2(texel.x,0)).r+texture2D(maskTex,uv+vec2(0,texel.y)).r+texture2D(maskTex,uv-vec2(0,texel.y)).r)*.125;
- m*=focus;shadow*=1.0-m*.85;float highlight=m*.035;float a=highlight+shadow*(1.0-highlight);
+ m*=focus;shadow*=1.0-m*.94;float highlight=m*.022;float a=highlight+shadow*(1.0-highlight);
  vec3 rgb=vec3(1.0,.78,.67)*highlight/max(.001,a);gl_FragColor=vec4(rgb,a);}`);
  const program=gl.createProgram();gl.attachShader(program,vertex);gl.attachShader(program,fragment);gl.linkProgram(program);
  if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error('Не удалось запустить эффект глубины.');

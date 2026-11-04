@@ -1,0 +1,18 @@
+{
+  "archive": "https://github.com/the-database/MangaJaNai/releases/download/3.0.0/IllustrationJaNai_V3detail_onnx.zip",
+  "member": "2x_IllustrationJaNai_V3detail_SPAN_S_40k_fp16_1x3xHxW_dyn-HW_strong_fp16_op23.onnx",
+  "bytes": 851846,
+  "sha256": "00b6a70642914371453bec96fbb7087697651c12ae8b0a3dbde5b9b4d82435b1",
+  "convertedBytes": 1673274,
+  "convertedSha256": "3f5245ed1abe8ba2b5249b70989757a086874ee6346bdf33a71c21701a4b663d",
+  "conversion": "All FLOAT16 tensor storage/types/Cast targets converted to FLOAT32 for CPU; architecture and trained weights preserved.",
+  "author": "the-database",
+  "name": "IllustrationJaNai V3detail SPAN-S 2x",
+  "license": "CC-BY-NC-4.0",
+  "licenseSource": "https://github.com/the-database/MangaJaNai/blob/main/LICENSE",
+  "sourceIR": 12,
+  "runtimeIR": 11,
+  "architecture": "SPAN-S",
+  "usage": "Colour manga covers/illustrations; actual CPU neural inference, not interpolation.",
+  "weightsCommitted": false
+}

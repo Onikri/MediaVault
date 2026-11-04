@@ -1,8 +1,8 @@
 import {createPortal} from 'react-dom';
 import {useLayoutEffect,useRef,useState} from 'react';
-import {Captions,Star,Tv} from 'lucide-react';
+import {Captions} from 'lucide-react';
 import type {Anime} from '../types/anime';
-import {safeSynopsis,scoreLabel} from '../utils/display';
+import {safeSynopsis} from '../utils/display';
 export interface AnimeHoverPreviewProps {anime:Anime;anchor:DOMRect|null;open:boolean;busy?:boolean;id?:string}
 // Portaled so catalog grids and horizontal rails never clip the detail card.
 export function AnimeHoverPreview({anime,anchor,open,busy=false,id}:AnimeHoverPreviewProps){
@@ -13,11 +13,11 @@ export function AnimeHoverPreview({anime,anchor,open,busy=false,id}:AnimeHoverPr
   update();const observer=new ResizeObserver(update);observer.observe(root.current);return()=>observer.disconnect();
  },[open,anchor?.left,anchor?.top,anchor?.height,anchor?.right]);
  if(!anchor||!open)return null;
- const scored=typeof anime.score==='number'&&Number.isFinite(anime.score),summary=safeSynopsis(anime);
+ const summary=safeSynopsis(anime);
  return createPortal(<aside ref={root} id={id} className="anime-preview is-portal is-open" style={{...position,transform:'none'}} role="tooltip">
-  <div className="preview-head"><h3>{anime.title}</h3>{scored&&<span className="score-pill"><Star size={13} fill="currentColor"/>{scoreLabel(anime.score)}</span>}</div>
+  <div className="preview-head"><h3>{anime.title}</h3></div>
   <p className="preview-synopsis">{summary||(busy?'Загружаем описание…':'Описание пока не предоставлено каталогом.')}</p>
-  <div className="preview-chips">{anime.type&&<span><Tv size={14}/>{anime.type}</span>}{anime.episodes&&<span><Captions size={14}/>{anime.episodes} сер.</span>}</div>
+  {anime.episodes&&<div className="preview-chips"><span><Captions size={14}/>{anime.episodes} сер.</span></div>}
   <dl className="preview-specs"><dt>Оригинал</dt><dd>{anime.title_japanese||'—'}</dd><dt>Выпуск</dt><dd>{anime.aired?.string||anime.year||'—'}</dd><dt>Статус</dt><dd>{anime.status||'—'}</dd><dt>Жанры</dt><dd>{anime.genres?.map(g=>g.name).join(', ')||'—'}</dd></dl>
  </aside>,document.body);
 }

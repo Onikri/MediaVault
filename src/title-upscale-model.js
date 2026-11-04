@@ -1,0 +1,1 @@
+export const TITLE_UPSCALE={name:'IllustrationJaNai V3detail SPAN-S 2×',bytes:1673274,sha256:'3f5245ed1abe8ba2b5249b70989757a086874ee6346bdf33a71c21701a4b663d',file:'illustration-span-3f5245ed1abe.onnx',source:'https://github.com/the-database/MangaJaNai/releases/tag/3.0.0',license:'CC-BY-NC-4.0'};

@@ -8,9 +8,9 @@ import {characterRoster} from './pause-character-context.js';
 import {recognizePauseFrame} from './pause-recognition.js';
 import './pause-frame.css';
 
-export default function PauseFrameEffects({videoRef,source,paused,enabled,modelAllowed=false,onAllowModel,strength=.82,autoRecognize=false,visible=true,characterContext={},characterService,userId}){
+export default function PauseFrameEffects({videoRef,source,paused,enabled,modelAllowed=false,onAllowModel,strength=.82,breathPeriod=10,breathAmplitude=.22,autoRecognize=false,visible=true,characterContext={},characterService,userId}){
  const contextRef=useRef(characterContext);contextRef.current=characterContext;
- const canvas=useRef(null),worker=useRef(null),busy=useRef(false),sequence=useRef(0),frame=useRef(null),cache=useRef(new Map()),renderer=useRef(null),recognition=useRef(null),cooldown=useRef(0),idleTimer=useRef(null),settings=useRef({strength,enabled});settings.current={strength,enabled};
+ const canvas=useRef(null),worker=useRef(null),busy=useRef(false),sequence=useRef(0),frame=useRef(null),cache=useRef(new Map()),renderer=useRef(null),recognition=useRef(null),cooldown=useRef(0),idleTimer=useRef(null),settings=useRef({strength,enabled});settings.current={strength,enabled,breathPeriod,breathAmplitude};
  const [view,setView]=useState({phase:'idle'}),[chars,setChars]=useState({phase:'idle',values:[]}),[selected,setSelected]=useState(null),[hovered,setHovered]=useState(null),[host,setHost]=useState(null),[rect,setRect]=useState(null),[retry,setRetry]=useState(0);
  const terminate=()=>{worker.current?.terminate();worker.current=null;busy.current=false;};
  useEffect(()=>()=>{clearTimeout(idleTimer.current);terminate();recognition.current?.abort();},[]);
@@ -75,8 +75,8 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
   const element=canvas.current,video=videoRef.current,scale=960/Math.max(video.videoWidth,video.videoHeight);element.width=Math.round(video.videoWidth*scale);element.height=Math.round(video.videoHeight*scale);
   let render;try{render=depthRenderer(element,view.width,view.height);render.depth(view.data);renderer.current=render;}catch(error){setView({phase:'error',message:error.message});return;}
   let raf=0,last=0,elapsed=0;const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  const draw=now=>{raf=0;if(document.hidden)return;if(!last)last=now;if(now-last>=40||reduced.matches){elapsed+=(now-last)/1000;last=now;render.draw(reduced.matches ? .48 : shadowCutoff(elapsed),settings.current.strength);}if(!reduced.matches)raf=requestAnimationFrame(draw);};
-  const restart=()=>{cancelAnimationFrame(raf);last=0;if(!document.hidden){render.draw(reduced.matches ? .48 : shadowCutoff(elapsed),settings.current.strength);raf=requestAnimationFrame(draw);}};
+  const draw=now=>{raf=0;if(document.hidden)return;if(!last)last=now;if(now-last>=40||reduced.matches){elapsed+=(now-last)/1000;last=now;render.draw(reduced.matches ? .48 : shadowCutoff(elapsed,{period:settings.current.breathPeriod,amplitude:settings.current.breathAmplitude}),settings.current.strength);}if(!reduced.matches)raf=requestAnimationFrame(draw);};
+  const restart=()=>{cancelAnimationFrame(raf);last=0;if(!document.hidden){render.draw(reduced.matches ? .48 : shadowCutoff(elapsed,{period:settings.current.breathPeriod,amplitude:settings.current.breathAmplitude}),settings.current.strength);raf=requestAnimationFrame(draw);}};
   document.addEventListener('visibilitychange',restart);reduced.addEventListener('change',restart);restart();
   return()=>{cancelAnimationFrame(raf);document.removeEventListener('visibilitychange',restart);reduced.removeEventListener('change',restart);renderer.current=null;render.dispose();};
  },[paused,enabled,view.phase,view.data]);

@@ -20,7 +20,7 @@ import {startFsr} from './fsr-upscaler.js';
 import useExternalAudio from './use-external-audio.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 import {buildPlaybackLibrary} from './player-model.js';
-export default function usePlayerController({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose,autoPlay=false,characterService}){
+export default function usePlayerController({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose,autoPlay=false,characterService,roomControl}){
   const timeline=useRef(null),clockDrawn=useRef(0),keyboardHandler=useRef(null);
   const ownRef=useRef(null),canvasRef=useRef(null),stageRef=useRef(null),railRef=useRef(null);
   const videoRef=mediaRef||ownRef;
@@ -189,6 +189,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     return()=>{disposed=true;stop?.();canvas.style.opacity='0';};
   },[source,prefs.gpu,prefs.neuralMode,engine,deviceProfile,gpuAttempt]);
   const seek=seconds=>{
+    if(roomControl){if(roomControl.canControl)roomControl.command('seek',Number(seconds));return;}
     const media=videoRef.current;
     if(media&&Number.isFinite(media.duration))media.currentTime=Math.max(0,Math.min(seconds,media.duration));
   };
@@ -228,7 +229,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     snapshot.current={time:0,duration:videoRef.current?.duration};setPlaying(false);writeProgress(userId,libraryId,item,0,videoRef.current?.duration);
     if(prefs.autoNext)nextEpisode();
   }
-  function toggle(){const video=videoRef.current;if(!video)return;
+  function toggle(){const video=videoRef.current;if(!video)return;if(roomControl){if(roomControl.canControl)roomControl.command(video.paused?'play':'pause');if(video.paused)video.play().catch(onError);return;}
     if(video.paused){openPanel('watch');video.play().catch(onError);}else video.pause();
   }
   function fullscreen(){
