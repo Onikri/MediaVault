@@ -12,7 +12,7 @@ import suwayomi_bridge as bridge
 LANGUAGES={'all','ru','en','ja','ko'}
 NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'MangaDex':0}
 def language_queries(values,language):
-    pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]'}[language]
+    pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[language]
     return sorted(dict.fromkeys(values),key=lambda v:not bool(re.search(pattern,v,re.I)))[:2]
 def public_aliases(row):
     values=[row.get('title'),*(row.get('aliases') or [])]
@@ -31,7 +31,7 @@ def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
     query=normalize(query)[:80]
     rows=[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))}
-          for s in bridge.sources() if s.get('lang') in LANGUAGES-{'all'} and (language=='all' or s['lang']==language)]
+          for s in bridge.sources() if s.get('lang') in LANGUAGES and (language=='all' or s['lang']==language)]
     rows.sort(key=lambda s:(s['language'],s['name'].casefold(),s['id']))
     from manga_source_health import states,blocked
     health=states();usable=[s for s in rows if not blocked(s['id'],health)]
@@ -214,7 +214,7 @@ class Discovery:
         if source_ids is not None and (not isinstance(source_ids,list) or not 1<=len(source_ids)<=1000 or any(not isinstance(v,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',v) for v in source_ids)):raise ValueError('Выбери хотя бы один установленный источник.')
         # Persist only public source identity, never an upstream response's
         # optional preference/authentication fields.
-        active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in bridge.sources() if s.get('lang') in LANGUAGES-{'all'}]
+        active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in bridge.sources() if s.get('lang') in LANGUAGES]
         installed={str(s['id']) for s in active}
         if source_ids and any(v not in installed for v in source_ids):raise ValueError('Выбранный источник не установлен. Обнови каталог источников.')
         selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())
@@ -230,7 +230,7 @@ class Discovery:
             # Searching a romanized name alone misses Russian, Japanese and Korean editions.
             clean_title={k:title.get(k) for k in ('kind','title','titles','aliases','ids','year')}
             for source in selected:
-                pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]'}[source['lang']]
+                pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[source['lang']]
                 source['_queries']=sorted(aliases(title),key=lambda v:not bool(re.search(pattern,v,re.I)))[:2]
                 source['_title']=clean_title
         signature=hashlib.sha256(json.dumps([key,language,[str(s['id']) for s in selected],title and aliases(title)],ensure_ascii=False).encode()).hexdigest()

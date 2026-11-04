@@ -191,6 +191,18 @@ class MangaDiscoveryTests(unittest.TestCase):
     self.assertEqual(manager.status('A',pending['id'])['state'],'interrupted')
     resumed=wait_done(manager,'A',manager.start('A','One Piece','all',['1','2'])['id'])
     self.assertEqual(resumed['state'],'done');self.assertEqual(resumed['progress']['completed'],2)
+ def test_multilingual_installed_sources_are_visible_and_searchable(self):
+    multi={'id':'900','name':'Multilingual reader','lang':'all','baseUrl':'https://source.example','isNsfw':True}
+    with patch.object(discovery.bridge,'sources',return_value=[*SOURCES,multi]):
+        self.assertIn('900',{s['id'] for s in discovery.source_list('all')['sources']})
+        self.assertNotIn('900',{s['id'] for s in discovery.source_list('ru')['sources']})
+        manager=self.manager(fetch=fixture)
+        title={'kind':'manga','title':'One Piece','aliases':['ワンピース']}
+        result=wait_done(manager,'A',manager.start('A','One Piece','all',['900'],title=title)['id'])
+        self.assertEqual(result['progress']['completed'],1)
+        self.assertEqual(result['results'][0]['language'],'all')
+        self.assertTrue(result['results'][0]['adult'])
+        self.assertEqual(discovery.language_queries(['One Piece','ワンピース'],'all'),['One Piece','ワンピース'])
  def test_source_list_and_result_metadata_never_expose_internal_image_targets(self):
     self.assertEqual(discovery.source_list('ja')['total'],4);self.assertEqual(len(discovery.source_list('all','Fixture 1')['sources']),8)
     row=discovery.result_row(SOURCES[0],{'id':1,'title':'候補の漫画','url':'/one','thumbnailUrl':'http://suwayomi:4567/private'})

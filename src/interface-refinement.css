@@ -45,3 +45,5 @@ html[data-blossom] .online-library-workspace .blossom-catalog-body.external-side
 html[data-blossom] .online-library-workspace .blossom-catalog-content{min-width:0;width:100%}
 html[data-blossom] .online-library-workspace>.library-workspace-main{min-width:0;max-width:100%}
 @media(max-width:760px){html[data-blossom] .online-library-workspace{display:block}html[data-blossom] .online-library-workspace>.library-sidebar{display:block;width:100%;box-sizing:border-box}html[data-blossom] .online-library-workspace>.library-sidebar>nav{display:flex;flex-wrap:nowrap;overflow:auto}html[data-blossom] .online-library-workspace .catalog-filters{min-width:0}html[data-blossom] .online-library-workspace .catalog-filters label{min-width:0}}
+.source-adult-toggle{padding:6px 10px;margin:6px 0 10px;border:0;border-radius:100px;background:var(--color-canvas-soft);color:var(--color-on-muted);font-size:11px}
+.source-adult-toggle[aria-pressed=true]{background:var(--color-blossom);color:var(--color-petal)}
