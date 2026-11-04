@@ -59,7 +59,7 @@ module.exports=async function({browser,base,installProvider,OWNER,PHRASE,catalog
   assert.equal(await page.locator('#libraryPanel').count(),0,'A biometric vault stays locked after Google restores');
   await page.locator('.device-settings').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));
-  await page.locator('#profileBtn').click();await page.getByRole('tab',{name:'Аккаунт',exact:true}).click();await page.locator('#logoutBtn').click();await page.reload();
+  await page.locator('#profileBtn').click();await page.getByRole('tab',{name:'Аккаунт',exact:true}).click();await page.getByRole('button',{name:'Выйти из аккаунта',exact:true}).click();await page.reload();
   await page.locator('#profileBtn').click();assert.equal(await page.locator('#loginBtn').isEnabled(),true,'Logout does not silently log the account back in');
   console.log('PASS: cookie consent; opt-in device persistence; non-exportable key; real signatures; automatic Google + vault restore; WebAuthn PRF wrapping and unlock with a virtual platform authenticator; logout.');
  }finally{await context.close();}
