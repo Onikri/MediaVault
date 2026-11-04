@@ -46,11 +46,13 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     const bounds=node.getBoundingClientRect();event.preventDefault();event.stopPropagation();
     seek(Math.max(0,Math.min(1,(event.clientX-bounds.left)/bounds.width))*duration);
   }
+  const selectorSeasons=onlineControls?.seasonOptions||seasons;
   usePlayerMediaSession(api);
   return <PlayerContext.Provider value={api}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
     style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls} data-player="mediavault">
     <div className="mv-player-screen">
+      {(episodes.length>1||onlineControls?.episodeBrowser)&&<div className="mv-player-top-selectors">{selectorSeasons.length>1&&<label><span className="sr-only">Сезон плеера</span><select aria-label="Сезон плеера" value={onlineControls?.browseSeasonId||shelfSeason?.id||''} onChange={event=>{if(onlineControls?.onBrowseSeason)onlineControls.onBrowseSeason(event.target.value);else setBrowsedSeasonId(event.target.value);openPanel('episodes');}}>{selectorSeasons.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}<button aria-label="Выбрать серию" aria-expanded={panel==='episodes'} onClick={()=>openPanel(panel==='episodes'?'watch':'episodes')}>{episode?.label||'Серии'}<ChevronsDown size={14}/></button></div>}
       <div className="mv-player-ambient" aria-hidden="true"/>
 
       <div className="mv-player-stage">
@@ -147,11 +149,11 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
         </div>
       </div>
     </div>
-    {onlineControls?.episodeBrowser&&<div className="mv-player-episode-browser" inert={settingsOpen}>{panel==='episodes'&&<button className="mv-player-close-episodes" aria-label="Закрыть серии" onClick={()=>openPanel('watch')}><X size={18}/>Серии</button>}{onlineControls.episodeBrowser}</div>}
+    {panel==='episodes'&&onlineControls?.episodeBrowser&&<div className="mv-player-episode-browser" inert={settingsOpen}>{panel==='episodes'&&<button className="mv-player-close-episodes" aria-label="Закрыть серии" onClick={()=>openPanel('watch')}><X size={18}/>Серии</button>}{onlineControls.episodeBrowser}</div>}
     <PlayerExtensionSlot name="footer" extensions={extensions} onError={onError}/>
     <input ref={subtitleInput} type="file" accept=".srt,.vtt,text/vtt" hidden onChange={attachSubtitle}/>
     <AnimatePresence>{musicOpen&&<PlayerPopover anchor={musicButton} label="Музыка из аниме" className="mv-player-music" onClose={()=>setMusicOpen(false)}><button className="icon-button" aria-label="Закрыть музыку" onClick={()=>setMusicOpen(false)}><X size={17}/></button><Soundtrack identity={musicIdentity} userId={userId} compact/></PlayerPopover>}</AnimatePresence>
-    {episodes.length>1&&!onlineControls?.externalEpisodeList&&<section className="mv-player-shelf" inert={settingsOpen} aria-label="Эпизоды сезона">
+    {panel==='episodes'&&episodes.length>1&&!onlineControls?.externalEpisodeList&&<section className="mv-player-shelf" inert={settingsOpen} aria-label="Эпизоды сезона">
       <div className="mv-player-shelf-heading">{panel==='episodes'&&<button aria-label="Закрыть эпизоды" onClick={()=>openPanel('watch')}><X size={20}/></button>}<div className="mv-player-season-title">{seasons.length>1?<label><span className="sr-only">Сезон</span><select aria-label="Сезон" value={shelfSeason?.id||''} onChange={event=>setBrowsedSeasonId(event.target.value)}>{seasons.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>:<span>{shelfSeason?.name}</span>}<button className="mv-player-expand-episodes" aria-label="Развернуть эпизоды" onClick={()=>openPanel(panel==='episodes'?'watch':'episodes')}>{shelfSeason?.episodes.length} эпизодов <ChevronsUp size={12}/></button></div><div><button aria-label="Предыдущие эпизоды" onClick={()=>scrollEpisodes(-360)}><ChevronLeft size={18}/></button><button aria-label="Следующие эпизоды" onClick={()=>scrollEpisodes(360)}><ChevronRight size={18}/></button></div></div>
       <div className="mv-player-rail" ref={railRef}>{shelfSeason?.episodes.map((ep,i)=>{
         const current=ep===episode;

@@ -47,6 +47,8 @@ class Member:
     ws:object=None
     seen:float=field(default_factory=time.monotonic)
     buffering:bool=False
+    voice:bool=False
+    last_chat:float=0
     slots:object=field(default_factory=lambda:asyncio.Semaphore(2))
 @dataclass
 class Room:
@@ -88,7 +90,7 @@ def snapshot(room):
     return {'id':room.id,'title':room.title,'malId':room.mal_id,'position':position(room),'duration':room.duration,'rate':room.rate,'playing':room.playing,'held':room.held,'epoch':room.epoch,'revision':room.revision,
             'leader':room.leader,'everyone':room.everyone,'waitAll':room.wait_all,'type':room.media['type'],'resource':room.media.get('resource','file'),
             'tracks':[{k:v for k,v in t.items() if k in {'kind','type','name','language','alias'}} for t in room.media.get('tracks',[])],'audioOffset':room.media.get('audioOffset',0),
-            'members':[{'id':m.id,'name':m.name,'host':m.host,'online':m.ws is not None,'buffering':m.buffering} for m in room.members.values()]}
+            'members':[{'id':m.id,'name':m.name,'host':m.host,'online':m.ws is not None,'buffering':m.buffering,'voice':m.voice} for m in room.members.values()]}
 async def send(member,value):
     if member.ws is not None:
         try:await asyncio.wait_for(member.ws.send_json(value),timeout=5)
@@ -159,11 +161,36 @@ def install(app,owner):
             while not room.closed:
                 raw=await asyncio.wait_for(ws.receive_text(),timeout=45)
                 if len(raw)>MAX_CHUNK*4//3+4096:raise ValueError()
-                if not member.host and len(raw)>4096:raise ValueError()
+                if not member.host and len(raw)>12288:raise ValueError()
                 data=__import__('json').loads(raw);kind=data.get('type');member.seen=time.monotonic()
                 now=time.monotonic();events=[t for t in events if t>now-1];events.append(now)
                 if len(events)>60:raise ValueError()
                 if kind=='ping':await send(member,{'type':'pong'});continue
+                if kind=='chat':
+                    text=data.get('text')
+                    if not isinstance(text,str) or not text.strip() or len(text)>500:continue
+                    if now-member.last_chat<.5:continue
+                    member.last_chat=now
+                    message={'type':'chat','id':secrets.token_urlsafe(10),'from':member.id,'name':member.name,'text':text.strip(),'at':time.time()}
+                    await asyncio.gather(*(send(m,message) for m in room.members.values()))
+                    continue
+                if kind=='voice':
+                    member.voice=data.get('enabled') is True
+                    await broadcast(room);continue
+                if kind=='signal':
+                    target=room.members.get(data.get('to')) if isinstance(data.get('to'),str) else None
+                    payload=data.get('payload')
+                    if not member.voice or not target or target is member or not target.voice or not isinstance(payload,dict) or len(raw)>12288:continue
+                    description=payload.get('description');candidate=payload.get('candidate')
+                    if description is not None:
+                        if not isinstance(description,dict) or description.get('type') not in {'offer','answer'} or not isinstance(description.get('sdp'),str) or len(description['sdp'])>10000:continue
+                        safe={'description':{'type':description['type'],'sdp':description['sdp']}}
+                    elif candidate is not None:
+                        if not isinstance(candidate,dict) or not isinstance(candidate.get('candidate'),str) or len(candidate['candidate'])>2000:continue
+                        safe={'candidate':{k:v for k,v in candidate.items() if k in {'candidate','sdpMid','sdpMLineIndex','usernameFragment'}}}
+                    else:continue
+                    await send(target,{'type':'signal','from':member.id,'payload':safe});continue
+
                 if kind=='data' and member.host:
                     pending=room.pending.get(data.get('id'))
                     if pending and not pending['future'].done():
@@ -206,7 +233,7 @@ def install(app,owner):
         except (WebSocketDisconnect,asyncio.TimeoutError,ValueError,HTTPException,KeyError):pass
         finally:
             if member and member.ws is ws:
-                member.ws=None;member.buffering=False
+                member.ws=None;member.buffering=False;member.voice=False
                 if room:
                     if member.host:room.wanted=False
                     recompute(room);await broadcast(room)

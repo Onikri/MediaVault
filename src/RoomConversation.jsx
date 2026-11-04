@@ -1,0 +1,7 @@
+import {useEffect,useRef,useState} from 'react';
+import {MessageCircle,Mic,MicOff,Send,Volume2} from 'lucide-react';
+export default function RoomConversation({conversation}){
+ const [text,setText]=useState(''),list=useRef(null);
+ useEffect(()=>{if(list.current)list.current.scrollTop=list.current.scrollHeight;},[conversation.messages]);
+ return <section className="room-conversation"><header><span><MessageCircle size={15}/>Чат комнаты</span><button disabled={!conversation.connected} aria-pressed={conversation.voice} onClick={conversation.voice?conversation.stop:conversation.start}>{conversation.voice?<MicOff size={15}/>:<Mic size={15}/>}<span>{conversation.voice?'Выключить микрофон':'Включить микрофон'}</span></button></header><ol ref={list} aria-live="polite" aria-relevant="additions">{conversation.messages.map(m=><li key={m.id}><strong>{m.name}</strong><span>{m.text}</span></li>)}</ol><form onSubmit={e=>{e.preventDefault();conversation.post(text);setText('');}}><input aria-label="Сообщение в комнате" value={text} maxLength={500} onChange={e=>setText(e.target.value)} placeholder="Сообщение…" disabled={!conversation.connected}/><button aria-label="Отправить сообщение" disabled={!conversation.connected||!text.trim()}><Send size={16}/></button></form>{conversation.voice&&<small>Микрофон включён · {conversation.peers} соединений · тестовый режим</small>}{conversation.error&&<p role="status">{conversation.error}<button onClick={conversation.unlock}><Volume2 size={15}/>Включить звук беседы</button></p>}</section>;
+}

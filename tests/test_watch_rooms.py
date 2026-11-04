@@ -83,3 +83,21 @@ class RoomTests(unittest.TestCase):
                 self.assertIn('/track0-'+resource,response.text)
                 self.assertEqual(response.headers['cache-control'],'private, no-store')
         finally:sessions.pop(token,None)
+
+
+class ConversationTests(RoomTests):
+    def test_chat_and_voice_signals_stay_inside_authenticated_room(self):
+        room=self.create();guest=self.join(room['id']).json();path='/rooms/'+room['id']+'/socket'
+        with self.client.websocket_connect(path) as host:
+            host.send_json({'token':room['token']});next_type(host,'state')
+            with self.client.websocket_connect(path) as peer:
+                peer.send_json({'token':guest['token']});next_type(peer,'state');next_type(host,'state')
+                host.send_json({'type':'chat','text':'Привет'})
+                self.assertEqual(next_type(peer,'chat')['text'],'Привет');next_type(host,'chat')
+                host.send_json({'type':'voice','enabled':True});next_type(host,'state');next_type(peer,'state')
+                peer.send_json({'type':'voice','enabled':True});next_type(host,'state');next_type(peer,'state')
+                host.send_json({'type':'signal','to':guest['memberId'],'payload':{'description':{'type':'offer','sdp':'fixture'}}})
+                message=next_type(peer,'signal');self.assertEqual(message['from'],room['memberId']);self.assertNotIn('token',message)
+                peer.send_json({'type':'voice','enabled':False});next_type(host,'state');next_type(peer,'state')
+                host.send_json({'type':'signal','to':guest['memberId'],'payload':{'description':{'type':'offer','sdp':'not delivered'}}})
+                peer.send_json({'type':'ping'});self.assertEqual(peer.receive_json()['type'],'pong')

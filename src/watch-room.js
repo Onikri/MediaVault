@@ -1,3 +1,4 @@
+import {useRoomConversation} from './room-conversation.js';
 import {useEffect,useRef,useState} from 'react';
 
 export function roomMedia(item,source,server,configuration={},audioOffset=0){
@@ -22,8 +23,9 @@ export function roomSocket(server,identity,token,onMessage,onStatus){
 function bytesBase64(bytes){let text='';for(let p=0;p<bytes.length;p+=8192)text+=String.fromCharCode(...bytes.subarray(p,p+8192));return btoa(text);}
 export function useHostRoom(api,service,item,source,context,enabled=true,configuration){
  const [password,setPassword]=useState(''),[info,setInfo]=useState(null),[state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[connected,setConnected]=useState(false);
- const live=useRef(),socket=useRef(null),session=useRef(null),applying=useRef(0),lastMedia=useRef(''),stateRef=useRef(null),reads=useRef(new Set());
+ const live=useRef(),socket=useRef(null),session=useRef(null),applying=useRef(new Map()),lastMedia=useRef(''),stateRef=useRef(null),reads=useRef(new Set());
  live.current={api,service,item,source,context,configuration};stateRef.current=state;
+ const conversation=useRoomConversation(socket,info?.memberId,state,connected);
  function send(value){if(socket.current?.readyState===1)socket.current.send(JSON.stringify(value));}
  async function read(data){
   const current=live.current,version=lastMedia.current,abort=new AbortController();reads.current.add(abort);
@@ -47,12 +49,13 @@ export function useHostRoom(api,service,item,source,context,enabled=true,configu
    const value=await current.service.request('/rooms',{method:'POST',body:{password,title:current.context?.title||current.item.collectionName||current.item.name,malId:/^\d{1,10}$/.test(mal)?mal:'',media}});
    session.current=value;setInfo(value);lastMedia.current=JSON.stringify(media);
    socket.current=roomSocket(current.service.server,value.id,value.token,data=>{
+    conversation.receive(data);
     if(data.type==='state'){
      setState(data.room);const video=live.current.api.media;
-     if(video&&data.room.held!==stateRef.current?.held){applying.current=performance.now()+500;if(data.room.held){if(!video.paused)video.pause();}else if(data.room.playing&&video.paused)video.play().catch(()=>{});}
+     if(video&&data.room.held!==stateRef.current?.held){if(data.room.held&&!video.paused){applying.current.set('pause',{until:performance.now()+1500});video.pause();}else if(!data.room.held&&data.room.playing&&video.paused){applying.current.set('play',{until:performance.now()+1500});video.play().catch(()=>applying.current.delete('play'));}}
     }else if(data.type==='command'){
-     applying.current=performance.now()+500;
-     if(data.action==='seek')live.current.api.seek(data.position);else if(data.action==='play')live.current.api.play()?.catch(()=>{});else if(data.action==='pause')live.current.api.pause();
+     const media=live.current.api.media;
+     if(data.action==='seek'){applying.current.set('seeked',{until:performance.now()+2000,position:data.position});live.current.api.seek(data.position);}else if(data.action==='play'&&media?.paused){applying.current.set('play',{until:performance.now()+1500});live.current.api.play()?.catch(()=>applying.current.delete('play'));}else if(data.action==='pause'&&media&&!media.paused){applying.current.set('pause',{until:performance.now()+1500});live.current.api.pause();}
     }else if(data.type==='read')read(data);
     else if(data.type==='error')setError(data.message);
    },status=>{setConnected(status==='connected');if(status==='connected')setTimeout(()=>publish(true),100);});
@@ -61,7 +64,7 @@ export function useHostRoom(api,service,item,source,context,enabled=true,configu
  function publish(intent=false){const value=live.current.api.getSnapshot();send({type:'state',position:value.time,duration:value.duration,rate:live.current.api.media?.playbackRate||1,playing:intent?value.playing:(stateRef.current?.playing??value.playing),intent});}
  useEffect(()=>{
   if(!info)return;const media=api.media;if(!media)return;
-  const update=e=>{if(performance.now()<applying.current)return;publish(['play','pause','seeked','ratechange'].includes(e.type));};
+  const update=e=>{const expected=applying.current.get(e.type);applying.current.delete(e.type);if(expected&&expected.until>performance.now()&&(e.type!=='seeked'||Math.abs(media.currentTime-expected.position)<.5))return;publish(['play','pause','seeked','ratechange'].includes(e.type));};
   const waiting=()=>send({type:'buffer',value:true}),ready=()=>send({type:'buffer',value:false});
   for(const type of ['play','pause','seeked','ratechange'])media.addEventListener(type,update);
   media.addEventListener('waiting',waiting);media.addEventListener('canplay',ready);media.addEventListener('playing',ready);const timer=setInterval(()=>publish(false),1000);
@@ -73,7 +76,7 @@ export function useHostRoom(api,service,item,source,context,enabled=true,configu
  });
  function close(){send({type:'close'});socket.current?.close();socket.current=null;session.current=null;setInfo(null);setState(null);setConnected(false);for(const c of reads.current)c.abort();}
  useEffect(()=>()=>{if(socket.current?.readyState===1)socket.current.send(JSON.stringify({type:'close'}));socket.current?.close();for(const c of reads.current)c.abort();},[]);
- return {password,setPassword,info,state,error,busy,connected,create,close,settings:value=>send({type:'settings',...value}),copy:async()=>{try{await navigator.clipboard.writeText(roomLink(info.id));}catch{setError('Скопируй ссылку из поля комнаты.');}}};
+ return {password,setPassword,info,state,error,busy,connected,create,close,conversation,settings:value=>send({type:'settings',...value}),copy:async()=>{try{await navigator.clipboard.writeText(roomLink(info.id));}catch{setError('Скопируй ссылку из поля комнаты.');}}};
 }
 
 export {applyRoomState} from './room-playback.js';

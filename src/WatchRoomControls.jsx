@@ -1,8 +1,12 @@
+import RoomConversation from './RoomConversation.jsx';
+import RoomInviteQR from './RoomInviteQR.jsx';
 import {Users,Copy,X} from 'lucide-react';
 import {roomLink} from './watch-room.js';
 export function roomControlRows(room){
  const rows=room.info?[
   <label key="invite">Ссылка комнаты<div className="room-invite"><input readOnly aria-label="Ссылка комнаты" value={roomLink(room.info.id)}/><button aria-label="Скопировать ссылку комнаты" onClick={room.copy}><Copy size={16}/></button></div></label>,
+  <RoomInviteQR key="qr" id={room.info.id} password={room.password}/>,
+  <details key="chat"><summary>Беседа · микрофон и сообщения</summary><RoomConversation conversation={room.conversation}/></details>,
   <label key="leader">Кто управляет<select value={room.state?.leader||room.info.memberId} onChange={e=>room.settings({leader:e.target.value})}>{(room.state?.members||[{id:room.info.memberId,name:'Ведущий'}]).map(m=><option key={m.id} value={m.id}>{m.name}{m.host?' · создатель':''}</option>)}</select></label>,
   <label key="everyone" className="mv-player-check"><input type="checkbox" checked={room.state?.everyone||false} onChange={e=>room.settings({everyone:e.target.checked})}/>Разрешить управление всем</label>,
   <label key="buffer" className="mv-player-check"><input type="checkbox" checked={room.state?.waitAll!==false} onChange={e=>room.settings({waitAll:e.target.checked})}/>Ждать буферизацию всех участников</label>,

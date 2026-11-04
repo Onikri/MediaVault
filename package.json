@@ -59,8 +59,10 @@
     "onnxruntime-web": "^1.30.0",
     "onnxruntime-web-moebius": "npm:onnxruntime-web@1.27.0",
     "pdfjs-dist": "5.4.296",
+    "qrcode": "1.5.4",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "react-pageflip": "2.0.3"
   },
   "devDependencies": {
     "playwright": "1.62.1",

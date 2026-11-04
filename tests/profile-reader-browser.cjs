@@ -9,7 +9,7 @@ let browser,vite,last;
  window.MEDIA_VAULT_CONFIG={importServerUrl:'https://fixture.example'};
  if(location.search.includes('tv')){const service={server:'https://fixture.example',status:'connected',session:{serverVersion:49},request:async()=>({voices:[],sources:[],providers:[],pending:false})};createRoot(document.getElementById('root')).render(<ThemeProvider><ImportSelection compact destination="online" item={{id:'tv-fixture',kind:'tv',title:'Сериал',aliases:['Сериал']}} state={{user:{sub:'fixture'}}} service={service}/></ThemeProvider>);}else if(location.search.includes('reader')){const c=document.createElement('canvas');c.width=640;c.height=960;const ctx=c.getContext('2d');ctx.fillStyle='#eee6d5';ctx.fillRect(0,0,640,960);ctx.fillStyle='#52525c';ctx.fillRect(25,25,590,400);ctx.fillStyle='#8e8e97';ctx.fillRect(25,450,270,480);ctx.fillRect(320,450,295,480);const blob=await new Promise(r=>c.toBlob(r,'image/png')),zip=new JSZip();for(let i=1;i<=3;i++)zip.file(i+'.png',blob);const archive=await zip.generateAsync({type:'blob'}),item={id:'reader-interface',name:'Проверка читалки',category:'manga',size:archive.size};createRoot(document.getElementById('root')).render(<ThemeProvider><MangaReader item={item} catalog={{items:[item]}} libraryId="fixture" userId="fixture" readWhole={async()=>archive} onClose={()=>{}}/></ThemeProvider>);}else createRoot(document.getElementById('root')).render(<App/>);
  `);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-profile-reader',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-profile-reader',logLevel:'error',server:{host:'127.0.0.1',port:5195}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of [390,1440]){
   const page=await browser.newPage({viewport:{width,height:940}}),errors=[];last=page;page.on('pageerror',e=>errors.push(e.message));
@@ -18,6 +18,8 @@ let browser,vite,last;
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html#profile');
   await page.getByRole('tab',{name:'Аккаунт',exact:true}).waitFor();await page.locator('#loginBtn').waitFor();
   assert.equal(await page.locator('.account-layout').count(),1);
+  if(width===390){const image=Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=16;canvas.getContext('2d').fillRect(0,0,16,16);return canvas.toDataURL('image/png').split(',')[1];}),'base64');await page.locator('.profile-avatar-editor input[type=file]').setInputFiles({name:'avatar.png',mimeType:'image/png',buffer:image});await page.locator('.profile-card .profile-avatar img').waitFor();await page.reload();await page.locator('.profile-card .profile-avatar img').waitFor();await page.locator('.profile-avatar-editor').getByRole('button',{name:'Убрать',exact:true}).click();}
+
   for(const [tab,selector] of [['Оформление','#appearanceSettings'],['Подключения','.kodik-connection'],['Устройство и доступ','.privacy-settings']]){
    await page.getByRole('tab',{name:tab,exact:true}).click();
    if(tab==='Устройство и доступ')await page.getByRole('tabpanel').waitFor();else await page.locator(selector).waitFor();
@@ -29,7 +31,11 @@ let browser,vite,last;
   await page.locator('.immersive-reader').dispatchEvent('reader-show-chrome');await page.getByRole('button',{name:'Настройки читалки',exact:true}).click();
   const panel=page.locator('.reader-panel');await panel.getByRole('button',{name:'Вписать целиком',exact:true}).click();
   await page.locator('.reader-fit-page').waitFor();assert.equal(await panel.getByRole('button',{name:'Вписать целиком',exact:true}).getAttribute('aria-pressed'),'true');
-  await panel.getByRole('button',{name:'Вебтун',exact:true}).click();await page.locator('.reader-mode-scroll').waitFor();assert.equal(await page.locator('.reader-page').count(),3);assert.equal(await page.getByRole('slider',{name:'Перейти к странице'}).getAttribute('aria-orientation'),'vertical');
+
+  await panel.getByLabel('Анимация перелистывания').selectOption('curl');if(width>=900)await panel.getByRole('button',{name:'Разворот',exact:true}).click();await page.getByRole('button',{name:'Закрыть настройки читалки',exact:true}).click();await page.locator('.stf__parent').waitFor();
+  await page.locator('.immersive-reader').dispatchEvent('reader-show-chrome');await page.getByRole('button',{name:'Вперёд',exact:true}).click();await page.waitForTimeout(850);assert.ok((await page.locator('.reader-page-count').textContent()).includes('2'),'Turning leaves the cover and reaches the next real page');assert.ok(await page.locator('.stf__item').count()>=3,'Real page-flip engine owns the sheets');
+  await page.locator('.immersive-reader').dispatchEvent('reader-show-chrome');await page.getByRole('button',{name:'Настройки читалки',exact:true}).click();await panel.getByLabel('Анимация перелистывания').selectOption('simple');
+  await panel.getByRole('button',{name:'Вебтун',exact:true}).click();await page.locator('.reader-mode-scroll').waitFor();assert.equal(await page.locator('.reader-page').count(),3);assert.equal(await page.locator('.reader-progress-slider').getAttribute('aria-orientation'),'vertical');
   await panel.getByRole('button',{name:'Разворот',exact:true}).click();await page.getByRole('button',{name:'Закрыть настройки читалки',exact:true}).click();
   await page.locator('.immersive-reader').dispatchEvent('reader-show-chrome');const chrome=await page.locator('.reader-top').boundingBox();assert.equal(await page.locator('.reader-bottom-float').evaluate(n=>getComputedStyle(n).borderTopWidth),'0px');assert.ok(chrome.width<=1101&&chrome.x>=0&&chrome.x+chrome.width<=width+1);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(dir,'reader-'+width+'.png')});

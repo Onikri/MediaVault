@@ -39,3 +39,9 @@ test('cancelled, unused and wrong-account chapter prefetches cannot be adopted',
  const lease=new ChapterLease('21','account:A',async()=>[]);assert.equal(lease.matches('21','account:B'),false);lease.releasePrefetch('20');assert.equal(lease.matches('21','account:A'),false);assert.throws(()=>lease.adopt(new AbortController().signal),e=>e.name==='AbortError');
  const orphan=new ChapterLease('21','account:A',async()=>[]);orphan.releasePrefetch('21');await Promise.resolve();assert.equal(orphan.controller.signal.aborted,true);
 });
+
+test('turn gestures are independent of text direction and new choices persist per profile',()=>{
+ const s=storage();saveSettings('A',{direction:'rtl',navigationDirection:'right',transition:'curl',upscale:true},s,'manga');
+ const value=readSettings('A',s,{},'manga');assert.equal(value.direction,'rtl');assert.equal(value.navigationDirection,'right');assert.equal(value.transition,'curl');assert.equal(value.upscale,true);
+ assert.equal(readSettings('B',s,{},'manga').transition,'simple');assert.equal(sanitize({navigationDirection:'invalid'}).navigationDirection,'right');
+});

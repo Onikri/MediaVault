@@ -161,7 +161,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   {displayEntries.length>count&&<button className="text-link" onClick={()=>setCount(n=>n+24)}>Ещё серии</button>}
 </section>;
  const idleCurrent=browsingCatalog?foreign.row?.entries[0]:current,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
- const controls={configuration,episodeBrowser,seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name})),voiceId:audioId||voice?.id,
+ const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name})),voiceId:audioId||voice?.id,
   onVoice:id=>{const value=id===voice?.id?'':id;setAudioId(value);persist({audioId:value});},
   captionVoices:voices.filter(v=>v.kind==='subtitles').map(v=>({id:v.id,name:v.name})),subtitleId,
   onCaptionVoice:id=>{setSubtitleId(id);persist({subtitleId:id});},audio,externalCaptions:captions,trackBusy,trackError};

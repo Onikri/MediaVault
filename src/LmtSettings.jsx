@@ -1,3 +1,4 @@
+import {useState} from 'react';
 import ReaderModelStorage from './ReaderModelStorage.jsx';
 import GoogleKeySettings from './GoogleKeyFields.jsx';
 import './reader-settings-grid.css';
@@ -12,8 +13,10 @@ import {DIRECT_DETECTORS,DIRECT_INPUTS} from './manga-direct-profiles.js';
 export function readLmt(user){try{const v=JSON.parse(localStorage.getItem('mv_lmt_settings:'+user)||'{"engine":"direct","version":10,"inpaint":"fast","directRenderVersion":2}');if(!v||typeof v!=='object')return translationConfig({engine:'direct',inpaint:'fast',directRenderVersion:2});delete v.apiKey;if(v.model?.startsWith('Llama-'))delete v.model;return migrateTranslationSettings(v);}catch{return translationConfig({engine:'direct',inpaint:'fast',directRenderVersion:2});}}
 export function saveLmt(user,value){try{const{apiKey,...safe}=value;localStorage.setItem('mv_lmt_settings:'+user,JSON.stringify(safe));}catch{}}
 export default function LmtSettings({value,onChange,backendStatus,onClearCache,onConfigureVm,directKeyScope,onDirectKeyChange,service,showDiagnostics=false}){
+ const [details,setDetails]=useState(false);
  const v=translationConfig(value),set=patch=>onChange(translationConfig({...v,...patch})),backend=v.engine==='backend',gemma=v.engine==='vm',direct=v.engine==='direct',visual=gemma||direct;
- return <details className="lmt-settings" open><summary>Перевод и восстановление страницы</summary>
+ return <details className="lmt-settings" open data-show-details={details}><summary>Перевод и восстановление страницы</summary>
+  <button className="reader-details-toggle" aria-pressed={details} onClick={()=>setDetails(v=>!v)}>{details?'Скрыть пояснения':'Показать пояснения'}</button>
   <p className="reader-hint">{direct?'Быстрый режим: детектор на устройстве или самостоятельный поиск Google → перевод → очистка и русский текст. Для английской, японской и корейской манги.':gemma?'ВМ: поиск областей → выбранная модель Google → JSON. Устройство: очистка и русский набор. Без отдельного OCR.':'Локальные модели: поиск текста → распознавание → перевод → очистка фона → русский набор. Оригинал сохраняется.'}</p>
   <button type="button" className="reader-block-toggle" aria-pressed={v.directInput==='blocks'} onClick={()=>set({directInput:v.directInput==='blocks'?'annotated':'blocks',engine:visual?v.engine:'vm'})}><PanelsTopLeft size={18}/>Блоки · пакетные листы</button>{v.directInput==='blocks'&&<p className="reader-hint">Используется выбранный детектор. На сервер уходят вырезки исходного размера с ID; число страниц на листе зависит от размера текста. Связанные края вебтуна переводятся вместе. Координаты, очистка и русский набор сохраняются; проверь рамки в отладке.</p>}
   <label>Где обрабатывать<select aria-label="Где обрабатывать перевод" value={direct?'direct':v.engine==='lmt'?'lmt':'vm'} onChange={e=>set({engine:e.target.value,mode:'gpu',...(e.target.value==='lmt'?{inpaint:'quality',font:'comic-relief'}:!visual?{inpaint:'fast',font:'auto'}:{})})}><option value="direct">Личные ключи Google · на устройстве</option><option value="lmt">Локальные модели · без отправки страниц</option><option value="vm">Google через ВМ · серверные ключи</option></select></label>

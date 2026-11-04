@@ -6,3 +6,4 @@
 @media(prefers-reduced-motion:reduce){.account-section{animation:none}}
 .account-mobile-exit{display:none;border:0;background:var(--color-surface);color:var(--color-petal);border-radius:50%;width:34px;height:34px;padding:0;place-items:center;margin-left:5px}
 @media(max-width:760px){.account-mobile-exit{display:grid}}
+.account-page .profile-avatar-editor .profile-avatar{display:grid;border:0;border-radius:50%;background:var(--color-canvas-soft);width:64px;height:64px}.account-page .profile-avatar-editor .profile-avatar>img{border-radius:50%}.account-page .profile-avatar-editor .profile-avatar>svg{width:15px;height:15px}

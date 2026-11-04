@@ -319,3 +319,21 @@ https://github.com/hksm-app/kodik-api/tree/master/models (not copied implementat
 Kodik credentials are issued by the service, not shipped with this repository.
 TV episode images/metadata come from TVmaze when available; its attribution link
 remains in the title's catalogue sources (https://www.tvmaze.com/api, CC BY-SA).
+
+## Reader paper animation and room invitation
+
+react-pageflip 2.0.3 and StPageFlip / page-flip 2.0.7 by Oleg Litovski
+(https://github.com/Nodlik/react-pageflip and https://github.com/Nodlik/StPageFlip)
+are MIT-licensed. Copyright (c) 2020 oleg.litovski9@gmail.com.
+The React integration uses the upstream sheet geometry; manga page decoding,
+translation overlays, progress and gesture preferences remain MediaVault code.
+qrcode 1.5.4 (https://github.com/soldair/node-qrcode) is MIT-licensed,
+Copyright (c) 2012 Ryan Day. It generates room invitation QR images in memory.
+Lucide's existing ISC-licensed reading symbols replace decorative floating icons.
+IllustrationJaNai small-page enhancement uses the same attributed SPAN model
+listed above; it is not represented as the grayscale MangaJaNai model.
+
+The vendored StPageFlip 2.0.7 engine retains its full MIT licence in
+`src/vendor/stpageflip/LICENSE`. Its only local engine change makes the animation
+loop cancellable on destroy; the upstream destroy method otherwise leaves its
+requestAnimationFrame loop running after switching reading modes.

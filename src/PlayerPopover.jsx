@@ -28,7 +28,7 @@ export default function PlayerPopover({anchor,label,children,className='',onClos
    const headerBottom=document.fullscreenElement?0:(document.querySelector('.site-header,.app-header')?.getBoundingClientRect().bottom||0);
    const visibleTop=Math.max(8,headerBottom+8-r.top),visibleBottom=Math.min(r.height-8,innerHeight-r.top-8);
    const maxHeight=Math.max(80,visibleBottom-visibleTop);
-   const width=Math.max(100,Math.min(className.includes('settings')?320:className.includes('music')?370:380,r.width-16));
+   const width=Math.max(100,Math.min(className.includes('settings')?440:className.includes('music')?370:380,r.width-16));
    const h=Math.min(root.current?.scrollHeight||280,maxHeight);
    const left=Math.max(8,Math.min(r.width-width-8,(a?.right??r.left+r.width-8)-r.left-width));
    const top=Math.max(visibleTop,Math.min((a?.top??r.top+r.height)-r.top-h-8,visibleBottom-h));

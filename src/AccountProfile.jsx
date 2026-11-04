@@ -1,3 +1,4 @@
+import ProfileAvatar from './ProfileAvatar.jsx';
 import {useEffect,useState} from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {UserRound,Palette,Plug,ShieldCheck,LogOut,Check,ChevronRight} from 'lucide-react';
@@ -11,7 +12,7 @@ export default function AccountProfile({state,panels,onLogout}){
  const name=state.user?.given_name||'Мой профиль',initial=(state.user?.given_name||state.user?.email||'М').slice(0,1).toUpperCase();
  return <section className="account-page"><header className="account-heading"><div><p className="eyebrow">Настройки</p><h1>Профиль</h1></div><span className={'account-presence'+(state.user?' is-connected':'')}><i/>{state.user?'Вход выполнен':'Гостевой режим'}{state.user&&<button className="account-mobile-exit" aria-label="Выйти из аккаунта" title="Выйти из аккаунта" onClick={onLogout}><LogOut size={16}/></button>}</span></header>
   <Tabs.Root defaultValue="account" className="account-layout" orientation={horizontal?'horizontal':'vertical'} activationMode="automatic">
-   <aside className="account-sidebar"><div className="account-identity"><div className="account-avatar">{initial}</div><strong>{name}</strong><small>{state.user?.email||'Подключи Google для своей коллекции'}</small></div>
+   <aside className="account-sidebar"><div className="account-identity"><ProfileAvatar user={state.user} className="account-avatar"/><strong>{name}</strong><small>{state.user?.email||'Подключи Google для своей коллекции'}</small></div>
     <Tabs.List className="account-navigation" aria-label="Разделы профиля">{sections.map(([id,label,Icon])=><Tabs.Trigger key={id} value={id}><Icon size={17}/><span>{label}</span><ChevronRight size={13}/></Tabs.Trigger>)}</Tabs.List>
     <div className="account-services"><span><Check size={13}/>Настройки сохраняются на устройстве</span>{state.user&&<button onClick={onLogout}><LogOut size={15}/>Выйти из аккаунта</button>}</div>
    </aside>

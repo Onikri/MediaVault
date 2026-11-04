@@ -22,7 +22,7 @@ export default defineConfig({
   publicDir: false,
   // Test output can be a junction into the private D: task cache. Keep HTML
   // proxy module IDs consistent with the URL used to load that harness.
-  resolve: {preserveSymlinks: true},
+  resolve: {preserveSymlinks: true,alias:{'page-flip':resolve(projectRoot,'src/vendor/stpageflip/page-flip.js')}},
   // The standalone AGPL engine is built separately; don't eagerly prebundle
   // its multi-megabyte ONNX/WebLLM graph when starting the main React app.
   optimizeDeps: {entries: ['index.html'],include:['hyphen/ru/index.js']},
