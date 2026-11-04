@@ -5,5 +5,6 @@ test('failed audio can still search lyrics using verified catalogue or selected 
  assert.equal(knownMusicDuration({},0,{durationMs:227000}),227);
  assert.equal(knownMusicDuration({},0,{}, {duration:'3:47'}),227);
  assert.equal(knownMusicDuration({},195,{durationMs:187000}),195,'Actual audio wins over recording metadata');
+ assert.equal(knownMusicDuration({},0,{durationMs:114000},{duration:'3:07'}),187,'Selected full recording wins over a catalogue TV edit');
  assert.equal(knownMusicDuration({},0,{},{}),0);assert.equal(knownMusicDuration({},0,{durationMs:NaN},{duration:'LIVE'}),0);
 });

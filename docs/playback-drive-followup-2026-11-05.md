@@ -24,7 +24,9 @@ the waiting-auth queue shows a reconnect action. No jobs are cancelled to free
 capacity. An invalid_grant still requires fresh consent through the VM connection.
 
 Lyrics can start using verified catalogue or selected-record duration before audio
-has loaded. Actual media duration takes precedence once available. MusicBrainz
+has loaded. Actual media duration takes precedence once available, followed by
+the selected upload; catalogue duration is a last resort because it can name a TV
+edit rather than the full song. MusicBrainz
 artist aliases and sort names participate in matching, including native/Latin
 forms. An empty, restricted or failed server lookup can consult public LRCLIB
 and AMLL independently; this does not bypass provider restrictions. Plain text is
@@ -36,3 +38,10 @@ at 390/1440 pixels, and a production build. Browser providers/Google refresh are
 fixtures: these checks establish cancellation, grant state, lookup without audio
 and fallback behavior, not successful live YouTube authentication or real ML
 inference. This change adds no model or changes to neural inference.
+
+Live VM verification: all 72 tasks and encrypted configuration survived the update.
+The WORLD returned plain LRCLIB lyrics; Otonoke and IRIS OUT returned timed
+Musixmatch lines. The saved background Drive grant still returns needs_consent,
+and an actual Otonoke audio preparation still receives YouTube's sign-in challenge.
+These authentication requirements remain visible and require renewed consent;
+successful lyric lookup does not establish playable audio.
