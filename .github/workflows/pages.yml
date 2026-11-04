@@ -129,6 +129,7 @@ jobs:
             npm run test:trusted &&
             npm run test:rooms &&
             npm run test:library-layout &&
+            npm run test:cards &&
             npm run test:suwayomi &&
             npm run test:world &&
             npm run test:music-nav
