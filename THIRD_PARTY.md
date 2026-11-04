@@ -315,7 +315,7 @@ MIT (Copyright shadcn; https://github.com/shadcn-ui/ui/blob/main/LICENSE.md).
 Its accessible behavior uses the existing @radix-ui/react-tabs dependency.
 No paid UI package was added; dimensions, colours and typography use AniView tokens.
 Kodik catalogue fields follow the authors' public SDK contracts at
-https://github.com/hksm-app/kodik-api/tree/main/models (not copied implementation).
+https://github.com/hksm-app/kodik-api/tree/master/models (not copied implementation).
 Kodik credentials are issued by the service, not shipped with this repository.
 TV episode images/metadata come from TVmaze when available; its attribution link
 remains in the title's catalogue sources (https://www.tvmaze.com/api, CC BY-SA).

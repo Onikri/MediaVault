@@ -8,7 +8,7 @@ Started only after the preceding frontend and VM release was verified live.
 - [x] Bounded parallel I/O on the 2-vCPU / 12-GiB Oracle VM, shared work and request priority.
 - [x] Progressive title metadata and faster cached previews.
 - [x] Compact reader capsules and animated mode thumbnails, all existing reading/translation options retained.
-- [ ] Relevant tests/build and frontend/VM publication.
+- [x] Relevant tests/build and frontend/VM publication.
 
 Kodik requires an owner-issued API token. None exists in the VM environment or
 stored settings at the start. Google API keys cannot authorize Kodik; do not use
@@ -47,3 +47,11 @@ token. A Gmail draft titled "Доступ к Kodik API для MediaVault" was cr
 The user chose to send it themselves. No message was sent and no third-party
 credential was used. The integration validates the issued key before storing
 it encrypted; the token can be entered under Profile > Connections.
+
+Published code: bee3c38c5bff6c869c6123b4c84cb480781bc1d9, API 49. Public
+WebSocket/Range room checks and the installed model checksum passed again.
+Live concurrent catalogue responses: TVmaze 0.35 s, Jikan 2.43 s; these are
+individual observations, not guaranteed response times. Existing 70 tasks,
+encrypted settings and service key were preserved. GitHub's Git-write incident
+required advancing the verified commit through the connector's leased ref API;
+the normal Pages workflow then completed successfully.
