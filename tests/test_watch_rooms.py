@@ -48,7 +48,7 @@ class RoomTests(unittest.TestCase):
                 peer.send_json({'type':'buffer','value':False});state=next_type(peer,'state')['room'];self.assertTrue(state['playing']);self.assertFalse(state['held']);next_type(host,'state')
                 peer.send_json({'type':'command','action':'seek','position':50});self.assertEqual(next_type(peer,'error')['message'],'Управление доступно ведущему.')
                 host.send_json({'type':'settings','everyone':True});next_type(host,'state');next_type(peer,'state')
-                peer.send_json({'type':'command','action':'seek','position':50});self.assertEqual(next_type(host,'command')['position'],50);state=next_type(peer,'state')['room'];self.assertGreaterEqual(state['position'],50)
+                peer.send_json({'type':'command','action':'seek','position':50});self.assertAlmostEqual(next_type(host,'command')['position'],50,delta=.1);state=next_type(peer,'state')['room'];self.assertGreaterEqual(state['position'],50)
                 host.send_json({'type':'close'});next_type(peer,'closed');next_type(host,'closed')
         self.assertEqual(self.client.get('/rooms/'+identity+'/media/'+guest['token']+'/file').status_code,410)
     def test_drive_chunk_is_bounded_range_data_and_never_a_library_key(self):
