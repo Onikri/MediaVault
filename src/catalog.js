@@ -69,7 +69,7 @@ export function normalizeCatalog(provider,data,kind='anime'){
     score:Number(a.score)||null,trailer:a.trailer||null,episodesAired:a.episodes_aired??null,broadcast:a.broadcast?.string,ids:{mal:String(a.mal_id)},links:[{provider,url:a.url}]}));
   if(provider==='tvmaze')return list(data).map(value=>value.show||value).filter(a=>a.id).map(a=>record(provider,a.id,a.genres?.includes('Anime')?'anime':'tv',{
     title:a.name,description:a.summary,cover:a.image?.original||a.image?.medium,format:a.type,genres:a.genres,status:a.status,startDate:a.premiered,endDate:a.ended,
-    ids:a.externals?.imdb?{imdb:a.externals.imdb}:{},episodes:a._embedded?.episodes?.length||null,
+    ids:a.externals?.imdb?{imdb:a.externals.imdb}:{},episodes:a._embedded?.episodes?.length||null,episodeImages:Object.fromEntries((a._embedded?.episodes||[]).filter(e=>e.image?.medium||e.image?.original).map(e=>[String(e.season||1)+':'+e.number,safeImage(e.image.medium||e.image.original)])),
     releases:(a._embedded?.episodes||[]).filter(e=>e.airstamp).map(e=>({episode:e.number,season:e.season,date:e.airstamp,kind:'original',provider})),links:[{provider,url:a.url}]}));
   if(provider==='imdb'){
     if(data['@type'])return [record(provider,(data.url||'').match(/tt\d+/)?.[0]||'',kind,{title:data.name,description:data.description,cover:typeof data.image==='string'?data.image:data.image?.url,

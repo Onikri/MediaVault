@@ -19,17 +19,17 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   const abort=new AbortController();setItem(value);setProfile(null);setViewSeason(null);setSeasonProfiles({});setTarget('online');setLoading(true);
   const tasks=[];
   if(!value.sourceOnly&&value.providerId&&!['openlibrary','youtube'].includes(value.provider))tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem({...mergeCatalog([...rows,value])[0],id:value.id});}));
-  if(value.ids?.mal)tasks.push(loadTitleProfile(value.ids.mal,value.kind,{server:service.server,signal:abort.signal}).then(data=>{if(!abort.signal.aborted)setProfile(data);}));
+  if(value.ids?.mal)tasks.push(loadTitleProfile(value.ids.mal,value.kind,{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setProfile(data);}}).then(data=>{if(!abort.signal.aborted)setProfile(data);}));
   Promise.allSettled(tasks).then(()=>{if(!abort.signal.aborted)setLoading(false);});return()=>abort.abort();
  },[value.id,service.server,destination]);
  const baseDisplayProfile=useMemo(()=>({
   title:item.title,cover:item.cover,description:item.description,year:item.year,format:item.format?translate(item.format):null,status:item.status?translate(item.status):null,
   sourceId:item.ids?.mal||'',source:item.ids?.mal?'shikimori':item.provider,sourceURL:item.sourceUrl||item.sourceURL,
-  releases:item.releases||[],rating:item.age!=null?item.age+'+':'',genres:(item.genres||[]).map(localLabel),themes:(item.tags||[]).map(localLabel),characters:[],staff:[],related:[],screenshots:[],
+  releases:item.releases||[],episodeImages:item.episodeImages||{},rating:item.age!=null?item.age+'+':'',genres:(item.genres||[]).map(localLabel),themes:(item.tags||[]).map(localLabel),characters:[],staff:[],related:[],screenshots:[],
   ...(profile||{})
  }),[item,profile]);
  const sceneItem=viewSeason?.item||item,sceneId=String(sceneItem.ids?.mal||''),basisId=String(item.ids?.mal||'');
- useEffect(()=>{if(!sceneId||sceneId===basisId||seasonProfiles[sceneId])return;const abort=new AbortController();loadTitleProfile(sceneId,'anime',{server:service.server,signal:abort.signal}).then(data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}).catch(()=>{});return()=>abort.abort();},[sceneId,basisId,service.server]);
+ useEffect(()=>{if(!sceneId||sceneId===basisId||seasonProfiles[sceneId])return;const abort=new AbortController();loadTitleProfile(sceneId,'anime',{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}}).then(data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}).catch(()=>{});return()=>abort.abort();},[sceneId,basisId,service.server]);
  const displayProfile=useMemo(()=>sceneId&&sceneId!==basisId?{...profileForSeason(sceneItem),...(seasonProfiles[sceneId]||{})}:baseDisplayProfile,[sceneItem,sceneId,basisId,seasonProfiles,baseDisplayProfile]);
  const title=useMemo(()=>({id:item.id,name:sceneItem.title,section:item.kind,category:item.kind==='manga'?'manga':['ranobe','book'].includes(item.kind)?'book':'video',items:[],parts:[],metadataId:sceneItem.ids?.mal,online:true,profile:displayProfile}),[item,sceneItem,displayProfile]);
  const facts=[['Доступ','Онлайн'],['Сезон просмотра',viewSeason?viewSeason.name+(viewSeason.episodes?' · '+viewSeason.episodes+' сер.':''):null],['Язык',languageNames[item.language]],['Источники',[...new Set((item.sources||[]).map(s=>s.providerName).filter(Boolean))].join(', ')||item.providerName],['Статус оригинала',displayProfile.status],['Перевод',item.language==='ru'?'Русский перевод':item.language?'Оригинал · перевод в читалке':null]];

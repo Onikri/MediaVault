@@ -190,9 +190,9 @@ async def lifespan(application):
     temporary = store.directory / "temporary"
     temporary.mkdir(exist_ok=True, mode=0o700)
     stopping.clear()
-    thread = threading.Thread(target=worker, daemon=True, name="media-import")
+    threads=[threading.Thread(target=worker,daemon=True,name="media-import-"+str(i)) for i in range(max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))))]
     if os.getenv("MEDIA_VAULT_DISABLE_WORKER") != "1":
-        thread.start()
+        for thread in threads:thread.start()
     await lyrics_relay.start()
     yield
     await lyrics_relay.close()
@@ -202,10 +202,10 @@ async def lifespan(application):
     shutdown_manga_discovery()
     from local_exports import shutdown as shutdown_local_exports
     shutdown_local_exports()
-    if thread.is_alive():
-        thread.join(timeout=2)
+    for thread in threads:
+        if thread.is_alive():thread.join(timeout=2)
     # A live worker may still be finishing a bounded source request during shutdown.
-    if not thread.is_alive():
+    if not any(thread.is_alive() for thread in threads):
         store.close()
 
 
@@ -252,7 +252,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 48, "watchRooms":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 49, "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -267,6 +267,8 @@ def authenticate(authorization: str = Header(default="")):
 
 import google_pool
 google_pool.install(app,owner,lambda:store)
+import kodik_api
+kodik_api.install(app,owner,lambda:store)
 import watch_rooms
 watch_rooms.install(app,owner)
 import title_upscale_model
@@ -429,6 +431,9 @@ _inspection_lock=threading.Lock()
 def source_inspect(body: Inspection, subject=Depends(owner)):
     if body.kind not in {"anime", "movie", "tv", "manga", "ranobe"}:
         raise HTTPException(422, "Неизвестный тип произведения.")
+    from kodik_api import cached_inspection
+    direct=cached_inspection(body.dub_url or body.url,body.season)
+    if direct and direct['kind']==body.kind:return direct
     signature=(subject,body.url,body.dub_url,body.season,body.kind)
     with _inspection_lock:
         for token in [k for k,v in _inspection_states.items() if v['expires']<time.monotonic()]:_inspection_states.pop(token,None)

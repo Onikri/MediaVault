@@ -2,9 +2,11 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {ArrowLeft,ChevronLeft,ChevronRight,Settings2,Maximize,Minimize,List,Grid2X2,X} from 'lucide-react';
 import './reader-shell.css';
+import ReaderModePicker from './ReaderModePicker.jsx';
+import './reader-morph.css';
 
 // Chrome overlays the reading surface. Opening a panel never resizes a page.
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug}){
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({});
  const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[hint,setHint]=useState(true),[fullscreenError,setFullscreenError]=useState('');
  methods.current={onClose,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel};
@@ -55,7 +57,7 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
    <div className="reader-top-actions">{actions}<button className="reader-control reader-fullscreen" aria-label={full?'Выйти из полного экрана':'На весь экран'} onClick={fullscreen}>{full?<Minimize size={19}/>:<Maximize size={19}/>}</button>{settings&&<button className="reader-control" aria-label="Настройки читалки" aria-expanded={settingsOpen} onClick={()=>openPanel('settings')}><Settings2 size={20}/></button>}</div>
   </div>
   <div className="reader-chrome reader-bottom reader-bottom-float mv-viewer-tools" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
-   <div className="reader-navigation">{contents&&<button className="reader-control" aria-label="Главы и тома" onClick={()=>openPanel('contents')}><List size={20}/></button>}{previews&&<button className="reader-control" aria-label="Превью страниц" onClick={()=>openPanel('previews')}><Grid2X2 size={19}/></button>}
+   <div className="reader-navigation">{onReadingMode&&<ReaderModePicker compact value={readingMode} onChange={onReadingMode}/>}{contents&&<button className="reader-control" aria-label="Главы и тома" onClick={()=>openPanel('contents')}><List size={20}/></button>}{previews&&<button className="reader-control" aria-label="Превью страниц" onClick={()=>openPanel('previews')}><Grid2X2 size={19}/></button>}
     <button className="reader-control" aria-label="Назад" disabled={!canPrevious} onClick={onPrevious}><ChevronLeft size={22}/></button>
     <span className="reader-page-count" aria-live="polite">{progress?.label||`${progress?.current||0} / ${progress?.total||0}`}</span>
     <button className="reader-control" aria-label="Вперёд" disabled={!canNext} onClick={onNext}><ChevronRight size={22}/></button>

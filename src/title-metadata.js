@@ -75,27 +75,29 @@ export async function loadTitleProfile(id,kind='anime',options={}){
   if(!/^\d{1,12}$/.test(String(id)))throw Error('Укажи тайтл из каталога Шикимори.');
   kind=['manga','ranobe','novel'].includes(kind)?kind:'anime';const path=resource(kind)+'/'+id;
   if(options.refresh)for(const key of pending.keys())if(key===path||key.startsWith(path+'/'))pending.delete(key);
-  const data=await request(path,options);
-  const names=['roles','related',...(kind==='anime'?['screenshots']:[])];
-  const extra=await Promise.allSettled(names.map(part=>request(path+'/'+part,options)));
-  const values=extra.map(r=>r.status==='fulfilled'?r.value:[]);
-  const profile=normalizeProfile(data,{roles:values[0],related:values[1],screenshots:values[2]});
-  const enrichment=await Promise.allSettled([highResolutionArtwork(id,kind),request(path+'/external_links',options).then(crossMediaFromLinks)]);
-  options.signal?.throwIfAborted();
-  const art=enrichment[0].status==='fulfilled'?enrichment[0].value:null,cross=enrichment[1].status==='fulfilled'?enrichment[1].value:[];
-  if(art?.background){profile.backgrounds=[imageURL(art.background)].filter(Boolean);profile.artworkSources=[{provider:'anilist',url:art.sourceURL}];}
-  if(art?.cover)profile.cover=imageURL(art.cover);
-  for(const value of cross)if(!profile.related.some(item=>item.kind===value.kind&&(String(item.id)===String(value.ids?.mal||'')||item.title===value.title)))profile.related.push(value);
-  if(options.server){
-    const ids=[id,...profile.related.filter(r=>r.kind===kind).map(r=>r.id)].filter(v=>/^\d+$/.test(v));
-    try{
-      const response=await fetch(options.server+'/metadata/posters?'+new URLSearchParams({ids:[...new Set(ids)].join(','),kind}),{signal:options.signal||AbortSignal.timeout(10000)});
-      if(response.ok){const posters=await response.json();if(imageURL(posters[id]?.cover))profile.cover=imageURL(posters[id].cover);
-        profile.related=profile.related.map(value=>({...value,...(posters[value.id]?{cover:imageURL(posters[value.id].cover),title:russianText(posters[value.id].title)||value.title}:{})}));}
-    }catch(cause){options.signal?.throwIfAborted();}
+  const data=await request(path,options),names=['roles','related',...(kind==='anime'?['screenshots']:[])];
+  const values=names.map(()=>[]),failed=[],posters={};let art=null,cross=[],complete=false;
+  function snapshot(){
+    const profile=normalizeProfile(data,{roles:values[0],related:values[1],screenshots:values[2]});
+    if(art?.background){profile.backgrounds=[imageURL(art.background)].filter(Boolean);profile.artworkSources=[{provider:'anilist',url:art.sourceURL}];}
+    if(art?.cover)profile.cover=imageURL(art.cover);
+    for(const value of cross)if(!profile.related.some(item=>item.kind===value.kind&&(String(item.id)===String(value.ids?.mal||'')||item.title===value.title)))profile.related.push(value);
+    if(imageURL(posters[id]?.cover))profile.cover=imageURL(posters[id].cover);
+    profile.related=[...new Map(profile.related.map(value=>[value.kind+':'+(value.ids?.mal||value.id),{...value,...(posters[value.id]?{cover:imageURL(posters[value.id].cover)||value.cover,title:russianText(posters[value.id].title)||value.title}:{})}])).values()];
+    return {...profile,partial:!complete||failed.length>0||!profile.description,missingParts:[...failed],retryAfter:Date.now()+60000};
   }
-  profile.related=[...new Map(profile.related.map(r=>[r.kind+':'+(r.ids?.mal||r.id),r])).values()];
-  return {...profile,partial:extra.some(r=>r.status==='rejected')||!profile.description,missingParts:names.filter((_,i)=>extra[i].status==='rejected'),retryAfter:Date.now()+60000};
+  const notify=()=>{if(!options.signal?.aborted)options.onPartial?.(snapshot());};notify();
+  async function loadPosters(ids){
+    if(!options.server||!ids.length)return;
+    try{const response=await fetch(options.server+'/metadata/posters?'+new URLSearchParams({ids:[...new Set(ids)].slice(0,24).join(','),kind}),{signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(8000)]):AbortSignal.timeout(8000)});if(response.ok)Object.assign(posters,await response.json());}catch{options.signal?.throwIfAborted();}
+  }
+  // Core copy and artwork can render now. No dependency between roles, gallery,
+  // cross-media links and cover enrichment: all I/O starts in the same turn.
+  const extra=names.map((part,index)=>request(path+'/'+part,options).then(value=>{values[index]=value;notify();}).catch(error=>{failed.push(part);notify();}));
+  const enrichment=[highResolutionArtwork(id,kind).then(value=>{art=value;notify();}),request(path+'/external_links',options).then(async value=>{cross=await crossMediaFromLinks(value);notify();}),loadPosters([id]).then(notify)];
+  await Promise.allSettled([...extra,...enrichment]);options.signal?.throwIfAborted();
+  const missing=snapshot().related.filter(r=>r.kind===kind&&!r.cover&&/^\d+$/.test(String(r.id))).map(r=>r.id);
+  await loadPosters(missing);options.signal?.throwIfAborted();complete=true;notify();return snapshot();
 }
 export async function loadCharacter(id,options={}){
   if(!/^\d{1,12}$/.test(String(id)))throw Error('Некорректный персонаж.');

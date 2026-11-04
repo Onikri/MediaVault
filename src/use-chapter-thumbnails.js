@@ -10,15 +10,16 @@ export default function useChapterThumbnails(root,entries,service,userId,enabled
   const abort=new AbortController();let timer;
   (async()=>{
    let failed=false;
-   for(const entry of entries){
-    if(abort.signal.aborted)return;if(!visible.has(entry.url)||images[entry.url]||entry.thumbnail)continue;
-    const key='chapter-thumb-v1:'+service.server+':'+(userId||'anonymous')+':'+entry.url;
+   const todo=entries.filter(entry=>visible.has(entry.url)&&!images[entry.url]&&!entry.thumbnail);let cursor=0;
+   async function lane(){while(cursor<todo.length){const entry=todo[cursor++];if(abort.signal.aborted)return;
+    const key='chapter-thumb-v2:'+service.server+':'+(userId||'anonymous')+':'+entry.url;
     try{
      let image=await readEpisodePreview(key);abort.signal.throwIfAborted();
      if(!image){const data=await live.current.request('/manga/thumbnail',{method:'POST',body:{url:entry.url},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(45000)])});image=data.image;if(image?.startsWith('data:image/jpeg;base64,')&&image.length<=150000)await saveEpisodePreview(key,image);else continue;}
      if(!abort.signal.aborted)setImages(old=>({...old,[entry.url]:image}));
     }catch{if(abort.signal.aborted)return;failed=true;}
    }
+   }await Promise.all([lane(),lane()]);
    if(failed&&!abort.signal.aborted)timer=setTimeout(()=>setRetry(n=>n+1),15000);
   })();
   return()=>{abort.abort();clearTimeout(timer);};

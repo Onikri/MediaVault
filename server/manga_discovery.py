@@ -191,7 +191,7 @@ class Discovery:
             self.db.execute("UPDATE jobs SET state='interrupted',updated=? WHERE state='running'",(self.clock(),))
             self.db.execute("UPDATE work SET state='cancelled' WHERE state IN ('queued','running')")
         if start_workers:
-            for i in range(max(1,min(workers,4))):
+            for i in range(max(1,min(workers,8))):
                 thread=threading.Thread(target=self._worker,daemon=True,name='manga-discovery-'+str(i));self.threads.append(thread);thread.start()
 
     def _prune(self,now):
@@ -293,7 +293,7 @@ class Discovery:
             self.condition.notify_all();return self._snapshot(owner,identity)
 
     def _take(self):
-        row=self.db.execute("SELECT w.*,j.query,j.owner FROM work w JOIN jobs j ON j.id=w.job WHERE w.state='queued' AND j.state='running' ORDER BY j.dispatched,j.created,CASE WHEN json_extract(w.source,'$.name') IN ('MangaLib','HentaiLib','MangaDex') THEN 0 ELSE 1 END,w.rowid LIMIT 1").fetchone()
+        row=self.db.execute("SELECT w.*,j.query,j.owner FROM work w JOIN jobs j ON j.id=w.job WHERE w.state='queued' AND j.state='running' AND NOT EXISTS (SELECT 1 FROM work busy WHERE busy.source_id=w.source_id AND busy.state='running') ORDER BY j.dispatched,j.created,CASE WHEN json_extract(w.source,'$.name') IN ('MangaLib','HentaiLib','MangaDex') THEN 0 ELSE 1 END,w.rowid LIMIT 1").fetchone()
         if row:
             with self.db:
                 self.db.execute("UPDATE work SET state='running' WHERE job=? AND source_id=?",(row['job'],row['source_id']))
@@ -359,7 +359,7 @@ _manager=None;_manager_lock=threading.Lock()
 def manager():
     global _manager
     with _manager_lock:
-        if _manager is None:_manager=Discovery(os.getenv('DATA_DIR','/data'))
+        if _manager is None:_manager=Discovery(os.getenv('DATA_DIR','/data'),workers=max(1,min(8,int(os.getenv('MANGA_DISCOVERY_WORKERS','8')))))
         return _manager
 
 def shutdown():

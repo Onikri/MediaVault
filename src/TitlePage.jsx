@@ -47,7 +47,7 @@ export function TitleImage({url,profile,actions,libraryId,alt='',className='',fa
 }
 export function EpisodeArtwork({item,profile,actions,libraryId,index=0}){
   const asset=item.previewArtwork;
-  const url=asset?'drive:'+asset.id:profile?.episodeImages?.[String(item.episode)]||'';
+  const url=asset?'drive:'+asset.id:profile?.episodeImages?.[String(item.season||1)+':'+item.episode]||profile?.episodeImages?.[String(item.episode)]||'';
   const art=url?<TitleImage url={url} profile={asset?{artwork:{[url]:asset}}:profile} actions={actions} libraryId={libraryId}/>:<div className="episode-preview-pending"><span>{String(item.episode??index+1).padStart(2,'0')}</span><small>{item.category==='manga'?'Обложка главы':'Кадр серии'} появится после синхронизации</small></div>;
   return item.category==='video'&&actions.prepareStream?<EpisodeMotionPreview prepare={async()=>({url:await actions.prepareStream(item),type:item.onlineType})}>{art}</EpisodeMotionPreview>:<HoverPreview item={item} actions={actions}>{art}</HoverPreview>;
 }
@@ -97,7 +97,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
     if(online)return;
     setBusy('loading');setError('');
     try{
-      const result=await loadTitleProfile(id,title.section==='manga'?'manga':title.section==='ranobe'?'ranobe':'anime',{signal,server:server||window.MEDIA_VAULT_CONFIG?.importServerUrl,refresh:!!profile?.sourceId});
+      const result=await loadTitleProfile(id,title.section==='manga'?'manga':title.section==='ranobe'?'ranobe':'anime',{signal,server:server||window.MEDIA_VAULT_CONFIG?.importServerUrl,refresh:!!profile?.sourceId,onPartial:value=>{if(!signal?.aborted)setProfile(value);}});
       signal?.throwIfAborted();setProfile(result);onMetadataLoaded?.(title.id,result);
       if(state.admin&&state.driveWritable)await save(result,signal);
     }catch(cause){if(!signal?.aborted)setError(cause.message||'Не удалось получить русское описание.');}finally{if(!signal?.aborted)setBusy('');}

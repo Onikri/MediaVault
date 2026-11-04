@@ -17,6 +17,19 @@ class AccelerationTests(unittest.TestCase):
   self.assertEqual(len(calls),1);self.assertEqual(sum(x[1] for x in [first,second]),1)
   first[0].streams.clear();self.assertEqual(len(cache.page('a','url',None,load)[0].streams),1)
   cache.page('b','url',None,load);cache.page('a','url',None,load,refresh=True);self.assertEqual(len(calls),3)
+ def test_thumbnail_saturation_does_not_occupy_playback_capacity(self):
+  cache=PlaybackResolver();cache.preview_slots.acquire();cache.preview_slots.acquire()
+  try:
+   started=time.monotonic();value=cache.page('a','chosen',None,lambda:SimpleNamespace(streams=[]))
+   self.assertLess(time.monotonic()-started,.5);self.assertFalse(value[1])
+  finally:cache.preview_slots.release();cache.preview_slots.release()
+ def test_two_import_workers_claim_distinct_tasks_atomically(self):
+  from task_store import TaskStore
+  with tempfile.TemporaryDirectory() as directory:
+   store=TaskStore(directory)
+   expected={store.add('owner',{'kind':'import','title':str(i)},'fixture-'+str(i))['id'] for i in range(6)}
+   with ThreadPoolExecutor(max_workers=2) as pool:claimed=[f.result()['id'] for f in [pool.submit(store.next) for _ in range(6)]]
+   self.assertEqual(set(claimed),expected);self.assertEqual(len(set(claimed)),6);self.assertIsNone(store.next());store.close()
  def test_failed_resolution_and_expired_signature_are_not_cached(self):
   cache=PlaybackResolver();calls=[]
   def bad():calls.append(1);raise SourceError('offline')

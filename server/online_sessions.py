@@ -79,6 +79,7 @@ class Prepare(BaseModel):
     referer:str|None=Field(default=None,max_length=8192)
     kind:str=Field(pattern='^(video|manga)$')
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
+    purpose:str=Field(default='playback',pattern='^(playback|preview)$')
     refresh:bool=False
     client_id:str=Field(default='',alias='clientId',max_length=100,pattern=r'^[A-Za-z0-9:_-]*$')
 
@@ -91,6 +92,7 @@ def install(app,owner):
     install_exports(app,owner)
     def resolve(body,subject,reservation=None):
         http=PublicHttp(timeout=(4,12),deadline=time.monotonic()+45)
+        http.preview=body.purpose=='preview'
         token=None
         try:
             if body.kind=='manga':
@@ -102,7 +104,7 @@ def install(app,owner):
             started=time.monotonic()
             from media_download import pick_stream
             parent=public_url(body.referer,resolve_dns=False) if body.referer else None
-            page,source_cached=resolver_cache.page(subject,body.url,parent,lambda:Resolver(http).resolve(body.url,referer=parent) if parent else Resolver(http).resolve(body.url),refresh=body.refresh)
+            page,source_cached=resolver_cache.page(subject,body.url,parent,lambda:Resolver(http).resolve(body.url,referer=parent) if parent else Resolver(http).resolve(body.url),refresh=body.refresh,preview=http.preview)
             resolved_at=time.monotonic()
             # Keep the HLS master: playback adapts while segments arrive. Do not
             # probe every variant or download/transcode an episode before play.

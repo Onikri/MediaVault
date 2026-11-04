@@ -9,12 +9,12 @@ from source_parser import SourceError
 
 class PlaybackResolver:
     def __init__(self):
-        self.cache=OrderedDict();self.pending={};self.lock=threading.RLock();self.slots=threading.BoundedSemaphore(6)
+        self.cache=OrderedDict();self.pending={};self.lock=threading.RLock();self.slots=threading.BoundedSemaphore(6);self.preview_slots=threading.BoundedSemaphore(2)
 
     def clear(self):
         with self.lock:self.cache.clear()
 
-    def get(self,key,loader,ttl=20,refresh=False):
+    def get(self,key,loader,ttl=20,refresh=False,preview=False):
         with self.lock:
             if refresh:self.cache.pop(key,None)
             old=self.cache.get(key)
@@ -30,7 +30,8 @@ class PlaybackResolver:
             return copy.deepcopy(pending['result']),True
         acquired=False
         try:
-            acquired=self.slots.acquire(timeout=3)
+            slots=self.preview_slots if preview else self.slots
+            acquired=slots.acquire(timeout=3)
             if not acquired:raise SourceError('Сервер готовит другие потоки. Повтори подключение.')
             value=loader()
             lifetime=ttl
@@ -47,12 +48,12 @@ class PlaybackResolver:
                 while len(self.cache)>192:self.cache.popitem(last=False)
             return value,False
         finally:
-            if acquired:self.slots.release()
+            if acquired:slots.release()
             with self.lock:self.pending.pop(key,None);pending['event'].set()
 
-    def page(self,subject,url,referer,loader,refresh=False):
-        return self.get(('page',subject,url,referer),loader,refresh=refresh)
+    def page(self,subject,url,referer,loader,refresh=False,preview=False):
+        return self.get(('page',subject,url,referer),loader,refresh=refresh,preview=preview)
 
     def document(self,http,url,headers=None,refresh=False):
         key=('manifest',url,tuple(sorted((headers or {}).items())))
-        return self.get(key,lambda:http.document(url,headers=headers),ttl=15,refresh=refresh)[0]
+        return self.get(key,lambda:http.document(url,headers=headers),ttl=15,refresh=refresh,preview=getattr(http,'preview',False))[0]

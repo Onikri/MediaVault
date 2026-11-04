@@ -8,7 +8,7 @@
 - [x] Stabilize player settings height, icon tabs, thin accent sliders, depth controls.
 - [x] Real CPU manga/illustration neural upscaling with verified persistent model/result caches and measurements.
 - [x] Password watch rooms: room-scoped media access, host permissions, shared buffering, timeline sync, guest-only page.
-- [ ] Relevant tests and production build; deploy frontend and VM; live smoke checks.
+- [x] Relevant tests and production build; deploy frontend and VM; live smoke checks.
 
 Preserve MediaVaultPlayer as the single React player shell. Do not persist decrypted
 Drive media. Room access cannot grant Drive credentials, decryption keys, arbitrary
@@ -47,3 +47,7 @@ contract tests using fixture media; a two-page browser test with actual MP4
 playback and the real room relay; desktop/mobile hero geometry at 390, 768,
 1024, 1366 and 1440 pixels (including manga poster actions on desktop).
 Production build passed and includes the existing LMT integration and its source/license.
+
+Published frontend and VM API48 at commit 0ef9292832ea0528b9c06ea2f8223493efaf6e23.
+Public TLS WebSocket, scoped Range relay and installed model checksum passed;
+70 existing tasks, service key and settings were preserved.

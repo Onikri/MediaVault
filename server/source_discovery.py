@@ -106,7 +106,7 @@ def _discover(selected,*,refresh=False,continuing=False):
             except Exception:
                 return {'provider':site.id,'name':site.name,'status':'unavailable','message':'Источник не ответил или изменил разметку.','sources':[]}
             finally:http.close()
-        sites=[s for s in SITES if s.kind=='anime' and s.id not in {'sovet','anilibriafun','animevosttv'}]
+        sites=[s for s in SITES if selected.get('kind','anime')=='anime' and s.kind=='anime' and s.id not in {'sovet','anilibriafun','animevosttv'}]
         providers=[]
         def snapshot(unfinished=False):
             sources=[s for p in providers for s in p.get('sources',[])]
@@ -118,9 +118,10 @@ def _discover(selected,*,refresh=False,continuing=False):
                 'pending':unfinished or any(s.get('pending') for s in sources) or any(p.get('pending') for p in providers),
                 'complete':not unfinished and all(p.get('complete',False) for p in providers),'checkedAt':int(time.time())}
         with ThreadPoolExecutor(max_workers=6) as pool:
-            futures=[pool.submit(work,site) for site in sites]
+            from kodik_api import discover as kodik_discover
+            futures=[pool.submit(kodik_discover,selected),*[pool.submit(work,site) for site in sites]]
             for future in as_completed(futures):
-                providers.append(future.result());result=snapshot(len(providers)<len(sites))
+                providers.append(future.result());result=snapshot(len(providers)<len(futures))
                 with _lock:_cache[key]=(time.monotonic()+(300 if result['sources'] else 30),result)
                 with _jobs_lock:job=_jobs.get(key)
                 if job and result['voices']:job['changed'].set()

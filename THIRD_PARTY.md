@@ -306,3 +306,16 @@ in `design/player-comfort/README.md`.
 ## IllustrationJaNai title backgrounds
 
 The-database's IllustrationJaNai V3detail SPAN-S 2x is used for low-resolution colour manga covers/illustrations. Source and model: https://github.com/the-database/MangaJaNai/releases/tag/3.0.0 . The upstream repository LICENSE specifies Attribution-NonCommercial 4.0: https://github.com/the-database/MangaJaNai/blob/main/LICENSE . Attribution and provenance are preserved in reader-models/title-background.json. Official FP16 ONNX tensors are expanded to FP32 for CPU/WASM; IR 12 is declared as compatible IR 11 after ONNX validation (no network/weight approximation). Weights are separately installed in the project-local model cache and never committed. ONNX Runtime Web performs real convolutional inference. Public output images/model bytes are cached in browser Cache Storage; decrypted private artwork is not persisted there. This model is IllustrationJaNai, not the grayscale MangaJaNai checkpoint.
+
+## Profile component patterns
+
+The account screen follows the free shadcn/ui Card/Tabs composition
+(https://ui.shadcn.com/docs/components/card and https://ui.shadcn.com/docs/components/tabs),
+MIT (Copyright shadcn; https://github.com/shadcn-ui/ui/blob/main/LICENSE.md).
+Its accessible behavior uses the existing @radix-ui/react-tabs dependency.
+No paid UI package was added; dimensions, colours and typography use AniView tokens.
+Kodik catalogue fields follow the authors' public SDK contracts at
+https://github.com/hksm-app/kodik-api/tree/main/models (not copied implementation).
+Kodik credentials are issued by the service, not shipped with this repository.
+TV episode images/metadata come from TVmaze when available; its attribution link
+remains in the title's catalogue sources (https://www.tvmaze.com/api, CC BY-SA).

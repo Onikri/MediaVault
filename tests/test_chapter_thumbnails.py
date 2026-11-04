@@ -29,7 +29,7 @@ class ChapterThumbnailTests(unittest.TestCase):
     def test_tall_page_is_a_small_top_panel_not_a_resized_original(self):
         raw=page();result=thumbnail(raw)
         with Image.open(BytesIO(result)) as image:
-            self.assertEqual(image.size,(320,180));self.assertEqual(image.format,'JPEG')
+            self.assertEqual(image.size,(240,360));self.assertEqual(image.format,'JPEG')
         self.assertNotEqual(raw,result)
 
     def test_cache_survives_restart_is_owner_scoped_and_contains_only_small_jpeg(self):
@@ -41,7 +41,7 @@ class ChapterThumbnailTests(unittest.TestCase):
             restored.get('owner-b','https://mangapill.com/chapters/1');self.assertEqual(upstream.call_count,2)
             for path in Path(folder).iterdir():
                 self.assertEqual(path.suffix,'.jpg');self.assertLess(path.stat().st_size,100000)
-                with Image.open(path) as image:self.assertLessEqual(image.width,320);self.assertLessEqual(image.height,180)
+                with Image.open(path) as image:self.assertLessEqual(image.width,240);self.assertLessEqual(image.height,360)
 
     def test_failure_does_not_poison_other_chapters_or_leak_work_slots(self):
         with tempfile.TemporaryDirectory() as folder:

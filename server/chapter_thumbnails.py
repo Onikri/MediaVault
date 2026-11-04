@@ -21,13 +21,14 @@ def thumbnail(raw):
         warnings.simplefilter('error',Image.DecompressionBombWarning)
         with Image.open(BytesIO(raw)) as original:
             if original.width*original.height>40_000_000:raise SourceError('Слишком большая страница для превью.')
+            original.draft('RGB',(480,720))
             image=ImageOps.exif_transpose(original).convert('RGB')
             try:
                 # A tall webtoon is represented by its top panel, not a one-pixel strip.
-                height=min(image.height,round(image.width*9/16))
+                height=min(image.height,round(image.width*3/2))
                 crop=image.crop((0,0,image.width,height))
                 try:
-                    crop.thumbnail((320,180),Image.Resampling.LANCZOS)
+                    crop.thumbnail((240,360),Image.Resampling.LANCZOS)
                     output=BytesIO();crop.save(output,'JPEG',quality=76,optimize=True)
                     return output.getvalue()
                 finally:crop.close()
@@ -60,7 +61,7 @@ class ChapterThumbnails:
         self.directory=Path(directory);self.lock=threading.RLock();self.pending={};self.slots=threading.BoundedSemaphore(2)
 
     def get(self,subject,url):
-        key=hashlib.sha256(('v1\0'+subject+'\0'+url).encode()).hexdigest()
+        key=hashlib.sha256(('v2\0'+subject+'\0'+url).encode()).hexdigest()
         path=self.directory/(key+'.jpg')
         with self.lock:
             if path.is_file() and path.stat().st_mtime>time.time()-30*86400:return self.result(path.read_bytes(),True)

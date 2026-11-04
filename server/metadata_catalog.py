@@ -44,7 +44,7 @@ def get_json(url, *, params=None, body=None):
         raise SourceError("Каталог сейчас недоступен. Остальные источники продолжат поиск.") from None
 
 
-def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=None, part="",genre="",tag=""):
+def _metadata(provider, *, query="", kind="anime", page=1, identity=None, year=None, part="",genre="",tag=""):
     if provider not in {"kitsu", "anilist", "shikimori", "jikan", "tvmaze", "imdb", "wikidata"}:
         raise SourceError("Неизвестный каталог.")
     query, page = str(query).strip()[:160], max(1, min(100, int(page)))
@@ -142,3 +142,24 @@ def metadata(provider, *, query="", kind="anime", page=1, identity=None, year=No
         while len(_cache) > 512:
             _cache.popitem(last=False)
     return value
+
+
+# Join an identical in-flight metadata request. Different catalogues/parts retain
+# parallel I/O, with no executor nesting or extra server process required.
+_inflight={}
+def metadata(provider,**options):
+    from concurrent.futures import Future
+    signature=(provider,tuple(sorted((k,str(v)) for k,v in options.items())))
+    with _lock:
+        future=_inflight.get(signature);leader=future is None
+        if leader:
+            future=Future();_inflight[signature]=future
+    if not leader:
+        try:return future.result(timeout=30)
+        except TimeoutError:raise SourceError('Каталог ещё готовит сведения. Повтори запрос позже.') from None
+    try:
+        value=_metadata(provider,**options);future.set_result(value);return value
+    except BaseException as error:
+        future.set_exception(error);raise
+    finally:
+        with _lock:_inflight.pop(signature,None)
