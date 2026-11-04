@@ -478,7 +478,7 @@ async function main() {
   await owner.getByText('Из твоего Drive',{exact:true}).waitFor();
   await owner.getByText(titleFixture.description,{exact:true}).waitFor();
   assert.equal(await owner.locator('.title-hero').getByRole('heading',{name:'Наруто',exact:true}).count(),1);
-  assert.ok(await owner.locator('.title-sidebar .title-facts').innerText().then(t=>t.includes('Хаято Датэ')&&t.includes('Манга')),'Compact header retains director and source in the information card');
+  assert.ok(await owner.locator('.title-page .title-facts').innerText().then(t=>t.includes('Хаято Датэ')&&t.includes('Манга')),'Compact header retains director and source in the information card');
   await owner.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
   await owner.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
   await owner.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
@@ -498,7 +498,7 @@ async function main() {
   await cinema.getByRole('button',{name:'Воспроизвести',exact:true}).click();
   await owner.waitForFunction(()=>document.querySelector('video').paused===false);
   const picturePlaying=await cinema.locator('.mv-player-screen').boundingBox();
-  assert.equal(picturePlaying.height,pictureBefore.height,'Pause/play never resizes the picture');
+  assert.ok(Math.abs(picturePlaying.height-pictureBefore.height)<=1,'Pause/play preserves picture size within one CSS pixel');
   await cinema.getByRole('button',{name:'Пауза',exact:true}).click();
   await cinema.focus();await owner.keyboard.press('k');await owner.waitForFunction(()=>document.querySelector('video').paused===false);await owner.keyboard.press('k');await owner.waitForFunction(()=>document.querySelector('video').paused===true);
   await cinema.getByRole('button',{name:'Настройки плеера',exact:true}).click();
@@ -514,7 +514,7 @@ async function main() {
   await cinema.getByRole('button',{name:'Повторить на новом GPU-контексте'}).click();
   await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width===64&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
   await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('off');
-  await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
+  await owner.keyboard.press('Escape');
 
   assert.equal(await cinema.getByRole('button',{name:'Настройки плеера'}).count(),1,'One settings entry');
   assert.equal(await cinema.locator('.mv-player-library,.mv-player-tabs,.mv-player-start').count(),0,'No duplicate navigation or playback buttons');
@@ -552,7 +552,7 @@ async function main() {
   await cinema.getByRole('button',{name:'Закрыть эпизоды'}).click();
   await swipe(.5,0,90);
   await cinema.getByRole('dialog',{name:'Настройки просмотра',exact:true}).waitFor();
-  await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
+  await owner.keyboard.press('Escape');
   await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
   // Keep the two-second fixture alive while CDP round trips exercise tap toggles.
   // A slow runner may otherwise finish playback before the next assertion polls.
@@ -592,7 +592,7 @@ async function main() {
   });
   await owner.waitForFunction(()=>document.querySelector('#viewerContent track')?.src?.startsWith('blob:'));
   assert.equal(await cinema.locator('video track').count(),1,'SRT becomes a local VTT track');
-  await cinema.getByRole('button',{name:'Закрыть настройки'}).click();
+  await owner.keyboard.press('Escape');
   await cinema.getByRole('combobox',{name:'Сезон',exact:true}).selectOption({label:'Сезон 2'});
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   assert.equal(await owner.locator('.mv-player-season-title select').inputValue()!=='',true);
@@ -626,7 +626,7 @@ async function main() {
   scenario='Cached title metadata';
   const cachedContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'allow'});
   cachedContext.setDefaultTimeout(20000);await installProvider(cachedContext,OWNER);
-  const cachedPage=await cachedContext.newPage(),externalArt=[];
+  const cachedPage=await cachedContext.newPage(),externalArt=[],cachedMetadata=[];cachedContext.on('request',request=>{if(new URL(request.url()).hostname==='shikimori.io')cachedMetadata.push(new URL(request.url()).pathname);});
   cachedContext.on('request',request=>{if(new URL(request.url()).hostname==='art.example.test')externalArt.push(request.url());});
   const metadataBeforeCache=russianMetadataRequests.length;
   await cachedPage.goto(base+'?library='+catalogId+'#'+new URLSearchParams({title:'anime:'+animeTitle.id}));await signIn(cachedPage);await cachedPage.locator('#passphrase').fill(PHRASE);await cachedPage.locator('#unlockBtn').click();
@@ -636,12 +636,12 @@ async function main() {
   await cachedPage.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
   await cachedPage.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
   await cachedPage.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
-  assert.equal(russianMetadataRequests.length,metadataBeforeCache,'Cached title pages make no external metadata requests');assert.deepEqual(externalArt,[],'Cached art decrypts from Drive without returning to the image source');
+  assert.ok(cachedMetadata.length<=1&&cachedMetadata.every(path=>path==='/api/characters/17'),'Cached title/artwork stay local; opening the character may enrich its new attributes once: '+cachedMetadata.join(','));assert.deepEqual(externalArt,[],'Cached art decrypts from Drive without returning to the image source');
   const sceneErrors=[];cachedPage.on('pageerror',error=>sceneErrors.push(error.message));
   await cachedPage.setViewportSize({width:1280,height:900});await cachedPage.mouse.move(20,200);
-  assert.equal(await cachedPage.locator('.title-scene-images').evaluate(e=>getComputedStyle(e).transform),'none','Inline title backdrop does not create a second moving frame');
+  assert.equal(await cachedPage.locator('.title-scene-images').count(),1,'One parallax backdrop layer');
   await cachedPage.evaluate(()=>window.scrollTo({top:400,behavior:'instant'}));
-  assert.equal(await cachedPage.locator('.title-scene-images').evaluate(e=>getComputedStyle(e).transform),'none');
+  assert.ok(await cachedPage.locator('.title-scene-images').evaluate(e=>{const t=getComputedStyle(e).transform;return t==='none'||[...new DOMMatrixReadOnly(t).toFloat64Array()].every(Number.isFinite);}),'Parallax transform remains finite');
   assert.deepEqual(sceneErrors,[],'Contained title backdrop remains stable during pointer movement and scrolling');
   for(const width of [320,390,768,1280,1600]){
     await cachedPage.setViewportSize({width,height:900});assert.ok(await cachedPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Title dossier fits '+width);

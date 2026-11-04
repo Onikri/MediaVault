@@ -67,8 +67,8 @@ async function run(){
     await page.screenshot({path:path.join(output,'react-'+width+'.png'),fullPage:true});
     const nav={getByRole:(_,options)=>({click:()=>navigateApp(page,options.name)})};
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
-    await page.getByRole('heading',{name:'Библиотека',exact:true}).waitFor();
-    await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы онлайн-библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Музыка',exact:true}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Коллекция',exact:true}).click();
+    await page.getByRole('heading',{name:'Библиотека',exact:true,level:1}).waitFor();
+    await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Музыка',exact:true}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Коллекция',exact:true}).click();
     await page.locator('#searchInput').fill('Тестовый поиск');
     assert.equal(await page.locator('#searchInput').inputValue(),'Тестовый поиск');
     await page.getByRole('button',{name:width>=1100?'Раздел Манга':'Манга',exact:true}).click();
@@ -77,8 +77,8 @@ async function run(){
     assert.ok((await page.locator(width>=1100?'.library-sidebar button[aria-label="Раздел Избранное"]':'.chip-active').textContent()).includes('Избранное'));
     await noOverflow('Library');
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
-    await page.getByRole('heading',{name:'Библиотека',exact:true}).waitFor();
-    const filtersToggle=page.getByRole('button',{name:'Фильтры каталога',exact:true});if(await filtersToggle.getAttribute('aria-expanded')!=='true')await filtersToggle.click();
+    await page.getByRole('heading',{name:'Библиотека',exact:true,level:1}).waitFor();
+    const filtersToggle=page.getByRole('button',{name:'Фильтры каталога',exact:true});if(await filtersToggle.isVisible()&&await filtersToggle.getAttribute('aria-expanded')!=='true')await filtersToggle.click();
     await noOverflow('Catalogue filters');
     await page.locator('#catalogSearch').fill('Наруто');
     await page.locator('#catalogPredictions').getByRole('option').first().waitFor();
@@ -95,7 +95,7 @@ async function run(){
     await page.screenshot({path:path.join(output,'import-'+width+'.png'),fullPage:true});
     if(width===390)await require('./catalog-browser.cjs')(page);
     await page.locator('#profileBtn').click();
-    await page.getByRole('heading',{name:'Мой профиль',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'Профиль',exact:true}).waitFor();
     assert.equal(await page.locator('#loginBtn').isVisible(),true);
     await noOverflow('Profile');
     await page.locator('#loginBtn').click();

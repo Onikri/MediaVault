@@ -77,12 +77,13 @@ module.exports=async function checkDynamicCatalogue(page){
 
     await input.fill('Typecheck');
     await page.getByRole('button',{name:'Выбрать Typed anime',exact:true}).waitFor();
-    await page.locator('.catalog-kind-row').getByRole('button',{name:'Манга',exact:true}).click();
+    async function chooseKind(label){const value=await input.inputValue(),button=page.locator('.catalog-kind-row').getByRole('button',{name:label,exact:true});if(await button.isVisible())await button.click();else await page.getByRole('navigation',{name:'Разделы библиотеки'}).getByRole('button',{name:label,exact:true}).click();await input.fill(value);}
+    await chooseKind('Манга');
     await page.getByRole('button',{name:'Выбрать Typed manga',exact:true}).waitFor();
     assert.ok(!(await page.locator('.catalog-card .media-name').allTextContents()).includes('Typed anime'));
-    await page.locator('.catalog-kind-row').getByRole('button',{name:'Фильмы',exact:true}).click();
+    await chooseKind('Фильмы');
     await page.getByText('Пока ничего не нашлось',{exact:true}).waitFor();
-    await page.locator('.catalog-kind-row').getByRole('button',{name:'Аниме',exact:true}).click();
+    await chooseKind('Аниме');
     await page.getByRole('button',{name:'Выбрать Typed anime',exact:true}).waitFor();
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Search has no horizontal overflow');
     console.log('PASS dynamic catalogue: debounce, partial results, ranking, stable keyboard selection, cancellation, retry, IME, Cyrillic fallback and type switches.');
