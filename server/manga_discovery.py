@@ -33,7 +33,9 @@ def source_list(language='all',query=''):
     rows=[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))}
           for s in bridge.sources() if s.get('lang') in LANGUAGES-{'all'} and (language=='all' or s['lang']==language)]
     rows.sort(key=lambda s:(s['language'],s['name'].casefold(),s['id']))
-    return {'sources':[s for s in rows if query in normalize(s['name'])],'total':len(rows)}
+    from manga_source_health import states,blocked
+    health=states();usable=[s for s in rows if not blocked(s['id'],health)]
+    return {'sources':[s for s in usable if query in normalize(s['name'])],'total':len(usable),'unavailableCount':len(rows)-len(usable)}
 
 def result_row(source,row):
     identity=row.get('id');title=row.get('title')
@@ -216,6 +218,11 @@ class Discovery:
         installed={str(s['id']) for s in active}
         if source_ids and any(v not in installed for v in source_ids):raise ValueError('Выбранный источник не установлен. Обнови каталог источников.')
         selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())
+        from manga_source_health import states,blocked
+        health=states()
+        if not refresh and not source_ids:selected=[s for s in selected if not blocked(s['id'],health)]
+        else:
+            for source in selected:source['_retryHealth']=True
         preferred='ru' if re.search(r'[а-яё]',query,re.I) else 'ko' if re.search(r'[가-힣]',query) else 'ja' if re.search(r'[ぁ-ヿ一-鿿]',query) else 'en'
         selected.sort(key=lambda s:(s['lang']!=preferred,s['lang'],s['name'].casefold(),str(s['id'])))
         if title:
@@ -259,9 +266,12 @@ class Discovery:
         job=self.db.execute('SELECT * FROM jobs WHERE id=? AND owner=? AND expires>?',(identity,owner,self.clock())).fetchone()
         if not job:raise SearchMissing('Поиск не найден или срок хранения истёк.')
         results={};providers=[];complete=failed=cached=0
+        from manga_source_health import states,blocked
+        health=states()
         for row in self.db.execute('SELECT * FROM work WHERE job=? ORDER BY source_id',(identity,)):
             source=json.loads(row['source']);items=json.loads(row['results'])
-            for value in items:results[value['id']]=value
+            if not blocked(row['source_id'],health) or source.get('_retryHealth'):
+                for value in items:results[value['id']]=value
             providers.append({'id':row['source_id'],'name':source['name'],'language':source['lang'],'state':row['state'],'count':len(items),'cached':bool(row['cached'])})
             complete+=row['state'] in {'done','unavailable','cancelled'};failed+=row['state']=='unavailable';cached+=row['cached']
         key=normalize(job['query']);tokens=key.split()

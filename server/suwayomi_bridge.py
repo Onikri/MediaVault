@@ -230,6 +230,19 @@ def native_reader_url(client,data,source,manga,chapter=None):
     from manga_catalog_adapters import UUID,LIB_SITES
     canonical=data.get('realUrl') or urljoin(source.get('baseUrl',''),data.get('url',''))
     parsed=urlsplit(canonical);lang=source.get('lang')
+    # Several installed extensions can search but fail at chapter/page retrieval.
+    # Use this SAME site's existing native reader adapter, including saved IDs.
+    from manga_sources import site_for
+    native=site_for(canonical)
+    if (native and native.family in {'pill','katana','poisk','hub','chan','buff','novelcool','naver','sen','mangaraw','webtoons'}
+        and lang in native.languages and parsed.scheme=='https' and site_for(source.get('baseUrl',''))==native):
+        if chapter is None:return canonical
+        rows=client.get(f'/manga/{manga}/chapters',{'onlineFetch':'false'},timeout=8)
+        row=next((r for r in rows if r.get('index')==chapter),None)
+        if row:
+            target=row.get('realUrl') or urljoin(source.get('baseUrl',''),row.get('url',''))
+            if urlsplit(target).scheme=='https' and site_for(target)==native:return target
+        raise SourceError('Не удалось сопоставить сохранённую главу с исходной читалкой.')
     lib=next((row for row in LIB_SITES.values() if parsed.hostname in {urlsplit(row[2]).hostname,row[0]+'.org'} and source.get('name')==row[1]),None)
     dex=source.get('name')=='MangaDex' and parsed.hostname=='mangadex.org'
     if parsed.scheme!='https' or lang not in LANGUAGES:return None
@@ -277,7 +290,9 @@ def page_image(value):
         except SourceError:
             saved=client.get(f'/manga/{manga}',{'onlineFetch':'false'},timeout=8)
             source=saved.get('source') or client.get('/source/'+str(saved['sourceId']))
-            if source.get('name')=='Manga Ball':raise SourceError('Manga Ball не отдал изображение страницы серверу. Список глав доступен, но загрузка картинок не работает. Выбери другую читалку или повтори позже.') from None
+            if source.get('name')=='Manga Ball':
+                from mangaball_reader import page as reserve_page
+                return reserve_page(client,saved,source,manga,chapter,page)
             target=native_reader_url(client,saved,source,manga,chapter)
             if not target:raise
             from manga_sources import inspect as native_inspect
@@ -311,7 +326,8 @@ def search(title,language='all',format='all',offset=0,limit=8):
     except SourceError as e:return {'results':[],'providers':[{'provider':'suwayomi','name':'Дополнительные источники','status':'unavailable','message':str(e)}]}
     # A stable, explicit window replaces the old silent first-32-source cut-off.
     # The UI can continue until every installed source in this language is tried.
-    active=sorted(active,key=lambda s:(s['lang'],s['name'].casefold(),str(s['id'])))
+    from manga_source_health import states,blocked
+    health=states();active=sorted((s for s in active if not blocked(s['id'],health)),key=lambda s:(s['lang'],s['name'].casefold(),str(s['id'])))
     total=len(active);offset=max(0,min(int(offset),total));limit=max(1,min(int(limit),16))
     deadline=time.monotonic()+12
     def work(source):

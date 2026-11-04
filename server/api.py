@@ -252,7 +252,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 46, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 47, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -547,6 +547,8 @@ def manga_bridge_search(body:MangaDiscovery,subject=Depends(owner)):
 class MangaInspection(StrictBody):
     url:str=Field(max_length=8192)
     title:dict|None=None
+    verifyPages:bool=False
+    refresh:bool=False
 
 @app.post('/manga/inspect')
 def manga_inspect(body:MangaInspection,subject=Depends(owner)):
@@ -558,12 +560,28 @@ def manga_inspect(body:MangaInspection,subject=Depends(owner)):
         if len(json.dumps(body.title).encode())>50000:raise HTTPException(422,'Слишком большое описание манги.')
         candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('identityTitles') or value.get('aliases') or [])])),'kind':'manga','year':value.get('year'),'ids':value.get('ids') or {}}
         if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
+    if body.verifyPages:
+        from manga_readability import verify
+        value={**value,**verify(value,body.refresh)}
+        if value.get('readable') and value.get('provider','').startswith('suwayomi:'):
+            from manga_source_health import record
+            record(value['provider'].split(':',1)[1],value.get('providerName',''),value.get('language',''),'working','image')
+        elif value.get('readable') and value.get('providerName') in {'MangaDex','MangaLib','HentaiLib'}:
+            from suwayomi_bridge import sources
+            from manga_source_health import record
+            for source in sources():
+                if source.get('name')==value['providerName'] and source.get('lang')==value.get('language'):record(source['id'],source['name'],source['lang'],'working','image')
     return value
 
 @app.post('/manga/summary')
 def manga_summary(body:MangaInspection,subject=Depends(owner)):
     value=manga_inspect(body,subject)
-    return {key:value.get(key) for key in ('provider','providerName','language','chapterCount','volumeCount','truncated')}
+    return {key:value.get(key) for key in ('provider','providerName','language','chapterCount','volumeCount','truncated','readable','readabilityError','verifiedPages','pagesCheckedAt') if key in value}
+
+@app.get('/discovery/manga/health')
+def manga_source_health(subject=Depends(owner)):
+    from manga_source_health import report
+    return report()
 
 
 class QualityInspection(StrictBody):

@@ -10,6 +10,15 @@ ENV={'PUBLIC_URL':'https://media.example','SUWAYOMI_URL':'http://suwayomi:4567',
 class BridgeTests(unittest.TestCase):
     def setUp(self):self.env=patch.dict(os.environ,ENV);self.env.start();bridge._cache.clear()
     def tearDown(self):self.env.stop();bridge._cache.clear()
+    def test_native_html_reader_recovers_same_saved_title_and_chapter(self):
+        client=MagicMock();source={'id':'2','name':'MangaPill','lang':'en','baseUrl':'https://mangapill.com'}
+        data={'realUrl':'https://mangapill.com/manga/1/naruto'}
+        self.assertEqual(bridge.native_reader_url(client,data,source,8),'https://mangapill.com/manga/1/naruto')
+        client.get.return_value=[{'index':4,'realUrl':'https://mangapill.com/chapters/1-10004000/naruto-chapter-4'}]
+        self.assertEqual(bridge.native_reader_url(client,data,source,8,4),'https://mangapill.com/chapters/1-10004000/naruto-chapter-4')
+        client.get.return_value=[{'index':4,'realUrl':'https://other.example/chapter/4'}]
+        with self.assertRaises(SourceError):bridge.native_reader_url(client,data,source,8,4)
+        self.assertIsNone(bridge.native_reader_url(client,data,{**source,'baseUrl':'https://other.example'},8))
     def test_installed_trusted_extension_is_updated_instead_of_skipped(self):
         package='eu.kanade.tachiyomi.extension.all.mangaball'
         with patch.object(bridge,'extensions',return_value=[{'pkgName':package,'name':'Manga Ball','installed':True,'hasUpdate':True}]),patch.object(bridge,'Client') as client:

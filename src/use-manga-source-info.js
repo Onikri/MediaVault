@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 
-// Two metadata requests at a time; no chapter images or library files are loaded.
+// Two checks at a time. New servers also verify one real page; only metadata is returned.
 export default function useMangaSourceInfo(sources,title,service,revision){
  const [info,setInfo]=useState({}),cache=useRef({}),generation=useRef(0),active=useRef(0),pump=useRef(()=>{}),live=useRef();
  live.current={sources,title,service};
@@ -14,8 +14,8 @@ export default function useMangaSourceInfo(sources,title,service,revision){
    while(active.current<2){
     const source=live.current.sources.find(s=>!cache.current[s.url]);if(!source)return;
     cache.current[source.url]={state:'loading'};active.current++;setInfo({...cache.current});
-    live.current.service.request('/manga/summary',{method:'POST',body:{url:source.url,title:live.current.title},signal:AbortSignal.timeout(75000)})
-     .then(value=>{if(current===generation.current)cache.current[source.url]={...value,state:'ready'};})
+    live.current.service.request('/manga/summary',{method:'POST',body:{url:source.url,title:live.current.title,...(Number(service.session?.serverVersion)>=47?{verifyPages:true,refresh:!!revision}:{})},signal:AbortSignal.timeout(75000)})
+     .then(value=>{if(current===generation.current)cache.current[source.url]={...value,state:value.readable===false?'error':'ready',...(value.readable===false?{error:value.readabilityError||'Источник не отдал страницу.'}:{})};})
      .catch(error=>{if(current===generation.current)cache.current[source.url]={state:'error',error:error.message};})
      .finally(()=>{active.current--;if(current===generation.current)setInfo({...cache.current});pump.current();});
    }
