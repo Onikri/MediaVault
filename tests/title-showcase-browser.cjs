@@ -17,9 +17,9 @@ let browser,vite,last;
  for(const [width,height] of [[390,900],[768,900],[1024,768],[1366,768],[1440,900]]){
   const page=await browser.newPage({viewport:{width,height}}),errors=[];last=page;page.setDefaultTimeout(8000);page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});
   await page.route('https://art.fixture/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><defs><linearGradient id="s" x2="0" y2="1"><stop stop-color="#b2b9bb"/><stop offset="1" stop-color="#23373c"/></linearGradient></defs><path fill="url(#s)" d="M0 0h1600v900H0z"/><circle fill="#d9cfb2" cx="1100" cy="240" r="120"/><path fill="#28363b" d="M0 700l280-350 160 280 350-400 260 470 200-230 350 230v200H0z"/></svg>'}));
-  await page.route('https://api.fixture/**',async r=>{
-   if(r.request().url().endsWith('/backgrounds/16498'))return r.fulfill({json:{status:'ready',url:'/backgrounds/16498/video'}});
-   if(r.request().url().endsWith('/backgrounds/16498/video'))return r.fulfill({contentType:'video/mp4',body:await fs.readFile(path.join(dir,'fixture.mp4'))});
+  let backgroundPolls=0;await page.route('https://www.youtube.com/**',r=>r.fulfill({body:'',contentType:'text/html'}));await page.route('https://api.fixture/**',async r=>{
+   if(r.request().url().endsWith('/backgrounds/16498'))return r.fulfill({json:++backgroundPolls===1?{status:'streaming',url:'/backgrounds/16498/source'}:{status:'ready',url:'/backgrounds/16498/video'}});
+   if(['/backgrounds/16498/video','/backgrounds/16498/source'].some(p=>r.request().url().endsWith(p)))return r.fulfill({contentType:'video/mp4',body:await fs.readFile(path.join(dir,'fixture.mp4'))});
    return r.fulfill({json:{data:[],tracks:[],ratings:[]}});
   });
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');
@@ -42,7 +42,7 @@ let browser,vite,last;
   await page.evaluate(()=>{window.player.media.loop=true;window.player.play();});await page.waitForFunction(()=>window.player.media.currentTime>.2);
   const before=await page.evaluate(()=>window.player.media.currentTime);await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(350);
   assert.ok(await page.evaluate(t=>window.originalVideo===window.player.media&&!window.player.media.paused&&window.player.media.currentTime>t,before),'Scroll and reveal preserve the playing media');
-  assert.ok(await page.evaluate(()=>window.originalFrame===document.querySelector('.title-background-video video')),'Background pauses without remounting');
+  assert.ok(await page.evaluate(()=>window.originalFrame===document.querySelector('.title-background-video video')&&window.originalFrame.src.endsWith('/source')),'Progressive original stays mounted after MP4 is ready');
   await page.waitForFunction(()=>document.querySelector('.title-playback-mask path').getAttribute('d')===window.originalPath);
   await page.evaluate(()=>{window.commands=[];window.player.pause();});await page.waitForFunction(()=>!document.querySelector('.title-background-video video').paused);
   await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.locator('.title-showcase').waitFor();await page.waitForFunction(()=>window.player?.media.readyState>=2);assert.equal(await page.locator('.title-background-video video').count(),0,'Reduced motion starts without autoplay');assert.equal(await page.locator('.title-playback-reveal').evaluate(n=>getComputedStyle(n).clipPath),'none');

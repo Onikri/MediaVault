@@ -108,6 +108,9 @@ def search_source(source,query):
                         if not match_title(selected,value)[0]:continue
                         value['aliases']=list(dict.fromkeys([*value['aliases'],selected['title']]))
                     elif not any(normalize(term) in normalize(v) for v in value['aliases']):continue
+                    if source.get('name')=='Manga Ball':
+                        languages=bridge.mangaball_languages(client,row['id'])
+                        if languages is not None and source['lang'] not in languages:continue
                     found[value['id']]=value
             if found:break
         return list(found.values())
@@ -169,6 +172,20 @@ class Discovery:
                 self.db.executemany('DELETE FROM query_cache WHERE source_id=?',[(sid,) for sid in sources])
                 self.db.executemany("UPDATE jobs SET state='interrupted' WHERE id IN (SELECT job FROM work WHERE source_id=?)",[(sid,) for sid in sources])
                 self.db.execute('PRAGMA user_version=1')
+            if self.db.execute('PRAGMA user_version').fetchone()[0]<2:
+                # Drop only the old, unverified multilingual Manga Ball results.
+                # Reading URLs and cached pages belong to Suwayomi and stay intact.
+                stale=[];sources=set()
+                for row in self.db.execute('SELECT id,source_id,metadata FROM titles'):
+                    if json.loads(row['metadata']).get('providerName')=='Manga Ball':
+                        stale.append((row['id'],));sources.add(row['source_id'])
+                for row in self.db.execute('SELECT source_id,source FROM work'):
+                    if json.loads(row['source']).get('name')=='Manga Ball':sources.add(row['source_id'])
+                self.db.executemany('DELETE FROM titles WHERE id=?',stale)
+                self.db.executemany('DELETE FROM query_cache WHERE source_id=?',[(sid,) for sid in sources])
+                self.db.executemany("UPDATE jobs SET state='interrupted' WHERE id IN (SELECT job FROM work WHERE source_id=?)",[(sid,) for sid in sources])
+                self.db.executemany("UPDATE work SET results='[]',state='cancelled' WHERE source_id=?",[(sid,) for sid in sources])
+                self.db.execute('PRAGMA user_version=2')
             self.db.execute("UPDATE jobs SET state='interrupted',updated=? WHERE state='running'",(self.clock(),))
             self.db.execute("UPDATE work SET state='cancelled' WHERE state IN ('queued','running')")
         if start_workers:

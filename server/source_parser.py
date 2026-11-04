@@ -140,7 +140,10 @@ class PublicHttp:
                          and isinstance(data,dict) and set(data)=={'do','subaction','story'}
                          and data.get('do')=='search' and data.get('subaction')=='search'
                          and isinstance(data.get('story'),str) and 0<len(data['story'])<=200)
-            if not (player_form or search_form):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            manga_form=(host=='mangaball.com' and urlsplit(url).scheme=='https' and urlsplit(url).path=='/api/v1/chapter/chapter-listing-by-title-id'
+                        and not urlsplit(url).query and isinstance(data,bytes) and bool(re.fullmatch(rb'\{"title_id":\s*"[a-f0-9]{24}"\}',data)))
+            if not (player_form or search_form or manga_form):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            if manga_form:outgoing['Content-Type']='application/json'
             if player_form:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
                 outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"

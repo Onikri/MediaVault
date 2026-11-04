@@ -12,8 +12,8 @@ import time
 from urllib.parse import urlsplit
 
 import requests
-from fastapi import HTTPException
-from fastapi.responses import FileResponse
+from fastapi import HTTPException,Request
+from fastapi.responses import FileResponse,StreamingResponse
 from metadata_catalog import get_json, metadata
 from title_extras import trailers_from_details
 from trailer_service import slots, download as download_trailer, jobs as trailer_jobs, lock as trailer_lock
@@ -25,6 +25,11 @@ QUERY='''query($ids:[Int!]!){findAnimeByExternalSite(site:MAL,id:$ids){
 jobs={}
 lock=threading.RLock()
 MAX_BYTES=100*1024*1024
+lookups=threading.BoundedSemaphore(4)
+streams=threading.BoundedSemaphore(8)
+
+def public_job(job):
+    return {k:v for k,v in job.items() if k in {'status','source','message','url'}}
 
 
 def candidates(identity):
@@ -65,10 +70,18 @@ def encode_clip(raw,partial):
 def render(identity,directory):
     raw=directory/(identity+'.source')
     partial=directory/(identity+'.partial.mp4')
+    acquired=False
     try:
         try:urls=candidates(identity)
         except Exception:urls=[]
         source='AnimeThemes'
+        if urls:
+            # The original WebM is playable while the optional MP4 cache builds.
+            with lock:jobs[identity]={'status':'streaming','source':source,'url':'/backgrounds/'+identity+'/source','clips':urls,'clip':0,'updated':time.time()}
+        acquired=slots.acquire(blocking=False)
+        if not acquired:
+            if urls:return
+            raise ValueError('Encoding busy')
         ready=False
         for url in urls:
             try:
@@ -91,11 +104,14 @@ def render(identity,directory):
                     if ready:source='Проморолик';break
         if not ready:raise ValueError('No available same-title video')
         partial.replace(directory/(identity+'.mp4'))
-        with lock:jobs[identity]={'status':'ready','source':source,'updated':time.time()}
+        with lock:jobs[identity]={**jobs.get(identity,{}),'status':'ready','source':source,'updated':time.time()}
     except Exception:
-        with lock:jobs[identity]={'status':'unavailable','message':'Видео этого тайтла пока не удалось получить. Повтори загрузку фона.','updated':time.time()}
+        with lock:
+            if jobs.get(identity,{}).get('status')!='streaming':jobs[identity]={'status':'unavailable','message':'Видео этого тайтла пока не удалось получить. Повтори загрузку фона.','updated':time.time()}
     finally:
-        raw.unlink(missing_ok=True);partial.unlink(missing_ok=True);slots.release()
+        raw.unlink(missing_ok=True);partial.unlink(missing_ok=True)
+        if acquired:slots.release()
+        lookups.release()
 
 
 def install(app,data_dir):
@@ -108,8 +124,8 @@ def install(app,data_dir):
             directory.mkdir(parents=True,exist_ok=True)
             if (directory/(identity+'.mp4')).is_file():return {'status':'ready','source':jobs.get(identity,{}).get('source','Каталог'),'url':'/backgrounds/'+identity+'/video'}
             old=jobs.get(identity)
-            if old and (old['status']=='preparing' or old['updated']>time.time()-90):return {k:v for k,v in old.items() if k!='updated'}
-            if not slots.acquire(blocking=False):raise HTTPException(429,'Подготовка видео занята. Повторяем автоматически.')
+            if old and (old['status']=='preparing' or old['updated']>time.time()-300):return public_job(old)
+            if not lookups.acquire(blocking=False):raise HTTPException(429,'Подготовка видео занята. Повторяем автоматически.')
             # Bound disk use; never remove clips being generated.
             paths=sorted((p for p in directory.glob('*.mp4') if p.stem.isdigit()),key=lambda p:p.stat().st_mtime)
             total=sum(p.stat().st_size for p in paths)
@@ -119,6 +135,43 @@ def install(app,data_dir):
             jobs[identity]={'status':'preparing','updated':time.time()}
             threading.Thread(target=render,args=(identity,directory),daemon=True,name='title-video').start()
             return {'status':'preparing'}
+
+    @app.get('/backgrounds/{identity}/source')
+    def source(identity:str,request:Request):
+        if not re.fullmatch(r'[1-9]\d{0,8}',identity):raise HTTPException(404)
+        with lock:
+            job=jobs.get(identity,{})
+            clips=job.get('clips',[]);index=job.get('clip',0)
+            url=clips[index] if index<len(clips) else ''
+        if not url or urlsplit(url).scheme!='https' or urlsplit(url).hostname!='v.animethemes.moe':raise HTTPException(404,'Подготовь видеофон заново.')
+        byte_range=request.headers.get('range','')
+        if byte_range and not re.fullmatch(r'bytes=(?:\d+-\d*|-\d+)',byte_range):raise HTTPException(416)
+        if not streams.acquire(blocking=False):raise HTTPException(429)
+        response=None
+        try:
+            response=requests.get(url,headers={'Range':byte_range} if byte_range else {},stream=True,timeout=(4,15),allow_redirects=False)
+            if response.status_code not in {200,206} or not response.headers.get('Content-Type','').split(';')[0].startswith('video/'):
+                with lock:
+                    if jobs.get(identity) is job:job['clip']=index+1
+                raise HTTPException(502,'Источник видео временно не отвечает.')
+            if int(response.headers.get('Content-Length') or 0)>MAX_BYTES:raise HTTPException(502)
+            headers={k:response.headers[k] for k in ['Content-Length','Content-Range','Accept-Ranges'] if k in response.headers}
+            headers['Cache-Control']='public,max-age=300'
+            def chunks():
+                total=0;deadline=time.monotonic()+180
+                try:
+                    for block in response.iter_content(64*1024):
+                        total+=len(block)
+                        if total>MAX_BYTES or time.monotonic()>deadline:break
+                        yield block
+                finally:response.close();streams.release()
+            return StreamingResponse(chunks(),status_code=response.status_code,media_type=response.headers['Content-Type'],headers=headers)
+        except requests.RequestException:
+            if response is not None:response.close()
+            streams.release();raise HTTPException(502,'Источник видео временно не отвечает.') from None
+        except BaseException:
+            if response is not None:response.close()
+            streams.release();raise
 
     @app.get('/backgrounds/{identity}/video')
     def video(identity:str):

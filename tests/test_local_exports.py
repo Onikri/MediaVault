@@ -23,6 +23,11 @@ def wait_terminal(manager,owner,identity):
     raise AssertionError('Export did not finish')
 
 class LocalExportTests(unittest.TestCase):
+ def test_safe_source_failure_reaches_the_download_status(self):
+    def fail(*args):raise exports.SourceError('Manga Ball не отдал изображение страницы серверу.')
+    manager=self.manager(producer=fail,reserve=0)
+    value=manager.start('A',URL,'manga');result=wait_terminal(manager,'A',value['id'])
+    self.assertEqual(result['error'],'Manga Ball не отдал изображение страницы серверу.')
  def setUp(self):self.directory=tempfile.TemporaryDirectory();self.managers=[]
  def tearDown(self):
     for manager in self.managers:manager.close()

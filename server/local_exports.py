@@ -239,7 +239,7 @@ class Exports:
             except Exception as error:
                 with self.lock:
                     job.state='error';job.progress={'phase':'error'}
-                    job.error=str(error) if isinstance(error,ExportProblem) else 'Источник не предоставил проверенный файл. Проверь главу или серию и повтори.'
+                    job.error=str(error) if isinstance(error,(ExportProblem,SourceError)) else 'Источник не предоставил проверенный файл. Проверь главу или серию и повтори.'
             finally:
                 with self.condition:
                     job.running=False;self._cleanup();self.condition.notify_all()

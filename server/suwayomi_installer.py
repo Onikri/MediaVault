@@ -46,7 +46,9 @@ def run(value):
             with _lock:
                 value.update(current=row['name'],updated=time.time());save(value)
             try:
-                if row.get('installed'):value['alreadyInstalled']+=1
+                if row.get('installed') and row.get('hasUpdate'):
+                    install(row['pkgName']);value['updatedExtensions']=value.get('updatedExtensions',0)+1
+                elif row.get('installed'):value['alreadyInstalled']+=1
                 else:install(row['pkgName']);value['installed']+=1
             except Exception:
                 # Provider errors can contain URLs/tokens; journal only fixed text.

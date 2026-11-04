@@ -8,7 +8,7 @@ function youtubeAPI(){
  });return apiPromise;
 }
 export const youtubeID=value=>/^[\w-]{11}$/.test(String(value||''))?String(value):'';
-export default function YouTubeEmbed({videoId,title='YouTube',autoplay=false,onReady,onState,onError,controller}){
+export default function YouTubeEmbed({videoId,title='YouTube',autoplay=false,background=false,onReady,onState,onError,controller}){
  const frame=useRef(null),callbacks=useRef({onReady,onState,onError}),[error,setError]=useState('');callbacks.current={onReady,onState,onError};
  const id=youtubeID(videoId);
  useEffect(()=>{
@@ -17,5 +17,5 @@ export default function YouTubeEmbed({videoId,title='YouTube',autoplay=false,onR
   return()=>{closed=true;if(controller)controller.current=null;try{player?.destroy();}catch{}};
  },[id]);
  if(!id)return null;
- return <div className="youtube-official"><iframe key={id} ref={frame} title={title} src={'https://www.youtube-nocookie.com/embed/'+id+'?'+new URLSearchParams({autoplay:autoplay?'1':'0',playsinline:'1',enablejsapi:'1',origin:location.origin,rel:'0'})} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/>{error&&<p role="status">{error} <a href={'https://www.youtube.com/watch?v='+id} target="_blank" rel="noopener noreferrer">Открыть YouTube</a></p>}</div>;
+ return <div className="youtube-official"><iframe key={id} ref={frame} title={title} tabIndex={background?-1:undefined} src={(background?'https://www.youtube.com':'https://www.youtube-nocookie.com')+'/embed/'+id+'?'+new URLSearchParams({autoplay:autoplay?'1':'0',playsinline:'1',enablejsapi:'1',origin:location.origin,rel:'0',...(background?{mute:'1',controls:'0',loop:'1',playlist:id,iv_load_policy:'3'}:{})})} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/>{error&&!background&&<p role="status">{error} <a href={'https://www.youtube.com/watch?v='+id} target="_blank" rel="noopener noreferrer">Открыть YouTube</a></p>}</div>;
 }

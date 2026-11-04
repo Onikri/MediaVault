@@ -20,6 +20,25 @@ def wait_done(manager,owner,identity):
     raise AssertionError('Discovery job did not finish')
 
 class NativeSourceFallbackTests(unittest.TestCase):
+    def test_language_filter_upgrade_discards_only_old_mangaball_search_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manager=discovery.Discovery(directory,start_workers=False)
+            with manager.db:
+                for sid,name in [('1','Manga Ball'),('2','Other')]:
+                    manager.db.execute('INSERT INTO titles VALUES(?,?,?,?,?,?)',(sid,sid,'ja','lodoss',json.dumps({'providerName':name}),time.time()))
+                    manager.db.execute('INSERT INTO query_cache VALUES(?,?,?,?)',('lodoss',sid,'[]',time.time()+900))
+                manager.db.execute('PRAGMA user_version=1')
+            manager.close();manager=discovery.Discovery(directory,start_workers=False)
+            self.assertEqual([r[0] for r in manager.db.execute('SELECT source_id FROM titles')],['2'])
+            self.assertEqual([r[0] for r in manager.db.execute('SELECT source_id FROM query_cache')],['2'])
+            manager.close()
+    def test_mangaball_search_excludes_languages_without_published_chapters(self):
+        source={'id':'1','name':'Manga Ball','lang':'ja','baseUrl':'https://mangaball.com'}
+        with patch.dict(os.environ,ENV),patch.object(discovery.bridge,'Client') as client,patch.object(discovery.bridge,'mangaball_languages',return_value={'en'}):
+            client.return_value.get.return_value={'mangaList':[{'id':8,'title':'Lodoss','url':'/title-detail/685183da0b95030249822109'}]}
+            self.assertEqual(discovery.search_source(source,'Lodoss'),[])
+            self.assertEqual(len(discovery.search_source({**source,'lang':'en'},'Lodoss')),1)
+
     def test_upgrade_expires_only_ambiguous_legacy_mangalib_public_cache(self):
         with tempfile.TemporaryDirectory() as directory:
             manager=discovery.Discovery(directory,start_workers=False)
@@ -239,7 +258,7 @@ class MangaDiscoveryApiTests(unittest.TestCase):
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('B')).status_code,404)
                 self.assertEqual(client.delete('/discovery/manga/search/'+identity,headers=auth('A')).status_code,200)
                 self.assertEqual(client.post('/discovery/manga/search',headers=auth('A'),json={'query':'abc','sourceIds':['999']}).status_code,422)
-                health=client.get('/health').json();self.assertEqual(health['version'],41);self.assertTrue(health['lyricsRelay']);self.assertTrue(health['animeDiscovery']);self.assertTrue(health['mangaGlobalDiscovery']);self.assertEqual(health['googleGatewayVersion'],2);self.assertEqual(health['googleParallelKeys'],3)
+                health=client.get('/health').json();self.assertGreaterEqual(health['version'],46);self.assertTrue(health['progressiveTitleBackgrounds']);self.assertTrue(health['lyricsRelay']);self.assertTrue(health['animeDiscovery']);self.assertTrue(health['mangaGlobalDiscovery']);self.assertEqual(health['googleGatewayVersion'],2);self.assertEqual(health['googleParallelKeys'],3)
         finally:manager.close()
 
 class VoiceSuggestionTests(unittest.TestCase):

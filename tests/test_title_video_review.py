@@ -16,6 +16,36 @@ from lyric_identity import identity
 
 
 class TitleReview(unittest.TestCase):
+    def test_original_video_is_exposed_before_download_and_encode(self):
+        identity='42';background.jobs[identity]={'status':'preparing'}
+        def download(url,path):
+            self.assertEqual(background.jobs[identity]['status'],'streaming')
+            self.assertEqual(background.public_job(background.jobs[identity])['url'],'/backgrounds/42/source')
+            self.assertNotIn('clips',background.public_job(background.jobs[identity]))
+            raise RuntimeError('Fixture encoder unavailable')
+        with tempfile.TemporaryDirectory() as folder,patch.object(background,'candidates',return_value=['https://v.animethemes.moe/fixture.webm']),patch.object(background,'fetch_clip',side_effect=download),patch.object(background,'metadata',side_effect=RuntimeError):
+            background.lookups.acquire();background.render(identity,Path(folder))
+            self.assertEqual(background.jobs[identity]['status'],'streaming','MP4 failure must not stop the playable original')
+        background.jobs.pop(identity,None)
+
+    def test_original_range_stream_is_verified_bounded_and_closed(self):
+        from unittest.mock import MagicMock
+        identity='43';background.jobs[identity]={'status':'streaming','clips':['https://v.animethemes.moe/fixture.webm'],'clip':0,'updated':0}
+        response=MagicMock();response.status_code=206;response.headers={'Content-Type':'video/webm','Content-Length':'6','Content-Range':'bytes 4-9/16','Accept-Ranges':'bytes'};response.iter_content.return_value=iter([b'456',b'789'])
+        app=FastAPI()
+        with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{'TITLE_VIDEO_CACHE_DIR':folder}),patch.object(background.requests,'get',return_value=response) as fetch:
+            background.install(app,folder)
+            with TestClient(app) as client:
+                result=client.get('/backgrounds/43/source',headers={'Range':'bytes=4-9'})
+                self.assertEqual(result.status_code,206);self.assertEqual(result.content,b'456789');self.assertEqual(result.headers['content-range'],'bytes 4-9/16')
+                self.assertEqual(fetch.call_args.kwargs['headers'],{'Range':'bytes=4-9'})
+                self.assertFalse(fetch.call_args.kwargs['allow_redirects']);response.close.assert_called_once()
+                self.assertEqual(client.get('/backgrounds/43/source',headers={'Range':'bytes=1-2,4-5'}).status_code,416)
+                background.jobs[identity]['clips']=['https://127.0.0.1/secret']
+                self.assertEqual(client.get('/backgrounds/43/source').status_code,404)
+                self.assertEqual(fetch.call_count,1)
+        background.jobs.pop(identity,None)
+
     def test_background_only_uses_exact_title_public_nonspoiler_video(self):
         def anime(key,url,**entry):
             return {'resources':{'nodes':[{'site':'MAL','externalId':key}]},'animethemes':[{'type':'OP','animethemeentries':[{'nsfw':False,'spoiler':False,**entry,'videos':{'nodes':[{'link':url,'resolution':720,'size':2000}]}}]}]}

@@ -10,6 +10,37 @@ ENV={'PUBLIC_URL':'https://media.example','SUWAYOMI_URL':'http://suwayomi:4567',
 class BridgeTests(unittest.TestCase):
     def setUp(self):self.env=patch.dict(os.environ,ENV);self.env.start();bridge._cache.clear()
     def tearDown(self):self.env.stop();bridge._cache.clear()
+    def test_installed_trusted_extension_is_updated_instead_of_skipped(self):
+        package='eu.kanade.tachiyomi.extension.all.mangaball'
+        with patch.object(bridge,'extensions',return_value=[{'pkgName':package,'name':'Manga Ball','installed':True,'hasUpdate':True}]),patch.object(bridge,'Client') as client:
+            bridge.install(package)
+            client.return_value.get.assert_called_once_with('/extension/update/'+package,timeout=90)
+            client.return_value.close.assert_called_once()
+
+    def test_mangaball_language_filter_uses_exact_work_and_shared_cache(self):
+        identity='685183da0b95030249822109';client=MagicMock();client.get.return_value={'realUrl':'https://mangaball.com/title-detail/'+identity}
+        rows=[{'title_id':identity,'lang':'en'},{'title_id':identity,'lang':'jp'},{'title_id':'other','lang':'ru'}]
+        with patch('source_parser.PublicHttp') as http:
+            http.return_value.document.return_value=(json.dumps({'data':rows}),'','')
+            self.assertEqual(bridge.mangaball_languages(client,8),{'en','ja'})
+            self.assertEqual(bridge.mangaball_languages(client,8),{'en','ja'})
+            http.return_value.document.assert_called_once();http.return_value.close.assert_called_once()
+        client.get.return_value={'realUrl':'https://evil.example/title-detail/'+identity}
+        with patch('source_parser.PublicHttp') as http:
+            self.assertIsNone(bridge.mangaball_languages(client,9));http.assert_not_called()
+
+    def test_public_chapter_form_accepts_only_the_fixed_read_only_json(self):
+        from source_parser import PublicHttp
+        url='https://mangaball.com/api/v1/chapter/chapter-listing-by-title-id'
+        with patch('source_parser.requests.Session') as session:
+            session.return_value.request.return_value.status_code=200
+            http=PublicHttp(validate=lambda value:value)
+            response,_=http._open(url,method='POST',data=b'{"title_id": "685183da0b95030249822109"}')
+            self.assertEqual(session.return_value.request.call_args.kwargs['headers']['Content-Type'],'application/json')
+            response.close()
+            for target,body in [(url,b'{"password":"secret"}'),(url+'?other=1',b'{"title_id":"685183da0b95030249822109"}'),('https://other.example/api/v1/chapter/chapter-listing-by-title-id',b'{"title_id":"685183da0b95030249822109"}')]:
+                with self.assertRaises(SourceError):http._open(target,method='POST',data=body)
+            http.close()
     def test_failed_novelcool_extension_recovers_only_its_indexed_public_reader(self):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}):
             path=Path(directory)/'manga-discovery.sqlite'

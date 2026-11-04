@@ -47,7 +47,7 @@ class Client:
         response=None
         try:
             response=self.session.get(self.root+'/api/v1'+path,params=params,timeout=(3,timeout),allow_redirects=False,stream=True)
-            if path.startswith('/extension/install/') and response.status_code in {200,201}:return {'installed':True}
+            if path.startswith(('/extension/install/','/extension/update/')) and response.status_code in {200,201,204}:return {'installed':True}
             if response.status_code!=200:
                 # Classify bounded upstream text; never expose its HTML, stack,
                 # account settings or arbitrary response content to the browser.
@@ -119,7 +119,7 @@ def status():
 
 def extension_catalog(language='all',query=''):
     query=query.casefold().strip()[:80]
-    result=[{'package':x['pkgName'],'name':x['name'],'language':x['lang'],'adult':bool(x.get('isNsfw')),'installed':bool(x.get('installed')),'obsolete':bool(x.get('obsolete'))} for x in extensions() if x['lang'] in {*LANGUAGES,'all'} and (language=='all' or x['lang'] in {language,'all'}) and (not query or query in x['name'].casefold())]
+    result=[{'package':x['pkgName'],'name':x['name'],'language':x['lang'],'adult':bool(x.get('isNsfw')),'installed':bool(x.get('installed')),'hasUpdate':bool(x.get('hasUpdate')),'obsolete':bool(x.get('obsolete'))} for x in extensions() if x['lang'] in {*LANGUAGES,'all'} and (language=='all' or x['lang'] in {language,'all'}) and (not query or query in x['name'].casefold())]
     result.sort(key=lambda x:(not x['installed'],x['language'],x['name'].casefold(),x['package']))
     return {'extensions':result,'total':len(extensions()),'matching':len(result)}
 
@@ -128,12 +128,40 @@ def install(package):
     with _install_lock:
         found=next((x for x in extensions() if x['pkgName']==package and not x.get('obsolete')),None)
         if not found:raise SourceError('Это расширение отсутствует в доверенном каталоге.')
-        if not found.get('installed'):
+        if not found.get('installed') or found.get('hasUpdate'):
             client=Client()
-            try:client.get('/extension/install/'+package,timeout=90)
+            try:client.get('/extension/'+('update' if found.get('installed') else 'install')+'/'+package,timeout=90)
             finally:client.close()
         with _lock:_cache.clear()
     return {'installed':True,'name':found['name']}
+
+def mangaball_languages(client,manga):
+    """Its title search is multilingual even when this language has no chapters.
+
+    Public API shape verified against MangaBall and Keiyoushi's MangaBall adapter.
+    Keep bridge identities stable; do not switch the selected provider or work.
+    """
+    key='mangaball-languages:'+str(manga);now=time.monotonic()
+    with _lock:hit=_cache.get(key)
+    if hit and hit[0]>now:return hit[1]
+    saved=client.get(f'/manga/{manga}',{'onlineFetch':'false'},timeout=4)
+    parsed=urlsplit(saved.get('realUrl',''))
+    match=re.fullmatch(r'/title-detail/([a-f0-9]{24})',parsed.path)
+    if parsed.scheme!='https' or parsed.hostname!='mangaball.com' or not match:return None
+    from source_parser import PublicHttp
+    def validate(url):
+        if url!='https://mangaball.com/api/v1/chapter/chapter-listing-by-title-id':raise SourceError('Неизвестный адрес каталога Manga Ball.')
+        return public_url(url,allow_api=True)
+    http=PublicHttp(validate=validate,timeout=(3,5),deadline=time.monotonic()+8)
+    try:
+        text,_,_=http.document('https://mangaball.com/api/v1/chapter/chapter-listing-by-title-id',method='POST',headers={'Content-Type':'application/json'},data=json.dumps({'title_id':match[1]}).encode())
+        rows=json.loads(text).get('data')
+        if not isinstance(rows,list):raise SourceError('Manga Ball изменил формат списка глав.')
+        languages={str(row.get('lang') or row.get('language') or '').lower() for row in rows if str(row.get('title_id'))==match[1] and row.get('status','published')=='published'}
+        languages={ {'jp':'ja','kr':'ko'}.get(lang,lang) for lang in languages }
+        with _lock:_cache[key]=(now+300,languages)
+        return languages
+    finally:http.close()
 
 def inspect(value):
     ids=parse_reference(value)
@@ -163,6 +191,9 @@ def inspect(value):
         source=data.get('source') or client.get('/source/'+str(data['sourceId']))
         lang=source.get('lang','')
         if lang not in {'ru','en','ja','ko'}:raise SourceError('Этот источник пока не поддерживает выбранный язык чтения.')
+        if chapter is None and source.get('name')=='Manga Ball':
+            languages=mangaball_languages(client,manga)
+            if languages is not None and lang not in languages:raise SourceError('Manga Ball не опубликовал главы этого тайтла на выбранном языке. Доступные языки: '+(', '.join(sorted(languages)).upper() or 'нет')+'.')
         try:chapters=client.get(f'/manga/{manga}/chapters',{'onlineFetch':'true' if chapter is None else 'false'},timeout=30)
         except SourceError:
             recovered=inspect_indexed_reader(value)
@@ -246,6 +277,7 @@ def page_image(value):
         except SourceError:
             saved=client.get(f'/manga/{manga}',{'onlineFetch':'false'},timeout=8)
             source=saved.get('source') or client.get('/source/'+str(saved['sourceId']))
+            if source.get('name')=='Manga Ball':raise SourceError('Manga Ball не отдал изображение страницы серверу. Список глав доступен, но загрузка картинок не работает. Выбери другую читалку или повтори позже.') from None
             target=native_reader_url(client,saved,source,manga,chapter)
             if not target:raise
             from manga_sources import inspect as native_inspect
@@ -298,7 +330,11 @@ def search(title,language='all',format='all',offset=0,limit=8):
                     candidate={'title':row['title'],'aliases':[row['title']],'kind':'manga'};accepted,evidence=match_title(title,candidate)
                     try:canonical=public_url(row.get('realUrl') or urljoin(source.get('baseUrl',''),row.get('url','')),resolve_dns=False)
                     except SourceError:canonical=''
-                    if accepted:result.append({**candidate,'url':reference(row['id']),'sourceUrl':canonical, 'provider':provider,'providerName':source['name'],'language':lang,'format':title.get('format') or ('manhwa' if lang=='ko' else 'manga'),'matchEvidence':evidence,'cover':''})
+                    if accepted:
+                        if source.get('name')=='Manga Ball':
+                            languages=mangaball_languages(client,row['id'])
+                            if languages is not None and lang not in languages:continue
+                        result.append({**candidate,'url':reference(row['id']),'sourceUrl':canonical, 'provider':provider,'providerName':source['name'],'language':lang,'format':title.get('format') or ('manhwa' if lang=='ko' else 'manga'),'matchEvidence':evidence,'cover':''})
                 if result:break
             return {'provider':provider,'name':source['name'],'status':'ok' if result else 'empty','message':'','results':result,'attempted':True}
         except (SourceError,ValueError,TypeError,KeyError,AttributeError):return {'provider':provider,'name':source['name'],'status':'unavailable','message':'Источник временно недоступен или изменил формат ответа.','results':[],'attempted':True}

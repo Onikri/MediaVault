@@ -58,6 +58,8 @@ html[data-blossom] .title-showcase .title-facts dd{text-align:right;overflow-wra
 }
 
 html[data-blossom] .title-showcase .title-background-video video{width:100%;height:100%;object-fit:cover;display:block}
+html[data-blossom] .title-showcase .title-background-youtube .youtube-official{width:100%;height:100%}
+html[data-blossom] .title-showcase .title-background-youtube iframe{left:50%;top:50%;width:max(100cqw,177.78cqh);height:max(100cqh,56.25cqw);inset:auto;transform:translate(-50%,-50%);max-width:none;border-radius:0;pointer-events:none}
 
 /* Fit the entire desktop composition, including real metadata, above the fold. */
 @media(min-width:1000px){
