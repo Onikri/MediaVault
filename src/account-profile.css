@@ -4,3 +4,5 @@
 @keyframes account-content-in{from{opacity:.6;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media(max-width:760px){.account-layout{grid-template-columns:minmax(0,1fr);gap:18px}.account-sidebar{position:static;padding:10px;border-radius:20px}.account-identity,.account-services{display:none}.account-navigation{display:flex;overflow:auto;scrollbar-width:none;gap:3px}.account-navigation button{flex:none;gap:7px;padding:11px 12px;font-size:11px}.account-navigation button>svg:last-child{display:none}.account-heading{margin-bottom:22px}.account-presence{font-size:10px}.account-page .settings-card,.account-page .profile-card{padding:20px}.account-page .profile-actions{width:100%}}
 @media(prefers-reduced-motion:reduce){.account-section{animation:none}}
+.account-mobile-exit{display:none;border:0;background:var(--color-surface);color:var(--color-petal);border-radius:50%;width:34px;height:34px;padding:0;place-items:center;margin-left:5px}
+@media(max-width:760px){.account-mobile-exit{display:grid}}
