@@ -525,13 +525,11 @@ html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search>butt
  html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{position:relative;inset:auto;transform:none;width:38px;min-width:38px;max-width:38px;margin-left:auto;justify-self:center}
 }
 
-/* Keep score, title and metadata in normal flow in every catalogue layout. */
+/* Keep title and metadata in normal flow in every catalogue layout. */
 html[data-blossom] .anime-card .card-caption{align-items:stretch;text-align:left;gap:7px}
 html[data-blossom] .anime-card .card-caption .media-name{margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;text-align:left}
 html[data-blossom] .card-caption-details{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;flex-wrap:wrap}
 html[data-blossom] .card-caption-details .media-meta{min-width:0;line-height:1.5;text-align:left;overflow-wrap:anywhere}
-html[data-blossom] .anime-card .card-caption .card-score{position:static;inset:auto;transform:none;transition:none;flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:0;max-width:none;border:0;border-radius:0;background:none;color:#f3d6a2;font-size:11px;line-height:1.5;box-shadow:none}
-html[data-blossom] .anime-card .card-caption .card-score svg{width:11px;height:11px;color:inherit}
 html[data-blossom] .library-layout-list .anime-card.media-open{display:grid;grid-template-columns:82px minmax(0,1fr);grid-template-rows:auto;column-gap:0;align-items:stretch;min-height:123px;aspect-ratio:auto;padding:0;text-align:left}
 html[data-blossom] .library-layout-list .anime-card.media-open .anime-cover{position:relative;inset:auto;width:82px;min-height:123px;height:100%;grid-column:1;grid-row:1;transform:none;opacity:1}
 html[data-blossom] .library-layout-list .anime-card.media-open .card-caption{position:static;inset:auto;grid-column:2;grid-row:1;min-width:0;padding:16px;justify-content:center;align-items:stretch}
@@ -546,7 +544,6 @@ html[data-blossom] .library-layout-list .anime-card.media-open .card-caption-det
  html[data-blossom] .catalog-layout-compact .anime-card .media-name{font-size:11px;line-height:1.35}
  html[data-blossom] .catalog-layout-compact .card-caption-details{flex-wrap:nowrap;gap:4px}
  html[data-blossom] .catalog-layout-compact .card-caption-details .media-meta{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px}
- html[data-blossom] .catalog-layout-compact .anime-card .card-caption .card-score{font-size:10px;gap:3px}
  html[data-blossom] .catalog-layout-compact .media-kind-badge{padding:6px;right:7px;top:7px}
  html[data-blossom] .catalog-layout-compact .media-kind-label{display:none}
  html[data-blossom] .catalog-layout-compact .anime-card-shell .bookmark-button{width:27px;height:27px;left:7px;top:7px}

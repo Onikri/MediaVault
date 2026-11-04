@@ -1,0 +1,7 @@
+# Rating ribbon and built showcase cascade — 2026-11-04
+
+The supplied AniView rating ribbon is a direct child of the card, anchored at its top center, with a hover/focus entrance and a visible touch state. It must not be positioned relative to the variable-height caption. Removed the obsolete bottom75px override and caption-specific rating positioning. CardRating now supplies library/catalogue/collection cards and both table views. List rows anchor the same rating at the upper right and reserve space beside the title. Narrow cover cards adapt the corner controls so the ribbon does not collide with them.
+
+The title showcase regression came from equal-specificity legacy layout rules whose ordering differs in the built application. The legacy grid placed the entire content group into the poster-width first column. The shared showcase selector now explicitly outranks that older layout. A regression test runs the actual built App through its public title route, rather than an isolated TitlePage import, at390/1440/1920/3440px. The previous bundle reproduced the hidden/zero-width desktop heading; the repaired bundle keeps a readable description column and fits its information above the fold.
+
+Validation: production build; shared cards in grid/compact/list at320/390/430/768/1440px; production title route at four widths. Catalogue/artwork/login services are fixture responses. No model, inference, backend or stored credentials were changed.

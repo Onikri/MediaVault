@@ -2,7 +2,6 @@
 .media-kind-badge{position:absolute;z-index:3;right:9px;top:9px;display:flex;align-items:center;gap:5px;padding:6px 8px;border-radius:100px;background:#111e;color:#f0e8e5;font-size:10px;font-weight:650;pointer-events:none}
 html[data-blossom] .anime-card-shell .bookmark-button{left:9px;right:auto;top:9px;width:32px;height:32px;border:0;border-radius:50%;background:#111d;opacity:1;color:var(--color-petal);display:grid;place-items:center;padding:0}
 html[data-blossom] .anime-card-shell .bookmark-button.is-saved{color:var(--color-blossom)}
-html[data-blossom] .anime-card .card-score{left:auto;top:auto;right:9px;bottom:75px;font-size:10px;padding:4px 6px}
 html[data-blossom] .anime-preview .preview-head{margin-bottom:9px}.anime-preview .preview-chips:empty{display:none}
 html[data-blossom] .anime-preview .preview-specs{row-gap:6px}.anime-preview .preview-synopsis{margin:0 0 10px}
 .title-browser-toolbar{min-width:0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
