@@ -51,14 +51,15 @@ module.exports=async function({browser,base,installProvider,OWNER,PHRASE,catalog
   const protectedKey=await page.evaluate(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('mediavault-trusted-device-v1',1);q.onsuccess=()=>r(q.result);});const record=await new Promise(r=>{const q=db.transaction('records').objectStore('records').get('auth');q.onsuccess=()=>r(q.result);});db.close();try{await crypto.subtle.exportKey('jwk',record.privateKey);return false;}catch{return record.privateKey.extractable===false;}});
   assert.ok(protectedKey,'The remembered signing key cannot be exported');
   await page.locator('#profileBtn').click();
+  await page.getByRole('tab',{name:'Устройство и доступ',exact:true}).click();
   await page.getByRole('button',{name:'Настроить защищённое открытие',exact:true}).click();
   await page.getByText('Разблокировка устройством включена',{exact:true}).waitFor();
-  await page.reload();await page.locator('#profileBtn').click();
+  await page.reload();await page.locator('#profileBtn').click();await page.getByRole('tab',{name:'Устройство и доступ',exact:true}).click();
   await page.locator('.device-settings').getByRole('button',{name:'Открыть библиотеку',exact:true}).waitFor();
   assert.equal(await page.locator('#libraryPanel').count(),0,'A biometric vault stays locked after Google restores');
   await page.locator('.device-settings').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));
-  await page.locator('#profileBtn').click();await page.locator('#logoutBtn').click();await page.reload();
+  await page.locator('#profileBtn').click();await page.getByRole('tab',{name:'Аккаунт',exact:true}).click();await page.locator('#logoutBtn').click();await page.reload();
   await page.locator('#profileBtn').click();assert.equal(await page.locator('#loginBtn').isEnabled(),true,'Logout does not silently log the account back in');
   console.log('PASS: cookie consent; opt-in device persistence; non-exportable key; real signatures; automatic Google + vault restore; WebAuthn PRF wrapping and unlock with a virtual platform authenticator; logout.');
  }finally{await context.close();}
