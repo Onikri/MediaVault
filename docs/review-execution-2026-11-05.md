@@ -135,6 +135,34 @@ choices at 390/1440px. Existing profile/reader checks passed. API/provider repli
 in the UI checks are fixtures; this stage does not benchmark translation or ML.
 Production build passed.
 
+## Stage 6 — language/key probe and typography
+
+- Explicit translation start can check the dialogue language using two reduced
+  pages and the selected personal/server credential mode. SFX proportions are
+  separate; ambiguous/unsupported text keeps the user's language. Manual language
+  selection disables automatic detection. No probe runs just by opening a reader.
+- Probe is quota paced, cancellable, has a 15-second deadline and no retry storm.
+  Its result is reused in the open chapter; credentials/model changes invalidate
+  the result. Errors do not launch translation silently. Missing credentials can
+  still leave existing translated cache readable.
+- Real Oracle/API measurements are in google-translation-diagnostics-2026-11-05.md.
+  The final production language prompt/schema returned valid English percentages
+  in 3.487 s; small two-page translations took 1.412–6.243 s, or 8.966 s including
+  provider cooldown/rerouting. One trial received HTTP 503. This is not a dense
+  full-chapter end-to-end guarantee.
+- Added licensed local Cyrillic Balsamiq Sans regular/bold and Caveat. Ordinary
+  dialogue stays Comic Relief; strong rounded shouts/loose notes gain distinct
+  fonts. The renderer image cache version changed, keeping translated JSON reusable.
+  Translation button shows active preparation instead of a frozen icon.
+
+Validation: 14 Node translation/language checks; real canvas JPEG reduction and
+FontFace decoding; actual reader start/detection/cleanup/Cyrillic worker with
+fixture Google replies at 390/1440px. Full direct-translation browser contract
+passed at 390/1366px (real contour detector, worker rendering, encrypted cache,
+lettering changes and quota diagnostics; no real Google in that browser test).
+Live Google API requests are separately documented, with no keys printed.
+Production build passed.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
@@ -145,7 +173,7 @@ Production build passed.
 - [x] Library toolbar styling; visible showcase poster/copy parallax verification.
 - [x] Reader chapter bar/cards, cursor-driven previews, one-page/spread/3D fixes.
 - [x] Adaptive page-point timeline and compact translation settings/help.
-- [ ] Language/API probe, quota/translation timings and typography/font matching.
+- [x] Language/API probe, quota/translation timings and typography/font matching.
 - [ ] Actual multi-model manga/background upscale comparison with image report.
 - [ ] Responsive animated calendar and watch-order presentation.
 - [ ] Music rows, interval-aware OP/ED information and login diagnosis.

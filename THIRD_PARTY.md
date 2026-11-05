@@ -341,3 +341,9 @@ requestAnimationFrame loop running after switching reading modes.
 Chapter scrub transitions use the MIT Motion AnimatePresence slideshow approach: https://motion.dev/docs/react-animate-presence.
 
 The StPageFlip UI destructor also removes the resize listener when native mouse gestures are disabled; reader gestures stay owned by React.
+
+Balsamiq Sans (regular/bold), Copyright Balsamiq, and Caveat by Pablo Impallari
+are SIL OFL 1.1. Source distributions: https://github.com/balsamiq/balsamiqsans
+and https://github.com/google/fonts/tree/main/ofl/caveat. Local WOFF2 files are
+Latin/Cyrillic subsets; full licences are reader-fonts/balsamiqsans-OFL.txt and
+reader-fonts/caveat-OFL.txt. Family names in application CSS are namespaced MV.

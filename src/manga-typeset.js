@@ -58,4 +58,4 @@ export function fitComicText(text,box,measure,{min=10,max=42,oval=true}={}){
  for(let size=Math.min(max,Math.floor(h/1.16));size>=min;size--){const fit=attempt(size);if(fit)return fit;}
  return {fits:false,lines:[],fontSize:min};
 }
-export const styleFont=style=>({standard_comic:'comic-relief',bold_scream:'comic-relief',handwritten_sloppy:'marck-script',handwritten_soft:'pangolin',handwritten_narrow:'neucha',sfx_art:'ruslan-display',serif_serious:'pt-serif',digital_box:'press-start'}[style]||'comic-relief');
+export const styleFont=style=>({standard_comic:'comic-relief',bold_scream:'balsamiq-sans',handwritten_sloppy:'caveat',handwritten_soft:'pangolin',handwritten_narrow:'neucha',sfx_art:'ruslan-display',serif_serious:'pt-serif',digital_box:'press-start'}[style]||'comic-relief');

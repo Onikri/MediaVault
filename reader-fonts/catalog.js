@@ -1,6 +1,8 @@
 // SIL OFL 1.1 fonts are bundled locally; no Google Fonts requests.
 export const MANGA_FONTS = [
  {id:'comic-relief',label:'Comic Relief · чёткий комикс',family:'MV Comic Relief',regular:new URL('./comic-relief.woff2',import.meta.url).href,bold:new URL('./comic-relief-bold.woff2',import.meta.url).href},
+ {id:'balsamiq-sans',label:'Balsamiq Sans · плотный комикс',family:'MV Balsamiq Sans',regular:new URL('./balsamiq-sans.woff2',import.meta.url).href,bold:new URL('./balsamiq-sans-bold.woff2',import.meta.url).href},
+ {id:'caveat',label:'Caveat · живые пометки',family:'MV Caveat',regular:new URL('./caveat.woff2',import.meta.url).href},
  {id:'pangolin',label:'Pangolin · мягкий рукописный',family:'MV Pangolin',regular:new URL('./pangolin.woff2',import.meta.url).href},
  {id:'neucha',label:'Neucha · узкий рукописный',family:'MV Neucha',regular:new URL('./neucha.woff2',import.meta.url).href},
  {id:'ruslan-display',label:'Ruslan Display · крик и спецэффекты',family:'MV Ruslan Display',regular:new URL('./ruslan-display.woff2',import.meta.url).href},
@@ -15,7 +17,7 @@ const loaded=new Map();
 export async function loadMangaFont(id){
  const font=mangaFont(id);if(!font.regular)return mangaFontStack(id);
  if(!loaded.has(font.id)){
-  const promise=Promise.all([[font.regular,'400'],...(font.bold?[[font.bold,'700']]:[])].map(async([url,weight])=>{const face=await new FontFace(font.family,`url("${url}")`,{weight,style:'normal'}).load();(globalThis.fonts||globalThis.document?.fonts).add(face);}));
+  const promise=Promise.all([[font.regular,'400'],...(font.bold?[[font.bold,'700']]:[])].map(async([url,weight])=>{const face=await new FontFace(font.family,`url("${url}")`,{weight,style:'normal'}).load();(typeof globalThis.fonts?.add==='function'?globalThis.fonts:globalThis.document?.fonts).add(face);}));
   loaded.set(font.id,promise);promise.catch(()=>loaded.delete(font.id));
  }
  await loaded.get(font.id);return mangaFontStack(id);
