@@ -9,7 +9,7 @@ import unicodedata
 import time
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin
 from bs4 import BeautifulSoup
-from source_parser import SourceError, public_url, public_player_html
+from source_parser import SourceError, public_url, public_player_html, is_alloha_player
 
 KODIK={'kodikplayer.com','kodik.info','kodik.biz','kodik.cc','aniqit.com'}
 CVH_API='https://plapi.cdnvideohub.com/api/v1/player/sv'
@@ -20,7 +20,7 @@ def player_name(url):
     from anistar_source import is_player
     if is_player(url):return 'AniStar'
     if host in {'jut.su','www.jut.su'}:return 'Jut.su'
-    if host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):return 'Alloha (динамический)'
+    if is_alloha_player(url):return 'Alloha (динамический)'
     if host in KODIK:return 'Kodik'
     if 'aniboom' in host:return 'Aniboom'
     if 'sibnet' in host:return 'Sibnet'
@@ -52,8 +52,7 @@ def choice(name, url, *, identity='', kind='', language='und', player='', episod
 def alloha_choices(text,base,*,season=None):
     """Read the published episode table and its actual translation IDs."""
     import json
-    host=urlsplit(base).hostname or ''
-    if not host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):return [],[]
+    if not is_alloha_player(base):return [],[]
     match=re.search(r"const\s+fileList\s*=\s*JSON\.parse\('((?:[^'\\]|\\.)*)'\)",text,re.S)
     if not match:return [],[]
     try:data=json.loads(match[1].replace("\\'","'").replace('\\\\','\\'))

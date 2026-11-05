@@ -14,7 +14,7 @@ import copy
 from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import urlsplit
-from source_parser import SourceError, public_url, playback_headers, BLOCKED, USER_AGENT
+from source_parser import SourceError, public_url, playback_headers, BLOCKED, USER_AGENT, is_alloha_player
 
 def browser_workers():
     try:return max(1,min(2,int(os.environ.get('MEDIA_VAULT_BROWSER_WORKERS',min(2,os.cpu_count() or 1)))))
@@ -81,7 +81,7 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
     if not executable:raise SourceError('На сервере не установлен Chromium для динамического плеера.')
     browser_paths()
     validate(url)
-    framed = (urlsplit(url).hostname or '').endswith(('.stravers.live', '.thealloha.club', '.alloha.tv'))
+    framed = is_alloha_player(url)
     if mode and referer:
         validate(referer)
     captured={};done=asyncio.Event();requests=0;selected_quality=None;requested_qualities={}
@@ -223,6 +223,8 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     # delayed WS responses during menu clicks cannot relabel it.
                     values=await target.evaluate("() => typeof player==='undefined' ? null : player.currentSource?.quality || null")
                     initial_headers=next(iter(captured.values()))['headers'] if captured else headers
+                    if urlsplit(url).hostname=='alloha.yani.tv':
+                        initial_headers={**initial_headers,'Origin':'https://alloha.yani.tv','Referer':url}
                     published=published_quality_streams(values,initial_headers,validate=validate)
                     if published:return published
                     # Modern Alloha serves a different signed one-quality HLS

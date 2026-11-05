@@ -198,6 +198,9 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime",st
             return {"provider": "direct", "title": "Видео по ссылке", "url": original,
                     "dubs": [], "seasons": [], "episodes": [{"number": 1, "url": original}], "releases": []}
         if kind in {'anime', 'movie', 'tv'}:
+            from yummy_anime_source import inspect as inspect_yummy, is_title_page
+            if is_title_page(original):
+                return inspect_yummy(original, http, dub_url=dub_url)
             from dynamic_video_sources import inspect, provider_for
             provider = provider_for(original)
             if provider:

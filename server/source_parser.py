@@ -39,6 +39,10 @@ BLOCKED = re.compile(
 )
 PLAYER_RELAY_HOSTS={'yummyanime.tv','animego.online'}
 
+def is_alloha_player(url):
+    host=urlsplit(url).hostname or ''
+    return host=='alloha.yani.tv' or host.endswith(('.stravers.live','.thealloha.club','.alloha.tv'))
+
 
 def public_url(value, *, resolve_dns=True, allow_api=False):
     """Validate every request and every redirect, including nested HLS URLs."""
@@ -63,6 +67,7 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
     # Only these public playback APIs are allowed; arbitrary site APIs remain blocked.
     playback_api = (
         host == "plapi.cdnvideohub.com" and bool(re.fullmatch(r"/api/v1/player/sv/(?:playlist|video/\d+)", url.path))
+        or host == "ru.yummyani.me" and bool(re.fullmatch(r"/api/anime/[1-9]\d{0,9}/videos", url.path))
         or host in {"anilibria.top", "aniliberty.top", "api.anilibria.app"}
         and bool(re.fullmatch(r"/api/v1/(?:anime/releases/[a-zA-Z0-9_-]+|app/search/releases)", url.path))
     )
@@ -450,7 +455,7 @@ class Resolver:
 
     def player(self, url, referer=None):
         host=urlsplit(url).hostname or ''
-        if host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):
+        if is_alloha_player(url):
             # This is a public iframe player, not a top-level HTML document.
             # A plain HTTP request can be rejected even though the publisher's
             # embedded player works. Preserve its selected audio/episode URL.
@@ -517,7 +522,7 @@ class Resolver:
                     continue
                 raise
         host=urlsplit(url).hostname or ''
-        if host in {'jut.su','www.jut.su'} or host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):
+        if host in {'jut.su','www.jut.su'}:
             from browser_player import extract
             result=extract(url,referer,details=True)
             return Page(title=page.title,streams=result['streams'],subtitles=result.get('subtitles',[]))

@@ -120,6 +120,9 @@ def _discover(selected,*,refresh=False,continuing=False):
         with ThreadPoolExecutor(max_workers=6) as pool:
             from kodik_api import discover as kodik_discover
             futures=[pool.submit(kodik_discover,selected),*[pool.submit(work,site) for site in sites]]
+            if selected.get('kind','anime') in {'anime','movie'} and str((selected.get('ids') or {}).get('mal'))=='57555':
+                from yummy_anime_source import discover_reze
+                futures.append(pool.submit(discover_reze))
             for future in as_completed(futures):
                 providers.append(future.result());result=snapshot(len(providers)<len(futures))
                 with _lock:_cache[key]=(time.monotonic()+(300 if result['sources'] else 30),result)

@@ -9,7 +9,7 @@ export function orderedVoices(voices,saved={}){
   Number(a.kind==='subtitles')-Number(b.kind==='subtitles')||a.name.localeCompare(b.name,'ru'));
 }
 export function variantsFor(voice,episode,failed=new Set()){
- const rank=v=>{const known=v.episodes?.length,found=v.episodes?.some(e=>Number(e.number)===Number(episode));return (known&&!found?10:0)+(v.player==='Kodik'?0:v.player==='Alloha'?2:1);};
+ const rank=v=>{const known=v.episodes?.length,found=v.episodes?.some(e=>Number(e.number)===Number(episode));return (known&&!found?10:0)+(v.provider==='yummy-official'?-1:v.player==='Kodik'?0:v.player==='Alloha'?2:1);};
  return [...(voice?.variants||[])].filter(v=>!failed.has(v.id)).sort((a,b)=>rank(a)-rank(b));
 }
 
