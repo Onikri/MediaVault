@@ -258,7 +258,7 @@ def install(app,owner):
         return StreamingResponse(body(),media_type='video/mp4',headers={'Content-Disposition':disposition,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
 
     @app.get('/online/{token}/{resource}')
-    def stream(token:str,resource:str,range_header:str=Header(default='',alias='Range')):
+    def stream(token:str,resource:str,request:Request,range_header:str=Header(default='',alias='Range')):
         with lock:
             expire();s=sessions.get(token);url=s.resources.get(resource) if s else None
             if s and url and s.client_id:s.expires=time.monotonic()+LEASE_SECONDS
@@ -269,6 +269,8 @@ def install(app,owner):
             from music_audio import audio_url
             http=PublicHttp(validate=audio_url,timeout=(5,20))
         else:http=PublicHttp(timeout=(5,20))
+        # The device-download remux reads this proxy from loopback: bulk pace.
+        http.bulk=bool(request.client and request.client.host in {'127.0.0.1','::1'})
         response=None;handed=False
         try:
             with s.lock:cached=s.manifests.get(resource)

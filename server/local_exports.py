@@ -141,6 +141,11 @@ def produce(job,progress,maximum,reserve):
             from media_download import download_episode,pick_stream
             page=Resolver(http).resolve(job.url,referer=job.referer) if job.referer else Resolver(http).resolve(job.url);budget.check()
             stream=pick_stream(page.streams,job.quality)
+            # Viewer-paced CDNs (source_parser.PACED_HOSTS) need about the film's own
+            # length; the 30 min budget would cut them off mid-episode.
+            from source_parser import PACED_HOSTS
+            from urllib.parse import urlsplit
+            if (urlsplit(stream['url']).hostname or '').endswith(PACED_HOSTS):budget.deadline=max(budget.deadline,time.monotonic()+3*3600)
             result=download_episode(stream,job.directory,http=http,quality=job.quality,progress=update,run=budget.run)
         budget.check()
         if result.stat().st_size>maximum:raise ExportProblem('Файл превышает лимит временного скачивания.')

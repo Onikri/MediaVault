@@ -49,10 +49,18 @@ PLAYER_RELAY_HOSTS={'yummyanime.tv','animego.online'}
 PACED_HOSTS=('.vkvideo.cloud',)
 PACE_SECONDS=0.25
 _pace_lock=threading.Lock();_pace_next=[0.0]
-def pace(url):
+# Whole-film transfers (Drive import, device download) must look like one
+# viewer: a 2026-11-05 burst of two parallel 4K film pulls at 4 req/s burned a
+# fresh UA within minutes, while playback (~1 segment/6 s) never did.
+BULK_PACE_SECONDS=4.0
+_bulk_next=[0.0]
+def pace(url,bulk=False):
     if not (urlsplit(url).hostname or '').endswith(PACED_HOSTS):return
     with _pace_lock:
-        now=time.monotonic();wait=_pace_next[0]-now;_pace_next[0]=max(now,_pace_next[0])+PACE_SECONDS
+        slot=_bulk_next if bulk else _pace_next;step=BULK_PACE_SECONDS if bulk else PACE_SECONDS
+        now=time.monotonic();wait=max(slot[0],_pace_next[0])-now;slot[0]=max(now,slot[0],_pace_next[0])+step
+        if not bulk:_pace_next[0]=max(_pace_next[0],slot[0])
+        else:_pace_next[0]=max(_pace_next[0],now+max(0,wait))+PACE_SECONDS
     if wait>0:time.sleep(wait)
 
 def is_alloha_player(url):
@@ -142,7 +150,7 @@ class PublicHttp:
         self.session.close()
 
     def fork(self):
-        return PublicHttp(validate=self.validate,timeout=self.timeout,deadline=self.deadline)
+        value=PublicHttp(validate=self.validate,timeout=self.timeout,deadline=self.deadline);value.bulk=getattr(self,'bulk',False);return value
 
     def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None):
         url = self.validate(value)
@@ -169,7 +177,7 @@ class PublicHttp:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
                 outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
         for hop in range(6):
-            pace(url)
+            pace(url,getattr(self,'bulk',False))
             if self.deadline and time.monotonic() >= self.deadline:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             try:

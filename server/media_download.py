@@ -180,7 +180,8 @@ class HlsDownload:
         try:
             # Alloha's CDN throttles a burst from one IP/UA: two paced workers.
             paced=any((urlsplit(url).hostname or '').endswith(PACED_HOSTS) for url,_,_ in downloads[:3])
-            with ThreadPoolExecutor(max_workers=(2 if paced else 4) if hasattr(self.http,'fork') else 1) as executor:
+            if paced:self.http.bulk=True
+            with ThreadPoolExecutor(max_workers=(1 if paced else 4) if hasattr(self.http,'fork') else 1) as executor:
                 # map submits references only; media remains on disk, not in RAM.
                 for _ in executor.map(download,downloads):pass
         finally:

@@ -246,3 +246,13 @@ class CdnPacing(unittest.TestCase):
             source_parser.pace('https://cdn.example.com/x.m3u8')
         self.assertEqual(len(sleeps),2)
         self.assertTrue(all(0<v<=source_parser.PACE_SECONDS*2+.05 for v in sleeps))
+
+    def test_bulk_transfers_run_at_viewer_pace(self):
+        import source_parser
+        from unittest.mock import patch
+        source_parser._pace_next[0]=0.0;source_parser._bulk_next[0]=0.0
+        sleeps=[]
+        with patch('source_parser.time.sleep',side_effect=sleeps.append):
+            for _ in range(3):source_parser.pace('https://x.vkvideo.cloud/0/s',bulk=True)
+        self.assertEqual(len(sleeps),2)
+        self.assertTrue(all(v>=source_parser.BULK_PACE_SECONDS-.05 for v in sleeps))
