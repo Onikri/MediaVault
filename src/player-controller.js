@@ -32,7 +32,10 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const [prefs,setPrefs]=useState(getPrefs);
   const [hoverSeek,setHoverSeek]=useState(null),seekTimer=useRef(null);
   useEffect(()=>()=>clearTimeout(seekTimer.current),[]);
-  const [time,setTime]=useState(0),[duration,setDuration]=useState(0),[buffered,setBuffered]=useState(0);
+  const [time,setTime]=useState(0),[duration,setDuration]=useState(0),[buffered,setBufferedState]=useState(0);
+  // timeupdate/progress fire several times a second; re-render the whole player
+  // only when the buffered edge has moved by a visible amount (>= 1 s).
+  const setBuffered=value=>setBufferedState(old=>Math.abs(old-value)>=1?value:old);
   const [playing,setPlaying]=useState(false),[muted,setMuted]=useState(false);
   const [audioError,setAudioError]=useState('');
   const external=useExternalAudio(videoRef,audioError?'':onlineControls?.audio?.url,onlineControls?.audio?.type,Number(prefs.volume),muted,Number(prefs.audioOffset)||0,e=>setAudioError(e.message));
@@ -62,25 +65,29 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const [gpuWarning,setGpuWarning]=useState('');
   const [neuralStats,setNeuralStats]=useState(null),statsClock=useRef(0);
   const [gpuAttempt,setGpuAttempt]=useState(0);
+  // A failure pauses the upscaler for this page only; a transient context loss
+  // must not silently switch off the viewer's saved preference.
+  const [gpuSuspended,setGpuSuspended]=useState(false);
   const mobileDevice=/Android|iPhone|iPad/i.test(navigator.userAgent)||matchMedia('(any-pointer: coarse)').matches;
   const deviceProfile=prefs.deviceProfile==='auto'?(mobileDevice?'phone':'desktop'):prefs.deviceProfile;
   const engine=prefs.upscaler==='auto'?(deviceProfile==='desktop'?'anime4k':'mobile'):prefs.upscaler;
   const [colors,setColors]=useState(()=>{try{return JSON.parse(localStorage.getItem('mv_video_colors')||'{}');}catch{return {};}});
-  function color(change){setColors(old=>{const next={...old,...change};localStorage.setItem('mv_video_colors',JSON.stringify(next));return next;});}
+  function color(change){setColors(old=>{const next={...old,...change};try{localStorage.setItem('mv_video_colors',JSON.stringify(next));}catch{}return next;});}
   const colorFilter=`saturate(${colors.saturation??1}) contrast(${colors.contrast??1}) brightness(${colors.brightness??1})`;
   const engineName=engine==='lanczos'?'Lanczos3':String(engine).startsWith('fsr-')||engine==='fsr'?(engine==='fsr-soft'?'FSR1 · мягкий':'FSR1'):engine==='mobile'?'Мобильный GPU':engine==='fsrcnn'?'FSRCNN':({'anime4k-l':'Anime4K L','anime4k-vl':'Anime4K VL','anime4k-ul':'Anime4K UL'}[engine]||'Anime4K');
-  function retryGpu(value=prefs.upscaler){setGpuAttempt(n=>n+1);changePrefs({gpu:value!=='off',...(value!=='off'?{upscaler:value}:{})});}
+  function retryGpu(value=prefs.upscaler){setGpuSuspended(false);setGpuAttempt(n=>n+1);changePrefs({gpu:value!=='off',...(value!=='off'?{upscaler:value}:{})});}
   const [opening,setOpening]=useState(()=>getOpening(item,libraryId));
   const [openingDraft,setOpeningDraft]=useState(null);
   const [introOffset,setIntroOffset]=useState(()=>{try{return Number(localStorage.getItem(openerKey(libraryId,item.id)+':offset'))||0;}catch{return 0;}});
   useEffect(()=>{try{setIntroOffset(Number(localStorage.getItem(openerKey(libraryId,item.id)+':offset'))||0);}catch{setIntroOffset(0);}},[item.id,libraryId]);
-  const shifted=episodeMusic.intervals.map(v=>({...v,start:Math.max(0,v.start+introOffset),end:Math.min(duration,v.end+introOffset)})).filter(v=>v.end>v.start);
+  // A manual offset means the viewer has aligned the timings themselves.
+  const shifted=episodeMusic.intervals.map(v=>({...v,needsReview:!!v.needsReview&&!introOffset,start:Math.max(0,v.start+introOffset),end:Math.min(duration,v.end+introOffset)})).filter(v=>v.end>v.start);
   const sourceIntervals=(onlineControls?.sourceIntervals||[]).filter(v=>['op','ed'].includes(v.type)&&Number.isFinite(v.start)&&Number.isFinite(v.end)&&v.start>=0&&v.end>v.start&&v.end<=duration+1);
   const effectiveOpening=opening||sourceIntervals.find(v=>v.type==='op')||shifted.find(v=>v.type==='op');
   const ending=openingBounds(item.ending)||sourceIntervals.find(v=>v.type==='ed')||shifted.find(v=>v.type==='ed');
   const activeTheme=effectiveOpening&&time>=effectiveOpening.start&&time<effectiveOpening.end?'OP':ending&&time>=ending.start&&time<ending.end?'ED':null;
   const songCandidates=episodeMusic.tracks.filter(t=>t.type===activeTheme),currentSong=songCandidates.length===1?songCandidates[0]:null;
-  const lastStored=useRef(-1),resumeApplied=useRef(false),subtitleInput=useRef(null);
+  const lastStored=useRef(-1),resumeApplied=useRef(false),subtitleInput=useRef(null),autoSkipped=useRef(new Set());
   const library=useMemo(()=>buildPlaybackLibrary(item,catalog),[item.id,catalog]);
   const seasons=library.seasons;
   const episodes=seasons.flatMap(season=>season.episodes);
@@ -147,15 +154,21 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     const tracks=Array.from(media.textTracks||[]);
     const refresh=()=>setSubtitleText(tracks.filter(track=>track.mode==='hidden')
       .flatMap(track=>Array.from(track.activeCues||[]).map(cue=>cue.text)).join('\n'));
-    tracks.forEach((track,index)=>{
-      if(!subtitle.startsWith('hls:'))track.mode=(subtitle===(track.label==='Загруженные субтитры'?'local':'native:'+index))?'hidden':'disabled';
-      track.addEventListener?.('cuechange',refresh);
+    // Our caption overlay is page DOM. iPhone fullscreen is the system video
+    // view, which cannot show it, so the selected track is drawn natively there.
+    let native=media.webkitDisplayingFullscreen===true;
+    const apply=()=>tracks.forEach((track,index)=>{
+      if(!subtitle.startsWith('hls:'))track.mode=(subtitle===(track.label==='Загруженные субтитры'?'local':'native:'+index))?(native?'showing':'hidden'):'disabled';
     });
+    const begin=()=>{native=true;apply();setSubtitleText('');},end=()=>{native=false;apply();refresh();};
+    apply();
+    tracks.forEach(track=>track.addEventListener?.('cuechange',refresh));
+    media.addEventListener('webkitbeginfullscreen',begin);media.addEventListener('webkitendfullscreen',end);
     refresh();
-    return()=>tracks.forEach(track=>track.removeEventListener?.('cuechange',refresh));
+    return()=>{tracks.forEach(track=>track.removeEventListener?.('cuechange',refresh));media.removeEventListener('webkitbeginfullscreen',begin);media.removeEventListener('webkitendfullscreen',end);};
   },[subtitle,availableTracks,localTrack,source]);
   useEffect(()=>{
-    if(!source||!prefs.gpu||!canvasRef.current||!videoRef.current){
+    if(!source||!prefs.gpu||gpuSuspended||!canvasRef.current||!videoRef.current){
       setGpuActive(false);setNeuralStats(null);
       return;
     }
@@ -174,7 +187,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
             failed=true;
             setGpuWarning(error.message||'Ошибка нейросетевого инференса.');
             setGpuActive(false);
-            changePrefs({gpu:false});
+            setGpuSuspended(true);
           }
         });
         if(disposed)stop();
@@ -183,11 +196,11 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
         if(disposed)return;
         setGpuActive(false);
         setGpuWarning(error.message||'Улучшение недоступно. Продолжаем исходное видео.');
-        changePrefs({gpu:false});
+        setGpuSuspended(true);
       }
     })();
     return()=>{disposed=true;stop?.();canvas.style.opacity='0';};
-  },[source,prefs.gpu,prefs.neuralMode,engine,deviceProfile,gpuAttempt]);
+  },[source,prefs.gpu,gpuSuspended,prefs.neuralMode,engine,deviceProfile,gpuAttempt]);
   const seek=seconds=>{
     if(roomControl){if(roomControl.canControl)roomControl.command('seek',Number(seconds));return;}
     const media=videoRef.current;
@@ -199,7 +212,10 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     if(onPreview&&previewCaptured.current!==item.id&&video.currentTime>=1){const image=captureEpisodePreview(video);if(image){previewCaptured.current=item.id;onPreview(item.episode,image);}}
     const ranges=video.buffered;
     setBuffered(contiguousBufferEnd(ranges,video.currentTime));
-    if(prefs.autoSkip){const skip=[effectiveOpening,ending].find(v=>v&&video.currentTime>=v.start&&video.currentTime<v.end-.2);if(skip)seek(skip.end);}
+    // Skip each confirmed interval once: a viewer who seeks back into it
+    // wants to watch it, and unconfirmed AniSkip timings (a release with a
+    // different duration) could cut real episode content.
+    if(prefs.autoSkip){const skip=[effectiveOpening,ending].find(v=>v&&!v.needsReview&&video.currentTime>=v.start&&video.currentTime<v.end-.2);const key=skip&&item.id+':'+skip.start+':'+skip.end;if(skip&&!autoSkipped.current.has(key)){autoSkipped.current.add(key);seek(skip.end);}}
     if(Math.abs(video.currentTime-lastStored.current)>=5){
       lastStored.current=video.currentTime;
       writeProgress(userId,libraryId,item,video.currentTime,video.duration);
@@ -230,7 +246,8 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     if(prefs.autoNext)nextEpisode();
   }
   function toggle(){const video=videoRef.current;if(!video)return;if(roomControl){if(roomControl.canControl)roomControl.command(video.paused?'play':'pause');if(video.paused&&roomControl.playing)video.play().catch(e=>{if(e.name!=='AbortError')onError?.(e);});return;}
-    if(video.paused){openPanel('watch');video.play().catch(onError);}else video.pause();
+    // A pause or a new source interrupting play() is not a playback failure.
+    if(video.paused){openPanel('watch');video.play().catch(e=>{if(e?.name!=='AbortError')onError?.(e);});}else video.pause();
   }
   function fullscreen(){
     const stage=stageRef.current,video=videoRef.current;

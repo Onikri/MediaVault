@@ -10,7 +10,7 @@ import './pause-frame.css';
 
 export default function PauseFrameEffects({videoRef,source,paused,enabled,modelAllowed=true,strength=.82,breathPeriod=10,breathAmplitude=.22,autoRecognize=false,visible=true,characterContext={},characterService,userId}){
  const contextRef=useRef(characterContext);contextRef.current=characterContext;
- const canvas=useRef(null),worker=useRef(null),busy=useRef(false),sequence=useRef(0),frame=useRef(null),cache=useRef(new Map()),renderer=useRef(null),recognition=useRef(null),cooldown=useRef(0),idleTimer=useRef(null),settings=useRef({strength,enabled});settings.current={strength,enabled,breathPeriod,breathAmplitude};
+ const canvas=useRef(null),worker=useRef(null),busy=useRef(false),sequence=useRef(0),frame=useRef(null),cache=useRef(new Map()),renderer=useRef(null),recognition=useRef(null),cooldown=useRef(0),idleTimer=useRef(null),usedPause=useRef(false),settings=useRef({strength,enabled});settings.current={strength,enabled,breathPeriod,breathAmplitude};
  const [view,setView]=useState({phase:'idle'}),[chars,setChars]=useState({phase:'idle',values:[]}),[selected,setSelected]=useState(null),[hovered,setHovered]=useState(null),[host,setHost]=useState(null),[rect,setRect]=useState(null),[retry,setRetry]=useState(0);
  const terminate=()=>{worker.current?.terminate();worker.current=null;busy.current=false;};
  useEffect(()=>()=>{clearTimeout(idleTimer.current);terminate();recognition.current?.abort();},[]);
@@ -36,8 +36,13 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
  }
  useEffect(()=>{if(!paused)return;const abort=new AbortController();warmCharacterModel();characterRoster(characterContext,{server:characterService?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl,signal:abort.signal}).catch(()=>{});return()=>abort.abort();},[paused,source,characterContext.malId]);
  // Prepare verified weights off the playback thread and reuse initialization on pause.
+ // The 27 MB model must not compete with the stream's first buffer: warm it
+ // during playback only after a pause has shown the viewer uses the effect,
+ // and never on a data-saving or slow connection.
+ useEffect(()=>{if(!source)return;if(!paused)usedPause.current=usedPause.current||'played';else if(usedPause.current==='played')usedPause.current=true;},[paused,source]);
  useEffect(()=>{
-  if(paused||!enabled||!modelAllowed||!source||document.hidden)return;
+  const network=navigator.connection;
+  if(paused||usedPause.current!==true||network?.saveData||/(?:^|-)2g$|^3g$/.test(network?.effectiveType||'')||!enabled||!modelAllowed||!source||document.hidden)return;
   const timer=setTimeout(()=>{
    if(worker.current||busy.current||document.hidden)return;
    worker.current=new Worker(new URL('./pause-depth.worker.js',import.meta.url),{type:'module'});
