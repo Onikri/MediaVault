@@ -16,6 +16,11 @@
   transient provider failure and retry. Cleanup was the **algorithmic fast**
   mode; this check does not claim local neural inpainting inference or comprehensive
   image-quality validation.
+- A second actual two-page Gemini 3.5 Flash Lite run completed in **9.55 seconds**
+  with a warm renderer profile. Transient 429/502/503/504 responses use bounded
+  retries and rotate through configured server key slots without changing the
+  selected model. Gemini 2.5 Flash Lite returned provider HTTP 404 in a separate
+  availability check; its availability is not guaranteed by the settings list.
 - Actual external HTTPS test staged a **923404-byte PNG**, built a plaintext CBZ,
   downloaded and reopened it, verified exact image bytes and confirmed temporary
   export cleanup after download. The upload routing was adjusted according to

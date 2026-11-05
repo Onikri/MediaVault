@@ -35,6 +35,7 @@ async def _translate_pages(job, pages, options, skip, save, progress, budget):
     profile.mkdir(parents=True, exist_ok=True, mode=0o700)
     origin = 'http://127.0.0.1:17862'
     headers = {'Authorization': 'Bearer ' + session_token(job.owner)}
+    slots = []
     def google(path, body):
         budget.check()
         if path not in {'/reader/google/keys', '/reader/google/generate'}:
@@ -59,6 +60,10 @@ async def _translate_pages(job, pages, options, skip, save, progress, budget):
             except GatewayRetry as error:
                 if attempt==2:
                     raise
+                if path.endswith('/generate') and len(slots)>1:
+                    previous=body.get('slot')
+                    position=slots.index(previous) if previous in slots else -1
+                    body={**body,'slot':slots[(position+1)%len(slots)]}
                 progress({'phase':'translating','message':f'Google временно занят · повтор через {error.seconds:g} с'})
                 until=time.monotonic()+error.seconds
                 while time.monotonic()<until:
