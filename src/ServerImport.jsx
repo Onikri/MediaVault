@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {Search,Link,CalendarDays,Download} from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import Icon from './Icons.jsx';
 import ReleaseAnnouncements from './ReleaseAnnouncements.jsx';
@@ -13,7 +14,7 @@ export default function ServerImport({state,service,onConnect,onOpenLibrary,init
  const Heading=embedded?'h2':'h1';
  return <section className={'import-workspace'+(online?' is-online':'')}>
   {!hideHeading&&<div className="import-workspace-heading"><div><p className="eyebrow">{online?'Сразу к истории':'Продолжение твоей коллекции'}</p><Heading>{online?'Смотри и читай сейчас':'Найти и сохранить'}</Heading><p>{online?'Выбери произведение и источник. Откроем здесь, без сохранения в Google Диск.':'Выбери тайтл, перевод и нужные главы или серии. Остальное сделает сервер.'}</p></div></div>}
-  <Tabs.Root value={tab} onValueChange={setTab}><Tabs.List className="import-tabs catalog-main-tabs" aria-label="Каталог и импорт"><Tabs.Trigger value="catalog">Найти произведение</Tabs.Trigger><Tabs.Trigger value="link">По ссылке</Tabs.Trigger><Tabs.Trigger value="calendar">Календарь</Tabs.Trigger>{<Tabs.Trigger value="queue">Мои загрузки{service.active&&<i className="tab-live-dot"/>}</Tabs.Trigger>}</Tabs.List>
+  <Tabs.Root value={tab} onValueChange={setTab}><Tabs.List className="import-tabs catalog-main-tabs catalog-action-bar" aria-label="Каталог и импорт"><Tabs.Trigger value="catalog"><Search size={15}/>Найти произведение</Tabs.Trigger><Tabs.Trigger value="link"><Link size={15}/>По ссылке</Tabs.Trigger><Tabs.Trigger value="calendar"><CalendarDays size={15}/>Календарь</Tabs.Trigger>{<Tabs.Trigger value="queue"><Download size={15}/>Мои загрузки{service.active&&<i className="tab-live-dot"/>}</Tabs.Trigger>}</Tabs.List>
    <Tabs.Content value="catalog"><CatalogBrowser sidebarPortal={sidebarPortal} favoritesOnly={favoritesOnly} destination={destination} initialItem={initialItem} initialKind={initialKind} initialQuery={initialQuery} onOpenLibrary={onOpenLibrary} state={state} service={service} onSubmitted={submitted} onItems={setItems}/></Tabs.Content>
    <Tabs.Content value="calendar"><ReleaseCalendar items={items}/><ReleaseAnnouncements service={service}/></Tabs.Content>
    {<Tabs.Content value="queue"><ImportQueue service={service}/></Tabs.Content>}

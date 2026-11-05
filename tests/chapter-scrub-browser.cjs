@@ -1,0 +1,21 @@
+// Real pointer positions and image decoding; chapter API/image bytes are fixtures.
+const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{chromium}=require('playwright');
+const ROOT=process.cwd(),DIR=path.join(ROOT,'.codex-local/test-output/chapter-scrub');let browser,vite,last;
+(async()=>{
+ await fs.mkdir(DIR,{recursive:true});await fs.writeFile(path.join(DIR,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/.codex-local/test-output/chapter-scrub/app.jsx"></script>');
+ await fs.writeFile(path.join(DIR,'app.jsx'),`
+ import React from'react';import{createRoot}from'react-dom/client';import Chooser from'/src/ChapterChooser.jsx';import{ThemeProvider}from'/src/blossom/ThemeProvider.tsx';import{chapterPreviewSamples}from'/src/ChapterScrubPreview.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/interface-refinement.css';
+ window.calls=[];window.samples=chapterPreviewSamples(24);window.budgets=[chapterPreviewSamples(24,{downlink:10}),chapterPreviewSamples(24,{effectiveType:'3g'}),chapterPreviewSamples(24,{saveData:true})];const service={status:'connected',server:location.origin,session:{serverVersion:42},request:async(p,o={})=>{window.calls.push(p);return p==='/online/prepare'?{id:'hover',pages:Array.from({length:24},(_,i)=>'/page/'+i+'.png')}:{}}};createRoot(document.getElementById('root')).render(<ThemeProvider><div className="title-page" style={{maxWidth:1000,margin:'40px auto'}}><Chooser cards entries={[1,2].map(number=>({url:'https://manga.fixture/'+number,number,title:'Chapter '+number}))} service={service} onChoose={()=>{}}/></div></ThemeProvider>);
+ `);
+ const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
+ for(const width of[390,1440]){
+  const page=await browser.newPage({viewport:{width,height:900}}),images=new Set(),errors=[];last=page;page.setDefaultTimeout(5000);page.on('pageerror',e=>errors.push(e.message));await page.route('**/page/*.png',async route=>{images.add(route.request().url());await route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6khAAAAAASUVORK5CYII=','base64')});});
+  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/chapter-scrub/index.html');const art=page.locator('.chapter-scrub-preview').first();const r=await art.boundingBox();
+  await page.mouse.move(r.x+3,r.y+r.height*.3);await page.mouse.move(0,0);await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>calls.length),0,'Passing the card does not start an online preview');
+  await page.mouse.move(r.x+3,r.y+r.height*.3);await page.getByText('Страница 1',{exact:true}).waitFor();assert.equal(await page.evaluate(()=>calls.filter(p=>p==='/online/prepare').length),1);
+  const next=await art.boundingBox();await page.mouse.move(next.x+next.width-3,next.y+next.height*.3);await page.getByText('Страница 24',{exact:true}).waitFor();const budgets=await page.evaluate(()=>budgets.map(b=>b.length));assert.deepEqual(budgets,[8,5,0]);
+  for(let i=0;i<8;i++){await page.mouse.move(r.x+Math.min(r.width-2,r.width*(i+.5)/8),r.y+r.height*.3);await page.waitForTimeout(120);}assert.ok(images.size<=await page.evaluate(()=>samples.length));
+  await page.mouse.move(0,0);await page.waitForTimeout(80);assert.ok(await page.evaluate(()=>calls.includes('/online/hover')),'Leaving releases the preview lease');assert.deepEqual(errors,[]);await page.close();
+ }
+ console.log('PASS chapter scrub follows card position, delay avoids passing hovers, 5/8-page budgets, save-data opt-out and lease cleanup at 390/1440px');
+})().catch(async e=>{console.error(e);if(last){console.error(await last.evaluate(()=>({calls,samples,previews:[...document.querySelectorAll('.chapter-scrub-preview')].map(n=>({bounds:n.getBoundingClientRect().toJSON(),text:n.textContent,images:[...n.querySelectorAll('img')].map(i=>i.src)}))})));await last.screenshot({path:path.join(DIR,'failure.png')});}process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

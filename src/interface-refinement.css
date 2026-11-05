@@ -102,3 +102,14 @@ html[data-blossom] .blossom-navbar #profileBtn{width:38px!important;min-width:38
 
 html[data-blossom] .blossom-navbar #profileBtn:focus-visible{outline:none!important;background:var(--color-surface-raised)}
 .mv-player .player-popover.player-settings-glass .player-setting-row .mv-select-trigger{background:var(--color-canvas)}
+
+/* Catalogue actions use the same individual quiet surfaces as collection actions. */
+html[data-blossom] .import-workspace .catalog-action-bar{display:flex;flex-wrap:wrap;gap:8px;width:100%;max-width:100%;padding:0;margin:0 0 22px;border:0;background:transparent;box-shadow:none;border-radius:0}
+html[data-blossom] .import-workspace .catalog-action-bar>button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:8px 14px;border:0;background:var(--color-canvas-soft);color:var(--color-on-muted);border-radius:100px;box-shadow:none;font-size:11px;font-weight:650;line-height:1.4;margin:0}
+html[data-blossom] .import-workspace .catalog-action-bar>button[data-state=active]{background:var(--color-blossom);color:var(--color-on-blossom,#fff)}
+html[data-blossom] .import-workspace .catalog-action-bar>button:hover{filter:brightness(1.1)}
+html[data-blossom] .online-library-workspace .catalog-search{width:100%;min-height:44px;padding:8px 12px;background:var(--color-canvas-soft);border:0;border-radius:18px;box-shadow:none}
+html[data-blossom] .title-showcase-poster-layer{transform-origin:50% 80%}
+.reader-title-group{display:flex;align-items:center;gap:10px;flex:1;min-width:0}.reader-title-group>.mv-viewer-title{flex:1;min-width:0}
+.immersive-reader[data-chrome] .reader-top{width:min(920px,calc(100% - 32px))}
+@media(max-width:640px){.reader-title-group{display:grid;gap:3px}.reader-title-group>.mv-viewer-title strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.reader-title-group .reader-chapter-menu .mv-select-trigger{height:25px;min-height:25px}.immersive-reader[data-chrome] .reader-top{width:calc(100% - 16px)}}

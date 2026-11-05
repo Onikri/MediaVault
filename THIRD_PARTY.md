@@ -334,6 +334,10 @@ IllustrationJaNai small-page enhancement uses the same attributed SPAN model
 listed above; it is not represented as the grayscale MangaJaNai model.
 
 The vendored StPageFlip 2.0.7 engine retains its full MIT licence in
-`src/vendor/stpageflip/LICENSE`. Its only local engine change makes the animation
+`src/vendor/stpageflip/LICENSE`. Its local engine changes make the animation
 loop cancellable on destroy; the upstream destroy method otherwise leaves its
 requestAnimationFrame loop running after switching reading modes.
+
+Chapter scrub transitions use the MIT Motion AnimatePresence slideshow approach: https://motion.dev/docs/react-animate-presence.
+
+The StPageFlip UI destructor also removes the resize listener when native mouse gestures are disabled; reader gestures stay owned by React.

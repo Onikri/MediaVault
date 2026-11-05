@@ -11,13 +11,14 @@ export default function TitleShowcase({background,children}){
  const {scrollYProgress}=useScroll({target:root,offset:['start start','end start']});
  const pointer=useMotionValue(0),x=useSpring(pointer,{stiffness:100,damping:25});
  const y=useTransform(scrollYProgress,[0,1],[0,390]),scale=useTransform(scrollYProgress,[0,1],[1.04,1.36]);
- const posterY=useTransform(scrollYProgress,[0,1],[0,-230]),copyY=useTransform(scrollYProgress,[0,1],[0,-125]),infoY=useTransform(scrollYProgress,[0,1],[0,-60]);
+ const posterY=useTransform(scrollYProgress,[0,1],[0,-285]),copyY=useTransform(scrollYProgress,[0,1],[0,-155]),infoY=useTransform(scrollYProgress,[0,1],[0,-65]);
+ const posterScale=useTransform(scrollYProgress,[0,1],[1,.94]);
  const posterX=useTransform(x,value=>-value*.35);
  const opacity=useTransform(scrollYProgress,[0,.6,1],[1,1,.3]),parts=Children.toArray(children);
  return <section ref={root} className={'hero-stage title-hero title-feature title-showcase is-revealed'+(!parts[2]?' without-info':'')} onPointerMove={event=>{if(!reduce&&event.pointerType==='mouse'){const r=event.currentTarget.getBoundingClientRect();pointer.set((event.clientX-r.left-r.width/2)/r.width*28);}}} onPointerLeave={()=>pointer.set(0)}>
   {background(reduce?undefined:{y,x,scale})}
   <div ref={content} className="title-showcase-content">
-   <motion.div className="title-showcase-poster-layer" style={reduce?undefined:{y:posterY,x:posterX,opacity}}>{parts[0]}</motion.div>
+   <motion.div className="title-showcase-poster-layer" style={reduce?undefined:{y:posterY,x:posterX,scale:posterScale,opacity}}>{parts[0]}</motion.div>
    <motion.div className="title-showcase-copy-layer" style={reduce?undefined:{y:copyY,opacity}}>{parts[1]}</motion.div>
    {parts[2]&&<motion.div className="title-showcase-info-layer" style={reduce?undefined:{y:infoY,opacity}}>{parts[2]}</motion.div>}
   </div>

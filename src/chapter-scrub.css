@@ -1,0 +1,18 @@
+.chapter-scrub-preview{position:relative;display:block;width:100%;height:100%;overflow:hidden;isolation:isolate;contain:paint}
+.chapter-scrub-preview>img,.chapter-scrub-preview>.chapter-scrub-sheet{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top}
+.chapter-scrub-sheet{z-index:1;pointer-events:none}
+.chapter-scrub-page{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:2;max-width:90%;padding:4px 7px;border-radius:10px;background:#111c;color:#fff;font-size:9px;white-space:nowrap;pointer-events:none}
+.online-chapter-art{width:100%;height:100%}.chapter-scrub-preview>.episode-preview-pending{height:100%}
+.reader-chapter-shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));align-content:start;gap:16px 12px}
+.reader-chapter-mini{position:relative;display:grid;gap:6px;min-width:0;align-content:start;border:0;background:transparent;color:inherit;text-align:left;padding:0;cursor:pointer}
+.reader-chapter-mini>span{position:relative;display:block;aspect-ratio:2/3;overflow:hidden;border-radius:13px;background:var(--color-canvas)}
+.reader-chapter-mini>span>img{width:100%;height:100%;object-fit:cover;object-position:top}.reader-chapter-mini svg{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);opacity:.3}
+.reader-chapter-mini b{position:absolute;left:9px;bottom:9px;font-size:18px;font-weight:500}.reader-chapter-mini strong{font-size:11px;line-height:1.4;overflow-wrap:anywhere}.reader-chapter-mini small{font-size:9px;opacity:.6}
+.reader-chapter-mini[aria-current=true]>span{box-shadow:inset 0 -4px var(--color-blossom)}.reader-chapter-mini[aria-current=true] strong{color:var(--color-blossom)}
+.reader-chapter-menu{display:flex;gap:5px;min-width:0;align-items:center}.reader-chapter-menu .mv-select-trigger{min-width:0;max-width:185px;min-height:30px;height:30px;font-size:10px;padding:4px 10px;border-radius:14px}
+.reader-chapter-menu .mv-select-trigger:first-child{max-width:92px}.reader-chapter-menu .mv-select-trigger>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:640px){.reader-chapter-menu .mv-select-trigger{max-width:94px}.reader-chapter-menu .mv-select-trigger:first-child{max-width:70px}.reader-chapter-shelf{grid-template-columns:repeat(auto-fill,minmax(86px,1fr))}}
+
+.title-episode-art::before,.title-episode-art::after{pointer-events:none}
+
+.online-chapter-entry{min-width:0}.online-chapter-entry>.title-episode-card{width:100%;display:block}

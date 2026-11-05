@@ -82,6 +82,36 @@ React player identity/theater/extension checks passed. Provider replies in manga
 browser checks are fixtures; this is not a live-source latency guarantee or a
 YouTube playback result. Standalone non-inline local readers are not retained.
 
+## Stage 4 — library surfaces, showcase layers and chapter navigation
+
+- Catalogue actions now use individual collection-style icon/label surfaces.
+  Search uses the same quiet material, without adding collection-only actions.
+- The poster, copy and facts have distinct reversible scroll velocities; the
+  poster scales subtly while the video moves behind it. Production geometry
+  remains checked from phone width through ultrawide screens.
+- Reader volume/chapter controls sit beside the title and share the Radix list
+  component. Repeated direction/chapter subtitles are removed. Chapter contents
+  use vertical mini cards, with available artwork and current-chapter indication.
+- A reusable chapter scrub preview follows pointer position across 5 or 8 sampled
+  pages, depending on connection quality. Save-data disables automatic preview.
+  Online preview preparation is delayed on hover and its lease is released on exit.
+  Local archive previews decode only selected samples into small RAM thumbnails.
+  Decorative overlays no longer intercept pointer movement; wrapped chapter cards
+  now fill their grid column instead of shrinking to the caption width.
+- The real StPageFlip book uses measured fixed page dimensions: one-page mode is
+  truly portrait, spreads use two pages. Its wrapper has real height, and custom
+  React turns are no longer blocked by the library's native-click corner filter.
+  RTL/LTR turns are covered. Existing render-loop cancellation was verified; the
+  remaining resize listener is now removed when native mouse gestures are off.
+
+Validation: real browser pointer/image decoding and 5/8-page budgets, real engine
+portrait/spread and forward/backward sheet animation at 390/1440px; one renderer
+frame while mounted and none after closing. Profile/reader checks, chapter
+thumbnail concurrency/persistence, nested library layout, reversible showcase
+layer velocities, SVG reveal/media continuity and built first-screen geometry
+passed. Production build passed. Provider/artwork data are controlled fixtures;
+these checks do not claim new ML inference or live YouTube availability.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
@@ -89,8 +119,8 @@ YouTube playback result. Standalone non-inline local readers are not retained.
 - [x] Persistent mounted playback session, navbar return/mini-view/history.
 - [x] Progressive manga inspection/first chapters (provider timing fixtures).
 - [ ] Live stream/source latency measurements across providers.
-- [ ] Library toolbar styling; visible showcase poster/copy parallax verification.
-- [ ] Reader chapter bar/cards, cursor-driven previews, one-page/spread/3D fixes.
+- [x] Library toolbar styling; visible showcase poster/copy parallax verification.
+- [x] Reader chapter bar/cards, cursor-driven previews, one-page/spread/3D fixes.
 - [ ] Adaptive page-point timeline and compact translation settings/help.
 - [ ] Language/API probe, quota/translation timings and typography/font matching.
 - [ ] Actual multi-model manga/background upscale comparison with image report.

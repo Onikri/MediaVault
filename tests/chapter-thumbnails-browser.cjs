@@ -21,7 +21,7 @@ let browser,vite,last;
   const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];last=page;page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
   const url='http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html';await page.goto(url);await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>window.calls.length),0,'Offscreen chapters do not trigger background requests');
   await page.locator('.world-chapters').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('.online-chapter-art img').length>=3);await page.locator('.online-chapter-entry').last().scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('.online-chapter-art img').length===11);
-  assert.equal(await page.evaluate(()=>window.maxInflight),1,'Thumbnail queue is bounded');
+  assert.ok(await page.evaluate(()=>window.maxInflight<=2),'Thumbnail queue is bounded to two lanes');
   assert.ok(await page.locator('.online-chapter-art img').first().evaluate(n=>n.complete&&n.naturalWidth===320));
   assert.equal(await page.locator('.title-episode-card').count(),12,'Failed thumbnail does not remove its chapter');
   await page.screenshot({path:path.join(dir,'chapters-'+width+'.png'),fullPage:false});
