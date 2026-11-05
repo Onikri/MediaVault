@@ -516,6 +516,8 @@ class VaultDrive:
             return self._manifest_cache
         catalog, _ = self._latest()
         checkpoints = []
+        checked, last_update = 0, 0
+        progress = getattr(self, 'checkpoint_progress', None)
         media = self._retry(lambda: self.drive.list_children(catalog["folderId"], mime_type=FOLDER_MIME))
         for media_folder in media:
             if media_folder.get("name") not in CATEGORIES | set(SECTION_LABELS.values()):
@@ -533,6 +535,10 @@ class VaultDrive:
                     if not asset.get("name", "").startswith("asset-"):
                         continue
                     manifests = self._retry(lambda: self.drive.list_children(asset["id"], name="manifest.enc.json"))
+                    checked += 1
+                    if progress and time.monotonic() - last_update >= 5:
+                        progress(checked)
+                        last_update = time.monotonic()
                     for manifest in manifests:
                         envelope = json.loads(self._retry(lambda: self.drive.download(manifest["id"])))
                         data = open_catalog(envelope, self._key)

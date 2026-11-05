@@ -25,6 +25,10 @@ class SourceError(RuntimeError):
     pass
 
 
+class SourceAccessError(SourceError):
+    pass
+
+
 # Use the same public browser UA as the player adapters' returned stream headers.
 # Some embeds reject a non-browser UA before their HTML can be parsed.
 USER_AGENT = DEFAULT_USER_AGENT
@@ -185,7 +189,7 @@ class PublicHttp:
                 status = response.status_code
                 response.close()
                 if status in {401, 403}:
-                    raise SourceError("Источник требует вход, проверку браузера или ограничивает доступ.")
+                    raise SourceAccessError("Источник требует вход, проверку браузера или ограничивает доступ.")
                 raise SourceError(f"Источник вернул HTTP {status}.")
             return response, url
         raise SourceError("Слишком много перенаправлений.")

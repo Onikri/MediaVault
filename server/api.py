@@ -153,6 +153,7 @@ def worker():
             def progress(event):
                 event={**event,**{key:base_counts[key]+event[key] for key in base_counts if key in event}}
                 store.update(task_id, progress=event)
+            vault.checkpoint_progress=lambda checked:progress({"operation":f"Проверяем незавершённые файлы в Drive · {checked}"})
             def cancelled():
                 return store.get(task_id)["status"] == "cancelling"
             if data.get('kind')=='enrich':
@@ -174,8 +175,9 @@ def worker():
                 store.update(task_id,status='queued',progress={**result,'phase':'queued','operation':'Ожидает следующего прохода','recover_needed':False,'message':'Следующий файл оформления — после других заданий.' if data.get('kind')=='enrich' else 'Следующая серия — после одного файла из других заданий.'})
                 wakeup.set()
             elif result["failed"]:
+                reason=store.get(task_id)["progress"].get("sourceError")
                 store.update(task_id, status="failed", progress={"phase": "failed", **result,
-                    "message": "Некоторые файлы недоступны в источнике. Сохранённые уже в коллекции; задание можно продолжить."})
+                    "message": reason or "Некоторые файлы недоступны в источнике. Сохранённые уже в коллекции; задание можно продолжить."})
             else:
                 store.update(task_id, status="completed", progress={"phase": "done", **result}, forget_key=True)
         except Exception as error:
@@ -712,7 +714,7 @@ def resume(task_id: str, subject=Depends(owner)):
     private = store.get(task_id, subject, private=True)
     if not private["data"].get("vault_key"):
         raise HTTPException(409, "Открой библиотеку и запусти новое задание: завершённые серии будут пропущены.")
-    store.update(task_id, status="queued", progress={"message": "", "phase": "queued",'cursor':0,'saved':0,'skipped':0,'failed':0,'recover_needed':True})
+    store.update(task_id, status="queued", progress={"message": "", "sourceError": "", "phase": "queued",'cursor':0,'saved':0,'skipped':0,'failed':0,'recover_needed':True})
     wakeup.set()
     return task(task_id, subject)
 

@@ -8,7 +8,7 @@ import tempfile
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from media_download import download_episode, pick_stream,video_height,expand_stream_qualities
-from source_parser import Resolver, SourceError, episode_number, public_url
+from source_parser import Resolver, SourceAccessError, SourceError, episode_number, is_alloha_player, public_url
 
 
 def episode_selection(value):
@@ -163,6 +163,26 @@ def plan_sources(job, resolver):
     return plans
 
 
+def video_import_source(job, entry, http):
+    url = entry['url']
+    parent = job['sources'][0] if is_alloha_player(url) else None
+    # Older queued imports for this film still carry the legacy embed.
+    # Resolve the exact same published dub while keeping the saved fingerprint.
+    legacy = urlsplit(url)
+    if (parent and urlsplit(parent).hostname == 'yummyanime.tv'
+            and urlsplit(parent).path == '/4660-chelovek-benzopila-reze-s7.html'
+            and legacy.hostname == 'absciss.thealloha.club'
+            and dict(parse_qsl(legacy.query)).get('translation') == '66'
+            and job['dub'] == 'Дублированный'):
+        from yummy_anime_source import REZE_PAGE, inspect
+        published = inspect(REZE_PAGE, http)
+        if published['ids'].get('mal') == 57555:
+            for dub in published['dubs']:
+                if dub['name'] == job['dub'] and dict(parse_qsl(urlsplit(dub['url']).query)).get('translation') == '66':
+                    return dub['url'], published['url']
+    return url, parent
+
+
 def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None):
     job = validate_job(value)
     if getattr(vault, "library_id", None) != job["library_id"]:
@@ -193,7 +213,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
             if job['version']>=3:identity+=':quality='+job['quality']
             label = f"Серия {number}" if number is not None else f"Видео {index}"
             emit({"current": index, "total": len(plans), "episode": number, "title": collection,
-                  "phase": "preparing", **result})
+                  "phase": "preparing", "operation": "Проверяем, есть ли этот файл в Drive", **result})
             category = "manga" if job["section"] == "manga" else "book" if job["section"] in {"ranobe", "book"} else "video"
             # Check before contacting the player, because its signed links expire.
             if vault.completed(identity, collection=collection, episode=number, category=category):
@@ -213,6 +233,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                             event["bytesTotal"] = event.pop("total")
                         if "loaded" in event:
                             event["bytesLoaded"] = event.pop("loaded")
+                        event.setdefault("operation", "")
                         emit(event)
                         phase = event.get("phase")
                         if phase != last_phase[0]:
@@ -228,13 +249,27 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                         path = download_text(entry["url"], temporary, resolver.http)
                         page = type("Chapter", (), {"title": entry["title"]})()
                     else:
-                        parent=job['sources'][0] if (urlsplit(entry['url']).hostname or '').endswith(('.stravers.live','.thealloha.club','.alloha.tv')) else None
-                        page = resolver.resolve(entry["url"],referer=parent) if parent else resolver.resolve(entry["url"])
-                        streams=expand_stream_qualities(page.streams,resolver.http)
-                        stream = pick_stream(streams, job["quality"])
-                        path = downloader(stream, temporary, http=resolver.http, quality=job["quality"], progress=report)
+                        emit({"operation": "Подключаемся к источнику видео"})
+                        url, parent = video_import_source(job, entry, resolver.http)
+                        for attempt in range(2):
+                            try:
+                                if attempt:
+                                    resolver.http.refresh_playback = True
+                                page = resolver.resolve(url,referer=parent) if parent else resolver.resolve(url)
+                                streams=expand_stream_qualities(page.streams,resolver.http)
+                                stream = pick_stream(streams, job["quality"])
+                                path = downloader(stream, temporary, http=resolver.http, quality=job["quality"], progress=report)
+                                break
+                            except SourceAccessError:
+                                if attempt or urlsplit(url).hostname != 'alloha.yani.tv' or (cancelled and cancelled()):
+                                    raise
+                                emit({"operation": "Обновляем доступ к потоку Alloha"})
+                            finally:
+                                if attempt:
+                                    resolver.http.refresh_playback = False
                 except SourceError as error:
                     result["failed"] += 1
+                    emit({"sourceError": re.sub(r'https?://\S+', '[ссылка]', str(error))[:400]})
                     log(f"  {label}: {error}")
                     continue
                 except Exception as error:
