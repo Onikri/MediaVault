@@ -1,3 +1,4 @@
+import {useRetainedMedia} from './RetainedMedia.jsx';
 import usePlaybackWarmup from './use-playback-warmup.js';
 import useSeasonSource from './use-season-source.js';
 import {episodeDetail,useFranchiseSeasons,catalogueSeasonHint} from './franchise-seasons.js';
@@ -36,6 +37,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const [browseSeason,setBrowseSeason]=useState(initialSeason),[browseData,setBrowseData]=useState(null),[browseBusy,setBrowseBusy]=useState(false),[browseError,setBrowseError]=useState(''),[browseAttempt,setBrowseAttempt]=useState(0);
  const [audioId,setAudioId]=useState(saved.current.audioId||''),[subtitleId,setSubtitleId]=useState(saved.current.subtitleId||'');
  const [entries,setEntries]=useState([]),[seasons,setSeasons]=useState([]),[variant,setVariant]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[playing,setPlaying]=useState(false),[count,setCount]=useState(24);
+ useRetainedMedia(playing,{label:item.title+' · '+season+' сезон · '+episode+' серия',kind:'video'},()=>setPlaying(false));
  const [hovering,setHovering]=useState(false),[sourceSettings,setSourceSettings]=useState(false),sourceButton=useRef(null);
  const [quality,setQuality]=useState(saved.current.quality||'best'),[bestVideo,setBestVideo]=useState(!!saved.current.bestVideo);
  const frozen=useRef(null);

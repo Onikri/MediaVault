@@ -1,3 +1,4 @@
+import {RetainedMediaProvider,VideoDock,useRetainedWorkspace} from './RetainedMedia.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import DriveServerStatus from './DriveServerStatus.jsx';
 import HistoryTimeline from './HistoryTimeline.jsx';
@@ -110,6 +111,7 @@ function EmptyState({icon='library',title,text,button,onClick}){
 function MediaVaultApp(){
   const {state,actions}=useVault();
   const importService=useImportService(state,actions);
+  const retained=useRetainedWorkspace();useEffect(()=>retained?.scope(state.user?.sub),[retained,state.user?.sub]);
   const [importTab,setImportTab]=useState('catalog');
   useLibraryProfiles(state,actions,importService.server,importService.active);
   const reduced=useReducedMotion();
@@ -176,11 +178,13 @@ function MediaVaultApp(){
   function selectCategory(id){setCategory(id);setFavoritesOnly(false);setQuery('');go('library');}
   function save(id){const next=favorites.includes(id)?favorites.filter(value=>value!==id):[...favorites,id];setFavorites(next);writeLocal(localPrefix+'_saved',next);}
   function open(item){
-    if(item.category==='video'){const title=buildTitles(state.catalog).find(t=>t.items.some(v=>v.id===item.id));setView('collection');setActiveTitle(title);titleLocation(title);}
+    if(['video','manga'].includes(item.category)){const title=buildTitles(state.catalog).find(t=>t.items.some(v=>v.id===item.id));setView('collection');setActiveTitle(title);titleLocation(title);}
     if(item.category==='audio'){setSelected(null);const queue=items.filter(i=>i.category==='audio'&&i.collectionId===item.collectionId).map(i=>({id:i.id,title:i.name.replace(/\.[^.]+$/,''),source:'library',item:i,artists:i.artists||[]}));const track=queue.find(t=>t.id===item.id);if(track)playMusic(track,queue);}else setSelected(item);
     const next=[{id:item.id,at:Date.now()},...history.filter(entry=>entry.id!==item.id)].slice(0,60);
     setHistory(next);writeLocal(localPrefix+'_history',next);
   }
+  const resumeOpen=useRef(open);resumeOpen.current=open;
+  useEffect(()=>{const restore=event=>{const item=vaultRef.current.catalog?.items.find(v=>v.id===event.detail?.id);if(item)resumeOpen.current(item);};addEventListener('mediavault:resume-item',restore);return()=>removeEventListener('mediavault:resume-item',restore);},[]);
   function showLibrarySetup(intent){libraryOpener.current=document.activeElement;setLibraryIntent(typeof intent==='string'?intent:view==='collection'?'drive':'online');setLibraryDialog(true);}
   async function openLibrary(create=false,stay=false){
     const resume=pendingRoute.current;
@@ -205,7 +209,7 @@ function MediaVaultApp(){
   const titleCard=(title,onOpen)=>{const cover=title.items.find(item=>item.category==='image')||title.items[0];return <MediaCard key={title.id} item={cover} displayName={title.profile?.title||title.name} detail={title.items.length+' '+plural(title.items.length)+' · '+formatSize(title.size)} hideSave saved={title.items.some(i=>favorites.includes(i.id))} onSave={()=>saveTitle(title)} onOpen={onOpen} readWhole={actions.readWhole} vaultKey={state.key} profile={{...title.profile,sourceId:title.profile?.sourceId||title.metadataId}} actions={actions} libraryId={state.libraryId}/>;};
 
   return <div className="app-shell" data-view={view}>
-    <AnimatedNavbar links={navigation.map(v=>({...v,icon:<Icon name={v.icon} size={17}/>}))} active={view} onNavigate={go} onSearch={find} brand={<button className="brand logo" onClick={()=>go('home')} aria-label="MediaVault — главная"><span>Media<span>Vault</span></span></button>}><MiniMusicPlayer service={importService} placement="nav" userId={state.user?.sub} prepareStream={actions.prepareStream} readWhole={actions.readWhole} resolveItem={id=>state.catalog?.items.find(i=>i.id===id)}/><NotificationBell userId={state.user?.sub} notice={state.toast} onOpenTask={()=>{setImportTab('queue');go('import');}}/><button id="profileBtn" className={'avatar-button'+(view==='profile'?' nav-active':'')} onClick={()=>go('profile')} aria-label="Открыть профиль">{state.user?<ProfileAvatar user={state.user}/>:<Icon name="user" size={21}/>}</button></AnimatedNavbar>
+    <AnimatedNavbar links={navigation.map(v=>({...v,icon:<Icon name={v.icon} size={17}/>}))} active={view} onNavigate={go} onSearch={find} brand={<button className="brand logo" onClick={()=>go('home')} aria-label="MediaVault — главная"><span>Media<span>Vault</span></span></button>}><MiniMusicPlayer service={importService} placement="nav" userId={state.user?.sub} prepareStream={actions.prepareStream} readWhole={actions.readWhole} resolveItem={id=>state.catalog?.items.find(i=>i.id===id)}/><VideoDock/><NotificationBell userId={state.user?.sub} notice={state.toast} onOpenTask={()=>{setImportTab('queue');go('import');}}/><button id="profileBtn" className={'avatar-button'+(view==='profile'?' nav-active':'')} onClick={()=>go('profile')} aria-label="Открыть профиль">{state.user?<ProfileAvatar user={state.user}/>:<Icon name="user" size={21}/>}</button></AnimatedNavbar>
     <motion.main key={view} className="app-main" initial={reduced?false:{opacity:0,y:7}} animate={{opacity:1,y:0}} transition={{duration:reduced?0:.45,ease:[.22,1,.36,1]}}>
       {view==='home'&&<>
         <HomeDiscover server={importService.server} onChoose={item=>openSearchResult(item)} onCatalog={()=>go('library')}/>
@@ -260,4 +264,4 @@ function MediaVaultApp(){
 
 function GoogleMark(){return <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.8 12.2c0-.7-.1-1.4-.2-2.1H12v4h5.5a4.7 4.7 0 0 1-2.1 3.1v2.6h3.4c2-1.8 3-4.4 3-7.6ZM12 22c2.8 0 5.1-.9 6.8-2.4l-3.4-2.6a6.2 6.2 0 0 1-9.2-3.2H2.7v2.7A10.2 10.2 0 0 0 12 22ZM6.2 13.8a6.1 6.1 0 0 1 0-3.6V7.5H2.7a10 10 0 0 0 0 9l3.5-2.7ZM12 6c1.5 0 2.8.5 3.9 1.5l3-3A10.2 10.2 0 0 0 2.7 7.5l3.5 2.7A6.1 6.1 0 0 1 12 6Z"/></svg>}
 
-export default function App(){const [room,setRoom]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('room'));useEffect(()=>{const update=()=>setRoom(new URLSearchParams(location.hash.slice(1)).get('room'));addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);return <ThemeProvider>{room?<Suspense fallback={<div className="watch-room-gate">Загружаем комнату…</div>}><WatchRoomPage identity={room}/></Suspense>:<MediaVaultApp/>}</ThemeProvider>;}
+export default function App(){const [room,setRoom]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('room'));useEffect(()=>{const update=()=>setRoom(new URLSearchParams(location.hash.slice(1)).get('room'));addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);return <ThemeProvider><RetainedMediaProvider>{room?<Suspense fallback={<div className="watch-room-gate">Загружаем комнату…</div>}><WatchRoomPage identity={room}/></Suspense>:<MediaVaultApp/>}</RetainedMediaProvider></ThemeProvider>;}

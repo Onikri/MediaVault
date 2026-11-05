@@ -10,6 +10,15 @@ class MangaInspectionTests(unittest.TestCase):
  def setUp(self):
   cache._cache.clear();cache._running.clear()
  def tearDown(self):cache._cache.clear()
+ def test_request_readability_does_not_mutate_cached_metadata(self):
+  with patch('manga_sources.inspect',return_value={'episodes':[{'number':1,'url':'chapter'}],'seasons':[]} ) as upstream:
+   first=cache.inspect('https://manga.example/title');first['readable']=True;first['episodes'][0]['url']='changed'
+   second=cache.inspect('https://manga.example/title')
+   self.assertNotIn('readable',second);self.assertEqual(second['episodes'][0]['url'],'chapter');self.assertEqual(upstream.call_count,1)
+ def test_explicit_retry_refreshes_metadata_then_verification_reuses_it(self):
+  with patch('manga_sources.inspect',return_value={'episodes':[],'seasons':[]}) as upstream:
+   cache.inspect('https://manga.example/title');cache.inspect('https://manga.example/title',refresh=True);cache.inspect('https://manga.example/title')
+   self.assertEqual(upstream.call_count,2)
  def test_summary_and_chapter_selection_share_one_actual_inspection(self):
   data={'episodes':[{'season':1,'number':1,'translator':'A'},{'season':1,'number':1,'translator':'B'},{'season':2,'number':2}], 'seasons':[{'number':1},{'number':2}]}
   calls=[]

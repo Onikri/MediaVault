@@ -56,12 +56,39 @@ These are not a real YouTube playback or new ML benchmark result.
   and select portals within real fullscreen at 390/1440px. Existing React player
   identity/theater/extension lifecycle checks and production build passed.
 
+## Stage 3 — retained media and progressive chapters
+
+- A workspace-level React host keeps the opened inline video/reader owner mounted
+  across page navigation. It pauses on leaving, retains the media element/buffer,
+  supports a navbar return action, mini view and explicit close. Only one session
+  stays active; logout/library lock removes its in-memory capabilities.
+- Recent-view history is account scoped and contains public labels/routes only.
+  Signed URLs, React props, decrypted pages and thumbnail frames are not persisted.
+  Returning scrolls to the player. Local episode selection has its own retained
+  state; the SVG reveal remains inside the live player tree.
+- Chapter metadata is published before the separate real-image check completes.
+  Automatic selection reuses that metadata instead of parsing the title again.
+  Reading/export remain gated on actual source readability; failed sources retain
+  chapter navigation and explicit retry. Source checks stop while reading/hidden.
+- The bounded server metadata cache returns isolated copies, so request-specific
+  readability flags cannot contaminate later metadata. Explicit retries refresh
+  metadata, while subsequent verification reuses the same parsed chapter list.
+
+Validation: 9 Python inspection/readability contracts, scoped-history Node test,
+real React progressive-provider checks at 390/1440px and source-health checks at
+360/1440px. Real local MP4 decoding confirms identical video DOM, retained buffer,
+position and no metadata reload after page unmount/mini-view/return. Existing
+React player identity/theater/extension checks passed. Provider replies in manga
+browser checks are fixtures; this is not a live-source latency guarantee or a
+YouTube playback result. Standalone non-inline local readers are not retained.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
 - [x] Notification bell instead of transient global toasts.
-- [ ] Persistent mounted playback session, navbar return/mini-view/history.
-- [ ] Progressive manga inspection/first chapters and stream latency measurements.
+- [x] Persistent mounted playback session, navbar return/mini-view/history.
+- [x] Progressive manga inspection/first chapters (provider timing fixtures).
+- [ ] Live stream/source latency measurements across providers.
 - [ ] Library toolbar styling; visible showcase poster/copy parallax verification.
 - [ ] Reader chapter bar/cards, cursor-driven previews, one-page/spread/3D fixes.
 - [ ] Adaptive page-point timeline and compact translation settings/help.

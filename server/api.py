@@ -575,7 +575,7 @@ def manga_inspect(body:MangaInspection,subject=Depends(owner)):
     from manga_sources import title_aliases
     from manga_inspection import inspect
     from title_identity import match_title
-    value=inspect(body.url)
+    value=inspect(body.url,refresh=body.refresh and not body.verifyPages)
     if body.title:
         if len(json.dumps(body.title).encode())>50000:raise HTTPException(422,'Слишком большое описание манги.')
         candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('identityTitles') or value.get('aliases') or [])])),'kind':'manga','year':value.get('year'),'ids':value.get('ids') or {}}

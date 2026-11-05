@@ -1,3 +1,4 @@
+import {RetainedMediaSlot} from './RetainedMedia.jsx';
 import React,{useEffect,useRef,useState} from 'react';
 import Icon from './Icons.jsx';
 import VoicePicker from './VoicePicker.jsx';
@@ -81,9 +82,9 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
       ...(selectedTranslation?.kind?{translation:{name:selectedTranslation.name,kind:selectedTranslation.kind,language:selectedTranslation.language||'und',player:selectedTranslation.player||'',variantId:selectedTranslation.id}}:{})};
     setBusy('submit');try{await service.submit(job);onSubmitted();}catch(cause){setError(cause.message);}finally{setBusy('');}
   }
-  if(kind==='manga')return <MangaImport compact={compact} destination={destination} state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary}/>;
+  if(kind==='manga'){const node=<MangaImport compact={compact} destination={destination} state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary}/>;return compact&&destination==='online'?<RetainedMediaSlot userId={state.user?.sub} id={'manga:'+state.user?.sub+':'+(item?.id||'manual')} label={item?.title||'Манга'} kind="reader">{node}</RetainedMediaSlot>:node;}
   const player=online&&<OnlineViewer sourceUrl={url} inline={compact} onEntryChange={e=>{setPlayingEntry(e);setOne(String(e.number));}} quality={quality} kind="video" entries={(compact?published:onlineEntries).map(e=>({...e,season:Number(e.season||season)}))} initial={playingEntry||onlineEntries[0]} title={collection} service={service} userId={state.user?.sub} dub={variant?.name||inspection?.dubs?.find(d=>d.url===dub)?.name||''} metadata={item} onClose={()=>setOnline(false)}/>;
-  if(compact&&destination==='online'&&(kind==='anime'||['tv','movie'].includes(kind)&&!url&&(discovery.loading||discovery.data?.voices?.length)))return <OnlineWatch item={item} profile={profile||item} discovery={discovery} service={service} userId={state.user?.sub} onSeasonBrowse={onSeasonBrowse}/>;
+  if(compact&&destination==='online'&&(kind==='anime'||['tv','movie'].includes(kind)&&!url&&(discovery.loading||discovery.data?.voices?.length)))return <RetainedMediaSlot userId={state.user?.sub} id={'watch:'+state.user?.sub+':'+(item?.ids?.mal||item?.id)} label={item?.title||'Видео'}><OnlineWatch item={item} profile={profile||item} discovery={discovery} service={service} userId={state.user?.sub} onSeasonBrowse={onSeasonBrowse}/></RetainedMediaSlot>;
   if(compact&&destination==='online')return <div className="title-playback-controls video-playback-controls">
    {['anime','tv','movie'].includes(item?.kind)&&<VoicePicker discovery={discovery} selected={variant} onChoose={value=>{setVariant(value);setInspection(null);setDub('');setOnline(false);generation.current++;if(value)inspect(value.sourceUrl,value.url);}}/>}
    {!['anime','tv','movie'].includes(item?.kind)&&found.length>0&&<label className="form-field input-label">Источник<select aria-label="Источник просмотра" className="field-input" value={url} onChange={e=>inspect(e.target.value)}><option value="">Выбери источник</option>{found.map(s=><option key={s.url} value={s.url}>{s.providerName}</option>)}</select></label>}

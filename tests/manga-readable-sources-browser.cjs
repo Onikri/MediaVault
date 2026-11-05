@@ -15,7 +15,7 @@ let browser,vite;
  for(const width of [360,1440]){
   const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');
   await page.getByText('Недоступные источники · 2',{exact:true}).waitFor();assert.equal(await page.locator('.title-source-option').count(),1);
-  assert.ok(await page.locator('.title-source-option').innerText().then(t=>t.includes('Reader 0')));assert.ok(await page.evaluate(()=>window.calls.length===3&&window.calls.every(c=>c.verifyPages===true)&&window.peak<=2));
+  assert.ok(await page.locator('.title-source-option').innerText().then(t=>t.includes('Reader 0')));assert.ok(await page.evaluate(()=>window.calls.filter(c=>c.verifyPages===true).length===3&&window.calls.filter(c=>c.verifyPages===false).length===2&&window.peak<=2));
   await page.locator('.title-source-option').click();assert.deepEqual(await page.evaluate(()=>window.chosen),['https://source.example/0']);
   await page.getByText('Недоступные источники · 2',{exact:true}).click();assert.equal(await page.getByText('Images unavailable',{exact:false}).count(),2);
   await page.getByRole('button',{name:'Повторить проверку',exact:true}).first().click();assert.deepEqual(await page.evaluate(()=>window.chosen),['https://source.example/0','https://source.example/1']);

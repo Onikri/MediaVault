@@ -1,3 +1,5 @@
+import {RetainedMediaSlot,useRetainedMedia} from './RetainedMedia.jsx';
+import PlaybackReveal from './PlaybackReveal.jsx';
 import {useEffect, useRef, useState} from 'react';
 import MangaReader from './MangaReader.jsx';
 import BookReader from './BookReader.jsx';
@@ -171,4 +173,11 @@ function LegacyMediaViewer({item,catalog,libraryId,userId,onSelectItem,onClose,r
   </section>;
 }
 
-export default function MediaViewer(props){return props.item.category==='manga'?<MangaReader {...props}/>:props.item.category==='book'?<BookReader {...props}/>:<LegacyMediaViewer {...props}/>;}
+function MediaContent(props){
+ const [item,setItem]=useState(props.item);
+ useEffect(()=>setItem(props.item),[props.item.id]);
+ useRetainedMedia(true,{label:item.name,kind:item.category==='manga'?'reader':'video'},props.onClose);
+ const current={...props,item,onSelectItem:value=>{setItem(value);props.onSelectItem?.(value);}};
+ return item.category==='manga'?<MangaReader {...current}/>:item.category==='book'?<BookReader {...current}/>:<LegacyMediaViewer {...current}/>;
+}
+export default function MediaViewer(props){const content=<MediaContent {...props}/>,node=props.reveal?<PlaybackReveal>{content}</PlaybackReveal>:content;return props.inline&&['video','manga'].includes(props.item.category)?<RetainedMediaSlot userId={props.userId} id={'drive:'+props.libraryId+':'+props.item.category+':'+(props.item.collectionId||props.item.id)} label={props.item.name} kind={props.item.category==='manga'?'reader':'video'} resumeItemId={props.item.id} restore={props.onSelectItem?()=>props.onSelectItem(props.item):undefined}>{node}</RetainedMediaSlot>:node;}

@@ -12,7 +12,7 @@ export default function ChapterChooser({entries,value,onChoose,service,cards=fal
  useEffect(()=>()=>{generation.current++;abort.current?.abort();lease.current?.();lease.current=null;},[]);
  useEffect(()=>{setCount(12);close();},[entries[0]?.url]);
  useEffect(()=>{if(!active)close();},[active]);
- async function show(entry){if(service.status!=='connected'||preview?.url===entry.url)return;await close();const version=++generation.current,controller=new AbortController();abort.current=controller;setError('');
+ async function show(entry){if(!active||service.status!=='connected'||preview?.url===entry.url)return;await close();const version=++generation.current,controller=new AbortController();abort.current=controller;setError('');
   try{const data=await service.request('/online/prepare',{method:'POST',body:{url:entry.url,kind:'manga',clientId:clientId.current},signal:controller.signal});if(version!==generation.current){await service.request('/online/'+data.id,{method:'DELETE',keepalive:true}).catch(()=>{});return;}token.current=data.id;lease.current=keepOnlineLease(service,data.id,()=>{setPreview(null);token.current=null;lease.current?.();lease.current=null;});setPreview({url:entry.url,pages:data.pages||[],index:0});}
   catch(e){if(!controller.signal.aborted)setError('Превью недоступно. Главу можно открыть отдельно.');}
  }

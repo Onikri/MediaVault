@@ -265,6 +265,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     else onError?.(Error('Конец опенинга должен быть позже его начала.'));
   }
   keyboardHandler.current=event=>{
+      if(stageRef.current?.closest('[data-mode="hidden"]'))return;
       if(event.key==='Escape'&&panel==='watch'&&theater){event.preventDefault();event.stopImmediatePropagation();setTheater(false);return;}
       if(event.key==='Escape'&&panel!=='watch'){event.preventDefault();event.stopImmediatePropagation();openPanel('watch');stageRef.current?.querySelector('[aria-label="Настройки плеера"]')?.focus();return;}
       if(panel!=='watch')return;
