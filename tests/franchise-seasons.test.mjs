@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {episodeDetail,catalogueSeasonHint} from '../src/franchise-seasons.js';
 import {inspectSeasonSource} from '../src/use-season-source.js';
+import {voicesForCatalogue} from '../src/watch-session.js';
 test('episode labels do not repeat the card heading but preserve real titles and translation notes',()=>{
  for(const title of ['Серия 2','2 серия','Эпизод 02','Episode 2','02 episode'])assert.equal(episodeDetail(title,2),undefined,title);
  assert.equal(episodeDetail('4 серия (Другой перевод: AniDUB)',4),'(Другой перевод: AniDUB)');assert.equal(episodeDetail('Серия 2 — Лекарство',2),'Лекарство');assert.equal(episodeDetail('Два лекаря',2),'Два лекаря');assert.equal(episodeDetail('Серия 20',2),'Серия 20');
@@ -21,4 +22,13 @@ test('a published bundled season URL is followed and duplicate episode numbers c
 
 test('catalogue season hints choose the actual numbered season before a bundled source is opened',()=>{
  assert.equal(catalogueSeasonHint({title:'Монолог фармацевта 3'}),3);assert.equal(catalogueSeasonHint({title:'Монолог фармацевта 3. Часть 2'}),3);assert.equal(catalogueSeasonHint({title:'Kusuriya no Hitorigoto 2nd Season'}),2);assert.equal(catalogueSeasonHint({title:'Монолог фармацевта'}),null);
+});
+
+test('sequel discovery keeps source-local season one but excludes first-season tracks from a bundled player',()=>{
+ const sources=[{url:'standalone',seasons:[{number:1}]},{url:'bundle',seasons:[{number:1},{number:2}]}];
+ const first={number:1,season:1,url:'first'},second={number:1,season:2,url:'second'};
+ const voices=[{id:'libria',variants:[{sourceUrl:'standalone',episodes:[first],url:'first'}]},{id:'mixed',variants:[{sourceUrl:'bundle',episodes:[first,second],url:'first'}]},{id:'first-only-dub',variants:[{sourceUrl:'bundle',episodes:[first],url:'first'}]}];
+ const result=voicesForCatalogue(voices,sources,2);
+ assert.deepEqual(result.map(v=>v.id),['libria','mixed']);assert.equal(result[0].variants[0].episodes[0].season,1);assert.equal(result[1].variants[0].url,'second');assert.deepEqual(result[1].variants[0].episodes,[second]);
+ assert.equal(voices[1].variants[0].episodes.length,2,'The shared catalogue cache stays unchanged');
 });

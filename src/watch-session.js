@@ -13,5 +13,17 @@ export function variantsFor(voice,episode,failed=new Set()){
  return [...(voice?.variants||[])].filter(v=>!failed.has(v.id)).sort((a,b)=>rank(a)-rank(b));
 }
 
+// A catalogue sequel can be season 1 at one publisher and season 2 in a
+// bundled player. Scope only bundled sources; keep standalone numbering intact.
+export function voicesForCatalogue(voices,sources,season){
+ if(!season)return voices;
+ const bundled=new Set((sources||[]).filter(source=>source.seasons?.length>1&&source.seasons.some(s=>Number(s.number)===Number(season))).map(source=>source.url));
+ return voices.map(voice=>({...voice,variants:voice.variants.flatMap(variant=>{
+  if(!bundled.has(variant.sourceUrl)||!variant.episodes?.length)return [variant];
+  const episodes=variant.episodes.filter(e=>Number(e.season||1)===Number(season));
+  return episodes.length?[{...variant,episodes,url:episodes[0].url}]:[];
+ })})).filter(voice=>voice.variants.length);
+}
+
 // Public source identity (not a media URL) isolates thumbnails from different mirrors.
 export function episodePreviewKey(identity,season,episode,source,user){return onlineEpisodeId(identity,season,episode)+':source:'+encodeURIComponent(source||'default')+':'+encodeURIComponent(user||'anonymous');}

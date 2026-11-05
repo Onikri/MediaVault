@@ -9,7 +9,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import OnlineViewer from './OnlineViewer.jsx';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import OnlineEpisodePreviews from './OnlineEpisodePreviews.jsx';
-import {readWatch,saveWatch,orderedVoices,variantsFor,episodePreviewKey} from './watch-session.js';
+import {readWatch,saveWatch,orderedVoices,variantsFor,episodePreviewKey,voicesForCatalogue} from './watch-session.js';
 import {readEpisodePreview,saveEpisodePreview} from './episode-preview-cache.js';
 import './watch-page.css';
 import EpisodeMotionPreview from './EpisodeMotionPreview.jsx';
@@ -31,7 +31,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const shelf=useRef(null);
  const identity=String(item.ids?.mal||item.id),saved=useRef(readWatch(userId,identity));
  const playbackMetadata=useMemo(()=>({...profile,ids:item.ids}),[profile,item.ids]);
- const voices=useMemo(()=>orderedVoices(discovery.data?.voices||[],saved.current),[discovery.data]);
+ const voices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,catalogueSeasonHint(item)),saved.current),[discovery.data,item]);
  const initialSeason=catalogueSeasonHint(basisItem)||saved.current.season||1;
  const [voiceId,setVoiceId]=useState(saved.current.voiceId||''),[episode,setEpisode]=useState(saved.current.episode||1),[season,setSeason]=useState(initialSeason);
  const [browseSeason,setBrowseSeason]=useState(initialSeason),[browseData,setBrowseData]=useState(null),[browseBusy,setBrowseBusy]=useState(false),[browseError,setBrowseError]=useState(''),[browseAttempt,setBrowseAttempt]=useState(0);
@@ -49,6 +49,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  function persist(change){saved.current=saveWatch(userId,identity,change);}
  useEffect(()=>{if(voice&&voice.id!==voiceId)setVoiceId(voice.id);},[voice?.id,voiceId]);
  async function inspect(candidate,signal,selectedSeason=season){
+  selectedSeason=catalogueSeasonHint(item)||selectedSeason;
   const key=identity+':'+candidate.id+':'+selectedSeason;if(cache.current.has(key))return cache.current.get(key);
   const seasonUrl=seasonUrls.current.get(key);
   let data,continuation,progress=-1,stalled=0;

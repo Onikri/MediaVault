@@ -449,6 +449,14 @@ class Resolver:
         return parse_page(text, final)
 
     def player(self, url, referer=None):
+        host=urlsplit(url).hostname or ''
+        if host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):
+            # This is a public iframe player, not a top-level HTML document.
+            # A plain HTTP request can be rejected even though the publisher's
+            # embedded player works. Preserve its selected audio/episode URL.
+            from browser_player import extract
+            result=extract(url,referer,details=True)
+            return Page(streams=result['streams'],subtitles=result.get('subtitles',[]))
         from anime_dl_core import AniboomPlayer, AnimediaPlayer, SibnetPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer
         from player_compat import KodikPlayer
         # Explicit registry: never ap.extract(), which also registers API-based players.

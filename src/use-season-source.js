@@ -1,7 +1,8 @@
 import {useEffect,useMemo,useState} from 'react';
 import {fetchCatalog} from './catalog.js';
 import useSourceDiscovery from './use-source-discovery.js';
-import {orderedVoices,variantsFor,readWatch} from './watch-session.js';
+import {orderedVoices,variantsFor,readWatch,voicesForCatalogue} from './watch-session.js';
+import {catalogueSeasonHint} from './franchise-seasons.js';
 
 export function profileForSeason(item){return {title:item?.title,sourceId:item?.ids?.mal,source:'shikimori',cover:item?.cover,description:item?.description,year:item?.year,format:item?.format,status:item?.status,genres:item?.genres||[],themes:item?.tags||[],characters:[],staff:[],related:[],screenshots:[],releases:item?.releases||[]};}
 const studio=value=>String(value||'').toLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
@@ -26,7 +27,7 @@ export default function useSeasonSource({workId,basisItem,basisProfile,basisDisc
  const item=isBasis?basisItem:loaded&&String(loaded.ids?.mal)===workId?loaded:null;
  const remoteDiscovery=useSourceDiscovery(isBasis?null:item,service),discovery=isBasis?basisDiscovery:remoteDiscovery;
  const profile=useMemo(()=>isBasis?basisProfile:profileForSeason(item),[isBasis,basisProfile,item]);
- const voices=useMemo(()=>orderedVoices(discovery.data?.voices||[],readWatch(userId,String(item?.ids?.mal||item?.id||''))),[discovery.data,item?.id,userId]);
+ const voices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,catalogueSeasonHint(item)),readWatch(userId,String(item?.ids?.mal||item?.id||''))),[discovery.data,item,userId]);
  const voice=voices.find(v=>studio(v.name)===studio(voiceName))||voices[0];
  useEffect(()=>{setRow(null);setError('');if(!enabled||!item||!voice){setBusy(false);return;}const abort=new AbortController();setBusy(true);
   (async()=>{let last;for(const candidate of variantsFor(voice,1)){try{return await inspectSeasonSource(service,candidate,descriptor?.number||1,abort.signal);}catch(e){abort.signal.throwIfAborted();last=e;}}throw last||Error('Для выбранного сезона источник пока не найден.');})().then(value=>{if(!abort.signal.aborted)setRow({...value,voiceId:voice.id,voice,workId,item,profile,discovery});}).catch(e=>{if(!abort.signal.aborted)setError(e.message);}).finally(()=>{if(!abort.signal.aborted)setBusy(false);});return()=>abort.abort();
