@@ -85,6 +85,49 @@ def songs(identity):
         with lock:_pending.pop(identity,None)
         pending.set()
 
+AUDIO_LINK=re.compile(r'https://a\.animethemes\.moe/[A-Za-z0-9._-]{1,200}\.ogg')
+_audio={}
+
+def theme_audio(theme_id):
+    """AnimeThemes' own audio rip of one OP/ED, played through /music/remote.
+
+    Our server proxy streams it, so OP/ED playback never depends on YouTube
+    (which refuses the Oracle datacenter IP without a saved session).
+    """
+    now=time.monotonic()
+    with lock:
+        hit=_audio.get(theme_id)
+        if hit and hit[0]>now:return hit[1]
+    import requests
+    from source_parser import USER_AGENT
+    try:
+        response=requests.get('https://api.animethemes.moe/animetheme/'+str(theme_id),
+                              params={'include':'animethemeentries.videos.audio','fields[video]':'basename','fields[audio]':'link'},
+                              headers={'User-Agent':USER_AGENT,'Accept':'application/json'},timeout=(4,15))
+        if response.status_code==404:raise HTTPException(404,'AnimeThemes не нашёл эту песню.')
+        response.raise_for_status();data=response.json()
+    except HTTPException:raise
+    except (requests.RequestException,ValueError):
+        raise HTTPException(502,'AnimeThemes сейчас не отвечает. Повтори немного позже.') from None
+    theme=data.get('animetheme') if isinstance(data,dict) else None
+    link=None
+    for entry in (theme or {}).get('animethemeentries') or []:
+        if entry.get('nsfw'):continue
+        for video in entry.get('videos') or []:
+            candidate=str((video.get('audio') or {}).get('link') or '')
+            if AUDIO_LINK.fullmatch(candidate):link=candidate;break
+        if link:break
+    if not link:raise HTTPException(404,'У этой песни нет аудио в AnimeThemes.')
+    with lock:
+        if len(_audio)>512:_audio.clear()
+        _audio[theme_id]=(now+86400,link)
+    return link
+
 def install(app):
     @app.get('/music/anime/{identity}')
     def music(identity:str):return songs(identity)
+
+    @app.get('/music/theme-audio/{theme_id}')
+    def music_theme_audio(theme_id:int):
+        if not 1<=theme_id<=10**9:raise HTTPException(422,'Некорректная песня AnimeThemes.')
+        return {'audio':theme_audio(theme_id)}

@@ -26,7 +26,7 @@ const imageURL=value=>{try{const u=new URL(value);return u.protocol==='https:'&&
 export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveItem,placement='dock',service}){
  const reduce=useReducedMotion();
  const [audioRetry,setAudioRetry]=useState(0),[embedRequest,setEmbedRequest]=useState(null);
- const state=useSyncExternalStore(subscribeMusic,musicSnapshot),track=state?.track,native=!!track&&['library','file'].includes(track.source),remote=track?.source==='url',youtube=!!track&&!native&&!remote,nav=placement==='nav',serverAudio=(youtube||remote)&&!!service?.request,audioBacked=native||serverAudio;
+ const state=useSyncExternalStore(subscribeMusic,musicSnapshot),track=state?.track,native=!!track&&['library','file'].includes(track.source),themeId=/^animethemes:(\d{1,10})$/.exec(track?.id||'')?.[1]||'',remote=track?.source==='url'||!!themeId,youtube=!!track&&!native&&!remote,nav=placement==='nav',serverAudio=(youtube||remote)&&!!service?.request,audioBacked=native||serverAudio;
  const [results,setResults]=useState([]),[selection,setSelection]=useState(null),[stream,setStream]=useState({request:null,url:''}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[playing,setPlaying]=useState(false),[saved,setSaved]=useState(false),[time,setTime]=useState(0),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[queue,setQueue]=useState(false),[expanded,setExpanded]=useState(false),[connections,setConnections]=useState(false),[metadata,setMetadata]=useState(null),[failedCover,setFailedCover]=useState('');
  const source=stream.request===state?.request?stream.url:'';const setSource=url=>setStream({request:state?.request,url});
  const selected=selection&&selection.request===state?.request?selection.id:'';const setSelected=id=>setSelection({id,request:state?.request});
@@ -94,7 +94,9 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
   (async()=>{
    if(native){let url=track.url;if(track.source==='library'){const item=track.item||methods.current.resolveItem?.(track.id);if(!item)throw Error('Открой коллекцию, в которой сохранена эта песня.');url=await methods.current.prepareStream?.(item);}if(track.source==='file'&&track.file){objectURL=URL.createObjectURL(track.file);url=objectURL;}if(!url)throw Error('Не удалось открыть аудиофайл.');if(!abort.signal.aborted)setSource(url);return;}
    if(!service?.request)throw Error('Подключи сервер Oracle в профиле для воспроизведения музыки.');
-   if(remote){setSelected(track.url);return;}
+   if(remote&&track.source==='url'){setSelected(track.url);return;}
+   // OP/ED from AnimeThemes: its own audio file, streamed by our server proxy.
+   if(themeId){const server=window.MEDIA_VAULT_CONFIG?.importServerUrl;if(!server)throw Error('Сервер музыки не подключён.');const response=await fetch(server+'/music/theme-audio/'+themeId,{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(25000)])}),data=await response.json().catch(()=>({}));if(!response.ok||!/^https:\/\/a\.animethemes\.moe\/[\w.-]+\.ogg$/.test(data.audio||''))throw Error(typeof data.detail==='string'?data.detail:'AnimeThemes не отдал аудио этой песни.');if(!abort.signal.aborted)setSelected(data.audio);return;}
    if(track.youtubeId){setSelected(track.youtubeId);return;}
    const server=window.MEDIA_VAULT_CONFIG?.importServerUrl;if(!server)throw Error('Сервер поиска музыки не подключён.');
    const response=await fetch(server+'/music/search?'+new URLSearchParams({title:identity.title,artist:identity.artist}),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(25000)])}),data=await response.json();if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Поиск записи временно недоступен.');if(abort.signal.aborted)return;setResults(data.results||[]);if(data.results?.[0]?.match)setSelected(data.results[0].id);else if(!data.results?.length)throw Error('Запись не найдена. Попробуй другое название.');

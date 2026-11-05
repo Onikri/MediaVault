@@ -1,0 +1,29 @@
+import sys,unittest
+from pathlib import Path
+from unittest.mock import patch,MagicMock
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
+from fastapi import HTTPException
+import anime_music
+
+
+def reply(payload,status=200):
+    response=MagicMock(status_code=status);response.json.return_value=payload;response.raise_for_status.return_value=None;return response
+
+
+class ThemeAudio(unittest.TestCase):
+    def setUp(self):anime_music._audio.clear()
+
+    def test_returns_first_safe_animethemes_audio_and_caches_it(self):
+        payload={'animetheme':{'animethemeentries':[{'nsfw':True,'videos':[{'audio':{'link':'https://a.animethemes.moe/Nsfw.ogg'}}]},
+                                                    {'nsfw':False,'videos':[{'audio':{'link':'https://evil.example/x.ogg'}},{'audio':{'link':'https://a.animethemes.moe/Show-OP1.ogg'}}]}]}}
+        with patch('requests.get',return_value=reply(payload)) as get:
+            self.assertEqual(anime_music.theme_audio(7),'https://a.animethemes.moe/Show-OP1.ogg')
+            self.assertEqual(anime_music.theme_audio(7),'https://a.animethemes.moe/Show-OP1.ogg')
+        self.assertEqual(get.call_count,1)
+
+    def test_missing_audio_is_a_clear_404(self):
+        with patch('requests.get',return_value=reply({'animetheme':{'animethemeentries':[{'videos':[]}]}})):
+            with self.assertRaises(HTTPException) as caught:anime_music.theme_audio(8)
+        self.assertEqual(caught.exception.status_code,404)
+
+if __name__=='__main__':unittest.main()
