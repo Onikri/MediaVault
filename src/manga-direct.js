@@ -122,7 +122,7 @@ export class DirectChapter{
    const painting=this.renderPage(blob,page,font,value=>this.notify(index,{...value,completedRegions:value.cleanedRegions||0,totalRegions:page.regions.filter(r=>r.ru_translation?.trim()).length,diagnostics:page.diagnostics}),{...config,preparedClean}).then(result=>{if(signal?.aborted){result.renderedBitmap?.close();throw signal.reason;}return result;});
    let result;try{result=await waitFor(painting,signal);}catch(error){error.stage='render';throw error;}signal?.throwIfAborted();
    result.detected=page.detected;result.detectionReport=page.detectionReport;
-   if(this.config.cache&&result.cacheImage){const {renderedBitmap,cacheImage,diagnostics,debug,...save}=result;await this.writeCache(renderCacheId,this.scope,{...save,renderedImage:cacheImage,renderedMime:'image/webp'});}delete result.cacheImage;
+   if(this.config.cache&&result.cacheImage){const {renderedBitmap,cacheImage,diagnostics,debug,...save}=result;await this.writeCache(renderCacheId,this.scope,{...save,renderedImage:cacheImage,renderedMime:'image/webp'},{chapter:this.config.contextKey,url:this.config.contextURL,index,total:this.entries.length});}delete result.cacheImage;
    result.timings={...result.timings,directTotalMs:Math.round(performance.now()-(fromMemory?renderStarted:job.started))};
    if(page.diagnostics)result.diagnostics={...page.diagnostics,stage:'ready',cleanup:result.inpaint,typesetting:result.typesetting,local:{...page.diagnostics.local,inpaintMs:result.timings.inpaintMs,typesetMs:result.timings.typesetMs,renderMs:result.timings.renderMs,totalMs:result.timings.directTotalMs}};
    return result;

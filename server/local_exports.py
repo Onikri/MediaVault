@@ -6,11 +6,13 @@ Completed files are streamed through short-lived, unguessable capabilities.
 from dataclasses import dataclass,field
 from pathlib import Path
 from urllib.parse import urlsplit
-import os,re,secrets,shutil,subprocess,tempfile,threading,time
-from fastapi import Depends,HTTPException
+import hashlib,os,re,secrets,shutil,subprocess,tempfile,threading,time
+from fastapi import Depends,HTTPException,Request
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel,ConfigDict,Field
 from source_parser import PublicHttp,Resolver,SourceError,public_url
+from manga_export import Options as MangaOptions, cached_path, verify_image
 
 GiB=1024**3
 class ExportCancelled(RuntimeError):pass
@@ -67,6 +69,7 @@ class Export:
     running:bool=False
     leases:int=0
     cancel:threading.Event=field(default_factory=threading.Event)
+    manga:dict|None=None
 
 class Budget:
     def __init__(self,job,maximum,reserve=GiB,deadline=1800):
@@ -128,8 +131,12 @@ def produce(job,progress,maximum,reserve):
         budget.check();progress({**value,'downloadedBytes':budget.downloaded})
     try:
         if job.kind=='manga':
-            from manga_download import download_chapter
-            result=download_chapter(job.url,job.directory,http,progress=update,quality=job.quality)
+            if job.manga:
+                from manga_export import produce as produce_manga
+                result=produce_manga(job,http,budget,update)
+            else:
+                from manga_download import download_chapter
+                result=download_chapter(job.url,job.directory,http,progress=update,quality=job.quality)
         else:
             from media_download import download_episode,pick_stream
             page=Resolver(http).resolve(job.url,referer=job.referer) if job.referer else Resolver(http).resolve(job.url);budget.check()
@@ -168,26 +175,54 @@ class Exports:
         if job.state=='done' and job.file:
             if job.capability_expires<=self.clock():job.capability=secrets.token_urlsafe(32);job.capability_expires=self.clock()+900
             value.update(downloadUrl='/online/exports/file/'+job.capability,downloadExpiresAt=job.capability_expires,
-                         filename='MediaVault-'+job.id[:8]+('.cbz' if job.kind=='manga' else '.mp4'),bytes=job.file.stat().st_size)
+                         filename=(re.sub(r'[<>:"/\\|?*\x00-\x1f]','_',job.manga['name']).strip(' .') or 'Манга')+'.'+job.manga['format'] if job.manga else 'MediaVault-'+job.id[:8]+('.cbz' if job.kind=='manga' else '.mp4'),bytes=job.file.stat().st_size)
         return value
     def _owned(self,owner,identity):
         job=self.jobs.get(identity)
         if job is None or job.owner!=owner or job.expires<self.clock():raise ExportMissing()
         return job
-    def start(self,owner,url,kind,quality='best',referer=None):
-        validate_request(url,kind,quality)
+    def start(self,owner,url,kind,quality='best',referer=None,manga=None):
+        manga=MangaOptions.model_validate(manga).model_dump() if manga is not None else None
+        if manga:
+            if kind!='manga':raise ValueError('Настройки глав доступны только для манги.')
+            if not manga['chapters'] and (manga['mode']!='cached' or not manga['cached']):raise ValueError('Выбери главы или готовые страницы из кэша.')
+            for chapter in manga['chapters']:validate_request(chapter['url'],'manga',quality)
+            identities={(p['chapter'],p['page']) for p in manga['cached']}
+            if len(identities)!=len(manga['cached']) or any(c>=max(1,len(manga['chapters'])) for c,p in identities):raise ValueError('Некорректный список сохранённых страниц.')
+        else:validate_request(url,kind,quality)
         referer=public_url(referer,resolve_dns=False) if referer else None
         with self.condition:
             self._cleanup()
-            same=next((j for j in self.jobs.values() if j.owner==owner and j.url==url and j.kind==kind and j.quality==quality and j.referer==referer and j.state in {'queued','running','done'}),None)
+            same=next((j for j in self.jobs.values() if j.owner==owner and j.url==url and j.kind==kind and j.quality==quality and j.referer==referer and j.manga==manga and j.state in {'staging','queued','running','done'}),None)
             if same:return self._snapshot(same)
-            active=[j for j in self.jobs.values() if j.running or j.state=='queued']
+            active=[j for j in self.jobs.values() if j.running or j.state in {'queued','staging'}]
             if len(active)>=4 or sum(j.owner==owner for j in active)>=2:raise ExportLimit('Дождись скачивания или останови предыдущее задание.')
             ready=[j for j in self.jobs.values() if j.state=='done']
             if len(ready)>=8 or sum(j.owner==owner for j in ready)>=4:raise ExportLimit('Скачай готовые файлы и убери их из списка перед новым заданием.')
             if shutil.disk_usage(self.root).free<self.reserve+32*1024**2:raise ExportLimit('На сервере недостаточно места для временного скачивания.')
             identity=secrets.token_hex(16);now=self.clock();job=Export(identity,owner,url,kind,quality,now,now+self.ttl,self.root/identity,referer=referer)
+            job.manga=manga
+            if manga and manga['cached']:
+                job.state='staging';job.progress={'phase':'staging'};job.directory.mkdir(mode=0o700)
             self.jobs[identity]=job;self.condition.notify_all();return self._snapshot(job)
+    def put_page(self,owner,identity,chapter,page,data):
+        with self.lock:
+            job=self._owned(owner,identity)
+            if job.state!='staging':raise ExportLimit('Подготовка страниц уже завершена.')
+            expected=next((v for v in job.manga['cached'] if v['chapter']==chapter and v['page']==page),None)
+            if not expected or hashlib.sha256(data).hexdigest()!=expected['imageHash']:raise ValueError('Сохранённая страница не совпадает с запросом.')
+            verify_image(data)
+            path=cached_path(job,chapter,page);previous=path.stat().st_size if path.is_file() else 0
+            size=sum(p.stat().st_size for p in job.directory.glob('cached-*.image'))
+            if size-previous+len(data)>GiB:raise ExportLimit('Кэш выбранных глав превышает 1 ГБ.')
+            if shutil.disk_usage(self.root).free<self.reserve+len(data):raise ExportLimit('На сервере недостаточно места для страниц.')
+            path.write_bytes(data);return self._snapshot(job)
+    def enqueue(self,owner,identity):
+        with self.condition:
+            job=self._owned(owner,identity)
+            if job.state!='staging':return self._snapshot(job)
+            if any(not cached_path(job,v['chapter'],v['page']).is_file() for v in job.manga['cached']):raise ValueError('Загружены не все страницы из кэша.')
+            job.state='queued';job.progress={'phase':'queued'};self.condition.notify_all();return self._snapshot(job)
     def status(self,owner,identity):
         with self.lock:self._cleanup();return self._snapshot(self._owned(owner,identity))
     def cancel(self,owner,identity):
@@ -213,11 +248,11 @@ class Exports:
                 if self.stopping:return
                 job=next((j for j in self.jobs.values() if j.state=='queued'),None)
                 if job is None:self.condition.wait(timeout=10);continue
-                job.state='running';job.running=True;job.progress={'phase':'preparing'};job.directory.mkdir(mode=0o700)
+                job.state='running';job.running=True;job.progress={'phase':'preparing'};job.directory.mkdir(mode=0o700,exist_ok=True)
             def progress(value):
                 if job.cancel.is_set():raise ExportCancelled()
                 with self.lock:
-                    job.progress={k:v for k,v in value.items() if k in {'phase','loaded','total','downloadedBytes','pagesLoaded','pagesTotal'} and isinstance(v,(str,int,float))}
+                    job.progress={k:v for k,v in value.items() if k in {'phase','message','page','chapter','chaptersTotal','loaded','total','downloadedBytes','pagesLoaded','pagesTotal'} and isinstance(v,(str,int,float))}
             try:
                 maximum=min(GiB if job.kind=='manga' else 2*GiB,max(0,(shutil.disk_usage(self.root).free-self.reserve-128*1024**2)//2))
                 if maximum<16*1024**2:raise ExportProblem('На сервере недостаточно места для временного файла.')
@@ -247,7 +282,7 @@ class Exports:
         with self.condition:
             self.stopping=True
             for job in self.jobs.values():
-                if job.running or job.state=='queued':job.cancel.set()
+                if job.running or job.state in {'queued','staging'}:job.cancel.set()
             self.condition.notify_all()
         if self.thread.is_alive():self.thread.join(timeout=6)
 
@@ -260,23 +295,38 @@ def manager():
 
 class ExportRequest(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    url:str=Field(min_length=1,max_length=8192)
+    url:str=Field(default='',max_length=8192)
     referer:str|None=Field(default=None,max_length=8192)
     kind:str=Field(pattern='^(video|manga)$')
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
+    manga:MangaOptions|None=None
 
 def install(app,owner):
     @app.post('/online/exports',status_code=202)
     def create_export(body:ExportRequest,subject=Depends(owner)):
-        try:return manager().start(subject,body.url,body.kind,body.quality,referer=body.referer)
+        try:return manager().start(subject,body.url,body.kind,body.quality,referer=body.referer,manga=body.manga.model_dump() if body.manga else None)
         except (ValueError,SourceError) as error:raise HTTPException(422,str(error)) from None
         except ExportLimit as error:raise HTTPException(429,str(error)) from None
+    @app.put('/online/exports/{identity}/pages/{chapter}/{page}')
+    async def upload_cached_page(identity:str,chapter:int,page:int,request:Request,subject=Depends(owner)):
+        data=await request.body()
+        if len(data)>30*1024**2:raise HTTPException(413,'Страница превышает 30 МБ.')
+        try:return await run_in_threadpool(manager().put_page,subject,identity,chapter,page,data)
+        except (ValueError,SourceError) as error:raise HTTPException(422,str(error)) from None
+        except ExportMissing:raise HTTPException(404,'Задание скачивания не найдено.') from None
+        except ExportLimit as error:raise HTTPException(429,str(error)) from None
+    @app.post('/online/exports/{identity}/start')
+    def start_staged_export(identity:str,subject=Depends(owner)):
+        try:return manager().enqueue(subject,identity)
+        except ValueError as error:raise HTTPException(422,str(error)) from None
+        except ExportMissing:raise HTTPException(404,'Задание скачивания не найдено.') from None
     @app.get('/online/exports/file/{capability}')
     def export_file(capability:str):
         try:job,value=manager().acquire(capability)
         except ExportMissing:raise HTTPException(410,'Ссылка скачивания истекла. Открой готовое задание снова.') from None
         try:
-            return LeaseFileResponse(job.file,filename=value['filename'],media_type='application/vnd.comicbook+zip' if job.kind=='manga' else 'video/mp4',
+            mime={'pdf':'application/pdf','zip':'application/zip','cbz':'application/vnd.comicbook+zip'}[job.manga['format']] if job.manga else 'application/vnd.comicbook+zip' if job.kind=='manga' else 'video/mp4'
+            return LeaseFileResponse(job.file,filename=value['filename'],media_type=mime,
                                 headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'},release=lambda completed:manager().release(job,completed))
         except BaseException:manager().release(job);raise
     @app.get('/online/exports/{identity}')
