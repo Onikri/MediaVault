@@ -81,6 +81,7 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
     if not executable:raise SourceError('На сервере не установлен Chromium для динамического плеера.')
     browser_paths()
     validate(url)
+    framed = (urlsplit(url).hostname or '').endswith(('.stravers.live', '.thealloha.club', '.alloha.tv'))
     if mode and referer:
         validate(referer)
     captured={};done=asyncio.Event();requests=0;selected_quality=None;requested_qualities={}
@@ -109,7 +110,10 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
         if proxy and fixture is None:launch['proxy']={'server':proxy}
         browser=await driver.chromium.launch(**launch)
         try:
-            context=await browser.new_context(service_workers='block',accept_downloads=False, **({'user_agent': USER_AGENT} if mode else {}))
+            # Alloha selects its signed CDN URLs during iframe initialization.
+            # Use the same public browser profile as subsequent media requests.
+            context_options = {'user_agent': USER_AGENT} if framed or mode else {}
+            context=await browser.new_context(service_workers='block',accept_downloads=False, **context_options)
             async def guard(route):
                 nonlocal requests
                 requests+=1
@@ -155,7 +159,6 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                 # Alloha publishes an iframe player and deliberately has no
                 # top-level UI. Load it as an ordinary public embed, preserving
                 # the selected episode URL and the publisher's Referer.
-                framed=(urlsplit(url).hostname or '').endswith(('.stravers.live','.thealloha.club','.alloha.tv'))
                 if framed:
                     if referer:
                         validate(referer)

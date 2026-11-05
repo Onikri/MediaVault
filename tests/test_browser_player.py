@@ -7,7 +7,7 @@ import sys
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from browser_player import _extract, _render, observed_streams, browser_destination,published_quality_streams
-from source_parser import SourceError
+from source_parser import SourceError, USER_AGENT
 
 class BrowserPlayerTests(unittest.TestCase):
     @unittest.skipUnless(os.environ.get('CHROMIUM_PATH') or shutil.which('chromium'), 'Chromium required')
@@ -66,13 +66,20 @@ class BrowserPlayerTests(unittest.TestCase):
         self.assertEqual([v['quality'] for v in result],[2160,480])
         self.assertNotIn('private-key',str(result));self.assertNotIn('private-cookie',str(result))
 
-    @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for active source contract')
+    @unittest.skipUnless(os.environ.get('CHROMIUM_PATH') or shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for active source contract')
     def test_alloha_active_source_map_preserves_4k_without_waiting_for_quality_switches(self):
         import json
         parent='https://publisher.example.com/film';url='https://embed.thealloha.club/?translation=66'
         heights=[360,480,720,1080,1440,2160]
         source={str(q):'https://cdn.example.com/russian-'+str(q)+'.m3u8' for q in heights}
-        markup='<video></video><script>window.player={currentSource:{audioId:"ru",quality:'+json.dumps(source)+'},otherAudio:{quality:{"2160":"https://cdn.example.com/wrong-audio.m3u8"}}};fetch("'+source['480']+'");</script>'
+        markup=(
+            '<video></video><script>'
+            'const compatible = navigator.userAgent === '+json.dumps(USER_AGENT)+';'
+            'window.player={currentSource:{audioId:"ru",quality:compatible ? '+json.dumps(source)
+            +':{"480":"https://cdn.example.com/fallback.m3u8"}},'
+            'otherAudio:{quality:{"2160":"https://cdn.example.com/wrong-audio.m3u8"}}};'
+            'fetch("'+source['480']+'");</script>'
+        )
         # No higher-quality request has completed. The active source map must
         # provide the full ladder immediately, retaining this Russian track.
         fixture={parent:('<html>Film</html>','text/html'),url:(markup,'text/html'),source['480']:('#EXTM3U','application/vnd.apple.mpegurl')}
