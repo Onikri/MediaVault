@@ -11,6 +11,7 @@ import ipaddress
 import json
 import re
 import socket
+import threading
 import time
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
@@ -42,6 +43,17 @@ BLOCKED = re.compile(
     re.I,
 )
 PLAYER_RELAY_HOSTS={'yummyanime.tv','animego.online'}
+# CDNs that block an (IP, User-Agent) pair after request bursts. Every request
+# to them from this server (playback proxy, Drive import, device download)
+# shares one pacer: at most one request per PACE_SECONDS.
+PACED_HOSTS=('.vkvideo.cloud',)
+PACE_SECONDS=0.25
+_pace_lock=threading.Lock();_pace_next=[0.0]
+def pace(url):
+    if not (urlsplit(url).hostname or '').endswith(PACED_HOSTS):return
+    with _pace_lock:
+        now=time.monotonic();wait=_pace_next[0]-now;_pace_next[0]=max(now,_pace_next[0])+PACE_SECONDS
+    if wait>0:time.sleep(wait)
 
 def is_alloha_player(url):
     host=urlsplit(url).hostname or ''
@@ -157,6 +169,7 @@ class PublicHttp:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
                 outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
         for hop in range(6):
+            pace(url)
             if self.deadline and time.monotonic() >= self.deadline:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             try:

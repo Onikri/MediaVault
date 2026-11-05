@@ -27,7 +27,10 @@ def browser_workers():
 # any other current browser UA, on any OS, is accepted. Signed URLs are not
 # bound to the extracting browser's UA, so stream fetches reuse this profile.
 YANI_ORIGIN='https://alloha.yani.tv'
-YANI_USER_AGENT='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
+# 2026-11-05: Mac Chrome/134 was burned by test bursts; this profile was
+# verified on the same signed URL (master, variant, segment). One fixed UA,
+# never rotated: the throttle is avoided by pacing, not by switching.
+YANI_USER_AGENT='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
 
 _slots=threading.BoundedSemaphore(browser_workers())
 _playback_cache=OrderedDict()
@@ -132,6 +135,11 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                 try:validate(route.request.url)
                 except SourceError:return await route.abort()
                 if requests>160 or route.request.resource_type in {'image','font'}:return await route.abort()
+                if yani and (urlsplit(route.request.url).hostname or '').endswith('.vkvideo.cloud'):
+                    # The signed ladder comes from player.currentSource; the
+                    # extraction itself must not spend CDN requests.
+                    record(route.request.url,route.request.headers)
+                    return await route.abort()
                 requested_qualities[route.request.url]=selected_quality
                 if mode and route.request.method == 'GET':
                     path = urlsplit(route.request.url).path.lower()

@@ -75,7 +75,7 @@ class BrowserPlayerTests(unittest.TestCase):
         markup=(
             '<video></video><script>'
             'const compatible = navigator.userAgent === '+json.dumps(USER_AGENT)
-            +' || (location.hostname === "alloha.yani.tv" && navigator.userAgent.includes("Chrome/134."));'
+            +' || (location.hostname === "alloha.yani.tv" && navigator.userAgent === '+json.dumps(YANI_USER_AGENT)+');'
             'window.player={currentSource:{audioId:"ru",quality:compatible ? '+json.dumps(source)
             +':{"480":"https://cdn.example.com/fallback.m3u8"}},'
             'otherAudio:{quality:{"2160":"https://cdn.example.com/wrong-audio.m3u8"}}};'
@@ -233,3 +233,16 @@ class AllohaThrottlePolicy(unittest.TestCase):
         self.assertFalse(self.bp.rejected(url,self.PARENT));self.assertEqual(self.bp._cooldown,{})
 
 if __name__=='__main__':unittest.main()
+
+
+class CdnPacing(unittest.TestCase):
+    def test_throttling_cdn_requests_are_spaced_and_others_are_not(self):
+        import source_parser
+        source_parser._pace_next[0]=0.0
+        sleeps=[]
+        from unittest.mock import patch
+        with patch('source_parser.time.sleep',side_effect=sleeps.append):
+            for _ in range(3):source_parser.pace('https://47-a1-95-r503.vkvideo.cloud/0/x')
+            source_parser.pace('https://cdn.example.com/x.m3u8')
+        self.assertEqual(len(sleeps),2)
+        self.assertTrue(all(0<v<=source_parser.PACE_SECONDS*2+.05 for v in sleeps))

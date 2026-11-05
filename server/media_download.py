@@ -16,7 +16,7 @@ from urllib.parse import urljoin, urlsplit
 
 import m3u8
 
-from source_parser import MAX_VIDEO, SourceError, playback_headers
+from source_parser import MAX_VIDEO, PACED_HOSTS, SourceError, playback_headers
 
 
 def expand_stream_qualities(streams, http):
@@ -178,7 +178,9 @@ class HlsDownload:
                 if self.total>MAX_VIDEO:raise SourceError('Превышен лимит размера видео.')
                 if saved%10==0 or saved==len(downloads):self.progress({'phase':'downloading','loaded':saved,'total':len(downloads),'downloadedBytes':self.total})
         try:
-            with ThreadPoolExecutor(max_workers=4 if hasattr(self.http,'fork') else 1) as executor:
+            # Alloha's CDN throttles a burst from one IP/UA: two paced workers.
+            paced=any((urlsplit(url).hostname or '').endswith(PACED_HOSTS) for url,_,_ in downloads[:3])
+            with ThreadPoolExecutor(max_workers=(2 if paced else 4) if hasattr(self.http,'fork') else 1) as executor:
                 # map submits references only; media remains on disk, not in RAM.
                 for _ in executor.map(download,downloads):pass
         finally:

@@ -59,4 +59,7 @@ class PlaybackResolver:
 
     def document(self,http,url,headers=None,refresh=False):
         key=('manifest',url,tuple(sorted((headers or {}).items())))
-        return self.get(key,lambda:http.document(url,headers=headers),ttl=90,refresh=refresh,preview=getattr(http,'preview',False))[0]
+        # Alloha's signed manifests live as long as their 20 min extraction:
+        # re-reading them every 90 s only adds requests to a throttling CDN.
+        ttl=1200 if (urlsplit(url).hostname or '').endswith('.vkvideo.cloud') else 90
+        return self.get(key,lambda:http.document(url,headers=headers),ttl=ttl,refresh=refresh,preview=getattr(http,'preview',False))[0]
