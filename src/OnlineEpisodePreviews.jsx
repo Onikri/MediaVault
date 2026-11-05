@@ -1,10 +1,10 @@
 import {useEffect,useRef} from 'react';
 import {captureEpisodePreview,readEpisodePreview} from './episode-preview-cache.js';
-import {episodePreviewKey} from './watch-session.js';
+import {episodePreviewKey,isShortEpisodeClip} from './watch-session.js';
 
 // Two bounded low-quality decoders with separate leases. Starting actual
 // playback aborts this work immediately, so thumbnails never compete with it.
-export async function frame(source,type,signal,multiple=false,onPartial){
+export async function frame(source,type,signal,multiple=false,onPartial,minimumDuration=0){
  const video=document.createElement('video');video.muted=true;video.playsInline=true;video.crossOrigin='anonymous';video.preload='auto';
  let hls,timer,abortListener,stopped=false;
  try{
@@ -12,7 +12,7 @@ export async function frame(source,type,signal,multiple=false,onPartial){
    let target=0,index=0,targets=[],images=[];
    const fail=()=>resolve('');
    const capture=()=>{if(video.readyState<2||Math.abs(video.currentTime-target)>=1)return;const image=captureEpisodePreview(video);if(!image)return;images.push(image);if(images.length>1)onPartial?.([...images]);if(++index>=targets.length)resolve(multiple?images:images[0]);else{target=targets[index];video.currentTime=target;}};
-   video.onloadedmetadata=()=>{targets=(multiple?[Math.min(2,(video.duration||0)*.02),(video.duration||0)*.27,(video.duration||0)*.47,(video.duration||0)*.68]:[Math.min(2,(video.duration||0)*.02)]).map(t=>Math.max(0,Math.min((video.duration||0)-.1,t)));target=targets[0];if(target>0)video.currentTime=target;};
+   video.onloadedmetadata=()=>{if(isShortEpisodeClip(video.duration,minimumDuration)){fail();return;}targets=(multiple?[Math.min(2,(video.duration||0)*.02),(video.duration||0)*.27,(video.duration||0)*.47,(video.duration||0)*.68]:[Math.min(2,(video.duration||0)*.02)]).map(t=>Math.max(0,Math.min((video.duration||0)-.1,t)));target=targets[0];if(target>0)video.currentTime=target;};
    video.onseeked=capture;video.onloadeddata=capture;video.onerror=fail;
    abortListener=fail;signal.addEventListener('abort',fail,{once:true});timer=setTimeout(fail,multiple?30000:15000);
    if(signal.aborted){fail();return;}
@@ -28,7 +28,7 @@ export async function frame(source,type,signal,multiple=false,onPartial){
  }finally{stopped=true;clearTimeout(timer);signal.removeEventListener('abort',abortListener);hls?.destroy();video.pause();video.removeAttribute('src');video.load();}
 }
 
-export default function OnlineEpisodePreviews({entries,active,service,sourceUrl,sourceId,identity,season,userId,onPreview}){
+export default function OnlineEpisodePreviews({entries,active,service,sourceUrl,sourceId,identity,season,userId,onPreview,minimumDuration=0}){
  const client=useRef('previews-'+crypto.randomUUID()),publish=useRef(onPreview);publish.current=onPreview;
  useEffect(()=>{
   if(!active||!sourceUrl||navigator.connection?.saveData)return;
@@ -41,12 +41,12 @@ export default function OnlineEpisodePreviews({entries,active,service,sourceUrl,
    try{
     const data=await service.request('/online/prepare',{method:'POST',body:{url:entry.url,referer:sourceUrl,kind:'video',quality:'360',clientId:client.current+'-'+index,...(Number(service.session?.serverVersion)>=49?{purpose:'preview'}:{})},signal:abort.signal});lease=data.id;
     if(abort.signal.aborted)continue;
-    const image=await frame(service.server.replace(/\/$/,'')+data.url,data.type,abort.signal);
+    const image=await frame(service.server.replace(/\/$/,'')+data.url,data.type,abort.signal,false,undefined,minimumDuration);
     if(image&&!abort.signal.aborted)publish.current(entry.number,image);
    }catch{if(abort.signal.aborted)return;}
    finally{if(lease)service.request('/online/'+lease,{method:'DELETE',keepalive:true}).catch(()=>{});}
   }}await Promise.all([lane(0),lane(1)]);})();
   return()=>abort.abort();
- },[entries,active,sourceUrl,sourceId,identity,season,userId,service.server]);
+ },[entries,active,sourceUrl,sourceId,identity,season,userId,service.server,minimumDuration]);
  return null;
 }

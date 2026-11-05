@@ -21,6 +21,7 @@ import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 import {contiguousBufferEnd} from './watch-quality.js';
 import {useImperativeHandle} from 'react';
+import {isShortEpisodeClip} from './watch-session.js';
 import usePlayerController from './player-controller.js';
 import {clock,keyFor,readResume,openerKey} from './player-runtime.js';
 import {PlayerContext,usePlayerSession,usePlayerExtensions,usePlayerMediaSession} from './player-session.js';
@@ -36,7 +37,7 @@ function VolumeGlyph({value,muted}){
     <path className="volume-wave" style={{opacity:level===0?1:0}} d="m14 10 6 6m0-6-6 6"/>
   </svg>;
 }
-export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onPlaybackRecovered,onlineControls,onPreview,onClose,autoPlay=false,characterService,extensions=[],apiRef,roomControl}){
+export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onPlaybackRecovered,minimumDuration=0,onRejectedSource,onlineControls,onPreview,onClose,autoPlay=false,characterService,extensions=[],apiRef,roomControl}){
   const controller=usePlayerController({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose,autoPlay,characterService,roomControl});
   const {timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress}=controller;
   const api=usePlayerSession(controller);
@@ -59,9 +60,9 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
 
       <div className="mv-player-stage">
         <video ref={videoRef} className="mv-player-touch-surface mv-player-media" {...gestures.surface} src={streaming.hls?undefined:source||undefined} crossOrigin="anonymous" playsInline preload="auto" muted={muted||!!onlineControls?.audio&&!audioError}
-          onLoadedMetadata={loaded} onLoadedData={()=>{const image=captureEpisodePreview(videoRef.current);if(onPreview&&image){previewCaptured.current=item.id;onPreview(item.episode,image);}}} onTimeUpdate={onTime} onProgress={()=>{const v=videoRef.current;if(v)setBuffered(contiguousBufferEnd(v.buffered,v.currentTime));}}
+          onLoadedMetadata={event=>{const video=event.currentTarget;if(isShortEpisodeClip(video.duration,minimumDuration)){video.pause();onRejectedSource?.(Error('Источник вернул короткий ролик вместо полной серии.'));return;}loaded();}} onLoadedData={event=>{if(isShortEpisodeClip(event.currentTarget.duration,minimumDuration))return;const image=captureEpisodePreview(videoRef.current);if(onPreview&&image){previewCaptured.current=item.id;onPreview(item.episode,image);}}} onTimeUpdate={onTime} onProgress={()=>{const v=videoRef.current;if(v)setBuffered(contiguousBufferEnd(v.buffered,v.currentTime));}}
           onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPlaying={()=>onPlaybackRecovered?.()} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);if(videoRef.current?.readyState>=1)writeProgress(userId,libraryId,item,videoRef.current?.currentTime||0,videoRef.current?.duration);}}
-          onDurationChange={loaded} onEnded={ended}
+          onDurationChange={event=>{if(!isShortEpisodeClip(event.currentTarget.duration,minimumDuration))loaded();}} onEnded={ended}
           onError={()=>{if(source)diagnoseVideoFailure({video:videoRef.current,source}).then(message=>onError?.(Error(message))).catch(()=>{});}}
           aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}{onlineControls?.externalCaptions?.map(t=><track key={t.url} kind="subtitles" src={t.url} srcLang={t.language||'ru'} label={t.name}/>)}</video>
         {onlineControls?.audio&&<video ref={external.ref} hidden style={{display:"none"}} className="mv-external-audio" src={onlineControls?.audio?.type==='hls'?undefined:onlineControls?.audio?.url} crossOrigin="anonymous" playsInline preload="metadata" aria-hidden="true" onError={()=>{if(onlineControls?.audio)setAudioError('Отдельная озвучка не ответила. Включён исходный звук.');}}/>}
