@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {notificationStore} from './notification-store.js';
 
 export function validateServer(value){
   if(!value?.trim())return '';
@@ -39,11 +40,14 @@ export function useImportService(state,actions){
   const client=useMemo(()=>createImportClient(server,()=>live.current.token),[server,state.user?.sub]);
   const refreshSignature=useRef('');
   const enrichmentRequested=useRef('');
+  const previousJobs=useRef(new Map());
   const active=jobs.some(job=>['queued','running','cancelling'].includes(job.status));
   function setServer(value){const address=validateServer(value);try{localStorage.setItem('mediavault_import_server',address);}catch{}setAddress(address);}
   useEffect(()=>{
     let closed=false,timer,checking=false,nextSessionCheck=0;
-    setSession(null);setJobs([]);setError('');refreshSignature.current='';
+    setSession(null);setJobs([]);setError('');refreshSignature.current='';previousJobs.current.clear();
+    const noticeKey='mv_job_states_v1:'+state.user?.sub+':'+server;let lastPoll=0;
+    try{const saved=JSON.parse(localStorage.getItem(noticeKey)||'{}');previousJobs.current=new Map(saved.states||[]);lastPoll=Number(saved.at)||0;}catch{}
     if(!server||!state.admin||!state.user||!state.token){setStatus(server?'disconnected':'unconfigured');return;}
     async function update(force=false){
       if(checking||closed)return;checking=true;clearTimeout(timer);
@@ -53,6 +57,12 @@ export function useImportService(state,actions){
         const access=(!cached||force||(!cached.driveConnected&&Date.now()>nextSessionCheck))?await client.authenticate():cached;
         nextSessionCheck=Date.now()+30000;
         const response=await client.request('/jobs');
+        if(!closed){
+          const notices=notificationStore(state.user?.sub);
+          for(const job of response.jobs||[]){const prior=previousJobs.current.get(job.id);if((prior?prior!==job.status:lastPoll>0&&job.updated*1000>lastPoll)&&['completed','failed','waiting_auth'].includes(job.status))notices.push({id:'job:'+job.id+':'+job.status+':'+job.updated,taskId:job.id,bad:job.status!=='completed',message:(job.progress?.title||'Задание')+' · '+({completed:'готово',failed:'нужно продолжить',waiting_auth:'нужен фоновый доступ Drive'}[job.status])});}
+          previousJobs.current=new Map((response.jobs||[]).map(j=>[j.id,j.status]));
+          lastPoll=Date.now();try{localStorage.setItem(noticeKey,JSON.stringify({states:[...previousJobs.current],at:lastPoll}));}catch{}
+        }
         const connection=response.driveConnection,nextAccess=connection?client.patchSession({driveConnected:connection.connected,driveNeedsConsent:connection.needsConsent}):access;
         if(!closed){setSession(nextAccess);setJobs(response.jobs||[]);setStatus('connected');setError('');}
       }catch(cause){if(!closed){setStatus('error');setError(cause.message);}}

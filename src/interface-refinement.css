@@ -83,3 +83,22 @@ html[data-blossom] .online-library-workspace>.library-workspace-main{min-width:0
 .pause-character.is-selected{box-shadow:none!important;background:color-mix(in srgb,var(--color-canvas) 88%,transparent)!important}.pause-character{border:0!important;backdrop-filter:blur(18px);transition:opacity .25s,background .2s,transform .2s}.pause-character:hover{transform:translateY(-1px)}
 .queue-auth-wait{padding:16px;margin:12px 0 20px;border-radius:18px;background:var(--color-canvas-soft);font-size:12px}.queue-auth-wait p{font-size:11px;color:var(--color-on-muted);line-height:1.6}.queue-auth-wait button{border:0;border-radius:99px;background:var(--color-blossom);color:white;padding:9px 13px;font-size:11px}.music-connection-heading h2{display:flex;align-items:center;gap:8px}
 .music-session-link{display:block;font-size:10px;color:var(--color-blossom);margin-top:9px;line-height:1.5}
+
+/* A single compact settings column; every selection uses the shared control. */
+.mv-player .player-popover.player-settings-glass{padding:10px;border:0;border-radius:20px;background:color-mix(in srgb,var(--color-canvas-soft) 94%,transparent);box-shadow:0 12px 36px rgb(0 0 0/.22);backdrop-filter:blur(24px)}
+.mv-player .player-popover.player-settings-glass #player-settings{height:min(270px,calc(var(--player-menu-height) - 20px));min-height:0}
+.mv-player .player-popover.player-settings-glass .mv-player-settings{grid-template-columns:minmax(0,1fr)!important;gap:5px!important}
+.mv-player .player-popover.player-settings-glass .player-setting-row{grid-column:auto!important;min-width:0}
+.mv-player .player-popover.player-settings-glass .player-settings-page{overflow:auto;scrollbar-width:thin;scrollbar-color:var(--color-blossom) transparent}
+.mv-player .player-popover.player-settings-glass .player-settings-tabs{padding-bottom:8px;gap:3px}
+.mv-player .player-popover.player-settings-glass .player-settings-tabs button{border-radius:50%;box-shadow:none;width:28px;height:28px;min-height:28px}
+.mv-player .player-popover.player-settings-glass .player-setting-row .mv-select-trigger{width:100%;height:28px;min-height:28px;font-size:11px;border-radius:10px}
+.mv-player .mv-player-top-selectors{gap:6px}
+.mv-player .mv-player-top-selectors>label{margin:0}
+.mv-player .mv-player-top-selectors .mv-select-trigger,.mv-player .mv-player-top-selectors>button{height:28px;min-height:28px;padding:0 10px;border:0;border-radius:99px;background:color-mix(in srgb,var(--color-canvas-soft) 86%,transparent);font-size:11px;box-shadow:none}
+html[data-blossom] .blossom-navbar #profileBtn{width:38px!important;min-width:38px!important;max-width:38px!important;height:38px!important;min-height:38px!important;flex:0 0 38px!important;padding:0!important;border:0!important;border-radius:50%!important;box-shadow:none!important;aspect-ratio:1}
+.queue-toolbar .mv-select-trigger{min-width:120px;font-size:11px}
+@media(max-width:700px){.queue-toolbar .mv-select-trigger{width:100%;min-width:0}}
+
+html[data-blossom] .blossom-navbar #profileBtn:focus-visible{outline:none!important;background:var(--color-surface-raised)}
+.mv-player .player-popover.player-settings-glass .player-setting-row .mv-select-trigger{background:var(--color-canvas)}

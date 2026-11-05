@@ -6,8 +6,8 @@ import CatalogBrowser from './CatalogBrowser.jsx';
 import ImportSelection from './ImportSelection.jsx';
 import {ImportSettings,ImportQueue,ReleaseCalendar} from './ImportParts.jsx';
 import './import-workspace.css';
-export default function ServerImport({state,service,onConnect,onOpenLibrary,initialItem,initialQuery,initialKind,destination='drive',embedded=false,hideHeading=false,sidebarPortal,favoritesOnly=false}){
- const [target,setTarget]=useState(destination),[tab,setTab]=useState('catalog'),[items,setItems]=useState([]),online=destination==='online';
+export default function ServerImport({state,service,onConnect,onOpenLibrary,initialItem,initialQuery,initialKind,destination='drive',initialTab='catalog',embedded=false,hideHeading=false,sidebarPortal,favoritesOnly=false}){
+ const [target,setTarget]=useState(destination),[tab,setTab]=useState(initialTab),[items,setItems]=useState([]),online=destination==='online';
  const submitted=()=>setTab('queue');
  useEffect(()=>{if(initialQuery)setTab('catalog');},[initialQuery]);
  const Heading=embedded?'h2':'h1';

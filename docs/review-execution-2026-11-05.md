@@ -37,10 +37,29 @@ The browser uses real MP4 decoding for timeline previews, while stall events and
 queue/provider responses are controlled fixtures. Production build passed.
 These are not a real YouTube playback or new ML benchmark result.
 
+## Stage 2 — shared controls and notifications
+
+- Added pinned MIT Radix Select/Switch primitives with existing AniView tokens.
+  Player settings, season selection and queue controls share the same select.
+  Lists stay in the player in fullscreen; settings switches retain real player
+  preference updates. Remaining reader/catalogue controls will migrate later.
+- Player settings use one compact column, a narrower panel and stable tab height.
+  Profile/notification icon buttons keep equal dimensions on mobile and desktop.
+- Notifications collect behind the navbar bell instead of global toast overlays.
+  Records are account-scoped, bounded to 100, persisted in browser storage, and
+  repeated messages are grouped. Read/all-read/clear actions are provided.
+- Task transitions create notifications with a queue action. Last-seen job states
+  survive reopening the browser so newly completed background work can surface.
+  Existing history is not flooded into notifications on first activation.
+- Focused browser checks cover season/speed selection, switches, stable settings
+  height, retained media element, actual navbar with music, notification persistence,
+  and select portals within real fullscreen at 390/1440px. Existing React player
+  identity/theater/extension lifecycle checks and production build passed.
+
 ## Next stages
 
-- [ ] Shared selects/switches, circular icon buttons, compact player settings.
-- [ ] Notification bell instead of transient global toasts.
+- [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
+- [x] Notification bell instead of transient global toasts.
 - [ ] Persistent mounted playback session, navbar return/mini-view/history.
 - [ ] Progressive manga inspection/first chapters and stream latency measurements.
 - [ ] Library toolbar styling; visible showcase poster/copy parallax verification.

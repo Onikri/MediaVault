@@ -1,3 +1,4 @@
+import NotificationBell from './NotificationBell.jsx';
 import DriveServerStatus from './DriveServerStatus.jsx';
 import HistoryTimeline from './HistoryTimeline.jsx';
 import ProfileAvatar from './ProfileAvatar.jsx';
@@ -109,6 +110,7 @@ function EmptyState({icon='library',title,text,button,onClick}){
 function MediaVaultApp(){
   const {state,actions}=useVault();
   const importService=useImportService(state,actions);
+  const [importTab,setImportTab]=useState('catalog');
   useLibraryProfiles(state,actions,importService.server,importService.active);
   const reduced=useReducedMotion();
   const [view,setView]=useState(()=>readOnlineTitle()||browseRoute()?'library':new URLSearchParams(location.hash.slice(1)).has('title')?'collection':['home','library','collection','import','history','profile'].includes(location.hash.slice(1))?location.hash.slice(1):'home');
@@ -203,7 +205,7 @@ function MediaVaultApp(){
   const titleCard=(title,onOpen)=>{const cover=title.items.find(item=>item.category==='image')||title.items[0];return <MediaCard key={title.id} item={cover} displayName={title.profile?.title||title.name} detail={title.items.length+' '+plural(title.items.length)+' · '+formatSize(title.size)} hideSave saved={title.items.some(i=>favorites.includes(i.id))} onSave={()=>saveTitle(title)} onOpen={onOpen} readWhole={actions.readWhole} vaultKey={state.key} profile={{...title.profile,sourceId:title.profile?.sourceId||title.metadataId}} actions={actions} libraryId={state.libraryId}/>;};
 
   return <div className="app-shell" data-view={view}>
-    <AnimatedNavbar links={navigation.map(v=>({...v,icon:<Icon name={v.icon} size={17}/>}))} active={view} onNavigate={go} onSearch={find} brand={<button className="brand logo" onClick={()=>go('home')} aria-label="MediaVault — главная"><span>Media<span>Vault</span></span></button>}><MiniMusicPlayer service={importService} placement="nav" userId={state.user?.sub} prepareStream={actions.prepareStream} readWhole={actions.readWhole} resolveItem={id=>state.catalog?.items.find(i=>i.id===id)}/><button id="profileBtn" className={'avatar-button'+(view==='profile'?' nav-active':'')} onClick={()=>go('profile')} aria-label="Открыть профиль">{state.user?<ProfileAvatar user={state.user}/>:<Icon name="user" size={21}/>}</button></AnimatedNavbar>
+    <AnimatedNavbar links={navigation.map(v=>({...v,icon:<Icon name={v.icon} size={17}/>}))} active={view} onNavigate={go} onSearch={find} brand={<button className="brand logo" onClick={()=>go('home')} aria-label="MediaVault — главная"><span>Media<span>Vault</span></span></button>}><MiniMusicPlayer service={importService} placement="nav" userId={state.user?.sub} prepareStream={actions.prepareStream} readWhole={actions.readWhole} resolveItem={id=>state.catalog?.items.find(i=>i.id===id)}/><NotificationBell userId={state.user?.sub} notice={state.toast} onOpenTask={()=>{setImportTab('queue');go('import');}}/><button id="profileBtn" className={'avatar-button'+(view==='profile'?' nav-active':'')} onClick={()=>go('profile')} aria-label="Открыть профиль">{state.user?<ProfileAvatar user={state.user}/>:<Icon name="user" size={21}/>}</button></AnimatedNavbar>
     <motion.main key={view} className="app-main" initial={reduced?false:{opacity:0,y:7}} animate={{opacity:1,y:0}} transition={{duration:reduced?0:.45,ease:[.22,1,.36,1]}}>
       {view==='home'&&<>
         <HomeDiscover server={importService.server} onChoose={item=>openSearchResult(item)} onCatalog={()=>go('library')}/>
@@ -213,7 +215,7 @@ function MediaVaultApp(){
         <footer className="app-footer"><BrandMark/><span>MediaVault</span><a href={guide} target="_blank" rel="noopener noreferrer">Справка</a></footer>
       </>}
 
-      {view==='import'&&<ServerImport state={state} service={importService} initialItem={importTarget} initialQuery={importQuery} initialKind={importKind} onOpenLibrary={showLibrarySetup} onConnect={showLibrarySetup}/>}
+      {view==='import'&&<ServerImport initialTab={importTab} state={state} service={importService} initialItem={importTarget} initialQuery={importQuery} initialKind={importKind} onOpenLibrary={showLibrarySetup} onConnect={showLibrarySetup}/>}
 
       {['library','collection'].includes(view)&&<>
         <div className="page-title-row"><div><p className="eyebrow">Каталог</p><h1 className="page-title">{view==='library'?'Библиотека':'Моя коллекция'}</h1><p className="page-subtitle">{view==='library'?'Поиск в онлайн-каталогах и источниках.':<><span id="count">{items.length} файлов</span>{items.length>0?' · '+formatSize(totalSize):''}</>}</p></div><Icon name="library" size={29}/></div>
@@ -251,7 +253,7 @@ function MediaVaultApp(){
 
     <Dialog.Root open={libraryDialog} onOpenChange={value=>{setLibraryDialog(value);if(!value){setPassphrase('');setAgain('');}}}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="server-dialog import-library-dialog" onCloseAutoFocus={event=>{event.preventDefault();libraryOpener.current?.isConnected&&libraryOpener.current.focus({preventScroll:true});}}><Dialog.Close className="icon-button dialog-close" aria-label="Закрыть подключение библиотеки"><Icon name="close" size={18}/></Dialog.Close><Dialog.Title>{onlineAccess?'Онлайн-просмотр':'Библиотека для импорта'}</Dialog.Title><Dialog.Description>Выбранные тайтл, озвучка и серии останутся на странице.</Dialog.Description>{!state.user?<button className="btn btn-primary" disabled={busy} onClick={actions.login}><GoogleMark/>Войти через Google</button>:!state.admin?<><p>Войди владельцем: roma.shevchenko2020@gmail.com.</p><button className="btn btn-secondary" onClick={actions.logout}>Сменить аккаунт</button></>:onlineAccess?<><p>{importService.error||'Подключаем источники. Google Диск открывать не требуется.'}</p><button className="btn btn-primary" onClick={()=>importService.refresh().catch(()=>{})}>Подключить сервер</button></>:!state.driveConnected?<button className="btn btn-primary" disabled={busy} onClick={actions.connectDrive}>Разрешить доступ к библиотеке</button>:!state.catalog?<LibrarySetup state={state} libraryId={libraryId} setLibraryId={setLibraryId} passphrase={passphrase} setPassphrase={setPassphrase} again={again} setAgain={setAgain} onOpen={create=>openLibrary(create,true)} onFind={actions.findMyLibrary}/>:<button className="btn btn-primary" onClick={()=>setLibraryDialog(false)}>Библиотека открыта — продолжить</button>}</Dialog.Content></Dialog.Portal></Dialog.Root>
     {searchOpen&&<SearchDialog service={importService} onClose={()=>setSearchOpen(false)} onChoose={item=>openSearchResult(item)} onBrowse={(query,kind)=>openSearchResult(null,query,kind)}/> }
-    {state.toast&&<div id="toast" className={'toast'+(state.toast.bad?' toast-bad':'')} role="status"><Icon name={state.toast.bad?'close':'check'} size={18}/><span>{state.toast.message}</span><button className="icon-button" aria-label="Закрыть уведомление" onClick={actions.clearToast}><Icon name="close" size={16}/></button></div>}
+
     {selected&&selected.category!=='video'&&state.catalog&&<MediaViewer userId={state.user?.sub} key={selected.category==='manga'?'manga-reader':selected.id} item={selected} catalog={state.catalog} libraryId={state.libraryId} onSelectItem={open} onClose={closeViewer} readWhole={actions.readWhole} readRange={actions.readRange} readerService={importService} prepareStream={actions.prepareStream} onError={actions.error}/>}
   </div>;
 }

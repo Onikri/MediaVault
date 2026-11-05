@@ -46,6 +46,8 @@
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.86",
     "@radix-ui/react-dialog": "1.1.15",
+    "@radix-ui/react-select": "2.4.1",
+    "@radix-ui/react-switch": "1.4.1",
     "@radix-ui/react-tabs": "1.1.13",
     "@wllama/wllama": "3.8.1",
     "anime4k.js": "1.1.3",

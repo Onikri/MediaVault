@@ -22,8 +22,8 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
   await page.locator('.mv-timeline-frame img').waitFor();assert.equal(await page.locator('.mv-timeline-frame video').evaluate(v=>getComputedStyle(v).display),'none');
   const main=await page.locator('.mv-player').boundingBox(),picture=await page.locator('video.mv-player-media').boundingBox();assert.ok(picture.width<=main.width+1&&picture.height<=main.height+1,'Real video stays inside player');
   await page.getByText('Извлекаем кадр для превью',{exact:true}).waitFor();assert.equal(await page.locator('.queue-task').count(),2,'Merged duplicates are history, not active queue entries');
-  await page.getByRole('button',{name:'Таблица',exact:true}).click();await page.getByLabel('Состояние заданий',{exact:true}).selectOption('active');assert.equal(await page.locator('.queue-task').count(),1);
-  await page.getByLabel('Группировка заданий',{exact:true}).selectOption('type');await page.getByRole('heading',{name:/^Оформление/}).waitFor();
+  await page.getByRole('button',{name:'Таблица',exact:true}).click();await page.getByRole('combobox',{name:'Состояние заданий',exact:true}).click();await page.getByRole('option',{name:'Активные',exact:true}).click();assert.equal(await page.locator('.queue-task').count(),1);
+  await page.getByRole('combobox',{name:'Группировка заданий',exact:true}).click();await page.getByRole('option',{name:'По операции',exact:true}).click();await page.getByRole('heading',{name:/^Оформление/}).waitFor();
   await page.screenshot({path:path.join(DIR,'queue-player-'+width+'.png'),fullPage:true});assert.deepEqual(errors,[]);await page.close();
  }
  console.log('PASS recoverable stall, parent notice recovery, actual preview decoding, contained video and queue filters at 390/1440px');
