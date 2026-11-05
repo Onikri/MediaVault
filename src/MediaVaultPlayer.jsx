@@ -4,7 +4,8 @@ import RoomConversation from './RoomConversation.jsx';
 import {roomControlRows} from './WatchRoomControls.jsx';
 import './watch-room.css';
 import './interface-refinement.css';
-import {Music2,Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown,Clapperboard,Users} from 'lucide-react';
+import {Music2,Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown,Users,RotateCcw,RotateCw,Captions,Download,RectangleHorizontal} from 'lucide-react';
+import './player-redesign.css';
 import './player.css';
 import './player-refinement.css';
 import './player-comfort.css';
@@ -51,6 +52,18 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   }
   const selectorSeasons=onlineControls?.seasonOptions||seasons;
   usePlayerMediaSession(api);
+  const toggleCaptions=controller.toggleCaptions;
+  // Online sessions are capability URLs: the server remuxes the playing
+  // quality into one MP4 (no re-encode). Rooms relay someone else's stream.
+  const onlineMatch=/^(https?:\/\/[^/]+)\/online\/([\w-]{20,80})\/([\w-]{10,40})$/.exec(source||'');
+  const canDownload=!roomControl&&!room.info&&(!!onlineMatch||String(source||'').startsWith('blob:'));
+  function download(){
+    const name=[library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,''),episode?.label].filter(Boolean).join(' · ')||'MediaVault';
+    const current=streaming.levels.find(l=>l.index===streaming.level)?.height,best=Math.max(0,...streaming.levels.map(l=>l.height||0));
+    const requested=onlineControls?.quality&&onlineControls.quality!=='best'?Number(onlineControls.quality):0;
+    const href=onlineMatch?onlineMatch[1]+'/online/'+onlineMatch[2]+'/'+onlineMatch[3]+'/download?'+new URLSearchParams({height:String(current||requested||best||0),name}):source;
+    const link=document.createElement('a');link.href=href;link.download=name+'.mp4';link.rel='noopener';document.body.append(link);link.click();link.remove();
+  }
   return <PlayerContext.Provider value={api}><div className={'player-room-layout'+(room.info?' has-live-room':'')}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
     style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls} data-player="mediavault">
@@ -139,15 +152,23 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
           style={{'--played':progress+'%','--buffered':Math.max(progress,seekable?buffered/duration*100:0)+'%'}}/></div>
         <div className="mv-player-controls">
           <div className="mv-player-control-group">
-            <button className="mv-player-play" aria-label={playing?'Пауза':'Воспроизвести'} onClick={toggle} disabled={!source}><AnimatePresence initial={false}><motion.span key={playing?'pause':'play'} initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:.9}} transition={{duration:reducedMotion?0:.14}}>{playing?<Pause size={21} fill="currentColor"/>:<Play size={21} fill="currentColor"/>}</motion.span></AnimatePresence></button>
-            <button aria-label={effectiveVolume===0?'Включить звук':'Отключить звук'} onClick={()=>{if(effectiveVolume===0){setMuted(false);if(!prefs.volume)changePrefs({volume:1});}else setMuted(true);}}><VolumeGlyph value={prefs.volume} muted={muted}/></button>
-            <input className="mv-player-volume" type="range" min="0" max="1" step=".05" value={prefs.volume} aria-label="Громкость" onChange={event=>{setMuted(false);changePrefs({volume:Number(event.target.value)});}}/>
+            <button className="mv-player-play" aria-label={playing?'Пауза':'Воспроизвести'} onClick={toggle} disabled={!source}><AnimatePresence initial={false} mode="popLayout"><motion.span key={playing?'pause':'play'} initial={reducedMotion?false:{opacity:0,scale:.5,rotate:playing?-90:90}} animate={{opacity:1,scale:1,rotate:0}} exit={reducedMotion?undefined:{opacity:0,scale:.5}} transition={{type:'spring',stiffness:520,damping:30}}>{playing?<Pause size={22} fill="currentColor" strokeWidth={0}/>:<Play size={22} fill="currentColor" strokeWidth={0}/>}</motion.span></AnimatePresence></button>
+            <motion.button whileTap={reducedMotion?undefined:{rotate:-40,scale:.9}} className="mv-player-jump" aria-label="Назад на 10 секунд" title="Назад 10 с · ←" disabled={!seekable} onClick={()=>seek(time-10)}><RotateCcw size={20}/><small aria-hidden="true">10</small></motion.button>
+            <motion.button whileTap={reducedMotion?undefined:{rotate:40,scale:.9}} className="mv-player-jump" aria-label="Вперёд на 10 секунд" title="Вперёд 10 с · →" disabled={!seekable} onClick={()=>seek(time+10)}><RotateCw size={20}/><small aria-hidden="true">10</small></motion.button>
+            <div className="mv-player-volume-group"><button aria-label={effectiveVolume===0?'Включить звук':'Отключить звук'} title="Звук · M" onClick={()=>{if(effectiveVolume===0){setMuted(false);if(!prefs.volume)changePrefs({volume:1});}else setMuted(true);}}><VolumeGlyph value={prefs.volume} muted={muted}/></button>
+            <input className="mv-player-volume" type="range" min="0" max="1" step=".05" value={effectiveVolume} aria-label="Громкость" style={{'--volume':effectiveVolume*100+'%'}} onChange={event=>{setMuted(false);changePrefs({volume:Number(event.target.value)});}}/></div>
             <span className="mv-player-time">{clock(time)} <span>/ {clock(duration)}</span></span>
           </div>
           <div className="mv-player-control-group">
-            {room.info&&<button className="room-active-control" title="Настройки комнаты" aria-label={'Комната · '+(room.state?.members.filter(m=>m.online).length||1)+' участников'} aria-pressed={settingsOpen&&settingsTab==='room'} onClick={()=>{setSettingsTab('room');openPanel('settings');}}><Users size={19}/><span className="room-participant-badge">{room.state?.members.filter(m=>m.online).length||1}</span></button>}<button title={effectiveOpening?"Пропустить опенинг":"Отметить опенинг"} aria-label="Пропуск и разметка опенинга" onClick={()=>{if(effectiveOpening&&time<effectiveOpening.end)seek(effectiveOpening.end);else{setSettingsTab("intro");openPanel("settings");}}}><SkipForward size={19}/></button><button title="Кинотеатр" aria-label="Режим кинотеатра" aria-pressed={theater} onClick={cinema}><Clapperboard size={19}/></button><button aria-label={isPip?'Закрыть мини-окно':'Мини-окно'} aria-pressed={isPip} title="Мини-окно" disabled={!document.pictureInPictureEnabled&&!('webkitSetPresentationMode' in HTMLVideoElement.prototype)} onClick={pip}><PictureInPicture2 size={19}/></button>
-            {musicIdentity&&<button ref={musicButton} aria-label="Музыка из аниме" aria-expanded={musicOpen} onClick={()=>openPanel(musicOpen?'watch':'music')}><Music2 size={19}/></button>}<button ref={settingsButton} className={settingsOpen?'is-active':''} aria-label="Настройки плеера" aria-expanded={settingsOpen} onClick={()=>{setSettingsTab('watch');setMusicOpen(false);openPanel(settingsOpen?'watch':'settings');}}><SettingsGlyph/></button>
-            <button aria-label={isFullscreen?'Выйти из полноэкранного режима':'На весь экран'} onClick={fullscreen}>{isFullscreen?<Minimize2 size={20}/>:<Maximize2 size={20}/>}</button>
+            {room.info&&<button className="room-active-control" title="Настройки комнаты" aria-label={'Комната · '+(room.state?.members.filter(m=>m.online).length||1)+' участников'} aria-pressed={settingsOpen&&settingsTab==='room'} onClick={()=>{setSettingsTab('room');openPanel('settings');}}><Users size={20}/><span className="room-participant-badge">{room.state?.members.filter(m=>m.online).length||1}</span></button>}
+            {controller.nextEpisode&&episodes[index+1]&&<motion.button whileHover={reducedMotion?undefined:{x:2}} aria-label="Следующая серия" title={'Следующая серия · '+(episodes[index+1]?.label||'')} onClick={controller.nextEpisode}><SkipForward size={20}/></motion.button>}
+            <button aria-label={subtitle==='off'?'Включить субтитры':'Выключить субтитры'} aria-pressed={subtitle!=='off'} title="Субтитры · C" onClick={toggleCaptions}><motion.span className="mv-icon" animate={{scale:subtitle!=='off'&&!reducedMotion?[1,1.18,1]:1}} transition={{duration:.25}}><Captions size={20}/></motion.span></button>
+            {canDownload&&<motion.button whileTap={reducedMotion?undefined:{y:2}} aria-label="Скачать видео" title="Сохранить серию на компьютер" onClick={download}><Download size={20}/></motion.button>}
+            {musicIdentity&&<button ref={musicButton} aria-label="Музыка из аниме" aria-expanded={musicOpen} onClick={()=>openPanel(musicOpen?'watch':'music')}><Music2 size={20}/></button>}
+            <button ref={settingsButton} className={settingsOpen?'is-active':''} aria-label="Настройки плеера" aria-expanded={settingsOpen} onClick={()=>{setSettingsTab('watch');setMusicOpen(false);openPanel(settingsOpen?'watch':'settings');}}><motion.span className="mv-icon" animate={{rotate:settingsOpen&&!reducedMotion?90:0}} transition={{type:'spring',stiffness:300,damping:20}}><Settings2 size={20}/></motion.span></button>
+            <button aria-label={isPip?'Закрыть мини-окно':'Мини-окно'} aria-pressed={isPip} title="Мини-окно" disabled={!document.pictureInPictureEnabled&&!('webkitSetPresentationMode' in HTMLVideoElement.prototype)} onClick={pip}><PictureInPicture2 size={20}/></button>
+            <button className="mv-player-theater" title="Кинотеатр" aria-label="Режим кинотеатра" aria-pressed={theater} onClick={cinema}><RectangleHorizontal size={20}/></button>
+            <button aria-label={isFullscreen?'Выйти из полноэкранного режима':'На весь экран'} title="Полный экран · F" onClick={fullscreen}><AnimatePresence initial={false} mode="popLayout"><motion.span className="mv-icon" key={isFullscreen?'min':'max'} initial={reducedMotion?false:{scale:isFullscreen?1.4:.6,opacity:0}} animate={{scale:1,opacity:1}} exit={reducedMotion?undefined:{opacity:0}} transition={{duration:.18}}>{isFullscreen?<Minimize2 size={20}/>:<Maximize2 size={20}/>}</motion.span></AnimatePresence></button>
           </div>
         </div>
       </div>

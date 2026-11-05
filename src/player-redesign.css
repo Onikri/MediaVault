@@ -1,0 +1,75 @@
+/* MediaVault player, 2026 redesign. Loaded last; scoped to the player root.
+   Tokens: src/blossom/tokens.css (--color-*, --radius-*, --motion-*). */
+.mv-player[data-player="mediavault"]{--track:4px;--track-hover:7px;--control:40px}
+
+/* Console: one calm gradient, no hard band. */
+.mv-player[data-player="mediavault"] .mv-player-console{padding:56px 18px 12px;background:linear-gradient(180deg,transparent,#05060a80 38%,#05060ae6)}
+
+/* Timeline: thin rail that thickens on hover; a capsule handle only while
+   pointing or dragging (no permanent dot). */
+.mv-player[data-player="mediavault"] .mv-player-timeline{position:relative;height:22px;display:flex;align-items:center;cursor:pointer;--h:var(--track)}
+.mv-player[data-player="mediavault"] .mv-player-timeline:hover,.mv-player[data-player="mediavault"] .mv-player-timeline:focus-within{--h:var(--track-hover)}
+.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]{-webkit-appearance:none;appearance:none;position:relative;z-index:2;width:100%;height:22px;margin:0;padding:0;background:transparent;cursor:pointer;touch-action:none}
+.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]::-webkit-slider-runnable-track{height:var(--h);border-radius:99px;background:linear-gradient(90deg,var(--color-blossom) 0 var(--played),#ffffff59 var(--played) var(--buffered),#ffffff26 var(--buffered) 100%);transition:height var(--motion-fast,180ms) var(--ease-expressive)}
+.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]::-moz-range-track{height:var(--h);border-radius:99px;background:linear-gradient(90deg,var(--color-blossom) 0 var(--played),#ffffff59 var(--played) var(--buffered),#ffffff26 var(--buffered) 100%)}
+.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:5px;height:18px;margin-top:calc((var(--h) - 18px)/2);border:0;border-radius:3px;background:#fff;box-shadow:0 0 0 1px #0004,0 2px 10px #0008;opacity:0;transform:scaleY(.4);transition:opacity var(--motion-fast,180ms),transform var(--motion-fast,180ms) var(--ease-expressive)}
+.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]::-moz-range-thumb{width:5px;height:18px;border:0;border-radius:3px;background:#fff;box-shadow:0 2px 10px #0008;opacity:0;transition:opacity var(--motion-fast,180ms)}
+.mv-player[data-player="mediavault"] .mv-player-timeline:hover input[type=range]::-webkit-slider-thumb,.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]:active::-webkit-slider-thumb,.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]:focus-visible::-webkit-slider-thumb{opacity:1;transform:scaleY(1)}
+.mv-player[data-player="mediavault"] .mv-player-timeline:hover input[type=range]::-moz-range-thumb,.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]:focus-visible::-moz-range-thumb{opacity:1}
+.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]:focus-visible{outline:none}
+.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]:focus-visible::-webkit-slider-runnable-track{box-shadow:0 0 0 2px #fff6}
+/* Opening/ending: soft segments on the rail. */
+.mv-player[data-player="mediavault"] .mv-timeline-markers{position:absolute;inset:0;z-index:1;pointer-events:none}
+.mv-player[data-player="mediavault"] .mv-timeline-markers i{position:absolute;top:50%;height:var(--h);transform:translateY(-50%);border-radius:99px;background:#f2c46d59;box-shadow:inset 0 0 0 1px #f2c46d33;transition:height var(--motion-fast,180ms)}
+
+/* Control bar. */
+.mv-player[data-player="mediavault"] .mv-player-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px}
+.mv-player[data-player="mediavault"] .mv-player-control-group{display:flex;align-items:center;gap:2px;min-width:0}
+.mv-player[data-player="mediavault"] .mv-player-control-group button{position:relative;display:grid;place-items:center;width:var(--control);min-width:var(--control);height:var(--control);min-height:var(--control);padding:0;border:0;border-radius:11px;background:transparent;color:#ffffffde;cursor:pointer;transition:background-color var(--motion-fast,180ms),color var(--motion-fast,180ms)}
+.mv-player[data-player="mediavault"] .mv-player-control-group button:hover{background:#ffffff17;color:#fff}
+.mv-player[data-player="mediavault"] .mv-player-control-group button:disabled{opacity:.35;cursor:default;background:transparent}
+.mv-player[data-player="mediavault"] .mv-player-control-group button[aria-pressed=true],.mv-player[data-player="mediavault"] .mv-player-control-group button.is-active{color:var(--color-blossom-light);background:color-mix(in srgb,var(--color-blossom) 16%,transparent)}
+.mv-player[data-player="mediavault"] .mv-player-control-group button:focus-visible{outline:2px solid #fffc;outline-offset:1px}
+.mv-player[data-player="mediavault"] .mv-icon{display:grid;place-items:center}
+.mv-player[data-player="mediavault"] .mv-player-play{width:44px;min-width:44px;height:44px;border-radius:50%!important;background:#ffffff1f!important;color:#fff!important}
+.mv-player[data-player="mediavault"] .mv-player-play:hover{background:#fff!important;color:#0b0b0f!important}
+.mv-player[data-player="mediavault"] .mv-player-play>span{position:absolute;inset:0;display:grid;place-items:center}
+.mv-player[data-player="mediavault"] .mv-player-jump small{position:absolute;inset:0;display:grid;place-items:center;padding-top:1px;font:700 8px/1 var(--font-ui);pointer-events:none}
+/* Volume: icon, slider slides out on hover/focus (desktop). */
+.mv-player[data-player="mediavault"] .mv-player-volume-group{display:flex;align-items:center;border-radius:11px;transition:background-color var(--motion-fast,180ms)}
+.mv-player[data-player="mediavault"] .mv-player-volume-group:hover,.mv-player[data-player="mediavault"] .mv-player-volume-group:focus-within{background:#ffffff12}
+.mv-player[data-player="mediavault"] .mv-player-volume{display:block;-webkit-appearance:none;appearance:none;width:0;height:4px;margin:0;opacity:0;border-radius:99px;background:linear-gradient(90deg,#fff 0 var(--volume),#ffffff40 var(--volume) 100%);transition:width var(--motion-standard,300ms) var(--ease-expressive),opacity var(--motion-fast,180ms),margin var(--motion-standard,300ms)}
+.mv-player[data-player="mediavault"] .mv-player-volume-group:hover .mv-player-volume,.mv-player[data-player="mediavault"] .mv-player-volume-group:focus-within .mv-player-volume{width:76px;margin:0 12px 0 2px;opacity:1}
+.mv-player[data-player="mediavault"] .mv-player-volume::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 4px #0008}
+.mv-player[data-player="mediavault"] .mv-player-volume::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:#fff}
+.mv-player[data-player="mediavault"] .mv-player-time{margin-left:8px;font:500 13px/1 var(--font-ui);font-variant-numeric:tabular-nums;color:#fff;letter-spacing:.01em}
+.mv-player[data-player="mediavault"] .mv-player-time>span{color:#ffffff8c}
+.mv-player[data-player="mediavault"] .room-participant-badge{right:3px;top:3px}
+
+/* Theater only makes sense on wide screens. */
+@media (max-width:1099px){.mv-player[data-player="mediavault"] .mv-player-theater{display:none!important}}
+/* Phones: fewer, larger targets. Volume is the hardware buttons. */
+@media (max-width:640px){
+ .mv-player[data-player="mediavault"]{--control:40px}
+ .mv-player[data-player="mediavault"] .mv-player-console{padding:40px 8px 6px}
+ .mv-player[data-player="mediavault"] .mv-player-controls{gap:4px}
+ .mv-player[data-player="mediavault"] .mv-player-control-group{gap:0}
+ .mv-player[data-player="mediavault"] .mv-player-volume-group,.mv-player[data-player="mediavault"] .mv-player-jump,.mv-player[data-player="mediavault"] .mv-player-control-group button[title="Мини-окно"]{display:none}
+ .mv-player[data-player="mediavault"] .mv-player-time{margin-left:4px;font-size:12px}
+ .mv-player[data-player="mediavault"] .mv-player-time>span{display:inline}
+ .mv-player[data-player="mediavault"] .mv-player-play{width:40px;min-width:40px;height:40px}
+}
+@media (pointer:coarse){.mv-player[data-player="mediavault"]{--track:5px;--track-hover:5px}.mv-player[data-player="mediavault"] .mv-player-timeline input[type=range]::-webkit-slider-thumb{opacity:1;transform:none;width:14px;height:14px;border-radius:50%;margin-top:calc((var(--h) - 14px)/2)}}
+@media (prefers-reduced-motion:reduce){.mv-player[data-player="mediavault"] *{transition:none!important}}
+
+/* Settings as a bottom sheet on phones (PlayerPopover adds .is-sheet). */
+.player-popover.is-sheet{left:0!important;right:0!important;bottom:0!important;top:auto!important;width:100%!important;max-height:min(72svh,560px)!important;border-radius:22px 22px 0 0!important;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.player-popover.is-sheet::before{content:'';display:block;width:36px;height:4px;margin:8px auto 4px;border-radius:99px;background:#ffffff40}
+.player-popover-scrim.is-sheet{background:#0007;backdrop-filter:blur(2px)}
+/* Portal host for the phone settings sheet: carries .mv-player only so the
+   scoped menu styles apply; it must not look or lay out like a player. */
+.mv-player.mv-sheet-host{position:fixed!important;inset:0!important;z-index:2147483000;width:auto!important;height:auto!important;min-height:0!important;aspect-ratio:auto!important;margin:0!important;padding:0!important;background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important;pointer-events:none}
+.mv-player.mv-sheet-host>*{pointer-events:auto}
+@media (max-width:640px){.mv-player[data-player="mediavault"] .mv-player-control-group>button.mv-player-jump,.mv-player[data-player="mediavault"] .mv-player-control-group>.mv-player-volume-group,.mv-player[data-player="mediavault"] .mv-player-control-group>button[title="Мини-окно"]{display:none}}
+@media (max-width:400px){.mv-player[data-player="mediavault"] .mv-player-time>span{display:none}}
+.mv-player .player-popover.is-sheet{background:var(--color-canvas-soft)!important;backdrop-filter:none!important;padding-left:16px!important;padding-right:16px!important;box-shadow:0 -18px 50px #000a!important;border:1px solid var(--color-border)!important;border-bottom:0!important}

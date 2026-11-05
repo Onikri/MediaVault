@@ -39,7 +39,7 @@ export function usePlayerUi(){
 export function usePlayerSession(controller){
  const latest=useRef(controller);latest.current=controller;
  return useMemo(()=>{
-  const call=(name,...args)=>latest.current[name](...args);
+  const call=(name,...args)=>latest.current[name]?.(...args);
   return {
    get media(){return latest.current.videoRef.current;},
    get root(){return latest.current.stageRef.current;},
