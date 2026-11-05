@@ -31,7 +31,7 @@ USER_AGENT = DEFAULT_USER_AGENT
 MAX_DOCUMENT = 4 * 1024 * 1024
 MAX_VIDEO = 40 * 1024**3
 BLOCKED = re.compile(
-    r"/cdn-cgi/challenge-platform|cf-chl-|__cf_chl_|checking your browser|"
+    r"/cdn-cgi/challenge-platform(?!/scripts/jsd/)|cf-chl-|__cf_chl_|checking your browser|"
     r"enable javascript and cookies to continue|verify (?:that )?you are human|"
     r"<title[^>]*>\s*(?:just a moment|access denied)|"
     r"[\"'](?:subscription_required|requires_subscription|requires_authentication)[\"']\s*:\s*true",
@@ -393,6 +393,10 @@ def parse_page(text, base):
     text=public_player_html(text,base)
     if BLOCKED.search(text):
         raise SourceError("Источник требует проверку браузера или подписку.")
+    from anistar_source import player_page
+    published = player_page(text, base)
+    if published is not None:
+        return published
     parser = PageParser(base)
     parser.feed(text)
     # Public inline player configuration; scripts are read as text, never executed.

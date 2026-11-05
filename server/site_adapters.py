@@ -144,6 +144,10 @@ def parse_search(site, text, base, query=""):
 def player_choices(text, base):
     """Kodik publishes real translation/season IDs in its HTML select options."""
     from player_catalog import alloha_choices
+    from anistar_source import choices as anistar_choices
+    published = anistar_choices(text, base)
+    if published:
+        return published, []
     alloha,seasons=alloha_choices(text,base)
     if alloha:return alloha,seasons
     soup = BeautifulSoup(text, "html.parser")

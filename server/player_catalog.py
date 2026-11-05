@@ -17,6 +17,8 @@ CVH_API='https://plapi.cdnvideohub.com/api/v1/player/sv'
 
 def player_name(url):
     host=urlsplit(url).hostname or ''
+    from anistar_source import is_player
+    if is_player(url):return 'AniStar'
     if host in {'jut.su','www.jut.su'}:return 'Jut.su'
     if host.endswith(('.stravers.live','.thealloha.club','.alloha.tv')):return 'Alloha (динамический)'
     if host in KODIK:return 'Kodik'
