@@ -186,7 +186,7 @@ function MediaVaultApp(){
     if(ok){setPassphrase('');setAgain('');setCategory('all');if(stay)setLibraryDialog(false);else if(resume)setView('collection');else go('collection');}
   }
   async function connect(){const ok=await actions.connectDrive();if(ok&&state.catalog)go('collection');}
-  async function upload(event){const files=Array.from(event.target.files||[]);event.target.value='';if(importService.active){actions.error(Error("Дождись завершения серверного импорта перед добавлением файлов."));return;}if(files.length&&await actions.refreshCatalog())actions.uploadFiles(files,{collection:uploadCollection,section:uploadSection==='auto'?(category==='all'?undefined:category):uploadSection,part:uploadPart});}
+  async function upload(event){const files=Array.from(event.target.files||[]);event.target.value='';if(files.length&&await actions.refreshCatalog())actions.uploadFiles(files,{collection:uploadCollection,section:uploadSection==='auto'?(category==='all'?undefined:category):uploadSection,part:uploadPart});}
   async function sendInvite(){if(await actions.invite(inviteEmail))setInviteEmail('');}
   function find(){setSearchOpen(true);}
   function openSearchResult(item,query='',kind='anime'){if(item?.kind==='music')playMusic({id:'youtube:'+item.youtubeId,youtubeId:item.youtubeId,title:item.title,artists:item.artists||[],source:'youtube'});go('library');setCategory(item?.kind||kind);setCatalogSearch(old=>({revision:old.revision+1,item,query}));setSearchOpen(false);}

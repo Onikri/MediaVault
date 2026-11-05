@@ -47,6 +47,32 @@ class TaskStore:
                 if 'cursor' not in progress:
                     progress['cursor']=max(0,int(progress.get('current',1))- (0 if progress.get('phase')=='episode_done' else 1))
                 self.database.execute("UPDATE tasks SET status='queued',progress=? WHERE id=?",(self.seal(progress,identity),identity))
+        self.coalesce_enrichment()
+
+    @staticmethod
+    def enrichment_scope(owner,data):
+        if data.get('kind')!='enrich':return None
+        return (owner,data.get('library_id'),data.get('title_id') or '',data.get('vault_key'))
+
+    def coalesce_enrichment(self):
+        """Keep legacy duplicate jobs as history; only one runs per identical scope.
+
+        Called at startup after interrupted workers have been recovered. Keep the
+        earliest cursor so that partially completed work can never be skipped.
+        """
+        with self.lock,self.database:
+            groups={}
+            for identity,owner,raw,progress in self.database.execute("SELECT id,owner,data,progress FROM tasks WHERE status='queued'").fetchall():
+                data=self.open(raw,identity);scope=self.enrichment_scope(owner,data)
+                if scope is not None:groups.setdefault(scope,[]).append((identity,data,self.open(progress,identity)))
+            for rows in groups.values():
+                if len(rows)<2:continue
+                keeper=min(rows,key=lambda r:r[2].get('cursor',0))[0]
+                for identity,data,progress in rows:
+                    if identity==keeper:continue
+                    data.pop('vault_key',None)
+                    progress.update(phase='merged',mergedInto=keeper,message='Повторное оформление объединено с существующим заданием. Готовые файлы сохранены.')
+                    self.database.execute("UPDATE tasks SET status='merged',updated=?,data=?,progress=? WHERE id=?",(time.time(),self.seal(data,identity),self.seal(progress,identity),identity))
 
     def seal(self, value, aad):
         nonce = os.urandom(12)
@@ -74,6 +100,10 @@ class TaskStore:
             existing = self.database.execute("SELECT id FROM tasks WHERE owner=? AND idempotency=?", (owner, idempotency)).fetchone()
             if existing:
                 return self.get(existing[0], owner)
+            scope=self.enrichment_scope(owner,data)
+            if scope is not None:
+                for row in self.database.execute("SELECT id,data FROM tasks WHERE owner=? AND status IN ('queued','running')",(owner,)).fetchall():
+                    if self.enrichment_scope(owner,self.open(row[1],row[0]))==scope:return self.get(row[0],owner)
             if self.database.execute("SELECT count(*) FROM tasks WHERE status IN ('queued','running','cancelling')").fetchone()[0] >= 30:
                 raise ValueError("В активной очереди уже 30 заданий. Ожидающие входа Google не занимают места. Дождись завершения или отмени лишние.")
             task_id, now = str(uuid.uuid4()), time.time()
@@ -97,13 +127,19 @@ class TaskStore:
         with self.lock:
             ids = self.database.execute("SELECT id FROM tasks WHERE owner=? ORDER BY created DESC LIMIT 40", (owner,)).fetchall()
         values=[self.get(row[0], owner) for row in ids]
+        # Include old active work even when newer history fills the first page.
+        with self.lock:active=self.database.execute("SELECT id FROM tasks WHERE owner=? AND status IN ('queued','running','cancelling','waiting_auth')",(owner,)).fetchall()
+        known={v['id'] for v in values}
+        values.extend(self.get(row[0],owner) for row in active if row[0] not in known)
         queued=sorted((v for v in values if v['status']=='queued'),key=lambda v:v['updated'])
         for index,value in enumerate(queued,1):value['queuePosition']=index
         return values
 
     def next(self):
         with self.lock, self.database:
-            row = self.database.execute("SELECT id FROM tasks WHERE status='queued' ORDER BY updated,created LIMIT 1").fetchone()
+            queued=self.database.execute("SELECT id,data FROM tasks WHERE status='queued' ORDER BY updated,created").fetchall()
+            # Interactive imports should not wait behind background decoration.
+            row=next((r for r in queued if self.open(r[1],r[0]).get('kind')!='enrich'),queued[0] if queued else None)
             if row:
                 self.database.execute("UPDATE tasks SET status='running',updated=? WHERE id=?", (time.time(), row[0]))
                 return self.get(row[0], private=True)
@@ -111,7 +147,7 @@ class TaskStore:
 
     def expire_keys(self):
         with self.lock:
-            rows = self.database.execute("SELECT id FROM tasks WHERE created<? AND status NOT IN ('completed','cancelled','running','cancelling')", (time.time() - 7 * 86400,)).fetchall()
+            rows = self.database.execute("SELECT id FROM tasks WHERE created<? AND status NOT IN ('completed','cancelled','merged','running','cancelling')", (time.time() - 7 * 86400,)).fetchall()
         for row in rows:
             self.update(row[0], status="cancelled", progress={"message": "Срок хранения задания истёк. Завершённые файлы остаются в Drive."}, forget_key=True)
 

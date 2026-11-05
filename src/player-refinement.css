@@ -58,3 +58,13 @@
 .player-popover.mv-player-drawer,.player-popover.mv-player-music{background:color-mix(in srgb,var(--color-surface) 97.25%,transparent);backdrop-filter:blur(10px)}
 
 .online-watch .online-video-frameless:not(:has(.mv-player)){aspect-ratio:16/9}
+
+/* Status never blankets the video or catches timeline/episode controls. */
+.mv-player .mv-playback-status{inset:auto auto 92px 50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:18px;background:color-mix(in srgb,var(--color-canvas) 90%,transparent);backdrop-filter:blur(18px);font-size:11px;z-index:9}
+.mv-player .mv-playback-status button{border:0;background:var(--color-canvas-soft);padding:5px 9px;border-radius:99px;font-size:11px}
+.mv-player .mv-playback-status .loading-ring{width:14px;height:14px;flex:none}
+.mv-player .mv-playback-status .mv-status-dismiss{width:24px;height:24px;padding:0;display:grid;place-items:center;border-radius:50%;flex:none}
+.mv-player-stage>video.mv-player-media{max-width:100%;max-height:100%;display:block}
+.online-watch .online-video-frameless>.inline-error{inset:auto 12px 12px;z-index:10;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border:0;border-radius:16px;font-size:11px;background:var(--color-canvas-soft)}
+.online-watch .online-video-frameless>.inline-error p{margin:0;flex:1}
+.online-watch .online-video-frameless>.inline-error button{font-size:11px;min-height:28px}

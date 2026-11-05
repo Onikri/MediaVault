@@ -142,8 +142,8 @@ def worker():
             store.update(task_id, status="cancelled", progress={"message": "Срок хранения задания истёк."}, forget_key=True)
             continue
         try:
-            store.update(task_id, progress={"phase": "preparing"})
             data = task["data"]
+            store.update(task_id, progress={"phase":"preparing","operation":"Открываем каталог Google Drive","message":"","taskType":data.get('kind','import')})
             credential=drive_credentials(task["owner"])
             vault = VaultDrive(GoogleDriveAdapter.from_adc(credential))
             library_id=data.get('library_id') or data['job']['library_id']
@@ -171,7 +171,7 @@ def worker():
             if cancelled():
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
             elif result.get('remaining'):
-                store.update(task_id,status='queued',progress={**result,'phase':'queued','recover_needed':False,'message':'Следующая серия — после одного файла из других заданий.'})
+                store.update(task_id,status='queued',progress={**result,'phase':'queued','operation':'Ожидает следующего прохода','recover_needed':False,'message':'Следующий файл оформления — после других заданий.' if data.get('kind')=='enrich' else 'Следующая серия — после одного файла из других заданий.'})
                 wakeup.set()
             elif result["failed"]:
                 store.update(task_id, status="failed", progress={"phase": "failed", **result,

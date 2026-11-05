@@ -12,7 +12,8 @@ FIELDS='id,title,duration,url,http_headers,ext,acodec,vcodec,protocol,is_live,li
 
 @contextlib.contextmanager
 def private_youtube_auth(root):
-    from youtube_auth import cookie_text
+    from youtube_auth import cookie_text,credentials,rotated_cookies
+    previous=credentials()
     cookies=cookie_text()
     if not cookies:
         yield [];return
@@ -23,6 +24,9 @@ def private_youtube_auth(root):
         descriptor=os.open(cookie_path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
         with os.fdopen(descriptor,'w',encoding='utf-8') as cookie_file:cookie_file.write(cookies)
         yield ['--cookies',str(cookie_path)]
+        # yt-dlp may refresh the jar. Discarding that file loses provider updates.
+        # Never let an old extraction replace a newly uploaded session.
+        with contextlib.suppress(OSError,UnicodeError):rotated_cookies(cookie_path.read_text(encoding='utf-8'),previous)
 
 def remote_audio(value):
     url=public_url(value)
@@ -111,6 +115,8 @@ def failure(detail):
     return 'YouTube не предоставил доступную аудиодорожку. Повтори подготовку аудио позднее.'
 
 def extract(identity,refresh=False):
+    from youtube_auth import credentials
+    session_revision=(credentials() or {}).get('updated',0)
     now=time.monotonic();deadline=now+65
     with lock:hit=cache.get(identity);epoch=auth_epoch
     if not refresh and hit and hit[0]>now:return hit[1],int(hit[2]-now)
@@ -131,7 +137,7 @@ def extract(identity,refresh=False):
                 time.sleep(.05)
             error.seek(0);diagnostic=error.read(256*1024).decode(errors='replace')
             from youtube_auth import playback_diagnostic
-            playback_diagnostic(diagnostic)
+            playback_diagnostic(diagnostic,expected_updated=session_revision)
             if process.returncode:raise HTTPException(502,failure(diagnostic))
             output.seek(0)
             try:data=json.loads(output.read(4*1024**2))

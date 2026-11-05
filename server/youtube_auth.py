@@ -38,13 +38,26 @@ def normalize_cookies(raw):
         raise HTTPException(422,'В файле нет действующей авторизованной сессии YouTube. Войди на YouTube перед экспортом.')
     return '# Netscape HTTP Cookie File\n'+'\n'.join(rows)+'\n'
 
-def playback_diagnostic(detail):
+def playback_diagnostic(detail,expected_updated=None):
     text=detail.lower()
     if not ('cookie' in text and any(v in text for v in ('no longer valid','rotated','expired'))):return
     store=_store()
     if store is not None:
-        value=credentials()
-        if value:store.setting(SETTING,{**value,'needsRefresh':True,'checked':time.time()})
+        with store.lock:
+            value=credentials()
+            if value and (expected_updated is None or value.get('updated')==expected_updated):store.setting(SETTING,{**value,'needsRefresh':True,'checked':time.time()})
+
+def rotated_cookies(raw,previous):
+    """Retain provider cookie updates only if this exact jar is still current."""
+    if not previous:return
+    try:canonical=normalize_cookies(raw)
+    except HTTPException:return
+    store=_store()
+    if store is None:return
+    with store.lock:
+        current=credentials()
+        if current and current.get('updated')==previous.get('updated') and current.get('cookies')==previous.get('cookies') and canonical!=current['cookies']:
+            store.setting(SETTING,{**current,'cookies':canonical,'refreshed':time.time()})
 
 class CookieSession(BaseModel):
     cookies:SecretStr
@@ -63,7 +76,7 @@ def install(app,owner,get_store):
     @app.get('/music/youtube/session')
     def status(subject=Depends(owner)):
         value=credentials()
-        return {'configured':bool(value),'updated':value.get('updated') if value else None,'needsRefresh':bool(value and value.get('needsRefresh'))}
+        return {'configured':bool(value),'updated':value.get('updated') if value else None,'refreshed':value.get('refreshed') if value else None,'checked':value.get('checked') if value else None,'needsRefresh':bool(value and value.get('needsRefresh'))}
 
     @app.put('/music/youtube/session')
     def connect(body:CookieSession,subject=Depends(owner)):

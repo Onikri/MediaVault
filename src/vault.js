@@ -493,19 +493,26 @@ function createController(get,patch){
       return uploads.saveTitleProfile(titleId,profile,images);
     });
   }
-  async function refreshCatalog(){
-    return run("refresh",async expected=>{
+  let catalogRefresh=null;
+  async function refreshCatalog({silent=false}={}){
+    if(silent&&get().busy)return false;
+    if(catalogRefresh)return catalogRefresh;
+    const read=async expected=>{
       if(!get().catalog||!get().key)throw Error("Сначала открой библиотеку.");
+      const key=get().key,library=get().libraryId;
       const envelope=await readEnvelope(driveToken(),get().libraryId);
       assertEpoch(expected);
-      const catalog=await openIndex(envelope,get().key);
+      const catalog=await openIndex(envelope,key);
       assertEpoch(expected);
+      if(silent&&(get().busy||get().key!==key||get().libraryId!==library))return false;
       salt=base64ToBytes(envelope.salt);
       patch({catalog});
       await syncWorker();
-      enterLibrary();toast("Библиотека обновлена.");
+      if(!silent){enterLibrary();toast("Библиотека обновлена.");}
       return true;
-    });
+    };
+    catalogRefresh=silent?read(epoch).catch(cause=>{if(cause?.status===401)error(cause);return false;}):run('refresh',read);
+    try{return await catalogRefresh;}finally{catalogRefresh=null;}
   }
   async function findMyLibrary(){
     return run("find",async expected=>{await discoverLibrary(expected);return true;});

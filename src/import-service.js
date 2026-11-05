@@ -63,11 +63,11 @@ export function useImportService(state,actions){
   },[server,state.admin,state.user?.sub,!!state.token,client]);
   useEffect(()=>{
     if(!state.catalog||state.busy||!state.driveConnected)return;
-    const signature=jobs.map(j=>j.id+':'+(j.progress?.saved||0)+':'+j.status).join('|');
+    const signature=jobs.map(j=>j.id+':'+(j.progress?.saved||0)+':'+(j.status==='completed'?'done':'')).join('|');
     if(!signature||signature===refreshSignature.current)return;
     if(jobs.some(j=>j.progress?.saved>0||j.status==='completed')){
       refreshSignature.current=signature;
-      actions.refreshCatalog().then(ok=>{if(!ok&&refreshSignature.current===signature)refreshSignature.current='';});
+      actions.refreshCatalog({silent:true}).then(ok=>{if(!ok&&refreshSignature.current===signature)refreshSignature.current='';});
     }
   },[jobs,state.catalog?.folderId,!!state.busy,state.driveConnected]);
   async function refresh(){const result=await client.authenticate();setSession(result);const data=await client.request('/jobs');setJobs(data.jobs);setStatus('connected');return result;}

@@ -60,4 +60,17 @@ class YouTubeAuth(unittest.TestCase):
   response=client.options('/music/youtube/session',headers=headers);self.assertEqual(response.status_code,200);self.assertIn('PUT',response.headers['access-control-allow-methods'])
   response=client.options('/music/youtube/session',headers={**headers,'Origin':'https://untrusted.example'});self.assertEqual(response.status_code,400)
 
+ def test_late_diagnostic_cannot_reject_a_new_manual_session(self):
+  self.client.put('/music/youtube/session',json={'cookies':COOKIE});old=auth.credentials()
+  self.store.setting(auth.SETTING,{**old,'updated':old['updated']+1})
+  auth.playback_diagnostic('WARNING cookies are no longer valid; rotated',expected_updated=old['updated'])
+  self.assertFalse(self.client.get('/music/youtube/session').json()['needsRefresh'])
+ def test_provider_rotation_is_saved_but_cannot_replace_a_new_jar(self):
+  self.client.put('/music/youtube/session',json={'cookies':COOKIE});old=auth.credentials()
+  # Use the same valid cookie names with a changed supplied value.
+  lines=COOKIE.splitlines();parts=lines[-1].split('\t');parts[-1]='provider-refreshed-session';lines[-1]='\t'.join(parts);changed='\n'.join(lines)+'\n'
+  auth.rotated_cookies(changed,old);self.assertIn('provider-refreshed-session',auth.cookie_text())
+  self.store.setting(auth.SETTING,{**old,'updated':old['updated']+1})
+  auth.rotated_cookies(changed,old);self.assertEqual(auth.cookie_text(),COOKIE)
+
 if __name__=='__main__':unittest.main()

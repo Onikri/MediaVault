@@ -82,7 +82,7 @@ def load_profile(identity,kind):
     except Exception:pass
     return profile
 
-def preview_existing(vault,item):
+def preview_existing(vault,item,progress=lambda _:None):
     """ffmpeg seeks through a loopback-only decrypted range stream: no full copy."""
     token=secrets.token_urlsafe(32);cache=OrderedDict();cache_lock=threading.Lock();key=vault._key;stopped=threading.Event()
     class Handler(BaseHTTPRequestHandler):
@@ -112,18 +112,21 @@ def preview_existing(vault,item):
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     source=f'http://127.0.0.1:{server.server_port}/{token}'
     try:
+        progress({'phase':'inspect_video','operation':'Определяем длительность видео'})
         result=subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','json',source],capture_output=True,timeout=45,check=False)
         duration=float(json.loads(result.stdout)['format']['duration'])
+        progress({'phase':'extract_frame','operation':'Извлекаем кадр для превью'})
         result=subprocess.run(['ffmpeg','-nostdin','-v','error','-ss',str(round(duration*.35,2)),'-i',source,'-frames:v','1','-vf',"scale='min(1280,iw)':-2",'-q:v','4','-threads','1','-f','image2pipe','-vcodec','mjpeg','-'],capture_output=True,timeout=45,check=False)
         return result.stdout if result.returncode==0 and result.stdout.startswith(b'\xff\xd8\xff') and len(result.stdout)<=500000 else None
     except (subprocess.SubprocessError,KeyError,ValueError):return None
     finally:stopped.set();server.shutdown();server.server_close();cache.clear()
 
-def enrich_profile(vault,group,section):
+def enrich_profile(vault,group,section,progress=lambda _:None):
     title_id=section+':'+group['id'];previous=vault.catalog.get('titleProfiles',{}).get(title_id,{})
     info=group.get('metadata') or {};identity=group.get('metadataId') or info.get('ids',{}).get('mal')
     profile=previous.copy()
     if identity and (not previous.get('sourceId') or previous.get('version',0)<4 or (previous.get('partial') or not previous.get('genres')) and previous.get('retryAfter',0)<time.time()*1000):
+        progress({'phase':'metadata','operation':'Получаем сведения о тайтле'})
         try:profile.update(load_profile(identity,'manga' if section in {'manga','ranobe'} else 'anime'))
         except Exception:profile.update({'partial':True,'retryAfter':int((time.time()+120)*1000)})
     profile.setdefault('version',4);profile.setdefault('title',group['name']);profile.setdefault('language','ru')
@@ -143,21 +146,26 @@ def enrich_profile(vault,group,section):
         except Exception:return None
     images=[]
     if previous.get('version',0)<4 or previous.get('artworkRetryAfter',0)<time.time()*1000:
+        progress({'phase':'artwork','operation':'Получаем обложки, кадры и изображения персонажей'})
         with ThreadPoolExecutor(max_workers=4) as executor:images=[value for value in executor.map(fetch,[u for u in urls if u and u not in assets][:48]) if value]
     downloaded={value[0] for value in images}
     profile['missingArtwork']=sum(1 for url in urls if url and url.startswith('https://') and url not in assets and url not in downloaded)
     profile['artworkRetryAfter']=int((time.time()+120)*1000)
+    progress({'phase':'save_profile','operation':'Шифруем оформление и сохраняем в Google Drive'})
     return vault.save_title_profile(title_id,profile,images)
 
 def enrichment_step(vault,*,cursor=0,title_id=None,progress=lambda _:None):
     items=[i for i in vault.catalog['items'] if i.get('category') in {'video','manga'} and (not title_id or title_id.endswith(':'+str(i.get('collectionId',''))))]
     if cursor>=len(items):return {'cursor':cursor,'remaining':False,'total':len(items),'saved':0,'failed':0,'skipped':0}
-    item=items[cursor];progress({'phase':'artwork','title':'Оформление библиотеки','current':cursor+1,'total':len(items)})
+    item=items[cursor]
+    group=next((g for g in vault.catalog.get('storage',{}).get('collections',[]) if g['id']==item.get('collectionId')),None)
+    progress({'phase':'artwork','taskType':'enrich','title':group.get('name') if group else item.get('name') or 'Оформление библиотеки','file':item.get('name',''),'episode':item.get('episode'),'chapter':item.get('chapter'),'current':cursor+1,'total':len(items),'operation':'Проверяем готовое оформление','message':''})
     failed=False
     if item.get('category')=='video' and not item.get('previewArtwork'):
-        frame=preview_existing(vault,item)
-        if frame:vault.save_preview(item['id'],frame)
+        frame=preview_existing(vault,item,progress)
+        if frame:
+            progress({'phase':'save_preview','operation':'Сохраняем превью в Google Drive'})
+            vault.save_preview(item['id'],frame)
         else:failed=True
-    group=next((g for g in vault.catalog.get('storage',{}).get('collections',[]) if g['id']==item.get('collectionId')),None)
-    if group:enrich_profile(vault,group,group_section(group,vault.catalog))
+    if group:enrich_profile(vault,group,group_section(group,vault.catalog),progress)
     return {'cursor':cursor+1,'remaining':cursor+1<len(items),'total':len(items),'saved':0 if failed else 1,'failed':1 if failed else 0,'skipped':0}
