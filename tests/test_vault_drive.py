@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 MODULE = Path(__file__).resolve().parents[1] / "server" / "vault_drive.py"
 spec = importlib.util.spec_from_file_location("vault_drive_under_test", MODULE)
@@ -175,7 +176,12 @@ class VaultTests(unittest.TestCase):
         resumed = vault_drive.VaultDrive(self.drive, sleep=lambda _: None)
         try:
             resumed.unlock(self.library, PHRASE)
-            recovered = resumed.completed("second-season", collection="Наруто", episode=1)
+            with patch.object(self.drive, 'list_children', wraps=self.drive.list_children) as listing:
+                recovered = resumed.completed("second-season", collection="Наруто", episode=1)
+            scanned_assets = [call.args[0] for call in listing.call_args_list
+                              if call.kwargs.get('name') == 'manifest.enc.json']
+            self.assertNotIn(first['folderId'], scanned_assets)
+            self.assertIn(recovered['folderId'], scanned_assets)
             catalog = resumed.refresh()
             self.assertEqual(len(catalog["items"]), 2)
             self.assertEqual(len(catalog["storage"]["collections"]), 1)

@@ -516,6 +516,9 @@ class VaultDrive:
             return self._manifest_cache
         catalog, _ = self._latest()
         checkpoints = []
+        # Committed assets already have their complete metadata in the catalog.
+        # Only orphan assets need their encrypted recovery manifest fetched.
+        committed_assets = {item.get("folderId") for item in catalog["items"] if item.get("folderId")}
         checked, last_update = 0, 0
         progress = getattr(self, 'checkpoint_progress', None)
         media = self._retry(lambda: self.drive.list_children(catalog["folderId"], mime_type=FOLDER_MIME))
@@ -533,6 +536,8 @@ class VaultDrive:
                         direct.extend(self._retry(lambda: self.drive.list_children(part["id"], mime_type=FOLDER_MIME)))
                 for asset in direct:
                     if not asset.get("name", "").startswith("asset-"):
+                        continue
+                    if asset["id"] in committed_assets:
                         continue
                     manifests = self._retry(lambda: self.drive.list_children(asset["id"], name="manifest.enc.json"))
                     checked += 1
