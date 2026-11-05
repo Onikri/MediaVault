@@ -1,5 +1,6 @@
 """Real server Chromium against fulfilled public-shaped responses, no external network."""
 import asyncio
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -9,6 +10,27 @@ from browser_player import _extract, _render, observed_streams, browser_destinat
 from source_parser import SourceError
 
 class BrowserPlayerTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get('CHROMIUM_PATH') or shutil.which('chromium'), 'Chromium required')
+    def test_mp4_mode_observes_the_player_tab_request_and_preserves_headers(self):
+        url = 'https://v4.hentasis.me/123-example.html'
+        stream = 'https://cdn.example.com/episode.mp4?signature=fixture'
+        markup = f"""<button class="rl-button-play">Воспроизвести</button>
+            <script>
+            document.querySelector('button').onclick = () => {{
+                fetch('https://cdn.example.com/decoy.m3u8').catch(() => {{}});
+                fetch('{stream}', {{headers: {{Authorization: 'fixture-only'}}}}).catch(() => {{}});
+            }};
+            </script>"""
+        fixture = {url: (markup, 'text/html')}
+        streams = asyncio.run(_extract(
+            url, mode='mp4', timeout=5, fixture=fixture,
+            validate=lambda value: browser_destination(value, resolve_dns=False)
+        ))
+        self.assertEqual([(s['url'], s['type']) for s in streams], [(stream, 'mp4')])
+        self.assertEqual(streams[0]['headers']['Referer'], 'https://v4.hentasis.me/')
+        self.assertIn('User-Agent', streams[0]['headers'])
+        self.assertNotIn('Authorization', streams[0]['headers'])
+
     @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for delayed active source contract')
     def test_parent_boot_stream_cannot_replace_delayed_selected_audio_quality_map(self):
         import json

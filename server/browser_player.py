@@ -14,7 +14,7 @@ import copy
 from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import urlsplit
-from source_parser import SourceError, public_url, playback_headers, BLOCKED
+from source_parser import SourceError, public_url, playback_headers, BLOCKED, USER_AGENT
 
 def browser_workers():
     try:return max(1,min(2,int(os.environ.get('MEDIA_VAULT_BROWSER_WORKERS',min(2,os.cpu_count() or 1)))))
@@ -74,26 +74,33 @@ async def _check_player_access(page):
     if await plus.count() and await plus.first.is_visible():raise SourceError('Эта серия закрыта ограничением JutPlus. Нужна общедоступная серия или другой источник.')
 
 
-async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,timeout=12,metadata=None):
-    try:from playwright.async_api import async_playwright,TimeoutError as PlaywrightTimeout
+async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,timeout=12,metadata=None,mode=None):
+    try:from playwright.async_api import async_playwright,Error as PlaywrightError,TimeoutError as PlaywrightTimeout
     except ImportError:raise SourceError('Для динамического плеера обнови серверный образ с Chromium.') from None
     executable=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium') or shutil.which('google-chrome')
     if not executable:raise SourceError('На сервере не установлен Chromium для динамического плеера.')
     browser_paths()
     validate(url)
+    if mode and referer:
+        validate(referer)
     captured={};done=asyncio.Event();requests=0;selected_quality=None;requested_qualities={}
     current=object()
     headers=playback_headers({'Referer':referer or url})
     def record(value,extra=None,quality_hint=current):
+        if mode and captured:
+            return
         try:target=validate(value)
         except SourceError:return
         path=urlsplit(target).path.lower()
         if urlsplit(target).hostname=='cdn.plyr.io' and path=='/static/blank.mp4':return
-        if not path.endswith(('.mp4','.m3u8')):return
+        if not path.endswith(('.mp4', '.m3u8')) or (mode == 'mp4' and not path.endswith('.mp4')):
+            return
+        if mode and path.rsplit('/', 1)[-1] in {'blank.mp4', 'init.mp4', 'ad.mp4', 'preroll.mp4'}:
+            return
         # A late response for the preceding selection must not relabel its URL.
         if target not in captured:
             quality=selected_quality if quality_hint is current else quality_hint
-            captured[target]={'url':target,'type':'hls' if path.endswith('.m3u8') else 'mp4','quality':quality,'headers':playback_headers(extra or headers)}
+            captured[target]={'url':target,'type':'hls' if path.endswith('.m3u8') else 'mp4','quality':quality,'headers':playback_headers({**headers, **{k.title(): v for k, v in (extra or {}).items()}})}
             done.set()
     async with async_playwright() as driver:
         launch={'headless':True,'executable_path':executable,'args':['--no-sandbox','--disable-background-networking','--disable-dev-shm-usage']}
@@ -102,7 +109,7 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
         if proxy and fixture is None:launch['proxy']={'server':proxy}
         browser=await driver.chromium.launch(**launch)
         try:
-            context=await browser.new_context(service_workers='block',accept_downloads=False)
+            context=await browser.new_context(service_workers='block',accept_downloads=False, **({'user_agent': USER_AGENT} if mode else {}))
             async def guard(route):
                 nonlocal requests
                 requests+=1
@@ -110,6 +117,11 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                 except SourceError:return await route.abort()
                 if requests>160 or route.request.resource_type in {'image','font'}:return await route.abort()
                 requested_qualities[route.request.url]=selected_quality
+                if mode and route.request.method == 'GET':
+                    path = urlsplit(route.request.url).path.lower()
+                    if (path.endswith('.mp4') or (mode != 'mp4' and path.endswith('.m3u8'))) and route.request.resource_type in {'media', 'xhr', 'fetch'}:
+                        record(route.request.url, route.request.headers)
+                        return await route.abort()
                 if fixture is not None:
                     body,mime=fixture.get(route.request.url,('', 'text/plain'))
                     return await route.fulfill(body=body,content_type=mime)
@@ -128,7 +140,8 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                 except SourceError:return await route.close()
                 remote=route.connect_to_server()
                 def receive(message):
-                    for value in observed_streams(message):record(value)
+                    if not mode:
+                        for value in observed_streams(message):record(value)
                     route.send(message)
                 remote.on_message(receive)
             await context.route_web_socket('**/*',websocket)
@@ -153,9 +166,28 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     element=await page.wait_for_selector('iframe');target=await element.content_frame()
                     await target.wait_for_load_state('domcontentloaded',timeout=timeout*1000)
                 else:
-                    await page.goto(url,wait_until='domcontentloaded',timeout=timeout*1000);target=page
+                    navigation = await page.goto(url, wait_until='domcontentloaded', timeout=timeout*1000,
+                                                 **({'referer': referer} if mode and referer else {}))
+                    if mode and navigation and navigation.status in {401, 403}:
+                        raise SourceError('Источник ограничил доступ к странице на Oracle.')
+                    target=page
                 await _check_player_access(target)
                 await target.evaluate('document.querySelectorAll("video").forEach(v=>{v.muted=true;v.play().catch(()=>{});})')
+                if mode and not captured:
+                    selectors = ('text=ВИДЕО ПЛЕЕР', '.play', '#player')
+                    if mode in {'mp4', 'hentasis-mirror'}:
+                        selectors += ('.rl-fake-player', '.rl-button-play')
+                    for selector in selectors:
+                        for player_frame in page.frames[:8]:
+                            if captured:
+                                break
+                            try:
+                                await player_frame.locator(selector).first.click(timeout=650)
+                                await asyncio.wait_for(done.wait(), timeout=.8)
+                            except (PlaywrightError, asyncio.TimeoutError):
+                                continue
+                        if captured:
+                            break
                 if framed:
                     control=target.locator('button[data-plyr="play"],button[data-allplay="play"]').first
                     try:
@@ -231,10 +263,10 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
         finally:await browser.close()
 
 
-def extract(url,referer=None,*,details=False):
+def extract(url,referer=None,*,details=False,mode=None):
     if os.environ.get('MEDIA_VAULT_BROWSER_PLAYERS','1')!='1':
         raise SourceError('Динамические плееры отключены на этом сервере.')
-    key=(url,referer)
+    key=(url,referer,mode)
     def cached():
         with _cache_lock:
             old=_playback_cache.get(key)
@@ -263,7 +295,11 @@ def extract(url,referer=None,*,details=False):
             pending['result']=copy.deepcopy(value);return value if details else value['streams']
         try:
             metadata={}
-            streams=asyncio.run(_extract(url,referer,metadata=metadata))
+            options = {'mode': mode, 'timeout': 25} if mode else {}
+            async def run():
+                work = _extract(url, referer, metadata=metadata, **options)
+                return await asyncio.wait_for(work, timeout=25) if mode else await work
+            streams = asyncio.run(run())
             value={'streams':streams,**metadata}
             if streams:
                 with _cache_lock:
@@ -274,6 +310,7 @@ def extract(url,referer=None,*,details=False):
             pending['result']=copy.deepcopy(value)
             return value if details else streams
         except SourceError:raise
+        except asyncio.TimeoutError:raise SourceError('Динамический плеер не выдал поток за 25 секунд.') from None
         except Exception:raise SourceError('Не удалось открыть динамический плеер на сервере.') from None
     except SourceError as error:
         pending['error']=str(error);raise

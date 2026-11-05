@@ -193,6 +193,11 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime",st
         if urlsplit(original).path.lower().endswith((".mp4", ".m3u8")):
             return {"provider": "direct", "title": "Видео по ссылке", "url": original,
                     "dubs": [], "seasons": [], "episodes": [{"number": 1, "url": original}], "releases": []}
+        if kind in {'anime', 'movie', 'tv'}:
+            from dynamic_video_sources import inspect, provider_for
+            provider = provider_for(original)
+            if provider:
+                return inspect(original, provider, http, dub_url=dub_url, state=state)
         if state is not None and state.get('_root'):text,final=state['_root']
         else:
             text, final, _ = http.document(original)

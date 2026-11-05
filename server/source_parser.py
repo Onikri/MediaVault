@@ -484,6 +484,11 @@ class Resolver:
             if len(matches) != 1:
                 raise SourceError('Выбранный перевод этой серии отсутствует. Другая озвучка автоматически не подставляется.')
             return self.resolve(matches[0]['url'], referer=final, depth=depth+1, visited=visited)
+        from dynamic_video_sources import provider_for, resolve_dynamic
+        provider = provider_for(url)
+        if provider:
+            identifier, label = provider
+            return resolve_dynamic(self.http, url, referer, label, identifier)
         page = self.player(url, referer) or self.inspect(url,referer)
         if page.streams:
             return page
@@ -504,4 +509,6 @@ class Resolver:
             from browser_player import extract
             result=extract(url,referer,details=True)
             return Page(title=page.title,streams=result['streams'],subtitles=result.get('subtitles',[]))
+        if depth == 0:
+            return resolve_dynamic(self.http, url, referer, page.title)
         raise SourceError("Публичный MP4/HLS-поток не найден. Вставь ссылку на доступную серию или поддерживаемый плеер.")
