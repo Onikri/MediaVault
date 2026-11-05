@@ -210,6 +210,30 @@ switching/numbering/navigation, inline song detail expansion, circular actions a
 actual media-time cue layout at 390/1440px. Catalogue/timing responses are fixtures;
 this pair does not claim new real YouTube playback. Production build passed.
 
+## Stage 9 — room layout/controls and verified voice conversation
+
+- Host and guest chat use a right-side column on wide screens and move below the
+  video at narrower widths. The host's same mounted player/video stays in place
+  when the room is created; there is no second playback instance.
+- An active toolbar room button shows the live participant count and opens room
+  settings. Removed the redundant actions shortcut and lower episode-browser arrow.
+  A single connected participant no longer gets a meaningless leader dropdown;
+  multiple participants use the shared Radix selector. Control/buffer settings use
+  switches. Fullscreen retains access to conversation inside the room settings.
+- Compact animated conversation has circular microphone/send buttons, message
+  timestamps, empty state and explicit microphone/connection status. Connection
+  count now reflects connected WebRTC peers rather than merely allocated links.
+  Microphone startup is visible and debounced; unlocking successful audio clears
+  the stale playback warning. Guest playing also clears stale recovery errors.
+
+Validation: 4 Node room-playback checks; real Python room API/WebSockets, host Range
+relay and two actual browser participants: password/guest scope, pause/seek sync,
+chat, QR join/removal of password from URL, repeated play/pause, responsive room
+geometry at 390/768/1440px. WebRTC used fake browser microphones but real signalling,
+connected RTCPeerConnections and received audio RTP bytes. This does not establish
+TURN connectivity on arbitrary European/Russian carrier networks. No new ML run.
+Production build passed.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
@@ -226,7 +250,7 @@ this pair does not claim new real YouTube playback. Production build passed.
 - [x] Watch-order presentation.
 - [x] Music rows and interval-aware OP/ED information.
 - [ ] YouTube/session/login investigation (last).
-- [ ] Room controls, chat beside video, voice UI and two-peer checks.
+- [x] Room controls, chat beside video, voice UI and two-peer checks.
 
 Release each completed group with relevant checks and live frontend/VM validation.
 Do not mark browser/media buffer retention across navigation or the unidentified

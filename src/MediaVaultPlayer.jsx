@@ -1,5 +1,6 @@
 import UiSelect from './UiSelect.jsx';
 import {useHostRoom} from './watch-room.js';
+import RoomConversation from './RoomConversation.jsx';
 import {roomControlRows} from './WatchRoomControls.jsx';
 import './watch-room.css';
 import './interface-refinement.css';
@@ -49,7 +50,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   }
   const selectorSeasons=onlineControls?.seasonOptions||seasons;
   usePlayerMediaSession(api);
-  return <PlayerContext.Provider value={api}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
+  return <PlayerContext.Provider value={api}><div className={'player-room-layout'+(room.info?' has-live-room':'')}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
     style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls} data-player="mediavault">
     <div className="mv-player-screen">
@@ -123,7 +124,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
           value={prefs.subOffset} onChange={event=>changePrefs({subOffset:Number(event.target.value)})}/></label>
 <button className="mv-player-settings-action" onClick={()=>subtitleInput.current?.click()}><Subtitles size={16}/> Загрузить SRT / VTT</button></div>,
         room:!roomControl&&<div className="mv-player-settings">{roomControlRows(room)}</div>,
-        actions:<div className="mv-player-settings">        <div className="mv-player-quick-actions">{onClose&&<button aria-label="Закрыть встроенный просмотр" onClick={onClose}><X size={19}/><span>Закрыть</span></button>}{!roomControl&&<button onClick={()=>setSettingsTab('room')}><Users size={19}/><span>Совместный просмотр</span></button>}<button onClick={actions.share}><Share2 size={19}/><span>Поделиться</span></button><button onClick={actions.screenshot}><Camera size={19}/><span>Кадр</span></button><button onClick={actions.clip} disabled={actions.recording} aria-pressed={actions.recording}><Video size={19}/><span>{actions.recording?'Запись…':'Клип'}</span></button></div>
+        actions:<div className="mv-player-settings">        <div className="mv-player-quick-actions">{onClose&&<button aria-label="Закрыть встроенный просмотр" onClick={onClose}><X size={19}/><span>Закрыть</span></button>}<button onClick={actions.share}><Share2 size={19}/><span>Поделиться</span></button><button onClick={actions.screenshot}><Camera size={19}/><span>Кадр</span></button><button onClick={actions.clip} disabled={actions.recording} aria-pressed={actions.recording}><Video size={19}/><span>{actions.recording?'Запись…':'Клип'}</span></button></div>
 <p className="player-setting-help">Ссылка откроет эту серию с текущей позиции после входа в библиотеку. Клип записывается до 30 секунд.</p></div>
       }}</PlayerSettings>}</AnimatePresence>
       {canSkip&&panel==='watch'&&<button className="mv-player-skip" onClick={()=>seek(skipRange.end)}><SkipForward size={16}/> {skipRange===ending?'Пропустить эндинг':'Пропустить опенинг'}</button>}
@@ -143,7 +144,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
             <span className="mv-player-time">{clock(time)} <span>/ {clock(duration)}</span></span>
           </div>
           <div className="mv-player-control-group">
-            {onlineControls?.episodeBrowser&&<button title="Сезоны и серии" aria-label="Сезоны и серии" aria-expanded={panel==='episodes'} onClick={()=>openPanel(panel==='episodes'?'watch':'episodes')}><ChevronsUp size={19}/></button>}<button title={effectiveOpening?"Пропустить опенинг":"Отметить опенинг"} aria-label="Пропуск и разметка опенинга" onClick={()=>{if(effectiveOpening&&time<effectiveOpening.end)seek(effectiveOpening.end);else{setSettingsTab("intro");openPanel("settings");}}}><SkipForward size={19}/></button><button title="Кинотеатр" aria-label="Режим кинотеатра" aria-pressed={theater} onClick={cinema}><Clapperboard size={19}/></button><button aria-label={isPip?'Закрыть мини-окно':'Мини-окно'} aria-pressed={isPip} title="Мини-окно" disabled={!videoRef.current?.requestPictureInPicture&&!videoRef.current?.webkitSetPresentationMode} onClick={pip}><PictureInPicture2 size={19}/></button>
+            {room.info&&<button className="room-active-control" title="Настройки комнаты" aria-label={'Комната · '+(room.state?.members.filter(m=>m.online).length||1)+' участников'} aria-pressed={settingsOpen&&settingsTab==='room'} onClick={()=>{setSettingsTab('room');openPanel('settings');}}><Users size={19}/><span className="room-participant-badge">{room.state?.members.filter(m=>m.online).length||1}</span></button>}<button title={effectiveOpening?"Пропустить опенинг":"Отметить опенинг"} aria-label="Пропуск и разметка опенинга" onClick={()=>{if(effectiveOpening&&time<effectiveOpening.end)seek(effectiveOpening.end);else{setSettingsTab("intro");openPanel("settings");}}}><SkipForward size={19}/></button><button title="Кинотеатр" aria-label="Режим кинотеатра" aria-pressed={theater} onClick={cinema}><Clapperboard size={19}/></button><button aria-label={isPip?'Закрыть мини-окно':'Мини-окно'} aria-pressed={isPip} title="Мини-окно" disabled={!videoRef.current?.requestPictureInPicture&&!videoRef.current?.webkitSetPresentationMode} onClick={pip}><PictureInPicture2 size={19}/></button>
             {musicIdentity&&<button ref={musicButton} aria-label="Музыка из аниме" aria-expanded={musicOpen} onClick={()=>openPanel(musicOpen?'watch':'music')}><Music2 size={19}/></button>}<button ref={settingsButton} className={settingsOpen?'is-active':''} aria-label="Настройки плеера" aria-expanded={settingsOpen} onClick={()=>{setSettingsTab('watch');setMusicOpen(false);openPanel(settingsOpen?'watch':'settings');}}><SettingsGlyph/></button>
             <button aria-label={isFullscreen?'Выйти из полноэкранного режима':'На весь экран'} onClick={fullscreen}>{isFullscreen?<Minimize2 size={20}/>:<Maximize2 size={20}/>}</button>
           </div>
@@ -166,5 +167,5 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     </section>}
     {gpuWarning&&<p className="mv-player-warning" role="status">{gpuWarning}</p>}
 
-  </div></PlayerContext.Provider>;
+  </div>{room.info&&<aside className="player-room-conversation"><RoomConversation conversation={room.conversation}/></aside>}</div></PlayerContext.Provider>;
 }
