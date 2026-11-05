@@ -14,8 +14,8 @@ export async function exportLocally({entries,kind,referer,quality='best',service
    job=await service.request('/online/exports',{method:'POST',body:tasks[index].body,signal});
    if(job.state==='staging'){
     for(const [number,page] of tasks[index].uploads.entries()){
-     signal?.throwIfAborted();onProgress('Передаём готовые страницы из кэша · '+(number+1)+' / '+tasks[index].uploads.length);
-     await service.request('/online/exports/'+job.id+'/pages/'+page.chapter+'/'+page.page,{method:'PUT',body:page.blob,signal});
+     signal?.throwIfAborted();onProgress((page.source?'Передаём исходные страницы':'Передаём готовые страницы из кэша')+' · '+(number+1)+' / '+tasks[index].uploads.length);
+     await service.request('/online/exports/'+job.id+'/pages/'+page.chapter+'/'+page.page+(page.source?'?source=1':''),{method:'PUT',body:page.blob,signal});
     }
     job=await service.request('/online/exports/'+job.id+'/start',{method:'POST',signal});
    }

@@ -71,6 +71,24 @@ class MangaExportTests(unittest.TestCase):
         options,data=self.options();options['chapters']=[{'url':'https://mangapill.com/chapters/fixture','number':1,'pageCount':2}]
         manager=self.manager();value=manager.start('A','','manga',manga=options);manager.put_page('A',value['id'],0,0,data);manager.enqueue('A',value['id']);result=wait_terminal(manager,'A',value['id'])
         self.assertEqual(result['state'],'error');self.assertIn('все страницы',result['error'])
+    def test_drive_original_upload_needs_no_public_url_or_vault_key(self):
+        data=png('blue');manager=self.manager()
+        options=Options(mode='original',pageCount=1,originals=[{'chapter':0,'page':0,'imageHash':hashlib.sha256(data).hexdigest()}]).model_dump()
+        with patch('manga_download.download_chapter',side_effect=AssertionError('A Drive chapter is already open')):
+            value=manager.start('A','','manga',manga=options);manager.put_page('A',value['id'],0,0,data,source=True);manager.enqueue('A',value['id']);result=wait_terminal(manager,'A',value['id'])
+        self.assertEqual(result['state'],'done',result)
+        with zipfile.ZipFile(manager.jobs[value['id']].file) as archive:self.assertEqual(archive.read('0001.png'),data)
+    def test_partial_drive_cache_translates_only_uploaded_missing_pages(self):
+        from manga_export import cached_path
+        cached,original,rendered=png('red'),png('white'),png('green')
+        options=Options(mode='translate',pageCount=2,cached=[{'chapter':0,'page':0,'imageHash':hashlib.sha256(cached).hexdigest()}],originals=[{'chapter':0,'page':1,'imageHash':hashlib.sha256(original).hexdigest()}]).model_dump()
+        directory=self.root/'drive';directory.mkdir();job=SimpleNamespace(directory=directory,manga=options,owner='A',quality='best',cancel=__import__('threading').Event())
+        cached_path(job,0,0).write_bytes(cached);cached_path(job,0,1,source=True).write_bytes(original)
+        def translate(job,pages,config,skip,save,progress,budget):
+            self.assertEqual(skip,[0]);self.assertEqual(pages[1],original);save(1,rendered)
+        with patch('manga_export_runtime.translate_pages',translate),patch('manga_download.download_chapter',side_effect=AssertionError('No public source needed')):
+            result=produce(job,None,Budget(job,1024**2,reserve=0),lambda p:None)
+        with zipfile.ZipFile(result) as archive:self.assertEqual([archive.read(n) for n in archive.namelist()],[cached,rendered])
     def test_upload_endpoint_accepts_binary_only_for_its_owner(self):
         import local_exports
         app=FastAPI();manager=self.manager(start_worker=False)

@@ -51,6 +51,8 @@ class Options(BaseModel):
     name: str = Field(default='Манга', min_length=1, max_length=180)
     chapters: list[Chapter] = Field(default_factory=list, max_length=100)
     cached: list[CachedPage] = Field(default_factory=list, max_length=1500)
+    originals: list[CachedPage] = Field(default_factory=list, max_length=1500)
+    pageCount: int = Field(default=0, ge=0, le=1500)
     translation: Translation = Field(default_factory=Translation)
 
 
@@ -66,8 +68,8 @@ def verify_image(data):
         raise SourceError('Готовая страница не является проверенным изображением до 24 Мп.') from None
 
 
-def cached_path(job, chapter, page):
-    return job.directory / f'cached-{chapter:03d}-{page:04d}.image'
+def cached_path(job, chapter, page, source=False):
+    return job.directory / f'{"source" if source else "cached"}-{chapter:03d}-{page:04d}.image'
 
 
 class PageCache:
@@ -110,6 +112,7 @@ def produce(job, http, budget, progress):
     options = job.manga
     result = job.directory / ('manga.' + options['format'])
     cached = {(v['chapter'],v['page']):v for v in options['cached']}
+    uploaded = {(v['chapter'],v['page']) for v in options['originals']}
     cache = PageCache(os.getenv('DATA_DIR','/data')) if options['mode']=='translate' else None
     output_pages = []
     total = 0
@@ -124,8 +127,8 @@ def produce(job, http, budget, progress):
             available = sorted(p for c,p in cached if c==chapter_index)
             complete = chapter and chapter['pageCount']>0 and available==list(range(chapter['pageCount']))
             if chapter is None or complete or options['mode']=='cached':
-                pages = sorted(p for c,p in cached if c==chapter_index)
-                if pages != list(range(len(pages))) or not pages or chapter and not complete:
+                pages = sorted({p for c,p in cached if c==chapter_index}|{p for c,p in uploaded if c==chapter_index})
+                if pages != list(range(len(pages))) or not pages or chapter and not complete or options['pageCount'] and len(pages)!=options['pageCount']:
                     raise SourceError('Для сохранения из кэша нужны все страницы главы.')
                 originals = None
             else:
@@ -133,9 +136,18 @@ def produce(job, http, budget, progress):
                 originals = zipfile.ZipFile(source)
                 pages = [v for v in originals.infolist() if not v.is_dir() and v.file_size<=30*1024**2 and v.filename.lower().endswith(('.jpg','.jpeg','.png','.webp','.gif','.avif'))]
                 pages.sort(key=lambda v:v.filename)
+            def read_original(index):
+                if originals:
+                    return originals.read(pages[index])
+                if (chapter_index,index) in uploaded:
+                    return cached_path(job,chapter_index,index,source=True).read_bytes()
+                return None
             class Pages:
                 def __len__(self):return len(pages)
-                def __getitem__(self,index):return originals.read(pages[index])
+                def __getitem__(self,index):
+                    data=read_original(index)
+                    if data is None:raise SourceError('Не загружен оригинал страницы для перевода.')
+                    return data
             identity = {}
             skip = []
             def save(index, data):
@@ -150,7 +162,7 @@ def produce(job, http, budget, progress):
             try:
                 for index in range(len(pages)):
                     budget.check()
-                    raw = originals.read(pages[index]) if originals else None
+                    raw = read_original(index)
                     if cache and raw is not None:
                         identity[index] = cache.key(job.owner,raw,options['translation'])
                     hit = cached.get((chapter_index,index))
@@ -161,6 +173,7 @@ def produce(job, http, budget, progress):
                         (directory / f'{index:04d}.image').write_bytes(data)
                         skip.append(index)
                     elif options['mode']=='original':
+                        if raw is None:raise SourceError('Оригинал страницы не загружен.')
                         (directory / f'{index:04d}.image').write_bytes(raw)
                         skip.append(index)
                     elif options['mode']=='cached':

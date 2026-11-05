@@ -9,7 +9,7 @@ const choices={
  directInput:[['vision','Страницы · разметка Google'],['annotated','Страницы с рамками'],['blocks','Текстовые блоки'],['coordinates','Координаты и страницы']],
  directDetector:[['en-fast','Быстрый'],['rtdetr','RT-DETR'],['ctd','Comic Text Detector'],['yolo26n-manga','YOLO Manga'],['ppocrv6-det','PaddleOCR']],
  inpaint:[['fast','Быстрая очистка'],['quality','Качественная очистка'],['moebius','Moebius'],['migan','MI-GAN']],
- font:[['auto','Автоматически'],['comic-relief','Comic Relief'],['balsamiq-sans','Balsamiq Sans'],['pangolin','Pangolin'],['neucha','Neucha'],['pt-serif','PT Serif']],
+ font:[['auto','Автоматически'],['comic-relief','Comic Relief'],['balsamiq-sans','Balsamiq Sans'],['pangolin','Pangolin'],['neucha','Neucha'],['pt-serif','PT Serif'],['caveat','Caveat'],['ruslan-display','Ruslan Display'],['marck-script','Marck Script'],['press-start','Press Start'],['system','Системный']],
  directBatchPages:[[2,'2 страницы'],[3,'3 страницы']],direction:[['rtl','Справа налево'],['ltr','Слева направо']]
 };
 export default function MangaExportSettings({value,onChange,disabled=false,chapterOnly=false}){

@@ -8,8 +8,9 @@ Selection accepts chapters (including fractional extras), a list of volume range
 one file per chapter, one per volume, or one file containing the selection.
 
 The reader's download icon exports the current translated chapter directly.
-For a chapter opened from Drive without a public source URL, complete its
-translation in the reader first. A partial chapter is never labelled complete.
+For a chapter opened from Drive without a public source URL, missing original
+pages are decrypted by the reader and uploaded to the authenticated temporary
+export. The vault key stays on the device. A partial chapter is never labelled complete.
 
 ## Processing and privacy
 

@@ -6,7 +6,7 @@ import {defaultMangaExport,exportTranslation} from './manga-export-options.js';
 import {cachedChapterPages} from './translation-cache.js';
 import {exportLocally} from './local-export.js';
 
-export default function ReaderChapterExport({item,scope,total,settings,service,container}){
+export default function ReaderChapterExport({item,scope,total,entries,settings,service,container}){
  const [open,setOpen]=useState(false),[value,setValue]=useState({...defaultMangaExport,...exportTranslation(settings),mode:'cached'}),[cache,setCache]=useState(null),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState(''),abort=useRef(null);
  useEffect(()=>()=>abort.current?.abort(),[item.id]);
  useEffect(()=>{if(!open)return;let closed=false;setCache(null);setError('');cachedChapterPages({scope,chapter:item.id,url:item.sourceURL,total}).then(result=>{if(!closed)setCache(result);}).catch(()=>{if(!closed)setError('Кэш перевода браузера недоступен.');});return()=>{closed=true;};},[open,item.id,scope,total]);
@@ -14,8 +14,7 @@ export default function ReaderChapterExport({item,scope,total,settings,service,c
   setBusy(true);setError('');const controller=new AbortController();abort.current=controller;
   try{
    if(!cache)throw Error('Дождись проверки кэша.');
-   if(value.mode!=='cached'&&!item.sourceURL)throw Error('Для главы из Drive сейчас доступен готовый перевод из кэша. Заверши перевод в читалке.');
-   await exportLocally({entries:[{url:item.sourceURL,number:item.episode||1,season:item.season||1,title:item.episodeTitle||item.name}],kind:'manga',service,manga:value,cacheContext:{name:item.name,cache,scope,chapter:item.id,total},signal:controller.signal,onProgress:setStatus});
+   await exportLocally({entries:[{url:item.sourceURL,number:item.episode??1,season:item.season||1,title:item.episodeTitle||item.name}],kind:'manga',service,manga:value,cacheContext:{name:item.name,cache,scope,chapter:item.id,total,entries},signal:controller.signal,onProgress:setStatus});
    setStatus('Файл передан браузеру для сохранения.');
   }catch(cause){setError(cause.name==='AbortError'?'Скачивание остановлено.':cause.message);}finally{setBusy(false);}
  }

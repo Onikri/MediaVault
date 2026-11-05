@@ -185,10 +185,11 @@ class Exports:
         manga=MangaOptions.model_validate(manga).model_dump() if manga is not None else None
         if manga:
             if kind!='manga':raise ValueError('Настройки глав доступны только для манги.')
-            if not manga['chapters'] and (manga['mode']!='cached' or not manga['cached']):raise ValueError('Выбери главы или готовые страницы из кэша.')
+            if not manga['chapters'] and not (manga['originals'] or manga['mode']=='cached' and manga['cached']):raise ValueError('Выбери главы или готовые страницы из кэша.')
             for chapter in manga['chapters']:validate_request(chapter['url'],'manga',quality)
-            identities={(p['chapter'],p['page']) for p in manga['cached']}
-            if len(identities)!=len(manga['cached']) or any(c>=max(1,len(manga['chapters'])) for c,p in identities):raise ValueError('Некорректный список сохранённых страниц.')
+            for group in ['cached','originals']:
+                identities={(p['chapter'],p['page']) for p in manga[group]}
+                if len(identities)!=len(manga[group]) or any(c>=max(1,len(manga['chapters'])) for c,p in identities):raise ValueError('Некорректный список сохранённых страниц.')
         else:validate_request(url,kind,quality)
         referer=public_url(referer,resolve_dns=False) if referer else None
         with self.condition:
@@ -202,18 +203,18 @@ class Exports:
             if shutil.disk_usage(self.root).free<self.reserve+32*1024**2:raise ExportLimit('На сервере недостаточно места для временного скачивания.')
             identity=secrets.token_hex(16);now=self.clock();job=Export(identity,owner,url,kind,quality,now,now+self.ttl,self.root/identity,referer=referer)
             job.manga=manga
-            if manga and manga['cached']:
+            if manga and (manga['cached'] or manga['originals']):
                 job.state='staging';job.progress={'phase':'staging'};job.directory.mkdir(mode=0o700)
             self.jobs[identity]=job;self.condition.notify_all();return self._snapshot(job)
-    def put_page(self,owner,identity,chapter,page,data):
+    def put_page(self,owner,identity,chapter,page,data,source=False):
         with self.lock:
             job=self._owned(owner,identity)
             if job.state!='staging':raise ExportLimit('Подготовка страниц уже завершена.')
-            expected=next((v for v in job.manga['cached'] if v['chapter']==chapter and v['page']==page),None)
+            expected=next((v for v in job.manga['originals' if source else 'cached'] if v['chapter']==chapter and v['page']==page),None)
             if not expected or hashlib.sha256(data).hexdigest()!=expected['imageHash']:raise ValueError('Сохранённая страница не совпадает с запросом.')
             verify_image(data)
-            path=cached_path(job,chapter,page);previous=path.stat().st_size if path.is_file() else 0
-            size=sum(p.stat().st_size for p in job.directory.glob('cached-*.image'))
+            path=cached_path(job,chapter,page,source);previous=path.stat().st_size if path.is_file() else 0
+            size=sum(p.stat().st_size for p in job.directory.glob('*.image'))
             if size-previous+len(data)>GiB:raise ExportLimit('Кэш выбранных глав превышает 1 ГБ.')
             if shutil.disk_usage(self.root).free<self.reserve+len(data):raise ExportLimit('На сервере недостаточно места для страниц.')
             path.write_bytes(data);return self._snapshot(job)
@@ -221,7 +222,7 @@ class Exports:
         with self.condition:
             job=self._owned(owner,identity)
             if job.state!='staging':return self._snapshot(job)
-            if any(not cached_path(job,v['chapter'],v['page']).is_file() for v in job.manga['cached']):raise ValueError('Загружены не все страницы из кэша.')
+            if any(not cached_path(job,v['chapter'],v['page'],source).is_file() for group,source in [('cached',False),('originals',True)] for v in job.manga[group]):raise ValueError('Загружены не все страницы главы.')
             job.state='queued';job.progress={'phase':'queued'};self.condition.notify_all();return self._snapshot(job)
     def status(self,owner,identity):
         with self.lock:self._cleanup();return self._snapshot(self._owned(owner,identity))
@@ -311,7 +312,7 @@ def install(app,owner):
     async def upload_cached_page(identity:str,chapter:int,page:int,request:Request,subject=Depends(owner)):
         data=await request.body()
         if len(data)>30*1024**2:raise HTTPException(413,'Страница превышает 30 МБ.')
-        try:return await run_in_threadpool(manager().put_page,subject,identity,chapter,page,data)
+        try:return await run_in_threadpool(manager().put_page,subject,identity,chapter,page,data,request.query_params.get('source')=='1')
         except (ValueError,SourceError) as error:raise HTTPException(422,str(error)) from None
         except ExportMissing:raise HTTPException(404,'Задание скачивания не найдено.') from None
         except ExportLimit as error:raise HTTPException(429,str(error)) from None

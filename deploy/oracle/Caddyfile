@@ -1,8 +1,8 @@
 {$SERVER_NAME} {
     encode zstd gzip
-    handle /online/exports/*/pages/* {
+    handle /online/exports/* {
         request_body {
-            max_size 31MB
+            max_size 32MB
         }
         reverse_proxy importer:7860
     }
