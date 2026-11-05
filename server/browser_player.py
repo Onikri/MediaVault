@@ -14,7 +14,6 @@ import copy
 from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import urlsplit
-from requests.utils import default_user_agent
 from source_parser import SourceError, public_url, playback_headers, BLOCKED, USER_AGENT, is_alloha_player
 
 def browser_workers():
@@ -83,6 +82,7 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
     browser_paths()
     validate(url)
     framed = is_alloha_player(url)
+    yani = urlsplit(url).hostname=='alloha.yani.tv'
     if mode and referer:
         validate(referer)
     captured={};done=asyncio.Event();requests=0;selected_quality=None;requested_qualities={}
@@ -114,6 +114,8 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
             # Alloha selects its signed CDN URLs during iframe initialization.
             # Use the same public browser profile as subsequent media requests.
             context_options = {'user_agent': USER_AGENT} if framed or mode else {}
+            if yani:
+                context_options.update(user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',locale='ru-RU',viewport={'width':1280,'height':720})
             context=await browser.new_context(service_workers='block',accept_downloads=False, **context_options)
             async def guard(route):
                 nonlocal requests
@@ -224,11 +226,8 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     # delayed WS responses during menu clicks cannot relabel it.
                     values=await target.evaluate("() => typeof player==='undefined' ? null : player.currentSource?.quality || null")
                     initial_headers=next(iter(captured.values()))['headers'] if captured else headers
-                    if urlsplit(url).hostname=='alloha.yani.tv':
-                        # The public YummyAnime ladder supports server HTTP
-                        # clients with the player Origin. Its CDN can reject
-                        # the embedded browser's UA on an out-of-browser GET.
-                        initial_headers={'Origin':'https://alloha.yani.tv','User-Agent':default_user_agent()}
+                    if yani:
+                        initial_headers={'Origin':'https://alloha.yani.tv','User-Agent':'node'}
                     published=published_quality_streams(values,initial_headers,validate=validate)
                     if published:return published
                     # Modern Alloha serves a different signed one-quality HLS
