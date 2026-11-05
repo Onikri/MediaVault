@@ -1,0 +1,13 @@
+{
+  "name": "FSRCNN x2",
+  "author": "Saafke/FSRCNN_Tensorflow; ONNX conversion televisualarts-cloud/wefax_decoder",
+  "source": "https://github.com/televisualarts-cloud/wefax_decoder/blob/main/wefax/models/fsrcnn_x2.onnx",
+  "sourceGitBlobSha1": "0ce756653b71056586ab508710135f4a3c967214",
+  "bytes": 35054,
+  "sha256": "313fe4371950fd90216db4d1ce6a8c9b513128c4e715b2363a11d6a52ccb0e36",
+  "license": "Apache-2.0",
+  "licenseSource": "https://github.com/televisualarts-cloud/wefax_decoder/blob/main/wefax/models/FSRCNN_LICENSE.txt",
+  "channels": 1,
+  "usage": "Neural luminance super-resolution; original colour is resampled separately. General image model, not MangaJaNai.",
+  "weightsCommitted": false
+}

@@ -1,0 +1,18 @@
+{
+  "archive": "https://github.com/the-database/MangaJaNai/releases/download/3.0.0/IllustrationJaNai_V3denoise_onnx.zip",
+  "member": "2x_IllustrationJaNai_V3denoise_SPAN_S_30k_fp16_1x3xHxW_dyn-HW_strong_fp16_op23.onnx",
+  "bytes": 851846,
+  "sha256": "cd0344ebae36281206827954b730e0f944ce961dbbe059a41a083014f3e7c03a",
+  "convertedBytes": 1673274,
+  "convertedSha256": "9d2c5ff9ea794d77976e69d41d9b84ffc99d4a2f0c7c11ba2eb05e040a2b69b6",
+  "conversion": "All FLOAT16 tensor storage/types/Cast targets converted to FLOAT32 for CPU; architecture and trained weights preserved.",
+  "author": "the-database",
+  "name": "IllustrationJaNai V3denoise SPAN-S 2x",
+  "license": "CC-BY-NC-4.0",
+  "licenseSource": "https://github.com/the-database/MangaJaNai/blob/main/LICENSE",
+  "sourceIR": 12,
+  "runtimeIR": 11,
+  "architecture": "SPAN-S",
+  "usage": "Colour illustrations and degraded manga-like lines; not the grayscale MangaJaNai ESRGAN model. Actual CPU neural inference.",
+  "weightsCommitted": false
+}

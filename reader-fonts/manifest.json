@@ -86,5 +86,44 @@
     "sha256": "ccbacc1ab3bd0e691b17e24d6c5286455e0b2404507f4b6df249fec850bfbca1",
     "russianGlyphsVerified": 66,
     "license": "SIL Open Font License 1.1"
+  },
+  {
+    "id": "balsamiq-sans",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/dc4174ea7e6302897638732e11a47f2cc978ec95/ofl/balsamiqsans/BalsamiqSans-Regular.ttf",
+    "sourceSHA256": "fcc9c00a9ad6e78673fa84653745569097241d99b5d1387a23f395858ed46b7e",
+    "file": "balsamiq-sans.woff2",
+    "bytes": 87324,
+    "sha256": "890ba9acd71872ad1097ba23b5f133a82dee954dd9130b3bffa22c92f11180f9",
+    "russianGlyphsVerified": 71,
+    "license": "SIL-OFL-1.1",
+    "licenseFile": "balsamiqsans-OFL.txt",
+    "conversion": "Latin and Cyrillic WOFF2 subset; original font outlines preserved."
+  },
+  {
+    "id": "balsamiq-sans",
+    "weight": 700,
+    "source": "https://raw.githubusercontent.com/google/fonts/dc4174ea7e6302897638732e11a47f2cc978ec95/ofl/balsamiqsans/BalsamiqSans-Bold.ttf",
+    "sourceSHA256": "a3302bd8424e6a37704eb5e20d5c5a3a2fd80feaf57e48a19d261f8e0c583621",
+    "file": "balsamiq-sans-bold.woff2",
+    "bytes": 85456,
+    "sha256": "d3f49c17d6f34bcc4edc5ebcaee32ba5bb6513882ee120edc62bad87301b3e81",
+    "russianGlyphsVerified": 71,
+    "license": "SIL-OFL-1.1",
+    "licenseFile": "balsamiqsans-OFL.txt",
+    "conversion": "Latin and Cyrillic WOFF2 subset; original font outlines preserved."
+  },
+  {
+    "id": "caveat",
+    "weight": 400,
+    "source": "https://raw.githubusercontent.com/google/fonts/5571d84c0d8c70ec1af4f64072d8c5cf1e4e9643/ofl/caveat/Caveat[wght].ttf",
+    "sourceSHA256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988",
+    "file": "caveat.woff2",
+    "bytes": 154280,
+    "sha256": "30ae721d6e29589cbdb55d86eb6de32737783d7b06316f882083d317da46e789",
+    "russianGlyphsVerified": 71,
+    "license": "SIL-OFL-1.1",
+    "licenseFile": "caveat-OFL.txt",
+    "conversion": "Latin and Cyrillic WOFF2 subset; original font outlines preserved."
   }
 ]

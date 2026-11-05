@@ -163,6 +163,31 @@ lettering changes and quota diagnostics; no real Google in that browser test).
 Live Google API requests are separately documented, with no keys printed.
 Production build passed.
 
+## Stage 7 — measured CPU upscale profiles and release calendar
+
+- Added real SPAN detail/denoise and FSRCNN CPU profiles, model choice in reader
+  settings, per-profile SHA-256 verification/cache identity and bounded inference.
+  The worker handles real RGB or luminance networks, keeping original chroma for
+  FSRCNN. Too-large originals are kept instead of labelled as an enhancement.
+- New weights stay in project cache and are served through explicit hash-checked
+  model routes. Reproduction supports --profile detail/denoise/fast. Manifests and
+  attribution distinguish IllustrationJaNai from grayscale MangaJaNai ESRGAN.
+- The image/timing comparison is docs/upscale-comparison-2026-11-05.md. Actual
+  native CPU inference on 192×256 samples took about 453–484 ms SPAN or 25–35 ms
+  FSRCNN, with controlled reconstruction metrics and separate reference/baseline
+  images. Browser CPU/WASM ran all three actual models, not mock inference.
+- Replaced handwritten month geometry with MIT React DayPicker 10.0.2. Calendar
+  is one or two months according to its actual width, with animated navigation,
+  Russian shared month/year dropdowns and season shortcuts. Dates are circular.
+  Episode details open on hover/focus and close when leaving; touch can tap.
+  The compact list still includes every episode with available name/filler/credits.
+
+Validation: actual hash-verified ONNX CPU/WASM inference; independent native CPU
+comparison images; Python route/hash safety contracts; real DayPicker/Radix
+navigation, 64 entries, one/two-month responsiveness and hover dismissal at
+390/1440px. Calendar episode replies are fixtures, not live schedule guarantees.
+Production build passed. Watch-order visual refinement remains a separate item.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
@@ -174,8 +199,9 @@ Production build passed.
 - [x] Reader chapter bar/cards, cursor-driven previews, one-page/spread/3D fixes.
 - [x] Adaptive page-point timeline and compact translation settings/help.
 - [x] Language/API probe, quota/translation timings and typography/font matching.
-- [ ] Actual multi-model manga/background upscale comparison with image report.
-- [ ] Responsive animated calendar and watch-order presentation.
+- [x] Actual multi-model manga/background upscale comparison with image report.
+- [x] Responsive animated calendar.
+- [ ] Watch-order presentation.
 - [ ] Music rows, interval-aware OP/ED information and login diagnosis.
 - [ ] Room controls, chat beside video, voice UI and two-peer checks.
 

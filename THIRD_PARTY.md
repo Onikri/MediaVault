@@ -347,3 +347,12 @@ are SIL OFL 1.1. Source distributions: https://github.com/balsamiq/balsamiqsans
 and https://github.com/google/fonts/tree/main/ofl/caveat. Local WOFF2 files are
 Latin/Cyrillic subsets; full licences are reader-fonts/balsamiqsans-OFL.txt and
 reader-fonts/caveat-OFL.txt. Family names in application CSS are namespaced MV.
+
+React DayPicker 10.0.2 by Giampaolo Bellavite and contributors is MIT-licensed
+(https://github.com/gpbl/react-day-picker). Its keyboard/date geometry and month
+animation are styled with AniView tokens; custom dropdowns use existing Radix.
+IllustrationJaNai V3denoise SPAN-S follows the same author's CC-BY-NC-4.0 licence
+as V3detail; full source/hash/conversion records are in reader-models/title-denoise.json.
+FSRCNN x2 uses Apache-2.0 trained weights (Saafke/FSRCNN_Tensorflow), converted by
+televisualarts-cloud/wefax_decoder; reader-models/title-fsrcnn.json records attribution
+and verified hashes. Neither model is represented as grayscale MangaJaNai ESRGAN.

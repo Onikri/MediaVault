@@ -63,6 +63,7 @@
     "pdfjs-dist": "5.4.296",
     "qrcode": "1.5.4",
     "react": "19.3.1",
+    "react-day-picker": "10.0.2",
     "react-dom": "19.3.1",
     "react-pageflip": "2.0.3"
   },

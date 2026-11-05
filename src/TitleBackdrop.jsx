@@ -14,7 +14,7 @@ import {extractYouTubeId} from './blossom/utils/trailer';
 function Slide({url,profile,actions,libraryId,onPalette,server,enhance}){
   const src=useArtwork(url,profile,actions.readArtwork,libraryId),reduced=useReducedMotion();
   const upgraded=useTitleUpscale(src,url,server,enhance,!!profile?.artwork?.[url]);
-  return src?<motion.img data-upscaled={!!upgraded} data-inference-ms={upgraded?.inferenceMs} src={upgraded?.source||src} alt="" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={{duration:reduced?0:1.8,ease:'easeInOut'}} onLoad={event=>{
+  return src?<motion.img data-upscaled={!!upgraded?.source} data-inference-ms={upgraded?.inferenceMs} src={upgraded?.source||src} alt="" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={{duration:reduced?0:1.8,ease:'easeInOut'}} onLoad={event=>{
     try{const canvas=document.createElement('canvas');canvas.width=64;canvas.height=36;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(event.currentTarget,0,0,64,36);const pixels=ctx.getImageData(0,0,64,36).data;onPalette({...scenePalette(pixels),seed:seedFromPixels(pixels)});}catch{}
   }}/>:null;
 }

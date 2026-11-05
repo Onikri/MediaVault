@@ -3,7 +3,7 @@
 Run from the checkout with project-local requests/numpy/onnx dependencies. Only
 one ZIP member is downloaded using HTTP Range. Weights are never committed.
 """
-import hashlib,io,zipfile
+import argparse,hashlib,io,json,zipfile
 from pathlib import Path
 import requests,numpy as np,onnx
 
@@ -24,7 +24,15 @@ def convert(graph):
             elif attr.name=='to' and attr.i==onnx.TensorProto.FLOAT16:attr.i=onnx.TensorProto.FLOAT
 
 def main():
+    global ARCHIVE,MEMBER,ORIGINAL,EXPECTED
+    parser=argparse.ArgumentParser();parser.add_argument('--profile',choices=['detail','denoise','fast'],default='detail');args=parser.parse_args()
     root=Path('.codex-local/models');root.mkdir(parents=True,exist_ok=True)
+    if args.profile=='fast':
+        manifest=json.loads(Path('reader-models/title-fsrcnn.json').read_text());url=manifest['source'].replace('github.com/','raw.githubusercontent.com/').replace('/blob/','/');response=requests.get(url,timeout=30);response.raise_for_status();raw=response.content
+        if len(raw)!=manifest['bytes'] or hashlib.sha256(raw).hexdigest()!=manifest['sha256']:raise RuntimeError('FSRCNN checksum mismatch')
+        output=root/'fsrcnn-313fe4371950.onnx';output.write_bytes(raw);print(output);return
+    if args.profile=='denoise':
+        manifest=json.loads(Path('reader-models/title-denoise.json').read_text());ARCHIVE=manifest['archive'];MEMBER=manifest['member'];ORIGINAL=manifest['sha256'];EXPECTED=manifest['convertedSha256']
     with requests.get(ARCHIVE,stream=True,timeout=30) as response:
         response.raise_for_status();size=int(response.headers['Content-Length']);url=response.url
     class Remote(io.RawIOBase):
@@ -47,7 +55,7 @@ def main():
     # This graph uses no IR12-only types/features. Checker and real CPU/WASM
     # inference validate the compatible IR11 declaration (network unchanged).
     model.ir_version=11;onnx.checker.check_model(model)
-    output=root/'illustration-span-3f5245ed1abe.onnx';onnx.save(model,output)
+    output=root/('illustration-denoise-9d2c5ff9ea79.onnx' if args.profile=='denoise' else 'illustration-span-3f5245ed1abe.onnx');onnx.save(model,output)
     if hashlib.sha256(output.read_bytes()).hexdigest()!=EXPECTED:output.unlink();raise RuntimeError('Converted model checksum mismatch')
     print(output)
 
