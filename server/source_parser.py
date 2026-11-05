@@ -165,11 +165,7 @@ class PublicHttp:
                 timeout=self.timeout
                 if self.deadline:
                     remaining=max(.2,self.deadline-time.monotonic());timeout=(min(timeout[0],remaining),min(timeout[1],remaining))
-                request_headers=outgoing
-                if method=='GET' and outgoing.get('Origin')=='https://alloha.yani.tv' and outgoing.get('User-Agent')=='node' and (urlsplit(url).hostname or '').endswith('.vkvideo.cloud'):
-                    # Match the public YummyAnime resolver's fetch request.
-                    request_headers={**outgoing,'Accept':'*/*','Accept-Language':'*','Sec-Fetch-Mode':'cors','Accept-Encoding':'gzip, deflate, br','Connection':'keep-alive'}
-                response = self.session.request(method, url, headers=request_headers, data=data,
+                response = self.session.request(method, url, headers=outgoing, data=data,
                                                 timeout=timeout, allow_redirects=False, stream=True)
             except requests.RequestException:
                 raise SourceError("Источник не ответил. Повтори импорт позднее.") from None

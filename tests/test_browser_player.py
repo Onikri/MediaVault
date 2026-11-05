@@ -6,7 +6,7 @@ import shutil
 import sys
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
-from browser_player import _extract, _render, observed_streams, browser_destination,published_quality_streams
+from browser_player import _extract, _render, observed_streams, browser_destination,published_quality_streams,YANI_USER_AGENT
 from source_parser import SourceError, USER_AGENT
 
 class BrowserPlayerTests(unittest.TestCase):
@@ -91,7 +91,10 @@ class BrowserPlayerTests(unittest.TestCase):
                 self.assertEqual(sorted(s['quality'] for s in result),heights)
                 self.assertEqual({s['url'] for s in result},set(source.values()))
                 if host=='alloha.yani.tv':
-                    self.assertTrue(all(s['headers']=={'Origin':'https://alloha.yani.tv','User-Agent':'node'} for s in result))
+                    # The CDN rejects node/python-requests and the shared
+                    # scraper default UA; streams reuse the browser profile.
+                    self.assertTrue(all(s['headers']=={'Origin':'https://alloha.yani.tv','User-Agent':YANI_USER_AGENT} for s in result))
+                    self.assertNotEqual(YANI_USER_AGENT,USER_AGENT)
 
     @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for a real iframe contract')
     def test_alloha_uses_public_parent_and_play_button_and_never_returns_plyr_blank_video(self):

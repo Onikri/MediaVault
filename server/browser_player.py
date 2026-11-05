@@ -20,6 +20,15 @@ def browser_workers():
     try:return max(1,min(2,int(os.environ.get('MEDIA_VAULT_BROWSER_WORKERS',min(2,os.cpu_count() or 1)))))
     except (TypeError,ValueError):return 1
 
+# YummyAnime's Alloha CDN (*.vkvideo.cloud) answers 403 unless a request
+# carries the player Origin and an ordinary browser User-Agent. Verified on
+# Oracle 2026-11-05: it refuses "node", "python-requests/*" and exactly the
+# shared scraper default (Windows Chrome/126 = source_parser.USER_AGENT), while
+# any other current browser UA, on any OS, is accepted. Signed URLs are not
+# bound to the extracting browser's UA, so stream fetches reuse this profile.
+YANI_ORIGIN='https://alloha.yani.tv'
+YANI_USER_AGENT='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
+
 _slots=threading.BoundedSemaphore(browser_workers())
 _playback_cache=OrderedDict()
 _cache_lock=threading.Lock()
@@ -115,7 +124,7 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
             # Use the same public browser profile as subsequent media requests.
             context_options = {'user_agent': USER_AGENT} if framed or mode else {}
             if yani:
-                context_options.update(user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',locale='ru-RU',viewport={'width':1280,'height':720})
+                context_options.update(user_agent=YANI_USER_AGENT,locale='ru-RU',viewport={'width':1280,'height':720})
             context=await browser.new_context(service_workers='block',accept_downloads=False, **context_options)
             async def guard(route):
                 nonlocal requests
@@ -227,7 +236,8 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     values=await target.evaluate("() => typeof player==='undefined' ? null : player.currentSource?.quality || null")
                     initial_headers=next(iter(captured.values()))['headers'] if captured else headers
                     if yani:
-                        initial_headers={'Origin':'https://alloha.yani.tv','User-Agent':'node'}
+                        # Same browser profile as this extraction; see YANI_USER_AGENT.
+                        initial_headers={'Origin':YANI_ORIGIN,'User-Agent':await target.evaluate('navigator.userAgent')}
                     published=published_quality_streams(values,initial_headers,validate=validate)
                     if published:return published
                     # Modern Alloha serves a different signed one-quality HLS

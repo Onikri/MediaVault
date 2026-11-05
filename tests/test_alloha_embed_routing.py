@@ -6,6 +6,7 @@ from source_parser import Resolver
 class AllohaRoutingTests(unittest.TestCase):
     def test_public_embed_keeps_selected_dub_episode_parent_and_full_quality_ladder(self):
         http=Mock();http.document.side_effect=AssertionError('Plain document preflight must not run for an iframe-only player')
+        http.refresh_playback=False
         url='https://embed.thealloha.club/?token_movie=fixture&season=2&episode=3&translation=66';parent='https://publisher.example.com/film'
         streams=[{'url':f'https://cdn.example.com/{q}.m3u8','type':'hls','quality':q,'headers':{'Referer':parent}} for q in [2160,1440,1080,720]]
         with patch('browser_player.extract',return_value={'streams':streams,'subtitles':[]}) as extract:
