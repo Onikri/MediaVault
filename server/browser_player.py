@@ -30,7 +30,9 @@ YANI_ORIGIN='https://alloha.yani.tv'
 # 2026-11-05: Mac Chrome/134 was burned by test bursts; this profile was
 # verified on the same signed URL (master, variant, segment). One fixed UA,
 # never rotated: the throttle is avoided by pacing, not by switching.
-YANI_USER_AGENT='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
+# 2026-11-06: Chrome/142 was burned by two parallel whole-film pulls (now
+# viewer-paced, see source_parser.BULK_PACE_SECONDS); Edge 141 verified.
+YANI_USER_AGENT='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0'
 
 _slots=threading.BoundedSemaphore(browser_workers())
 _playback_cache=OrderedDict()
