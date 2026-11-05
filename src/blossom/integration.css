@@ -1,11 +1,16 @@
 /* MediaVault adapters use AniView's tokens, anatomy, breakpoints and timing. */
 html[data-blossom]{--bg:var(--color-canvas);--panel:var(--color-surface);--panel-raised:var(--color-surface-raised);--text:var(--color-petal);--muted:var(--color-on-muted);--accent:var(--color-blossom);--accent-soft:color-mix(in srgb,var(--color-blossom) 13.0%,transparent);--border:var(--color-border);font-family:var(--font-ui);background:var(--color-canvas);color:var(--color-petal);color-scheme:dark}
-html[data-blossom] body{background:var(--color-canvas);color:var(--color-petal);font-family:var(--font-ui)}
+html[data-blossom] body{isolation:isolate;background:var(--color-canvas);color:var(--color-petal);font-family:var(--font-ui)}
 html[data-blossom] button,html[data-blossom] input,html[data-blossom] select,html[data-blossom] textarea{font-family:inherit}
-html[data-blossom] .app-shell{isolation:isolate;background:transparent;min-height:100dvh}
+/* The fixed header and body portals must share a stacking context. Keep
+   route content below both, even after its entrance animation finishes. */
+html[data-blossom] #root{z-index:auto}
+html[data-blossom] #scene-root{z-index:-2}
+html[data-blossom] .app-shell{background:transparent;min-height:100dvh}
 html[data-blossom] .app-shell:before{content:'';position:fixed;inset:0;z-index:-1;background-image:linear-gradient(rgb(var(--canvas-rgb)/.82),rgb(var(--canvas-rgb)/.96)),var(--site-wallpaper);background-size:cover;background-position:center;pointer-events:none;opacity:0;transition:opacity var(--motion-standard)}
 html[data-blossom][data-wallpaper=visible] .app-shell:before{opacity:1}
-html[data-blossom] .app-main{width:min(1268px,calc(100% - 72px));max-width:1268px;padding:112px 0 64px;margin-inline:auto;min-height:80dvh}
+html[data-blossom] .app-main{isolation:isolate;width:min(1268px,calc(100% - 72px));max-width:1268px;padding:112px 0 64px;margin-inline:auto;min-height:80dvh}
+html[data-blossom] body>.release-date-tooltip{z-index:50}
 html[data-blossom] .page-title-row{margin:14px 0 36px;padding:0;align-items:end}
 html[data-blossom] .page-title{font-family:var(--font-display);font-size:clamp(46px,6vw,80px);font-weight:800;line-height:1.05;letter-spacing:-.065em;color:var(--color-petal);margin:12px 0 16px}
 html[data-blossom] .page-subtitle{color:var(--color-on-muted);font-size:14px;line-height:1.8}
