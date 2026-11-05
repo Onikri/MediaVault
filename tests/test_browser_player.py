@@ -173,4 +173,63 @@ class BrowserPlayerTests(unittest.TestCase):
         self.assertEqual(sorted(s['quality'] for s in result),heights)
         self.assertEqual({s['url'] for s in result},{stream(q) for q in heights})
 
+
+class AllohaThrottlePolicy(unittest.TestCase):
+    """YummyAnime's Alloha CDN throttles the server after bursts of new signed URLs."""
+    URL='https://alloha.yani.tv/?token_movie=fixture&translation=66'
+    PARENT='https://ru.yummyani.me/catalog/item/fixture'
+
+    def setUp(self):
+        from unittest.mock import patch
+        import browser_player
+        self.bp=browser_player
+        browser_player._playback_cache.clear();browser_player._cooldown.clear()
+        self.addCleanup(browser_player._playback_cache.clear);self.addCleanup(browser_player._cooldown.clear)
+        self.calls=0
+        async def fake(url,referer=None,**_):
+            self.calls+=1
+            return [{'url':'https://cdn.example.com/'+str(self.calls)+'.m3u8','type':'hls','quality':2160,'headers':{}}]
+        patcher=patch.object(browser_player,'_extract',new=fake);patcher.start();self.addCleanup(patcher.stop)
+
+    def age(self,url,seconds):
+        key=(url,self.PARENT,None);expires,value,created=self.bp._playback_cache[key]
+        self.bp._playback_cache[key]=(expires,value,created-seconds)
+
+    def test_one_extraction_serves_repeated_opens_and_rapid_client_retries(self):
+        first=self.bp.extract(self.URL,self.PARENT)
+        self.assertEqual(self.bp.extract(self.URL,self.PARENT),first)
+        self.assertEqual(self.bp.extract(self.URL,self.PARENT,refresh=True),first)
+        self.assertEqual(self.calls,1)
+        expires,_,created=self.bp._playback_cache[(self.URL,self.PARENT,None)]
+        self.assertEqual(round(expires-created),self.bp.ALLOHA_CACHE_SECONDS)
+        self.age(self.URL,self.bp.ALLOHA_MIN_REFRESH_SECONDS+1)
+        self.assertNotEqual(self.bp.extract(self.URL,self.PARENT,refresh=True),first)
+        self.assertEqual(self.calls,2)
+
+    def test_previews_never_issue_new_signed_urls(self):
+        with self.assertRaises(SourceError):self.bp.extract(self.URL,self.PARENT,cached_only=True)
+        self.assertEqual(self.calls,0)
+        played=self.bp.extract(self.URL,self.PARENT)
+        self.assertEqual(self.bp.extract(self.URL,self.PARENT,cached_only=True),played)
+        self.assertEqual(self.calls,1)
+
+    def test_refused_fresh_urls_back_off_but_expired_urls_renew_once(self):
+        self.bp.extract(self.URL,self.PARENT)
+        self.assertFalse(self.bp.rejected(self.URL,self.PARENT))
+        with self.assertRaisesRegex(SourceError,'временно'):self.bp.extract(self.URL,self.PARENT,refresh=True)
+        self.assertEqual(self.calls,1)
+        self.bp._cooldown.clear()
+        self.bp.extract(self.URL,self.PARENT)
+        self.age(self.URL,self.bp.ALLOHA_MIN_REFRESH_SECONDS+1)
+        self.assertTrue(self.bp.rejected(self.URL,self.PARENT))
+        self.assertEqual(self.bp._cooldown,{})
+        self.bp.extract(self.URL,self.PARENT);self.assertEqual(self.calls,3)
+
+    def test_other_dynamic_players_keep_their_previous_behaviour(self):
+        url='https://embed.thealloha.club/?translation=66'
+        self.bp.extract(url,self.PARENT);self.bp.extract(url,self.PARENT,refresh=True)
+        self.assertEqual(self.calls,2)
+        self.bp.extract(url,self.PARENT,cached_only=True)
+        self.assertFalse(self.bp.rejected(url,self.PARENT));self.assertEqual(self.bp._cooldown,{})
+
 if __name__=='__main__':unittest.main()

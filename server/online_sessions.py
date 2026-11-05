@@ -7,7 +7,7 @@ from fastapi import Depends,HTTPException,Header,Request
 from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response,StreamingResponse
 from pydantic import BaseModel,ConfigDict,Field
-from source_parser import PublicHttp,Resolver,SourceError,public_url
+from source_parser import PublicHttp,Resolver,SourceAccessError,SourceError,is_alloha_player,public_url
 
 @dataclass
 class Session:
@@ -111,24 +111,36 @@ def install(app,owner):
             started=time.monotonic()
             from media_download import pick_stream
             parent=public_url(body.referer,resolve_dns=False) if body.referer else None
-            page,source_cached=resolver_cache.page(subject,body.url,parent,lambda:Resolver(http).resolve(body.url,referer=parent) if parent else Resolver(http).resolve(body.url),refresh=body.refresh,preview=http.preview)
-            resolved_at=time.monotonic()
-            # Keep the HLS master: playback adapts while segments arrive. Do not
-            # probe every variant or download/transcode an episode before play.
-            masters=[v for v in page.streams if v.get('type')=='hls' and not v.get('quality')]
-            stream=masters[0] if masters else pick_stream(page.streams,body.quality)
-            max_height=None if body.quality=='best' else int(body.quality)
-            manifest=None
-            generated=False
-            # Check the first manifest now, before granting a playback capability.
-            if stream['type']=='hls':
-                from adaptive_playback import adaptive_master
-                text=adaptive_master(page.streams,http,max_height,document=lambda client,url,headers=None:resolver_cache.document(client,url,headers,refresh=body.refresh)) if not masters else None
-                generated=text is not None
-                if not generated:text,final,_=resolver_cache.document(http,stream['url'],headers=stream.get('headers'),refresh=body.refresh)
-                else:final=stream['url']
-                rewrite_manifest(text,final,lambda v:v,None if generated else max_height)
-                manifest=(text,final,float('inf') if generated else time.monotonic()+30)
+            refresh=body.refresh
+            for attempt in (0,1):
+                http.refresh_playback=refresh
+                page,source_cached=resolver_cache.page(subject,body.url,parent,lambda:Resolver(http).resolve(body.url,referer=parent) if parent else Resolver(http).resolve(body.url),refresh=refresh,preview=http.preview)
+                resolved_at=time.monotonic()
+                # Keep the HLS master: playback adapts while segments arrive. Do not
+                # probe every variant or download/transcode an episode before play.
+                masters=[v for v in page.streams if v.get('type')=='hls' and not v.get('quality')]
+                stream=masters[0] if masters else pick_stream(page.streams,body.quality)
+                max_height=None if body.quality=='best' else int(body.quality)
+                manifest=None
+                generated=False
+                try:
+                    # Check the first manifest now, before granting a playback capability.
+                    if stream['type']=='hls':
+                        from adaptive_playback import adaptive_master
+                        text=adaptive_master(page.streams,http,max_height,document=lambda client,url,headers=None,refresh=refresh:resolver_cache.document(client,url,headers,refresh=refresh)) if not masters else None
+                        generated=text is not None
+                        if not generated:text,final,_=resolver_cache.document(http,stream['url'],headers=stream.get('headers'),refresh=refresh)
+                        else:final=stream['url']
+                        rewrite_manifest(text,final,lambda v:v,None if generated else max_height)
+                        manifest=(text,final,float('inf') if generated else time.monotonic()+30)
+                    break
+                except SourceAccessError:
+                    # Long-cached Alloha URLs may have expired: renew them once.
+                    # Freshly issued ones being refused puts the CDN on cooldown.
+                    if not is_alloha_player(body.url):raise
+                    from browser_player import rejected
+                    if not rejected(body.url,parent) or attempt:raise
+                    refresh=True
             token,s=create(subject,stream.get('headers') or {},kind='preview' if body.purpose=='preview' else 'video',client_id=body.client_id,reservation=reservation)
             s.max_height=None if generated else max_height
             # A generated master can include its base URL as a media playlist.

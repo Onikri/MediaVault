@@ -158,3 +158,25 @@ class PreviewLeasePriority(unittest.TestCase):
   video,_=online.create('A',{},kind='video')
   self.assertIn(video,online.sessions);self.assertIn(music,online.sessions);self.assertIn(manga,online.sessions);self.assertIn(foreign,online.sessions)
   self.assertTrue(all(p not in online.sessions for p in previews))
+ def test_alloha_renews_expired_cached_urls_once_and_backs_off_on_fresh_refusal(self):
+  from types import SimpleNamespace
+  from source_parser import SourceAccessError
+  url='https://alloha.yani.tv/?translation=66';master='#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=3840x1604\n4k.m3u8\n'
+  for stale,resolves in ((True,2),(False,1)):
+   with self.subTest(stale=stale):
+    online.sessions.clear()
+    app=FastAPI();online.install(app,lambda:'A');client=TestClient(app)
+    replies=[SourceAccessError('refused'),(master,'https://cdn.example/m.m3u8',{})]
+    def document(*_,**__):
+     value=replies.pop(0)
+     if isinstance(value,Exception):raise value
+     return value
+    with patch('online_sessions.PublicHttp') as http,patch('online_sessions.Resolver') as resolver,patch('browser_player.rejected',return_value=stale) as rejected:
+     http.return_value.document.side_effect=document
+     resolver.return_value.resolve.return_value=SimpleNamespace(streams=[{'url':'https://cdn.example/m.m3u8','type':'hls'}])
+     body={'url':url,'kind':'video','referer':'https://ru.yummyani.me/catalog/item/x'}
+     if stale:self.assertEqual(client.post('/online/prepare',json=body).status_code,200)
+     else:
+      with self.assertRaises(SourceAccessError):client.post('/online/prepare',json=body)
+    self.assertEqual(resolver.return_value.resolve.call_count,resolves)
+    rejected.assert_called_once_with(url,'https://ru.yummyani.me/catalog/item/x')

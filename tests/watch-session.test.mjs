@@ -65,3 +65,22 @@ test('preview identity isolates season, episode, public source and account',asyn
  const base=key('16498',1,2,'kodik-17','user-a');
  for(const other of [key('16498',2,2,'kodik-17','user-a'),key('16498',1,3,'kodik-17','user-a'),key('16498',1,2,'alloha-17','user-a'),key('16498',1,2,'kodik-17','user-b')])assert.notEqual(base,other);
 });
+
+test('Alloha is playback-only; previews borrow the same episode from Kodik', async () => {
+  const {isAllohaVariant, previewSource, previewEntry} = await import('../src/watch-session.js');
+  const alloha = {id: 'yani', player: 'Alloha', url: 'https://alloha.yani.tv/?translation=66', sourceUrl: 'https://ru.yummyani.me/catalog/item/x'};
+  const dynamic = {id: 'dyn', player: 'Плеер', url: 'https://abc.stravers.live/?e=1', sourceUrl: 'https://site.example/t'};
+  const kodikSubs = {id: 'ks', player: 'Kodik', kind: 'subtitles', url: 'https://kodik.info/serial/1/a/720p', sourceUrl: 'https://site.example/t'};
+  const kodik = {id: 'kv', player: 'Kodik', url: 'https://kodik.info/serial/1/b/720p', sourceUrl: 'https://site.example/t'};
+  const other = {id: 'sib', player: 'Sibnet', url: 'https://video.sibnet.ru/shell.php?videoid=1', sourceUrl: 'https://site.example/t'};
+  assert.equal(isAllohaVariant(alloha), true);
+  assert.equal(isAllohaVariant(dynamic), true);
+  assert.equal(isAllohaVariant(kodik), false);
+  const voices = [{id: 'dub', variants: [alloha, other]}, {id: 'subs', kind: 'subtitles', variants: [kodikSubs]}, {id: 'anistar', variants: [kodik, dynamic]}];
+  assert.equal(previewSource(voices, kodik), kodik, 'non-Alloha players keep their own previews');
+  assert.equal(previewSource(voices, alloha), kodik, 'voiced Kodik before burned-in subtitles and other players');
+  assert.equal(previewSource([{id: 'dub', variants: [alloha, other]}], alloha), other);
+  assert.equal(previewSource([{id: 'dub', variants: [alloha, dynamic]}], alloha), null, 'never another Alloha mirror');
+  assert.deepEqual(previewEntry([{number: 1, url: 'k1'}, {number: 2, url: 'k2'}], {number: '2', url: 'a2'}), {number: 2, url: 'k2'});
+  assert.equal(previewEntry([{number: 1, url: 'k1'}], {number: 5}), null);
+});

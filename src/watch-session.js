@@ -28,6 +28,33 @@ export function voicesForCatalogue(voices,sources,season){
  })})).filter(voice=>voice.variants.length);
 }
 
+const ALLOHA_HOST=/(?:^|\.)(?:alloha\.yani\.tv|stravers\.live|thealloha\.club|alloha\.tv)$/i;
+export function isAllohaVariant(variant){
+ if(/^alloha/i.test(variant?.player||''))return true;
+ try{const url=variant?.url||variant?.episodes?.[0]?.url;return !!url&&ALLOHA_HOST.test(new URL(url).hostname);}catch{return false;}
+}
+
+// Alloha is playback-only: each server extraction issues new signed CDN links
+// and its CDN throttles the server after a burst. Episode frames are the same
+// in every player, so thumbnails and hover previews use another player's copy
+// of the episode: Kodik first, voiced before burned-in subtitles.
+export function previewSource(voices,variant){
+ if(!variant)return null;
+ if(!isAllohaVariant(variant))return variant;
+ let best=null,score=Infinity;
+ for(const voice of voices||[])for(const candidate of voice.variants||[]){
+  if(isAllohaVariant(candidate)||!candidate.sourceUrl||!candidate.url)continue;
+  const value=(candidate.player==='Kodik'?0:2)+(voice.kind==='subtitles'||candidate.kind==='subtitles'?1:0);
+  if(value<score){best=candidate;score=value;}
+ }
+ return best;
+}
+
+// Same-numbered episode of the preview source's own (season-scoped) list.
+export function previewEntry(entries,entry){
+ return (entries||[]).find(e=>Number(e.number)===Number(entry?.number))||null;
+}
+
 // Public source identity (not a media URL) isolates thumbnails from different mirrors.
 export function episodePreviewKey(identity,season,episode,source,user){return 'v2:'+onlineEpisodeId(identity,season,episode)+':source:'+encodeURIComponent(source||'default')+':'+encodeURIComponent(user||'anonymous');}
 

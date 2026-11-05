@@ -281,12 +281,55 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
         finally:await browser.close()
 
 
-def extract(url,referer=None,*,details=False,mode=None,refresh=False):
+# The same CDN also starts refusing a (server IP, User-Agent) pair after a
+# burst of extractions: every extraction issues new signed URLs. One viewer
+# needs one extraction per episode, so keep its URLs instead of re-issuing.
+def _seconds(name,default):
+    try:return max(0,int(os.environ.get(name,default)))
+    except (TypeError,ValueError):return default
+ALLOHA_CACHE_SECONDS=_seconds('MEDIA_VAULT_ALLOHA_CACHE_SECONDS',1200)
+ALLOHA_MIN_REFRESH_SECONDS=_seconds('MEDIA_VAULT_ALLOHA_MIN_REFRESH_SECONDS',90)
+ALLOHA_COOLDOWN_SECONDS=_seconds('MEDIA_VAULT_ALLOHA_COOLDOWN_SECONDS',300)
+_cooldown={}
+
+
+def _throttled(url):
+    return urlsplit(url).hostname=='alloha.yani.tv'
+
+
+def _cooling(url):
+    with _cache_lock:
+        remaining=_cooldown.get(urlsplit(url).hostname,0)-time.monotonic()
+    if remaining>0:
+        raise SourceError('CDN Alloha временно ограничил сервер. Повтори через '+str(max(1,round(remaining/60)))+' мин. или выбери другой плеер.')
+
+
+def rejected(url,referer=None,mode=None):
+    """The CDN answered 403 for streams from this extraction.
+
+    Returns True when the cached URLs were old enough that a single new
+    extraction is reasonable. Freshly issued URLs being refused means the
+    server is throttled: back off instead of issuing more signed URLs.
+    """
+    if not _throttled(url):return False
+    with _cache_lock:
+        old=_playback_cache.pop((url,referer,mode),None)
+        if old and time.monotonic()-old[2]>=ALLOHA_MIN_REFRESH_SECONDS:return True
+        _cooldown[urlsplit(url).hostname]=time.monotonic()+ALLOHA_COOLDOWN_SECONDS
+        return False
+
+
+def extract(url,referer=None,*,details=False,mode=None,refresh=False,cached_only=False):
     if os.environ.get('MEDIA_VAULT_BROWSER_PLAYERS','1')!='1':
         raise SourceError('Динамические плееры отключены на этом сервере.')
     key=(url,referer,mode)
+    throttled=_throttled(url)
     if refresh:
-        with _cache_lock:_playback_cache.pop(key,None)
+        with _cache_lock:
+            old=_playback_cache.get(key)
+            # Client retries must not re-issue signed URLs in a tight loop.
+            if not throttled or not old or time.monotonic()-old[2]>=ALLOHA_MIN_REFRESH_SECONDS:
+                _playback_cache.pop(key,None)
     def cached():
         with _cache_lock:
             old=_playback_cache.get(key)
@@ -295,6 +338,11 @@ def extract(url,referer=None,*,details=False,mode=None,refresh=False):
                 return copy.deepcopy(old[1])
     value=cached()
     if value is not None:return value if details else value['streams']
+    if throttled:
+        _cooling(url)
+        # Hover/episode previews and warm-ups would each issue new signed
+        # URLs; for this CDN they may only reuse an existing extraction.
+        if cached_only:raise SourceError('Превью этого плеера не готовится, чтобы не перегружать источник.')
     # Different public players can use two CPU-bounded slots. Identical work
     # still shares one extraction, rather than launching duplicate Chromiums.
     with _cache_lock:
@@ -325,7 +373,8 @@ def extract(url,referer=None,*,details=False,mode=None,refresh=False):
                 with _cache_lock:
                     # Short signed-source lifetime, VM memory only. Quality
                     # inspection and immediate playback share one browser run.
-                    _playback_cache[key]=(time.monotonic()+45,copy.deepcopy(value))
+                    now=time.monotonic()
+                    _playback_cache[key]=(now+(ALLOHA_CACHE_SECONDS if throttled else 45),copy.deepcopy(value),now)
                     while len(_playback_cache)>64:_playback_cache.popitem(last=False)
             pending['result']=copy.deepcopy(value)
             return value if details else streams
