@@ -180,3 +180,14 @@ class PreviewLeasePriority(unittest.TestCase):
       with self.assertRaises(SourceAccessError):client.post('/online/prepare',json=body)
     self.assertEqual(resolver.return_value.resolve.call_count,resolves)
     rejected.assert_called_once_with(url,'https://ru.yummyani.me/catalog/item/x')
+ def test_device_download_refuses_an_empty_remux_and_streams_a_named_mp4(self):
+  import io
+  from types import SimpleNamespace
+  token,s=online.create('A',{});resource=s.resource('https://cdn.example/master.m3u8')
+  app=FastAPI();online.install(app,lambda:'A');client=TestClient(app,raise_server_exceptions=False)
+  for output,status in ((b'',502),(b'\x00\x00\x00\x18ftypmp42'+b'x'*64,200)):
+   process=SimpleNamespace(stdout=io.BytesIO(output),poll=lambda:0,wait=lambda:0,kill=lambda:None)
+   with patch('subprocess.Popen',return_value=process),patch('shutil.which',return_value='/usr/bin/ffmpeg'),patch('online_sessions.hls_extension_option',return_value=True):
+    response=client.get('/online/'+token+'/'+resource+'/download',params={'name':'Серия 1'})
+   self.assertEqual(response.status_code,status)
+   if status==200:self.assertIn("filename*=UTF-8''%D0%A1%D0%B5%D1%80%D0%B8%D1%8F%201.mp4",response.headers['content-disposition']);self.assertTrue(response.content[4:8]==b'ftyp')

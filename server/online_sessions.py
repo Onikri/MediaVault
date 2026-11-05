@@ -89,6 +89,14 @@ class Prepare(BaseModel):
     refresh:bool=False
     client_id:str=Field(default='',alias='clientId',max_length=100,pattern=r'^[A-Za-z0-9:_-]*$')
 
+_hls_option=[]
+def hls_extension_option():
+    if not _hls_option:
+        import subprocess
+        try:_hls_option.append('extension_picky' in subprocess.run(['ffmpeg','-hide_banner','-h','demuxer=hls'],capture_output=True,text=True,timeout=10).stdout)
+        except (OSError,subprocess.SubprocessError):_hls_option.append(False)
+    return _hls_option[0]
+
 def install(app,owner):
     from playback_resolver import PlaybackResolver
     resolver_cache=PlaybackResolver();app.state.playback_resolver=resolver_cache
@@ -226,11 +234,19 @@ def install(app,owner):
                 target=urljoin(cached[1],(fitting or variants)[-1].uri)
         local='http://127.0.0.1:'+os.getenv('PORT','7860')+'/online/'+token+'/'+(resource if target==url else s.resource(target))
         safe=re.sub(r'[\\/:*?"<>|\x00-\x1f]+',' ',name).strip()[:120] or 'video'
-        command=['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-protocol_whitelist','http,tcp,crypto,data,file','-i',local,
+        # Our proxy URLs have no file extension; patched ffmpeg builds reject
+        # such HLS segments unless extension_picky is off (only our proxy is read).
+        command=['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-protocol_whitelist','http,tcp,crypto,data,file',*(['-extension_picky','0'] if hls_extension_option() else []),'-i',local,
                  '-map','0:v:0','-map','0:a:0?','-c','copy','-f','mp4','-movflags','frag_keyframe+empty_moov+default_base_moof','pipe:1']
         process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
+        # Fail before the browser starts saving: never hand out an empty file.
+        first=process.stdout.read(256*1024)
+        if not first:
+            process.wait()
+            raise HTTPException(502,'Не удалось собрать видео для сохранения. Повтори позже или выбери другое качество.')
         def body():
             try:
+                yield first
                 while True:
                     block=process.stdout.read(256*1024)
                     if not block:break
