@@ -28,7 +28,7 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
   recognition.current?.abort();const abort=new AbortController();recognition.current=abort;const id=sequence.current;
   cooldown.current=Date.now()+(automatic?10000:2000);setChars({phase:'loading',values:[]});
   try{
-   const result=await recognizePauseFrame(current.image,current.context||{},{signal:abort.signal,service:characterService,userId,onPartial:values=>{if(!abort.signal.aborted&&id===sequence.current)setChars({phase:'verifying',values});}});
+   const result=await recognizePauseFrame(current.full||current.image,current.context||{},{signal:abort.signal,service:characterService,userId,onPartial:values=>{if(!abort.signal.aborted&&id===sequence.current)setChars({phase:'verifying',values});}});
    if(abort.signal.aborted||id!==sequence.current)return;
    if(result.complete){cache.current.set(current.key,{...cache.current.get(current.key),characters:result.values});while(cache.current.size>4)cache.current.delete(cache.current.keys().next().value);}
    setChars({phase:'ready',values:result.values,message:result.message});
@@ -63,7 +63,9 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
     try{
      const scale=Math.min(1,960/Math.max(video.videoWidth,video.videoHeight)),image=document.createElement('canvas');image.width=Math.max(1,Math.round(video.videoWidth*scale));image.height=Math.max(1,Math.round(video.videoHeight*scale));
      const context=image.getContext('2d',{willReadFrequently:true});context.drawImage(video,0,0,image.width,image.height);context.getImageData(0,0,1,1);
-     frame.current={key,image,context:{...contextRef.current,timeSeconds:Math.round(video.currentTime*1000)/1000,timecode:new Date(video.currentTime*1000).toISOString().slice(11,19)}};const hit=cache.current.get(key);if(hit?.characters)setChars({phase:'ready',values:hit.characters});
+     // Recognition crops faces from a sharper copy (≤1600 px) than depth needs.
+     const fullScale=Math.min(1,1600/Math.max(video.videoWidth,video.videoHeight)),full=fullScale>scale?document.createElement('canvas'):image;if(full!==image){full.width=Math.max(1,Math.round(video.videoWidth*fullScale));full.height=Math.max(1,Math.round(video.videoHeight*fullScale));full.getContext('2d').drawImage(video,0,0,full.width,full.height);}
+     frame.current={key,image,full,context:{...contextRef.current,timeSeconds:Math.round(video.currentTime*1000)/1000,timecode:new Date(video.currentTime*1000).toISOString().slice(11,19)}};const hit=cache.current.get(key);if(hit?.characters)setChars({phase:'ready',values:hit.characters});
      if(autoRecognize)recognize(frame.current,true);
      if(!enabled||!modelAllowed){setView({phase:'idle'});return;}
      if(hit?.depth){setView({phase:'ready',...hit.depth});return;}
@@ -88,12 +90,18 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
  useEffect(()=>{
   if(!paused||!enabled||view.phase!=='ready'||!canvas.current)return;
   const element=canvas.current,video=videoRef.current,scale=960/Math.max(video.videoWidth,video.videoHeight);element.width=Math.round(video.videoWidth*scale);element.height=Math.round(video.videoHeight*scale);
-  let render;try{render=depthRenderer(element,view.width,view.height);render.depth(view.data);renderer.current=render;}catch(error){setView({phase:'error',message:error.message});return;}
-  let raf=0,last=0,elapsed=0;const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  const draw=now=>{raf=0;if(document.hidden)return;if(!last)last=now;if(now-last>=40||reduced.matches){elapsed+=(now-last)/1000;last=now;render.draw(reduced.matches ? .48 : shadowCutoff(elapsed,{period:settings.current.breathPeriod,amplitude:settings.current.breathAmplitude}),settings.current.strength);}if(!reduced.matches)raf=requestAnimationFrame(draw);};
+  let render;try{render=depthRenderer(element,view.width,view.height);render.depth(view.data);render.frame(frame.current?.image);renderer.current=render;}catch(error){setView({phase:'error',message:error.message});return;}
+  let raf=0,last=0,elapsed=0,pointerAt=0;const reduced=matchMedia('(prefers-reduced-motion: reduce)'),aim=[0,0],eased=[0,0];
+  // Parallax follows the pointer; without one it drifts in a slow orbit.
+  const screen=video.closest('.mv-player-screen');
+  const point=event=>{if(event.pointerType==='touch')return;const r=element.getBoundingClientRect();aim[0]=((event.clientX-r.left)/r.width-.5)*2;aim[1]=((event.clientY-r.top)/r.height-.5)*2;pointerAt=performance.now();};
+  screen?.addEventListener('pointermove',point);
+  const draw=now=>{raf=0;if(document.hidden)return;if(!last)last=now;if(now-last>=33||reduced.matches){const step=(now-last)/1000;elapsed+=step;last=now;
+    if(!reduced.matches){const idle=now-pointerAt>2500,tx=idle?Math.sin(elapsed*.35)*.55:aim[0],ty=idle?Math.sin(elapsed*.23+1)*.35:aim[1],k=1-Math.exp(-step*4);eased[0]+=(tx-eased[0])*k;eased[1]+=(ty-eased[1])*k;render.parallax(eased[0],eased[1]);}
+    render.draw(reduced.matches ? .48 : shadowCutoff(elapsed,{period:settings.current.breathPeriod,amplitude:settings.current.breathAmplitude}),settings.current.strength);}if(!reduced.matches)raf=requestAnimationFrame(draw);};
   const restart=()=>{cancelAnimationFrame(raf);last=0;if(!document.hidden){render.draw(reduced.matches ? .48 : shadowCutoff(elapsed,{period:settings.current.breathPeriod,amplitude:settings.current.breathAmplitude}),settings.current.strength);raf=requestAnimationFrame(draw);}};
   document.addEventListener('visibilitychange',restart);reduced.addEventListener('change',restart);restart();
-  return()=>{cancelAnimationFrame(raf);document.removeEventListener('visibilitychange',restart);reduced.removeEventListener('change',restart);renderer.current=null;render.dispose();};
+  return()=>{cancelAnimationFrame(raf);screen?.removeEventListener('pointermove',point);document.removeEventListener('visibilitychange',restart);reduced.removeEventListener('change',restart);renderer.current=null;render.dispose();};
  },[paused,enabled,view.phase,view.data]);
  const masks=useMemo(()=>{if(view.phase!=='ready')return new Map();return new Map(chars.values.map(c=>[c.id,depthSurface(view.data,view.width,view.height,c.box,c.bodyBox)]));},[view.data,view.phase,chars.values]);
  const currentCharacter=value=>chars.values.find(c=>c.id===value?.id||(value?.nameRu&&c.nameRu===value.nameRu));

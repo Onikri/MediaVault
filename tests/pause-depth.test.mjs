@@ -65,3 +65,10 @@ test('Hover uses the refined depth surface and resolves overlapping boxes by the
  const a={id:'a',box:[.1,.1,.3,.3],bodyBox:[0,0,.6,1]},b={id:'b',box:[.6,.1,.8,.3],bodyBox:[.4,0,1,1]},masks=new Map([['a',new Uint8Array(100).fill(255)],['b',new Uint8Array(100).fill(255)]]);
  assert.equal(characterAtDepthPoint([a,b],masks,10,10,.58,.5).id,'b');masks.get('b').fill(0);assert.equal(characterAtDepthPoint([a,b],masks,10,10,.8,.5),null);assert.equal(characterAtDepthPoint([a,b],masks,10,10,-.1,.5),null);
 });
+test('Uncertain people get a second crop-level verification pass; its failure keeps the first answer',async()=>{
+ const image={toBlob:done=>done(new Blob(['frame']))},unsure={id:'g:0',nameRu:'',uncertain:true,box:[.2,.1,.4,.3],bodyBox:[.1,0,.7,1],candidates:[]};
+ const checked=await recognizePauseFrame(image,{}, {trace:async()=>[],detect:async()=>[unsure],verify:async(_,values)=>values.map(v=>({...v,nameRu:'Эдвард Элрик',uncertain:false,verification:'gemini'})),hintMs:2});
+ assert.equal(checked.values[0].nameRu,'Эдвард Элрик');assert.equal(checked.complete,true);
+ const kept=await recognizePauseFrame(image,{}, {trace:async()=>[],detect:async()=>[unsure],verify:async()=>{throw Error('quota');},hintMs:2});
+ assert.equal(kept.values[0].uncertain,true);assert.equal(kept.complete,true);
+});

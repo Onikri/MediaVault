@@ -1,6 +1,6 @@
 import {recognizeCharacters} from './character-recognition.js';
 import {cachedCharacterRoster,localizeCharacters} from './pause-character-context.js';
-import {detectPauseCharacters} from './pause-character-gemini.js';
+import {detectPauseCharacters,verifyPauseCharacters} from './pause-character-gemini.js';
 function hintsWithin(promise,ms,signal){return new Promise((resolve,reject)=>{const finish=(value,error)=>{clearTimeout(timer);signal?.removeEventListener('abort',cancel);error?reject(error):resolve(value);},cancel=()=>finish(null,signal.reason),timer=setTimeout(()=>finish(null),ms);signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted)cancel();promise.then(v=>finish(v),()=>finish(null));});}
 export function mergeFrameCharacters(primary,hints){
  const result=primary.map(c=>({...c}));
@@ -9,13 +9,21 @@ export function mergeFrameCharacters(primary,hints){
   else if(result.length<8)result.push(hint);
  }return result;
 }
-export async function recognizePauseFrame(image,context,{signal,onPartial=()=>{},trace=recognizeCharacters,detect=detectPauseCharacters,hintMs=350,...options}={}){
+// AnimeTrace's face candidates make Gemini's frame pass far more accurate, so
+// it gets a real head start; then every still-uncertain person gets a second,
+// crop-level verification pass at the frame's full resolution.
+export async function recognizePauseFrame(image,context,{signal,onPartial=()=>{},trace=recognizeCharacters,detect=detectPauseCharacters,verify=verifyPauseCharacters,hintMs=2500,...options}={}){
  const traceAbort=new AbortController(),bounded=signal?AbortSignal.any([signal,traceAbort.signal]):traceAbort.signal,roster=cachedCharacterRoster(context);let hints=[];
  const blob=await new Promise(resolve=>image.toBlob(resolve,'image/jpeg',.82));signal?.throwIfAborted();if(!blob)throw Error('Не удалось прочитать стоп-кадр.');
  const tracing=trace(blob,{signal:bounded}).then(values=>{if(bounded.aborted)return [];hints=localizeCharacters(values,roster);onPartial(hints);return hints;}).catch(()=>[]);
  try{
   await hintsWithin(tracing,hintMs,signal);signal?.throwIfAborted();
-  try{const values=await detect(image,hints,{...context,roster},{...options,signal});signal?.throwIfAborted();return {values:mergeFrameCharacters(values,hints),complete:true};}
+  try{
+   const values=await detect(image,hints,{...context,roster},{...options,signal});signal?.throwIfAborted();
+   const merged=mergeFrameCharacters(values,hints);
+   if(verify&&merged.some(c=>c.uncertain||!c.nameRu)){onPartial(merged);try{const checked=await verify(image,merged,{...context,roster},{...options,signal});signal?.throwIfAborted();return {values:checked,complete:true};}catch(error){signal?.throwIfAborted();return {values:merged,complete:true};}}
+   return {values:merged,complete:true};
+  }
   catch(error){signal?.throwIfAborted();await tracing;signal?.throwIfAborted();if(hints.length)return {values:hints,complete:false,message:error.name==='TimeoutError'?'Gemini не ответил вовремя. Показан результат AnimeTrace.':error.message};throw error;}
  }finally{traceAbort.abort();}
 }
