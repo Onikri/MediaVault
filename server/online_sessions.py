@@ -23,12 +23,15 @@ class Session:
     reverse:dict=field(default_factory=dict)
     lock:object=field(default_factory=threading.RLock)
     slots:object=field(default_factory=lambda:threading.BoundedSemaphore(8))
-    def resource(self,url):
+    def resource(self,url,*,synthetic=False):
         url=public_url(url,resolve_dns=False)
         with self.lock:
-            if url in self.reverse:return self.reverse[url]
+            if not synthetic and url in self.reverse:return self.reverse[url]
             if len(self.resources)>=8000:raise SourceError('Слишком много частей в потоке.')
-            token=secrets.token_urlsafe(12);self.resources[token]=url;self.reverse[url]=token;return token
+            token=secrets.token_urlsafe(12)
+            self.resources[token]=url
+            if not synthetic:self.reverse[url]=token
+            return token
 
 sessions={};lock=threading.RLock();preparations={}
 LEASE_SECONDS=120
@@ -127,7 +130,9 @@ def install(app,owner):
                 manifest=(text,final,float('inf') if generated else time.monotonic()+30)
             token,s=create(subject,stream.get('headers') or {},kind='preview' if body.purpose=='preview' else 'video',client_id=body.client_id,reservation=reservation)
             s.max_height=None if generated else max_height
-            resource=s.resource(stream['url'])
+            # A generated master can include its base URL as a media playlist.
+            # Give it a distinct resource so that variant never loops to the master.
+            resource=s.resource(stream['url'],synthetic=generated)
             if manifest:s.manifests[resource]=manifest
             captions=[]
             for i,track in enumerate(getattr(page,'subtitles',[])):

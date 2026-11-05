@@ -107,6 +107,22 @@ class OnlinePlayback(unittest.TestCase):
   self.assertEqual(targets,['https://source.example/video/sub/ru.m3u8','https://source.example/video/init.mp4','https://source.example/video/part.ts']);self.assertNotIn('source.example',out)
   for line in ['#EXT-X-KEY:METHOD=SAMPLE-AES,URI="secret"','#EXT-X-SESSION-KEY:METHOD=AES-128,URI="secret"']:
    with self.assertRaises(SourceError):online.rewrite_manifest('#EXTM3U\n'+line,'https://source.example/a',str)
+ def test_synthetic_master_does_not_point_to_itself_when_highest_variant_is_media(self):
+  from types import SimpleNamespace
+  import m3u8
+  media='#EXTM3U\n#EXTINF:5,\nfirst.ts\n#EXT-X-ENDLIST\n'
+  app=FastAPI();online.install(app,lambda:'A');client=TestClient(app)
+  with patch('online_sessions.PublicHttp') as http,patch('online_sessions.Resolver') as resolver:
+   http.return_value.fork.return_value=http.return_value
+   http.return_value.document.side_effect=lambda url,**_: (media,url,{})
+   response=SimpleNamespace(headers={'Content-Type':'application/vnd.apple.mpegurl'},iter_content=lambda size:iter([media.encode()]),close=lambda:None)
+   http.return_value._open.side_effect=lambda url,**_: (response,url)
+   resolver.return_value.resolve.return_value=SimpleNamespace(streams=[{'url':f'https://cdn.example/{height}.m3u8','type':'hls','quality':height} for height in (720,1080)])
+   prepared=client.post('/online/prepare',json={'url':'https://source.example/episode','kind':'video','quality':'1080'}).json()
+   master=m3u8.loads(client.get(prepared['url']).text)
+   highest=master.playlists[-1].uri
+   self.assertNotEqual(highest,prepared['url'])
+   self.assertEqual(len(m3u8.loads(client.get(highest).text).segments),1)
  def test_expiring_capabilities_are_owner_limited_and_cannot_be_closed_by_another_user(self):
   token,s=online.create('A',{});resource=s.resource('https://source.example/test.mp4');self.assertEqual(resource,s.resource('https://source.example/test.mp4'))
   app=FastAPI();subject=['B'];online.install(app,lambda:subject[0]);client=TestClient(app)
