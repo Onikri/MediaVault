@@ -234,13 +234,37 @@ connected RTCPeerConnections and received audio RTP bytes. This does not establi
 TURN connectivity on arbitrary European/Russian carrier networks. No new ML run.
 Production build passed.
 
+## Stage 10 — measured preparation, targeted preview loading and pause tools
+
+- Live Oracle source/manifest/segment measurements for AniLiberty, Alloha and
+  Kodik are in playback-latency-2026-11-05.md. They distinguish source preparation
+  from browser first-frame latency and do not pretend to benchmark a real Drive file.
+- Dynamic public browser adapters have two CPU-bounded slots on this 2-core VM;
+  per-source singleflight keeps identical requests from spawning two browsers.
+  Cache/result isolation, signed-link bounds, private-address checks and empty
+  browser profiles remain. Failure releases the slot/pending record for retry.
+- Timeline previews start HLS at the hovered time, capture on actual decodable
+  data and reuse up to 120 frames without new media requests for a cached frame.
+  There is no expensive whole-episode per-second background extraction.
+- Verified depth worker can initialize during playback and reuse its runtime on
+  pause. Explicitly disabling depth releases the worker. New preferences default
+  to enabled model loading; existing saved opt-outs are respected. Model control
+  moved to atmosphere settings and recognition is a single round busy-state icon.
+
+Validation: actual HLS segments show the first requested preview segment is near
+17 seconds rather than zero, and reopening the cached frame causes no new segment
+requests. Real hash-verified Depth Anything WASM warm/init and inference passed.
+13 Node depth/recognition checks and fixture-provider React/WebGL hover/cancellation
+at 390/1280px passed; 5 Python slot/singleflight/isolation contracts passed. Fixture
+recognition is not a live Gemini accuracy test. Production build passed.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
 - [x] Notification bell instead of transient global toasts.
 - [x] Persistent mounted playback session, navbar return/mini-view/history.
 - [x] Progressive manga inspection/first chapters (provider timing fixtures).
-- [ ] Live stream/source latency measurements across providers.
+- [x] Live stream/source latency measurements across three providers (Drive latency not measured).
 - [x] Library toolbar styling; visible showcase poster/copy parallax verification.
 - [x] Reader chapter bar/cards, cursor-driven previews, one-page/spread/3D fixes.
 - [x] Adaptive page-point timeline and compact translation settings/help.

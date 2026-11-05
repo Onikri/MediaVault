@@ -14,3 +14,5 @@
 @keyframes pause-character-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:600px){.pause-frame-tools{right:10px;top:10px;gap:5px;max-width:calc(100% - 20px)}.pause-frame-tools button{padding:7px 9px!important}.pause-depth-status{max-width:160px}.pause-character{max-width:45%;padding:6px 8px!important}.pause-character small{max-width:140px}}
 @media(prefers-reduced-motion:reduce){.pause-depth-shadow,.pause-character{transition:none;animation:none}}
+
+.pause-frame-tools>.pause-recognize{width:30px!important;height:30px!important;min-width:30px!important;min-height:30px!important;max-width:30px!important;max-height:30px!important;padding:0!important;display:grid;place-items:center;border:0!important;border-radius:50%!important}.pause-recognize[aria-busy=true]>svg{animation:pause-recognition-pulse 1s ease-in-out infinite}@keyframes pause-recognition-pulse{50%{opacity:.35;transform:scale(.9)}}@media(prefers-reduced-motion:reduce){.pause-recognize[aria-busy=true]>svg{animation:none}}

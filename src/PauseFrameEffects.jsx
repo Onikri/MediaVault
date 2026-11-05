@@ -8,7 +8,7 @@ import {characterRoster} from './pause-character-context.js';
 import {recognizePauseFrame} from './pause-recognition.js';
 import './pause-frame.css';
 
-export default function PauseFrameEffects({videoRef,source,paused,enabled,modelAllowed=false,onAllowModel,strength=.82,breathPeriod=10,breathAmplitude=.22,autoRecognize=false,visible=true,characterContext={},characterService,userId}){
+export default function PauseFrameEffects({videoRef,source,paused,enabled,modelAllowed=true,strength=.82,breathPeriod=10,breathAmplitude=.22,autoRecognize=false,visible=true,characterContext={},characterService,userId}){
  const contextRef=useRef(characterContext);contextRef.current=characterContext;
  const canvas=useRef(null),worker=useRef(null),busy=useRef(false),sequence=useRef(0),frame=useRef(null),cache=useRef(new Map()),renderer=useRef(null),recognition=useRef(null),cooldown=useRef(0),idleTimer=useRef(null),settings=useRef({strength,enabled});settings.current={strength,enabled,breathPeriod,breathAmplitude};
  const [view,setView]=useState({phase:'idle'}),[chars,setChars]=useState({phase:'idle',values:[]}),[selected,setSelected]=useState(null),[hovered,setHovered]=useState(null),[host,setHost]=useState(null),[rect,setRect]=useState(null),[retry,setRetry]=useState(0);
@@ -35,10 +35,20 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
   }catch(error){if(!abort.signal.aborted&&id===sequence.current)setChars(old=>({...old,phase:'error',message:error.name==='TimeoutError'?'Служба распознавания не ответила вовремя.':/[А-Яа-яЁё]/.test(error.message||'')?error.message:'Не удалось связаться со службой распознавания.'}));}
  }
  useEffect(()=>{if(!paused)return;const abort=new AbortController();warmCharacterModel();characterRoster(characterContext,{server:characterService?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl,signal:abort.signal}).catch(()=>{});return()=>abort.abort();},[paused,source,characterContext.malId]);
+ // Prepare verified weights off the playback thread and reuse initialization on pause.
  useEffect(()=>{
-  const video=videoRef.current;if(!video||!source)return;let timer,closed=false;clearTimeout(idleTimer.current);if((!enabled||!modelAllowed)&&busy.current)terminate();
+  if(paused||!enabled||!modelAllowed||!source||document.hidden)return;
+  const timer=setTimeout(()=>{
+   if(worker.current||busy.current||document.hidden)return;
+   worker.current=new Worker(new URL('./pause-depth.worker.js',import.meta.url),{type:'module'});
+   worker.current.onerror=()=>terminate();worker.current.postMessage({id:0,type:'warm'});
+  },1800);
+  return()=>clearTimeout(timer);
+ },[paused,enabled,modelAllowed,source]);
+ useEffect(()=>{
+  const video=videoRef.current;if(!video||!source)return;let timer,closed=false;clearTimeout(idleTimer.current);if(!enabled||!modelAllowed)terminate();
   if(!paused){sequence.current++;recognition.current?.abort();setView({phase:'idle'});setChars({phase:'idle',values:[]});setSelected(null);setHovered(null);frame.current=null;
-   if(busy.current)terminate();else idleTimer.current=setTimeout(terminate,15000);return;
+   if(busy.current)terminate();else if(!enabled||!modelAllowed)idleTimer.current=setTimeout(terminate,15000);return;
   }
   const capture=()=>{
    clearTimeout(timer);timer=setTimeout(()=>{
@@ -94,11 +104,10 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
  const loading=enabled&&!['idle','ready','error'].includes(view.phase),message=view.phase==='download'?'Глубина · загрузка '+Math.min(100,Math.round(view.loaded/view.total*100))+'%':view.phase==='inference'?'Глубина · анализ кадра…':'Глубина · запуск модели…';
  return <><canvas ref={canvas} className={'pause-depth-shadow'+(paused&&enabled&&view.phase==='ready'?' is-ready':'')} aria-hidden="true" data-model="Depth Anything V2 Small"/>{paused&&visible&&host&&createPortal(<div className="pause-frame-ui">
    <div className="pause-frame-tools" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
-    <button type="button" className="pause-recognize" disabled={['loading','verifying'].includes(chars.phase)||!frame.current} onClick={()=>recognize()} aria-label="Распознать персонажей на стоп-кадре" title="Найти персонажей в кадре через Gemini и AnimeTrace"><ScanFace size={15}/>{chars.phase==='loading'?'Ищем персонажей…':chars.phase==='verifying'?'Ищем по всему кадру…':'Персонажи'}</button>
-    {enabled&&!modelAllowed&&<button onClick={onAllowModel} aria-label="Загрузить модель глубины">Глубина · 27 МБ</button>}
+    <button type="button" className="pause-recognize" disabled={['loading','verifying'].includes(chars.phase)||!frame.current} aria-busy={['loading','verifying'].includes(chars.phase)} onClick={()=>recognize()} aria-label="Распознать персонажей на стоп-кадре" title={chars.phase==='loading'?'Ищем персонажей…':chars.phase==='verifying'?'Проверяем весь кадр…':'Распознать персонажей'}><ScanFace size={16}/></button>
     {loading&&modelAllowed&&<span className="pause-depth-status" role="status">{message}</span>}
     {view.phase==='error'&&enabled&&<button className="pause-depth-status" onClick={()=>setRetry(n=>n+1)} title={view.message} aria-label="Повторить карту глубины"><RotateCcw size={13}/>{view.message}</button>}
-    {(chars.phase==='error'||chars.message)&&<span role="status">{chars.message}</span>}{chars.phase==='ready'&&!chars.values.length&&<span role="status">Персонажи не распознаны</span>}
+    {(chars.phase==='error'||chars.message)&&<span role="status">{chars.message}</span>}{chars.phase==='ready'&&!chars.values.length&&<span className="sr-only" role="status">Персонажи не распознаны</span>}
     {chars.values.length>0&&<button aria-label="Скрыть персонажей" onClick={()=>{setChars({phase:'idle',values:[]});setSelected(null);setHovered(null);}}><X size={14}/></button>}
    </div>
    {rect&&chars.values.map(character=>{const x=Math.max(0,Math.min(rect.width-150,(character.box[0]+character.box[2])*.5*rect.width-60)),y=Math.max(50,Math.min(rect.height-120,character.box[3]*rect.height+9));return <button key={character.id} className={'pause-character'+(focused?.id===character.id?' is-selected':'')} style={{left:rect.left+x,top:rect.top+y}} aria-pressed={pinned?.id===character.id} onPointerEnter={()=>setHovered(character)} onPointerLeave={()=>setHovered(null)} onFocus={()=>setHovered(character)} onBlur={()=>setHovered(null)} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(pinned?.id===character.id?null:character);}} title={[character.reasonRu,...character.candidates.map(c=>(c.nameRu||c.name)+' · '+c.work)].filter(Boolean).join('\n')}><strong>{character.nameRu||'Персонаж не уточнён'}</strong><small>{character.verification==='gemini'?'Gemini · уточнено':character.nameRu?'AnimeTrace · каталог':chars.phase==='verifying'?'Проверяем варианты…':'Имя пока не уточнено'}</small></button>;})}

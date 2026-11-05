@@ -16,9 +16,14 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from source_parser import SourceError, public_url, playback_headers, BLOCKED
 
-_slots=threading.BoundedSemaphore(1)
+def browser_workers():
+    try:return max(1,min(2,int(os.environ.get('MEDIA_VAULT_BROWSER_WORKERS',min(2,os.cpu_count() or 1)))))
+    except (TypeError,ValueError):return 1
+
+_slots=threading.BoundedSemaphore(browser_workers())
 _playback_cache=OrderedDict()
 _cache_lock=threading.Lock()
+_pending={}
 
 
 def browser_paths():
@@ -238,10 +243,24 @@ def extract(url,referer=None,*,details=False):
                 return copy.deepcopy(old[1])
     value=cached()
     if value is not None:return value if details else value['streams']
-    if not _slots.acquire(timeout=15):raise SourceError('Серверный браузер занят другим плеером. Повтори позднее.')
+    # Different public players can use two CPU-bounded slots. Identical work
+    # still shares one extraction, rather than launching duplicate Chromiums.
+    with _cache_lock:
+        pending=_pending.get(key);leader=pending is None
+        if leader:
+            if len(_pending)>=64:raise SourceError('Сервер готовит другие плееры. Повтори позднее.')
+            pending=_pending[key]={'event':threading.Event()}
+    if not leader:
+        if not pending['event'].wait(45):raise SourceError('Плеер не завершил подготовку. Повтори подключение.')
+        if 'result' not in pending:raise SourceError(pending.get('error','Не удалось открыть динамический плеер на сервере.'))
+        result=copy.deepcopy(pending['result']);return result if details else result['streams']
+    acquired=False
     try:
+        acquired=_slots.acquire(timeout=15)
+        if not acquired:raise SourceError('Серверный браузер занят другим плеером. Повтори позднее.')
         value=cached()
-        if value is not None:return value if details else value['streams']
+        if value is not None:
+            pending['result']=copy.deepcopy(value);return value if details else value['streams']
         try:
             metadata={}
             streams=asyncio.run(_extract(url,referer,metadata=metadata))
@@ -252,10 +271,15 @@ def extract(url,referer=None,*,details=False):
                     # inspection and immediate playback share one browser run.
                     _playback_cache[key]=(time.monotonic()+45,copy.deepcopy(value))
                     while len(_playback_cache)>64:_playback_cache.popitem(last=False)
+            pending['result']=copy.deepcopy(value)
             return value if details else streams
         except SourceError:raise
         except Exception:raise SourceError('Не удалось открыть динамический плеер на сервере.') from None
-    finally:_slots.release()
+    except SourceError as error:
+        pending['error']=str(error);raise
+    finally:
+        if acquired:_slots.release()
+        with _cache_lock:_pending.pop(key,None);pending['event'].set()
 
 
 async def _render(url,*,validate=browser_destination,fixture=None,timeout=8):

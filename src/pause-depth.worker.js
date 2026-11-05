@@ -13,7 +13,9 @@ self.onmessage=async({data})=>{
  const {id,width,height,pixels}=data;let input,outputs;
  try{
   if(!runtime)runtime=initialize(id).catch(e=>{runtime=null;throw e;});
-  const {ort,session}=await runtime;postMessage({id,type:'status',phase:'inference'});
+  const {ort,session}=await runtime;
+  if(data.type==='warm'){postMessage({id,type:'warmed'});return;}
+  postMessage({id,type:'status',phase:'inference'});
   input=new ort.Tensor('float32',depthInput(new Uint8ClampedArray(pixels),width,height),[1,3,height,width]);
   const start=performance.now();outputs=await session.run({[session.inputNames[0]]:input});const output=outputs[session.outputNames[0]],values=await output.getData(),dims=output.dims;
   const w=dims.at(-1),h=dims.at(-2);if(!w||!h||w*h!==values.length)throw Error('Некорректная карта глубины.');
