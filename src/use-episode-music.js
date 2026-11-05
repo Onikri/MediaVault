@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 export function inEpisodes(values,episode){
  if(!values?.length)return true;
- return values.some(v=>String(v).split(/[, ]+/).some(part=>{const m=part.match(/^(\d+)(?:-(\d+))?$/);return m&&episode>=Number(m[1])&&episode<=Number(m[2]||m[1]);}));
+ return values.some(v=>String(v).replace(/[–—−〜～]/g,'-').replace(/(\d)\s*-\s*(\d)/g,'$1-$2').split(/[,;\s]+/).some(part=>{const m=part.match(/^(\d+)(?:-(\d+))?$/);return m&&episode>=Number(m[1])&&episode<=Number(m[2]||m[1]);}));
 }
 const cache=new Map();
 async function load(url,signal,fresh=false){

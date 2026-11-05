@@ -188,6 +188,28 @@ navigation, 64 entries, one/two-month responsiveness and hover dismissal at
 390/1440px. Calendar episode replies are fixtures, not live schedule guarantees.
 Production build passed. Watch-order visual refinement remains a separate item.
 
+## Stage 8 — watch routes and compact soundtrack rows
+
+- Watch order distinguishes catalogue prequel/sequel continuity from all works in
+  release order. It does not present release dates as an authoritative Fate route.
+  Shared Radix selector, numbered connected rows and current-title marker replace
+  the native dropdown. Expansion keeps numbering correct and exposes every work.
+- Soundtrack rows use one play surface, compact title/type/artist/episode text and
+  round info/save/more actions. Information expands in the existing row with Motion;
+  compact player lists retain their separate song sheet and playlist functions.
+  The anime poster is no longer repeated as an alleged cover for every recording;
+  actual supplied recording covers are preserved, with an icon when none is supplied.
+- OP/ED credits use the title area below the episode controls. The floating overlay
+  that covered season/episode selection is removed. Only an unambiguous matching song
+  is shown. Episode ranges accept en/em dash and spaces as well as ASCII hyphens.
+- Calendar arrow targets now also explicitly retain equal width and height against
+  legacy global button minimums.
+
+Validation: 10 focused Node player/franchise checks; real React/Radix/Motion route
+switching/numbering/navigation, inline song detail expansion, circular actions and
+actual media-time cue layout at 390/1440px. Catalogue/timing responses are fixtures;
+this pair does not claim new real YouTube playback. Production build passed.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
@@ -201,8 +223,9 @@ Production build passed. Watch-order visual refinement remains a separate item.
 - [x] Language/API probe, quota/translation timings and typography/font matching.
 - [x] Actual multi-model manga/background upscale comparison with image report.
 - [x] Responsive animated calendar.
-- [ ] Watch-order presentation.
-- [ ] Music rows, interval-aware OP/ED information and login diagnosis.
+- [x] Watch-order presentation.
+- [x] Music rows and interval-aware OP/ED information.
+- [ ] YouTube/session/login investigation (last).
 - [ ] Room controls, chat beside video, voice UI and two-peer checks.
 
 Release each completed group with relevant checks and live frontend/VM validation.

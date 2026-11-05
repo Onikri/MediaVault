@@ -14,7 +14,7 @@ import PauseFrameEffects from './PauseFrameEffects.jsx';
 import Soundtrack from './Soundtrack.jsx';
 import TimelinePreview from './TimelinePreview.jsx';
 import {playMusic} from './music-player.js';
-import {youtubeSearch,spotifySearch} from './music-library.js';
+import PlayerSongCue from './PlayerSongCue.jsx';
 import PlayerSettings,{SettingsGlyph} from './PlayerSettings.jsx';
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
@@ -76,9 +76,9 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       {actions.notice&&<output className="mv-player-action-notice" role="status">{actions.notice}</output>}
       {actions.recording&&<button className="mv-player-recording" onClick={actions.clip}><i/> {actions.clipSeconds} / 30 сек. · Остановить</button>}
       <PlayerExtensionSlot name="overlay" extensions={extensions} onError={onError}/>
-      <div id="player-panel-watch" className="mv-player-watch" aria-hidden={playing||panel!=='watch'}>
+      <div id="player-panel-watch" className={'mv-player-watch'+(currentSong&&dismissedCue!==currentSong.id?' has-song-cue':'')} aria-hidden={panel!=='watch'||(playing&&(!currentSong||dismissedCue===currentSong.id||hiddenControls))}>
         <div className="mv-player-overview">
-          <h1>{library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,'')}</h1>
+          {currentSong&&dismissedCue!==currentSong.id?<PlayerSongCue track={currentSong} theme={activeTheme} visible={panel==='watch'} onDismiss={()=>setDismissedCue(currentSong.id)} onPlay={()=>playMusic(currentSong)}/>:<h1>{library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,'')}</h1>}
           <p>{onlineControls?.seasonName||season?.name}<span> / </span>{episode?.label}</p>{episode?.description&&/[а-яё]/i.test(episode.description)&&<p className="mv-episode-description">{episode.description}</p>}
         </div>
       </div>
@@ -127,7 +127,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
 <p className="player-setting-help">Ссылка откроет эту серию с текущей позиции после входа в библиотеку. Клип записывается до 30 секунд.</p></div>
       }}</PlayerSettings>}</AnimatePresence>
       {canSkip&&panel==='watch'&&<button className="mv-player-skip" onClick={()=>seek(skipRange.end)}><SkipForward size={16}/> {skipRange===ending?'Пропустить эндинг':'Пропустить опенинг'}</button>}
-      <AnimatePresence>{currentSong&&dismissedCue!==currentSong.id&&panel==='watch'&&<motion.aside className="mv-song-cue" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:5}}><Music2 size={18}/><div><small>{activeTheme==='OP'?'Сейчас звучит · опенинг':'Сейчас звучит · эндинг'}</small><strong>{currentSong.title}</strong><span>{currentSong.artists?.join(', ')}</span><div><button onClick={()=>playMusic(currentSong)}><Play size={12}/>Слушать</button><a href={youtubeSearch(currentSong)} target="_blank" rel="noopener noreferrer">YouTube</a><a href={spotifySearch(currentSong)} target="_blank" rel="noopener noreferrer">Spotify</a></div></div><button aria-label="Скрыть песню" onClick={()=>setDismissedCue(currentSong.id)}><X size={13}/></button></motion.aside>}</AnimatePresence>
+
       {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {engineName}{engine==='mobile'||engine==='lanczos'||String(engine).startsWith('fsr')?'':' ×2'}{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
       <div className="mv-player-console" onPointerEnter={revealControls}>
