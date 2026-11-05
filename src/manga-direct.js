@@ -9,6 +9,8 @@ import {drainBlockChapter} from './manga-block-chapter.js';
 import {ChapterPreparation,drainOrderedChapter,sharedRequestPacer} from './reader-chapter-pipeline.js';
 import {unresolvedRegions} from './manga-empty-review.js';
 
+// Bump when rendered page output changes (fonts, layout) so stale cached renders are skipped.
+export const RENDER_CACHE_VERSION='render-v12';
 const cancelled=()=>new DOMException('Читалка закрыта','AbortError');
 function waitFor(promise,signal){
  if(!signal)return promise;signal.throwIfAborted();
@@ -110,7 +112,7 @@ export class DirectChapter{
   const last=this.progress.get(index);if(last)status?.(last);
   try{
    const job=this.request(index,blob,background);
-   const renderCacheId=(await this.jsonCacheId(blob,index))+':render-v12:'+(config.inpaint||this.config.inpaint)+':'+font;
+   const renderCacheId=(await this.jsonCacheId(blob,index))+':'+RENDER_CACHE_VERSION+':'+(config.inpaint||this.config.inpaint)+':'+font;
    if(this.config.cache&&!this.bypass.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage&&!config.captureDebug)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
    const stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
    if(config.captureDebug&&!page.detected){
