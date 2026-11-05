@@ -112,6 +112,29 @@ layer velocities, SVG reveal/media continuity and built first-screen geometry
 passed. Production build passed. Provider/artwork data are controlled fixtures;
 these checks do not claim new ML inference or live YouTube availability.
 
+## Stage 5 — page track and translation settings
+
+- Reader navigation is a thin sampled point track. Its spring indicator follows
+  the current page/range, points enlarge near the cursor and show a page label.
+  Point count adapts to available length, capped at 120 for long chapters.
+- Pointer seeking uses the exact cursor position, with keyboard range controls
+  retained. Previous/next sit at the track ends; all-page previews moved to the
+  upper toolbar. Webtoon keeps a vertical right-side track and compact counter.
+- Translation settings use the full panel width, category headings and aligned
+  controls. Help is a circular question button instead of a full-width action.
+  Personal keys remain available in a collapsible connection section.
+- The two principal payload choices use existing Lucide icons, hover explanations
+  and a selected-mode description. All four prior payload modes remain available
+  in the additional markup section; no translation capability was removed.
+- Translation lists/switches use shared Radix controls. Select portals now respect
+  their surrounding dialog, fixing options appearing behind the reader panel.
+
+Validation: page-position/point bounds Node checks, real React pointer dragging,
+keyboard seeking, horizontal/vertical layout, top previews, help and all payload
+choices at 390/1440px. Existing profile/reader checks passed. API/provider replies
+in the UI checks are fixtures; this stage does not benchmark translation or ML.
+Production build passed.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
@@ -121,7 +144,7 @@ these checks do not claim new ML inference or live YouTube availability.
 - [ ] Live stream/source latency measurements across providers.
 - [x] Library toolbar styling; visible showcase poster/copy parallax verification.
 - [x] Reader chapter bar/cards, cursor-driven previews, one-page/spread/3D fixes.
-- [ ] Adaptive page-point timeline and compact translation settings/help.
+- [x] Adaptive page-point timeline and compact translation settings/help.
 - [ ] Language/API probe, quota/translation timings and typography/font matching.
 - [ ] Actual multi-model manga/background upscale comparison with image report.
 - [ ] Responsive animated calendar and watch-order presentation.

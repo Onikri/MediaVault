@@ -19,7 +19,7 @@ export default function GoogleKeySettings({scope,onApply,onSaveServer,service,se
    setMessage(remember?'Ключи зашифрованы на устройстве.':'Ключи применены для этой вкладки.');onApply?.();
   }
  }catch(error){setMessage(error.message);}finally{setBusy(false);}}
- return <details className="reader-google-keys" open={!server}>
+ return <details className="reader-google-keys">
   <summary>{server?'Ключи Google на Oracle':'Личные ключи Google AI Studio'}{server&&status?' · '+status.keyCount+' подключено':''}</summary>
   <fieldset className="reader-google-key"><legend>До трёх ключей</legend>
    <p className="reader-hint">По две или три страницы в запросе, до трёх запросов одновременно. Буфер — до девяти страниц. Ключи одного проекта разделяют квоты. При ограничении Google очередь ожидает.</p>

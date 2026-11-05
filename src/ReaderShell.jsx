@@ -1,3 +1,4 @@
+import ReaderPageTrack from './ReaderPageTrack.jsx';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {ArrowLeft,ChevronLeft,ChevronRight,Settings2,Maximize,Minimize,List,Grid2X2,X} from 'lucide-react';
@@ -54,15 +55,14 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
   <div className="reader-chrome reader-top" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
    <button className="reader-control" aria-label="Закрыть просмотр" onClick={onClose}><ArrowLeft size={20}/></button>
    <div className="reader-title-group"><div className="mv-viewer-title"><strong>{title}</strong></div>{chapterControl}</div>
-   <div className="reader-top-actions">{contents&&<button className="reader-control" aria-label="Главы и тома" onClick={()=>openPanel('contents')}><List size={20}/></button>}{actions}<button className="reader-control reader-fullscreen" aria-label={full?'Выйти из полного экрана':'На весь экран'} onClick={fullscreen}>{full?<Minimize size={19}/>:<Maximize size={19}/>}</button>{settings&&<button className="reader-control" aria-label="Настройки читалки" aria-expanded={settingsOpen} onClick={()=>openPanel('settings')}><Settings2 size={20}/></button>}</div>
+   <div className="reader-top-actions">{previews&&<button className="reader-control" aria-label="Превью страниц" onClick={()=>openPanel('previews')}><Grid2X2 size={19}/></button>}{contents&&<button className="reader-control" aria-label="Главы и тома" onClick={()=>openPanel('contents')}><List size={20}/></button>}{actions}<button className="reader-control reader-fullscreen" aria-label={full?'Выйти из полного экрана':'На весь экран'} onClick={fullscreen}>{full?<Minimize size={19}/>:<Maximize size={19}/>}</button>{settings&&<button className="reader-control" aria-label="Настройки читалки" aria-expanded={settingsOpen} onClick={()=>openPanel('settings')}><Settings2 size={20}/></button>}</div>
   </div>
   <div className="reader-chrome reader-bottom reader-bottom-float mv-viewer-tools" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
-   <div className="reader-navigation">{previews&&<button className="reader-control" aria-label="Превью страниц" onClick={()=>openPanel('previews')}><Grid2X2 size={19}/></button>}
+   <div className="reader-navigation">
     <button className="reader-control" aria-label="Назад" disabled={!canPrevious} onClick={onPrevious}><ChevronLeft size={22}/></button>
-    <span className="reader-page-count" aria-live="polite">{progress?.label||`${progress?.current||0} / ${progress?.total||0}`}</span>
+    {onPage&&progress?.total>1?<ReaderPageTrack progress={progress} onPage={onPage} orientation={progressOrientation} chapter={title}/>:<span className="reader-page-count" aria-live="polite">{progress?.label||`${progress?.current||0} / ${progress?.total||0}`}</span>}
     <button className="reader-control" aria-label="Вперёд" disabled={!canNext} onClick={onNext}><ChevronRight size={22}/></button>
    </div>
-   {onPage&&progress?.total>1&&<input className="reader-progress-slider" type="range" aria-orientation={progressOrientation==='vertical'?'vertical':'horizontal'} aria-label="Перейти к странице" min="1" max={progress.total} value={Math.min(progress.total,progress.current||1)} onChange={e=>onPage(Number(e.target.value)-1)}/>}
    {status&&<div className="reader-quiet-status">{status}</div>}{fullscreenError&&<small role="status">{fullscreenError}</small>}
   </div>
   {hint&&!visible&&!activePanel&&<div className="reader-gesture-hint" aria-hidden="true">Касание центра — меню{paged?' · По краям — листать':''}</div>}
