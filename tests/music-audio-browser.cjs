@@ -116,6 +116,15 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
    assert.equal(prepared.length,attempts+1,'Expanded Play retries Oracle');
    assert.equal(await page.locator('iframe').count(),0);
   }
+  if(width<900){
+   const attempts=prepared.length;
+   await page.getByRole('button',{name:'Воспроизвести через YouTube',exact:true}).click();
+   const embed=page.locator('.music-island iframe');
+   assert.match(await embed.getAttribute('src'),/^https:\/\/www\.youtube-nocookie\.com\/embed\/dQw4w9WgXcQ\?/);
+   await page.getByRole('button',{name:'Закрыть видео YouTube',exact:true}).click();
+   await embed.waitFor({state:'detached'});
+   assert.equal(prepared.length,attempts,'Opening and closing the explicit embed does not retry the failed server');
+  }
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await page.screenshot({path:path.join(DIR,'music-audio-'+width+'.png')});await page.close();console.log('PASS pasted YouTube URL, real audio decode/seek, collapsed playback, cleanup, compact errors and server retry at '+width+'px');
  }
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();for(const name of['music-audio-harness.html','music-audio-harness.jsx'])await fs.rm(path.join(DIR,name),{force:true});});

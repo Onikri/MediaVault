@@ -49,7 +49,12 @@ def match(query,title,artist,duration):
     if not set(map(name,row['titles']))&set(map(name,query['titles'])):return None
     if not set(map(name,row['artists']))&set(map(name,query['artists'])):return None
     if not any(version(t)==version(title) for t in query['titles']):return None
-    try:delta=abs(float(duration)-query['duration'])
+    try:
+        seconds=float(duration)
+        if not math.isfinite(seconds) or not 0<seconds<=7200:return None
+        # Unknown playback length permits exact-identity plain lyrics only.
+        if query['duration']==0:return {'timingMismatch':True,'durationUnknown':True,'delta':0}
+        delta=abs(seconds-query['duration'])
     except (ValueError,TypeError):return None
     if not math.isfinite(delta) or delta>min(20,max(10,query['duration']*.08)):return None
     return {'timingMismatch':delta>2.5,'delta':delta}

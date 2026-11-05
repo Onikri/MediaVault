@@ -12,9 +12,9 @@ FIELDS='id,title,duration,url,http_headers,ext,acodec,vcodec,protocol,is_live,li
 
 @contextlib.contextmanager
 def private_youtube_auth(root):
-    from youtube_auth import cookie_text,credentials,rotated_cookies
+    from youtube_auth import credentials,rotated_cookies
     previous=credentials()
-    cookies=cookie_text()
+    cookies=(previous or {}).get('cookies','')
     if not cookies:
         yield [];return
     # The deployment maps DATA_DIR inside the checkout's private .codex-local.
@@ -109,7 +109,7 @@ def failure(detail):
     if '429' in lower and not any(v in lower for v in ['sign in','not a bot','confirm you']):
         return 'YouTube временно ограничил запросы с сервера. Сохранённая сессия не удалена; повтори позднее.'
     if 'not a bot' in lower or 'confirm you' in lower or 'sign in' in lower:
-        return 'YouTube требует входа для IP Oracle. Подключи или обнови серверную сессию YouTube в профиле.'
+        return 'YouTube отклонил воспроизведение через Oracle. Запись можно открыть в плеере YouTube.'
     if 'private' in lower or 'members-only' in lower or 'unavailable' in lower or 'age' in lower:
         return 'Эта запись недоступна серверу без входа или имеет ограничения доступа.'
     return 'YouTube не предоставил доступную аудиодорожку. Повтори подготовку аудио позднее.'

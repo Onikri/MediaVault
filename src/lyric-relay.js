@@ -9,5 +9,5 @@ export async function searchRelayLyrics(track,duration,service,{signal,refresh=f
  const parsed=value.lines?.length?normalizeLyrics(value.lines):value.lrc?parseLrc(value.lrc):{lines:[],precision:'plain'};
  const url=/^https:\/\/(?:www\.musixmatch\.com\/|lrclib\.net\/api\/get\/|lyrics\.ovh\/)/.test(value.url||'')?value.url:'';
  return {...parsed,phase:value.phase,plainText:String(value.plainText||'').slice(0,100000),source:value.source||'',url,
-  timingMismatch:!!value.timingMismatch,cached:!!value.cached,elapsedMs:value.elapsedMs,identity:value.identity};
+  durationUnknown:!!value.durationUnknown,timingMismatch:!!value.timingMismatch,cached:!!value.cached,elapsedMs:value.elapsedMs,identity:value.identity};
 }

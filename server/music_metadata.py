@@ -25,7 +25,10 @@ def select_recording(data,title,artist):
         aliases=list(dict.fromkeys(x for x in aliases if isinstance(x,str) and x and x not in artists))
         title_score=len(wanted&words(name))/max(1,len(wanted));artist_score=len(performer&words(' '.join([*artists,*aliases])))/max(1,len(performer)) if performer else 1
         if title_score<.8 or artist_score<.5:continue
-        candidates.append((title_score*.7+artist_score*.3,row,artists,aliases))
+        # Do not use a short/TV/music-video edit as a full-song duration.
+        extra=words(name)-wanted
+        if extra&{'video','mv','tv','short','karaoke','cover','remix','live','instrumental','slowed','sped','nightcore'}:continue
+        candidates.append((title_score*.7+artist_score*.3+(.1 if wanted==words(name) else 0),row,artists,aliases))
     if not candidates:return {'found':False,'provider':'MusicBrainz','artworkDownloaded':False}
     score,row,artists,aliases=max(candidates,key=lambda x:x[0]);releases=sorted(row.get('releases',[]),key=lambda r:(r.get('status')!='Official',r.get('date') or '9999'))
     release=next((r for r in releases if _uuid.fullmatch(r.get('id',''))),{})

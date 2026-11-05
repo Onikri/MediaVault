@@ -258,6 +258,36 @@ requests. Real hash-verified Depth Anything WASM warm/init and inference passed.
 at 390/1280px passed; 5 Python slot/singleflight/isolation contracts passed. Fixture
 recognition is not a live Gemini accuracy test. Production build passed.
 
+## Stage 11 — YouTube playback diagnosis and independent lyrics lookup
+
+Oracle runs yt-dlp 2026.10.21, yt-dlp-ejs 0.8.0 and Node 22.22.0. Real requests
+for Otonoke and the WORLD failed on both the configured cookie session and
+anonymous extraction. The anonymous extractor reported a sign-in challenge
+before returning a media URL, with no missing JS runtime/solver diagnostic.
+The configured session was present and marked rejected. This does not isolate
+the IP alone as the cause or establish that a new cookie export will work.
+
+The music panel offers an explicit official YouTube embed for the selected
+recording and a direct link when Oracle audio fails. Successful Oracle audio
+keeps using the existing audio player. Opening or closing the embed does not
+retry the failed stream. The YouTube settings describe the isolated cookie
+export workflow and let the owner verify the session. Data API OAuth is for
+catalogue/account operations and does not renew yt-dlp browser cookies.
+
+Lyrics lookup accepts exact track and artist identities even when neither
+the server audio nor catalogue has a known length. It returns only plain text
+for that case. Timed matches still require a compatible duration. MusicBrainz
+short/music-video edits no longer supply the duration for a full song.
+
+Sources: [yt-dlp extractors](https://github.com/yt-dlp/yt-dlp/wiki/Extractors),
+[upstream cookie investigation](https://github.com/yt-dlp/yt-dlp/issues/14872),
+[JS setup](https://github.com/yt-dlp/yt-dlp/wiki/EJS),
+[YouTube Data API](https://developers.google.com/youtube/data/getting-started).
+
+Validation: 33 Python and 19 Node checks, React browser audio and retry at
+390/1440px, explicit embed lifecycle with a fixture response, production build.
+Oracle rejection was checked with real upstream requests.
+
 ## Next stages
 
 - [x] Shared selects/switches, circular navbar icon buttons, compact player settings.
@@ -273,7 +303,8 @@ recognition is not a live Gemini accuracy test. Production build passed.
 - [x] Responsive animated calendar.
 - [x] Watch-order presentation.
 - [x] Music rows and interval-aware OP/ED information.
-- [ ] YouTube/session/login investigation (last).
+- [x] YouTube/session/login diagnosis and browser playback option.
+- [x] Independent lyrics lookup with unknown playback length.
 - [x] Room controls, chat beside video, voice UI and two-peer checks.
 
 Release each completed group with relevant checks and live frontend/VM validation.

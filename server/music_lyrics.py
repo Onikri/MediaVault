@@ -21,7 +21,7 @@ class Query(BaseModel):
     model_config=ConfigDict(extra='forbid')
     titles:list[str]=Field(min_length=1,max_length=8)
     artists:list[str]=Field(min_length=1,max_length=8)
-    duration:float=Field(gt=0,le=7200,allow_inf_nan=False)
+    duration:float=Field(ge=0,le=7200,allow_inf_nan=False)
     rich:bool=True
     refresh:bool=False
 
@@ -111,6 +111,8 @@ class LyricsRelay:
         title=query['titles'][0];artist=next((a for a in query['artists'] if a.isascii()),query['artists'][0])
         params={'q_track':title,'q_artist':artist,'q_duration':round(query['duration']),'f_subtitle_length':round(query['duration']),
                 'f_subtitle_length_max_deviation':2,'subtitle_format':'lrc','namespace':'lyrics_richsynched'}
+        if not query['duration']:
+            for field in ('q_duration','f_subtitle_length','f_subtitle_length_max_deviation'):params.pop(field,None)
         if self.key:
             track=(await self.mxm('matcher.track.get',params)).get('track') or {};calls={}
         else:
@@ -119,7 +121,7 @@ class LyricsRelay:
         matched=match(query,track.get('track_name'),track.get('artist_name'),track.get('track_length'))
         if not matched:return {'phase':'empty'}
         common={'source':'Musixmatch','url':track.get('track_share_url') if str(track.get('track_share_url','')).startswith('https://www.musixmatch.com/') else 'https://www.musixmatch.com/',
-                'identity':{'title':track.get('track_name'),'artist':track.get('artist_name'),'duration':track.get('track_length')},'timingMismatch':matched['timingMismatch']}
+                'identity':{'title':track.get('track_name'),'artist':track.get('artist_name'),'duration':track.get('track_length')},'timingMismatch':matched['timingMismatch'],'durationUnknown':not query['duration']}
         track_id=track.get('track_id')
         if self.key:
             lyrics_body,subtitle_body=await asyncio.gather(self.mxm('track.lyrics.get',{'track_id':track_id}),self.mxm('track.subtitle.get',{'track_id':track_id,'subtitle_format':'lrc'}),return_exceptions=True)
@@ -152,7 +154,7 @@ class LyricsRelay:
 
     async def lrclib(self,query):
         rows=[];failed=False
-        queries=[('get',{'track_name':query['titles'][0],'artist_name':query['artists'][0],'duration':round(query['duration'])})]
+        queries=[('get',{'track_name':query['titles'][0],'artist_name':query['artists'][0],'duration':round(query['duration'])})] if query['duration'] else []
         queries += [('search',{'track_name':t,'artist_name':a}) for t in query['titles'][:2] for a in query['artists'][:3]]
         queries += [('search',{'q':t+' '+a}) for t in query['titles'][:2] for a in query['artists'][:3]]
         # No title-only fuzzy result is accepted without matching artist/version.
@@ -168,13 +170,13 @@ class LyricsRelay:
             for row in rows:
                 if not isinstance(row,dict):continue
                 matched=match(query,row.get('trackName'),row.get('artistName'),row.get('duration'))
-                if matched and (row.get('syncedLyrics') or row.get('plainLyrics') or row.get('instrumental')):valid.append((row,matched))
+                if matched and (row.get('plainLyrics') or row.get('instrumental') or (query['duration'] and row.get('syncedLyrics'))):valid.append((row,matched))
             if valid:
                 row,matched=max(valid,key=lambda v:(not v[1]['timingMismatch'],bool(v[0].get('syncedLyrics')),-v[1]['delta']))
                 plain=str(row.get('plainLyrics') or '')[:100000]
                 return {'phase':'instrumental' if row.get('instrumental') else 'ready','source':'LRCLIB','url':'https://lrclib.net/api/get/'+str(int(row['id'])),
                         'plainText':plain,'lrc':str(row.get('syncedLyrics') or '')[:300000] if not matched['timingMismatch'] else '',
-                        'timingMismatch':matched['timingMismatch'],'identity':{'title':row.get('trackName'),'artist':row.get('artistName'),'duration':row.get('duration')}}
+                        'timingMismatch':matched['timingMismatch'],'durationUnknown':not query['duration'],'identity':{'title':row.get('trackName'),'artist':row.get('artistName'),'duration':row.get('duration')}}
         return {'phase':'error' if failed else 'empty'}
 
     async def lyrics_ovh(self,query):
@@ -182,7 +184,7 @@ class LyricsRelay:
         artist=next((a for a in query['artists'] if a.isascii()),query['artists'][0])
         data=await self.get_json('https://api.lyrics.ovh/v1/'+quote(artist,safe='')+'/'+quote(query['titles'][0],safe=''),{})
         text=str((data or {}).get('lyrics') or '')[:100000]
-        return {'phase':'ready' if text else 'empty','plainText':text,'source':'Lyrics.ovh','url':'https://lyrics.ovh/','precision':'plain'}
+        return {'phase':'ready' if text else 'empty','plainText':text,'source':'Lyrics.ovh','url':'https://lyrics.ovh/','precision':'plain','durationUnknown':not query['duration']}
 
     @staticmethod
     def rank(value):
@@ -224,7 +226,7 @@ class LyricsRelay:
         start=time.monotonic()
         query={**query,**identity(query['titles'],query['artists'])}
         if not query['titles'] or not query['artists']:return {'phase':'empty','lines':[]}
-        key='v2:'+cache_key(query)
+        key='v3:'+cache_key(query)
         def read():
             with self.db() as db:row=db.execute('SELECT payload FROM lyrics WHERE k=? AND expires>?',(key,time.time())).fetchone()
             return json.loads(row[0]) if row else None

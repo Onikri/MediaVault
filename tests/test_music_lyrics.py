@@ -34,6 +34,16 @@ class Relay(unittest.IsolatedAsyncioTestCase):
         self.client=httpx.AsyncClient(transport=httpx.MockTransport(lambda r:httpx.Response(404)))
         self.relay=LyricsRelay(self.directory.name,budget=.12,client=self.client);self.relay.key='fixture-key'
         await self.relay.start()
+    async def test_unknown_playback_length_returns_plain_text_only(self):
+        self.relay.get_json=AsyncMock(return_value=[{'id':123,'trackName':'the WORLD','artistName':'NIGHTMARE',
+            'duration':227,'plainLyrics':'Fixture text','syncedLyrics':'[00:01.00]Fixture text'}])
+        result=await self.relay.lrclib({'titles':['the WORLD'],'artists':['NIGHTMARE'],'duration':0})
+        self.assertEqual(result['phase'],'ready')
+        self.assertTrue(result['durationUnknown'])
+        self.assertEqual(result['plainText'],'Fixture text')
+        self.assertEqual(result['lrc'],'')
+        self.assertTrue(all(call.args[0].endswith('/search') for call in self.relay.get_json.await_args_list))
+
     async def asyncTearDown(self):
         await self.relay.close();await self.client.aclose()
     async def test_fast_provider_failure_is_removed_and_hedge_finishes_without_busy_loop(self):
@@ -101,5 +111,5 @@ class Routes(unittest.TestCase):
         relay.lookup.assert_not_awaited()
         app=FastAPI();install(app,lambda:'owner',relay)
         with TestClient(app) as client:
-            for body in [{**QUERY,'duration':0},{**QUERY,'duration':9000},{**QUERY,'titles':[]},{**QUERY,'rich':True,'upstream':'http://localhost'}]:
+            for body in [{**QUERY,'duration':-1},{**QUERY,'duration':9000},{**QUERY,'titles':[]},{**QUERY,'rich':True,'upstream':'http://localhost'}]:
                 self.assertEqual(client.post('/music/lyrics',json=body).status_code,422)

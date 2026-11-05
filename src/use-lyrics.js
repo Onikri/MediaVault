@@ -18,7 +18,8 @@ export default function useLyrics(track,duration,enabled=true,service){
   if(!enabled||!track){setData({phase:'idle',lines:[]});return;}
   const raw=track.syncedLyrics||track.lyrics,supplied=typeof raw==='string'?parseLrc(raw):Array.isArray(raw)?normalizeLyrics(raw):null;
   if(supplied?.lines.length){setData({...supplied,phase:'ready',source:'Встроенный текст'});return;}
-  if(!duration||!track.title||!track.artists?.length){setData({phase:duration?'empty':'loading',lines:[]});return;}
+  if(!track.title||!track.artists?.length){setData({phase:'empty',lines:[]});return;}
+  if(!duration&&!liveService.current?.request){setData({phase:'idle',lines:[]});return;}
   const hit=cache.get(key);if(hit&&!retry){setData(hit);return;}
   const abort=new AbortController(),signal=abort.signal;let found=false,quality=0;
   setData({phase:'loading',lines:[]});
@@ -32,8 +33,8 @@ export default function useLyrics(track,duration,enabled=true,service){
     if(!found)setData({...value,lines:[]});
     // Show the first server result immediately. AMLL may enrich line timing
     // to word timing, but never holds up the initial result.
-    if(value.phase!=='instrumental'&&value.precision!=='word'){if(!found||!value.lines?.length)direct(value);else amll().catch(()=>{});}
-   }).catch(error=>{if(!signal.aborted){direct({phase:'error'});}});
+    if(duration&&value.phase!=='instrumental'&&value.precision!=='word'){if(!found||!value.lines?.length)direct(value);else amll().catch(()=>{});}
+   }).catch(error=>{if(!signal.aborted){if(duration)direct({phase:'error'});else setData({phase:'error',lines:[]});}});
   }else direct();
   return()=>abort.abort();
  },[key,!!duration,enabled,retry]);
