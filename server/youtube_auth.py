@@ -38,26 +38,49 @@ def normalize_cookies(raw):
         raise HTTPException(422,'В файле нет действующей авторизованной сессии YouTube. Войди на YouTube перед экспортом.')
     return '# Netscape HTTP Cookie File\n'+'\n'.join(rows)+'\n'
 
-def playback_diagnostic(detail,expected_updated=None):
-    text=detail.lower()
-    if not ('cookie' in text and any(v in text for v in ('no longer valid','rotated','expired'))):return
-    store=_store()
-    if store is not None:
-        with store.lock:
-            value=credentials()
-            if value and (expected_updated is None or value.get('updated')==expected_updated):store.setting(SETTING,{**value,'needsRefresh':True,'checked':time.time()})
+def cookie_rejected(detail):
+    return 'youtube account cookies are no longer valid' in detail.lower()
 
-def rotated_cookies(raw,previous):
-    """Retain provider cookie updates only if this exact jar is still current."""
-    if not previous:return
-    try:canonical=normalize_cookies(raw)
-    except HTTPException:return
-    store=_store()
-    if store is None:return
+
+def same_snapshot(current, previous):
+    return bool(current and previous and current.get('updated') == previous.get('updated')
+                and current.get('cookies') == previous.get('cookies'))
+
+
+def playback_rejected(previous):
+    store = _store()
+    if not store or not previous:
+        return
     with store.lock:
-        current=credentials()
-        if current and current.get('updated')==previous.get('updated') and current.get('cookies')==previous.get('cookies') and canonical!=current['cookies']:
-            store.setting(SETTING,{**current,'cookies':canonical,'refreshed':time.time()})
+        current = credentials()
+        if same_snapshot(current, previous):
+            store.setting(SETTING, {**current, 'needsRefresh': True, 'checked': time.time()})
+
+
+def playback_verified(raw, previous):
+    """Persist a changed jar only after playback verifies the same session."""
+    store = _store()
+    if not store or not previous:
+        return
+    try:
+        candidate = normalize_cookies(raw)
+    except HTTPException:
+        candidate = previous['cookies']
+    def has_login_marker(jar):
+        return any(line.split('\t')[-2:-1] == ['LOGIN_INFO'] for line in jar.splitlines())
+    if has_login_marker(previous['cookies']) and not has_login_marker(candidate):
+        candidate = previous['cookies']
+    with store.lock:
+        current = credentials()
+        if not same_snapshot(current, previous):
+            return
+        changed = candidate != current['cookies']
+        if changed or current.get('needsRefresh') or not current.get('checked'):
+            now = time.time()
+            update = {**current, 'cookies': candidate, 'needsRefresh': False, 'checked': now}
+            if changed:
+                update['refreshed'] = now
+            store.setting(SETTING, update)
 
 class CookieSession(BaseModel):
     cookies:SecretStr

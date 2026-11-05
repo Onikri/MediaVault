@@ -8,25 +8,24 @@ from starlette.concurrency import run_in_threadpool
 from source_parser import public_url,SourceError,playback_headers,PublicHttp
 
 slots=threading.BoundedSemaphore(2);lock=threading.RLock();cache={};auth_epoch=0
+youtube_slot=threading.Lock()
 FIELDS='id,title,duration,url,http_headers,ext,acodec,vcodec,protocol,is_live,live_status,availability,available_at'
 
 @contextlib.contextmanager
-def private_youtube_auth(root):
-    from youtube_auth import credentials,rotated_cookies
-    previous=credentials()
-    cookies=(previous or {}).get('cookies','')
+def private_youtube_auth(root, previous):
+    cookies = (previous or {}).get('cookies', '')
     if not cookies:
-        yield [];return
-    # The deployment maps DATA_DIR inside the checkout's private .codex-local.
-    # Only the subprocess receives this mode0600 copy; it is always removed.
-    with tempfile.TemporaryDirectory(dir=root,prefix='audio-session-') as directory:
-        cookie_path=Path(directory)/'youtube-cookies.txt'
-        descriptor=os.open(cookie_path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-        with os.fdopen(descriptor,'w',encoding='utf-8') as cookie_file:cookie_file.write(cookies)
-        yield ['--cookies',str(cookie_path)]
-        # yt-dlp may refresh the jar. Discarding that file loses provider updates.
-        # Never let an old extraction replace a newly uploaded session.
-        with contextlib.suppress(OSError,UnicodeError):rotated_cookies(cookie_path.read_text(encoding='utf-8'),previous)
+        yield [], None
+        return
+    # The subprocess uses a private temporary copy. The caller decides whether
+    # to keep its changes after verifying both extraction and the media stream.
+    with tempfile.TemporaryDirectory(dir=root, prefix='audio-session-') as directory:
+        cookie_path = Path(directory) / 'youtube-cookies.txt'
+        descriptor = os.open(cookie_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as cookie_file:
+            cookie_file.write(cookies)
+        yield ['--cookies', str(cookie_path)], cookie_path
+
 
 def remote_audio(value):
     url=public_url(value)
@@ -114,9 +113,21 @@ def failure(detail):
         return 'Эта запись недоступна серверу без входа или имеет ограничения доступа.'
     return 'YouTube не предоставил доступную аудиодорожку. Повтори подготовку аудио позднее.'
 
-def extract(identity,refresh=False):
-    from youtube_auth import credentials
-    session_revision=(credentials() or {}).get('updated',0)
+def extract(identity, refresh=False):
+    # This server uses one YouTube account. Two extractions must not read and
+    # independently mutate the same cookie snapshot.
+    if not youtube_slot.acquire(timeout=12):
+        raise HTTPException(429, 'YouTube ещё готовит предыдущую запись. Повтори через несколько секунд.')
+    try:
+        return _extract(identity, refresh)
+    finally:
+        youtube_slot.release()
+
+
+def _extract(identity, refresh):
+    from youtube_auth import cookie_rejected, credentials, playback_rejected, playback_verified
+    previous = credentials()
+    updated_jar = None
     now=time.monotonic();deadline=now+65
     with lock:hit=cache.get(identity);epoch=auth_epoch
     if not refresh and hit and hit[0]>now:return hit[1],int(hit[2]-now)
@@ -126,7 +137,7 @@ def extract(identity,refresh=False):
         root=Path(os.getenv('DATA_DIR','/data'))/'temporary';root.mkdir(parents=True,exist_ok=True)
         # No shell, browser-profile reads, credential forwarding or plugins.
         # Explicit owner-supplied YouTube cookies use a private temporary copy.
-        with tempfile.TemporaryDirectory(dir=root,prefix='audio-resolve-') as directory,open(Path(directory)/'result','w+b') as output,open(Path(directory)/'error','w+b') as error,private_youtube_auth(root) as authentication:
+        with tempfile.TemporaryDirectory(dir=root,prefix='audio-resolve-') as directory,open(Path(directory)/'result','w+b') as output,open(Path(directory)/'error','w+b') as error,private_youtube_auth(root, previous) as (authentication, cookie_path):
             command=[sys.executable,'-m','yt_dlp','--ignore-config','--no-plugin-dirs','--no-cache-dir','--no-playlist','--no-color','--socket-timeout','6','--retries','0','--extractor-retries','0','--js-runtimes','node','--skip-download','--print','%(.{'+FIELDS+'})j','-f','bestaudio[ext=m4a][protocol=https]/bestaudio[ext=webm][protocol=https]','--','https://www.youtube.com/watch?v='+identity]
             command[command.index('--'):command.index('--')]=authentication
             process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=output,stderr=error)
@@ -136,9 +147,15 @@ def extract(identity,refresh=False):
                     process.kill();process.wait();raise HTTPException(504,'YouTube не ответил за время подготовки. Повтори запрос.')
                 time.sleep(.05)
             error.seek(0);diagnostic=error.read(256*1024).decode(errors='replace')
-            from youtube_auth import playback_diagnostic
-            playback_diagnostic(diagnostic,expected_updated=session_revision)
-            if process.returncode:raise HTTPException(502,failure(diagnostic))
+            rejected = cookie_rejected(diagnostic)
+            if rejected:
+                playback_rejected(previous)
+            if process.returncode:
+                message = 'YouTube отклонил сохранённые cookies. Загруженная копия сохранена.' if rejected else failure(diagnostic)
+                raise HTTPException(502, message)
+            if cookie_path and not rejected:
+                with contextlib.suppress(OSError, UnicodeError):
+                    updated_jar = cookie_path.read_text(encoding='utf-8')
             output.seek(0)
             try:data=json.loads(output.read(4*1024**2))
             except ValueError:raise HTTPException(502,'Некорректный ответ обработчика аудио.') from None
@@ -157,6 +174,8 @@ def extract(identity,refresh=False):
             if len(cache)>=64:cache.clear()
             created=time.monotonic()
             cache[identity]=(created+min(600,ttl),value,created+ttl)
+        if updated_jar is not None:
+            playback_verified(updated_jar, previous)
         return value,ttl
     finally:
         if process and process.poll() is None:process.kill();process.wait()

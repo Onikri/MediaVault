@@ -23,7 +23,8 @@ class YouTubeAuth(unittest.TestCase):
   raw=self.store.database.execute('SELECT value FROM settings WHERE name=?',(auth.SETTING,)).fetchone()[0];self.assertNotIn(b'fixture-youtube-session',raw)
  def test_rotated_cookie_diagnostic_preserves_credentials_and_exposes_no_values(self):
   self.client.put('/music/youtube/session',json={'cookies':COOKIE})
-  auth.playback_diagnostic('WARNING: YouTube cookies are no longer valid; rotated Cookie=private-value')
+  self.assertTrue(auth.cookie_rejected('WARNING: The provided YouTube account cookies are no longer valid.'))
+  auth.playback_rejected(auth.credentials())
   status=self.client.get('/music/youtube/session').json()
   self.assertTrue(status['needsRefresh']);self.assertNotIn('private-value',json.dumps(status))
   self.assertEqual(auth.cookie_text(),COOKIE)
@@ -51,7 +52,8 @@ class YouTubeAuth(unittest.TestCase):
    cookie=Path(command[command.index('--cookies')+1]);paths.append(cookie);self.assertEqual(cookie.read_text(),COOKIE);self.assertNotIn('fixture-youtube-session',' '.join(command));self.assertNotIn('--cookies-from-browser',command)
    if os.name!='nt':self.assertEqual(cookie.stat().st_mode&0o777,0o600)
    kwargs['stdout'].write(json.dumps({'id':'dQw4w9WgXcQ','title':'Fixture','duration':213,'url':'https://media.googlevideo.com/videoplayback?expire='+str(expiry),'ext':'m4a','vcodec':'none','protocol':'https','http_headers':{'Cookie':'fixture-secret-header'}}).encode());kwargs['stdout'].flush();p=MagicMock();p.poll.return_value=0;p.returncode=0;return p
-  with patch.object(auth,'cookie_text',return_value=COOKIE),patch.dict(os.environ,{'DATA_DIR':self.temporary.name}),patch.object(music,'audio_url',side_effect=lambda u:u),patch.object(music,'verify_audio'),patch.object(music.subprocess,'Popen',side_effect=spawn):data,_=music.extract('dQw4w9WgXcQ',True)
+  self.client.put('/music/youtube/session',json={'cookies':COOKIE})
+  with patch.dict(os.environ,{'DATA_DIR':self.temporary.name}),patch.object(music,'audio_url',side_effect=lambda u:u),patch.object(music,'verify_audio'),patch.object(music.subprocess,'Popen',side_effect=spawn):data,_=music.extract('dQw4w9WgXcQ',True)
   self.assertNotIn('Cookie',data['headers']);self.assertTrue(paths);self.assertFalse(paths[0].exists());self.assertEqual(list((Path(self.temporary.name)/'temporary').iterdir()),[])
  def test_published_pages_can_preflight_session_upload_but_other_origins_cannot(self):
   import api
@@ -63,14 +65,50 @@ class YouTubeAuth(unittest.TestCase):
  def test_late_diagnostic_cannot_reject_a_new_manual_session(self):
   self.client.put('/music/youtube/session',json={'cookies':COOKIE});old=auth.credentials()
   self.store.setting(auth.SETTING,{**old,'updated':old['updated']+1})
-  auth.playback_diagnostic('WARNING cookies are no longer valid; rotated',expected_updated=old['updated'])
+  auth.playback_rejected(old)
   self.assertFalse(self.client.get('/music/youtube/session').json()['needsRefresh'])
  def test_provider_rotation_is_saved_but_cannot_replace_a_new_jar(self):
   self.client.put('/music/youtube/session',json={'cookies':COOKIE});old=auth.credentials()
   # Use the same valid cookie names with a changed supplied value.
   lines=COOKIE.splitlines();parts=lines[-1].split('\t');parts[-1]='provider-refreshed-session';lines[-1]='\t'.join(parts);changed='\n'.join(lines)+'\n'
-  auth.rotated_cookies(changed,old);self.assertIn('provider-refreshed-session',auth.cookie_text())
+  auth.playback_verified(changed,old);self.assertIn('provider-refreshed-session',auth.cookie_text())
   self.store.setting(auth.SETTING,{**old,'updated':old['updated']+1})
-  auth.rotated_cookies(changed,old);self.assertEqual(auth.cookie_text(),COOKIE)
+  auth.playback_verified(changed,old);self.assertEqual(auth.cookie_text(),COOKIE)
+
+ def test_success_failure_success_never_persists_a_rejected_jar(self):
+  login = '.youtube.com\tTRUE\t/\tTRUE\t0\tLOGIN_INFO\tfixture-login\n'
+  original = COOKIE + login
+  rotated = original.replace('fixture-youtube-session', 'fixture-rotated-session')
+  self.client.put('/music/youtube/session', json={'cookies': original})
+  expired = COOKIE.replace('fixture-youtube-session', 'fixture-invalid-session')
+  inputs = []
+  def spawn(command, **kwargs):
+   cookie = Path(command[command.index('--cookies')+1])
+   inputs.append(cookie.read_text())
+   video_id = command[-1].split('=')[-1]
+   result = MagicMock()
+   if len(inputs) == 2:
+    cookie.write_text(expired)
+    kwargs['stderr'].write(b'WARNING: The provided YouTube account cookies are no longer valid.\n')
+    result.returncode = 1
+   else:
+    cookie.write_text(rotated)
+    data = {'id':video_id, 'title':'Fixture', 'duration':180, 'ext':'m4a', 'vcodec':'none',
+            'protocol':'https', 'url':'https://media.googlevideo.com/videoplayback'}
+    kwargs['stdout'].write(json.dumps(data).encode())
+    result.returncode = 0
+   result.poll.return_value = result.returncode
+   return result
+  with patch.dict(os.environ, {'DATA_DIR':self.temporary.name}), patch.object(music, 'audio_url', side_effect=lambda value:value), patch.object(music, 'verify_audio'), patch.object(music.subprocess, 'Popen', side_effect=spawn):
+   music.extract('dQw4w9WgXcQ', True)
+   self.assertEqual(auth.cookie_text(), rotated)
+   with self.assertRaisesRegex(HTTPException, 'YouTube отклонил'):
+    music.extract('tRwHpyOq4P4', True)
+   self.assertTrue(auth.credentials()['needsRefresh'])
+   self.assertEqual(auth.cookie_text(), rotated)
+   music.extract('abcdefghijk', True)
+  self.assertEqual(inputs, [original, rotated, rotated])
+  self.assertFalse(auth.credentials()['needsRefresh'])
+  self.assertEqual(auth.cookie_text(), rotated)
 
 if __name__=='__main__':unittest.main()
