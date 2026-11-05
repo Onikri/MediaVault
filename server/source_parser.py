@@ -460,7 +460,7 @@ class Resolver:
             # A plain HTTP request can be rejected even though the publisher's
             # embedded player works. Preserve its selected audio/episode URL.
             from browser_player import extract
-            result=extract(url,referer,details=True)
+            result=extract(url,referer,details=True,**({'refresh':True} if getattr(self.http,'refresh_playback',False) else {}))
             return Page(streams=result['streams'],subtitles=result.get('subtitles',[]))
         from anime_dl_core import AniboomPlayer, AnimediaPlayer, SibnetPlayer, CvhPlayer, VkPlayer, AnilibriaPlayer, SovetRomanticaPlayer
         from player_compat import KodikPlayer

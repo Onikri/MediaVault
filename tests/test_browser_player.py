@@ -69,7 +69,8 @@ class BrowserPlayerTests(unittest.TestCase):
     @unittest.skipUnless(os.environ.get('CHROMIUM_PATH') or shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for active source contract')
     def test_alloha_active_source_map_preserves_4k_without_waiting_for_quality_switches(self):
         import json
-        parent='https://publisher.example.com/film';url='https://embed.thealloha.club/?translation=66'
+        from requests.utils import default_user_agent
+        parent='https://publisher.example.com/film'
         heights=[360,480,720,1080,1440,2160]
         source={str(q):'https://cdn.example.com/russian-'+str(q)+'.m3u8' for q in heights}
         markup=(
@@ -82,10 +83,15 @@ class BrowserPlayerTests(unittest.TestCase):
         )
         # No higher-quality request has completed. The active source map must
         # provide the full ladder immediately, retaining this Russian track.
-        fixture={parent:('<html>Film</html>','text/html'),url:(markup,'text/html'),source['480']:('#EXTM3U','application/vnd.apple.mpegurl')}
-        result=asyncio.run(_extract(url,parent,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=1))
-        self.assertEqual(sorted(s['quality'] for s in result),heights)
-        self.assertEqual({s['url'] for s in result},set(source.values()))
+        for host in ('embed.thealloha.club','alloha.yani.tv'):
+            with self.subTest(host=host):
+                url='https://'+host+'/?translation=66'
+                fixture={parent:('<html>Film</html>','text/html'),url:(markup,'text/html'),source['480']:('#EXTM3U','application/vnd.apple.mpegurl')}
+                result=asyncio.run(_extract(url,parent,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=1))
+                self.assertEqual(sorted(s['quality'] for s in result),heights)
+                self.assertEqual({s['url'] for s in result},set(source.values()))
+                if host=='alloha.yani.tv':
+                    self.assertTrue(all(s['headers']=={'Origin':'https://alloha.yani.tv','User-Agent':default_user_agent()} for s in result))
 
     @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for a real iframe contract')
     def test_alloha_uses_public_parent_and_play_button_and_never_returns_plyr_blank_video(self):

@@ -14,6 +14,7 @@ import copy
 from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import urlsplit
+from requests.utils import default_user_agent
 from source_parser import SourceError, public_url, playback_headers, BLOCKED, USER_AGENT, is_alloha_player
 
 def browser_workers():
@@ -224,7 +225,10 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
                     values=await target.evaluate("() => typeof player==='undefined' ? null : player.currentSource?.quality || null")
                     initial_headers=next(iter(captured.values()))['headers'] if captured else headers
                     if urlsplit(url).hostname=='alloha.yani.tv':
-                        initial_headers={**initial_headers,'Origin':'https://alloha.yani.tv','Referer':url}
+                        # The public YummyAnime ladder supports server HTTP
+                        # clients with the player Origin. Its CDN can reject
+                        # the embedded browser's UA on an out-of-browser GET.
+                        initial_headers={'Origin':'https://alloha.yani.tv','User-Agent':default_user_agent()}
                     published=published_quality_streams(values,initial_headers,validate=validate)
                     if published:return published
                     # Modern Alloha serves a different signed one-quality HLS
@@ -268,10 +272,12 @@ async def _extract(url,referer=None,*,validate=browser_destination,fixture=None,
         finally:await browser.close()
 
 
-def extract(url,referer=None,*,details=False,mode=None):
+def extract(url,referer=None,*,details=False,mode=None,refresh=False):
     if os.environ.get('MEDIA_VAULT_BROWSER_PLAYERS','1')!='1':
         raise SourceError('Динамические плееры отключены на этом сервере.')
     key=(url,referer,mode)
+    if refresh:
+        with _cache_lock:_playback_cache.pop(key,None)
     def cached():
         with _cache_lock:
             old=_playback_cache.get(key)

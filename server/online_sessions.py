@@ -99,6 +99,7 @@ def install(app,owner):
     def resolve(body,subject,reservation=None):
         http=PublicHttp(timeout=(4,12),deadline=time.monotonic()+45)
         http.preview=body.purpose=='preview'
+        http.refresh_playback=body.refresh
         token=None
         try:
             if body.kind=='manga':
