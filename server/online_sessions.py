@@ -1,6 +1,6 @@
 """Short-lived, owner-created playback capabilities. No Drive writes or open proxy."""
 from dataclasses import dataclass,field
-import asyncio,contextlib,re,secrets,threading,time
+import asyncio,contextlib,os,re,secrets,threading,time
 import m3u8
 from urllib.parse import urljoin,urlsplit
 from fastapi import Depends,HTTPException,Header,Request
@@ -205,6 +205,41 @@ def install(app,owner):
             if not s or s.owner!=subject:raise HTTPException(410,'Онлайн-сеанс завершён. Открой главу снова.')
             s.expires=time.monotonic()+LEASE_SECONDS
         return {'expiresIn':LEASE_SECONDS}
+
+    @app.get('/online/{token}/{resource}/download')
+    def download(token:str,resource:str,height:int=0,name:str='video'):
+        """Save the playing episode as one MP4: ffmpeg remuxes (-c copy, no
+        re-encode) the chosen HLS quality read through this same capability
+        proxy, so upstream headers and URL validation stay server-side."""
+        import shutil,subprocess,urllib.parse
+        with lock:
+            expire();s=sessions.get(token);url=s.resources.get(resource) if s else None
+        if not s or not url or s.kind!='video':raise HTTPException(410,'Онлайн-сеанс завершён. Открой серию снова.')
+        if not shutil.which('ffmpeg'):raise HTTPException(503,'На сервере нет ffmpeg для сохранения видео.')
+        target=url
+        with s.lock:cached=s.manifests.get(resource)
+        if cached:
+            playlist=m3u8.loads(cached[0],uri=cached[1])
+            if playlist.playlists:
+                variants=sorted(playlist.playlists,key=lambda v:(v.stream_info.resolution or (0,0))[1])
+                fitting=[v for v in variants if height and (v.stream_info.resolution or (0,0))[1]<=height]
+                target=urljoin(cached[1],(fitting or variants)[-1].uri)
+        local='http://127.0.0.1:'+os.getenv('PORT','7860')+'/online/'+token+'/'+(resource if target==url else s.resource(target))
+        safe=re.sub(r'[\\/:*?"<>|\x00-\x1f]+',' ',name).strip()[:120] or 'video'
+        command=['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-protocol_whitelist','http,tcp,crypto,data,file','-i',local,
+                 '-map','0:v:0','-map','0:a:0?','-c','copy','-f','mp4','-movflags','frag_keyframe+empty_moov+default_base_moof','pipe:1']
+        process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
+        def body():
+            try:
+                while True:
+                    block=process.stdout.read(256*1024)
+                    if not block:break
+                    yield block
+            finally:
+                if process.poll() is None:process.kill()
+                process.wait()
+        disposition="attachment; filename=video.mp4; filename*=UTF-8''"+urllib.parse.quote(safe+'.mp4')
+        return StreamingResponse(body(),media_type='video/mp4',headers={'Content-Disposition':disposition,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
 
     @app.get('/online/{token}/{resource}')
     def stream(token:str,resource:str,range_header:str=Header(default='',alias='Range')):

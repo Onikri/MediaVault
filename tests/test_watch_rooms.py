@@ -24,6 +24,24 @@ class RoomTests(unittest.TestCase):
         self.assertEqual(response.status_code,201,response.text);return response.json()
     def join(self,identity,password='room-secret'):
         return self.client.post('/rooms/'+identity+'/join',json={'password':password,'name':'Друг'})
+    def test_lobby_preview_shows_title_but_never_tokens(self):
+        room=self.create();self.join(room['id'])
+        data=self.client.get('/rooms/'+room['id']+'/preview').json()
+        self.assertEqual(data['title'],'Fixture video');self.assertNotIn(room['token'],str(data));self.assertNotIn('memberId',data)
+        self.assertEqual(self.client.get('/rooms/missing/preview').status_code,410)
+    def test_ice_requires_membership_and_signs_short_lived_turn_credentials(self):
+        import hashlib,hmac,os
+        from unittest.mock import patch
+        room=self.create();guest=self.join(room['id']).json()
+        self.assertEqual(self.client.post('/rooms/'+room['id']+'/ice',json={'token':'x'*32}).status_code,403)
+        plain=self.client.post('/rooms/'+room['id']+'/ice',json={'token':guest['token']}).json()
+        self.assertFalse(plain['relay']);self.assertTrue(all('credential' not in s for s in plain['iceServers']))
+        with patch.dict(os.environ,{'MEDIA_VAULT_TURN_SECRET':'s3cret','MEDIA_VAULT_TURN_HOST':'turn.example.com'}):
+            data=self.client.post('/rooms/'+room['id']+'/ice',json={'token':guest['token']}).json()
+        turn=next(s for s in data['iceServers'] if 'credential' in s);expiry,member=turn['username'].split(':')
+        self.assertEqual(member,guest['memberId']);self.assertGreater(int(expiry),time.time()+3600)
+        self.assertEqual(turn['credential'],base64.b64encode(hmac.new(b's3cret',turn['username'].encode(),hashlib.sha1).digest()).decode())
+        self.assertNotIn('s3cret',str(data))
     def test_password_and_scoped_capability_do_not_grant_owner_access(self):
         self.assertEqual(self.client.post('/rooms',json={'title':'X','password':'secret','media':{'size':16}}).status_code,401)
         room=self.create();self.assertEqual(self.join(room['id'],'wrong').status_code,403)

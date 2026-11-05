@@ -25,7 +25,7 @@ export function useHostRoom(api,service,item,source,context,enabled=true,configu
  const [password,setPassword]=useState(''),[info,setInfo]=useState(null),[state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[connected,setConnected]=useState(false);
  const live=useRef(),socket=useRef(null),session=useRef(null),applying=useRef(new Map()),lastMedia=useRef(''),stateRef=useRef(null),reads=useRef(new Set());
  live.current={api,service,item,source,context,configuration};stateRef.current=state;
- const conversation=useRoomConversation(socket,info?.memberId,state,connected);
+ const conversation=useRoomConversation(socket,info?.memberId,state,connected,{server:service?.server,id:info?.id,token:info?.token});
  function send(value){if(socket.current?.readyState===1)socket.current.send(JSON.stringify(value));}
  async function read(data){
   const current=live.current,version=lastMedia.current,abort=new AbortController();reads.current.add(abort);

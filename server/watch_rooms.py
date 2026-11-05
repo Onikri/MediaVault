@@ -36,6 +36,23 @@ class Create(BaseModel):
     title:str=Field(min_length=1,max_length=300)
     malId:str=Field(default='',pattern=r'^\d{0,10}$')
     media:Media
+class Ice(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    token:str=Field(min_length=10,max_length=100)
+
+def ice_servers(member_id,now=None):
+    """Short-lived TURN REST credentials (coturn use-auth-secret).
+
+    Without MEDIA_VAULT_TURN_SECRET only STUN is offered: direct connections
+    still work, strict NAT/mobile networks need the relay."""
+    stun=[{'urls':'stun:stun.l.google.com:19302'}]
+    secret=os.getenv('MEDIA_VAULT_TURN_SECRET','');host=os.getenv('MEDIA_VAULT_TURN_HOST','')
+    if not secret or not re.fullmatch(r'[A-Za-z0-9.-]{3,253}',host):return {'iceServers':stun,'relay':False}
+    expiry=int((now or time.time())+6*3600);username=str(expiry)+':'+member_id
+    credential=base64.b64encode(hmac.new(secret.encode(),username.encode(),hashlib.sha1).digest()).decode()
+    return {'iceServers':[{'urls':['stun:'+host+':3478']},
+                          {'urls':['turn:'+host+':3478?transport=udp','turn:'+host+':3478?transport=tcp'],'username':username,'credential':credential},*stun],'relay':True}
+
 class Join(BaseModel):
     model_config=ConfigDict(extra='forbid')
     password:str=Field(min_length=1,max_length=128)
@@ -48,6 +65,7 @@ class Member:
     seen:float=field(default_factory=time.monotonic)
     buffering:bool=False
     voice:bool=False
+    muted:bool=False
     last_chat:float=0
     slots:object=field(default_factory=lambda:asyncio.Semaphore(2))
 @dataclass
@@ -90,7 +108,7 @@ def snapshot(room):
     return {'id':room.id,'title':room.title,'malId':room.mal_id,'position':position(room),'duration':room.duration,'rate':room.rate,'playing':room.playing,'held':room.held,'epoch':room.epoch,'revision':room.revision,
             'leader':room.leader,'everyone':room.everyone,'waitAll':room.wait_all,'type':room.media['type'],'resource':room.media.get('resource','file'),
             'tracks':[{k:v for k,v in t.items() if k in {'kind','type','name','language','alias'}} for t in room.media.get('tracks',[])],'audioOffset':room.media.get('audioOffset',0),
-            'members':[{'id':m.id,'name':m.name,'host':m.host,'online':m.ws is not None,'buffering':m.buffering,'voice':m.voice} for m in room.members.values()]}
+            'members':[{'id':m.id,'name':m.name,'host':m.host,'online':m.ws is not None,'buffering':m.buffering,'voice':m.voice,'muted':m.muted} for m in room.members.values()]}
 async def send(member,value):
     if member.ws is not None:
         try:await asyncio.wait_for(member.ws.send_json(value),timeout=5)
@@ -127,6 +145,20 @@ def install(app,owner):
         room=Room(secrets.token_urlsafe(20),subject,salt,digest,body.title,body.malId,media)
         host=Member(secrets.token_urlsafe(8),secrets.token_urlsafe(32),'Ведущий',True);room.members[host.id]=host;room.leader=host.id;rooms[room.id]=room
         return {'id':room.id,'token':host.token,'memberId':host.id,'room':snapshot(room)}
+
+    @app.get('/rooms/{identity}/preview')
+    def preview(identity:str):
+        # The lobby showcase: what is playing and who is there. No media,
+        # tokens or member ids; joining still requires the room password.
+        room=lookup(identity);online=[m for m in room.members.values() if m.ws is not None]
+        host=next((m.name for m in room.members.values() if m.host),'')
+        return {'title':room.title,'malId':room.mal_id,'duration':room.duration,'position':position(room),'playing':room.playing,
+                'online':len(online),'host':host,'names':[m.name for m in online][:9]}
+
+    @app.post('/rooms/{identity}/ice')
+    def ice(identity:str,body:Ice):
+        room=lookup(identity);member=membership(room,body.token)
+        return ice_servers(member.id)
 
     @app.post('/rooms/{identity}/join')
     async def join(identity:str,body:Join,request:Request):
@@ -175,7 +207,7 @@ def install(app,owner):
                     await asyncio.gather(*(send(m,message) for m in room.members.values()))
                     continue
                 if kind=='voice':
-                    member.voice=data.get('enabled') is True
+                    member.voice=data.get('enabled') is True;member.muted=member.voice and data.get('muted') is True
                     await broadcast(room);continue
                 if kind=='signal':
                     target=room.members.get(data.get('to')) if isinstance(data.get('to'),str) else None

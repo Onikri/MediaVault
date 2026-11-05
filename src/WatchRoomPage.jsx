@@ -1,7 +1,8 @@
 import RoomConversation from './RoomConversation.jsx';
 import {useRoomConversation} from './room-conversation.js';
 import {useEffect,useRef,useState,useMemo} from 'react';
-import {Users,LogOut} from 'lucide-react';
+import {Users,LogOut,Clock3,Crown,Play,Radio} from 'lucide-react';
+import {clock} from './player-runtime.js';
 import MediaVaultPlayer from './MediaVaultPlayer.jsx';
 import TitleShowcase from './TitleShowcase.jsx';
 import TitleBackdrop from './TitleBackdrop.jsx';
@@ -14,7 +15,12 @@ export default function WatchRoomPage({identity}){
  const [password,setPassword]=useState(''),[name,setName]=useState(''),[joined,setJoined]=useState(null),[state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[api,setApi]=useState(null),[profile,setProfile]=useState(null),[online,setOnline]=useState(false),[blocked,setBlocked]=useState(false);
  const socket=useRef(null),applying=useRef(0),latest=useRef();latest.current={api,state};
  let server='';try{server=validateServer(window.MEDIA_VAULT_CONFIG?.importServerUrl||'');}catch{}
- const conversation=useRoomConversation(socket,joined?.memberId,state,online);
+ const [preview,setPreview]=useState(null),[previewProfile,setPreviewProfile]=useState(null);
+ // Lobby showcase: public room summary (no media or member tokens) so the
+ // gate shows what is about to be watched before the password is entered.
+ useEffect(()=>{if(joined||!server)return;const abort=new AbortController();const load=()=>fetch(server+'/rooms/'+encodeURIComponent(identity)+'/preview',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(v=>{if(!abort.signal.aborted)setPreview(v);}).catch(()=>{});load();const timer=setInterval(load,10000);return()=>{abort.abort();clearInterval(timer);};},[identity,server,joined]);
+ useEffect(()=>{if(!preview?.malId)return;const abort=new AbortController();loadTitleProfile(preview.malId,'anime',{server,signal:abort.signal}).then(setPreviewProfile).catch(()=>{});return()=>abort.abort();},[preview?.malId,server]);
+ const conversation=useRoomConversation(socket,joined?.memberId,state,online,{server,id:joined?.id||identity,token:joined?.token});
  function send(data){if(socket.current?.readyState===1)socket.current.send(JSON.stringify(data));}
  async function join(event,secret=password){event?.preventDefault();setBusy(true);setError('');try{const response=await fetch(server+'/rooms/'+encodeURIComponent(identity)+'/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:secret,name:name.trim()||'Гость'})}),data=await response.json();if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Не удалось войти в комнату.');setPassword('');setJoined(data);setState(data.room);}catch(e){setError(e.message);}finally{setBusy(false);}}
  useEffect(()=>{const params=new URLSearchParams(location.hash.slice(1)),secret=params.get('key');if(secret){params.delete('key');history.replaceState(null,'',location.pathname+location.search+'#'+params.toString());join(null,secret);}},[identity]);
@@ -38,7 +44,31 @@ export default function WatchRoomPage({identity}){
  useEffect(()=>{if(api)api.preferences({audioOffset:state?.audioOffset||0});},[api,state?.audioOffset]);
  const lastState=useRef(performance.now());useEffect(()=>{lastState.current=performance.now();},[state]);
   const roomItem=useMemo(()=>({id:'room:'+identity+':'+state?.epoch,name:state?.title,category:'video',onlineType:state?.type}),[identity,state?.epoch,state?.title,state?.type]);
- if(!joined)return <main className="watch-room-gate"><div><Users size={30}/><h1>Совместный просмотр</h1><p>Введи пароль, который передал создатель комнаты.</p><form onSubmit={join}><label>Имя<input aria-label="Имя в комнате" maxLength={40} value={name} onChange={e=>setName(e.target.value)} autoComplete="nickname"/></label><label>Пароль комнаты<input type="password" aria-label="Пароль комнаты" maxLength={128} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/></label><button className="btn btn-primary" disabled={busy||!password||!server}>{busy?'Подключаемся…':'Войти в комнату'}</button></form>{error&&<p className="inline-error" role="alert">{error}</p>}</div></main>;
+ if(!joined){
+  const g=previewProfile||{},title=g.title||preview?.title,duration=preview?.duration||0,progress=duration?Math.min(100,(preview?.position||0)/duration*100):0;
+  return <main className="watch-room-gate room-lobby" style={g.cover?{'--lobby-art':`url("${String(g.cover).replace(/["\\]/g,'')}")`}:undefined}>
+   <div className="room-lobby-backdrop" aria-hidden="true"/>
+   <section className="room-lobby-card">
+    <div className="room-lobby-show">
+     <div className="room-lobby-poster">{g.cover?<img src={g.cover} alt=""/>:<Artwork kind="anime"/>}{preview?.playing&&<span className="room-lobby-live"><Radio size={12}/>Идёт просмотр</span>}</div>
+     <div className="room-lobby-copy">
+      <p className="eyebrow">Совместный просмотр</p>
+      <h1>{title||'Комната просмотра'}</h1>
+      {g.description&&<p className="room-lobby-description">{g.description}</p>}
+      <div className="room-lobby-facts">{duration>0&&<span><Clock3 size={14}/>{clock(duration)}</span>}{(g.genres||[]).slice(0,3).map(v=><span key={v}>{v}</span>)}</div>
+      {duration>0&&<div className="room-lobby-progress" aria-label={'Позиция просмотра '+clock(preview.position||0)+' из '+clock(duration)}><span style={{width:progress+'%'}}/><small>{preview.playing?<Play size={11}/>:null}{clock(preview.position||0)} / {clock(duration)}</small></div>}
+      {preview&&<div className="room-lobby-people"><div className="room-lobby-avatars">{preview.names.map((n,i)=><span key={i} title={n}>{String(n).trim().slice(0,1).toUpperCase()}</span>)}</div><small>{preview.host&&<><Crown size={12}/>{preview.host} · </>}{preview.online} в комнате</small></div>}
+     </div>
+    </div>
+    <form className="room-lobby-form" onSubmit={join}>
+     <label>Имя<input aria-label="Имя в комнате" maxLength={40} value={name} onChange={e=>setName(e.target.value)} autoComplete="nickname" placeholder="Как тебя называть"/></label>
+     <label>Пароль комнаты<input type="password" aria-label="Пароль комнаты" maxLength={128} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/></label>
+     <button className="btn btn-primary" disabled={busy||!password||!server}><Users size={16}/>{busy?'Подключаемся…':'Войти в комнату'}</button>
+     {error&&<p className="inline-error" role="alert">{error}</p>}
+    </form>
+   </section>
+  </main>;
+ }
  const canControl=state?.everyone||state?.leader===joined.memberId;
  const p=profile||{title:state?.title,description:'Совместный просмотр',cover:'',backgrounds:[]};
  const resource=state?.resource||'file',source=server+'/rooms/'+identity+'/media/'+joined.token+'/'+resource+'?epoch='+state?.epoch;
