@@ -12,7 +12,7 @@ def image_extension(header):
     if header.startswith(b'\x89PNG\r\n\x1a\n'):return 'png'
     if header.startswith((b'GIF87a',b'GIF89a')):return 'gif'
     if header[:4]==b'RIFF' and header[8:12]==b'WEBP':return 'webp'
-    if header[4:8]==b'ftyp' and header[8:12] in {b'avif',b'avis'}:return 'avif'
+    if header[4:8]==b'ftyp' and header[8:12] in (b'avif',b'avis'):return 'avif'
     return None
 
 def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):

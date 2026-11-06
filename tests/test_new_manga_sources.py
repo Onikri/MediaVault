@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'server'))
 import manga_hentaichan_cc as chan
 import manga_hitomi as hitomi
 from artwork import hitomi_cover
+from manga_download import image_extension
 from manga_sources import inspect
 from source_parser import SourceError
 
@@ -23,8 +24,10 @@ class NativeMangaTests(TestCase):
         row, = chan.search('Sample', http)
         self.assertEqual((row['cover'], row['url']), (cover, chan.ROOT + '/manga/sample'))
         chapter = chan.ROOT + '/read/sample-glava-2'
-        http.document.return_value = ('<h1>Sample</h1><a href="/read/sample-glava-2">Read</a>', row['url'], {})
-        self.assertEqual(inspect(row['url'], http)['episodes'][0]['url'], chapter)
+        detail = '<title>Read Sample online</title><h1>Sample</h1><a href="/read/sample-glava-2">Read</a>'
+        http.document.return_value = (detail, row['url'], {})
+        info = inspect(row['url'], http)
+        self.assertEqual((info['title'], info['episodes'][0]['url']), (row['title'], chapter))
         bootstrap = 'setup();$_TSR.router={pages:$R[1]=[{originalSrc:"'+cover+'"}],ssr:"data-only"}'
         http.document.return_value = ('<script>'+bootstrap+'</script>', chapter, {})
         self.assertEqual(inspect(chapter, http)['pages'], [cover])
@@ -44,3 +47,4 @@ class NativeMangaTests(TestCase):
         self.assertTrue(hitomi_cover(thumb))
         self.assertFalse(hitomi_cover(thumb.replace('/webpbigtn/', '/other/')))
         self.assertIn('/12345/2578/', hitomi.image(page, table))
+        self.assertEqual(image_extension(bytearray(b'\x00\x00\x00\x20ftypavif')), 'avif')

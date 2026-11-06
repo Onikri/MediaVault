@@ -6,12 +6,6 @@ export function readOnlineTitle(hash=location.hash,storage=localStorage){
  if(!['anime','manga','ranobe','book','movie','tv'].includes(kind)||!provider||!id||value.length>400)return null;
  const base={id:value,kind,provider,providerId:id,providers:[provider],title:'Загружаем тайтл…',ids:['shikimori','jikan'].includes(provider)?{mal:id}:{},genres:[],tags:[],aliases:[],titles:{},links:[],releases:[]};
  try{const saved=JSON.parse(storage.getItem(KEY)||'{}')[value];if(saved)return {...base,...saved,providers:saved.providers||[provider]};}catch{}
- if(kind==='manga'&&provider==='hitomi'&&/^hitomi:\d{1,10}$/.test(id)){
-  return {...base,title:'Hitomi',age:18,adult:true,sourceOnly:true,sourceURL:'https://hitomi.la/reader/'+id.slice(7)+'.html'};
- }
- if(kind==='manga'&&provider==='hentaichan-cc'&&/^hentaichan-cc:[\w-]{1,240}$/.test(id)){
-  return {...base,title:'HentaiChan.cc',age:18,adult:true,sourceOnly:true,sourceURL:'https://hentaichan.cc/manga/'+id.slice(14)};
- }
  if(kind==='anime'&&provider==='hentaichan-video'){
   try{
    const url=new URL(id.replace(/^hentaichan-video:/,''));

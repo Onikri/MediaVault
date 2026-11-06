@@ -72,7 +72,7 @@ def inspect(url, http: PublicHttp):
     if final.rstrip('/') != canonical:
         raise SourceError('HentaiChan.cc перенаправил на другую публикацию.')
     soup = BeautifulSoup(text, 'html.parser')
-    title = soup.select_one('h1,meta[property="og:title"],title')
+    title = soup.select_one('h1') or soup.select_one('meta[property="og:title"]') or soup.title
     name = (title.get('content') or title.get_text(' ', strip=True))[:500] if title else SOURCE['name']
     meta = soup.select_one('meta[property="og:image"]')
     cover = cdn_image(meta.get('content')) if meta else ''
