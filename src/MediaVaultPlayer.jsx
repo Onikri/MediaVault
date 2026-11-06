@@ -30,6 +30,7 @@ import {PlayerContext,usePlayerSession,usePlayerExtensions,usePlayerMediaSession
 import PlayerExtensionSlot from './PlayerExtensionSlot.jsx';
 import {createPortal} from 'react-dom';
 import {UPSCALERS,upscalerById,autoUpscaler,migrateUpscaler} from './upscaler-catalog.js';
+import {SourceBadges} from './source-badges.jsx';
 import {useColorGrade,readCustomPresets,writeCustomPresets} from './color-grade.js';
 import './player-shell.css';
 
@@ -92,7 +93,7 @@ function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type
 }
 
 // Dub switch kept in the control bar: the most frequent anime-specific choice.
-function DubMenu({label,options,value,onPick}){
+function DubMenu({label,options,value,onPick,current:currentSource}){
   const [open,setOpen]=useState(false),root=useRef(null);
   const current=options.find(o=>String(o.value)===String(value));
   useEffect(()=>{
@@ -104,11 +105,11 @@ function DubMenu({label,options,value,onPick}){
   },[open]);
   return <div className="mvx-dub" ref={root} onKeyDownCapture={event=>{if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();setOpen(false);root.current?.querySelector('.mvx-dub-button')?.focus();}}}>
     <button type="button" className="mvx-dub-button" aria-haspopup="true" aria-expanded={open} aria-label={label+': '+(current?.label||'')} onClick={()=>setOpen(v=>!v)}>
-      <span>{current?.label||label}</span><ChevronDown size={14} aria-hidden="true"/>
+      <span>{current?.label||label}</span>{currentSource&&<SourceBadges sources={[currentSource]}/>}<ChevronDown size={14} aria-hidden="true"/>
     </button>
     {open&&<div className="mvx-dub-menu mvx-scroll" role="radiogroup" aria-label={label}>
       {options.map(o=><button type="button" key={o.value} role="radio" aria-checked={String(o.value)===String(value)} onClick={()=>{setOpen(false);onPick(o.value);}}>
-        <span>{o.label}</span>{String(o.value)===String(value)&&<Check size={15} aria-hidden="true"/>}
+        <span>{o.label}<SourceBadges sources={o.sources}/></span>{String(o.value)===String(value)&&<Check size={15} aria-hidden="true"/>}
       </button>)}
     </div>}
   </div>;
@@ -183,7 +184,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   const subtitleOptions=[{value:'off',label:'Выключены'},...streaming.subtitles.map(t=>({value:'hls:'+t.index,label:t.name})),...availableTracks.map(t=>({value:t.id,label:t.name}))];
   const subtitleLabel=subtitleOptions.find(o=>o.value===subtitle)?.label||'Выключены';
   // Dub in the bar: online voices (separate audio) or local file variants.
-  const dub=onlineControls?.voices?.length>1?{label:'Озвучка',value:onlineControls.voiceId||'',options:onlineControls.voices.map(v=>({value:v.id,label:v.name})),pick:id=>onlineControls.onVoice(id)}
+  const dub=onlineControls?.voices?.length>1?{label:'Озвучка',value:onlineControls.voiceId||'',options:onlineControls.voices.map(v=>({value:v.id,label:v.name,sources:v.sources})),pick:id=>onlineControls.onVoice(id),current:onlineControls.currentSource}
     :episode?.variants.length>1?{label:'Озвучка',value:item.id,options:episode.variants.map(v=>({value:v.item.id,label:v.label})),pick:id=>switchVariant(episode.variants.find(v=>v.item.id===id)?.item)}:null;
   const engineValue=prefs.gpu?migrateUpscaler(prefs.upscaler||'auto'):'off';
   const engineLabel=(prefs.gpu?(engineValue==='auto'?'Авто, '+(upscalerById(autoUpscaler(deviceProfile))?.label||''):upscalerById(engineValue)?.label||'Выключено'):'Выключено')+(colors.sharpen?', резкость':'')+(colors.deband?', без полос':'');
@@ -204,7 +205,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   const picker=(label,value,options,pick)=>close=><Choices label={label} value={value} options={options} onPick={v=>{pick(v);close();}}/>;
   const voiceItem=episode?.variants.length>1&&{id:'voice',label:'Озвучка',value:currentVariant?.label,content:picker('Озвучка',item.id,episode.variants.map(v=>({value:v.item.id,label:v.label})),id=>switchVariant(episode.variants.find(v=>v.item.id===id)?.item))};
   const trackItem=onlineControls?.voices?.length>0&&{id:'track',label:'Озвучка',value:onlineControls.voices.find(v=>v.id===onlineControls.voiceId)?.name,content:close=><>
-      <Choices label="Озвучка" value={onlineControls.voiceId||''} options={onlineControls.voices.map(v=>({value:v.id,label:v.name}))} onPick={id=>{onlineControls.onVoice(id);if(!onlineControls?.audio)close();}}/>
+      <Choices label="Озвучка" value={onlineControls.voiceId||''} options={onlineControls.voices.map(v=>({value:v.id,label:v.name,badges:<SourceBadges sources={v.sources}/>}))} onPick={id=>{onlineControls.onVoice(id);if(!onlineControls?.audio)close();}}/>
       {onlineControls?.audio&&<><Note>Видео остаётся в выбранном качестве, звук идёт отдельным потоком и тоже расходует сеть.</Note><Slider label="Сдвиг звука" ariaLabel="Сдвиг звука" min={-30} max={30} step={.1} value={Number(prefs.audioOffset)||0} format={v=>(v>0?'+':'')+v.toFixed(1)+' с'} onChange={v=>changePrefs({audioOffset:v})}/></>}
       {(onlineControls?.trackBusy||onlineControls?.trackError||audioError)&&<Note role="status">{audioError||onlineControls.trackError||'Подключаем дорожку.'}</Note>}
     </>};
@@ -217,7 +218,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       {id:'speed',label:'Скорость',value:prefs.speed===1?'Обычная':prefs.speed+'×',content:picker('Скорость',prefs.speed,[0.5,0.75,1,1.25,1.5,1.75,2].map(v=>({value:v,label:v===1?'Обычная':v+'×'})),v=>changePrefs({speed:Number(v)}))},
       {id:'captions',label:'Субтитры',value:subtitleLabel,content:<>
         <Choices label="Субтитры" value={subtitle} options={subtitleOptions} onPick={setSubtitle}/>
-        {onlineControls?.captionVoices?.length>0&&<><h3 className="mvx-subhead">Из другой версии</h3><Choices label="Источник субтитров" value={onlineControls.subtitleId||''} options={[{value:'',label:'Дорожки текущего видео'},...onlineControls.captionVoices.map(v=>({value:v.id,label:v.name}))]} onPick={id=>onlineControls.onCaptionVoice(id)}/></>}
+        {onlineControls?.captionVoices?.length>0&&<><h3 className="mvx-subhead">Из другой версии</h3><Choices label="Источник субтитров" value={onlineControls.subtitleId||''} options={[{value:'',label:'Дорожки текущего видео'},...onlineControls.captionVoices.map(v=>({value:v.id,label:v.name,badges:<SourceBadges sources={v.sources}/>}))]} onPick={id=>onlineControls.onCaptionVoice(id)}/></>}
         <button type="button" className="mvx-link" onClick={()=>subtitleInput.current?.click()}><Subtitles size={16}/>Загрузить файл SRT или VTT</button>
         <Slider label="Размер" ariaLabel="Размер субтитров" min={16} max={40} step={2} value={prefs.subSize} format={v=>v+' px'} onChange={v=>changePrefs({subSize:v})}/>
         <Slider label="Отступ снизу" ariaLabel="Отступ субтитров" min={3} max={22} step={1} value={prefs.subOffset} format={v=>v+'%'} onChange={v=>changePrefs({subOffset:v})}/>

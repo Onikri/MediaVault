@@ -5,6 +5,7 @@ import {episodeDetail,useFranchiseSeasons,catalogueSeasonHint} from './franchise
 import PlayerSettings from './PlayerSettings.jsx';
 import {SlidersHorizontal} from 'lucide-react';
 import {Choices} from './player-sheet-controls.jsx';
+import {SourceBadges,sourceOf,sourcesOfVoice} from './source-badges.jsx';
 import PlaybackReveal from './PlaybackReveal.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import OnlineViewer from './OnlineViewer.jsx';
@@ -196,7 +197,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const [sourceOpen,setSourceOpen]=useState('');
  const voiceHint=v=>[qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]?'до '+qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]+'p':'',voiceEpisodeCount(v,season)?voiceEpisodeCount(v,season)+' сер.':'',v.kind==='subtitles'?'субтитры':'',saved.current.usage?.[v.id]?'твой выбор':''].filter(Boolean).join(', ');
  const sourceSections=[{id:'source',items:[
-  {id:'voice',label:'Озвучка',value:voice?.name||(discovery.loading?'Ищем':'Не выбрана'),content:close=><Choices label="Озвучка" value={voice?.id||''} options={offeredVoices.map(v=>({value:v.id,label:v.name,hint:voiceHint(v)}))} onPick={id=>{changeVoice(id);close();}}/>},
+  {id:'voice',label:'Озвучка',value:voice?.name||(discovery.loading?'Ищем':'Не выбрана'),content:close=><Choices label="Озвучка" value={voice?.id||''} options={offeredVoices.map(v=>({value:v.id,label:v.name,hint:voiceHint(v),badges:<SourceBadges sources={sourcesOfVoice(v)}/>}))} onPick={id=>{changeVoice(id);close();}}/>},
   {id:'quality',label:'Качество',value:quality==='best'?'Лучшее, авто':quality+'p',content:close=><Choices label="Качество" value={quality} options={[{value:'best',label:'Лучшее, автоматически'},...heights.map(q=>({value:String(q),label:q+'p',hint:!bestVideo&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(q))?'В другой озвучке':''})),...(quality!=='best'&&!heights.includes(Number(quality))?[{value:quality,label:quality+'p',hint:'Проверяем'}]:[])]} onPick={v=>{changeQuality(v);close();}}/>},
   {id:'bestVideo',label:'Лучшее видео из всех озвучек',hint:'Звук выбранной озвучки идёт отдельно',switch:{checked:bestVideo,onChange:changeVideoMode}}
  ]},{id:'scan',items:[
@@ -205,9 +206,9 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  ]}];
  const idleCurrent=browsingCatalog?foreign.row?.entries[0]:current,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
  const warmCurrent=usePlaybackWarmup({entry:idleCurrent,sourceUrl:idleVariant?.sourceUrl,quality,service,enabled:!playing&&!idleBusy&&!isAllohaVariant(idleVariant),anchor:sourceButton});
- const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name})),voiceId:audioId||voice?.id,
+ const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:audioId||voice?.id,
   onVoice:id=>{const value=id===voice?.id?'':id;setAudioId(value);persist({audioId:value});},
-  captionVoices:voices.filter(v=>v.kind==='subtitles').map(v=>({id:v.id,name:v.name})),subtitleId,
+  captionVoices:voices.filter(v=>v.kind==='subtitles').map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),subtitleId,
   onCaptionVoice:id=>{setSubtitleId(id);persist({subtitleId:id});},audio,externalCaptions:captions,trackBusy,trackError};
  return <div className="online-watch">
   <OnlineEpisodePreviews minimumDuration={minimumEpisodeDuration(displayProfile)} entries={previewTargets} active={!playing&&!busy&&!browseBusy&&!foreignBusy&&!hovering} service={service} sourceUrl={previewVariant?.sourceUrl} sourceId={displayVariant?.id} identity={displayIdentity} season={displaySeason} userId={userId} onPreview={(number,image)=>preview(number,image,displaySeason,displayVariant?.id,displayIdentity)}/>

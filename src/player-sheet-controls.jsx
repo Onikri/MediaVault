@@ -18,7 +18,7 @@ export function Choices({label,options,value,onPick}){
     {options.map(option=>{
       const checked=String(option.value)===String(value);
       return <button type="button" key={option.value} role="radio" aria-checked={checked} className="mvx-choice" disabled={option.disabled} onClick={()=>onPick(option.value)}>
-        <span><strong>{option.label}</strong>{option.hint&&<small>{option.hint}</small>}</span>
+        <span><strong>{option.label}{option.badges}</strong>{option.hint&&<small>{option.hint}</small>}</span>
         {checked&&<Check size={16} aria-hidden="true"/>}
       </button>;
     })}
