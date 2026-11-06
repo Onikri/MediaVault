@@ -21,5 +21,5 @@ export default function useVideoStream(ref,source,type,onError,{preview=false,au
   return()=>{closed=true;instance?.destroy();if(engine.current===instance)engine.current=null;};
  },[ref,source,hls,preview,audioOnly]);
  useEffect(()=>{const instance=engine.current;if(!instance?.levels?.length)return;const index=quality==='best'?-1:instance.levels.findIndex(l=>Number.parseInt(l.attrs?.NAME||l.name||l.height)===Number(quality));instance.nextLevel=index;setLevelState(index);},[quality]);
- return {hls,levels,level,setLevel:n=>{if(engine.current){engine.current.nextLevel=n;setLevelState(n);}},audio,setAudio:n=>{if(engine.current)engine.current.audioTrack=n;},subtitles,setSubtitle:n=>{if(engine.current){engine.current.subtitleTrack=n;engine.current.subtitleDisplay=n>=0;}}};
+ return {hls,levels,level,setLevel:n=>{if(engine.current){engine.current.nextLevel=n;setLevelState(n);}},audio,setAudio:n=>{if(engine.current)engine.current.audioTrack=n;},subtitles,setSubtitle:n=>{if(engine.current){engine.current.subtitleDisplay=false;engine.current.subtitleTrack=n;}}};
 }
