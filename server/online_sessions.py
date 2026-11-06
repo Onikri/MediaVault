@@ -373,7 +373,11 @@ def install(app,owner):
             if s.kind=='manga' and parse_reference(url):
                 raw,mime=page_image(url)
                 return Response(raw,media_type=mime,headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
-            response,final=http._open(url,headers=s.headers,byte_range=range_header or None)
+            from hentaichan_video import open_media, video_media
+            if s.kind in {'video', 'preview'} and video_media(url):
+                response,final=open_media(http,url,headers=s.headers,byte_range=range_header or None)
+            else:
+                response,final=http._open(url,headers=s.headers,byte_range=range_header or None)
             mime=response.headers.get('Content-Type','').split(';')[0].lower()
             common={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}
             if s.kind=='music':

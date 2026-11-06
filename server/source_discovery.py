@@ -141,6 +141,16 @@ def _discover(selected,*,refresh=False,continuing=False):
 _jobs={};_jobs_lock=threading.RLock()
 
 def discover(selected,*,refresh=False,continuing=False):
+    source_url = selected.get('sourceURL')
+    if selected.get('provider') == 'hentaichan-video' and isinstance(source_url, str):
+        from hentaichan_video import video_page
+        if video_page(source_url):
+            source = inspect_source(source_url, kind='anime')
+            available = bool(source['episodes'])
+            return {'title': selected, 'sources': [source], 'voices': group_voices([source]),
+                    'providers': [{'provider': source['provider'], 'name': source['providerName'],
+                                   'status': 'ok' if available else 'no_players', 'complete': True}],
+                    'progress': 1, 'pending': False, 'complete': True, 'checkedAt': int(time.time())}
     if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')
     key=repr((selected.get('ids'),aliases(selected),selected.get('year'),selected.get('kind')))
     with _lock:hit=_cache.get(key)

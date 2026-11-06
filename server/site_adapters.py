@@ -10,6 +10,7 @@ from urllib.parse import urlencode, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
+from hentaichan_video import HOSTS as HENTAICHAN_HOSTS, ROOT as HENTAICHAN_ROOT
 from source_parser import PublicHttp, Resolver, SourceError, episode_number, parse_page, public_url
 
 
@@ -41,7 +42,7 @@ class Site:
 
 
 SITES = (
-    Site("hentaichan-video", "HentaiChan · Видео", "https://hentaichan.live", ("hentaichan.live", "x17.h-chan.me"), ".content_row", "a.title_link"),
+    Site("hentaichan-video", "HentaiChan · Видео", HENTAICHAN_ROOT, HENTAICHAN_HOSTS, ".content_row", "a.title_link"),
     Site("yummy", "YummyAnime", "https://yummyanime.tv", ("yummyanime.tv",), ".movie-item", ".movie-item__title"),
     Site("animego", "AnimeGo", "https://animego.me", ("animego.me", "animego.org"), ".animes-list-item, .anime-item, .ani-grid__item", ".ani-grid__item-title, .h5, h2, h3"),
     Site("jutsu", "Jut.su", "https://jut.su", ("jut.su",), ".all_anime_global, .all_anime", ".aaname, .anime_name"),
