@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 // Room-scoped signalling only. Audio goes peer to peer (or through our own
 // TURN relay on Oracle when a network blocks direct connections), never into
 // playback. Microphone choice and processing stay in this browser.
@@ -29,7 +29,7 @@ async function iceConfiguration(access){
  return {iceServers:[{urls:'stun:stun.l.google.com:19302'}],relay:false};
 }
 export function useRoomConversation(socket,memberId,room,connected,access){
- const [messages,setMessages]=useState([]),[voice,setVoice]=useState(false),[error,setError]=useState(''),[startingVoice,setStartingVoice]=useState(false);
+ const [messages,setMessages]=useState([]),[typing,setTyping]=useState({}),lastTyping=useRef(0),[voice,setVoice]=useState(false),[error,setError]=useState(''),[startingVoice,setStartingVoice]=useState(false);
  const [muted,setMutedState]=useState(false),[deafened,setDeafened]=useState(false),[settings,setSettingsState]=useState(readSettings),[devices,setDevices]=useState({inputs:[],outputs:[]});
  const [links,setLinks]=useState({}),[speaking,setSpeaking]=useState({}),[inputLevel,setInputLevel]=useState(0),[relay,setRelay]=useState(null);
  const stream=useRef(null),raw=useRef(null),gain=useRef(null),peers=useRef(new Map()),meters=useRef(new Map()),live=useRef({}),mounted=useRef(true),starting=useRef(false),ice=useRef(null);
@@ -96,7 +96,11 @@ export function useRoomConversation(socket,memberId,room,connected,access){
  function setVolume(id,value){const volumes={...live.current.settings.volumes,[id]:value};setSettings({volumes});const p=peers.current.get(id);if(p)p.audio.volume=Math.min(1,value);}
  function setOutput(id){setSettings({outputId:id});for(const p of peers.current.values())p.audio.setSinkId?.(id).catch(()=>{});}
  async function receive(data){
-  if(data.type==='chat'&&typeof data.text==='string'&&typeof data.name==='string'){setMessages(old=>[...old.filter(x=>x.id!==data.id),data].slice(-80));return;}
+  if(data.type==='chat'&&typeof data.text==='string'&&typeof data.name==='string'){setMessages(old=>[...old.filter(x=>x.id!==data.id),data].slice(-200));setTyping(old=>{if(!old[data.from])return old;const next={...old};delete next[data.from];return next;});return;}
+  if(data.type==='history'&&Array.isArray(data.messages)){setMessages(data.messages.filter(m=>m&&typeof m.text==='string').slice(-200));return;}
+  if(data.type==='reaction'&&typeof data.id==='string'){setMessages(old=>old.map(m=>m.id===data.id?{...m,reactions:data.reactions||{}}:m));return;}
+  if(data.type==='deleted'&&typeof data.id==='string'){setMessages(old=>old.filter(m=>m.id!==data.id));return;}
+  if(data.type==='typing'&&typeof data.from==='string'){setTyping(old=>({...old,[data.from]:{name:String(data.name||''),until:Date.now()+4500}}));return;}
   if(data.type!=='signal'||!stream.current||!live.current.room?.members.some(m=>m.id===data.from&&m.online&&m.voice))return;
   try{const value=link(data.from);if(!value)return;const payload=data.payload;if(payload.description){await value.pc.setRemoteDescription(payload.description);for(const candidate of value.pending.splice(0))await value.pc.addIceCandidate(candidate);if(payload.description.type==='offer'){await value.pc.setLocalDescription(await value.pc.createAnswer());send({type:'signal',to:data.from,payload:{description:value.pc.localDescription.toJSON()}});}}else if(payload.candidate){if(value.pc.remoteDescription)await value.pc.addIceCandidate(payload.candidate);else value.pending.push(payload.candidate);}}catch{setError('Не удалось согласовать голосовой канал. Переподключи микрофон.');}
  }
@@ -106,9 +110,21 @@ export function useRoomConversation(socket,memberId,room,connected,access){
  useEffect(()=>{if(!navigator.mediaDevices?.addEventListener)return;navigator.mediaDevices.addEventListener('devicechange',listDevices);listDevices();return()=>navigator.mediaDevices.removeEventListener('devicechange',listDevices);},[]);
  useEffect(()=>{if(!connected)stop();},[connected]);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;stop();};},[]);
- useEffect(()=>{setMessages([]);},[memberId]);
+ useEffect(()=>{setMessages([]);setTyping({});},[memberId]);
+ // Typing hints fade out on their own a few seconds after the last keystroke.
+ const typingCount=Object.keys(typing).length;
+ useEffect(()=>{if(!typingCount)return;const timer=setInterval(()=>setTyping(old=>{const now=Date.now(),next=Object.fromEntries(Object.entries(old).filter(([,v])=>v.until>now));return Object.keys(next).length===Object.keys(old).length?old:next;}),1000);return()=>clearInterval(timer);},[typingCount]);
+ const base=(access?.server||'').replace(/\/$/,'');
+ const resolve=path=>typeof path==='string'&&path.startsWith('/')&&base?base+path:path||'';
  const peerCount=Object.values(links).filter(v=>v.state==='connected').length;
- return {members:room?.members||[],messages,voice,peers:peerCount,links,speaking,inputLevel,relay,muted,deafened,settings,devices,error,starting:startingVoice,start,stop,receive,setMuted,deafen,setVolume,setOutput,applyInput,memberId,
-  post:text=>{const value=text.trim().slice(0,500);if(value&&connected)send({type:'chat',text:value});},
+ // Guest photos are served by the room server under a path; make them absolute.
+ const members=useMemo(()=>(room?.members||[]).map(m=>m.avatar&&m.avatar.startsWith('/')&&access?.server?{...m,avatar:access.server.replace(/\/$/,'')+m.avatar}:m),[room?.members,access?.server]);
+ return {members,messages,voice,peers:peerCount,links,speaking,inputLevel,relay,muted,deafened,settings,devices,error,starting:startingVoice,start,stop,receive,setMuted,deafen,setVolume,setOutput,applyInput,memberId,
+  typing,resolve,
+  post:(text,{reply,gif}={})=>{const value=String(text||'').trim().slice(0,2000);if((value||gif)&&connected){send({type:'chat',text:value,...(reply?{reply}:{}),...(gif?{gif:{url:gif.url,width:gif.width,height:gif.height,title:gif.title||''}}:{})});lastTyping.current=0;}},
+  react:(id,emoji)=>{if(connected)send({type:'react',id,emoji});},
+  remove:id=>{if(connected)send({type:'delete',id});},
+  notifyTyping:()=>{const now=Date.now();if(connected&&now-lastTyping.current>2500){lastTyping.current=now;send({type:'typing'});}},
+  searchGifs:async(q,offset=0,signal)=>{if(!base||!access?.id||!access?.token)throw Error('Нет соединения с комнатой.');const response=await fetch(base+'/rooms/'+encodeURIComponent(access.id)+'/gifs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:access.token,q,offset}),signal});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'GIF сейчас недоступны.');return data.results||[];},
   unlock:async()=>{const results=await Promise.allSettled([...peers.current.values()].map(value=>value.audio.play()));context();if(mounted.current&&results.every(value=>value.status==='fulfilled'))setError('');},connected};
 }

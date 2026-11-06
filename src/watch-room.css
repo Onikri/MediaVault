@@ -15,26 +15,3 @@ html[data-blossom] .watch-room-page .title-hero-copy h1{overflow-wrap:anywhere}
 html[data-blossom] .watch-room-page .title-facts dl{display:block}
 html[data-blossom] .watch-room-page .title-facts dl>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:baseline}
 html[data-blossom] .watch-room-page .title-facts dd{min-width:0;text-align:right;overflow-wrap:normal;word-break:normal}
-
-/* Room lobby showcase (gate before the password). */
-.room-lobby{position:relative;min-height:100svh;display:grid;place-items:center;padding:32px 16px;overflow:hidden;isolation:isolate;background:var(--color-canvas)}
-.room-lobby-backdrop{position:absolute;inset:-40px;z-index:-1;background:var(--lobby-art,none) center/cover no-repeat;filter:blur(38px) saturate(1.2) brightness(.42);transform:scale(1.08)}
-.room-lobby-backdrop::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 20%,transparent,var(--color-canvas) 78%)}
-.room-lobby-card{width:min(920px,100%);display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:28px;padding:28px;border:0;border-radius:var(--radius-xl,27px);background:color-mix(in srgb,var(--color-canvas-soft) 80%,transparent);backdrop-filter:blur(18px);box-shadow:0 30px 80px #0008}
-.room-lobby-show{display:grid;grid-template-columns:150px minmax(0,1fr);gap:20px;align-items:start}
-.room-lobby-poster{position:relative;aspect-ratio:2/3;border-radius:var(--radius-md,13px);overflow:hidden;background:var(--color-surface);box-shadow:0 18px 40px #0009}.room-lobby-poster img{width:100%;height:100%;object-fit:cover;display:block}
-.room-lobby-live{position:absolute;left:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:99px;background:var(--color-blossom);color:#fff;font-size:11px;font-weight:650}
-.room-lobby-live svg{animation:lobby-pulse 1.6s ease-in-out infinite}@keyframes lobby-pulse{50%{opacity:.4}}
-.room-lobby-copy{display:flex;flex-direction:column;gap:10px;min-width:0}.room-lobby-copy h1{margin:0;font:700 clamp(22px,3vw,32px)/1.1 var(--font-display);color:var(--color-petal);overflow-wrap:anywhere}
-.room-lobby-copy .eyebrow{margin:0;color:var(--color-blossom-light);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
-.room-lobby-description{margin:0;color:var(--color-on-muted);font-size:13px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
-.room-lobby-facts{display:flex;flex-wrap:wrap;gap:6px}.room-lobby-facts span{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;background:var(--color-surface);color:var(--color-on-surface);font-size:12px}
-.room-lobby-progress{position:relative;height:5px;border-radius:99px;background:var(--color-surface-raised);margin-top:4px}.room-lobby-progress>span{position:absolute;inset:0 auto 0 0;border-radius:inherit;background:var(--color-blossom)}
-.room-lobby-progress small{position:absolute;top:10px;left:0;display:inline-flex;align-items:center;gap:4px;color:var(--color-quiet);font-size:11px;font-variant-numeric:tabular-nums}
-.room-lobby-people{display:flex;align-items:center;gap:10px;margin-top:22px}.room-lobby-people small{display:inline-flex;align-items:center;gap:5px;color:var(--color-on-muted);font-size:12px}.room-lobby-people small svg{color:#f2c46d}
-.room-lobby-avatars{display:flex}.room-lobby-avatars span{display:grid;place-items:center;width:30px;height:30px;margin-left:-8px;border-radius:50%;border:2px solid var(--color-canvas-soft);background:var(--color-surface-raised);color:var(--color-petal);font:650 12px/1 var(--font-display)}.room-lobby-avatars span:first-child{margin-left:0}
-.room-lobby-form{display:flex;flex-direction:column;gap:12px;justify-content:center}.room-lobby-form label{display:flex;flex-direction:column;gap:6px;color:var(--color-on-muted);font-size:12px}
-.room-lobby-form input{min-height:44px;padding:0 14px;border:0;border-radius:12px;background:var(--color-canvas);color:var(--color-petal);font:inherit;font-size:14px}.room-lobby-form input:focus-visible{outline:2px solid var(--color-blossom);outline-offset:0}
-.room-lobby-form .btn{min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
-@media(max-width:760px){.room-lobby-card{grid-template-columns:1fr;padding:20px;gap:22px}.room-lobby-show{grid-template-columns:96px minmax(0,1fr);gap:14px}}
-@media(prefers-reduced-motion:reduce){.room-lobby-live svg{animation:none}}

@@ -52,3 +52,4 @@ html[data-blossom] .rc-chat{flex:1;min-height:120px;overflow:auto;margin:0;paddi
 @keyframes room-chat-in{from{max-height:0;opacity:0;margin-bottom:-18px;transform:translateY(-8px)}60%{opacity:1}to{max-height:700px;opacity:1;margin-bottom:0;transform:none}}
 @keyframes room-chat-out{from{max-height:700px;opacity:1}to{max-height:0;opacity:0;margin-bottom:-18px}}
 @media(prefers-reduced-motion:reduce){.room-chat-slot,.room-chat-slot.is-leaving{animation:none}}
+.rc-avatar-photo{object-fit:cover;display:block}

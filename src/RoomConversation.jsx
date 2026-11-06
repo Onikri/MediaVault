@@ -1,9 +1,11 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Crown,Headphones,HeadphoneOff,MessageCircle,Mic,MicOff,PhoneOff,Send,Settings2,ShieldCheck,Volume2} from 'lucide-react';
+import {Crown,Headphones,HeadphoneOff,Mic,MicOff,PhoneOff,Settings2,Volume2,X} from 'lucide-react';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {VOICE_PROFILES} from './room-conversation.js';
+import RoomChat from './RoomChat.jsx';
 import './room-conversation.css';
 import './room-chat-next.css';
+import './room-rail.css';
 // Stable, readable avatar colour per member id: hue only, fixed lightness.
 function hue(id){let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return h;}
 function initials(name){const parts=String(name||'?').trim().split(/\s+/);return (parts[0]?.[0]||'?')+(parts[1]?.[0]||'');}
@@ -11,26 +13,36 @@ function Avatar({member,speaking,size=40}){
  const reduce=useReducedMotion();
  return <span className="rc-avatar" style={{'--avatar-hue':hue(member.id),width:size,height:size}} data-speaking={speaking||undefined}>
   <motion.span className="rc-avatar-ring" aria-hidden="true" animate={speaking&&!reduce?{scale:[1,1.08,1],opacity:1}:{scale:1,opacity:speaking?1:0}} transition={speaking&&!reduce?{duration:.9,repeat:Infinity,ease:'easeInOut'}:{duration:.15}}/>
-  <span className="rc-avatar-face">{initials(member.name).toUpperCase()}</span>
+  {member.avatar?<img className="rc-avatar-face rc-avatar-photo" src={member.avatar} alt="" draggable={false}/>:<span className="rc-avatar-face">{initials(member.name).toUpperCase()}</span>}
  </span>;
 }
 function ToggleIcon({on,onIcon,offIcon}){
  const reduce=useReducedMotion();
  return <AnimatePresence mode="popLayout" initial={false}><motion.span key={on?'on':'off'} className="rc-icon" initial={reduce?false:{opacity:0,scale:.6,rotate:on?-25:25}} animate={{opacity:1,scale:1,rotate:0}} exit={reduce?undefined:{opacity:0,scale:.6}} transition={{type:'spring',stiffness:520,damping:28}}>{on?onIcon:offIcon}</motion.span></AnimatePresence>;
 }
-function Participant({member,conversation,self}){
- const [open,setOpen]=useState(false),speaking=!!conversation.speaking[member.id],link=conversation.links[member.id];
- const state=!member.voice?'Не в голосе':member.muted?'Микрофон выключен':self?'Это ты':link?.state==='connected'?(link.relay?'Через ретранслятор':'На связи'):conversation.voice?'Соединяемся…':'В голосе';
- const volume=conversation.settings.volumes?.[member.id]??1;
- return <li className="rc-member" data-voice={member.voice||undefined} data-speaking={speaking||undefined}>
-  <button type="button" className="rc-member-main" disabled={self||!member.voice} aria-expanded={open} onClick={()=>setOpen(v=>!v)} title={self?undefined:'Громкость участника'}>
-      <span className="rc-member-text"><strong>{member.name}</strong><small>{speaking?'Говорит':state}{member.host?', создатель':''}</small></span>
-   {member.voice&&member.muted&&<MicOff className="rc-member-flag" size={14} aria-hidden="true"/>}
+// One circle per person in the rail; the card shows who it is, their voice
+// state and a personal volume for that voice.
+function RailMember({member,conversation,self,selected,onSelect}){
+ const speaking=!!conversation.speaking[member.id];
+ const label=member.name+(self?' (ты)':'')+(member.host?', создатель':'')+(!member.voice?', не в голосе':member.muted?', микрофон выключен':speaking?', говорит':', в голосе');
+ return <li className="rc-rail-member" data-voice={member.voice||undefined} data-speaking={speaking||undefined} data-self={self||undefined}>
+  <button type="button" aria-label={label} title={label} aria-pressed={selected} onClick={onSelect}>
+   <Avatar member={member} speaking={speaking} size={40}/>
+   {member.voice&&member.muted&&<span className="rc-rail-badge" aria-hidden="true"><MicOff size={10}/></span>}
+   {member.host&&<span className="rc-rail-crown" aria-hidden="true"><Crown size={10}/></span>}
   </button>
-  <AnimatePresence initial={false}>{open&&!self&&<motion.label className="rc-member-volume" initial={{height:0,opacity:0}} animate={{height:'auto',opacity:1}} exit={{height:0,opacity:0}}>
-   <Volume2 size={13}/><input type="range" min="0" max="1" step=".05" value={volume} aria-label={'Громкость: '+member.name} onChange={e=>conversation.setVolume(member.id,Number(e.target.value))}/><output>{Math.round(volume*100)}%</output>
-  </motion.label>}</AnimatePresence>
  </li>;
+}
+function MemberCard({member,conversation,self,onClose}){
+ const speaking=!!conversation.speaking[member.id],link=conversation.links[member.id];
+ const state=!member.voice?'Не в голосе':member.muted?'Микрофон выключен':speaking?'Говорит':self?'В голосе':link?.state==='connected'?(link.relay?'Через ретранслятор':'На связи'):conversation.voice?'Соединяемся…':'В голосе';
+ const volume=conversation.settings.volumes?.[member.id]??1;
+ return <motion.div className="rc-card" initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={{duration:.16}}>
+  <Avatar member={member} speaking={speaking} size={44}/>
+  <div className="rc-card-text"><strong>{member.name}{self&&<small> ты</small>}</strong><span>{state}{member.host?', создатель':''}</span></div>
+  <button type="button" className="rc-card-close" aria-label="Закрыть" onClick={onClose}><X size={15}/></button>
+  {!self&&member.voice&&<label className="rc-card-volume"><Volume2 size={14}/><input type="range" min="0" max="1" step=".05" value={volume} aria-label={'Громкость: '+member.name} onChange={e=>conversation.setVolume(member.id,Number(e.target.value))}/><output>{Math.round(volume*100)}%</output></label>}
+ </motion.div>;
 }
 function VoiceSettings({conversation}){
  const s=conversation.settings,sink=typeof HTMLMediaElement!=='undefined'&&'setSinkId' in HTMLMediaElement.prototype;
@@ -44,27 +56,28 @@ function VoiceSettings({conversation}){
  </motion.div>;
 }
 export default function RoomConversation({conversation}){
- const [text,setText]=useState(''),[settings,setSettings]=useState(false),list=useRef(null),reduce=useReducedMotion();
- useEffect(()=>{if(list.current)list.current.scrollTop=list.current.scrollHeight;},[conversation.messages]);
+ const [settings,setSettings]=useState(false),[selected,setSelected]=useState(null),reduce=useReducedMotion();
  const online=useMemo(()=>(conversation.members||[]).filter(m=>m.online).sort((a,b)=>Number(b.voice)-Number(a.voice)||Number(b.host)-Number(a.host)),[conversation.members]);
- const names=useMemo(()=>Object.fromEntries((conversation.members||[]).map(m=>[m.id,m])),[conversation.members]);
+ const chosen=online.find(m=>m.id===selected);
  const tap=reduce?undefined:{scale:.88};
- return <section className="rc" aria-label="Беседа комнаты">
-  <header className="rc-head"><h2>Комната</h2>{conversation.relay&&<span className="rc-relay" title="Если прямое соединение невозможно, голос идёт через наш сервер">через ретранслятор</span>}<small>{online.length} в комнате, {online.filter(m=>m.voice).length} в голосе</small></header>
-  <ul className="rc-members">{online.map(m=><Participant key={m.id} member={m} self={m.id===conversation.memberId} conversation={conversation}/>)}</ul>
-  <div className="rc-voicebar" role="toolbar" aria-label="Управление голосом">
-   {!conversation.voice?<motion.button whileTap={tap} type="button" className="rc-join" disabled={!conversation.connected||conversation.starting} onClick={conversation.start}><Headphones size={16}/>{conversation.starting?'Подключаем голос':'Войти в голос'}</motion.button>:<>
-    <motion.button whileTap={tap} type="button" className="rc-tool" aria-pressed={conversation.muted} aria-label={conversation.muted?'Включить микрофон':'Выключить микрофон'} title={conversation.muted?'Включить микрофон':'Выключить микрофон'} onClick={()=>conversation.setMuted(!conversation.muted)}><ToggleIcon on={conversation.muted} onIcon={<MicOff size={18}/>} offIcon={<Mic size={18}/>}/></motion.button>
-    <motion.button whileTap={tap} type="button" className="rc-tool" aria-pressed={conversation.deafened} aria-label={conversation.deafened?'Включить звук собеседников':'Выключить звук собеседников'} title={conversation.deafened?'Включить звук':'Не слышать собеседников'} onClick={()=>conversation.deafen(!conversation.deafened)}><ToggleIcon on={conversation.deafened} onIcon={<HeadphoneOff size={18}/>} offIcon={<Headphones size={18}/>}/></motion.button>
-    <motion.button whileTap={tap} type="button" className="rc-tool" aria-expanded={settings} aria-label="Настройки голоса" title="Настройки голоса" onClick={()=>setSettings(v=>!v)}><motion.span className="rc-icon" animate={{rotate:settings&&!reduce?90:0}} transition={{type:'spring',stiffness:300,damping:20}}><Settings2 size={18}/></motion.span></motion.button>
-    <motion.button whileTap={tap} type="button" className="rc-tool rc-leave" aria-label="Выйти из голосового канала" title="Выйти из голоса" onClick={conversation.stop}><PhoneOff size={18}/></motion.button>
-   </>}
-   {!conversation.voice&&<motion.button whileTap={tap} type="button" className="rc-tool" aria-expanded={settings} aria-label="Настройки голоса" title="Настройки голоса" onClick={()=>setSettings(v=>!v)}><motion.span className="rc-icon" animate={{rotate:settings&&!reduce?90:0}}><Settings2 size={18}/></motion.span></motion.button>}
+ return <section className="rc rc-split" aria-label="Беседа комнаты">
+  <nav className="rc-rail" aria-label="Участники и голос">
+   <ul className="rc-rail-people">{online.map(m=><RailMember key={m.id} member={m} self={m.id===conversation.memberId} conversation={conversation} selected={selected===m.id} onSelect={()=>setSelected(v=>v===m.id?null:m.id)}/>)}</ul>
+   <div className="rc-rail-voice" role="toolbar" aria-label="Управление голосом" aria-orientation="vertical">
+    {!conversation.voice?<motion.button whileTap={tap} type="button" className="rc-round is-join" disabled={!conversation.connected||conversation.starting} aria-label={conversation.starting?'Подключаем голос':'Войти в голос'} title={conversation.starting?'Подключаем голос':'Войти в голос'} onClick={conversation.start}><Headphones size={18}/></motion.button>:<>
+     <motion.button whileTap={tap} type="button" className="rc-round" aria-pressed={conversation.muted} aria-label={conversation.muted?'Включить микрофон':'Выключить микрофон'} title={conversation.muted?'Включить микрофон':'Выключить микрофон'} onClick={()=>conversation.setMuted(!conversation.muted)}><ToggleIcon on={conversation.muted} onIcon={<MicOff size={18}/>} offIcon={<Mic size={18}/>}/></motion.button>
+     <motion.button whileTap={tap} type="button" className="rc-round" aria-pressed={conversation.deafened} aria-label={conversation.deafened?'Включить звук собеседников':'Выключить звук собеседников'} title={conversation.deafened?'Включить звук':'Не слышать собеседников'} onClick={()=>conversation.deafen(!conversation.deafened)}><ToggleIcon on={conversation.deafened} onIcon={<HeadphoneOff size={18}/>} offIcon={<Headphones size={18}/>}/></motion.button>
+     <motion.button whileTap={tap} type="button" className="rc-round is-leave" aria-label="Выйти из голосового канала" title="Выйти из голоса" onClick={conversation.stop}><PhoneOff size={18}/></motion.button>
+    </>}
+    <motion.button whileTap={tap} type="button" className="rc-round" aria-expanded={settings} aria-label="Настройки голоса" title="Настройки голоса" onClick={()=>setSettings(v=>!v)}><Settings2 size={18}/></motion.button>
+   </div>
+  </nav>
+  <div className="rc-main">
+   <header className="rc-head"><h2>Комната</h2><small>{online.length} в комнате{online.some(m=>m.voice)?', '+online.filter(m=>m.voice).length+' в голосе':''}</small>{conversation.relay&&<span className="rc-relay" title="Если прямое соединение невозможно, голос идёт через наш сервер">через ретранслятор</span>}</header>
+   <AnimatePresence initial={false}>{chosen&&<MemberCard key={chosen.id} member={chosen} self={chosen.id===conversation.memberId} conversation={conversation} onClose={()=>setSelected(null)}/>}</AnimatePresence>
+   {conversation.error&&<p className="rc-error" role="status">{conversation.error}<button type="button" onClick={conversation.unlock}><Volume2 size={13}/>Включить звук беседы</button></p>}
+   <RoomChat conversation={conversation}/>
+   <AnimatePresence initial={false}>{settings&&<motion.div key="settings" className="rc-settings-sheet" initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:.18}}><div className="rc-settings-head"><strong>Настройки голоса</strong><button type="button" aria-label="Закрыть настройки" onClick={()=>setSettings(false)}><X size={16}/></button></div><VoiceSettings conversation={conversation}/></motion.div>}</AnimatePresence>
   </div>
-  <AnimatePresence initial={false}>{settings&&<VoiceSettings conversation={conversation}/>}</AnimatePresence>
-  {conversation.error&&<p className="rc-error" role="status">{conversation.error}<button type="button" onClick={conversation.unlock}><Volume2 size={13}/>Включить звук беседы</button></p>}
-  <div className="rc-chat-head">Чат</div>
-  <ol ref={list} className="rc-chat" aria-live="polite" aria-relevant="additions">{!conversation.messages.length&&<li className="rc-chat-empty">Обсуждайте серию здесь</li>}<AnimatePresence initial={false}>{conversation.messages.map(m=>{const member=names[m.from]||{id:m.from||m.name,name:m.name};return <motion.li key={m.id} initial={reduce?false:{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:.18}}><div><p><strong style={{'--avatar-hue':hue(member.id)}}>{m.name}</strong>{Number.isFinite(m.at)&&<time dateTime={new Date(m.at*1000).toISOString()}>{new Date(m.at*1000).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</time>}</p><span>{m.text}</span></div></motion.li>;})}</AnimatePresence></ol>
-  <form className="rc-compose" onSubmit={e=>{e.preventDefault();if(conversation.connected&&text.trim()){conversation.post(text);setText('');}}}><input aria-label="Сообщение в комнате" value={text} maxLength={500} onChange={e=>setText(e.target.value)} placeholder={conversation.connected?'Написать в чат':'Нет соединения'} disabled={!conversation.connected}/><motion.button whileTap={tap} aria-label="Отправить сообщение" disabled={!conversation.connected||!text.trim()}><Send size={15}/></motion.button></form>
  </section>;
 }
