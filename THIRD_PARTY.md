@@ -365,3 +365,29 @@ Source: https://github.com/otaku-melons/HentaiChanParser
 Full license: licenses/hentaichan-parser.txt. Modified integration:
 server/manga_hentaichan.py; bounded native search, mirror validation, lazy chapter
 loading and safe inline image-list decoding replace its standalone CLI workflow.
+## Player picture enhancement (2026-11-06)
+
+* **NijiLucid** WebGPU effect engine, vendored in `src/vendor/nijilucid` from
+  https://github.com/chenmozhijin/Anime4K-WebExtension at commit `1c9309bac94c991848c1b501eb34ce6642afdabf`.
+  Core code MIT (`src/vendor/nijilucid/licenses/MIT.txt`); CuNNy-derived generated
+  components LGPL-3.0-or-later (`src/vendor/nijilucid/licenses/LGPL-3.0-or-later.txt`).
+  Its `THIRD_PARTY_NOTICES.md` is kept alongside. Only the renderer, effect registry and
+  engines are used; extension UI is not included. ACNet generated variants were pruned to
+  F8B8, F8B18 and F8B18 HDN. Shaders are unmodified; WGSL is loaded as text by a Vite plugin.
+  * **Anime4K** (bloc97/Anime4K, MIT): mode chains A, B, C, A+A, B+B, C+A.
+  * **ArtCNN** (Artoriuz/ArtCNN, MIT): C4F16, C4F32 and their DS/DN variants.
+  * **CuNNy** (funnyplanter/CuNNy, LGPL-3.0-or-later): Veryfast to 8x32. Source of the
+    corresponding WGSL is the vendored directory itself; upstream GLSL is linked above.
+  * **ACNet** (TianZerL/ACNetGLSL, MIT).
+* **Ani4K v2 ArtCNN** and **AniSD ArtCNN** by Sirosky
+  (https://github.com/Sirosky/Upscale-Hub/releases/tag/Ani4k-v2-ArtCNN and
+  .../tag/AniSD-ArtCNN), **CC BY-NC 4.0**, ArtCNN architecture MIT. Unmodified mpv GLSL in
+  `src/vendor/mpv-shaders` (licence header kept in each file), run by our WebGL2 mpv hook
+  runtime `src/mpv-hook-runtime.js`. Non-commercial use only.
+* **Real-ESRGAN AnimeVideo-v3** (xinntao/Real-ESRGAN, BSD-3-Clause), ONNX export by
+  skillsafe-ai (https://huggingface.co/skillsafe-ai/realesr-animevideov3, BSD-3-Clause),
+  fetched at runtime from revision `185e9142d439d17e3fb99395600fb7d08af09de5` and verified
+  by SHA-256 `78baa685a1a92cac6e14ab2af2a8ad0ef56fa48629563b1414e3a7acc54d86e2` before
+  inference with ONNX Runtime Web (MIT) on WebGPU.
+* **AMD FidelityFX CAS** sharpening (MIT, GPUOpen) is reimplemented in the colour pass
+  `src/color-grade.js`.

@@ -35,7 +35,7 @@ export default function PlayerPopover({anchor,label,children,className='',onClos
    const visibleTop=Math.max(8,headerBottom+8-r.top),visibleBottom=Math.min(r.height-8,innerHeight-r.top-8);
    const maxHeight=Math.max(80,visibleBottom-visibleTop);
    // Desktop settings: a two-column panel; small menus stay compact.
-   const width=Math.max(100,Math.min(className.includes('mini-menu')?300:className.includes('settings')?(r.width>=700?520:360):380,r.width-16));
+   const width=Math.max(100,Math.min(className.includes('mvx-menu')?340:className.includes('mini-menu')?300:className.includes('mvx-sheet')?380:className.includes('settings')?(r.width>=700?520:360):380,r.width-16));
    const h=Math.min(root.current?.scrollHeight||280,maxHeight);
    const left=Math.max(8,Math.min(r.width-width-8,(a?.right??r.left+r.width-8)-r.left-width));
    const top=Math.max(visibleTop,Math.min((a?.top??r.top+r.height)-r.top-h-8,visibleBottom-h));
@@ -44,6 +44,12 @@ export default function PlayerPopover({anchor,label,children,className='',onClos
    if(sheetQuery()){
     const sheetMax=Math.min(innerHeight*.72,560),sheet={position:'fixed',left:0,top:Math.max(0,innerHeight-Math.min(root.current?.scrollHeight||420,sheetMax)),width:innerWidth,maxHeight:sheetMax,transformOrigin:'50% 100%',sheet:true};
     setBox(old=>Object.keys(sheet).every(k=>sheet[k]===old[k])?old:sheet);return;
+   }
+   // Player settings sheet: pinned to the player's right edge, above the control bar.
+   if((className.includes('mvx-sheet')||className.includes('mvx-menu'))&&host){
+    const gap=14,bar=Math.min(88,Math.max(56,r.height*.2)),bottom=Math.min(r.height-bar,visibleBottom),room=Math.max(80,bottom-visibleTop),height=Math.min(root.current?.scrollHeight||280,room);
+    const pinned={position:'absolute',left:Math.max(8,r.width-width-gap),top:bottom-height,width,maxHeight:room,transformOrigin:'100% 100%'};
+    setBox(old=>Object.keys(pinned).every(k=>pinned[k]===old[k])?old:pinned);return;
    }
    const next={position:host?'absolute':'fixed',left,top,width,maxHeight,transformOrigin:Math.max(0,Math.min(width,(a?a.left+a.width/2:r.left+left)-r.left-left))+'px '+(a?a.top+a.height/2-r.top-top:h)+'px'};
    setBox(old=>Object.keys(next).every(k=>next[k]===old[k])?old:next);

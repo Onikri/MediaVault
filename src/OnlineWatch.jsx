@@ -3,7 +3,8 @@ import usePlaybackWarmup from './use-playback-warmup.js';
 import useSeasonSource from './use-season-source.js';
 import {episodeDetail,useFranchiseSeasons,catalogueSeasonHint} from './franchise-seasons.js';
 import PlayerSettings from './PlayerSettings.jsx';
-import {Settings2} from 'lucide-react';
+import {SlidersHorizontal} from 'lucide-react';
+import {Choices} from './player-sheet-controls.jsx';
 import PlaybackReveal from './PlaybackReveal.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import OnlineViewer from './OnlineViewer.jsx';
@@ -192,6 +193,16 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   <div className="watch-episode-grid">{displayEntries.slice(0,count).map(e=>{const art=displayPreviews[e.number]||e.thumbnail||e.image||displayProfile?.episodeImages?.[String(e.season||displaySeason)+':'+e.number]||displayProfile?.episodeImages?.[String(e.number)]||displayProfile?.cover;return <TitleEpisodeCard key={e.number} data-preview-key={e.url} number={e.number} title={'Серия '+e.number} detail={episodeDetail(e.title,e.number)} selected={playing&&!browsingCatalog&&browseSeason===season&&Number(e.number)===episode} onClick={()=>{if(browsingCatalog){startCatalogPlayback(e.number);return;}persist({episode:Number(e.number),season:e.season||browseSeason});startPlayback(e.number,browseSeason,displayRows);}} artwork={<EpisodeMotionPreview minimumDuration={minimumEpisodeDuration(displayProfile)} cacheKey={episodePreviewKey(displayIdentity,e.season||displaySeason,e.number,displayVariant?.id,userId)} onActive={setHovering} prepare={async signal=>{const target=previewTarget(e);if(!target)throw Error('Нет источника для превью.');const d=await service.request('/online/prepare',{method:'POST',body:{url:target.url,referer:previewVariant.sourceUrl,kind:'video',quality:'360',clientId:'motion-'+crypto.randomUUID(),...(Number(service.session?.serverVersion)>=49?{purpose:'preview'}:{})},signal});return {url:service.server.replace(/\/$/,'')+d.url,type:d.type,close:()=>service.request('/online/'+d.id,{method:'DELETE',keepalive:true}).catch(()=>{})};}}>{art?<img src={art} alt={displayPreviews[e.number]?'Кадр серии '+e.number:'Обложка тайтла'} loading='lazy' referrerPolicy='no-referrer'/>:null}</EpisodeMotionPreview>}/>;})}</div>
   {displayEntries.length>count&&<button className="text-link" onClick={()=>setCount(n=>n+24)}>Ещё серии</button>}
 </section>;
+ const [sourceOpen,setSourceOpen]=useState('');
+ const voiceHint=v=>[qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]?'до '+qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]+'p':'',voiceEpisodeCount(v,season)?voiceEpisodeCount(v,season)+' сер.':'',v.kind==='subtitles'?'субтитры':'',saved.current.usage?.[v.id]?'твой выбор':''].filter(Boolean).join(', ');
+ const sourceSections=[{id:'source',items:[
+  {id:'voice',label:'Озвучка',value:voice?.name||(discovery.loading?'Ищем':'Не выбрана'),content:close=><Choices label="Озвучка" value={voice?.id||''} options={offeredVoices.map(v=>({value:v.id,label:v.name,hint:voiceHint(v)}))} onPick={id=>{changeVoice(id);close();}}/>},
+  {id:'quality',label:'Качество',value:quality==='best'?'Лучшее, авто':quality+'p',content:close=><Choices label="Качество" value={quality} options={[{value:'best',label:'Лучшее, автоматически'},...heights.map(q=>({value:String(q),label:q+'p',hint:!bestVideo&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(q))?'В другой озвучке':''})),...(quality!=='best'&&!heights.includes(Number(quality))?[{value:quality,label:quality+'p',hint:'Проверяем'}]:[])]} onPick={v=>{changeQuality(v);close();}}/>},
+  {id:'bestVideo',label:'Лучшее видео из всех озвучек',hint:'Звук выбранной озвучки идёт отдельно',switch:{checked:bestVideo,onChange:changeVideoMode}}
+ ]},{id:'scan',items:[
+  {id:'scanQualities',label:qualityScan.busy&&scanScope?'Ищем варианты':'Найти другие качества',value:'',onClick:()=>startScan('all')},
+  playing&&preferred&&preferred.variant.id!==viewVariant?.id&&{id:'applyFound',label:'Применить найденное',value:preferred.qualities[0]+'p',onClick:()=>{setScanScope('');setApplyRevision(n=>n+1);}}
+ ]}];
  const idleCurrent=browsingCatalog?foreign.row?.entries[0]:current,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
  const warmCurrent=usePlaybackWarmup({entry:idleCurrent,sourceUrl:idleVariant?.sourceUrl,quality,service,enabled:!playing&&!idleBusy&&!isAllohaVariant(idleVariant),anchor:sourceButton});
  const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name})),voiceId:audioId||voice?.id,
@@ -201,9 +212,22 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  return <div className="online-watch">
   <OnlineEpisodePreviews minimumDuration={minimumEpisodeDuration(displayProfile)} entries={previewTargets} active={!playing&&!busy&&!browseBusy&&!foreignBusy&&!hovering} service={service} sourceUrl={previewVariant?.sourceUrl} sourceId={displayVariant?.id} identity={displayIdentity} season={displaySeason} userId={userId} onPreview={(number,image)=>preview(number,image,displaySeason,displayVariant?.id,displayIdentity)}/>
   <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
-   :<div className="watch-idle mv-player watch-player-idle" style={profile.cover?{'--watch-poster':`url("${profile.cover.replace(/["\\]/g,'')}")`}:undefined}>
-    {idleBusy?<div className="watch-skeleton" role="status"><span/>Подбираем озвучки, качества и серии…</div>:<button className="watch-play" onPointerEnter={warmCurrent} onFocus={warmCurrent} disabled={!idleCurrent||!idleVariant} onClick={()=>browsingCatalog?startCatalogPlayback(idleCurrent.number):startPlayback()}><span aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4v16l13-8z"/></svg></span>{idleCurrent?'Смотреть · серия '+idleCurrent.number:'Выбери озвучку'}</button>}
-    <button ref={sourceButton} type="button" className="watch-idle-settings" aria-label="Настройки просмотра" onClick={()=>setSourceSettings(v=>!v)}><Settings2 size={20}/></button>{sourceSettings&&<PlayerSettings anchor={sourceButton} initialPage="watch" onClose={()=>setSourceSettings(false)}>{{watch:configuration}}</PlayerSettings>}
+   :<div className="watch-idle mv-player mvx mvx-idle watch-player-idle" style={profile.cover?{'--watch-poster':`url("${profile.cover.replace(/["\\]/g,'')}")`}:undefined}>
+    <div className="mvx-idle-poster" aria-hidden="true"/>
+    <div className="mvx-overview mvx-idle-overview">
+     <h1>{profile.title||item.title}</h1>
+     {idleBusy?<p className="mvx-meta mvx-idle-busy" role="status"><span className="mvx-spinner"/><span>Подбираем озвучки, качества и серии</span></p>
+      :<p className="mvx-meta">{idleCurrent&&<span>Серия {idleCurrent.number}</span>}{(browsingCatalog?familySeason?.name:activeFamilySeason?.name)&&<span>{browsingCatalog?familySeason?.name:activeFamilySeason?.name}</span>}{voice&&<span>{voice.name}</span>}<span>{quality==='best'?'Лучшее качество':quality+'p'}</span></p>}
+     {!idleBusy&&(idleCurrent&&idleVariant
+      ?<button type="button" className="mvx-primary" onPointerEnter={warmCurrent} onFocus={warmCurrent} onClick={()=>browsingCatalog?startCatalogPlayback(idleCurrent.number):startPlayback()}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>Смотреть серию {idleCurrent.number}</button>
+      :voice?<button type="button" className="mvx-primary" disabled>Серии пока не найдены</button>
+      :<button type="button" className="mvx-primary" onClick={()=>{setSourceOpen('voice');setSourceSettings(true);}}>Выбрать озвучку</button>)}
+    </div>
+    <div className="mvx-idle-bar">
+     {voice&&offeredVoices.length>1&&<button type="button" className="mvx-idle-chip" onClick={()=>{setSourceOpen('voice');setSourceSettings(v=>!v);}}><span>{voice.name}</span></button>}
+     <button ref={sourceButton} type="button" className="mvx-idle-settings" aria-label="Настройки просмотра" aria-expanded={sourceSettings} onClick={()=>{setSourceOpen('');setSourceSettings(v=>!v);}}><SlidersHorizontal size={19}/></button>
+    </div>
+    {sourceSettings&&<PlayerSettings anchor={sourceButton} initialPage={sourceOpen} sections={sourceSections} footer={<p className="mvx-help" role="status">{qualityScan.busy&&scanScope?'Проверяем качества: '+qualityScan.done+' из '+qualityScan.total:heights.length?'Доступно до '+heights[0]+'p.':'Качества появятся после запуска.'}{bestVideo&&videoVoiceId!==voice?.id?' Видео берётся из версии '+(voices.find(v=>v.id===videoVoiceId)?.name||'другой озвучки')+'.':''}</p>} onClose={()=>setSourceSettings(false)}/>}
    </div>}</PlaybackReveal>
   {!playing&&episodeBrowser}
   {!browsingCatalog&&error&&<div className="inline-error" role="alert">{error}<button className="text-link" onClick={()=>{failed.current.clear();setAttempt(n=>n+1);}}>Повторить</button></div>}

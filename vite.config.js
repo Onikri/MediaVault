@@ -51,6 +51,12 @@ export default defineConfig({
     }
   },
   plugins: [{
+    // WebGPU shaders of the vendored upscaler engine are imported as text.
+    name: 'wgsl-source',
+    transform(code, id) {
+      if (id.split('?')[0].endsWith('.wgsl')) return {code: 'export default ' + JSON.stringify(code) + ';', map: null};
+    }
+  }, {
     name: 'mediavault-runtime-files',
     apply: 'build',
     closeBundle() {
