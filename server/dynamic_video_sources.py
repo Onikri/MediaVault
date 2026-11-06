@@ -21,6 +21,37 @@ def provider_for(url):
     return None
 
 
+# Current mirrors first; a mirror that is down or redirected elsewhere is skipped.
+HENTASIS_MIRRORS = ('https://v5.hentasis5.top', 'https://hentasis1.top', 'https://v4.hentasis.me')
+HENTASIS_TITLE = re.compile(r'(.+?)\s*\(\s*((?:19|20)\d{2})\s*г?\.?\s*\)\s*$')
+
+
+def search_hentasis(query, http):
+    """DLE search on the first working mirror. Cards are `a.sres-wrap` with an
+    `h2` of "Русское / Romaji (2026г.)"; the year comes from that title, not
+    from the card's publication date."""
+    from site_adapters import Site, parse_search
+    failure = None
+    for root in HENTASIS_MIRRORS:
+        host = urlsplit(root).hostname
+        site = Site('hentasis', 'Hentasis', root, (host,), 'a.sres-wrap', 'h2')
+        try:
+            text, final, _ = http.document(site.search_url(query))
+        except SourceError as error:
+            failure = error
+            continue
+        if urlsplit(final).hostname != host:
+            continue
+        results = []
+        for row in parse_search(site, text, final, query):
+            match = HENTASIS_TITLE.fullmatch(row['title'])
+            names = [name.strip() for name in (match[1] if match else row['title']).split(' / ') if name.strip()]
+            if names:
+                results.append({**row, 'title': names[0], 'aliases': names, 'year': int(match[2]) if match else None})
+        return results
+    raise failure or SourceError('Зеркала Hentasis не ответили.')
+
+
 def inspect(url, provider, http, dub_url=None, state=None):
     from player_catalog import choice
 

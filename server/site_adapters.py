@@ -72,6 +72,7 @@ SITES = (
     Site('animegoonline','AnimeGO Online','https://animego.online',('animego.online',),'a.poster-item','.animego-online-poster-item__title'),
     Site('anigoonline','Anigoo Online','https://www.anigoonline.ru',('anigoonline.ru','www.anigoonline.ru'),'article.short','a.short__title'),
     Site('hanime','HanimeTV','https://hanime.tv',('hanime.tv','www.hanime.tv'),'',''),
+    Site('hentasis','Hentasis','https://v5.hentasis5.top',('v5.hentasis5.top','hentasis1.top','www.hentasis1.top','v4.hentasis.me','hentasis.me'),'a.sres-wrap','h2'),
     Site("readmanga", "ReadManga", "https://readmanga.live", ("readmanga.live", "mintmanga.live"), ".tile, .manga-list-item", "h3, .title", "/search", "manga"),
 )
 BY_ID = {site.id: site for site in SITES}
@@ -270,6 +271,9 @@ def search_site(site, query, *, http=None):
         elif site.id=='hanime':
             from hanime_source import search
             values=search(query,http)
+        elif site.id=='hentasis':
+            from dynamic_video_sources import search_hentasis
+            values=search_hentasis(query,http)
         else:
             if site.search_method=='POST':
                 text,final,_=http.document(site.root+site.search_path,method='POST',data={'do':'search','subaction':'search','story':query})
