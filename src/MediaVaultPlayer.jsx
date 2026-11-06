@@ -26,6 +26,7 @@ import usePlayerController from './player-controller.js';
 import {clock,keyFor,readResume,openerKey} from './player-runtime.js';
 import {PlayerContext,usePlayerSession,usePlayerExtensions,usePlayerMediaSession} from './player-session.js';
 import PlayerExtensionSlot from './PlayerExtensionSlot.jsx';
+import {createPortal} from 'react-dom';
 import './player-shell.css';
 function VolumeGlyph({value,muted}){
   const level=muted?0:value;
@@ -51,6 +52,15 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   }
   const selectorSeasons=onlineControls?.seasonOptions||seasons;
   usePlayerMediaSession(api);
+  // On a title page the room chat takes the right column's top (ratings slide
+  // below it) so the player keeps its width while a room is live.
+  const [chatSlot,setChatSlot]=useState(null),roomLive=!!room.info;
+  useEffect(()=>{
+    const sidebar=roomLive&&stageRef.current?.closest('.mv-title-layout')?.querySelector('.title-sidebar');
+    if(!sidebar||getComputedStyle(sidebar).display==='none'){setChatSlot(null);return;}
+    const slot=document.createElement('div');slot.className='room-chat-slot';sidebar.prepend(slot);sidebar.classList.add('has-room-chat');setChatSlot(slot);
+    return()=>{slot.remove();sidebar.classList.remove('has-room-chat');setChatSlot(null);};
+  },[roomLive]);
   const toggleCaptions=controller.toggleCaptions;
   // Online sessions are capability URLs: the server remuxes the playing
   // quality into one MP4 (no re-encode). Rooms relay someone else's stream.
@@ -68,7 +78,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     const href=onlineMatch?onlineMatch[1]+'/online/'+onlineMatch[2]+'/'+onlineMatch[3]+'/download?'+new URLSearchParams({height:String(chosen||current||requested||best||0),name}):source;
     const link=document.createElement('a');link.href=href;link.download=name+'.mp4';link.rel='noopener';document.body.append(link);link.click();link.remove();
   }
-  return <PlayerContext.Provider value={api}><div className={'player-room-layout'+(room.info?' has-live-room':'')}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
+  return <PlayerContext.Provider value={api}><div className={'player-room-layout'+(room.info&&!chatSlot?' has-live-room':'')}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
     style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls} data-player="mediavault">
     <div className="mv-player-screen">
@@ -203,5 +213,5 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     </section>}
     {gpuWarning&&<p className="mv-player-warning" role="status">{gpuWarning}</p>}
 
-  </div>{room.info&&<aside className="player-room-conversation"><RoomConversation conversation={room.conversation}/></aside>}</div></PlayerContext.Provider>;
+  </div>{room.info&&(chatSlot?createPortal(<aside className="player-room-conversation is-sidebar"><RoomConversation conversation={room.conversation}/></aside>,chatSlot):<aside className="player-room-conversation"><RoomConversation conversation={room.conversation}/></aside>)}</div></PlayerContext.Provider>;
 }

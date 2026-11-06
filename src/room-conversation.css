@@ -41,3 +41,10 @@ html[data-blossom] .rc-chat{flex:1;min-height:120px;overflow:auto;margin:0;paddi
 .rc-compose{display:flex;gap:8px}.rc-compose input{flex:1;min-width:0;min-height:40px;padding:0 12px;border:0;border-radius:11px;background:var(--color-canvas);color:var(--color-petal);font:inherit;font-size:13px}.rc-compose input:focus-visible{outline:2px solid var(--color-blossom);outline-offset:0}
 .rc-compose button{all:unset;display:grid;place-items:center;width:44px;height:40px;border-radius:11px;background:var(--color-blossom);color:#fff;cursor:pointer}.rc-compose button:disabled{opacity:.4;cursor:default}
 @media (pointer:coarse){.rc-tool{height:44px}.rc-member-main{min-height:48px}}
+/* Title page: the live room chat sits at the top of the right column. */
+.title-sidebar.has-room-chat{display:flex;flex-direction:column;gap:18px}
+.room-chat-slot{position:sticky;top:76px;z-index:2;animation:room-chat-in var(--motion-standard,300ms) var(--ease-expressive,ease) both}
+.room-chat-slot .player-room-conversation.is-sidebar{display:block}
+.room-chat-slot .rc{height:min(640px,calc(100svh - 110px));max-height:none}
+@keyframes room-chat-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.room-chat-slot{animation:none}}
