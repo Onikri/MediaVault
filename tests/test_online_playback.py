@@ -9,7 +9,10 @@ from source_parser import SourceError
 from music_playback import parse_recordings
 from manga_sources import parse_pages,parse_search,SITES
 class OnlinePlayback(unittest.TestCase):
- def setUp(self):online.sessions.clear()
+ def setUp(self):
+  online.sessions.clear();online._ready.clear()
+  # Manifest-selection tests; readiness has its own tests below.
+  ready=patch('online_sessions.playable');ready.start();self.addCleanup(ready.stop)
  def test_alloha_labelled_4k_master_is_selected_instead_of_480_boot_stream(self):
   from types import SimpleNamespace
   app=FastAPI();online.install(app,lambda:'fixture-owner');client=TestClient(app)
@@ -151,7 +154,9 @@ class OnlinePlayback(unittest.TestCase):
   s=next(v for v in SITES if v.id=='mangakatana');rows=parse_search('<div id="book_list"><div class="item"><h3 class="title"><a href="/manga/demo.1">Demo</a></h3><img src="/cover.jpg"></div></div>',s.root,s);self.assertEqual(rows[0]['language'],'en');self.assertEqual(rows[0]['title'],'Demo')
 
 class PreviewLeasePriority(unittest.TestCase):
- def setUp(self):online.sessions.clear();online.preparations.clear()
+ def setUp(self):
+  online.sessions.clear();online.preparations.clear()
+  ready=patch('online_sessions.playable');ready.start();self.addCleanup(ready.stop)
  def test_playback_evicts_only_owners_preview_slots_and_keeps_music_and_manga(self):
   music,_=online.create('A',{},kind='music');manga,_=online.create('A',{},kind='manga');foreign,_=online.create('B',{},kind='preview')
   previews=[online.create('A',{},kind='preview')[0] for _ in range(2)]
@@ -191,3 +196,25 @@ class PreviewLeasePriority(unittest.TestCase):
     response=client.get('/online/'+token+'/'+resource+'/download',params={'name':'Серия 1'})
    self.assertEqual(response.status_code,status)
    if status==200:self.assertIn("filename*=UTF-8''%D0%A1%D0%B5%D1%80%D0%B8%D1%8F%201.mp4",response.headers['content-disposition']);self.assertTrue(response.content[4:8]==b'ftyp')
+
+class Readiness(unittest.TestCase):
+ def setUp(self):online._ready.clear()
+ def check(self,mime,body):
+  from types import SimpleNamespace
+  master='#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1,RESOLUTION=640x360\nlow.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=9,RESOLUTION=3840x1604\nhigh.m3u8\n'
+  media='#EXTM3U\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:6,\nseg-1.m4s\n#EXT-X-ENDLIST\n'
+  seen=[];opened=[]
+  def document(client,url,headers=None):seen.append(url);return media,url,{}
+  def _open(url,headers=None,byte_range=None):
+   opened.append((url,byte_range));return SimpleNamespace(headers={'Content-Type':mime},iter_content=lambda n:iter([body]),close=lambda:None),url
+  online.playable(master,'https://cdn.example/m.m3u8',{},SimpleNamespace(_open=_open),document)
+  return seen,opened
+ def test_follows_the_best_variant_to_its_first_fragment_and_reads_2_kb(self):
+  seen,opened=self.check('video/mp4',b'\x00\x00\x00\x18ftypiso6')
+  self.assertEqual(seen,['https://cdn.example/high.m3u8']);self.assertEqual(opened,[('https://cdn.example/init.mp4','bytes=0-2047')])
+  self.assertEqual(self.check('video/mp4',b'x')[1],[],'A ready variant is not probed again')
+ def test_html_or_empty_fragment_is_a_dead_source(self):
+  for mime,body in (('text/html',b'<html>403</html>'),('video/mp4',b''),('application/octet-stream',b'<!doctype html>')):
+   online._ready.clear()
+   with self.subTest(mime=mime,body=body):
+    with self.assertRaises(SourceError):self.check(mime,body)

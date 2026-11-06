@@ -97,6 +97,38 @@ def hls_extension_option():
         except (OSError,subprocess.SubprocessError):_hls_option.append(False)
     return _hls_option[0]
 
+_ready={};_ready_lock=threading.Lock()
+VIDEO_TYPES=('video/','audio/','application/octet-stream','binary/octet-stream','application/mp4')
+def playable(text,base,headers,http,document,depth=0):
+    """Readiness: before granting playback, follow the playlist (≤4 levels)
+    to its first fragment and require real media bytes. A CDN that answers a
+    segment with an HTML/empty page is a dead source, not a slow one."""
+    playlist=m3u8.loads(text,uri=base)
+    if playlist.playlists:
+        if depth>=4:raise SourceError('Плейлист источника вложен слишком глубоко.')
+        best=max(playlist.playlists,key=lambda v:((v.stream_info.resolution or (0,0))[1],v.stream_info.bandwidth or 0))
+        child=urljoin(base,best.uri)
+        with _ready_lock:
+            if _ready.get(child,0)>time.monotonic():return
+        inner,final,_=document(http,child,headers=headers)
+        return playable(inner,final,headers,http,document,depth+1)
+    first=next((urljoin(base,m.uri) for m in playlist.segment_map if m.uri),None) or (urljoin(base,playlist.segments[0].uri) if playlist.segments else None)
+    if not first:raise SourceError('В плейлисте источника нет фрагментов видео.')
+    key=base
+    with _ready_lock:
+        if _ready.get(key,0)>time.monotonic():return
+    response,_=http._open(first,headers=headers,byte_range='bytes=0-2047')
+    try:
+        mime=response.headers.get('Content-Type','').split(';')[0].strip().lower()
+        sample=next(response.iter_content(2048),b'')
+    finally:response.close()
+    if mime=='text/html' or sample.lstrip()[:1]==b'<' or not sample or mime and not mime.startswith(VIDEO_TYPES) and 'mp2t' not in mime:
+        raise SourceError('Источник отдаёт страницу вместо видео. Выбери другой плеер или повтори позже.')
+    with _ready_lock:
+        if len(_ready)>512:_ready.clear()
+        # Signed Alloha links live ~20 min; other sources are re-checked sooner.
+        _ready[key]=time.monotonic()+(1200 if (urlsplit(first).hostname or '').endswith('.vkvideo.cloud') else 300)
+
 def install(app,owner):
     from playback_resolver import PlaybackResolver
     resolver_cache=PlaybackResolver();app.state.playback_resolver=resolver_cache
@@ -141,6 +173,7 @@ def install(app,owner):
                         else:final=stream['url']
                         rewrite_manifest(text,final,lambda v:v,None if generated else max_height)
                         manifest=(text,final,float('inf') if generated else time.monotonic()+30)
+                        playable(text,final,stream.get('headers'),http,lambda client,url,headers=None,refresh=refresh:resolver_cache.document(client,url,headers,refresh=refresh))
                     break
                 except SourceAccessError:
                     # Long-cached Alloha URLs may have expired: renew them once.
