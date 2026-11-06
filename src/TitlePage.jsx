@@ -5,7 +5,7 @@ import {useEffect,useRef,useState,useMemo} from 'react';
 import {useReducedMotion} from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {ArrowLeft,Play,Star,ChevronRight,RefreshCw,Cloud,CloudUpload,Users,X,ExternalLink,Film,BookOpen,Bookmark,Download,FolderOpen} from 'lucide-react';
-import {loadTitleProfile,loadCharacter,searchRussianTitles,russianText,hasRussian} from './title-metadata.js';
+import {loadTitleProfile,loadCharacter,searchRussianTitles,russianText,hasRussian,profileNeedsRefresh,scheduleProfileRetry} from './title-metadata.js';
 import {useArtwork,fetchArtwork} from './title-artwork.js';
 import {titleParts,SECTION_LABELS} from './library-model.js';
 import {episodeNumber,voiceLabel} from './player-model.js';
@@ -80,25 +80,28 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
     if(kind==='anime'&&!currentProfile.current?.screenshots?.length)jikan('anime/'+supplementIdentity+'/videos',{server,signal:controller.signal}).then(result=>{if(controller.signal.aborted)return;const screenshots=(result.data?.episodes||[]).map(row=>row.images?.jpg?.image_url).filter(Boolean).slice(0,12);setProfile(old=>fillProfile(old||{},{screenshots}));}).catch(()=>{});
     return()=>controller.abort();
   },[supplementIdentity,title.section,server]);
-  function saveRatings(value){setProfile(old=>({...old,ratings:value}));if(!online&&live.current.admin&&live.current.driveWritable)actions.saveTitleProfile(title.id,{ratings:value}).catch(()=>{});}
+  function saveRatings(value){setProfile(old=>({...old,ratings:value}));if(!online&&live.current.admin&&live.current.driveWritable)actions.saveTitleProfile(title.id,{ratings:value},[],{background:true});}
   useEffect(()=>{if(online)setProfile(onlineProfile||{});else if(saved)setProfile(saved);},[saved,online,onlineProfile]);
   useEffect(()=>{
     const controller=new AbortController();abort.current=controller;
     setProfile(online?onlineProfile:saved||title.profile||null);setError('');setCandidates([]);setSearch(title.name);setPart('');setCharacter(null);setCharacterLimit(6);
     if(online)return()=>controller.abort();
-    if(!saved?.sourceId||saved.version<4||(saved.partial||!saved.genres?.length)&&Date.now()>(saved.retryAfter||0)){
+    // Opening a page refreshes a dossier only when its retry is due; the save
+    // then runs quietly. Manual refresh and search keep their visible status.
+    if(profileNeedsRefresh(saved)){
       const identity=title.metadataId||title.metadata?.ids?.mal;
-      if(identity)hydrate(identity,controller.signal);
+      if(identity)hydrate(identity,controller.signal,{background:true});
     }
     return()=>controller.abort();
   },[title.id,online]);
-  async function hydrate(id,signal=abort.current?.signal){
+  async function hydrate(id,signal=abort.current?.signal,{background=false}={}){
     if(online)return;
     setBusy('loading');setError('');
     try{
       const result=await loadTitleProfile(id,title.section==='manga'?'manga':title.section==='ranobe'?'ranobe':'anime',{signal,server:server||window.MEDIA_VAULT_CONFIG?.importServerUrl,refresh:!!profile?.sourceId,onPartial:value=>{if(!signal?.aborted)setProfile(value);}});
       signal?.throwIfAborted();setProfile(result);onMetadataLoaded?.(title.id,result);
-      if(state.admin&&state.driveWritable)await save(result,signal);
+      const scheduled=scheduleProfileRetry(result,saved);
+      if(state.admin&&state.driveWritable)await (background?saveQuietly(scheduled,signal):save(scheduled,signal));
     }catch(cause){if(!signal?.aborted)setError(cause.message||'Не удалось получить русское описание.');}finally{if(!signal?.aborted)setBusy('');}
   }
   async function find(event){
@@ -119,6 +122,14 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
       if(result&&!signal?.aborted){setProfile(result);if(failed.length)setError('Описание сохранено. Часть изображений источник пока не отдал; их можно загрузить повторно.');}
     }catch(cause){if(!signal?.aborted)setError(cause.message);}finally{saveInProgress.current=false;if(!signal?.aborted)setBusy('');}
   }
+  async function saveQuietly(value,signal){
+    if(online||!value||saveInProgress.current)return;saveInProgress.current=true;
+    try{
+      const {images,failed}=await fetchArtwork(value,{signal});signal?.throwIfAborted();
+      const result=await actions.saveTitleProfile(title.id,{...value,missingArtwork:failed},images,{background:true});
+      if(result&&!signal?.aborted)setProfile(result);
+    }catch{}finally{saveInProgress.current=false;}
+  }
   useEffect(()=>()=>characterAbort.current?.abort(),[]);
   async function showCharacter(value){
     characterAbort.current?.abort();const controller=new AbortController();characterAbort.current=controller;
@@ -132,7 +143,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
       const merged={...value,...detail,name:[detail.name,value.name].find(hasRussian)||detail.name||value.name,description:detail.description||value.description,image:detail.image||value.image};
       setCharacter(merged);
       const updated={...profile,characters:(profile?.characters||[]).map(c=>c.id===value.id?{...c,...merged}:c)};setProfile(updated);
-      if(!online&&live.current.admin&&live.current.driveWritable&&!saveInProgress.current)actions.saveTitleProfile(title.id,updated).catch(()=>{});
+      if(!online&&live.current.admin&&live.current.driveWritable&&!saveInProgress.current)actions.saveTitleProfile(title.id,updated,[],{background:true});
     }catch(cause){if(!controller.signal.aborted)setCharacterError(cause.message||'Каталоги пока не ответили. Сохранённые сведения доступны.');
     }finally{if(!controller.signal.aborted)setCharacterBusy(false);}
   }
@@ -184,7 +195,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
       {p.related?.length>0&&<section id="titleRelated" className="title-related"><div className="section-heading"><h2>В этой вселенной</h2><span className="fine">Сезоны · Фильмы · Манга · Книги · Игры</span></div><div className="title-horizontal">{p.related.map(value=><button key={value.kind+value.id} onClick={()=>onRelated({...value,artwork:p.artwork,savedAt:p.savedAt})}><span className="related-poster"><TitleImage url={value.cover} {...artProps} alt={value.title}/><small>{value.format}</small></span><strong>{value.title}</strong><small>{value.relation}</small></button>)}</div></section>}
       <section id="titleDiscussion" className="title-discussion"><div><h2>Обсуждение и обзоры</h2><p>Отзывы читателей и зрителей — на странице произведения.</p></div>{p.sourceURL&&<a className="text-link" href={p.sourceURL} target="_blank" rel="noopener noreferrer">{p.source==='wikidata'?'Открыть источник':'Читать на Шикимори'}<ExternalLink size={14}/></a>}</section>
     </div><aside className="title-sidebar"><section className="title-rating-section">      {(online||state.admin)&&<div className="title-rating"><h3>Твоя оценка</h3><p>{ownRating?ownRating+' из 10':'Как тебе эта история?'}</p><div role="group" aria-label="Оценить произведение">{Array.from({length:10},(_,index)=><button key={index} aria-label={'Оценка '+(index+1)} aria-pressed={ownRating===index+1} disabled={ratingBusy||!online&&(!!state.busy||state.importActive)} onClick={()=>rate(index+1)}>{index+1}</button>)}</div><small>{online?'Сохраняется на этом устройстве.':'Сохраняется в зашифрованном каталоге.'}</small></div>}
-    </section><PlatformRatings identity={p.sourceId} kind={title.section} cached={p.ratings} score={p.score} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} onLoaded={saveRatings}/>{title.section==='anime'&&/^\d+$/.test(String(p.sourceId||''))&&<WatchOrder identity={p.sourceId} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} cached={p.watchOrder} onRelated={onRelated} onLoaded={value=>{setProfile(old=>({...old,watchOrder:value}));if(!online&&state.admin&&state.driveWritable&&!live.current.busy)actions.saveTitleProfile(title.id,{watchOrder:value}).catch(()=>{});}}/>}<CreditsPanel kind={title.section} profile={p} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} renderArtwork={value=><TitleImage url={value.image} {...artProps} alt=""/>}/></aside></div>
+    </section><PlatformRatings identity={p.sourceId} kind={title.section} cached={p.ratings} score={p.score} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} onLoaded={saveRatings}/>{title.section==='anime'&&/^\d+$/.test(String(p.sourceId||''))&&<WatchOrder identity={p.sourceId} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} cached={p.watchOrder} onRelated={onRelated} onLoaded={value=>{setProfile(old=>({...old,watchOrder:value}));if(!online&&state.admin&&state.driveWritable)actions.saveTitleProfile(title.id,{watchOrder:value},[],{background:true});}}/>}<CreditsPanel kind={title.section} profile={p} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} renderArtwork={value=><TitleImage url={value.image} {...artProps} alt=""/>}/></aside></div>
     <Dialog.Root open={summaryOpen} onOpenChange={setSummaryOpen}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="server-dialog title-summary-dialog"><header className="entity-dialog-heading"><Dialog.Title>{name}</Dialog.Title><Dialog.Close className="circle-button" aria-label="Закрыть описание"><X size={20}/></Dialog.Close></header><Dialog.Description className="entity-biography">{(online?p.description:russianText(p.description))||'Описание пока не предоставлено каталогом.'}</Dialog.Description></Dialog.Content></Dialog.Portal></Dialog.Root>
     <CharacterDialog character={character} busy={characterBusy} error={characterError} onClose={()=>{characterAbort.current?.abort();setCharacter(null);}} renderArtwork={value=><TitleImage url={value.image} {...artProps} alt={value.name}/>} onRelated={onRelated}/>
   </article>;

@@ -10,15 +10,20 @@ export default function PlatformRatings({identity,kind='anime',cached,score,serv
   useEffect(()=>{
     const abort=new AbortController(),saved=valid(cached,identity,kind)?cached:null;setValue(saved);setError('');
     if(!/^[1-9]\d{0,11}$/.test(identity)||!server)return;
-    const dates=(saved?.items||[]).map(v=>Date.parse(v.checkedAt)).filter(Number.isFinite);
-    const expires=saved?.providers?.some(v=>v.status==='unavailable')?saved.retryAfter:(dates.length?Math.min(...dates):Date.parse(saved?.checkedAt))+6*3600000;
+    // Fresh for 6 h after this browser last asked. Older code took the oldest
+    // provider date (a platform that stopped answering kept its old entry) or a
+    // 90-second retry for unavailable platforms, so every visit refetched the
+    // ratings and rewrote the Drive catalog. Unavailable platforms now simply
+    // wait for the next 6-hour check; the refresh button still forces one.
+    const dates=[saved?.fetchedAt,saved?.checkedAt,...(saved?.items||[]).map(v=>v.checkedAt)].map(v=>Date.parse(v)).filter(Number.isFinite);
+    const expires=(dates.length?Math.max(...dates):0)+6*3600000;
     if(!revision&&saved?.items?.length&&Date.now()<expires)return;
     setLoading(true);
     fetch(server+'/metadata/ratings?'+new URLSearchParams({identity,kind}),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(20000)])}).then(async response=>{if(!response.ok)throw Error('Платформы временно не ответили. Сохранённые оценки остаются доступными.');return response.json();}).then(data=>{
       if(!valid(data,identity,kind))throw Error('Каталоги не подтвердили выбранное произведение.');
       if(abort.signal.aborted)return;
       const items=[...new Map([...(saved?.items||[]),...data.items].map(item=>[item.provider,item])).values()];
-      const next={...data,items};setValue(next);if(items.length)callback.current?.(next);
+      const next={...data,items,fetchedAt:new Date().toISOString()};setValue(next);if(items.length)callback.current?.(next);
     }).catch(cause=>{if(!abort.signal.aborted)setError(cause.message);}).finally(()=>{if(!abort.signal.aborted)setLoading(false);});
     return()=>abort.abort();
   },[identity,kind,server,revision]);

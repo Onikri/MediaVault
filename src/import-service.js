@@ -1,5 +1,21 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {notificationStore} from './notification-store.js';
+import {profileNeedsRefresh,previewNeedsRetry} from './title-metadata.js';
+
+// The server pass walks the whole library, so it is requested only when a frame
+// or dossier is actually due under the shared back-off, and at most once per
+// six hours per library on this device: reloading the page must not restart it.
+const ENRICH_COOLDOWN=6*3600000;
+export function libraryEnrichmentDue(catalog,now=Date.now()){
+  const items=(catalog?.items||[]).filter(item=>item.category==='video'||item.category==='manga');
+  if(!items.length)return false;
+  return items.some(item=>previewNeedsRetry(item,now))||Object.values(catalog.titleProfiles||{}).some(profile=>profileNeedsRefresh(profile,now));
+}
+// Library artwork passes run unattended: only a request for Drive access is news.
+export const jobNoticeWanted=job=>['completed','failed','waiting_auth'].includes(job.status)&&(job.progress?.taskType!=='enrich'||job.status==='waiting_auth');
+function enrichCooldownKey(libraryId){return 'mediavault_enrich_requested:'+libraryId;}
+function enrichRequestedRecently(libraryId,now=Date.now()){try{return now-Number(localStorage.getItem(enrichCooldownKey(libraryId))||0)<ENRICH_COOLDOWN;}catch{return false;}}
+function rememberEnrichRequest(libraryId,now=Date.now()){try{localStorage.setItem(enrichCooldownKey(libraryId),String(now));}catch{}}
 
 export function validateServer(value){
   if(!value?.trim())return '';
@@ -60,7 +76,7 @@ export function useImportService(state,actions){
         const response=await client.request('/jobs');
         if(!closed){
           const notices=notificationStore(state.user?.sub);
-          for(const job of response.jobs||[]){const prior=previousJobs.current.get(job.id);if((prior?prior!==job.status:lastPoll>0&&job.updated*1000>lastPoll)&&['completed','failed','waiting_auth'].includes(job.status))notices.push({id:'job:'+job.id+':'+job.status+':'+job.updated,taskId:job.id,bad:job.status!=='completed',message:(job.progress?.title||'Задание')+' · '+({completed:'готово',failed:'нужно продолжить',waiting_auth:'нужен фоновый доступ Drive'}[job.status])});}
+          for(const job of response.jobs||[]){const prior=previousJobs.current.get(job.id);if((prior?prior!==job.status:lastPoll>0&&job.updated*1000>lastPoll)&&jobNoticeWanted(job))notices.push({id:'job:'+job.id+':'+job.status+':'+job.updated,taskId:job.id,bad:job.status!=='completed',message:(job.progress?.title||'Задание')+' · '+({completed:'готово',failed:'нужно продолжить',waiting_auth:'нужен фоновый доступ Drive'}[job.status])});}
           previousJobs.current=new Map((response.jobs||[]).map(j=>[j.id,j.status]));
           lastPoll=Date.now();try{localStorage.setItem(noticeKey,JSON.stringify({states:[...previousJobs.current],at:lastPoll}));}catch{}
         }
@@ -118,11 +134,11 @@ export function useImportService(state,actions){
   useEffect(()=>{
     const key=state.user?.sub+':'+state.libraryId;
     if(!state.catalog||!state.admin||state.busy||!session?.driveConnected||!(session.serverVersion>=5)||enrichmentRequested.current===key)return;
-    const videos=state.catalog.items.filter(item=>item.category==='video');
-    if(!videos.length)return;
     enrichmentRequested.current=key;
     const pending=jobs.some(job=>job.progress?.taskType==='enrich'&&['queued','running'].includes(job.status));
-    if(!pending&&(videos.some(item=>!item.previewArtwork)||Object.values(state.catalog.titleProfiles||{}).some(p=>p.version<4||p.partial)))enrichLibrary().catch(()=>{enrichmentRequested.current='';});
+    if(pending||enrichRequestedRecently(state.libraryId)||!libraryEnrichmentDue(state.catalog))return;
+    rememberEnrichRequest(state.libraryId);
+    enrichLibrary().catch(()=>{enrichmentRequested.current='';try{localStorage.removeItem(enrichCooldownKey(state.libraryId));}catch{}});
   },[state.catalog,!!state.busy,session?.driveConnected,session?.serverVersion]);
   async function operation(id,op){const task=await client.request('/jobs/'+encodeURIComponent(id)+'/'+op,{method:'POST'});setJobs(old=>old.map(value=>value.id===id?task:value));return task;}
   return {server,setServer,status,error,session,jobs,active,connect,submit,refresh,configureGoogle,enrichLibrary,

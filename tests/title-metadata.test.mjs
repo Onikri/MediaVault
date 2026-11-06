@@ -24,3 +24,33 @@ test('legacy PBKDF2 encrypted libraries open with the unified server-import key 
  const envelope=await sealIndex(catalog,legacy,salt),current=await deriveVaultMaterial(phrase,salt);
  try{assert.deepEqual(await openIndex(envelope,current.key),catalog);assert.equal(current.key.extractable,false);assert.equal(current.serverKey.length,32);}finally{current.serverKey.fill(0);}
 });
+
+test('background dossier retries back off and stop instead of rewriting Drive on every visit',async()=>{
+ const {profileNeedsRefresh,scheduleProfileRetry,previewNeedsRetry,PROFILE_RETRY_LIMIT}=await import('../src/title-metadata.js');
+ const {libraryEnrichmentDue,jobNoticeWanted}=await import('../src/import-service.js');
+ const now=1_800_000_000_000,hour=3600000;
+ assert.equal(profileNeedsRefresh(undefined,now),true);
+ const complete={version:4,sourceId:'1',partial:false};
+ assert.equal(profileNeedsRefresh(complete,now),false);
+ assert.equal(profileNeedsRefresh({...complete,genres:[]},now),false,'a catalogue without genres is not a reason to refetch');
+ let profile={version:4,sourceId:'1',partial:true};
+ assert.equal(profileNeedsRefresh(profile,now),true);
+ profile=scheduleProfileRetry(profile,profile,now);
+ assert.equal(profile.profileAttempts,1);assert.equal(profile.retryAfter,now+6*hour);
+ assert.equal(profileNeedsRefresh(profile,now+60000),false);
+ for(let i=1;i<PROFILE_RETRY_LIMIT;i++)profile=scheduleProfileRetry(profile,profile,profile.retryAfter);
+ assert.equal(profile.profileAttempts,PROFILE_RETRY_LIMIT);
+ assert.equal(profileNeedsRefresh(profile,now+10**12),false);
+ assert.deepEqual(scheduleProfileRetry({...complete},profile,now),{...complete,profileAttempts:0,retryAfter:0});
+ const frame={category:'video',previewAttempts:1,previewRetryAfter:now+hour};
+ assert.equal(previewNeedsRetry(frame,now),false);assert.equal(previewNeedsRetry(frame,now+hour),true);
+ assert.equal(previewNeedsRetry({...frame,previewAttempts:3},now+10**12),false);
+ const catalog={items:[{category:'manga',collectionId:'c'},{...frame}],titleProfiles:{'manga:c':complete}};
+ assert.equal(libraryEnrichmentDue(catalog,now),false);
+ assert.equal(libraryEnrichmentDue(catalog,now+hour),true);
+ assert.equal(libraryEnrichmentDue({items:[{category:'video',previewArtwork:{}}],titleProfiles:{x:profile}},now),false);
+ const enrich=status=>({status,progress:{taskType:'enrich'}});
+ assert.equal(jobNoticeWanted(enrich('completed')),false);assert.equal(jobNoticeWanted(enrich('failed')),false);
+ assert.equal(jobNoticeWanted(enrich('waiting_auth')),true);
+ assert.equal(jobNoticeWanted({status:'completed',progress:{taskType:'import'}}),true);
+});

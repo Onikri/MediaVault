@@ -1,5 +1,6 @@
 """Server-side Russian dossiers and real per-episode frames, including old files."""
 import base64
+import copy
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime,timezone
@@ -121,51 +122,118 @@ def preview_existing(vault,item,progress=lambda _:None):
     except (subprocess.SubprocessError,KeyError,ValueError):return None
     finally:stopped.set();server.shutdown();server.server_close();cache.clear()
 
-def enrich_profile(vault,group,section,progress=lambda _:None):
+# Enrichment is requested whenever the owner opens the library, so every retry
+# is spaced out and stops after a few attempts: a title the catalogue cannot
+# describe, an image that keeps failing or a video ffmpeg cannot seek must not
+# cost Drive and network traffic on every visit. src/title-metadata.js mirrors
+# these rules for the browser.
+HOUR_MS=3600000
+PROFILE_RETRY_LIMIT=4
+PREVIEW_RETRY_LIMIT=3
+
+def _now_ms():return int(time.time()*1000)
+
+def retry_delay(attempts):
+    """6 h, 24 h, 4 days, 16 days; capped at 30 days."""
+    return min(30*24*HOUR_MS,6*HOUR_MS*4**max(0,attempts-1))
+
+def profile_due(profile,now):
+    profile=profile or {}
+    if profile.get('sourceId') and profile.get('version',0)>=4 and not profile.get('partial'):return False
+    if profile.get('profileAttempts',0)>=PROFILE_RETRY_LIMIT:return False
+    return profile.get('retryAfter',0)<=now
+
+def preview_due(item,now):
+    return (item.get('category')=='video' and not item.get('previewArtwork')
+            and item.get('previewAttempts',0)<PREVIEW_RETRY_LIMIT and item.get('previewRetryAfter',0)<=now)
+
+def schedule_profile(profile,previous,now):
+    if profile.get('partial'):
+        attempts=previous.get('profileAttempts',0)+1
+        profile.update(profileAttempts=attempts,retryAfter=now+retry_delay(attempts))
+    else:
+        profile.update(profileAttempts=0,retryAfter=0)
+
+def enrich_profile(vault,group,section,progress=lambda _:None,now=None):
+    """Returns (profile, wrote, worked); worked means network requests were made."""
+    now=_now_ms() if now is None else now
     title_id=section+':'+group['id'];previous=vault.catalog.get('titleProfiles',{}).get(title_id,{})
     info=group.get('metadata') or {};identity=group.get('metadataId') or info.get('ids',{}).get('mal')
-    profile=previous.copy()
-    if identity and (not previous.get('sourceId') or previous.get('version',0)<4 or (previous.get('partial') or not previous.get('genres')) and previous.get('retryAfter',0)<time.time()*1000):
+    profile=copy.deepcopy(previous);worked=False
+    if identity and profile_due(previous,now):
+        worked=True
         progress({'phase':'metadata','operation':'Получаем сведения о тайтле'})
         try:profile.update(load_profile(identity,'manga' if section in {'manga','ranobe'} else 'anime'))
-        except Exception:profile.update({'partial':True,'retryAfter':int((time.time()+120)*1000)})
+        except Exception:profile['partial']=True
+        schedule_profile(profile,previous,now)
     profile.setdefault('version',4);profile.setdefault('title',group['name']);profile.setdefault('language','ru')
     own=[i['previewArtwork'] for i in vault.catalog['items'] if i.get('collectionId')==group['id'] and i.get('previewArtwork')][:10]
     assets={**profile.get('artwork',{}),**{'drive:'+a['id']:a for a in own}}
     own_urls=['drive:'+a['id'] for a in own]
-    if profile==previous and all(url in previous.get('screenshots',[]) for url in own_urls) and previous.get('artworkRetryAfter',0)>time.time()*1000:return previous
     profile['artwork']=assets;published=[u for u in [profile.get('background'),*profile.get('screenshots',[])] if u and u.startswith('https://') and u!=profile.get('cover')];profile['backgrounds']=list(dict.fromkeys(published+own_urls))[:10]
     profile['screenshots']=list(dict.fromkeys(own_urls+profile.get('screenshots',[])))[:14]
     urls=list(dict.fromkeys([profile.get('cover'),profile.get('background'),*profile['screenshots'],*[c.get('image') for c in profile.get('characters',[])],*[r.get('cover') for r in profile.get('related',[])],*[r.get('image') for r in profile.get('staff',[])],*[a.get('image') for c in profile.get('characters',[]) for a in c.get('voiceActors',[])],*[t.get('image') for t in profile.get('trailers',[])]]))
-    from artwork import fetch_image
-    def fetch(url):
-        if not url or url in assets or not url.startswith('https://'):return None
-        try:
-            data,mime=fetch_image(url)
-            return (url,data,mime) if len(data)<=2*1024*1024 else None
-        except Exception:return None
-    images=[]
-    if previous.get('version',0)<4 or previous.get('artworkRetryAfter',0)<time.time()*1000:
+    missing=[url for url in urls if url and url.startswith('https://') and url not in assets]
+    images=[];attempts=profile.get('artworkAttempts',0)
+    if missing and (worked or attempts<PROFILE_RETRY_LIMIT and profile.get('artworkRetryAfter',0)<=now):
+        worked=True
         progress({'phase':'artwork','operation':'Получаем обложки, кадры и изображения персонажей'})
-        with ThreadPoolExecutor(max_workers=4) as executor:images=[value for value in executor.map(fetch,[u for u in urls if u and u not in assets][:48]) if value]
-    downloaded={value[0] for value in images}
-    profile['missingArtwork']=sum(1 for url in urls if url and url.startswith('https://') and url not in assets and url not in downloaded)
-    profile['artworkRetryAfter']=int((time.time()+120)*1000)
+        from artwork import fetch_image
+        def fetch(url):
+            try:
+                data,mime=fetch_image(url)
+                return (url,data,mime) if len(data)<=2*1024*1024 else None
+            except Exception:return None
+        with ThreadPoolExecutor(max_workers=4) as executor:images=[value for value in executor.map(fetch,missing[:48]) if value]
+        downloaded={value[0] for value in images}
+        missing=[url for url in missing if url not in downloaded]
+        # Only a round that downloaded nothing counts towards giving up.
+        if missing and not images:attempts+=1
+        profile.update(artworkAttempts=attempts if missing else 0,
+                       artworkRetryAfter=now+retry_delay(max(1,attempts)) if missing else 0)
+    profile['missingArtwork']=len(missing)
+    if profile==previous and not images:return previous,False,worked
     progress({'phase':'save_profile','operation':'Шифруем оформление и сохраняем в Google Drive'})
-    return vault.save_title_profile(title_id,profile,images)
+    return vault.save_title_profile(title_id,profile,images),True,worked
 
-def enrichment_step(vault,*,cursor=0,title_id=None,progress=lambda _:None):
+def mark_preview_failed(vault,item_id,now):
+    def edit(catalog):
+        item=next((i for i in catalog['items'] if i['id']==item_id),None)
+        if item is None or item.get('previewArtwork'):return
+        attempts=item.get('previewAttempts',0)+1
+        item.update(previewAttempts=attempts,previewRetryAfter=now+retry_delay(attempts))
+    vault.edit_catalog(edit)
+
+def enrichment_step(vault,*,cursor=0,title_id=None,progress=lambda _:None,now=None):
+    """Advance to the next item with due work; idle items cost no request.
+
+    A title's dossier is handled once, at its last item and after that title's
+    own episode frames, never once per episode or chapter. 'saved' counts only
+    visible catalog changes, so the browser re-reads the catalog only then."""
+    now=_now_ms() if now is None else now
     items=[i for i in vault.catalog['items'] if i.get('category') in {'video','manga'} and (not title_id or title_id.endswith(':'+str(i.get('collectionId',''))))]
-    if cursor>=len(items):return {'cursor':cursor,'remaining':False,'total':len(items),'saved':0,'failed':0,'skipped':0}
-    item=items[cursor]
-    group=next((g for g in vault.catalog.get('storage',{}).get('collections',[]) if g['id']==item.get('collectionId')),None)
-    progress({'phase':'artwork','taskType':'enrich','title':group.get('name') if group else item.get('name') or 'Оформление библиотеки','file':item.get('name',''),'episode':item.get('episode'),'chapter':item.get('chapter'),'current':cursor+1,'total':len(items),'operation':'Проверяем готовое оформление','message':''})
-    failed=False
-    if item.get('category')=='video' and not item.get('previewArtwork'):
-        frame=preview_existing(vault,item,progress)
-        if frame:
-            progress({'phase':'save_preview','operation':'Сохраняем превью в Google Drive'})
-            vault.save_preview(item['id'],frame)
-        else:failed=True
-    if group:enrich_profile(vault,group,group_section(group,vault.catalog),progress)
-    return {'cursor':cursor+1,'remaining':cursor+1<len(items),'total':len(items),'saved':0 if failed else 1,'failed':1 if failed else 0,'skipped':0}
+    last={}
+    for index,item in enumerate(items):last[item.get('collectionId')]=index
+    groups={g['id']:g for g in vault.catalog.get('storage',{}).get('collections',[])}
+    skipped=0
+    while cursor<len(items):
+        item=items[cursor];group=groups.get(item.get('collectionId'))
+        wrote=failed=worked=False
+        def announce(operation):
+            progress({'phase':'artwork','taskType':'enrich','title':group.get('name') if group else item.get('name') or 'Оформление библиотеки','file':item.get('name',''),'episode':item.get('episode'),'chapter':item.get('chapter'),'current':cursor+1,'total':len(items),'operation':operation,'message':''})
+        if preview_due(item,now):
+            announce('Проверяем готовое оформление')
+            worked=True;frame=preview_existing(vault,item,progress)
+            if frame:
+                progress({'phase':'save_preview','operation':'Сохраняем превью в Google Drive'})
+                vault.save_preview(item['id'],frame);wrote=True
+            else:mark_preview_failed(vault,item['id'],now);failed=True
+        if group and last.get(group['id'])==cursor:
+            if not worked:announce('Проверяем готовое оформление')
+            _,saved,fetched=enrich_profile(vault,group,group_section(group,vault.catalog),progress,now)
+            wrote=wrote or saved;worked=worked or fetched
+        cursor+=1
+        if wrote or worked:
+            return {'cursor':cursor,'remaining':cursor<len(items),'total':len(items),'saved':1 if wrote else 0,'failed':1 if failed else 0,'skipped':skipped}
+        skipped+=1
+    return {'cursor':cursor,'remaining':False,'total':len(items),'saved':0,'failed':0,'skipped':skipped}

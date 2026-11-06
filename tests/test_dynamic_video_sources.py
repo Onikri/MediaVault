@@ -17,6 +17,16 @@ class DynamicVideoSourcesTests(unittest.TestCase):
         self.assertIsNone(provider_for('https://hentasis.me.example.com/14-episode.html'))
         self.assertIsNone(provider_for('https://hentasis.me/'))
 
+    def test_hentasis_numbered_mirrors_are_recognised(self):
+        for url in ('https://v5.hentasis5.top/1079-mujikaku-na-osananajimi.html',
+                    'https://hentasis1.top/1034-sister-breeder.html',
+                    'https://www.hentasis1.top/1034-sister-breeder.html',
+                    'https://v4.hentasis.me/1175-ikusei.html'):
+            self.assertEqual(provider_for(url), ('hentasis', 'Hentasis'), url)
+        for url in ('https://hentasis5.top.example.com/1-x.html', 'https://nothentasis5.top/1-x.html',
+                    'https://v5.hentasis5.top/', 'https://hentasis5.xyz/1-x.html'):
+            self.assertIsNone(provider_for(url), url)
+
     def test_hentasis_checks_range_with_browser_headers_and_rejects_html(self):
         url = 'https://hentasis1.top/123-episode.html'
         stream = {'url': 'https://cdn.example.com/episode.mp4', 'type': 'mp4', 'headers': {'Referer': url}}

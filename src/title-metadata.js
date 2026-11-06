@@ -4,6 +4,25 @@ import {crossMediaFromLinks,highResolutionArtwork} from './cross-media.js';
 const ORIGIN='https://shikimori.io';
 const pending=new Map();
 let lastRequest=0;
+// Mirrors server/library_enrichment.py. A title the catalogue cannot fully
+// describe is retried after 6 h, 24 h, 4 and 16 days, then left alone, so it
+// does not cost a Drive catalog rewrite on every library or title visit.
+// "Обновить сведения" on the title page still refreshes on demand.
+const HOUR=3600000;
+export const PROFILE_RETRY_LIMIT=4,PREVIEW_RETRY_LIMIT=3;
+export const retryDelay=attempts=>Math.min(30*24*HOUR,6*HOUR*4**Math.max(0,attempts-1));
+export function profileNeedsRefresh(profile,now=Date.now()){
+  if(profile?.sourceId&&(profile.version||0)>=4&&!profile.partial)return false;
+  if((profile?.profileAttempts||0)>=PROFILE_RETRY_LIMIT)return false;
+  return now>=(profile?.retryAfter||0);
+}
+export function scheduleProfileRetry(next,previous,now=Date.now()){
+  if(!next?.partial)return {...next,profileAttempts:0,retryAfter:0};
+  const attempts=(previous?.profileAttempts||0)+1;
+  return {...next,profileAttempts:attempts,retryAfter:now+retryDelay(attempts)};
+}
+export const previewNeedsRetry=(item,now=Date.now())=>item?.category==='video'&&!item.previewArtwork&&
+  (item.previewAttempts||0)<PREVIEW_RETRY_LIMIT&&now>=(item.previewRetryAfter||0);
 export const hasRussian=value=>/[а-яё]/i.test(String(value||''));
 export function plainText(value){
   return String(value||'').replace(/<br\s*\/?\s*>/gi,'\n').replace(/<\/(?:p|div|li|h[1-6])>/gi,'\n\n').replace(/<[^>]*>/g,'').replace(/\[(?:\/?[a-z_]+)(?:[^\]]*)\]/gi,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\n{3,}/g,'\n\n').trim();

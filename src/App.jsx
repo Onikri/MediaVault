@@ -113,7 +113,7 @@ function MediaVaultApp(){
   const importService=useImportService(state,actions);
   const retained=useRetainedWorkspace();useEffect(()=>retained?.scope(state.user?.sub),[retained,state.user?.sub]);
   const [importTab,setImportTab]=useState('catalog');
-  useLibraryProfiles(state,actions,importService.server,importService.active);
+  useLibraryProfiles(state,actions,importService.server,importService.active,!!(importService.session?.driveConnected&&importService.session?.serverVersion>=5));
   const reduced=useReducedMotion();
   const [view,setView]=useState(()=>readOnlineTitle()||browseRoute()?'library':new URLSearchParams(location.hash.slice(1)).has('title')?'collection':['home','library','collection','import','history','profile'].includes(location.hash.slice(1))?location.hash.slice(1):'home');
   const [libraryDialog,setLibraryDialog]=useState(false),[libraryIntent,setLibraryIntent]=useState('online');

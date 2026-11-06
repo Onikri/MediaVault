@@ -487,7 +487,16 @@ function createController(get,patch){
     const data=await openChunk(bytes,key,asset.id,0,asset.iv);assertEpoch(expected);
     return new Blob([data],{type:asset.mime});
   }
-  async function saveTitleProfile(titleId,profile,images=[]){
+  async function saveTitleProfile(titleId,profile,images=[],{background=false}={}){
+    if(background){
+      // Automatic dossier, rating and watch-order saves: no global busy lock
+      // (it would block the owner's buttons), no toasts, no Google consent popup.
+      // The upload service's mutation queue still serialises catalog writes.
+      if(!get().admin||!get().driveWritable||!get().catalog||!tokenAlive())return null;
+      const expected=epoch;
+      try{const result=await uploads.saveTitleProfile(titleId,profile,images);return expected===epoch?result:null;}
+      catch(cause){if(cause?.status===401)expireDrive();else if(cause?.name!=='AbortError')console.warn('Background title profile save failed',cause);return null;}
+    }
     return run('artwork',async expected=>{
       await ensureWriteAccess(expected);
       return uploads.saveTitleProfile(titleId,profile,images);

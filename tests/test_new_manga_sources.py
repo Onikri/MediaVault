@@ -42,9 +42,25 @@ class NativeMangaTests(TestCase):
         with self.assertRaises(SourceError):
             hitomi.decode_node(node[:-1])
         page = {'hash': '0'*61+'12a', 'hasavif': 1}
-        table = ('12345', {0xa12})
+        table = ('12345', 0, 1, {0xa12})
         thumb = hitomi.image(page, table, thumbnail=True)
         self.assertTrue(hitomi_cover(thumb))
         self.assertFalse(hitomi_cover(thumb.replace('/webpbigtn/', '/other/')))
         self.assertIn('/12345/2578/', hitomi.image(page, table))
+
+    def test_hitomi_route_table_accepts_either_polarity(self):
+        # gg.js as served in November 2026: listed shards use server 0, all others 1.
+        flipped = ("gg = { m: function(g) {\nvar o = 1;\nswitch (g) {\ncase 2578:\ncase 6:\no = 0; break;\n}\nreturn o;\n},\n"
+                   "s: function(h) { var m = /(..)(.)$/.exec(h); return parseInt(m[2]+m[1], 16).toString(10); },\nb: '1793973601/'\n};")
+        table = hitomi.route_table(flipped)
+        self.assertEqual(table, ('1793973601', 1, 0, frozenset({2578, 6})))
+        listed = {'hash': '0'*61+'12a', 'hasavif': 1}
+        other = {'hash': '0'*61+'13a'}
+        self.assertTrue(hitomi.image(listed, table).startswith('https://a1.gold-usergeneratedcontent.net/1793973601/2578/'))
+        self.assertTrue(hitomi.image(other, table).startswith('https://w2.gold-usergeneratedcontent.net/1793973601/2579/'))
+        self.assertTrue(hitomi.image(other, table, thumbnail=True).startswith('https://btn.'))
+        older = flipped.replace('var o = 1;', 'var o = 0;').replace('o = 0; break;', 'o = 1; break;')
+        self.assertEqual(hitomi.route_table(older)[1:3], (0, 1))
+        with self.assertRaises(SourceError):
+            hitomi.route_table(flipped.replace('var o = 1;', 'var o = 2;'))
         self.assertEqual(image_extension(bytearray(b'\x00\x00\x00\x20ftypavif')), 'avif')

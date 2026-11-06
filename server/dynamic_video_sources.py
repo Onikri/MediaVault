@@ -4,6 +4,8 @@ from urllib.parse import urlsplit
 
 from source_parser import Page, SourceError, parse_page
 
+HENTASIS_HOST = re.compile(r'(?:[a-z0-9-]+\.)?hentasis\d{0,3}\.(?:top|me)')
+
 
 def provider_for(url):
     parts = urlsplit(url)
@@ -12,9 +14,9 @@ def provider_for(url):
         r'/(?:videos/hentai|hentai/video|playlists/[a-zA-Z0-9]+/video)/[^/]+/?', parts.path
     ):
         return 'hanime', 'HanimeTV'
-    if (host in {'hentasis1.top', 'www.hentasis1.top', 'hentasis.me'} or host.endswith('.hentasis.me')) and re.search(
-        r'/\d+-[^/]+\.html$', parts.path, re.I
-    ):
+    # Hentasis moves between numbered mirrors (hentasis1.top, v4.hentasis.me,
+    # v5.hentasis5.top in November 2026); accept the whole family, not one host.
+    if HENTASIS_HOST.fullmatch(host) and re.search(r'/\d+-[^/]+\.html$', parts.path, re.I):
         return 'hentasis', 'Hentasis'
     return None
 

@@ -42,10 +42,17 @@ def version(text):
 
 
 def route_table(text):
+    """gg.m(g): a default server for every shard and another for the listed ones.
+
+    Hitomi flips the polarity from time to time (`var o = 0` with `o = 1` for the
+    cases, or the reverse, as of November 2026), so both values are read from
+    gg.js instead of assumed."""
     prefix = re.search(r"\bb:\s*'(\d{1,24})/'", text)
-    if not prefix or not re.search(r'var o = 0;\s*switch \(g\)', text) or not re.search(r'o = 1;\s*break;', text):
+    default = re.findall(r'var o = ([01]);\s*switch \(g\)', text)
+    listed = re.findall(r'\bo = ([01]);\s*break;', text)
+    if not prefix or len(default) != 1 or len(listed) != 1:
         raise SourceError('Hitomi изменил маршрутизацию изображений.')
-    return prefix[1], frozenset(map(int, re.findall(r'\bcase (\d+):', text)))
+    return prefix[1], int(default[0]), int(listed[0]), frozenset(map(int, re.findall(r'\bcase (\d+):', text)))
 
 
 def range_bytes(http, url, offset, size):
@@ -130,9 +137,9 @@ def image(file, table, *, thumbnail=False):
     if not re.fullmatch(r'[a-f0-9]{64}', digest):
         raise SourceError('Hitomi вернул неверный идентификатор изображения.')
     tail = digest[-1] + digest[-3:-1]
-    prefix, webp_hosts = table
+    prefix, default, listed, cases = table
     shard = int(tail, 16)
-    split = int(shard in webp_hosts)
+    split = listed if shard in cases else default
     if thumbnail:
         return f'https://{chr(97+split)}tn.{DOMAIN}/webpbigtn/{tail[0]}/{tail[1:]}/{digest}.webp'
     extension = 'avif' if file.get('hasavif') else 'webp'
