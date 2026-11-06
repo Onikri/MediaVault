@@ -38,6 +38,9 @@ class SourceTemporaryError(SourceError):
 # Some embeds reject a non-browser UA before their HTML can be parsed.
 USER_AGENT = DEFAULT_USER_AGENT
 MAX_DOCUMENT = 4 * 1024 * 1024
+# Set by hanime_relay.install on the server: tokenised HanimeTV playlists,
+# which refuse the Oracle address, are read through the owner's Worker.
+RELAY_ROUTE = None
 MAX_VIDEO = 40 * 1024**3
 BLOCKED = re.compile(
     r"/cdn-cgi/challenge-platform(?!/scripts/jsd/)|cf-chl-|__cf_chl_|checking your browser|"
@@ -159,6 +162,10 @@ class PublicHttp:
 
     def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None, action=None):
         url = self.validate(value)
+        if RELAY_ROUTE is not None and method == 'GET' and not byte_range:
+            routed = RELAY_ROUTE(url, headers)
+            if routed is not None:
+                return routed
         outgoing = playback_headers(headers)
         if urlsplit(url).hostname in {'animego.org','animego.me'} and re.fullmatch(r'/player/(?:videos/)?\d+/?',urlsplit(url).path):
             # These published player pages return their HTML in data.content.

@@ -4,6 +4,7 @@ from hashlib import sha256
 from importlib.util import module_from_spec, spec_from_file_location
 from io import BytesIO
 import os
+import re
 from pathlib import Path
 import sys
 import time
@@ -83,7 +84,10 @@ def extract(url):
                     if response.status_code != 200 or not response.headers.get('X-Token'):
                         raise SourceError('HanimeTV не предоставил ответ публичного плеера.')
                     return Response(BytesIO(), address, headers={'X-Token': response.headers['X-Token']}, status=200)
-            if method != 'GET' or (address != url and not urlsplit(address).path.lower().endswith('.m3u8')):
+            # Playlists moved to tokenised https://hanime.tv/hls/<id>/<token> (November 2026).
+            playlist = urlsplit(address).path.lower().endswith('.m3u8') or (
+                urlsplit(address).hostname in {'hanime.tv', 'www.hanime.tv'} and re.fullmatch(r'/hls/\d{1,10}/[A-Za-z0-9]{16,600}', urlsplit(address).path))
+            if method != 'GET' or (address != url and not playlist):
                 raise SourceError('Модуль HanimeTV запросил неподдерживаемый адрес.')
             text, final, response_headers = http.document(address, headers=headers)
             return Response(BytesIO(text.encode()), final,

@@ -23,7 +23,8 @@ def adaptive_master(streams,http,max_quality=None,document=None):
         rows=list(pool.map(read,sorted(choices.items())))
     master=m3u8.M3U8();master.is_variant=True
     for quality,stream,playlist,final in rows:
-        if playlist.session_keys or any(k and k.method not in (None,'NONE') for k in playlist.keys):
+        # Plain AES-128 with a published key plays in the browser; DRM does not.
+        if playlist.session_keys or any(k and k.method not in (None,'NONE') and (k.method!='AES-128' or k.keyformat not in (None,'identity') or not k.uri) for k in playlist.keys):
             raise SourceError('Зашифрованные и DRM-потоки в онлайн-режиме не поддерживаются.')
         prefix='q'+str(quality)+'-'
         if playlist.is_variant:

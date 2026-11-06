@@ -73,7 +73,15 @@ def create(owner,headers,kind='video',client_id='',reservation=None):
 
 def rewrite_manifest(text,base,link,max_height=None):
     if not text.lstrip().startswith('#EXTM3U'):raise SourceError('Источник не предоставил HLS.')
-    if re.search(r'#EXT-X-(?:SESSION-KEY|KEY):[^\n]*(?:METHOD=(?!NONE)[^,\s]+|KEYFORMAT=)',text):raise SourceError('Зашифрованные и DRM-потоки в онлайн-режиме не поддерживаются.')
+    for tag,attributes in re.findall(r'#EXT-X-(SESSION-KEY|KEY):([^\r\n]*)',text):
+        # Plain AES-128 with a published key (HanimeTV) is ordinary HLS that the
+        # player decrypts itself, as media_download already accepts. DRM systems,
+        # SAMPLE-AES and session keys stay unsupported.
+        method=(re.search(r'METHOD=([^,\s]+)',attributes) or [None,''])[1]
+        keyformat=(re.search(r'KEYFORMAT="?([^",\s]*)',attributes) or [None,'identity'])[1]
+        if method=='NONE':continue
+        if tag!='KEY' or method!='AES-128' or keyformat!='identity' or 'URI="' not in attributes:
+            raise SourceError('Зашифрованные и DRM-потоки в онлайн-режиме не поддерживаются.')
     if max_height is not None:
         playlist=m3u8.loads(text,uri=base)
         if playlist.playlists:
@@ -109,6 +117,11 @@ def hls_extension_option():
 
 _ready={};_ready_lock=threading.Lock()
 VIDEO_TYPES=('video/','audio/','application/octet-stream','binary/octet-stream','application/mp4')
+# HanimeTV's CDN labels its AES-128 MPEG-TS segments text/html with a .html name.
+DISGUISED_SEGMENT_HOSTS=('.htv-elidibus.com',)
+def disguised_segment(url):
+    host=urlsplit(url).hostname or ''
+    return host.endswith(DISGUISED_SEGMENT_HOSTS) and urlsplit(url).path.endswith('.html')
 def playable(text,base,headers,http,document,depth=0):
     """Readiness: before granting playback, follow the playlist (≤4 levels)
     to its first fragment and require real media bytes. A CDN that answers a
@@ -132,7 +145,7 @@ def playable(text,base,headers,http,document,depth=0):
         mime=response.headers.get('Content-Type','').split(';')[0].strip().lower()
         sample=next(response.iter_content(2048),b'')
     finally:response.close()
-    if mime=='text/html' or sample.lstrip()[:1]==b'<' or not sample or mime and not mime.startswith(VIDEO_TYPES) and 'mp2t' not in mime:
+    if not sample or not disguised_segment(first) and (mime=='text/html' or sample.lstrip()[:1]==b'<' or mime and not mime.startswith(VIDEO_TYPES) and 'mp2t' not in mime):
         raise SourceError('Источник отдаёт страницу вместо видео. Выбери другой плеер или повтори позже.')
     with _ready_lock:
         if len(_ready)>512:_ready.clear()
@@ -404,6 +417,7 @@ def install(app,owner):
                     parts.append(block)
                 data=rewrite_manifest(b''.join(parts).decode('utf-8'),final,lambda value:'/online/'+token+'/'+s.resource(value),s.max_height)
                 return Response(data,media_type='application/vnd.apple.mpegurl',headers=common)
+            if s.kind in {'video','preview'} and disguised_segment(final) and mime=='text/html':mime='video/mp2t'
             allowed=mime.startswith(('video/','audio/','image/')) or mime in {'application/octet-stream','binary/octet-stream','text/vtt'}
             if not allowed:raise SourceError('Источник вернул неподдерживаемый файл.')
             for name in ('Content-Length','Content-Range','Accept-Ranges'):

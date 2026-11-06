@@ -2,7 +2,7 @@
 import re
 from urllib.parse import urlsplit
 
-from source_parser import Page, SourceError, parse_page
+from source_parser import Page, SourceAccessError, SourceError, parse_page
 
 HENTASIS_HOST = re.compile(r'(?:[a-z0-9-]+\.)?hentasis\d{0,3}\.(?:top|me)')
 
@@ -75,6 +75,12 @@ def resolve_dynamic(http, url, referer, title, provider=None):
     from browser_player import extract
 
     if provider == 'hanime':
+        # Cloudflare challenges the Oracle address for every HanimeTV page and
+        # signed API call. The handshake and playlists go through the owner's
+        # Worker (hanime_relay); Oracle still fetches the video segments itself.
+        import hanime_relay
+        if hanime_relay.settings():
+            return Page(title=title, streams=hanime_relay.resolve(url))
         from hanime_player import extract as extract_hanime
         try:
             streams = extract_hanime(url)
@@ -82,6 +88,8 @@ def resolve_dynamic(http, url, referer, title, provider=None):
                 if stream['type'] == 'mp4':
                     check_mp4(http, stream)
             return Page(title=title, streams=streams)
+        except SourceAccessError:
+            raise SourceError(hanime_relay.HINT) from None
         except (SourceError, ImportError):
             pass
     mode = 'auto'

@@ -1,0 +1,5 @@
+name = "mediavault-hanime-relay"
+main = "src/index.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+# Secret: wrangler secret put RELAY_SECRET (at least 32 characters).

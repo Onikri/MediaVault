@@ -747,6 +747,9 @@ from alloha_delivery import install as install_alloha
 install_alloha(app)
 from online_sessions import install as install_online
 install_online(app,owner)
+# HanimeTV refuses the Oracle address: its playlists go through the owner's Worker.
+from hanime_relay import install as install_hanime_relay
+install_hanime_relay()
 from music_playback import install as install_music_playback
 install_music_playback(app)
 from music_audio import install as install_music_audio
