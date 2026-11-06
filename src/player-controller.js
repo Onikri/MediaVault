@@ -18,6 +18,7 @@ import {musicIdentityFor} from './music-library.js';
 import {startMobileGpu} from './mobile-gpu-upscaler.js';
 import {startFsr} from './fsr-upscaler.js';
 import useExternalAudio from './use-external-audio.js';
+import {useAutoCaptions} from './auto-captions.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 import {buildPlaybackLibrary} from './player-model.js';
 export default function usePlayerController({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose,autoPlay=false,characterService,roomControl}){
@@ -40,6 +41,9 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const [audioError,setAudioError]=useState('');
   const external=useExternalAudio(videoRef,audioError?'':onlineControls?.audio?.url,onlineControls?.audio?.type,Number(prefs.volume),muted,Number(prefs.audioOffset)||0,e=>setAudioError(e.message));
   useEffect(()=>setAudioError(''),[onlineControls?.audio?.url]);
+  // Auto captions listen to whatever is audible: a separate dub track if one
+  // is playing, otherwise the video itself.
+  const autoCaptions=useAutoCaptions(onlineControls?.audio&&!audioError?external.ref:videoRef,{language:prefs.autoLang,translateTo:prefs.autoTranslate,engine:prefs.autoEngine},!!source);
   const snapshot=useRef({time:0,duration:0}),previewCaptured=useRef('');
   useEffect(()=>{const save=()=>{const v=snapshot.current;if(v.time>0)writeProgress(userId,libraryId,item,v.time,v.duration);};const hidden=()=>{if(document.visibilityState==='hidden')save();};addEventListener('pagehide',save);document.addEventListener('visibilitychange',hidden);return()=>{save();removeEventListener('pagehide',save);document.removeEventListener('visibilitychange',hidden);};},[item.id,source,userId,libraryId]);
   const [isFullscreen,setIsFullscreen]=useState(false),[isPip,setIsPip]=useState(false);
@@ -325,6 +329,6 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const hiddenControls=playing&&panel==='watch'&&!musicOpen&&!controlsVisible;
   const progress=seekable?Math.min(100,previewTime/duration*100):0;
   return {
-    timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,item,source,nextEpisode:next?nextEpisode:null,toggleCaptions,previous,setTheater
+    timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,item,source,autoCaptions,nextEpisode:next?nextEpisode:null,toggleCaptions,previous,setTheater
   };
 }

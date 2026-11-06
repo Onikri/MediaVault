@@ -1,7 +1,7 @@
 import {readProgress} from './playback-progress.js';
 import {openingBounds} from './player-model.js';
 export const PREF_KEY='mediavault_player_preferences_v1';
-export const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,upscaler:'auto',deviceProfile:'auto',neuralMode:'balanced',subSize:24,subOffset:8,depthShadow:true,depthModelAllowed:true,shadowStrength:.82,breathPeriod:10,breathAmplitude:.22,characterAuto:false,ambient:true};
+export const DEFAULTS={speed:1,volume:1,autoNext:false,autoSkip:false,gpu:false,upscaler:'auto',deviceProfile:'auto',neuralMode:'balanced',subSize:24,subOffset:8,depthShadow:true,depthModelAllowed:true,shadowStrength:.82,breathPeriod:10,breathAmplitude:.22,characterAuto:false,ambient:true,autoLang:'off',autoTranslate:'',autoEngine:'auto'};
 export function getPrefs(){
   try{const saved=JSON.parse(localStorage.getItem(PREF_KEY)||'{}');return {...DEFAULTS,...saved,depthShadow:saved.depthShadow??saved.parallax??true};}catch{return DEFAULTS;}
 }

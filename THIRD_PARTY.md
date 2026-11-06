@@ -356,3 +356,10 @@ as V3detail; full source/hash/conversion records are in reader-models/title-deno
 FSRCNN x2 uses Apache-2.0 trained weights (Saafke/FSRCNN_Tensorflow), converted by
 televisualarts-cloud/wefax_decoder; reader-models/title-fsrcnn.json records attribution
 and verified hashes. Neither model is represented as grayscale MangaJaNai ESRGAN.
+
+## Automatic captions (player)
+
+- Transformers.js 4.3.2 (`@huggingface/transformers`), Apache-2.0: https://github.com/huggingface/transformers.js . Runs Whisper in a browser worker (`src/auto-captions.worker.js`), loaded only when auto captions are switched on.
+- ONNX Runtime Web 1.31.0-dev (bundled with Transformers.js), MIT: https://github.com/microsoft/onnxruntime . WebAssembly files are self-hosted under `/lmt/transformers-ort/` by `scripts/build-lmt.mjs`.
+- OpenAI Whisper base (ONNX export `onnx-community/whisper-base`), MIT: https://github.com/openai/whisper , https://huggingface.co/onnx-community/whisper-base . Downloaded by the viewer's browser from Hugging Face on first use and cached there; never stored in this repository.
+- Chrome's on-device Web Speech recognizer and Translator API are browser features, used when available; no audio leaves the device in either path.

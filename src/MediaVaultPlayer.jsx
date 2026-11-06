@@ -27,6 +27,7 @@ import {clock,keyFor,readResume,openerKey} from './player-runtime.js';
 import {PlayerContext,usePlayerSession,usePlayerExtensions,usePlayerMediaSession} from './player-session.js';
 import PlayerExtensionSlot from './PlayerExtensionSlot.jsx';
 import {createPortal} from 'react-dom';
+import {AUTO_LANGUAGES} from './auto-captions.js';
 import './player-shell.css';
 function VolumeGlyph({value,muted}){
   const level=muted?0:value;
@@ -95,7 +96,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
         {onlineControls?.audio&&<video ref={external.ref} hidden style={{display:"none"}} className="mv-external-audio" src={onlineControls?.audio?.type==='hls'?undefined:onlineControls?.audio?.url} crossOrigin="anonymous" playsInline preload="metadata" aria-hidden="true" onError={()=>{if(onlineControls?.audio)setAudioError('Отдельная озвучка не ответила. Включён исходный звук.');}}/>}
         <canvas key={engine+':'+deviceProfile+':'+prefs.neuralMode+':'+gpuAttempt} ref={canvasRef} className="mv-player-canvas" aria-hidden="true"/>
         <PauseFrameEffects characterContext={characterContext} characterService={characterService} userId={userId} key={item.id} videoRef={videoRef} source={source} paused={!playing} enabled={prefs.depthShadow} modelAllowed={prefs.depthModelAllowed} strength={prefs.shadowStrength} breathPeriod={prefs.breathPeriod} breathAmplitude={prefs.breathAmplitude} autoRecognize={prefs.characterAuto} visible={panel==='watch'&&!musicOpen}/>
-        {subtitleText&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:(hiddenControls?prefs.subOffset:Math.max(22,prefs.subOffset))+'%'}} aria-live="off">{subtitleText}</div>}
+        {(subtitleText||controller.autoCaptions.text)&&<div className="mv-player-captions" style={{fontSize:prefs.subSize+'px',bottom:(hiddenControls?prefs.subOffset:Math.max(22,prefs.subOffset))+'%'}} aria-live="off">{subtitleText||controller.autoCaptions.text}</div>}
       </div>
       {health.visible&&<div className="mv-playback-status" role="status">{health.phase==='blocked'?<button onClick={health.retry}>Нажми, чтобы воспроизвести</button>:health.phase==='failed'?<><span>Поток задерживается</span><button onClick={onlineControls?.retryStream||health.retry}>Повторить</button></>:<><span className="loading-ring"/>{health.phase==='loading'?'Запускаем видео…':'Подгружаем видео…'}</>}<button className="mv-status-dismiss" aria-label="Скрыть статус воспроизведения" onClick={health.dismiss}><X size={14}/></button></div>}
 
@@ -145,6 +146,10 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
           {streaming.subtitles.map(t=><option key={'hls:'+t.index} value={'hls:'+t.index}>{t.name}</option>)}
           {availableTracks.map(track=><option key={track.id} value={track.id}>{track.name}</option>)}
         </UiSelect></label>
+        <label>Автосубтитры<select aria-label="Язык речи для автосубтитров" value={prefs.autoLang||'off'} onChange={e=>changePrefs({autoLang:e.target.value})}><option value="off">Выключены</option>{Object.entries(AUTO_LANGUAGES).map(([id,name])=><option key={id} value={id}>{name} речь</option>)}</select></label>
+        {prefs.autoLang&&prefs.autoLang!=='off'&&<label>Перевод<select aria-label="Перевод автосубтитров" value={prefs.autoTranslate||''} onChange={e=>changePrefs({autoTranslate:e.target.value})}><option value="">Без перевода</option><option value="ru">На русский</option><option value="en">На английский</option></select></label>}
+        {prefs.autoLang&&prefs.autoLang!=='off'&&<label>Распознавание<select aria-label="Способ распознавания автосубтитров" value={prefs.autoEngine||'auto'} onChange={e=>changePrefs({autoEngine:e.target.value})}><option value="auto">Авто</option><option value="native">Chrome на устройстве</option><option value="whisper">Whisper в браузере</option></select></label>}
+        {prefs.autoLang&&prefs.autoLang!=='off'&&<p className="player-setting-help" role="status">{controller.autoCaptions.status||(controller.autoCaptions.engine==='native'?'Распознаёт Chrome на устройстве, звук никуда не отправляется.':controller.autoCaptions.engine==='whisper'?'Распознаёт Whisper на этом устройстве.':'')}</p>}
         {onlineControls?.captionVoices?.length>0&&<label>Подключить из другой версии<UiSelect aria-label="Источник субтитров" value={onlineControls.subtitleId||''} onChange={e=>onlineControls.onCaptionVoice(e.target.value)}><option value="">Дорожки текущего видео</option>{onlineControls.captionVoices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</UiSelect></label>}
         <label>Размер субтитров<input aria-label="Размер субтитров" type="range" min="16" max="40" step="2"
           value={prefs.subSize} onChange={event=>changePrefs({subSize:Number(event.target.value)})}/></label>
