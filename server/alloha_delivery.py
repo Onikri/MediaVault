@@ -123,6 +123,7 @@ class DeliverySession:
     skip: list = field(default_factory=list)
     subtitles: list = field(default_factory=list)
     online_quality: str = ''
+    published_qualities: list = field(default_factory=list)
     closed: bool = False
     switch_lock: object = field(default_factory=asyncio.Lock)
     io_lock: object = field(default_factory=asyncio.Lock)
@@ -230,12 +231,17 @@ class AllohaDelivery:
 
     async def failed(self, session, error, url):
         if not session.closed:
-            self.profiles.refused(session.profile, session.iframe)
+            if isinstance(error, SourceRefused):
+                self.profiles.refused(session.profile, session.iframe)
+            else:
+                self.profiles.unavailable(session.profile, session.iframe)
         code = 409 if isinstance(error, SourceRefused) else 502
         self.log(session, code, url)
         await self.close_session(session)
         if code == 409:
             raise HTTPException(409, 'Alloha временно отказал сессии. Разреши iframe заново.', headers={'Retry-After': '120'})
+        if getattr(error, 'status', None) in {404, 410}:
+            raise invalid('Ссылка Alloha больше недоступна. Обнови список источников.')
         raise invalid()
 
     def session(self, sid):
@@ -319,7 +325,7 @@ class AllohaDelivery:
                 byte_range = f'bytes={start}-{start + min(65536, int(match[1])) - 1}'
             await self.fetch(session, resource, byte_range=byte_range, probe=True)
 
-    async def resolve(self, iframe, *, audio=None):
+    async def resolve(self, iframe, *, audio=None, online_quality=None):
         try:
             iframe = public_url(iframe, resolve_dns=False)
         except Exception:
@@ -362,12 +368,22 @@ class AllohaDelivery:
                 identifier = str(value.get('audioId', ''))
                 if not IDENTIFIER.fullmatch(identifier):
                     continue
+                if online_quality is not None and identifier != session.active:
+                    continue
                 qualities = {}
+                published = {}
                 for label, url in (value.get('quality') or {}).items():
                     label = str(label).removesuffix('p')
                     if not label.isdigit() or not 1 <= int(label) <= 8640 or not isinstance(url, str):
                         continue
                     url = public_url(url.split(' or ')[0].strip(), resolve_dns=False)
+                    published[label] = url
+                if online_quality is not None and published:
+                    session.published_qualities = sorted(map(int, published), reverse=True)
+                    selected = (max(published, key=int) if online_quality == 'best'
+                                else self.select_quality(published, online_quality))
+                    published = {selected: published[selected]}
+                for label, url in published.items():
                     await self.ready(session, url, label)
                     self.register(session, url, 'manifest')
                     qualities[label] = url
@@ -425,7 +441,7 @@ class AllohaDelivery:
         if previous in self.sessions:
             await self.close_session(self.sessions[previous])
         started = self.clock()
-        data = await self.resolve(body.url)
+        data = await self.resolve(body.url, online_quality=body.quality)
         session = self.session(data['sid'])
         if key:
             self.online_clients[key] = session.sid
@@ -434,7 +450,7 @@ class AllohaDelivery:
         session.online_quality = quality
         return {'id': session.sid, 'kind': 'video', 'type': 'hls',
                 'url': f'/online/{session.sid}/alloha-playback',
-                'expiresIn': self.ttl, 'qualities': sorted(map(int, qualities), reverse=True),
+                'expiresIn': self.ttl, 'qualities': session.published_qualities,
                 'subtitles': [{'id': str(i), 'name': t['label'], 'language': t['lang'], 'url': t['src']}
                               for i, t in enumerate(session.subtitles)],
                 'sourceIntervals': [{'start': a, 'end': b, 'type': 'op' if i == 0 else 'ed', 'source': 'Alloha'}

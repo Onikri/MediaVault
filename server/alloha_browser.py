@@ -119,6 +119,8 @@ class NativeSession:
         self.response_headers = {}
         self.response_status = {}
         self.bootstrap_denied = False
+        self.bootstrap_status = None
+        self.bootstrap_failed = asyncio.Event()
 
     async def validate(self, url):
         host = urlsplit(url).hostname
@@ -157,6 +159,11 @@ class NativeSession:
 
     async def observe(self, response):
         parts = urlsplit(response.url)
+        if (parts.hostname == urlsplit(self.iframe).hostname
+                and response.request.resource_type == 'document'
+                and response.status in {401, 403, 404, 410, 429}):
+            self.bootstrap_status = response.status
+            self.bootstrap_failed.set()
         if parts.hostname == urlsplit(self.iframe).hostname and response.status in {401, 403, 429}:
             self.bootstrap_denied = True
         if parts.hostname != urlsplit(self.iframe).hostname or not parts.path.startswith('/bnsi/'):
@@ -228,8 +235,7 @@ class NativeSession:
         await self.page.goto(wrapper, wait_until='domcontentloaded', timeout=25000)
         element = await self.page.wait_for_selector('iframe', timeout=5000)
         self.frame = await element.content_frame()
-        await self.frame.wait_for_function(
-            "() => typeof player !== 'undefined' && player.currentSource?.quality", timeout=25000)
+        await self.wait_player()
         if audio is not None:
             labels = await self.frame.evaluate("() => (player._wsHlsSource || player.config.hlsSource || []).map(s => ({id:String(s.audioId),label:s.label}))")
             target = next((row for row in labels if row['id'] == audio), None)
@@ -249,6 +255,23 @@ class NativeSession:
         if not self.sockets:
             raise SourceInvalid('Alloha did not open its session WebSocket')
         self.heartbeat = asyncio.create_task(self.keepalive())
+
+    async def wait_player(self):
+        ready = asyncio.create_task(self.frame.wait_for_function(
+            "() => typeof player !== 'undefined' && player.currentSource?.quality", timeout=25000))
+        failed = asyncio.create_task(self.bootstrap_failed.wait())
+        try:
+            await asyncio.wait([ready, failed], return_when=asyncio.FIRST_COMPLETED)
+            if self.bootstrap_status in {401, 403, 429}:
+                raise SourceRefused('Alloha refused its session bootstrap')
+            if self.bootstrap_status in {404, 410}:
+                raise SourceInvalid('Alloha iframe no longer exists', status=self.bootstrap_status)
+            await ready
+        finally:
+            for task in (ready, failed):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(ready, failed, return_exceptions=True)
 
     async def keepalive(self):
         try:

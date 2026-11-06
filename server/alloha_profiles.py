@@ -271,3 +271,10 @@ class NativeProfiles:
             profile.quarantine_until = self.clock() + 900
             profile.refusals = 0
         self.save(profile)
+
+    def unavailable(self, profile, iframe):
+        # Missing pages and malformed metadata concern this URL, not every
+        # other title using a healthy browser. Avoid repeated URL probes.
+        identity = hashlib.sha256(iframe.encode()).hexdigest()
+        self.failed_for_iframe[(identity, profile.id)] = self.clock() + 120
+        self.save(profile)

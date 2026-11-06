@@ -4,12 +4,13 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'server'))
 from fastapi import FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient
-from alloha_browser import SourceRefused
+from alloha_browser import NativeSession, SourceInvalid, SourceRefused
 from alloha_delivery import AllohaDelivery, SegmentCache, install
 from alloha_profiles import NativeProfiles, Profile
 
@@ -20,7 +21,7 @@ ORIGIN = 'https://cdn.example.com/'
 class Profiles:
     def __init__(self):
         self.profiles = [Profile('native-fixture', '/fixture', '1.2.3.4', 'fixture')]
-        self.promotions, self.failures = 0, 0
+        self.promotions, self.failures, self.unavailable_urls = 0, 0, []
 
     async def refresh(self):
         pass
@@ -33,6 +34,9 @@ class Profiles:
 
     def refused(self, profile, iframe):
         self.failures += 1
+
+    def unavailable(self, profile, iframe):
+        self.unavailable_urls.append(iframe)
 
 
 class Source:
@@ -91,6 +95,18 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    async def test_site_prepares_only_selected_audio_and_quality(self):
+        body = SimpleNamespace(url=IFRAME, quality='720', client_id='viewer')
+        data = await self.service.prepare_online(body, 'owner')
+        session = self.service.sessions[data['id']]
+        self.assertEqual(data['qualities'], [1080, 720], 'Other published qualities remain visible in settings')
+        self.assertEqual(list(session.translations), ['1'])
+        self.assertEqual(list(session.translations['1']['qualities']), ['720'])
+        requests = Source.opened[-1].requests
+        self.assertEqual([url for url, _ in requests if url.endswith('.m3u8')], [ORIGIN + '1-720.m3u8'])
+        self.assertTrue(any(url.endswith('first.m4s') for url, _ in requests))
+        self.assertEqual((await self.client.get('/play/'+data['id']+'/1/720.m3u8')).status_code, 200)
+
     async def test_contract_rewrites_every_resource_and_checks_actual_segments(self):
         data = await self.resolve()
         self.assertEqual(set(data), {'sid', 'active_id', 'skip', 'subtitles', 'translations'})
@@ -115,6 +131,8 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         Source.html = True
         response = await self.client.get('/resolve', params={'iframe': IFRAME})
         self.assertEqual(response.status_code, 502)
+        self.assertEqual(self.profiles.failures, 0, 'Invalid content must not quarantine a browser for other titles')
+        self.assertEqual(self.profiles.unavailable_urls, [IFRAME])
         self.assertEqual(self.profiles.promotions, 0)
         self.assertFalse(self.service.sessions)
         self.assertTrue(Source.opened[0].closed)
@@ -182,7 +200,41 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(Source.opened[-1].closed)
 
 
+class BootstrapTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_iframe_fails_without_waiting_for_player_timeout(self):
+        session = NativeSession(None, IFRAME)
+        async def waiting(*args, **kwargs):
+            await asyncio.Event().wait()
+        session.frame = SimpleNamespace(wait_for_function=waiting)
+        response = SimpleNamespace(url=IFRAME, status=404, request=SimpleNamespace(resource_type='document'))
+        await session.observe(response)
+        with self.assertRaises(SourceInvalid) as error:
+            await asyncio.wait_for(session.wait_player(), .5)
+        self.assertEqual(error.exception.status, 404)
+
+    async def test_refused_iframe_stays_a_real_access_refusal(self):
+        session = NativeSession(None, IFRAME)
+        async def waiting(*args, **kwargs):
+            await asyncio.Event().wait()
+        session.frame = SimpleNamespace(wait_for_function=waiting)
+        await session.observe(SimpleNamespace(url=IFRAME, status=403, request=SimpleNamespace(resource_type='document')))
+        with self.assertRaises(SourceRefused):
+            await asyncio.wait_for(session.wait_player(), .5)
+
+
 class ProfileTests(unittest.TestCase):
+    def test_missing_title_does_not_quarantine_profile_for_other_titles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pool = NativeProfiles(directory)
+            profile = Profile('native', '/fixture', '1.2.3.4', 'signed-fixture')
+            pool.profiles = [profile]
+            for _ in range(3):
+                pool.unavailable(profile, IFRAME)
+            self.assertEqual(profile.refusals, 0)
+            self.assertEqual(profile.quarantine_until, 0)
+            self.assertIsNone(pool.choose(IFRAME))
+            self.assertIs(pool.choose(IFRAME+'&other=1'), profile)
+
     def test_three_refusals_quarantine_and_eighteen_successes_retire(self):
         with tempfile.TemporaryDirectory() as directory:
             now = [1000]

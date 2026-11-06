@@ -45,7 +45,9 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const [previewStore,setPreviewStore]=useState({}),[audio,setAudio]=useState(null),[captions,setCaptions]=useState([]),[trackError,setTrackError]=useState(''),[trackBusy,setTrackBusy]=useState(false);
  const trackClient=useRef('watch-'+crypto.randomUUID());
  const failed=useRef(new Set()),cache=useRef(new Map()),seasonUrls=useRef(new Map()),tracked=useRef('');
+ const refreshedAlloha=useRef(new Set());
  const voice=voices.find(v=>v.id===voiceId||v.aliases?.includes(voiceId))||voices[0];activeVoiceName.current=voice?.name||'';
+ const allohaRevision=(voice?.variants||[]).filter(isAllohaVariant).map(v=>v.id+':'+v.url).join('|');
  function persist(change){saved.current=saveWatch(userId,identity,change);}
  useEffect(()=>{if(voice&&voice.id!==voiceId)setVoiceId(voice.id);},[voice?.id,voiceId]);
  async function inspect(candidate,signal,selectedSeason=season){
@@ -76,6 +78,9 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   resolve(voice,episode,abort.signal).then(value=>{if(abort.signal.aborted)return;setEntries(value.entries);setSeasons(value.seasons);setVariant(value.variant);if(value.season!==season){setSeason(value.season);setBrowseSeason(value.season);}const selected=value.entries.find(e=>Number(e.number)===Number(episode))||value.entries[0];setEpisode(Number(selected.number));persist({voiceId:voice.id,episode:Number(selected.number),season:value.season});}).catch(e=>{if(!abort.signal.aborted){setVariant(null);setError(e.message);}}).finally(()=>!abort.signal.aborted&&setBusy(false));
   return()=>abort.abort();
  },[voice?.id,season,attempt,service.server]);
+ useEffect(()=>{
+  if(variant&&failed.current.has(variant.id)&&variantsFor(voice,episode,failed.current).length)setAttempt(n=>n+1);
+ },[allohaRevision]);
  useEffect(()=>{if(!playing||!voice)return;const key=identity+':'+voice.id+':'+season+':'+episode;if(tracked.current===key)return;tracked.current=key;
   persist({voiceId:voice.id,episode,season,usage:{...saved.current.usage,[voice.id]:(saved.current.usage?.[voice.id]||0)+1}});
  },[playing,voice?.id,episode,season,identity]);
@@ -147,7 +152,18 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
 
  const spoken=voices.filter(v=>v.kind!=='subtitles');
  function changeVoice(id,nextQuality=quality){failed.current.clear();setVoiceId(id);setAudioId('');setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
- function fallback(){if(!viewVariant)return false;failed.current.add(viewVariant.id);if(!variantsFor(voice,episode,failed.current).length)return false;setAttempt(n=>n+1);return true;}
+ function fallback(){
+  if(!viewVariant)return false;
+  failed.current.add(viewVariant.id);
+  if(!variantsFor(voice,episode,failed.current).length){
+   const key=[identity,voice?.id,season,episode].join(':');
+   if(isAllohaVariant(viewVariant)&&discovery.retry&&!refreshedAlloha.current.has(key)){
+    refreshedAlloha.current.add(key);discovery.retry();
+   }
+   return false;
+  }
+  setAttempt(n=>n+1);return true;
+ }
  function preview(number,image,selectedSeason=season,sourceId=viewVariant?.id,workIdentity=identity){setPreviewStore(old=>({...old,[workIdentity+':'+selectedSeason+':'+sourceId+':'+number]:image}));saveEpisodePreview(episodePreviewKey(workIdentity,selectedSeason,number,sourceId,userId),image);}
  const heights=qualityHeights(knownRows);
  const offeredVoices=quality==='best'||bestVideo?voices:voices.filter(v=>v.id===voice?.id||knownRows.some(r=>r.voiceId===v.id&&r.qualities.includes(Number(quality)))||!knownRows.some(r=>r.voiceId===v.id));
