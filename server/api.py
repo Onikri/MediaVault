@@ -207,6 +207,7 @@ async def lifespan(application):
     await lyrics_relay.start()
     yield
     await lyrics_relay.close()
+    await application.state.alloha_delivery.close()
     stopping.set()
     wakeup.set()
     from manga_discovery import shutdown as shutdown_manga_discovery
@@ -726,6 +727,8 @@ install_reader_translation(app, os.getenv("DATA_DIR", "/data"), owner)
 from anime_music import install as install_anime_music
 install_anime_music(app)
 
+from alloha_delivery import install as install_alloha
+install_alloha(app)
 from online_sessions import install as install_online
 install_online(app,owner)
 from music_playback import install as install_music_playback

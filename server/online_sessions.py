@@ -18,6 +18,7 @@ class Session:
     client_id:str=''
     max_height:int|None=None
     audio_mime:str=''
+    alloha:bool=False
     manifests:dict=field(default_factory=dict)
     resources:dict=field(default_factory=dict)
     reverse:dict=field(default_factory=dict)
@@ -218,6 +219,20 @@ def install(app,owner):
                 preparations[(subject,body.client_id)]=(reservation,time.monotonic()+60,body.purpose)
         disconnected=asyncio.Event();watcher=asyncio.create_task(watch_disconnect(request,disconnected))
         try:
+            if body.kind == 'video' and is_alloha_player(body.url) and hasattr(app.state, 'alloha_delivery'):
+                service = app.state.alloha_delivery
+                data = await service.prepare_online(body, subject)
+                if disconnected.is_set():
+                    await service.close_session(service.session(data['id']))
+                    raise HTTPException(499, 'Подготовка просмотра отменена.')
+                # Keep the existing player/room/download capability shape. The
+                # Alloha branch below delegates all actual I/O to its live browser.
+                native = service.session(data['id'])
+                with lock:
+                    bridge = Session(subject, {}, native.expires, client_id=body.client_id, alloha=True)
+                    bridge.resources['alloha-playback'] = body.url
+                    sessions[data['id']] = bridge
+                return data
             data=await run_in_threadpool(resolve,body,subject,reservation)
             if disconnected.is_set():
                 with lock:
@@ -233,7 +248,12 @@ def install(app,owner):
             with contextlib.suppress(asyncio.CancelledError):await watcher
 
     @app.delete('/online/{token}')
-    def close(token:str,subject=Depends(owner)):
+    async def close(token:str,subject=Depends(owner)):
+        service = getattr(app.state, 'alloha_delivery', None)
+        if service and token in service.sessions:
+            await service.close_session(service.sessions[token])
+            with lock:sessions.pop(token, None)
+            return {'closed': True}
         with lock:
             s=sessions.get(token)
             if s and s.owner==subject:del sessions[token]
@@ -241,6 +261,10 @@ def install(app,owner):
 
     @app.post('/online/{token}/heartbeat')
     def heartbeat(token:str,subject=Depends(owner)):
+        service = getattr(app.state, 'alloha_delivery', None)
+        if service and token in service.sessions:
+            session = service.session(token)
+            return {'expiresIn': max(0, int(session.expires - service.clock()))}
         with lock:
             expire();s=sessions.get(token)
             if not s or s.owner!=subject:raise HTTPException(410,'Онлайн-сеанс завершён. Открой главу снова.')
@@ -257,15 +281,22 @@ def install(app,owner):
             expire();s=sessions.get(token);url=s.resources.get(resource) if s else None
         if not s or not url or s.kind!='video':raise HTTPException(410,'Онлайн-сеанс завершён. Открой серию снова.')
         if not shutil.which('ffmpeg'):raise HTTPException(503,'На сервере нет ffmpeg для сохранения видео.')
-        target=url
-        with s.lock:cached=s.manifests.get(resource)
-        if cached:
-            playlist=m3u8.loads(cached[0],uri=cached[1])
-            if playlist.playlists:
-                variants=sorted(playlist.playlists,key=lambda v:(v.stream_info.resolution or (0,0))[1])
-                fitting=[v for v in variants if height and (v.stream_info.resolution or (0,0))[1]<=height]
-                target=urljoin(cached[1],(fitting or variants)[-1].uri)
-        local='http://127.0.0.1:'+os.getenv('PORT','7860')+'/online/'+token+'/'+(resource if target==url else s.resource(target))
+        if s.alloha:
+            service = app.state.alloha_delivery
+            native = service.session(token)
+            quality = service.select_quality(native.translations[native.active]['qualities'], str(height)) if height else native.online_quality
+            path = f'/play/{token}/{native.active}/{quality}.m3u8'
+        else:
+            target=url
+            with s.lock:cached=s.manifests.get(resource)
+            if cached:
+                playlist=m3u8.loads(cached[0],uri=cached[1])
+                if playlist.playlists:
+                    variants=sorted(playlist.playlists,key=lambda v:(v.stream_info.resolution or (0,0))[1])
+                    fitting=[v for v in variants if height and (v.stream_info.resolution or (0,0))[1]<=height]
+                    target=urljoin(cached[1],(fitting or variants)[-1].uri)
+            path='/online/'+token+'/'+(resource if target==url else s.resource(target))
+        local='http://127.0.0.1:'+os.getenv('PORT','7860')+path
         safe=re.sub(r'[\\/:*?"<>|\x00-\x1f]+',' ',name).strip()[:120] or 'video'
         # Our proxy URLs have no file extension; patched ffmpeg builds reject
         # such HLS segments unless extension_picky is off (only our proxy is read).
@@ -296,6 +327,11 @@ def install(app,owner):
             expire();s=sessions.get(token);url=s.resources.get(resource) if s else None
             if s and url and s.client_id:s.expires=time.monotonic()+LEASE_SECONDS
         if not s or not url:raise HTTPException(410,'Онлайн-сеанс завершён. Открой серию или главу снова.')
+        if s.alloha:
+            from anyio import from_thread
+            service = app.state.alloha_delivery
+            native = service.session(token)
+            return from_thread.run(service.play, token, native.active, native.online_quality)
         if range_header and not re.fullmatch(r'bytes=(?:\d+-\d*|-\d+)',range_header):raise HTTPException(416,'Некорректный диапазон.')
         if not s.slots.acquire(blocking=False):raise HTTPException(429,'Дождись загрузки предыдущих частей.')
         if s.kind=='music':
