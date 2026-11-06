@@ -460,7 +460,7 @@ class AllohaDelivery:
     async def play(self, sid, audio, quality):
         session = self.session(sid)
         value = session.translations.get(audio)
-        if not value or not quality.isdigit():
+        if not value or not re.fullmatch(r'[1-9]\d{0,3}', quality) or int(quality) > 8640:
             raise HTTPException(404, 'Озвучка или качество отсутствуют в сессии.')
         if audio != session.active:
             async with session.switch_lock:
