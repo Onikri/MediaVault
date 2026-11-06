@@ -26,7 +26,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const videoRef=mediaRef||ownRef;
   const health=usePlaybackHealth(videoRef,source,onError,autoPlay);
   useSmoothTimeline(videoRef,timeline,source);
-  const streaming=useVideoStream(videoRef,source,item.onlineType,onError,{quality:onlineControls?.quality||'best',startPosition:readResume(keyFor(userId,libraryId,item.id))||0});
+  const streaming=useVideoStream(videoRef,source,item.onlineType,onError,{quality:onlineControls?.quality||'best',startPosition:readResume(keyFor(userId,libraryId,item.id))||0,sessionRecovery:!!onlineControls?.sessionRecovery});
   const reducedMotion=useReducedMotion();
   useEffect(()=>{const pause=()=>videoRef.current?.pause();addEventListener('mediavault-music-playing',pause);return()=>removeEventListener('mediavault-music-playing',pause);},[]);
   const [prefs,setPrefs]=useState(getPrefs);

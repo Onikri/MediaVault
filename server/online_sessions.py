@@ -37,6 +37,15 @@ class Session:
 sessions={};lock=threading.RLock();preparations={}
 LEASE_SECONDS=120
 
+class AllohaPlaybackState(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    time: float = Field(ge=0, le=604800, allow_inf_nan=False)
+    paused: bool = Field(strict=True)
+    rate: float = Field(default=1, ge=.25, le=4, allow_inf_nan=False)
+    seeking: bool = Field(default=False, strict=True)
+    buffering: bool = Field(default=False, strict=True)
+    ended: bool = Field(default=False, strict=True)
+
 async def watch_disconnect(request,event):
     # Unlike is_disconnected()'s nonblocking poll, an active receive task also
     # observes disconnects through Starlette's buffered-body middleware.
@@ -262,14 +271,28 @@ def install(app,owner):
     @app.post('/online/{token}/heartbeat')
     def heartbeat(token:str,subject=Depends(owner)):
         service = getattr(app.state, 'alloha_delivery', None)
-        if service and token in service.sessions:
-            session = service.session(token)
-            return {'expiresIn': max(0, int(session.expires - service.clock()))}
         with lock:
             expire();s=sessions.get(token)
             if not s or s.owner!=subject:raise HTTPException(410,'Онлайн-сеанс завершён. Открой главу снова.')
+            if s.alloha:
+                if not service or token not in service.sessions:
+                    raise HTTPException(410,'Сессия Alloha завершена.')
+                session=service.sessions[token]
+                if session.closed or session.expires<=service.clock() or session.source.socket_closed:
+                    raise HTTPException(410,'Сессия Alloha завершена.')
+                return {'expiresIn': max(0, int(session.expires-service.clock()))}
             s.expires=time.monotonic()+LEASE_SECONDS
         return {'expiresIn':LEASE_SECONDS}
+
+    @app.post('/online/{token}/playback')
+    async def playback(token:str,body:AllohaPlaybackState,subject=Depends(owner)):
+        with lock:
+            session=sessions.get(token)
+            if not session or session.owner!=subject or not session.alloha:
+                raise HTTPException(404,'Сессия Alloha недоступна.')
+        service=getattr(app.state,'alloha_delivery',None)
+        if not service:raise HTTPException(410,'Сессия Alloha завершена.')
+        return await service.report_playback(token,subject,body.model_dump())
 
     @app.get('/online/{token}/{resource}/download')
     def download(token:str,resource:str,height:int=0,name:str='video'):

@@ -40,16 +40,28 @@ INIT = """() => {
     const send = Native.prototype.send;
     window.__allohaDelivery = {
         closed: false,
-        heartbeat() {
+        playback: null,
+        updatePlayback(value) {
+            const before = this.playback;
+            this.playback = {...value, received: Date.now()};
+            const stopped = value.paused || value.seeking || value.buffering;
+            const wasStopped = !before || before.paused || before.seeking || before.buffering;
+            this.heartbeat(value.ended ? 'ended' : stopped ? 'paused' : wasStopped ? 'resumed' : 'playing');
+        },
+        heartbeat(event) {
             if (this.closed || typeof player === 'undefined') return;
             const source = player.currentSource;
             if (!source) return;
+            const state = this.playback;
+            if (state?.ended && !event) return;
+            const stopped = !state || state.paused || state.seeking || state.buffering || Date.now() - state.received > 90000;
+            const type = event || (state?.ended ? 'ended' : stopped ? 'paused' : 'playing');
             for (const socket of sockets) {
                 if (socket.readyState !== Native.OPEN) continue;
-                send.call(socket, JSON.stringify({type: 'playing',
-                    current_time: Math.floor(player.currentTime || 0),
-                    resolution: String(player.quality || ''), track_id: String(source.audioId),
-                    speed: player.speed || 1, subtitle: player.currentTrack || 0, ts: Date.now()}));
+                send.call(socket, JSON.stringify({type,
+                    current_time: Math.floor(state?.time || 0),
+                    resolution: String(state?.quality || player.quality || ''), track_id: String(source.audioId),
+                    speed: state?.rate || 1, subtitle: player.currentTrack || 0, ts: Date.now()}));
             }
         },
         close() {
@@ -286,6 +298,14 @@ class NativeSession:
     async def metadata(self):
         return {'active_id': self.active_id, 'active': self.active, 'sources': self.sources,
                 'skip': self.skip, 'subtitles': self.subtitles}
+
+    async def update_playback(self, state):
+        if self.closed or self.socket_closed:
+            raise SourceRefused('Source session WebSocket closed')
+        try:
+            await asyncio.wait_for(self.frame.evaluate('value => window.__allohaDelivery.updatePlayback(value)', state), 5)
+        except Exception as error:
+            raise SourceRefused('Source session no longer accepts playback state') from error
 
     async def fetch(self, url, byte_range='', maximum=32 * 1024 * 1024):
         if self.closed or self.socket_closed:
