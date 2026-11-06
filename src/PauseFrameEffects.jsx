@@ -9,9 +9,9 @@ import {characterRoster} from './pause-character-context.js';
 import {recognizePauseFrame} from './pause-recognition.js';
 import './pause-frame.css';
 
-export default function PauseFrameEffects({videoRef,source,paused,enabled,modelAllowed=true,strength=.82,breathPeriod=10,breathAmplitude=.22,autoRecognize=false,visible=true,characterContext={},characterService,userId}){
+export default function PauseFrameEffects({videoRef,source,paused,enabled,mode='cinematic',modelAllowed=true,strength=.82,breathPeriod=10,breathAmplitude=.22,autoRecognize=false,visible=true,characterContext={},characterService,userId}){
  const contextRef=useRef(characterContext);contextRef.current=characterContext;
- const canvas=useRef(null),worker=useRef(null),busy=useRef(false),sequence=useRef(0),frame=useRef(null),cache=useRef(new Map()),renderer=useRef(null),recognition=useRef(null),cooldown=useRef(0),idleTimer=useRef(null),usedPause=useRef(false),settings=useRef({strength,enabled});settings.current={strength,enabled,breathPeriod,breathAmplitude};
+ const canvas=useRef(null),worker=useRef(null),busy=useRef(false),sequence=useRef(0),frame=useRef(null),cache=useRef(new Map()),renderer=useRef(null),recognition=useRef(null),cooldown=useRef(0),idleTimer=useRef(null),usedPause=useRef(false),settings=useRef({strength,enabled});settings.current={strength,enabled,breathPeriod,breathAmplitude,mode};
  const [view,setView]=useState({phase:'idle'}),[chars,setChars]=useState({phase:'idle',values:[]}),[selected,setSelected]=useState(null),[hovered,setHovered]=useState(null),[host,setHost]=useState(null),[rect,setRect]=useState(null),[retry,setRetry]=useState(0);
  const terminate=()=>{worker.current?.terminate();worker.current=null;busy.current=false;};
  useEffect(()=>()=>{clearTimeout(idleTimer.current);terminate();recognition.current?.abort();},[]);
@@ -100,7 +100,7 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
   if(!paused||!enabled||view.phase!=='ready'||!canvas.current)return;
   const element=canvas.current,video=videoRef.current,scale=960/Math.max(video.videoWidth,video.videoHeight);element.width=Math.round(video.videoWidth*scale);element.height=Math.round(video.videoHeight*scale);
   const image=frame.current?.image;let render;
-  try{render=depthRenderer(element,refined.width,refined.height);render.depth(refined.data);if(image){render.frame(image);render.blur(blurredCopy(image,7));}renderer.current=render;}
+  try{render=depthRenderer(element,refined.width,refined.height);render.depth(refined.data);if(image){render.frame(image);render.blur(blurredCopy(image,7));}render.mode(settings.current.mode);renderer.current=render;}
   catch(error){setView({phase:'error',message:error.message});return;}
   let raf=0,last=0,elapsed=0,pointerAt=0;const reduced=matchMedia('(prefers-reduced-motion: reduce)'),aim=[0,0],eased=[0,0];
   // Parallax follows the pointer; without one it drifts in a slow orbit.
@@ -108,12 +108,13 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
   const point=event=>{if(event.pointerType==='touch')return;const r=element.getBoundingClientRect();aim[0]=((event.clientX-r.left)/r.width-.5)*2;aim[1]=((event.clientY-r.top)/r.height-.5)*2;pointerAt=performance.now();};
   screen?.addEventListener('pointermove',point);
   const draw=now=>{raf=0;if(document.hidden)return;if(!last)last=now;if(now-last>=33||reduced.matches){const step=(now-last)/1000;elapsed+=step;last=now;
-    if(!reduced.matches){const idle=now-pointerAt>2500,tx=idle?Math.sin(elapsed*.35)*.55:aim[0],ty=idle?Math.sin(elapsed*.23+1)*.35:aim[1],k=1-Math.exp(-step*4);eased[0]+=(tx-eased[0])*k;eased[1]+=(ty-eased[1])*k;render.parallax(eased[0],eased[1]);}
+    if(!reduced.matches&&settings.current.mode!=='shadow'){const idle=now-pointerAt>2500,tx=idle?Math.sin(elapsed*.35)*.55:aim[0],ty=idle?Math.sin(elapsed*.23+1)*.35:aim[1],k=1-Math.exp(-step*4);eased[0]+=(tx-eased[0])*k;eased[1]+=(ty-eased[1])*k;render.parallax(eased[0],eased[1]);}
     render.draw(reduced.matches ? .48 : shadowCutoff(elapsed,{period:settings.current.breathPeriod,amplitude:settings.current.breathAmplitude}),settings.current.strength);}if(!reduced.matches)raf=requestAnimationFrame(draw);};
   const restart=()=>{cancelAnimationFrame(raf);last=0;if(!document.hidden){render.draw(reduced.matches ? .48 : shadowCutoff(elapsed,{period:settings.current.breathPeriod,amplitude:settings.current.breathAmplitude}),settings.current.strength);raf=requestAnimationFrame(draw);}};
   document.addEventListener('visibilitychange',restart);reduced.addEventListener('change',restart);restart();
   return()=>{cancelAnimationFrame(raf);screen?.removeEventListener('pointermove',point);document.removeEventListener('visibilitychange',restart);reduced.removeEventListener('change',restart);renderer.current=null;render.dispose();};
  },[paused,enabled,view.phase,view.data,refined]);
+ useEffect(()=>{const r=renderer.current;if(!r)return;r.mode(mode);if(mode==='shadow')r.parallax(0,0);r.draw();},[mode]);
  // Masks are flood-filled on the refined depth: its edges follow the drawing,
  // so the fill no longer leaks into background that the coarse map blurred in.
  const masks=useMemo(()=>{if(view.phase!=='ready')return new Map();return new Map(chars.values.map(c=>[c.id,depthSurface(refined.data,refined.width,refined.height,c.box,c.bodyBox,{tolerance:26})]));},[refined,view.phase,chars.values]);

@@ -9,7 +9,7 @@ export function depthRenderer(canvas,width,height){
  const vertex=shader(gl.VERTEX_SHADER,'attribute vec2 p; varying vec2 uv; void main(){uv=vec2((p.x+1.0)*.5,(1.0-p.y)*.5);gl_Position=vec4(p,0,1);}');
  const fragment=shader(gl.FRAGMENT_SHADER,`precision mediump float; varying vec2 uv;
  uniform sampler2D depthTex; uniform sampler2D maskTex; uniform sampler2D frameTex; uniform sampler2D blurTex;
- uniform vec2 offset; uniform float cutoff; uniform float strength; uniform float focus; uniform float hasFrame;
+ uniform vec2 offset; uniform float cutoff; uniform float strength; uniform float focus; uniform float hasFrame; uniform float shadowMode;
  float depthAt(vec2 p){return texture2D(depthTex,p).r;}
  void main(){
   // Slight zoom hides the edge the drift would otherwise reveal.
@@ -21,6 +21,14 @@ export function depthRenderer(canvas,width,height){
   float d=depthAt(p);
   float t=smoothstep(cutoff-.32,cutoff+.32,d);float near=t*t*(3.0-2.0*t);float far=1.0-near;
   float m=texture2D(maskTex,p).r*focus;
+  // "Shadow" mode: the original creeping black plane over the relief, now on
+  // the refined depth. No drift, no blur: a contrasting, cinematic cut.
+  if(shadowMode>.5){
+   float s=smoothstep(cutoff-.209,cutoff+.209,depthAt(c));float lit=pow(s*s*(3.0-2.0*s),1.25);
+   float shade=(1.0-lit)*strength*(1.0-m*.94);
+   vec3 base=hasFrame>.5?texture2D(frameTex,c).rgb:vec3(0.);
+   gl_FragColor=hasFrame>.5?vec4(base*(1.0-shade),1.0):vec4(0.,0.,0.,shade);return;
+  }
   if(hasFrame<.5){gl_FragColor=vec4(0.,0.,0.,far*strength*(1.0-m));return;}
   vec3 sharp=texture2D(frameTex,p).rgb,soft=texture2D(blurTex,p).rgb;
   // Depth of field only on the far layer, eased so mid-depth stays crisp.
@@ -39,7 +47,7 @@ export function depthRenderer(canvas,width,height){
  const textures=[0,1,2,3].map(unit=>{const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t;});
  const u=name=>gl.getUniformLocation(program,name);
  gl.uniform1i(u('depthTex'),0);gl.uniform1i(u('maskTex'),1);gl.uniform1i(u('frameTex'),2);gl.uniform1i(u('blurTex'),3);gl.uniform1f(u('hasFrame'),0);
- const cut=u('cutoff'),mix=u('strength'),focusUniform=u('focus'),offsetUniform=u('offset');
+ const cut=u('cutoff'),mix=u('strength'),focusUniform=u('focus'),offsetUniform=u('offset'),modeUniform=u('shadowMode');gl.uniform1f(modeUniform,0);
  const upload=(unit,data)=>{gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,textures[unit]);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.LUMINANCE,width,height,0,gl.LUMINANCE,gl.UNSIGNED_BYTE,data);};
  const image=(unit,source)=>{gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,textures[unit]);gl.pixelStorei(gl.UNPACK_ALIGNMENT,4);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);};
  upload(0,new Uint8Array(width*height));upload(1,new Uint8Array(width*height));
@@ -49,6 +57,7 @@ export function depthRenderer(canvas,width,height){
   frame(source){if(!source)return;try{image(2,source);if(!hasBlur)image(3,source);gl.uniform1f(u('hasFrame'),1);}catch{gl.uniform1f(u('hasFrame'),0);}},
   blur(source){if(!source)return;try{image(3,source);hasBlur=true;}catch{}},
   parallax(x,y){offset=[Math.max(-1,Math.min(1,x)),Math.max(-1,Math.min(1,y))];},
+  mode(value){gl.uniform1f(modeUniform,value==='shadow'?1:0);},
   surface(data,{immediate=false}={}){target=data?1:0;if(data&&data!==lastMask){if(data.length===width*height)upload(1,data);lastMask=data;focus=0;}if(immediate)focus=target;},
   draw(cutoff=lastCutoff,strength=lastStrength){lastCutoff=cutoff;lastStrength=strength;const now=performance.now();focus+=(target-focus)*(1-Math.exp(-Math.max(0,now-lastDraw)/160));lastDraw=now;gl.viewport(0,0,canvas.width,canvas.height);gl.uniform1f(cut,cutoff);gl.uniform1f(mix,strength);gl.uniform1f(focusUniform,focus);gl.uniform2f(offsetUniform,offset[0],offset[1]);gl.drawArrays(gl.TRIANGLES,0,6);},
   dispose(){textures.forEach(t=>gl.deleteTexture(t));gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.deleteShader(vertex);gl.deleteShader(fragment);}
