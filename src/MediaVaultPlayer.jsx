@@ -132,12 +132,35 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   const selectorSeasons=onlineControls?.seasonOptions||seasons;
   // On a title page the room chat takes the right column's top (ratings slide
   // below it) so the player keeps its width while a room is live.
+  // The retained player is portalled into document.body, so the title layout is
+  // found through its anchor on the page; it is re-checked when the player turns
+  // into a popup, theater mode hides the column, the route or the width changes.
   const [chatSlot,setChatSlot]=useState(null),roomLive=!!room.info;
   useEffect(()=>{
-    const sidebar=roomLive&&stageRef.current?.closest('.mv-title-layout')?.querySelector('.title-sidebar');
-    if(!sidebar||getComputedStyle(sidebar).display==='none'){setChatSlot(null);return;}
-    const slot=document.createElement('div');slot.className='room-chat-slot';sidebar.prepend(slot);sidebar.classList.add('has-room-chat');setChatSlot(slot);
-    return()=>{slot.remove();sidebar.classList.remove('has-room-chat');setChatSlot(null);};
+    if(!roomLive){setChatSlot(null);return;}
+    let slot=null,sidebar=null,frame=0,watched=null;
+    const observer=new MutationObserver(()=>schedule());
+    const release=()=>{
+      const old=slot;old?.classList.add('is-leaving');setTimeout(()=>old?.remove(),320);
+      sidebar?.classList.remove('has-room-chat');slot=sidebar=null;setChatSlot(null);
+    };
+    const place=()=>{
+      frame=0;
+      const stage=stageRef.current,host=stage?.closest('.retained-media-host');
+      const anchor=host?document.querySelector('[data-retained-slot="'+CSS.escape(host.dataset.session||'')+'"]'):stage;
+      const layout=host&&host.dataset.mode!=='attached'?null:anchor?.closest('.mv-title-layout');
+      if(watched!==layout){observer.disconnect();watched=layout;if(host)observer.observe(host,{attributes:true,attributeFilter:['data-mode']});if(layout)observer.observe(layout,{attributes:true,attributeFilter:['class']});}
+      const next=layout?.querySelector('.title-sidebar');
+      if(!next||getComputedStyle(next).display==='none'){if(slot)release();return;}
+      if(slot&&sidebar===next&&slot.isConnected)return;
+      if(slot)release();
+      slot=document.createElement('div');slot.className='room-chat-slot';next.prepend(slot);next.classList.add('has-room-chat');sidebar=next;setChatSlot(slot);
+    };
+    const schedule=()=>{if(!frame)frame=requestAnimationFrame(place);};
+    place();
+    const late=setTimeout(schedule,400);
+    addEventListener('hashchange',schedule);addEventListener('resize',schedule);
+    return()=>{clearTimeout(late);cancelAnimationFrame(frame);observer.disconnect();removeEventListener('hashchange',schedule);removeEventListener('resize',schedule);slot?.remove();sidebar?.classList.remove('has-room-chat');setChatSlot(null);};
   },[roomLive]);
   const toggleCaptions=controller.toggleCaptions;
   // Online sessions are capability URLs: the server remuxes the playing

@@ -43,8 +43,12 @@ html[data-blossom] .rc-chat{flex:1;min-height:120px;overflow:auto;margin:0;paddi
 @media (pointer:coarse){.rc-tool{height:44px}.rc-member-main{min-height:48px}}
 /* Title page: the live room chat sits at the top of the right column. */
 .title-sidebar.has-room-chat{display:flex;flex-direction:column;gap:18px}
-.room-chat-slot{position:sticky;top:76px;z-index:2;animation:room-chat-in var(--motion-standard,300ms) var(--ease-expressive,ease) both}
+/* The slot grows from zero height, so the ratings below slide down instead of
+   jumping; closing the room collapses it the same way before it is removed. */
+.room-chat-slot{position:sticky;top:76px;z-index:2;overflow:clip;overflow-clip-margin:8px;animation:room-chat-in 420ms var(--ease-expressive,cubic-bezier(.2,.8,.2,1)) both}
+.room-chat-slot.is-leaving{pointer-events:none;animation:room-chat-out 300ms ease-in both}
 .room-chat-slot .player-room-conversation.is-sidebar{display:block}
 .room-chat-slot .rc{height:min(640px,calc(100svh - 110px));max-height:none}
-@keyframes room-chat-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.room-chat-slot{animation:none}}
+@keyframes room-chat-in{from{max-height:0;opacity:0;margin-bottom:-18px;transform:translateY(-8px)}60%{opacity:1}to{max-height:700px;opacity:1;margin-bottom:0;transform:none}}
+@keyframes room-chat-out{from{max-height:700px;opacity:1}to{max-height:0;opacity:0;margin-bottom:-18px}}
+@media(prefers-reduced-motion:reduce){.room-chat-slot,.room-chat-slot.is-leaving{animation:none}}
