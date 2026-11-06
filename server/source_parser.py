@@ -157,7 +157,7 @@ class PublicHttp:
     def fork(self):
         value=PublicHttp(validate=self.validate,timeout=self.timeout,deadline=self.deadline);value.bulk=getattr(self,'bulk',False);return value
 
-    def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None):
+    def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None, action=None):
         url = self.validate(value)
         outgoing = playback_headers(headers)
         if urlsplit(url).hostname in {'animego.org','animego.me'} and re.fullmatch(r'/player/(?:videos/)?\d+/?',urlsplit(url).path):
@@ -176,7 +176,15 @@ class PublicHttp:
                          and isinstance(data.get('story'),str) and 0<len(data['story'])<=200)
             manga_form=(host=='mangaball.com' and urlsplit(url).scheme=='https' and urlsplit(url).path=='/api/v1/chapter/chapter-listing-by-title-id'
                         and not urlsplit(url).query and isinstance(data,bytes) and bool(re.fullmatch(rb'\{"title_id":\s*"[a-f0-9]{24}"\}',data)))
-            if not (player_form or search_form or manga_form):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            chan_search = (action == 'hentaichan-search' and url == 'https://hentaichan.cc/'
+                           and isinstance(data, str) and 0 < len(data) <= 200)
+            if not (player_form or search_form or manga_form or chan_search):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            if chan_search:
+                # The public search box's Next.js action. The caller supplies only the title.
+                outgoing.update({'Next-Action': '7fe1df09f7c8151b600f1a3e496cdda2e7ed7f0f95',
+                                 'Accept': 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8',
+                                 'Origin': 'https://hentaichan.cc', 'Referer': 'https://hentaichan.cc/'})
+                data = json.dumps([{'name': data, 'page': 1, 'limit': 24}]).encode()
             if manga_form:outgoing['Content-Type']='application/json'
             if player_form:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
@@ -201,7 +209,7 @@ class PublicHttp:
                 if not location or hop == 5:
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
-                if method == "POST" and urlsplit(next_url).netloc != urlsplit(url).netloc:
+                if method == "POST" and (action or urlsplit(next_url).netloc != urlsplit(url).netloc):
                     raise SourceError("Плеер перенаправил форму на другой сервер.")
                 if response.status_code == 303:
                     method, data = "GET", None
@@ -218,8 +226,10 @@ class PublicHttp:
             return response, url
         raise SourceError("Слишком много перенаправлений.")
 
-    def document(self, value, *, headers=None, method="GET", data=None, timeout=None):
+    def document(self, value, *, headers=None, method="GET", data=None, timeout=None, action=None):
         options = {'timeout': timeout} if timeout else {}
+        if action:
+            options['action'] = action
         response, url = self._open(value, headers=headers, method=method, data=data, **options)
         try:
             parts, size, start = [], 0, time.monotonic()

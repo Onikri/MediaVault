@@ -72,7 +72,8 @@ class HentaiChanTests(unittest.TestCase):
     def test_discovery_lists_native_and_dispatches_it(self):
         with patch.object(manga_discovery.bridge,'sources',return_value=[]),patch('manga_source_health.states',return_value={}):
             value=manga_discovery.source_list('ru','HentaiChan')
-            self.assertEqual(len(value['sources']),1);self.assertTrue(value['sources'][0]['adult'])
+            self.assertEqual({row['name'] for row in value['sources']},{'HentaiChan','HentaiChan.cc'})
+            self.assertTrue(all(row['adult'] for row in value['sources']))
         row=parse_search('<div class="content_row"><a class="title_link" href="'+MANGA+'">Neutral story</a></div>',BASE)[0]
         with patch('manga_hentaichan.search',return_value=[row]) as search:
             result=manga_discovery.search_source(SOURCE,'Neutral story')

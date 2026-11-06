@@ -18,9 +18,10 @@ class RawSources(unittest.TestCase):
    def __init__(self,**kwargs):pass
    def close(self):pass
   def search(query,site,http):calls.append((query,site.id));return []
-  with patch('manga_sources.PublicHttp',Http),patch('manga_raw_adapters.search',side_effect=search),patch('manga_catalog_adapters.dex_search',return_value=[]):
+  with patch('manga_sources.PublicHttp',Http),patch('manga_raw_adapters.search',side_effect=search),patch('manga_catalog_adapters.dex_search',return_value=[]),patch('manga_hitomi.search',return_value=[]) as hitomi:
    result=sources.search_title({'kind':'manga','title':'Тест','titles':{'ja':'テスト'},'aliases':['Test Manga']},'ja')
-  self.assertEqual({p['provider'] for p in result['providers']},{'mangadex','senmanga','mangaraw'});self.assertTrue(all(next(q for q,s in calls if s==provider)=='テスト' for provider in {'senmanga','mangaraw'}));self.assertEqual(result['language'],'ja')
+  self.assertEqual({p['provider'] for p in result['providers']},{'mangadex','senmanga','mangaraw','hitomi'});self.assertTrue(all(next(q for q,s in calls if s==provider)=='テスト' for provider in {'senmanga','mangaraw'}));self.assertEqual(result['language'],'ja')
+  self.assertEqual(hitomi.call_args_list[0].args[0],'テスト')
  def test_webtoon_filter_retains_korean_original_readers(self):
   class Http:
    def __init__(self,**kwargs):pass

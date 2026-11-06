@@ -24,6 +24,8 @@ class MangaSite:
     format:str=''
 
 SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan',('x17.h-chan.me',)),
+       MangaSite('hentaichan-cc','HentaiChan.cc','https://hentaichan.cc','hentaichan-cc'),
+       MangaSite('hitomi','Hitomi','https://hitomi.la','hitomi',languages=('en','ja','ru','ko')),
        MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('mangapoisk.io','eropoisk.com')),
        MangaSite('mangahub','MangaHub','https://mangahub.ru','hub'),
        MangaSite('mangachan','MangaChan','https://im.manga-chan.me','chan',('manga-chan.me','mangachan.me')),
@@ -126,12 +128,18 @@ def search_title(title,language='auto',format='all'):
         http=PublicHttp(timeout=(3,18) if site.family=='hentaichan' else (3,6),deadline=time.monotonic()+38 if site.family=='hentaichan' else search_deadline);results=[];message='Точное совпадение не найдено.';status='empty'
         try:
             queries=[q for q in aliases(title) if re.search('[a-z]',q,re.I) and not re.search('[а-яё]',q,re.I)] if site.family in {'pill','katana','webtoons'} else aliases(title)
-            if site.languages==('ja',):queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\u3040-\u30ff\u3400-\u9fff]',q)))
-            if site.languages==('ko',):queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\uac00-\ud7af]',q)))
+            if site.languages==('ja',) or site.family=='hitomi' and language=='ja':queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\u3040-\u30ff\u3400-\u9fff]',q)))
+            if site.languages==('ko',) or site.family=='hitomi' and language=='ko':queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\uac00-\ud7af]',q)))
             for query in queries[:2]:
                 if site.family=='hentaichan':
                     from manga_hentaichan import search
                     candidates=search(query,http)
+                elif site.family=='hentaichan-cc':
+                    from manga_hentaichan_cc import search
+                    candidates=search(query,http)
+                elif site.family=='hitomi':
+                    from manga_hitomi import search
+                    candidates=search(query,http,'all' if language=='auto' else language)
                 elif site.family in {'dex','lib'}:
                     from manga_catalog_adapters import dex_search,lib_search
                     candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http,4 if site.id=='hentailib' else 1)
@@ -231,6 +239,12 @@ def inspect(url,http=None):
         if initial and initial.family=='hentaichan':
             from manga_hentaichan import inspect as inspect_hentaichan
             return inspect_hentaichan(url,http)
+        if initial and initial.family=='hentaichan-cc':
+            from manga_hentaichan_cc import inspect as inspect_chan_cc
+            return inspect_chan_cc(url,http)
+        if initial and initial.family=='hitomi':
+            from manga_hitomi import inspect as inspect_hitomi
+            return inspect_hitomi(url,http)
         if initial and initial.family=='novelcool':
             from manga_novelcool import inspect as inspect_novelcool
             return inspect_novelcool(url,http)

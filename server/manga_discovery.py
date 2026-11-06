@@ -29,7 +29,9 @@ def normalize(value):
 
 def installed_sources():
     from manga_hentaichan import SOURCE
-    return [*bridge.sources(),dict(SOURCE)]
+    from manga_hentaichan_cc import SOURCE as CHAN_CC
+    from manga_hitomi import SOURCES as HITOMI
+    return [*bridge.sources(),dict(SOURCE),dict(CHAN_CC),*(dict(s) for s in HITOMI)]
 
 def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
@@ -99,10 +101,17 @@ def native_search_source(source,query):
              'sourceOnly':True,'ids':{},'genres':[],'tags':[]} for row in found.values()][:40]
 
 def search_source(source,query):
-    if source.get('name')=='HentaiChan':
-        from manga_hentaichan import search
+    if source.get('name') in {'HentaiChan','HentaiChan.cc','Hitomi'}:
         from title_identity import match_title
         from source_parser import PublicHttp
+        if source['name']=='HentaiChan':
+            from manga_hentaichan import search
+        elif source['name']=='HentaiChan.cc':
+            from manga_hentaichan_cc import search
+        else:
+            from functools import partial
+            from manga_hitomi import search as hitomi_search
+            search=partial(hitomi_search,language=source['lang'])
         http=PublicHttp(timeout=(3,18),deadline=time.monotonic()+38)
         try:
             found={}
@@ -110,7 +119,7 @@ def search_source(source,query):
                 for row in search(term,http):
                     selected=source.get('_title') or source.get('_alias_title')
                     if selected and not match_title(selected,row)[0]:continue
-                    if not selected and not any(normalize(term) in normalize(v) for v in row['aliases']):continue
+                    if source['name']=='HentaiChan' and not selected and not any(normalize(term) in normalize(v) for v in row['aliases']):continue
                     found[row['id']]=row
                 if found:break
             return list(found.values())
