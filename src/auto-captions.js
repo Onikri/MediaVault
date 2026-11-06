@@ -76,6 +76,74 @@ export function prepareAutoCaptions(language,translateTo){
 // training subtitles); never shown as captions.
 const HALLUCINATIONS=/(редактор субтитров|корректор|субтитры (сделал|создавал|подготовил)|продолжение следует|спасибо за (просмотр|внимание)|подписывайтесь|thanks? for watching|subtitles by|please subscribe|ご視聴ありがとうございました|字幕)/i;
 
+// Google: gemini-3.5-transcribe-live over the Live API WebSocket, text only.
+// Our server mints a one-use token (the API key stays on Oracle), or the
+// viewer's personal translator key is used. Sessions are renewed every 9 min
+// (Google closes audio sessions at 15 min) with a short overlap.
+const LIVE_URL='wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
+async function personalKey(userId){
+ try{const config=JSON.parse(localStorage.getItem('mv_lmt_settings:'+userId)||'{}');if(config.engine!=='direct')return null;}catch{return null;}
+ const {restoreDirectKeys}=await import('./manga-direct-key.js');const keys=await restoreDirectKeys(String(userId||'anonymous'));
+ return keys.length?keys[Math.floor(Math.random()*keys.length)]:null;
+}
+async function liveUrl(service,userId){
+ const key=await personalKey(userId).catch(()=>null);
+ if(!service?.request)throw Error('Подключи сервер Oracle в профиле для субтитров Google.');
+ const data=await service.request('/reader/google/live-token',{method:'POST',body:key?{key}:{}});
+ return LIVE_URL+'Constrained?access_token='+encodeURIComponent(data.token);
+}
+// Fallback translation when Chrome's on-device Translator is not available.
+async function geminiTranslate(text,from,to,{service,userId},previous){
+ const key=await personalKey(userId).catch(()=>null);
+ const names={ja:'японского',ru:'русского',en:'английского'},target={ru:'русский',en:'английский'}[to];
+ const request={systemInstruction:{parts:[{text:'Ты переводишь субтитры аниме с '+names[from]+' на '+target+'. Верни только перевод одной реплики, живым разговорным языком, без кавычек и пояснений. Предыдущие реплики даны для контекста, их не переводи.'}]},contents:[{role:'user',parts:[{text:(previous.length?'Контекст: '+previous.join(' / ')+'\n':'')+'Реплика: '+text}]}],generationConfig:{temperature:.2,maxOutputTokens:200}};
+ const result=await service.request('/reader/google/generate',{method:'POST',body:{...(key?{key}:{}),model:'gemini-3.5-flash-lite',request}});
+ return (result?.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim()||text;
+}
+async function startGoogle({media,language,translateTo,translator,show,onStatus,signal,service,userId}){
+ const track=await audioTrack(media,signal);if(!track)throw Error('Браузер не отдаёт звук видео для распознавания.');
+ const ctx=new AudioContext(),source=ctx.createMediaStreamSource(new MediaStream([track])),node=ctx.createScriptProcessor(4096,1,1),mute=ctx.createGain();mute.gain.value=0;
+ const ratio=ctx.sampleRate/16000;let carry=new Int16Array(0),active=true,sockets=[],renew=0;
+ const recent=[],needsTranslation=translateTo&&translateTo!==language;
+ const deliver=async text=>{
+  text=text.trim();if(!text||!active)return;
+  let shown=text;
+  if(needsTranslation){shown=translator?await translator.translate(text).catch(()=>null):null;if(!shown)shown=await geminiTranslate(text,language,translateTo,{service,userId},recent.slice(-2)).catch(()=>text);}
+  recent.push(text);if(recent.length>4)recent.shift();
+  // A whole utterance can be several sentences: show them as a sequence of
+  // short captions (≤ ~70 chars), each for a time proportional to its length.
+  const parts=shown.match(/[^。！？!?.…]+[。！？!?.…]*\s*/g)||[shown],lines=[];
+  for(const part of parts){const last=lines.at(-1);if(last&&(last+part).length<=70)lines[lines.length-1]=last+part;else lines.push(part);}
+  queue=queue.then(async()=>{for(const line of lines){if(!active)return;show(line.trim(),true);await new Promise(r=>setTimeout(r,Math.max(1800,Math.min(5000,line.length*70))));}});
+ };
+ let queue=Promise.resolve();
+ const open=async()=>{
+  const ws=new WebSocket(await liveUrl(service,userId));let pending='';
+  ws.onopen=()=>ws.send(JSON.stringify({setup:{model:'models/gemini-3.5-transcribe-live',generationConfig:{responseModalities:['TEXT']},inputAudioTranscription:{}}}));
+  ws.onmessage=async event=>{
+   let message;try{message=JSON.parse(typeof event.data==='string'?event.data:await event.data.text());}catch{return;}
+   const piece=message.serverContent?.inputTranscription?.text;
+   if(piece){pending+=piece;if(/[。！？!?.…]\s*$/.test(pending)||pending.length>80){const line=pending;pending='';deliver(line);}}
+   if(message.serverContent?.turnComplete&&pending){const line=pending;pending='';deliver(line);}
+  };
+  ws.onclose=event=>{sockets=sockets.filter(s=>s!==ws);if(active&&!sockets.length)onStatus(event.code===1000?'':'Субтитры Google переподключаются…');if(active&&!sockets.length)setTimeout(()=>{if(active&&!sockets.length)open().then(s=>sockets.push(s)).catch(e=>onStatus(e.message));},1500);};
+  return ws;
+ };
+ sockets.push(await open());onStatus('');
+ renew=setInterval(async()=>{if(!active)return;try{const next=await open();sockets.push(next);const old=sockets.filter(s=>s!==next);setTimeout(()=>old.forEach(s=>{try{s.close(1000);}catch{}}),5000);}catch(e){onStatus(e.message);}},9*60*1000);
+ node.onaudioprocess=event=>{
+  if(!active||media.paused)return;
+  const input=event.inputBuffer.getChannelData(0),length=Math.floor(input.length/ratio),samples=new Int16Array(carry.length+length);samples.set(carry);
+  for(let i=0;i<length;i++){const v=input[Math.min(input.length-1,Math.floor(i*ratio))];samples[carry.length+i]=Math.max(-32768,Math.min(32767,Math.round(v*32767)));}
+  let offset=0;
+  while(samples.length-offset>=1600){const chunk=samples.subarray(offset,offset+1600);offset+=1600;const bytes=new Uint8Array(chunk.buffer,chunk.byteOffset,chunk.byteLength);let binary='';for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);const data=btoa(binary);
+   for(const ws of sockets)if(ws.readyState===1)ws.send(JSON.stringify({realtimeInput:{audio:{data,mimeType:'audio/pcm;rate=16000'}}}));}
+  carry=samples.slice(offset);
+ };
+ source.connect(node);node.connect(mute).connect(ctx.destination);
+ return {engine:'google',stop(){active=false;clearInterval(renew);for(const ws of sockets)try{ws.close(1000);}catch{}try{source.disconnect();node.disconnect();}catch{}ctx.close().catch(()=>{});}};
+}
+
 let worker=null;
 function whisperWorker(){if(!worker)worker=new Worker(new URL('./auto-captions.worker.js',import.meta.url),{type:'module'});return worker;}
 
@@ -112,7 +180,7 @@ async function startWhisper({media,language,translateTo,translator,show,onStatus
 }
 
 // language: 'off'|'ja'|'ru'|'en'; translateTo: ''|'ru'|'en'; engine: 'auto'|'native'|'whisper'
-export function useAutoCaptions(mediaRef,{language='off',translateTo='',engine='auto'},active){
+export function useAutoCaptions(mediaRef,{language='off',translateTo='',engine='auto',service=null,userId=''},active){
  const [text,setText]=useState(''),[status,setStatus]=useState(''),[running,setRunning]=useState('');
  const clear=useRef(0);
  useEffect(()=>{
@@ -125,12 +193,14 @@ export function useAutoCaptions(mediaRef,{language='off',translateTo='',engine='
    const translator=await translatorFor(language,translateTo,setStatus).catch(()=>null);
    if(closed)return;
    const fallback=async()=>{if(closed||engine==='native')return;session?.stop();setStatus('Chrome не распознаёт звук видео — переключились на Whisper.');session=await startWhisper({media,language,translateTo,translator,show,onStatus:v=>setStatus(v||''),signal}).catch(e=>{setStatus(e.message);return null;});if(session)setRunning(session.engine);};
-   if(engine!=='whisper'){try{session=await startNative({media,language,translator,show,onStatus:setStatus,signal,onFail:fallback});}catch(error){if(engine==='native'){setStatus(error.message==='native-unavailable'?'Распознавание Chrome на устройстве недоступно для этого языка.':error.message);return;}}}
+   // Google first (most accurate), then Chrome on-device, then Whisper.
+   if((engine==='auto'||engine==='google')&&service?.request){try{session=await startGoogle({media,language,translateTo,translator,show,onStatus:setStatus,signal,service,userId});}catch(error){if(engine==='google'){setStatus(error.message);return;}}}
+   if(!session&&engine!=='whisper'&&engine!=='google'){try{session=await startNative({media,language,translator,show,onStatus:setStatus,signal,onFail:fallback});}catch(error){if(engine==='native'){setStatus(error.message==='native-unavailable'?'Распознавание Chrome на устройстве недоступно для этого языка.':error.message);return;}}}
    if(!session&&!closed)session=await startWhisper({media,language,translateTo,translator,show,onStatus:setStatus,signal});
    if(closed){session?.stop();return;}
    setRunning(session.engine);
   })().catch(error=>{if(!closed)setStatus(error.message||'Автосубтитры недоступны.');});
   return()=>{closed=true;abort.abort();clearTimeout(clear.current);session?.stop();};
- },[mediaRef,language,translateTo,engine,active]);
+ },[mediaRef,language,translateTo,engine,active,service,userId]);
  return {text,status,engine:running};
 }

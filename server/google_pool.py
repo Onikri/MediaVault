@@ -24,6 +24,11 @@ class KeySlot(BaseModel):
     project:str=Field(default='',max_length=100,pattern=r'^[A-Za-z0-9_.-]*$')
 class KeyPool(BaseModel):
     slots:list[KeySlot]=Field(min_length=1,max_length=3)
+LIVE_TRANSCRIBE='gemini-3.5-transcribe-live'
+_live_turn=-1
+class LiveToken(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    key:SecretStr|None=None
 class Generate(BaseModel):
     model_config=ConfigDict(extra='forbid')
     key:SecretStr|None=None
@@ -78,6 +83,32 @@ def install(app,owner,get_store):
         if store is None:raise HTTPException(503,'Хранилище сервера не готово.')
         store.setting(SETTING,{'slots':rows,'updated':time.time()})
         return status_rows()
+    @app.post('/reader/google/live-token')
+    async def live_token(body:LiveToken,subject=Depends(owner)):
+        """One-use Live API token for in-player captions (gemini transcribe).
+
+        The browser opens Google's WebSocket itself with this short-lived
+        token; the API key never leaves this server. A personal key from the
+        translator settings may be used instead of the server pool."""
+        if body.key is not None:
+            key=body.key.get_secret_value().strip()
+            if not key or len(key)>512 or any(c.isspace() for c in key):raise HTTPException(422,'Проверь личный ключ Google.')
+        else:
+            rows=saved()
+            if not rows:raise HTTPException(422,'Добавь ключ Google в настройках переводчика, чтобы включить субтитры Google.')
+            global _live_turn
+            _live_turn=(_live_turn+1)%len(rows);key=rows[_live_turn]['key']
+        from datetime import datetime,timedelta,timezone
+        now=datetime.now(timezone.utc);fmt=lambda minutes:(now+timedelta(minutes=minutes)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        try:
+            async with httpx.AsyncClient(timeout=15,follow_redirects=False) as client:
+                response=await client.post('https://generativelanguage.googleapis.com/v1beta/auth_tokens',headers={'x-goog-api-key':key},json={'uses':1,'expireTime':fmt(16),'newSessionExpireTime':fmt(2)})
+        except httpx.HTTPError:
+            raise HTTPException(502,'Google не ответил на запрос токена субтитров.') from None
+        if response.status_code!=200:raise HTTPException(502 if response.status_code>=500 else 422,'Google отклонил токен субтитров · HTTP '+str(response.status_code))
+        name=str(response.json().get('name',''))
+        if not name.startswith('auth_tokens/'):raise HTTPException(502,'Google вернул некорректный токен.')
+        return {'token':name,'model':LIVE_TRANSCRIBE,'expiresIn':15*60}
     @app.post('/reader/google/generate')
     async def generate(body:Generate,connection:Request,subject=Depends(owner)):
         if body.model not in MODELS:raise HTTPException(422,'Выбери поддерживаемую модель Google.')
