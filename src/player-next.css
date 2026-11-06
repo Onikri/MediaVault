@@ -459,3 +459,19 @@
 /* Grouped engine lists in the enhancement block */
 .mvx-engine-group .mvx-choices{max-height:none}
 .mvx-engine-group .mvx-subhead{margin-top:8px}
+
+/* Launch screen of online viewing: the same language as the paused player. */
+.watch-idle.mvx-idle{position:relative;display:block;aspect-ratio:16/9;border:0;border-radius:18px;background:#0d0d0f;overflow:hidden;isolation:isolate}
+.watch-idle.mvx-idle::before{display:none}
+.mvx-idle-poster{position:absolute;inset:0;z-index:0;background-image:var(--watch-poster);background-size:cover;background-position:center 30%;transform:scale(1.03)}
+.mvx-idle-poster::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,#000000d9 0%,#0000008c 45%,#00000033 80%),linear-gradient(0deg,#000000c7,transparent 55%)}
+.mvx .mvx-idle-overview{bottom:clamp(56px,14%,110px);pointer-events:auto}
+.mvx-idle-busy{align-items:center;gap:10px!important}
+.mvx-idle-busy .mvx-spinner{width:16px;height:16px;border-width:2px}
+.mvx-idle-bar{position:absolute;z-index:6;right:clamp(14px,2.6%,28px);bottom:clamp(14px,2.6%,24px);display:flex;align-items:center;gap:6px}
+.mvx .mvx-idle-chip{display:flex;align-items:center;max-width:220px;height:40px;padding:0 14px;border-radius:10px;background:#00000080;backdrop-filter:blur(16px);font-size:13px;font-weight:500;color:#fff}
+.mvx .mvx-idle-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mvx .mvx-idle-settings{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:#00000080;backdrop-filter:blur(16px);color:#ffffffd6}
+.mvx .mvx-idle-chip:hover,.mvx .mvx-idle-settings:hover,.mvx .mvx-idle-settings[aria-expanded=true]{background:#000000b8;color:#fff}
+@media(max-width:650px){.watch-idle.mvx-idle{border-radius:12px}.mvx .mvx-idle-overview{bottom:62px}.mvx .mvx-idle-chip{display:none}}
+.mvx .mvx-primary:disabled{opacity:.55;cursor:default;background:var(--mvx-text)}
