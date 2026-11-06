@@ -4,7 +4,7 @@ import RoomConversation from './RoomConversation.jsx';
 import {roomControlRows} from './WatchRoomControls.jsx';
 import './watch-room.css';
 import './interface-refinement.css';
-import {Music2,Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown,Users,RotateCcw,RotateCw,Captions,Download,RectangleHorizontal} from 'lucide-react';
+import {Music2,Pause,Play,Settings2,SkipForward,Subtitles,PictureInPicture2,Maximize2,Minimize2,ChevronLeft,ChevronRight,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown,Users,RotateCcw,RotateCw,Captions,Download,RectangleHorizontal,SlidersHorizontal,ChevronsRight} from 'lucide-react';
 import './player-redesign.css';
 import './player.css';
 import './player-refinement.css';
@@ -13,7 +13,6 @@ import PlayerPopover from './PlayerPopover.jsx';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {readProgress,writeProgress} from './playback-progress.js';
 import PauseFrameEffects from './PauseFrameEffects.jsx';
-import Soundtrack from './Soundtrack.jsx';
 import TimelinePreview from './TimelinePreview.jsx';
 import {playMusic} from './music-player.js';
 import PlayerSongCue from './PlayerSongCue.jsx';
@@ -21,12 +20,13 @@ import PlayerSettings,{SettingsGlyph} from './PlayerSettings.jsx';
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 import {contiguousBufferEnd} from './watch-quality.js';
-import {useImperativeHandle} from 'react';
+import {useEffect,useImperativeHandle,useRef,useState} from 'react';
 import {isShortEpisodeClip} from './watch-session.js';
 import usePlayerController from './player-controller.js';
 import {clock,keyFor,readResume,openerKey} from './player-runtime.js';
 import {PlayerContext,usePlayerSession,usePlayerExtensions,usePlayerMediaSession} from './player-session.js';
 import PlayerExtensionSlot from './PlayerExtensionSlot.jsx';
+import {createPortal} from 'react-dom';
 import './player-shell.css';
 function VolumeGlyph({value,muted}){
   const level=muted?0:value;
@@ -52,19 +52,33 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   }
   const selectorSeasons=onlineControls?.seasonOptions||seasons;
   usePlayerMediaSession(api);
+  // On a title page the room chat takes the right column's top (ratings slide
+  // below it) so the player keeps its width while a room is live.
+  const [chatSlot,setChatSlot]=useState(null),roomLive=!!room.info;
+  useEffect(()=>{
+    const sidebar=roomLive&&stageRef.current?.closest('.mv-title-layout')?.querySelector('.title-sidebar');
+    if(!sidebar||getComputedStyle(sidebar).display==='none'){setChatSlot(null);return;}
+    const slot=document.createElement('div');slot.className='room-chat-slot';sidebar.prepend(slot);sidebar.classList.add('has-room-chat');setChatSlot(slot);
+    return()=>{slot.remove();sidebar.classList.remove('has-room-chat');setChatSlot(null);};
+  },[roomLive]);
   const toggleCaptions=controller.toggleCaptions;
   // Online sessions are capability URLs: the server remuxes the playing
   // quality into one MP4 (no re-encode). Rooms relay someone else's stream.
   const onlineMatch=/^(https?:\/\/[^/]+)\/online\/([\w-]{20,80})\/([\w-]{10,40})$/.exec(source||'');
   const canDownload=!roomControl&&!room.info&&(!!onlineMatch||String(source||'').startsWith('blob:'));
-  function download(){
-    const name=[library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,''),episode?.label].filter(Boolean).join(' · ')||'MediaVault';
+  const [downloadOpen,setDownloadOpen]=useState(false),downloadButton=useRef(null);
+  const defaultName=[library.title.replace(/\.(mp4|mkv|webm|mov|m4v|avi)$/i,''),episode?.label].filter(Boolean).join(' · ')||'MediaVault';
+  const downloadHeights=[...new Set([...streaming.levels.map(l=>l.height||0),...(onlineControls?.qualities||[]).map(Number)])].filter(h=>h>0).sort((a,b)=>b-a);
+  const [downloadHeight,setDownloadHeight]=useState(0),[downloadName,setDownloadName]=useState('');
+  useEffect(()=>{if(downloadOpen){setDownloadName(defaultName);setDownloadHeight(streaming.levels.find(l=>l.index===streaming.level)?.height||downloadHeights[0]||0);}},[downloadOpen]);
+  function download(chosen,label){
+    const name=(label||'').trim()||defaultName;
     const current=streaming.levels.find(l=>l.index===streaming.level)?.height,best=Math.max(0,...streaming.levels.map(l=>l.height||0));
     const requested=onlineControls?.quality&&onlineControls.quality!=='best'?Number(onlineControls.quality):0;
-    const href=onlineMatch?onlineMatch[1]+'/online/'+onlineMatch[2]+'/'+onlineMatch[3]+'/download?'+new URLSearchParams({height:String(current||requested||best||0),name}):source;
+    const href=onlineMatch?onlineMatch[1]+'/online/'+onlineMatch[2]+'/'+onlineMatch[3]+'/download?'+new URLSearchParams({height:String(chosen||current||requested||best||0),name}):source;
     const link=document.createElement('a');link.href=href;link.download=name+'.mp4';link.rel='noopener';document.body.append(link);link.click();link.remove();
   }
-  return <PlayerContext.Provider value={api}><div className={'player-room-layout'+(room.info?' has-live-room':'')}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
+  return <PlayerContext.Provider value={api}><div className={'player-room-layout'+(room.info&&!chatSlot?' has-live-room':'')}><div ref={stageRef} className={'mv-player'+(playing?' is-playing':'')+(panel!=='watch'?' is-browsing':'')+(hiddenControls?' controls-hidden':'')+(theater?' is-theater':'')+(!prefs.depthShadow?' depth-shadow-off':'')+(!prefs.ambient?' ambient-off':'')+(panel==='episodes'?' episodes-open':'')}
     style={{'--scene-rgb':scene.color,'--video-brightness':gestures.brightness,'--picture-filter':colorFilter}} aria-label="Видеоплеер MediaVault" role="region" tabIndex={0} onPointerDown={event=>{if(!event.target.closest('button,input,select,a,[role="dialog"]'))stageRef.current?.focus({preventScroll:true});}} onPointerMove={revealControls}
     onTouchStart={revealControls} onFocusCapture={revealControls} data-player="mediavault">
     <div className="mv-player-screen">
@@ -141,7 +155,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
         actions:<div className="mv-player-settings">        <div className="mv-player-quick-actions">{onClose&&<button aria-label="Закрыть встроенный просмотр" onClick={onClose}><X size={19}/><span>Закрыть</span></button>}<button onClick={actions.share}><Share2 size={19}/><span>Поделиться</span></button><button onClick={actions.screenshot}><Camera size={19}/><span>Кадр</span></button><button onClick={actions.clip} disabled={actions.recording} aria-pressed={actions.recording}><Video size={19}/><span>{actions.recording?'Запись…':'Клип'}</span></button></div>
 <p className="player-setting-help">Ссылка откроет эту серию с текущей позиции после входа в библиотеку. Клип записывается до 30 секунд.</p></div>
       }}</PlayerSettings>}</AnimatePresence>
-      {canSkip&&panel==='watch'&&<button className="mv-player-skip" onClick={()=>seek(skipRange.end)}><SkipForward size={16}/> {skipRange===ending?'Пропустить эндинг':'Пропустить опенинг'}</button>}
+      <AnimatePresence>{canSkip&&panel==='watch'&&<motion.button key={skipRange===ending?'ed':'op'} className="mv-player-skip" style={{'--skip-progress':Math.max(0,Math.min(1,(time-skipRange.start)/Math.max(1,skipRange.end-skipRange.start)))}} initial={reducedMotion?false:{opacity:0,x:16}} animate={{opacity:1,x:0}} exit={reducedMotion?undefined:{opacity:0,x:16}} transition={{duration:.2,ease:[.2,.8,.2,1]}} onClick={()=>seek(skipRange.end)}><span>{skipRange===ending?'Пропустить эндинг':'Пропустить опенинг'}</span><ChevronsRight size={18}/></motion.button>}</AnimatePresence>
 
       {gpuActive&&<span className="mv-player-gpu-tag"><Sparkles size={12}/> {engineName}{engine==='mobile'||engine==='lanczos'||String(engine).startsWith('fsr')?'':' ×2'}{neuralStats?` · ${neuralStats.fps} кадр/с`:``}</span>}
       {busy&&<div className="mv-player-loading" role="status">Готовим видео…</div>}
@@ -163,9 +177,9 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
             {room.info&&<button className="room-active-control" title="Настройки комнаты" aria-label={'Комната · '+(room.state?.members.filter(m=>m.online).length||1)+' участников'} aria-pressed={settingsOpen&&settingsTab==='room'} onClick={()=>{setSettingsTab('room');openPanel('settings');}}><Users size={20}/><span className="room-participant-badge">{room.state?.members.filter(m=>m.online).length||1}</span></button>}
             {controller.nextEpisode&&episodes[index+1]&&<motion.button whileHover={reducedMotion?undefined:{x:2}} aria-label="Следующая серия" title={'Следующая серия · '+(episodes[index+1]?.label||'')} onClick={controller.nextEpisode}><SkipForward size={20}/></motion.button>}
             <button aria-label={subtitle==='off'?'Включить субтитры':'Выключить субтитры'} aria-pressed={subtitle!=='off'} title="Субтитры · C" onClick={toggleCaptions}><motion.span className="mv-icon" animate={{scale:subtitle!=='off'&&!reducedMotion?[1,1.18,1]:1}} transition={{duration:.25}}><Captions size={20}/></motion.span></button>
-            {canDownload&&<motion.button whileTap={reducedMotion?undefined:{y:2}} aria-label="Скачать видео" title="Сохранить серию на компьютер" onClick={download}><Download size={20}/></motion.button>}
+            {canDownload&&<motion.button ref={downloadButton} whileTap={reducedMotion?undefined:{y:2}} aria-label="Скачать видео" aria-expanded={downloadOpen} title="Сохранить серию на компьютер" onClick={()=>{setMusicOpen(false);setDownloadOpen(v=>!v);}}><Download size={20}/></motion.button>}
             {musicIdentity&&<button ref={musicButton} aria-label="Музыка из аниме" aria-expanded={musicOpen} onClick={()=>openPanel(musicOpen?'watch':'music')}><Music2 size={20}/></button>}
-            <button ref={settingsButton} className={settingsOpen?'is-active':''} aria-label="Настройки плеера" aria-expanded={settingsOpen} onClick={()=>{setSettingsTab('watch');setMusicOpen(false);openPanel(settingsOpen?'watch':'settings');}}><motion.span className="mv-icon" animate={{rotate:settingsOpen&&!reducedMotion?90:0}} transition={{type:'spring',stiffness:300,damping:20}}><Settings2 size={20}/></motion.span></button>
+            <button ref={settingsButton} className={settingsOpen?'is-active':''} aria-label="Настройки плеера" aria-expanded={settingsOpen} onClick={()=>{setSettingsTab('watch');setMusicOpen(false);openPanel(settingsOpen?'watch':'settings');}}><SlidersHorizontal size={20}/></button>
             <button aria-label={isPip?'Закрыть мини-окно':'Мини-окно'} aria-pressed={isPip} title="Мини-окно" disabled={!document.pictureInPictureEnabled&&!('webkitSetPresentationMode' in HTMLVideoElement.prototype)} onClick={pip}><PictureInPicture2 size={20}/></button>
             <button className="mv-player-theater" title="Кинотеатр" aria-label="Режим кинотеатра" aria-pressed={theater} onClick={cinema}><RectangleHorizontal size={20}/></button>
             <button aria-label={isFullscreen?'Выйти из полноэкранного режима':'На весь экран'} title="Полный экран · F" onClick={fullscreen}><AnimatePresence initial={false} mode="popLayout"><motion.span className="mv-icon" key={isFullscreen?'min':'max'} initial={reducedMotion?false:{scale:isFullscreen?1.4:.6,opacity:0}} animate={{scale:1,opacity:1}} exit={reducedMotion?undefined:{opacity:0}} transition={{duration:.18}}>{isFullscreen?<Minimize2 size={20}/>:<Maximize2 size={20}/>}</motion.span></AnimatePresence></button>
@@ -176,7 +190,17 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     {panel==='episodes'&&onlineControls?.episodeBrowser&&<div className="mv-player-episode-browser" inert={settingsOpen}>{panel==='episodes'&&<button className="mv-player-close-episodes" aria-label="Закрыть серии" onClick={()=>openPanel('watch')}><X size={18}/>Серии</button>}{onlineControls.episodeBrowser}</div>}
     <PlayerExtensionSlot name="footer" extensions={extensions} onError={onError}/>
     <input ref={subtitleInput} type="file" accept=".srt,.vtt,text/vtt" hidden onChange={attachSubtitle}/>
-    <AnimatePresence>{musicOpen&&<PlayerPopover anchor={musicButton} label="Музыка из аниме" className="mv-player-music" onClose={()=>setMusicOpen(false)}><button className="icon-button" aria-label="Закрыть музыку" onClick={()=>setMusicOpen(false)}><X size={17}/></button><Soundtrack identity={musicIdentity} userId={userId} compact/></PlayerPopover>}</AnimatePresence>
+    <AnimatePresence>{musicOpen&&<PlayerPopover anchor={musicButton} label="Музыка серии" className="mv-player-music mv-mini-menu" onClose={()=>setMusicOpen(false)}>
+      <div className="mv-mini-head"><strong>Музыка серии</strong><small>{episodeMusic.tracks.length?episodeMusic.tracks.length+' песен':''}</small></div>
+      {episodeMusic.tracks.length?<ul className="mv-mini-list">{episodeMusic.tracks.slice(0,8).map(t=><li key={t.id}><button onClick={()=>{playMusic(t,episodeMusic.tracks);setMusicOpen(false);}} aria-label={'Слушать '+t.title}><span className="mv-mini-badge" data-type={t.type}>{t.type||'♪'}</span><span className="mv-mini-text"><strong>{t.title}</strong><small>{(t.artists||[]).join(', ')}</small></span><Play size={14} fill="currentColor" strokeWidth={0}/></button></li>)}</ul>:<p className="mv-mini-empty">{episodeMusic.timingState==='loading'?'Ищем песни серии…':'Песни для этой серии не найдены.'}</p>}
+    </PlayerPopover>}</AnimatePresence>
+    <AnimatePresence>{downloadOpen&&<PlayerPopover anchor={downloadButton} label="Скачать серию" className="mv-player-download mv-mini-menu" onClose={()=>setDownloadOpen(false)}>
+      <div className="mv-mini-head"><strong>Скачать серию</strong><small>MP4 · без перекодирования</small></div>
+      {downloadHeights.length>0&&<div className="mv-mini-chips" role="radiogroup" aria-label="Качество файла">{downloadHeights.map(h=><button key={h} role="radio" aria-checked={downloadHeight===h} onClick={()=>setDownloadHeight(h)}>{h>=2160?'4K':h+'p'}</button>)}</div>}
+      <label className="mv-mini-field">Имя файла<input value={downloadName} maxLength={120} onChange={e=>setDownloadName(e.target.value)}/></label>
+      <p className="mv-mini-note">Сервер собирает файл из потока и отдаёт его постепенно. Для некоторых источников скорость равна скорости просмотра.</p>
+      <div className="mv-mini-actions"><button className="mv-mini-secondary" onClick={()=>setDownloadOpen(false)}>Отмена</button><button className="mv-mini-primary" onClick={()=>{download(downloadHeight,downloadName);setDownloadOpen(false);}}><Download size={15}/>Скачать</button></div>
+    </PlayerPopover>}</AnimatePresence>
     {panel==='episodes'&&episodes.length>1&&!onlineControls?.externalEpisodeList&&<section className="mv-player-shelf" inert={settingsOpen} aria-label="Эпизоды сезона">
       <div className="mv-player-shelf-heading">{panel==='episodes'&&<button aria-label="Закрыть эпизоды" onClick={()=>openPanel('watch')}><X size={20}/></button>}<div className="mv-player-season-title">{seasons.length>1?<label><span className="sr-only">Сезон</span><UiSelect aria-label="Сезон" value={shelfSeason?.id||''} onChange={event=>setBrowsedSeasonId(event.target.value)}>{seasons.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</UiSelect></label>:<span>{shelfSeason?.name}</span>}<button className="mv-player-expand-episodes" aria-label="Развернуть эпизоды" onClick={()=>openPanel(panel==='episodes'?'watch':'episodes')}>{shelfSeason?.episodes.length} эпизодов <ChevronsUp size={12}/></button></div><div><button aria-label="Предыдущие эпизоды" onClick={()=>scrollEpisodes(-360)}><ChevronLeft size={18}/></button><button aria-label="Следующие эпизоды" onClick={()=>scrollEpisodes(360)}><ChevronRight size={18}/></button></div></div>
       <div className="mv-player-rail" ref={railRef}>{shelfSeason?.episodes.map((ep,i)=>{
@@ -189,5 +213,5 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     </section>}
     {gpuWarning&&<p className="mv-player-warning" role="status">{gpuWarning}</p>}
 
-  </div>{room.info&&<aside className="player-room-conversation"><RoomConversation conversation={room.conversation}/></aside>}</div></PlayerContext.Provider>;
+  </div>{room.info&&(chatSlot?createPortal(<aside className="player-room-conversation is-sidebar"><RoomConversation conversation={room.conversation}/></aside>,chatSlot):<aside className="player-room-conversation"><RoomConversation conversation={room.conversation}/></aside>)}</div></PlayerContext.Provider>;
 }

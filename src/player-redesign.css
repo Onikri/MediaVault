@@ -72,4 +72,49 @@
 .mv-player.mv-sheet-host>*{pointer-events:auto}
 @media (max-width:640px){.mv-player[data-player="mediavault"] .mv-player-control-group>button.mv-player-jump,.mv-player[data-player="mediavault"] .mv-player-control-group>.mv-player-volume-group,.mv-player[data-player="mediavault"] .mv-player-control-group>button[title="Мини-окно"]{display:none}}
 @media (max-width:400px){.mv-player[data-player="mediavault"] .mv-player-time>span{display:none}}
-.mv-player .player-popover.is-sheet{background:var(--color-canvas-soft)!important;backdrop-filter:none!important;padding-left:16px!important;padding-right:16px!important;box-shadow:0 -18px 50px #000a!important;border:1px solid var(--color-border)!important;border-bottom:0!important}
+.mv-player .player-popover.is-sheet{background:var(--color-canvas-soft)!important;backdrop-filter:none!important;padding-left:16px!important;padding-right:16px!important;box-shadow:0 -18px 50px #000a!important;border:0;border-bottom:0!important}
+
+/* Skip opening/ending: glass pill in the control language, with progress. */
+.mv-player[data-player="mediavault"] .mv-player-skip{position:absolute;z-index:7;right:18px;bottom:104px;display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 14px 0 18px!important;border:0;border-radius:12px;background:#0a0c10a6!important;backdrop-filter:blur(14px);color:#fff;font:600 13px/1 var(--font-ui)!important;letter-spacing:.01em;cursor:pointer;overflow:hidden;box-shadow:0 8px 24px #0006;transition:background-color var(--motion-fast,180ms),color var(--motion-fast,180ms)}
+.mv-player[data-player="mediavault"] .mv-player-skip::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:calc(var(--skip-progress)*100%);background:var(--color-blossom);transition:width .25s linear}
+.mv-player[data-player="mediavault"] .mv-player-skip:hover{background:#fff!important;color:#0b0b0f}
+.mv-player[data-player="mediavault"] .mv-player-skip:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.mv-player[data-player="mediavault"].controls-hidden .mv-player-skip{bottom:28px}
+@media (max-width:640px){.mv-player[data-player="mediavault"] .mv-player-skip{right:10px;bottom:70px;height:38px;font-size:12px!important;padding:0 10px 0 14px!important}}
+
+/* Small player menus (music, download). */
+.mv-player .player-popover.mv-mini-menu{padding:12px;border-radius:16px;background:color-mix(in srgb,var(--color-canvas) 94%,transparent);backdrop-filter:blur(18px);border:0;box-shadow:0 14px 40px #0008;color:var(--color-petal);font-family:var(--font-ui)}
+.mv-mini-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 2px 10px}.mv-mini-head strong{font-size:13px;font-weight:650}.mv-mini-head small{color:var(--color-quiet);font-size:11px}
+.mv-mini-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto;scrollbar-width:thin}
+.mv-mini-list button{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;padding:7px 8px;border-radius:10px;cursor:pointer;transition:background-color var(--motion-fast,180ms)}
+.mv-mini-list button:hover,.mv-mini-list button:focus-visible{background:#ffffff12}.mv-mini-list button:focus-visible{outline:2px solid var(--color-blossom)}
+.mv-mini-list button>svg{opacity:0;color:#fff;flex:none;transition:opacity var(--motion-fast,180ms)}.mv-mini-list button:hover>svg,.mv-mini-list button:focus-visible>svg{opacity:1}
+.mv-mini-badge{display:grid;place-items:center;width:30px;height:22px;border-radius:6px;flex:none;font:700 10px/1 var(--font-ui);background:#ffffff14;color:var(--color-on-muted)}.mv-mini-badge[data-type=OP]{background:color-mix(in srgb,var(--color-blossom) 22%,transparent);color:var(--color-blossom-light)}
+.mv-mini-text{display:flex;flex-direction:column;min-width:0;flex:1}.mv-mini-text strong{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mv-mini-text small{font-size:11px;color:var(--color-quiet);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mv-mini-empty,.mv-mini-note{margin:4px 2px;color:var(--color-quiet);font-size:11px;line-height:1.45}
+.mv-mini-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.mv-mini-chips button{all:unset;cursor:pointer;padding:6px 11px;border-radius:9px;background:#ffffff12;font:600 12px/1 var(--font-ui);color:var(--color-on-surface)}.mv-mini-chips button[aria-checked=true]{background:#fff;color:#0b0b0f}.mv-mini-chips button:focus-visible{outline:2px solid var(--color-blossom)}
+.mv-mini-field{display:flex;flex-direction:column;gap:5px;color:var(--color-on-muted);font-size:11px}.mv-mini-field input{min-height:34px;padding:0 10px;border:0;border-radius:9px;background:#ffffff0f;color:var(--color-petal);font:inherit;font-size:12px}.mv-mini-field input:focus-visible{outline:2px solid var(--color-blossom);outline-offset:0}
+.mv-mini-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.mv-mini-actions button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:10px;font:600 12px/1 var(--font-ui)}
+.mv-mini-actions .mv-mini-primary{background:var(--color-blossom);color:#fff}.mv-mini-actions .mv-mini-primary:hover{background:var(--color-blossom-light)}.mv-mini-actions .mv-mini-secondary{color:var(--color-on-muted)}.mv-mini-actions .mv-mini-secondary:hover{background:#ffffff12;color:#fff}
+.mv-mini-actions button:focus-visible{outline:2px solid #fff;outline-offset:1px}
+
+/* Desktop settings: labelled tabs on the left, content on the right. */
+.player-settings-tabs .tab-label{display:none}
+@media (min-width:641px){
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet){padding:10px;border-radius:18px;border:0;background:color-mix(in srgb,var(--color-canvas) 95%,transparent)}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) #player-settings{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;height:min(300px,calc(var(--player-menu-height) - 20px))}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-settings-tabs{display:flex!important;flex-direction:column;gap:2px;padding:0 10px 0 0!important;border-right:0;grid-template-columns:none!important}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-settings-tabs button{width:100%!important;height:34px!important;min-height:34px!important;display:flex!important;align-items:center;justify-content:flex-start!important;justify-self:stretch!important;gap:10px!important;padding:0 10px!important;border-radius:9px;font:500 12px/1 var(--font-ui);color:var(--color-on-muted)}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-settings-tabs button:hover{background:#ffffff0d;color:#fff}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-settings-tabs button[aria-selected=true]{background:#ffffff14;color:#fff}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-settings-tabs button[aria-selected=true] svg{color:var(--color-blossom-light)}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-settings-tabs .tab-label{display:inline;white-space:nowrap}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-settings-page{overflow:auto!important;padding-right:4px;scrollbar-width:thin}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .mv-player-settings{gap:10px}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-setting-row>label:not(.mv-player-check){font-size:12px;min-height:32px}
+ .mv-player .player-popover.player-settings-glass:not(.is-sheet) .player-setting-row select{font-size:12px;min-height:32px}
+}
+
+/* Theater: wider than the page column, but never taller than the window, so
+   the timeline and controls always stay on screen. The page behind is dimmed. */
+.mv-player[data-player="mediavault"].is-theater{width:min(100%,calc((100svh - 72px) * 16 / 9));max-width:100%;margin-inline:auto;border-radius:14px}

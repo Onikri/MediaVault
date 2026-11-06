@@ -111,6 +111,8 @@ const dimmed=new WeakMap();
 export function usePlayerTheater(root,enabled){
  useEffect(()=>{
   if(!enabled||!root.current)return;
+  // Bring the whole enlarged player (with its timeline) into view.
+  requestAnimationFrame(()=>root.current?.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'}));
   const layout=root.current.closest('.mv-title-layout');
   layout?.classList.add('player-theater-layout');
   const siblings=[];

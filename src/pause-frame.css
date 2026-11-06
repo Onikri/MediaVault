@@ -16,3 +16,8 @@
 @media(prefers-reduced-motion:reduce){.pause-depth-shadow,.pause-character{transition:none;animation:none}}
 
 .pause-frame-tools>.pause-recognize{width:30px!important;height:30px!important;min-width:30px!important;min-height:30px!important;max-width:30px!important;max-height:30px!important;padding:0!important;display:grid;place-items:center;border:0!important;border-radius:50%!important}.pause-recognize[aria-busy=true]>svg{animation:pause-recognition-pulse 1s ease-in-out infinite}@keyframes pause-recognition-pulse{50%{opacity:.35;transform:scale(.9)}}@media(prefers-reduced-motion:reduce){.pause-recognize[aria-busy=true]>svg{animation:none}}
+/* Character cards: the name only, quiet glass, no outline. */
+.pause-character{padding:8px 14px!important;border:0!important;border-radius:12px!important;background:color-mix(in srgb,var(--color-canvas,#0c0c0f) 72%,transparent)!important;backdrop-filter:blur(16px);box-shadow:none!important;font-family:var(--font-ui,inherit);transition:background-color var(--motion-fast,180ms)!important}
+.pause-character:hover,.pause-character.is-selected{background:color-mix(in srgb,var(--color-canvas,#0c0c0f) 90%,transparent)!important}
+.pause-character strong{font-size:13px!important;font-weight:600!important}
+.pause-character small{display:none}

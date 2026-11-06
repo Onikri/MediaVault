@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom';
 import {ScanFace,RotateCcw,X} from 'lucide-react';
 import {depthSize,shadowCutoff,depthSurface,videoRect,characterAtDepthPoint} from './pause-depth-model.js';
 import {depthRenderer} from './pause-depth-renderer.js';
+import {guidedRefine,luminance,blurredCopy,softMask} from './pause-depth-refine.js';
 import {warmCharacterModel} from './character-recognition.js';
 import {characterRoster} from './pause-character-context.js';
 import {recognizePauseFrame} from './pause-recognition.js';
@@ -87,10 +88,20 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
   capture();video.addEventListener('loadeddata',capture);video.addEventListener('seeked',capture);video.addEventListener('seeking',invalidate);document.addEventListener('visibilitychange',capture);
   return()=>{closed=true;sequence.current++;clearTimeout(timer);recognition.current?.abort();video.removeEventListener('loadeddata',capture);video.removeEventListener('seeked',capture);video.removeEventListener('seeking',invalidate);document.removeEventListener('visibilitychange',capture);};
  },[source,paused,enabled,modelAllowed,autoRecognize,retry,videoRef]);
+ // Depth is refined once per still at the frame's resolution so its edges
+ // follow the drawn contours instead of the model's ~392 px grid.
+ const refined=useMemo(()=>{
+  if(view.phase!=='ready')return {data:view.data,width:view.width,height:view.height};
+  const image=frame.current?.image;if(!image)return {data:view.data,width:view.width,height:view.height};
+  try{const pixels=image.getContext('2d',{willReadFrequently:true}).getImageData(0,0,image.width,image.height).data,guide=luminance(pixels,image.width,image.height);return {data:guidedRefine(view.data,view.width,view.height,guide,image.width,image.height,{radius:6,eps:.0015}),width:image.width,height:image.height,guide};}
+  catch{return {data:view.data,width:view.width,height:view.height};}
+ },[view.data,view.phase]);
  useEffect(()=>{
   if(!paused||!enabled||view.phase!=='ready'||!canvas.current)return;
   const element=canvas.current,video=videoRef.current,scale=960/Math.max(video.videoWidth,video.videoHeight);element.width=Math.round(video.videoWidth*scale);element.height=Math.round(video.videoHeight*scale);
-  let render;try{render=depthRenderer(element,view.width,view.height);render.depth(view.data);render.frame(frame.current?.image);renderer.current=render;}catch(error){setView({phase:'error',message:error.message});return;}
+  const image=frame.current?.image;let render;
+  try{render=depthRenderer(element,refined.width,refined.height);render.depth(refined.data);if(image){render.frame(image);render.blur(blurredCopy(image,7));}renderer.current=render;}
+  catch(error){setView({phase:'error',message:error.message});return;}
   let raf=0,last=0,elapsed=0,pointerAt=0;const reduced=matchMedia('(prefers-reduced-motion: reduce)'),aim=[0,0],eased=[0,0];
   // Parallax follows the pointer; without one it drifts in a slow orbit.
   const screen=video.closest('.mv-player-screen');
@@ -102,18 +113,22 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
   const restart=()=>{cancelAnimationFrame(raf);last=0;if(!document.hidden){render.draw(reduced.matches ? .48 : shadowCutoff(elapsed,{period:settings.current.breathPeriod,amplitude:settings.current.breathAmplitude}),settings.current.strength);raf=requestAnimationFrame(draw);}};
   document.addEventListener('visibilitychange',restart);reduced.addEventListener('change',restart);restart();
   return()=>{cancelAnimationFrame(raf);screen?.removeEventListener('pointermove',point);document.removeEventListener('visibilitychange',restart);reduced.removeEventListener('change',restart);renderer.current=null;render.dispose();};
- },[paused,enabled,view.phase,view.data]);
- const masks=useMemo(()=>{if(view.phase!=='ready')return new Map();return new Map(chars.values.map(c=>[c.id,depthSurface(view.data,view.width,view.height,c.box,c.bodyBox)]));},[view.data,view.phase,chars.values]);
+ },[paused,enabled,view.phase,view.data,refined]);
+ // Masks are flood-filled on the refined depth: its edges follow the drawing,
+ // so the fill no longer leaks into background that the coarse map blurred in.
+ const masks=useMemo(()=>{if(view.phase!=='ready')return new Map();return new Map(chars.values.map(c=>[c.id,depthSurface(refined.data,refined.width,refined.height,c.box,c.bodyBox,{tolerance:26})]));},[refined,view.phase,chars.values]);
  const currentCharacter=value=>chars.values.find(c=>c.id===value?.id||(value?.nameRu&&c.nameRu===value.nameRu));
  const pinned=currentCharacter(selected),focused=currentCharacter(hovered)||pinned;
- useEffect(()=>{if(renderer.current&&view.phase==='ready'){renderer.current.surface(focused?masks.get(focused.id):null,{immediate:matchMedia('(prefers-reduced-motion: reduce)').matches});renderer.current.draw(undefined,strength);}},[focused,masks,view.data,strength]);
+ const soft=useMemo(()=>new Map(),[masks]);
+ const surfaceFor=character=>{const mask=character&&masks.get(character.id);if(!mask)return null;if(!soft.has(mask))soft.set(mask,softMask(mask,refined.width,refined.height));return soft.get(mask);};
+ useEffect(()=>{if(renderer.current&&view.phase==='ready'){renderer.current.surface(focused?surfaceFor(focused):null,{immediate:matchMedia('(prefers-reduced-motion: reduce)').matches});renderer.current.draw(undefined,strength);}},[focused,masks,view.data,strength]);
  useEffect(()=>{
   if(!host||!paused||!visible||!rect)return;let active=null;
   const move=event=>{if(event.pointerType==='touch'||event.target.closest?.('button,input,select'))return;const r=host.getBoundingClientRect(),x=(event.clientX-r.left-rect.left)/rect.width,y=(event.clientY-r.top-rect.top)/rect.height;
-   const hit=characterAtDepthPoint(chars.values,masks,view.width,view.height,x,y);
+   const hit=characterAtDepthPoint(chars.values,masks,refined.width,refined.height,x,y);
    if(active!==hit?.id){active=hit?.id;setHovered(hit||null);}
   };const leave=()=>{active=null;setHovered(null);};host.addEventListener('pointermove',move);host.addEventListener('pointerleave',leave);return()=>{host.removeEventListener('pointermove',move);host.removeEventListener('pointerleave',leave);};
- },[host,paused,visible,rect,chars.values,masks,view.width,view.height]);
+ },[host,paused,visible,rect,chars.values,masks,refined]);
  const loading=enabled&&!['idle','ready','error'].includes(view.phase),message=view.phase==='download'?'Глубина · загрузка '+Math.min(100,Math.round(view.loaded/view.total*100))+'%':view.phase==='inference'?'Глубина · анализ кадра…':'Глубина · запуск модели…';
  return <><canvas ref={canvas} className={'pause-depth-shadow'+(paused&&enabled&&view.phase==='ready'?' is-ready':'')} aria-hidden="true" data-model="Depth Anything V2 Small"/>{paused&&visible&&host&&createPortal(<div className="pause-frame-ui">
    <div className="pause-frame-tools" onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
@@ -123,6 +138,6 @@ export default function PauseFrameEffects({videoRef,source,paused,enabled,modelA
     {(chars.phase==='error'||chars.message)&&<span role="status">{chars.message}</span>}{chars.phase==='ready'&&!chars.values.length&&<span className="sr-only" role="status">Персонажи не распознаны</span>}
     {chars.values.length>0&&<button aria-label="Скрыть персонажей" onClick={()=>{setChars({phase:'idle',values:[]});setSelected(null);setHovered(null);}}><X size={14}/></button>}
    </div>
-   {rect&&chars.values.map(character=>{const x=Math.max(0,Math.min(rect.width-150,(character.box[0]+character.box[2])*.5*rect.width-60)),y=Math.max(50,Math.min(rect.height-120,character.box[3]*rect.height+9));return <button key={character.id} className={'pause-character'+(focused?.id===character.id?' is-selected':'')} style={{left:rect.left+x,top:rect.top+y}} aria-pressed={pinned?.id===character.id} onPointerEnter={()=>setHovered(character)} onPointerLeave={()=>setHovered(null)} onFocus={()=>setHovered(character)} onBlur={()=>setHovered(null)} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(pinned?.id===character.id?null:character);}} title={[character.reasonRu,...character.candidates.map(c=>(c.nameRu||c.name)+' · '+c.work)].filter(Boolean).join('\n')}><strong>{character.nameRu||'Персонаж не уточнён'}</strong><small>{character.verification==='gemini'?'Gemini · уточнено':character.nameRu?'AnimeTrace · каталог':chars.phase==='verifying'?'Проверяем варианты…':'Имя пока не уточнено'}</small></button>;})}
+   {rect&&chars.values.map(character=>{const x=Math.max(0,Math.min(rect.width-150,(character.box[0]+character.box[2])*.5*rect.width-60)),y=Math.max(50,Math.min(rect.height-120,character.box[3]*rect.height+9));return <button key={character.id} className={'pause-character'+(focused?.id===character.id?' is-selected':'')} style={{left:rect.left+x,top:rect.top+y}} aria-pressed={pinned?.id===character.id} onPointerEnter={()=>setHovered(character)} onPointerLeave={()=>setHovered(null)} onFocus={()=>setHovered(character)} onBlur={()=>setHovered(null)} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelected(pinned?.id===character.id?null:character);}} title={[character.reasonRu,...character.candidates.map(c=>(c.nameRu||c.name)+' · '+c.work)].filter(Boolean).join('\n')}><strong>{character.nameRu||'Персонаж не уточнён'}</strong></button>;})}
   </div>,host)}</>;
 }
