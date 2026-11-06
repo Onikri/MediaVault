@@ -222,7 +222,7 @@ async def lifespan(application):
 
 
 app = FastAPI(title="MediaVault import service", version="8.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
-app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "HEAD", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Range"], expose_headers=["Content-Disposition","Content-Range","Accept-Ranges","Content-Length"])
+app.add_middleware(CORSMiddleware, allow_origins=[ORIGIN], allow_methods=["GET", "HEAD", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Range"], expose_headers=["Content-Disposition","Content-Range","Accept-Ranges","Content-Length","X-Alloha-Quality","X-Alloha-Degradation","Retry-After"])
 
 
 @app.middleware("http")
