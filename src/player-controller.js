@@ -43,7 +43,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   useEffect(()=>setAudioError(''),[onlineControls?.audio?.url]);
   // Auto captions listen to whatever is audible: a separate dub track if one
   // is playing, otherwise the video itself.
-  const autoCaptions=useAutoCaptions(onlineControls?.audio&&!audioError?external.ref:videoRef,{language:prefs.autoLang,translateTo:prefs.autoTranslate,engine:prefs.autoEngine,service:characterService,userId},!!source);
+  const autoCaptions=useAutoCaptions(onlineControls?.audio&&!audioError?external.ref:videoRef,{language:prefs.autoLang,translateTo:prefs.autoTranslate,engine:prefs.autoEngine},!!source);
   const snapshot=useRef({time:0,duration:0}),previewCaptured=useRef('');
   useEffect(()=>{const save=()=>{const v=snapshot.current;if(v.time>0)writeProgress(userId,libraryId,item,v.time,v.duration);};const hidden=()=>{if(document.visibilityState==='hidden')save();};addEventListener('pagehide',save);document.addEventListener('visibilitychange',hidden);return()=>{save();removeEventListener('pagehide',save);document.removeEventListener('visibilitychange',hidden);};},[item.id,source,userId,libraryId]);
   const [isFullscreen,setIsFullscreen]=useState(false),[isPip,setIsPip]=useState(false);
