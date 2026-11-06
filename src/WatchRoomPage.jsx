@@ -15,17 +15,21 @@ import './watch-room.css';
 const GUEST_KEY='mv-room-guest';
 function storedGuest(){try{const v=JSON.parse(localStorage.getItem(GUEST_KEY)||'{}');return {name:typeof v.name==='string'?v.name.slice(0,40):'',avatar:typeof v.avatar==='string'&&/^data:image\/(webp|jpeg);base64,/.test(v.avatar)?v.avatar:''};}catch{return {name:'',avatar:''};}}
 export default function WatchRoomPage({identity}){
- const guest=useMemo(storedGuest,[]),[password,setPassword]=useState(''),[name,setName]=useState(guest.name),[avatar,setAvatar]=useState(guest.avatar),[joined,setJoined]=useState(null),[state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[api,setApi]=useState(null),[profile,setProfile]=useState(null),[online,setOnline]=useState(false),[blocked,setBlocked]=useState(false),[leaving,setLeaving]=useState(false);
+ const guest=useMemo(storedGuest,[]),[password,setPassword]=useState(''),[name,setName]=useState(guest.name),[avatar,setAvatar]=useState(guest.avatar),[joined,setJoined]=useState(null),[state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[api,setApi]=useState(null),[profile,setProfile]=useState(null),[online,setOnline]=useState(false),[blocked,setBlocked]=useState(false),[leaving,setLeaving]=useState(false),[gone,setGone]=useState(false);
  const socket=useRef(null),applying=useRef(0),latest=useRef();latest.current={api,state};
  let server='';try{server=validateServer(window.MEDIA_VAULT_CONFIG?.importServerUrl||'');}catch{}
  const [preview,setPreview]=useState(null),[previewProfile,setPreviewProfile]=useState(null);
  // Lobby showcase: public room summary (no media or member tokens) so the
  // gate shows what is about to be watched before the password is entered.
- useEffect(()=>{if(joined||!server)return;const abort=new AbortController();const load=()=>fetch(server+'/rooms/'+encodeURIComponent(identity)+'/preview',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(v=>{if(!abort.signal.aborted)setPreview(v);}).catch(()=>{});load();const timer=setInterval(load,10000);return()=>{abort.abort();clearInterval(timer);};},[identity,server,joined]);
+ useEffect(()=>{if(joined||!server)return;const abort=new AbortController();const load=()=>fetch(server+'/rooms/'+encodeURIComponent(identity)+'/preview',{signal:abort.signal}).then(r=>{
+  // 410: the creator closed the room or the link expired. A room never reopens
+  // under the same link, so polling stops and the lobby says so.
+  if(r.status===410){clearInterval(timer);if(!abort.signal.aborted)setGone(true);return null;}
+  return r.ok?r.json():null;}).then(v=>{if(!abort.signal.aborted)setPreview(v);}).catch(()=>{});let timer;load();timer=setInterval(load,10000);return()=>{abort.abort();clearInterval(timer);};},[identity,server,joined]);
  useEffect(()=>{if(!preview?.malId)return;const abort=new AbortController();loadTitleProfile(preview.malId,'anime',{server,signal:abort.signal}).then(setPreviewProfile).catch(()=>{});return()=>abort.abort();},[preview?.malId,server]);
  const conversation=useRoomConversation(socket,joined?.memberId,state,online,{server,id:joined?.id||identity,token:joined?.token});
  function send(data){if(socket.current?.readyState===1)socket.current.send(JSON.stringify(data));}
- async function join(event,secret=password){event?.preventDefault();setBusy(true);setError('');try{const response=await fetch(server+'/rooms/'+encodeURIComponent(identity)+'/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:secret,name:name.trim()||'Гость',...(avatar?{avatar}:{})})}),data=await response.json();if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Не удалось войти в комнату.');setPassword('');try{localStorage.setItem(GUEST_KEY,JSON.stringify({name:name.trim(),avatar}));}catch{}
+ async function join(event,secret=password){event?.preventDefault();setBusy(true);setError('');try{const response=await fetch(server+'/rooms/'+encodeURIComponent(identity)+'/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:secret,name:name.trim()||'Гость',...(avatar?{avatar}:{})})}),data=await response.json();if(response.status===410){setGone(true);return;}if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Не удалось войти в комнату.');setPassword('');try{localStorage.setItem(GUEST_KEY,JSON.stringify({name:name.trim(),avatar}));}catch{}
   // Let the lobby play its walk-in before the room replaces it.
   if(!matchMedia('(prefers-reduced-motion: reduce)').matches){setLeaving(true);await new Promise(r=>setTimeout(r,620));}
   setJoined(data);setState(data.room);}catch(e){setError(e.message);}finally{setBusy(false);setLeaving(false);}}
@@ -35,7 +39,7 @@ export default function WatchRoomPage({identity}){
   const connection=roomSocket(server,identity,joined.token,data=>{
    conversation.receive(data);
    if(data.type==='state'){latest.current.state=data.room;lastState.current=performance.now();setState(data.room);applying.current=performance.now()+500;applyRoomState(latest.current.api?.media,data.room,{onBlocked:()=>setBlocked(true)});}
-   else if(data.type==='closed'){setError('Создатель закрыл комнату.');setJoined(null);}
+   else if(data.type==='closed'){setGone(true);setJoined(null);}
    else if(data.type==='error')setError(data.message);
   },status=>setOnline(status==='connected'));socket.current=connection;return()=>connection.close();
  },[joined?.token,server,identity]);
@@ -50,7 +54,7 @@ export default function WatchRoomPage({identity}){
  useEffect(()=>{if(api)api.preferences({audioOffset:state?.audioOffset||0});},[api,state?.audioOffset]);
  const lastState=useRef(performance.now());useEffect(()=>{lastState.current=performance.now();},[state]);
   const roomItem=useMemo(()=>({id:'room:'+identity+':'+state?.epoch,name:state?.title,category:'video',onlineType:state?.type}),[identity,state?.epoch,state?.title,state?.type]);
- if(!joined)return <RoomLobby preview={preview} profile={previewProfile} server={server} name={name} setName={setName} password={password} setPassword={setPassword} avatar={avatar} setAvatar={setAvatar} busy={busy} error={error} leaving={leaving} onJoin={join}/>;
+ if(!joined)return <RoomLobby preview={preview} profile={previewProfile} server={server} name={name} setName={setName} password={password} setPassword={setPassword} avatar={avatar} setAvatar={setAvatar} busy={busy} error={error} leaving={leaving} gone={gone} onJoin={join}/>;
  const canControl=state?.everyone||state?.leader===joined.memberId;
  const p=profile||{title:state?.title,description:'Совместный просмотр',cover:'',backgrounds:[]};
  const resource=state?.resource||'file',source=server+'/rooms/'+identity+'/media/'+joined.token+'/'+resource+'?epoch='+state?.epoch;

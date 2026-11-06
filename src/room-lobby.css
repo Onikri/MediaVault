@@ -74,6 +74,10 @@
 .room-lobby-form .btn:focus-visible{outline:none;background:var(--color-blossom-light)}
 .room-lobby-form .inline-error{margin:0;font-size:13px;line-height:1.45}
 
+.room-lobby-gone strong{font:700 18px/1.25 var(--font-display);letter-spacing:-.01em;color:var(--color-petal)}
+.room-lobby-gone p{margin:0;font-size:14px;line-height:1.5;color:var(--color-on-muted)}
+.room-lobby-gone .btn{text-decoration:none}
+
 /* Guest photo */
 .room-lobby-photo{display:grid;grid-template-columns:64px minmax(0,1fr);align-items:center;gap:14px;margin-bottom:4px}
 .room-lobby-photo-face{position:relative;display:grid;place-items:center;width:64px;height:64px;padding:0;border:0;border-radius:50%;overflow:hidden;background:rgb(255 255 255 / .07);color:var(--color-on-muted);cursor:pointer;transition:background-color .2s,color .2s,transform .2s var(--ease-out)}

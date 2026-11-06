@@ -80,7 +80,7 @@ function People({preview,server,name,avatar}){
  </ul>;
 }
 
-export default function RoomLobby({preview,profile,server,name,setName,password,setPassword,avatar,setAvatar,busy,error,leaving,onJoin}){
+export default function RoomLobby({preview,profile,server,name,setName,password,setPassword,avatar,setAvatar,busy,error,leaving,gone,onJoin}){
  const root=useRef(null),form=useRef(null),keyImage=useRef(null);
  const [lit,setLit]=useState(false),[posterReady,setPosterReady]=useState(false),[reveal,setReveal]=useState(false),[frame,setFrame]=useState(-1),[seen,setSeen]=useState(()=>new Set());
  useDepth(root);
@@ -105,7 +105,7 @@ export default function RoomLobby({preview,profile,server,name,setName,password,
   <div className="room-lobby-stage">
    <header className="room-lobby-bar">
     <a className="room-lobby-home" href={location.pathname+location.search}><ChevronLeft size={18}/>MediaVault</a>
-    {preview&&<p className={'room-lobby-state'+(preview.playing?' is-playing':'')}>{preview.playing?<><Radio size={15}/>Сейчас смотрят</>:<><Pause size={15}/>На паузе</>}</p>}
+    {preview&&!gone&&<p className={'room-lobby-state'+(preview.playing?' is-playing':'')}>{preview.playing?<><Radio size={15}/>Сейчас смотрят</>:<><Pause size={15}/>На паузе</>}</p>}
    </header>
 
    <section className="room-lobby-show">
@@ -121,7 +121,11 @@ export default function RoomLobby({preview,profile,server,name,setName,password,
     </div>
    </section>
 
-   <form ref={form} className="room-lobby-form" onSubmit={onJoin}>
+   {gone?<section className="room-lobby-form room-lobby-gone" role="status">
+    <strong>Ссылка больше не работает</strong>
+    <p>Создатель закрыл комнату или у ссылки истёк срок. Попроси у него новую ссылку.</p>
+    <a className="btn btn-primary" href={location.pathname+location.search}>Открыть MediaVault</a>
+   </section>:<form ref={form} className="room-lobby-form" onSubmit={onJoin}>
     <PhotoPicker avatar={avatar} setAvatar={setAvatar} name={name}/>
     <label>Имя<TypingField aria-label="Имя в комнате" maxLength={40} value={name} onChange={e=>setName(e.target.value)} autoComplete="nickname" placeholder="Как тебя называть"/></label>
     <label>Пароль комнаты
@@ -134,7 +138,7 @@ export default function RoomLobby({preview,profile,server,name,setName,password,
     <button className="btn btn-primary" disabled={busy||leaving||!password||!server}><LogIn size={17}/>{busy?'Подключаемся…':'Войти в комнату'}</button>
     {!server&&<p className="inline-error">Сервер не подключён. Открой ссылку в браузере, где подключён сервер MediaVault.</p>}
     {error&&<p className="inline-error" role="alert">{error}</p>}
-   </form>
+   </form>}
 
    <footer className="room-lobby-band">
     {duration>0&&<div className="room-lobby-timeline">
