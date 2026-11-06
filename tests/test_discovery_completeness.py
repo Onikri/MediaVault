@@ -2,12 +2,23 @@ from pathlib import Path
 from types import SimpleNamespace
 import sys
 import unittest
+import time
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 import source_discovery
 from player_catalog import choice
 
 class DiscoveryCompletenessTests(unittest.TestCase):
+    def test_public_refresh_does_not_reuse_cached_alloha_inspection(self):
+        selected={'title':'Refresh Alloha','kind':'anime'}
+        key=repr((None,source_discovery.aliases(selected),None,'anime'))
+        previous={'title':selected,'voices':[{'id':'dub'}],'sources':[],'pending':False}
+        def thread(*,target,**kwargs):
+            return SimpleNamespace(start=target)
+        with patch.dict(source_discovery._cache,{key:(time.monotonic()+300,previous)},clear=True),patch.dict(source_discovery._jobs,{},clear=True),patch.object(source_discovery.threading,'Thread',side_effect=thread),patch.object(source_discovery,'_discover') as scan:
+            source_discovery.discover(selected,refresh=True)
+            scan.assert_called_once_with(selected,refresh=True,continuing=False)
+
     def test_all_exact_title_pages_are_inspected_instead_of_only_the_first_two(self):
         selected={'title':'Exact show','kind':'anime','year':2024,'ids':{'mal':'123'}}
         candidates=[{'title':'Exact show','kind':'anime','year':2024,'url':'https://catalog.example.com/show-'+str(i)} for i in range(7)]

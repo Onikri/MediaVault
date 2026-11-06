@@ -43,7 +43,7 @@ export default function OnlineViewer({entries,initial,kind,title,service,userId,
    resumePending.current=false;
    activeLease.current=keepOnlineLease(live.current,token,()=>reconnect.current());
    setMedia({...data,resume,item:items.find(e=>e.sourceURL===current.url)||items[0],entry:current,entries,catalog});
-   previous?.();prepared.current?.(data);}).catch(e=>{if(!abort.signal.aborted&&!unavailable.current?.(e))setError(e.name==='TimeoutError'?'Источник не ответил за 45 секунд. Повтори подключение или выбери другой источник.':e.message);}).finally(()=>{if(!abort.signal.aborted)setBusy(false);});return()=>{generation.current++;abort.abort();};
+   previous?.();prepared.current?.(data);}).catch(e=>{if(!abort.signal.aborted){recovering.current='';if(!unavailable.current?.(e))setError(e.name==='TimeoutError'?'Источник не ответил за 45 секунд. Повтори подключение или выбери другой источник.':e.message);}}).finally(()=>{if(!abort.signal.aborted)setBusy(false);});return()=>{generation.current++;abort.abort();};
  },[current.url,kind,service.server,playbackQuality,retry,sourceUrl]);
  useEffect(()=>()=>{activeLease.current?.();activeLease.current=null;},[]);
  useEffect(()=>{const close=()=>onClose();addEventListener('mediavault-locked',close);const old=document.body.style.overflow;if(!inline)document.body.style.overflow='hidden';return()=>{if(!inline)document.body.style.overflow=old;removeEventListener('mediavault-locked',close);};},[onClose,inline]);

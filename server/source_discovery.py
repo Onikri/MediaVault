@@ -119,10 +119,11 @@ def _discover(selected,*,refresh=False,continuing=False):
                 'complete':not unfinished and all(p.get('complete',False) for p in providers),'checkedAt':int(time.time())}
         with ThreadPoolExecutor(max_workers=6) as pool:
             from kodik_api import discover as kodik_discover
-            futures=[pool.submit(kodik_discover,selected),*[pool.submit(work,site) for site in sites]]
+            futures=[]
             if selected.get('kind','anime') in {'anime','movie'} and str((selected.get('ids') or {}).get('mal'))=='57555':
                 from yummy_anime_source import discover_reze
                 futures.append(pool.submit(discover_reze))
+            futures.extend([pool.submit(kodik_discover,selected),*[pool.submit(work,site) for site in sites]])
             for future in as_completed(futures):
                 providers.append(future.result());result=snapshot(len(providers)<len(futures))
                 with _lock:_cache[key]=(time.monotonic()+(300 if result['sources'] else 30),result)
@@ -169,7 +170,7 @@ def discover(selected,*,refresh=False,continuing=False):
                     with _lock:_cache[key]=hit
             job=_jobs[key]={'changed':threading.Event(),'done':threading.Event()}
             def run():
-                try:_discover(selected,refresh=True,continuing=continuing or bool(hit))
+                try:_discover(selected,refresh=True,continuing=continuing or bool(hit) and not refresh)
                 except Exception:job['error']=True
                 finally:
                     job['done'].set();job['changed'].set()
