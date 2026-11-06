@@ -1,0 +1,9 @@
+NijiLucid is distributed as a mixed-license project.
+
+- Core NijiLucid code: MIT License, see
+  licenses/MIT.txt.
+- CuNNy-derived generated components bundled with the default extension
+  package: LGPL-3.0-or-later, see licenses/LGPL-3.0-or-later.txt.
+
+The applicable license for a specific component is defined by its file-level
+SPDX header where present and by THIRD_PARTY_NOTICES.md.

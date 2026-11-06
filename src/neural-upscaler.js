@@ -23,7 +23,7 @@ export async function gitBlobSha1(bytes) {
   const digest = await crypto.subtle.digest('SHA-1',packed);
   return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
 }
-async function loadRuntime() {
+export async function loadRuntime() {
   if(!navigator.gpu) throw Error('Нужен браузер с WebGPU (Chromium/Chrome/Edge и совместимая видеокарта).');
   if(window.ort?.InferenceSession) return window.ort;
   if(!runtimePromise){

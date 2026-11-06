@@ -1,0 +1,65 @@
+/* Room conversation in the player's language: names instead of initial avatars,
+   tone instead of outlines, one quiet surface. Overrides room-conversation.css. */
+.rc.rc{--rc-text:#f4f3f1;--rc-muted:#a3a3aa;--rc-raised:#ffffff12;--rc-accent:var(--accent,#ff7a36);
+  display:flex;flex-direction:column;gap:12px;min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#ffffff30 transparent;padding:16px;border:0;border-radius:18px;background:#1a1a1c;color:var(--rc-text);box-shadow:none;font-size:14px}
+.rc button{font:inherit;color:inherit;border:0;background:transparent;cursor:pointer;box-shadow:none}
+.rc button:disabled{opacity:.4;cursor:default}
+.rc button:focus-visible,.rc input:focus-visible,.rc select:focus-visible{outline:0;box-shadow:0 0 0 2px var(--rc-accent)}
+.rc .rc-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin:0;padding:0;border:0}
+.rc .rc-head h2{margin:0;font-size:17px;font-weight:650;letter-spacing:-.01em}
+.rc .rc-head small{margin-left:auto;font-size:12px;color:var(--rc-muted)}
+.rc .rc-relay{display:inline;padding:0;border:0;background:none;font-size:12px;color:var(--rc-muted)}
+.rc .rc-members{display:grid;gap:2px;margin:0;padding:0;list-style:none;max-height:220px;overflow:auto}
+.rc .rc-member{display:grid;border:0;background:none;padding:0}
+.rc .rc-member-main{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:4px 10px;border-radius:11px;text-align:left}
+.rc .rc-member-main:not(:disabled):hover{background:var(--rc-raised)}
+.rc .rc-member-main:disabled{opacity:1;cursor:default}
+.rc .rc-member-text{display:grid;flex:1;min-width:0}
+.rc .rc-member-text strong{display:block;font-size:14px;font-weight:600;color:var(--rc-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc .rc-member-text small{font-size:12px;color:var(--rc-muted)}
+.rc .rc-member:not([data-voice]) .rc-member-text strong{color:#ffffffb0}
+.rc .rc-member[data-speaking] .rc-member-text strong,.rc .rc-member[data-speaking] .rc-member-text small{color:var(--rc-accent)}
+.rc .rc-member-flag{color:var(--rc-muted)}
+.rc .rc-member-volume{display:flex;align-items:center;gap:10px;padding:2px 10px 8px;font-size:12px;color:var(--rc-muted);overflow:hidden}
+.rc .rc-member-volume input{flex:1;accent-color:var(--rc-accent)}
+.rc .rc-voicebar{display:flex;align-items:center;gap:6px;margin:0;padding:0;border:0;background:none}
+.rc .rc-join{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:42px;border-radius:12px;background:var(--rc-text);color:#111;font-weight:600;box-shadow:none}
+.rc .rc-join:hover:not(:disabled){background:#fff}
+.rc .rc-tool{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--rc-raised);color:#ffffffd0}
+.rc .rc-tool:hover{background:#ffffff1f;color:#fff}
+.rc .rc-tool[aria-pressed=true]{color:var(--rc-accent)}
+.rc .rc-leave{margin-left:auto;color:#f08a7a;background:#f08a7a1a}
+.rc .rc-leave:hover{background:#f08a7a2e;color:#f6a294}
+.rc .rc-settings{display:grid;gap:10px;flex:none;min-width:0;padding:12px;border:0;border-radius:14px;background:#00000038;overflow:hidden}
+.rc .rc-settings label{display:grid;gap:6px;font-size:13px;color:var(--rc-muted)}
+.rc .rc-settings select{width:100%;min-width:0;max-width:100%;font:inherit;font-size:13px;height:38px;padding:0 10px;border:0;border-radius:10px;background:#ffffff12;color:var(--rc-text)}
+.rc .rc-settings input[type=range]{accent-color:var(--rc-accent)}
+.rc .rc-level{height:4px;border-radius:4px;background:#ffffff1c;overflow:hidden}
+.rc .rc-level span{display:block;height:100%;background:var(--rc-accent);transform-origin:left}
+.rc .rc-profile{display:grid;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0;padding:0;border:0}
+.rc .rc-profile legend{margin-bottom:6px;font-size:13px;color:var(--rc-muted)}
+.rc .rc-profile button{display:grid;gap:2px;min-width:0;padding:10px;overflow-wrap:anywhere;border-radius:11px;background:#ffffff0d;text-align:left}
+.rc .rc-profile button[aria-pressed=true]{background:#ffffff21}
+.rc .rc-profile strong{font-size:13px;font-weight:600}
+.rc .rc-profile small{font-size:11px;color:var(--rc-muted);line-height:1.4}
+.rc .rc-switch{display:flex!important;align-items:center;gap:10px;color:var(--rc-text)!important;font-size:14px!important}
+.rc .rc-switch input{accent-color:var(--rc-accent)}
+.rc .rc-error{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;padding:10px 12px;border:0;border-radius:12px;background:#f08a7a14;color:#f0b3a7;font-size:13px}
+.rc .rc-error button{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:999px;background:#ffffff14;color:var(--rc-text)}
+.rc .rc-chat-head{display:block;margin:4px 0 -4px;padding:0;border:0;font-size:13px;font-weight:600;color:var(--rc-muted)}
+.rc .rc-chat{flex:1 0 120px;min-height:120px;display:flex;flex-direction:column;gap:10px;margin:0;padding:2px 4px 2px 0;list-style:none;overflow:auto;scrollbar-width:thin;scrollbar-color:#ffffff30 transparent}
+.rc .rc-chat>li{display:block;padding:0;border:0;background:none}
+.rc .rc-chat>li p{display:flex;align-items:baseline;gap:8px;margin:0 0 1px}
+.rc .rc-chat>li strong{font-size:13px;font-weight:600;color:hsl(var(--avatar-hue,20) 70% 74%)}
+.rc .rc-chat>li time{font-size:11px;color:var(--rc-muted);font-variant-numeric:tabular-nums}
+.rc .rc-chat>li span{display:block;font-size:14px;line-height:1.45;color:#ffffffdc;overflow-wrap:anywhere}
+.rc .rc-chat-empty{font-size:13px!important;color:var(--rc-muted)}
+.rc .rc-compose{display:flex;gap:6px;margin:0;padding:4px;border:0;border-radius:14px;background:#00000047}
+.rc .rc-compose input{flex:1;min-width:0;height:40px;padding:0 10px;border:0;background:transparent;color:var(--rc-text);font:inherit;font-size:14px;outline:0;box-shadow:none}
+.rc .rc-compose button{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--rc-text);color:#111}
+.rc .rc-compose button:disabled{background:#ffffff14;color:#ffffff80;opacity:1}
+.player-room-conversation .rc{height:100%}
+.mvx-sheet .mvx-room-chat{margin:0 10px}
+.mvx-sheet .mvx-room-chat>summary{min-height:40px;display:flex;align-items:center;cursor:pointer;font-size:14px;color:var(--mvx-text)}
+.mvx-sheet .mvx-room-chat .rc{padding:10px;background:#00000038;max-height:420px}
+@media(max-width:650px){.rc.rc{padding:14px;border-radius:16px}.player-room-conversation{padding:0 0 0}}

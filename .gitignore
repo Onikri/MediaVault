@@ -12,3 +12,5 @@ test-output/
 *.tfstate
 *.tfstate.*
 deploy/oracle/data/
+
+demo/player-redesign/media/

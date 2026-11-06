@@ -10,13 +10,11 @@ import usePlayerGestures from './use-player-gestures.js';
 import usePlayerActions from './use-player-actions.js';
 import usePlayerAtmosphere from './use-player-atmosphere.js';
 import {pauseContext} from './pause-character-context.js';
-import {startNeuralUpscaler} from './neural-upscaler.js';
 import useVideoStream from './use-video-stream.js';
 import {contiguousBufferEnd} from './watch-quality.js';
 import useEpisodeMusic from './use-episode-music.js';
 import {musicIdentityFor} from './music-library.js';
-import {startMobileGpu} from './mobile-gpu-upscaler.js';
-import {startFsr} from './fsr-upscaler.js';
+import {upscalerById,autoUpscaler,migrateUpscaler} from './upscaler-catalog.js';
 import useExternalAudio from './use-external-audio.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 import {buildPlaybackLibrary} from './player-model.js';
@@ -70,11 +68,11 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const [gpuSuspended,setGpuSuspended]=useState(false);
   const mobileDevice=/Android|iPhone|iPad/i.test(navigator.userAgent)||matchMedia('(any-pointer: coarse)').matches;
   const deviceProfile=prefs.deviceProfile==='auto'?(mobileDevice?'phone':'desktop'):prefs.deviceProfile;
-  const engine=prefs.upscaler==='auto'?(deviceProfile==='desktop'?'anime4k':'mobile'):prefs.upscaler;
+  const engine=prefs.upscaler==='auto'||!prefs.upscaler?autoUpscaler(deviceProfile):migrateUpscaler(prefs.upscaler);
   const [colors,setColors]=useState(()=>{try{return JSON.parse(localStorage.getItem('mv_video_colors')||'{}');}catch{return {};}});
   function color(change){setColors(old=>{const next={...old,...change};try{localStorage.setItem('mv_video_colors',JSON.stringify(next));}catch{}return next;});}
   const colorFilter=`saturate(${colors.saturation??1}) contrast(${colors.contrast??1}) brightness(${colors.brightness??1})`;
-  const engineName=engine==='lanczos'?'Lanczos3':String(engine).startsWith('fsr-')||engine==='fsr'?(engine==='fsr-soft'?'FSR1 · мягкий':'FSR1'):engine==='mobile'?'Мобильный GPU':engine==='fsrcnn'?'FSRCNN':({'anime4k-l':'Anime4K L','anime4k-vl':'Anime4K VL','anime4k-ul':'Anime4K UL'}[engine]||'Anime4K');
+  const engineName=upscalerById(engine)?.label||'Anime4K';
   function retryGpu(value=prefs.upscaler){setGpuSuspended(false);setGpuAttempt(n=>n+1);changePrefs({gpu:value!=='off',...(value!=='off'?{upscaler:value}:{})});}
   const [opening,setOpening]=useState(()=>getOpening(item,libraryId));
   const [openingDraft,setOpeningDraft]=useState(null);
@@ -178,7 +176,8 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     setGpuWarning('');setNeuralStats(null);setGpuActive(false);
     (async()=>{
       try{
-        const start=engine==='fsr'||engine==='fsr-soft'?startFsr:engine==='mobile'||engine==='lanczos'?startMobileGpu:engine==='fsrcnn'?startNeuralUpscaler:(await import('./anime4k-runtime.js')).startAnime4K;
+        const kind=upscalerById(engine)?.kind;
+        const start=kind==='webgpu'?(await import('./webgpu-upscaler.js')).startWebGpuUpscaler:kind==='mpv'?(await import('./mpv-hook-runtime.js')).startMpvUpscaler:kind==='realesrgan'?(await import('./realesrgan-upscaler.js')).startRealEsrgan:(await import('./anime4k-runtime.js')).startAnime4K;
         stop=await start(videoRef.current,canvas,{
           mode:prefs.neuralMode,profile:engine,deviceProfile,
           onStats:stats=>{const now=performance.now();if(!disposed&&now-statsClock.current>=1000){statsClock.current=now;setNeuralStats(stats);}},
@@ -293,6 +292,8 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   keyboardHandler.current=event=>{
       if(stageRef.current?.closest('[data-mode="hidden"]'))return;
       if(event.key==='Escape'&&panel==='watch'&&theater){event.preventDefault();event.stopImmediatePropagation();setTheater(false);return;}
+      // A nested settings page handles Escape itself (back to the list first).
+      if(event.key==='Escape'&&panel==='settings'&&document.activeElement?.closest?.('[data-settings-nested]'))return;
       if(event.key==='Escape'&&panel!=='watch'){event.preventDefault();event.stopImmediatePropagation();openPanel('watch');stageRef.current?.querySelector('[aria-label="Настройки плеера"]')?.focus();return;}
       if(panel!=='watch')return;
       if(!stageRef.current?.contains(document.activeElement)&&document.fullscreenElement!==stageRef.current)return;
