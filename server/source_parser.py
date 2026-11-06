@@ -92,6 +92,7 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
     playback_api = (
         host == "plapi.cdnvideohub.com" and bool(re.fullmatch(r"/api/v1/player/sv/(?:playlist|video/\d+)", url.path))
         or host == "ru.yummyani.me" and bool(re.fullmatch(r"/api/anime/[1-9]\d{0,9}/videos", url.path))
+        or host == "guest.freeanimehentai.net" and url.path == "/api/v11/search_hvs"
         or host in {"anilibria.top", "aniliberty.top", "api.anilibria.app"}
         and bool(re.fullmatch(r"/api/v1/(?:anime/releases/[a-zA-Z0-9_-]+|app/search/releases)", url.path))
     )

@@ -40,6 +40,16 @@ def inspect(url, provider, http, dub_url=None, state=None):
     except SourceError:
         diagnostics.append({'status': 'unavailable', 'message': 'Доступ к плееру проверяется при запуске.'})
     episodes = [{'number': 1, 'season': 1, 'url': url, 'title': title}]
+    if identifier == 'hanime':
+        # Other episodes of the same series come from the HanimeTV catalogue feed.
+        try:
+            from hanime_source import episodes_for, series_name
+            series = episodes_for(url, http)
+            if series:
+                episodes = series
+                title = series_name(series[0]['title']) or title
+        except SourceError:
+            pass
     return {'provider': identifier, 'title': title, 'url': url, 'episodes': episodes,
             'dubs': [choice('Дорожка источника', url, player=label, episodes=episodes)],
             'seasons': [], 'releases': [], 'complete': True, 'available': True, 'diagnostics': diagnostics}

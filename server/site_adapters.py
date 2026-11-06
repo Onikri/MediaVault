@@ -69,6 +69,7 @@ SITES = (
     Site('anixart','AniXart','https://anixart.site',('anixart.site','www.anixart.site'),'.shortstory, .poster, .movie-item, .short-item, .th-item, article','.poster__title, .th-title, .short-title, .title, h2, h3','/index.php'),
     Site('animegoonline','AnimeGO Online','https://animego.online',('animego.online',),'a.poster-item','.animego-online-poster-item__title'),
     Site('anigoonline','Anigoo Online','https://www.anigoonline.ru',('anigoonline.ru','www.anigoonline.ru'),'article.short','a.short__title'),
+    Site('hanime','HanimeTV','https://hanime.tv',('hanime.tv','www.hanime.tv'),'',''),
     Site("readmanga", "ReadManga", "https://readmanga.live", ("readmanga.live", "mintmanga.live"), ".tile, .manga-list-item", "h3, .title", "/search", "manga"),
 )
 BY_ID = {site.id: site for site in SITES}
@@ -256,6 +257,9 @@ def search_site(site, query, *, http=None):
     try:
         if site.id=='anilibria':
             from aniliberty_source import search
+            values=search(query,http)
+        elif site.id=='hanime':
+            from hanime_source import search
             values=search(query,http)
         else:
             if site.search_method=='POST':
