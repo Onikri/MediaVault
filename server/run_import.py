@@ -183,12 +183,12 @@ def video_import_source(job, entry, http):
     return url, parent
 
 
-def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None):
+def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None, alloha_downloader=None, alloha_cache=None):
     job = validate_job(value)
     if getattr(vault, "library_id", None) != job["library_id"]:
         raise SourceError("Открытая библиотека не совпадает с заданием.")
     own_resolver = resolver is None
-    resolver = resolver or Resolver()
+    resolver = resolver or Resolver(native_alloha=alloha_downloader is not None)
     result = {"saved": 0, "skipped": 0, "failed": 0}
     emit = progress or (lambda event: None)
     try:
@@ -256,9 +256,15 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                                 if attempt:
                                     resolver.http.refresh_playback = True
                                 page = resolver.resolve(url,referer=parent) if parent else resolver.resolve(url)
-                                streams=expand_stream_qualities(page.streams,resolver.http)
-                                stream = pick_stream(streams, job["quality"])
-                                path = downloader(stream, temporary, http=resolver.http, quality=job["quality"], progress=report)
+                                native = next((s for s in page.streams if s.get('type') == 'alloha-native'), None)
+                                if native and alloha_downloader:
+                                    checkpoint = Path(alloha_cache) / __import__('hashlib').sha256((identity+collection).encode()).hexdigest() if alloha_cache else None
+                                    path = alloha_downloader(native['url'], temporary, quality=job["quality"], progress=report,
+                                                             cancelled=cancelled, checkpoint=checkpoint)
+                                else:
+                                    streams=expand_stream_qualities(page.streams,resolver.http)
+                                    stream = pick_stream(streams, job["quality"])
+                                    path = downloader(stream, temporary, http=resolver.http, quality=job["quality"], progress=report)
                                 break
                             except SourceAccessError:
                                 if attempt or urlsplit(url).hostname != 'alloha.yani.tv' or (cancelled and cancelled()):
@@ -307,6 +313,9 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                 saved_item=vault.upload_file(path, name=name, category=category, collection=collection,
                                   episode=number, source_identity=identity, mime=mime, progress=report,
                                   section=job["section"], part=f"{'Том' if category != 'video' else 'Сезон'} {season}", season=season, **options)
+                if category == 'video' and alloha_downloader and alloha_cache:
+                    from alloha_import import discard_checkpoint
+                    discard_checkpoint(Path(alloha_cache) / __import__('hashlib').sha256((identity+collection).encode()).hexdigest(), Path(alloha_cache))
                 result["saved"] += 1
                 emit({**result, "phase": "episode_done"})
                 if on_saved:on_saved(saved_item)

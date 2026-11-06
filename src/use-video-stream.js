@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {streamBufferPolicy,initialStreamLevel,bitrateBufferPolicy} from './watch-quality.js';
-export default function useVideoStream(ref,source,type,onError,{preview=false,audioOnly=false,quality='best',startPosition=0}={}){
+export default function useVideoStream(ref,source,type,onError,{preview=false,audioOnly=false,quality='best',startPosition=0,sessionRecovery=false}={}){
  const engine=useRef(null),report=useRef(onError),requested=useRef(quality);report.current=onError;requested.current=quality;
  const [levels,setLevels]=useState([]),[level,setLevelState]=useState(-1),[audio,setAudio]=useState([]),[subtitles,setSubtitles]=useState([]);
  const hls=type==='hls'||/\.m3u8(?:\?|$)/i.test(source||'');
@@ -15,11 +15,12 @@ export default function useVideoStream(ref,source,type,onError,{preview=false,au
    instance.on(Hls.Events.FRAG_BUFFERED,()=>{recovery=0;});
    instance.on(Hls.Events.AUDIO_TRACKS_UPDATED,()=>setAudio(instance.audioTracks.map((a,i)=>({index:i,name:a.name||a.lang||'Дорожка '+(i+1)}))));
    instance.on(Hls.Events.SUBTITLE_TRACKS_UPDATED,()=>setSubtitles(instance.subtitleTracks.map((a,i)=>({index:i,name:a.name||a.lang||'Субтитры '+(i+1)}))));
-   instance.on(Hls.Events.ERROR,(_,data)=>{if(!data.fatal||closed)return;if(recovery++<2){if(data.type===Hls.ErrorTypes.NETWORK_ERROR){instance.startLoad();return;}if(data.type===Hls.ErrorTypes.MEDIA_ERROR){instance.recoverMediaError();return;}}report.current?.(Error('Поток не ответил. Попробуй другой источник той же озвучки.'));});
+   let sessionFailed=false;
+   instance.on(Hls.Events.ERROR,(_,data)=>{if(closed||sessionFailed)return;const status=Number(data.response?.code);if(sessionRecovery&&[404,409,410].includes(status)){sessionFailed=true;instance.stopLoad();report.current?.(Object.assign(Error('Сессия потока завершена. Переподключаем…'),{status}));return;}if(!data.fatal)return;if(recovery++<2){if(data.type===Hls.ErrorTypes.NETWORK_ERROR){instance.startLoad();return;}if(data.type===Hls.ErrorTypes.MEDIA_ERROR){instance.recoverMediaError();return;}}report.current?.(Error('Поток не ответил. Попробуй другой источник той же озвучки.'));});
    instance.loadSource(source);instance.attachMedia(v);
   }).catch(e=>!closed&&report.current?.(e));
   return()=>{closed=true;instance?.destroy();if(engine.current===instance)engine.current=null;};
- },[ref,source,hls,preview,audioOnly]);
+ },[ref,source,hls,preview,audioOnly,sessionRecovery]);
  useEffect(()=>{const instance=engine.current;if(!instance?.levels?.length)return;const index=quality==='best'?-1:instance.levels.findIndex(l=>Number.parseInt(l.attrs?.NAME||l.name||l.height)===Number(quality));instance.nextLevel=index;setLevelState(index);},[quality]);
  return {hls,levels,level,setLevel:n=>{if(engine.current){engine.current.nextLevel=n;setLevelState(n);}},audio,setAudio:n=>{if(engine.current)engine.current.audioTrack=n;},subtitles,setSubtitle:n=>{if(engine.current){engine.current.subtitleDisplay=false;engine.current.subtitleTrack=n;}}};
 }

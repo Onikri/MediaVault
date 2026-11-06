@@ -46,6 +46,7 @@ class Source:
 
     def __init__(self, profile, iframe):
         self.closed, self.requests = False, []
+        self.socket_closed, self.playback = False, []
 
     async def open(self, audio=None):
         self.audio = audio or '1'
@@ -73,6 +74,9 @@ class Source:
     async def close(self):
         self.closed = True
 
+    async def update_playback(self, state):
+        self.playback.append(state)
+
 
 class DeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -94,6 +98,47 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.get('/resolve', params={'iframe': IFRAME})
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
+
+    async def test_authenticated_viewer_state_and_closed_native_lease(self):
+        import online_sessions
+        subject = {'id': 'viewer'}
+        online_sessions.install(self.app, lambda: subject['id'])
+        response = await self.client.post('/online/prepare', json={
+            'url': IFRAME, 'kind': 'video', 'quality': '720', 'clientId': 'state-viewer'})
+        data = response.json()
+        self.assertTrue(data['playbackTelemetry'])
+        sid = data['id'];native = self.service.sessions[sid]
+        state = {'time': 123.75, 'paused': False, 'rate': 1.5, 'seeking': False, 'buffering': False}
+        result = await self.client.post('/online/'+sid+'/playback', json=state)
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(native.source.playback[-1]['time'], 123.75)
+        self.assertEqual(native.source.playback[-1]['quality'], '720')
+        state.update(time=500, paused=True, seeking=True)
+        self.assertEqual((await self.client.post('/online/'+sid+'/playback', json=state)).status_code, 200)
+        self.assertTrue(native.source.playback[-1]['paused'])
+        for invalid in [{'time': -1}, {'rate': 100}, {'paused': 'false'}, {'quality': '2160'}]:
+            r = await self.client.post('/online/'+sid+'/playback', json={**state, **invalid})
+            self.assertEqual(r.status_code, 422)
+        subject['id'] = 'other-viewer'
+        self.assertEqual((await self.client.post('/online/'+sid+'/playback', json=state)).status_code, 404)
+        subject['id'] = 'viewer'
+        await self.service.close_session(native)
+        self.assertEqual((await self.client.post('/online/'+sid+'/heartbeat')).status_code, 410,
+                         'A stale bridge must not renew a closed native Alloha session')
+        self.assertEqual((await self.client.post('/online/'+sid+'/playback', json=state)).status_code, 404)
+        online_sessions.sessions.pop(sid, None)
+
+    async def test_expired_and_disconnected_native_lease_are_reported(self):
+        import online_sessions
+        online_sessions.install(self.app, lambda: 'viewer')
+        for reason in ['expired', 'socket']:
+            r = await self.client.post('/online/prepare', json={'url': IFRAME, 'kind': 'video', 'quality': '720'})
+            sid = r.json()['id'];native = self.service.sessions[sid]
+            if reason == 'expired':native.expires = self.service.clock()-1
+            else:native.source.socket_closed = True
+            self.assertEqual((await self.client.post('/online/'+sid+'/heartbeat')).status_code, 410)
+            await self.service.close_session(native)
+            online_sessions.sessions.pop(sid, None)
 
     async def test_site_prepares_only_selected_audio_and_quality(self):
         body = SimpleNamespace(url=IFRAME, quality='720', client_id='viewer')

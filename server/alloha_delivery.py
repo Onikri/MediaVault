@@ -123,6 +123,7 @@ class DeliverySession:
     skip: list = field(default_factory=list)
     subtitles: list = field(default_factory=list)
     online_quality: str = ''
+    owner: str = ''
     published_qualities: list = field(default_factory=list)
     closed: bool = False
     switch_lock: object = field(default_factory=asyncio.Lock)
@@ -443,6 +444,7 @@ class AllohaDelivery:
         started = self.clock()
         data = await self.resolve(body.url, online_quality=body.quality)
         session = self.session(data['sid'])
+        session.owner = subject
         if key:
             self.online_clients[key] = session.sid
         qualities = session.translations[session.active]['qualities']
@@ -450,12 +452,22 @@ class AllohaDelivery:
         session.online_quality = quality
         return {'id': session.sid, 'kind': 'video', 'type': 'hls',
                 'url': f'/online/{session.sid}/alloha-playback',
-                'expiresIn': self.ttl, 'qualities': session.published_qualities,
+                'expiresIn': self.ttl, 'qualities': session.published_qualities, 'playbackTelemetry': True,
                 'subtitles': [{'id': str(i), 'name': t['label'], 'language': t['lang'], 'url': t['src']}
                               for i, t in enumerate(session.subtitles)],
                 'sourceIntervals': [{'start': a, 'end': b, 'type': 'op' if i == 0 else 'ed', 'source': 'Alloha'}
                                     for i, (a, b) in enumerate(session.skip)],
                 'preparationMs': round((self.clock() - started) * 1000)}
+
+    async def report_playback(self, sid, subject, state):
+        session = self.session(sid)
+        if session.owner != subject:
+            raise HTTPException(404, 'Сессия Alloha недоступна.')
+        try:
+            await session.source.update_playback({**state, 'quality': session.online_quality})
+        except SourceRefused as error:
+            await self.failed(session, error, session.iframe)
+        return {'received': True, 'expiresIn': max(0, int(session.expires - self.clock()))}
 
     def rewrite(self, session, text, base):
         if not text.lstrip().startswith('#EXTM3U'):
