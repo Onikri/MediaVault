@@ -4,9 +4,6 @@ await cp('lmt/licenses','dist/lmt/licenses',{recursive:true});
 await cp('src/vendor/fsr1/LICENSE','dist/FSR1-LICENSE.txt');
 await cp('lmt/upstream/dicts','dist/lmt/dicts',{recursive:true});await cp('lmt/upstream/LICENSE','dist/lmt/LICENSE');await mkdir('dist/lmt/upstream',{recursive:true});await cp('lmt/upstream/LICENSE','dist/lmt/upstream/LICENSE');
 for(const name of await readdir('node_modules/onnxruntime-web/dist'))if(/^ort-wasm-simd-threaded(?:\.(?:jsep|asyncify))?\.(?:mjs|wasm)$/.test(name))await cp('node_modules/onnxruntime-web/dist/'+name,'dist/lmt/'+name);
-// Whisper auto-captions (transformers.js) need their own ORT build's wasm.
-await mkdir('dist/lmt/transformers-ort',{recursive:true});
-for(const name of await readdir('node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist'))if(/^ort-wasm-simd-threaded(?:\.(?:jsep|asyncify))?\.(?:mjs|wasm)$/.test(name))await cp('node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/'+name,'dist/lmt/transformers-ort/'+name);
 await mkdir('dist/lmt/moebius-ort',{recursive:true});
 await cp('lmt/licenses/onnxruntime-moebius-MIT.txt','dist/lmt/moebius-ort/LICENSE');
 for(const name of await readdir('node_modules/onnxruntime-web-moebius/dist'))if(/^ort-wasm-simd-threaded(?:\.(?:jsep|asyncify))?\.(?:mjs|wasm)$/.test(name))await cp('node_modules/onnxruntime-web-moebius/dist/'+name,'dist/lmt/moebius-ort/'+name);

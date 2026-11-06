@@ -44,7 +44,6 @@
     "test:blossom": "node tests/blossom-browser.cjs && node tests/title-capsule-browser.cjs && node tests/title-showcase-browser.cjs"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.3.2",
     "@mlc-ai/web-llm": "^0.2.86",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-select": "2.4.1",
