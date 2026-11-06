@@ -48,7 +48,7 @@ def site_for(url):
     from suwayomi_bridge import parse_reference
     if parse_reference(url):return MangaSite("suwayomi","Дополнительные источники",os.getenv("PUBLIC_URL",""),"suwayomi",languages=("ru","en","ja","ko"))
     host=urlsplit(url).hostname
-    return next((s for s in SITES if host in (urlsplit(s.root).hostname,*s.hosts) and (s.family!='naver' or urlsplit(url).path.startswith(urlsplit(s.root).path+'/'))),None)
+    return next((s for s in SITES if host in (urlsplit(s.root).hostname,*s.hosts) and (s.family!='hentaichan' or not urlsplit(url).path.startswith('/video')) and (s.family!='naver' or urlsplit(url).path.startswith(urlsplit(s.root).path+'/'))),None)
 def clean(value):return re.sub(r'\s+',' ',str(value or '')).strip()[:300]
 def chapter_number(value):
     text=str(value).strip().replace(',','.')

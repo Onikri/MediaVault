@@ -532,6 +532,10 @@ class Resolver:
             if len(matches) != 1:
                 raise SourceError('Выбранный перевод этой серии отсутствует. Другая озвучка автоматически не подставляется.')
             return self.resolve(matches[0]['url'], referer=final, depth=depth+1, visited=visited)
+        if urlsplit(url).hostname in {'hentaichan.live', 'x17.h-chan.me'}:
+            from hentaichan_video import resolve, video_page
+            if video_page(url):
+                return resolve(url, self.http)
         from dynamic_video_sources import provider_for, resolve_dynamic
         provider = provider_for(url)
         if provider:
