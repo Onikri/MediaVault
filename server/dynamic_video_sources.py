@@ -55,14 +55,16 @@ def inspect(url, provider, http, dub_url=None, state=None):
             'seasons': [], 'releases': [], 'complete': True, 'available': True, 'diagnostics': diagnostics}
 
 
-def check_mp4(http, stream):
-    response, _ = http._open(stream['url'], headers=stream.get('headers'), byte_range='bytes=0-1023')
+def check_mp4(http, stream, *, open_stream=None):
+    response, final = (open_stream or http._open)(
+        stream['url'], headers=stream.get('headers'), byte_range='bytes=0-1023')
     try:
         mime = response.headers.get('Content-Type', '').partition(';')[0].lower()
         if response.status_code != 206 or not re.fullmatch(
             r'bytes 0-\d+/[1-9]\d*', response.headers.get('Content-Range', ''), re.I
         ) or mime not in {'video/mp4', 'application/octet-stream', 'binary/octet-stream'}:
             raise SourceError('Источник не отдал MP4 с поддержкой перемотки.')
+        return final
     finally:
         response.close()
 

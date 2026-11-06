@@ -30,6 +30,10 @@ class SourceAccessError(SourceError):
     pass
 
 
+class SourceTemporaryError(SourceError):
+    """A network failure or temporary upstream response."""
+
+
 # Use the same public browser UA as the player adapters' returned stream headers.
 # Some embeds reject a non-browser UA before their HTML can be parsed.
 USER_AGENT = DEFAULT_USER_AGENT
@@ -153,7 +157,7 @@ class PublicHttp:
     def fork(self):
         value=PublicHttp(validate=self.validate,timeout=self.timeout,deadline=self.deadline);value.bulk=getattr(self,'bulk',False);return value
 
-    def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None):
+    def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None):
         url = self.validate(value)
         outgoing = playback_headers(headers)
         if urlsplit(url).hostname in {'animego.org','animego.me'} and re.fullmatch(r'/player/(?:videos/)?\d+/?',urlsplit(url).path):
@@ -184,13 +188,13 @@ class PublicHttp:
             try:
                 # Clear cookies collected by previous HTML pages, including redirects.
                 self.session.cookies.clear()
-                timeout=self.timeout
+                request_timeout=timeout or self.timeout
                 if self.deadline:
-                    remaining=max(.2,self.deadline-time.monotonic());timeout=(min(timeout[0],remaining),min(timeout[1],remaining))
+                    remaining=max(.2,self.deadline-time.monotonic());request_timeout=(min(request_timeout[0],remaining),min(request_timeout[1],remaining))
                 response = self.session.request(method, url, headers=outgoing, data=data,
-                                                timeout=timeout, allow_redirects=False, stream=True)
+                                                timeout=request_timeout, allow_redirects=False, stream=True)
             except requests.RequestException:
-                raise SourceError("Источник не ответил. Повтори импорт позднее.") from None
+                raise SourceTemporaryError("Источник не ответил. Повтори импорт позднее.") from None
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
                 response.close()
@@ -208,12 +212,15 @@ class PublicHttp:
                 response.close()
                 if status in {401, 403}:
                     raise SourceAccessError("Источник требует вход, проверку браузера или ограничивает доступ.")
+                if status in {408, 502, 504} or status == 503 and not response.headers.get('Retry-After'):
+                    raise SourceTemporaryError(f"Источник вернул HTTP {status}.")
                 raise SourceError(f"Источник вернул HTTP {status}.")
             return response, url
         raise SourceError("Слишком много перенаправлений.")
 
-    def document(self, value, *, headers=None, method="GET", data=None):
-        response, url = self._open(value, headers=headers, method=method, data=data)
+    def document(self, value, *, headers=None, method="GET", data=None, timeout=None):
+        options = {'timeout': timeout} if timeout else {}
+        response, url = self._open(value, headers=headers, method=method, data=data, **options)
         try:
             parts, size, start = [], 0, time.monotonic()
             for block in response.iter_content(65536):
@@ -533,6 +540,9 @@ class Resolver:
             if len(matches) != 1:
                 raise SourceError('Выбранный перевод этой серии отсутствует. Другая озвучка автоматически не подставляется.')
             return self.resolve(matches[0]['url'], referer=final, depth=depth+1, visited=visited)
+        from hentaichan_video import resolve, video_page
+        if video_page(url):
+            return resolve(url, self.http)
         from dynamic_video_sources import provider_for, resolve_dynamic
         provider = provider_for(url)
         if provider:

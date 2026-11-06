@@ -68,7 +68,7 @@ def calendar():
             return events,{'name':site.name,'status':'ok' if events else 'no_dates'}
         except Exception:return [],{'name':site.name,'status':'unavailable'}
         finally:http.close()
-    with ThreadPoolExecutor(max_workers=6) as pool:values=list(pool.map(work,[s for s in SITES if s.kind=='anime' and s.id not in {'sovet','anilibriafun','animevosttv'}]))
+    with ThreadPoolExecutor(max_workers=6) as pool:values=list(pool.map(work,[s for s in SITES if s.kind=='anime' and s.id not in {'sovet','anilibriafun','animevosttv','hentaichan-video'}]))
     result={'events':sorted([e for v,_ in values for e in v],key=lambda e:e['date'],reverse=True)[:150], 'providers':[p for _,p in values],'checkedAt':int(time.time())}
     with _lock:_cache=(time.monotonic()+300,result)
     return result

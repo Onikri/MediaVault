@@ -57,10 +57,14 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   const key=identity+':'+candidate.id+':'+selectedSeason;if(cache.current.has(key))return cache.current.get(key);
   const seasonUrl=seasonUrls.current.get(key);
   let data,continuation,progress=-1,stalled=0;
-  do{data=await service.request('/sources/inspect',{method:'POST',body:{url:seasonUrl||candidate.sourceUrl,...(!seasonUrl?{dub_url:candidate.url}:{}),season:Number(selectedSeason),kind:item.kind||'anime',...(continuation?{continuation}:{})},signal});
-   continuation=data.continuation;stalled=continuation&&data.scannedPages===progress?stalled+1:0;progress=data.scannedPages;
-   if(stalled>=3)throw Error('Источник не завершил проверку серий.');
-  }while(continuation);
+  if(candidate.provider==='hentaichan-video'&&candidate.episodes?.length){
+   data={episodes:candidate.episodes,seasons:[]};
+  }else{
+   do{data=await service.request('/sources/inspect',{method:'POST',body:{url:seasonUrl||candidate.sourceUrl,...(!seasonUrl?{dub_url:candidate.url}:{}),season:Number(selectedSeason),kind:item.kind||'anime',...(continuation?{continuation}:{})},signal});
+    continuation=data.continuation;stalled=continuation&&data.scannedPages===progress?stalled+1:0;progress=data.scannedPages;
+    if(stalled>=3)throw Error('Источник не завершил проверку серий.');
+   }while(continuation);
+  }
   signal.throwIfAborted();for(const s of data.seasons||[])if(s.url)seasonUrls.current.set(identity+':'+candidate.id+':'+s.number,s.url);
   let rows=(data.episodes||[]).filter(e=>!e.season||Number(e.season)===Number(selectedSeason)).map(e=>({...e,season:e.season||Number(selectedSeason)}));
   const actualSeasons=[...new Set((data.episodes||[]).map(e=>Number(e.season)||1))];

@@ -211,10 +211,18 @@ async def lifespan(application):
     stopping.clear()
     threads=[threading.Thread(target=worker,daemon=True,name="media-import-"+str(i)) for i in range(max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))))]
     if os.getenv("MEDIA_VAULT_DISABLE_WORKER") != "1":
+        from hentaichan_video import index_catalog
+        catalog_stop = threading.Event()
+        catalog_thread = threading.Thread(target=index_catalog, args=(catalog_stop,), daemon=True, name='hentaichan-catalog')
+        catalog_thread.start()
         for thread in threads:thread.start()
+    else:
+        catalog_stop = None
     await lyrics_relay.start()
     yield
     stopping.set()
+    if catalog_stop:
+        catalog_stop.set()
     await lyrics_relay.close()
     await application.state.alloha_delivery.close()
     wakeup.set()

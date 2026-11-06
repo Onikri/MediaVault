@@ -1,12 +1,14 @@
 import {useEffect,useState} from 'react';
 export default function useSourceDiscovery(item,service){
   const [data,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[revision,setRevision]=useState(0);
+  const sourceURL=item?.provider==='hentaichan-video'?(item.sourceURL||item.sourceUrl):undefined;
   useEffect(()=>{
     const controller=new AbortController();setData(null);setError('');setLoading(false);
     if(!item||!['anime','tv','movie'].includes(item.kind)||(!service.session?.serverVersion&&service.status!=='connected'))return()=>controller.abort();
     if(service.session?.serverVersion&&service.session.serverVersion<7){setError('Сервер импорта нужно обновить для полного списка озвучек и качеств.');return()=>controller.abort();}
     setLoading(true);
     const title=Object.fromEntries(['id','ids','title','titles','aliases','year','kind','format'].map(key=>[key,item[key]]));
+    if(sourceURL){title.provider=item.provider;title.sourceURL=sourceURL;}
     const search=async()=>{
       let value,continuing=false,previousProgress=-1,stalled=0;
       do{
@@ -22,6 +24,6 @@ export default function useSourceDiscovery(item,service){
       .catch(cause=>{if(!controller.signal.aborted)setError(cause.message);})
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
-  },[item?.id,item?.year,service.server,service.session?.serverVersion||service.status==='connected',revision]);
+  },[item?.id,item?.year,sourceURL,service.server,service.session?.serverVersion||service.status==='connected',revision]);
   return {data,loading,error,retry:()=>setRevision(r=>r+1)};
 }

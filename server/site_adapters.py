@@ -10,6 +10,7 @@ from urllib.parse import urlencode, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
+from hentaichan_video import HOSTS as HENTAICHAN_HOSTS, ROOT as HENTAICHAN_ROOT
 from source_parser import PublicHttp, Resolver, SourceError, episode_number, parse_page, public_url
 
 
@@ -41,6 +42,7 @@ class Site:
 
 
 SITES = (
+    Site("hentaichan-video", "HentaiChan · Видео", HENTAICHAN_ROOT, HENTAICHAN_HOSTS, ".content_row", "a.title_link"),
     Site("yummy", "YummyAnime", "https://yummyanime.tv", ("yummyanime.tv",), ".movie-item", ".movie-item__title"),
     Site("animego", "AnimeGo", "https://animego.me", ("animego.me", "animego.org"), ".animes-list-item, .anime-item, .ani-grid__item", ".ani-grid__item-title, .h5, h2, h3"),
     Site("jutsu", "Jut.su", "https://jut.su", ("jut.su",), ".all_anime_global, .all_anime", ".aaname, .anime_name"),
@@ -192,6 +194,10 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime",st
         if kind=='manga':
             from manga_sources import inspect
             return inspect(original,http=http)
+        if site and site.id == 'hentaichan-video':
+            from hentaichan_video import inspect, video_page
+            if video_page(original):
+                return inspect(original, http, dub_url=dub_url, state=state)
         if site and site.id=='anilibria':
             from aniliberty_source import inspect
             return inspect(original,http,dub_url=dub_url)
@@ -255,7 +261,10 @@ def search_site(site, query, *, http=None):
     own_http = http is None
     http = http or PublicHttp(timeout=(4,6),deadline=time.monotonic()+9)
     try:
-        if site.id=='anilibria':
+        if site.id == 'hentaichan-video':
+            from hentaichan_video import search
+            values = search(query, http)
+        elif site.id=='anilibria':
             from aniliberty_source import search
             values=search(query,http)
         elif site.id=='hanime':

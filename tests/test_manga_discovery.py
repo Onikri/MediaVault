@@ -92,7 +92,7 @@ class NativeSourceFallbackTests(unittest.TestCase):
 
 class MangaDiscoveryTests(unittest.TestCase):
  def setUp(self):
-    self.directory=tempfile.TemporaryDirectory();self.env=patch.dict(os.environ,ENV);self.env.start();self.sources=patch.object(discovery.bridge,'sources',return_value=SOURCES);self.sources.start();self.managers=[]
+    self.directory=tempfile.TemporaryDirectory();self.env=patch.dict(os.environ,ENV);self.env.start();self.sources=patch.object(discovery,'installed_sources',return_value=SOURCES);self.sources.start();self.managers=[]
  def tearDown(self):
     for manager in self.managers:manager.close()
     self.sources.stop();self.env.stop();self.directory.cleanup()
@@ -104,7 +104,7 @@ class MangaDiscoveryTests(unittest.TestCase):
         seen.append((source['id'],source.get('_queries',[query])))
         if source['id']=='1':return [{'id':'native-lib','sourceId':'1','kind':'manga','title':'Белый Кит','identityTitles':['Белый Кит'],'aliases':['Белый Кит','Moby Dick','모비딕'],'language':'ru','year':2023}]
         return [{'id':'native-dex','sourceId':'2','kind':'manga','title':'Moby Dick','aliases':['Moby Dick','Белый Кит'],'language':'en'}] if 'Moby Dick' in source.get('_queries',[]) else []
-    with patch.object(discovery.bridge,'sources',return_value=sources):
+    with patch.object(discovery,'installed_sources',return_value=sources):
         manager=self.manager(fetch=fetch,workers=1);job=manager.start('A','Белый кит');result=wait_done(manager,'A',job['id'])
     self.assertEqual({r['id'] for r in result['results']},{'native-lib','native-dex'});self.assertIn(('2',['Moby Dick','Белый Кит']),seen)
     self.assertTrue(manager._indexed('moby dick','1'))
@@ -193,7 +193,7 @@ class MangaDiscoveryTests(unittest.TestCase):
     self.assertEqual(resumed['state'],'done');self.assertEqual(resumed['progress']['completed'],2)
  def test_multilingual_installed_sources_are_visible_and_searchable(self):
     multi={'id':'900','name':'Multilingual reader','lang':'all','baseUrl':'https://source.example','isNsfw':True}
-    with patch.object(discovery.bridge,'sources',return_value=[*SOURCES,multi]):
+    with patch.object(discovery,'installed_sources',return_value=[*SOURCES,multi]):
         self.assertIn('900',{s['id'] for s in discovery.source_list('all')['sources']})
         self.assertNotIn('900',{s['id'] for s in discovery.source_list('ru')['sources']})
         manager=self.manager(fetch=fixture)
@@ -231,7 +231,7 @@ class MangaTitleDiscoveryTests(unittest.TestCase):
  def tearDown(self):self.env.stop()
  def test_chosen_title_uses_its_own_language_aliases_and_filters_other_titles(self):
   selected={'kind':'manga','title':'English title','titles':{'ru':'Русское название','ja':'日本語の題名','ko':'한국어 제목'}}
-  with tempfile.TemporaryDirectory() as directory,patch.object(discovery.bridge,'sources',return_value=SOURCES):
+  with tempfile.TemporaryDirectory() as directory,patch.object(discovery,'installed_sources',return_value=SOURCES):
    manager=discovery.Discovery(directory,start_workers=False)
    try:
     job=manager.start('A','English title','all',title=selected)
@@ -244,7 +244,7 @@ class MangaTitleDiscoveryTests(unittest.TestCase):
      self.assertEqual([v['title'] for v in result],['Русское название'])
    finally:manager.close()
  def test_failed_refresh_preserves_indexed_source_metadata(self):
-  with tempfile.TemporaryDirectory() as directory,patch.object(discovery.bridge,'sources',return_value=SOURCES):
+  with tempfile.TemporaryDirectory() as directory,patch.object(discovery,'installed_sources',return_value=SOURCES):
    manager=discovery.Discovery(directory,fetch=fixture)
    try:
     first=wait_done(manager,'A',manager.start('A','One Piece','all',['1'])['id'])
@@ -259,7 +259,7 @@ class MangaDiscoveryApiTests(unittest.TestCase):
     from fastapi.testclient import TestClient
     client=TestClient(api.app)
     self.assertEqual(client.get('/discovery/manga/sources').status_code,401)
-    with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,ENV),patch.object(discovery.bridge,'sources',return_value=SOURCES),patch.object(api,'store',SimpleNamespace(key=b'x'*32,setting=lambda name:None)):
+    with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,ENV),patch.object(discovery,'installed_sources',return_value=SOURCES),patch.object(api,'store',SimpleNamespace(key=b'x'*32,setting=lambda name:None)):
         manager=discovery.Discovery(directory,fetch=fixture)
         try:
             with patch.object(discovery,'manager',return_value=manager):
