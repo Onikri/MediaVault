@@ -6,6 +6,7 @@ discard their vault key. Public source clients never receive Google credentials.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 from contextlib import asynccontextmanager
 import hashlib
@@ -167,7 +168,10 @@ def worker():
                         try:store.add(task['owner'],{'kind':'enrich','library_id':library_id,'vault_key':data['vault_key'],'title_id':item.get('section','anime')+':'+group},identity)
                         except ValueError:pass
                 result = run_job(data["job"], vault, log=lambda _: None, progress=progress, cancelled=cancelled,
-                                 temporary_dir=store.directory / "temporary",start_index=task['progress'].get('cursor',0),max_files=1,on_saved=saved)
+                                 temporary_dir=store.directory / "temporary",start_index=task['progress'].get('cursor',0),max_files=1,on_saved=saved,
+                                 alloha_downloader=app.state.alloha_importer.download,
+                                 alloha_cache=store.directory / ".codex-local" / "alloha-import" / task_id)
+            if stopping.is_set():continue
             result={**result,**{key:base_counts[key]+result[key] for key in base_counts}}
             if cancelled():
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
@@ -181,6 +185,7 @@ def worker():
             else:
                 store.update(task_id, status="completed", progress={"phase": "done", **result}, forget_key=True)
         except Exception as error:
+            if stopping.is_set():continue
             if store.get(task_id)["status"] == "cancelling":
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
             elif import_auth_error(error):
@@ -200,15 +205,18 @@ async def lifespan(application):
     store = TaskStore(os.getenv("DATA_DIR", "/data"))
     temporary = store.directory / "temporary"
     temporary.mkdir(exist_ok=True, mode=0o700)
+    from alloha_import import AllohaImporter, prune_checkpoints
+    prune_checkpoints(store.directory / ".codex-local" / "alloha-import")
+    application.state.alloha_importer = AllohaImporter(application.state.alloha_delivery, asyncio.get_running_loop())
     stopping.clear()
     threads=[threading.Thread(target=worker,daemon=True,name="media-import-"+str(i)) for i in range(max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))))]
     if os.getenv("MEDIA_VAULT_DISABLE_WORKER") != "1":
         for thread in threads:thread.start()
     await lyrics_relay.start()
     yield
+    stopping.set()
     await lyrics_relay.close()
     await application.state.alloha_delivery.close()
-    stopping.set()
     wakeup.set()
     from manga_discovery import shutdown as shutdown_manga_discovery
     shutdown_manga_discovery()

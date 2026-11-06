@@ -467,8 +467,9 @@ def parse_page(text, base):
 
 
 class Resolver:
-    def __init__(self, http=None):
+    def __init__(self, http=None, *, native_alloha=False):
         self.http = http or PublicHttp()
+        self.native_alloha = native_alloha
 
     def inspect(self, url, referer=None):
         url = public_url(url, resolve_dns=False)
@@ -481,6 +482,8 @@ class Resolver:
     def player(self, url, referer=None):
         host=urlsplit(url).hostname or ''
         if is_alloha_player(url):
+            if getattr(self, 'native_alloha', False):
+                return Page(streams=[{'url': url, 'type': 'alloha-native', 'headers': {}}])
             # This is a public iframe player, not a top-level HTML document.
             # A plain HTTP request can be rejected even though the publisher's
             # embedded player works. Preserve its selected audio/episode URL.
