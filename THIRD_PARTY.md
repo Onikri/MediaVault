@@ -356,3 +356,12 @@ as V3detail; full source/hash/conversion records are in reader-models/title-deno
 FSRCNN x2 uses Apache-2.0 trained weights (Saafke/FSRCNN_Tensorflow), converted by
 televisualarts-cloud/wefax_decoder; reader-models/title-fsrcnn.json records attribution
 and verified hashes. Neither model is represented as grayscale MangaJaNai ESRGAN.
+
+
+HentaiChan HTML reader/search adapter is adapted from otaku-melons/HentaiChanParser
+by DUB1401 (Copyright 2022–2024), Apache License 2.0.
+Upstream commit: 92d80387f6a24fd48c6be0097bbd2d1450353751.
+Source: https://github.com/otaku-melons/HentaiChanParser
+Full license: licenses/hentaichan-parser.txt. Modified integration:
+server/manga_hentaichan.py; bounded native search, mirror validation, lazy chapter
+loading and safe inline image-list decoding replace its standalone CLI workflow.

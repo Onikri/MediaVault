@@ -23,7 +23,8 @@ class MangaSite:
     languages:tuple=('ru',)
     format:str=''
 
-SITES=(MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('mangapoisk.io','eropoisk.com')),
+SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan',('x17.h-chan.me',)),
+       MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('mangapoisk.io','eropoisk.com')),
        MangaSite('mangahub','MangaHub','https://mangahub.ru','hub'),
        MangaSite('mangachan','MangaChan','https://im.manga-chan.me','chan',('manga-chan.me','mangachan.me')),
        MangaSite('readmanga','ReadManga','https://a.zazaza.me','grouple',('readmanga.live','readmanga.io','readmanga.me')),
@@ -76,6 +77,9 @@ def title_aliases(value):
     value=re.sub(r'^Манга\s+','',clean(value),flags=re.I)
     return list(dict.fromkeys([value,*[clean(v) for v in re.split(r'\s/\s|\s\|\s|[()]',value) if len(clean(v))>1]]))
 def parse_search(text,base,site):
+    if site.family=='hentaichan':
+        from manga_hentaichan import parse_search as parse_hentaichan
+        return parse_hentaichan(text,base)
     soup=BeautifulSoup(text,'html.parser');results=[]
     if site.family=='pill':
         for anchor in soup.select('a.mb-2[href^="/manga/"]')[:40]:
@@ -102,7 +106,7 @@ def parse_search(text,base,site):
     return list({v['url']:v for v in results}.values())
 def search_url(site,query):
     if site.family=='katana':return site.root+'/?'+urlencode({'search':query,'search_by':'book_name'})
-    if site.family=='chan':return site.root+'/?'+urlencode({'do':'search','subaction':'search','story':query})
+    if site.family in {'chan','hentaichan'}:return site.root+'/?'+urlencode({'do':'search','subaction':'search','story':query})
     if site.family=='hub':return site.root+'/search/title?'+urlencode({'query':query})
     return site.root+'/search?'+urlencode({'q':query,**({'type':'manga'} if site.family=='buff' else {})})
 def normalized_format(value):
@@ -119,13 +123,16 @@ def search_title(title,language='auto',format='all'):
     if hit and hit[0]>time.monotonic():return hit[1]
     search_deadline=time.monotonic()+18
     def work(site):
-        http=PublicHttp(timeout=(3,6),deadline=search_deadline);results=[];message='Точное совпадение не найдено.';status='empty'
+        http=PublicHttp(timeout=(3,18) if site.family=='hentaichan' else (3,6),deadline=time.monotonic()+38 if site.family=='hentaichan' else search_deadline);results=[];message='Точное совпадение не найдено.';status='empty'
         try:
             queries=[q for q in aliases(title) if re.search('[a-z]',q,re.I) and not re.search('[а-яё]',q,re.I)] if site.family in {'pill','katana','webtoons'} else aliases(title)
             if site.languages==('ja',):queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\u3040-\u30ff\u3400-\u9fff]',q)))
             if site.languages==('ko',):queries=sorted(aliases(title),key=lambda q:not bool(re.search(r'[\uac00-\ud7af]',q)))
             for query in queries[:2]:
-                if site.family in {'dex','lib'}:
+                if site.family=='hentaichan':
+                    from manga_hentaichan import search
+                    candidates=search(query,http)
+                elif site.family in {'dex','lib'}:
                     from manga_catalog_adapters import dex_search,lib_search
                     candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http,4 if site.id=='hentailib' else 1)
                 elif site.family=='webtoons':
@@ -183,6 +190,10 @@ def parse_chapters(text,base):
     return sorted({c['url']:c for c in chapters}.values(),key=lambda c:(c['season'],c['number'],c['translator']))
 
 def parse_pages(text,base):
+    site=site_for(base)
+    if site and site.family=='hentaichan':
+        from manga_hentaichan import parse_pages as parse_hentaichan
+        return parse_hentaichan(text,base)
     soup=BeautifulSoup(text,'html.parser');guard(soup);pages=[]
     if urlsplit(base).hostname=='mangakatana.com':
         match=re.search(r'var\s+thzq\s*=\s*(\[[^;]+\])',text)
@@ -217,6 +228,9 @@ def inspect(url,http=None):
     own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
     try:
         initial=site_for(url)
+        if initial and initial.family=='hentaichan':
+            from manga_hentaichan import inspect as inspect_hentaichan
+            return inspect_hentaichan(url,http)
         if initial and initial.family=='novelcool':
             from manga_novelcool import inspect as inspect_novelcool
             return inspect_novelcool(url,http)

@@ -27,11 +27,15 @@ def public_aliases(row):
 def normalize(value):
     return ' '.join(unicodedata.normalize('NFKC',value).casefold().split())
 
+def installed_sources():
+    from manga_hentaichan import SOURCE
+    return [*bridge.sources(),dict(SOURCE)]
+
 def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
     query=normalize(query)[:80]
     rows=[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))}
-          for s in bridge.sources() if s.get('lang') in LANGUAGES and (language=='all' or s['lang']==language)]
+          for s in installed_sources() if s.get('lang') in LANGUAGES and (language=='all' or s['lang']==language)]
     rows.sort(key=lambda s:(s['language'],s['name'].casefold(),s['id']))
     from manga_source_health import states,blocked
     health=states();usable=[s for s in rows if not blocked(s['id'],health)]
@@ -95,6 +99,22 @@ def native_search_source(source,query):
              'sourceOnly':True,'ids':{},'genres':[],'tags':[]} for row in found.values()][:40]
 
 def search_source(source,query):
+    if source.get('name')=='HentaiChan':
+        from manga_hentaichan import search
+        from title_identity import match_title
+        from source_parser import PublicHttp
+        http=PublicHttp(timeout=(3,18),deadline=time.monotonic()+38)
+        try:
+            found={}
+            for term in source.get('_queries',[query]):
+                for row in search(term,http):
+                    selected=source.get('_title') or source.get('_alias_title')
+                    if selected and not match_title(selected,row)[0]:continue
+                    if not selected and not any(normalize(term) in normalize(v) for v in row['aliases']):continue
+                    found[row['id']]=row
+                if found:break
+            return list(found.values())
+        finally:http.close()
     if source.get('name') in NATIVE_SOURCES:return native_search_source(source,query)
     client=bridge.Client()
     try:
@@ -214,7 +234,7 @@ class Discovery:
         if source_ids is not None and (not isinstance(source_ids,list) or not 1<=len(source_ids)<=1000 or any(not isinstance(v,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',v) for v in source_ids)):raise ValueError('Выбери хотя бы один установленный источник.')
         # Persist only public source identity, never an upstream response's
         # optional preference/authentication fields.
-        active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in bridge.sources() if s.get('lang') in LANGUAGES]
+        active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in installed_sources() if s.get('lang') in LANGUAGES]
         installed={str(s['id']) for s in active}
         if source_ids and any(v not in installed for v in source_ids):raise ValueError('Выбранный источник не установлен. Обнови каталог источников.')
         selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())
