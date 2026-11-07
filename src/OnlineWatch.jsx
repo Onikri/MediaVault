@@ -12,7 +12,6 @@ import OnlineViewer from './OnlineViewer.jsx';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import OnlineEpisodePreviews from './OnlineEpisodePreviews.jsx';
 import {readSceneJump,consumeSceneJump} from './scene-search.js';
-import {jumpTitleSection} from './title-navigation-store.js';
 import {onlineEpisodeId} from './watch-session.js';
 import {readWatch,saveWatch,orderedVoices,variantsFor,episodePreviewKey,minimumEpisodeDuration,voicesForCatalogue,isAllohaVariant,previewSource,previewEntry} from './watch-session.js';
 import {readEpisodePreview,saveEpisodePreview} from './episode-preview-cache.js';
@@ -86,8 +85,8 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
    catch(e){signal.throwIfAborted();last=e;}
   }throw last||Error('Эта серия не ответила ни в одном источнике выбранной озвучки.');
  }
- useEffect(()=>{if(!voice)return;const abort=new AbortController();setBusy(true);setVariant(null);setError('');
-  resolve(voice,episode,abort.signal).then(value=>{if(abort.signal.aborted)return;setEntries(value.entries);setSeasons(value.seasons);setVariant(value.variant);if(value.season!==season){setSeason(value.season);setBrowseSeason(value.season);}const selected=value.entries.find(e=>Number(e.number)===Number(episode))||value.entries[0];setEpisode(Number(selected.number));persist({voiceId:voice.id,episode:Number(selected.number),season:value.season});}).catch(e=>{if(!abort.signal.aborted){setVariant(null);setError(e.message);}}).finally(()=>!abort.signal.aborted&&setBusy(false));
+ useEffect(()=>{if(!voice)return;const abort=new AbortController(),resolving=voice.id;settledVoice.current='';setBusy(true);setVariant(null);setError('');
+  resolve(voice,episode,abort.signal,failed.current,season,playing||!!sceneJump.current).then(value=>{if(abort.signal.aborted)return;setEntries(value.entries);setSeasons(value.seasons);setVariant(value.variant);if(value.season!==season){setSeason(value.season);setBrowseSeason(value.season);}const selected=value.entries.find(e=>Number(e.number)===Number(episode))||value.entries[0];setEpisode(Number(selected.number));persist({voiceId:voice.id,episode:Number(selected.number),season:value.season});settledVoice.current=resolving;}).catch(e=>{if(!abort.signal.aborted){setVariant(null);setError(e.message);settledVoice.current=resolving;}}).finally(()=>!abort.signal.aborted&&setBusy(false));
   return()=>abort.abort();
  },[voice?.id,season,attempt,service.server]);
  useEffect(()=>{
@@ -100,15 +99,33 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const preferred=bestQualityRow(knownRows,{voiceId:voice?.id,quality,anyVoice:bestVideo,failed:failed.current});
  const selectionKey=[identity,voice?.id,season,episode,quality,bestVideo,attempt,applyRevision].join(':');
  const base=voice?.variants.some(v=>v.id===variant?.id)&&!failed.current.has(variant?.id)?{variant,entries,voiceId:voice?.id}:null;
+ // Scene search hand-off: pick the season of this work, a voice that has the
+ // episode, then start it at the found second. If the browser refuses autoplay,
+ // the player stays in view, paused at that second, waiting for Play.
+ const familyNumber=Number(family.find(f=>String(f.id)===basisId)?.number)||0;
+ useEffect(()=>{if(!sceneJump.current||playing||catalogueSeasonHint(basisItem)||!familyNumber||familyNumber===season)return;setSeason(familyNumber);setBrowseSeason(familyNumber);},[familyNumber,playing]);
+ const jumpVoices=useRef(new Set()),jumpPicked=useRef(false),settledVoice=useRef('');
+ const hasEpisode=(v,n,s)=>(v?.variants||[]).some(x=>(x.episodes||[]).some(e=>Number(e.number)===Number(n)&&(!e.season||Number(e.season)===Number(s))));
  useEffect(()=>{
-  const jump=sceneJump.current;if(!jump||playing||!base)return;
-  const entry=base.entries.find(e=>Number(e.number)===Number(jump.episode));
-  if(!entry){if(!busy){sceneJump.current=null;consumeSceneJump();}return;}
+  const jump=sceneJump.current;if(!jump||playing||!voices.length||jumpPicked.current)return;jumpPicked.current=true;
+  const chosen=[voice,...voices].find(v=>v&&hasEpisode(v,jump.episode,season))||voice;
+  if(chosen.id!==voice?.id)setVoiceId(chosen.id);
+ },[voices,playing,season]);
+ useEffect(()=>{
+  const jump=sceneJump.current;if(!jump||playing||busy)return;
+  const entry=base?.entries.find(e=>Number(e.number)===Number(jump.episode));
+  if(!entry){
+   if(!voices.length||!voice||settledVoice.current!==voice.id)return;
+   jumpVoices.current.add(voice.id);
+   const next=voices.find(v=>!jumpVoices.current.has(v.id)&&(hasEpisode(v,jump.episode,season)||!(v.variants||[]).some(x=>x.episodes?.length)));
+   if(next){jumpVoices.current.add(next.id);setVoiceId(next.id);return;}
+   sceneJump.current=null;consumeSceneJump();setError('Серия '+jump.episode+' из найденной сцены пока не вышла ни в одной доступной озвучке. Выбери серию вручную.');return;
+  }
   sceneJump.current=null;consumeSceneJump();
   try{sessionStorage.setItem('mediavault_pending_time_'+onlineEpisodeId(identity,entry.season||season,entry.number),String(jump.time));}catch{}
   startPlayback(Number(entry.number),Number(entry.season)||season);
-  requestAnimationFrame(()=>jumpTitleSection('titlePlayback'));
- },[base?.variant?.id,base?.entries,playing,busy]);
+  for(const delay of [0,450,1400])setTimeout(()=>(document.querySelector('.title-playback .mv-player,.watch-player .mv-player')||document.querySelector('.mv-player'))?.scrollIntoView({block:'center',behavior:delay?'smooth':'auto'}),delay);
+ },[base?.variant?.id,base?.entries,playing,busy,error,voices,voice?.id]);
  if(!playing)frozen.current=null;
  const candidate=preferred||base;
  if(playing&&candidate&&(frozen.current?.key!==selectionKey||!frozen.current?.value))frozen.current={key:selectionKey,value:candidate};

@@ -483,3 +483,7 @@
 .mvx-source.is-more{background:#ffffff12;color:#ffffff9a}
 .mvx-dub-button .mvx-sources{margin-left:2px}
 .mvx-dub-menu button>span{display:flex;align-items:center;flex-wrap:wrap;gap:2px}
+
+/* The console gradient pads 34-60px above the controls; that empty band must not
+   swallow taps on the "Continue from" button above it (phones). */
+.mv-player .mvx-console{pointer-events:none}.mv-player .mvx-console>*{pointer-events:auto}
