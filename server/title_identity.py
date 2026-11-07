@@ -56,4 +56,19 @@ def match_title(selected, candidate):
             if normalized(a)==normalized(b):return True,'exact_title'
             if len(base_title(a))>=4 and base_title(a)==base_title(b) and season_of(a)==season_of(b):
                 return True,'title_and_season'
+    # Light-novel titles are often listed by sites without their long subtitle
+    # ("Main title: I can also ..."). A long enough headline is the same work;
+    # short ones ("Атака титанов: Финал") stay distinct. Year/ID checks above
+    # and the post-inspection verification still apply.
+    heads=lambda values:[h for h in (headline(v) for v in values) if h]
+    for a,b in [(x,y) for x in heads(wanted) for y in found]+[(x,y) for x in wanted for y in heads(found)]:
+        if normalized(a)==normalized(b) or base_title(a)==base_title(b) and season_of(a)==season_of(b):
+            return True,'headline'
     return False,'different_title_or_season'
+
+
+def headline(value):
+    text=str(value or '').strip()
+    head=re.split(r'\s*[:：]\s+|\.\s+(?=\S)',text,maxsplit=1)[0].strip(' .')
+    if head==text.strip(' .') or len(head.split())<4 or len(normalized(head))<20:return ''
+    return head

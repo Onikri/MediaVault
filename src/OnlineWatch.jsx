@@ -240,6 +240,9 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   {id:'scanQualities',label:qualityScan.busy&&scanScope?'Ищем варианты':'Найти другие качества',value:'',onClick:()=>startScan('all')},
   playing&&preferred&&preferred.variant.id!==viewVariant?.id&&{id:'applyFound',label:'Применить найденное',value:preferred.qualities[0]+'p',onClick:()=>{setScanScope('');setApplyRevision(n=>n+1);}}
  ]}];
+ // Without a profile the page never reaches the server, so there is nothing to
+ // search yet: say so instead of offering an empty voice picker.
+ const signedOut=['disconnected','unconfigured'].includes(service.status)&&!service.session;
  const idleCurrent=browsingCatalog?foreign.row?.entries[0]:current,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
  const warmCurrent=usePlaybackWarmup({entry:idleCurrent,sourceUrl:idleVariant?.sourceUrl,quality,service,enabled:!playing&&!idleBusy&&!isAllohaVariant(idleVariant),anchor:sourceButton});
  const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:audioId||voice?.id,
@@ -253,9 +256,11 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
     <div className="mvx-idle-poster" aria-hidden="true"/>
     <div className="mvx-overview mvx-idle-overview">
      <h1>{profile.title||item.title}</h1>
-     {idleBusy?<p className="mvx-meta mvx-idle-busy" role="status"><span className="mvx-spinner"/><span>Подбираем озвучки, качества и серии</span></p>
+     {signedOut?<p className="mvx-meta" role="status"><span>Чтобы смотреть онлайн, войди в профиль: озвучки ищет твой сервер MediaVault</span></p>
+      :idleBusy?<p className="mvx-meta mvx-idle-busy" role="status"><span className="mvx-spinner"/><span>Подбираем озвучки, качества и серии</span></p>
       :<p className="mvx-meta">{idleCurrent&&<span>Серия {idleCurrent.number}</span>}{(browsingCatalog?familySeason?.name:activeFamilySeason?.name)&&<span>{browsingCatalog?familySeason?.name:activeFamilySeason?.name}</span>}{voice&&<span>{voice.name}</span>}<span>{quality==='best'?'Лучшее качество':quality+'p'}</span></p>}
-     {!idleBusy&&(idleCurrent&&idleVariant
+     {signedOut?<button type="button" className="mvx-primary" onClick={()=>dispatchEvent(new Event('mediavault:request-login'))}>Войти</button>
+     :!idleBusy&&(idleCurrent&&idleVariant
       ?<button type="button" className="mvx-primary" onPointerEnter={warmCurrent} onFocus={warmCurrent} onClick={()=>browsingCatalog?startCatalogPlayback(idleCurrent.number):startPlayback()}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>Смотреть серию {idleCurrent.number}</button>
       :voice?<button type="button" className="mvx-primary" disabled>Серии пока не найдены</button>
       :<button type="button" className="mvx-primary" onClick={()=>{setSourceOpen('voice');setSourceSettings(true);}}>Выбрать озвучку</button>)}

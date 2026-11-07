@@ -182,6 +182,7 @@ function MediaVaultApp(){
     else if(state.remembered&&['home','profile'].includes(view))go('collection');
   },[!!state.catalog,state.libraryId]);
   const go=useCallback(next=>{setView(next);setActiveTitle(null);if(location.hash!=='#'+next)location.hash=next;},[]);
+  useEffect(()=>{const ask=()=>showLibrarySetup('online');addEventListener('mediavault:request-login',ask);return()=>removeEventListener('mediavault:request-login',ask);});
   const openSettings=useCallback(tab=>{setProfileTab(tab||'account');go('profile');},[go]);
   function finishGuest(){setGuestScreen(null);window.history.replaceState(null,'',location.pathname+location.search+'#home');setView('home');}
   function closeGuest(){setGuestScreen(null);if(readInviteToken()||location.hash==='#signin')window.history.replaceState(null,'',location.pathname+location.search+'#'+view);}
