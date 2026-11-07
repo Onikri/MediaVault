@@ -48,3 +48,23 @@ html[data-blossom] .admin-bar .upload-options{border:0;border-radius:16px;backgr
 html[data-blossom] .admin-bar .upload-options>summary{padding:10px 0;font-size:12px;font-weight:600;color:var(--color-on-muted);cursor:pointer}
 html[data-blossom] .morph-search-footer .morph-search-frame{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border:0;border-radius:999px;background:rgba(255,255,255,.06);color:#e6e6ee;font:600 11.5px/1 var(--font-ui,system-ui);cursor:pointer}
 html[data-blossom] .morph-search-footer .morph-search-frame:hover{background:rgba(255,255,255,.1);color:#fff}
+
+/* Title showcase starts at the very top, behind the navbar: no black band. */
+html[data-blossom] .app-shell:has(.title-showcase)>.app-main{padding-top:0}
+html[data-blossom] .app-main .library-workspace:has(.title-showcase){margin-top:0}
+@media(max-width:900px){html[data-blossom] .app-main .library-workspace:has(.title-showcase)>.library-sidebar{display:none}}
+
+/* ---------- Grid alignment, both versions ---------- */
+/* Page headings: eyebrow, title and subtitle on one left edge; no decorative icon. */
+html[data-blossom] .page-title-row>svg{display:none}
+html[data-blossom] .page-title-row{align-items:flex-end}
+/* Every page uses the same content column as the navbar pill. */
+html[data-blossom] .account-page{max-width:none;width:100%;margin:10px 0 50px}
+/* The catalogue search field spans its column like the collection search. */
+html[data-blossom] .catalog-search-wrap>.search-bar.catalog-search{max-width:none;width:100%}
+/* Calm surfaces instead of outlined boxes. */
+html[data-blossom] .online-access{border:0;background:var(--color-surface);border-radius:20px}
+html[data-blossom] .empty-state{border:0;background:var(--color-surface);border-radius:24px}
+html[data-blossom] .profile-actions .btn-secondary,html[data-blossom] .import-library-dialog .btn-secondary{border:0;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
+/* Section rhythm: the same vertical gap between blocks everywhere. */
+html[data-blossom] .app-main>.page-title-row+*{margin-top:0}

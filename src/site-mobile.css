@@ -1,0 +1,102 @@
+/* Phones and small tablets. Loaded after site-layout.css.
+   One bottom dock for navigation, a light top bar, content that clears the dock,
+   floating panels lifted above it, and single-column screens. */
+
+html[data-blossom] .mobile-dock{display:none}
+
+@media(max-width:1000px){
+ html[data-blossom]{--dock-h:66px;--dock-gap:calc(10px + env(safe-area-inset-bottom));--dock-clear:calc(var(--dock-h) + var(--dock-gap) + 18px)}
+
+ /* Top bar: brand on the left, personal actions on the right. */
+ html[data-blossom] .blossom-navbar .mobile-toggle,
+ html[data-blossom] .blossom-navbar .mobile-nav,
+ html[data-blossom] .blossom-navbar .header-center-search{display:none!important}
+ html[data-blossom] .blossom-navbar .header-inner,html[data-blossom] .blossom-navbar.is-scrolled .header-inner{display:flex!important;justify-content:space-between;gap:8px;padding:8px 8px 8px 12px;min-height:54px}
+ html[data-blossom] .blossom-navbar .header-actions{gap:4px}
+ html[data-blossom] .app-shell>.blossom-navbar,html[data-blossom] .app-shell>.blossom-navbar.is-scrolled{top:calc(8px + env(safe-area-inset-top));width:calc(100% - 20px)}
+ html[data-blossom] .blossom-navbar.is-scrolled .header-inner{background:color-mix(in srgb,var(--color-canvas-soft) 86%,transparent);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border-radius:22px}
+
+ /* The dock */
+ html[data-blossom] .mobile-dock{position:fixed;z-index:70;left:50%;bottom:var(--dock-gap);transform:translateX(-50%);width:min(460px,calc(100vw - 20px));height:var(--dock-h);box-sizing:border-box;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;padding:0 6px;border-radius:26px;background:color-mix(in srgb,var(--color-canvas-soft) 88%,transparent);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);box-shadow:0 16px 40px -14px rgb(0 0 0 / .7),inset 0 1px rgb(255 255 255 / .05)}
+ html[data-blossom] .mobile-dock-link{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:54px;min-width:0;padding:0;border:0;border-radius:18px;background:none;color:var(--color-on-muted);font:600 10.5px/1 var(--font-ui,system-ui);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .2s}
+ html[data-blossom] .mobile-dock-icon{display:grid;place-items:center;width:44px;height:28px;border-radius:999px;transition:background-color .25s}
+ html[data-blossom] .mobile-dock-icon svg{width:20px;height:20px}
+ html[data-blossom] .mobile-dock-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ html[data-blossom] .mobile-dock-link.is-active{color:var(--color-petal)}
+ html[data-blossom] .mobile-dock-link.is-active .mobile-dock-icon{background:color-mix(in srgb,var(--color-blossom) 22%,transparent);color:var(--color-blossom-light,var(--color-blossom))}
+ html[data-blossom] .mobile-dock-search{justify-self:center;display:grid;place-items:center;width:52px;height:52px;padding:0;border:0;border-radius:50%;background:var(--nav-search-accent,var(--color-blossom));color:var(--nav-search-ink,#fff);box-shadow:0 10px 24px -8px color-mix(in srgb,var(--color-blossom) 70%,transparent);cursor:pointer;-webkit-tap-highlight-color:transparent}
+ html[data-blossom] .mobile-dock-search:active,html[data-blossom] .mobile-dock-link:active{transform:scale(.94)}
+
+ /* Content clears the dock; floating panels sit above it. */
+ html[data-blossom] .app-shell>.app-main{padding-bottom:var(--dock-clear)!important}
+ html[data-blossom] .cookie-notice{bottom:calc(var(--dock-h) + var(--dock-gap) + 10px)!important;right:10px;left:10px;width:auto}
+ .retained-media-host[data-mode=popup]{bottom:calc(var(--dock-h) + var(--dock-gap) + 10px)!important;right:10px!important;width:min(380px,calc(100vw - 20px))!important}
+ html[data-blossom] .app-footer{margin-bottom:0}
+}
+
+@media(max-width:640px){
+ /* Page headings: compact, no decorative icons. */
+ html[data-blossom] .page-title-row{margin-bottom:18px}
+ html[data-blossom] .page-title-row h1.page-title{font-size:clamp(34px,10vw,44px);line-height:1.02}
+ html[data-blossom] .page-title-row .page-subtitle{font-size:13px;line-height:1.5}
+
+ /* Library: sections scroll as a row, filters open from the search field. */
+ html[data-blossom] .online-library-workspace .library-sidebar-filters:not(.is-open){display:none}
+ html[data-blossom] .app-shell[data-view=collection]>.app-main>.chip-row{display:none}
+ html[data-blossom] .library-sidebar-filters label,html[data-blossom] .library-sidebar-filters input,html[data-blossom] .library-sidebar-filters select,html[data-blossom] .library-sidebar-filters .mv-select-trigger{width:100%;max-width:none}
+ html[data-blossom] .library-sidebar-filters{display:grid;grid-template-columns:1fr 1fr;gap:10px 10px;margin-top:12px}
+ html[data-blossom] .library-sidebar-filters>.filter-heading{grid-column:1/-1}
+ html[data-blossom] .library-sidebar.blossom-catalog-sidebar{padding:8px;border-radius:20px;margin-bottom:14px}
+ html[data-blossom] .library-sidebar.blossom-catalog-sidebar>.filter-heading{display:none}
+ html[data-blossom] .library-sidebar nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0}
+ html[data-blossom] .library-sidebar nav::-webkit-scrollbar{display:none}
+ html[data-blossom] .library-sidebar nav>button{flex:none;width:auto;min-height:38px;padding:0 14px;border-radius:999px;white-space:nowrap}
+ html[data-blossom] .library-sidebar nav>button small{display:none}
+ html[data-blossom] .library-drive-note{display:none}
+ html[data-blossom] .catalog-main-tabs.catalog-action-bar{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:6px;margin-inline:-14px;padding-inline:14px;scroll-padding-inline:14px}
+ html[data-blossom] .catalog-main-tabs.catalog-action-bar::-webkit-scrollbar{display:none}
+ html[data-blossom] .catalog-main-tabs.catalog-action-bar>*{flex:none}
+ html[data-blossom] .online-access{flex-direction:column;align-items:stretch;gap:12px;border:0}
+ html[data-blossom] .online-access .btn{width:100%}
+
+ /* Title page */
+ html[data-blossom] .title-page .title-character-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ html[data-blossom] .title-tabbar{margin-inline:-14px;padding-inline:14px}
+
+ /* History: whole card opens; the remove button keeps its own corner. */
+ html[data-blossom] .history-go{display:none}
+ html[data-blossom] .history-card{grid-template-columns:64px minmax(0,1fr);padding-right:44px}
+ html[data-blossom] .history-forget{top:50%;right:10px;transform:translateY(-50%);width:32px;height:32px}
+ html[data-blossom] .history-toolbar{gap:10px}
+ html[data-blossom] .history-filter{flex:1;justify-content:space-between}
+ html[data-blossom] .history-clear{width:100%;justify-content:center}
+
+ /* Collection */
+ html[data-blossom] .collection-actions .btn{flex:1;justify-content:center}
+ html[data-blossom] .collection-add{width:100%}
+ html[data-blossom] .collection-refresh{margin-left:0}
+
+ /* Calendar: one month, toolbar on two rows. */
+ html[data-blossom] .lc-toolbar{flex-direction:column;align-items:stretch}
+ html[data-blossom] .lc-modes{width:100%}.lc-modes>button{flex:1;justify-content:center}
+ html[data-blossom] .lc-nav{justify-content:space-between}
+
+ /* Profile and settings */
+ html[data-blossom] .profile-card{flex-direction:column;align-items:stretch;text-align:left}
+ html[data-blossom] .profile-actions{flex-direction:column;align-items:stretch}
+ html[data-blossom] .profile-actions .btn{width:100%;justify-content:center}
+ html[data-blossom] .guest-create .btn{width:100%;justify-content:center}
+
+ /* Search and overlays use the full width. */
+ html[data-blossom] .morph-search-facets label{flex:1}
+ html[data-blossom] .morph-search-facets .mv-select-trigger{flex:1;min-width:0}
+ .profile-menu,.retained-dock-panel{right:10px!important;width:calc(100vw - 20px)!important}
+ .scene-lens{max-width:calc(100vw - 24px)}
+}
+html[data-blossom] .online-access .btn{border:0;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
+@media(max-width:640px){
+ html[data-blossom] .library-sidebar.blossom-catalog-sidebar{display:flex;flex-direction:column;gap:12px}
+ html[data-blossom] .library-sidebar .library-sidebar-filters{margin-top:0;padding:4px 6px 6px}
+ html[data-blossom] .hero-stage.title-feature.title-showcase{padding-top:clamp(220px,30svh,300px)}
+ html[data-blossom] .title-showcase .poster-actions{max-width:none}
+}
