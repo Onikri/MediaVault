@@ -175,7 +175,103 @@ function parseRange(header,size){
   }
   return {start,end};
 }
-function decryptedStream(session,item,start,end,request,clientId,background){
+// Build a front seek index for streamed fMP4 from FFmpeg's trailing index.
+// The virtual playback response leaves the encrypted archive bytes unchanged.
+function frontMp4Index(head,tail,mediaEnd,duration){
+  const view=bytes=>new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  function* boxes(data,start=0,end=data.byteLength){
+    while(start+8<=end){
+      const size=data.getUint32(start);
+      if(size<8||start+size>end)return;
+      yield {type:data.getUint32(start+4),start:start+8,end:start+size};
+      start+=size;
+    }
+  }
+  const header=view(head),index=view(tail);
+  const moov=[...boxes(header)].find(box=>box.type===0x6d6f6f76);
+  if(!moov||index.getUint32(4)!==0x6d667261)return null; // moov, mfra
+  const tracks=[];
+  for(const track of boxes(header,moov.start,moov.end)){
+    if(track.type!==0x7472616b)continue;
+    const children=[...boxes(header,track.start,track.end)];
+    const tkhd=children.find(box=>box.type===0x746b6864);
+    const mdia=children.find(box=>box.type===0x6d646961);
+    if(!tkhd||!mdia)continue;
+    const media=[...boxes(header,mdia.start,mdia.end)];
+    const hdlr=media.find(box=>box.type===0x68646c72);
+    const mdhd=media.find(box=>box.type===0x6d646864);
+    if(!hdlr||!mdhd)continue;
+    const handler=header.getUint32(hdlr.start+8);
+    if(handler!==0x76696465&&handler!==0x736f756e)continue;
+    const id=header.getUint32(tkhd.start+(header.getUint8(tkhd.start)?20:12));
+    const scale=header.getUint32(mdhd.start+(header.getUint8(mdhd.start)?20:12));
+    const tfra=[...boxes(index,8)].find(box=>box.type===0x74667261&&index.getUint32(box.start+4)===id);
+    if(!tfra||!scale)return null;
+    const wide=index.getUint8(tfra.start)===1;
+    const lengths=index.getUint32(tfra.start+8);
+    const stride=(wide?16:8)+3+(lengths&3)+(lengths>>2&3)+(lengths>>4&3);
+    const count=index.getUint32(tfra.start+12);
+    const records=tfra.start+16;
+    if(!count||count>65535||records+stride*count>tfra.end)return null;
+    const read=(n,offset)=>wide?Number(index.getBigUint64(records+n*stride+offset)):index.getUint32(records+n*stride+offset);
+    const position=n=>read(n,wide?8:4),time=n=>read(n,0);
+    const first=position(0);
+    if(first!==moov.end||first+8>head.length||header.getUint32(first+4)!==0x6d6f6f66)return null;
+    tracks.push({id,scale,count,first,position,time,length:40+count*12});
+  }
+  if(!tracks.length)return null;
+  const first=tracks[0].first;
+  if(tracks.some(track=>track.first!==first))return null;
+  const shift=tracks.reduce((sum,track)=>sum+track.length,0);
+  const prefix=new Uint8Array(first+shift);
+  prefix.set(head.subarray(0,first));
+  let cursor=first;
+  for(const {id,scale,count,position,time,length} of tracks){
+    const sidx=new DataView(prefix.buffer,cursor,length);
+    sidx.setUint32(0,length);sidx.setUint32(4,0x73696478);sidx.setUint32(8,0x01000000);
+    sidx.setUint32(12,id);sidx.setUint32(16,scale);
+    sidx.setBigUint64(20,BigInt(time(0)));
+    sidx.setBigUint64(28,BigInt(prefix.length-cursor-length));
+    sidx.setUint16(38,count);
+    for(let n=0;n<count;n++){
+      const size=(n+1<count?position(n+1):mediaEnd)-position(n);
+      const ticks=(n+1<count?time(n+1):Math.round(duration*scale))-time(n);
+      if(!Number.isSafeInteger(size)||size<=0||size>0x7fffffff||!Number.isSafeInteger(ticks)||ticks<=0||ticks>0xffffffff)return null;
+      sidx.setUint32(40+n*12,size);
+      sidx.setUint32(44+n*12,ticks);
+      sidx.setUint32(48+n*12,0x90000000);
+    }
+    cursor+=length;
+  }
+  return {prefix,shift,size:mediaEnd+shift};
+}
+async function indexedMp4(session,item,clientId,background){
+  session.playbackIndexes??=new Map();
+  const cache=session.playbackIndexes;
+  if(!cache.has(item.id)){
+    const pending=(async()=>{
+      const last=item.chunks.length-1;
+      const chunk=async n=>new Uint8Array(await chunkPlain(session,item,n,undefined,clientId,background));
+      const [head,tail]=await Promise.all([chunk(0),chunk(last)]);
+      if(tail.length<16)return null;
+      const footer=new DataView(tail.buffer,tail.byteOffset+tail.length-16,16);
+      if(footer.getUint32(0)!==16||footer.getUint32(4)!==0x6d66726f)return null;
+      const length=footer.getUint32(12),start=item.size-length;
+      if(length<24||length>8*1024*1024||start<0)return null;
+      const index=new Uint8Array(length);
+      for(let n=Math.floor(start/CHUNK_SIZE);n<=last;n++){
+        const bytes=n===last?tail:await chunk(n);
+        const left=Math.max(0,start-n*CHUNK_SIZE);
+        index.set(bytes.subarray(left),Math.max(0,n*CHUNK_SIZE-start));
+      }
+      return frontMp4Index(head,index,start,item.mediaInfo.duration);
+    })().catch(error=>{cache.delete(item.id);throw error;});
+    cache.set(item.id,pending);
+    while(cache.size>4)cache.delete(cache.keys().next().value);
+  }
+  return cache.get(item.id);
+}
+function decryptedStream(session,item,start,end,request,clientId,background,prefix){
   let n=Math.floor(start/CHUNK_SIZE),cancelled=false;
   const last=Math.floor(end/CHUNK_SIZE);
   const aborter=new AbortController();
@@ -186,6 +282,7 @@ function decryptedStream(session,item,start,end,request,clientId,background){
   return new ReadableStream({
     async pull(controller){
       try{
+        if(prefix){controller.enqueue(prefix);prefix=null;return;}
         const raw=new Uint8Array(await chunkPlain(session,item,n,aborter.signal,clientId,background));
         if(cancelled)return;
         if(aborter.signal.aborted)throw new DOMException("Запрос отменён","AbortError");
@@ -208,8 +305,10 @@ async function serveRange(request,id,clientId,background){
     if(!session)return new Response("Сначала откройте библиотеку",{status:503});
     const item=session.items.get(id);
     if(!item)return new Response("Медиа не найдено",{status:404});
-    const size=item.size;
-    if(!Number.isSafeInteger(size)||size<=0)return new Response("Пустой или повреждённый файл",{status:404});
+    if(!Number.isSafeInteger(item.size)||item.size<=0)return new Response("Пустой или повреждённый файл",{status:404});
+    const playbackIndex=item.mime==="video/mp4"&&item.size>=CHUNK_SIZE&&item.mediaInfo?.duration>0
+      ?await indexedMp4(session,item,clientId,background):null;
+    const size=playbackIndex?.size??item.size;
     // Range applies to GET only; HEAD returns metadata without decrypting a block.
     const range=request.method==="GET"?parseRange(request.headers.get("Range"),size):null;
     if(range===false)return new Response(null,{status:416,headers:{"Content-Range":"bytes */"+size}});
@@ -217,7 +316,14 @@ async function serveRange(request,id,clientId,background){
     const headers={"Content-Type":item.mime||"application/octet-stream",
       "Accept-Ranges":"bytes","Content-Length":String(end-start+1),"Cache-Control":"no-store"};
     if(range)headers["Content-Range"]="bytes "+start+"-"+end+"/"+size;
-    const body=request.method==="HEAD"?null:decryptedStream(session,item,start,end,request,clientId,background);
+    let body=null;
+    if(request.method==="GET"){
+      const prefix=playbackIndex&&start<playbackIndex.prefix.length
+        ?playbackIndex.prefix.subarray(start,end+1):null;
+      body=prefix?.length===end-start+1?prefix:decryptedStream(session,item,
+        Math.max(start,playbackIndex?.prefix.length??0)-(playbackIndex?.shift??0),
+        end-(playbackIndex?.shift??0),request,clientId,background,prefix);
+    }
     return new Response(body,{status:range?206:200,headers});
   }catch(error){
     return new Response("Ошибка расшифровки или Google Drive: "+error.message,{status:503,

@@ -263,8 +263,8 @@ class AllohaDelivery:
             session.resource_urls[token] = url
         return '/hls/' + session.sid + '?u=' + session.resource_ids[url]
 
-    async def fetch(self, session, url, *, kind='media', byte_range='', probe=False):
-        if kind != 'manifest' and not probe:
+    async def fetch(self, session, url, *, kind='media', byte_range='', probe=False, cache=True):
+        if cache and kind != 'manifest' and not probe:
             cached = await asyncio.to_thread(self.cache.get, url, byte_range)
             if cached:
                 self.log(session, cached[2], url)
@@ -280,7 +280,7 @@ class AllohaDelivery:
                 raise SourceInvalid('Source returned invalid subtitles')
         else:
             media(raw, headers)
-        if kind != 'manifest' and not probe:
+        if cache and kind != 'manifest' and not probe:
             await asyncio.to_thread(self.cache.put, url, byte_range, value)
         return value
 

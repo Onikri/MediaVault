@@ -34,13 +34,13 @@ def prune_checkpoints(root, *, maximum_age=7*86400):
     for task in root.iterdir():
         if task.is_dir() and not task.is_symlink():
             for checkpoint in task.iterdir():
-                if checkpoint.is_dir() and time.time()-checkpoint.stat().st_mtime>maximum_age:
+                if checkpoint.is_dir() and not (checkpoint/'stream.enc.json').exists() and time.time()-checkpoint.stat().st_mtime>maximum_age:
                     discard_checkpoint(checkpoint,task)
             if not any(task.iterdir()):task.rmdir()
 
 
 class AllohaImporter:
-    def __init__(self, service, loop, *, interval=4):
+    def __init__(self, service, loop, *, interval=2):
         self.service, self.loop, self.interval = service, loop, interval
         self.pacing = asyncio.Lock()
         self.next_request = 0
@@ -49,6 +49,13 @@ class AllohaImporter:
         async with self.pacing:
             await asyncio.sleep(max(0, self.next_request - time.monotonic()))
             self.next_request = time.monotonic() + self.interval
+
+    def stream(self, iframe, directory, *, quality='best', progress=lambda _: None,
+               cancelled=None, checkpoint=None, referer=None):
+        from alloha_stream import StreamingVideo
+        if not is_alloha_player(iframe):
+            raise SourceError('Потоковый импорт предназначен только для Alloha.')
+        return StreamingVideo(AllohaImportHttp(self, iframe, quality, progress, cancelled, None, referer=referer), directory, checkpoint=checkpoint)
 
     def download(self, iframe, directory, *, quality='best', progress=lambda _: None,
                  cancelled=None, checkpoint=None, referer=None):
@@ -73,12 +80,14 @@ class AllohaImportHttp:
         self.checkpoint = Path(checkpoint) if checkpoint else None
         self.session = None
         self.audio = None
+        self.audio_name = None
         self.selected = None
         self.resources, self.documents, self.layout = {}, {}, []
         self.initialization = {}
         self.fingerprint = None
         self.recoveries = 0
         self.saved_resources = set()
+        self.cache_media = True
 
     def call(self, coroutine, *, cleanup=False):
         future = asyncio.run_coroutine_threadsafe(coroutine, self.importer.loop)
@@ -107,6 +116,10 @@ class AllohaImportHttp:
                                           online_quality=self.selected or self.quality, referer=self.referer)
         self.session = self.service.session(data['sid'])
         self.audio = self.session.active
+        label = self.session.translations[self.audio]['name']
+        if self.audio_name is not None and label != self.audio_name:
+            raise SourceError('Alloha изменил звуковую дорожку. Другая озвучка не подставлена.')
+        self.audio_name = label
         qualities = self.session.translations[self.audio]['qualities']
         selected = max(qualities, key=int) if self.quality == 'best' and not self.selected else self.service.select_quality(qualities, self.selected or self.quality)
         if self.selected and selected != self.selected:
@@ -119,11 +132,13 @@ class AllohaImportHttp:
         for key,(url,range_,kind) in self.resources.items():
             if kind not in {'map','key'}:continue
             await self.importer.pace()
-            raw,_,_,_=await self.service.fetch(self.session,url,byte_range=range_)
+            raw,_,_,_=await self.service.fetch(self.session,url,byte_range=range_,cache=self.cache_media)
             if kind=='key' and len(raw)!=16:raise SourceInvalid('Invalid AES-128 key')
             self.initialization[key]=raw
             self.layout.append([key,hashlib.sha256(raw).hexdigest()])
-        fingerprint = hashlib.sha256(json.dumps([self.audio, selected, self.layout], sort_keys=True).encode()).hexdigest()
+        identity = ([self.audio, selected, self.layout] if self.cache_media
+                    else [self.audio, self.audio_name, selected, self.layout])
+        fingerprint = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
         if self.fingerprint and self.fingerprint != fingerprint:
             raise SourceError('Состав видео Alloha изменился. Нельзя смешивать сегменты разных версий.')
         self.fingerprint = fingerprint
@@ -192,7 +207,7 @@ class AllohaImportHttp:
                 url, range_, kind = self.resources[key]
                 if key in self.initialization:return self.initialization[key]
                 await self.importer.pace()
-                raw, headers, _, _ = await self.service.fetch(self.session, url, byte_range=range_)
+                raw, headers, _, _ = await self.service.fetch(self.session, url, byte_range=range_, cache=self.cache_media)
                 if kind == 'key' and len(raw) != 16:
                     raise SourceInvalid('Invalid AES-128 key')
                 return raw
@@ -202,7 +217,7 @@ class AllohaImportHttp:
                     raise
                 if isinstance(error, HTTPException) and error.status_code not in {404,409,410}:
                     raise
-                if isinstance(error, (SourceRefused, SourceInvalid)):
+                if isinstance(error, SourceRefused) or isinstance(error, SourceInvalid) and not expired:
                     try:
                         await self.service.failed(self.session, error, self.session.iframe)
                     except HTTPException:
@@ -210,7 +225,9 @@ class AllohaImportHttp:
                 if attempt == 2 or self.recoveries >= 8:
                     raise SourceError('Alloha прервал скачивание. Сохранённые сегменты доступны для продолжения.') from None
                 if not isinstance(error, HTTPException):self.recoveries += 1
-                self.progress({'phase':'downloading','operation':'Переподключаем Alloha; скачанные сегменты сохранены'})
+                self.progress({'phase':'downloading','operation':
+                    'Обновляем сессию Alloha; отправленные части остаются в Drive' if not self.cache_media
+                    else 'Переподключаем Alloha; скачанные сегменты сохранены'})
                 await self.open()
         raise SourceError('Alloha не вернул сегмент.')
 

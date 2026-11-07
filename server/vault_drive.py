@@ -12,6 +12,7 @@ be atomic. Each completed asset has an encrypted recovery manifest.
 from __future__ import annotations
 
 import base64
+from contextlib import nullcontext
 import copy
 import hashlib
 import io
@@ -24,7 +25,7 @@ import uuid
 import unicodedata
 import threading
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -567,20 +568,29 @@ class VaultDrive:
                     return copy.deepcopy(self._commit_item(item, checkpoint.get("storage", {})))
         return None
 
+    def upload_stream(self, source, *, validate, checkpoint=None, stream_identity='', **options):
+        """Encrypt a bounded sequential stream; publish only after validation.
+
+        The producer owns its stream/process lifetime. Drive backpressure limits
+        reading to the same two 4-MiB encrypted chunks as ordinary file uploads.
+        """
+        return self.upload_file(None, _stream=source, _validate=validate,
+                                _checkpoint=checkpoint, _stream_identity=stream_identity, **options)
+
     def upload_file(self, path, *, name=None, category="video", collection="Без коллекции",
                     episode=None, source_identity=None, mime=None, metadata_id=None, progress=None,
-                    section=None, part="", season=None, metadata=None, dub="", preview=None, preview_motion=None, translation=None,quality=None,episode_title="",episode_description=""):
+                    section=None, part="", season=None, metadata=None, dub="", preview=None, preview_motion=None, translation=None,quality=None,episode_title="",episode_description="",_stream=None,_validate=None,_checkpoint=None,_stream_identity=''):
         if category not in CATEGORIES:
             raise VaultError("Unsupported media category.")
-        file_path = Path(path)
-        filename, collection = str(name or file_path.name).strip(), normalized_name(collection)
+        file_path = Path(path) if _stream is None else None
+        filename, collection = str(name or (file_path.name if file_path else '')).strip(), normalized_name(collection)
         section, part = section or DEFAULT_SECTION[category], normalized_name(part)
         if section not in SECTION_FORMAT or (category != SECTION_FORMAT[section] and category != "image"):
             raise VaultError("Invalid library section for this file format.")
         if not filename or len(filename) > 500 or not collection or len(collection) > 500 or len(part) > 500:
             raise VaultError("Invalid file or collection name.")
-        size = file_path.stat().st_size
-        if size <= 0:
+        size = file_path.stat().st_size if file_path else None
+        if size is not None and size <= 0:
             raise VaultError("Empty files are not supported.")
         if source_identity:
             existing = self.completed(source_identity, collection=collection, episode=episode, category=category)
@@ -592,7 +602,30 @@ class VaultDrive:
             same=next((group for group in catalog.get('storage',{}).get('collections',[])
                        if group_section(group,catalog)==section and str(group.get('metadataId') or group.get('metadata',{}).get('ids',{}).get('mal') or '')==str(incoming_id)),None)
             if same:collection=same['name']
-        item_id, asset_id, collection_id, storage, selected_part = self._folders(catalog, category, collection, section, part)
+        checkpoint_path = Path(_checkpoint) if _stream is not None and _checkpoint else None
+        signature = hashlib.sha256(_json([self.library_id,source_identity,filename,category,collection,episode,season,dub,part,quality,_stream_identity])).hexdigest()
+        partial = None
+        if checkpoint_path and checkpoint_path.exists():
+            partial = open_catalog(json.loads(checkpoint_path.read_text()), self._key)
+            if partial.get('checkpoint') != 'stream-v1' or partial.get('signature') != signature or partial['folderId'] != catalog['folderId']:
+                raise VaultError('Состав потока изменился. Незавершённые части не смешаны с другим видео.')
+        if partial:
+            item_id, asset_id, collection_id, storage, selected_part = (partial[k] for k in ('itemId','assetId','collectionId','storage','selectedPart'))
+        else:
+            item_id, asset_id, collection_id, storage, selected_part = self._folders(catalog, category, collection, section, part)
+        recorded = list(partial.get('chunks', [])) if partial else []
+        confirmed = []
+        def save_partial():
+            if not checkpoint_path:
+                return
+            record = {'items': [], 'folderId': catalog['folderId'], 'checkpoint': 'stream-v1', 'signature': signature,
+                      'itemId': item_id, 'assetId': asset_id, 'collectionId': collection_id, 'storage': storage,
+                      'selectedPart': selected_part, 'chunks': confirmed + recorded[len(confirmed):]}
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            pending_path = checkpoint_path.with_suffix('.pending')
+            pending_path.write_bytes(_json(seal_catalog(record, self._key, self._salt)))
+            pending_path.chmod(0o600)
+            pending_path.replace(checkpoint_path)
         if metadata:
             if not isinstance(metadata, dict) or len(_json(metadata)) > 100000:
                 raise VaultError("Invalid title metadata.")
@@ -605,37 +638,63 @@ class VaultDrive:
             started, encryption_ms, pending = time.monotonic(), 0, deque()
             def completed_upload():
                 nonlocal loaded
-                future, nonce, length = pending.popleft()
-                chunks.append({'fileId': future.result(), 'iv': nonce})
+                future, nonce, length, digest = pending.popleft()
+                chunk = {'fileId': future.result(), 'iv': nonce}
+                chunks.append(chunk)
+                confirmed.append({**chunk, 'size': length, 'sha256': digest})
+                save_partial()
                 loaded += length
                 elapsed = max(.001, time.monotonic() - started)
                 if progress:
-                    progress({'loaded': loaded, 'total': size, 'phase': 'uploading', 'uploadSeconds': round(elapsed, 2),
+                    progress({'loaded': loaded, 'total': size or 0, 'phase': 'uploading', 'uploadSeconds': round(elapsed, 2),
                               'encryptionMs': round(encryption_ms, 2), 'mbps': round(loaded / 1048576 / elapsed, 2), 'activeUploads': parallel})
-            with file_path.open("rb") as source, ThreadPoolExecutor(max_workers=parallel) as executor:
+            with (file_path.open("rb") if file_path else nullcontext(_stream)) as source, ThreadPoolExecutor(max_workers=parallel) as executor:
                 index = 0
                 while True:
                     if len(pending) >= parallel:
                         completed_upload()
-                    raw = source.read(CHUNK_SIZE)
+                    if _stream is None:
+                        raw = source.read(CHUNK_SIZE)
+                    else:
+                        blocks, count = [], 0
+                        while count < CHUNK_SIZE:
+                            block = source.read(CHUNK_SIZE - count)
+                            if not block:
+                                break
+                            blocks.append(block)
+                            count += len(block)
+                        raw = b''.join(blocks)
                     if not raw:
                         break
                     content_hash.update(raw)
+                    digest = hashlib.sha256(raw).hexdigest()
+                    if index < len(recorded):
+                        previous = recorded[index]
+                        if previous['size'] != len(raw) or previous['sha256'] != digest:
+                            raise VaultError('Поток отличается от сохранённых частей. Смешивание видео остановлено.')
+                        future = Future()
+                        future.set_result(previous['fileId'])
+                        pending.append((future, previous['iv'], len(raw), digest))
+                        index += 1
+                        continue
                     before = time.monotonic()
                     sealed = seal_chunk(raw, self._key, item_id, index)
                     encryption_ms += (time.monotonic() - before) * 1000
                     future = executor.submit(self._new_bytes, f'part-{index:06d}.enc', sealed['ciphertext'], asset_id)
-                    pending.append((future, sealed['iv'], len(raw)))
+                    pending.append((future, sealed['iv'], len(raw), digest))
                     index += 1
                 while pending:
                     completed_upload()
-            if loaded != size or file_path.stat().st_size != size:
+            if not loaded or size is not None and (loaded != size or file_path.stat().st_size != size):
                 raise VaultError("Source file changed while uploading.")
+            media_info = _validate() if _validate else None
             item = {"id": item_id, "folderId": asset_id, "name": filename, "category": category,
                     "section": section,
                     "mime": mime or mimetypes.guess_type(filename)[0] or "application/octet-stream",
                     "size": loaded, "addedAt": _now(), "collectionId": collection_id, "chunks": chunks,
                     "sha256": content_hash.hexdigest()}
+            if isinstance(media_info, dict):
+                item['mediaInfo'] = media_info
             if selected_part:
                 item.update({"partId": selected_part["id"], "partName": selected_part["name"]})
             if season is not None:
@@ -672,13 +731,17 @@ class VaultDrive:
             if self._manifest_cache is not None:
                 self._manifest_cache.append(copy.deepcopy(checkpoint))
             committed = self._commit_item(item, storage)
+            if checkpoint_path:
+                checkpoint_path.unlink(missing_ok=True)
             if committed["id"] != item_id:
                 self._retry(lambda: self.drive.trash(asset_id))
             if progress:
-                progress({"loaded": loaded, "total": size, "phase": "done"})
+                progress({"loaded": loaded, "total": loaded, "phase": "done"})
             return copy.deepcopy(committed)
         except Exception as error:
             if not checkpoint_written:
+                if checkpoint_path and checkpoint_path.exists() and (confirmed or recorded):
+                    raise  # Encrypted remote parts and their sealed resume index survive.
                 try:
                     self._retry(lambda: self.drive.trash(asset_id))
                 except Exception:

@@ -11,9 +11,9 @@ const encoder=new TextEncoder();
 
 // A deterministic file spanning three real AES-GCM blocks catches truncation,
 // wrong offsets, incorrect AAD and accidental use of another tab's key.
-async function fixture(id="movie",size=2*CHUNK_SIZE+137){
+async function fixture(id="movie",size=2*CHUNK_SIZE+137,bytes){
   const key=await webcrypto.subtle.generateKey({name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
-  const plain=Uint8Array.from({length:size},(_,i)=>(i*31+Math.floor(i/CHUNK_SIZE))%251);
+  const plain=bytes??Uint8Array.from({length:size},(_,i)=>(i*31+Math.floor(i/CHUNK_SIZE))%251);
   const remote=new Map(),chunks=[];
   for(let offset=0,n=0;offset<size;offset+=CHUNK_SIZE,n++){
     const iv=webcrypto.getRandomValues(new Uint8Array(12));
@@ -96,6 +96,38 @@ test("HEAD returns the full length without downloading or decrypting blocks",asy
   assert.equal(response.headers.get("Content-Range"),null);
   assert.equal((await response.arrayBuffer()).byteLength,0);
   assert.equal(w.downloads.length,0);
+});
+test("fragmented MP4 serves a front seek index and maps later ranges to encrypted blocks",async()=>{
+  const words=(...values)=>{
+    const result=Buffer.alloc(values.length*4);
+    values.forEach((value,n)=>result.writeUInt32BE(value,n*4));
+    return result;
+  };
+  const box=(type,...parts)=>Buffer.concat([words(8+parts.reduce((n,p)=>n+p.length,0)),Buffer.from(type),...parts]);
+  const header=box("moov",box("trak",box("tkhd",words(0,0,0,1)),
+    box("mdia",box("mdhd",words(0,0,0,1000)),box("hdlr",words(0,0,0x76696465)))));
+  const first=box("moof",Buffer.alloc(CHUNK_SIZE));
+  const second=box("moof",Buffer.alloc(32,42));
+  const entry=(time,offset)=>Buffer.concat([words(time,offset),Buffer.from([1,1,1])]);
+  const tfra=box("tfra",words(0,1,0,2),entry(0,header.length),entry(1000,header.length+first.length));
+  const tail=box("mfra",tfra,box("mfro",words(0,8+tfra.length+16)));
+  const bytes=Buffer.concat([header,first,second,tail]);
+  const indexed=await fixture("indexed",bytes.length,bytes);
+  indexed.item.mediaInfo={duration:2};
+  const w=worker(indexed.remote);
+  w.session("tab-a",indexed.session);
+  const shift=64,size=bytes.length-tail.length+shift;
+  const head=await w.request(`bytes=0-${header.length+shift+3}`,"tab-a","GET","indexed");
+  assert.equal(head.headers.get("Content-Range"),`bytes 0-${header.length+shift+3}/${size}`);
+  const prefix=Buffer.from(await head.arrayBuffer());
+  assert.deepEqual(prefix.subarray(0,header.length),header);
+  assert.equal(prefix.toString("ascii",header.length+4,header.length+8),"sidx");
+  assert.equal(prefix.readUInt32BE(header.length+40),first.length);
+  assert.equal(prefix.readUInt32BE(header.length+52),second.length);
+  assert.deepEqual(prefix.subarray(-4),first.subarray(0,4));
+  const start=header.length+first.length+shift;
+  await assertBytes(await w.request(`bytes=${start}-`,"tab-a","GET","indexed"),
+    Uint8Array.from(second),206,`bytes ${start}-${size-1}/${size}`);
 });
 test("unsatisfiable ranges return 416 without downloading blocks",async()=>{
   for(const header of ["bytes="+media.plain.length+"-","bytes=20-10","bytes=-0"]){

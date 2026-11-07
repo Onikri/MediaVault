@@ -90,6 +90,67 @@ class AllohaImportTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(s['codec_type']=='audio' for s in info['streams']))
         self.assertEqual(len(NativeSource.sources),1)
         self.assertEqual(NativeSource.sources[0].referer,'https://publisher.example.com/show')
+
+    async def test_stream_to_encrypted_drive_without_materializing_movie(self):
+        drive=FakeDrive();vault=VaultDrive(drive,sleep=lambda _:None);library=vault.initialize(PHRASE)
+        job={'version':3,'library_id':library,'sources':[IFRAME],'collection':'Stream import','quality':'720',
+             'section':'anime','entries':[{'number':1,'season':1,'url':IFRAME}]}
+        try:
+            cache=self.root/'stream-cache'
+            result=await asyncio.to_thread(run_job,job,vault,alloha_streamer=self.importer.stream,alloha_cache=cache,temporary_dir=self.root,log=lambda _:None)
+            self.assertEqual(result['saved'],1)
+            item=vault.refresh()['items'][0]
+            decrypted=b''.join(open_chunk(drive.download(c['fileId']),vault._key,item['id'],n,c['iv']) for n,c in enumerate(item['chunks']))
+            output=self.root/'stream-decrypted.mp4';output.write_bytes(decrypted)
+            info=verify_video(output)
+            self.assertTrue(any(s['codec_type']=='audio' for s in info['streams']))
+            self.assertEqual(item['quality'],'720p')
+            self.assertEqual(item['mediaInfo']['height'],64)
+            self.assertEqual(list((self.root/'service'/'segments').iterdir()),[])
+            self.assertEqual(list(self.root.glob('mediavault-episode-*')),[])
+            self.assertEqual(list(cache.iterdir()),[])
+        finally:vault.close()
+
+    async def test_failed_stream_validation_never_publishes_truncated_film(self):
+        import io
+        drive=FakeDrive();vault=VaultDrive(drive,sleep=lambda _:None);vault.initialize(PHRASE)
+        def fail():raise SourceError('incomplete film')
+        try:
+            with self.assertRaisesRegex(SourceError,'incomplete'):
+                vault.upload_stream(io.BytesIO(b'partial video'),validate=fail,name='incomplete.mp4',collection='Incomplete')
+            self.assertEqual(vault.refresh()['items'],[])
+            self.assertTrue(drive.trashed)
+        finally:vault.close()
+
+    async def test_stream_session_renewal_preserves_continuous_mp4(self):
+        NativeSource.fail_second=True
+        await self.test_stream_to_encrypted_drive_without_materializing_movie()
+        self.assertEqual(len(NativeSource.sources),2)
+
+    async def test_sealed_stream_checkpoint_reuses_remote_chunks_after_restart(self):
+        import io
+        from vault_drive import CHUNK_SIZE
+        drive=FakeDrive();vault=VaultDrive(drive,sleep=lambda _:None);library=vault.initialize(PHRASE)
+        raw=b'private-payload-'*(CHUNK_SIZE//8)
+        checkpoint=self.root/'resume'/'stream.enc.json'
+        class Broken(io.BytesIO):
+            def read(self,size=-1):
+                if self.tell()>=CHUNK_SIZE:raise SourceError('injected interruption')
+                return super().read(size)
+        options={'name':'resume.mp4','collection':'Resume','checkpoint':checkpoint,'stream_identity':'verified-layout'}
+        try:
+            with self.assertRaisesRegex(SourceError,'interruption'):
+                vault.upload_stream(Broken(raw),validate=lambda:None,**options)
+            self.assertTrue(checkpoint.exists())
+            self.assertNotIn(b'private-payload',checkpoint.read_bytes())
+            self.assertEqual(vault.refresh()['items'],[])
+            previous=sum(name.startswith('part-') for _,name in drive.upload_calls)
+            vault.close();vault=VaultDrive(drive,sleep=lambda _:None);vault.unlock(library,PHRASE)
+            item=vault.upload_stream(io.BytesIO(raw),validate=lambda:None,**options)
+            self.assertEqual(sum(name.startswith('part-') for _,name in drive.upload_calls),previous+1)
+            self.assertEqual(b''.join(open_chunk(drive.download(c['fileId']),vault._key,item['id'],n,c['iv']) for n,c in enumerate(item['chunks'])),raw)
+            self.assertFalse(checkpoint.exists())
+        finally:vault.close()
     async def test_refusal_reopens_without_fetching_saved_segments(self):
         NativeSource.fail_second=True
         output=await self.download();info=verify_video(output)

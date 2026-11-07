@@ -183,12 +183,12 @@ def video_import_source(job, entry, http):
     return url, parent
 
 
-def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None, alloha_downloader=None, alloha_cache=None):
+def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None, alloha_downloader=None, alloha_cache=None, alloha_streamer=None):
     job = validate_job(value)
     if getattr(vault, "library_id", None) != job["library_id"]:
         raise SourceError("Открытая библиотека не совпадает с заданием.")
     own_resolver = resolver is None
-    resolver = resolver or Resolver(native_alloha=alloha_downloader is not None)
+    resolver = resolver or Resolver(native_alloha=alloha_downloader is not None or alloha_streamer is not None)
     result = {"saved": 0, "skipped": 0, "failed": 0}
     emit = progress or (lambda event: None)
     try:
@@ -223,6 +223,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
             log(f"[{index}/{len(plans)}] {label}: скачивание на сервер импорта.")
             # Every episode gets its own temporary directory; nothing accumulates for a season.
             with tempfile.TemporaryDirectory(prefix="mediavault-episode-", dir=temporary_dir) as temporary:
+                streaming = None
                 try:
                     last_phase = [None]
                     def report(event):
@@ -257,7 +258,12 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                                     resolver.http.refresh_playback = True
                                 page = resolver.resolve(url,referer=parent) if parent else resolver.resolve(url)
                                 native = next((s for s in page.streams if s.get('type') == 'alloha-native'), None)
-                                if native and alloha_downloader:
+                                if native and alloha_streamer:
+                                    checkpoint = Path(alloha_cache) / __import__('hashlib').sha256((identity+collection).encode()).hexdigest() if alloha_cache else None
+                                    streaming = alloha_streamer(native['url'], temporary, quality=job['quality'], progress=report,
+                                                               cancelled=cancelled, checkpoint=checkpoint, referer=native.get('headers', {}).get('Referer') or parent)
+                                    path = None
+                                elif native and alloha_downloader:
                                     checkpoint = Path(alloha_cache) / __import__('hashlib').sha256((identity+collection).encode()).hexdigest() if alloha_cache else None
                                     path = alloha_downloader(native['url'], temporary, quality=job["quality"], progress=report,
                                                              cancelled=cancelled, checkpoint=checkpoint,
@@ -299,7 +305,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                 episode_title=russian(entry.get('title'))
                 if episode_title and not re.fullmatch(r'(?:Серия|Эпизод)\s*\d+',episode_title,re.I):options['episode_title']=episode_title
                 if russian(entry.get('description')):options['episode_description']=russian(entry['description'])
-                if category == 'video':
+                if category == 'video' and streaming is None:
                     height=video_height(path)
                     if height:options['quality']=height
                     from media_download import preview_frame,animated_preview
@@ -311,10 +317,12 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                     from manga_download import chapter_preview
                     thumbnail=chapter_preview(path)
                     if thumbnail:options['preview']=thumbnail
-                saved_item=vault.upload_file(path, name=name, category=category, collection=collection,
-                                  episode=number, source_identity=identity, mime=mime, progress=report,
-                                  section=job["section"], part=f"{'Том' if category != 'video' else 'Сезон'} {season}", season=season, **options)
-                if category == 'video' and alloha_downloader and alloha_cache:
+                options.update(name=name, category=category, collection=collection,
+                               episode=number, source_identity=identity, mime=mime, progress=report,
+                               section=job["section"], part=f"{'Том' if category != 'video' else 'Сезон'} {season}",
+                               season=season)
+                saved_item = streaming.upload(vault, **options) if streaming else vault.upload_file(path, **options)
+                if category == 'video' and (alloha_downloader or alloha_streamer) and alloha_cache:
                     from alloha_import import discard_checkpoint
                     discard_checkpoint(Path(alloha_cache) / __import__('hashlib').sha256((identity+collection).encode()).hexdigest(), Path(alloha_cache))
                 result["saved"] += 1

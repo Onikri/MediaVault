@@ -170,6 +170,7 @@ def worker():
                 result = run_job(data["job"], vault, log=lambda _: None, progress=progress, cancelled=cancelled,
                                  temporary_dir=store.directory / "temporary",start_index=task['progress'].get('cursor',0),max_files=1,on_saved=saved,
                                  alloha_downloader=app.state.alloha_importer.download,
+                                 alloha_streamer=app.state.alloha_importer.stream,
                                  alloha_cache=store.directory / ".codex-local" / "alloha-import" / task_id)
             if stopping.is_set():continue
             result={**result,**{key:base_counts[key]+result[key] for key in base_counts}}
