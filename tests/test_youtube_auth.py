@@ -82,19 +82,28 @@ class YouTubeAuth(unittest.TestCase):
   self.client.put('/music/youtube/session', json={'cookies': original})
   expired = COOKIE.replace('fixture-youtube-session', 'fixture-invalid-session')
   inputs = []
+  anonymous = {'ok': True}
   def spawn(command, **kwargs):
-   cookie = Path(command[command.index('--cookies')+1])
-   inputs.append(cookie.read_text())
    video_id = command[-1].split('=')[-1]
    result = MagicMock()
-   if len(inputs) == 2:
+   data = {'id':video_id, 'title':'Fixture', 'duration':180, 'ext':'m4a', 'vcodec':'none',
+           'protocol':'https', 'url':'https://media.googlevideo.com/videoplayback'}
+   if '--cookies' not in command:
+    inputs.append(None)
+    if anonymous['ok']:
+     kwargs['stdout'].write(json.dumps(data).encode());result.returncode = 0
+    else:
+     kwargs['stderr'].write(b'ERROR: Sign in to confirm you are not a bot');result.returncode = 1
+    result.poll.return_value = result.returncode
+    return result
+   cookie = Path(command[command.index('--cookies')+1])
+   inputs.append(cookie.read_text())
+   if len([v for v in inputs if v]) == 2:
     cookie.write_text(expired)
     kwargs['stderr'].write(b'WARNING: The provided YouTube account cookies are no longer valid.\n')
     result.returncode = 1
    else:
     cookie.write_text(rotated)
-    data = {'id':video_id, 'title':'Fixture', 'duration':180, 'ext':'m4a', 'vcodec':'none',
-            'protocol':'https', 'url':'https://media.googlevideo.com/videoplayback'}
     kwargs['stdout'].write(json.dumps(data).encode())
     result.returncode = 0
    result.poll.return_value = result.returncode
@@ -102,12 +111,17 @@ class YouTubeAuth(unittest.TestCase):
   with patch.dict(os.environ, {'DATA_DIR':self.temporary.name}), patch.object(music, 'audio_url', side_effect=lambda value:value), patch.object(music, 'verify_audio'), patch.object(music.subprocess, 'Popen', side_effect=spawn):
    music.extract('dQw4w9WgXcQ', True)
    self.assertEqual(auth.cookie_text(), rotated)
-   with self.assertRaisesRegex(HTTPException, 'YouTube отклонил'):
-    music.extract('tRwHpyOq4P4', True)
+   # Revoked cookies: the same record is fetched anonymously instead of failing.
+   music.extract('tRwHpyOq4P4', True)
    self.assertTrue(auth.credentials()['needsRefresh'])
    self.assertEqual(auth.cookie_text(), rotated)
+   # A revoked session is not sent first; anonymous playback suffices.
    music.extract('abcdefghijk', True)
-  self.assertEqual(inputs, [original, rotated, rotated])
+   self.assertEqual(inputs, [original, rotated, None, None])
+   # When YouTube wants a sign-in, the stale session is still tried and recovers.
+   anonymous['ok'] = False
+   music.extract('ABCDEFGHIJK', True)
+  self.assertEqual(inputs, [original, rotated, None, None, None, rotated])
   self.assertFalse(auth.credentials()['needsRefresh'])
   self.assertEqual(auth.cookie_text(), rotated)
 

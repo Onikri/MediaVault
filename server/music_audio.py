@@ -137,28 +137,42 @@ def _extract(identity, refresh):
         root=Path(os.getenv('DATA_DIR','/data'))/'temporary';root.mkdir(parents=True,exist_ok=True)
         # No shell, browser-profile reads, credential forwarding or plugins.
         # Explicit owner-supplied YouTube cookies use a private temporary copy.
-        with tempfile.TemporaryDirectory(dir=root,prefix='audio-resolve-') as directory,open(Path(directory)/'result','w+b') as output,open(Path(directory)/'error','w+b') as error,private_youtube_auth(root, previous) as (authentication, cookie_path):
-            command=[sys.executable,'-m','yt_dlp','--ignore-config','--no-plugin-dirs','--no-cache-dir','--no-playlist','--no-color','--socket-timeout','6','--retries','0','--extractor-retries','0','--js-runtimes','node','--skip-download','--print','%(.{'+FIELDS+'})j','-f','bestaudio[ext=m4a][protocol=https]/bestaudio[ext=webm][protocol=https]','--','https://www.youtube.com/watch?v='+identity]
-            command[command.index('--'):command.index('--')]=authentication
-            process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=output,stderr=error)
-            end=time.monotonic()+28
-            while process.poll() is None:
-                if time.monotonic()>end or os.fstat(output.fileno()).st_size>4*1024**2 or os.fstat(error.fileno()).st_size>256*1024:
-                    process.kill();process.wait();raise HTTPException(504,'YouTube не ответил за время подготовки. Повтори запрос.')
-                time.sleep(.05)
-            error.seek(0);diagnostic=error.read(256*1024).decode(errors='replace')
-            rejected = cookie_rejected(diagnostic)
-            if rejected:
-                playback_rejected(previous)
-            if process.returncode:
-                message = 'YouTube отклонил сохранённые cookies. Загруженная копия сохранена.' if rejected else failure(diagnostic)
-                raise HTTPException(502, message)
-            if cookie_path and not rejected:
-                with contextlib.suppress(OSError, UnicodeError):
-                    updated_jar = cookie_path.read_text(encoding='utf-8')
-            output.seek(0)
-            try:data=json.loads(output.read(4*1024**2))
-            except ValueError:raise HTTPException(502,'Некорректный ответ обработчика аудио.') from None
+        # The owner's YouTube session first, then the same request without
+        # cookies. A session YouTube already revoked goes last: anonymous
+        # playback is tried before it, and it may still recover on its own.
+        stale_session = bool(previous and previous.get('cookies') and previous.get('needsRefresh'))
+        attempts = [None, previous] if stale_session else ([previous, None] if previous and previous.get('cookies') else [None])
+        for attempt, auth in enumerate(attempts):
+            with tempfile.TemporaryDirectory(dir=root,prefix='audio-resolve-') as directory,open(Path(directory)/'result','w+b') as output,open(Path(directory)/'error','w+b') as error,private_youtube_auth(root, auth) as (authentication, cookie_path):
+                command=[sys.executable,'-m','yt_dlp','--ignore-config','--no-plugin-dirs','--no-cache-dir','--no-playlist','--no-color','--socket-timeout','6','--retries','0','--extractor-retries','0','--js-runtimes','node','--skip-download','--print','%(.{'+FIELDS+'})j','-f','bestaudio[ext=m4a][protocol=https]/bestaudio[ext=webm][protocol=https]','--','https://www.youtube.com/watch?v='+identity]
+                command[command.index('--'):command.index('--')]=authentication
+                process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=output,stderr=error)
+                end=time.monotonic()+28
+                while process.poll() is None:
+                    if time.monotonic()>end or os.fstat(output.fileno()).st_size>4*1024**2 or os.fstat(error.fileno()).st_size>256*1024:
+                        process.kill();process.wait();raise HTTPException(504,'YouTube не ответил за время подготовки. Повтори запрос.')
+                    time.sleep(.05)
+                error.seek(0);diagnostic=error.read(256*1024).decode(errors='replace')
+                rejected = auth is not None and cookie_rejected(diagnostic)
+                if rejected:
+                    playback_rejected(previous)
+                    stale_session = True
+                if process.returncode:
+                    # A revoked session must not block playback that YouTube
+                    # still allows anonymously from this address: retry once.
+                    if attempt + 1 < len(attempts):
+                        continue
+                    message = failure(diagnostic)
+                    if stale_session and ('Oracle' in message or rejected):
+                        message = 'YouTube просит вход для этой записи, а сохранённая сессия YouTube устарела. Обнови её в настройках: Подключения → YouTube на Oracle.'
+                    raise HTTPException(502, message)
+                if cookie_path and not rejected:
+                    with contextlib.suppress(OSError, UnicodeError):
+                        updated_jar = cookie_path.read_text(encoding='utf-8')
+                output.seek(0)
+                try:data=json.loads(output.read(4*1024**2))
+                except ValueError:raise HTTPException(502,'Некорректный ответ обработчика аудио.') from None
+                break
         if data.get('id')!=identity or data.get('is_live') or data.get('live_status') in {'is_live','is_upcoming'} or data.get('vcodec')!='none' or data.get('ext') not in {'m4a','webm'} or data.get('protocol')!='https':raise HTTPException(422,'Нужна опубликованная запись с отдельной аудиодорожкой.')
         duration=data.get('duration')
         if not isinstance(duration,(int,float)) or not 0<duration<=7200:raise HTTPException(422,'Поддерживаются записи продолжительностью до двух часов.')

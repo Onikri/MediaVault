@@ -143,9 +143,61 @@ def theme_audio(theme_id):
         _audio[theme_id]=(now+86400,link)
     return link
 
+THEME_SEARCH_QUERY='query($q:String!){search(search:$q,first:8){animethemes{id type song{title{romaji native} performances{artist{... on Artist{name{main}}}}} animethemeentries{nsfw videos{nodes{audio{link}}}}}}}'
+_theme_search={}
+
+def song_key(value):
+    text=re.sub(r'[\(\[（【][^)\]）】]*(?:tv|size|ver|version|full|short|op|ed|opening|ending)[^)\]）】]*[\)\]）】]','',str(value or ''),flags=re.I)
+    text=re.sub(r'\b(?:tv\s*size|full\s*(?:ver(?:sion)?|size)|opening|ending|op\s*\d*|ed\s*\d*)\b','',text,flags=re.I)
+    return re.sub(r'[^\w]+','',text.casefold())
+
+def search_theme(title,artist=''):
+    """An anime song by name (and artist) -> AnimeThemes' own audio rip.
+
+    Lets the music player avoid YouTube for OP/ED songs whose saved record
+    lacks an AnimeThemes id. Only an exact song-title match is accepted.
+    """
+    wanted=song_key(title)
+    if len(wanted)<2:return None
+    key=(wanted,song_key(artist))
+    now=time.monotonic()
+    with lock:
+        hit=_theme_search.get(key)
+        if hit and hit[0]>now:return hit[1]
+    import requests
+    from source_parser import USER_AGENT
+    query=re.sub(r'[\(\[（【][^)\]）】]*[\)\]）】]',' ',str(title)).strip()+(' '+str(artist).strip() if artist else '')
+    try:
+        response=requests.post(GRAPHQL,json={'query':THEME_SEARCH_QUERY,'variables':{'q':query[:200]}},headers={'User-Agent':USER_AGENT,'Accept':'application/json'},timeout=(4,15))
+        response.raise_for_status();rows=((response.json().get('data') or {}).get('search') or {}).get('animethemes') or []
+    except (requests.RequestException,ValueError,AttributeError):
+        raise HTTPException(502,'AnimeThemes сейчас не отвечает. Повтори немного позже.') from None
+    best=None
+    for row in rows:
+        song=(row or {}).get('song') or {}
+        titles=[song_key(v) for v in (song.get('title') or {}).values() if v]
+        if wanted not in titles:continue
+        artists=[song_key((p.get('artist') or {}).get('name',{}).get('main')) for p in song.get('performances') or [] if isinstance(p,dict)]
+        link=_first_audio(row.get('animethemeentries'))
+        if not link:continue
+        score=2 if key[1] and key[1] in artists else 1
+        if not best or score>best[0]:best=(score,{'id':'animethemes:'+str(row['id']),'audio':link,'type':row.get('type'),'title':(song.get('title') or {}).get('romaji')})
+    value=best[1] if best and (best[0]==2 or not key[1]) else None
+    with lock:
+        if len(_theme_search)>512:_theme_search.clear()
+        _theme_search[key]=(now+86400,value)
+    return value
+
 def install(app):
     @app.get('/music/anime/{identity}')
     def music(identity:str):return songs(identity)
+
+    @app.get('/music/theme-search')
+    def music_theme_search(title:str,artist:str=''):
+        if not 1<=len(title)<=200 or len(artist)>200:raise HTTPException(422,'Некорректное название песни.')
+        value=search_theme(title,artist)
+        if not value:raise HTTPException(404,'Песни нет в AnimeThemes.')
+        return value
 
     @app.get('/music/theme-audio/{theme_id}')
     def music_theme_audio(theme_id:int):

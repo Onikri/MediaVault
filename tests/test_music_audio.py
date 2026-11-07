@@ -72,6 +72,26 @@ class MusicAudio(unittest.TestCase):
    self.assertEqual(spawn.call_count,2,'Stale metadata is extracted again without cutting off existing playback')
    command=spawn.call_args.args[0];self.assertIn('--ignore-config',command);self.assertIn('--no-cache-dir',command);self.assertIn('--no-plugin-dirs',command);self.assertNotIn('shell',spawn.call_args.kwargs);self.assertEqual(command[-1],WATCH)
    self.assertEqual(list((Path(directory)/'temporary').iterdir()),[])
+ def test_revoked_cookies_retry_without_them_and_stale_sessions_are_skipped(self):
+  data={'id':IDENTITY,'title':'Fixture','duration':213,'url':CDN,'ext':'m4a','vcodec':'none','acodec':'mp4a','protocol':'https','http_headers':{}}
+  calls=[]
+  def start(command,**kwargs):
+   calls.append(command);process=MagicMock();process.poll.return_value=0
+   if '--cookies' in command:
+    kwargs['stderr'].write(b'WARNING: The provided YouTube account cookies are no longer valid.\nERROR: Sign in to confirm you are not a bot');kwargs['stderr'].flush();process.returncode=1
+   else:
+    kwargs['stdout'].write(json.dumps(data).encode());kwargs['stdout'].flush();process.returncode=0
+   return process
+  session={'cookies':'# Netscape HTTP Cookie File\n','needsRefresh':False}
+  with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}),patch.object(music,'audio_url',side_effect=lambda url:url),patch.object(music,'verify_audio'),patch.object(music.subprocess,'Popen',side_effect=start),patch('youtube_auth.credentials',return_value=session),patch('youtube_auth.playback_rejected') as rejected:
+   value,_=music.extract(IDENTITY)
+   self.assertEqual(value['url'],CDN)
+   self.assertEqual(['--cookies' in c for c in calls],[True,False],'Cookies first, then the same request anonymously')
+   rejected.assert_called_once()
+   music.cache.clear();calls.clear()
+   session['needsRefresh']=True
+   music.extract(IDENTITY)
+   self.assertEqual(['--cookies' in c for c in calls],[False],'A session YouTube already revoked is not tried again')
  def test_combined_video_live_and_overlong_tracks_are_rejected(self):
   base={'id':IDENTITY,'title':'Fixture','duration':213,'url':CDN,'ext':'m4a','vcodec':'none','protocol':'https'}
   for changes in [{'vcodec':'avc1'},{'is_live':True},{'duration':7201},{'id':'other'},{'protocol':'m3u8_native'}]:

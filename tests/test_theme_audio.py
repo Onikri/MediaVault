@@ -39,4 +39,29 @@ class ThemeAudio(unittest.TestCase):
             with self.assertRaises(HTTPException) as caught:anime_music.theme_audio(8)
         self.assertEqual(caught.exception.status_code,404)
 
+class ThemeSearch(unittest.TestCase):
+    def setUp(self):anime_music._theme_search.clear()
+
+    def payload(self):
+        row=lambda i,title,artist,link,nsfw=False:{'id':i,'type':'OP','song':{'title':{'romaji':title,'native':None},'performances':[{'artist':{'name':{'main':artist}}}]},'animethemeentries':[{'nsfw':nsfw,'videos':{'nodes':[{'audio':{'link':link}}]}}]}
+        return {'data':{'search':{'animethemes':[row(1,'LOVE THE WORLD','Other','https://a.animethemes.moe/Other.ogg'),row(2,'THE WORLD','Nightmare','https://a.animethemes.moe/DeathNote-OP1.ogg'),row(3,'THE WORLD','Cover Band','https://a.animethemes.moe/Cover.ogg')]}}}
+
+    def test_exact_song_and_artist_from_a_tv_size_title(self):
+        with patch('requests.post',return_value=reply(self.payload())) as post:
+            found=anime_music.search_theme('The WORLD (TV Size)','Nightmare')
+            self.assertEqual(found['audio'],'https://a.animethemes.moe/DeathNote-OP1.ogg')
+            self.assertEqual(found['id'],'animethemes:2')
+            anime_music.search_theme('The WORLD (TV Size)','Nightmare')
+        self.assertEqual(post.call_count,1)
+
+    def test_wrong_artist_or_partial_title_is_not_a_match(self):
+        with patch('requests.post',return_value=reply(self.payload())):
+            self.assertIsNone(anime_music.search_theme('THE WORLD','Unknown Artist'))
+            self.assertIsNone(anime_music.search_theme('WORLD',''))
+
+    def test_words_containing_ed_or_op_survive_normalisation(self):
+        self.assertEqual(anime_music.song_key('Red (TV Size)'),'red')
+        self.assertEqual(anime_music.song_key('Hope Opening'),'hope')
+
+
 if __name__=='__main__':unittest.main()
