@@ -86,6 +86,16 @@ def owner(authorization: str = Header(default="")):
     return payload["sub"]
 
 
+def guest_may_open(subject, title):
+    """Owner: always. Guest: only titles (and kinds) the owner opened for them."""
+    if not str(subject or '').startswith('guest:'):
+        return
+    import guest_profiles
+    record = store.setting('guest:' + str(subject)[6:]) if store else None
+    if not guest_profiles.allows(record, title):
+        raise HTTPException(403, 'Владелец пока не открыл тебе этот тайтл. Попроси его добавить тайтл в твой доступ.')
+
+
 def viewer(authorization: str = Header(default="")):
     """Owner or an active guest profile: online viewing, reading and music only."""
     payload = token_payload(authorization)
@@ -558,6 +568,7 @@ def discovery_manga_cancel(identity:str,subject=Depends(viewer)):
 
 @app.post('/manga/search')
 def manga_search(body:MangaDiscovery,subject=Depends(viewer)):
+    guest_may_open(subject,{**body.title,'kind':body.title.get('kind') or 'manga'})
     from manga_sources import search_title
     from concurrent.futures import ThreadPoolExecutor
     from suwayomi_bridge import search as bridge_search
@@ -604,6 +615,7 @@ def manga_bridge_pack_status(subject=Depends(owner)):
 @app.post('/manga/bridge/search')
 def manga_bridge_search(body:MangaDiscovery,subject=Depends(viewer)):
     from suwayomi_bridge import search
+    guest_may_open(subject,{**body.title,'kind':body.title.get('kind') or 'manga'})
     return search(body.title,body.language,body.format,body.bridgeOffset,body.bridgeLimit)
 
 class MangaInspection(StrictBody):
@@ -614,6 +626,7 @@ class MangaInspection(StrictBody):
 
 @app.post('/manga/inspect')
 def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
+    if body.title:guest_may_open(subject,{**body.title,'kind':body.title.get('kind') or 'manga'})
     from manga_sources import title_aliases
     from manga_inspection import inspect
     from title_identity import match_title
@@ -661,6 +674,7 @@ def source_qualities(body: QualityInspection, subject=Depends(viewer)):
 @app.post('/sources/discover')
 def discover_voices(body: TitleDiscovery, subject=Depends(viewer)):
     from source_discovery import discover
+    guest_may_open(subject, body.title)
     if len(json.dumps(body.title)) > 10000:
         raise HTTPException(422, 'Слишком большое описание тайтла.')
     try:

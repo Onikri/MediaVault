@@ -3,6 +3,7 @@ import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {Ban,Check,Clock,Copy,Link2,RotateCcw,Trash2,UserPlus} from 'lucide-react';
 import UiSelect from './UiSelect.jsx';
 import {inviteLink} from './guest-session.js';
+import GuestAccessEditor,{accessSummary} from './GuestAccessEditor.jsx';
 
 const TERMS=[['1','1 день'],['7','7 дней'],['30','30 дней'],['90','3 месяца'],['365','Год'],['','Без срока']];
 const date=value=>new Date(value*1000).toLocaleDateString('ru',{day:'numeric',month:'short',year:'numeric'});
@@ -18,7 +19,7 @@ function CopyLink({url}){
 }
 export default function GuestManager({service}){
  const reduce=useReducedMotion();
- const [guests,setGuests]=useState(null),[error,setError]=useState(''),[name,setName]=useState(''),[term,setTerm]=useState('30'),[busy,setBusy]=useState(''),[links,setLinks]=useState({});
+ const [guests,setGuests]=useState(null),[error,setError]=useState(''),[name,setName]=useState(''),[term,setTerm]=useState('30'),[busy,setBusy]=useState(''),[links,setLinks]=useState({}),[editing,setEditing]=useState('');
  const connected=service?.status==='connected'&&service.session?.role!=='guest';
  const load=useCallback(()=>service.request('/guests').then(d=>{setGuests(d.guests||[]);setError('');}).catch(e=>setError(e.message)),[service.request]);
  useEffect(()=>{if(connected)load();},[connected,load]);
@@ -29,7 +30,7 @@ export default function GuestManager({service}){
  const remove=guest=>{if(confirm('Удалить профиль «'+guest.name+'»? Гость сразу потеряет доступ.'))run(guest.id,()=>service.request('/guests/'+guest.id,{method:'DELETE'}));};
  if(!connected)return <section className="settings-card guest-manager"><h2>Гостевые профили</h2><p className="fine">{service?.error||'Подключаем сервер MediaVault…'}</p></section>;
  return <section className="settings-card guest-manager">
-  <div className="guest-manager-head"><h2>Гостевые профили</h2><p className="fine">Создай профиль, отправь ссылку — гость сам задаст логин и пароль. Гости смотрят и читают онлайн, но не видят твою коллекцию на Google Диске и не запускают загрузки.</p></div>
+  <div className="guest-manager-head"><h2>Гостевые профили</h2><p className="fine">Создай профиль, отправь ссылку — гость сам задаст логин и пароль. По умолчанию гостю открыта вся библиотека; в «Доступе» можно оставить только выбранные тайтлы и отдельно разрешить смотреть или читать. Коллекцию на Google Диске и загрузки гости не видят.</p></div>
   <form className="guest-create" onSubmit={create}>
    <label><span>Имя гостя</span><input className="field-input" value={name} onChange={e=>setName(e.target.value)} maxLength={40} placeholder="Например, Аня" required/></label>
    <label><span>Доступ</span><UiSelect aria-label="Срок доступа" value={term} onChange={e=>setTerm(e.target.value)}>{TERMS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</UiSelect></label>
@@ -49,6 +50,8 @@ export default function GuestManager({service}){
     <button type="button" disabled={busy===guest.id} onClick={()=>change(guest,{disabled:!guest.disabled})}>{guest.disabled?<RotateCcw size={15}/>:<Ban size={15}/>}{guest.disabled?'Разблокировать':'Заблокировать'}</button>
     <button type="button" className="is-danger" disabled={busy===guest.id} onClick={()=>remove(guest)} aria-label={'Удалить '+guest.name}><Trash2 size={15}/></button>
    </div>
+   <button type="button" className="guest-access-toggle" aria-expanded={editing===guest.id} onClick={()=>setEditing(v=>v===guest.id?'':guest.id)}><span>Доступ</span><strong>{accessSummary(guest.access)}</strong></button>
+   {editing===guest.id&&<GuestAccessEditor guest={guest} busy={busy===guest.id} onSave={access=>change(guest,{access})}/>}
    {links[guest.id]&&<CopyLink url={links[guest.id]}/>}
   </motion.li>;})}</AnimatePresence></ul>
  </section>;

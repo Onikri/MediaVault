@@ -32,7 +32,21 @@ class Create(Strict):
     days: Optional[int] = Field(default=None, ge=1, le=3650)
 
 
+class AccessTitle(Strict):
+    key: str = Field(pattern=r'^(anime|manga):\d{1,9}$')
+    title: str = Field(default='', max_length=300)
+    cover: str = Field(default='', max_length=600)
+
+
+class Access(Strict):
+    scope: str = Field(default='all', pattern=r'^(all|titles)$')
+    watch: bool = True
+    read: bool = True
+    titles: list[AccessTitle] = Field(default_factory=list, max_length=500)
+
+
 class Change(Strict):
+    access: Optional[Access] = None
     name: Optional[str] = Field(default=None, min_length=1, max_length=40)
     days: Optional[int] = Field(default=None, ge=1, le=3650)
     unlimited: bool = False
@@ -69,6 +83,34 @@ def check_password(password, record):
         return False
 
 
+WATCH_KINDS = {'anime', 'movie', 'tv', 'ona', 'ova', 'special'}
+READ_KINDS = {'manga', 'ranobe', 'book', 'manhwa', 'manhua', 'novel', 'one_shot', 'doujin'}
+FULL_ACCESS = {'scope': 'all', 'watch': True, 'read': True, 'titles': []}
+
+
+def access_of(record):
+    value = (record or {}).get('access')
+    return {**FULL_ACCESS, **value} if isinstance(value, dict) else dict(FULL_ACCESS)
+
+
+def title_group(kind):
+    kind = str(kind or 'anime').lower()
+    return 'manga' if kind in READ_KINDS else 'anime'
+
+
+def allows(record, title):
+    """Whether a guest may open this catalogue title (dict with kind and ids)."""
+    access = access_of(record)
+    group = title_group((title or {}).get('kind'))
+    if not access['watch' if group == 'anime' else 'read']:
+        return False
+    if access['scope'] == 'all':
+        return True
+    ids = (title or {}).get('ids') or {}
+    mal = str(ids.get('mal') or '').strip()
+    return bool(mal) and (group + ':' + mal) in {t.get('key') for t in access['titles']}
+
+
 def public(record, now=None):
     now = now or time.time()
     expires = record.get('expires_at')
@@ -76,7 +118,7 @@ def public(record, now=None):
             'createdAt': record['created_at'], 'expiresAt': expires, 'disabled': bool(record.get('disabled')),
             'expired': bool(expires and expires < now), 'enrolled': bool(record.get('password')),
             'inviteExpiresAt': record.get('invite_expires_at') if record.get('invite_hash') else None,
-            'lastSeen': record.get('last_seen')}
+            'lastSeen': record.get('last_seen'), 'access': access_of(record)}
 
 
 class Attempts:
@@ -268,6 +310,8 @@ def install(app, owner, get_store, sign, decode):
             record['expires_at'] = lifetime(body.days)
         if body.disabled is not None:
             record['disabled'] = body.disabled
+        if body.access is not None:
+            record['access'] = body.access.model_dump()
         return {'guest': public(save(record))}
 
     @app.post('/guests/{identity}/invite')

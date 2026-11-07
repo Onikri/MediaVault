@@ -12,6 +12,7 @@ import OnlineViewer from './OnlineViewer.jsx';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import OnlineEpisodePreviews from './OnlineEpisodePreviews.jsx';
 import {readSceneJump,consumeSceneJump} from './scene-search.js';
+import {guestLocked} from './guest-session.js';
 import {onlineEpisodeId} from './watch-session.js';
 import {readWatch,saveWatch,orderedVoices,variantsFor,episodePreviewKey,minimumEpisodeDuration,voicesForCatalogue,isAllohaVariant,previewSource,previewEntry} from './watch-session.js';
 import {readEpisodePreview,saveEpisodePreview} from './episode-preview-cache.js';
@@ -105,6 +106,17 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const familyNumber=Number(family.find(f=>String(f.id)===basisId)?.number)||0;
  useEffect(()=>{if(!sceneJump.current||playing||catalogueSeasonHint(basisItem)||!familyNumber||familyNumber===season)return;setSeason(familyNumber);setBrowseSeason(familyNumber);},[familyNumber,playing]);
  const jumpVoices=useRef(new Set()),jumpPicked=useRef(false),settledVoice=useRef('');
+ // A remembered voice may not exist in this season (a page that lists several
+ // seasons, a voice that dubbed only one). Until the viewer picks a voice by
+ // hand, move on to the next voice instead of stopping at an error.
+ const manualVoice=useRef(false),autoTried=useRef(new Set());
+ useEffect(()=>{autoTried.current=new Set();},[identity,season]);
+ useEffect(()=>{
+  if(playing||busy||!error||!voice||manualVoice.current||sceneJump.current||settledVoice.current!==voice.id)return;
+  autoTried.current.add(voice.id);
+  const next=voices.find(v=>!autoTried.current.has(v.id));
+  if(next&&autoTried.current.size<=8)setVoiceId(next.id);
+ },[error,busy,playing,voice?.id,voices]);
  const hasEpisode=(v,n,s)=>(v?.variants||[]).some(x=>(x.episodes||[]).some(e=>Number(e.number)===Number(n)&&(!e.season||Number(e.season)===Number(s))));
  useEffect(()=>{
   const jump=sceneJump.current;if(!jump||playing||!voices.length||jumpPicked.current)return;jumpPicked.current=true;
@@ -189,7 +201,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
 
 
  const spoken=voices.filter(v=>v.kind!=='subtitles');
- function changeVoice(id,nextQuality=quality){failed.current.clear();setVoiceId(id);setAudioId('');setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
+ function changeVoice(id,nextQuality=quality){manualVoice.current=true;failed.current.clear();setVoiceId(id);setAudioId('');setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
  function fallback(){
   if(!viewVariant)return false;
   failed.current.add(viewVariant.id);
@@ -242,7 +254,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  ]}];
  // Without a profile the page never reaches the server, so there is nothing to
  // search yet: say so instead of offering an empty voice picker.
- const signedOut=['disconnected','unconfigured'].includes(service.status)&&!service.session;
+ const signedOut=['disconnected','unconfigured'].includes(service.status)&&!service.session,locked=guestLocked(service.session,item);
  const idleCurrent=browsingCatalog?foreign.row?.entries[0]:current,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
  const warmCurrent=usePlaybackWarmup({entry:idleCurrent,sourceUrl:idleVariant?.sourceUrl,quality,service,enabled:!playing&&!idleBusy&&!isAllohaVariant(idleVariant),anchor:sourceButton});
  const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:audioId||voice?.id,
@@ -256,12 +268,16 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
     <div className="mvx-idle-poster" aria-hidden="true"/>
     <div className="mvx-overview mvx-idle-overview">
      <h1>{profile.title||item.title}</h1>
-     {signedOut?<p className="mvx-meta" role="status"><span>Чтобы смотреть онлайн, войди в профиль: озвучки ищет твой сервер MediaVault</span></p>
+     {locked?<p className="mvx-meta" role="status"><span>Владелец пока не открыл тебе этот тайтл. Попроси его добавить тайтл в твой гостевой доступ.</span></p>
+      :signedOut?<p className="mvx-meta" role="status"><span>Чтобы смотреть онлайн, войди в профиль: озвучки ищет твой сервер MediaVault</span></p>
+      :!voices.length&&discovery.data&&!discovery.loading?<p className="mvx-meta" role="status"><span>Ни один сайт-источник пока не опубликовал этот тайтл с озвучкой или субтитрами. Загляни позже — поиск повторится при следующем открытии.</span></p>
       :idleBusy?<p className="mvx-meta mvx-idle-busy" role="status"><span className="mvx-spinner"/><span>Подбираем озвучки, качества и серии</span></p>
       :<p className="mvx-meta">{idleCurrent&&<span>Серия {idleCurrent.number}</span>}{(browsingCatalog?familySeason?.name:activeFamilySeason?.name)&&<span>{browsingCatalog?familySeason?.name:activeFamilySeason?.name}</span>}{voice&&<span>{voice.name}</span>}<span>{quality==='best'?'Лучшее качество':quality+'p'}</span></p>}
-     {signedOut?<button type="button" className="mvx-primary" onClick={()=>dispatchEvent(new Event('mediavault:request-login'))}>Войти</button>
+     {locked?<button type="button" className="mvx-primary" disabled>Нет доступа</button>
+     :signedOut?<button type="button" className="mvx-primary" onClick={()=>dispatchEvent(new Event('mediavault:request-login'))}>Войти</button>
      :!idleBusy&&(idleCurrent&&idleVariant
       ?<button type="button" className="mvx-primary" onPointerEnter={warmCurrent} onFocus={warmCurrent} onClick={()=>browsingCatalog?startCatalogPlayback(idleCurrent.number):startPlayback()}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>Смотреть серию {idleCurrent.number}</button>
+      :!voices.length&&discovery.data&&!discovery.loading?<button type="button" className="mvx-primary" disabled>Озвучек пока нет</button>
       :voice?<button type="button" className="mvx-primary" disabled>Серии пока не найдены</button>
       :<button type="button" className="mvx-primary" onClick={()=>{setSourceOpen('voice');setSourceSettings(true);}}>Выбрать озвучку</button>)}
     </div>
@@ -273,7 +289,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
    </div>}</PlaybackReveal>
   {!playing&&episodeBrowser}
   {!browsingCatalog&&error&&<div className="inline-error" role="alert">{error}<button className="text-link" onClick={()=>{failed.current.clear();setAttempt(n=>n+1);}}>Повторить</button></div>}
-  {!browsingCatalog&&discovery.error&&<p className="fine">{discovery.error}<button className="text-link" onClick={discovery.retry}>Повторить поиск</button></p>}
+  {!browsingCatalog&&!locked&&discovery.error&&<p className="fine">{discovery.error}<button className="text-link" onClick={discovery.retry}>Повторить поиск</button></p>}
   {!!saved.current.usage&&<p className="watch-personal-note">«Твой выбор» — история просмотров на этом устройстве.</p>}
  </div>;
 }

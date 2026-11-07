@@ -23,5 +23,18 @@ async function call(path,{method='GET',body}={}){
 export const invitePreview=token=>call('/guests/invite/'+encodeURIComponent(token));
 export async function enrollGuest(body){const session=await call('/guests/enroll',{method:'POST',body});saveGuestSession(session);return session;}
 export async function loginGuest(body){const session=await call('/guests/login',{method:'POST',body});saveGuestSession(session);return session;}
+// Mirrors server/guest_profiles.allows: the server enforces it, this only
+// lets the page explain the lock instead of showing an empty player.
+const READ_KINDS=new Set(['manga','ranobe','book','manhwa','manhua','novel','one_shot','doujin']);
+export const GUEST_LOCKED='Владелец пока не открыл тебе этот тайтл. Попроси его добавить тайтл в твой доступ.';
+export function guestAllows(access,title){
+ const a={scope:'all',watch:true,read:true,titles:[],...(access||{})};
+ const group=READ_KINDS.has(String(title?.kind||'anime').toLowerCase())?'manga':'anime';
+ if(!a[group==='anime'?'watch':'read'])return false;
+ if(a.scope==='all')return true;
+ const mal=String(title?.ids?.mal||'').trim();
+ return !!mal&&(a.titles||[]).some(t=>t.key===group+':'+mal);
+}
+export function guestLocked(session,title){return session?.role==='guest'&&!!title&&!guestAllows(session.guest?.access,title);}
 export function inviteLink(token){const url=new URL(location.href);url.hash='invite='+token;url.search='';return url.href;}
 export function readInviteToken(hash=location.hash){const value=new URLSearchParams(hash.slice(1)).get('invite')||'';return /^[\w-]{20,80}$/.test(value)?value:'';}

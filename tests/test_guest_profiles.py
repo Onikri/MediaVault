@@ -110,6 +110,15 @@ class GuestProfiles(unittest.TestCase):
         self.assertEqual(self.client.get('/guests', headers=self.admin).json()['guests'], [])
         self.assertEqual(self.client.post('/guests/login', json={'login': 'boris', 'password': '12345678'}).status_code, 401)
 
+    def test_owner_sets_access_and_guest_sees_it(self):
+        created=self.create()
+        body={'access':{'scope':'titles','watch':True,'read':False,'titles':[{'key':'anime:34599','title':'Созданный в Бездне'}]}}
+        response=self.client.post('/guests/'+created['guest']['id'],json=body,headers=self.admin)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()['guest']['access']['titles'][0]['key'],'anime:34599')
+        bad=self.client.post('/guests/'+created['guest']['id'],json={'access':{'scope':'titles','titles':[{'key':'anime:<script>'}]}},headers=self.admin)
+        self.assertEqual(bad.status_code,422)
+
     def test_login_taken_and_validation(self):
         first, second = self.create(), self.create()
         self.client.post('/guests/enroll', json={'invite': first['invite'], 'login': 'same', 'password': '12345678'})
@@ -123,3 +132,18 @@ class GuestProfiles(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Access(unittest.TestCase):
+    def test_scope_kinds_and_titles(self):
+        from guest_profiles import allows,access_of
+        self.assertEqual(access_of({})['scope'],'all')
+        titles={'scope':'titles','watch':True,'read':False,'titles':[{'key':'anime:34599','title':'Abyss'}]}
+        rec={'access':titles}
+        self.assertTrue(allows(rec,{'kind':'anime','ids':{'mal':'34599'}}))
+        self.assertTrue(allows(rec,{'kind':'movie','ids':{'mal':34599}}))
+        self.assertFalse(allows(rec,{'kind':'anime','ids':{'mal':'1'}}))
+        self.assertFalse(allows(rec,{'kind':'manga','ids':{'mal':'34599'}}),'Reading is switched off')
+        self.assertFalse(allows(rec,{'kind':'anime','ids':{}}),'A title without a catalogue id cannot be matched')
+        self.assertTrue(allows({'access':{'scope':'all','watch':True,'read':True}},{'kind':'manga'}))
+        self.assertFalse(allows({'access':{'scope':'all','watch':False,'read':True}},{'kind':'anime','ids':{'mal':'1'}}))

@@ -1,10 +1,12 @@
 import {useEffect,useState} from 'react';
+import {guestLocked,GUEST_LOCKED} from './guest-session.js';
 export default function useSourceDiscovery(item,service){
   const [data,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[revision,setRevision]=useState(0);
   const sourceURL=item?.provider==='hentaichan-video'?(item.sourceURL||item.sourceUrl):undefined;
   useEffect(()=>{
     const controller=new AbortController();setData(null);setError('');setLoading(false);
     if(!item||!['anime','tv','movie'].includes(item.kind)||(!service.session?.serverVersion&&service.status!=='connected'))return()=>controller.abort();
+    if(guestLocked(service.session,item)){setError(GUEST_LOCKED);return()=>controller.abort();}
     if(service.session?.serverVersion&&service.session.serverVersion<7){setError('Сервер импорта нужно обновить для полного списка озвучек и качеств.');return()=>controller.abort();}
     setLoading(true);
     const title=Object.fromEntries(['id','ids','title','titles','aliases','year','kind','format'].map(key=>[key,item[key]]));
