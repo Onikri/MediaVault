@@ -260,7 +260,8 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                                 if native and alloha_downloader:
                                     checkpoint = Path(alloha_cache) / __import__('hashlib').sha256((identity+collection).encode()).hexdigest() if alloha_cache else None
                                     path = alloha_downloader(native['url'], temporary, quality=job["quality"], progress=report,
-                                                             cancelled=cancelled, checkpoint=checkpoint)
+                                                             cancelled=cancelled, checkpoint=checkpoint,
+                                                             referer=native.get('headers', {}).get('Referer') or parent)
                                 else:
                                     streams=expand_stream_qualities(page.streams,resolver.http)
                                     stream = pick_stream(streams, job["quality"])

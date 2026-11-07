@@ -113,6 +113,7 @@ class DeliverySession:
     source: object
     expires: float
     address: str
+    referer: str = ''
     active: str = ''
     active_id: str = ''
     translations: dict = field(default_factory=dict)
@@ -326,9 +327,10 @@ class AllohaDelivery:
                 byte_range = f'bytes={start}-{start + min(65536, int(match[1])) - 1}'
             await self.fetch(session, resource, byte_range=byte_range, probe=True)
 
-    async def resolve(self, iframe, *, audio=None, online_quality=None):
+    async def resolve(self, iframe, *, audio=None, online_quality=None, referer=None):
         try:
             iframe = public_url(iframe, resolve_dns=False)
+            referer = public_url(referer, resolve_dns=False) if referer else None
         except Exception:
             raise HTTPException(422, 'Нужен публичный iframe Alloha.') from None
         if not is_alloha_player(iframe):
@@ -357,9 +359,9 @@ class AllohaDelivery:
             profile = self.profiles.choose(iframe)
             if not profile:
                 raise HTTPException(409, 'Профили Alloha временно недоступны.', headers={'Retry-After': '120'})
-            source = self.factory(profile, iframe)
+            source = self.factory(profile, iframe, referer=referer)
             session = DeliverySession(secrets.token_urlsafe(32), iframe, profile, source,
-                                      self.clock() + self.ttl, self.external_address)
+                                      self.clock() + self.ttl, self.external_address, referer=referer or '')
             profile.reservations += 1
             profile.in_use += 1
             await source.open(audio)
@@ -442,7 +444,7 @@ class AllohaDelivery:
         if previous in self.sessions:
             await self.close_session(self.sessions[previous])
         started = self.clock()
-        data = await self.resolve(body.url, online_quality=body.quality)
+        data = await self.resolve(body.url, online_quality=body.quality, referer=getattr(body, 'referer', None))
         session = self.session(data['sid'])
         session.owner = subject
         if key:
@@ -495,7 +497,7 @@ class AllohaDelivery:
                 self.session(sid)
                 iframe = session.iframe
                 await self.close_session(session)
-                result = await self.resolve(iframe, audio=audio)
+                result = await self.resolve(iframe, audio=audio, referer=session.referer)
                 replacement = self.session(result['sid'])
                 selected = self.select_quality(replacement.translations[audio]['qualities'], quality)
                 return RedirectResponse(f'/play/{result["sid"]}/{audio}/{selected}.m3u8', status_code=307)
@@ -549,8 +551,8 @@ def install(app, service=None):
     app.state.alloha_delivery = service
 
     @app.get('/resolve')
-    async def resolve(iframe: str):
-        return await service.resolve(iframe)
+    async def resolve(iframe: str, referer: str | None = None):
+        return await service.resolve(iframe, referer=referer)
 
     @app.get('/play/{sid}/{audio}/{quality}.m3u8')
     async def play(sid: str, audio: str, quality: str):

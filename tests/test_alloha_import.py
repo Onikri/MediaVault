@@ -35,7 +35,8 @@ class NativeSource:
     master=False
     calls=Counter()
 
-    def __init__(self,profile,iframe):
+    def __init__(self,profile,iframe,*,referer=None):
+        self.referer=referer
         self.index=len(self.sources);self.sources.append(self)
         self.closed=self.socket_closed=False
         self.playback=[]
@@ -81,13 +82,14 @@ class AllohaImportTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.service.close();self.directory.cleanup()
     async def download(self,name='out'):
-        return await asyncio.to_thread(self.importer.download,IFRAME,self.root/name,quality='720',checkpoint=self.root/'checkpoint')
+        return await asyncio.to_thread(self.importer.download,IFRAME,self.root/name,quality='720',checkpoint=self.root/'checkpoint',referer='https://publisher.example.com/show')
     async def test_master_with_separate_audio(self):
         NativeSource.master=True
         output=await self.download()
         info=verify_video(output)
         self.assertTrue(any(s['codec_type']=='audio' for s in info['streams']))
         self.assertEqual(len(NativeSource.sources),1)
+        self.assertEqual(NativeSource.sources[0].referer,'https://publisher.example.com/show')
     async def test_refusal_reopens_without_fetching_saved_segments(self):
         NativeSource.fail_second=True
         output=await self.download();info=verify_video(output)

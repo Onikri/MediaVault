@@ -44,7 +44,8 @@ class Source:
     fail = False
     html = False
 
-    def __init__(self, profile, iframe):
+    def __init__(self, profile, iframe, *, referer=None):
+        self.referer = referer
         self.closed, self.requests = False, []
         self.socket_closed, self.playback = False, []
 
@@ -141,9 +142,11 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
             online_sessions.sessions.pop(sid, None)
 
     async def test_site_prepares_only_selected_audio_and_quality(self):
-        body = SimpleNamespace(url=IFRAME, quality='720', client_id='viewer')
+        body = SimpleNamespace(url=IFRAME, quality='720', client_id='viewer', referer='https://publisher.example.com/show')
         data = await self.service.prepare_online(body, 'owner')
         session = self.service.sessions[data['id']]
+        self.assertEqual(session.source.referer, body.referer)
+        self.assertEqual(session.referer, body.referer)
         self.assertEqual(data['qualities'], [1080, 720], 'Other published qualities remain visible in settings')
         self.assertEqual(list(session.translations), ['1'])
         self.assertEqual(list(session.translations['1']['qualities']), ['720'])
@@ -198,11 +201,13 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rejected.headers['retry-after'], '30')
 
     async def test_audio_change_creates_new_sid_and_native_source_selection(self):
-        data = await self.resolve()
+        referer = 'https://publisher.example.com/show'
+        data = (await self.client.get('/resolve', params={'iframe': IFRAME, 'referer': referer})).json()
         response = await self.client.get(data['translations'][1]['play']['720'], follow_redirects=False)
         self.assertEqual(response.status_code, 307)
         self.assertNotIn(data['sid'], response.headers['location'])
         self.assertEqual(Source.opened[-1].audio, '2')
+        self.assertEqual(Source.opened[-1].referer, referer)
         self.assertTrue(Source.opened[0].closed)
         self.assertEqual((await self.client.get(response.headers['location'])).status_code, 200)
         expired = await self.client.get(data['translations'][0]['play']['720'])

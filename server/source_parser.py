@@ -508,7 +508,7 @@ class Resolver:
         host=urlsplit(url).hostname or ''
         if is_alloha_player(url):
             if getattr(self, 'native_alloha', False):
-                return Page(streams=[{'url': url, 'type': 'alloha-native', 'headers': {}}])
+                return Page(streams=[{'url': url, 'type': 'alloha-native', 'headers': {'Referer': referer} if referer else {}}])
             # This is a public iframe player, not a top-level HTML document.
             # A plain HTTP request can be rejected even though the publisher's
             # embedded player works. Preserve its selected audio/episode URL.

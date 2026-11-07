@@ -112,8 +112,9 @@ FETCH = """async ({url, headers, maximum}) => {
 
 
 class NativeSession:
-    def __init__(self, profile, iframe):
+    def __init__(self, profile, iframe, *, referer=None):
         self.profile, self.iframe = profile, iframe
+        self.referer = referer
         self.browser = self.context = self.driver = self.page = self.fetch_page = self.frame = None
         self.token_headers = {}
         self.sources = []
@@ -201,6 +202,8 @@ class NativeSession:
         from playwright.async_api import async_playwright
         browser_paths()
         await self.validate(self.iframe)
+        if self.referer:
+            await self.validate(self.referer)
         self.driver = await async_playwright().start()
         self.browser = await self.driver.chromium.launch(
             executable_path=self.profile.executable, headless=True,
@@ -213,12 +216,18 @@ class NativeSession:
         self.page = await self.context.new_page()
         self.fetch_page = await self.context.new_page()
         origin = urlsplit(self.iframe)
-        wrapper = f'{origin.scheme}://{origin.netloc}/__mediavault_alloha_{secrets.token_hex(12)}'
+        parent = urlsplit(self.referer or self.iframe)
+        nonce = secrets.token_hex(12)
+        # The browser must enter the iframe from its actual publisher. Some
+        # Alloha containers reject a same-origin parent with a misleading 404.
+        # Let Chromium generate Referer naturally; do not override headers.
+        wrapper = f'{parent.scheme}://{parent.netloc}/__mediavault_alloha_{nonce}'
+        fetch_wrapper = f'{origin.scheme}://{origin.netloc}/__mediavault_alloha_{nonce}/fetch'
         async def guard(route):
             request, url = route.request, route.request.url
             if url == wrapper:
                 return await route.fulfill(content_type='text/html', body='<iframe allow="autoplay" src="' + html.escape(self.iframe, quote=True) + '"></iframe>')
-            if url == wrapper + '/fetch':
+            if url == fetch_wrapper:
                 return await route.fulfill(content_type='text/html', body='<!doctype html><title>Alloha transport</title>')
             try:
                 await self.validate(url)
@@ -263,7 +272,7 @@ class NativeSession:
         self.sources = data['sources'] or self.sources
         self.skip, self.subtitles = data['skip'], data['tracks']
         await self.frame.evaluate("() => {player.hls?.stopLoad(); player.media?.pause();}")
-        await self.fetch_page.goto(wrapper + '/fetch', wait_until='domcontentloaded')
+        await self.fetch_page.goto(fetch_wrapper, wait_until='domcontentloaded')
         if not self.sockets:
             raise SourceInvalid('Alloha did not open its session WebSocket')
         self.heartbeat = asyncio.create_task(self.keepalive())

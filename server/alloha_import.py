@@ -51,10 +51,10 @@ class AllohaImporter:
             self.next_request = time.monotonic() + self.interval
 
     def download(self, iframe, directory, *, quality='best', progress=lambda _: None,
-                 cancelled=None, checkpoint=None):
+                 cancelled=None, checkpoint=None, referer=None):
         if not is_alloha_player(iframe):
             raise SourceError('Нативный импорт предназначен только для Alloha.')
-        http = AllohaImportHttp(self, iframe, quality, progress, cancelled, checkpoint)
+        http = AllohaImportHttp(self, iframe, quality, progress, cancelled, checkpoint, referer=referer)
         try:
             http.call(http.open())
             return download_episode({'type': 'hls', 'url': PREFIX+'root', 'headers': {}},
@@ -65,9 +65,10 @@ class AllohaImporter:
 
 class AllohaImportHttp:
     """The synchronous HLS downloader never receives an upstream CDN URL."""
-    def __init__(self, importer, iframe, quality, progress, cancelled, checkpoint):
+    def __init__(self, importer, iframe, quality, progress, cancelled, checkpoint, *, referer=None):
         self.importer, self.service = importer, importer.service
         self.iframe, self.quality, self.progress = iframe, quality, progress
+        self.referer = referer
         self.cancelled = cancelled or (lambda: False)
         self.checkpoint = Path(checkpoint) if checkpoint else None
         self.session = None
@@ -103,7 +104,7 @@ class AllohaImportHttp:
     async def open(self):
         await self.close()
         data = await self.service.resolve(self.iframe, audio=self.audio,
-                                          online_quality=self.selected or self.quality)
+                                          online_quality=self.selected or self.quality, referer=self.referer)
         self.session = self.service.session(data['sid'])
         self.audio = self.session.active
         qualities = self.session.translations[self.audio]['qualities']
