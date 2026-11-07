@@ -1,7 +1,7 @@
 import {createContext,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
-import {ArrowUpRight,BookOpen,History,Pause,PictureInPicture2,Play,Square,Video,X} from 'lucide-react';
+import {ArrowUpRight,BookOpen,History,Minimize2,Pause,PictureInPicture2,Play,Video,X} from 'lucide-react';
 import {createRetainedMediaStore} from './retained-media-store.js';
 import './retained-media.css';
 const Workspace=createContext(null),Owner=createContext(null);
@@ -38,7 +38,7 @@ function RetainedHost({row,store,popup,active}){
  },[row.anchor,mode]);
  function media(event){const v=event.target;if(!v.matches?.('video.mv-player-media'))return;if(event.type==='timeupdate'&&Math.abs((row.time||0)-v.currentTime)<1)return;const change={playing:!v.paused,time:v.currentTime,duration:Number.isFinite(v.duration)?v.duration:0};if(!row.preview&&v.readyState>=2)try{const canvas=document.createElement('canvas');canvas.width=160;canvas.height=90;canvas.getContext('2d').drawImage(v,0,0,160,90);change.preview=canvas.toDataURL('image/jpeg',.65);}catch{}store.media(row.id,change);}
  return <div ref={root} className="retained-media-host" data-mode={mode} data-session={row.id} style={mode==='attached'?box:undefined} inert={mode==='hidden'} aria-hidden={mode==='hidden'} onPlayCapture={media} onPauseCapture={media} onTimeUpdateCapture={media} onLoadedDataCapture={media}>
- {mode==='popup'&&<div className="retained-popup-heading"><strong>{row.label}</strong><button aria-label="Вернуться к просмотру на странице" onClick={()=>store.return(row.id)}><ArrowUpRight size={16}/></button><button aria-label="Скрыть мини-просмотр" onClick={()=>store.popup(row.id)}><X size={16}/></button></div>}
+ {mode==='popup'&&<div className="retained-popup-heading"><strong>{row.label}</strong><button aria-label="Вернуться к просмотру на странице" onClick={()=>store.return(row.id)}><ArrowUpRight size={16}/></button><button aria-label="Свернуть мини-просмотр" title="Свернуть — продолжит в фоне" onClick={()=>store.popup(row.id)}><Minimize2 size={15}/></button><button className="is-close" aria-label={row.kind==='reader'?'Закрыть читалку':'Закрыть просмотр'} title="Закрыть" onClick={()=>store.close(row.id)}><X size={16}/></button></div>}
  <Owner.Provider value={owner}>{row.node}</Owner.Provider></div>;
 }
 export function VideoDock(){
@@ -63,7 +63,7 @@ function Dock({store}){
    <div className="retained-dock-actions">
     <button className="is-primary" onClick={()=>{store.return(active.id);setOpen(false);}}><ArrowUpRight size={16}/>Вернуться к просмотру</button>
     <button aria-label="Картинка в картинке" title="Картинка в картинке" onClick={()=>{store.popup(active.id);setOpen(false);}}><PictureInPicture2 size={17}/></button>
-    <button aria-label="Остановить просмотр" title="Остановить" onClick={()=>{store.close(active.id);setOpen(false);}}><Square size={14}/></button>
+    <button className="is-close" aria-label={active.kind==='reader'?'Закрыть читалку':'Закрыть просмотр'} title="Закрыть" onClick={()=>{store.close(active.id);setOpen(false);}}><X size={17}/></button>
    </div>
   </div>}
   {recent.length>0&&<div className="retained-history"><h3><History size={13}/>Недавнее</h3>{recent.map(item=><button key={item.id} onClick={()=>{store.revisit(item);setOpen(false);}}>{item.kind==='reader'?<BookOpen size={14}/>:<Video size={14}/>}<span>{item.label}</span><ArrowUpRight size={13}/></button>)}</div>}

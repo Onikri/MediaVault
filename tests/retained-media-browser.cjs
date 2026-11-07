@@ -22,7 +22,7 @@ const ROOT=process.cwd(),DIR=path.join(ROOT,'.codex-local/test-output/retained-m
   await page.getByRole('button',{name:'Вернуться к просмотру на странице',exact:true}).click();await page.locator('[data-mode=attached]').waitFor();await page.waitForTimeout(600);
   assert.equal(await page.evaluate(()=>player.media===original),true);assert.equal(await page.evaluate(()=>metadataCount),0,'Navigation and mini view do not reload media metadata');assert.ok(await page.evaluate(v=>original.buffered.end(original.buffered.length-1)>=v-.1,before.end),'Existing native buffered range stays intact');
   const bounds=await page.locator('.mv-player').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1);await page.screenshot({path:path.join(DIR,'retained-'+width+'.png'),fullPage:true});
-  await page.getByRole('button',{name:'Плеер в фоне',exact:true}).click();await page.getByRole('button',{name:'Остановить просмотр',exact:true}).click();await page.getByRole('button',{name:'Начать снова',exact:true}).waitFor();assert.equal(await page.locator('video.mv-player-media').count(),0);assert.deepEqual(errors,[]);await page.close();
+  await page.getByRole('button',{name:'Плеер в фоне',exact:true}).click();await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();await page.getByRole('button',{name:'Начать снова',exact:true}).waitFor();assert.equal(await page.locator('video.mv-player-media').count(),0);assert.deepEqual(errors,[]);await page.close();
  }
  console.log('PASS same video DOM node, buffered range, time and metadata across page unmount, mini view, return and explicit close at 390/1440px');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});
