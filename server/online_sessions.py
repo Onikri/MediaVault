@@ -240,6 +240,9 @@ def install(app,owner,exports_owner=None):
                         if key[0]==subject and len(value)>2 and value[2]=='preview':preparations.pop(key,None)
                 preparations[(subject,body.client_id)]=(reservation,time.monotonic()+60,body.purpose)
         disconnected=asyncio.Event();watcher=asyncio.create_task(watch_disconnect(request,disconnected))
+        activity=getattr(app.state,'guest_activity',None)
+        if activity is not None and str(subject).startswith('guest:') and body.purpose=='playback' and not body.client_id.startswith(('watch-warm-','motion-')):
+            with contextlib.suppress(Exception):activity.started(str(subject)[6:],body.kind,urlsplit(body.referer or body.url).hostname or '')
         try:
             if body.kind == 'video' and is_alloha_player(body.url) and hasattr(app.state, 'alloha_delivery'):
                 service = app.state.alloha_delivery

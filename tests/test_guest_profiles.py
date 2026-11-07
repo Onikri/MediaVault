@@ -147,3 +147,25 @@ class Access(unittest.TestCase):
         self.assertFalse(allows(rec,{'kind':'anime','ids':{}}),'A title without a catalogue id cannot be matched')
         self.assertTrue(allows({'access':{'scope':'all','watch':True,'read':True}},{'kind':'manga'}))
         self.assertFalse(allows({'access':{'scope':'all','watch':False,'read':True}},{'kind':'anime','ids':{'mal':'1'}}))
+
+
+class ActivityRoutes(unittest.TestCase):
+    def test_owner_reads_login_activity_and_guest_cannot(self):
+        from guest_activity import Activity
+        store = Store()
+        activity = Activity(lambda: store)
+        app = FastAPI()
+        guest_profiles.install(app, owner, lambda: store, sign, decode, activity=activity)
+        client = TestClient(app)
+        admin = {'Authorization': 'Bearer ' + sign({'sub': 'owner', 'exp': time.time() + 600})}
+        created = client.post('/guests', json={'name': 'Вика'}, headers=admin).json()
+        identity = created['guest']['id']
+        session = client.post('/guests/enroll', json={'invite': created['invite'], 'login': 'vika', 'password': '12345678'}).json()
+        client.post('/guests/login', json={'login': 'vika', 'password': 'wrong-pass'})
+        report = client.get('/guests/' + identity + '/activity', headers=admin).json()
+        self.assertEqual([e['action'] for e in report['events']], ['Неверный пароль', 'Зарегистрировался'])
+        self.assertIn(identity, client.get('/guests/activity', headers=admin).json()['guests'])
+        guest = {'Authorization': 'Bearer ' + session['token']}
+        self.assertEqual(client.get('/guests/' + identity + '/activity', headers=guest).status_code, 403)
+        client.delete('/guests/' + identity, headers=admin)
+        self.assertNotIn('guest-activity:' + identity, store.values)

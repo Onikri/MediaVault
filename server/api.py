@@ -92,8 +92,11 @@ def guest_may_open(subject, title):
         return
     import guest_profiles
     record = store.setting('guest:' + str(subject)[6:]) if store else None
+    identity = str(subject)[6:]
     if not guest_profiles.allows(record, title):
+        guest_activity.event(identity, 'Попытка открыть закрытый тайтл', title)
         raise HTTPException(403, 'Владелец пока не открыл тебе этот тайтл. Попроси его добавить тайтл в твой доступ.')
+    guest_activity.opened(identity, title)
 
 
 def viewer(authorization: str = Header(default="")):
@@ -252,6 +255,10 @@ async def lifespan(application):
     await lyrics_relay.start()
     yield
     stopping.set()
+    try:
+        guest_activity.flush()
+    except Exception:
+        pass
     if catalog_stop:
         catalog_stop.set()
     await lyrics_relay.close()
@@ -333,7 +340,23 @@ kodik_api.install(app,owner,lambda:store)
 import watch_rooms
 watch_rooms.install(app,viewer)
 import guest_profiles
-guest_subject,_,_=guest_profiles.install(app,owner,lambda:store,sign_payload,token_payload)
+import guest_activity as guest_activity_module
+guest_activity = guest_activity_module.Activity(lambda: store)
+app.state.guest_activity = guest_activity
+guest_subject,_,_=guest_profiles.install(app,owner,lambda:store,sign_payload,token_payload,activity=guest_activity)
+
+
+def activity_subject(authorization):
+    try:
+        payload = token_payload(authorization)
+    except HTTPException:
+        return None
+    return payload['sub'] if payload.get('role') == 'guest' else None
+
+
+from online_sessions import sessions as online_session_table
+app.add_middleware(guest_activity_module.Middleware, activity=guest_activity, identify=activity_subject,
+                   stream_owner=guest_activity_module.stream_owner(online_session_table, lambda: app.state.alloha_delivery))
 import title_upscale_model
 title_upscale_model.install(app)
 

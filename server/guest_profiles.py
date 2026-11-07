@@ -152,8 +152,13 @@ class Attempts:
                 self.values.pop(key, None)
 
 
-def install(app, owner, get_store, sign, decode):
+def install(app, owner, get_store, sign, decode, activity=None):
     attempts = Attempts()
+    from guest_activity import request_address
+
+    def note(identity, action, request=None, detail=''):
+        if activity is not None and identity:
+            activity.event(identity, action, detail=detail, address=request_address(request) if request is not None else None, force=True)
 
     def store():
         return get_store()
@@ -227,7 +232,7 @@ def install(app, owner, get_store, sign, decode):
 
     @app.post('/guests/enroll')
     def enroll(body: Enroll, request: Request):
-        address = 'ip:' + (request.client.host if request.client else '?')
+        address = 'ip:' + (request_address(request) or '?')
         attempts.check(address)
         login = body.login.strip().lower()
         password = body.password.get_secret_value()
@@ -256,20 +261,28 @@ def install(app, owner, get_store, sign, decode):
             record.pop('invite_expires_at', None)
             store().setting('guest-login:' + login, {'id': record['id']})
             save(record)
+        note(record['id'], 'Сменил пароль по ссылке' if record.get('session_version', 2) > 2 else 'Зарегистрировался', request, 'логин ' + login)
         return session(record)
 
     @app.post('/guests/login')
     def login(body: Login, request: Request):
         name = body.login.strip().lower()
-        address, account = 'ip:' + (request.client.host if request.client else '?'), 'login:' + name
+        address, account = 'ip:' + (request_address(request) or '?'), 'login:' + name
         attempts.check(address, account)
         pointer = store().setting('guest-login:' + name) if LOGIN.fullmatch(name) else None
         record = load(pointer['id']) if pointer else None
         if not record or not check_password(body.password.get_secret_value(), record):
             attempts.fail(address, account)
+            if record:
+                note(record['id'], 'Неверный пароль', request)
             raise HTTPException(401, 'Неверный логин или пароль.')
         attempts.clear(account)
-        active(record)
+        try:
+            active(record)
+        except HTTPException as error:
+            note(record['id'], 'Вход отклонён', request, error.detail)
+            raise
+        note(record['id'], 'Вошёл в профиль', request)
         return session(record)
 
     @app.get('/guests/me')
@@ -277,6 +290,26 @@ def install(app, owner, get_store, sign, decode):
         return {'guest': public(record)}
 
     # ---- Owner management -------------------------------------------------
+    @app.get('/guests/activity')
+    def activity_overview(subject=Depends(owner)):
+        if activity is None:
+            return {'guests': {}}
+        return {'guests': {identity: activity.summary(identity) for identity in ids()}}
+
+    @app.get('/guests/{identity}/activity')
+    def activity_report(identity: str, subject=Depends(owner)):
+        record = load(identity)
+        if not record or activity is None:
+            raise HTTPException(404, 'Гостевой профиль не найден.')
+        return {'guest': public(record), **activity.report(identity)}
+
+    @app.delete('/guests/{identity}/activity')
+    def activity_clear(identity: str, subject=Depends(owner)):
+        if not load(identity) or activity is None:
+            raise HTTPException(404, 'Гостевой профиль не найден.')
+        activity.forget(identity)
+        return {'cleared': True}
+
     @app.get('/guests')
     def list_guests(subject=Depends(owner)):
         now = time.time()
@@ -340,6 +373,8 @@ def install(app, owner, get_store, sign, decode):
                 if record.get('invite_hash'):
                     store().consume('guest-invite:' + record['invite_hash'])
             store().setting(INDEX, {'ids': [i for i in ids() if i != identity]})
+        if activity is not None:
+            activity.forget(identity)
         return {'removed': bool(record)}
 
     return guest_subject, active, load
