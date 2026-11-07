@@ -14,11 +14,33 @@ def cookie_text():
     value=credentials()
     return value.get('cookies','') if value else ''
 
+def json_cookies(raw):
+    """EditThisCookie / Cookie-Editor JSON export -> Netscape cookies.txt text."""
+    import json
+    try:items=json.loads(raw)
+    except ValueError:raise HTTPException(422,'Не удалось прочитать JSON-экспорт cookies.') from None
+    if isinstance(items,dict):items=items.get('cookies') or []
+    if not isinstance(items,list):raise HTTPException(422,'Нужен список cookies из расширения браузера.')
+    rows=['# Netscape HTTP Cookie File']
+    for item in items[:2000]:
+        if not isinstance(item,dict):continue
+        domain=str(item.get('domain') or item.get('host') or '').strip()
+        name,value=str(item.get('name') or ''),str(item.get('value') or '')
+        if not domain or not name:continue
+        host_only=bool(item.get('hostOnly')) and not domain.startswith('.')
+        expires=item.get('expirationDate',item.get('expires',item.get('expiry',0)))
+        try:expires=0 if item.get('session') else max(0,int(float(expires or 0)))
+        except (TypeError,ValueError):expires=0
+        rows.append('\t'.join([domain,'FALSE' if host_only else 'TRUE',str(item.get('path') or '/'),'TRUE' if item.get('secure') else 'FALSE',str(expires),name,value]))
+    return '\n'.join(rows)+'\n'
+
 def normalize_cookies(raw):
     if not isinstance(raw,str) or not 0<len(raw.encode())<=1024*1024:
         raise HTTPException(422,'Нужен cookies.txt размером до 1 МБ.')
+    if raw.lstrip('\ufeff \r\n\t')[:1] in '[{':
+        raw=json_cookies(raw.lstrip('\ufeff'))
     if not raw.lstrip('\ufeff').startswith('# Netscape HTTP Cookie File'):
-        raise HTTPException(422,'Нужен экспорт YouTube в формате Netscape cookies.txt.')
+        raise HTTPException(422,'Нужен экспорт cookies YouTube: файл cookies.txt (Netscape) или JSON из расширения EditThisCookie / Cookie-Editor.')
     rows=[];names=set()
     for line in raw.splitlines():
         if line.startswith('#HttpOnly_'):line=line[len('#HttpOnly_'):]

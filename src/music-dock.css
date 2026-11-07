@@ -340,3 +340,5 @@ body:has(.immersive-reader:not(.reader-embedded)) .music-nav{visibility:hidden;p
 .music-panel-track>.music-disc{border-radius:50%}
 @keyframes music-vinyl-turn{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.music-artwork-vinyl{animation:none}.music-cover-control{transition:none}}
+.music-connection-alert{margin:12px 0 0;padding:12px 14px;border-radius:14px;background:rgb(90 200 140 / .12);color:#a9e9c4;font-size:13px;line-height:1.5}
+.music-connection-alert.is-error{background:rgb(240 80 70 / .14);color:#ffb3aa}
