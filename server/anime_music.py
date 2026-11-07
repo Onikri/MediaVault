@@ -88,11 +88,25 @@ def songs(identity):
 AUDIO_LINK=re.compile(r'https://a\.animethemes\.moe/[A-Za-z0-9._-]{1,200}\.ogg')
 _audio={}
 
+THEME_AUDIO_QUERY='query($id:Int){animethemePagination(id:$id,first:1){data{animethemeentries{nsfw videos{nodes{audio{link}}}}}}}'
+
+def _first_audio(entries):
+    for entry in entries or []:
+        if not isinstance(entry,dict) or entry.get('nsfw'):continue
+        videos=entry.get('videos') or []
+        if isinstance(videos,dict):videos=videos.get('nodes') or []
+        for video in videos:
+            candidate=str(((video or {}).get('audio') or {}).get('link') or '')
+            if AUDIO_LINK.fullmatch(candidate):return candidate
+    return None
+
 def theme_audio(theme_id):
     """AnimeThemes' own audio rip of one OP/ED, played through /music/remote.
 
     Our server proxy streams it, so OP/ED playback never depends on YouTube
     (which refuses the Oracle datacenter IP without a saved session).
+    GraphQL is the primary contract: AnimeThemes' REST host has been answering
+    503 for long stretches, which left every OP/ED unplayable.
     """
     now=time.monotonic()
     with lock:
@@ -100,23 +114,29 @@ def theme_audio(theme_id):
         if hit and hit[0]>now:return hit[1]
     import requests
     from source_parser import USER_AGENT
+    headers={'User-Agent':USER_AGENT,'Accept':'application/json'}
+    link=None;found=False;reachable=False
     try:
-        response=requests.get('https://api.animethemes.moe/animetheme/'+str(theme_id),
-                              params={'include':'animethemeentries.videos.audio','fields[video]':'basename','fields[audio]':'link'},
-                              headers={'User-Agent':USER_AGENT,'Accept':'application/json'},timeout=(4,15))
-        if response.status_code==404:raise HTTPException(404,'AnimeThemes не нашёл эту песню.')
+        response=requests.post(GRAPHQL,json={'query':THEME_AUDIO_QUERY,'variables':{'id':int(theme_id)}},headers=headers,timeout=(4,15))
         response.raise_for_status();data=response.json()
-    except HTTPException:raise
-    except (requests.RequestException,ValueError):
-        raise HTTPException(502,'AnimeThemes сейчас не отвечает. Повтори немного позже.') from None
-    theme=data.get('animetheme') if isinstance(data,dict) else None
-    link=None
-    for entry in (theme or {}).get('animethemeentries') or []:
-        if entry.get('nsfw'):continue
-        for video in entry.get('videos') or []:
-            candidate=str((video.get('audio') or {}).get('link') or '')
-            if AUDIO_LINK.fullmatch(candidate):link=candidate;break
-        if link:break
+        rows=((data.get('data') or {}).get('animethemePagination') or {}).get('data') if isinstance(data,dict) else None
+        if isinstance(rows,list):
+            reachable=True;found=bool(rows)
+            if rows:link=_first_audio(rows[0].get('animethemeentries'))
+    except (requests.RequestException,ValueError,AttributeError,TypeError):pass
+    if not link and not reachable:
+        try:
+            response=requests.get('https://api.animethemes.moe/animetheme/'+str(theme_id),
+                                  params={'include':'animethemeentries.videos.audio','fields[video]':'basename','fields[audio]':'link'},
+                                  headers=headers,timeout=(4,15))
+            if response.status_code==404:raise HTTPException(404,'AnimeThemes не нашёл эту песню.')
+            response.raise_for_status();data=response.json()
+        except HTTPException:raise
+        except (requests.RequestException,ValueError):
+            raise HTTPException(502,'AnimeThemes сейчас не отвечает. Повтори немного позже.') from None
+        theme=data.get('animetheme') if isinstance(data,dict) else None
+        found=bool(theme);link=_first_audio((theme or {}).get('animethemeentries'))
+    if not found:raise HTTPException(404,'AnimeThemes не нашёл эту песню.')
     if not link:raise HTTPException(404,'У этой песни нет аудио в AnimeThemes.')
     with lock:
         if len(_audio)>512:_audio.clear()

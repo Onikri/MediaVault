@@ -1,0 +1,34 @@
+.history-page{display:grid;gap:28px}
+.history-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.history-filter{display:inline-flex;gap:2px;padding:4px;border-radius:999px;background:var(--color-surface)}
+.history-filter>button{position:relative;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border:0;border-radius:999px;background:none;color:var(--color-on-muted);font:600 13px/1 var(--font-ui,system-ui);cursor:pointer}
+.history-filter>button>span:not(.history-filter-active),.history-filter>button>small{position:relative;z-index:1}
+.history-filter>button>small{font-size:11px;opacity:.7}
+.history-filter>button[aria-pressed=true]{color:var(--color-petal)}
+.history-filter-active{position:absolute;inset:0;border-radius:999px;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
+.history-clear{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border:0;border-radius:999px;background:var(--color-surface);color:var(--color-on-muted);font:600 13px/1 var(--font-ui,system-ui);cursor:pointer}
+.history-clear:hover{background:color-mix(in srgb,var(--color-blossom) 14%,var(--color-surface));color:var(--color-blossom-light,var(--color-blossom))}
+.history-day>h2{margin:0 0 12px;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.history-day>ul{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin:0;padding:0;list-style:none}
+.history-day li{position:relative;min-width:0}
+.history-card{display:grid;grid-template-columns:72px minmax(0,1fr) auto;align-items:center;gap:16px;width:100%;padding:10px 14px 10px 10px;border:0;border-radius:20px;background:var(--color-surface);color:var(--color-petal);text-align:left;cursor:pointer;transition:background-color .2s,transform .25s cubic-bezier(.2,.8,.2,1)}
+.history-card:hover{background:var(--color-surface-raised,rgb(255 255 255 / .07));transform:translateY(-1px)}
+.history-poster{position:relative;display:block;width:72px;aspect-ratio:3/4;border-radius:13px;overflow:hidden;background:var(--color-canvas-soft)}
+.history-poster img{width:100%;height:100%;object-fit:cover;display:block}
+.history-poster svg{max-width:100%}
+.history-poster-empty{display:grid;place-items:center;width:100%;height:100%;color:var(--color-on-muted)}
+.history-bar{position:absolute;left:6px;right:6px;bottom:6px;height:4px;border-radius:4px;background:rgb(0 0 0 / .5);overflow:hidden}
+.history-bar>b{display:block;height:100%;background:var(--color-blossom);transform-origin:left}
+.history-text{display:grid;gap:5px;min-width:0}
+.history-text strong{font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.history-text small{font-size:12px;color:var(--color-on-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-tags{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--color-on-muted)}
+.history-source{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;background:var(--color-canvas-soft);font-weight:600}
+.history-source.is-collection{color:#9fc6ff}
+.history-go{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--color-canvas-soft);color:var(--color-petal);transition:background-color .2s}
+.history-card:hover .history-go{background:var(--color-petal);color:var(--color-canvas)}
+.history-forget{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:var(--color-canvas-soft);color:var(--color-on-muted);opacity:0;cursor:pointer;transition:opacity .18s,background-color .18s}
+.history-day li:hover .history-forget,.history-forget:focus-visible{opacity:1}
+.history-forget:hover{background:color-mix(in srgb,var(--color-blossom) 22%,var(--color-canvas-soft));color:#fff}
+@media(hover:none){.history-forget{opacity:1}}
+@media(max-width:640px){.history-day>ul{grid-template-columns:1fr}.history-card{grid-template-columns:60px minmax(0,1fr) auto;gap:12px}.history-poster{width:60px}.history-filter>button{padding:0 12px}}

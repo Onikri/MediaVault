@@ -12,7 +12,7 @@ html[data-blossom] .title-showcase-content{
  align-items:start;gap:clamp(28px,3.2vw,52px);width:100%;min-width:0;
  position:relative;z-index:1;
 }
-html[data-blossom] .title-showcase .title-showcase-poster-layer>.title-poster{
+html[data-blossom] .title-showcase .title-showcase-poster-layer .title-poster{
  width:100%;align-self:start;aspect-ratio:3/4;margin:0;grid-column:auto;grid-row:auto;
 }
 html[data-blossom] .title-showcase .title-showcase-copy-layer>.title-hero-copy{grid-column:auto;grid-row:auto;max-width:850px;padding:0}
@@ -49,7 +49,7 @@ html[data-blossom] .title-showcase .title-facts dd{text-align:right;overflow-wra
  }
  html[data-blossom] .title-showcase-content{grid-template-columns:minmax(0,1fr);gap:24px}
  .title-showcase-info-layer{grid-column:auto}
- html[data-blossom] .title-showcase .title-showcase-poster-layer>.title-poster{width:clamp(150px,40vw,210px);border-radius:14px}
+ html[data-blossom] .title-showcase .title-showcase-poster-layer .title-poster{width:clamp(150px,40vw,210px);border-radius:14px}
  html[data-blossom] .title-showcase .title-showcase-copy-layer>.title-hero-copy{display:flex;grid-column:auto;grid-row:auto}
  html[data-blossom] .title-showcase .title-hero-copy>.eyebrow{margin-bottom:12px}
  html[data-blossom] .title-showcase .title-hero-copy h1{font-size:32px;line-height:1.1}
@@ -83,7 +83,7 @@ html[data-blossom] .title-showcase .title-background-youtube iframe{left:50%;top
 @media(min-width:1000px) and (max-height:800px){
  html[data-blossom] .title-showcase .title-hero-copy h1{font-size:clamp(27px,2.65vw,39px)}
  html[data-blossom] .title-showcase .title-hero-description{-webkit-line-clamp:3;font-size:12px}
- html[data-blossom] .title-showcase .title-showcase-poster-layer>.title-poster{max-height:calc(100svh - 200px);aspect-ratio:3/4}
+ html[data-blossom] .title-showcase .title-showcase-poster-layer .title-poster{max-height:calc(100svh - 200px);aspect-ratio:3/4}
 }
 
 /* Geometry belongs to the showcase itself, including password-protected rooms. */
@@ -102,3 +102,19 @@ html[data-blossom] .home-feature .title-scene-images,html[data-blossom] .home-fe
 html[data-blossom] .home-feature .title-background-video video{width:100%;height:100%;object-fit:cover}
 html[data-blossom] .home-feature .title-background-youtube .youtube-official{width:100%;height:100%}
 html[data-blossom] .home-feature .title-background-youtube iframe{position:absolute;left:50%;top:50%;width:max(100cqw,177.78cqh);height:max(100cqh,56.25cqw);transform:translate(-50%,-50%) scale(1.12);max-width:none;border:0;pointer-events:none}
+
+/* Foreground motion: staggered arrival of the copy, poster tilt with a highlight. */
+html[data-blossom] .title-showcase-tilt{perspective:900px}
+html[data-blossom] .title-showcase.is-animated .title-showcase-tilt .title-poster{position:relative;transform:rotateX(var(--tilt-x,0deg)) rotateY(var(--tilt-y,0deg));transform-style:preserve-3d;will-change:transform;box-shadow:0 30px 60px -28px rgb(0 0 0 / .75)}
+html[data-blossom] .title-showcase.is-animated .title-showcase-tilt .title-poster::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(circle at var(--glare-x,50%) var(--glare-y,30%),rgb(255 255 255 / .18),transparent 58%);opacity:0;transition:opacity .35s ease;z-index:2}
+html[data-blossom] .title-showcase.is-animated .title-showcase-tilt:hover .title-poster::after{opacity:1}
+@keyframes mv-showcase-rise{from{opacity:0;transform:translateY(18px);filter:blur(6px)}to{opacity:1;transform:none;filter:blur(0)}}
+html[data-blossom] .title-showcase.is-animated .title-showcase-copy-layer>.title-hero-copy>*{animation:mv-showcase-rise .75s cubic-bezier(.22,1,.36,1) both}
+html[data-blossom] .title-showcase.is-animated .title-showcase-copy-layer>.title-hero-copy>:nth-child(1){animation-delay:.12s}
+html[data-blossom] .title-showcase.is-animated .title-showcase-copy-layer>.title-hero-copy>:nth-child(2){animation-delay:.2s}
+html[data-blossom] .title-showcase.is-animated .title-showcase-copy-layer>.title-hero-copy>:nth-child(3){animation-delay:.28s}
+html[data-blossom] .title-showcase.is-animated .title-showcase-copy-layer>.title-hero-copy>:nth-child(4){animation-delay:.36s}
+html[data-blossom] .title-showcase.is-animated .title-showcase-copy-layer>.title-hero-copy>:nth-child(5){animation-delay:.44s}
+html[data-blossom] .title-showcase.is-animated .title-showcase-copy-layer>.title-hero-copy>:nth-child(n+6){animation-delay:.52s}
+html[data-blossom] .title-showcase.is-animated .poster-actions>*{animation:mv-showcase-rise .7s cubic-bezier(.22,1,.36,1) .5s both}
+html[data-blossom] .title-showcase-tilt{width:100%}

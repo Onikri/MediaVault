@@ -3,6 +3,8 @@ import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ArrowUpRight,Clock,LoaderCircle,Search,X} from 'lucide-react';
 import {useGlobalSearch,SEARCH_KINDS} from '../../use-global-search.js';
+import {genreLabels,matchesFilters} from '../../catalog.js';
+import UiSelect from '../../UiSelect.jsx';
 import {Poster} from '../../ImportParts.jsx';
 import './morph-search.css';
 import '../../glass-popover.css';
@@ -15,25 +17,36 @@ const SWAP={type:'spring',stiffness:420,damping:34,mass:.7} as const;
 const KEY='mediavault_search_recents_v1';
 const typeLabel=(kind:string)=>Object.fromEntries(SEARCH_KINDS)[kind]||'Сериал';
 const same=(a:string,b:string)=>a.trim().toLocaleLowerCase()===b.trim().toLocaleLowerCase();
+const GENRES=[...new Set(Object.values(genreLabels))].sort((a,b)=>a.localeCompare(b,'ru'));
+const YEARS=Array.from({length:new Date().getFullYear()+2-1960},(_,i)=>String(new Date().getFullYear()+1-i));
+const MAX_WIDTH=680,MIN_WIDTH=300;
 // Coordinates are local to the navbar. Scrolling moves the same surface with
 // its button; a viewport portal would chase the animated header one frame late.
 function coordinates(){
  const target=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();
- const inner=document.querySelector('.blossom-navbar .header-inner')?.getBoundingClientRect();
- const width=Math.min(340,window.innerWidth<=640?(inner?.width??window.innerWidth)-20:window.innerWidth<=1120?Math.max(180,window.innerWidth*.2):window.innerWidth<=1350?300:340);
- const height=38,left=((inner?.width??window.innerWidth)-width)/2;
+ const innerElement=document.querySelector<HTMLElement>('.blossom-navbar .header-inner'),inner=innerElement?.getBoundingClientRect();
+ const total=inner?.width??window.innerWidth;
+ let width:number;
+ if(window.innerWidth<=640)width=total-20;
+ else{
+  // The field grows into whatever the brand/nav and the action icons leave free,
+  // so the search (and its filters) use the wide header instead of a fixed 340px.
+  const brand=innerElement?.querySelector<HTMLElement>('.header-brand-area')?.scrollWidth??0,actions=innerElement?.querySelector<HTMLElement>('.header-actions')?.scrollWidth??0;
+  width=Math.max(MIN_WIDTH,Math.min(MAX_WIDTH,total-2*Math.max(brand,actions)-48));
+ }
+ const height=38,left=(total-width)/2;
  const top=inner?(inner.height-height)/2:(target?.top??18);
  return {width,left,top,height,anchorX:target?target.left+target.width/2-(inner?.left??0)-left-width/2:0,seedWidth:target?.width??38};
 }
 function Highlight({text,query}:{text:string,query:string}){const at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;return at<0?<>{text}</>:<>{text.slice(0,at)}<strong>{text.slice(at,at+query.length)}</strong>{text.slice(at+query.length)}</>;}
-export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,onClose:()=>void,onChoose:(item:any)=>void,onBrowse:(query:string,kind:string)=>void}){
+export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,onClose:()=>void,onChoose:(item:any)=>void,onBrowse:(query:string,kind:string,filters?:{year:string,genre:string})=>void}){
  const reduce=useReducedMotion(),[geometry,setGeometry]=useState(coordinates),id=useId();
- const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[composing,setComposing]=useState(false),[closing,setClosing]=useState(false);
+ const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[year,setYear]=useState(''),[genre,setGenre]=useState(''),[composing,setComposing]=useState(false),[closing,setClosing]=useState(false);
  const [chips,setChips]=useState<string[]>([]),[marked,setMarked]=useState<string|null>(null),[activeId,setActiveId]=useState<string|null>(null),[rowCursor,setRowCursor]=useState(0),[panelFloor,setPanelFloor]=useState(0);
  const [recents,setRecents]=useState<string[]>(()=>{try{const saved=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(saved)?saved.filter((v):v is string=>typeof v==='string').slice(0,5):[];}catch{return[];}});
  const input=useRef<HTMLInputElement>(null),finished=useRef(false),panelRows=useRef<HTMLDivElement>(null);
  const searchText=query.trim()||chips.at(-1)||'';
- const state=useGlobalSearch(searchText,kind,service,composing),items=state.items.slice(0,24),index=Math.max(0,items.findIndex((x:any)=>x.id===activeId));
+ const state=useGlobalSearch(searchText,kind,service,composing),filtered=useMemo(()=>year||genre?state.items.filter((item:any)=>matchesFilters({genres:[],...item},{year,genre})):state.items,[state.items,year,genre]),items=filtered.slice(0,24),index=Math.max(0,items.findIndex((x:any)=>x.id===activeId));
  const suggestions=useMemo(()=>!query.trim()?recents.map(label=>({id:'recent:'+label,label,kind:'recent'})): [
   {id:'query:'+query.trim(),label:query.trim(),kind:'query'},
   ...recents.filter(v=>v.toLowerCase().includes(query.trim().toLowerCase())&&!same(v,query)).slice(0,5).map(label=>({id:'recent:'+label,label,kind:'recent'}))
@@ -42,7 +55,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
  const remember=useCallback((term:string)=>{const value=term.trim();if(value)persist([value,...recents.filter(v=>!same(value,v))].slice(0,5));},[recents,persist]);
  const close=useCallback(()=>{if(finished.current||closing)return;if(reduce){finished.current=true;onClose();}else setClosing(true);},[closing,onClose,reduce]);
  const choose=(item:any)=>{remember(searchText||item.title);onChoose(item);};
- const browse=()=>{if(searchText)remember(searchText);onBrowse(searchText,kind);};
+ const browse=()=>{if(searchText)remember(searchText);onBrowse(searchText,kind==='all'&&!searchText?'anime':kind,{year,genre});};
  const addChip=(text:string)=>{const v=text.trim();if(!v)return;setChips(old=>old.some(c=>same(c,v))?old:[...old,v]);setQuery('');setMarked(null);remember(v);setRowCursor(0);input.current?.focus();};
  const removeChip=(text:string)=>{setChips(old=>old.filter(c=>c!==text));setMarked(null);input.current?.focus();};
  const forget=(text?:string)=>persist(text?recents.filter(v=>v!==text):[]);
@@ -57,8 +70,9 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
   const slot=header?.querySelector('.header-center-search');if(slot)observer.observe(slot);
   window.addEventListener('resize',update);
   input.current?.focus({preventScroll:true});
-  return()=>{observer.disconnect();window.removeEventListener('resize',update);header?.classList.remove('is-search-open');dispatchEvent(new Event('mediavault:search-close'));};
+  return()=>{observer.disconnect();window.removeEventListener('resize',update);(header?.querySelector('.header-inner') as HTMLElement|null)?.style.removeProperty('--search-slot');header?.classList.remove('is-search-open');dispatchEvent(new Event('mediavault:search-close'));};
  },[]);
+ useLayoutEffect(()=>{const inner=document.querySelector<HTMLElement>('.blossom-navbar .header-inner');if(!inner||window.innerWidth<=640)return;inner.style.setProperty('--search-slot',(closing?38:geometry.width)+'px');},[geometry.width,closing]);
  useEffect(()=>{if(!closing)return;const t=setTimeout(()=>{if(!finished.current){finished.current=true;onClose();}},400);return()=>clearTimeout(t);},[closing,onClose]);
  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key!=='Escape'||event.isComposing)return;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();if(marked){setMarked(null);return;}if(query){setQuery('');setActiveId(null);return;}close();};document.addEventListener('keydown',escape,true);return()=>document.removeEventListener('keydown',escape,true);},[marked,query,close]);
  useEffect(()=>{if(closing)return;const handler=(event:PointerEvent)=>{const root=document.querySelector('.morph-search-dialog');const trigger=document.querySelector('.header-center-search');if(root?.contains(event.target as Node)||trigger?.contains(event.target as Node))return;close();};document.addEventListener('pointerdown',handler,true);return()=>document.removeEventListener('pointerdown',handler,true);},[closing,close]);
@@ -107,19 +121,26 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
        </motion.button>)}
        {!suggestions.length&&!query.trim()&&<p className="morph-search-empty">Начни вводить название — поиск по каталогам MediaVault.</p>}
       </div>
-      <div className="morph-search-filters" role="group" aria-label="Где искать">{SEARCH_KINDS.map(([k,label])=><button key={k} className="morph-search-chip" type="button" aria-pressed={kind===k} onClick={()=>{setKind(k);setActiveId(null);}}>{kind===k&&<motion.span className="morph-search-chip-active" layoutId="morph-search-active-category" transition={SWAP}/>}<span>{label}</span></button>)}</div>
+      <div className="morph-search-refine">
+       <div className="morph-search-filters" role="group" aria-label="Где искать">{SEARCH_KINDS.map(([k,label])=><button key={k} className="morph-search-chip" type="button" aria-pressed={kind===k} onClick={()=>{setKind(k);setActiveId(null);}}>{kind===k&&<motion.span className="morph-search-chip-active" layoutId="morph-search-active-category" transition={SWAP}/>}<span>{label}</span></button>)}</div>
+       <div className="morph-search-facets" role="group" aria-label="Фильтры поиска">
+        <label><span>Год</span><UiSelect aria-label="Год выхода" value={year} onChange={(e:any)=>{setYear(e.target.value);setActiveId(null);}}><option value="">Любой</option>{YEARS.map(v=><option key={v} value={v}>{v}</option>)}</UiSelect></label>
+        <label><span>Жанр</span><UiSelect aria-label="Жанр" value={genre} onChange={(e:any)=>{setGenre(e.target.value);setActiveId(null);}}><option value="">Любой</option>{GENRES.map(v=><option key={v} value={v}>{v}</option>)}</UiSelect></label>
+        {(year||genre)&&<button type="button" className="morph-search-reset" onClick={()=>{setYear('');setGenre('');}}>Сбросить</button>}
+       </div>
+      </div>
       {searchText.length>=2&&<div className="morph-search-results">
        <div className="morph-search-panel-heading"><span>Результаты поиска</span>{items.length>0&&<span>{items.length}{state.loading?' +':''}</span>}</div>
        <div id="blossomSearchHits" className="morph-search-results-list" role="listbox" aria-label="Результаты поиска" aria-busy={state.loading}>
         <AnimatePresence initial={false}>{items.map((item:any,i:number)=><motion.button key={item.id} id={id+'-hit-'+i} role="option" aria-selected={index===i} type="button" className={'morph-search-result'+(index===i?' is-active':'')} onMouseEnter={()=>setActiveId(item.id)} onClick={()=>choose(item)} initial={reduce?false:{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}} transition={{duration:reduce?0:.18,delay:reduce?0:Math.min(i,5)*.025}}>
          <span className="morph-search-poster"><Poster item={item}/></span><span className="morph-search-result-meta"><strong><Highlight text={item.title} query={searchText}/></strong><small>{typeLabel(item.kind)}{[item.year,item.authors?.join(', ')||item.artists?.join(', '),item.format].filter(Boolean).map(v=>' · '+v)}</small></span><ArrowUpRight size={17}/>
         </motion.button>)}</AnimatePresence>
-        {!state.loading&&!items.length&&<p className="morph-search-empty" role="status">Совпадений нет. Попробуй другое название.</p>}
+        {!state.loading&&!items.length&&<p className="morph-search-empty" role="status">{state.items.length&&(year||genre)?'С такими фильтрами ничего нет. Сбрось год или жанр.':'Совпадений нет. Попробуй другое название.'}</p>}
         {state.loading&&<p className="morph-search-progress" role="status">Каталоги дополняют результаты…</p>}
        </div>
       </div>}
      </div>
-     <footer className="morph-search-footer" id={id+'-help'}><span className="morph-search-footer-caption">Поиск по медиатеке</span>{searchText.length>=2&&<button type="button" onClick={browse}>Полный поиск <ArrowUpRight size={13}/></button>}</footer>
+     <footer className="morph-search-footer" id={id+'-help'}><span className="morph-search-footer-caption">Поиск по медиатеке</span>{(searchText.length>=2||year||genre)&&<button type="button" onClick={browse}>{searchText.length>=2?'Полный поиск':'Открыть в библиотеке'} <ArrowUpRight size={13}/></button>}</footer>
     </motion.div>
    </motion.div>}
   </AnimatePresence>

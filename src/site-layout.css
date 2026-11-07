@@ -1,0 +1,48 @@
+/* Site-wide geometry pass (loaded last from main.jsx).
+   One width token drives the content column and the scrolled navbar pill, so
+   both widen together; the top (unscrolled) navbar spreads nearly edge to edge. */
+html[data-blossom]{--site-width:min(1720px,calc(100% - clamp(40px,5vw,112px)))}
+
+@media(min-width:901px){
+ html[data-blossom] .app-shell>.app-main{width:var(--site-width);max-width:1720px}
+ html[data-blossom] .app-shell>.blossom-navbar{width:min(2200px,calc(100% - 28px))}
+ html[data-blossom] .app-shell>.blossom-navbar.is-scrolled{width:var(--site-width)}
+ html[data-blossom] .blossom-navbar .header-inner,html[data-blossom] .blossom-navbar.is-scrolled .header-inner{padding-inline:14px}
+}
+
+/* ---------- Search: wide field, rounded filter tray ---------- */
+html[data-blossom] .morph-search-panel-content{padding:10px}
+html[data-blossom] .morph-search-refine{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding:8px;border-radius:20px;background:rgba(255,255,255,.035)}
+html[data-blossom] .morph-search-refine .morph-search-filters{flex-wrap:wrap;gap:4px;margin:0;padding:0;border:0;background:none;overflow:visible}
+html[data-blossom] .morph-search-refine .morph-search-chip{height:32px;padding:0 14px;font-size:12px}
+html[data-blossom] .morph-search-facets{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+html[data-blossom] .morph-search-facets label{display:inline-flex;align-items:center;gap:8px;min-width:0;padding-left:12px;border-radius:14px;background:rgba(255,255,255,.04);font-size:11px;font-weight:600;color:#a5a6b3}
+html[data-blossom] .morph-search-facets .mv-select-trigger{height:32px;min-width:112px;border-radius:14px;background:rgba(255,255,255,.05);font-size:12px;color:#f1f1f5}
+html[data-blossom] .morph-search-reset{height:32px;padding:0 12px;border:0;border-radius:14px;background:none;color:#c8c9d3;font:600 12px inherit;cursor:pointer}
+html[data-blossom] .morph-search-reset:hover{color:#fff;background:rgba(255,255,255,.06)}
+html[data-blossom] .morph-search-footer{padding:9px 12px 3px}
+html[data-blossom] .morph-search-results{margin-top:6px}
+
+/* ---------- Bigger cards ---------- */
+@media(min-width:901px){
+ html[data-blossom] .blossom-catalog-content .catalog-grid.catalog-layout-grid{grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:26px 20px}
+ html[data-blossom] .blossom-catalog-content .catalog-layout-compact{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+ html[data-blossom] .media-grid.library-layout-grid{grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:26px 20px}
+ html[data-blossom] .media-grid.library-layout-compact{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+ html[data-blossom] .carousel-rail{grid-auto-columns:minmax(200px,calc((100% - 5*18px)/6))}
+}
+
+/* Title page: the wider column gives the right rail (room chat, ratings, order) room. */
+@media(min-width:1200px){html[data-blossom] .title-page .mv-title-layout{grid-template-columns:minmax(0,1fr) clamp(300px,22vw,360px);gap:clamp(28px,2.6vw,44px)}}
+
+/* Collection toolbar: one calm row, rounded surfaces, no outlines. */
+html[data-blossom] .admin-bar{border:0;border-radius:22px;background:var(--color-surface);padding:12px}
+html[data-blossom] .collection-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+html[data-blossom] .collection-add{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--color-canvas-soft)}
+html[data-blossom] .collection-actions .btn{height:40px;border:0;border-radius:999px;padding:0 18px;box-shadow:none}
+html[data-blossom] .collection-add .btn-secondary{background:transparent}
+html[data-blossom] .collection-add .btn-secondary:hover{background:var(--color-surface-raised)}
+html[data-blossom] .collection-sync{background:var(--color-canvas-soft)}
+html[data-blossom] .collection-refresh{margin-left:auto;width:40px;height:40px;border:0;border-radius:50%;background:var(--color-canvas-soft)}
+html[data-blossom] .admin-bar .upload-options{border:0;border-radius:16px;background:var(--color-canvas-soft);padding:2px 14px}
+html[data-blossom] .admin-bar .upload-options>summary{padding:10px 0;font-size:12px;font-weight:600;color:var(--color-on-muted);cursor:pointer}

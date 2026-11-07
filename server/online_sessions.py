@@ -152,13 +152,13 @@ def playable(text,base,headers,http,document,depth=0):
         # Signed Alloha links live ~20 min; other sources are re-checked sooner.
         _ready[key]=time.monotonic()+(1200 if (urlsplit(first).hostname or '').endswith('.vkvideo.cloud') else 300)
 
-def install(app,owner):
+def install(app,owner,exports_owner=None):
     from playback_resolver import PlaybackResolver
     resolver_cache=PlaybackResolver();app.state.playback_resolver=resolver_cache
     # Register before /online/{token}/{resource}, which otherwise captures
     # /online/exports/{id} as an ordinary playback capability.
     from local_exports import install as install_exports
-    install_exports(app,owner)
+    install_exports(app,exports_owner or owner)
     def resolve(body,subject,reservation=None):
         http=PublicHttp(timeout=(4,12),deadline=time.monotonic()+45)
         http.preview=body.purpose=='preview'

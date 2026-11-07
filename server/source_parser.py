@@ -142,6 +142,35 @@ class _SourcePoolAdapter(requests.adapters.HTTPAdapter):
 _SOURCE_POOL=_SourcePoolAdapter(pool_connections=48,pool_maxsize=12,pool_block=False,max_retries=0)
 
 
+META_CHARSET = re.compile(rb"""<meta[^>]+charset\s*=\s*["']?\s*([A-Za-z0-9_-]{2,30})""", re.I)
+
+
+def decode_document(raw, declared=None):
+    """Decode a page the way a browser would: header charset, then <meta>, then
+    UTF-8, falling back to windows-1251 for older Russian sites that omit it."""
+    if declared and declared.upper() != "ISO-8859-1":
+        try:
+            return raw.decode(declared, errors="replace")
+        except LookupError:
+            pass
+    match = META_CHARSET.search(raw[:4096])
+    if match:
+        try:
+            return raw.decode(match.group(1).decode("ascii"), errors="replace")
+        except LookupError:
+            pass
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("utf-8", errors="replace")
+        if text.count("\ufffd") > 3:
+            try:
+                return raw.decode("cp1251")
+            except UnicodeDecodeError:
+                pass
+        return text
+
+
 class PublicHttp:
     def __init__(self, *, session=None, validate=public_url, timeout=(6, 20), deadline=None):
         self.session = session or requests.Session()
@@ -245,7 +274,7 @@ class PublicHttp:
                 if size > MAX_DOCUMENT or time.monotonic() - start > 20 or self.deadline and time.monotonic() > self.deadline:
                     raise SourceError("Страница или плейлист слишком велики.")
                 parts.append(block)
-            text = b"".join(parts).decode(response.encoding if response.encoding not in (None, "ISO-8859-1") else "utf-8", errors="replace")
+            text = decode_document(b"".join(parts), response.encoding)
             if BLOCKED.search(text):
                 raise SourceError("Страница требует проверку браузера или подписку. Выбери другой публичный источник.")
             return text, url, dict(response.headers)

@@ -95,10 +95,10 @@ class SourceQualityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory,'MEDIA_VAULT_DISABLE_WORKER':'1'}):
             with TestClient(api.app) as client:
                 self.assertEqual(client.post('/sources/qualities',json={'url':'https://player.example.com/episode-3'}).status_code,401)
-                api.app.dependency_overrides[api.owner]=lambda:'owner-fixture'
+                api.app.dependency_overrides[api.viewer]=lambda:'owner-fixture'
                 try:
                     with patch('source_quality.inspect_qualities',return_value={'qualities':[2160,1080,720],'best':2160,'original':False,'streamCount':3}):
                         response=client.post('/sources/qualities',json={'url':'https://player.example.com/episode-3'})
                     self.assertEqual(response.status_code,200);self.assertEqual(response.json()['qualities'],[2160,1080,720])
                     self.assertNotIn('https://',response.text)
-                finally:api.app.dependency_overrides.pop(api.owner,None)
+                finally:api.app.dependency_overrides.pop(api.viewer,None)

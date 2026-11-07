@@ -1,7 +1,7 @@
 import {createContext,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
-import {ArrowUpRight,BookOpen,History,Pause,PictureInPicture2,Play,Video,X} from 'lucide-react';
+import {ArrowUpRight,BookOpen,History,Pause,PictureInPicture2,Play,Square,Video,X} from 'lucide-react';
 import {createRetainedMediaStore} from './retained-media-store.js';
 import './retained-media.css';
 const Workspace=createContext(null),Owner=createContext(null);
@@ -49,5 +49,23 @@ function Dock({store}){
  useEffect(()=>{if(!open)return;const update=()=>{const r=trigger.current?.getBoundingClientRect();if(r)setBox({right:Math.max(12,innerWidth-r.right),top:r.bottom+10});};update();addEventListener('resize',update);addEventListener('scroll',update,true);const outside=e=>{if(!panel.current?.contains(e.target)&&!trigger.current?.contains(e.target))setOpen(false);};const key=e=>{if(e.key==='Escape'){setOpen(false);trigger.current?.focus();}};document.addEventListener('pointerdown',outside);document.addEventListener('keydown',key);return()=>{removeEventListener('resize',update);removeEventListener('scroll',update,true);document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',key);};},[open]);
  if(!active&&!state.history.length)return null;
  const toggle=()=>{const video=active?.host?.querySelector('video.mv-player-media');if(video){if(video.paused)video.play().catch(()=>{});else video.pause();}};
- return <><button ref={trigger} className="retained-dock" title={active?.label||'История просмотра'} aria-label="Активный просмотр и история" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>{active?.kind==='reader'?<BookOpen size={18}/>:<Video size={18}/ >}{active&&<i/>}</button>{createPortal(<AnimatePresence>{open&&<motion.section ref={panel} role="dialog" aria-label="Активный просмотр" className="retained-dock-panel" style={box} initial={{opacity:0,scale:reduced?1:.94,y:reduced?0:-4}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:reduced?1:.96}} transition={{type:'spring',stiffness:420,damping:34}}><header><h2>Просмотр</h2><button aria-label="Закрыть панель просмотра" onClick={()=>setOpen(false)}><X size={16}/></button></header>{active&&<><div className="retained-now">{active.preview&&<img src={active.preview} alt=""/>}<strong>{active.label}</strong></div><div className="retained-dock-actions">{active.kind!=='reader'&&<button aria-label={active.playing?'Пауза активного видео':'Продолжить активное видео'} onClick={toggle}>{active.playing?<Pause size={16}/>:<Play size={16}/>}</button>}<button onClick={()=>{store.return(active.id);setOpen(false);}}><ArrowUpRight size={15}/>К просмотру</button><button aria-label="Открыть мини-просмотр" onClick={()=>{store.popup(active.id);setOpen(false);}}><PictureInPicture2 size={17}/></button><button aria-label="Завершить активный просмотр" onClick={()=>{store.close(active.id);setOpen(false);}}><X size={16}/></button></div></>}{state.history.length>0&&<div className="retained-history"><h3><History size={13}/>Недавнее</h3>{state.history.map(item=><button key={item.id} onClick={()=>{store.revisit(item);setOpen(false);}}><span>{item.label}</span><ArrowUpRight size={13}/></button>)}</div>}</motion.section>}</AnimatePresence>,document.body)}</>;
+ const recent=state.history.filter(item=>item.id!==active?.id).slice(0,6);
+ const playing=!!active?.playing&&active?.kind!=='reader',progress=active?.duration?Math.min(1,(active.time||0)/active.duration):0;
+ const clock=v=>{v=Math.max(0,Math.floor(v||0));const h=Math.floor(v/3600),m=Math.floor(v%3600/60),s=String(v%60).padStart(2,'0');return h?h+':'+String(m).padStart(2,'0')+':'+s:m+':'+s;};
+ return <><button ref={trigger} className={'retained-dock'+(active?' is-live':'')+(playing?' is-playing':'')} title={active?.label||'История просмотра'} aria-label="Плеер в фоне" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>{playing?<span className="retained-eq" aria-hidden="true"><i/><i/><i/></span>:active?.kind==='reader'?<BookOpen size={18}/>:<Video size={18}/>}</button>{createPortal(<AnimatePresence>{open&&<motion.section ref={panel} role="dialog" aria-label={active?'Сейчас в фоне':'Недавний просмотр'} className="retained-dock-panel" style={box} initial={{opacity:0,scale:reduced?1:.94,y:reduced?0:-4}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:reduced?1:.96}} transition={{type:'spring',stiffness:420,damping:34}}>
+  {active&&<div className="retained-player">
+   <div className="retained-cover">{active.preview?<img src={active.preview} alt=""/>:<span className="retained-cover-empty">{active.kind==='reader'?<BookOpen size={28}/>:<Video size={28}/>}</span>}
+    {active.kind!=='reader'&&<button className="retained-cover-play" aria-label={playing?'Пауза':'Продолжить'} onClick={toggle}>{playing?<Pause size={20}/>:<Play size={20}/>}</button>}
+   </div>
+   <p className="retained-eyebrow">{playing?<><span className="retained-eq" aria-hidden="true"><i/><i/><i/></span>Сейчас играет</>:active.kind==='reader'?'Открыто чтение':'На паузе'}</p>
+   <strong className="retained-title">{active.label}</strong>
+   {active.kind!=='reader'&&active.duration>0&&<div className="retained-progress" role="progressbar" aria-label="Прогресс просмотра" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress*100)}><span style={{transform:`scaleX(${progress})`}}/><small>{clock(active.time)}</small><small>{clock(active.duration)}</small></div>}
+   <div className="retained-dock-actions">
+    <button className="is-primary" onClick={()=>{store.return(active.id);setOpen(false);}}><ArrowUpRight size={16}/>Вернуться к просмотру</button>
+    <button aria-label="Картинка в картинке" title="Картинка в картинке" onClick={()=>{store.popup(active.id);setOpen(false);}}><PictureInPicture2 size={17}/></button>
+    <button aria-label="Остановить просмотр" title="Остановить" onClick={()=>{store.close(active.id);setOpen(false);}}><Square size={14}/></button>
+   </div>
+  </div>}
+  {recent.length>0&&<div className="retained-history"><h3><History size={13}/>Недавнее</h3>{recent.map(item=><button key={item.id} onClick={()=>{store.revisit(item);setOpen(false);}}>{item.kind==='reader'?<BookOpen size={14}/>:<Video size={14}/>}<span>{item.label}</span><ArrowUpRight size={13}/></button>)}</div>}
+ </motion.section>}</AnimatePresence>,document.body)}</>;
 }

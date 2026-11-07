@@ -28,7 +28,7 @@ const noTitles=Object.freeze([]);
 
 export function TitleDetails(props){return <WorldTitlePage {...props}/>;}
 
-export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpenLibrary,initialQuery,initialKind,initialTarget,initialItem,destination,sidebarPortal,favoritesOnly=false}){
+export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpenLibrary,initialQuery,initialFilters,initialKind,initialTarget,initialItem,destination,sidebarPortal,favoritesOnly=false}){
   const bookmarks=useCatalogFavorites(state.user?.sub);
   const [layout,setLayout]=useState(()=>{try{const value=localStorage.getItem('mediavault_catalog_view_v2');return ['grid','compact','list','table'].includes(value)?value:'grid';}catch{return 'grid';}});
   const changeLayout=value=>{setLayout(value);try{localStorage.setItem('mediavault_catalog_view_v2',value);}catch{}};
@@ -36,7 +36,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   useEffect(()=>{const update=()=>{setExplore(browseRoute());const route=readOnlineTitle();if(route)setSelected(route);else if(browseRoute()||location.hash==='#library')setSelected(null);};addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);
   const preset=initialTarget||initialItem;
   const [query,setQuery]=useState(initialQuery||''),[kind,setKind]=useState(initialKind||'anime'),[selected,setSelected]=useState(()=>readOnlineTitle()||preset||null);
-  const [filters,setFilters]=useState({year:'',genre:'',tag:'',format:'',age:''}),[voice,setVoice]=useState(''),[showFilters,setShowFilters]=useState(()=>matchMedia('(min-width: 641px)').matches),[page,setPage]=useState(1),[composing,setComposing]=useState(false);
+  const [filters,setFilters]=useState(()=>({year:'',genre:'',tag:'',format:'',age:'',...Object.fromEntries(Object.entries(initialFilters||{}).filter(([key,value])=>['year','genre'].includes(key)&&value))})),[voice,setVoice]=useState(''),[showFilters,setShowFilters]=useState(()=>matchMedia('(min-width: 641px)').matches),[page,setPage]=useState(1),[composing,setComposing]=useState(false);
   useEffect(()=>{if(preset){setSelected(preset);onlineTitleLocation(preset,true);}},[preset]);
   const reduced=useReducedMotion();
   const [sourceIds,setSourceIds]=useState([]),[sourceLanguage,setSourceLanguage]=useState('all'),[sourceRevision,setSourceRevision]=useState(0),[voiceOptions,setVoiceOptions]=useState([]);

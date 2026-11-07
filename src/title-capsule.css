@@ -9,3 +9,16 @@ html[data-blossom] .blossom-navbar .title-section-capsule.brand.logo{font:700 12
 .title-section-menu>button{display:flex;align-items:center;gap:8px;padding:11px 13px;min-height:38px;border:0;border-radius:999px;background:transparent;color:var(--color-on-muted);font:600 12px/1.3 var(--font-ui,system-ui);text-align:left}
 .title-section-menu>button:hover,.title-section-menu>button:focus-visible,.title-section-menu>button[aria-current]{background:color-mix(in srgb,var(--color-petal) 9%,transparent);color:var(--color-petal);outline:0}
 .title-nav-droplet{z-index:65;display:grid;place-items:center;border:0;border-radius:999px;background:var(--color-canvas);color:var(--color-petal);font:700 12px/1 var(--font-ui,system-ui);pointer-events:none;transform-origin:50% 50%;filter:drop-shadow(0 5px 10px #0003)}
+
+/* Inline title sections: one steady segmented bar (all sections, fixed order). */
+html[data-blossom] .title-navigation-anchor{height:auto;min-height:58px;padding-left:0!important}
+html[data-blossom] .title-capsule-shortcuts.title-tabbar{display:inline-flex;max-width:100%;height:auto;gap:2px;padding:5px;border-radius:999px;background:var(--color-surface);clip-path:none}
+html[data-blossom] .title-capsule-shortcuts.title-tabbar.is-absorbed{clip-path:inset(0 calc(100% - var(--title-capsule-width)) 0 0 round 999px)}
+html[data-blossom] .title-tabbar>button{position:relative;display:inline-flex;align-items:center;gap:8px;height:42px;min-height:42px;padding:0 18px;border-radius:999px;color:var(--color-on-muted);font:600 13.5px/1 var(--font-ui,system-ui);letter-spacing:-.005em;transition:color .2s}
+html[data-blossom] .title-tabbar>button>svg,html[data-blossom] .title-tabbar>button>span:not(.title-tab-indicator){position:relative;z-index:1}
+html[data-blossom] .title-tabbar>button>svg{opacity:.7}
+html[data-blossom] .title-tabbar>button:hover{color:var(--color-petal);background:transparent}
+html[data-blossom] .title-tabbar>button[aria-current]{color:var(--color-petal);background:transparent}
+html[data-blossom] .title-tabbar>button[aria-current]>svg{opacity:1;color:var(--title-accent,var(--color-blossom))}
+html[data-blossom] .title-tab-indicator{position:absolute;inset:0;border-radius:999px;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
+@media(max-width:900px){html[data-blossom] .title-tabbar>button{padding:0 13px;font-size:12.5px;height:38px;min-height:38px}html[data-blossom] .title-tabbar>button>svg{display:none}}

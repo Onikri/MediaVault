@@ -6,6 +6,7 @@ import RoomChat from './RoomChat.jsx';
 import './room-conversation.css';
 import './room-chat-next.css';
 import './room-rail.css';
+import './room-panel.css';
 // Stable, readable avatar colour per member id: hue only, fixed lightness.
 function hue(id){let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return h;}
 function initials(name){const parts=String(name||'?').trim().split(/\s+/);return (parts[0]?.[0]||'?')+(parts[1]?.[0]||'');}
@@ -60,10 +61,11 @@ export default function RoomConversation({conversation}){
  const online=useMemo(()=>(conversation.members||[]).filter(m=>m.online).sort((a,b)=>Number(b.voice)-Number(a.voice)||Number(b.host)-Number(a.host)),[conversation.members]);
  const chosen=online.find(m=>m.id===selected);
  const tap=reduce?undefined:{scale:.88};
- return <section className="rc rc-split" aria-label="Беседа комнаты">
+ return <section className="rc rc-stack" aria-label="Беседа комнаты">
+  <header className="rc-head"><h2>Комната</h2><small>{online.length} в комнате{online.some(m=>m.voice)?', '+online.filter(m=>m.voice).length+' в голосе':''}</small>{conversation.relay&&<span className="rc-relay" title="Если прямое соединение невозможно, голос идёт через наш сервер">через ретранслятор</span>}</header>
   <nav className="rc-rail" aria-label="Участники и голос">
    <ul className="rc-rail-people">{online.map(m=><RailMember key={m.id} member={m} self={m.id===conversation.memberId} conversation={conversation} selected={selected===m.id} onSelect={()=>setSelected(v=>v===m.id?null:m.id)}/>)}</ul>
-   <div className="rc-rail-voice" role="toolbar" aria-label="Управление голосом" aria-orientation="vertical">
+   <div className="rc-rail-voice" role="toolbar" aria-label="Управление голосом">
     {!conversation.voice?<motion.button whileTap={tap} type="button" className="rc-round is-join" disabled={!conversation.connected||conversation.starting} aria-label={conversation.starting?'Подключаем голос':'Войти в голос'} title={conversation.starting?'Подключаем голос':'Войти в голос'} onClick={conversation.start}><Headphones size={18}/></motion.button>:<>
      <motion.button whileTap={tap} type="button" className="rc-round" aria-pressed={conversation.muted} aria-label={conversation.muted?'Включить микрофон':'Выключить микрофон'} title={conversation.muted?'Включить микрофон':'Выключить микрофон'} onClick={()=>conversation.setMuted(!conversation.muted)}><ToggleIcon on={conversation.muted} onIcon={<MicOff size={18}/>} offIcon={<Mic size={18}/>}/></motion.button>
      <motion.button whileTap={tap} type="button" className="rc-round" aria-pressed={conversation.deafened} aria-label={conversation.deafened?'Включить звук собеседников':'Выключить звук собеседников'} title={conversation.deafened?'Включить звук':'Не слышать собеседников'} onClick={()=>conversation.deafen(!conversation.deafened)}><ToggleIcon on={conversation.deafened} onIcon={<HeadphoneOff size={18}/>} offIcon={<Headphones size={18}/>}/></motion.button>
@@ -73,7 +75,7 @@ export default function RoomConversation({conversation}){
    </div>
   </nav>
   <div className="rc-main">
-   <header className="rc-head"><h2>Комната</h2><small>{online.length} в комнате{online.some(m=>m.voice)?', '+online.filter(m=>m.voice).length+' в голосе':''}</small>{conversation.relay&&<span className="rc-relay" title="Если прямое соединение невозможно, голос идёт через наш сервер">через ретранслятор</span>}</header>
+
    <AnimatePresence initial={false}>{chosen&&<MemberCard key={chosen.id} member={chosen} self={chosen.id===conversation.memberId} conversation={conversation} onClose={()=>setSelected(null)}/>}</AnimatePresence>
    {conversation.error&&<p className="rc-error" role="status">{conversation.error}<button type="button" onClick={conversation.unlock}><Volume2 size={13}/>Включить звук беседы</button></p>}
    <RoomChat conversation={conversation}/>

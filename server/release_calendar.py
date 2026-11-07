@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from email.utils import parsedate_to_datetime
+import html
 import re
 import threading
 import time
@@ -47,7 +48,20 @@ def parse_announcements(text,base,provider):
                 if date and title and urlsplit(url).hostname==urlsplit(base).hostname:
                     events.append({'title':title[:240],'label':title[:240],'date':date,'url':url,'provider':provider,'episode':episode_number(title),'kind':'translation','datePrecision':'time'})
         except ET.ParseError:pass
-    return list({(e['provider'],e['url'],e['date'],e['title']):e for e in events}.values())
+    return collapse(events)
+
+
+def collapse(events):
+    """Readable titles (RSS often double-escapes entities) and one row per
+    release: sites re-post the same item several times within seconds."""
+    rows={}
+    for event in events:
+        title=re.sub(r'\s+',' ',html.unescape(html.unescape(event['title']))).strip()[:240]
+        if not title:continue
+        event={**event,'title':title,'label':title}
+        key=(event['provider'],title.casefold(),event['date'][:13])
+        if key not in rows or rows[key]['date']<event['date']:rows[key]=event
+    return list(rows.values())
 
 
 def calendar():

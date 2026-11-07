@@ -2,7 +2,6 @@ import {useEffect,useState} from 'react';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {loadWatchOrder} from './franchise-seasons.js';
 import {ListOrdered,Check,ExternalLink,ChevronDown,ArrowUpRight} from 'lucide-react';
-import UiSelect from './UiSelect.jsx';
 import './watch-order.css';
 
 const formats={tv:'Сериал',tv_13:'Сериал',tv_24:'Сериал',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Клип'};
@@ -23,12 +22,11 @@ export default function WatchOrder({identity,server,onRelated,cached,onLoaded}){
  const items=mode==='main'&&hasMain?main:all,current=items.findIndex(i=>String(i.id)===String(identity));
  const start=expanded?0:Math.max(0,Math.min(current-2,items.length-6)),visible=expanded?items:items.slice(start,start+6);
  return <section id="titleWatchOrder" className="watch-order watch-route">
-  <div className="section-heading"><h2><ListOrdered size={17}/>Порядок просмотра</h2>{!!all.length&&<UiSelect aria-label="Порядок просмотра" value={hasMain?mode:'release'} onValueChange={v=>{setMode(v);setExpanded(false);}}>
-   {hasMain&&<option value="main">Основные сезоны</option>}<option value="release">Все произведения</option>
-  </UiSelect>}</div>
+  <div className="section-heading"><h2><ListOrdered size={17}/>Порядок просмотра</h2></div>
+  {hasMain&&<div className="watch-route-modes" role="group" aria-label="Порядок просмотра">{[['main','Основные сезоны'],['release','Все произведения']].map(([id,label])=><button key={id} type="button" aria-pressed={mode===id} onClick={()=>{setMode(id);setExpanded(false);}}>{mode===id&&<motion.span className="watch-route-mode-active" layoutId="watch-route-mode" transition={reduce?{duration:0}:{type:'spring',stiffness:420,damping:36}}/>}<span>{label}</span></button>)}</div>}
   {error?<p className="fine" role="status">{error} <button className="text-link" onClick={()=>setRetry(v=>v+1)}>Повторить</button></p>:!value?<p className="fine" role="status">Получаем связи франшизы…</p>:<>
    <p className="watch-order-note">{mode==='main'&&hasMain?'Продолжения основной истории по связям каталога.':'Все адаптации и ответвления по дате выхода.'} Для разных сюжетных веток единого порядка может не быть.</p>
-   {!items.length?<p className="fine">Связанные произведения пока не указаны.</p>:<motion.ol layout={!reduce} aria-label={mode==='main'&&hasMain?'Основная история':'Порядок выхода'}>
+   {!items.length?<p className="fine">Связанные произведения пока не указаны.</p>:<motion.ol className={!expanded&&items.length>visible.length?'is-clipped':''} layout={!reduce} aria-label={mode==='main'&&hasMain?'Основная история':'Порядок выхода'}>
     <AnimatePresence initial={false}>{visible.map((item,index)=>{
      const active=String(item.id)===String(identity);
      return <motion.li layout={!reduce} key={item.id} aria-current={active?'step':undefined} initial={reduce?false:{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:.18}}>
@@ -39,7 +37,8 @@ export default function WatchOrder({identity,server,onRelated,cached,onLoaded}){
      </motion.li>;
     })}</AnimatePresence>
    </motion.ol>}
-   <footer>{items.length>6&&<button className="watch-route-expand" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded?'Свернуть':'Все · '+items.length}<ChevronDown size={13} style={{transform:expanded?'rotate(180deg)':undefined}}/></button>}
+   {items.length>6&&<button type="button" className="watch-route-expand" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}><span>{expanded?'Свернуть список':'Показать весь порядок'}</span>{!expanded&&<small>{items.length}</small>}<ChevronDown size={16} style={{transform:expanded?'rotate(180deg)':undefined}}/></button>}
+   <footer>
     <a className="watch-order-source" href={'https://shikimori.io/animes/'+identity+'/franchise'} target="_blank" rel="noopener noreferrer">Карта связей<ExternalLink size={12}/></a></footer>
   </>}
  </section>;

@@ -19,6 +19,6 @@ export function readOnlineTitle(hash=location.hash,storage=localStorage){
 export function onlineTitleLocation(item,replace=false){
  const id=item.providerId||item.ids?.mal||item.id,provider=item.provider||'shikimori',key=[item.kind,provider,id].join(':');
  const snapshot=Object.fromEntries(['id','kind','provider','providers','providerId','title','titles','ids','aliases','cover','year','format','genres','tags','links','releases','sourceOnly','sourceUrl','sourceURL','age','adult','language'].map(k=>[k,item[k]]));
- try{const values=JSON.parse(localStorage.getItem(KEY)||'{}');delete values[key];values[key]=snapshot;localStorage.setItem(KEY,JSON.stringify(Object.fromEntries(Object.entries(values).slice(-40))));}catch{}
+ try{const values=JSON.parse(localStorage.getItem(KEY)||'{}');delete values[key];values[key]={...snapshot,openedAt:Date.now()};localStorage.setItem(KEY,JSON.stringify(Object.fromEntries(Object.entries(values).slice(-40))));}catch{}
  const hash='#'+new URLSearchParams({watch:key});if(location.hash!==hash){history[replace?'replaceState':'pushState'](null,'',location.pathname+location.search+hash);dispatchEvent(new HashChangeEvent('hashchange'));}
 }

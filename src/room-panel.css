@@ -1,0 +1,28 @@
+/* Room conversation as one vertical card: header, a single row of people and
+   voice buttons, the message list, and a full-width composer. Works in the
+   title page's right column, beside the player and in fullscreen sheets. */
+.rc.rc.rc-stack{width:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;min-height:0;padding:16px;overflow:hidden}
+.rc-stack>.rc-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 10px;margin:0}
+.rc-stack>.rc-head h2{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.rc-stack>.rc-head small{margin-left:auto;font-size:12px;color:var(--rc-muted,#a3a3aa)}
+.rc-stack>.rc-head .rc-relay{flex-basis:100%;font-size:11px;color:var(--rc-muted,#a3a3aa)}
+.rc-stack>.rc-rail{display:flex;align-items:center;gap:10px;min-width:0;padding:6px;border-radius:999px;background:#ffffff0a}
+.rc-stack .rc-rail-people{display:flex;align-items:center;gap:6px;flex:1;min-width:0;margin:0;padding:2px;list-style:none;overflow-x:auto;scrollbar-width:none}
+.rc-stack .rc-rail-people::-webkit-scrollbar{display:none}
+.rc-stack .rc-rail-member>button,.rc-stack .rc-rail-member .rc-avatar{width:34px!important;height:34px!important}
+.rc-stack .rc-rail-member .rc-avatar-face{font-size:12px}
+.rc-stack .rc-rail-crown,.rc-stack .rc-rail-badge{width:15px;height:15px}
+.rc-stack .rc-rail-voice{display:flex;align-items:center;gap:4px;flex:none}
+.rc-stack .rc-round{width:34px;height:34px}
+.rc-stack .rc-round svg{width:16px;height:16px}
+.rc-stack .rc-main{position:relative;display:flex;flex-direction:column;gap:8px;flex:1;min-width:0;min-height:0}
+.rc-stack .rcx{flex:1 1 0;min-height:220px}
+.rc-stack .rcx-head{display:none}
+.rc-stack .rc-settings-sheet{border-radius:16px}
+/* Composer: the text gets the whole width; tools sit on their own line. */
+.rc-stack .rcx-compose{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:2px;padding:6px;border-radius:18px}
+.rc-stack .rcx-compose textarea{grid-column:1 / -1;min-height:38px;padding:9px 10px 4px}
+.rc-stack .rcx-compose .rcx-tool{height:34px;width:34px;border-radius:12px}
+.rc-stack .rcx-compose .rcx-send{grid-column:4;width:38px;height:34px;border-radius:12px}
+@media(pointer:coarse){.rc-stack .rc-round,.rc-stack .rc-rail-member>button,.rc-stack .rc-rail-member .rc-avatar{width:40px!important;height:40px!important}}
+.room-chat-slot{top:92px}.room-chat-slot .rc.rc-stack{height:min(680px,calc(100svh - 116px))}

@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {clearGuestSession,readGuestSession,useGuestSession} from './guest-session.js';
 import {notificationStore} from './notification-store.js';
 import {profileNeedsRefresh,previewNeedsRetry} from './title-metadata.js';
 
@@ -24,7 +25,7 @@ export function validateServer(value){
   return url.origin;
 }
 function storedServer(){try{return validateServer(window.MEDIA_VAULT_CONFIG?.importServerUrl||localStorage.getItem('mediavault_import_server')||'');}catch{return '';}}
-export function createImportClient(server,googleToken,fetcher=fetch){
+export function createImportClient(server,googleToken,fetcher=fetch,guestSession=()=>null){
   let session=null,signing=null;
   async function request(path,{method='GET',body,auth=true,headers={},signal,raw=false,keepalive=false}={}){
     if(!server)throw Error('Сервер импорта ещё не подключён.');
@@ -41,6 +42,14 @@ export function createImportClient(server,googleToken,fetcher=fetch){
     signing=(async()=>{
       const health=await request('/health',{auth:false});
       if(health.application!=='MediaVault'||health.version<4||health.origin!==window.location.origin)throw Error('Этот адрес не подтвердил конфигурацию MediaVault.');
+      const guest=!googleToken()&&guestSession();
+      if(guest){
+        // Guest profile: the owner-issued session token is the server session.
+        const response=await fetcher(server+'/guests/me',{signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+guest.token}});
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok){if(response.status===401||response.status===403)clearGuestSession();throw Error(typeof data.detail==='string'?data.detail:'Сервер не подтвердил гостевой вход.');}
+        session={token:guest.token,guest:data.guest,role:'guest',driveConnected:false,serverVersion:health.version};return session;
+      }
       if(!googleToken())throw Error('Сначала войди через Google.');
       const response=await fetcher(server+'/auth/session',{method:'POST',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+googleToken()}});
       const data=await response.json();if(!response.ok)throw Error(data.detail||'Сервер не подтвердил вход.');
@@ -54,7 +63,8 @@ export function createImportClient(server,googleToken,fetcher=fetch){
 export function useImportService(state,actions){
   const [server,setAddress]=useState(storedServer),[status,setStatus]=useState('idle'),[error,setError]=useState(''),[session,setSession]=useState(null),[jobs,setJobs]=useState([]);
   const live=useRef(state);live.current=state;
-  const client=useMemo(()=>createImportClient(server,()=>live.current.token),[server,state.user?.sub]);
+  const guest=useGuestSession(),guestToken=!state.user?guest?.token||'':'';
+  const client=useMemo(()=>createImportClient(server,()=>live.current.token,fetch,()=>guestToken?readGuestSession():null),[server,state.user?.sub,guestToken]);
   const refreshSignature=useRef('');
   const enrichmentRequested=useRef('');
   const previousJobs=useRef(new Map());
@@ -65,6 +75,11 @@ export function useImportService(state,actions){
     setSession(null);setJobs([]);setError('');refreshSignature.current='';previousJobs.current.clear();
     const noticeKey='mv_job_states_v1:'+state.user?.sub+':'+server;let lastPoll=0;
     try{const saved=JSON.parse(localStorage.getItem(noticeKey)||'{}');previousJobs.current=new Map(saved.states||[]);lastPoll=Number(saved.at)||0;}catch{}
+    if(server&&!state.user&&guestToken){
+      // Guests only watch: keep the session verified, never poll owner jobs.
+      const check=async()=>{if(closed)return;try{setStatus(previous=>previous==='connected'?'connected':'connecting');const access=await client.authenticate();if(!closed){setSession(access);setStatus('connected');setError('');}}catch(cause){if(!closed){setStatus('error');setError(cause.message);}}if(!closed)timer=setTimeout(()=>{client.reset();check();},300000);};
+      check();return()=>{closed=true;clearTimeout(timer);client.reset();};
+    }
     if(!server||!state.admin||!state.user||!state.token){setStatus(server?'disconnected':'unconfigured');return;}
     async function update(force=false){
       if(checking||closed)return;checking=true;clearTimeout(timer);
@@ -87,7 +102,7 @@ export function useImportService(state,actions){
     }
     const focus=()=>update(true);window.addEventListener('focus',focus);
     update();return()=>{closed=true;clearTimeout(timer);window.removeEventListener('focus',focus);client.reset();};
-  },[server,state.admin,state.user?.sub,!!state.token,client]);
+  },[server,state.admin,state.user?.sub,!!state.token,client,guestToken]);
   useEffect(()=>{
     if(!state.catalog||state.busy||!state.driveConnected)return;
     const signature=jobs.map(j=>j.id+':'+(j.progress?.saved||0)+':'+(j.status==='completed'?'done':'')).join('|');
@@ -97,7 +112,7 @@ export function useImportService(state,actions){
       actions.refreshCatalog({silent:true}).then(ok=>{if(!ok&&refreshSignature.current===signature)refreshSignature.current='';});
     }
   },[jobs,state.catalog?.folderId,!!state.busy,state.driveConnected]);
-  async function refresh(){const result=await client.authenticate();setSession(result);const data=await client.request('/jobs');setJobs(data.jobs);setStatus('connected');return result;}
+  async function refresh(){const result=await client.authenticate();setSession(result);if(result.role==='guest'){setStatus('connected');return result;}const data=await client.request('/jobs');setJobs(data.jobs);setStatus('connected');return result;}
   async function configureGoogle(configuration){
     await client.request('/admin/google-oauth',{method:'POST',body:configuration});
     return refresh();

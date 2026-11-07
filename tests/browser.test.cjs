@@ -109,7 +109,7 @@ async function installProvider(context, identity,options={}) {
 }
 
 async function signIn(page) {
-  await page.locator('#profileBtn').click();
+  await page.locator('#profileBtn').click();await page.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
   await page.locator('#loginBtn').click();
   await page.waitForFunction(()=>document.querySelector('#loginBtn').disabled);
   await page.locator('#setupPanel').waitFor({state:'visible'});
@@ -213,7 +213,7 @@ async function main() {
   await navigateApp(owner,'Библиотека');
   // Connection settings live in Profile rather than taking a slot in the navbar.
   assert.equal(await owner.locator('.blossom-navbar .import-settings-trigger').count(),0,'navbar has no connection icon');
-  await owner.locator('#profileBtn').click();
+  await owner.locator('#profileBtn').click();await owner.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
   await owner.getByRole('tab',{name:'Подключения',exact:true}).click();
   await owner.locator('.connection-settings-card .import-settings-trigger').click();
   await owner.locator('#importServer').fill('https://import.example.com');
@@ -335,11 +335,11 @@ async function main() {
   await owner.getByRole('button',{name:'Избранное',exact:true}).click();
   assert.equal(await owner.locator('.media-card').count(),1,'Favorites persist after refresh and unlocking');
   await owner.getByRole('button',{name:'Всё',exact:true}).click();
-  await owner.locator('#profileBtn').click();
+  await owner.locator('#profileBtn').click();await owner.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
   await owner.evaluate(()=>window.__tokenDuration=16);
   await owner.locator('#driveBtn').click();
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===3);
-  await owner.locator('#profileBtn').click();
+  await owner.locator('#profileBtn').click();await owner.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
   await owner.waitForFunction(()=>document.querySelector('#driveBtn')?.textContent.includes('заново'));
   await owner.evaluate(()=>window.__tokenDuration=3600);
   await owner.locator('#driveBtn').click();
@@ -412,7 +412,7 @@ async function main() {
     return respond({data:[]});
   });
   await navigateApp(fresh,'Библиотека');
-  await fresh.locator('#profileBtn').click();
+  await fresh.locator('#profileBtn').click();await fresh.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
   await fresh.getByRole('tab',{name:'Подключения',exact:true}).click();await fresh.locator('.connection-settings-card .import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
   await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await navigateApp(fresh,'Библиотека');await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();await fresh.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await fresh.locator('#streamUrl').fill('https://source.example.com/titans');await fresh.getByRole('button',{name:'Проверить',exact:true}).click();await fresh.locator('#importDub').selectOption('https://source.example.com/studio');await fresh.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();

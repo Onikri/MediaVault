@@ -55,12 +55,16 @@ def b64url(value):
     return base64.urlsafe_b64encode(value).decode().rstrip("=")
 
 
-def session_token(subject):
-    body = b64url(json.dumps({"sub": subject, "exp": int(time.time()) + 86400, "nonce": secrets.token_urlsafe(12)}, separators=(",", ":")).encode())
+def sign_payload(payload):
+    body = b64url(json.dumps(payload, separators=(",", ":")).encode())
     return body + "." + b64url(hmac.digest(store.key, body.encode(), "sha256"))
 
 
-def owner(authorization: str = Header(default="")):
+def session_token(subject):
+    return sign_payload({"sub": subject, "exp": int(time.time()) + 86400, "nonce": secrets.token_urlsafe(12)})
+
+
+def token_payload(authorization):
     try:
         token = authorization.removeprefix("Bearer ")
         body, signature = token.split(".")
@@ -69,9 +73,25 @@ def owner(authorization: str = Header(default="")):
         payload = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
         if payload["exp"] < time.time() or not payload.get("sub"):
             raise ValueError()
-        return payload["sub"]
-    except (ValueError, KeyError, TypeError):
-        raise HTTPException(401, "Войди через Google на сайте заново.") from None
+        return payload
+    except (ValueError, KeyError, TypeError, AttributeError):
+        raise HTTPException(401, "Войди на сайте заново.") from None
+
+
+def owner(authorization: str = Header(default="")):
+    payload = token_payload(authorization)
+    # Guest sessions share the signing key but never reach owner endpoints.
+    if payload.get("role") == "guest" or str(payload["sub"]).startswith("guest:"):
+        raise HTTPException(403, "Это действие доступно только владельцу MediaVault.")
+    return payload["sub"]
+
+
+def viewer(authorization: str = Header(default="")):
+    """Owner or an active guest profile: online viewing, reading and music only."""
+    payload = token_payload(authorization)
+    if payload.get("role") == "guest" or str(payload["sub"]).startswith("guest:"):
+        return guest_subject(authorization).get("id") and payload["sub"]
+    return payload["sub"]
 
 
 def google_identity(token):
@@ -301,7 +321,9 @@ google_pool.install(app,owner,lambda:store)
 import kodik_api
 kodik_api.install(app,owner,lambda:store)
 import watch_rooms
-watch_rooms.install(app,owner)
+watch_rooms.install(app,viewer)
+import guest_profiles
+guest_subject,_,_=guest_profiles.install(app,owner,lambda:store,sign_payload,token_payload)
 import title_upscale_model
 title_upscale_model.install(app)
 
@@ -430,7 +452,7 @@ def artwork(url: str):
 
 
 @app.get("/sources/search")
-def source_search(q: str, kind: str = "anime", subject=Depends(owner)):
+def source_search(q: str, kind: str = "anime", subject=Depends(viewer)):
     if not 2 <= len(q.strip()) <= 160:
         raise HTTPException(422, "Укажи название от 2 до 160 символов.")
     if kind=='manga':
@@ -440,7 +462,7 @@ def source_search(q: str, kind: str = "anime", subject=Depends(owner)):
 
 
 @app.get("/sources/availability")
-def availability(q: str, subject=Depends(owner)):
+def availability(q: str, subject=Depends(viewer)):
     if not 2 <= len(q.strip()) <= 160:
         raise HTTPException(422, "Некорректное название.")
     return voice_availability(q.strip())
@@ -459,7 +481,7 @@ _inspection_lock=threading.Lock()
 
 
 @app.post("/sources/inspect")
-def source_inspect(body: Inspection, subject=Depends(owner)):
+def source_inspect(body: Inspection, subject=Depends(viewer)):
     if body.kind not in {"anime", "movie", "tv", "manga", "ranobe"}:
         raise HTTPException(422, "Неизвестный тип произведения.")
     from kodik_api import cached_inspection
@@ -515,27 +537,27 @@ def manga_discovery_call(action,*args):
     except ValueError as error:raise HTTPException(422,str(error)) from None
 
 @app.get('/discovery/manga/sources')
-def discovery_manga_sources(language:str='all',q:str='',subject=Depends(owner)):
+def discovery_manga_sources(language:str='all',q:str='',subject=Depends(viewer)):
     from manga_discovery import source_list
     return manga_discovery_call(source_list,language,q)
 
 @app.post('/discovery/manga/search',status_code=202)
-def discovery_manga_search(body:MangaGlobalSearch,subject=Depends(owner)):
+def discovery_manga_search(body:MangaGlobalSearch,subject=Depends(viewer)):
     from manga_discovery import manager
     return manga_discovery_call(manager().start,subject,body.query,body.language,body.sourceIds,body.refresh,body.title)
 
 @app.get('/discovery/manga/search/{identity}')
-def discovery_manga_status(identity:str,subject=Depends(owner)):
+def discovery_manga_status(identity:str,subject=Depends(viewer)):
     from manga_discovery import manager
     return manga_discovery_call(manager().status,subject,identity)
 
 @app.delete('/discovery/manga/search/{identity}')
-def discovery_manga_cancel(identity:str,subject=Depends(owner)):
+def discovery_manga_cancel(identity:str,subject=Depends(viewer)):
     from manga_discovery import manager
     return manga_discovery_call(manager().cancel,subject,identity)
 
 @app.post('/manga/search')
-def manga_search(body:MangaDiscovery,subject=Depends(owner)):
+def manga_search(body:MangaDiscovery,subject=Depends(viewer)):
     from manga_sources import search_title
     from concurrent.futures import ThreadPoolExecutor
     from suwayomi_bridge import search as bridge_search
@@ -580,7 +602,7 @@ def manga_bridge_pack_status(subject=Depends(owner)):
     return status()
 
 @app.post('/manga/bridge/search')
-def manga_bridge_search(body:MangaDiscovery,subject=Depends(owner)):
+def manga_bridge_search(body:MangaDiscovery,subject=Depends(viewer)):
     from suwayomi_bridge import search
     return search(body.title,body.language,body.format,body.bridgeOffset,body.bridgeLimit)
 
@@ -591,7 +613,7 @@ class MangaInspection(StrictBody):
     refresh:bool=False
 
 @app.post('/manga/inspect')
-def manga_inspect(body:MangaInspection,subject=Depends(owner)):
+def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
     from manga_sources import title_aliases
     from manga_inspection import inspect
     from title_identity import match_title
@@ -614,7 +636,7 @@ def manga_inspect(body:MangaInspection,subject=Depends(owner)):
     return value
 
 @app.post('/manga/summary')
-def manga_summary(body:MangaInspection,subject=Depends(owner)):
+def manga_summary(body:MangaInspection,subject=Depends(viewer)):
     value=manga_inspect(body,subject)
     return {key:value.get(key) for key in ('provider','providerName','language','chapterCount','volumeCount','truncated','readable','readabilityError','verifiedPages','pagesCheckedAt') if key in value}
 
@@ -630,14 +652,14 @@ class QualityInspection(StrictBody):
 
 
 @app.post('/sources/qualities')
-def source_qualities(body: QualityInspection, subject=Depends(owner)):
+def source_qualities(body: QualityInspection, subject=Depends(viewer)):
     from source_quality import cached_qualities
     if body.referer:public_url(body.referer,resolve_dns=False)
     return cached_qualities(body.url,resolver_cache=getattr(app.state,'playback_resolver',None),subject=subject,**({'referer':body.referer} if body.referer else {}))
 
 
 @app.post('/sources/discover')
-def discover_voices(body: TitleDiscovery, subject=Depends(owner)):
+def discover_voices(body: TitleDiscovery, subject=Depends(viewer)):
     from source_discovery import discover
     if len(json.dumps(body.title)) > 10000:
         raise HTTPException(422, 'Слишком большое описание тайтла.')
@@ -647,14 +669,14 @@ def discover_voices(body: TitleDiscovery, subject=Depends(owner)):
         raise HTTPException(422, str(error)) from None
 
 @app.get('/discovery/voices')
-def discovery_voice_suggestions(q:str='',subject=Depends(owner)):
+def discovery_voice_suggestions(q:str='',subject=Depends(viewer)):
     from source_discovery import voice_suggestions
     if len(q)>80:raise HTTPException(422,'Слишком длинный запрос озвучки.')
     return voice_suggestions(q)
 
 
 @app.get('/sources/calendar')
-def source_calendar(subject=Depends(owner)):
+def source_calendar(subject=Depends(viewer)):
     from release_calendar import calendar
     return calendar()
 
@@ -747,17 +769,17 @@ install_anime_music(app)
 from alloha_delivery import install as install_alloha
 install_alloha(app)
 from online_sessions import install as install_online
-install_online(app,owner)
+install_online(app,viewer,owner)
 # HanimeTV refuses the Oracle address: its playlists go through the owner's Worker.
 from hanime_relay import install as install_hanime_relay
 install_hanime_relay()
 from music_playback import install as install_music_playback
 install_music_playback(app)
 from music_audio import install as install_music_audio
-install_music_audio(app,owner)
+install_music_audio(app,viewer)
 from music_lyrics import LyricsRelay,install as install_music_lyrics
 lyrics_relay=LyricsRelay()
-install_music_lyrics(app,owner,lyrics_relay)
+install_music_lyrics(app,viewer,lyrics_relay)
 from youtube_auth import install as install_youtube_auth
 install_youtube_auth(app,owner,lambda:store)
 from music_artists import install as install_music_artists
@@ -767,7 +789,7 @@ from title_background import install as install_title_background
 install_title_background(app, os.getenv("DATA_DIR", "/data"))
 
 from chapter_thumbnails import install as install_chapter_thumbnails
-install_chapter_thumbnails(app, owner)
+install_chapter_thumbnails(app, viewer)
 
 from character_profile import install as install_character_profile
 install_character_profile(app)

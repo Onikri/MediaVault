@@ -17,6 +17,8 @@ export function createRetainedMediaStore(){
   popup(id){if(active!==id)return;popup=popup===id?'':id;if(!popup&&!rows.get(id)?.anchor)pause(rows.get(id));emit();},
   return(id){const row=rows.get(id);if(!row)return;popup='';row.wantReturn=true;row.restore?.();if(!row.restore&&row.route){if(location.hash!==row.route)location.hash=row.route;else dispatchEvent(new HashChangeEvent('hashchange'));}emit();},
   close(id){const row=rows.get(id);if(!row)return;pause(row);active=active===id?'':active;popup=popup===id?'':popup;if(row.anchor&&row.stop)row.stop();else rows.delete(id);emit();},
+  forget(id){history=history.filter(v=>v.id!==id);try{localStorage.setItem('mv_viewing_history_v1:'+scope,JSON.stringify(history));}catch{}emit();},
+  forgetAll(){history=[];try{localStorage.removeItem('mv_viewing_history_v1:'+scope);}catch{}emit();},
   clear(){for(const row of rows.values())pause(row);rows.clear();active='';popup='';emit();},
   revisit(item){if(rows.has(item.id)&&active===item.id){store.return(item.id);return;}if(item.resumeItemId)dispatchEvent(new CustomEvent('mediavault:resume-item',{detail:{id:item.resumeItemId}}));else{if(location.hash!==item.route)location.hash=item.route;else dispatchEvent(new HashChangeEvent('hashchange'));}},
  };
