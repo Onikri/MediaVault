@@ -13,6 +13,7 @@ import {pauseContext} from './pause-character-context.js';
 import useVideoStream from './use-video-stream.js';
 import {contiguousBufferEnd} from './watch-quality.js';
 import useEpisodeMusic from './use-episode-music.js';
+import useEpisodeOst,{ostTrack} from './use-episode-ost.js';
 import {musicIdentityFor} from './music-library.js';
 import {upscalerById,autoUpscaler,migrateUpscaler} from './upscaler-catalog.js';
 import useExternalAudio from './use-external-audio.js';
@@ -52,7 +53,9 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   function cinema(){setTheater(v=>!v);}
 
   const musicIdentity=musicIdentityFor(item,catalog);
-  const episodeMusic=useEpisodeMusic(musicIdentity,item.episode||Number(item.name?.match(/(?:серия|episode)[ _-]*(\d+)/i)?.[1])||1,duration,onlineControls?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl);
+  const musicEpisode=item.episode||Number(item.name?.match(/(?:серия|episode)[ _-]*(\d+)/i)?.[1])||1;
+  const episodeMusic=useEpisodeMusic(musicIdentity,musicEpisode,duration,onlineControls?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl);
+  const episodeOst=useEpisodeOst(musicIdentity,musicEpisode,onlineControls?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl);
   const [dismissedCue,setDismissedCue]=useState('');
   const settingsOpen=panel==='settings';
   const scene=usePlayerAtmosphere(videoRef,source,prefs.ambient);
@@ -84,7 +87,10 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const effectiveOpening=opening||sourceIntervals.find(v=>v.type==='op')||shifted.find(v=>v.type==='op');
   const ending=openingBounds(item.ending)||sourceIntervals.find(v=>v.type==='ed')||shifted.find(v=>v.type==='ed');
   const activeTheme=effectiveOpening&&time>=effectiveOpening.start&&time<effectiveOpening.end?'OP':ending&&time>=ending.start&&time<ending.end?'ED':null;
-  const songCandidates=episodeMusic.tracks.filter(t=>t.type===activeTheme),currentSong=songCandidates.length===1?songCandidates[0]:null;
+  const songCandidates=episodeMusic.tracks.filter(t=>t.type===activeTheme);
+  // Between the opening and ending: the background track WTAS heard at this second.
+  const ostNow=activeTheme?null:episodeOst.tracks.filter(t=>!t.uncertain&&time>=t.start&&time<t.end).sort((a,b)=>b.confidence-a.confidence)[0];
+  const currentSong=songCandidates.length===1?songCandidates[0]:ostNow?ostTrack(ostNow):null,songTheme=activeTheme||(ostNow?'OST':null);
   const lastStored=useRef(-1),resumeApplied=useRef(false),subtitleInput=useRef(null),autoSkipped=useRef(new Set());
   const library=useMemo(()=>buildPlaybackLibrary(item,catalog),[item.id,catalog]);
   const seasons=library.seasons;
@@ -326,6 +332,6 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const hiddenControls=playing&&panel==='watch'&&!musicOpen&&!controlsVisible;
   const progress=seekable?Math.min(100,previewTime/duration*100):0;
   return {
-    timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,item,source,nextEpisode:next?nextEpisode:null,toggleCaptions,previous,setTheater
+    episodeOst,songTheme,timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,item,source,nextEpisode:next?nextEpisode:null,toggleCaptions,previous,setTheater
   };
 }

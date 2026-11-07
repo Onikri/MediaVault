@@ -765,6 +765,8 @@ from reader_translation import install as install_reader_translation
 install_reader_translation(app, os.getenv("DATA_DIR", "/data"), owner)
 from anime_music import install as install_anime_music
 install_anime_music(app)
+from wtas_ost import install as install_wtas_ost
+install_wtas_ost(app, os.getenv("DATA_DIR", "/data"))
 
 from alloha_delivery import install as install_alloha
 install_alloha(app)

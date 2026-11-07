@@ -33,12 +33,17 @@ let browser,vite,last;
   // Headless Chrome ignores --autoplay-policy; reproduce the real refusal: unmuted
   // play() rejects with NotAllowedError until the viewer clicks.
   if(!allowed)await page.addInitScript(()=>{let activated=false;addEventListener('pointerdown',()=>{activated=true;},true);const play=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){return activated||this.muted?play.call(this):Promise.reject(new DOMException('play() requires a user gesture','NotAllowedError'));};});
+  // WTAS.moe background music for episode 5: a track that covers the found second.
+  await page.route('**/music/ost/29787/5',route=>route.fulfill({json:{available:true,pending:false,episodeDuration:20,tracks:[{title:'Scene Theme',album:'Fixture OST',start:3,end:15,confidence:.05,uncertain:false,spotify:'1234567890abcdefABCDEF'},{title:'Noise',album:'Fixture OST',start:4,end:9,confidence:.002,uncertain:true,spotify:null}]}}));
   await page.addInitScript(()=>{try{if(!sessionStorage.getItem('jump-seeded')){sessionStorage.setItem('jump-seeded','1');sessionStorage.setItem('mv_scene_jump_v1',JSON.stringify({mal:'29787',episode:5,time:6,at:Date.now()}));}}catch{}});
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');
   await page.waitForFunction(()=>{const v=document.querySelector('video.mv-player-media');return v&&v.readyState>=2&&v.currentTime>=5.5;});
   await page.waitForTimeout(1600);
   const state=await page.evaluate(()=>{const v=document.querySelector('video.mv-player-media'),r=document.querySelector('.mv-player').getBoundingClientRect();return {time:v.currentTime,paused:v.paused,muted:v.muted,inView:r.top<innerHeight&&r.bottom>0,prepared:window.prepared,jump:sessionStorage.getItem('mv_scene_jump_v1')};});
-  if(allowed){assert.equal(state.paused,false,'Allowed autoplay starts by itself');assert.ok(state.time>=6&&state.time<9,'Plays from the found second: '+state.time);}
+  if(allowed){assert.equal(state.paused,false,'Allowed autoplay starts by itself');
+   const cue=page.locator('.mvx-song');await cue.waitFor();const cueText=await cue.innerText();
+   assert.ok(cueText.includes('Scene Theme')&&cueText.includes('Сейчас звучит')&&!cueText.includes('Noise'),'Background track at this second is shown, uncertain ones are not: '+cueText);
+   assert.equal(await cue.locator('a[href="https://open.spotify.com/track/1234567890abcdefABCDEF"]').count(),1,'Official Spotify track link');assert.ok(state.time>=6&&state.time<9,'Plays from the found second: '+state.time);}
   else{assert.ok(state.time>=5.5&&state.time<6.5,'Timeline is set to the found second: '+JSON.stringify(state));assert.equal(state.paused,true,'Refused autoplay waits for Play');}
   assert.equal(state.muted,false,'No silent fallback');
   assert.ok(state.inView,'The player is scrolled into view');

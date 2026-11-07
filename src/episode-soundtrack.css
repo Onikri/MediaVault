@@ -1,0 +1,29 @@
+.episode-ost{display:grid;gap:14px;margin-top:22px;padding:18px;border-radius:24px;background:var(--color-surface);min-width:0}
+.episode-ost-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.episode-ost-head h3{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.episode-ost-head span{font-size:12px;color:var(--color-on-muted)}
+.episode-ost-episodes{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding:4px;border-radius:999px;background:var(--color-canvas-soft)}
+.episode-ost-episodes::-webkit-scrollbar{display:none}
+.episode-ost-episodes>button{position:relative;flex:none;min-width:38px;height:34px;padding:0 10px;border:0;border-radius:999px;background:none;color:var(--color-on-muted);font:600 12.5px/1 var(--font-ui,system-ui);cursor:pointer}
+.episode-ost-episodes>button>span:last-child{position:relative;z-index:1}
+.episode-ost-episodes>button[aria-selected=true]{color:var(--color-petal)}
+.episode-ost-active{position:absolute;inset:0;border-radius:999px;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
+.episode-ost-timeline{position:relative;height:30px;margin:4px 0 16px;border-radius:10px;background:var(--color-canvas-soft)}
+.episode-ost-timeline>i{position:absolute;top:5px;bottom:5px;border-radius:6px;background:hsl(var(--track-hue) 62% 58%)}
+.episode-ost-timeline>span{position:absolute;left:0;right:0;top:100%}
+.episode-ost-timeline>span>small{position:absolute;top:4px;transform:translateX(-50%);font-size:10px;color:var(--color-on-muted);font-variant-numeric:tabular-nums}
+.episode-ost-timeline>span>small:first-child{transform:none}.episode-ost-timeline>span>small:last-child{transform:translateX(-100%)}
+.episode-ost-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.episode-ost-list>li{display:grid;grid-template-columns:6px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 10px 10px 12px;border-radius:16px;background:var(--color-canvas-soft)}
+.episode-ost-swatch{align-self:stretch;width:6px;border-radius:6px;background:hsl(var(--track-hue) 62% 58%)}
+.episode-ost-text{display:grid;gap:3px;min-width:0}
+.episode-ost-text strong{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.episode-ost-text small{font-size:11.5px;color:var(--color-on-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.episode-ost-text>span{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.episode-ost-text em{font-style:normal;font-size:11px;padding:2px 7px;border-radius:999px;background:var(--color-surface);color:var(--color-on-muted);font-variant-numeric:tabular-nums}
+.episode-ost-actions{display:flex;gap:4px}
+.episode-ost-actions>button,.episode-ost-actions>a{display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;background:var(--color-surface);color:var(--color-petal);cursor:pointer}
+.episode-ost-actions>button:hover,.episode-ost-actions>a:hover{background:var(--color-surface-raised,rgb(255 255 255 / .1))}
+.episode-ost-toggle{justify-self:start;height:34px;padding:0 14px;border:0;border-radius:999px;background:var(--color-canvas-soft);color:var(--color-on-muted);font:600 12px/1 var(--font-ui,system-ui);cursor:pointer}
+.episode-ost-toggle:hover{color:var(--color-petal)}
+@media(max-width:640px){.episode-ost{padding:14px;border-radius:20px}.episode-ost-list{grid-template-columns:1fr}}

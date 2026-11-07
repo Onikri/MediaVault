@@ -487,3 +487,11 @@
 /* The console gradient pads 34-60px above the controls; that empty band must not
    swallow taps on the "Continue from" button above it (phones). */
 .mv-player .mvx-console{pointer-events:none}.mv-player .mvx-console>*{pointer-events:auto}
+
+/* Episode background music (WTAS.moe) inside "Музыка серии". */
+.mvx-ost{margin-top:10px}
+.mvx-ost .mvx-menu-head small{opacity:.7}
+.mvx-ost .mvx-songs>li{position:relative}
+.mvx-ost .mvx-song-row{padding-right:48px}
+.mvx-ost-play{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:50%;background:rgb(255 255 255 / .08);color:#fff;cursor:pointer}
+.mvx-ost-play:hover{background:rgb(255 255 255 / .16)}
