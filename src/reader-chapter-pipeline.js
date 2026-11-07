@@ -1,6 +1,6 @@
 import {readChapterBlob,writeChapterBlob,removeChapterBlob,encodeCleanPage,decodeCleanPage} from './reader-chapter-cache.js';
 import {directKey,restoreDirectKeys} from './manga-direct-key.js';
-import {linkPageBlocks,packBlockSheets,unpackBlockTranslations,BLOCK_LIMITS} from './manga-blocks.js';
+import {blockPackets,linkPageBlocks,packBlockSheets,unpackBlockTranslations,BLOCK_LIMITS} from './manga-blocks.js';
 import {needsEmptyReview,reviewEmptyTranslations,unresolvedRegions} from './manga-empty-review.js';
 
 const pause=(ms,signal)=>new Promise((resolve,reject)=>{const abort=()=>{clearTimeout(timer);reject(signal.reason);};const timer=setTimeout(()=>{signal.removeEventListener('abort',abort);resolve();},ms);signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();});
@@ -71,7 +71,21 @@ export async function drainOrderedChapter(c){
   while(!c.controller.signal.aborted){
    if(c.priorityBarrier){if(inFlight.size){await Promise.allSettled([...inFlight]);continue;}c.priorityBarrier=false;}
    if(inFlight.size>=3||(c.activePages||0)+c.batchSize()>9&&inFlight.size){await Promise.race(inFlight);continue;}
-   const pending=c.pendingJobs();if(!pending.length)break;
+   const pending=c.pendingJobs();
+   if(!pending.length){
+    if(inFlight.size){await Promise.allSettled([...inFlight]);continue;}
+    if(c.chapterStarted&&!c.recoveryStarted){
+     c.recoveryStarted=true;
+     const failed=[...c.pageStates].filter(([,page])=>page.state==='failed'&&page.retryable).map(([index])=>index);
+     for(const index of failed)c.request(index,null,true).retryAfterChapter=true;
+     continue;
+    }
+    if(c.recoveryStarted===true){
+     c.recoveryStarted='done';
+     await c.recoverChapter().catch(()=>{});
+    }
+    break;
+   }
    const first=pending[0],group=[],sources=[],epoch=c.priorityEpoch,priority=c.priorityPages.has(first.index);let key;
    try{
     const blocks=c.config.directInput==='blocks',max=blocks?9-(c.activePages||0):c.packetRange(first.index).count;let pixels=0,regions=0;
@@ -81,7 +95,7 @@ export async function drainOrderedChapter(c){
      const source=await c.preparation.get(job.index);
      if(blocks&&sources.length&&(pixels+source.width*source.height>BLOCK_LIMITS.pixels||regions+source.regions.length>100))break;
      job.state='running';c.pageStates.set(job.index,{page:job.index+1,state:'running'});group.push(job);sources.push(source);job.prepared=source;job.blob=source.blob;pixels+=source.width*source.height;regions+=source.regions.length;
-     if(blocks&&packBlockSheets(linkPageBlocks(sources,{direction:c.direction,webtoon:c.config.webtoon})).length>1)break;
+     if(blocks&&packBlockSheets(linkPageBlocks(sources,{direction:c.direction,webtoon:c.config.webtoon})).length>2)break;
     }
     if(!group.length)continue;
     const hits=await Promise.all(group.map(job=>c.cached(job)));
@@ -100,7 +114,7 @@ export async function drainOrderedChapter(c){
     const local=sources.filter(p=>active.some(j=>j.index+1===p.page));
     if(!blocks&&local.length===1&&c.entries.length>1){const neighbour=local[0].page<c.entries.length?local[0].page:local[0].page-2;try{local.push(await c.preparation.get(neighbour));local.sort((a,b)=>a.page-b.page);}catch{}}
     c.activePages=(c.activePages||0)+active.length;const leasedKey=key;
-    const task=translatePacket(c,active,local,leasedKey,hits.every(Boolean)?hits:null).then(completed=>{c.keyBusy.delete(leasedKey);for(const[job,page]of completed)c.finish(job,page);}).catch(error=>{c.keyBusy.delete(leasedKey);for(const job of active)if(job.state!=='done')c.fail(job,error);}).finally(()=>{c.keyBusy.delete(leasedKey);c.activePages-=active.length;inFlight.delete(task);c.active=inFlight.size;});
+    const task=translatePacket(c,active,local,leasedKey,hits.every(Boolean)?hits:null).then(completed=>{c.keyBusy.delete(leasedKey);for(const[job,page]of completed){c.finish(job,page);if(job.retryAfterChapter)c.config.onRecovered?.(job.index);}}).catch(error=>{c.keyBusy.delete(leasedKey);for(const job of active)if(job.state!=='done')c.fail(job,error,{retryable:true});}).finally(()=>{c.keyBusy.delete(leasedKey);c.activePages-=active.length;inFlight.delete(task);c.active=inFlight.size;});
     inFlight.add(task);c.active=inFlight.size;key=null;
    }catch(error){if(key)c.keyBusy.delete(key);if(!group.length)c.fail(first,error);for(const job of group)if(job.state==='running')c.fail(job,error);}
   }
@@ -114,7 +128,7 @@ async function translatePacket(c,jobs,sources,key,cachedPages){
   for(const job of jobs)c.notify(job.index,{phase:'translating',message:blocks?'Блоки · '+sources.length+' исходных страниц на '+send.length+' листах':'Перевод по порядку · страницы '+sources.map(p=>p.page).join(', '),totalRegions:job.prepared.regions.length});
   options={key,paced:true,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:c.config.gemmaProfile||'compat',context:[...c.context].filter(([i])=>i<jobs[0].index).sort((a,b)=>a[0]-b[0]).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{if(value.gateway?.personal===false&&Number.isInteger(value.gateway.slot))for(const job of jobs)job.keySlot=value.gateway.slot+1;diagnostics={...value,local:{batchPages:sources.map(p=>p.page),buffer:9},transport:{viaOracle:!!c.config.directViaOracle,keySlot:jobs[0].keySlot,serverKey:jobs[0].serverKey}};for(const job of jobs)c.notify(job.index,{phase:'translating',message:({prepared:'Запрос подготовлен',sending:'Отправляем пакет в Google',uploading:'Отправляем изображения в Google',waiting:'Пакет отправлен · ждём Google',headers:'Google начал отвечать',receiving:'Получаем ответ Google',streaming:'Google присылает перевод',complete:'JSON проверен'}[value.stage]||'Пакет · '+value.stage),diagnostics});}};
   if(!cachedPages){
-  const answer={pages:[],usage:[]};for(const[part,packet]of labelPackets(send).entries()){const result=await c.callGoogle(packet,{...options,paced:part===0});answer.pages.push(...result.pages);answer.usage.push(result.usage);}
+  const answer={pages:[],usage:[]};for(const[part,packet]of (blocks?blockPackets(send):labelPackets(send)).entries()){const result=await c.callGoogle(packet,{...options,allowMissing:true,paced:part===0});answer.pages.push(...result.pages);answer.usage.push(result.usage);}
   if(!blocks){const merged=new Map();for(const p of answer.pages){const prior=merged.get(p.page);merged.set(p.page,prior?{...p,regions:[...prior.regions,...p.regions]}:p);}answer.pages=[...merged.values()];}
   translated=blocks?unpackBlockTranslations(answer.pages,sheets,sources):answer.pages;usage=answer.usage;
   }

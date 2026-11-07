@@ -10,17 +10,19 @@ export function boxIou(a,b){
  const area=v=>Math.max(0,v[2]-v[0])*Math.max(0,v[3]-v[1]),intersection=area([Math.max(a[0],b[0]),Math.max(a[1],b[1]),Math.min(a[2],b[2]),Math.min(a[3],b[3])]);
  return intersection/Math.max(1,area(a)+area(b)-intersection);
 }
-export function visionRegions(rows,page,fonts,kinds){
+export function visionRegions(rows,page,fonts,kinds,{allowMissing=false}={}){
  if(!Array.isArray(rows)||rows.length>100)throw Error('Google вернул слишком много областей или некорректный список.');
  const result=[];
  for(const [i,row] of rows.entries()){
   if(!row||typeof row.ru!=='string'||row.ru.length>4000)throw Error('Google вернул некорректный текст области.');
-  if(/\p{L}/u.test(row.ru)&&!/[А-Яа-яЁё]/.test(row.ru))throw Error('В ответе есть непереведённая реплика. Оригинал сохранён.');
+  const foreign=/\p{L}/u.test(row.ru)&&!/[А-Яа-яЁё]/.test(row.ru);
+  if(foreign&&!allowMissing)throw Error('В ответе есть непереведённая реплика. Оригинал сохранён.');
   const bbox=rectangle(row.box,page.width,page.height),layout=row.layout?rectangle(row.layout,page.width,page.height):bbox;
   if(bbox[2]-bbox[0]<4||bbox[3]-bbox[1]<4||(bbox[2]-bbox[0])*(bbox[3]-bbox[1])>page.width*page.height*.3)throw Error('Область Google слишком мала или велика для безопасной очистки. Оригинал сохранён.');
   if(layout[0]>bbox[0]+1||layout[1]>bbox[1]+1||layout[2]<bbox[2]-1||layout[3]<bbox[3]-1)throw Error('Рамка набора Google не вмещает исходный текст. Оригинал сохранён.');
   if(result.some(r=>boxIou(r.text_bbox,bbox)>.85))throw Error('Google продублировал текстовую область. Оригинал сохранён.');
-  result.push({uid:page.id+'_B'+(i+1),text_bbox:bbox,layout_bbox:layout,ru_translation:row.ru.trim(),source_text:'',font_style:fonts[row.f]||fonts[0],text_category:kinds[row.k]||kinds[0]});
+  const translation=foreign?'':row.ru.trim();
+  result.push({uid:page.id+'_B'+(i+1),text_bbox:bbox,layout_bbox:layout,ru_translation:translation,...(!translation?{empty_reason:foreign?'unreadable':['non_text','unreadable'].includes(row.e)?row.e:'unconfirmed'}:{}),source_text:'',font_style:fonts[row.f]||fonts[0],text_category:kinds[row.k]||kinds[0]});
  }
  return result;
 }

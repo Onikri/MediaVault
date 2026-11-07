@@ -59,6 +59,19 @@ export function unpackBlockTranslations(translated,sheets,pages){
  for(const [id,group]of expected){const row=rows.get(id);for(const part of group.parts){const page=result.get(part.page);page.regions.push({...row,uid:part.id,text_bbox:part.bbox,layout_bbox:part.layout_bbox||part.bbox,...(part.bubble_bbox?{bubble_bbox:part.bubble_bbox}:{}),...(group.parts.length>1?{flow:{id,width:group.width,height:group.height,offsetY:part.offsetY}}:{})});if(group.parts.length>1)page.detected.seams.push({id,parts:group.parts.map(p=>({page:p.page,bbox:p.bbox}))});}}
  return [...result.values()];
 }
+export function blockPackets(sheets){
+ const packets=[];let packet=[],regions=0,bytes=0;
+ for(const sheet of sheets){
+  const size=sheet.image?.length||0;
+  if(size>16*1024*1024)throw Error('Лист блоков превышает лимит запроса.');
+  if(packet.length&&(packet.length===2||regions+sheet.regions.length>100||bytes+size>16*1024*1024)){
+   packets.push(packet);packet=[];regions=0;bytes=0;
+  }
+  packet.push(sheet);regions+=sheet.regions.length;bytes+=size;
+ }
+ if(packet.length)packets.push(packet);
+ return packets;
+}
 export async function paintBlockSheets(sheets,pages){
  const bitmaps=new Map();try{
   for(const p of pages)bitmaps.set(p.page,await createImageBitmap(p.blob));

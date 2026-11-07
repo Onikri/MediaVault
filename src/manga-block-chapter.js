@@ -1,4 +1,4 @@
-import {BLOCK_LIMITS,linkPageBlocks,packBlockSheets,unpackBlockTranslations} from './manga-blocks.js';
+import {BLOCK_LIMITS,blockPackets,linkPageBlocks,packBlockSheets,unpackBlockTranslations} from './manga-blocks.js';
 import {directKey,restoreDirectKeys} from './manga-direct-key.js';
 
 // Measured budgets determine how many source pages share a sheet.
@@ -13,6 +13,7 @@ export async function drainBlockChapter(c){
    const firstHit=await c.cached(first);if(firstHit){c.finish(first,firstHit);continue;}
    const previous=c.config.webtoon&&first.index>0&&!c.jobs.has(first.index-1)?first.index-1:first.index;
    for(let n=previous;n<c.entries.length;n++){
+    if(c.config.skipPages?.has(n))break;
     let job=c.jobs.get(n);if(job&&job.state!=='queued'){if(n>=first.index)break;continue;}
     job=job||c.request(n,null,true);job.state='running';job.queueMs=Math.round(performance.now()-job.started);group.push(job);
     try{
@@ -39,16 +40,15 @@ export async function drainBlockChapter(c){
    if(sheets.length){
     const available=c.serverSlots.length?c.serverSlots.map(slot=>'oracle-slot:'+slot):c.getKey===directKey?await restoreDirectKeys(c.keyScope):[c.getKey(c.keyScope)];key=available.find(k=>!c.keyBusy.has(k));if(!key)throw Error('Добавь ключ Google в настройках перевода.');c.keyBusy.add(key);
     const packed=await c.canvasTask({operation:'blocks-pack',sheets,pages:prepared});c.controller.signal.throwIfAborted();
-    const answers=[];let pack=[],count=0,bytes=0;
-    const send=async()=>{if(!pack.length)return;const current=pack;pack=[];count=0;bytes=0;
+    const answers=[];
+    for(const current of blockPackets(packed)){
      for(const job of active){job.keySlot=c.serverSlots.length?c.serverSlots[available.indexOf(key)]+1:available.indexOf(key)+1;job.serverKey=!!c.serverSlots.length;c.notify(job.index,{phase:'translating',message:'Блоки · '+current.length+' лист(а), '+prepared.length+' исходных страниц',model:c.config.directModel,totalRegions:job.prepared.regions.length,completedRegions:0});}
-     const result=await c.callGoogle(current,{key,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:'compat',context:[...c.context].filter(([i])=>i<first.index).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{
+     const result=await c.callGoogle(current,{key,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:'compat',allowMissing:true,context:[...c.context].filter(([i])=>i<first.index).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{
       diagnostics={...value,blocks:{sourcePages:prepared.map(p=>p.page),sheets:current.map(s=>({id:s.id,width:s.width,height:s.height,placements:s.placements.map(p=>({id:p.group.id,box:p.box,parts:p.group.parts.map(part=>({page:part.page,bbox:part.bbox}))}))})),joined:groups.filter(g=>g.parts.length>1).map(g=>g.id)},transport:{viaOracle:!!c.config.directViaOracle,keySlot:active[0]?.keySlot,serverKey:!!c.serverSlots.length}};
       for(const job of active)c.notify(job.index,{phase:'translating',message:'Лист блоков · '+value.stage,diagnostics});
      }});answers.push(...result.pages);usage.push(result.usage);
-    };
-    for(const sheet of packed){if(sheet.image.length>16*1024*1024)throw Error('Лист превышает лимит запроса. Раздели слишком большой текстовый блок.');if(pack.length&&(pack.length>=3||count+sheet.regions.length>100||bytes+sheet.image.length>16*1024*1024))await send();pack.push(sheet);count+=sheet.regions.length;bytes+=sheet.image.length;}
-    await send();pages=unpackBlockTranslations(answers,sheets,prepared);
+    }
+    pages=unpackBlockTranslations(answers,sheets,prepared);
    }
    c.controller.signal.throwIfAborted();
    for(const job of active){const page=pages.find(p=>p.page===job.index+1);if(!page)throw Error('Не получена страница пакета блоков.');page.usage=usage;page.engine='Блоки → Google → очистка на устройстве';page.diagnostics=diagnostics;

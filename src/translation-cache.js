@@ -1,4 +1,5 @@
 import {resultConfig,bytesBase64,fromBase64,hasRenderedPage} from './manga-translation.js';
+export const incompleteRender=value=>!!(value?.unresolvedRegions?.length||value?.detectionReport?.unresolved?.length||value?.inpaint?.unpainted||value?.warnings?.length);
 const DB='mv-translated-pages-v1',LIMIT=256*1024*1024,MAX=1000;
 const request=r=>new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
 const done=tx=>new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(tx.error);});
@@ -11,14 +12,14 @@ export async function putTranslation(id,scope,result,metadata){if((!hasRenderedP
 // Old reader rows are discoverable too; never treat an incomplete cache as a chapter.
 export async function cachedChapterPages({scope,chapter,url,total}){
  const db=await database(),rows=await request(db.transaction('pages').objectStore('pages').getAll()),marker=':chapter='+encodeURIComponent(chapter||'online:'+url)+':page=';
- const candidates=rows.filter(row=>row.scope===scope&&(row.id.includes(':render-v')||row.metadata)&&(row.metadata?.chapter===chapter||url&&row.metadata?.url===url||row.id.includes(marker))).sort((a,b)=>b.time-a.time);
+ const candidates=rows.filter(row=>row.scope===scope&&(row.id.includes(':render-v')||row.metadata)&&(chapter&&row.metadata?.chapter===chapter||url&&row.metadata?.url===url||row.id.includes(marker))).sort((a,b)=>b.time-a.time);
  if(!candidates.length)return {pages:[],total:total||0,complete:false};
  const variant=row=>row.metadata?.variant||row.id.slice(scope.length+1).slice(row.id.slice(scope.length+1).indexOf(':')+1).replace(/:page=\d+/,'');
  const newest=variant(candidates[0]),pages=[],seen=new Set();let expected=total||candidates[0].metadata?.total||0;
  for(const row of candidates){
   if(variant(row)!==newest)continue;
   const page=row.metadata?.index??Number(row.id.match(/:page=(\d+)/)?.[1]);if(!Number.isInteger(page)||seen.has(page))continue;
-  const value=await getTranslation(row.id,scope);if(!value?.renderedImage)continue;
+  const value=await getTranslation(row.id,scope);if(!value?.renderedImage||incompleteRender(value))continue;
   const digest=fromBase64(row.id.slice(scope.length+1).split(':')[0]);
   pages.push({page,blob:new Blob([value.renderedImage],{type:value.renderedMime||'image/webp'}),sourceHash:Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')});seen.add(page);
  }

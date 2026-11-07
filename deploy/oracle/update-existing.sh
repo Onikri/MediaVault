@@ -54,9 +54,17 @@ with log.open('w') as output:
     execute(['git','-C',str(release),'fetch','--depth=1','origin',revision],stdout=output,stderr=output)
     execute(['git','-C',str(release),'checkout','--detach','FETCH_HEAD'],stdout=output,stderr=output)
     if command(['git','-C',str(release),'rev-parse','HEAD'])!=revision:raise SystemExit('Release SHA mismatch.')
-    execute(['docker','build','--label','org.opencontainers.image.revision='+revision,'-t',image,str(release/'server')],stdout=output,stderr=output)
+    dockerfile=release/'server'/'Dockerfile'
+    build=['docker','build','--label','org.opencontainers.image.revision='+revision,'-t',image]
+    if dockerfile.is_file() and 'AS export-assets' in dockerfile.read_text():
+        build+=['-f',str(dockerfile),str(release)]
+    else:
+        build.append(str(release/'server'))
+    execute(build,stdout=output,stderr=output)
 expected_version=int(command(['docker','run','--rm','--network','none','--entrypoint','python',image,'-c','import api; print(api.health()["version"])']))
 if expected_version<6:raise SystemExit('The release does not support voice discovery; no replacement made.')
+if expected_version>=51:
+    execute(['docker','run','--rm','--network','none','--entrypoint','python',image,'-c','import api; assert api.health()["mangaTranslationExport"]'])
 override=work/('release-'+revision[:12]+'.yaml')
 if override.exists():raise SystemExit('Release override already exists. Inspect the previous attempt before retrying.')
 override.write_text('services:\n  importer:\n    image: '+image+'\n')
@@ -87,7 +95,7 @@ try:
     for attempt in range(45):
         try:
             current=json.loads(command([*paused,'exec','-T','importer','python','-c',health_code],stderr=subprocess.DEVNULL))
-            if current.get('version')==expected_version and current.get('voiceDiscovery'):break
+            if current.get('version')==expected_version and current.get('voiceDiscovery') and (expected_version<51 or current.get('mangaTranslationExport')):break
         except (subprocess.CalledProcessError,ValueError):pass
         time.sleep(2)
     else:raise RuntimeError('Release backend health check failed.')
@@ -103,7 +111,7 @@ try:
     for attempt in range(45):
         try:
             current=json.loads(command([*updated,'exec','-T','importer','python','-c',health_code],stderr=subprocess.DEVNULL))
-            if current.get('version')==expected_version and current.get('voiceDiscovery') and current.get('oauthConfigured')==before_health.get('oauthConfigured'):break
+            if current.get('version')==expected_version and current.get('voiceDiscovery') and current.get('oauthConfigured')==before_health.get('oauthConfigured') and (expected_version<51 or current.get('mangaTranslationExport')):break
         except (subprocess.CalledProcessError,ValueError):pass
         time.sleep(2)
     else:raise RuntimeError('Worker-enabled backend health check failed.')

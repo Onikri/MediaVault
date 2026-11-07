@@ -93,7 +93,7 @@ function missingChapter({reviewFails=false,cached=false,nonText=false}={}){
  const initial=p=>({page:p.page,width:300,height:400,regions:[{uid:'P'+p.page+'_B1',text_bbox:[30,40,130,190],layout_bbox:[20,30,145,210],font_style:'standard_comic',ru_translation:p.page===1?'':'Уже переведено',...(nonText&&p.page===1?{empty_reason:'non_text'}:{})}]});
  const c=new DirectChapter({entries:[1,2].map(n=>({async:async()=>new Blob(['page'+n])})),scope:'missing-fixture',config:translationConfig({engine:'direct',cache:cached}),getKey:()=> 'personal-fixture',cacheKey:async b=>b.text(),pacer:{reserve:async key=>leases.push(key)},prepare:async(b,i)=>({id:'P'+(i+1),page:i+1,width:300,height:400,mime:'image/png',image:'original',regions:[{id:'P'+(i+1)+'_B1',bbox:[30,40,130,190],layout_bbox:[20,30,145,210]}]}),readCache:async id=>cached?{kind:'manga-json',page:initial({page:id.includes('page=0')?1:2})}:null,writeCache:async(...v)=>writes.push(v),google:async(pages,o)=>{
   sent.push({pages,options:o});
-  if(o.reviewEmptyIds){if(reviewFails)throw Error('Google HTTP 429');return{pages:[{page:1,regions:[{uid:'P1_B1',text_bbox:[0,0,999,999],ru_translation:'Восстановленная реплика',font_style:'bold_scream',text_category:'dialogue'}]}]};}
+  if(o.reviewEmptyIds){if(reviewFails)throw Error('Google HTTP 429');return{pages:pages.map(p=>({page:p.page,regions:p.regions.map(r=>({uid:r.id,text_bbox:[0,0,999,999],ru_translation:'Восстановленная реплика',font_style:'bold_scream',text_category:'dialogue'}))}))};}
   return{pages:pages.map(initial)};
  }});
  c.canvasTask=async message=>message.operation==='blocks-pack'?message.sheets.map(s=>({...s,image:'enlarged-crops',mime:'image/png'})):{regions:[],cleanedImage:new ArrayBuffer(0)};
@@ -148,4 +148,24 @@ test('one crop review restores both parts of a joined webtoon sentence without c
 test('old partial JSON stays readable without keys instead of failing its whole packet',async()=>{
  const {c,sent}=missingChapter({cached:true});c.getKey=()=>'';
  try{c.request(0,null);const pages=await Promise.all([...c.jobs.values()].map(j=>j.promise));assert.equal(sent.length,0);assert.equal(pages[1].regions[0].ru_translation,'Уже переведено');assert.match(pages[0].emptyReview.error,/Нет ключа/);assert.equal(pages[0].emptyReview.attempted,false);assert.equal(c.snapshot().preparation.partial,1);}finally{c.close();}
+});
+
+test('chapter recovery sends only missing crops from separate pages and preserves good translations',async()=>{
+ const {c,sent}=missingChapter();
+ try{
+  c.canvasTask=async message=>message.sheets.map(sheet=>({...sheet,image:'fixture'}));
+  for(const index of [0,1]){
+   const page=index+1;
+   c.incomplete.set(index,{page:{page,width:300,height:400,regions:[
+    {uid:'P'+page+'_B1',text_bbox:[30,40,130,190],ru_translation:''},
+    {uid:'P'+page+'_B2',text_bbox:[30,220,130,290],ru_translation:'Уже переведено'}
+   ]}});
+   c.partialPages.add(index);
+  }
+  await c.recoverChapter();
+  assert.equal(sent.length,1);
+  assert.deepEqual(sent[0].options.reviewEmptyIds,['P1_B1','P2_B1']);
+  assert.equal(c.partialPages.size,0);
+  assert.equal(c.recovered.get(0).regions[1].ru_translation,'Уже переведено');
+ }finally{c.close();}
 });

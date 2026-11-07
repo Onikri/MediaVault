@@ -1,16 +1,28 @@
 # syntax=docker/dockerfile:1
+FROM node:22.22.0-bookworm-slim AS export-assets
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY src/ src/
+COPY lmt/ lmt/
+COPY reader-fonts/ reader-fonts/
+COPY scripts/build-lmt.mjs scripts/
+COPY vite.config.js index.html manga-export.html config.js spotify-callback.html translation-demo.html sw.js crypto.js drive.js selftest.html icon.svg manifest.webmanifest ./
+RUN npm run build && test -s dist/manga-export.html && test -s dist/lmt/index.html
+
 FROM python:3.12-slim-bookworm
 ENV CHROMIUM_PATH=/usr/bin/chromium PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates chromium tesseract-ocr tesseract-ocr-eng libgomp1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY requirements.txt requirements-service.txt ./
+COPY server/requirements.txt server/requirements-service.txt ./
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir -r requirements-service.txt; \
     else pip install --no-cache-dir -r requirements-service.txt; fi
 RUN useradd --uid 1000 --create-home vault && mkdir -p /data /app/.codex-local/lyrics && chown -R vault:vault /data /app/.codex-local
 COPY --from=node:22.22.0-bookworm-slim /usr/local/bin/node /usr/local/bin/node
-COPY --chown=vault:vault --chmod=0644 *.py ./
-COPY --chown=vault:vault --chmod=0644 gemma-system.md ./
+COPY --chown=vault:vault --chmod=0644 server/*.py ./
+COPY --chown=vault:vault --chmod=0644 server/gemma-system.md ./
+COPY --from=export-assets /build/dist /app/export-assets
 USER vault
 EXPOSE 7860
 CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1", "--no-access-log"]

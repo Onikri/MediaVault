@@ -34,29 +34,32 @@ export function directRequest(pages,{model=DIRECT_MODELS[0],direction='rtl',cont
  if(count>100)throw Error('Запрос превышает лимит 100 текстовых областей. Раздели пакет.');
  return {contents:[{role:'user',parts}],generationConfig:{...(!model.startsWith('gemini-3.')?{temperature:0}:{}),maxOutputTokens:Math.min(8192,Math.max(input==='vision'?8192:native?1024:2048,count*(native?100:180))),...(!model.startsWith('gemma-')?{responseMimeType:'application/json'}:{}),thinkingConfig:{...googleModel(model).thinking}}};
 }
-export function validateDirectResponse(response,pages){
+export function validateDirectResponse(response,pages,{allowMissing=false}={}){
  const candidate=response.candidates?.[0];
  if(candidate?.finishReason&&candidate.finishReason!=='STOP')throw Error(candidate.finishReason==='MAX_TOKENS'?'Ответ обрезан. Оригинал сохранён; повтори с одной страницей.':'Google не вернул полный перевод. Оригинал сохранён.');
  const text=(candidate?.content?.parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('').trim().replace(/^```(?:json)?\s*|\s*```$/g,'');
  let rows;try{rows=JSON.parse(text);}catch{throw Error('Google вернул незавершённый JSON. Повтори перевод.');}
- if(pages.length===1&&pages[0].inputMode==='vision'){const p=pages[0];return [{page:p.page,width:p.width,height:p.height,regions:visionRegions(rows,p,DIRECT_FONTS,kinds),timings:{detectionMs:0,ocrMs:0},engine:'Google Vision · координаты и перевод → Canvas Worker'}];}
+ if(pages.length===1&&pages[0].inputMode==='vision'){const p=pages[0];return [{page:p.page,width:p.width,height:p.height,regions:visionRegions(rows,p,DIRECT_FONTS,kinds,{allowMissing}),timings:{detectionMs:0,ocrMs:0},engine:'Google Vision · координаты и перевод → Canvas Worker'}];}
  if(pages[0].inputMode==='vision'){
   if(!Array.isArray(rows)||!rows.length||rows.some(r=>!pages.some(p=>p.id===r?.page)))throw Error('Google не указал страницы для координат. Оригинал сохранён.');
-  return pages.map(p=>{const local=rows.filter(r=>r.page===p.id);if(!local.length)throw Error('Google пропустил страницу пакета. Оригинал сохранён.');return {page:p.page,width:p.width,height:p.height,regions:visionRegions(local,p,DIRECT_FONTS,kinds),timings:{detectionMs:0,ocrMs:0}};});
+  return pages.map(p=>{const local=rows.filter(r=>r.page===p.id);if(!local.length)throw Error('Google пропустил страницу пакета. Оригинал сохранён.');return {page:p.page,width:p.width,height:p.height,regions:visionRegions(local,p,DIRECT_FONTS,kinds,{allowMissing}),timings:{detectionMs:0,ocrMs:0}};});
  }
  const expected=new Map(pages.flatMap(p=>p.regions.map(r=>[r.id,r]))),seen=new Map();
- if(!Array.isArray(rows)||rows.length!==expected.size)throw Error('Google пропустил часть реплик. Оригинал сохранён; повтори перевод.');
+ if(!Array.isArray(rows)||(!allowMissing&&rows.length!==expected.size))throw Error('Google пропустил часть реплик. Оригинал сохранён; повтори перевод.');
  for(let row of rows){
   if(Array.isArray(row)){const region=pages[0].regions[row[0]-1];if(pages.length!==1||!Number.isInteger(row[0])||!region||row.length<2||row.length>4)throw Error('Gemma вернула некорректный номер реплики.');row={id:region.id,ru:row[1],f:row[2]??0,k:row[3]??0};}
   if(!row||!expected.has(row.id)||seen.has(row.id)||typeof row.ru!=='string'||row.ru.length>4000)throw Error('Ответ Google не совпадает с разметкой страницы.');
-  if(/\p{L}/u.test(row.ru)&&!/[А-Яа-яЁё]/.test(row.ru))throw Error('В ответе есть непереведённая реплика. Оригинал сохранён.');
+  if(/\p{L}/u.test(row.ru)&&!/[А-Яа-яЁё]/.test(row.ru)){
+   if(!allowMissing)throw Error('В ответе есть непереведённая реплика. Оригинал сохранён.');
+   row={...row,ru:'',e:'unreadable'};
+  }
   seen.set(row.id,row);
  }
  return pages.map(p=>({page:p.page,width:p.width,height:p.height,regions:p.regions.map(r=>{
-  const row=seen.get(r.id);return {uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox||r.bbox,ru_translation:row.ru.trim(),...(!row.ru.trim()?{empty_reason:['non_text','unreadable'].includes(row.e)?row.e:'unconfirmed'}:{}),source_text:'',font_style:DIRECT_FONTS[row.f]||DIRECT_FONTS[0],text_category:kinds[row.k]||kinds[0]};
+  const row=seen.get(r.id)||{ru:''};return {uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox||r.bbox,ru_translation:row.ru.trim(),...(!row.ru.trim()?{empty_reason:['non_text','unreadable'].includes(row.e)?row.e:'unconfirmed'}:{}),source_text:'',font_style:DIRECT_FONTS[row.f]||DIRECT_FONTS[0],text_category:kinds[row.k]||kinds[0]};
  }),timings:{detectionMs:p.detectionMs,ocrMs:0},engine:'Gemma 4 · личный ключ → Canvas Worker'}));
 }
-export async function callDirectGoogle(pages,{key,model=DIRECT_MODELS[0],direction,context='',gemmaProfile='native',language='English',signal,fetcher,transport,timeoutMs=30000,onDiagnostic=()=>{},reviewEmptyIds=[]}){
+export async function callDirectGoogle(pages,{key,model=DIRECT_MODELS[0],direction,context='',gemmaProfile='native',language='English',signal,fetcher,transport,timeoutMs=30000,onDiagnostic=()=>{},reviewEmptyIds=[],allowMissing=false}){
  if(!key)throw Error('Введи личный ключ Google AI Studio в настройках быстрого режима.');
  const start=performance.now(),native=model.startsWith('gemma-')&&gemmaProfile==='native'&&pages.length===1,body=directRequest(pages,{model,direction,context,gemmaProfile,language,reviewEmptyIds});
  const totalTimeout=native?Math.min(120000,Math.max(60000,timeoutMs*3)):timeoutMs;
@@ -82,7 +85,7 @@ export async function callDirectGoogle(pages,{key,model=DIRECT_MODELS[0],directi
    diagnostic={...diagnostic,googleError:api,retryAfter:response.retryAfter||null};
    throw Error(title+' · HTTP '+response.status+(api.status?' · '+api.status:'')+(api.message?' · '+api.message:''));
   }
-  const validateStart=performance.now(),translated=validateDirectResponse(data,pages);
+  const validateStart=performance.now(),translated=validateDirectResponse(data,pages,{allowMissing});
   diagnostic={...diagnostic,stage:'complete',finishReason:data.candidates?.[0]?.finishReason||'',usage:data.usageMetadata||null,outputBoxes:translated.reduce((n,p)=>n+p.regions.length,0),outputCoordinates:translated.map(p=>({page:p.page,regions:p.regions.map(r=>({id:r.uid,text_bbox:r.text_bbox,layout_bbox:r.layout_bbox}))})),metrics:{...diagnostic.metrics,validationMs:Math.round(performance.now()-validateStart),googleTotalMs:Math.round(performance.now()-start)}};publish();
   return {pages:translated,usage:data.usageMetadata,diagnostics:diagnostic};
  }catch(error){

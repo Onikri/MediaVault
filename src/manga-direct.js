@@ -4,10 +4,10 @@ import {callDirectGoogle} from './manga-direct-api.js';
 import {directKey,restoreDirectKey,directKeys,restoreDirectKeys,keySlotScope} from './manga-direct-key.js';
 import {DIRECT_DETECTORS} from './manga-direct-profiles.js';
 import {compareDirectInputs} from './manga-direct-comparison.js';
-import {translationCacheKey,getTranslation,putTranslation} from './translation-cache.js';
+import {translationCacheKey,getTranslation,incompleteRender,putTranslation} from './translation-cache.js';
 import {drainBlockChapter} from './manga-block-chapter.js';
 import {ChapterPreparation,drainOrderedChapter,sharedRequestPacer} from './reader-chapter-pipeline.js';
-import {unresolvedRegions} from './manga-empty-review.js';
+import {reviewEmptyTranslations,unresolvedRegions} from './manga-empty-review.js';
 
 // Bump when rendered page output changes (fonts, layout) so stale cached renders are skipped.
 export const RENDER_CACHE_VERSION='render-v12';
@@ -27,6 +27,7 @@ export class DirectChapter{
   this.prepare=prepare||((blob,index,status,inputMode=config.directInput)=>{const type=inputMode==='blocks'?'annotated':inputMode;return type!=='vision'&&DIRECT_DETECTORS.some(v=>v.id===config.directDetector&&v.model)?translateLmt(blob,{...config,directInput:type,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({channel:'prepare',operation:'direct-prepare',blob,index,direction,inputMode:type},status);});
   this.renderPage=renderPage||this.renderCanvas.bind(this);this.controller=new AbortController();this.jobs=new Map();this.listeners=new Map();this.progress=new Map();this.context=new Map();this.active=0;this.keyBusy=new Set();this.worker=null;this.renders=new Map();this.serial=0;this.bypass=new Set();
   this.translatedPages=new Set();this.partialPages=new Set();this.pageStates=new Map();this.priorityPages=new Set();this.focusWindow=[];this.priorityEpoch=0;this.focusIndex=0;this.pacer=pacer||sharedRequestPacer;this.preparation=new ChapterPreparation(this);
+  this.incomplete=new Map();this.recovered=new Map();
  }
  notify(index,value){const old=this.progress.get(index)||{};value=value.phase==='cleaning'&&(old.phase==='error'||old.phase==='translating'&&this.jobs.get(index)?.state==='running')?{...old,backgroundCleanup:value}:{...old,...value};this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
  request(index,blob,background=false){
@@ -35,6 +36,7 @@ export class DirectChapter{
   job={index,blob,background,state:'queued',started:performance.now()};
   job.promise=new Promise((resolve,reject)=>Object.assign(job,{resolve,reject}));job.promise.catch(()=>{});
   this.jobs.set(index,job);this.pageStates.set(index,{page:index+1,state:'queued'});this.notify(index,{phase:'queued',message:background?'Готовим следующую страницу заранее':'Быстрый режим · готовим страницу на устройстве'});
+  if(this.recovered.has(index)){this.finish(job,this.recovered.get(index));return job;}
   if(!background&&this.config.chapterPipeline!==false&&!this.chapterStarted){this.chapterStarted=true;if(index>=this.batchSize())this.focus(index,true);for(let n=0;n<this.entries.length;n++)if(!this.jobs.has(n))this.request(n,null,true);}
   if(!background&&this.config.chapterPipeline!==false){const{count,start}=this.packetRange(index);for(let n=start;n<Math.min(start+count,this.entries.length);n++)if(!this.jobs.has(n))this.request(n,null,true);}
   if(!background&&this.config.directInput!=='blocks'&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(3,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n))this.request(n,null,true);}
@@ -88,7 +90,7 @@ export class DirectChapter{
       const local={batchPages:nonempty.map(p=>p.page),sourceBytes:group.reduce((sum,j)=>sum+(j.blob?.size||0),0),queueMs:first.queueMs,sourceReadMs:first.sourceReadMs,fingerprintAndCacheMs:first.cacheMs,clientPreparationMs:first.prepareMs,...first.prepared?.prepareTimings};
       first.diagnostics={...value,local,transport:{viaOracle:!!this.config.directViaOracle,keySlot:first.keySlot,serverKey:first.serverKey}};for(const job of group)this.notify(job.index,{phase:'translating',message:names[value.stage]||'Google · обработка',model:this.config.directModel,completedRegions:value.metrics?.completedRegions||0,totalRegions:job.prepared?.regions.length,diagnostics:first.diagnostics});
      }};const packs=[];let pack=[],count=0,bytes=0;for(const page of nonempty){const size=page.image?.length||0;if(pack.length&&(count+page.regions.length>100||bytes+size>18*1024*1024)){packs.push(pack);pack=[];count=0;bytes=0;}pack.push(page);count+=page.regions.length;bytes+=size;}if(pack.length)packs.push(pack);
-     const answer={pages:[],usage:[]};for(const pack of packs){const result=await this.callGoogle(pack,options);answer.pages.push(...result.pages);answer.usage.push(result.usage);answer.diagnostics=result.diagnostics;}
+     const answer={pages:[],usage:[]};for(const pack of packs){const result=await this.callGoogle(pack,{...options,allowMissing:true});answer.pages.push(...result.pages);answer.usage.push(result.usage);answer.diagnostics=result.diagnostics;}
      diagnostics=first.diagnostics||answer.diagnostics;cloudMs=Math.round(performance.now()-start);translated=answer.pages;usage=answer.usage.length===1?answer.usage[0]:answer.usage;
     }
     this.controller.signal.throwIfAborted();
@@ -104,8 +106,42 @@ export class DirectChapter{
    }catch(error){for(const job of group)if(job.state!=='done')this.fail(job,error);}finally{if(first.keyLease)this.keyBusy.delete(first.keyLease);}
   }}finally{this.active--;if([...this.jobs.values()].some(j=>j.state==='queued')&&!this.controller.signal.aborted)queueMicrotask(()=>this.drain());}
  }
- finish(job,page){this.translatedPages.add(job.index);if(unresolvedRegions(page).length)this.partialPages.add(job.index);else this.partialPages.delete(job.index);this.pageStates.set(job.index,{page:job.index+1,state:this.partialPages.has(job.index)?'partial':'done',keySlot:job.keySlot,serverKey:job.serverKey});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.bypass.delete(job.index);this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);job.state='done';job.blob=null;if(job.prepared)job.prepared={...job.prepared,image:undefined,blob:undefined};job.resolve(page);for(const old of [...this.jobs.values()].filter(j=>j.state==='done').slice(0,-12)){this.jobs.delete(old.index);this.progress.delete(old.index);}}
- fail(job,error){this.pageStates.set(job.index,{page:job.index+1,state:'failed'});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.jobs.delete(job.index);const raw=job.diagnostics||error.diagnostics,diagnostics=raw?{...raw,local:{...raw.local,totalMs:Math.round(performance.now()-job.started)}}:undefined;job.reject(error);this.notify(job.index,{phase:'error',message:error.message,diagnostics});}
+ finish(job,page){this.translatedPages.add(job.index);if(unresolvedRegions(page).length){this.partialPages.add(job.index);this.incomplete.set(job.index,{page,cacheId:job.cacheId});}else{this.partialPages.delete(job.index);this.incomplete.delete(job.index);}this.pageStates.set(job.index,{page:job.index+1,state:this.partialPages.has(job.index)?'partial':'done',keySlot:job.keySlot,serverKey:job.serverKey});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.bypass.delete(job.index);this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);job.state='done';job.blob=null;if(job.prepared)job.prepared={...job.prepared,image:undefined,blob:undefined};job.resolve(page);for(const old of [...this.jobs.values()].filter(j=>j.state==='done').slice(0,-12)){this.jobs.delete(old.index);this.progress.delete(old.index);}}
+ async recoverChapter(){
+  const pending=[...this.incomplete].sort(([a],[b])=>a-b);
+  if(!pending.length)return;
+  const keys=this.serverSlots.length?this.serverSlots.map(slot=>'oracle-slot:'+slot):this.getKey===directKey?await restoreDirectKeys(this.keyScope):[this.getKey(this.keyScope)].filter(Boolean);
+  if(!keys.length)return;
+  const signal=this.controller.signal;
+  for(let offset=0;offset<pending.length;offset+=4){
+   const packet=pending.slice(offset,offset+4),sources=[],pages=[];
+   for(const [index,record] of packet){
+    try{
+     const blob=await waitFor(this.entries[index].async('blob'),AbortSignal.any([signal,AbortSignal.timeout(30000)]));
+     pages.push({...record.page});sources.push({page:index+1,width:record.page.width,height:record.page.height,blob});
+     this.notify(index,{phase:'translating',message:'Повторный проход · пропущенные реплики главы'});
+    }catch(error){signal.throwIfAborted();this.notify(index,{phase:'error',message:error.message});}
+   }
+   if(!pages.length)continue;
+   await reviewEmptyTranslations(this,pages,sources,{key:keys[(Math.floor(offset/4)+1)%keys.length],model:this.config.directModel,language:this.config.language,direction:this.direction,signal,timeoutMs:this.config.directTimeoutMs},{retry:true});
+   for(const page of pages){
+    const index=page.page-1,record=this.incomplete.get(index);
+    if(!record)continue;
+    const unresolved=unresolvedRegions(page),changed=unresolved.length!==unresolvedRegions(record.page).length;
+    page.detectionReport={...page.detectionReport,translated:page.regions.filter(r=>r.ru_translation?.trim()).length,unresolved:unresolved.map(r=>r.uid),review:page.emptyReview};
+    if(changed){
+     this.recovered.set(index,page);
+     const job=this.jobs.get(index);if(job?.state==='done')job.promise=Promise.resolve(page);
+     if(this.config.cache&&record.cacheId){const {diagnostics,...safe}=page;await this.writeCache(record.cacheId,this.scope,{kind:'manga-json',page:safe});}
+     if(!unresolved.length){this.partialPages.delete(index);this.incomplete.delete(index);this.pageStates.set(index,{...this.pageStates.get(index),state:'done'});}
+     else this.incomplete.set(index,{...record,page});
+     this.config.onRecovered?.(index);
+    }
+    this.notify(index,{phase:unresolved.length?'partial':'ready',message:unresolved.length?'Осталось реплик без перевода: '+unresolved.length:'Пропущенные реплики проверены'});
+   }
+  }
+ }
+ fail(job,error,{retryable=false}={}){this.pageStates.set(job.index,{page:job.index+1,state:'failed',retryable});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.jobs.delete(job.index);const raw=job.diagnostics||error.diagnostics,diagnostics=raw?{...raw,local:{...raw.local,totalMs:Math.round(performance.now()-job.started)}}:undefined;job.reject(error);this.notify(job.index,{phase:'error',message:error.message,diagnostics});}
  async render(blob,index,font,status,config={},signal,background=false){
   const renderStarted=performance.now(),fromMemory=this.jobs.get(index)?.state==='done';
   signal?.throwIfAborted();const listeners=this.listeners.get(index)||new Set();if(status)listeners.add(status);this.listeners.set(index,listeners);
@@ -113,7 +149,7 @@ export class DirectChapter{
   try{
    const job=this.request(index,blob,background);
    const renderCacheId=(await this.jsonCacheId(blob,index))+':'+RENDER_CACHE_VERSION+':'+(config.inpaint||this.config.inpaint)+':'+font;
-   if(this.config.cache&&!this.bypass.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage&&!config.captureDebug)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
+   if(this.config.cache&&!this.bypass.has(index)&&!this.recovered.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage&&!incompleteRender(cached)&&!config.captureDebug)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
    const stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
    if(config.captureDebug&&!page.detected){
     const source=await this.prepare(blob,index,message=>this.notify(index,{phase:'detecting',message}));
@@ -123,14 +159,14 @@ export class DirectChapter{
    const preparedClean=this.config.chapterPipeline!==false?await this.preparation.cleanFor(index).catch(()=>null):null;
    const painting=this.renderPage(blob,page,font,value=>this.notify(index,{...value,completedRegions:value.cleanedRegions||0,totalRegions:page.regions.filter(r=>r.ru_translation?.trim()).length,diagnostics:page.diagnostics}),{...config,preparedClean}).then(result=>{if(signal?.aborted){result.renderedBitmap?.close();throw signal.reason;}return result;});
    let result;try{result=await waitFor(painting,signal);}catch(error){error.stage='render';throw error;}signal?.throwIfAborted();
-   result.detected=page.detected;result.detectionReport=page.detectionReport;
-   if(this.config.cache&&result.cacheImage){const {renderedBitmap,cacheImage,diagnostics,debug,...save}=result;await this.writeCache(renderCacheId,this.scope,{...save,renderedImage:cacheImage,renderedMime:'image/webp'},{chapter:this.config.contextKey,url:this.config.contextURL,index,total:this.entries.length});}delete result.cacheImage;
+   result.detected=page.detected;result.detectionReport=page.detectionReport;result.unresolvedRegions=unresolvedRegions(page).map(r=>r.uid);
+   if(this.config.cache&&result.cacheImage&&!result.unresolvedRegions.length){const {renderedBitmap,cacheImage,diagnostics,debug,...save}=result;await this.writeCache(renderCacheId,this.scope,{...save,renderedImage:cacheImage,renderedMime:'image/webp'},{chapter:this.config.contextKey,url:this.config.contextURL,index,total:this.entries.length});}delete result.cacheImage;
    result.timings={...result.timings,directTotalMs:Math.round(performance.now()-(fromMemory?renderStarted:job.started))};
    if(page.diagnostics)result.diagnostics={...page.diagnostics,stage:'ready',cleanup:result.inpaint,typesetting:result.typesetting,local:{...page.diagnostics.local,inpaintMs:result.timings.inpaintMs,typesetMs:result.timings.typesetMs,renderMs:result.timings.renderMs,totalMs:result.timings.directTotalMs}};
    return result;
   }finally{if(status)listeners.delete(status);if(!listeners.size)this.listeners.delete(index);}
  }
- invalidate(index){if(this.jobs.get(index)?.state==='running')return;const{count,start}=this.packetRange(index);for(let n=start;n<Math.min(this.entries.length,start+count);n++){if(this.jobs.get(n)?.state==='running')continue;this.jobs.delete(n);this.progress.delete(n);this.bypass.add(n);}}
+ invalidate(index){if(this.jobs.get(index)?.state==='running')return;const{count,start}=this.packetRange(index);for(let n=start;n<Math.min(this.entries.length,start+count);n++){if(this.jobs.get(n)?.state==='running')continue;this.jobs.delete(n);this.recovered.delete(n);this.incomplete.delete(n);this.progress.delete(n);this.bypass.add(n);}}
  async callGoogle(pages,options){
   const oracle=this.config.directViaOracle&&this.service?.();
   if(this.config.directViaOracle&&this.google===callDirectGoogle&&!oracle)throw Error('Для перевода личным ключом подключи Oracle в профиле.');
