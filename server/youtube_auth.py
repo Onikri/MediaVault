@@ -14,6 +14,8 @@ def cookie_text():
     value=credentials()
     return value.get('cookies','') if value else ''
 
+JUNK=__import__('re').compile(r'^(?:ST-[A-Za-z0-9_-]+|_ga.*|_gid|_gcl_.*|_gat.*|__utm.*)$')
+
 def json_cookies(raw):
     """EditThisCookie / Cookie-Editor JSON export -> Netscape cookies.txt text."""
     import json
@@ -50,12 +52,15 @@ def normalize_cookies(raw):
         domain,include,path,secure,expires,name,value=parts
         # Only YouTube session cookies are accepted. Other Google/website
         # credentials in an overbroad export are not stored or forwarded.
-        if domain.lower() not in {'youtube.com','.youtube.com'}:continue
+        if domain.lower() not in {'youtube.com','.youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'}:continue
+        # Per-page state (ST-…) and analytics cookies pile up by the hundreds in a
+        # browser export and play no part in signing in; they are not stored.
+        if JUNK.match(name):continue
         if include not in {'TRUE','FALSE'} or secure not in {'TRUE','FALSE'} or not expires.isdigit() or not path.startswith('/') or not name or not value or any(ord(c)<32 for c in line if c!='\t'):
             raise HTTPException(422,'Некорректная запись сессии YouTube.')
         if int(expires) and int(expires)<=time.time():continue
         rows.append('\t'.join([domain.lower(),include,path,secure,expires,name,value]));names.add(name)
-        if len(rows)>200:raise HTTPException(422,'Слишком много записей сессии YouTube.')
+        if len(rows)>400:raise HTTPException(422,'Слишком много cookies YouTube в экспорте. Экспортируй их из нового приватного окна, где открыт только YouTube.')
     if not names&{'SID','SAPISID','__Secure-1PSID','__Secure-3PSID'}:
         raise HTTPException(422,'В файле нет действующей авторизованной сессии YouTube. Войди на YouTube перед экспортом.')
     return '# Netscape HTTP Cookie File\n'+'\n'.join(rows)+'\n'

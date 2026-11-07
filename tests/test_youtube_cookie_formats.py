@@ -20,7 +20,7 @@ class CookieFormats(unittest.TestCase):
         lines=text.strip().split('\n')
         self.assertEqual(lines[0],'# Netscape HTTP Cookie File')
         rows=[l.split('\t') for l in lines[1:]]
-        self.assertEqual({r[5] for r in rows},{'SID','__Secure-3PSID'})
+        self.assertEqual({r[5] for r in rows},{'SID','__Secure-3PSID','PREF'})
         self.assertNotIn('google-must-not-be-stored',text)
         self.assertNotIn('expired',text)
         self.assertEqual(rows[0][:4],['.youtube.com','TRUE','/','FALSE'])
@@ -35,6 +35,14 @@ class CookieFormats(unittest.TestCase):
         with self.assertRaises(HTTPException):normalize_cookies('[not json')
         with self.assertRaises(HTTPException) as caught:normalize_cookies('hello')
         self.assertIn('EditThisCookie',caught.exception.detail)
+
+
+class Bloated(unittest.TestCase):
+    def test_hundreds_of_page_state_cookies_are_dropped_not_rejected(self):
+        noise=[{'domain':'.youtube.com','name':'ST-'+str(i)+'abc','path':'/','secure':False,'session':True,'value':'s'} for i in range(450)]
+        noise+=[{'domain':'.youtube.com','name':'_ga_X'+str(i),'path':'/','session':True,'value':'g'} for i in range(20)]
+        text=normalize_cookies(json.dumps(EDIT_THIS_COOKIE[:2]+noise))
+        self.assertNotIn('ST-',text);self.assertNotIn('_ga',text);self.assertIn('sid-value',text)
 
 
 if __name__=='__main__':unittest.main()
