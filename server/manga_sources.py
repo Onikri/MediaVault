@@ -23,7 +23,7 @@ class MangaSite:
     languages:tuple=('ru',)
     format:str=''
 
-SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan',('x17.h-chan.me',)),
+SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan',('x17.h-chan.me','xxl.hentaichan.live')),
        MangaSite('hentaichan-cc','HentaiChan.cc','https://hentaichan.cc','hentaichan-cc'),
        MangaSite('hitomi','Hitomi','https://hitomi.la','hitomi',languages=('en','ja','ru','ko')),
        MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('mangapoisk.io','eropoisk.com')),
@@ -37,6 +37,8 @@ SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan
        MangaSite('mangadex','MangaDex','https://mangadex.org','dex',languages=('ru','en','ja','ko')),
        MangaSite('mangalib','MangaLib','https://mangalib.me','lib',('mangalib.org',)),
        MangaSite('hentailib','HentaiLib','https://hentailib.me','lib',('hentailib.org',)),
+       MangaSite('slashlib','SlashLib','https://v2.shlib.life','lib',('slashlib.me',)),
+       MangaSite('senkognito','Senkognito','https://senkognito.com','senkognito'),
        MangaSite('novelcool-ru','NovelCool','https://ru.novelcool.com','novelcool'),
        MangaSite('senmanga','Sen Manga · JA','https://raw.senmanga.com','sen',languages=('ja',),format='manga'),
        MangaSite('mangaraw','MangaRaw · JA','https://mangaraw.co.uk','mangaraw',languages=('ja',),format='manga'),
@@ -116,7 +118,7 @@ def normalized_format(value):
     return {'манга':'manga','манхва':'manhwa','маньхуа':'manhua','вебтун':'webtoon','web_manga':'manga','long_strip':'webtoon'}.get(value,value)
 
 def search_title(title,language='auto',format='all'):
-    if language not in {'auto','all','ru','en','ja','ko'}:raise SourceError('Выбери русский, английский, японский или корейский язык источника.')
+    if language not in {'auto','all','ru','en','ja','ko'}:raise SourceError('Выбери поддерживаемый язык источника.')
     if format not in {'all','manga','manhwa','manhua','webtoon'}:raise SourceError('Выбери доступный формат комикса.')
     if not isinstance(title,dict) or title.get('kind')!='manga' or not aliases(title):raise SourceError('Выбери конкретную мангу из каталога.')
     if len(json.dumps(title).encode())>50000:raise SourceError('Описание выбранной манги слишком велико.')
@@ -140,9 +142,12 @@ def search_title(title,language='auto',format='all'):
                 elif site.family=='hitomi':
                     from manga_hitomi import search
                     candidates=search(query,http,'all' if language=='auto' else language)
+                elif site.family=='senkognito':
+                    from manga_senkognito import search
+                    candidates=search(query,http)
                 elif site.family in {'dex','lib'}:
-                    from manga_catalog_adapters import dex_search,lib_search
-                    candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http,4 if site.id=='hentailib' else 1)
+                    from manga_catalog_adapters import dex_search,lib_search,LIB_SITES
+                    candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http,next(sid for sid,row in LIB_SITES.items() if row[0]==site.id))
                 elif site.family=='webtoons':
                     from manga_webtoons import search
                     candidates=search(query,site,http)
@@ -245,6 +250,9 @@ def inspect(url,http=None):
         if initial and initial.family=='hitomi':
             from manga_hitomi import inspect as inspect_hitomi
             return inspect_hitomi(url,http)
+        if initial and initial.family=='senkognito':
+            from manga_senkognito import inspect as inspect_senkognito
+            return inspect_senkognito(url,http)
         if initial and initial.family=='novelcool':
             from manga_novelcool import inspect as inspect_novelcool
             return inspect_novelcool(url,http)

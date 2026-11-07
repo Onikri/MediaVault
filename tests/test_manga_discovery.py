@@ -20,6 +20,12 @@ def wait_done(manager,owner,identity):
     raise AssertionError('Discovery job did not finish')
 
 class NativeSourceFallbackTests(unittest.TestCase):
+    def test_mangadex_edge_failure_falls_back_to_the_installed_source(self):
+        source={'id':'2','name':'MangaDex','lang':'ru','baseUrl':'https://mangadex.org'}
+        with patch.dict(os.environ,ENV),patch.object(discovery,'native_search_source',side_effect=SourceError('edge challenge')),patch.object(discovery.bridge,'Client') as client:
+            client.return_value.get.return_value={'mangaList':[{'id':8,'title':'Скала Кэн','url':'/title/fixture'}]}
+            result=discovery.search_source(source,'Скала Кэн')
+        self.assertEqual([(row['providerName'],row['sourceId']) for row in result],[('MangaDex','2')])
     def test_language_filter_upgrade_discards_only_old_mangaball_search_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             manager=discovery.Discovery(directory,start_workers=False)
@@ -98,6 +104,17 @@ class MangaDiscoveryTests(unittest.TestCase):
     self.sources.stop();self.env.stop();self.directory.cleanup()
  def manager(self,**options):
     manager=discovery.Discovery(self.directory.name,**options);self.managers.append(manager);return manager
+ def test_discovery_reports_browser_checks_and_ignores_unsupported_languages(self):
+    sources=[{'id':str(i),'name':'Fixture '+str(i),'lang':'ru'} for i in range(1,4)]
+    def fetch(source,_):
+        if source['id']=='1':raise discovery.bridge.bridge_error(500,'cloudflare bypass currently disabled')
+        if source['id']=='2':raise discovery.bridge.bridge_error(400,'please enter a valid cubari url')
+        return []
+    with patch.object(discovery,'installed_sources',return_value=[*sources,{'id':'4','name':'Other language','lang':'ar'},{'id':'5','name':'Unspecified','lang':'all'}]):
+        manager=self.manager(fetch=fetch);job=manager.start('A','Наруто');result=wait_done(manager,'A',job['id'])
+    self.assertEqual(result['progress']['failed'],1)
+    self.assertEqual(result['progress']['completed'],3)
+    self.assertEqual([(r['state'],r.get('code')) for r in result['providers']],[('unavailable','challenge'),('skipped','link-required'),('done',None)])
  def test_found_title_aliases_requeue_empty_english_source_and_remain_indexed(self):
     sources=[{'id':'1','name':'HentaiLib','lang':'ru'},{'id':'2','name':'MangaDex','lang':'en'}];seen=[]
     def fetch(source,query):
@@ -191,18 +208,18 @@ class MangaDiscoveryTests(unittest.TestCase):
     self.assertEqual(manager.status('A',pending['id'])['state'],'interrupted')
     resumed=wait_done(manager,'A',manager.start('A','One Piece','all',['1','2'])['id'])
     self.assertEqual(resumed['state'],'done');self.assertEqual(resumed['progress']['completed'],2)
- def test_multilingual_installed_sources_are_visible_and_searchable(self):
+ def test_multilingual_site_only_exposes_declared_supported_editions(self):
     multi={'id':'900','name':'Multilingual reader','lang':'all','baseUrl':'https://source.example','isNsfw':True}
-    with patch.object(discovery,'installed_sources',return_value=[*SOURCES,multi]):
-        self.assertIn('900',{s['id'] for s in discovery.source_list('all')['sources']})
-        self.assertNotIn('900',{s['id'] for s in discovery.source_list('ru')['sources']})
+    russian={**multi,'id':'901','lang':'ru'}
+    with patch.object(discovery,'installed_sources',return_value=[*SOURCES,multi,russian]):
+        self.assertNotIn('900',{s['id'] for s in discovery.source_list('all')['sources']})
+        self.assertIn('901',{s['id'] for s in discovery.source_list('ru')['sources']})
         manager=self.manager(fetch=fixture)
         title={'kind':'manga','title':'One Piece','aliases':['ワンピース']}
-        result=wait_done(manager,'A',manager.start('A','One Piece','all',['900'],title=title)['id'])
+        result=wait_done(manager,'A',manager.start('A','One Piece','all',['901'],title=title)['id'])
         self.assertEqual(result['progress']['completed'],1)
-        self.assertEqual(result['results'][0]['language'],'all')
+        self.assertEqual(result['results'][0]['language'],'ru')
         self.assertTrue(result['results'][0]['adult'])
-        self.assertEqual(discovery.language_queries(['One Piece','ワンピース'],'all'),['One Piece','ワンピース'])
  def test_source_list_and_result_metadata_never_expose_internal_image_targets(self):
     self.assertEqual(discovery.source_list('ja')['total'],4);self.assertEqual(len(discovery.source_list('all','Fixture 1')['sources']),8)
     row=discovery.result_row(SOURCES[0],{'id':1,'title':'候補の漫画','url':'/one','thumbnailUrl':'http://suwayomi:4567/private'})
@@ -223,7 +240,7 @@ class MangaDiscoveryTests(unittest.TestCase):
     with patch.object(discovery.bridge,'Client') as client:
         client.return_value.get.return_value={'mangaList':[{'id':8,'title':'One Piece: Adventure'}]}
         results=discovery.search_source(SOURCES[0],'One P')
-        client.return_value.get.assert_called_once_with('/source/1/search',{'searchTerm':'One P','pageNum':1},timeout=4)
+        client.return_value.get.assert_called_once_with('/source/1/search',{'searchTerm':'One P','pageNum':1},timeout=12)
         self.assertEqual(results[0]['title'],'One Piece: Adventure');client.return_value.close.assert_called_once()
 
 class MangaTitleDiscoveryTests(unittest.TestCase):

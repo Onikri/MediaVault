@@ -214,7 +214,9 @@ class PublicHttp:
                         and not urlsplit(url).query and isinstance(data,bytes) and bool(re.fullmatch(rb'\{"title_id":\s*"[a-f0-9]{24}"\}',data)))
             chan_search = (action == 'hentaichan-search' and url == 'https://hentaichan.cc/'
                            and isinstance(data, str) and 0 < len(data) <= 200)
-            if not (player_form or search_form or manga_form or chan_search):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            senkognito_read=(action=='senkognito-read' and url=='https://api.senkognito.com/graphql'
+                            and isinstance(data,bytes) and len(data)<=4096)
+            if not (player_form or search_form or manga_form or chan_search or senkognito_read):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if chan_search:
                 # The public search box's Next.js action. The caller supplies only the title.
                 outgoing.update({'Next-Action': '7fe1df09f7c8151b600f1a3e496cdda2e7ed7f0f95',

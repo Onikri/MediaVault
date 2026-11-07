@@ -24,7 +24,7 @@ class ReadabilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{'DISCOVERY_CACHE_DIR':folder}):
             health.record('1','Manga Ball','en','restricted','image','Источник не отдаёт страницы.')
             self.assertTrue(health.blocked('1'));self.assertFalse(health.blocked('2'))
-            with patch.object(discovery.bridge,'sources',return_value=[{'id':'1','name':'Manga Ball','lang':'en'},{'id':'2','name':'Manga Ball','lang':'ru'}]):
+            with patch.object(discovery,'installed_sources',return_value=[{'id':'1','name':'Manga Ball','lang':'en'},{'id':'2','name':'Manga Ball','lang':'ru'}]):
                 rows=discovery.source_list()['sources'];self.assertEqual([r['id'] for r in rows],['2'])
             self.assertEqual(health.report()['unavailable'],1)
             with patch.object(health.time,'time',return_value=time.time()+health.TTL+1):self.assertFalse(health.blocked('1'))

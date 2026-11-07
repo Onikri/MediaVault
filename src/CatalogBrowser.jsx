@@ -17,6 +17,7 @@ import CatalogSearch from './CatalogSearch.jsx';
 import {tagLabels,localLabel} from './taxonomy.js';
 import {useVoices} from './use-voices.js';
 import useGlobalManga from './use-global-manga.js';
+import MangaSearchDiagnostics from './MangaSearchDiagnostics.jsx';
 import useSourceTitles from './use-source-titles.js';
 import SourceFilter from './SourceFilter.jsx';
 import {worldResults} from './world-search.js';
@@ -66,6 +67,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
     {kind==='manga'&&globalManga.progress&&<div className="world-search-progress" role="status"><span><i className={globalManga.state==='running'?'is-searching':''}/>{globalManga.state==='running'?'Ищем в источниках':'Поиск завершён'} · {globalManga.progress.completed} / {globalManga.progress.total}{globalManga.progress.cached?' · из индекса '+globalManga.progress.cached:''}</span><small>{globalManga.progress.failed?globalManga.progress.failed+' источников не ответили':'Результаты появляются по мере готовности'}</small></div>}
     {kind==='manga'&&globalManga.error&&<p className="inline-error" role="alert">{globalManga.error} <button className="text-link" onClick={()=>setSourceRevision(v=>v+1)}>Повторить</button></p>}
     {kind==='manga'&&service.status==='connected'&&Number(service.session?.serverVersion)<16&&<p className="fine">Глобальный поиск источников включится после обновления сервера до версии 16. Сейчас доступны каталоги метаданных.</p>}
+    {kind==='manga'&&<MangaSearchDiagnostics providers={globalManga.providers} key={globalManga.id}/>}
     <p className="catalog-search-hint">Подсказки появляются сразу. Источники дополняют результаты в фоне.</p>
 
     <div className="catalog-provider-row" aria-label="Источники метаданных">{Object.entries(statuses).map(([id,status])=><span key={id} className={'catalog-provider provider-'+status} title={status==='unavailable'?'Сейчас недоступен; поиск идёт в остальных каталогах':providers[id]}><i/>{providers[id]}</span>)}{unavailable&&<button className="catalog-retry" disabled={loading} onClick={retry}><Icon name="refresh" size={13}/>Повторить поиск</button>}</div>{spelling&&<p className="fine catalog-spelling">Также ищем по написанию «{spelling}»</p>}<div className="section-heading"><h2 className="section-title">{query?'Результаты поиска':'Тайтлы'}</h2><span className="fine" role="status" aria-live="polite">{loading?'Обновляем карточки…':visible.length?visible.length+' тайтлов':''}</span><CatalogViewControls value={layout} onChange={changeLayout}/></div>

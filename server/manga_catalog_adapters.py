@@ -9,7 +9,8 @@ from urllib.parse import urlencode,urlsplit,parse_qs,quote
 from source_parser import PublicHttp,SourceError,public_url
 UUID=r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}'
 LIB='https://api.cdnlibs.org'
-LIB_SITES={1:('mangalib','MangaLib','https://mangalib.me'),4:('hentailib','HentaiLib','https://hentailib.me')}
+LIB_SITES={1:('mangalib','MangaLib','https://mangalib.me'),2:('slashlib','SlashLib','https://v2.shlib.life'),4:('hentailib','HentaiLib','https://hentailib.me')}
+DEX_LANGUAGES=('ru','en','ja','ko')
 CONTENT_RATINGS=('safe','suggestive','erotica','pornographic')
 def lib_context(http,site_id):
     if site_id not in LIB_SITES:raise SourceError('Неизвестный каталог LibGroup.')
@@ -45,7 +46,7 @@ def get(url,http):
 def names(attributes):
     return list(dict.fromkeys(v for row in [attributes.get('title',{}),*attributes.get('altTitles',[])] for v in row.values() if isinstance(v,str) and v.strip()))
 def dex_search(query,language,http):
-    languages=['ru','en','ja','ko'] if language=='all' else [language if language in {'ru','en','ja','ko'} else 'ru']
+    languages=DEX_LANGUAGES if language=='all' else [language if language in DEX_LANGUAGES else 'ru']
     params=[('title',query),('limit','25'),('includes[]','cover_art')]+[('availableTranslatedLanguage[]',l) for l in languages]+[('contentRating[]',r) for r in CONTENT_RATINGS]
     rows=get('https://api.mangadex.org/manga?'+urlencode(params),http).get('data',[]);out=[]
     for row in rows:
@@ -80,7 +81,7 @@ def inspect_catalog(url,http):
     from manga_sources import chapter_number,clean
     p=urlsplit(url);query=parse_qs(p.query);chapters=[];pages=[];language=query.get('lang',['ru'])[0]
     if p.hostname=='mangadex.org':
-        language=language if language in {'ru','en','ja','ko'} else 'ru'
+        language=language if language in DEX_LANGUAGES else 'ru'
         match=re.fullmatch(r'/(title|chapter)/('+UUID+r')(?:/[^/]*)?/?',p.path)
         if not match:raise SourceError('Нужна ссылка MangaDex на тайтл или главу.')
         kind,identity=match.groups()
@@ -88,7 +89,7 @@ def inspect_catalog(url,http):
             record=get('https://api.mangadex.org/chapter/'+identity,http).get('data',{});a=record.get('attributes',{})
             if a.get('externalUrl'):raise SourceError('Эта глава доступна только на внешнем сайте.')
             language=a.get('translatedLanguage')
-            if language not in {'ru','en','ja','ko'}:raise SourceError('Выбери доступный язык главы: RU, EN, JA или KO.')
+            if language not in DEX_LANGUAGES:raise SourceError('Выбери доступный язык главы: RU, EN, JA или KO.')
             server=get('https://api.mangadex.org/at-home/server/'+identity+'?forcePort443=true',http);part=server.get('chapter',{});base=public_url(server.get('baseUrl',''),resolve_dns=False).rstrip('/')
             pages=[base+'/data/'+quote(part['hash'],safe='')+'/'+quote(f,safe='') for f in part.get('data',[])][:1500]
             root=next((v['id'] for v in record.get('relationships',[]) if v['type']=='manga'),None)
@@ -110,7 +111,7 @@ def inspect_catalog(url,http):
             truncated=offset<total
         attributes=detail.get('attributes',{});format='manhwa' if attributes.get('originalLanguage')=='ko' else 'manhua' if attributes.get('originalLanguage') in {'zh','zh-hk'} else 'manga'
         return {**result('mangadex','MangaDex',title,url,language,chapters,pages,truncated),'format':format,'readingMode':'scroll' if format=='manhwa' or any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in attributes.get('tags',[])) else 'pages','aliases':names(attributes)}
-    config=next(((sid,*row) for sid,row in LIB_SITES.items() if p.hostname==urlsplit(row[2]).hostname or p.hostname==row[0]+'.org'),None)
+    config=next(((sid,*row) for sid,row in LIB_SITES.items() if p.hostname==urlsplit(row[2]).hostname or p.hostname==row[0]+'.org' or sid==2 and p.hostname=='slashlib.me'),None)
     if config is None:raise SourceError('Неизвестный каталог читалки.')
     site_id,provider,provider_name,root=config;http=lib_context(http,site_id)
     match=re.fullmatch(r'/ru/(?:manga/)?([\w-]+)(?:/read/v(\d+)/c(\d+(?:\.\d+)?))?/?',p.path)

@@ -12,7 +12,7 @@ from urllib.parse import urljoin,urlsplit,urlencode
 from bs4 import BeautifulSoup
 from source_parser import SourceError,public_url
 
-HOSTS={'hentaichan.live','x17.h-chan.me'}
+HOSTS={'hentaichan.live','xxl.hentaichan.live','x17.h-chan.me'}
 ROOT='https://x17.h-chan.me'
 SOURCE={'id':'990000000000000001','name':'HentaiChan','lang':'ru','baseUrl':ROOT,'isNsfw':True}
 ITEM=re.compile(r'^/(manga|online|related)/([1-9]\d{0,11}-[^/?]{1,250})\.html$')
@@ -60,10 +60,14 @@ def parse_search(text,base):
     return list(result.values())
 
 
-def search(query,http):
+def search(query,http,root=ROOT):
     query=clean(query)[:160]
     if len(query)<2:return []
-    text,final,_=document(ROOT+'/?'+urlencode({'do':'search','subaction':'search','story':query}),http)
+    if root not in {ROOT,'https://xxl.hentaichan.live'}:raise SourceError('Неизвестный адрес каталога HentaiChan.')
+    params=urlencode({'do':'search','subaction':'search','story':query,'search_start':1})
+    backup='https://xxl.hentaichan.live' if root==ROOT else ROOT
+    try:text,final,_=document(root+'/?'+params,http)
+    except SourceError:text,final,_=document(backup+'/?'+params,http)
     return parse_search(text,final)
 
 

@@ -8,6 +8,7 @@ import ImportReadiness,{canImport} from './ImportReadiness.jsx';
 import {selectChapters,mangaMetadata,MANGA_LANGUAGES,MANGA_FORMATS,mangaLanguageName} from './manga-import.js';
 import OnlineViewer from './OnlineViewer.jsx';
 import useGlobalManga from './use-global-manga.js';
+import MangaSearchDiagnostics from './MangaSearchDiagnostics.jsx';
 import {exportLocally} from './local-export.js';
 import ChapterChooser from './ChapterChooser.jsx';
 import MangaSourceManager from './MangaSourceManager.jsx';
@@ -84,6 +85,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
   <TitleSourcePicker requireVerified={Number(service.session?.serverVersion)>=47} key={item?.id||'manual'} sources={visibleSources} value={url} info={displayInfo} loading={searching||globalSearch.state==='running'} onChoose={value=>{setOnline(false);inspect(value);}}/>
   {globalSearch.error&&<p className="inline-error" role="alert">{globalSearch.error} <button type="button" className="text-link" onClick={()=>setRevision(n=>n+1)}>Повторить поиск источников</button></p>}
   {globalSearch.progress&&<p className="fine" role="status">{globalSearch.state==='running'?'Поиск источников':'Поиск завершён'}: {globalSearch.progress.completed} / {globalSearch.progress.total}{globalSearch.progress.failed?' · не ответили: '+globalSearch.progress.failed:''}. Найденные источники сохранены.</p>}
+  <MangaSearchDiagnostics providers={globalSearch.providers} key={globalSearch.id}/>
   {inspection&&<div className="title-playback-selectors"><label className="form-field input-label">Перевод<select aria-label="Переводчик" className="field-input" value={team} onChange={e=>{setOnline(false);setTeam(e.target.value);}}><option value="">{inspection.language==='ru'?'Все доступные переводы':mangaLanguageName(inspection.language)+' · оригинал'}</option>{(inspection.translations||[]).map(v=><option key={v}>{v}</option>)}</select></label>{inspection.seasons?.length>1&&<label className="form-field input-label">Том<select aria-label="Том" className="field-input" value={volume} onChange={e=>{setOnline(false);setVolume(e.target.value);}}><option value="all">Все тома</option>{inspection.seasons.map(v=><option key={v.number} value={v.number}>{v.name}</option>)}</select></label>}</div>}
   {busy==='inspect'&&<p className="fine" role="status">Загружаем главы…</p>}{error&&<p className="inline-error" role="alert">{error}</p>}
   {inspection&&!sourceReady&&!error&&<p className="fine" role="status">Главы получены · проверяем загрузку страницы…</p>}

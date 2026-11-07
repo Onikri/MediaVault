@@ -6,11 +6,12 @@ search responses are candidates, not claims that chapters are readable.
 from pathlib import Path
 from urllib.parse import urljoin
 import hashlib,json,os,re,secrets,sqlite3,threading,time,unicodedata
-from source_parser import SourceError,public_url
+from source_parser import SourceAccessError,SourceError,public_url
 import suwayomi_bridge as bridge
 
-LANGUAGES={'all','ru','en','ja','ko'}
-NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'MangaDex':0}
+LANGUAGES={'all',*bridge.LANGUAGES}
+DISCOVERY_VERSION=3
+NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'SlashLib':2,'MangaDex':0,'Senkognito':None}
 def language_queries(values,language):
     pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[language]
     return sorted(dict.fromkeys(values),key=lambda v:not bool(re.search(pattern,v,re.I)))[:2]
@@ -37,7 +38,7 @@ def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
     query=normalize(query)[:80]
     rows=[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))}
-          for s in installed_sources() if s.get('lang') in LANGUAGES and (language=='all' or s['lang']==language)]
+          for s in installed_sources() if s.get('lang') in bridge.LANGUAGES and (language=='all' or s['lang']==language)]
     rows.sort(key=lambda s:(s['language'],s['name'].casefold(),s['id']))
     from manga_source_health import states,blocked
     health=states();usable=[s for s in rows if not blocked(s['id'],health)]
@@ -71,9 +72,16 @@ def native_search_source(source,query):
     try:
         terms=source.get('_queries',[query])
         for term in terms:
-            rows=dex_search(term,source['lang'],http) if source['name']=='MangaDex' else lib_search(term,http,NATIVE_SOURCES[source['name']],details=True)
+            if source['name']=='MangaDex':
+                rows=dex_search(term,source['lang'],http)
+            elif source['name']=='Senkognito':
+                from manga_senkognito import search
+                rows=search(term,http)
+            else:
+                rows=lib_search(term,http,NATIVE_SOURCES[source['name']],details=True)
             for row in rows:
                 candidate={**row,'aliases':row.get('identityTitles') or row.get('aliases') or [row['title']]}
+                if source['name']=='Senkognito' and not selected and not any(normalized(term) in normalized(name) for name in candidate['aliases']):continue
                 matched=not selected or match_title(selected,candidate)[0]
                 # A matching publication year permits the documented English alias,
                 # while unrelated fan works with a franchise alias remain rejected.
@@ -101,15 +109,16 @@ def native_search_source(source,query):
              'sourceOnly':True,'ids':{},'genres':[],'tags':[]} for row in found.values()][:40]
 
 def search_source(source,query):
-    if source.get('name') in {'HentaiChan','HentaiChan.cc','Hitomi'}:
+    if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi'}:
         from title_identity import match_title
         from source_parser import PublicHttp
-        if source['name']=='HentaiChan':
+        from functools import partial
+        if source['name'] in {'HentaiChan','HenChan'}:
             from manga_hentaichan import search
+            if source['name']=='HenChan':search=partial(search,root='https://xxl.hentaichan.live')
         elif source['name']=='HentaiChan.cc':
             from manga_hentaichan_cc import search
         else:
-            from functools import partial
             from manga_hitomi import search as hitomi_search
             search=partial(hitomi_search,language=source['lang'])
         http=PublicHttp(timeout=(3,18),deadline=time.monotonic()+38)
@@ -119,18 +128,25 @@ def search_source(source,query):
                 for row in search(term,http):
                     selected=source.get('_title') or source.get('_alias_title')
                     if selected and not match_title(selected,row)[0]:continue
-                    if source['name']=='HentaiChan' and not selected and not any(normalize(term) in normalize(v) for v in row['aliases']):continue
+                    if source['name'] in {'HentaiChan','HenChan'} and not selected and not any(normalize(term) in normalize(v) for v in row['aliases']):continue
+                    if source['name']=='HenChan':
+                        row={**row,'id':'henchan:'+row['id'].split(':')[-1],'sourceId':str(source['id']),'providerName':'HenChan'}
                     found[row['id']]=row
                 if found:break
             return list(found.values())
         finally:http.close()
-    if source.get('name') in NATIVE_SOURCES:return native_search_source(source,query)
+    if source.get('name') in NATIVE_SOURCES:
+        try:return native_search_source(source,query)
+        except SourceError:
+            # The installed extension can reach the same catalogue when the
+            # public API redirects to an edge challenge or its alias API fails.
+            if source['name'] not in {'MangaDex','SlashLib','Senkognito'}:raise
     client=bridge.Client()
     try:
         from title_identity import match_title
         found={};selected=source.get('_title') or source.get('_alias_title')
         for term in source.get('_queries',[query]):
-            data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=4)
+            data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=12)
             rows=data.get('mangaList',[])
             if not isinstance(rows,list):raise ValueError('Invalid source result')
             for row in rows[:40]:
@@ -186,6 +202,8 @@ class Discovery:
               CREATE TABLE IF NOT EXISTS work(job TEXT NOT NULL,source_id TEXT NOT NULL,source TEXT NOT NULL,state TEXT NOT NULL,
                 results TEXT NOT NULL DEFAULT '[]',cached INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(job,source_id));
               CREATE INDEX IF NOT EXISTS work_queue ON work(state,job);
+              CREATE TABLE IF NOT EXISTS work_diagnostics(job TEXT NOT NULL,source_id TEXT NOT NULL,
+                details TEXT NOT NULL,PRIMARY KEY(job,source_id));
               CREATE TABLE IF NOT EXISTS query_cache(query TEXT NOT NULL,source_id TEXT NOT NULL,results TEXT NOT NULL,expires REAL NOT NULL,
                 PRIMARY KEY(query,source_id));
               CREATE TABLE IF NOT EXISTS titles(id TEXT PRIMARY KEY,source_id TEXT NOT NULL,language TEXT NOT NULL,title_norm TEXT NOT NULL,
@@ -233,6 +251,7 @@ class Discovery:
         stale=[r[0] for r in self.db.execute("SELECT id FROM jobs WHERE state!='running' ORDER BY updated DESC LIMIT -1 OFFSET 32")]
         for identity in stale:
             self.db.execute('DELETE FROM work WHERE job=?',(identity,));self.db.execute('DELETE FROM jobs WHERE id=?',(identity,))
+        self.db.execute('DELETE FROM work_diagnostics WHERE job NOT IN (SELECT id FROM jobs)')
 
     def start(self,owner,query,language='all',source_ids=None,refresh=False,title=None):
         if not isinstance(query,str) or not 2<=len(query.strip())<=160 or any(unicodedata.category(c)=='Cc' for c in query):raise ValueError('Укажи запрос от 2 до 160 символов.')
@@ -243,7 +262,7 @@ class Discovery:
         if source_ids is not None and (not isinstance(source_ids,list) or not 1<=len(source_ids)<=1000 or any(not isinstance(v,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',v) for v in source_ids)):raise ValueError('Выбери хотя бы один установленный источник.')
         # Persist only public source identity, never an upstream response's
         # optional preference/authentication fields.
-        active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in installed_sources() if s.get('lang') in LANGUAGES]
+        active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in installed_sources() if s.get('lang') in bridge.LANGUAGES]
         installed={str(s['id']) for s in active}
         if source_ids and any(v not in installed for v in source_ids):raise ValueError('Выбранный источник не установлен. Обнови каталог источников.')
         selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())
@@ -259,10 +278,9 @@ class Discovery:
             # Searching a romanized name alone misses Russian, Japanese and Korean editions.
             clean_title={k:title.get(k) for k in ('kind','title','titles','aliases','ids','year')}
             for source in selected:
-                pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[source['lang']]
-                source['_queries']=sorted(aliases(title),key=lambda v:not bool(re.search(pattern,v,re.I)))[:2]
+                source['_queries']=language_queries(aliases(title),source['lang'])
                 source['_title']=clean_title
-        signature=hashlib.sha256(json.dumps([key,language,[str(s['id']) for s in selected],title and aliases(title)],ensure_ascii=False).encode()).hexdigest()
+        signature=hashlib.sha256(json.dumps([DISCOVERY_VERSION,key,language,[str(s['id']) for s in selected],title and aliases(title)],ensure_ascii=False).encode()).hexdigest()
         now=self.clock()
         with self.condition,self.db:
             self._prune(now)
@@ -283,7 +301,8 @@ class Discovery:
 
     @staticmethod
     def _cache_key(key,source):
-        return 'native-v2:'+key if not source.get('_title') else 'native-v2:'+key+'|title:'+hashlib.sha256(json.dumps(source['_title'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        versioned=f'native-v{DISCOVERY_VERSION}:{key}'
+        return versioned if not source.get('_title') else versioned+'|title:'+hashlib.sha256(json.dumps(source['_title'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
     def _indexed(self,key,sid):
         # Parameterized escaped LIKE supports raw Japanese/Korean substring
@@ -297,12 +316,12 @@ class Discovery:
         results={};providers=[];complete=failed=cached=0
         from manga_source_health import states,blocked
         health=states()
-        for row in self.db.execute('SELECT * FROM work WHERE job=? ORDER BY source_id',(identity,)):
+        for row in self.db.execute('SELECT w.*,d.details FROM work w LEFT JOIN work_diagnostics d USING(job,source_id) WHERE w.job=? ORDER BY source_id',(identity,)):
             source=json.loads(row['source']);items=json.loads(row['results'])
             if not blocked(row['source_id'],health) or source.get('_retryHealth'):
                 for value in items:results[value['id']]=value
-            providers.append({'id':row['source_id'],'name':source['name'],'language':source['lang'],'state':row['state'],'count':len(items),'cached':bool(row['cached'])})
-            complete+=row['state'] in {'done','unavailable','cancelled'};failed+=row['state']=='unavailable';cached+=row['cached']
+            providers.append({'id':row['source_id'],'name':source['name'],'language':source['lang'],'state':row['state'],'count':len(items),'cached':bool(row['cached']),**(json.loads(row['details']) if row['details'] else {})})
+            complete+=row['state'] in {'done','unavailable','skipped','cancelled'};failed+=row['state']=='unavailable';cached+=row['cached']
         key=normalize(job['query']);tokens=key.split()
         def rank(value):
             title=normalize(value['title']);return (title!=key,not title.startswith(key),key not in title,-sum(t in title for t in tokens),title,value['id'])
@@ -352,10 +371,24 @@ class Discovery:
                 if self.stopping:return
                 row=self._take()
                 if row is None:self.condition.wait(timeout=1);continue
+            started=time.monotonic();details={}
             try:
                 values=self.fetch(json.loads(row['source']),row['query']);state='done'
                 if not isinstance(values,list):raise ValueError('Invalid result')
-            except Exception:values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
+            except bridge.BridgeError as error:
+                values=[{**v,'stale':True} for v in json.loads(row['results'])]
+                state='skipped' if error.code=='link-required' else 'unavailable'
+                details={'code':error.code,'message':str(error)}
+            except SourceAccessError:
+                values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
+                details={'code':'restricted','message':'Источник требует вход, проверку браузера или ограничивает доступ.'}
+            except SourceError:
+                values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
+                details={'code':'source','message':'Не удалось получить данные публичного каталога.'}
+            except Exception:
+                values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
+                details={'code':'format','message':'Расширение вернуло данные в неизвестном формате.'}
+            details['elapsedMs']=round((time.monotonic()-started)*1000)
             now=self.clock()
             with self.condition,self.db:
                 job=self.db.execute('SELECT state FROM jobs WHERE id=?',(row['job'],)).fetchone()
@@ -369,6 +402,7 @@ class Discovery:
                     if expected and not any(match_title(expected,v)[0] for v in values):state='queued'
                 encoded=json.dumps(values,ensure_ascii=False)
                 self.db.execute('UPDATE work SET state=?,results=? WHERE job=? AND source_id=?',(state,encoded,row['job'],row['source_id']))
+                if state!='queued':self.db.execute('INSERT OR REPLACE INTO work_diagnostics VALUES(?,?,?)',(row['job'],row['source_id'],json.dumps(details,ensure_ascii=False)))
                 # Failed upstream requests are not persisted as successful empty
                 # cache entries for other owners or refreshed searches.
                 if state=='done':

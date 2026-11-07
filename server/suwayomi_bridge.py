@@ -13,6 +13,28 @@ PREFIX='/__manga/suwayomi/'
 LANGUAGES={'ru','en','ja','ko'}
 _cache={};_lock=threading.RLock();_install_lock=threading.Lock()
 
+class BridgeError(SourceError):
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code=code
+
+
+def bridge_error(status, text, image=False):
+    for terms, code, message in (
+        (('no space left on device','disk quota exceeded'),'storage','На сервере источников заполнен кэш страниц. Требуется очистка кэша; повторное открытие главы не поможет.'),
+        (('cef is disabled','webview.getfactory'),'webview','Для этого расширения на сервере отключён браузер WebView. Требуется восстановить среду Suwayomi.'),
+        (('no chapters found','no chapter found'),'no-chapters','Источник отвечает, но не опубликовал открытые главы этого тайтла на выбранном языке.'),
+        (('cloudflare bypass currently disabled','bypass site protection','necessary cookies'),'challenge','Источник требует браузерную проверку.'),
+        (('your country is not supported','only available in japan','only be used from japan','not available in your region'),'region','Источник ограничил доступ из региона сервера.'),
+        (('timed out','timeout'),'timeout','Источник не успел ответить.'),
+        (('name or service not known','failure in name resolution','unknownhostexception'),'dns','Домен источника не разрешается.'),
+        (('enter a valid cubari url','enter a deviantart gallery url'),'link-required','Расширение открывает прямые ссылки и не ищет по названию.'),
+        (('username or password cannot be empty','requires a login'),'login','Источник требует вход.'),
+    ):
+        if any(term in text for term in terms):return BridgeError(code,message)
+    code={401:'login',403:'restricted',404:'missing',429:'rate-limit'}.get(status,'upstream')
+    return BridgeError(code,f'Ошибка источника (HTTP {status}). Не удалось получить '+('страницу главы.' if image else 'данные читалки.'))
+
 def configured():return bool(os.getenv('SUWAYOMI_URL') and os.getenv('SUWAYOMI_AUTH_FILE') and os.getenv('PUBLIC_URL','').startswith('https://'))
 def reference(manga,chapter=None,page=None):
     root=os.getenv('PUBLIC_URL','').rstrip('/')
@@ -56,10 +78,7 @@ class Client:
                     raw+=block[:4096-len(raw)]
                     if len(raw)>=4096:break
                 text=raw.decode('utf-8',errors='replace').casefold()
-                if any(v in text for v in ['no space left on device','disk quota exceeded']):raise SourceError('На сервере источников заполнен кэш страниц. Требуется очистка кэша; повторное открытие главы не поможет.')
-                if 'cef is disabled' in text:raise SourceError('Для этого расширения на сервере отключён браузер WebView. Требуется восстановить среду Suwayomi.')
-                if any(v in text for v in ['no chapters found','no chapter found']):raise SourceError('Источник отвечает, но не опубликовал открытые главы этого тайтла на выбранном языке.')
-                raise SourceError(f'Ошибка источника (HTTP {response.status_code}). Не удалось получить '+('страницу главы.' if image else 'данные читалки.'))
+                raise bridge_error(response.status_code,text,image)
             chunks=[];size=0;limit=30*1024*1024 if image else 8*1024*1024
             for block in response.iter_content(65536):
                 size+=len(block)
@@ -72,7 +91,9 @@ class Client:
                 if not extension:raise SourceError('Источник вернул заглушку вместо страницы.')
                 return raw,'image/'+('jpeg' if extension=='jpg' else extension)
             return json.loads(raw)
-        except (requests.RequestException,ValueError,KeyError):raise SourceError('Каталог источников не ответил. Повтори запрос позже.') from None
+        except requests.Timeout:raise BridgeError('timeout','Каталог источников не успел ответить.') from None
+        except requests.RequestException:raise BridgeError('network','Нет связи с каталогом источников.') from None
+        except (ValueError,KeyError):raise BridgeError('format','Каталог источников вернул данные в неизвестном формате.') from None
         finally:
             if response is not None:response.close()
 
@@ -114,7 +135,7 @@ def status():
     if not configured():return {'configured':False,'ready':False,'message':'Дополнительные источники пока не подключены.'}
     try:
         active=sources();available=extensions()
-        return {'configured':True,'ready':True,'availableExtensions':len(available),'installedExtensions':sum(bool(x.get('installed')) for x in available),'sources':[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))} for s in active]}
+        return {'configured':True,'ready':True,'availableExtensions':len(available),'installedExtensions':sum(bool(x.get('installed')) for x in available),'sources':[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))} for s in active if s.get('lang') in LANGUAGES]}
     except SourceError:return {'configured':True,'ready':False,'message':'Каталог источников запускается или временно недоступен.'}
 
 def extension_catalog(language='all',query=''):
@@ -182,7 +203,7 @@ def inspect(value):
         except SourceError:
             # The normal path retains bounded retries and indexed NovelCool
             # recovery for providers without a public catalogue adapter.
-            if 'native' in locals() and native:raise
+            if 'native' in locals() and native and saved_source.get('name')!='MangaDex':raise
         try:data=client.get(f'/manga/{manga}',{'onlineFetch':'true' if chapter is None else 'false'},timeout=25)
         except SourceError:
             recovered=inspect_indexed_reader(value)
@@ -190,7 +211,7 @@ def inspect(value):
             raise
         source=data.get('source') or client.get('/source/'+str(data['sourceId']))
         lang=source.get('lang','')
-        if lang not in {'ru','en','ja','ko'}:raise SourceError('Этот источник пока не поддерживает выбранный язык чтения.')
+        if lang not in LANGUAGES:raise SourceError('Этот источник пока не поддерживает выбранный язык чтения.')
         if chapter is None and source.get('name')=='Manga Ball':
             languages=mangaball_languages(client,manga)
             if languages is not None and lang not in languages:raise SourceError('Manga Ball не опубликовал главы этого тайтла на выбранном языке. Доступные языки: '+(', '.join(sorted(languages)).upper() or 'нет')+'.')
@@ -206,7 +227,8 @@ def inspect(value):
             if chapter is None and parsed.scheme=='https' and parsed.hostname=='mangadex.org' and re.fullmatch(r'/(?:title|manga)/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}(?:/[^/]*)?/?',parsed.path):
                 from manga_sources import inspect as native_inspect
                 identity=parsed.path.split('/')[2]
-                return native_inspect('https://mangadex.org/title/'+identity+'?lang='+lang)
+                try:return native_inspect('https://mangadex.org/title/'+identity+'?lang='+lang)
+                except SourceError:pass
             raise
         episodes=[]
         for row in chapters[:1500]:
@@ -322,7 +344,7 @@ def page_image(value):
 def search(title,language='all',format='all',offset=0,limit=8):
     from title_identity import aliases,match_title
     if not configured():return {'results':[],'providers':[]}
-    try:active=[s for s in sources() if s['lang'] in ({'ru'} if language=='auto' else {'ru','en','ja','ko'} if language=='all' else {language})]
+    try:active=[s for s in sources() if s['lang'] in ({'ru'} if language=='auto' else LANGUAGES if language=='all' else {language})]
     except SourceError as e:return {'results':[],'providers':[{'provider':'suwayomi','name':'Дополнительные источники','status':'unavailable','message':str(e)}]}
     # A stable, explicit window replaces the old silent first-32-source cut-off.
     # The UI can continue until every installed source in this language is tried.

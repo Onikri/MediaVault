@@ -201,6 +201,7 @@ The short Dandadan excerpt in `translation-demo.html` is artwork by Yukinobu Tat
 
 - HLS.js 1.6.13, Apache-2.0: https://github.com/video-dev/hls.js . Loaded only for HLS MediaSource playback.
 - MangaLib public field formats were reviewed against Keiyoushi LibGroup at f1edb0341163935686ba09a444eef092287779f3 (Apache-2.0). MediaVault implements its own key-free client and does not copy authentication or restriction bypasses.
+- The Senkognito reader uses public GraphQL fields documented by the [Keiyoushi Senkuro extension](https://github.com/keiyoushi/extensions-source/tree/main/lib-multisrc/senkuro) (Apache-2.0).
 - MangaDex free public API: https://api.mangadex.org/docs/ . Scanlation images retain their original owners' rights; API access does not grant redistribution rights.
 - Opening/ending annotations: AniSkip https://api.aniskip.com/ . Music credits: AnimeThemes. Artist identities: MusicBrainz (core data CC0), with Russian Wikidata descriptions (CC0) and Wikipedia extracts (CC BY-SA, source links retained).
 - YouTube music and trailers use the official IFrame Player API https://developers.google.com/youtube/iframe_api_reference . Videos remain visible and controlled by YouTube; MediaVault does not extract or download their audio.
