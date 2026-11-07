@@ -46,3 +46,5 @@ html[data-blossom] .collection-sync{background:var(--color-canvas-soft)}
 html[data-blossom] .collection-refresh{margin-left:auto;width:40px;height:40px;border:0;border-radius:50%;background:var(--color-canvas-soft)}
 html[data-blossom] .admin-bar .upload-options{border:0;border-radius:16px;background:var(--color-canvas-soft);padding:2px 14px}
 html[data-blossom] .admin-bar .upload-options>summary{padding:10px 0;font-size:12px;font-weight:600;color:var(--color-on-muted);cursor:pointer}
+html[data-blossom] .morph-search-footer .morph-search-frame{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border:0;border-radius:999px;background:rgba(255,255,255,.06);color:#e6e6ee;font:600 11.5px/1 var(--font-ui,system-ui);cursor:pointer}
+html[data-blossom] .morph-search-footer .morph-search-frame:hover{background:rgba(255,255,255,.1);color:#fff}

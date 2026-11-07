@@ -4,6 +4,7 @@ import DriveServerStatus from './DriveServerStatus.jsx';
 import HistoryTimeline from './HistoryTimeline.jsx';
 import ProfileAvatar from './ProfileAvatar.jsx';
 import ProfileMenu from './ProfileMenu.jsx';
+import SceneSearch from './SceneSearch.jsx';
 import GuestAccess from './GuestAccess.jsx';
 import GuestManager from './GuestManager.jsx';
 import {clearGuestSession,readInviteToken,useGuestSession} from './guest-session.js';
@@ -266,6 +267,7 @@ function MediaVaultApp(){
       }}/>}
     </motion.main>
     <CookieNotice state={state} actions={actions}/>
+    <SceneSearch/>
     {guestScreen&&<GuestAccess mode={guestScreen.mode} invite={guestScreen.invite} onDone={finishGuest} onClose={closeGuest} onGoogle={()=>{closeGuest();actions.login();}}/>}
 
     <Dialog.Root open={libraryDialog} onOpenChange={value=>{setLibraryDialog(value);if(!value){setPassphrase('');setAgain('');}}}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="server-dialog import-library-dialog" onCloseAutoFocus={event=>{event.preventDefault();libraryOpener.current?.isConnected&&libraryOpener.current.focus({preventScroll:true});}}><Dialog.Close className="icon-button dialog-close" aria-label="Закрыть подключение библиотеки"><Icon name="close" size={18}/></Dialog.Close><Dialog.Title>{onlineAccess?'Онлайн-просмотр':'Библиотека для импорта'}</Dialog.Title><Dialog.Description>Выбранные тайтл, озвучка и серии останутся на странице.</Dialog.Description>{!state.user&&guest&&onlineAccess?<><p>{importService.error||'Ты вошёл как гость «'+guest.guest.name+'». Подключаем источники.'}</p><button className="btn btn-primary" onClick={()=>importService.refresh().then(()=>setLibraryDialog(false)).catch(()=>{})}>Подключить</button></>:!state.user?<div className="form-actions"><button className="btn btn-primary" disabled={busy} onClick={actions.login}><GoogleMark/>Войти через Google</button><button className="btn btn-secondary" onClick={()=>{setLibraryDialog(false);setGuestScreen({mode:'login'});}}>Вход по приглашению</button></div>:!state.admin?<><p>Войди владельцем: roma.shevchenko2020@gmail.com.</p><button className="btn btn-secondary" onClick={actions.logout}>Сменить аккаунт</button></>:onlineAccess?<><p>{importService.error||'Подключаем источники. Google Диск открывать не требуется.'}</p><button className="btn btn-primary" onClick={()=>importService.refresh().catch(()=>{})}>Подключить сервер</button></>:!state.driveConnected?<button className="btn btn-primary" disabled={busy} onClick={actions.connectDrive}>Разрешить доступ к библиотеке</button>:!state.catalog?<LibrarySetup state={state} libraryId={libraryId} setLibraryId={setLibraryId} passphrase={passphrase} setPassphrase={setPassphrase} again={again} setAgain={setAgain} onOpen={create=>openLibrary(create,true)} onFind={actions.findMyLibrary}/>:<button className="btn btn-primary" onClick={()=>setLibraryDialog(false)}>Библиотека открыта — продолжить</button>}</Dialog.Content></Dialog.Portal></Dialog.Root>

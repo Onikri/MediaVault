@@ -11,6 +11,9 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import OnlineViewer from './OnlineViewer.jsx';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import OnlineEpisodePreviews from './OnlineEpisodePreviews.jsx';
+import {readSceneJump,consumeSceneJump} from './scene-search.js';
+import {jumpTitleSection} from './title-navigation-store.js';
+import {onlineEpisodeId} from './watch-session.js';
 import {readWatch,saveWatch,orderedVoices,variantsFor,episodePreviewKey,minimumEpisodeDuration,voicesForCatalogue,isAllohaVariant,previewSource,previewEntry} from './watch-session.js';
 import {readEpisodePreview,saveEpisodePreview} from './episode-preview-cache.js';
 import './watch-page.css';
@@ -34,8 +37,11 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const identity=String(item.ids?.mal||item.id),saved=useRef(readWatch(userId,identity));
  const playbackMetadata=useMemo(()=>({...profile,ids:item.ids}),[profile,item.ids]);
  const voices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,catalogueSeasonHint(item)),saved.current),[discovery.data,item]);
- const initialSeason=catalogueSeasonHint(basisItem)||saved.current.season||1;
- const [voiceId,setVoiceId]=useState(saved.current.voiceId||''),[episode,setEpisode]=useState(saved.current.episode||1),[season,setSeason]=useState(initialSeason);
+ // A scene found by frame search names this work's own episode, so the saved
+ // season of earlier viewing must not override it.
+ const sceneJump=useRef(readSceneJump(identity));
+ const initialSeason=catalogueSeasonHint(basisItem)||(sceneJump.current?1:saved.current.season)||1;
+ const [voiceId,setVoiceId]=useState(saved.current.voiceId||''),[episode,setEpisode]=useState(sceneJump.current?.episode||saved.current.episode||1),[season,setSeason]=useState(initialSeason);
  const [browseSeason,setBrowseSeason]=useState(initialSeason),[browseData,setBrowseData]=useState(null),[browseBusy,setBrowseBusy]=useState(false),[browseError,setBrowseError]=useState(''),[browseAttempt,setBrowseAttempt]=useState(0);
  const [audioId,setAudioId]=useState(saved.current.audioId||''),[subtitleId,setSubtitleId]=useState(saved.current.subtitleId||'');
  const [entries,setEntries]=useState([]),[seasons,setSeasons]=useState([]),[variant,setVariant]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[playing,setPlaying]=useState(false),[count,setCount]=useState(24);
@@ -94,6 +100,15 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const preferred=bestQualityRow(knownRows,{voiceId:voice?.id,quality,anyVoice:bestVideo,failed:failed.current});
  const selectionKey=[identity,voice?.id,season,episode,quality,bestVideo,attempt,applyRevision].join(':');
  const base=voice?.variants.some(v=>v.id===variant?.id)&&!failed.current.has(variant?.id)?{variant,entries,voiceId:voice?.id}:null;
+ useEffect(()=>{
+  const jump=sceneJump.current;if(!jump||playing||!base)return;
+  const entry=base.entries.find(e=>Number(e.number)===Number(jump.episode));
+  if(!entry){if(!busy){sceneJump.current=null;consumeSceneJump();}return;}
+  sceneJump.current=null;consumeSceneJump();
+  try{sessionStorage.setItem('mediavault_pending_time_'+onlineEpisodeId(identity,entry.season||season,entry.number),String(jump.time));}catch{}
+  startPlayback(Number(entry.number),Number(entry.season)||season);
+  requestAnimationFrame(()=>jumpTitleSection('titlePlayback'));
+ },[base?.variant?.id,base?.entries,playing,busy]);
  if(!playing)frozen.current=null;
  const candidate=preferred||base;
  if(playing&&candidate&&(frozen.current?.key!==selectionKey||!frozen.current?.value))frozen.current={key:selectionKey,value:candidate};

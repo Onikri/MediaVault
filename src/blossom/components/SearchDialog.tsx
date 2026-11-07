@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useId,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
-import {ArrowUpRight,Clock,LoaderCircle,Search,X} from 'lucide-react';
+import {ArrowUpRight,Clock,ImageUp,LoaderCircle,Search,X} from 'lucide-react';
 import {useGlobalSearch,SEARCH_KINDS} from '../../use-global-search.js';
 import {genreLabels,matchesFilters} from '../../catalog.js';
 import UiSelect from '../../UiSelect.jsx';
@@ -140,7 +140,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
        </div>
       </div>}
      </div>
-     <footer className="morph-search-footer" id={id+'-help'}><span className="morph-search-footer-caption">Поиск по медиатеке</span>{(searchText.length>=2||year||genre)&&<button type="button" onClick={browse}>{searchText.length>=2?'Полный поиск':'Открыть в библиотеке'} <ArrowUpRight size={13}/></button>}</footer>
+     <footer className="morph-search-footer" id={id+'-help'}><button type="button" className="morph-search-frame" title="Найти аниме, серию и момент по скриншоту. Можно и перетащить картинку на страницу или вставить Ctrl+V." onClick={()=>{dispatchEvent(new Event('mediavault:scene-pick'));close();}}><ImageUp size={14}/>Найти по кадру</button>{(searchText.length>=2||year||genre)&&<button type="button" onClick={browse}>{searchText.length>=2?'Полный поиск':'Открыть в библиотеке'} <ArrowUpRight size={13}/></button>}</footer>
     </motion.div>
    </motion.div>}
   </AnimatePresence>
