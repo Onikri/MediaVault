@@ -5,10 +5,12 @@
 import {uiLanguage} from '../i18n/index.js';
 export const ROLE_COLORS=['#d9485f','#2f7fe0','#1f9d6c','#c27a00','#8a58d6','#d1457f','#0f97ab','#6f8f12'];
 export const EMOTION_LABELS={joy:'радостно',sad:'грустно',angry:'сердито',fear:'испуганно',surprise:'удивлённо',whisper:'шёпотом',shout:'громко',
- tender:'мягко',sarcastic:'с иронией',tired:'устало',excited:'взволнованно'};
+ tender:'мягко',sarcastic:'с иронией',tired:'устало',excited:'взволнованно',calm:'спокойно',cold:'холодно',pleading:'умоляюще',nervous:'нервно',
+ determined:'решительно',proud:'гордо',menacing:'угрожающе',crying:'сквозь слёзы',embarrassed:'смущённо',disgust:'с отвращением',confused:'растерянно',dreamy:'мечтательно'};
 // Chips sit inside translate="no" prose, so they are localised here.
 const EMOTION_LABELS_UK={joy:'радісно',sad:'сумно',angry:'сердито',fear:'налякано',surprise:'здивовано',whisper:'пошепки',shout:'голосно',
- tender:'лагідно',sarcastic:'з іронією',tired:'втомлено',excited:'схвильовано'};
+ tender:'лагідно',sarcastic:'з іронією',tired:'втомлено',excited:'схвильовано',calm:'спокійно',cold:'холодно',pleading:'благально',nervous:'нервово',
+ determined:'рішуче',proud:'гордо',menacing:'загрозливо',crying:'крізь сльози',embarrassed:'збентежено',disgust:'з огидою',confused:'розгублено',dreamy:'мрійливо'};
 
 // Colours follow the cast order (most frequent speakers first), so the first
 // eight characters of a chapter never share a colour.

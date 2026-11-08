@@ -136,7 +136,7 @@ export default function BookReader({item,userId,libraryId,onClose,readWhole,inli
    {!busy&&!error&&['txt','fb2'].includes(kind)&&indices.map(i=><article className="reader-prose ranobe-prose" translate="no" data-book-page={i} key={i}>{pages[i]?.content.split('\n\n').map((p,n)=>{const at=paragraphIndex.get(i+':'+n),now=speaking?.page===i&&speaking.n===n;return <p key={n} className={now?'is-speaking':undefined}><RoleText text={p} segments={at!=null?byParagraph?.get(at):null} colors={script?.colors} speaking={now?speaking.segment:null} show={prefs.roles}/></p>;})}</article>)}
    {!busy&&!error&&narrated?.rows.length>0&&<div className="ranobe-narration-dock book-narration-dock" onClick={e=>e.stopPropagation()}>
     <Narration key={narrated.key} paragraphs={narrated.rows.map(r=>r.text)} language={language} bookKey={'book:'+item.id} chapterKey={narrated.key}
-     title={item.name+(narrated.title?' · '+narrated.title:'')} service={service} userId={userId} startParagraph={Math.max(0,narrated.rows.findIndex(r=>r.page>=page))}
+     title={item.name+(narrated.title?' · '+narrated.title:'')} book={{title:String(item.name||'').replace(/\.(epub|pdf|fb2|txt)$/i,''),kind:'book'}} service={service} userId={userId} startParagraph={Math.max(0,narrated.rows.findIndex(r=>r.page>=page))}
      autoplay={continueVoice} onAutoplayHandled={()=>setContinueVoice(false)}
      onSpeaking={follow} onFinished={nextSection} onScript={setScript} commandRef={voice} onPlaying={setVoicePlaying}/>
    </div>}

@@ -319,7 +319,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 56, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 57, "ranobeReader":True, "bookReader":True, "wordStress":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -662,6 +662,25 @@ class MangaInspection(StrictBody):
     title:dict|None=None
     verifyPages:bool=False
     refresh:bool=False
+
+class AccentRequest(StrictBody):
+    texts:list[str]=Field(min_length=1,max_length=400)
+    language:str=Field(default='ru',pattern=r'^(ru|uk)$')
+
+@app.post('/tts/accent')
+def tts_accent(body:AccentRequest,subject=Depends(viewer)):
+    # Word stress for narration (RUAccent). The first call starts loading the
+    # model in the background and answers 503 + Retry-After until it is ready.
+    import stress_service
+    try:return {'texts':stress_service.stress(body.texts,body.language),**stress_service.status()}
+    except stress_service.Warming as error:raise HTTPException(503,str(error),headers={'Retry-After':'10'}) from None
+    except ValueError as error:raise HTTPException(422,str(error)) from None
+    except RuntimeError as error:raise HTTPException(503,str(error)) from None
+
+@app.get('/tts/accent/status')
+def tts_accent_status(subject=Depends(viewer)):
+    import stress_service
+    return stress_service.status()
 
 class RanobeSearch(StrictBody):
     title:dict
