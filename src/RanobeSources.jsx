@@ -39,7 +39,7 @@ export default function RanobeSources({item,service,state}){
    <label>{isBook?'Язык текста':'Язык перевода'}<select aria-label={isBook?'Язык текста книги':'Язык перевода ранобэ'} value={language} onChange={e=>setContentLanguage(e.target.value)}>{CONTENT_LANGUAGES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
    <button type="button" className="text-link" disabled={search.loading} onClick={()=>setRevision(v=>v+1)} aria-label="Повторить поиск текста"><RefreshCw size={14}/>Повторить</button>
   </div>
-  {search.loading?<p className="discovery-status" role="status"><span className="loading-ring"/>{isBook?'Ищем полный текст в Project Gutenberg и Викитеке…':'Ищем перевод в RanobeHub, Zenko, Смаколиках и Баке…'}</p>
+  {search.loading?<p className="discovery-status" role="status"><span className="loading-ring"/>{isBook?'Ищем полный текст в Project Gutenberg и Викитеке…':'Ищем перевод в RanobeLib, RanobeHub, Jaomix, Rulate, Zenko, Смаколиках и Баке…'}</p>
   :search.error?<p className="inline-error" role="alert">{search.error}</p>
   :!search.results.length?<p className="fine">{isBook?'Свободного текста этой книги в Project Gutenberg и Викитеке нет: обычно это значит, что книга ещё под авторским правом':'Точный перевод пока не найден'}{search.providers.some(p=>p.status==='unavailable')?'; часть источников не ответила':''}. Можно открыть свой файл ниже.</p>
   :<div className="manga-source-list ranobe-source-list">{search.results.map(row=><button type="button" key={row.url} aria-pressed={source?.url===row.url} disabled={busy} onClick={()=>choose(row)}>

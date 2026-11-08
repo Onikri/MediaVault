@@ -234,7 +234,9 @@ class PublicHttp:
                             and bool(re.fullmatch(rb'\{"page": \d{1,3}, "pageSize": 100, "sortOrder": "ASC", "mangaId": "[0-9a-f-]{36}"\}',data)))
             hikka_search=(action=='hikka-search' and urlsplit(url).hostname=='api.hikka.io' and urlsplit(url).path in {'/novel','/anime','/manga'}
                           and isinstance(data,bytes) and len(data)<=512 and bool(re.fullmatch(rb'\{"query": "(?:[^"\\]|\\.){1,400}"\}',data)))
-            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog or honey_chapters or hikka_search):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            jaomix_toc=(url=='https://jaomix.ru/wp-admin/admin-ajax.php' and isinstance(data,dict) and set(data)=={'action','page'}
+                        and data.get('action')=='loadpagenavchapstt' and bool(re.fullmatch(r'\d{1,3}',str(data.get('page','')))))
+            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog or honey_chapters or hikka_search or jaomix_toc):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if chan_search:
                 # The public search box's Next.js action. The caller supplies only the title.
                 outgoing.update({'Next-Action': '7fe1df09f7c8151b600f1a3e496cdda2e7ed7f0f95',
