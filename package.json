@@ -13,6 +13,7 @@
     "test:cards": "node tests/card-layout-browser.cjs",
     "test:library-layout": "node tests/library-layout-browser.cjs",
     "test:rooms": "ROOMS_ONLY=1 node tests/interface-rooms-browser.cjs",
+    "test:control": "node tests/control-center-browser.cjs",
     "test:browser": "node tests/browser.test.cjs",
     "test:design": "node tests/design-browser.cjs",
     "test:title-sections": "node tests/title-showcase-browser.cjs && node tests/title-sections-browser.cjs",

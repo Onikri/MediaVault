@@ -3,6 +3,7 @@ import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {Check,LoaderCircle,Plus,Search,X} from 'lucide-react';
 import UiSwitch from './UiSwitch.jsx';
 import {fetchCatalog} from './catalog.js';
+import './guest-access-editor.css';
 
 // What one guest may open: the whole library or titles the owner picks,
 // and separately whether they may watch and/or read.

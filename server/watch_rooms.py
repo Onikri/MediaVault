@@ -94,6 +94,7 @@ class Room:
     pending:dict=field(default_factory=dict)
     messages:deque=field(default_factory=lambda:deque(maxlen=CHAT_HISTORY))
     closed:bool=False
+    created:float=field(default_factory=time.time)
 
 def chat_gif(value):
     if not isinstance(value,dict):return None
@@ -210,18 +211,58 @@ def range_bounds(header,size):
     if start>=size or end<start:raise HTTPException(416,headers={'Content-Range':'bytes */'+str(size)})
     return start,min(end,start+MAX_CHUNK-1)
 
-def install(app,owner):
+DEFAULT_RULES={'limit':16,'perOwner':2,'members':8,'hours':6,'guestsMayHost':True}
+def admin_view(room,now=None):
+    # Owner console: what is playing, who is inside and how long the link lives.
+    # No tokens, passwords, media paths or chat text leave the server here.
+    now=now or time.monotonic()
+    host=next((m for m in room.members.values() if m.host),None)
+    return {'id':room.id,'title':room.title,'malId':room.mal_id,'owner':room.owner,
+            'guest':room.owner[6:] if str(room.owner).startswith('guest:') else '',
+            'createdAt':int(room.created),'expiresAt':int(time.time()+max(0,room.expires-now)),
+            'position':position(room),'duration':room.duration,'rate':room.rate,'playing':room.playing,'held':room.held,
+            'type':room.media.get('type','mp4'),'online':room.media.get('session') is not None,'messages':len(room.messages),
+            'everyone':room.everyone,'waitAll':room.wait_all,'hostOnline':bool(host and host.ws is not None),
+            'members':[{'id':m.id,'name':m.name,'host':m.host,'online':m.ws is not None,'buffering':m.buffering,'voice':m.voice,'muted':m.muted,'avatar':avatar_url(room,m)} for m in room.members.values()]}
+async def close_room(room):
+    room.closed=True
+    for pending in room.pending.values():
+        if not pending['future'].done():pending['future'].set_exception(ValueError('Room closed'))
+    await asyncio.gather(*(send(m,{'type':'closed'}) for m in list(room.members.values())))
+def install(app,owner,admin=None,rules=None):
+    def limits():
+        try:value=rules() if rules else None
+        except Exception:value=None
+        return {**DEFAULT_RULES,**(value or {})}
+    def prune(subject=None):
+        now=time.monotonic()
+        for identity,r in list(rooms.items()):
+            if r.closed or r.expires<now or subject and r.owner==subject and all(m.ws is None and m.seen<now-60 for m in r.members.values() if m.host):rooms.pop(identity,None)
+    def capacity(subject,rule):
+        if len(rooms)>=rule['limit']:raise HTTPException(429,'На сервере открыто максимум комнат. Закрой одну из них.')
+        if sum(r.owner==subject for r in rooms.values())>=rule['perOwner']:raise HTTPException(429,'Закрой предыдущую комнату.')
     @app.post('/rooms',status_code=201)
     async def create(body:Create,subject=Depends(owner)):
-        for identity,r in list(rooms.items()):
-            if r.closed or r.expires<time.monotonic() or r.owner==subject and all(m.ws is None and m.seen<time.monotonic()-60 for m in r.members.values() if m.host):rooms.pop(identity,None)
-        if len(rooms)>=16 or sum(r.owner==subject for r in rooms.values())>=2:raise HTTPException(429,'Закрой предыдущую комнату.')
+        rule=limits()
+        if str(subject).startswith('guest:') and not rule['guestsMayHost']:raise HTTPException(403,'Владелец не разрешил гостям открывать комнаты.')
+        prune(subject);capacity(subject,rule)
         media=validated_media(body.media,subject);salt=secrets.token_bytes(16)
         digest=await run_in_threadpool(hashlib.scrypt,body.password.encode(),salt=salt,n=16384,r=8,p=1)
-        if len(rooms)>=16 or sum(r.owner==subject for r in rooms.values())>=2:raise HTTPException(429,'Закрой предыдущую комнату.')
-        room=Room(secrets.token_urlsafe(20),subject,salt,digest,body.title,body.malId,media)
+        capacity(subject,rule)
+        room=Room(secrets.token_urlsafe(20),subject,salt,digest,body.title,body.malId,media,expires=time.monotonic()+rule['hours']*3600)
         host=Member(secrets.token_urlsafe(8),secrets.token_urlsafe(32),'Ведущий',True);room.members[host.id]=host;room.leader=host.id;rooms[room.id]=room
         return {'id':room.id,'token':host.token,'memberId':host.id,'room':snapshot(room)}
+
+    if admin is not None:
+        @app.get('/rooms')
+        def list_rooms(subject=Depends(admin)):
+            prune();now=time.monotonic()
+            return {'rooms':[admin_view(r,now) for r in sorted(rooms.values(),key=lambda r:-r.created)],'rules':limits()}
+
+        @app.delete('/rooms/{identity}')
+        async def close(identity:str,subject=Depends(admin)):
+            room=lookup(identity);await close_room(room)
+            return {'closed':room.id}
 
     @app.get('/rooms/{identity}/preview')
     def preview(identity:str):
@@ -268,7 +309,8 @@ def install(app,owner):
         lookup(identity)
         for mid,m in list(room.members.items()):
             if not m.host and m.ws is None and m.seen<now-60:room.members.pop(mid,None)
-        if len(room.members)>=9:raise HTTPException(429,'В комнате уже восемь гостей.')
+        limit=limits()['members']
+        if len(room.members)>=limit+1:raise HTTPException(429,'В комнате уже максимум гостей: '+str(limit)+'.')
         m=Member(secrets.token_urlsafe(8),secrets.token_urlsafe(32),body.name.strip() or 'Гость',buffering=True,avatar=photo,avatar_type=photo_type,avatar_key=secrets.token_urlsafe(12) if photo else '');room.members[m.id]=m
         return {'id':room.id,'token':m.token,'memberId':m.id,'room':snapshot(room)}
 
@@ -344,10 +386,7 @@ def install(app,owner):
                             pending['future'].set_result(chunk)
                     continue
                 if kind=='close' and member.host:
-                    room.closed=True
-                    for pending in room.pending.values():
-                        if not pending['future'].done():pending['future'].set_exception(ValueError('Room closed'))
-                    await asyncio.gather(*(send(m,{'type':'closed'}) for m in room.members.values()));break
+                    await close_room(room);break
                 if kind=='settings' and member.host:
                     leader=data.get('leader',room.leader)
                     if leader not in room.members:raise ValueError()
