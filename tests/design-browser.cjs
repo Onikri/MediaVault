@@ -51,7 +51,7 @@ let vite,browser;
  const reads=await page.evaluate(()=>window.artworkReads);assert.ok(reads.includes('preview-1')&&reads.includes('preview-2'));
  const timeline=page.locator('.mvx-timeline');await timeline.hover({position:{x:100,y:1}});await page.locator('.mv-timeline-frame img').waitFor();await page.mouse.move(0,0);
  await page.locator('.mv-player video').evaluate(v=>{v.currentTime=18;});
- await page.locator('.mvx-play').click();await page.waitForFunction(()=>!document.querySelector('.mv-player video').paused);
+ await page.locator('.mvx-play').click();await page.waitForFunction(()=>document.querySelector('.mv-player video')?.paused===false);
  await page.locator('.mvx-play').click();
  await page.waitForFunction(()=>Object.keys(localStorage).some(k=>k.startsWith('mediavault_progress_v2:')&&k.includes('user-a')));
  await page.locator('#switchUser').click();await page.locator('.title-episode-card').first().click();await page.locator('.mv-player').scrollIntoViewIfNeeded();
