@@ -63,7 +63,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
    const cached=automatic?sourceInfo[value]:null;
    const data=cached?.inspection||await service.request('/manga/inspect',{method:'POST',body:{url:value,...(item?{title:searchTitle}:{}),verifyPages:false,refresh:!automatic}});
    if(version!==generation.current)return;
-   if(!['ru','en','ja','ko'].includes(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
+   if(!['ru','uk','en','ja','ko'].includes(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
    if(!data.episodes?.length)throw Error('У этого тайтла нет открытых глав на языке «'+mangaLanguageName(data.language)+'».');
    setInspection({...data,readable:undefined,...(cached?{readable:cached.readable,readabilityError:cached.readabilityError,fromSourceInfo:true}:{})});setVolume('all');setTeam('');setOne(data.episodes[0].url);setFirst(String(data.episodes[0].number));setLast(String(data.episodes.at(-1).number));if(!item)setCollection(data.title);setBusy('');
    if(cached)return;

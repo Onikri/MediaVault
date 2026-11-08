@@ -3,6 +3,8 @@ import ReaderShell from './ReaderShell.jsx';
 import {bookPreferences,saveBookPreferences} from './book-content.js';
 import {readRanobeChapter,saveRanobeProgress} from './ranobe-client.js';
 import Narration from './tts/Narration.jsx';
+import RoleText,{segmentsByParagraph} from './tts/RoleText.jsx';
+import {Headphones,Pause} from 'lucide-react';
 import './reader-surface.css';
 import './ranobe.css';
 
@@ -12,13 +14,13 @@ export default function RanobeReader({book,item,start,service,userId,onClose}){
  const root=useRef(null),body=useRef(null),restored=useRef(false),follow=useRef(true),scrollPause=useRef(0);
  const [prefs,setPrefs]=useState(()=>bookPreferences(userId)),[settings,setSettings]=useState(false);
  const [index,setIndex]=useState(start?.index||0),[chapter,setChapter]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
- const [speaking,setSpeaking]=useState(-1),[continueVoice,setContinueVoice]=useState(false),[startParagraph,setStartParagraph]=useState(start?.paragraph||0);
+ const [speaking,setSpeaking]=useState(-1),[speakingSegment,setSpeakingSegment]=useState(null),[script,setScript]=useState(null),voice=useRef(null),[voicePlaying,setVoicePlaying]=useState(false),[continueVoice,setContinueVoice]=useState(false),[startParagraph,setStartParagraph]=useState(start?.paragraph||0);
  const entry=book.episodes[index];
  function update(change){setPrefs(old=>{const next={...old,...change};saveBookPreferences(userId,next);return next;});}
 
  useEffect(()=>{
   if(!entry)return;const abort=new AbortController();
-  setLoading(true);setError('');setChapter(null);setSpeaking(-1);
+  setLoading(true);setError('');setChapter(null);setSpeaking(-1);setSpeakingSegment(null);setScript(null);
   readRanobeChapter(service,entry.url,item,{signal:abort.signal}).then(data=>{
    setChapter(data);setLoading(false);
    const next=book.episodes[index+1];if(next)readRanobeChapter(service,next.url,item).catch(()=>{});
@@ -45,7 +47,7 @@ export default function RanobeReader({book,item,start,service,userId,onClose}){
   saveRanobeProgress(userId,book.url,{chapter:book.episodes[next].url,paragraph:0,title:book.episodes[next].title});
  }
  function speakingRow(row){
-  setSpeaking(row.p);
+  setSpeaking(row.p);setSpeakingSegment(row.segment);
   if(!follow.current||Date.now()<scrollPause.current)return;
   const node=body.current?.querySelector('[data-p="'+row.p+'"]');
   node?.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
@@ -59,13 +61,17 @@ export default function RanobeReader({book,item,start,service,userId,onClose}){
   <label>Интерлиньяж<select aria-label="Межстрочный интервал ранобэ" value={prefs.lineHeight} onChange={e=>update({lineHeight:Number(e.target.value)})}>{[1.5,1.75,2].map(v=><option key={v} value={v}>{v}</option>)}</select></label>
   <label>Ширина<select aria-label="Ширина текста ранобэ" value={prefs.width} onChange={e=>update({width:Number(e.target.value)})}>{[560,720,900,1100].map(v=><option key={v} value={v}>{v} px</option>)}</select></label>
   <label className="narration-switch"><input type="checkbox" defaultChecked onChange={e=>{follow.current=e.target.checked;}}/>Следовать за голосом</label>
+  <label className="narration-switch"><input type="checkbox" checked={prefs.roles} onChange={e=>update({roles:e.target.checked})}/>Показывать роли в тексте</label>
  </div>;
  const contents=<nav className="reader-chapter-list">{book.episodes.map((c,i)=><button key={c.url} aria-current={i===index||undefined} onClick={()=>go(i)}><span translate="no">{c.number}. {c.title}</span></button>)}</nav>;
  const narration=chapter&&<Narration key={entry.url} paragraphs={chapter.paragraphs} language={chapter.language||book.language} bookKey={book.url} chapterKey={entry.url}
   title={book.title+' · '+(chapter.title||entry.title)} service={service} userId={userId} startParagraph={startParagraph} autoplay={continueVoice}
-  onAutoplayHandled={()=>setContinueVoice(false)} onSpeaking={speakingRow} onFinished={()=>go(index+1,{keepVoice:true})}/>;
+  onAutoplayHandled={()=>setContinueVoice(false)} onSpeaking={speakingRow} onFinished={()=>go(index+1,{keepVoice:true})}
+  onScript={setScript} commandRef={voice} onPlaying={setVoicePlaying}/>;
+ const byParagraph=script?segmentsByParagraph(script.segments):null;
+ const listen=<button className="reader-control reader-listen" aria-label={voicePlaying?'Пауза озвучки':'Слушать главу'} aria-pressed={voicePlaying} disabled={!chapter} onClick={()=>voice.current?.toggle()}>{voicePlaying?<Pause size={19}/>:<Headphones size={19}/>}</button>;
  return <ReaderShell readerRef={root} title={book.title} subtitle={'Глава '+entry?.number+(entry?.title?' · '+entry.title:'')} onClose={onClose} theme={prefs.theme}
-  className="book-reader ranobe-reader" paged={false} settings={options} settingsOpen={settings} onSettingsOpenChange={setSettings} contents={contents}
+  className="book-reader ranobe-reader" paged={false} actions={listen} settings={options} settingsOpen={settings} onSettingsOpenChange={setSettings} contents={contents}
   progress={{current:index+1,total:book.episodes.length,label:'Глава '+(index+1)+' / '+book.episodes.length}}
   onPrevious={()=>go(index-1)} onNext={()=>go(index+1)} canPrevious={index>0} canNext={index<book.episodes.length-1}>
   <div ref={body} className="book-reading-surface book-flow-scroll ranobe-surface" style={surface} onWheel={()=>{scrollPause.current=Date.now()+4000;}} onTouchMove={()=>{scrollPause.current=Date.now()+4000;}}>
@@ -73,7 +79,7 @@ export default function RanobeReader({book,item,start,service,userId,onClose}){
    {error&&<div className="reader-book-error" role="alert">{error} <button type="button" className="text-link" onClick={()=>{setIndex(i=>i);setChapter(null);readRanobeChapter(service,entry.url,item).then(setChapter).catch(e=>setError(e.message));}}>Повторить</button></div>}
    {chapter&&<article className="reader-prose ranobe-prose" translate="no" lang={chapter.language||book.language}>
     <h2>{chapter.title||entry.title}</h2>
-    {chapter.paragraphs.map((text,i)=><p key={i} data-p={i} className={i===speaking?'is-speaking':undefined}>{text}</p>)}
+    {chapter.paragraphs.map((text,i)=><p key={i} data-p={i} className={i===speaking?'is-speaking':undefined}><RoleText text={text} segments={byParagraph?.get(i)} colors={script?.colors} speaking={i===speaking?speakingSegment:null} show={prefs.roles}/></p>)}
     <footer className="ranobe-chapter-end">{index<book.episodes.length-1?<button type="button" className="btn btn-primary" onClick={()=>go(index+1)}>Следующая глава</button>:<p>Это последняя опубликованная глава.</p>}</footer>
    </article>}
    {narration&&<div className="ranobe-narration-dock" onClick={e=>e.stopPropagation()}>{narration}</div>}

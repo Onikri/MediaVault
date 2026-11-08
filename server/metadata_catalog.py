@@ -45,7 +45,7 @@ def get_json(url, *, params=None, body=None):
 
 
 def _metadata(provider, *, query="", kind="anime", page=1, identity=None, year=None, part="",genre="",tag=""):
-    if provider not in {"kitsu", "anilist", "shikimori", "jikan", "tvmaze", "imdb", "wikidata"}:
+    if provider not in {"kitsu", "anilist", "shikimori", "jikan", "tvmaze", "imdb", "wikidata", "kinobox"}:
         raise SourceError("Неизвестный каталог.")
     query, page = str(query).strip()[:160], max(1, min(100, int(page)))
     if kind not in {"anime", "manga", "ranobe", "movie", "tv", "character", "person"}:
@@ -72,18 +72,19 @@ def _metadata(provider, *, query="", kind="anime", page=1, identity=None, year=N
             if year and resource == "anime":
                 params["filter[seasonYear]"] = year
         if not identity and (genre or tag):params['filter[categories]']=re.sub(r'[^a-z0-9]+','-',(genre or tag).lower()).strip('-')
+        if not identity and kind == "ranobe":params["filter[subtype]"] = "novel"
         value = get_json(f"https://kitsu.io/api/edge/{resource}" + (f"/{identity}" if identity else ""), params=params)
     elif provider == "anilist":
         if identity:
             body = {"query": f"query($id:Int){{Media(id:$id){{{MEDIA_FIELDS}}}}}", "variables": {"id": int(identity)}}
         else:
-            arguments = "type:$type,sort:POPULARITY_DESC" + (",search:$search" if query else "") + (",seasonYear:$year" if year else "") + (",genre_in:$genre" if genre else "") + (",tag_in:$tag" if tag else "")
+            arguments = "type:$type,sort:POPULARITY_DESC" + (",format_in:[NOVEL]" if kind == "ranobe" else ",format_not_in:[NOVEL]" if kind == "manga" else "") + (",search:$search" if query else "") + (",seasonYear:$year" if year else "") + (",genre_in:$genre" if genre else "") + (",tag_in:$tag" if tag else "")
             definitions=["$type:MediaType","$page:Int"]+(["$search:String"] if query else [])+(["$year:Int"] if year else [])+(["$genre:[String]"] if genre else [])+(["$tag:[String]"] if tag else [])
             body = {"query": "query("+",".join(definitions)+"){Page(page:$page,perPage:16){pageInfo{hasNextPage} media(" + arguments + "){" + MEDIA_FIELDS + "}}}",
                     "variables": {"search": query or None, "type": "MANGA" if resource == "manga" else "ANIME", "page": page, "year": int(year) if year else None,"genre":[genre] if genre else None,"tag":[t.strip() for t in tag.split(",") if t.strip()] if tag else None}}
         value = get_json("https://graphql.anilist.co", body=body)
     elif provider == "shikimori":
-        resource = 'people' if kind=='person' else 'characters' if kind == 'character' else "mangas" if resource == "manga" else "animes"
+        resource = 'people' if kind=='person' else 'characters' if kind == 'character' else "ranobe" if kind == "ranobe" and not identity else "mangas" if resource == "manga" else "animes"
         params = {"limit": 16, "page": page, "order": "popularity"}
         if query:
             params["search"] = query
@@ -96,6 +97,8 @@ def _metadata(provider, *, query="", kind="anime", page=1, identity=None, year=N
         value = get_json(f"https://shikimori.io/api/{resource}" + (f"/{identity}" if identity else "") + (f'/{part}' if part else ''), params=params)
     elif provider == "jikan":
         params = {"q": query, "page": page, "limit": 16, "sfw": "false"}
+        if kind == "ranobe" and not identity:
+            params["type"] = "lightnovel"
         if year and resource == "anime":
             params["start_date"], params["end_date"] = f"{year}-01-01", f"{year}-12-31"
         if not identity and (genre or tag):
@@ -105,6 +108,19 @@ def _metadata(provider, *, query="", kind="anime", page=1, identity=None, year=N
         value = get_json(f"https://api.jikan.moe/v4/{resource}" + (f"/{identity}/full" if identity else ""), params=params)
     elif provider == "tvmaze":
         value = get_json(f"https://api.tvmaze.com/shows/{identity}", params={"embed": "episodes"}) if identity else get_json("https://api.tvmaze.com/search/shows", params={"q": query})
+    elif provider == "kinobox":
+        if kind not in {"movie", "tv"}:
+            raise SourceError("Kinobox ведёт только фильмы и сериалы.")
+        root = "https://fbphdplay.top/api/"
+        if identity:
+            if not re.fullmatch(r"\d{1,12}", str(identity)):
+                raise SourceError("Некорректный идентификатор тайтла.")
+            value = get_json(root + f"movies/{identity}")
+        elif query:
+            # The search answer has one page; later pages would repeat it.
+            value = get_json(root + "movies/search", params={"query": query}) if page == 1 else {"data": {"items": []}}
+        else:
+            value = get_json(root + "popular", params={"page": page, "type": "series" if kind == "tv" else "films"})
     elif provider == "wikidata":
         if identity:
             params = {"action": "wbgetentities", "ids": identity, "props": "labels|descriptions|aliases|claims", "languages": "ru|en|ja|zh|ko", "format": "json"}

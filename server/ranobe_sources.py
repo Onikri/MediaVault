@@ -191,6 +191,9 @@ SEARCH = {'ranobehub': _hub_search, 'zenko-novel': _zenko_search, 'smakolyky': _
 
 
 def search(title, language='all'):
+    if isinstance(title, dict) and title.get('kind') == 'book':
+        import book_sources
+        return book_sources.search(title, language)
     if not isinstance(title, dict) or not aliases(title): raise SourceError('Выбери конкретное ранобэ из каталога.')
     if language not in {'all', 'ru', 'uk'}: raise SourceError('Выбери язык: все, русский или украинский.')
     key = json.dumps([language, aliases(title), title.get('ids')], ensure_ascii=False, sort_keys=True)
@@ -292,6 +295,8 @@ def _chapter_url(identity, book, chapter):
 
 def inspect(url, http=None):
     """Book and its free chapter list (volume, number, title, url)."""
+    import book_sources
+    if book_sources.route(url): return book_sources.inspect(url)
     identity, book, _ = _route(url)
     own = http is None
     http = http or PublicHttp(timeout=(3, 10), deadline=time.monotonic() + 40)
@@ -357,6 +362,8 @@ def inspect(url, http=None):
 
 def chapter(url, http=None):
     """Plain paragraphs of one chapter."""
+    import book_sources
+    if book_sources.route(url): return book_sources.chapter(url)
     identity, book, selected = _route(url)
     if not selected: raise SourceError('Выбери конкретную главу.')
     own = http is None
