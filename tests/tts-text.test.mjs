@@ -84,7 +84,7 @@ test('voices are designed from measured preset pitch: age, gender, timbre, pitch
 });
 test('the title bible is validated, aliases resolve to names and lexicon stresses only unmarked words',()=>{
  const bible=parseBible({tone:'роман',narrator:{gender:'f',age:'adult',timbre:'warm',pitch:9},characters:[{name:'Наташа Ростова',aliases:['Наташа','Натали'],gender:'f',age:'teen',importance:'main',timbre:'bright',pitch:1},{name:''}],
-  lexicon:[{word:'Ростова',stressed:'Росто́ва'},{word:'Boris',stressed:'Bóris'},{word:'Пьер',stressed:'Пье́р!'}]},'gemini-3.5-flash');
+  lexicon:[{word:'Ростова',stressed:'Росто́ва'},{word:'Boris',stressed:'Bóris'},{word:'Пьер',stressed:'Пье́р!'}]},'gemini-3.5-flash-lite');
  assert.equal(bible.characters.length,1);assert.equal(bible.narrator.pitch,3);
  assert.deepEqual(bible.lexicon.map(e=>e.word),['Ростова']);
  assert.equal(aliasMap(bible).get('натали'),'Наташа Ростова');

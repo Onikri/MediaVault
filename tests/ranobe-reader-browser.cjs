@@ -36,7 +36,7 @@ let browser,vite;
  assert.ok((await page.locator('.ranobe-prose .role-name i').allInnerTexts()).some(t=>/сердито|умоляюще/.test(t)),'emotion chips from the chapter pass');
  await page.getByRole('button',{name:'Роли и голоса'}).click();
  const facts=await page.locator('.narration-facts').innerText();
- assert.match(facts,/Gemini 3\.5 Flash/);assert.match(facts,/Gemma 4 · 26B A4B/);assert.match(facts,/RUAccent/);
+ assert.match(facts,/Gemini 3\.5 Flash Lite/);assert.match(facts,/Gemma 4 · 26B A4B/);assert.match(facts,/RUAccent/);
  assert.match(await page.locator('.narration-cast').innerText(),/вспыльчивая, но заботливая/);
  const cast=await page.locator('.narration-cast li').allInnerTexts();
  assert.ok(cast.some(t=>t.includes('Мирэй'))&&cast.some(t=>t.includes('Кайто')),'speakers found: '+cast.join(' | '));

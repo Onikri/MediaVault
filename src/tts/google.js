@@ -10,7 +10,6 @@ export const ROLE_MODELS=[
  ['gemini-3.5-flash-lite','Gemini 3.5 Flash Lite'],
 ];
 export const BIBLE_MODELS=[
- ['gemini-3.5-flash','Gemini 3.5 Flash'],
  ['gemini-3.5-flash-lite','Gemini 3.5 Flash Lite'],
  ['gemma-4-31b-it','Gemma 4 · 31B'],
 ];

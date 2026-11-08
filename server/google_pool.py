@@ -4,9 +4,9 @@ from pathlib import Path
 import httpx
 from fastapi import Depends,HTTPException,Request
 from pydantic import BaseModel,Field,SecretStr,ConfigDict
-MODELS=('gemini-3.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-3.1-flash-lite','gemini-2.5-flash-lite','gemini-3.5-flash')
-# Added after key slots were saved: allowed on every slot (narration title bible).
-LATER_MODELS=('gemini-3.5-flash',)
+MODELS=('gemini-3.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
+# Models added after key slots were saved are allowed on every slot. (Owner rule: no non-Lite Flash.)
+LATER_MODELS=()
 SETTING='reader:google-keys';_store=lambda:None
 
 def saved():

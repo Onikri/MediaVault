@@ -31,8 +31,9 @@ Decision: RUAccent places stresses; Google models do roles and emotions only.
 - Bible: Gemini 3.5 Flash Lite, 3.7 s. 7 characters with aliases (Анна Павловна /
   Annette; Маленькая княгиня / Лиза / Lise; Пьер / monsieur Pierre; князь Василий; Элен;
   аббат Морио; тётушка), temperament, manner of speech, timbre and pitch, narrator voice and
-  a 9-word name lexicon (Безу́хов, Болко́нская, Ипполи́т…). Gemini 3.5 Flash is the
-  default bible model; Flash Lite and Gemma 4 31B are automatic fallbacks (quota/overload).
+  a 9-word name lexicon (Безу́хов, Болко́нская, Ипполи́т…). Gemini 3.5 Flash Lite is the
+  bible model (the owner does not use non-Lite Flash; no text 3.8 Flash Lite is offered to
+  these keys, only `gemini-3.8-flash-lite-tts`); Gemma 4 31B is the fallback on quota/overload.
 - Chapter pass: Gemma 4 26B A4B with the bible, 24 s for 32 segments. Speakers correct in
   11 of 14 lines (heuristic alone: about 3); one line given to the wrong speaker
   (князь Василий instead of the little princess), one left unattributed.

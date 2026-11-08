@@ -17,7 +17,7 @@ const service={status:'connected',session:{serverVersion:57},request:async(path,
  // speakers and emotions for the chapter model. Real models are tested live separately.
  if(path==='/reader/google/generate'){
   const answer=value=>({candidates:[{content:{parts:[{text:JSON.stringify(value)}]}}]});
-  if(body.model==='gemini-3.5-flash')return answer({tone:'городское фэнтези',narrator:{gender:'m',age:'adult',style:'спокойный',timbre:'warm',pitch:0,energy:0,pace:1},
+  if(body.model==='gemini-3.5-flash-lite')return answer({tone:'городское фэнтези',narrator:{gender:'m',age:'adult',style:'спокойный',timbre:'warm',pitch:0,energy:0,pace:1},
    characters:[{name:'Мирэй',aliases:['Мирэй-сан'],gender:'f',age:'young',importance:'main',traits:'вспыльчивая, но заботливая',speech:'резко, коротко',timbre:'bright',pitch:1,energy:1,pace:1.05},
     {name:'Кайто',aliases:[],gender:'m',age:'young',importance:'main',traits:'рассеянный добряк',speech:'мягко, виновато',timbre:'warm',pitch:0,energy:-1,pace:.97}],
    lexicon:[{word:'Мирэй',stressed:'Мирэ́й'}]});
