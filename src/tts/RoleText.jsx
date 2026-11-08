@@ -32,11 +32,16 @@ export default function RoleText({text,segments,colors,speaking,show=true}){
  segments.forEach((segment,i)=>{
   const at=segment.text?text.indexOf(segment.text,cursor):-1;
   if(at<0)return;
-  if(at>cursor)out.push(text.slice(cursor,at));
   const speech=segment.kind!=='narration',named=speech&&segment.speaker,color=named?colors?.[segment.speaker]:null;
   const mood=emotionLabel(segment),label=named&&(segment.speaker!==last||mood);
+  const chip=label&&<b key={'n'+i} className="role-name" style={color?{'--role':color}:undefined} aria-label={(uiLanguage()==='uk'?'Говорить ':'Говорит ')+segment.speaker+(mood?', '+mood:'')}>{segment.speaker}{mood&&<i>{mood}</i>}</b>;
+  const before=at>cursor?text.slice(cursor,at):'';
+  // "— Line": the name goes before the dialogue dash, like a script.
+  const dash=chip&&/^\s*[—–-]\s*$/.test(before);
+  if(dash)out.push(chip);
+  if(before)out.push(before);
   out.push(<span key={i} data-segment={segment.id} className={'role-segment'+(speech?' role-speech':'')+(segment.kind==='thought'?' role-thought':'')+(segment.id===speaking?' is-speaking':'')} style={color?{'--role':color}:undefined}>
-   {label&&<b className="role-name" aria-label={(uiLanguage()==='uk'?'Говорить ':'Говорит ')+segment.speaker+(mood?', '+mood:'')}>{segment.speaker}{mood&&<i>{mood}</i>}</b>}{segment.text}</span>);
+   {chip&&!dash&&chip}{segment.text}</span>);
   cursor=at+segment.text.length;if(named)last=segment.speaker;
  });
  if(cursor<text.length)out.push(text.slice(cursor));

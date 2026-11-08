@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState,useRef,lazy,Suspense} from 'react';
 import {profileForSeason} from './use-season-source.js';
-import {fetchCatalog,mergeCatalog} from './catalog.js';
+import {fetchCatalog,mergeCatalog,normalized} from './catalog.js';
 import {loadTitleProfile,translate} from './title-metadata.js';
 import TitlePage from './TitlePage.jsx';
 import ImportSelection from './ImportSelection.jsx';
@@ -19,7 +19,14 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  useEffect(()=>{
   const abort=new AbortController();setItem(value);setProfile(null);setViewSeason(null);setSeasonProfiles({});setTarget('online');setLoading(true);
   const tasks=[];
-  if(!value.sourceOnly&&value.providerId&&!['youtube'].includes(value.provider)&&!(value.provider==='openlibrary'&&!/^OL\d+W$/.test(value.providerId)))tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem({...mergeCatalog([...rows,value])[0],id:value.id});}));
+  if(!value.sourceOnly&&value.providerId&&!['youtube'].includes(value.provider)&&!(value.provider==='openlibrary'&&!/^OL\d+W$/.test(value.providerId)))tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem(old=>({...mergeCatalog(value.kind==='book'?[old,...rows]:[...rows,old])[0],id:value.id}));}));
+  // Books: the Russian description and edition from Fantlab, the same work by ID.
+  if(value.kind==='book'&&value.provider!=='fantlab'){
+   const same=row=>[row.titles?.en,row.titles?.ru].some(t=>t&&(value.aliases||[value.title]).some(a=>normalized(a)===normalized(t)));
+   const id=value.ids?.fantlab?Promise.resolve(value.ids.fantlab):fetchCatalog('fantlab',{query:value.titles?.en||value.title,kind:'book',signal:abort.signal}).then(rows=>rows.find(same)?.providerId);
+   // Not awaited by the page: the description fills in when Fantlab answers.
+   id.then(found=>found&&fetchCatalog('fantlab',{identity:found,kind:'book',signal:abort.signal})).then(rows=>{if(!abort.signal.aborted&&rows?.length)setItem(old=>({...mergeCatalog([old,{...rows[0],ids:{...old.ids,...rows[0].ids}}])[0],id:value.id}));}).catch(()=>{});
+  }
   if(value.ids?.mal)tasks.push(loadTitleProfile(value.ids.mal,value.kind,{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setProfile(data);}}).then(data=>{if(!abort.signal.aborted)setProfile(data);}));
   Promise.allSettled(tasks).then(()=>{if(!abort.signal.aborted)setLoading(false);});return()=>abort.abort();
  },[value.id,service.server,destination]);

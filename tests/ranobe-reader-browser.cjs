@@ -23,10 +23,18 @@ let browser,vite;
  await page.getByRole('button',{name:'Слушать главу'}).click();
  await page.getByRole('button',{name:'Загрузить и слушать'}).click();
  page.on('console',m=>{if(m.type()==='error')console.log('console:',m.text());});await page.waitForSelector('.ranobe-prose p.is-speaking',{timeout:240000}).catch(async e=>{await page.screenshot({path:path.join(OUT,'timeout.png')});console.log(await page.locator('.narration').innerText().catch(()=>''));throw e;});
+ // Roles are drawn in the text: speaker names in their colour, a live caption.
+ await page.waitForSelector('.ranobe-prose .role-name',{timeout:60000});
+ const names=await page.locator('.ranobe-prose .role-name').allInnerTexts();
+ assert.ok(names.some(t=>t.includes('Мирэй'))||names.some(t=>t.includes('Кайто')),'role names in text: '+names.join(' | '));
+ assert.ok(await page.locator('.ranobe-prose .role-speech').first().evaluate(n=>getComputedStyle(n).getPropertyValue('--role').trim().startsWith('#')),'speech has a role colour');
+ await page.waitForSelector('.narration-caption b',{timeout:60000});
+ assert.ok(await page.getByRole('button',{name:/Пауза озвучки|Слушать главу/}).first().isVisible(),'top-bar listen control');
  await page.getByRole('button',{name:'Роли и голоса'}).click();
  const cast=await page.locator('.narration-cast li').allInnerTexts();
  assert.ok(cast.some(t=>t.includes('Мирэй'))&&cast.some(t=>t.includes('Кайто')),'speakers found: '+cast.join(' | '));
  await page.screenshot({path:path.join(OUT,'narration.png')});
+ assert.ok(await page.getByRole('button',{name:/Пример голоса: /}).count()>=2,'voice samples per character');
  // Two voices actually speak: wait until the dialogue paragraph is highlighted.
  await page.waitForSelector('.ranobe-prose p.is-speaking[data-p="1"]',{timeout:240000});
  assert.ok(await page.evaluate(()=>window.requests.includes('/reader/google/generate')),'role pass attempted (mocked)');

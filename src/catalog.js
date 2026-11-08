@@ -36,7 +36,7 @@ function record(provider,id,kind,values){
   const title=strip(titles.ru||titles.uk||titles.en||values.title||titles.native||'Без названия');
   return {...values,id:provider+':'+id,provider,providerId:String(id),providers:[provider],kind,title,
     titles,aliases:unique([title,...Object.values(titles),...(values.aliases||[])]),description:russianText(values.description),
-    cover:safeImage(values.cover),year:values.year||yearOf(values.startDate),format:kind==='anime'?translate(values.format,'Аниме'):values.format||'',
+    cover:safeImage(values.cover),year:values.year||yearOf(values.startDate),format:kind==='anime'?translate(values.format,'Аниме'):kind==='ranobe'?(/^novel$/.test(values.format||'')?'Новелла':'Ранобэ'):values.format||'',
     genres:unique(values.genres||[]),tags:unique(values.tags||[]),age:values.age??null,ageLabel:values.ageLabel||'',
     episodes:values.episodes||null,chapters:values.chapters||null,volumes:values.volumes||null,
     status:values.status||'',startDate:values.startDate||null,endDate:values.endDate||null,
@@ -85,16 +85,18 @@ export function normalizeCatalog(provider,data,kind='anime'){
       const id=work(data.key);if(!id)return [];
       const text=typeof data.description==='string'?data.description:data.description?.value||'';
       return [record(provider,id,'book',{title:data.title,titles:{en:data.title},description:text.replace(/\(\[source\]\[\d+\]\)|\[\d+\]: https?:\S+/g,'').trim(),
-        cover:cover(data.covers?.find(c=>c>0)),genres:(data.subjects||[]).slice(0,8),format:'Книга',ids:{openlibrary:id},links:[{provider,url:'https://openlibrary.org/works/'+id}]})];
+        cover:cover(data.covers?.find(c=>c>0)),format:'Книга',ids:{openlibrary:id},links:[{provider,url:'https://openlibrary.org/works/'+id}]})];
     }
     const local=data?.mvLanguage||'ru';
-    return list(data?.docs).filter(x=>work(x.key)&&x.title).map(x=>{
+    // The default shelf is stories: popular fiction, not business or self-help.
+    const stories=x=>!data?.mvStories||!(x.subject||[]).some(s=>/non-?fiction|self-help|business|success|finance|psycholog/i.test(s))&&(x.subject||[]).some(s=>/fiction|novel|fantasy|stories|роман|фантаст/i.test(s));
+    return list(data?.docs).filter(x=>work(x.key)&&x.title&&stories(x)).map(x=>{
       const edition=x.editions?.docs?.[0]||{},id=work(x.key);
       // Transliterated edition titles ("Bogatyĭ papa") are worse than the original.
       const translated=edition.title&&/[Ѐ-ӿ]/.test(edition.title)?edition.title:'';
       return record(provider,id,'book',{titles:{[local]:translated||undefined,en:x.title},title:x.title,aliases:[x.title,translated],
         authors:(x.author_name||[]).slice(0,4),cover:cover(edition.cover_i)||cover(x.cover_i),year:x.first_publish_year||null,format:'Книга',
-        genres:(x.subject||[]).slice(0,6),ids:{openlibrary:id},description:'',links:[{provider,url:'https://openlibrary.org/works/'+id}]});
+        ids:{openlibrary:id},description:'',links:[{provider,url:'https://openlibrary.org/works/'+id}]});
     });
   }
   if(provider==='fantlab'){
@@ -165,7 +167,7 @@ export function providerUrl(provider,{query='',kind='anime',page=1,identity,year
     const language=bookLanguage(),url=new URL('https://openlibrary.org/search.json');
     const terms=[query||'language:'+(language==='uk'?'ukr':'rus'),year?'first_publish_year:'+Number(year):'',genre?'subject:"'+String(genre).replace(/"/g,'')+'"':''].filter(Boolean);
     url.searchParams.set('q',terms.join(' '));if(!query)url.searchParams.set('sort','readinglog');url.searchParams.set('lang',language);
-    url.searchParams.set('limit',16);url.searchParams.set('page',page);url.searchParams.set('fields',OPEN_LIBRARY_FIELDS);return url.href;
+    url.searchParams.set('limit',query||genre?16:32);url.searchParams.set('page',page);url.searchParams.set('fields',OPEN_LIBRARY_FIELDS);return url.href;
   }
   if(provider==='fantlab')return identity?'https://api.fantlab.ru/work/'+encodeURIComponent(identity):'https://api.fantlab.ru/search-works?'+new URLSearchParams({q:query,page:String(page)});
   if(server){const url=new URL('metadata/'+provider,server+'/');for(const [key,value]of Object.entries({q:query,kind,page,identity,year,genre:queryLabel(genre),tag:String(tag||'').split(',').map(t=>queryLabel(t.trim())).join(',')}))if(value)url.searchParams.set(key,value);return url.href;}
@@ -195,8 +197,9 @@ export async function fetchCatalog(provider,options,fetcher=fetch){
     const response=await fetcher(url,init);
     if(!response.ok)throw Error(response.status===429?'Слишком частые запросы':'Каталог временно недоступен');
     const data=await response.json();if(data.errors)throw Error('Каталог не ответил на запрос');
-    if(provider==='openlibrary'&&data&&typeof data==='object')data.mvLanguage=bookLanguage();
-    const items=normalizeCatalog(provider,data,options.kind);
+    if(provider==='openlibrary'&&data&&typeof data==='object'){data.mvLanguage=bookLanguage();data.mvStories=!options.query&&!options.genre;}
+    let items=normalizeCatalog(provider,data,options.kind);
+    if(provider==='openlibrary'&&!options.identity&&data?.mvLanguage==='ru')items=await russianBookTitles(items,options.signal,fetcher);
     const alternate=!options.identity&&!options.spellingFallback&&['kitsu','anilist','jikan'].includes(provider)&&alternateSpelling(options.query);
     if(!items.length&&alternate){
       clearTimeout(timeout);options.signal?.throwIfAborted();
@@ -214,6 +217,20 @@ export async function fetchCatalog(provider,options,fetcher=fetch){
     }
     throw error;
   }finally{clearTimeout(timeout);signal?.removeEventListener('abort',stop);}
+}
+// Open Library often lacks the Russian edition; Fantlab (Russian base) names
+// the same work by its original title. Only an exact original-title match is used.
+async function russianBookTitles(items,signal,fetcher){
+  const missing=items.filter(item=>!item.titles.ru&&item.titles.en).slice(0,16);
+  await Promise.all(missing.map(async item=>{
+    try{
+      const response=await fetcher('https://api.fantlab.ru/search-works?'+new URLSearchParams({q:item.titles.en,page:'1'}),{signal:AbortSignal.any([signal,AbortSignal.timeout(6000)].filter(Boolean))});
+      if(!response.ok)return;
+      const match=((await response.json()).matches||[]).find(x=>x.rusname&&normalized(x.name)===normalized(item.titles.en));
+      if(match){const ru=String(match.rusname).trim();item.titles={...item.titles,ru};item.title=ru;item.aliases=unique([ru,...item.aliases]);item.ids={...item.ids,fantlab:String(match.work_id)};}
+    }catch{}
+  }));
+  return items;
 }
 export function catalogProviders(kind,query,server){
   // Kinobox (Kinopoisk) is the Russian film base: popular lists without a
