@@ -16,16 +16,16 @@ let browser,vite,last;
   await page.route('https://**/*',r=>r.fulfill({json:{data:[],current:[],popular:[]}}));
   await page.addInitScript(()=>localStorage.setItem('mediavault_privacy_v1',JSON.stringify({version:1,chosen:true,remember:false})));
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html#profile');
-  await page.getByRole('tab',{name:'Аккаунт',exact:true}).waitFor();await page.locator('#loginBtn').waitFor();
-  assert.equal(await page.locator('.account-layout').count(),1);
+  await page.locator('.cc-nav').getByRole('button',{name:'Профиль'}).waitFor();await page.locator('#loginBtn').waitFor();
+  assert.equal(await page.locator('.cc').count(),1);
   if(width===390){const image=Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=16;canvas.getContext('2d').fillRect(0,0,16,16);return canvas.toDataURL('image/png').split(',')[1];}),'base64');await page.locator('.profile-avatar-editor input[type=file]').setInputFiles({name:'avatar.png',mimeType:'image/png',buffer:image});await page.locator('.profile-card .profile-avatar img').waitFor();await page.reload();await page.locator('.profile-card .profile-avatar img').waitFor();await page.locator('.profile-avatar-editor').getByRole('button',{name:'Убрать',exact:true}).click();}
 
-  for(const [tab,selector] of [['Оформление','#appearanceSettings'],['Подключения','.kodik-connection'],['Устройство и доступ','.privacy-settings']]){
-   await page.getByRole('tab',{name:tab,exact:true}).click();
-   if(tab==='Устройство и доступ')await page.getByRole('tabpanel').waitFor();else await page.locator(selector).waitFor();
+  for(const [tab,selector] of [['Оформление','#appearanceSettings'],['Источники','.kodik-connection'],['Устройство','.device-settings']]){
+   await page.locator('.cc-nav').getByRole('button',{name:tab}).click();
+   await page.locator(selector).waitFor();
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Profile fits '+width+' '+tab);
   }
-  await page.getByRole('tab',{name:'Оформление',exact:true}).click();await page.waitForTimeout(220);await page.screenshot({path:path.join(dir,'profile-'+width+'.png'),fullPage:true});
+  await page.locator('.cc-nav').getByRole('button',{name:'Оформление'}).click();await page.waitForTimeout(220);await page.screenshot({path:path.join(dir,'profile-'+width+'.png'),fullPage:true});
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html?reader=1');
   await page.waitForFunction(()=>document.querySelector('.reader-page img')?.naturalWidth===640);
   await page.locator('.immersive-reader').dispatchEvent('reader-show-chrome');await page.getByRole('button',{name:'Настройки читалки',exact:true}).click();

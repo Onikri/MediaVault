@@ -238,7 +238,7 @@ async function main() {
   await owner.getByRole('spinbutton',{name:'Первая серия',exact:true}).fill('1');
   await owner.getByRole('spinbutton',{name:'Последняя серия',exact:true}).fill('3');
   await owner.locator('#importVideoBtn').click();
-  await owner.getByRole('heading',{name:'Очередь импорта',exact:true}).waitFor();
+  await owner.getByRole('heading',{name:'Задания',exact:true}).waitFor();
   assert.equal(submitted.length,1);
   const serverJob=submitted[0].job;
   assert.equal(serverJob.version,3);assert.equal(serverJob.quality,'best');assert.equal(serverJob.library_id,catalogId);assert.equal(serverJob.episodes,'1-3');
