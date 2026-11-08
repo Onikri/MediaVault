@@ -70,12 +70,12 @@ def inspect_player(row, kind, http):
     except SourceError:
         return None
     if kind_name.casefold() == 'collaps' and is_collaps(iframe):
-        text, final, _ = http.document(iframe, headers={'Referer': 'https://fbphdplay.top/'})
+        text, final, _ = http.document(iframe, headers={'Referer': iframe})
         return {'url': iframe, 'player': 'Collaps', 'dubs': collaps_choices(iframe, text)}
     if kind_name.casefold() == 'alloha' and is_alloha_player(iframe):
         if kind == 'movie':
             return {'url': iframe, 'player': 'Alloha', 'dubs': _movie_alloha(row, kind)}
-        text, final, _ = http.document(iframe, headers={'Referer': 'https://fbphdplay.top/'})
+        text, final, _ = http.document(iframe, headers={'Referer': iframe})
         dubs, seasons = alloha_choices(text, final)
         if not dubs: dubs = _movie_alloha(row, kind)
         return {'url': iframe, 'player': 'Alloha', 'dubs': dubs, 'seasons': seasons}

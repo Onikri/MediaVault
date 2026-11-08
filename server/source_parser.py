@@ -583,17 +583,17 @@ class Resolver:
         """Ashdi / HDVB-UA / Tortuga Playerjs and Collaps: re-read the embed for fresh media."""
         from ua_players import split_selectors, is_collaps, playerjs_stream, collaps_stream
         embed, selected = split_selectors(url)
-        origin = '{0.scheme}://{0.netloc}'.format(urlsplit(embed))
-        text, final, _ = self.http.document(embed, headers={'Referer': referer or origin + '/'})
+        # The embed itself is the validated page URL; Origin is reduced to its host.
+        text, final, _ = self.http.document(embed, headers={'Referer': referer or embed})
         if is_collaps(embed):
             media, audio = collaps_stream(text, selected)
             if not media:raise SourceError('Выбранная серия больше не опубликована в плеере.')
             return Page(streams=[{'url': media, 'type': 'hls', 'quality': None, 'audio': audio,
-                                  'headers': playback_headers({'Referer': origin + '/', 'Origin': origin})}])
+                                  'headers': playback_headers({'Referer': embed, 'Origin': embed})}])
         media = playerjs_stream(embed, text, selected)
         if not media:raise SourceError('Выбранная озвучка или серия больше не опубликована в плеере.')
         return Page(streams=[{'url': media, 'type': 'hls' if '.m3u8' in media else 'mp4', 'quality': None,
-                              'headers': playback_headers({'Referer': origin + '/', 'Origin': origin})}])
+                              'headers': playback_headers({'Referer': embed, 'Origin': embed})}])
 
     def resolve(self, url, *, referer=None, depth=0, visited=None):
         if depth > 4:
