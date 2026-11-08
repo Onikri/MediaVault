@@ -1,0 +1,134 @@
+{
+ "date": "2026-11-08",
+ "method": "Real ONNX synthesis (Python onnxruntime CPU, 4 threads) of 8 ru + 8 uk sentences per voice; Whisper large-v3-turbo (CPU int8) transcribes; CER after normalisation. Intelligibility only, not naturalness. Browser speed is measured separately.",
+ "rows": [
+  {
+   "engine": "piper-ru_RU-denis-medium",
+   "lang": "ru",
+   "meanCER": 0.0155,
+   "medianRTF": 0.025,
+   "loadSeconds": 2.52,
+   "samples": 8
+  },
+  {
+   "engine": "piper-ru_RU-irina-medium",
+   "lang": "ru",
+   "meanCER": 0.0081,
+   "medianRTF": 0.024,
+   "loadSeconds": 2.41,
+   "samples": 8
+  },
+  {
+   "engine": "piper-uk_UA-lada-x_low",
+   "lang": "uk",
+   "meanCER": 0.0172,
+   "medianRTF": 0.017,
+   "loadSeconds": 2.56,
+   "samples": 8
+  },
+  {
+   "engine": "piper-uk_UA-ukrainian_tts-medium",
+   "lang": "uk",
+   "meanCER": 0.0712,
+   "medianRTF": 0.022,
+   "loadSeconds": 2.49,
+   "samples": 8
+  },
+  {
+   "engine": "supertonic3-fp32-s5",
+   "lang": "ru",
+   "meanCER": 0.005,
+   "medianRTF": 0.237,
+   "loadSeconds": 1.31,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-fp32-s5",
+   "lang": "uk",
+   "meanCER": 0.0087,
+   "medianRTF": 0.226,
+   "loadSeconds": 1.31,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-fp32-s8",
+   "lang": "ru",
+   "meanCER": 0.005,
+   "medianRTF": 0.318,
+   "loadSeconds": 1.44,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-fp32-s8",
+   "lang": "uk",
+   "meanCER": 0.0076,
+   "medianRTF": 0.327,
+   "loadSeconds": 1.44,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-int8-s5",
+   "lang": "ru",
+   "meanCER": 0.7654,
+   "medianRTF": 0.868,
+   "loadSeconds": 3.0,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-int8-s5",
+   "lang": "uk",
+   "meanCER": 0.643,
+   "medianRTF": 0.972,
+   "loadSeconds": 3.0,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-int8-s8",
+   "lang": "ru",
+   "meanCER": 0.7945,
+   "medianRTF": 1.426,
+   "loadSeconds": 2.87,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-int8-s8",
+   "lang": "uk",
+   "meanCER": 0.7539,
+   "medianRTF": 1.436,
+   "loadSeconds": 2.87,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-q4-s5",
+   "lang": "ru",
+   "meanCER": 0.0068,
+   "medianRTF": 0.238,
+   "loadSeconds": 1.21,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-q4-s5",
+   "lang": "uk",
+   "meanCER": 0.0129,
+   "medianRTF": 0.247,
+   "loadSeconds": 1.21,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-q4-s8",
+   "lang": "ru",
+   "meanCER": 0.008,
+   "medianRTF": 0.672,
+   "loadSeconds": 1.14,
+   "samples": 16
+  },
+  {
+   "engine": "supertonic3-q4-s8",
+   "lang": "uk",
+   "meanCER": 0.0057,
+   "medianRTF": 0.343,
+   "loadSeconds": 1.14,
+   "samples": 16
+  }
+ ]
+}
