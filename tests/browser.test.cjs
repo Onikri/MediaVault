@@ -481,7 +481,8 @@ async function main() {
   await owner.getByRole('button',{name:'Найти',exact:true}).click();
   await owner.getByText(titleFixture.description,{exact:true}).waitFor();
   assert.equal(await owner.locator('.title-hero').getByRole('heading',{name:'Наруто',exact:true}).count(),1);
-  assert.ok(await owner.locator('.title-page .title-facts').innerText().then(t=>t.includes('Хаято Датэ')&&t.includes('Манга')),'Compact header retains director and source in the information card');
+  // Roles arrive after the description, so wait for the director instead of sampling once.
+  await owner.locator('.title-page .title-facts').filter({hasText:'Хаято Датэ'}).filter({hasText:'Манга'}).waitFor({timeout:10000}).catch(()=>assert.fail('Compact header retains director and source in the information card'));
   await owner.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
   await owner.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
   await owner.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
