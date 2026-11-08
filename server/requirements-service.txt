@@ -11,12 +11,4 @@ Pillow==11.3.0
 ctranslate2==4.6.0
 sentencepiece==0.2.1
 
-# Russian word stress for narration (RUAccent; transformers 5 drops token_type_ids it needs).
-ruaccent==1.5.8.3
-transformers==4.57.6
-tokenizers==0.22.2
-huggingface_hub==0.36.2
-python-crfsuite==0.9.12
-razdel==0.5.0
-
 opencv-python-headless==4.12.0.88

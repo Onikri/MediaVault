@@ -18,9 +18,6 @@ COPY server/requirements.txt server/requirements-service.txt ./
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir -r requirements-service.txt; \
     else pip install --no-cache-dir -r requirements-service.txt; fi
-# RUAccent reads its koziev morphology from the package folder: fetch it at a
-# pinned model revision while the image is still writable (code Apache-2.0, data MIT).
-RUN python -c "import pathlib,ruaccent;from huggingface_hub import snapshot_download;snapshot_download('ruaccent/accentuator',revision='b78ae5ea1e62beaf138bed1865cd8c3b0b5ca855',allow_patterns=['koziev/*'],local_dir=str(pathlib.Path(ruaccent.__file__).parent))" && rm -rf /root/.cache/huggingface
 RUN useradd --uid 1000 --create-home vault && mkdir -p /data /app/.codex-local/lyrics && chown -R vault:vault /data /app/.codex-local
 COPY --from=node:22.22.0-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 COPY --chown=vault:vault --chmod=0644 server/*.py ./

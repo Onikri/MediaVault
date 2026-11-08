@@ -278,3 +278,30 @@ class NativeProfiles:
         identity = hashlib.sha256(iframe.encode()).hexdigest()
         self.failed_for_iframe[(identity, profile.id)] = self.clock() + 120
         self.save(profile)
+
+
+def playback_available(directory=None):
+    """False when every known browser profile is retired or quarantined.
+
+    Then AllohaDelivery answers 409 for any title, so discovery should not
+    offer Alloha voices. Reads the persisted state only; an unknown state is
+    treated as available (playback then reports its own error).
+    """
+    import os
+    root = Path(directory) if directory else Path(os.getenv('DATA_DIR') or Path(__file__).resolve().parents[1]) / '.codex-local' / 'alloha-delivery' / 'profiles'
+    try:
+        health = json.loads((root / 'health.json').read_text())
+    except (OSError, ValueError):
+        return True
+    ids = set(health)
+    for name in ('active.json', 'candidates.json'):
+        try:
+            value = json.loads((root / name).read_text())
+        except (OSError, ValueError):
+            continue
+        for row in value if isinstance(value, list) else [value]:
+            if isinstance(row, dict) and row.get('id'):
+                ids.add(str(row['id']))
+    now = time.time()
+    return any(i not in health or (not health[i].get('retired') and float(health[i].get('quarantine_until') or 0) <= now
+                                   and int(health[i].get('successes') or 0) < 18) for i in ids)

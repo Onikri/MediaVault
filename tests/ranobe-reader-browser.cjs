@@ -36,7 +36,7 @@ let browser,vite;
  assert.ok((await page.locator('.ranobe-prose .role-name i').allInnerTexts()).some(t=>/сердито|умоляюще/.test(t)),'emotion chips from the chapter pass');
  await page.getByRole('button',{name:'Роли и голоса'}).click();
  const facts=await page.locator('.narration-facts').innerText();
- assert.match(facts,/Gemini 3\.5 Flash Lite/);assert.match(facts,/Gemma 4 · 26B A4B/);assert.match(facts,/RUAccent/);
+ assert.equal((facts.match(/Gemini 3\.5 Flash Lite/g)||[]).length,2,'bible and roles on Flash Lite: '+facts);assert.doesNotMatch(facts,/RUAccent|Ударения/);
  assert.match(await page.locator('.narration-cast').innerText(),/вспыльчивая, но заботливая/);
  const cast=await page.locator('.narration-cast li').allInnerTexts();
  assert.ok(cast.some(t=>t.includes('Мирэй'))&&cast.some(t=>t.includes('Кайто')),'speakers found: '+cast.join(' | '));
@@ -44,7 +44,7 @@ let browser,vite;
  assert.ok(await page.getByRole('button',{name:/Пример голоса: /}).count()>=2,'voice samples per character');
  // Two voices actually speak: wait until the dialogue paragraph is highlighted.
  await page.waitForSelector('.ranobe-prose p.is-speaking[data-p="1"]',{timeout:240000});
- assert.ok(await page.evaluate(()=>window.requests.includes('/reader/google/generate')&&window.requests.includes('/tts/accent')),'bible, roles and stress requested (mocked answers)');
+ assert.ok(await page.evaluate(()=>window.requests.includes('/reader/google/generate')&&!window.requests.includes('/tts/accent')),'bible, roles and stress requested (mocked answers)');
  assert.deepEqual(errors,[]);
- console.log('Ranobe reader + narration: OK (real Supertonic inference; fixture server; MOCKED Google bible/roles and RUAccent answers).');
+ console.log('Ranobe reader + narration: OK (real Supertonic inference; fixture server; MOCKED Google bible/roles answers).');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

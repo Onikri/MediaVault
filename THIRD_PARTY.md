@@ -407,13 +407,6 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   vector estimator, vocoder, configuration, character indexer and the ten voice styles).
 - `src/tts/supertonic.worker.js` ports the inference loop of Supertone's MIT-licensed
   `web/helper.js` (https://github.com/supertone-oss-archive/supertonic).
-- **RUAccent** by Den4ikAI (https://github.com/Den4ikAI/ruaccent) — Russian word stress
-  for narration on the server (`server/stress_service.py`). Code under **Apache-2.0**
-  (package `ruaccent==1.5.8.3`); models and dictionaries `ruaccent/accentuator` under
-  **MIT**, revision `b78ae5ea1e62beaf138bed1865cd8c3b0b5ca855` (omograph model `turbo3.1`,
-  accent, stress-usage and ё-homograph models, dictionaries). Its `koziev` morphology
-  files (rulemma/rupostagger by Ilya Koziev, from the same model repository and revision)
-  are placed in the image at build time.
 
 ## Text sources
 
