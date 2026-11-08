@@ -106,6 +106,8 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         or host in {"api.nextembed.ws", "api.bhcesh.me", "api.namy.ws", "api.delivembd.ws"}
         and bool(re.fullmatch(r"/embed/(?:movie|kp|imdb)/[a-zA-Z0-9]{1,24}", url.path))
         or host == "fbphdplay.top" and url.path == "/api/players"
+        # Ukrainian manga readers' public catalogues (Zenko).
+        or host == "api.zenko.online" and bool(re.fullmatch(r"/(?:titles(?:/\d{1,9}(?:/chapters)?)?|chapters/\d{1,9})", url.path))
     )
     if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
         raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
@@ -223,7 +225,9 @@ class PublicHttp:
             lostfilm_catalog=(url=='https://www.lostfilm.tv/ajaxik.php' and isinstance(data,dict) and set(data)=={'act','type','o','s','t'}
                               and data.get('act')=='serial' and data.get('type')=='search' and str(data.get('o','')).isdigit()
                               and data.get('s') in {'1','2','3'} and data.get('t')=='0')
-            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            honey_chapters=(url=='https://data.api.honey-manga.com.ua/v2/chapter/cursor-list' and isinstance(data,bytes) and len(data)<=256
+                            and bool(re.fullmatch(rb'\{"page": \d{1,3}, "pageSize": 100, "sortOrder": "ASC", "mangaId": "[0-9a-f-]{36}"\}',data)))
+            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog or honey_chapters):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if chan_search:
                 # The public search box's Next.js action. The caller supplies only the title.
                 outgoing.update({'Next-Action': '7fe1df09f7c8151b600f1a3e496cdda2e7ed7f0f95',

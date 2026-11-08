@@ -46,6 +46,8 @@ SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan
        MangaSite('naver-best','Naver Best Challenge · KO','https://comic.naver.com/bestChallenge','naver',languages=('ko',),format='manhwa'),
        MangaSite('naver-challenge','Naver Challenge · KO','https://comic.naver.com/challenge','naver',languages=('ko',),format='manhwa'),
        MangaSite('toonkor','Toonkor · KO','https://toonkor7.org','toonkor',hosts=('toonkor0.org','toonkor2.org'),languages=('ko',),format='manhwa'),
+       MangaSite('honey-manga','Honey Manga · UA','https://honey-manga.com.ua','honey',languages=('uk',)),
+       MangaSite('zenko','Zenko · UA','https://zenko.online','zenko',languages=('uk',)),
        MangaSite('webtoons','WEBTOON · EN · Originals и Canvas','https://www.webtoons.com','webtoons',hosts=('webtoons.com','m.webtoons.com'),languages=('en',),format='webtoon'))
 _cache={};_lock=threading.RLock()
 def site_for(url):
@@ -148,6 +150,9 @@ def search_title(title,language='auto',format='all'):
                 elif site.family in {'dex','lib'}:
                     from manga_catalog_adapters import dex_search,lib_search,LIB_SITES
                     candidates=dex_search(query,language,http) if site.family=='dex' else lib_search(query,http,next(sid for sid,row in LIB_SITES.items() if row[0]==site.id))
+                elif site.family in {'honey','zenko'}:
+                    from manga_ukrainian import honey_search,zenko_search
+                    candidates=(honey_search if site.family=='honey' else zenko_search)(query,http)
                 elif site.family=='webtoons':
                     from manga_webtoons import search
                     candidates=search(query,site,http)
@@ -259,6 +264,9 @@ def inspect(url,http=None):
         if initial and initial.family=='suwayomi':
             from suwayomi_bridge import inspect as inspect_bridge
             return inspect_bridge(url)
+        if initial and initial.family in {'honey','zenko'}:
+            from manga_ukrainian import honey_inspect,zenko_inspect
+            return (honey_inspect if initial.family=='honey' else zenko_inspect)(url,http)
         if initial and initial.family=='webtoons':
             from manga_webtoons import inspect as inspect_webtoons
             try:return inspect_webtoons(url,initial,http)
