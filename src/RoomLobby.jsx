@@ -95,7 +95,7 @@ export default function RoomLobby({preview,profile,server,name,setName,password,
  const shown=e=>{e.currentTarget.dataset.ready='';};
  // Frames under the title become the backdrop while hovered or focused.
  const pick=i=>{setFrame(i);if(i>=0&&!seen.has(i))setSeen(s=>new Set(s).add(i));};
- return <main ref={root} lang="ru" className={'room-lobby'+(lit?' is-lit':'')+(leaving?' is-leaving':'')+(frame>=0?' is-framed':'')} aria-busy={busy||undefined}>
+ return <main ref={root} className={'room-lobby'+(lit?' is-lit':'')+(leaving?' is-leaving':'')+(frame>=0?' is-framed':'')} aria-busy={busy||undefined}>
   <div className="room-lobby-scene" aria-hidden="true">
    {far&&<img className="room-lobby-far" src={far} alt="" decoding="async" onLoad={shown}/>}
    {key&&<img ref={keyImage} className="room-lobby-key" src={key} alt="" decoding="async" onLoad={e=>{shown(e);setLit(true);}} onError={()=>setLit(true)}/>}

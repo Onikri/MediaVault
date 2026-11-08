@@ -4,6 +4,7 @@ import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ChevronRight,Cloud,Download,Gauge,History,LogIn,LogOut,Settings,UserPlus,UsersRound} from 'lucide-react';
 import ProfileAvatar from './ProfileAvatar.jsx';
 import './profile-menu.css';
+import {uiLocale} from './i18n/index.js';
 
 // Compact account island under the avatar. The full profile page is only for settings.
 export default function ProfileMenu({state,guest,importActive,onNavigate,onDownloads,onGuests,onControl,onLogin,onGuestLogin,onLogout}){
@@ -14,7 +15,7 @@ export default function ProfileMenu({state,guest,importActive,onNavigate,onDownl
  const user=state.user||(guest?{sub:'guest:'+guest.id,given_name:guest.name,name:guest.name,email:''}:null);
  const name=user?.given_name||user?.name||'Гость';
  const role=state.admin?'Владелец':guest?'Гостевой профиль':state.user?'Зритель':'Не выполнен вход';
- const until=guest?.expiresAt?'до '+new Date(guest.expiresAt*1000).toLocaleDateString('ru',{day:'numeric',month:'long'}):guest?'без срока':'';
+ const until=guest?.expiresAt?'до '+new Date(guest.expiresAt*1000).toLocaleDateString(uiLocale(),{day:'numeric',month:'long'}):guest?'без срока':'';
  const items=[
   state.catalog&&{id:'collection',label:'Моя коллекция',icon:Cloud,run:()=>onNavigate('collection')},
   {id:'history',label:'История',icon:History,run:()=>onNavigate('history')},

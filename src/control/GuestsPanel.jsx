@@ -7,10 +7,11 @@ import GuestAccessEditor,{accessSummary} from '../GuestAccessEditor.jsx';
 import {Addresses,Events,Overview as ActivityOverview,Titles,useGuestReport} from '../GuestActivity.jsx';
 import {ago,bytes,duration} from '../guest-activity-format.js';
 import {useNow} from './use-control-data.js';
+import {uiLocale} from '../i18n/index.js';
 
 const TERMS=[['1','1 день'],['7','7 дней'],['30','30 дней'],['90','3 месяца'],['365','Год'],['','Без срока']];
 const EXTEND=[['7','На 7 дней'],['30','На 30 дней'],['90','На 3 месяца'],['365','На год'],['unlimited','Без срока']];
-const date=value=>new Date(value*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'});
+const date=value=>new Date(value*1000).toLocaleDateString(uiLocale(),{day:'numeric',month:'long',year:'numeric'});
 function status(guest){
  if(guest.disabled)return ['Заблокирован','is-bad'];
  if(guest.expired)return ['Срок истёк','is-bad'];

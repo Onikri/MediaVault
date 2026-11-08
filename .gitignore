@@ -14,3 +14,4 @@ test-output/
 deploy/oracle/data/
 
 demo/player-redesign/media/
+src/i18n/source-strings.json

@@ -8,6 +8,7 @@ import {privacyPreferences,savePrivacyPreferences} from './privacy.js';
 import {rememberGoogleSession,restoreGoogleSession,forgetGoogleSession} from './device-auth.js';
 import {saveTrustedVault,openTrustedVault,trustedVault,forgetTrustedVault,biometricAvailable} from './trusted-vault.js';
 import {deviceStore} from './device-storage.js';
+import {uiLocale} from './i18n/index.js';
 
 export const labels={all:"Все материалы",video:"Видео",audio:"Музыка",manga:"Манга",
   book:"Книги",image:"Изображения"};
@@ -243,7 +244,7 @@ function createController(get,patch){
       }
       assertEpoch(expected);
       const options=files.map((file,index)=>({id:file.id,
-        label:files.length===1?"Твоя библиотека":`Библиотека ${index+1}${file.modifiedTime?' · '+new Date(file.modifiedTime).toLocaleDateString('ru-RU'):''}`}));
+        label:files.length===1?"Твоя библиотека":`Библиотека ${index+1}${file.modifiedTime?' · '+new Date(file.modifiedTime).toLocaleDateString(uiLocale()):''}`}));
       const known=options.find(option=>option.id===get().libraryId);
       saveLibraryId(known?.id||(options.length===1?options[0].id:""));
       patch({libraryOptions:options,libraryDiscovery:options.length?"found":"empty"});

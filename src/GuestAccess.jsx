@@ -3,6 +3,7 @@ import {motion,useMotionValue,useReducedMotion,useSpring,useTransform} from 'mot
 import {ArrowRight,Eye,EyeOff,LoaderCircle,X} from 'lucide-react';
 import {enrollGuest,invitePreview,loginGuest} from './guest-session.js';
 import './guest-access.css';
+import {uiLocale} from './i18n/index.js';
 
 // Posters of the running season, used as the scene. Public metadata only.
 function usePosters(){
@@ -27,7 +28,7 @@ function Field({label,hint,type='text',value,onChange,autoComplete,autoFocus,min
  const [shown,setShown]=useState(false),secret=type==='password';
  return <label className="guest-field"><span>{label}</span><span className="guest-input"><input type={secret&&!shown?'password':secret?'text':type} value={value} onChange={e=>onChange(e.target.value)} autoComplete={autoComplete} autoFocus={autoFocus} minLength={minLength} maxLength={maxLength} pattern={pattern} required spellCheck={false}/>{secret&&<button type="button" aria-label={shown?'Скрыть пароль':'Показать пароль'} onClick={()=>setShown(v=>!v)}>{shown?<EyeOff size={16}/>:<Eye size={16}/>}</button>}</span>{hint&&<small>{hint}</small>}</label>;
 }
-const date=value=>new Date(value*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'});
+const date=value=>new Date(value*1000).toLocaleDateString(uiLocale(),{day:'numeric',month:'long',year:'numeric'});
 export default function GuestAccess({mode,invite,onDone,onClose,onGoogle}){
  const posters=usePosters(),reduce=useReducedMotion();
  const [preview,setPreview]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);

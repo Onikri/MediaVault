@@ -300,7 +300,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
       if(event.key==='Escape'&&panel==='watch'&&theater){event.preventDefault();event.stopImmediatePropagation();setTheater(false);return;}
       // A nested settings page handles Escape itself (back to the list first).
       if(event.key==='Escape'&&panel==='settings'&&document.activeElement?.closest?.('[data-settings-nested]'))return;
-      if(event.key==='Escape'&&panel!=='watch'){event.preventDefault();event.stopImmediatePropagation();openPanel('watch');stageRef.current?.querySelector('[aria-label="Настройки плеера"]')?.focus();return;}
+      if(event.key==='Escape'&&panel!=='watch'){event.preventDefault();event.stopImmediatePropagation();openPanel('watch');stageRef.current?.querySelector('[data-player-settings]')?.focus();return;}
       if(panel!=='watch')return;
       if(!stageRef.current?.contains(document.activeElement)&&document.fullscreenElement!==stageRef.current)return;
       if(document.activeElement?.tagName==='BUTTON'&&['Space','Enter'].includes(event.code))return;

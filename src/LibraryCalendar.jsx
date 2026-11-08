@@ -4,6 +4,7 @@ import {Bookmark,BookmarkCheck,CalendarDays,ChevronLeft,ChevronRight,LoaderCircl
 import {useCatalogFavorites} from './catalog-favorites.js';
 import {onlineTitleLocation} from './title-route.js';
 import './library-calendar.css';
+import {uiLocale} from './i18n/index.js';
 
 // Episode air dates come from AniList's published airing schedule (not computed);
 // Russian names from Shikimori. Bookmarked anime are the tracked ones.
@@ -15,7 +16,7 @@ const QUERY=`query($ids:[Int],$tracked:Boolean!){
 }`;
 const WEEK=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const dayKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-const monthName=d=>d.toLocaleDateString('ru-RU',{month:'long'});
+const monthName=d=>d.toLocaleDateString(uiLocale(),{month:'long'});
 const cap=v=>v.charAt(0).toUpperCase()+v.slice(1);
 const cache={value:null,key:''};
 
@@ -66,8 +67,8 @@ export default function LibraryCalendar({userId}){
  const range=cap(monthName(months[0]))+' — '+monthName(months[2])+' '+months[2].getFullYear();
  const toggle=t=>favorites.toggle({kind:'anime',ids:{mal:t.mal}});
  const open=t=>onlineTitleLocation({kind:'anime',provider:'shikimori',providerId:t.mal,id:'shikimori:'+t.mal,ids:{mal:t.mal},title:t.title,cover:t.cover});
- const when=at=>{const days=Math.round((new Date(at).setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/86400000);return days===0?'сегодня':days===1?'завтра':days===-1?'вчера':days>1?'через '+days+' дн.':new Date(at).toLocaleDateString('ru-RU',{day:'numeric',month:'short'});};
- const time=at=>new Date(at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+ const when=at=>{const days=Math.round((new Date(at).setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/86400000);return days===0?'сегодня':days===1?'завтра':days===-1?'вчера':days>1?'через '+days+' дн.':new Date(at).toLocaleDateString(uiLocale(),{day:'numeric',month:'short'});};
+ const time=at=>new Date(at).toLocaleTimeString(uiLocale(),{hour:'2-digit',minute:'2-digit'});
  const dayItems=byDay.get(selected)||[];
  return <section className="library-calendar" aria-label="Календарь выхода серий">
   <header className="lc-toolbar">
@@ -81,14 +82,14 @@ export default function LibraryCalendar({userId}){
   <div className="lc-months">{months.map(month=>{const first=(month.getDay()+6)%7,days=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();return <div key={dayKey(month)} className="lc-month">
    <h3>{cap(monthName(month))} <span>{month.getFullYear()}</span></h3>
    <div className="lc-grid" role="grid">{WEEK.map(d=><span key={d} className="lc-weekday">{d}</span>)}{Array.from({length:first},(_,i)=><span key={'e'+i}/>)}
-    {Array.from({length:days},(_,i)=>{const date=new Date(month.getFullYear(),month.getMonth(),i+1),key=dayKey(date),items=byDay.get(key)||[],past=key<today;return <button key={key} type="button" role="gridcell" className={'lc-day'+(items.length?' has-items':'')+(key===today?' is-today':'')+(key===selected?' is-selected':'')+(past?' is-past':'')} aria-label={date.toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+(items.length?', серий: '+items.length:'')} onClick={()=>setSelected(key)}>
+    {Array.from({length:days},(_,i)=>{const date=new Date(month.getFullYear(),month.getMonth(),i+1),key=dayKey(date),items=byDay.get(key)||[],past=key<today;return <button key={key} type="button" role="gridcell" className={'lc-day'+(items.length?' has-items':'')+(key===today?' is-today':'')+(key===selected?' is-selected':'')+(past?' is-past':'')} aria-label={date.toLocaleDateString(uiLocale(),{day:'numeric',month:'long'})+(items.length?', серий: '+items.length:'')} onClick={()=>setSelected(key)}>
      <span className="lc-num">{i+1}</span>
      {items.length>0&&<span className="lc-stack">{items.slice(0,3).map(e=><span key={e.t.mal+':'+e.episode}><Poster src={e.t.cover}/></span>)}{items.length>3&&<b>+{items.length-3}</b>}</span>}
     </button>;})}
    </div>
   </div>;})}</div>
   <AnimatePresence mode="wait" initial={false}><motion.div key={selected} className="lc-day-panel" initial={reduce?false:{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:.2}}>
-   <h3><CalendarDays size={17}/>{cap(new Date(selected+'T12:00:00').toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'}))}</h3>
+   <h3><CalendarDays size={17}/>{cap(new Date(selected+'T12:00:00').toLocaleDateString(uiLocale(),{weekday:'long',day:'numeric',month:'long'}))}</h3>
    {dayItems.length?<ul>{dayItems.map(e=><li key={e.t.mal+':'+e.episode}>
     <button type="button" className="lc-entry" onClick={()=>open(e.t)}><span className="lc-entry-poster"><Poster src={e.t.cover}/></span><span className="lc-entry-text"><strong>{e.t.title}</strong><small>Серия {e.episode}{e.t.total?' из '+e.t.total:''} · {time(e.at)}</small></span><span className={'lc-entry-state'+(e.at<=now?' is-out':'')}>{e.at<=now?'Вышла':'Выйдет '+when(e.at)}</span></button>
     <button type="button" className={'lc-track'+(tracked.has(e.t.mal)?' is-on':'')} aria-pressed={tracked.has(e.t.mal)} aria-label={(tracked.has(e.t.mal)?'Не отслеживать ':'Отслеживать ')+e.t.title} title={tracked.has(e.t.mal)?'Убрать из закладок':'Добавить в закладки и отслеживать'} onClick={()=>toggle(e.t)}>{tracked.has(e.t.mal)?<BookmarkCheck size={17}/>:<Bookmark size={17}/>}</button>

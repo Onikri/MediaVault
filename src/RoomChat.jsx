@@ -3,12 +3,13 @@ import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {Send,Smile,Reply,Trash2,SmilePlus,X,ArrowDown,Search} from 'lucide-react';
 import {EMOJI_GROUPS,QUICK_REACTIONS,recentEmoji,rememberEmoji,jumboEmoji} from './emoji-data.js';
 import './room-chat.css';
+import {uiLocale} from './i18n/index.js';
 
 // Room chat in the spirit of Discord/Telegram: grouped messages, replies,
 // reactions, typing hints, emoji and GIFs. Server keeps a short history so
 // late joiners see the conversation.
 function hue(id){let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return h;}
-const time=at=>new Date(at*1000).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});
+const time=at=>new Date(at*1000).toLocaleTimeString(uiLocale(),{hour:'2-digit',minute:'2-digit'});
 function Linkified({text}){
  return text.split(/(https?:\/\/[^\s<>"]+)/g).map((part,i)=>i%2?<a key={i} href={part} target="_blank" rel="noopener noreferrer nofollow">{part}</a>:part);
 }
@@ -48,7 +49,7 @@ function Message({m,grouped,me,canDelete,mention,conversation,onReply,onReact,on
  const jumbo=!m.gif&&jumboEmoji(m.text);
  return <motion.li data-id={m.id} className={'rcx-msg'+(grouped?' is-grouped':'')+(avatar?'':' no-avatar')+(m.from===me?' is-mine':'')+(mention?' is-mention':'')+(open?' is-open':'')} onClick={e=>{if(!e.target.closest('button,a'))onToggle(m.id);}} initial={live&&!reduce?{opacity:0,y:10}:false} animate={{opacity:1,y:0}} exit={reduce?undefined:{opacity:0,height:0,marginTop:0}} transition={{duration:.2,ease:[.16,1,.3,1]}} layout={reduce?false:'position'}>
   <div className="rcx-gutter">{!grouped&&avatar?<img className="rcx-avatar" src={avatar} alt=""/>:grouped?<time className="rcx-side-time" dateTime={new Date(m.at*1000).toISOString()}>{time(m.at)}</time>:null}</div>
-  <div className="rcx-body">
+  <div className="rcx-body" translate="no">
    {!grouped&&<p className="rcx-meta"><strong style={{'--author-hue':hue(m.from)}}>{m.name}</strong><time dateTime={new Date(m.at*1000).toISOString()}>{time(m.at)}</time></p>}
    {m.reply&&<button type="button" className="rcx-quote" onClick={()=>onJump(m.reply.id)}><strong>{m.reply.name}</strong><span>{m.reply.text}</span></button>}
    {m.text&&<p className={'rcx-text'+(jumbo?' is-jumbo':'')}><Linkified text={m.text}/></p>}

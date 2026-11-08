@@ -6,6 +6,7 @@ import {readReading} from './reading-progress.js';
 import {useRetainedWorkspace} from './RetainedMedia.jsx';
 import {Poster} from './ImportParts.jsx';
 import './history-page.css';
+import {uiLocale} from './i18n/index.js';
 
 // One history for everything opened on this device: library titles (online),
 // player sessions (online and collection) and collection files.
@@ -16,8 +17,8 @@ function hidden(){return readJSON(HIDDEN,{});}
 function hide(keys){const value=hidden(),now=Date.now();for(const key of keys)value[key]=now;try{localStorage.setItem(HIDDEN,JSON.stringify(Object.fromEntries(Object.entries(value).slice(-400))));}catch{}emit();}
 function useHistoryRevision(){return useSyncExternalStore(fn=>{listeners.add(fn);addEventListener('storage',fn);return()=>{listeners.delete(fn);removeEventListener('storage',fn);};},()=>localStorage.getItem(HIDDEN)||'',()=>'');}
 const kindLabel={anime:'Аниме',manga:'Манга',ranobe:'Ранобэ',book:'Книга',movie:'Фильм',tv:'Сериал',music:'Музыка'};
-const dayLabel=at=>{const d=new Date(at),today=new Date();today.setHours(0,0,0,0);const diff=Math.round((today-new Date(d.getFullYear(),d.getMonth(),d.getDate()))/86400000);return diff===0?'Сегодня':diff===1?'Вчера':d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',...(d.getFullYear()!==today.getFullYear()?{year:'numeric'}:{})});};
-const timeLabel=at=>new Date(at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+const dayLabel=at=>{const d=new Date(at),today=new Date();today.setHours(0,0,0,0);const diff=Math.round((today-new Date(d.getFullYear(),d.getMonth(),d.getDate()))/86400000);return diff===0?'Сегодня':diff===1?'Вчера':d.toLocaleDateString(uiLocale(),{day:'numeric',month:'long',...(d.getFullYear()!==today.getFullYear()?{year:'numeric'}:{})});};
+const timeLabel=at=>new Date(at).toLocaleTimeString(uiLocale(),{hour:'2-digit',minute:'2-digit'});
 const watchKey=route=>{try{return new URLSearchParams(String(route||'').replace(/^#/,'')).get('watch')||'';}catch{return '';}};
 
 export default function HistoryTimeline({recent,onOpen,renderCover,userId,libraryId,onForgetCollection,onClearCollection,actions,empty=null}){

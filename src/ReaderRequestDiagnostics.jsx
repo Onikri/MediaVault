@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {safeDiagnosticExport} from './google-request-diagnostics.js';
+import {uiLocale} from './i18n/index.js';
 const bytes=n=>!Number.isFinite(n)?'—':n<1024?n+' Б':n<1024*1024?(n/1024).toFixed(1)+' КБ':(n/1024/1024).toFixed(2)+' МБ';
 const time=n=>Number.isFinite(n)?(n/1000).toFixed(3)+' с':'не сообщено браузером';
 export default function ReaderRequestDiagnostics({value:d,now}){
@@ -12,7 +13,7 @@ export default function ReaderRequestDiagnostics({value:d,now}){
   <p><strong>{d.model}</strong> · {d.protocol||'JSON'} · {d.pages} стр. · {d.boxes} блоков · HTTP {d.httpStatus||'не получен'}</p>
   <p>Разметка: {d.inputMode==='blocks'?'Листы текстовых блоков':d.inputMode==='vision'?'Google сам определяет координаты':d.inputMode==='coordinates'?'координаты + чистая страница':'рамки и метки'} · детектор {d.detector}. Получено областей: {d.outputBoxes??'—'}.</p>
   <p>JSON запроса: <strong>{bytes(d.requestBytes)}</strong> / {bytes(d.limitBytes)} inline-данных. Максимум ответа: {d.requestBody?.generationConfig?.maxOutputTokens} токенов. Квота запросов и токенов в минуту зависит от проекта Google.</p>
-  {d.modelInputLimit&&<p>Лимиты модели по документации: вход {d.modelInputLimit.toLocaleString('ru-RU')} токенов, выход {d.modelOutputLimit?.toLocaleString('ru-RU')}. Это размер контекста, не минутная квота ключа.</p>}
+  {d.modelInputLimit&&<p>Лимиты модели по документации: вход {d.modelInputLimit.toLocaleString(uiLocale())} токенов, выход {d.modelOutputLimit?.toLocaleString(uiLocale())}. Это размер контекста, не минутная квота ключа.</p>}
   {m.chunks>0&&<p>Поток: {m.chunks} событий · {m.streamChars||0} символов · {m.completedRegions||0} завершённых реплик. Новые данные подтверждают работу запроса.</p>}
   {d.idleTimeoutMs>0&&<p>Gemma: ожидание новых данных до {d.idleTimeoutMs/1000} с; общий предел {d.timeoutMs/1000} с. MINIMAL отключает thinking у Gemma.</p>}
   {m.sentAt&&d.stage!=='ready'&&d.stage!=='complete'&&d.stage!=='error'&&<p role="status">С начала отправки: {Math.max(0,(now-m.sentAt)/1000).toFixed(1)} с · тайм-аут {d.timeoutMs/1000} с{Number.isFinite(m.uploadLoaded)?' · отправлено '+bytes(m.uploadLoaded)+(m.uploadTotal?' / '+bytes(m.uploadTotal):''):''}</p>}

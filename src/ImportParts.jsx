@@ -7,6 +7,7 @@ import {useArtwork} from './title-artwork.js';
 import {providers} from './catalog.js';
 import {jikan} from './media-metadata.js';
 import GoogleOAuthSetup from './GoogleOAuthSetup.jsx';
+import {uiLocale} from './i18n/index.js';
 
 export const kinds=[['anime','Аниме'],['manga','Манга'],['movie','Фильмы'],['ranobe','Ранобэ'],['tv','Сериалы']];
 export function Poster({item}){
@@ -24,7 +25,7 @@ export function Poster({item}){
   return source&&!failed?<img ref={anchor} src={source} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<Artwork ref={anchor} kind={['manga','ranobe'].includes(item.kind)?'manga':'video'}/>;
 }
 function DateLabel({value,japan=false}){
-  try{return <time dateTime={value}>{new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',...(japan?{timeZone:'Asia/Tokyo'}:{})}).format(new Date(value))}{japan?' JST':''}</time>;}catch{return null;}
+  try{return <time dateTime={value}>{new Intl.DateTimeFormat(uiLocale(),{dateStyle:'medium',timeStyle:'short',...(japan?{timeZone:'Asia/Tokyo'}:{})}).format(new Date(value))}{japan?' JST':''}</time>;}catch{return null;}
 }
 export function ReleaseCalendar({items=[],dubReleases=[]}){
   const releases=items.flatMap(item=>(item.releases||[]).filter(r=>r.kind==='original'&&Date.parse(r.date)>Date.now()-86400000).map(r=>({...r,title:item.title,japan:item.kind==='anime'}))).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date)).filter((r,i,a)=>a.findIndex(x=>x.title===r.title&&x.date===r.date&&x.episode===r.episode)===i).slice(0,60);

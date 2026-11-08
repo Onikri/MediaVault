@@ -98,7 +98,7 @@ export default function SceneSearch(){
         <span className="scene-match" title="Насколько кадр совпал со сценой">{Math.round(best.similarity*100)}%</span></div>
        <div className="scene-copy">
         <p className="scene-eyebrow">{confident?'Нашёл сцену':'Похоже, это'}</p>
-        <h2>{best.title}</h2>
+        <h2 translate="no">{best.title}</h2>
         <p className="scene-meta"><span>Серия {best.episode}</span><span>{clock(best.time)}</span>{best.original&&best.original!==best.title&&<span className="scene-original">{best.original}</span>}</p>
         {!best.mal&&<p className="scene-note">Этого тайтла нет в каталоге MyAnimeList, поэтому открыть его здесь не получится.</p>}
         <div className="scene-actions">

@@ -3,13 +3,14 @@ import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {Copy,Search} from 'lucide-react';
 import {CATEGORY_LABELS,EVENT_GROUPS,ago,bytes,clock,dayLabel,device,duration,eventTone,stamp} from './guest-activity-format.js';
 import './guest-activity.css';
+import {uiLocale} from './i18n/index.js';
 
 
 function TrafficChart({days}){
  const [hover,setHover]=useState(null);
  const max=Math.max(1,...days.map(d=>d.bytes));
  const width=600,height=150,gap=2,bar=(width-gap*(days.length-1))/days.length;
- const tick=v=>{const t=new Date(v+'T00:00:00Z');return t.toLocaleDateString('ru',{day:'numeric',month:'short',timeZone:'UTC'});};
+ const tick=v=>{const t=new Date(v+'T00:00:00Z');return t.toLocaleDateString(uiLocale(),{day:'numeric',month:'short',timeZone:'UTC'});};
  const shown=hover==null?null:days[hover];
  return <figure className="guest-chart">
   <figcaption><span>Трафик по дням, 30 дней</span><strong>{shown?tick(shown.day)+': '+bytes(shown.bytes)+' · '+shown.requests+' запр.':'Наведи на столбец'}</strong></figcaption>
@@ -34,7 +35,7 @@ export function Overview({report}){
    <div><dt>7 дней</dt><dd>{bytes(s.bytesWeek)}</dd></div>
    <div><dt>30 дней</dt><dd>{bytes(s.bytesMonth)}</dd></div>
    <div><dt>Всего</dt><dd>{bytes(s.bytes)}</dd></div>
-   <div><dt>Запросов</dt><dd>{s.requests.toLocaleString('ru')}</dd></div>
+   <div><dt>Запросов</dt><dd>{s.requests.toLocaleString(uiLocale())}</dd></div>
    <div><dt>Тайтлов</dt><dd>{s.titles}</dd></div>
    <div><dt>IP-адресов</dt><dd>{s.addresses}</dd></div>
   </dl>
@@ -67,7 +68,7 @@ export function Addresses({addresses}){
  if(!addresses.length)return <p className="fine guest-empty">Адресов пока нет.</p>;
  return <div className="guest-tab-body"><div className="guest-table-wrap"><table className="guest-table">
   <thead><tr><th>IP-адрес</th><th>Устройство</th><th>Впервые</th><th>Последний раз</th><th>Запросов</th><th>Трафик</th></tr></thead>
-  <tbody>{addresses.map(a=><tr key={a.ip}><td><button type="button" className="guest-ip" onClick={()=>navigator.clipboard?.writeText(a.ip).then(()=>{setCopied(a.ip);setTimeout(()=>setCopied(''),1400);})} aria-label={'Скопировать '+a.ip}><code>{a.ip}</code><Copy size={12}/>{copied===a.ip&&<em>скопирован</em>}</button></td><td title={a.agent}>{device(a.agent)}</td><td>{stamp(a.first)}</td><td title={stamp(a.last)}>{ago(a.last)}</td><td>{a.requests.toLocaleString('ru')}</td><td>{bytes(a.bytes)}</td></tr>)}</tbody>
+  <tbody>{addresses.map(a=><tr key={a.ip}><td><button type="button" className="guest-ip" onClick={()=>navigator.clipboard?.writeText(a.ip).then(()=>{setCopied(a.ip);setTimeout(()=>setCopied(''),1400);})} aria-label={'Скопировать '+a.ip}><code>{a.ip}</code><Copy size={12}/>{copied===a.ip&&<em>скопирован</em>}</button></td><td title={a.agent}>{device(a.agent)}</td><td>{stamp(a.first)}</td><td title={stamp(a.last)}>{ago(a.last)}</td><td>{a.requests.toLocaleString(uiLocale())}</td><td>{bytes(a.bytes)}</td></tr>)}</tbody>
  </table></div></div>;
 }
 

@@ -1,3 +1,4 @@
+import {uiLocale} from './i18n/index.js';
 // Formatting helpers for the guest activity admin.
 export function bytes(n){
  const value=Number(n)||0;
@@ -22,14 +23,14 @@ export function duration(seconds){
  return Math.floor(d/3600)+' ч '+Math.floor(d%3600/60)+' мин';
 }
 export function stamp(seconds,time=true){
- return new Date(seconds*1000).toLocaleString('ru',{day:'numeric',month:'short',...(new Date(seconds*1000).getFullYear()!==new Date().getFullYear()?{year:'numeric'}:{}),...(time?{hour:'2-digit',minute:'2-digit'}:{})});
+ return new Date(seconds*1000).toLocaleString(uiLocale(),{day:'numeric',month:'short',...(new Date(seconds*1000).getFullYear()!==new Date().getFullYear()?{year:'numeric'}:{}),...(time?{hour:'2-digit',minute:'2-digit'}:{})});
 }
-export function clock(seconds){return new Date(seconds*1000).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});}
+export function clock(seconds){return new Date(seconds*1000).toLocaleTimeString(uiLocale(),{hour:'2-digit',minute:'2-digit'});}
 export function dayLabel(seconds,now=new Date()){
  const date=new Date(seconds*1000),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
  const diff=Math.round((today-new Date(date.getFullYear(),date.getMonth(),date.getDate()))/86400000);
  if(diff===0)return 'Сегодня';if(diff===1)return 'Вчера';
- return date.toLocaleDateString('ru',{weekday:'long',day:'numeric',month:'long'});
+ return date.toLocaleDateString(uiLocale(),{weekday:'long',day:'numeric',month:'long'});
 }
 // "Chrome · Windows" from a User-Agent; enough for an owner to tell devices apart.
 export function device(agent=''){

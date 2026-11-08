@@ -2,6 +2,7 @@ import ReleaseMonthCalendar from './ReleaseMonthCalendar.tsx';
 import {useEffect,useRef,useState} from 'react';
 import {CalendarDays,List} from 'lucide-react';
 import {jikan} from '../media-metadata.js';
+import {uiLocale} from '../i18n/index.js';
 export default function ReleaseTimeline({identity,releases=[],server}:{identity?:string;releases?:any[];server?:string}){
  const root=useRef<HTMLElement>(null),generation=useRef(0);
  const [enabled,setEnabled]=useState(false),[episodes,setEpisodes]=useState<any[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0),[view,setView]=useState('list');
@@ -22,7 +23,7 @@ export default function ReleaseTimeline({identity,releases=[],server}:{identity?
  const values=[...merged.values()].sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
 
  const description=(x:any)=>[x.filler?'Филлер':'',x.recap?'Рекап':'',...(x.characters||[]).map((c:any)=>typeof c==='string'?c:c.name).filter(Boolean)].filter(Boolean).join(' · ');
- function entry(x:any){return <><span className="release-episode-number">{String(x.episode).padStart(2,'0')}</span><div><strong>{x.title||x.titleRomanji||x.titleJapanese||'Серия '+x.episode}</strong><time dateTime={x.date}>{new Date(x.date).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})}</time>{description(x)&&<small>{description(x)}</small>}</div><small>{Date.parse(x.date)<Date.now()?'Вышла':'Ожидается'}</small></>;}
+ function entry(x:any){return <><span className="release-episode-number">{String(x.episode).padStart(2,'0')}</span><div><strong>{x.title||x.titleRomanji||x.titleJapanese||'Серия '+x.episode}</strong><time dateTime={x.date}>{new Date(x.date).toLocaleDateString(uiLocale(),{day:'numeric',month:'short',year:'numeric'})}</time>{description(x)&&<small>{description(x)}</small>}</div><small>{Date.parse(x.date)<Date.now()?'Вышла':'Ожидается'}</small></>;}
 
  return <section ref={root} id="titleSchedule" className="release-timeline release-calendar"><div className="section-heading"><h2><CalendarDays size={19}/>Календарь выпуска</h2><div className="section-view-switch" role="group" aria-label="Вид календаря"><button aria-label="Список дат" aria-pressed={view==='list'} onClick={()=>setView('list')}><List size={17}/></button><button aria-label="Календарь по месяцам" aria-pressed={view==='month'} onClick={()=>setView('month')}><CalendarDays size={17}/></button></div></div>
  {view==='list'?<ol className="release-calendar-entries release-compact-list">{values.map(x=><li key={x.episode+':'+x.date}>{entry(x)}</li>)}</ol>:<ReleaseMonthCalendar key={identity} entries={values} renderEntry={entry}/>}
