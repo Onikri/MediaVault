@@ -10,7 +10,7 @@ let browser,vite;
  window.calls=[];window.active=0;window.peak=0;window.chosen=[];
  const service={server:'https://api.fixture',session:{serverVersion:47},request:async(url,options)=>{window.calls.push(options.body);window.active++;window.peak=Math.max(window.peak,window.active);await new Promise(r=>setTimeout(r,70));window.active--;return{chapterCount:70,volumeCount:4,readable:options.body.url.endsWith('/0'),verifiedPages:options.body.url.endsWith('/0')?1:0,readabilityError:'Images unavailable'};}};
  function Demo(){const info=useInfo(sources,title,service,0);return <main style={{maxWidth:900,padding:16,margin:'auto'}}><Picker requireVerified sources={sources} info={info} onChoose={url=>window.chosen.push(url)}/></main>;}createRoot(document.getElementById('root')).render(<Demo/>);`);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-reader-health',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-reader-health',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of [360,1440]){
   const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');

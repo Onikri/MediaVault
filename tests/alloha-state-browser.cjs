@@ -13,7 +13,7 @@ let browser,vite,debug=async()=>({});
  const entry={number:1,season:1,title:'Серия 1',url:'https://alloha.yani.tv/?fixture=1'};
  function Demo(){const[open,setOpen]=useState(true);window.unmountPlayer=()=>setOpen(false);return <main style={{maxWidth:960,margin:'auto'}}>{open&&<OnlineViewer entries={[entry]} initial={entry} kind="video" title="Проверка восстановления" service={service} userId="state-test" identity="state-test" metadata={{}} inline onClose={()=>setOpen(false)}/>}</main>;}createRoot(document.getElementById('root')).render(<Demo/>);
  `);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/alloha-state',logLevel:'error',server:{port:0,strictPort:false,host:'127.0.0.1'}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/alloha-state',logLevel:'error',server:{watch:null,port:0,strictPort:false,host:'127.0.0.1'}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});const page=await browser.newPage({viewport:{width:1280,height:900}});
  const errors=[],reports=[],requests=[],expired=new Map();let prepared=0;
  page.on('pageerror',e=>errors.push(e.message));

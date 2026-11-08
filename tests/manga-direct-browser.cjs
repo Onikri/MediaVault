@@ -20,7 +20,7 @@ createRoot(document.getElementById('root')).render(<MangaReader item={item} cata
   const pathname=new URL(req.url,'http://fixture').pathname,at=pathname.indexOf('/lmt/');if(at<0)return next();
   const file=path.resolve(root,'dist/lmt',pathname.slice(at+5));if(!file.startsWith(path.join(root,'dist/lmt/')))return next();
   try{const data=await fs.readFile(file);res.setHeader('Content-Type',file.endsWith('.wasm')?'application/wasm':file.endsWith('.js')||file.endsWith('.mjs')?'text/javascript':file.endsWith('.html')?'text/html':'application/octet-stream');res.end(data);}catch{next();}
- });}}],server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();
+ });}}],server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
  const metrics=[];
  for(const width of[390,1366]){

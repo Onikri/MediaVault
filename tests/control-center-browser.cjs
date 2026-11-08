@@ -6,7 +6,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
 (async()=>{
  await fs.mkdir(dir,{recursive:true});await fs.mkdir(path.join(ROOT,'test-output'),{recursive:true});
  await fs.writeFile(path.join(ROOT,'test-output/control-center.html'),'<!doctype html><html lang="ru" data-blossom><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/tests/control-center-harness.jsx"></script></html>');
- const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  const base='http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/control-center.html';
  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox']});
  for(const width of [375,900,1440]){
@@ -51,6 +51,13 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   assert.equal(await page.evaluate(()=>window.__controlCalls.filter(c=>c==='PUT /admin/rules').length),1);
   await fits('Rules');await page.screenshot({path:path.join(dir,'rules-'+width+'.png'),fullPage:true});
   await nav('Задачи').click();await page.locator('.import-queue').waitFor();await fits('Tasks');
+  // Storage: space for Drive and the VM, live load with sparklines, containers and processes.
+  await nav('Хранилище').click();await page.locator('.cc-table[aria-label="Контейнеры"] [role=row]').nth(3).waitFor();
+  assert.match(await page.locator('.cc-space').first().innerText(),/Google Диск[\s\S]*512 ГБ свободно/);
+  assert.equal(await page.locator('.cc-space').count(),3,'Data disk and system disk are shown separately');
+  assert.match(await page.locator('.cc-table[aria-label="Процессы"]').innerText(),/python3[\s\S]*38\.5%/);
+  await page.waitForFunction(()=>document.querySelectorAll('.cc-spark polyline').length===2,null,{timeout:12000});
+  await fits('Storage');await page.screenshot({path:path.join(dir,'storage-'+width+'.png'),fullPage:true});
   assert.equal(await page.locator('.cc-rail .cc-who').isVisible(),width>860,'Identity block only on the wide rail');
   assert.deepEqual(errors,[],'No page errors at '+width);
   await context.close();

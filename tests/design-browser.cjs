@@ -26,7 +26,7 @@ let vite,browser;
  </script></html>`);
  const html=await fs.readFile(harness,'utf8'),embedded=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
  await fs.writeFile(path.join(dir,'design-harness.jsx'),embedded);await fs.writeFile(harness,html.replace(/<script type="module">[\s\S]*?<\/script>/,'<script type="module" src="/test-output/design-harness.jsx"></script>'));
- const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox','--enable-unsafe-swiftshader']});
  const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
  page.on('pageerror',e=>{errors.push(e.message);console.error('UI error:',e.message);});

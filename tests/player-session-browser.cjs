@@ -12,7 +12,7 @@ let browser,vite,last;
  function Demo(){const[revision,setRevision]=useState(0),[enabled,setEnabled]=useState(true),[mounted,setMounted]=useState(true);return <><div className="app-header" style={{position:'fixed',top:0,left:0,width:'100%',height:56,minHeight:0,padding:0,zIndex:100,background:'#17171b'}}>Навигация</div><header id="outside" style={{height:220}}>Страница тайтла</header><main style={{maxWidth:900,margin:'0 auto'}}>{mounted&&<Player item={{...item,revision}} source="/test-output/player-session.mp4" catalog={{items:[item]}} userId="test" libraryId="core" extensions={enabled?[extension]:[]} apiRef={api=>window.player=api}/>}<button id="rerender" onClick={()=>setRevision(n=>n+1)}>Сведения</button><button id="module" onClick={()=>setEnabled(v=>!v)}>Модуль</button><button id="unmount" onClick={()=>setMounted(false)}>Закрыть</button><div style={{height:1400}}/></main></>;}createRoot(document.getElementById('root')).render(<Demo/>);
  document.addEventListener('contextmenu',e=>window.contextTarget=e.target.tagName);
  `);
- const {createServer}=await import('vite');vite=await createServer({root,logLevel:'error',cacheDir:'.codex-local/player-session-vite',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,logLevel:'error',cacheDir:'.codex-local/player-session-vite',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--enable-unsafe-swiftshader']});
  for(const width of [390,1440]){
   const page=await browser.newPage({viewport:{width,height:900}}),errors=[];last=page;page.on('pageerror',e=>errors.push(e.message));

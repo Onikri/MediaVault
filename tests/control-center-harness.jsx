@@ -46,7 +46,7 @@ const reply=v=>new Promise(r=>setTimeout(()=>r(structuredClone(v)),120));
 async function request(path,{method='GET',body}={}){
  window.__controlCalls.push(method+' '+path);
  const fail=(window.__controlFail||{})[path];if(fail)throw Object.assign(Error(fail),{status:500});
- if(path==='/health')return reply({version:53,controlCenter:true,siteRules:true});
+ if(path==='/health')return reply({version:54,controlCenter:true,siteRules:true,systemStatus:true});
  if(path==='/rooms')return reply({rooms:db.rooms,rules:db.rules.rooms});
  if(path.startsWith('/rooms/')&&method==='DELETE'){db.rooms=db.rooms.filter(r=>'/rooms/'+r.id!==path);return reply({closed:true});}
  if(path==='/guests'&&method==='POST'){const g={id:'n'+Date.now(),name:body.name,login:'',createdAt:now,expiresAt:body.days?now+body.days*86400:null,disabled:false,expired:false,enrolled:false,lastSeen:null,access:{scope:'all',watch:db.rules.guests.watch,read:db.rules.guests.read,titles:[]}};db.guests.unshift(g);return reply({guest:g,invite:'fixture-invite-token'});}
@@ -59,6 +59,11 @@ async function request(path,{method='GET',body}={}){
  if(path==='/google/connection')return reply({configured:true,state:'ready',checkedAt:now-5400});
  if(path==='/admin/rules'&&method==='PUT'){db.rules=structuredClone(body);return reply({rules:db.rules,defaults:rules});}
  if(path==='/admin/rules')return reply({rules:db.rules,defaults:rules});
+ if(path==='/admin/system'){db.tick=(db.tick||0)+1;const G=1024**3;return reply({at:now,host:{cpu:22+db.tick%5*7,cores:4,load:[1.2,0.9,0.7],uptime:3*86400+3600,memory:{total:24*G,used:(9+db.tick%3)*G,available:13*G,swapTotal:0,swapUsed:0},disk:{total:200*G,used:182*G,free:18*G}},
+  available:true,at:now,stale:false,hostDisk:{total:47*G,used:43*G,free:4*G},
+  containers:[{name:'oracle-importer-1',image:'mediavault-importer:2ec07ed7ff32',state:'running',status:'Up 3 hours',cpu:'12.40%',memory:'1.2GiB / 23.4GiB',memoryPercent:'5.1%',pids:'31'},{name:'oracle-https-1',image:'caddy:2.10.2-alpine',state:'running',status:'Up 6 days',cpu:'0.10%',memory:'38MiB / 23.4GiB',memoryPercent:'0.2%',pids:'9'},{name:'manga-batch',image:'mediavault-manga-batch',state:'exited',status:'Exited (0) 2 days ago',cpu:'',memory:'',memoryPercent:'',pids:''}],
+  processes:[{pid:4121,user:'1000',cpu:38.5,memory:4.9,rss:1.2*G,elapsed:10800,command:'python3'},{pid:802,user:'root',cpu:3.1,memory:0.6,rss:150*1024**2,elapsed:518400,command:'dockerd'}]});}
+ if(path==='/admin/drive-quota')return reply({limit:2*1024**4,usage:1.5*1024**4,drive:1.4*1024**4,trash:12*1024**3,checkedAt:now});
  if(path.startsWith('/metadata/posters'))return reply({'52991':{cover},'20':{cover}});
  return reply({});
 }

@@ -54,7 +54,8 @@ module.exports=async function({browser,base,installProvider,OWNER,PHRASE,catalog
   await page.locator('.cc-nav').getByRole('button',{name:'Устройство'}).click();
   await page.getByRole('button',{name:'Настроить защищённое открытие',exact:true}).click();
   await page.getByText('Разблокировка устройством включена',{exact:true}).waitFor();
-  await page.reload();await page.locator('#profileBtn').click();await page.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();await page.locator('.cc-nav').getByRole('button',{name:'Устройство'}).click();
+  await page.reload();await page.locator('.cc-nav').getByRole('button',{name:'Устройство'}).and(page.locator('[aria-current=page]')).waitFor();
+  assert.match(page.url(),/#profile$/,'A reload keeps the control center open on the same section');
   await page.locator('.device-settings').getByRole('button',{name:'Открыть библиотеку',exact:true}).waitFor();
   assert.equal(await page.locator('#libraryPanel').count(),0,'A biometric vault stays locked after Google restores');
   await page.locator('.device-settings').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();

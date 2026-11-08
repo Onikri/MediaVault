@@ -24,7 +24,7 @@ const quarantined=(p,name)=>p.locator('.title-source-picker .title-source-tools>
  if(p==='/manga/inspect'){const n=Number(o.body.url.split('/').at(-1));await sleep(n===2?100:10);if(n===0||n===2)throw Error('HTTP 500 source failed');return{title:title.title,url:o.body.url,language:n%2?'en':'ru',episodes:[{url:o.body.url+'/chapter/1',number:1,season:1,title:'Chapter for '+n,language:n%2?'en':'ru'}],seasons:[{number:1,name:'Том 1'}],translations:[]};}
  return{};}};return <main style={{maxWidth:1000,margin:'auto',padding:16}}><button onClick={()=>setStatus(status==='connected'?'error':'connected')}>Toggle connection</button><MangaImport compact destination="online" item={{...title,sources}} state={{user:{sub:'fixture'}}} service={service}/></main>;}
  createRoot(document.getElementById('root')).render(<Demo/>);`);
- const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
+ const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of[360,1440]){
   const p=await browser.newPage({viewport:{width,height:1000}}),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/title-sources.html');
   await p.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();assert.equal(await offered(p),82);

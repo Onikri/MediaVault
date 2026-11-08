@@ -5,7 +5,7 @@ let browser,vite;
 (async()=>{
  const root=path.resolve(__dirname,'..'),dir=path.join(root,'.codex-local/test-output/migan'),real=process.env.MIGAN_REAL==='1';await fs.mkdir(dir,{recursive:true});
  await fs.writeFile(path.join(dir,'index.html'),'<meta charset="utf-8"><canvas id="result"></canvas><script type="module">import{renderComicPage}from"/src/manga-renderer.js";import{DirectChapter}from"/src/manga-direct.js";window.render=renderComicPage;window.DirectChapter=DirectChapter;</script>');
- const{createServer}=await import('vite');vite=await createServer({root,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const{createServer}=await import('vite');vite=await createServer({root,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});const page=await browser.newPage();
  if(real){
   await page.route('https://huggingface.co/andraniksargsyan/migan/**',route=>route.fulfill({path:path.join(root,'.codex-local/cache/migan/migan_pipeline_v2.onnx'),contentType:'application/octet-stream',headers:{'access-control-allow-origin':'*'}}));

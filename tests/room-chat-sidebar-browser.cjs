@@ -29,7 +29,7 @@ watch_rooms.install(app,owner)
 @app.get('/health')
 def health():return {'ok':True}
 `);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-room-chat-sidebar',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();const origin='http://127.0.0.1:'+vite.httpServer.address().port;
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-room-chat-sidebar',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();const origin='http://127.0.0.1:'+vite.httpServer.address().port;
  const net=require('node:net'),port=await new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const n=s.address().port;s.close(()=>r(n));});}),server='https://127.0.0.1:'+port;
  log=await fs.open(path.join(dir,'api.log'),'w');backend=spawn(python,['-m','uvicorn','fixture_api:app','--host','127.0.0.1','--port',String(port),'--ssl-keyfile',path.join(dir,'key.pem'),'--ssl-certfile',path.join(dir,'cert.pem'),'--no-access-log'],{cwd:root,windowsHide:true,env:{...process.env,PYTHONPATH:[path.join(root,'server'),dir].join(path.delimiter),ALLOWED_ORIGIN:origin},stdio:['ignore',log.fd,log.fd]});
  for(let i=0;i<100;i++){try{await new Promise((resolve,reject)=>https.get(server+'/health',{rejectUnauthorized:false},res=>{res.resume();res.statusCode===200?resolve():reject();}).on('error',reject));break;}catch{await new Promise(r=>setTimeout(r,100));if(i===99)throw Error('Fixture API did not start');}}
