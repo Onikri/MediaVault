@@ -20,7 +20,7 @@ Script: `scratchpad stress_probe.py` (not committed), audio in `.codex-local/ben
 | Gemini 3.5 Flash Lite | 76 % | 2 |
 | Gemma 4 26B A4B | 65 % | 1 (Latin `á` homoglyphs) |
 | Gemma 4 31B | 60 % | 4 (partly free-tier errors) |
-| Gemini 3.5 Flash | 65 % | 4 (free tier: 20 requests/day/project, quota spent) |
+| Gemini 3.5 Flash | 65 % | 4 (free tier: 20 requests/day per project; the test used only key slot 1 directly, bypassing the gateway, and spent that slot's quota — slots 2 and 3 still answered) |
 
 One gold label was wrong (`стоя́ли` is correct); RUAccent's remaining misses are the
 hardest pairs on purpose (`замо́к/за́мок`, `мука́/му́ка`, `хлопо́к/хло́пок`).
@@ -31,8 +31,9 @@ Decision: RUAccent places stresses; Google models do roles and emotions only.
 - Bible: Gemini 3.5 Flash Lite, 3.7 s. 7 characters with aliases (Анна Павловна /
   Annette; Маленькая княгиня / Лиза / Lise; Пьер / monsieur Pierre; князь Василий; Элен;
   аббат Морио; тётушка), temperament, manner of speech, timbre and pitch, narrator voice and
-  a 9-word name lexicon (Безу́хов, Болко́нская, Ипполи́т…). Gemini 3.5 Flash is the
-  default bible model; Flash Lite and Gemma 4 31B are automatic fallbacks (quota/overload).
+  a 9-word name lexicon (Безу́хов, Болко́нская, Ипполи́т…). Gemini 3.5 Flash Lite is the
+  bible model (the owner does not use non-Lite Flash; no text 3.8 Flash Lite is offered to
+  these keys, only `gemini-3.8-flash-lite-tts`); Gemma 4 31B is the fallback on quota/overload.
 - Chapter pass: Gemma 4 26B A4B with the bible, 24 s for 32 segments. Speakers correct in
   11 of 14 lines (heuristic alone: about 3); one line given to the wrong speaker
   (князь Василий instead of the little princess), one left unattributed.

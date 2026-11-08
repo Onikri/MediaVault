@@ -71,11 +71,11 @@ export function savedBible(book){try{const v=JSON.parse(localStorage.getItem(KEY
 export function saveBible(book,value){try{localStorage.setItem(KEY+book,JSON.stringify(value));}catch{}}
 export function forgetBible(book){try{localStorage.removeItem(KEY+book);}catch{}}
 
-// Gemini 3.5 Flash has 20 free requests a day per project: when its quota is
-// spent (or a model is overloaded), Flash Lite and then Gemma 4 31B write it.
-export async function buildBible({book,sample,service,userId,model='gemini-3.5-flash',signal}){
+// Gemini 3.5 Flash Lite writes the card (the owner never uses non-Lite Flash);
+// when its quota is spent or it is overloaded, Gemma 4 31B writes it.
+export async function buildBible({book,sample,service,userId,model='gemini-3.5-flash-lite',signal}){
  let last;
- for(const candidate of [...new Set([model,'gemini-3.5-flash-lite','gemma-4-31b-it'])]){
+ for(const candidate of [...new Set([model,'gemma-4-31b-it'])]){
   try{
    const answer=await generate({service,userId,model:candidate,request:bibleRequest(book,sample),signal,timeout:150000});
    return parseBible(answerJson(answer),candidate);

@@ -11,8 +11,9 @@ import {roleColors,emotionLabel} from './RoleText.jsx';
 import './narration.css';
 
 const PREFS='mediavault_tts_prefs_v2';
-const DEFAULTS={pace:1,narrator:'auto',roles:true,stress:true,rolesModel:ROLE_MODEL,bibleModel:'gemini-3.5-flash'};
-function readPrefs(){try{return {...DEFAULTS,...JSON.parse(localStorage.getItem(PREFS)||'{}')};}catch{return {...DEFAULTS};}}
+const DEFAULTS={pace:1,narrator:'auto',roles:true,stress:true,rolesModel:ROLE_MODEL,bibleModel:'gemini-3.5-flash-lite'};
+// Only models offered in the panel are kept (non-Lite Flash is never used).
+function readPrefs(){try{const value={...DEFAULTS,...JSON.parse(localStorage.getItem(PREFS)||'{}')};if(!BIBLE_MODELS.some(([id])=>id===value.bibleModel))value.bibleModel=DEFAULTS.bibleModel;if(!ROLE_MODELS.some(([id])=>id===value.rolesModel))value.rolesModel=DEFAULTS.rolesModel;return value;}catch{return {...DEFAULTS};}}
 const mb=bytes=>Math.round(bytes/1048576);
 const ROLE_CACHE=new Map(),STRESS_CACHE=new Map();
 const voiceName=v=>(v[0]==='F'?'Женский ':'Мужской ')+v.slice(1);
