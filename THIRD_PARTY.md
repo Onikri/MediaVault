@@ -392,3 +392,26 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   inference with ONNX Runtime Web (MIT) on WebGPU.
 * **AMD FidelityFX CAS** sharpening (MIT, GPUOpen) is reimplemented in the colour pass
   `src/color-grade.js`.
+
+## Neural narration (ranobe reader)
+
+- **Supertonic 3** by Supertone Inc. — model weights under the **BigScience OpenRAIL-M**
+  license (https://huggingface.co/Supertone/supertonic-3, revision
+  `3cadd1ee6394adea1bd021217a0e650ede09a323`; duration predictor and text encoder are
+  loaded from here). Use-based restrictions apply: synthetic speech must not be passed off
+  as a real person's voice or used for impersonation; the reader shows this notice before
+  the first download. Weights are downloaded by the viewer's browser and are not
+  redistributed by MediaVault.
+- **Supertonic-3-ONNX-WebGPU** by danyalmalik — 4-bit derivative of the above, same
+  OpenRAIL-M license and restrictions (revision `aed039b76a7472220e9d89f3ef537f7e2ff077a7`;
+  vector estimator, vocoder, configuration, character indexer and the ten voice styles).
+- `src/tts/supertonic.worker.js` ports the inference loop of Supertone's MIT-licensed
+  `web/helper.js` (https://github.com/supertone-oss-archive/supertonic).
+
+## Text sources
+
+- Ranobe adapters (`server/ranobe_sources.py`) follow the public endpoints used by the MIT
+  LNReader plugins (https://github.com/lnreader/lnreader-plugins: `russian/ranobehub.ts`,
+  `ukrainian/smakolykytl.ts`).
+- Ukrainian manga and Zenko novels (`server/manga_ukrainian.py`) follow the Apache-2.0
+  Keiyoushi extensions (`src/uk/honeymanga`, `src/uk/zenko`). No code is copied verbatim.
