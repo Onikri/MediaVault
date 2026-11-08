@@ -107,6 +107,9 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         and bool(re.fullmatch(r"/embed/(?:movie|kp|imdb)/[a-zA-Z0-9]{1,24}", url.path))
         or host == "fbphdplay.top" and url.path == "/api/players"
         # Ukrainian manga readers' public catalogues (Zenko).
+        # Light-novel text APIs (RanobeHub, Smakolyky).
+        or host == "ranobehub.org" and bool(re.fullmatch(r"/api/(?:search|books/\d{1,9}/chapters|chapters/\d{1,9})", url.path))
+        or host == "api.smakolykytl.site" and bool(re.fullmatch(r"/api/user/(?:projects(?:/\d{1,9}/books)?|chapters/\d{1,9})", url.path))
         or host == "api.zenko.online" and bool(re.fullmatch(r"/(?:titles(?:/\d{1,9}(?:/chapters)?)?|chapters/\d{1,9})", url.path))
     )
     if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
