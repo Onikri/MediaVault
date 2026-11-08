@@ -13,7 +13,7 @@ export function useGlobalSearch(query,kind,service,composing=false){
  const [state,setState]=useState({key:'',items:[],loading:false,failed:0}),text=query.trim(),key=[text,kind,service.server].join(':');
  const [nativeSources,setNativeSources]=useState(null);
  const nativeEnabled=(kind==='all'||kind==='manga')&&text.length>=2&&!composing&&Number(service.session?.serverVersion)>=16;
- const sourceIds=nativeSources?.server===service.server?nativeSources.ids:[];
+ const sourceIds=nativeSources&&nativeSources.server===service.server?nativeSources.ids:[];
  useEffect(()=>{
   if(!nativeEnabled||nativeSources?.server===service.server)return;
   const controller=new AbortController();

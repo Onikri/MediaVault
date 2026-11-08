@@ -50,7 +50,9 @@ let browser,vite,last;
   assert.equal(await mainCount(),countBefore+1,'Explicit episode choice prepares exactly one stream');
   assert.ok(await page.evaluate(()=>window.requests.filter(r=>r.clientId?.endsWith(':viewer')).at(-1).url.endsWith('/s2/2')));
   assert.ok(await page.evaluate(()=>window.video===document.querySelector('.mv-player-media')&&window.shell===document.querySelector('[data-player]')),'Episode handoff preserves React player/native video identity');
-  await page.getByRole('button',{name:'Выбрать серию',exact:true}).click();await page.getByRole('button',{name:'Закрыть серии',exact:true}).click();await page.locator('.mvx-episodes').waitFor({state:'detached'});
+  // The online episode panel stays open after a choice; close it and toggle it from the chip.
+  await page.getByRole('button',{name:'Закрыть серии',exact:true}).click();await page.locator('.mvx-episodes').waitFor({state:'detached'});
+  await page.getByRole('button',{name:'Выбрать серию',exact:true}).click();await page.locator('.mvx-episodes').waitFor();await page.getByRole('button',{name:'Закрыть серии',exact:true}).click();await page.locator('.mvx-episodes').waitFor({state:'detached'});
   const nextCount=await mainCount();await chooseSeason(page,'1');await page.locator('#browsed').getByText('Сезон 1 · 3',{exact:true}).waitFor();
   assert.equal(await mainCount(),nextCount);
   const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('mv_watch_v1:test:season-fixture')));assert.equal(saved.season,2);assert.equal(saved.episode,2,'Browsing does not overwrite actual resume position');
