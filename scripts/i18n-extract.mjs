@@ -98,7 +98,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  if(process.argv.includes('--check')){
   const uk=JSON.parse(fs.readFileSync(path.join(ROOT,'src/i18n/uk.json'),'utf8'));
   const missing=rows.filter(row=>!(row.text in uk));
-  if(missing.length){console.error(missing.length+' strings have no Ukrainian translation, e.g.:\n'+missing.slice(0,20).map(r=>'  '+r.text+'  ('+r.file+')').join('\n'));process.exit(1);}
+  if(missing.length){console.error(missing.length+' strings have no Ukrainian translation, e.g.:\n'+missing.slice(0,Number(process.env.I18N_SHOW||20)).map(r=>'  '+r.text+'  ('+r.file+')').join('\n'));process.exit(1);}
   console.log('Ukrainian dictionary covers all '+rows.length+' interface strings.');
  }else{
   fs.mkdirSync(path.dirname(OUT),{recursive:true});

@@ -10,7 +10,7 @@ from source_parser import PublicHttp,SourceError,public_url
 UUID=r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}'
 LIB='https://api.cdnlibs.org'
 LIB_SITES={1:('mangalib','MangaLib','https://mangalib.me'),2:('slashlib','SlashLib','https://v2.shlib.life'),4:('hentailib','HentaiLib','https://hentailib.me')}
-DEX_LANGUAGES=('ru','en','ja','ko')
+DEX_LANGUAGES=('ru','uk','en','ja','ko')
 CONTENT_RATINGS=('safe','suggestive','erotica','pornographic')
 def lib_context(http,site_id):
     if site_id not in LIB_SITES:raise SourceError('Неизвестный каталог LibGroup.')
@@ -55,7 +55,7 @@ def dex_search(query,language,http):
         cover=next((v.get('attributes',{}).get('fileName') for v in row.get('relationships',[]) if v['type']=='cover_art'),None)
         for lang in languages:
             if lang not in a.get('availableTranslatedLanguages',[]):continue
-            name=a.get('title',{}).get('ru') or next((v['ru'] for v in a.get('altTitles',[]) if v.get('ru')),aliases[0])
+            name=a.get('title',{}).get(lang if lang in {'ru','uk'} else 'ru') or next((v[lang] for v in a.get('altTitles',[]) if lang in {'ru','uk'} and v.get(lang)),None) or a.get('title',{}).get('ru') or next((v['ru'] for v in a.get('altTitles',[]) if v.get('ru')),aliases[0])
             out.append({'provider':'mangadex','providerName':'MangaDex · '+lang.upper(),'title':name,'aliases':aliases,'kind':'manga','format':'manhwa' if a.get('originalLanguage')=='ko' else 'manhua' if a.get('originalLanguage') in {'zh','zh-hk'} else 'manga','readingMode':'scroll' if any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in a.get('tags',[])) else 'pages','language':lang,'year':a.get('year'),'adult':a.get('contentRating') in {'erotica','pornographic'},'age':18 if a.get('contentRating') in {'erotica','pornographic'} else None,'url':'https://mangadex.org/title/'+row['id']+'?lang='+lang,'cover':'https://uploads.mangadex.org/covers/'+row['id']+'/'+cover+'.256.jpg' if cover else ''})
     return out
 
@@ -89,7 +89,7 @@ def inspect_catalog(url,http):
             record=get('https://api.mangadex.org/chapter/'+identity,http).get('data',{});a=record.get('attributes',{})
             if a.get('externalUrl'):raise SourceError('Эта глава доступна только на внешнем сайте.')
             language=a.get('translatedLanguage')
-            if language not in DEX_LANGUAGES:raise SourceError('Выбери доступный язык главы: RU, EN, JA или KO.')
+            if language not in DEX_LANGUAGES:raise SourceError('Выбери доступный язык главы: RU, UK, EN, JA или KO.')
             server=get('https://api.mangadex.org/at-home/server/'+identity+'?forcePort443=true',http);part=server.get('chapter',{});base=public_url(server.get('baseUrl',''),resolve_dns=False).rstrip('/')
             pages=[base+'/data/'+quote(part['hash'],safe='')+'/'+quote(f,safe='') for f in part.get('data',[])][:1500]
             root=next((v['id'] for v in record.get('relationships',[]) if v['type']=='manga'),None)

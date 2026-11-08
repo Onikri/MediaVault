@@ -10,6 +10,7 @@ import GoogleOAuthSetup from './GoogleOAuthSetup.jsx';
 import {uiLocale} from './i18n/index.js';
 
 export const kinds=[['anime','Аниме'],['manga','Манга'],['movie','Фильмы'],['ranobe','Ранобэ'],['tv','Сериалы']];
+export const catalogKinds=[...kinds,['book','Книги']];
 export function Poster({item}){
   const anchor=useRef(null),[visible,setVisible]=useState(false),[replacement,setReplacement]=useState(null);
   useEffect(()=>{const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'300px'});if(anchor.current)observer.observe(anchor.current);return()=>observer.disconnect();},[]);

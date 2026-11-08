@@ -26,7 +26,7 @@ export function useGlobalSearch(query,kind,service,composing=false){
   const timer=setTimeout(()=>{const scopes=kind==='all'?['anime','manga','book','music','movie']:kind==='movie'?['movie','tv']:[kind],jobs=[];
    const add=(label,work)=>jobs.push({label,work});
    for(const scope of scopes){if(scope==='book'){add('Open Library',()=>searchBooks(text,abort.signal));continue;}if(scope==='music'){add('Музыка',()=>searchMusic(text,service.server,abort.signal));continue;}
-    const providers=['movie','tv'].includes(scope)?['tvmaze',...(service.server?['imdb']:[])]:['shikimori','anilist','jikan'];
+    const providers=['movie','tv'].includes(scope)?[...(service.server?['kinobox','imdb']:[]),'tvmaze']:['shikimori','anilist','jikan'];
     for(const provider of providers)add(provider,()=>fetchCatalog(provider,{query:text,kind:scope,server:service.server,signal:abort.signal,page:1}));
    }
    let remaining=jobs.length,failed=0;const groups=new Map(),publish=()=>{if(abort.signal.aborted)return;const items=rankCatalog(mergeCatalog([...groups.values()].flat()),text);setState({key,items,loading:remaining>0,failed});if(!remaining&&items.length){remembered.set(key,{items,until:Date.now()+120000});while(remembered.size>30)remembered.delete(remembered.keys().next().value);}};

@@ -5,7 +5,7 @@ const chapters=new Map();
 const LIMIT=24;
 
 export function ranobeTitle(item){
- return {id:item.id,title:item.title,titles:item.titles||{},aliases:item.aliases||[],ids:item.ids||{},year:item.year,kind:'ranobe'};
+ return {id:item.id,title:item.title,titles:item.titles||{},aliases:item.aliases||[],ids:item.ids||{},year:item.year,kind:item.kind==='book'?'book':'ranobe',...(item.kind==='book'?{authors:(item.authors||[]).slice(0,4)}:{})};
 }
 export async function searchRanobe(service,item,language,{signal}={}){
  return service.request('/ranobe/search',{method:'POST',body:{title:ranobeTitle(item),language},signal});

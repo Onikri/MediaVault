@@ -1,5 +1,7 @@
 import {localLabel,queryLabel} from './taxonomy.js';
 import {russianText,translate,imageURL} from './title-metadata.js';
+import {contentLanguage} from './content-language.js';
+import {uiLanguage} from './i18n/index.js';
 // Free metadata only. Source discovery and every media byte stay on the import server.
 const strip=value=>String(value||'').replace(/<[^>]*>/g,' ').replace(/\[\/?(?:b|i|u|url|spoiler|quote)[^\]]*\]/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
 export const normalized=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -24,14 +26,14 @@ const yearOf=value=>value?Number(String(value).slice(0,4))||null:null;
 const fuzzyDate=value=>!value?.year?null:[value.year,...(value.month?[String(value.month).padStart(2,'0')]:[]),...(value.month&&value.day?[String(value.day).padStart(2,'0')]:[])].join('-');
 const unique=values=>[...new Set(values.filter(Boolean))];
 export const genreLabels={Action:'Экшен',Adventure:'Приключения',Comedy:'Комедия',Drama:'Драма',Fantasy:'Фэнтези',Horror:'Ужасы',Mystery:'Детектив',Romance:'Романтика','Sci-Fi':'Фантастика','Science Fiction':'Фантастика','Slice of Life':'Повседневность',Sports:'Спорт',Supernatural:'Сверхъестественное',Suspense:'Триллер',Thriller:'Триллер',Mecha:'Меха',Music:'Музыка',Psychological:'Психология',Historical:'История',School:'Школа'};
-export const providers={kitsu:'Kitsu',anilist:'AniList',shikimori:'Shikimori',jikan:'MyAnimeList / Jikan',imdb:'IMDb',tvmaze:'TVmaze',wikidata:'Wikidata'};
+export const providers={kitsu:'Kitsu',anilist:'AniList',shikimori:'Shikimori',jikan:'MyAnimeList / Jikan',kinobox:'Кинопоиск · Kinobox',openlibrary:'Open Library',fantlab:'Fantlab',imdb:'IMDb',tvmaze:'TVmaze',wikidata:'Wikidata'};
 const ageOf=value=>/^(R18|rx|r_plus)|18\+|NC-17/i.test(value||'')?18:/^R\b|R - 17|17\+/i.test(value||'')?17:/^PG[-_]13|13\+/i.test(value||'')?13:/^PG\b/i.test(value||'')?12:/^G\b/i.test(value||'')?0:null;
 export const validExternalIds=values=>Object.fromEntries(Object.entries(values||{}).filter(([key,value])=>['mal','anilist','kitsu','shikimori'].includes(key)?/^[1-9]\d{0,11}$/.test(String(value)):key==='imdb'?/^tt[1-9]\d{0,11}$/.test(String(value)):typeof value==='string'&&!!value));
 const dates=values=>(values||[]).map(x=>({...x,date:typeof x.date==='number'?new Date(x.date*1000).toISOString():x.date})).filter(x=>x.date&&!Number.isNaN(Date.parse(x.date)));
 function record(provider,id,kind,values){
   if(['manga','ranobe'].includes(kind))kind=/novel|раноб[эе]/i.test(values.format||'')?'ranobe':'manga';
   const titles=values.titles||{};
-  const title=strip(titles.ru||titles.en||values.title||titles.native||'Без названия');
+  const title=strip(titles.ru||titles.uk||titles.en||values.title||titles.native||'Без названия');
   return {...values,id:provider+':'+id,provider,providerId:String(id),providers:[provider],kind,title,
     titles,aliases:unique([title,...Object.values(titles),...(values.aliases||[])]),description:russianText(values.description),
     cover:safeImage(values.cover),year:values.year||yearOf(values.startDate),format:kind==='anime'?translate(values.format,'Аниме'):values.format||'',
@@ -76,6 +78,53 @@ export function normalizeCatalog(provider,data,kind='anime'){
       format:data['@type'],genres:list(data.genre),age:ageOf(data.contentRating),ageLabel:data.contentRating,startDate:data.datePublished,links:[{provider,url:data.url}]})];
     return (data.d||[]).filter(a=>a.id?.startsWith('tt')&&/movie|film|series|tv/i.test(a.qid||a.q||'')).map(a=>record(provider,a.id,/series/i.test(a.qid||a.q)?'tv':'movie',{title:a.l,cover:a.i?.imageUrl,year:a.y,format:a.q,ids:{imdb:a.id},description:'',links:[{provider,url:'https://www.imdb.com/title/'+a.id+'/'}]}));
   }
+  if(provider==='openlibrary'){
+    const cover=id=>Number(id)>0?'https://covers.openlibrary.org/b/id/'+Number(id)+'-L.jpg':'';
+    const work=key=>String(key||'').match(/^\/works\/(OL\d{1,12}W)$/)?.[1];
+    if(data?.key&&!data.docs){
+      const id=work(data.key);if(!id)return [];
+      const text=typeof data.description==='string'?data.description:data.description?.value||'';
+      return [record(provider,id,'book',{title:data.title,titles:{en:data.title},description:text.replace(/\(\[source\]\[\d+\]\)|\[\d+\]: https?:\S+/g,'').trim(),
+        cover:cover(data.covers?.find(c=>c>0)),genres:(data.subjects||[]).slice(0,8),format:'Книга',ids:{openlibrary:id},links:[{provider,url:'https://openlibrary.org/works/'+id}]})];
+    }
+    const local=data?.mvLanguage||'ru';
+    return list(data?.docs).filter(x=>work(x.key)&&x.title).map(x=>{
+      const edition=x.editions?.docs?.[0]||{},id=work(x.key);
+      // Transliterated edition titles ("Bogatyĭ papa") are worse than the original.
+      const translated=edition.title&&/[Ѐ-ӿ]/.test(edition.title)?edition.title:'';
+      return record(provider,id,'book',{titles:{[local]:translated||undefined,en:x.title},title:x.title,aliases:[x.title,translated],
+        authors:(x.author_name||[]).slice(0,4),cover:cover(edition.cover_i)||cover(x.cover_i),year:x.first_publish_year||null,format:'Книга',
+        genres:(x.subject||[]).slice(0,6),ids:{openlibrary:id},description:'',links:[{provider,url:'https://openlibrary.org/works/'+id}]});
+    });
+  }
+  if(provider==='fantlab'){
+    const image=value=>value?safeImage(new URL(value,'https://fantlab.ru/').href):'';
+    if(data?.work_id){
+      const authors=(data.authors||[]).filter(a=>a.type==='autor').map(a=>a.name);
+      return [record(provider,data.work_id,'book',{titles:{ru:data.work_name,en:data.work_name_orig||undefined},title:data.work_name,aliases:[data.work_name,data.work_name_orig,...(data.work_name_alts||[])],
+        authors,description:String(data.work_description||'').replace(/\[[^\]]{1,40}\]/g,''),cover:image(data.image),year:data.work_year||null,format:'Книга',score:Number(data.rating?.rating)||null,
+        ids:{fantlab:String(data.work_id)},links:[{provider,url:'https://fantlab.ru/work'+data.work_id}]})];
+    }
+    return list(data?.matches).filter(x=>/^\d{1,9}$/.test(String(x.work_id))&&String(x.rusname||x.name||'').trim()).map(x=>{
+      const picture=x.pic_edition_id||x.pic_edition_id_auto;
+      return record(provider,x.work_id,'book',{titles:{ru:String(x.rusname||'').trim()||undefined,en:String(x.name||'').trim()||undefined},title:String(x.rusname||x.name).trim(),
+        aliases:[x.rusname,x.name,x.altname].map(v=>String(v||'').trim()),authors:String(x.all_autor_rusname||x.autor1_rusname||'').split(/,\s*/).filter(Boolean),
+        cover:picture?'https://fantlab.ru/images/editions/big/'+Number(picture):'',year:Number(x.year)||null,format:x.name_show_im?x.name_show_im.replace(/^./,c=>c.toLocaleUpperCase('ru')):'Книга',
+        score:Number(x.midmark?.[0])?Math.round(x.midmark[0]*10)/10:null,ids:{fantlab:String(x.work_id)},description:'',links:[{provider,url:'https://fantlab.ru/work'+x.work_id}]});
+    });
+  }
+  if(provider==='kinobox'){
+    const rows=data?.data?.movie?[data.data.movie]:list(data?.data?.items);
+    return rows.filter(a=>/^\d{1,12}$/.test(String(a?.id))&&a.title?.russian).map(a=>{
+      const poster=safeImage(a.gallery?.posterUrl||'').replace(/\/orig$/,'/600x900'),rating=a.rating||{};
+      return record(provider,a.id,a.type==='Series'?'tv':'movie',{titles:{ru:a.title.russian,en:a.title.original||undefined},title:a.title.russian,aliases:[a.title.russian,a.title.original],
+        description:a.synopsis||a.description||'',cover:poster,background:safeImage(a.gallery?.coverUrl||'').replace(/\/orig$/,'/1920x'),year:a.year||yearOf(a.releaseDate),startDate:a.releaseDate||null,
+        format:a.type==='Series'?'Сериал':'Фильм',genres:(a.genres||[]).map(g=>String(g.name||'').replace(/^./,c=>c.toLocaleUpperCase('ru'))).filter(Boolean),
+        tags:(a.countries||[]).map(c=>c.name).filter(Boolean),score:Number(rating.kinopoisk?.value)||Number(rating.imdb?.value)||null,
+        age:/age(\d+)/.test(a.restriction?.age||'')?Number(a.restriction.age.match(/age(\d+)/)[1]):null,ageLabel:/age(\d+)/.test(a.restriction?.age||'')?a.restriction.age.match(/age(\d+)/)[1]+'+':'',
+        ids:{kinopoisk:String(a.id)},links:[{provider,url:'https://www.kinopoisk.ru/'+(a.type==='Series'?'series':'film')+'/'+a.id+'/'}]});
+    });
+  }
   if(provider==='wikidata')return (data.search||[]).filter(a=>/film|фильм|映画|영화|电影|сериал|television/i.test(a.description||'')).map(a=>record(provider,a.id,/сериал|series|television/i.test(a.description||'')?'tv':'movie',{title:a.label,description:a.description,aliases:a.aliases,links:[{provider,url:a.concepturi||'https://www.wikidata.org/wiki/'+a.id}]}));
   return [];
 }
@@ -106,16 +155,28 @@ export function matchesFilters(item,filters){
   return true;
 }
 
+const OPEN_LIBRARY_FIELDS='key,title,author_name,cover_i,first_publish_year,subject,editions,editions.title,editions.cover_i,editions.language';
+// Books: Open Library (popular editions in Russian/Ukrainian, with covers) and
+// Fantlab (Russian base). Both allow browser requests; no server is needed.
+export function bookLanguage(){const value=contentLanguage();return value==='uk'||value==='all'&&uiLanguage()==='uk'?'uk':'ru';}
 export function providerUrl(provider,{query='',kind='anime',page=1,identity,year,genre,tag,server=''}){
+  if(provider==='openlibrary'){
+    if(identity)return 'https://openlibrary.org/works/'+encodeURIComponent(identity)+'.json';
+    const language=bookLanguage(),url=new URL('https://openlibrary.org/search.json');
+    const terms=[query||'language:'+(language==='uk'?'ukr':'rus'),year?'first_publish_year:'+Number(year):'',genre?'subject:"'+String(genre).replace(/"/g,'')+'"':''].filter(Boolean);
+    url.searchParams.set('q',terms.join(' '));if(!query)url.searchParams.set('sort','readinglog');url.searchParams.set('lang',language);
+    url.searchParams.set('limit',16);url.searchParams.set('page',page);url.searchParams.set('fields',OPEN_LIBRARY_FIELDS);return url.href;
+  }
+  if(provider==='fantlab')return identity?'https://api.fantlab.ru/work/'+encodeURIComponent(identity):'https://api.fantlab.ru/search-works?'+new URLSearchParams({q:query,page:String(page)});
   if(server){const url=new URL('metadata/'+provider,server+'/');for(const [key,value]of Object.entries({q:query,kind,page,identity,year,genre:queryLabel(genre),tag:String(tag||'').split(',').map(t=>queryLabel(t.trim())).join(',')}))if(value)url.searchParams.set(key,value);return url.href;}
   const resource=['manga','ranobe'].includes(kind)?'manga':'anime';
   if(provider==='kitsu'){
     const url=new URL('https://kitsu.io/api/edge/'+resource+(identity?'/'+identity:''));url.searchParams.set('include','genres,categories,mappings');
-    if(!identity){url.searchParams.set('page[limit]',16);url.searchParams.set('page[offset]',(page-1)*16);if(query)url.searchParams.set('filter[text]',query);else url.searchParams.set('sort','-userCount');if(year&&resource==='anime')url.searchParams.set('filter[seasonYear]',year);}
+    if(!identity){url.searchParams.set('page[limit]',16);url.searchParams.set('page[offset]',(page-1)*16);if(query)url.searchParams.set('filter[text]',query);else url.searchParams.set('sort','-userCount');if(year&&resource==='anime')url.searchParams.set('filter[seasonYear]',year);if(kind==='ranobe')url.searchParams.set('filter[subtype]','novel');}
     return url.href;
   }
-  if(provider==='shikimori'){const url=new URL('https://shikimori.io/api/'+(resource==='anime'?'animes':'mangas')+(identity?'/'+identity:''));if(!identity){url.searchParams.set('search',query);url.searchParams.set('limit',16);url.searchParams.set('page',page);url.searchParams.set('order','popularity');if(year)url.searchParams.set('season',year);}return url.href;}
-  if(provider==='jikan'){const url=new URL('https://api.jikan.moe/v4/'+resource+(identity?'/'+identity+'/full':''));if(!identity){url.searchParams.set('q',query);url.searchParams.set('limit',16);url.searchParams.set('page',page);}return url.href;}
+  if(provider==='shikimori'){const url=new URL('https://shikimori.io/api/'+(resource==='anime'?'animes':kind==='ranobe'&&!identity?'ranobe':'mangas')+(identity?'/'+identity:''));if(!identity){url.searchParams.set('search',query);url.searchParams.set('limit',16);url.searchParams.set('page',page);url.searchParams.set('order','popularity');if(year)url.searchParams.set('season',year);}return url.href;}
+  if(provider==='jikan'){const url=new URL('https://api.jikan.moe/v4/'+resource+(identity?'/'+identity+'/full':''));if(!identity){url.searchParams.set('q',query);url.searchParams.set('limit',16);url.searchParams.set('page',page);if(kind==='ranobe')url.searchParams.set('type','lightnovel');}return url.href;}
   if(provider==='tvmaze')return identity?'https://api.tvmaze.com/shows/'+identity+'?embed=episodes':'https://api.tvmaze.com/search/shows?q='+encodeURIComponent(query);
   if(provider==='wikidata')return 'https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&origin=*&language='+(/[А-Яа-яЁё]/.test(query)?'ru':/[ぁ-ヿ]/.test(query)?'ja':/[가-힣]/.test(query)?'ko':/[一-鿿]/.test(query)?'zh':'en')+'&search='+encodeURIComponent(query)+'&limit=20';
   if(provider==='anilist')return 'https://graphql.anilist.co';
@@ -130,10 +191,11 @@ export async function fetchCatalog(provider,options,fetcher=fetch){
   const timeout=setTimeout(stop,16000);
   try{
     const init={signal:abort.signal};
-    if(provider==='anilist'&&!options.server){init.method='POST';init.headers={'Content-Type':'application/json'};init.body=JSON.stringify(options.identity?{query:`query($id:Int){Media(id:$id){${aniFields}}}`,variables:{id:Number(options.identity)}}:{query:`query($search:String,$type:MediaType,$page:Int){Page(page:$page,perPage:16){media(type:$type,sort:POPULARITY_DESC${options.query?',search:$search':''}){${aniFields}}}}`,variables:{search:options.query||null,type:['manga','ranobe'].includes(options.kind)?'MANGA':'ANIME',page:options.page||1}});}
+    if(provider==='anilist'&&!options.server){init.method='POST';init.headers={'Content-Type':'application/json'};init.body=JSON.stringify(options.identity?{query:`query($id:Int){Media(id:$id){${aniFields}}}`,variables:{id:Number(options.identity)}}:{query:`query($search:String,$type:MediaType,$page:Int){Page(page:$page,perPage:16){media(type:$type,sort:POPULARITY_DESC${options.kind==='ranobe'?',format_in:[NOVEL]':options.kind==='manga'?',format_not_in:[NOVEL]':''}${options.query?',search:$search':''}){${aniFields}}}}`,variables:{search:options.query||null,type:['manga','ranobe'].includes(options.kind)?'MANGA':'ANIME',page:options.page||1}});}
     const response=await fetcher(url,init);
     if(!response.ok)throw Error(response.status===429?'Слишком частые запросы':'Каталог временно недоступен');
     const data=await response.json();if(data.errors)throw Error('Каталог не ответил на запрос');
+    if(provider==='openlibrary'&&data&&typeof data==='object')data.mvLanguage=bookLanguage();
     const items=normalizeCatalog(provider,data,options.kind);
     const alternate=!options.identity&&!options.spellingFallback&&['kitsu','anilist','jikan'].includes(provider)&&alternateSpelling(options.query);
     if(!items.length&&alternate){
@@ -146,7 +208,7 @@ export async function fetchCatalog(provider,options,fetcher=fetch){
     // Free metadata hosts can be reachable from a browser while rejecting a
     // datacentre IP (or vice versa). IMDb needs the relay because it lacks CORS.
     // This fallback never handles source pages, playlists or media bytes.
-    if(options.server&&provider!=='imdb'){
+    if(options.server&&!['imdb','kinobox','openlibrary','fantlab'].includes(provider)){
       clearTimeout(timeout);
       return await fetchCatalog(provider,{...options,server:''},fetcher);
     }
@@ -154,6 +216,11 @@ export async function fetchCatalog(provider,options,fetcher=fetch){
   }finally{clearTimeout(timeout);signal?.removeEventListener('abort',stop);}
 }
 export function catalogProviders(kind,query,server){
-  if(['movie','tv'].includes(kind))return [...(server?['imdb']:[]),...(query?['tvmaze','wikidata']:[])];
+  // Kinobox (Kinopoisk) is the Russian film base: popular lists without a
+  // query and Russian titles. IMDb/TVmaze/Wikidata add English titles when searching.
+  if(['movie','tv'].includes(kind))return [...(server?['kinobox']:[]),...(server&&query?['imdb']:[]),...(query?['tvmaze','wikidata']:[])];
+  // Shikimori is the Russian base; AniList/Kitsu/Jikan are English. Duplicates merge.
+  if(kind==='ranobe')return ['shikimori','anilist','kitsu',...(query?['jikan']:[])];
+  if(kind==='book')return ['openlibrary',...(query?['fantlab']:[])];
   return ['kitsu','shikimori','anilist',...(query?['jikan']:[])];
 }

@@ -34,7 +34,7 @@ SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan
        MangaSite('mangabuff','MangaBuff','https://mangabuff.ru','buff'),
        MangaSite('mangapill','MangaPill · EN','https://mangapill.com','pill',languages=('en',)),
        MangaSite('mangakatana','MangaKatana · EN','https://mangakatana.com','katana',languages=('en',)),
-       MangaSite('mangadex','MangaDex','https://mangadex.org','dex',languages=('ru','en','ja','ko')),
+       MangaSite('mangadex','MangaDex','https://mangadex.org','dex',languages=('ru','uk','en','ja','ko')),
        MangaSite('mangalib','MangaLib','https://mangalib.me','lib',('mangalib.org',)),
        MangaSite('hentailib','HentaiLib','https://hentailib.me','lib',('hentailib.org',)),
        MangaSite('slashlib','SlashLib','https://v2.shlib.life','lib',('slashlib.me',)),
@@ -52,7 +52,7 @@ SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan
 _cache={};_lock=threading.RLock()
 def site_for(url):
     from suwayomi_bridge import parse_reference
-    if parse_reference(url):return MangaSite("suwayomi","Дополнительные источники",os.getenv("PUBLIC_URL",""),"suwayomi",languages=("ru","en","ja","ko"))
+    if parse_reference(url):return MangaSite("suwayomi","Дополнительные источники",os.getenv("PUBLIC_URL",""),"suwayomi",languages=("ru","uk","en","ja","ko"))
     host=urlsplit(url).hostname
     return next((s for s in SITES if host in (urlsplit(s.root).hostname,*s.hosts) and (s.family!='hentaichan' or not urlsplit(url).path.startswith('/video')) and (s.family!='naver' or urlsplit(url).path.startswith(urlsplit(s.root).path+'/'))),None)
 def clean(value):return re.sub(r'\s+',' ',str(value or '')).strip()[:300]
