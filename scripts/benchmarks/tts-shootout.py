@@ -115,12 +115,13 @@ def main():
     parser.add_argument('--threads', type=int, default=1)
     parser.add_argument('--whisper', default='large-v3-turbo')
     parser.add_argument('--device', default='cuda')
+    parser.add_argument('--steps', type=lambda v: [int(x) for x in v.split(',')], default=[5, 8])
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     engines = []
-    for variant in ('fp32', 'int8', 'q4'):
+    for variant in ('fp32', 'int8', 'q4', 'mixed'):
         if (args.models / variant / 'onnx').exists():
-            for steps in (5, 8):
+            for steps in args.steps:
                 engines.append(('supertonic3-%s-s%d' % (variant, steps), lambda v=variant: Supertonic(args.models / v, args.threads),
                                 {'ru': ['F1', 'M2'], 'uk': ['F1', 'M2']}, {'steps': steps}))
     piper_dir = args.models / 'piper'

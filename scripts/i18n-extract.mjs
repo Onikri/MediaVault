@@ -14,6 +14,8 @@ import {transformSync} from 'esbuild';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const CYRILLIC=/[А-Яа-яЁёІіЇїЄєҐґ]/;
 const OUT=path.join(ROOT,'src/i18n/source-strings.json');
+// Pure data modules (number words for speech synthesis) contain no interface text.
+const DATA_FILES=new Set(['src/tts/text.js']);
 
 // Long instructions and anything that talks to a model are not interface text.
 export function isPrompt(text){
@@ -46,6 +48,7 @@ function visit(node,emit){
 export function frontendStrings(){
  const found=new Map();
  for(const file of walk(path.join(ROOT,'src'),name=>/\.(jsx?|tsx?)$/.test(name)&&!/\.d\.ts$/.test(name))){
+  if(DATA_FILES.has(path.relative(ROOT,file).split(path.sep).join('/')))continue;
   let code=fs.readFileSync(file,'utf8');
   if(/\.tsx?$/.test(file))code=transformSync(code,{loader:file.endsWith('x')?'tsx':'ts',jsx:'preserve',format:'esm'}).code;
   let ast;try{ast=parseAst(code,{jsx:true});}catch(error){throw Error(path.relative(ROOT,file)+': '+error.message);}
