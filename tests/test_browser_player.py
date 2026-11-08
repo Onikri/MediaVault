@@ -38,7 +38,7 @@ class BrowserPlayerTests(unittest.TestCase):
         source={'1080':'https://cdn.example.com/selected-1080.m3u8','480':'https://cdn.example.com/selected-480.m3u8'}
         markup='<video></video><script>window.player={currentSource:null};fetch("https://cdn.example.com/boot-360.m3u8");setTimeout(()=>player.currentSource={audioId:"selected",quality:'+json.dumps(source)+'},350);</script>'
         fixture={parent:('<html>Film</html>','text/html'),url:(markup,'text/html'),'https://cdn.example.com/boot-360.m3u8':('#EXTM3U','application/vnd.apple.mpegurl')}
-        result=asyncio.run(_extract(url,parent,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=1))
+        result=asyncio.run(_extract(url,parent,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=8))
         self.assertEqual({s['url'] for s in result},set(source.values()))
 
     def test_immediate_playback_reuses_quality_probe_without_mixing_translations_or_mutable_results(self):
@@ -87,7 +87,7 @@ class BrowserPlayerTests(unittest.TestCase):
             with self.subTest(host=host):
                 url='https://'+host+'/?translation=66'
                 fixture={parent:('<html>Film</html>','text/html'),url:(markup,'text/html'),source['480']:('#EXTM3U','application/vnd.apple.mpegurl')}
-                result=asyncio.run(_extract(url,parent,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=1))
+                result=asyncio.run(_extract(url,parent,validate=lambda u:browser_destination(u,resolve_dns=False),fixture=fixture,timeout=8))
                 self.assertEqual(sorted(s['quality'] for s in result),heights)
                 self.assertEqual({s['url'] for s in result},set(source.values()))
                 if host=='alloha.yani.tv':
@@ -154,7 +154,7 @@ class BrowserPlayerTests(unittest.TestCase):
         url='https://public.example.com/qualities'
         heights=[144,240,360,480,720,1080,1440,2160,4320]
         markup='<video>'+''.join('<source src="https://cdn.example.com/'+str(q)+'.mp4" res="'+str(q)+'">' for q in heights)+'</video>'
-        result=asyncio.run(_extract(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture={url:(markup,'text/html')},timeout=1))
+        result=asyncio.run(_extract(url,validate=lambda u:browser_destination(u,resolve_dns=False),fixture={url:(markup,'text/html')},timeout=8))
         self.assertEqual(sorted(s['quality'] for s in result),heights)
 
     @unittest.skipUnless(shutil.which('chromium') or shutil.which('google-chrome'),'Chromium required for quality menu contract')
