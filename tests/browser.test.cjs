@@ -543,9 +543,13 @@ async function main() {
   await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
   const swipe=async(zone,dx,dy)=>{
     const {x,y}=await cinema.locator('.mv-player-touch-surface').evaluate((el,zone)=>{
-      const rect=el.getBoundingClientRect(),x=rect.x+rect.width*zone;
-      for(const fraction of [.3,.4,.5,.6]){const y=rect.y+Math.min(rect.height*fraction,200);if(document.elementFromPoint(x,y)===el)return {x,y};}
-      throw Error('No unobstructed video point for the touch gesture');
+      // Panels opened by earlier gestures can scroll the page, leaving the video under the
+      // phone dock, so re-centre it and search only its visible part before every gesture.
+      el.scrollIntoView({block:'center',behavior:'instant'});
+      const rect=el.getBoundingClientRect(),x=rect.x+rect.width*zone,top=Math.max(rect.y,0),bottom=Math.min(rect.bottom,innerHeight);
+      for(const fraction of [.3,.4,.5,.6]){const y=top+Math.min((bottom-top)*fraction,200);if(document.elementFromPoint(x,y)===el)return {x,y};}
+      const cover=document.elementFromPoint(x,top+(bottom-top)/2);
+      throw Error('No unobstructed video point for the touch gesture; covered by '+(cover?cover.tagName+'.'+[...cover.classList].join('.'):'nothing')+', video '+Math.round(rect.y)+'..'+Math.round(rect.bottom)+' of '+innerHeight);
     },zone);
     await touchSession.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
     const original=await cinema.locator('video').evaluate(v=>v.currentTime);

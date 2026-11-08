@@ -146,6 +146,8 @@ function MediaVaultApp(){
   const [uploadCollection,setUploadCollection]=useState('');
   const [uploadSection,setUploadSection]=useState('auto'),[uploadPart,setUploadPart]=useState('');
   const search=useRef(null),fileInput=useRef(null),libraryOpener=useRef(null),vaultRef=useRef(state);vaultRef.current=state;
+  // Set when the device unlock button in settings opens the vault: that is a request to see the library.
+  const unlockedHere=useRef(false);
   const pendingRoute=useRef(/(?:^#|&)(?:episode|title)=/.test(location.hash)?location.hash:'');
   const localPrefix='mediavault_ui_'+(state.libraryId||'none');
   const items=state.catalog?.items||[];
@@ -181,7 +183,7 @@ function MediaVaultApp(){
     const resume=pendingRoute.current;
     if(resume){pendingRoute.current='';if(!restoreRoute(resume))go('collection');}
     // Only the landing page jumps to the collection; a reload on #profile stays in the control center.
-    else if(state.remembered&&view==='home')go('collection');
+    else if(state.remembered&&(view==='home'||unlockedHere.current)){unlockedHere.current=false;go('collection');}
   },[!!state.catalog,state.libraryId]);
   const go=useCallback(next=>{setView(next);setActiveTitle(null);if(location.hash!=='#'+next)location.hash=next;},[]);
   useEffect(()=>{const ask=()=>showLibrarySetup('online');addEventListener('mediavault:request-login',ask);return()=>removeEventListener('mediavault:request-login',ask);});
@@ -266,7 +268,7 @@ function MediaVaultApp(){
         appearance:<AppearanceSettings/>,
         storage:!guest||state.user?<>{state.catalog&&<section className="settings-card"><div className="section-heading"><h2 className="section-title">Твоя коллекция</h2><span className="status-pill connected"><Icon name="check" size={13}/> Открыта</span></div><div className="profile-stats"><div><strong>{items.length}</strong><span>{plural(items.length)}</span></div><div><strong>{formatSize(totalSize)}</strong><span>в твоём Drive</span></div><div><strong>{state.admin?'Владелец':'Зритель'}</strong><span>твой доступ</span></div></div><button className="btn btn-secondary" onClick={()=>go('collection')}>В мою коллекцию<Icon name="arrow" size={17}/></button></section>}<section className="settings-card connection-settings-card"><h2>Подключения и импорт</h2><p className="fine">Настройки соединения с сервером и Google Диском доступны только в профиле.</p><ImportSettings service={importService} state={state} onConnect={showLibrarySetup}/><div className="connection-settings-status" role="status"><span className={importService.status==='connected'?'is-ready':''}>{importService.status==='connected'?'Сервер подключён':'Сервер не подключён'}</span><span>{state.driveConnected?'Браузер: Google Диск подключён':'Браузер: Google Диск не подключён'}</span></div></section><DriveServerStatus service={importService} enabled={!!(state.admin&&state.user)}/></>:null,
         sources:!guest||state.user?<><KodikConnection service={importService}/><YouTubeServerSession service={importService} enabled={!!(state.admin&&state.user)}/><MusicConnections userId={state.user?.sub}/>{state.admin&&importService.status==='connected'&&Number(importService.session?.serverVersion)>=14&&<section className="settings-card manga-sources-card"><h2>Читалки манги</h2><p className="fine">Расширения Suwayomi на ВМ. Подключённые читалки появятся в общем поиске переводов.</p><MangaSourceManager service={importService}/></section>}</>:null,
-        privacy:<DeviceSettings state={state} actions={actions}/>
+        privacy:<DeviceSettings state={state} actions={{...actions,biometricUnlock:()=>{unlockedHere.current=true;return actions.biometricUnlock();}}}/>
       }}/>}
     </motion.main>
     <CookieNotice state={state} actions={actions}/>
