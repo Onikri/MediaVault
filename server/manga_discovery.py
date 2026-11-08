@@ -13,7 +13,7 @@ LANGUAGES={'all',*bridge.LANGUAGES}
 DISCOVERY_VERSION=3
 NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'SlashLib':2,'MangaDex':0,'Senkognito':None}
 def language_queries(values,language):
-    pattern={'ru':r'[а-яё]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[language]
+    pattern={'ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[language]
     return sorted(dict.fromkeys(values),key=lambda v:not bool(re.search(pattern,v,re.I)))[:2]
 def public_aliases(row):
     values=[row.get('title'),*(row.get('aliases') or [])]
@@ -271,7 +271,7 @@ class Discovery:
         if not refresh and not source_ids:selected=[s for s in selected if not blocked(s['id'],health)]
         else:
             for source in selected:source['_retryHealth']=True
-        preferred='ru' if re.search(r'[а-яё]',query,re.I) else 'ko' if re.search(r'[가-힣]',query) else 'ja' if re.search(r'[ぁ-ヿ一-鿿]',query) else 'en'
+        preferred='uk' if re.search(r'[іїєґ]',query,re.I) else 'ru' if re.search(r'[а-яё]',query,re.I) else 'ko' if re.search(r'[가-힣]',query) else 'ja' if re.search(r'[ぁ-ヿ一-鿿]',query) else 'en'
         selected.sort(key=lambda s:(s['lang']!=preferred,s['lang'],s['name'].casefold(),str(s['id'])))
         if title:
             # Use the selected title's own aliases in each source's language.

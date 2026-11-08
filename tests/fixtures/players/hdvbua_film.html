@@ -1,0 +1,68 @@
+<!-- nc --><!DOCTYPE html>
+<html lang="uk">
+<head>
+<link href="/player/playerjs.55.ad.t.js?v=1" rel="preload" as="script">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; overflow: hidden; }
+body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: black; }
+</style><script src="https://hdvbua.pro/player/playerjs.55.ad.t.js?v=1"></script>
+</head>
+<body>
+<div id="player_5561" class="PL" style="width:100%;height:100%"></div>
+<script>
+var ref_domain = (window.location != window.parent.location) ?
+			document.referrer :
+			document.location.href;
+
+
+
+var player = new Playerjs({
+                    id: "player_5561",
+				    file: "https://s10.hdvbua.pro/media2/hls/films/interstellar.2014.imax.bdrip.1080p.h.265_5561/hls/index.m3u8",
+				    subtitle: "[Українські]https://s10.hdvbua.pro/media2/player/subtitle/5561_ua.vtt",
+				    poster: "https://s10.hdvbua.pro/media2/content/stream/films/interstellar.2014.imax.bdrip.1080p.h.265_5561/screen.jpg",
+                    //forbidden_quality: "720p,1080p,Авто",
+                    //default_quality: "480p",
+				    parent_domain: "",
+				    label: "",
+				    preroll: "",
+                    default_adblock: 1,
+                    vast_replace: {"{site_name}":"Eneyida_tv", "(site_name)":"Eneyida_tv", "(domain)":ref_domain},
+                                        //hlsconfig: {loader:CustomTSLoader}
+
+                    preroll_deny:"vast10758",
+                    midroll_deny:"vast10758",
+                });
+                
+                
+</script>
+<script>
+function PlayerjsEvents(event, id, info) {
+    //console.log(event);
+    //console.log(id);
+    //console.log(info);
+        if (event == "vast_Impression" || event == "vast_complete") {
+		var url = (window.location != window.parent.location) ?
+			document.referrer :
+			document.location.href;
+
+	    var xhr = new XMLHttpRequest();
+        xhr.open("POST", "https://stat.hdvbua.pro/api/hit", true);
+        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        xhr.withCredentials = true; 
+        xhr.onload = function() {
+            if (xhr.status !== 200) {
+                console.log('Request failed.  Returned status of ' + xhr.status);
+            }
+        };
+        
+        info = JSON.parse(info);
+        xhr.send(JSON.stringify({referer: encodeURI(url), event: event, id: id, ad_id: info['id']}));
+	}
+    }
+</script>
+<!-- 0.001309871673584 -->
+</body>
+</html>

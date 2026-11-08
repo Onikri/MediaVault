@@ -42,3 +42,12 @@
 @media(max-width:767px){.title-save-menu{float:none;margin:0 0 18px}.title-save-menu>summary{text-align:left}.online-title-materials .title-episode-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}.title-playback-selectors{gap:12px}}
 
 .title-source-picker{display:grid;gap:10px;min-width:0}.title-source-picker h4{margin:0}.title-source-options{display:grid;max-height:320px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.title-source-option{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:13px 12px;border:0;border-bottom:1px solid var(--border);background:transparent;color:inherit;text-align:left;cursor:pointer;min-width:0}.title-source-option:hover,.title-source-option[aria-pressed=true]{background:var(--surface-hover,rgba(255,255,255,.06))}.title-source-option[aria-pressed=true]{box-shadow:inset 3px 0 var(--accent)}.title-source-option>span{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}.title-source-option small{font-size:12px;color:var(--text-muted)}.title-source-counts{text-align:right;font-size:13px;font-variant-numeric:tabular-nums}.title-source-counts[data-state=error]{color:var(--warning,#eab99a)}.title-playback-selectors .world-source-filter{min-width:0}@media(max-width:600px){.title-source-option{gap:10px;padding-inline:8px}.title-source-counts{font-size:12px}}
+
+/* LostFilm catalogue shelf in the serials section */
+.lostfilm-shelf{display:grid;gap:16px;margin:8px 0 28px}
+.lostfilm-shelf>header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.lostfilm-shelf h2{margin:0;font:700 22px/1.2 var(--font-display);letter-spacing:-.03em}
+.lostfilm-shelf header p{margin:6px 0 0;font-size:13px;color:var(--color-on-muted)}
+.lostfilm-sort{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--color-canvas-soft)}
+.lostfilm-sort button{height:32px;padding:0 14px;border:0;border-radius:999px;background:none;color:var(--color-on-muted);font:600 13px var(--font-ui);cursor:pointer}
+.lostfilm-sort button[aria-pressed=true],.lostfilm-sort button:hover{background:var(--color-surface-raised);color:var(--color-petal)}

@@ -114,6 +114,7 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--threads', type=int, default=1)
     parser.add_argument('--whisper', default='large-v3-turbo')
+    parser.add_argument('--device', default='cuda')
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     engines = []
@@ -139,11 +140,16 @@ def main():
                     rows.append({'engine': label, 'lang': lang, 'voice': voice, 'index': index, 'seconds': len(audio) / rate,
                                  'synthesis': took, 'rtf': took / max(.01, len(audio) / rate), 'load': load, 'wav': path.name, 'text': sentence})
         print(label, 'done', flush=True)
+    (args.out / 'synthesis.json').write_text(json.dumps(rows, ensure_ascii=False, indent=1), 'utf-8')
     from faster_whisper import WhisperModel
-    try:
-        model = WhisperModel(args.whisper, device='cuda', compute_type='float16')
-    except Exception:
-        model = WhisperModel(args.whisper, device='cpu', compute_type='int8')
+    model = None
+    if args.device == 'cuda':
+        try:
+            model = WhisperModel(args.whisper, device='cuda', compute_type='float16')
+            list(model.transcribe(str(args.out / rows[0]['wav']), language=rows[0]['lang'])[0])  # CUDA libraries load lazily
+        except Exception as error:
+            print('CUDA Whisper unavailable, using CPU:', error, flush=True); model = None
+    model = model or WhisperModel(args.whisper, device='cpu', compute_type='int8')
     from jiwer import cer
     for row in rows:
         segments, _ = model.transcribe(str(args.out / row['wav']), language=row['lang'], beam_size=5, condition_on_previous_text=False)

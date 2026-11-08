@@ -3,9 +3,14 @@ export const watchKey=(user,title)=>'mv_watch_v1:'+encodeURIComponent(user||'ano
 export function readWatch(user,title,storage=globalThis.localStorage){try{return JSON.parse(storage.getItem(watchKey(user,title))||'{}')||{};}catch{return {};}}
 export function saveWatch(user,title,change,storage=globalThis.localStorage){try{const value={...readWatch(user,title,storage),...change,updatedAt:Date.now()};storage.setItem(watchKey(user,title),JSON.stringify(value));return value;}catch{return change;}}
 export function onlineEpisodeId(identity,season,episode){return 'online:'+identity+':s'+(season||1)+':e'+episode;}
-export function orderedVoices(voices,saved={}){
- return [...voices].filter(v=>v.language!=='en'&&v.language!=='uk'&&!/^(?:неизвестн|unknown|название перевода не указано|озвучка не указана|(?:серия|episode)\s*\d)/i.test(v.name)).sort((a,b)=>
+// filter: 'all' | 'ru' | 'uk'; prefer: which language sorts first.
+export function orderedVoices(voices,saved={},{filter='all',prefer='ru',preferName=''}={}){
+ const named=v=>!!preferName&&v.name.toLocaleLowerCase('ru').includes(preferName.toLocaleLowerCase('ru'));
+ const wanted=v=>filter==='all'||(filter==='uk'?v.language==='uk':v.language!=='uk');
+ return [...voices].filter(v=>v.language!=='en'&&wanted(v)&&!/^(?:неизвестн|unknown|название перевода не указано|озвучка не указана|(?:серия|episode)\s*\d)/i.test(v.name)).sort((a,b)=>
   Number(!!(b.id===saved.voiceId||b.aliases?.includes(saved.voiceId)))-Number(!!(a.id===saved.voiceId||a.aliases?.includes(saved.voiceId)))||(saved.usage?.[b.id]||0)-(saved.usage?.[a.id]||0)||
+  Number(named(b))-Number(named(a))||
+  Number((b.language==='uk')===(prefer==='uk'))-Number((a.language==='uk')===(prefer==='uk'))||
   Number(a.kind==='subtitles')-Number(b.kind==='subtitles')||a.name.localeCompare(b.name,'ru'));
 }
 export function variantsFor(voice,episode,failed=new Set()){

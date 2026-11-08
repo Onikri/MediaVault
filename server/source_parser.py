@@ -102,6 +102,10 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         or host == "guest.freeanimehentai.net" and url.path == "/api/v11/search_hvs"
         or host in {"anilibria.top", "aniliberty.top", "api.anilibria.app"}
         and bool(re.fullmatch(r"/api/v1/(?:anime/releases/[a-zA-Z0-9_-]+|app/search/releases)", url.path))
+        # Collaps public embed (one film/serial page) and the Kinobox player balancer.
+        or host in {"api.nextembed.ws", "api.bhcesh.me", "api.namy.ws", "api.delivembd.ws"}
+        and bool(re.fullmatch(r"/embed/(?:movie|kp|imdb)/[a-zA-Z0-9]{1,24}", url.path))
+        or host == "fbphdplay.top" and url.path == "/api/players"
     )
     if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
         raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
@@ -216,7 +220,10 @@ class PublicHttp:
                            and isinstance(data, str) and 0 < len(data) <= 200)
             senkognito_read=(action=='senkognito-read' and url=='https://api.senkognito.com/graphql'
                             and isinstance(data,bytes) and len(data)<=4096)
-            if not (player_form or search_form or manga_form or chan_search or senkognito_read):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            lostfilm_catalog=(url=='https://www.lostfilm.tv/ajaxik.php' and isinstance(data,dict) and set(data)=={'act','type','o','s','t'}
+                              and data.get('act')=='serial' and data.get('type')=='search' and str(data.get('o','')).isdigit()
+                              and data.get('s') in {'1','2','3'} and data.get('t')=='0')
+            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if chan_search:
                 # The public search box's Next.js action. The caller supplies only the title.
                 outgoing.update({'Next-Action': '7fe1df09f7c8151b600f1a3e496cdda2e7ed7f0f95',
@@ -572,6 +579,22 @@ class Resolver:
                 return Page(title=result.title or "", streams=streams,skip_segments=segments)
         return None
 
+    def ua_player(self, url, referer=None):
+        """Ashdi / HDVB-UA / Tortuga Playerjs and Collaps: re-read the embed for fresh media."""
+        from ua_players import split_selectors, is_collaps, playerjs_stream, collaps_stream
+        embed, selected = split_selectors(url)
+        origin = '{0.scheme}://{0.netloc}'.format(urlsplit(embed))
+        text, final, _ = self.http.document(embed, headers={'Referer': referer or origin + '/'})
+        if is_collaps(embed):
+            media, audio = collaps_stream(text, selected)
+            if not media:raise SourceError('Выбранная серия больше не опубликована в плеере.')
+            return Page(streams=[{'url': media, 'type': 'hls', 'quality': None, 'audio': audio,
+                                  'headers': playback_headers({'Referer': origin + '/', 'Origin': origin})}])
+        media = playerjs_stream(embed, text, selected)
+        if not media:raise SourceError('Выбранная озвучка или серия больше не опубликована в плеере.')
+        return Page(streams=[{'url': media, 'type': 'hls' if '.m3u8' in media else 'mp4', 'quality': None,
+                              'headers': playback_headers({'Referer': origin + '/', 'Origin': origin})}])
+
     def resolve(self, url, *, referer=None, depth=0, visited=None):
         if depth > 4:
             raise SourceError("Слишком длинная цепочка вложенных плееров.")
@@ -596,6 +619,9 @@ class Resolver:
         if provider:
             identifier, label = provider
             return resolve_dynamic(self.http, url, referer, label, identifier)
+        from ua_players import is_playerjs, is_collaps
+        if is_playerjs(url) or is_collaps(url):
+            return self.ua_player(url, referer)
         page = self.player(url, referer) or self.inspect(url,referer)
         if page.streams:
             return page

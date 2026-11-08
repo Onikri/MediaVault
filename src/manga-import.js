@@ -1,4 +1,4 @@
-export const MANGA_LANGUAGES=[['all','Все языки'],['ru','Русский'],['en','Английский'],['ja','Японский · равки'],['ko','Корейский · оригинал']];
+export const MANGA_LANGUAGES=[['all','Все языки'],['ru','Русский'],['uk','Українська'],['en','Английский'],['ja','Японский · равки'],['ko','Корейский · оригинал']];
 export const MANGA_FORMATS=[['all','Все форматы'],['manga','Манга'],['manhwa','Манхва'],['manhua','Маньхуа'],['webtoon','Вебтуны']];
 export const mangaLanguageName=code=>MANGA_LANGUAGES.find(v=>v[0]===code)?.[1]||code?.toUpperCase()||'Язык не указан';
 export function chapterRanges(text){

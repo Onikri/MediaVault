@@ -14,6 +14,7 @@ import OnlineEpisodePreviews from './OnlineEpisodePreviews.jsx';
 import {readSceneJump,consumeSceneJump} from './scene-search.js';
 import {guestLocked} from './guest-session.js';
 import {onlineEpisodeId} from './watch-session.js';
+import {useContentLanguage,setContentLanguage,preferredVoiceLanguage,CONTENT_LANGUAGES,voiceHintFor} from './content-language.js';
 import {readWatch,saveWatch,orderedVoices,variantsFor,episodePreviewKey,minimumEpisodeDuration,voicesForCatalogue,isAllohaVariant,previewSource,previewEntry} from './watch-session.js';
 import {readEpisodePreview,saveEpisodePreview} from './episode-preview-cache.js';
 import './watch-page.css';
@@ -36,7 +37,8 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const shelf=useRef(null);
  const identity=String(item.ids?.mal||item.id),saved=useRef(readWatch(userId,identity));
  const playbackMetadata=useMemo(()=>({...profile,ids:item.ids}),[profile,item.ids]);
- const voices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,catalogueSeasonHint(item)),saved.current),[discovery.data,item]);
+ const languageFilter=useContentLanguage();
+ const voices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,catalogueSeasonHint(item)),saved.current,{filter:languageFilter,prefer:preferredVoiceLanguage(languageFilter),preferName:voiceHintFor(item)}),[discovery.data,item,languageFilter]);
  // A scene found by frame search names this work's own episode, so the saved
  // season of earlier viewing must not override it.
  const sceneJump=useRef(readSceneJump(identity));
@@ -247,6 +249,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const sourceSections=[{id:'source',items:[
   {id:'voice',label:'Озвучка',value:voice?.name||(discovery.loading?'Ищем по сайтам…':discovery.data&&!voices.length?'Пока нет':'Не выбрана'),content:close=><Choices label="Озвучка" value={voice?.id||''} options={offeredVoices.map(v=>({value:v.id,label:v.name,hint:voiceHint(v),badges:<SourceBadges sources={sourcesOfVoice(v)}/>}))} onPick={id=>{changeVoice(id);close();}}/>},
   {id:'quality',label:'Качество',value:quality==='best'?'Лучшее, авто':quality+'p',content:close=><Choices label="Качество" value={quality} options={[{value:'best',label:'Лучшее, автоматически'},...heights.map(q=>({value:String(q),label:q+'p',hint:!bestVideo&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(q))?'В другой озвучке':''})),...(quality!=='best'&&!heights.includes(Number(quality))?[{value:quality,label:quality+'p',hint:'Проверяем'}]:[])]} onPick={v=>{changeQuality(v);close();}}/>},
+  {id:'voiceLanguage',label:'Язык озвучки',value:CONTENT_LANGUAGES.find(([id])=>id===languageFilter)?.[1],content:close=><Choices label="Язык озвучки" value={languageFilter} options={CONTENT_LANGUAGES.map(([value,label])=>({value,label}))} onPick={value=>{setContentLanguage(value);close();}}/>},
   {id:'bestVideo',label:'Лучшее видео из всех озвучек',hint:'Звук выбранной озвучки идёт отдельно',switch:{checked:bestVideo,onChange:changeVideoMode}}
  ]},{id:'scan',items:[
   {id:'scanQualities',label:qualityScan.busy&&scanScope?'Ищем варианты':'Найти другие качества',value:'',onClick:()=>startScan('all')},

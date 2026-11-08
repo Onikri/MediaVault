@@ -339,6 +339,8 @@ import google_pool
 google_pool.install(app,owner,lambda:store)
 import kodik_api
 kodik_api.install(app,owner,lambda:store)
+import lostfilm_catalog
+lostfilm_catalog.install(app,viewer)
 import watch_rooms,site_rules
 watch_rooms.install(app,viewer,owner,lambda:site_rules.current(store)['rooms'])
 
@@ -718,10 +720,10 @@ def discover_voices(body: TitleDiscovery, subject=Depends(viewer)):
         raise HTTPException(422, str(error)) from None
 
 @app.get('/discovery/voices')
-def discovery_voice_suggestions(q:str='',subject=Depends(viewer)):
+def discovery_voice_suggestions(q:str='',language:str='all',subject=Depends(viewer)):
     from source_discovery import voice_suggestions
     if len(q)>80:raise HTTPException(422,'Слишком длинный запрос озвучки.')
-    return voice_suggestions(q)
+    return voice_suggestions(q,language=language)
 
 
 @app.get('/sources/calendar')

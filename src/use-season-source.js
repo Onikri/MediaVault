@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {fetchCatalog} from './catalog.js';
 import useSourceDiscovery from './use-source-discovery.js';
+import {useContentLanguage,preferredVoiceLanguage} from './content-language.js';
 import {orderedVoices,variantsFor,readWatch,voicesForCatalogue} from './watch-session.js';
 import {catalogueSeasonHint} from './franchise-seasons.js';
 
@@ -27,7 +28,8 @@ export default function useSeasonSource({workId,basisItem,basisProfile,basisDisc
  const item=isBasis?basisItem:loaded&&String(loaded.ids?.mal)===workId?loaded:null;
  const remoteDiscovery=useSourceDiscovery(isBasis?null:item,service),discovery=isBasis?basisDiscovery:remoteDiscovery;
  const profile=useMemo(()=>isBasis?basisProfile:profileForSeason(item),[isBasis,basisProfile,item]);
- const voices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,catalogueSeasonHint(item)),readWatch(userId,String(item?.ids?.mal||item?.id||''))),[discovery.data,item,userId]);
+ const languageFilter=useContentLanguage();
+ const voices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,catalogueSeasonHint(item)),readWatch(userId,String(item?.ids?.mal||item?.id||'')),{filter:languageFilter,prefer:preferredVoiceLanguage(languageFilter)}),[discovery.data,item,userId,languageFilter]);
  const voice=voices.find(v=>studio(v.name)===studio(voiceName))||voices[0];
  useEffect(()=>{setRow(null);setError('');if(!enabled||!item||!voice){setBusy(false);return;}const abort=new AbortController();setBusy(true);
   (async()=>{let last;for(const candidate of variantsFor(voice,1)){try{return await inspectSeasonSource(service,candidate,descriptor?.number||1,abort.signal);}catch(e){abort.signal.throwIfAborted();last=e;}}throw last||Error('Для выбранного сезона источник пока не найден.');})().then(value=>{if(!abort.signal.aborted)setRow({...value,voiceId:voice.id,voice,workId,item,profile,discovery});}).catch(e=>{if(!abort.signal.aborted)setError(e.message);}).finally(()=>{if(!abort.signal.aborted)setBusy(false);});return()=>abort.abort();

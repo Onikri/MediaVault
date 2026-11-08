@@ -25,6 +25,11 @@ class Site:
     search_path: str = "/"
     kind: str = "anime"
     search_method: str = "GET"
+    kinds: tuple = ()        # several kinds (film/serial/anime catalogues); empty → (kind,)
+    original: str = ""       # selector of the original/Latin title on a search card
+
+    def serves(self, kind):
+        return kind in (self.kinds or (self.kind,))
 
     def search_url(self, query):
         if self.id == "animego":
@@ -73,6 +78,9 @@ SITES = (
     Site('anigoonline','Anigoo Online','https://www.anigoonline.ru',('anigoonline.ru','www.anigoonline.ru'),'article.short','a.short__title'),
     Site('hanime','HanimeTV','https://hanime.tv',('hanime.tv','www.hanime.tv'),'',''),
     Site('hentasis','Hentasis','https://v5.hentasis5.top',('v5.hentasis5.top','hentasis1.top','www.hentasis1.top','v4.hentasis.me','hentasis.me'),'a.sres-wrap','h2'),
+    # Ukrainian dubbed films, serials and anime; players are HDVB-UA / Ashdi.
+    Site('eneyida','Eneyida · UA','https://eneyida.tv',('eneyida.tv',),'.short','.short_title',kinds=('movie','tv','anime'),original='.short_subtitle'),
+    Site('uaserials','UASerials · UA','https://uaserials.my',('uaserials.my','uaserials.pro'),'.short-item','.th-title',kinds=('movie','tv','anime'),original='.th-title-oname'),
     Site("readmanga", "ReadManga", "https://readmanga.live", ("readmanga.live", "mintmanga.live"), ".tile, .manga-list-item", "h3, .title", "/search", "manga"),
 )
 BY_ID = {site.id: site for site in SITES}
@@ -127,8 +135,13 @@ def parse_search(site, text, base, query=""):
         if not title or (query and site.id == "jutsu" and query.casefold() not in (title + " " + url).casefold()):
             continue
         seen.add(url)
-        result = {"provider": site.id, "providerName": site.name, "url": url, "title": title,
-                  "kind": site.kind, "dubs": [], "releaseDates": [],
+        names = [title]
+        if site.original and card.select_one(site.original):
+            # "2002 • Wiedźmin" → "Wiedźmin": the original title is the identity alias.
+            original = re.sub(r'^\s*(?:(?:19|20)\d{2}\s*[•·|/,-]\s*)?', '', clean(card.select_one(site.original).get_text(" ", strip=True)))
+            if original and original != title: names.append(original)
+        result = {"provider": site.id, "providerName": site.name, "url": url, "title": title, "aliases": names,
+                  "kind": None if site.kinds else site.kind, "dubs": [], "releaseDates": [],
                   "year": int(re.search(r'\b((?:19|20)\d{2})\b',card.get_text(' ',strip=True))[1]) if re.search(r'\b((?:19|20)\d{2})\b',card.get_text(' ',strip=True)) else None}
         if image:
             result["cover"] = link(image.get("data-src") or image.get("src"), base)

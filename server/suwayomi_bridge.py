@@ -10,7 +10,7 @@ import requests
 from source_parser import SourceError,public_url
 
 PREFIX='/__manga/suwayomi/'
-LANGUAGES={'ru','en','ja','ko'}
+LANGUAGES={'ru','uk','en','ja','ko'}
 _cache={};_lock=threading.RLock();_install_lock=threading.Lock()
 
 class BridgeError(SourceError):
@@ -358,7 +358,7 @@ def search(title,language='all',format='all',offset=0,limit=8):
         client=Client()
         try:
             queries=aliases(title)
-            lang=source['lang'];pattern={'ja':r'[\u3040-\u30ff\u3400-\u9fff]','ko':r'[\uac00-\ud7af]','ru':r'[а-яё]','en':r'[a-z]'}[lang]
+            lang=source['lang'];pattern={'ja':r'[\u3040-\u30ff\u3400-\u9fff]','ko':r'[\uac00-\ud7af]','ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]'}[lang]
             queries=sorted(queries,key=lambda q:not bool(re.search(pattern,q,re.I)))
             for query in queries[:2]:
                 remaining=deadline-time.monotonic()

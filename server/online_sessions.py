@@ -18,6 +18,7 @@ class Session:
     client_id:str=''
     max_height:int|None=None
     audio_mime:str=''
+    audio_index:int|None=None
     alloha:bool=False
     manifests:dict=field(default_factory=dict)
     resources:dict=field(default_factory=dict)
@@ -71,8 +72,12 @@ def create(owner,headers,kind='video',client_id='',reservation=None):
         if len(sessions)>=24 or sum(s.owner==owner for s in sessions.values())>=4:raise HTTPException(429,'Закрой предыдущий онлайн-просмотр и повтори.')
         token=secrets.token_urlsafe(32);session=Session(owner,headers,time.monotonic()+(LEASE_SECONDS if client_id else 7200),kind,client_id);sessions[token]=session;return token,session
 
-def rewrite_manifest(text,base,link,max_height=None):
+def rewrite_manifest(text,base,link,max_height=None,audio_index=None):
     if not text.lstrip().startswith('#EXTM3U'):raise SourceError('Источник не предоставил HLS.')
+    if audio_index is not None:
+        # One HLS carries every dub (Collaps): play the chosen one by default.
+        from ua_players import prefer_audio
+        text=prefer_audio(text,audio_index)
     for tag,attributes in re.findall(r'#EXT-X-(SESSION-KEY|KEY):([^\r\n]*)',text):
         # Plain AES-128 with a published key (HanimeTV) is ordinary HLS that the
         # player decrypts itself, as media_download already accepts. DRM systems,
@@ -207,6 +212,7 @@ def install(app,owner,exports_owner=None):
                     refresh=True
             token,s=create(subject,stream.get('headers') or {},kind='preview' if body.purpose=='preview' else 'video',client_id=body.client_id,reservation=reservation)
             s.max_height=None if generated else max_height
+            s.audio_index=stream.get('audio')
             # A generated master can include its base URL as a media playlist.
             # Give it a distinct resource so that variant never loops to the master.
             resource=s.resource(stream['url'],synthetic=generated)
@@ -383,7 +389,7 @@ def install(app,owner,exports_owner=None):
         try:
             with s.lock:cached=s.manifests.get(resource)
             if cached and cached[2]>time.monotonic():
-                data=rewrite_manifest(cached[0],cached[1],lambda value:'/online/'+token+'/'+s.resource(value),s.max_height)
+                data=rewrite_manifest(cached[0],cached[1],lambda value:'/online/'+token+'/'+s.resource(value),s.max_height,s.audio_index)
                 return Response(data,media_type='application/vnd.apple.mpegurl',headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
             from suwayomi_bridge import parse_reference,page_image
             if s.kind=='manga' and parse_reference(url):
@@ -418,7 +424,7 @@ def install(app,owner,exports_owner=None):
                     size+=len(block)
                     if size>4*1024*1024:raise SourceError('Слишком большой плейлист.')
                     parts.append(block)
-                data=rewrite_manifest(b''.join(parts).decode('utf-8'),final,lambda value:'/online/'+token+'/'+s.resource(value),s.max_height)
+                data=rewrite_manifest(b''.join(parts).decode('utf-8'),final,lambda value:'/online/'+token+'/'+s.resource(value),s.max_height,s.audio_index)
                 return Response(data,media_type='application/vnd.apple.mpegurl',headers=common)
             if s.kind in {'video','preview'} and disguised_segment(final) and mime=='text/html':mime='video/mp2t'
             allowed=mime.startswith(('video/','audio/','image/')) or mime in {'application/octet-stream','binary/octet-stream','text/vtt'}

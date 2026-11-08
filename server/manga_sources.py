@@ -118,7 +118,7 @@ def normalized_format(value):
     return {'манга':'manga','манхва':'manhwa','маньхуа':'manhua','вебтун':'webtoon','web_manga':'manga','long_strip':'webtoon'}.get(value,value)
 
 def search_title(title,language='auto',format='all'):
-    if language not in {'auto','all','ru','en','ja','ko'}:raise SourceError('Выбери поддерживаемый язык источника.')
+    if language not in {'auto','all','ru','uk','en','ja','ko'}:raise SourceError('Выбери поддерживаемый язык источника.')
     if format not in {'all','manga','manhwa','manhua','webtoon'}:raise SourceError('Выбери доступный формат комикса.')
     if not isinstance(title,dict) or title.get('kind')!='manga' or not aliases(title):raise SourceError('Выбери конкретную мангу из каталога.')
     if len(json.dumps(title).encode())>50000:raise SourceError('Описание выбранной манги слишком велико.')

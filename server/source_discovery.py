@@ -11,19 +11,20 @@ from source_parser import PublicHttp
 _cache={};_lock=threading.Lock();_slots=threading.BoundedSemaphore(2)
 _progress={}
 
-def voice_suggestions(query='',limit=30):
+def voice_suggestions(query='',limit=30,language='all'):
     """Labels observed on real Russian source/player pages; never a studio list.
 
     An unknown language stays unknown in the response, rather than fabricating
     language verification for a Russian provider's player label.
     """
+    language_filter=language if language in {'all','ru','uk'} else 'all'
     query=' '.join(str(query).casefold().split())[:80];now=time.monotonic();groups={}
     with _lock:
         snapshots=[entry[1] for entry in _cache.values() if entry[0]>now]
     for snapshot in snapshots:
         for voice in snapshot.get('voices',[]):
             name=voice.get('name','');kind=voice.get('kind','');language=voice.get('language','und')
-            if not name or kind in {'sub','subs','subtitle','subtitles'} or language not in {'ru','und'} or query not in name.casefold():continue
+            if not name or kind in {'sub','subs','subtitle','subtitles'} or language not in ({'ru','und','uk'} if language_filter=='all' else {'uk'} if language_filter=='uk' else {'ru','und'}) or query not in name.casefold():continue
             variants=[v for v in voice.get('variants',[]) if v.get('named',True) and v.get('sourceUrl')]
             if not variants:continue
             key=(name.casefold(),kind,language)
@@ -93,7 +94,9 @@ def _discover(selected,*,refresh=False,continuing=False):
                         # HTML title must not contradict the selected identity. Search snippets can be stale.
                         import re
                         page_title=re.split(r'\s+(?:смотреть|watch)\b|\s+[|–—]\s+',value.get('title',''),flags=re.I)[0]
-                        if page_title and not match_title(selected,{'title':page_title,'kind':'anime'})[0]:
+                        # A Ukrainian page heading cannot equal Russian/English catalogue titles;
+                        # those pages were already matched by the card's original-title alias.
+                        if page_title and not re.search(r'[іїєґ]',page_title,re.I) and not match_title(selected,{'title':page_title,'kind':selected.get('kind','anime')})[0]:
                             continue
                         inspected.append({**value,'title':candidate['title'],'providerName':site.name,'matchEvidence':candidate['matchEvidence']})
                     except Exception:
@@ -106,7 +109,8 @@ def _discover(selected,*,refresh=False,continuing=False):
             except Exception:
                 return {'provider':site.id,'name':site.name,'status':'unavailable','message':'Источник не ответил или изменил разметку.','sources':[]}
             finally:http.close()
-        sites=[s for s in SITES if selected.get('kind','anime')=='anime' and s.kind=='anime' and s.id not in {'sovet','anilibriafun','animevosttv'}]
+        wanted=selected.get('kind','anime')
+        sites=[s for s in SITES if (s.serves(wanted) if hasattr(s,'serves') else s.kind==wanted=='anime') and s.kind!='manga' and s.id not in {'sovet','anilibriafun','animevosttv'}]
         providers=[]
         def snapshot(unfinished=False):
             sources=[s for p in providers for s in p.get('sources',[])]
@@ -123,7 +127,8 @@ def _discover(selected,*,refresh=False,continuing=False):
             if selected.get('kind','anime') in {'anime','movie'} and str((selected.get('ids') or {}).get('mal'))=='57555':
                 from yummy_anime_source import discover_reze
                 futures.append(pool.submit(discover_reze))
-            futures.extend([pool.submit(kodik_discover,selected),*[pool.submit(work,site) for site in sites]])
+            from kinobox_source import discover as kinobox_discover
+            futures.extend([pool.submit(kodik_discover,selected),pool.submit(kinobox_discover,selected),*[pool.submit(work,site) for site in sites]])
             for future in as_completed(futures):
                 providers.append(future.result());result=snapshot(len(providers)<len(futures))
                 with _lock:_cache[key]=(time.monotonic()+(300 if result['sources'] else 30),result)

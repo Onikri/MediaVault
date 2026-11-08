@@ -29,7 +29,7 @@ def status():
 def start(languages):
     global _worker
     wanted=set(languages)
-    if not wanted or not wanted<=LANGUAGES:raise SourceError('Выбери RU, EN, JA или KO.')
+    if not wanted or not wanted<=LANGUAGES:raise SourceError('Выбери RU, UK, EN, JA или KO.')
     with _lock:
         if _worker and _worker.is_alive():return status()
         # Refreshing the catalog happens in the worker, not in the HTTP request.

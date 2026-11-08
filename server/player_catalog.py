@@ -31,6 +31,17 @@ def player_name(url):
     return host
 
 
+# Ukrainian dubs: Ukrainian-only letters, explicit markers, or studios that only
+# publish in Ukrainian. Russian labels never contain і/ї/є/ґ.
+UKRAINIAN_VOICE=re.compile(r"[іїєґ]|укр|україн|ukrain|\bukr\b|\bua\b|\(ua\)|uateam|fanvoxua|так\s*треба|tak\s*treba|amanogawa|unimay|inari\s*dub|dniprofilm|le\s*doyen|postmodern|\bqtv\b|\bictv\b|1\+1|\b[іi]нтер\b|новий\s*канал|cinemaker|gwean|струґачка|струга?чка",re.I)
+
+
+def voice_language(name, current='und'):
+    """Only promotes unknown/Russian-defaulted labels to Ukrainian; never guesses Russian."""
+    if current in {'und','ru'} and UKRAINIAN_VOICE.search(str(name or '')):return 'uk'
+    return current or 'und'
+
+
 def translation_kind(name, explicit=''):
     text=str(explicit or name).casefold()
     return 'subtitles' if re.search(r'subtitle|субтит|\bsubs?\b',text) else 'voice'
@@ -152,7 +163,7 @@ def group_voices(inspections):
             label=voice['name']
             if not voice.get('named',True) or re.search(r'^(?:неизвестн|unknown|название перевода не указано|озвучка не указана|(?:серия|episode)\s*\d)',label,re.I):continue
             kind=voice.get('kind') or translation_kind(label)
-            language=voice.get('language') or 'und'
+            language=voice_language(label,voice.get('language') or 'und')
             name_key=normalized_studio(label)
             old_key=(re.sub(r'[\W_]+','',unicodedata.normalize('NFKC',label).casefold()),kind,language)
             if name_key=='anilibria' and language=='und':language='ru'
@@ -207,6 +218,14 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             if getattr(http,'deadline',None) and time.monotonic()>=http.deadline:
                 pending.insert(0,(document,url,referer,depth));seen.discard(url);break
             diagnostics.append({'player':player_name(url),'status':'unavailable'});continue
+        from ua_players import is_playerjs, is_collaps, playerjs_choices, collaps_choices, is_ua_trailer
+        if is_playerjs(url) or is_collaps(url):
+            # Ukrainian Playerjs players and Collaps publish every dub and episode in the embed.
+            for item in (collaps_choices(url,document) if is_collaps(url) else playerjs_choices(url,document)):
+                item.setdefault('referer',referer or url)
+                key=(item['url'],item['name'],item.get('kind'))
+                if key not in choice_seen:choices.append(item);choice_seen.add(key)
+            continue
         if provider=='anilibria' and current.episodes and re.search(r'/anime/releases/release/[a-zA-Z0-9_-]+',urlsplit(url).path):
             base_url=re.match(r'(https://[^/]+/anime/releases/release/[a-zA-Z0-9_-]+)',url)[1]
             current.episodes=[{**entry,'url':base_url+'/episodes/'+str(entry['number'])} for entry in current.episodes]
@@ -240,6 +259,7 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
         if depth<8:
             for child in current.players:
                 if (urlsplit(child).hostname or '').endswith(('youtube.com','youtu.be','youtube-nocookie.com')):continue
+                if is_ua_trailer(child):continue
                 pending.append((None,child,url,depth+1))
         elif any(child not in seen for child in current.players):
             diagnostics.append({'status':'unavailable','message':'Слишком глубокая цепочка вложенных страниц; список переводов неполный.'})

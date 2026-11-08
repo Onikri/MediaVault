@@ -84,3 +84,11 @@ test('Alloha is playback-only; previews borrow the same episode from Kodik', asy
   assert.deepEqual(previewEntry([{number: 1, url: 'k1'}, {number: 2, url: 'k2'}], {number: '2', url: 'a2'}), {number: 2, url: 'k2'});
   assert.equal(previewEntry([{number: 1, url: 'k1'}], {number: 5}), null);
 });
+
+test('Ukrainian dubs are kept, filtered and ordered by content language',()=>{
+ const voices=[{id:'ru',name:'AniLibria',language:'ru'},{id:'uk',name:'FanVoxUA',language:'uk'},{id:'en',name:'English',language:'en'}];
+ assert.deepEqual(orderedVoices(voices).map(v=>v.id),['ru','uk']);
+ assert.deepEqual(orderedVoices(voices,{},{prefer:'uk'}).map(v=>v.id),['uk','ru']);
+ assert.deepEqual(orderedVoices(voices,{},{filter:'uk',prefer:'uk'}).map(v=>v.id),['uk']);
+ assert.deepEqual(orderedVoices(voices,{},{filter:'ru'}).map(v=>v.id),['ru']);
+});
