@@ -51,6 +51,13 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   assert.equal(await page.evaluate(()=>window.__controlCalls.filter(c=>c==='PUT /admin/rules').length),1);
   await fits('Rules');await page.screenshot({path:path.join(dir,'rules-'+width+'.png'),fullPage:true});
   await nav('Задачи').click();await page.locator('.import-queue').waitFor();await fits('Tasks');
+  // Storage: space for Drive and the VM, live load with sparklines, containers and processes.
+  await nav('Хранилище').click();await page.locator('.cc-table[aria-label="Контейнеры"] [role=row]').nth(3).waitFor();
+  assert.match(await page.locator('.cc-space').first().innerText(),/Google Диск[\s\S]*512 ГБ свободно/);
+  assert.equal(await page.locator('.cc-space').count(),3,'Data disk and system disk are shown separately');
+  assert.match(await page.locator('.cc-table[aria-label="Процессы"]').innerText(),/python3[\s\S]*38\.5%/);
+  await page.waitForFunction(()=>document.querySelectorAll('.cc-spark polyline').length===2,null,{timeout:12000});
+  await fits('Storage');await page.screenshot({path:path.join(dir,'storage-'+width+'.png'),fullPage:true});
   assert.equal(await page.locator('.cc-rail .cc-who').isVisible(),width>860,'Identity block only on the wide rail');
   assert.deepEqual(errors,[],'No page errors at '+width);
   await context.close();

@@ -121,7 +121,7 @@ function MediaVaultApp(){
   const [importTab,setImportTab]=useState('catalog');
   const guestSession=useGuestSession(),guest=!state.user?guestSession:null;
   const [guestScreen,setGuestScreen]=useState(()=>readInviteToken()?{mode:'invite',invite:readInviteToken()}:location.hash==='#signin'?{mode:'login'}:null);
-  const [profileTab,setProfileTab]=useState('account');
+  const [profileTab,setProfileTab]=useState(()=>{try{return sessionStorage.getItem('mediavault_control_tab')||'account';}catch{return 'account';}});
   useLibraryProfiles(state,actions,importService.server,importService.active,!!(importService.session?.driveConnected&&importService.session?.serverVersion>=5));
   const reduced=useReducedMotion();
   const [view,setView]=useState(()=>readOnlineTitle()||browseRoute()?'library':new URLSearchParams(location.hash.slice(1)).has('title')?'collection':['home','library','collection','import','history','profile'].includes(location.hash.slice(1))?location.hash.slice(1):'home');
@@ -180,7 +180,8 @@ function MediaVaultApp(){
     if(!state.catalog)return;
     const resume=pendingRoute.current;
     if(resume){pendingRoute.current='';if(!restoreRoute(resume))go('collection');}
-    else if(state.remembered&&['home','profile'].includes(view))go('collection');
+    // Only the landing page jumps to the collection; a reload on #profile stays in the control center.
+    else if(state.remembered&&view==='home')go('collection');
   },[!!state.catalog,state.libraryId]);
   const go=useCallback(next=>{setView(next);setActiveTitle(null);if(location.hash!=='#'+next)location.hash=next;},[]);
   useEffect(()=>{const ask=()=>showLibrarySetup('online');addEventListener('mediavault:request-login',ask);return()=>removeEventListener('mediavault:request-login',ask);});

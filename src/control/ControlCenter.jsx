@@ -7,6 +7,7 @@ import RoomsPanel from './RoomsPanel.jsx';
 import GuestsPanel from './GuestsPanel.jsx';
 import TasksPanel from './TasksPanel.jsx';
 import RulesPanel from './RulesPanel.jsx';
+import SystemPanel from './SystemPanel.jsx';
 import './control-center.css';
 
 // The owner's control center and everyone's settings share one shell:
@@ -20,7 +21,7 @@ const GROUPS=[
   ['rules','Правила',SlidersHorizontal,'Ограничения комнат и права новых гостей'],
  ]],
  ['data','Данные',[
-  ['storage','Хранилище',HardDrive,'Коллекция, Google Диск и подключение к серверу'],
+  ['storage','Хранилище',HardDrive,'Место, нагрузка сервера, коллекция и Google Диск'],
   ['sources','Источники',Plug,'Каталоги, музыка и читалки, из которых берётся контент'],
  ]],
  ['personal','Личное',[
@@ -45,6 +46,7 @@ export default function ControlCenter({state,guest,service,initialTab,onLogout,p
  const first=order.includes(initialTab)?initialTab:order[0];
  const [tab,setTab]=useState(first),direction=useRef(1),content=useRef(null);
  useEffect(()=>{if(order.includes(initialTab))setTab(initialTab);},[initialTab]);
+ useEffect(()=>{try{sessionStorage.setItem('mediavault_control_tab',tab);}catch{}},[tab]);
  const current=order.includes(tab)?tab:order[0];
  const meta=groups.flatMap(([,,items])=>items).find(([key])=>key===current);
  const now=useNow(5000);
@@ -66,7 +68,7 @@ export default function ControlCenter({state,guest,service,initialTab,onLogout,p
   guests:<GuestsPanel data={data} service={service}/>,
   tasks:<TasksPanel service={service}/>,
   rules:<RulesPanel service={service} onSaved={data.refresh}/>,
- }[current]:panels[current];
+ }[current]:current==='storage'&&admin?<><SystemPanel service={service}/>{panels.storage}</>:panels[current];
  return <section className="cc" aria-label="Пульт и настройки">
   <aside className="cc-rail">
    <div className="cc-who"><strong>{name}</strong><span>{role}{state.user?.email?<small>{state.user.email}</small>:guest?<small>@{guest.guest.login}</small>:null}</span></div>
