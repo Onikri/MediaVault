@@ -14,6 +14,11 @@ let browser,vite,last;
  `);
  const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-showcase',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required','--enable-unsafe-swiftshader']});
+ // Warm-up: on a cold cache Vite discovers lazily imported dependencies after the first
+ // render, re-optimises them and reloads the page. Let that happen before any check runs.
+ {const warm=await browser.newPage();await warm.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');
+  await warm.waitForFunction(()=>window.player?.media.readyState>=2,null,{timeout:30000}).catch(()=>{});
+  await warm.evaluate(()=>scrollTo(0,document.body.scrollHeight)).catch(()=>{});await warm.waitForTimeout(2500);await warm.close();}
  for(const [width,height] of [[390,900],[768,900],[1024,768],[1366,768],[1440,900]]){
   const page=await browser.newPage({viewport:{width,height}}),errors=[];last=page;page.setDefaultTimeout(8000);page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});
   await page.route('https://art.fixture/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><defs><linearGradient id="s" x2="0" y2="1"><stop stop-color="#b2b9bb"/><stop offset="1" stop-color="#23373c"/></linearGradient></defs><path fill="url(#s)" d="M0 0h1600v900H0z"/><circle fill="#d9cfb2" cx="1100" cy="240" r="120"/><path fill="#28363b" d="M0 700l280-350 160 280 350-400 260 470 200-230 350 230v200H0z"/></svg>'}));
