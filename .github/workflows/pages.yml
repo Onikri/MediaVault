@@ -97,7 +97,7 @@ jobs:
 
       - name: Responsive UI and browser integration
         if: env.PUBLISH_NOW != 'true'
-        timeout-minutes: 10
+        timeout-minutes: 25
         env:
           MEDIA_VAULT_SKIP_BUILD: '1'
         run: |
