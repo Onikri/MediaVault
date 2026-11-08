@@ -20,7 +20,7 @@ Script: `scratchpad stress_probe.py` (not committed), audio in `.codex-local/ben
 | Gemini 3.5 Flash Lite | 76 % | 2 |
 | Gemma 4 26B A4B | 65 % | 1 (Latin `á` homoglyphs) |
 | Gemma 4 31B | 60 % | 4 (partly free-tier errors) |
-| Gemini 3.5 Flash | 65 % | 4 (free tier: 20 requests/day/project, quota spent) |
+| Gemini 3.5 Flash | 65 % | 4 (free tier: 20 requests/day per project; the test used only key slot 1 directly, bypassing the gateway, and spent that slot's quota — slots 2 and 3 still answered) |
 
 One gold label was wrong (`стоя́ли` is correct); RUAccent's remaining misses are the
 hardest pairs on purpose (`замо́к/за́мок`, `мука́/му́ка`, `хлопо́к/хло́пок`).
