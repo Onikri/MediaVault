@@ -68,7 +68,8 @@ html[data-blossom] .mobile-dock{display:none}
  html[data-blossom] .history-card{grid-template-columns:64px minmax(0,1fr);padding-right:44px}
  html[data-blossom] .history-forget{top:50%;right:10px;transform:translateY(-50%);width:32px;height:32px}
  html[data-blossom] .history-toolbar{gap:10px}
- html[data-blossom] .history-filter{flex:1;justify-content:space-between}
+ html[data-blossom] .history-filter{flex:1;min-width:0;justify-content:space-between}
+ html[data-blossom] .history-filter>button{flex:1 1 0;min-width:0;justify-content:center;padding:0 8px;gap:5px}
  html[data-blossom] .history-clear{width:100%;justify-content:center}
 
  /* Collection */
