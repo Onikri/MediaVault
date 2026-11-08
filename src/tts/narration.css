@@ -39,3 +39,19 @@
 .role-name i{margin-left:.45em;font-weight:500;font-style:normal;opacity:.75}
 .role-segment.is-speaking{background:color-mix(in srgb,var(--role,var(--color-blossom,#ee3c35)) 18%,transparent);border-radius:6px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .ranobe-prose p.is-speaking:has(.role-segment){background:none}
+
+/* Cast panel: facts, key, per-character voice controls. */
+.narration-cast{max-height:min(62vh,640px);overflow:auto}
+.narration-cast ul{max-height:none}
+.narration-facts{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:4px 0 10px;font-size:12.5px}
+.narration-facts dt{color:#c9c3ba}.narration-facts dd{margin:0}
+.narration-key{display:grid;gap:8px;margin:8px 0;padding:12px;border-radius:14px;background:color-mix(in srgb,currentColor 6%,transparent)}
+.narration-key label{display:flex!important;flex-direction:column;align-items:stretch!important;gap:6px;margin:0!important}
+.narration-key input{height:36px;border:0;border-radius:10px;padding:0 10px;background:#0006;color:inherit;font:inherit}
+.narration-key small{color:#c9c3ba;font-size:11.5px;line-height:1.45}
+.narration-restudy{display:inline-flex;align-items:center;gap:6px;margin-top:8px;color:inherit}
+.narration-cast li{flex-wrap:wrap}
+.narration-person{flex:1 1 180px;min-width:0;display:flex;flex-direction:column;gap:2px;font-weight:600}
+.narration-person small{font-weight:400;color:#c9c3ba;font-size:11.5px;line-height:1.35}
+.narration-voice-controls{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.narration-voice-controls select{max-width:150px}

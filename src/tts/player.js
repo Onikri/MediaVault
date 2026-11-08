@@ -9,19 +9,42 @@ export const TTS_EVENT='mediavault-tts-playing';
 let context=null;
 function audioContext(){context||=new (globalThis.AudioContext||globalThis.webkitAudioContext)();return context;}
 
+// narrator: the narrator's voice object (narratorCast). Each row carries the
+// stressed text to speak, its voice, pitch rate, EQ and delivery.
 export function utterancesOf(segments,{cast,narrator,pace=1}){
  const rows=[];
  for(const segment of segments){
-  const {voice,pace:own=1}=voiceFor(segment,cast,narrator),how=delivery(segment,pace*own);
-  const parts=sentences(segment.text);
-  parts.forEach((text,i)=>rows.push({segment:segment.id,p:segment.p,text,voice,speed:how.speed,gain:how.gain,
+  const voice=voiceFor(segment,cast,narrator),how=delivery(segment,pace*(voice.pace||1));
+  const parts=sentences(segment.spoken||segment.text);
+  const eq={low:(voice.eq?.low||0)+how.eq.low,mid:(voice.eq?.mid||0)+how.eq.mid,high:(voice.eq?.high||0)+how.eq.high,midFreq:voice.eq?.midFreq||2500};
+  parts.forEach((text,i)=>rows.push({segment:segment.id,p:segment.p,text,voice:voice.voice,rate:voice.rate||1,eq,speed:how.speed,gain:how.gain*(voice.gain||1),
    pause:i===parts.length-1?how.pause:.12,tags:i===0?segment.tags||[]:[],kind:segment.kind}));
  }
  return rows;
 }
 
+// Pitch by playback rate (tempo compensated at synthesis), then a three-band
+// equaliser: low shelf 220 Hz, presence peak, high shelf 6.5 kHz.
+export function voiceChain(ctx,{rate=1,eq={},gain=1}={}){
+ const low=ctx.createBiquadFilter();low.type='lowshelf';low.frequency.value=220;low.gain.value=Math.max(-12,Math.min(12,eq.low||0));
+ const mid=ctx.createBiquadFilter();mid.type='peaking';mid.frequency.value=eq.midFreq||2500;mid.Q.value=1;mid.gain.value=Math.max(-12,Math.min(12,eq.mid||0));
+ const high=ctx.createBiquadFilter();high.type='highshelf';high.frequency.value=6500;high.gain.value=Math.max(-12,Math.min(12,eq.high||0));
+ const level=ctx.createGain();level.gain.value=Math.min(1.6,gain);
+ low.connect(mid).connect(high).connect(level).connect(ctx.destination);
+ return {input:low,rate};
+}
+
+let previewContext=null;
+export async function playClip(result,options={}){
+ previewContext||=new (globalThis.AudioContext||globalThis.webkitAudioContext)();if(previewContext.state==='suspended')await previewContext.resume();
+ const buffer=previewContext.createBuffer(1,result.audio.length,result.sampleRate);buffer.copyToChannel(result.audio,0);
+ const source=previewContext.createBufferSource();source.buffer=buffer;source.playbackRate.value=options.rate||1;
+ source.connect(voiceChain(previewContext,options).input);
+ return new Promise(resolve=>{source.onended=resolve;source.start();});
+}
+
 export function createNarrator({language='ru',steps=5,lookahead=4,onSegment=()=>{},onState=()=>{},onEnd=()=>{},onError=()=>{}}={}){
- let queue=[],index=0,playing=false,generation=0,source=null,gainNode=null,title='';
+ let queue=[],index=0,playing=false,generation=0,source=null,title='';
  const ready=new Map();
  const state=extra=>onState({playing,index,total:queue.length,...extra});
 
@@ -30,7 +53,7 @@ export function createNarrator({language='ru',steps=5,lookahead=4,onSegment=()=>
   for(let i=index;i<Math.min(queue.length,index+lookahead);i++){
    if(ready.has(i))continue;
    const row=queue[i];
-   ready.set(i,synthesize({text:row.text,lang:language,voice:row.voice,steps,speed:row.speed,tags:row.tags,seed:7+i%5}).then(result=>{
+   ready.set(i,synthesize({text:row.text,lang:language,voice:row.voice,steps,speed:row.speed/(row.rate||1),tags:row.tags,seed:7+i%5}).then(result=>{
     if(version!==generation)return null;
     const buffer=audioContext().createBuffer(1,result.audio.length,result.sampleRate);buffer.copyToChannel(result.audio,0);
     return {buffer,ms:result.ms,provider:result.provider};
@@ -49,9 +72,8 @@ export function createNarrator({language='ru',steps=5,lookahead=4,onSegment=()=>
   try{state({buffering:true});item=await ready.get(index);}catch(error){if(version===generation){playing=false;state();onError(error);}return;}
   if(version!==generation||!playing||!item)return;
   const ctx=audioContext();if(ctx.state==='suspended')await ctx.resume();
-  source=ctx.createBufferSource();source.buffer=item.buffer;
-  gainNode=ctx.createGain();gainNode.gain.value=Math.min(1.6,row.gain);
-  source.connect(gainNode).connect(ctx.destination);
+  source=ctx.createBufferSource();source.buffer=item.buffer;source.playbackRate.value=row.rate||1;
+  source.connect(voiceChain(ctx,row).input);
   state({buffering:false,provider:item.provider});
   source.onended=()=>{if(version!==generation||!playing)return;source=null;setTimeout(()=>{if(version!==generation)return;index++;playNext();},row.pause*1000);};
   source.start();

@@ -4,7 +4,9 @@ from pathlib import Path
 import httpx
 from fastapi import Depends,HTTPException,Request
 from pydantic import BaseModel,Field,SecretStr,ConfigDict
-MODELS=('gemini-3.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
+MODELS=('gemini-3.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-3.1-flash-lite','gemini-2.5-flash-lite','gemini-3.5-flash')
+# Added after key slots were saved: allowed on every slot (narration title bible).
+LATER_MODELS=('gemini-3.5-flash',)
 SETTING='reader:google-keys';_store=lambda:None
 
 def saved():
@@ -90,7 +92,7 @@ def install(app,owner,get_store):
             known=next((r for r in rows if r['key']==key),{})
             rows=[{'slot':None,'key':key,'project':known.get('project') or 'personal-shared'}]
         else:
-            rows=[r for r in rows if body.model in r.get('models',MODELS)]
+            rows=[r for r in rows if body.model in r.get('models',MODELS) or body.model in LATER_MODELS]
         if not rows:raise HTTPException(422,'Добавь серверный ключ Google для выбранной модели.')
         model=body.model;activity=network.begin(subject,body.slot,model,personal=personal);lease=None;response=None;status_code=0;usage=None
         try:

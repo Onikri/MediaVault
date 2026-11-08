@@ -1,50 +1,98 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Play,Pause,SkipBack,SkipForward,Users,Headphones,X,Volume2} from 'lucide-react';
+import {Play,Pause,SkipBack,SkipForward,Users,Headphones,X,Volume2,RefreshCw,KeyRound} from 'lucide-react';
 import {TTS_BYTES,ttsConsent,setTtsConsent,PRESET_VOICES} from './model.js';
 import {startNarrationEngine,engineReady,synthesize} from './engine.js';
+import {heuristicRoles,modelRoles,ROLE_MODEL} from './roles.js';
+import {castVoices,narratorCast,savedCast,saveCast,PRESET_TRAITS} from './voices.js';
+import {createNarrator,utterancesOf,playClip} from './player.js';
+import {buildBible,savedBible,saveBible,forgetBible,applyLexicon,TIMBRES,AGES} from './bible.js';
+import {ROLE_MODELS,BIBLE_MODELS,personalKey,savePersonalKey} from './google.js';
 import {roleColors,emotionLabel} from './RoleText.jsx';
-import {heuristicRoles,modelRoles} from './roles.js';
-import {castVoices,savedCast,saveCast,voiceLabel} from './voices.js';
-import {createNarrator,utterancesOf} from './player.js';
 import './narration.css';
 
-const PREFS='mediavault_tts_prefs_v1';
-function readPrefs(){try{return {pace:1,narrator:'M2',roles:true,...JSON.parse(localStorage.getItem(PREFS)||'{}')};}catch{return {pace:1,narrator:'M2',roles:true};}}
+const PREFS='mediavault_tts_prefs_v2';
+const DEFAULTS={pace:1,narrator:'auto',roles:true,stress:true,rolesModel:ROLE_MODEL,bibleModel:'gemini-3.5-flash'};
+function readPrefs(){try{return {...DEFAULTS,...JSON.parse(localStorage.getItem(PREFS)||'{}')};}catch{return {...DEFAULTS};}}
 const mb=bytes=>Math.round(bytes/1048576);
-const ROLE_CACHE=new Map();
+const ROLE_CACHE=new Map(),STRESS_CACHE=new Map();
 const voiceName=v=>(v[0]==='F'?'Женский ':'Мужской ')+v.slice(1);
+const TIMBRE_LABELS={neutral:'обычный',warm:'тёплый',bright:'звонкий',dark:'низкий, глухой',breathy:'с придыханием',rough:'хрипловатый',nasal:'носовой',soft:'мягкий'};
+const AGE_LABELS={child:'ребёнок',teen:'подросток',young:'молодой',adult:'взрослый',old:'пожилой'};
 const SAMPLE={ru:'Здравствуй. Так звучит мой голос в этой книге.',uk:'Привіт. Так звучить мій голос у цій книжці.'};
-let previewContext=null;
+const wait=(ms,signal)=>new Promise((resolve,reject)=>{const t=setTimeout(resolve,ms);signal?.addEventListener('abort',()=>{clearTimeout(t);reject(signal.reason);},{once:true});});
+
+// Word stress for Russian text from the server (RUAccent). 503 = the model is
+// still loading on first use: retry for up to three minutes.
+async function stressTexts(service,texts,language,signal){
+ const missing=[...new Set(texts.filter(t=>!STRESS_CACHE.has(t)))];
+ for(let i=0;i<missing.length;i+=300){
+  const part=missing.slice(i,i+300);
+  for(let attempt=0;;attempt++){
+   try{const data=await service.request('/tts/accent',{method:'POST',body:{texts:part,language},signal:AbortSignal.any([signal,AbortSignal.timeout(60000)])});
+    part.forEach((t,n)=>STRESS_CACHE.set(t,data.texts?.[n]||t));break;}
+   catch(error){if(signal.aborted||error?.status!==503||attempt>=18)throw error;await wait(10000,signal);}
+  }
+ }
+ while(STRESS_CACHE.size>30000)STRESS_CACHE.delete(STRESS_CACHE.keys().next().value);
+}
 
 // Narration for one chapter. onSpeaking({p,segment}) highlights the text;
 // onFinished() lets the reader open the next chapter and continue.
-export default function Narration({paragraphs,language,bookKey,chapterKey,title,service,userId,startParagraph=0,autoplay=false,onSpeaking,onFinished,onAutoplayHandled,onScript,commandRef,onPlaying,caption=true}){
+// book: {title, aliases, authors, description, year, kind} for the title bible.
+export default function Narration({paragraphs,language,bookKey,chapterKey,title,book,service,userId,startParagraph=0,autoplay=false,onSpeaking,onFinished,onAutoplayHandled,onScript,commandRef,onPlaying,caption=true}){
  const [prefs,setPrefs]=useState(readPrefs),[phase,setPhase]=useState('idle'),[progress,setProgress]=useState(null),[error,setError]=useState('');
  const [segments,setSegments]=useState([]),[characters,setCharacters]=useState([]),[analysis,setAnalysis]=useState(''),[cast,setCast]=useState(()=>savedCast(bookKey));
+ const [bible,setBible]=useState(()=>savedBible(bookKey)),[bibleState,setBibleState]=useState(''),[bibleRevision,setBibleRevision]=useState(0);
+ const [stressState,setStressState]=useState(''),[stressRevision,setStressRevision]=useState(0);
  const [state,setState]=useState({playing:false,index:0,total:0}),[provider,setProvider]=useState(''),[castOpen,setCastOpen]=useState(false),[consent,setConsent]=useState(ttsConsent);
+ const [hasKey,setHasKey]=useState(null),[keyDraft,setKeyDraft]=useState(''),[sampling,setSampling]=useState('');
  const narrator=useRef(null),live=useRef({}),rowsRef=useRef([]),wantPlay=useRef(false);live.current={onSpeaking,onFinished};
  function update(change){setPrefs(old=>{const next={...old,...change};try{localStorage.setItem(PREFS,JSON.stringify(next));}catch{}return next;});}
+ const meta=useMemo(()=>({title:book?.title||title,aliases:book?.aliases||[],authors:book?.authors||[],description:book?.description||'',year:book?.year||null,kind:book?.kind||'book',language}),[book?.title,title,language]);
 
- // Instant heuristic roles, then (optionally) the model pass in the background.
+ // 1. Title bible: once per book, the strongest free model studies the cast.
  useEffect(()=>{
-  const key=chapterKey,cached=ROLE_CACHE.get(key);
+  if(!prefs.roles||!service||!paragraphs.length||bible)return;
+  const abort=new AbortController();setBibleState('running');
+  buildBible({book:meta,sample:paragraphs.join('\n'),service,userId,model:prefs.bibleModel,signal:abort.signal})
+   .then(value=>{saveBible(bookKey,value);setBible(value);setBibleState('');})
+   .catch(e=>{if(!abort.signal.aborted)setBibleState('error:'+(e.message||''));});
+  return()=>abort.abort();
+ },[bookKey,prefs.roles,prefs.bibleModel,bibleRevision,!!bible]);
+
+ // 2. Instant heuristic roles; the chapter pass (Gemma) runs once the bible is settled.
+ useEffect(()=>{
+  const key=chapterKey+'|'+prefs.rolesModel+'|'+(bible?.createdAt||0),cached=ROLE_CACHE.get(key);
   const base=cached?.segments||heuristicRoles(paragraphs);setSegments(base);setCharacters(cached?.characters||[]);setAnalysis(cached?'model':'');
-  if(cached||!prefs.roles||!service||!paragraphs.length)return;
+  if(cached||!prefs.roles||!service||!paragraphs.length||bibleState==='running')return;
   const abort=new AbortController();setAnalysis('running');
-  modelRoles(base,{known:characters,context:{title,language},service,userId,signal:abort.signal}).then(result=>{
+  modelRoles(base,{bible,known:[],context:{title:meta.title,language,tone:bible?.tone},service,userId,model:prefs.rolesModel,signal:abort.signal}).then(result=>{
    if(abort.signal.aborted)return;ROLE_CACHE.set(key,result);while(ROLE_CACHE.size>20)ROLE_CACHE.delete(ROLE_CACHE.keys().next().value);
-   setSegments(result.segments);setCharacters(old=>[...old,...result.characters.filter(c=>!old.some(o=>o.name===c.name))]);setAnalysis('model');
+   setSegments(result.segments);setCharacters(result.characters);setAnalysis('model');
   }).catch(e=>{if(!abort.signal.aborted)setAnalysis('heuristic:'+(e.message||''));});
   return()=>abort.abort();
- },[chapterKey,prefs.roles]);
+ },[chapterKey,prefs.roles,prefs.rolesModel,bible?.createdAt,bibleState==='running']);
 
- const voices=useMemo(()=>castVoices(segments,characters,{narrator:prefs.narrator,saved:cast}),[segments,characters,prefs.narrator,cast]);
+ // 3. Word stress (Russian): RUAccent on the server, bible names on top.
+ useEffect(()=>{
+  if(!prefs.stress||language!=='ru'||!service?.request||!paragraphs.length){setStressState('');return;}
+  const texts=heuristicRoles(paragraphs).map(s=>s.text);
+  if(texts.every(t=>STRESS_CACHE.has(t))){setStressState('ready');setStressRevision(v=>v+1);return;}
+  const abort=new AbortController();setStressState('running');
+  stressTexts(service,texts,language,abort.signal).then(()=>{setStressState('ready');setStressRevision(v=>v+1);})
+   .catch(e=>{if(!abort.signal.aborted)setStressState('error:'+(e.message||''));});
+  return()=>abort.abort();
+ },[chapterKey,prefs.stress,language]);
+
+ const spoken=useMemo(()=>segments.map(s=>({...s,spoken:applyLexicon(prefs.stress?STRESS_CACHE.get(s.text)||s.text:s.text,bible)})),[segments,bible,prefs.stress,stressRevision]);
+ const voices=useMemo(()=>castVoices(segments,characters,{narrator:prefs.narrator,saved:cast,bible}),[segments,characters,prefs.narrator,cast,bible]);
+ const narratorVoice=useMemo(()=>narratorCast(bible,prefs.narrator),[bible,prefs.narrator]);
  useEffect(()=>{saveCast(bookKey,voices);},[bookKey,voices]);
- const rows=useMemo(()=>utterancesOf(segments,{cast:voices,narrator:prefs.narrator,pace:prefs.pace}),[segments,voices,prefs.narrator,prefs.pace]);
+ const rows=useMemo(()=>utterancesOf(spoken,{cast:voices,narrator:narratorVoice,pace:prefs.pace}),[spoken,voices,narratorVoice,prefs.pace]);
+ rowsRef.current=rows;
  const colors=useMemo(()=>roleColors(voices),[voices]);
  // The reader draws the same roles in the text (names, colours, emotions).
  useEffect(()=>{onScript?.({segments,cast:voices,colors,narrator:prefs.narrator,analysis});},[segments,voices,colors,prefs.narrator,analysis]);
- rowsRef.current=rows;
 
  useEffect(()=>{
   // CPU: 4 flow steps (measured CER: 3 steps ru 1.6% / uk 4.7%, 5 steps 0.5% / 0.8%).
@@ -55,7 +103,7 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
   if(wantPlay.current&&provider){wantPlay.current=false;narrator.current.play();}
   return()=>narrator.current?.destroy();
  },[language,provider]);
- // Re-queue when roles, voices or pace change, keeping the current position.
+ // Re-queue when roles, stresses, voices or pace change, keeping the position.
  useEffect(()=>{
   const player=narrator.current;if(!player)return;
   const current=player.queue[player.index],was=player.playing;
@@ -79,22 +127,34 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  function toggle(){if(narrator.current?.playing)narrator.current.pause();else if(phase==='ready'&&engineReady())narrator.current?.play();else begin();}
  if(commandRef)commandRef.current={toggle,playing:state.playing,busy:phase==='downloading'||phase==='starting'};
  useEffect(()=>{onPlaying?.(state.playing);},[state.playing]);
- const [sampling,setSampling]=useState('');
- async function preview(name,voice){
+ useEffect(()=>{if(castOpen)personalKey(userId).then(k=>setHasKey(!!k)).catch(()=>setHasKey(false));},[castOpen,userId]);
+
+ async function preview(name,value){
   if(!engineReady()){begin();return;}
   setSampling(name);
   try{
-   const result=await synthesize({text:SAMPLE[language]||SAMPLE.ru,lang:language,voice,steps:provider==='wasm'?4:5,speed:1,seed:3});
-   previewContext||=new (globalThis.AudioContext||globalThis.webkitAudioContext)();if(previewContext.state==='suspended')await previewContext.resume();
-   const buffer=previewContext.createBuffer(1,result.audio.length,result.sampleRate);buffer.copyToChannel(result.audio,0);
-   const source=previewContext.createBufferSource();source.buffer=buffer;source.connect(previewContext.destination);source.onended=()=>setSampling('');source.start();
-  }catch(e){setSampling('');setError(e.message||'Не удалось проиграть пример голоса.');}
+   const result=await synthesize({text:SAMPLE[language]||SAMPLE.ru,lang:language,voice:value.voice,steps:provider==='wasm'?4:5,speed:(value.pace||1)/(value.rate||1),seed:3});
+   await playClip(result,{rate:value.rate,eq:value.eq,gain:value.gain});
+  }catch(e){setError(e.message||'Не удалось проиграть пример голоса.');}
+  finally{setSampling('');}
  }
+ function change(name,patch){
+  setCast(old=>{const base={...voices[name],...old[name]};const next={...base,...patch,saved:true};
+   if('pitch' in patch)next.rate=Math.pow(2,next.pitch/12);
+   if('timbre' in patch){const eq={neutral:{low:0,mid:0,high:0},warm:{low:3,mid:-1,high:-2},bright:{low:-1,mid:2,high:3},dark:{low:2,mid:-1,high:-4},breathy:{low:-2,mid:-1,high:4},rough:{low:1,mid:3,high:-1},nasal:{low:-2,mid:4,high:-1,midFreq:1100},soft:{low:1,mid:-2,high:-1}}[patch.timbre];next.eq=eq;}
+   return {...old,[name]:next};});
+ }
+ async function saveKey(event){
+  event.preventDefault();
+  try{await savePersonalKey(userId,keyDraft);setKeyDraft('');setHasKey(true);setBibleRevision(v=>v+1);}catch(e){setError(e.message||'Не удалось сохранить ключ.');}
+ }
+ function restudy(){forgetBible(bookKey);setBible(null);setBibleRevision(v=>v+1);}
 
- const people=Object.entries(voices);
+ const people=Object.entries(voices).filter(([name])=>segments.some(s=>s.speaker===name));
+ const busy=phase==='downloading'||phase==='starting';
  const current=state.playing||phase==='ready'?rows[state.index]:null,currentSegment=current&&segments.find(x=>x.id===current.segment);
  const who=currentSegment&&currentSegment.kind!=='narration'?currentSegment.speaker||(currentSegment.gender==='f'?'Героиня':currentSegment.gender==='m'?'Герой':'Персонаж'):'Рассказчик';
- const busy=phase==='downloading'||phase==='starting';
+ const modelName=id=>[...ROLE_MODELS,...BIBLE_MODELS].find(([m])=>m===id)?.[1]||id;
  return <div className="narration" role="region" aria-label="Озвучка главы">
   {phase==='consent'&&<div className="narration-consent">
    <p><strong>Озвучка работает на этом устройстве.</strong> Один раз загрузится нейросеть Supertonic 3 — около {mb(TTS_BYTES)} МБ. Дальше она работает без сервера и сохраняется в кэше браузера.</p>
@@ -114,12 +174,28 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
   </div>
   {error&&<p className="inline-error" role="alert">{error}</p>}
   {castOpen&&<div className="narration-cast">
-   <header><strong>Роли</strong><button type="button" aria-label="Закрыть роли" onClick={()=>setCastOpen(false)}><X size={15}/></button></header>
-   <p className="fine">{analysis==='running'?'Определяем персонажей и эмоции через Google…':analysis==='model'?'Персонажи и эмоции определены моделью Google.':analysis.startsWith('heuristic:')?'Роли определены по тексту без модели: '+analysis.slice(10):'Роли определены по тексту главы.'}</p>
-   <label className="narration-switch"><input type="checkbox" checked={prefs.roles} onChange={e=>update({roles:e.target.checked})}/>Уточнять роли и эмоции через Google (по твоему ключу)</label>
-   <label>Рассказчик<select aria-label="Голос рассказчика" value={prefs.narrator} onChange={e=>update({narrator:e.target.value})}>{PRESET_VOICES.map(v=><option key={v} value={v}>{voiceName(v)}</option>)}</select></label>
-   <label className="narration-voice-row">Рассказчик · пример<button type="button" className="narration-sample" aria-label="Пример голоса рассказчика" disabled={!!sampling} onClick={()=>preview('narrator',{[prefs.narrator]:1})}><Volume2 size={15}/></button></label>
-   <ul>{people.map(([name,value])=><li key={name}><span translate="no" style={{color:colors[name]}}>{name}<small>{value.gender==='f'?'женский':value.gender==='m'?'мужской':''}</small></span><button type="button" className="narration-sample" aria-label={'Пример голоса: '+name} aria-pressed={sampling===name} disabled={!!sampling} onClick={()=>preview(name,value.voice)}><Volume2 size={15}/></button><select aria-label={'Голос: '+name} value={Object.keys(value.voice).length===1?Object.keys(value.voice)[0]:''} onChange={e=>setCast(old=>({...voices,...old,[name]:{...value,voice:{[e.target.value]:1}}}))}>{Object.keys(value.voice).length>1&&<option value="">Смесь · {voiceLabel(value.voice)}</option>}{PRESET_VOICES.map(v=><option key={v} value={v}>{voiceName(v)}</option>)}</select></li>)}</ul>
+   <header><strong>Роли и голоса</strong><button type="button" aria-label="Закрыть роли" onClick={()=>setCastOpen(false)}><X size={15}/></button></header>
+   <dl className="narration-facts">
+    <dt>Персонажи книги</dt><dd>{bibleState==='running'?'Изучаем героев: '+modelName(prefs.bibleModel)+'…':bible?modelName(bible.model)+(bible.tone?' · '+bible.tone:''):bibleState.startsWith('error:')?'Не получилось: '+bibleState.slice(6):prefs.roles?'Ждём ключ Google':'Выключено'}</dd>
+    <dt>Роли и эмоции</dt><dd>{analysis==='running'?'Размечаем главу: '+modelName(prefs.rolesModel)+'…':analysis==='model'?modelName(prefs.rolesModel):analysis.startsWith('heuristic:')?'По тексту без модели: '+analysis.slice(10):'По тексту главы'}</dd>
+    <dt>Ударения</dt><dd>{language!=='ru'?'Для украинского — только имена из карточки книги':!prefs.stress?'Выключено':stressState==='running'?'RUAccent расставляет ударения…':stressState==='ready'?'RUAccent':stressState.startsWith('error:')?'Не получилось: '+stressState.slice(6):'—'}</dd>
+   </dl>
+   {hasKey===false&&<form className="narration-key" onSubmit={saveKey}><label><KeyRound size={14}/>Личный ключ Google<input type="password" autoComplete="off" value={keyDraft} onChange={e=>setKeyDraft(e.target.value)} placeholder="Ключ из Google AI Studio"/></label><button className="btn btn-primary" disabled={!keyDraft.trim()}>Сохранить</button><small>Ключ хранится зашифрованным на этом устройстве и отправляется в Google через сервер MediaVault только вместе с запросом. Без ключа работают ключи владельца сервера.</small></form>}
+   {hasKey&&<p className="fine">Используется личный ключ Google с этого устройства.</p>}
+   <label className="narration-switch"><input type="checkbox" checked={prefs.roles} onChange={e=>update({roles:e.target.checked})}/>Разбирать персонажей, роли и эмоции моделями Google</label>
+   {language==='ru'&&<label className="narration-switch"><input type="checkbox" checked={prefs.stress} onChange={e=>update({stress:e.target.checked})}/>Ставить ударения (RUAccent)</label>}
+   <label>Роли и эмоции<select aria-label="Модель разметки ролей" value={prefs.rolesModel} onChange={e=>update({rolesModel:e.target.value})}>{ROLE_MODELS.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
+   <label>Персонажи книги<select aria-label="Модель карточки персонажей" value={prefs.bibleModel} onChange={e=>update({bibleModel:e.target.value})}>{BIBLE_MODELS.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
+   {prefs.roles&&<button type="button" className="text-link narration-restudy" disabled={bibleState==='running'} onClick={restudy}><RefreshCw size={13}/>Изучить персонажей заново</button>}
+   <label>Рассказчик<span className="narration-voice-controls"><button type="button" className="narration-sample" aria-label="Пример голоса рассказчика" disabled={!!sampling} onClick={()=>preview('narrator',narratorVoice)}><Volume2 size={15}/></button><select aria-label="Голос рассказчика" value={prefs.narrator} onChange={e=>update({narrator:e.target.value})}><option value="auto">{bible?.narrator?'По книге · '+(TIMBRE_LABELS[bible.narrator.timbre]||''):'Автоматически'}</option>{PRESET_VOICES.map(v=><option key={v} value={v}>{voiceName(v)}</option>)}</select></span></label>
+   <ul>{people.map(([name,value])=><li key={name}>
+    <div className="narration-person"><span translate="no" style={{color:colors[name]}}>{name}</span><small>{[value.gender==='f'?'женский':value.gender==='m'?'мужской':'',AGE_LABELS[value.age]].filter(Boolean).join(', ')}{value.traits?' · ':''}<span translate="no">{value.traits}</span></small></div>
+    <span className="narration-voice-controls">
+     <button type="button" className="narration-sample" aria-label={'Пример голоса: '+name} aria-pressed={sampling===name} disabled={!!sampling} onClick={()=>preview(name,value)}><Volume2 size={15}/></button>
+     <select aria-label={'Голос: '+name} value={Object.keys(value.voice)[0]} onChange={e=>change(name,{voice:{[e.target.value]:1}})}>{PRESET_VOICES.map(v=><option key={v} value={v}>{voiceName(v)} · {PRESET_TRAITS[v].f0} Гц</option>)}</select>
+     <select aria-label={'Высота голоса: '+name} value={Math.round(value.pitch||0)} onChange={e=>change(name,{pitch:Number(e.target.value)})}>{[-4,-3,-2,-1,0,1,2,3,4].map(v=><option key={v} value={v}>{v>0?'+'+v:v} пт</option>)}</select>
+     <select aria-label={'Тембр: '+name} value={value.timbre||'neutral'} onChange={e=>change(name,{timbre:e.target.value})}>{TIMBRES.map(t=><option key={t} value={t}>{TIMBRE_LABELS[t]}</option>)}</select>
+    </span></li>)}</ul>
    {!people.length&&<p className="fine">В этой главе нет реплик персонажей — читает рассказчик.</p>}
   </div>}
  </div>;

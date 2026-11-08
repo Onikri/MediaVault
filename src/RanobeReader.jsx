@@ -65,7 +65,7 @@ export default function RanobeReader({book,item,start,service,userId,onClose}){
  </div>;
  const contents=<nav className="reader-chapter-list">{book.episodes.map((c,i)=><button key={c.url} aria-current={i===index||undefined} onClick={()=>go(i)}><span translate="no">{c.number}. {c.title}</span></button>)}</nav>;
  const narration=chapter&&<Narration key={entry.url} paragraphs={chapter.paragraphs} language={chapter.language||book.language} bookKey={book.url} chapterKey={entry.url}
-  title={book.title+' · '+(chapter.title||entry.title)} service={service} userId={userId} startParagraph={startParagraph} autoplay={continueVoice}
+  title={book.title+' · '+(chapter.title||entry.title)} book={{title:item?.title||book.title,aliases:item?.aliases,authors:item?.authors,description:item?.description,year:item?.year,kind:item?.kind||'ranobe'}} service={service} userId={userId} startParagraph={startParagraph} autoplay={continueVoice}
   onAutoplayHandled={()=>setContinueVoice(false)} onSpeaking={speakingRow} onFinished={()=>go(index+1,{keepVoice:true})}
   onScript={setScript} commandRef={voice} onPlaying={setVoicePlaying}/>;
  const byParagraph=script?segmentsByParagraph(script.segments):null;
