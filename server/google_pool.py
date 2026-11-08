@@ -95,16 +95,28 @@ def install(app,owner,get_store):
             rows=[r for r in rows if body.model in r.get('models',MODELS) or body.model in LATER_MODELS]
         if not rows:raise HTTPException(422,'Добавь серверный ключ Google для выбранной модели.')
         model=body.model;activity=network.begin(subject,body.slot,model,personal=personal);lease=None;response=None;status_code=0;usage=None
+        # Without a pinned slot (narration), a 429 moves the request to a key of
+        # another project: the spent project gets its cooldown and is skipped.
+        # A pinned slot (the manga queue spreads pages over keys) never moves.
+        from google_gateway_limits import identity as key_identity,project as key_project
+        spare=[] if personal or body.slot is not None else list(rows)
         try:
-            lease=await state().acquire(rows,model,preferred=body.slot,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),disconnected=connection.is_disconnected)
-            row,call=lease
-            network.update(activity,'translating',slot=row.get('slot'))
-            if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
-            # Exactly the same request body as personal mode. No countTokens
-            # round trip or unrelated Gemma TPM budget on Gemini vision calls.
-            async with httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':row['key']}) as client:
-                response=await client.post('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',json=request)
-            status_code=response.status_code
+            while True:
+                lease=await state().acquire(spare or rows,model,preferred=body.slot,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),disconnected=connection.is_disconnected)
+                row,call=lease
+                network.update(activity,'translating',slot=row.get('slot'))
+                if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
+                # Exactly the same request body as personal mode. No countTokens
+                # round trip or unrelated Gemma TPM budget on Gemini vision calls.
+                async with httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':row['key']}) as client:
+                    response=await client.post('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',json=request)
+                status_code=response.status_code
+                if status_code==429 and spare:
+                    state().finish(row,model,call,status_code,None,response);lease=None
+                    spare=[r for r in spare if key_identity(r['key'])!=key_identity(row['key']) and key_project(r)!=key_project(row)]
+                    if spare:
+                        network.update(activity,'quota');continue
+                break
             if status_code!=200:
                 from google_gateway_limits import provider_limit
                 delay,_=provider_limit(response,time.time())
