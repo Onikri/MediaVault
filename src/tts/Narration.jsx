@@ -41,7 +41,8 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  rowsRef.current=rows;
 
  useEffect(()=>{
-  narrator.current=createNarrator({language,steps:provider==='wasm'?3:5,
+  // CPU: 4 flow steps (measured CER: 3 steps ru 1.6% / uk 4.7%, 5 steps 0.5% / 0.8%).
+  narrator.current=createNarrator({language,steps:provider==='wasm'?4:5,
    onSegment:row=>live.current.onSpeaking?.(row),onState:setState,onEnd:()=>live.current.onFinished?.(),onError:e=>{setError(e.message||'Озвучка остановилась.');}});
   const rows=rowsRef.current,first=Math.max(0,rows.findIndex(r=>r.p>=startParagraph));
   narrator.current.load(rows,{start:first,label:title});
