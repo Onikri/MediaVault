@@ -12,13 +12,14 @@ const readRange=async(item,a,b,{signal})=>{if(item.episode===21){if(!window.firs
 function Demo(){const[item,setItem]=useState(items[0]),[open,setOpen]=useState(true);window.closeReader=()=>setOpen(false);return open?<MangaReader item={item} catalog={{items}} userId="handoff" libraryId="drive-fixture" onClose={()=>setOpen(false)} onSelectItem={setItem} readWhole={readWhole} readRange={readRange}/>:<p>Закрыто</p>;}
 createRoot(document.getElementById('root')).render(<Demo/>);
 `);
- const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/chapter-handoff-vite',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});
+ const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/chapter-handoff-vite',logLevel:'error',server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});
  for(const width of[390,1366]){
   const context=await browser.newContext({viewport:{width,height:950}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>localStorage.setItem('mediavault_reader_v3:handoff:manga',JSON.stringify({nextChapter:true,translate:false,preload:2,fit:'page'})));
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/chapter-handoff/index.html');await page.waitForFunction(()=>document.querySelector('.reader-page img')?.naturalWidth===600&&window.rangeReads.some(r=>r.id==='chapter-21'));
-  await require('./reader-controls.cjs').revealReader(page);await page.getByRole('button',{name:'Настройки читалки',exact:true}).click();await page.getByLabel('Перейти к главе').selectOption('chapter-21');await page.getByRole('button',{name:'Закрыть настройки читалки',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('.reader-top')?.textContent.includes('21.cbz')&&document.querySelector('.reader-page img')?.naturalWidth===600);
+  // The chapter jump lives in the reader's top bar as a UiSelect (no longer inside settings).
+  await require('./reader-controls.cjs').revealReader(page);await require('./reader-select.cjs').chooseOption(page,'Перейти к главе','Глава 21');
+  await page.waitForFunction(()=>document.querySelector('.reader-top .mv-viewer-title strong')?.textContent==='Глава 21'&&document.querySelector('.reader-page img')?.naturalWidth===600);
   const result=await page.evaluate(()=>({sameLease:window.first21Signal===window.last21Signal,aborted:window.last21Signal.aborted,wholeReads:window.wholeReads,reads21:window.rangeReads.filter(r=>r.id==='chapter-21').length,alerts:[...document.querySelectorAll('[role="alert"]')].map(n=>n.textContent)}));
   assert.ok(result.sameLease);assert.equal(result.aborted,false);assert.equal(result.wholeReads,0);assert.ok(result.reads21>=3);assert.deepEqual(result.alerts,[]);assert.deepEqual(errors,[]);
   await page.evaluate(()=>window.closeReader());await page.waitForFunction(()=>window.last21Signal.aborted);await context.close();console.log('PASS Drive CBZ prefetch handoff 20 → 21, valid lazy pages and cancellation on close at '+width);

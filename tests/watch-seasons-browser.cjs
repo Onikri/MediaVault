@@ -1,4 +1,5 @@
 // Real React/native media decoding; source inspections and leases are fixtures.
+const {showEpisodes,chooseSeason}=require('./player-episodes.cjs');
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 let browser,vite,last;
 (async()=>{
@@ -29,28 +30,30 @@ let browser,vite,last;
  for(const width of [390,1440]){
   const page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'}),errors=[];last=page;page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});page.setDefaultTimeout(8000);
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');
-  await page.getByRole('button',{name:'Смотреть · серия 1',exact:true}).click();
+  await page.getByRole('button',{name:'Смотреть серию 1',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.mv-player-media')?.currentTime>.1);
-  await page.evaluate(()=>{window.video=document.querySelector('.mv-player-media');window.shell=document.querySelector('[data-player]');window.selector=document.querySelector('[aria-label="Сезон просмотра"]');});
+  await showEpisodes(page);await page.evaluate(()=>{window.video=document.querySelector('.mv-player-media');window.shell=document.querySelector('[data-player]');window.selector=document.querySelector('[aria-label="Сезон просмотра"]');});
   const mainCount=()=>page.evaluate(()=>window.requests.filter(r=>r.clientId?.endsWith(':viewer')).length);
   const countBefore=await mainCount();
-  await page.getByLabel('Сезон просмотра').selectOption('2');
-  await page.getByLabel('Сезон просмотра').selectOption('3');
+  await chooseSeason(page,'2');
+  await chooseSeason(page,'3');
   await page.getByText('Тест: список сезона временно недоступен',{exact:false}).waitFor();
   assert.equal(await mainCount(),countBefore,'Browsing/failing a season must not prepare another media stream');
   assert.ok(await page.evaluate(()=>window.video===document.querySelector('.mv-player-media')&&!window.video.paused&&window.shell===document.querySelector('[data-player]')&&window.selector===document.querySelector('[aria-label="Сезон просмотра"]')),'Player and season chooser stay mounted');
-  await page.getByLabel('Сезон просмотра').selectOption('2');await page.locator('#browsed').getByText('Сезон 2 · 3',{exact:true}).waitFor();
+  await chooseSeason(page,'2');await page.locator('#browsed').getByText('Сезон 2 · 3',{exact:true}).waitFor();
   assert.equal(await mainCount(),countBefore);
   const previous=await page.evaluate(()=>({time:window.video.currentTime,src:window.video.currentSrc,closed:window.releasedLeases.length}));
-  await page.locator('.watch-episode-grid .title-episode-card').nth(1).click();
+  await showEpisodes(page);await page.locator('.watch-episode-grid .title-episode-card').nth(1).click();
   await page.waitForTimeout(150);
   assert.ok(await page.evaluate(p=>window.video.currentSrc===p.src&&!window.video.paused&&window.video.currentTime>p.time&&window.releasedLeases.length===p.closed,previous),'Current stream survives preparation of the next episode');
   await page.waitForFunction(src=>window.video.currentSrc!==src&&window.video.readyState>=2,previous.src);
   assert.equal(await mainCount(),countBefore+1,'Explicit episode choice prepares exactly one stream');
   assert.ok(await page.evaluate(()=>window.requests.filter(r=>r.clientId?.endsWith(':viewer')).at(-1).url.endsWith('/s2/2')));
   assert.ok(await page.evaluate(()=>window.video===document.querySelector('.mv-player-media')&&window.shell===document.querySelector('[data-player]')),'Episode handoff preserves React player/native video identity');
-  await page.getByRole('button',{name:'Сезоны и серии',exact:true}).click();await page.getByRole('button',{name:'Закрыть серии',exact:true}).click();
-  const nextCount=await mainCount();await page.getByLabel('Сезон просмотра').selectOption('1');await page.locator('#browsed').getByText('Сезон 1 · 3',{exact:true}).waitFor();
+  // The online episode panel stays open after a choice; close it and toggle it from the chip.
+  await page.getByRole('button',{name:'Закрыть серии',exact:true}).click();await page.locator('.mvx-episodes').waitFor({state:'detached'});
+  await page.getByRole('button',{name:'Выбрать серию',exact:true}).click();await page.locator('.mvx-episodes').waitFor();await page.getByRole('button',{name:'Закрыть серии',exact:true}).click();await page.locator('.mvx-episodes').waitFor({state:'detached'});
+  const nextCount=await mainCount();await chooseSeason(page,'1');await page.locator('#browsed').getByText('Сезон 1 · 3',{exact:true}).waitFor();
   assert.equal(await mainCount(),nextCount);
   const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('mv_watch_v1:test:season-fixture')));assert.equal(saved.season,2);assert.equal(saved.episode,2,'Browsing does not overwrite actual resume position');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
@@ -58,9 +61,11 @@ let browser,vite,last;
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html?local');
   await page.waitForFunction(()=>document.querySelector('.mv-player-media')?.readyState>=2);
   await page.evaluate(()=>{window.video=document.querySelector('.mv-player-media');window.source=window.video.currentSrc;});
-  await page.getByLabel('Сезон',{exact:true}).selectOption({label:'Сезон 2'});
+  // Local seasons are browsed from the player's episode panel.
+  await page.getByRole('button',{name:'Выбрать серию',exact:true}).click();
+  await page.getByRole('tablist',{name:'Сезон плеера'}).getByRole('tab',{name:'Сезон 2',exact:true}).click();
   assert.ok(await page.evaluate(()=>window.video===document.querySelector('.mv-player-media')&&window.video.currentSrc===window.source&&!window.localChoices),'Local season browsing also preserves current media');
-  await page.locator('.mv-player-rail button').nth(1).click();
+  await page.locator('.mvx-episodes .mvx-card').nth(1).click();
   await page.waitForFunction(()=>window.video.currentSrc.includes('s2e2'));
   assert.equal(await page.evaluate(()=>window.localChoices),1);assert.ok(await page.evaluate(()=>window.video===document.querySelector('.mv-player-media')));
   assert.deepEqual(errors,[]);await page.close();console.log('PASS season browsing, source errors, exact episode handoff, stable player and resume '+width);

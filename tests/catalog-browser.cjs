@@ -46,7 +46,8 @@ module.exports=async function checkDynamicCatalogue(page){
     await page.waitForFunction(()=>document.querySelector('[role=option] strong')?.textContent==='Star');
     assert.ok((await page.locator('[role=option][aria-selected=true]').innerText()).includes('Star Quest'),'Late results do not change the keyboard choice');
     await input.press('Enter');
-    await page.getByRole('heading',{name:'Star Quest',exact:true}).waitFor();
+    // The paused player repeats the title in its own overview, so read the page hero.
+    await page.locator('.title-hero').getByRole('heading',{name:'Star Quest',exact:true}).waitFor();
     await page.getByRole('button',{name:'К результатам поиска'}).click();
 
     await input.fill('Old');

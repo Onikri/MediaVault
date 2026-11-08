@@ -51,7 +51,8 @@ let browser,vite,last;
    await page.evaluate(()=>window.player.pause());
    const rect=await video.boundingBox(),vx=rect.x+rect.width*.85,vy=rect.y+rect.height*.5;
    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:vx,y:vy}]});await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:vx,y:vy-40}]});await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-   assert.ok(await video.evaluate(v=>v.volume>.4),'Touch volume works independently of pointer media queries');
+   // The new volume reaches the element through a React effect, after the gesture ends.
+   await page.waitForFunction(()=>window.player.media.volume>.4,null,{timeout:5000}).catch(()=>assert.fail('Touch volume works independently of pointer media queries'));
    for(let i=0;i<4;i++){
     const r=await video.boundingBox(),x=r.x+r.width*.5,y=r.y+r.height*.3;
     await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
