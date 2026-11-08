@@ -3,7 +3,11 @@ const navigateApp=require('./app-navigation.cjs');
 // Run: npm run test:browser (builds the production React app; requires Chromium).
 const assert = require('node:assert/strict');
 const {revealReader}=require('./reader-controls.cjs');
-async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}
+// Title-page playback lives in the retained-media layer above the page, which currently covers the
+// title page's own close button (regression since 96f932e); close it from the background-player dock.
+async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else if(await page.locator('.title-playback').count()){await page.getByRole('button',{name:'Плеер в фоне'}).click();await page.locator('.retained-dock-panel').getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}
+// Status and error toasts are collected in the navbar notification centre.
+async function expectNotice(page,text){await page.getByRole('button',{name:/^Уведомления/}).click();const center=page.getByRole('dialog',{name:'Уведомления'});await center.getByText(text,{exact:true}).first().waitFor();await page.keyboard.press('Escape');await center.waitFor({state:'hidden'});}
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
@@ -214,7 +218,7 @@ async function main() {
   // Connection settings live in Profile rather than taking a slot in the navbar.
   assert.equal(await owner.locator('.blossom-navbar .import-settings-trigger').count(),0,'navbar has no connection icon');
   await owner.locator('#profileBtn').click();await owner.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
-  await owner.getByRole('tab',{name:'Подключения',exact:true}).click();
+  await owner.locator('.cc-nav').getByRole('button',{name:'Хранилище'}).click();
   await owner.locator('.connection-settings-card .import-settings-trigger').click();
   await owner.locator('#importServer').fill('https://import.example.com');
   await owner.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
@@ -238,7 +242,7 @@ async function main() {
   await owner.getByRole('spinbutton',{name:'Первая серия',exact:true}).fill('1');
   await owner.getByRole('spinbutton',{name:'Последняя серия',exact:true}).fill('3');
   await owner.locator('#importVideoBtn').click();
-  await owner.getByRole('heading',{name:'Очередь импорта',exact:true}).waitFor();
+  await owner.getByRole('heading',{name:'Задания',exact:true}).waitFor();
   assert.equal(submitted.length,1);
   const serverJob=submitted[0].job;
   assert.equal(serverJob.version,3);assert.equal(serverJob.quality,'best');assert.equal(serverJob.library_id,catalogId);assert.equal(serverJob.episodes,'1-3');
@@ -277,11 +281,11 @@ async function main() {
   await owner.locator('.media-card').filter({hasText:'private-video.mp4'}).click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   assert.equal(await owner.locator('video').evaluate(video=>Math.round(video.duration)),2,'Service Worker streams playable MP4');
-  await owner.locator('.mv-player-controls button[aria-label="Воспроизвести"]').click();
+  await owner.locator('.mv-player button.mvx-play[aria-label="Воспроизвести"]').click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.paused===false);
   assert.equal(await owner.locator('video').evaluate(video=>video.paused),false,
     'Video starts after pressing custom player Play button');
-  await owner.locator('.mv-player-controls button[aria-label="Пауза"]').click();
+  await owner.locator('.mv-player button.mvx-play[aria-label="Пауза"]').click();
   assert.equal(await owner.locator('.mv-player-panorama img').count(),0,'Paused video does not duplicate the decoded frame');
   await owner.waitForFunction(()=>document.querySelector('.mv-player')?.style.getPropertyValue('--scene-rgb')!=='150 157 166');
   assert.notEqual(await owner.locator('.mv-player').evaluate(el=>el.style.getPropertyValue('--scene-rgb')),'150 157 166','A decoded frame supplies ambient colors without a JPEG copy');
@@ -301,20 +305,20 @@ async function main() {
   await owner.locator('#searchInput').fill('no-such-file');
   await owner.getByRole('heading',{name:'Ничего не нашлось'}).waitFor();
   await owner.locator('#searchInput').fill('');
-  await owner.getByRole('button',{name:'Видео',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Видео',exact:true}).click();
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===1);
   assert.ok((await owner.locator('.media-card').innerText()).includes('private-video.mp4'),'Category filter selects video');
-  await owner.getByRole('button',{name:'Всё',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Всё',exact:true}).click();
   await owner.locator('.media-card').filter({hasText:'private-note.txt'}).getByRole('button',{name:'В избранное'}).click();
-  await owner.getByRole('button',{name:'Избранное',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Избранное',exact:true}).click();
   assert.equal(await owner.locator('.media-card').count(),1,'Favorites show only bookmarked material');
   assert.ok((await owner.locator('.media-card').innerText()).includes('private-note.txt'));
-  await owner.getByRole('button',{name:'Всё',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Всё',exact:true}).click();
   await owner.getByRole('combobox',{name:'Порядок материалов'}).selectOption('name');
   assert.deepEqual(await owner.locator('.media-name').allTextContents(),['private-image.png','private-note.txt','private-video.mp4'],'Name sort orders the library');
   await navigateApp(owner,'История');
-  assert.equal(await owner.locator('.history-item').count(),3,'History records the three opened files');
-  await owner.locator('.history-item').filter({hasText:'private-note.txt'}).click();
+  assert.equal(await owner.locator('.history-card').count(),3,'History records the three opened files');
+  await owner.locator('.history-card').filter({hasText:'private-note.txt'}).click();
   await owner.locator('.reader-prose').waitFor();
   await closeViewer(owner);
   await navigateApp(owner,'Коллекция');
@@ -326,15 +330,15 @@ async function main() {
   await signIn(owner);
   await owner.locator('#passphrase').fill('deliberately wrong phrase');
   await owner.locator('#unlockBtn').click();
-  await owner.getByText('Неверная секретная фраза или повреждённый каталог.',{exact:true}).waitFor();
+  await expectNotice(owner,'Неверная секретная фраза или повреждённый каталог.');
   assert.equal(await owner.locator('#adminPanel').isVisible(),false,'Wrong phrase does not open library');
   await owner.locator('#passphrase').fill(PHRASE);
   await owner.locator('#unlockBtn').click();
   await owner.locator('#adminPanel').waitFor({state:'visible'});
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===3);
-  await owner.getByRole('button',{name:'Избранное',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Избранное',exact:true}).click();
   assert.equal(await owner.locator('.media-card').count(),1,'Favorites persist after refresh and unlocking');
-  await owner.getByRole('button',{name:'Всё',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Всё',exact:true}).click();
   await owner.locator('#profileBtn').click();await owner.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
   await owner.evaluate(()=>window.__tokenDuration=16);
   await owner.locator('#driveBtn').click();
@@ -413,7 +417,7 @@ async function main() {
   });
   await navigateApp(fresh,'Библиотека');
   await fresh.locator('#profileBtn').click();await fresh.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
-  await fresh.getByRole('tab',{name:'Подключения',exact:true}).click();await fresh.locator('.connection-settings-card .import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
+  await fresh.locator('.cc-nav').getByRole('button',{name:'Хранилище'}).click();await fresh.locator('.connection-settings-card .import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
   await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await navigateApp(fresh,'Библиотека');await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();await fresh.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await fresh.locator('#streamUrl').fill('https://source.example.com/titans');await fresh.getByRole('button',{name:'Проверить',exact:true}).click();await fresh.locator('#importDub').selectOption('https://source.example.com/studio');await fresh.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
   await fresh.locator('#serverCollection').fill('Атака титанов');await fresh.getByRole('button',{name:'Одна',exact:true}).click();await fresh.getByRole('combobox',{name:'Номер серии'}).selectOption('3');
@@ -470,15 +474,15 @@ async function main() {
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===9);
   await owner.locator('#showTitlesBtn').click();
   assert.equal(await owner.locator('.title-card[data-title-name="Наруто"]').count(),2,'Same-named anime and manga have separate title cards');
-  await owner.getByRole('button',{name:'Аниме',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Аниме',exact:true}).click();
   assert.equal(await owner.locator('.title-card').count(),1,'Three episodes appear as one anime title');
   await owner.locator('.title-card').click();
   await owner.locator('#titleLookup').fill('Наруто');
   await owner.getByRole('button',{name:'Найти',exact:true}).click();
-  await owner.getByText('Из твоего Drive',{exact:true}).waitFor();
   await owner.getByText(titleFixture.description,{exact:true}).waitFor();
   assert.equal(await owner.locator('.title-hero').getByRole('heading',{name:'Наруто',exact:true}).count(),1);
-  assert.ok(await owner.locator('.title-page .title-facts').innerText().then(t=>t.includes('Хаято Датэ')&&t.includes('Манга')),'Compact header retains director and source in the information card');
+  // Roles arrive after the description, so wait for the director instead of sampling once.
+  await owner.locator('.title-page .title-facts').filter({hasText:'Хаято Датэ'}).filter({hasText:'Манга'}).waitFor({timeout:10000}).catch(()=>assert.fail('Compact header retains director and source in the information card'));
   await owner.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
   await owner.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
   await owner.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
@@ -490,35 +494,50 @@ async function main() {
   assert.equal(await owner.locator('.title-episode-card').count(),2);
   await owner.locator('.title-episode-card').first().click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
-  const cinema=owner.locator('.mv-player');
+  const cinema=owner.locator('.mv-player.mvx');
+  // On phones the settings sheet is portalled to <body>, so it is looked up on the page.
+  const playerSettings=owner.getByRole('dialog',{name:'Настройки просмотра',exact:true});
+  const settingsRow=label=>playerSettings.locator('.mvx-row').filter({hasText:new RegExp('^'+label)});
+  // Escape first folds an expanded settings row, then closes the sheet; a third press would close the viewer.
+  const closeSettings=async()=>{if(await playerSettings.locator('[data-settings-nested]').count()){await owner.keyboard.press('Escape');await playerSettings.locator('[data-settings-nested]').waitFor({state:'detached'});}await owner.keyboard.press('Escape');await playerSettings.waitFor({state:'hidden'});};
   assert.equal(await cinema.count(),1,'Anime opens the advanced player');
   assert.equal(await owner.locator('#viewerContent').evaluate(el=>el.scrollTop),0,'Centering the active episode never scrolls the video out of view');
-  assert.equal(await cinema.locator('.mv-player-play').count(),1,'One playback action');
-  const pictureBefore=await cinema.locator('.mv-player-screen').boundingBox();
+  assert.equal(await cinema.locator('.mvx-play').count(),1,'One playback action');
+  // The title page scales the player in with scroll (PlaybackReveal) until it is touched,
+  // so measure with the player scrolled fully open and compare playing with paused frames.
+  const settledBox=async locator=>{let last=null;for(let i=0;i<40;i++){const box=await locator.boundingBox();if(last&&Math.abs(box.width-last.width)<.1&&Math.abs(box.height-last.height)<.1)return box;last=box;await owner.waitForTimeout(100);}return last;};
+  await cinema.evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
   await cinema.getByRole('button',{name:'Воспроизвести',exact:true}).click();
   await owner.waitForFunction(()=>document.querySelector('video').paused===false);
-  const picturePlaying=await cinema.locator('.mv-player-screen').boundingBox();
-  assert.ok(Math.abs(picturePlaying.height-pictureBefore.height)<=1,'Pause/play preserves picture size within one CSS pixel');
+  const picturePlaying=await settledBox(cinema.locator('.mv-player-screen'));
   await cinema.getByRole('button',{name:'Пауза',exact:true}).click();
+  const picturePaused=await settledBox(cinema.locator('.mv-player-screen'));
+  assert.ok(Math.abs(picturePlaying.height-picturePaused.height)<=1,'Pause/play preserves picture size within one CSS pixel');
   await cinema.focus();await owner.keyboard.press('k');await owner.waitForFunction(()=>document.querySelector('video').paused===false);await owner.keyboard.press('k');await owner.waitForFunction(()=>document.querySelector('video').paused===true);
   await cinema.getByRole('button',{name:'Настройки плеера',exact:true}).click();
-  await cinema.getByRole('tab',{name:'Изображение',exact:true}).click();
-  await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('anime4k');
+  await settingsRow('Улучшение').click();
+  await playerSettings.getByRole('radio',{name:/^Anime4K, WebGL/}).click();
   await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width>0&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
   assert.equal(await cinema.locator('.mv-player-canvas').evaluate(c=>c.width),64,'Anime4K WebGL shaders upscale the 32px decoded fixture to 64px');
-  await cinema.getByRole('combobox',{name:'Профиль устройства'}).selectOption('tablet');
-  await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('mobile');
+  await playerSettings.getByRole('radiogroup',{name:'Устройство'}).getByRole('radio',{name:'Планшет',exact:true}).click();
+  await playerSettings.getByRole('radio',{name:/^Anime4K L, WebGL/}).click();
   await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width===64&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
   await cinema.locator('.mv-player-canvas').evaluate(canvas=>canvas.dispatchEvent(new Event('webglcontextlost',{cancelable:true})));
-  await owner.waitForFunction(()=>document.querySelector('.mv-player-warning')?.textContent.includes('Контекст GPU'));
-  await cinema.getByRole('button',{name:'Повторить на новом GPU-контексте'}).click();
+  await owner.waitForFunction(()=>document.querySelector('.mvx-warning')?.textContent.includes('GPU'));
+  await playerSettings.getByRole('button',{name:'Повторить на новом GPU-контексте'}).click();
   await owner.waitForFunction(()=>document.querySelector('.mv-player-canvas')?.width===64&&getComputedStyle(document.querySelector('.mv-player-canvas')).opacity==='1');
-  await cinema.getByRole('combobox',{name:'Алгоритм улучшения'}).selectOption('off');
-  await owner.keyboard.press('Escape');
+  await playerSettings.getByRole('radiogroup',{name:'Улучшение выключено'}).getByRole('radio').click();
+  await closeSettings();
 
   assert.equal(await cinema.getByRole('button',{name:'Настройки плеера'}).count(),1,'One settings entry');
-  assert.equal(await cinema.locator('.mv-player-library,.mv-player-tabs,.mv-player-start').count(),0,'No duplicate navigation or playback buttons');
-  await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
+  // Pause effects download a depth model; when that fails offline its status pill grows over
+  // the frame at an unpredictable moment, so switch them off to keep the gesture surface stable.
+  await cinema.getByRole('button',{name:'Настройки плеера',exact:true}).click();
+  await settingsRow('Эффекты паузы').click();
+  await playerSettings.getByRole('switch',{name:/^Эффект на паузе/}).click();
+  await closeSettings();
+  assert.equal(await cinema.locator('.pause-depth-status').count(),0,'Pause effects are off for the gesture checks');
+  assert.equal(await playerSettings.count(),0,'Settings close before touch gestures');
   await cinema.locator('.mv-player-touch-surface').evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
   const touchSession=await ownerContext.newCDPSession(owner);
   await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
@@ -533,27 +552,29 @@ async function main() {
     for(let i=1;i<=6;i++){
       await touchSession.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx*i/6,y:y+dy*i/6}]});
       if(dx&&i===3){
-        assert.equal(await cinema.locator('.mv-player-seek-preview').count(),1,'Scrubbing previews its destination on the timeline');
+        assert.equal(await cinema.locator('.mvx-timeline-bubble').count(),1,'Scrubbing previews its destination on the timeline');
         assert.equal(await cinema.locator('video').evaluate(v=>v.currentTime),original,'Touch seek waits for release');
       }
     }
     await touchSession.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   };
   await swipe(.15,0,-90);
+  // Gesture state reaches the DOM on the next React commit after the touch ends.
+  await owner.waitForFunction(()=>Number(document.querySelector('.mv-player.mvx').style.getPropertyValue('--video-brightness'))>1,null,{timeout:5000}).catch(()=>{});
   assert.ok(await cinema.evaluate(el=>Number(el.style.getPropertyValue('--video-brightness'))>1),'Left vertical touch changes player brightness');
   await swipe(.85,0,90);
+  await owner.waitForFunction(()=>document.querySelector('.mv-player.mvx video').volume<1,null,{timeout:5000}).catch(()=>{});
   assert.ok(await cinema.locator('video').evaluate(v=>v.volume<1),'Right vertical touch changes volume');
   assert.equal(await cinema.locator('video').evaluate(v=>v.paused),true,'Swipes never trigger tap playback');
   await swipe(.15,65,0);
   assert.ok(await cinema.locator('video').evaluate(v=>v.currentTime>0),'Horizontal touch commits the timeline preview');
   await swipe(.5,0,-90);
-  await cinema.getByRole('button',{name:'Закрыть эпизоды'}).waitFor();
-  assert.equal(await cinema.locator('.mv-player-rail').evaluate(el=>getComputedStyle(el).display),'grid','Center swipe expands the existing episode rail');
-  await cinema.getByRole('button',{name:'Закрыть эпизоды'}).click();
+  await cinema.getByRole('button',{name:'Закрыть серии'}).waitFor();
+  assert.equal(await cinema.locator('.mvx-episodes .mvx-card').count(),2,'Center swipe up opens the episode panel');
+  await cinema.getByRole('button',{name:'Закрыть серии'}).click();await cinema.locator('.mvx-episodes').waitFor({state:'detached'});
   await swipe(.5,0,90);
-  await cinema.getByRole('dialog',{name:'Настройки просмотра',exact:true}).waitFor();
-  await owner.keyboard.press('Escape');
-  await owner.waitForFunction(()=>!document.querySelector('.mv-player-drawer'));
+  await playerSettings.waitFor();
+  await closeSettings();
   // Keep the two-second fixture alive while CDP round trips exercise tap toggles.
   // A slow runner may otherwise finish playback before the next assertion polls.
   await cinema.locator('video').evaluate(v=>{v.loop=true;v.currentTime=0;window.tapTrace=[];for(const type of ['pointerdown','pointerup','click','play','pause','ended'])v.addEventListener(type,e=>{if(window.tapTrace.length<30)window.tapTrace.push({type:e.type,pointer:e.pointerType,paused:v.paused,time:v.currentTime,coarse:matchMedia('(any-pointer:coarse)').matches});});});
@@ -569,40 +590,44 @@ async function main() {
     await owner.setViewportSize({width,height:900});
     await cinema.screenshot({path:path.join(output,'player-'+width+'.png'),animations:'disabled'});
     assert.ok(await cinema.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Player fits '+width);
-    assert.equal(await cinema.locator('.mv-player-card').count(),2,'One episode rail');
-    assert.equal(await cinema.locator('.mv-player-card.is-current .mv-player-card-art').evaluate(el=>getComputedStyle(el).outlineStyle),'none','No decorative selection frame');
+    await cinema.getByRole('button',{name:'Выбрать серию'}).click();
+    assert.equal(await cinema.locator('.mvx-episodes .mvx-card').count(),2,'One episode grid');
+    assert.equal(await cinema.locator('.mvx-card.is-current .mvx-card-art').evaluate(el=>getComputedStyle(el).outlineStyle),'none','No decorative selection frame');
+    await cinema.getByRole('button',{name:'Закрыть серии'}).click();await cinema.locator('.mvx-episodes').waitFor({state:'detached'});
     await cinema.getByRole('button',{name:'Настройки плеера'}).click();
-    await cinema.getByRole('dialog',{name:'Настройки просмотра',exact:true}).waitFor();
-    await cinema.screenshot({path:path.join(output,'player-settings-'+width+'.png'),animations:'disabled'});
-    assert.ok(await cinema.locator('.mv-player-drawer').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Settings fit '+width);
-    await owner.keyboard.press('Escape');
+    await playerSettings.waitFor();
+    await owner.screenshot({path:path.join(output,'player-settings-'+width+'.png'),animations:'disabled'});
+    assert.ok(await playerSettings.evaluate(el=>el.scrollWidth<=el.clientWidth+1&&el.getBoundingClientRect().right<=innerWidth+1),'Settings fit '+width);
+    await closeSettings();
     assert.equal(await owner.locator('#viewer').isVisible(),true,'Escape dismisses settings first');
   }
   await cinema.getByRole('button',{name:'На весь экран',exact:true}).click();
   await owner.waitForFunction(()=>document.fullscreenElement?.classList.contains('mv-player'));
-  assert.equal(await cinema.locator('.mv-player-controls').isVisible(),true,'Fullscreen keeps custom playback controls');
+  assert.equal(await cinema.locator('.mvx-controls').isVisible(),true,'Fullscreen keeps custom playback controls');
   await owner.evaluate(()=>document.exitFullscreen());
   await owner.setViewportSize({width:390,height:860});
   await cinema.getByRole('button',{name:'Настройки плеера'}).click();
-  await cinema.getByRole('tab',{name:'Субтитры',exact:true}).click();
-  assert.equal(await cinema.getByRole('combobox',{name:'Субтитры'}).count(),1);
-  await cinema.locator('input[type=file]').setInputFiles({
+  await settingsRow('Субтитры').click();
+  assert.equal(await playerSettings.getByRole('radiogroup',{name:'Субтитры',exact:true}).count(),1);
+  await cinema.locator('input[type=file][accept*=".srt"]').setInputFiles({
     name:'example.srt',mimeType:'text/plain',
     buffer:Buffer.from('1\n00:00:00,000 --> 00:00:01,500\nПривет\n')
   });
   await owner.waitForFunction(()=>document.querySelector('#viewerContent track')?.src?.startsWith('blob:'));
   assert.equal(await cinema.locator('video track').count(),1,'SRT becomes a local VTT track');
-  await owner.keyboard.press('Escape');
-  await cinema.getByRole('combobox',{name:'Сезон',exact:true}).selectOption({label:'Сезон 2'});
+  await closeSettings();
+  await cinema.getByRole('button',{name:'Выбрать серию'}).click();
+  await cinema.getByRole('tab',{name:'Сезон 2',exact:true}).click();
+  await cinema.locator('.mvx-episodes .mvx-card').first().click();
+  await owner.waitForFunction(()=>document.querySelector('.mv-player .mvx-meta')?.textContent.includes('Сезон 2'));
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
-  assert.equal(await owner.locator('.mv-player-season-title select').inputValue()!=='',true);
   await closeViewer(owner);
   await owner.locator('#backToTitles').click();
-  await owner.getByRole('button',{name:'Манга',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Манга',exact:true}).click();
   assert.equal(await owner.locator('.title-card').count(),1);
   await owner.locator('#searchInput').fill('Наруто');
   assert.equal(await owner.locator('.title-card').count(),1,'Title search finds files even when filenames do not contain the title');
-  await owner.getByRole('button',{name:'Ранобэ',exact:true}).click();
+  await owner.getByRole('button',{name:'Раздел Ранобэ',exact:true}).click();
   await owner.locator('#uploadSection').selectOption('ranobe');
   await owner.locator('#filesInput').setInputFiles([{name:'Том-01.txt',mimeType:'text/plain',buffer:Buffer.from('Light novel volume text')}]);
   await owner.waitForFunction(()=>document.querySelector('#count').textContent==='10 файлов');

@@ -1,12 +1,12 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
-import {ChevronRight,Cloud,Download,History,LogIn,LogOut,Settings,UserPlus,UsersRound} from 'lucide-react';
+import {ChevronRight,Cloud,Download,Gauge,History,LogIn,LogOut,Settings,UserPlus,UsersRound} from 'lucide-react';
 import ProfileAvatar from './ProfileAvatar.jsx';
 import './profile-menu.css';
 
 // Compact account island under the avatar. The full profile page is only for settings.
-export default function ProfileMenu({state,guest,importActive,onNavigate,onDownloads,onGuests,onLogin,onGuestLogin,onLogout}){
+export default function ProfileMenu({state,guest,importActive,onNavigate,onDownloads,onGuests,onControl,onLogin,onGuestLogin,onLogout}){
  const [open,setOpen]=useState(false),[box,setBox]=useState({right:16,top:72}),trigger=useRef(null),panel=useRef(null),reduce=useReducedMotion();
  useLayoutEffect(()=>{if(!open)return;const update=()=>{const r=trigger.current?.getBoundingClientRect();if(r)setBox({right:Math.max(12,innerWidth-r.right),top:r.bottom+10});};update();addEventListener('resize',update);addEventListener('scroll',update,true);return()=>{removeEventListener('resize',update);removeEventListener('scroll',update,true);};},[open]);
  useEffect(()=>{if(!open)return;const outside=e=>{if(!panel.current?.contains(e.target)&&!trigger.current?.contains(e.target))setOpen(false);};const key=e=>{if(e.key==='Escape'){setOpen(false);trigger.current?.focus();}};document.addEventListener('pointerdown',outside);document.addEventListener('keydown',key);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',key);};},[open]);
@@ -19,7 +19,8 @@ export default function ProfileMenu({state,guest,importActive,onNavigate,onDownl
   state.catalog&&{id:'collection',label:'Моя коллекция',icon:Cloud,run:()=>onNavigate('collection')},
   {id:'history',label:'История',icon:History,run:()=>onNavigate('history')},
   state.admin&&{id:'downloads',label:'Загрузки',icon:Download,run:onDownloads,live:importActive},
-  state.admin&&{id:'guests',label:'Гостевые профили',icon:UsersRound,run:onGuests},
+  state.admin&&{id:'control',label:'Пульт управления',icon:Gauge,run:onControl},
+  state.admin&&{id:'guests',label:'Гости',icon:UsersRound,run:onGuests},
   {id:'settings',label:'Настройки',icon:Settings,run:()=>onNavigate('profile'),chevron:true},
  ].filter(Boolean);
  return <><button ref={trigger} id="profileBtn" className={'avatar-button'+(open?' nav-active':'')} onClick={()=>setOpen(v=>!v)} aria-haspopup="dialog" aria-expanded={open} aria-label="Профиль">{user?<ProfileAvatar user={user}/>:<UserIconFallback/>}</button>

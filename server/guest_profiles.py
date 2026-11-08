@@ -325,6 +325,11 @@ def install(app, owner, get_store, sign, decode, activity=None):
             identity = secrets.token_hex(8)
             record = {'id': identity, 'name': body.name.strip(), 'created_at': int(time.time()), 'expires_at': lifetime(body.days),
                       'disabled': False, 'session_version': 1}
+            # New guests start with the owner's default rights (site rules).
+            import site_rules
+            defaults = site_rules.current(store())['guests']
+            if not (defaults['watch'] and defaults['read']):
+                record['access'] = {**FULL_ACCESS, 'watch': defaults['watch'], 'read': defaults['read']}
             invite = issue_invite(record)
             save(record)
             store().setting(INDEX, {'ids': [identity, *present]})

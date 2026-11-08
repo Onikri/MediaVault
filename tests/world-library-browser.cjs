@@ -1,6 +1,7 @@
 // UI/provider contracts. No production account, sources, or ML inference.
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{chromium}=require('playwright');
 const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let vite,browser;
+const expectText=(locator,text)=>locator.filter({hasText:text}).waitFor();
 (async()=>{
  await fs.mkdir(DIR,{recursive:true});await fs.writeFile(path.join(DIR,'world-harness.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/test-output/world-harness.jsx"></script>');
  await fs.writeFile(path.join(DIR,'world-harness.jsx'),`
@@ -46,14 +47,20 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let vi
   await page.waitForFunction(()=>document.querySelector('.reader-embedded .reader-page-image img')?.naturalWidth>0);
   assert.equal(await page.getByRole('dialog',{name:'Онлайн без сохранения',exact:true}).count(),0);assert.equal(await page.locator('.online-title-materials .online-viewer-inline').count(),1,'Reader stays inside title materials');
   assert.equal(await page.locator('.reader-embedded').evaluate(n=>getComputedStyle(n).position),'relative');assert.notEqual(await page.evaluate(()=>document.body.style.overflow),'hidden');
-  await page.getByRole('button',{name:'Развернуть просмотр на весь экран',exact:true}).click();await page.waitForFunction(()=>document.fullscreenElement?.classList.contains('online-viewer-inline'));await page.getByRole('button',{name:'Вернуть на страницу',exact:true}).click();await page.waitForFunction(()=>!document.fullscreenElement);
-  await page.getByRole('button',{name:'Закрыть встроенный просмотр',exact:true}).click();assert.equal(await page.locator('.online-viewer-inline').count(),0);
-  await page.locator('.online-title-materials .title-episode-card').filter({hasText:'Глава 2'}).click();await page.waitForFunction(()=>document.querySelector('.online-viewer-inline>header small')?.textContent.includes('Глава 2'));
-  await page.locator('.reader-embedded').waitFor();await page.locator('.reader-embedded').dispatchEvent('reader-show-chrome');await page.getByRole('button',{name:'Назад',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('.online-viewer-inline>header small')?.textContent.includes('Глава 1'));
+  // Since 2e8aac4 a loaded manga has no OnlineViewer header: the embedded ReaderShell chrome owns
+  // fullscreen, closing and the current chapter (the «Перейти к главе» combobox).
+  const reader=page.locator('.reader-embedded'),chrome=()=>reader.dispatchEvent('reader-show-chrome'),chapter=page.getByRole('combobox',{name:'Перейти к главе',exact:true});
+  const showsChapter=async n=>{await chrome();await expectText(chapter,'Глава '+n);};
+  await chrome();await page.getByRole('button',{name:'На весь экран',exact:true}).click();await page.waitForFunction(()=>document.fullscreenElement?.classList.contains('reader-embedded'));
+  assert.ok(await page.evaluate(()=>!!document.fullscreenElement.closest('.online-title-materials .online-viewer-inline')),'Fullscreen keeps the reader that lives inside the title materials');
+  await chrome();await page.getByRole('button',{name:'Выйти из полного экрана',exact:true}).click();await page.waitForFunction(()=>!document.fullscreenElement);
+  await chrome();await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();await page.locator('.online-viewer-inline').waitFor({state:'detached'});
+  await page.locator('.online-title-materials .title-episode-card').filter({hasText:'Глава 2'}).click();await reader.waitFor();await showsChapter(2);
+  await chrome();await page.getByRole('button',{name:'Назад',exact:true}).click();
+  await showsChapter(1);
   assert.equal(await page.locator('.online-title-materials .title-episode-card').filter({hasText:'Глава 1'}).getAttribute('aria-pressed'),'true','Internal reader navigation updates the selected title card');
-  await page.locator('.online-title-materials .title-episode-card').filter({hasText:'Глава 2'}).click();await page.waitForFunction(()=>document.querySelector('.online-viewer-inline>header small')?.textContent.includes('Глава 2'));
-  await page.getByRole('button',{name:'Закрыть встроенный просмотр',exact:true}).click();
+  await page.locator('.online-title-materials .title-episode-card').filter({hasText:'Глава 2'}).click();await showsChapter(2);
+  await chrome();await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();await page.locator('.online-viewer-inline').waitFor({state:'detached'});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal overflow');assert.deepEqual(errors,[]);
   assert.equal(await page.locator('.online-title-page .title-hero').count(),1);assert.equal(await page.locator('.world-title-grid').count(),0,'No second title template');assert.equal(await page.locator('.online-title-materials .title-episode-card').count(),2,'Online chapters use the collection episode cards');
   const layout=()=>{const read=selector=>{const n=document.querySelector(selector),s=getComputedStyle(n);return{display:s.display,columns:s.gridTemplateColumns,gap:s.gap,padding:s.padding,radius:s.borderRadius,font:s.fontSize,lineHeight:s.lineHeight,width:Math.round(n.getBoundingClientRect().width)};};return{hero:read('.title-hero'),poster:read('.title-poster'),heading:read('.title-hero h1'),columns:read('.title-page-columns')};};

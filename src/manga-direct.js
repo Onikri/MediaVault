@@ -157,6 +157,9 @@ export class DirectChapter{
    }
    this.notify(index,{detected:page.detected,phase:'cleaning',message:page.cacheHit?'Из кэша устройства · вставляем русский текст':'Лёгкая очистка и русский набор',completedRegions:0,totalRegions:page.regions.length,diagnostics:page.diagnostics});
    const preparedClean=this.config.chapterPipeline!==false?await this.preparation.cleanFor(index).catch(()=>null):null;
+   // waitFor() rejects at once for an already aborted signal and never subscribes to
+   // `painting`, whose own abort rejection would then go unhandled. Stop before rendering.
+   signal?.throwIfAborted();
    const painting=this.renderPage(blob,page,font,value=>this.notify(index,{...value,completedRegions:value.cleanedRegions||0,totalRegions:page.regions.filter(r=>r.ru_translation?.trim()).length,diagnostics:page.diagnostics}),{...config,preparedClean}).then(result=>{if(signal?.aborted){result.renderedBitmap?.close();throw signal.reason;}return result;});
    let result;try{result=await waitFor(painting,signal);}catch(error){error.stage='render';throw error;}signal?.throwIfAborted();
    result.detected=page.detected;result.detectionReport=page.detectionReport;result.unresolvedRegions=unresolvedRegions(page).map(r=>r.uid);

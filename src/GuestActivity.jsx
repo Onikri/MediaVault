@@ -1,11 +1,9 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
-import {Copy,RefreshCw,Search,Trash2,X} from 'lucide-react';
+import {Copy,Search} from 'lucide-react';
 import {CATEGORY_LABELS,EVENT_GROUPS,ago,bytes,clock,dayLabel,device,duration,eventTone,stamp} from './guest-activity-format.js';
 import './guest-activity.css';
 
-const TABS=[['overview','Обзор'],['titles','Тайтлы'],['addresses','IP и устройства'],['events','Журнал']];
 
 function TrafficChart({days}){
  const [hover,setHover]=useState(null);
@@ -27,7 +25,7 @@ function TrafficChart({days}){
  </figure>;
 }
 
-function Overview({report}){
+export function Overview({report}){
  const s=report.summary,cats=Object.entries(report.categories||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]),top=Math.max(1,...cats.map(([,v])=>v));
  const topTitles=[...report.titles].sort((a,b)=>b.bytes-a.bytes||b.opens-a.opens).slice(0,5);
  return <div className="guest-overview">
@@ -49,7 +47,7 @@ function Overview({report}){
  </div>;
 }
 
-function Titles({titles}){
+export function Titles({titles}){
  const [query,setQuery]=useState(''),[sort,setSort]=useState('last');
  const rows=useMemo(()=>titles.filter(t=>!query||t.title.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>sort==='bytes'?b.bytes-a.bytes:sort==='opens'?b.opens-a.opens:b.last-a.last),[titles,query,sort]);
  if(!titles.length)return <p className="fine guest-empty">Гость ещё не открывал тайтлы.</p>;
@@ -64,7 +62,7 @@ function Titles({titles}){
  </div>;
 }
 
-function Addresses({addresses}){
+export function Addresses({addresses}){
  const [copied,setCopied]=useState('');
  if(!addresses.length)return <p className="fine guest-empty">Адресов пока нет.</p>;
  return <div className="guest-tab-body"><div className="guest-table-wrap"><table className="guest-table">
@@ -73,7 +71,7 @@ function Addresses({addresses}){
  </table></div></div>;
 }
 
-function Events({events}){
+export function Events({events}){
  const reduce=useReducedMotion(),[group,setGroup]=useState('all'),[query,setQuery]=useState(''),[limit,setLimit]=useState(80);
  const test=EVENT_GROUPS.find(g=>g[0]===group)?.[2];
  const rows=events.filter(e=>(!test||test(e.action))&&(!query||[e.action,e.title,e.ip,e.detail].join(' ').toLowerCase().includes(query.toLowerCase())));
@@ -91,29 +89,12 @@ function Events({events}){
  </div>;
 }
 
-export default function GuestActivity({service,guest,open,onOpenChange}){
- const reduce=useReducedMotion();
- const [report,setReport]=useState(null),[error,setError]=useState(''),[tab,setTab]=useState('overview'),[loading,setLoading]=useState(false);
+// Report for one guest, refreshed every 15 seconds while it is on screen.
+export function useGuestReport(service,guest){
+ const [report,setReport]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
  const alive=useRef(true);
  const load=useCallback(()=>{if(!guest)return Promise.resolve();setLoading(true);return service.request('/guests/'+guest.id+'/activity').then(d=>{if(alive.current){setReport(d);setError('');}}).catch(e=>{if(alive.current)setError(e.message);}).finally(()=>{if(alive.current)setLoading(false);});},[guest?.id,service.request]);
- useEffect(()=>{alive.current=true;if(!open)return()=>{alive.current=false;};setTab('overview');setReport(null);load();const timer=setInterval(()=>{if(document.visibilityState==='visible')load();},15000);return()=>{alive.current=false;clearInterval(timer);};},[open,load]);
- const clear=()=>{if(confirm('Очистить журнал и статистику гостя «'+guest.name+'»? Это нельзя отменить.'))service.request('/guests/'+guest.id+'/activity',{method:'DELETE'}).then(load).catch(e=>setError(e.message));};
- const s=report?.summary,watching=s?.watching;
- return <Dialog.Root open={open} onOpenChange={onOpenChange}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="server-dialog guest-activity" aria-describedby={undefined}>
-  <header className="guest-activity-head">
-   <div><p className="eyebrow">Активность гостя</p><Dialog.Title>{guest?.name}{guest?.login?<small> @{guest.login}</small>:null}</Dialog.Title>
-    <p className="guest-activity-now" role="status">{watching?<><strong>{watching.category==='manga'?'Читает':watching.category==='music'?'Слушает музыку':'Смотрит'}{watching.title?' «'+watching.title+'»':''}</strong> · {duration(Date.now()/1000-watching.since)}</>:s?'Был в сети '+ago(s.lastActive||guest?.lastSeen):'Загружаем…'}</p></div>
-   <div className="guest-activity-head-actions"><button type="button" className="circle-button" onClick={load} aria-label="Обновить" disabled={loading}><RefreshCw size={17} className={loading?'guest-access-spin':''}/></button><Dialog.Close className="circle-button" aria-label="Закрыть активность"><X size={19}/></Dialog.Close></div>
-  </header>
-  <nav className="guest-tabs" role="tablist">{TABS.map(([id,l])=><button key={id} role="tab" type="button" aria-selected={tab===id} onClick={()=>setTab(id)}>{tab===id&&<motion.span className="guest-tab-active" layoutId="guest-activity-tab" transition={reduce?{duration:0}:{type:'spring',stiffness:420,damping:36}}/>}<span>{l}{id==='titles'&&report?' '+report.titles.length:id==='addresses'&&report?' '+report.addresses.length:''}</span></button>)}</nav>
-  {error&&<p className="guest-manager-error" role="alert">{error}</p>}
-  {!report&&!error&&<p className="fine guest-empty">Загружаем активность…</p>}
-  {report&&<AnimatePresence mode="wait" initial={false}><motion.div key={tab} initial={reduce?false:{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={reduce?undefined:{opacity:0}} transition={{duration:.16}}>
-   {tab==='overview'&&<Overview report={report}/>}
-   {tab==='titles'&&<Titles titles={report.titles}/>}
-   {tab==='addresses'&&<Addresses addresses={report.addresses}/>}
-   {tab==='events'&&<Events events={report.events}/>}
-  </motion.div></AnimatePresence>}
-  {report&&<footer className="guest-activity-foot"><span className="fine">Записываются только действия гостя на твоём сервере. Обновляется каждые 15 секунд.</span><button type="button" className="text-link guest-clear" onClick={clear}><Trash2 size={14}/>Очистить журнал</button></footer>}
- </Dialog.Content></Dialog.Portal></Dialog.Root>;
+ useEffect(()=>{alive.current=true;setReport(null);setError('');if(!guest)return()=>{alive.current=false;};load();const timer=setInterval(()=>{if(document.visibilityState==='visible')load();},15000);return()=>{alive.current=false;clearInterval(timer);};},[guest?.id,load]);
+ const clear=()=>service.request('/guests/'+guest.id+'/activity',{method:'DELETE'}).then(load).catch(e=>setError(e.message));
+ return {report,error,loading,load,clear};
 }

@@ -15,7 +15,7 @@ let browser,vite,last;
  }};
  function Demo(){const[chosen,setChosen]=useState(null);return <ThemeProvider><main className="app-main" style={{paddingTop:1200}}><output id="chosen">{chosen?.number}</output><ChapterChooser active={!chosen} userId="fixture" entries={entries} service={service} cards onChoose={setChosen}/></main></ThemeProvider>};createRoot(document.getElementById('root')).render(<Demo/>);
  `);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-chapter-thumbs',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-chapter-thumbs',logLevel:'error',server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of [390,1440]){
   const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];last=page;page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);

@@ -62,7 +62,8 @@ async function run(){
       assert.ok(size.scroll<=size.viewport+1,view+' has no overflow at '+width+'px: '+JSON.stringify(size));
     };
     await noOverflow('Home');
-    assert.equal(await page.locator('.mobile-toggle').isVisible(),width<=1000);
+    // Up to 1000px the site navigates from the bottom dock instead of the header links.
+    assert.equal(await page.locator('.mobile-dock').isVisible(),width<=1000);
     assert.equal(await page.locator('.desktop-nav').isVisible(),width>1000);
     await page.screenshot({path:path.join(output,'react-'+width+'.png'),fullPage:true});
     const nav={getByRole:(_,options)=>({click:()=>navigateApp(page,options.name)})};
@@ -71,10 +72,11 @@ async function run(){
     await page.locator('.online-library').waitFor();assert.equal(await page.locator('#adminPanel').count(),0);await page.getByRole('navigation',{name:'Разделы библиотеки'}).getByRole('button',{name:'Музыка',exact:true}).click();await page.getByRole('heading',{name:'Музыка',exact:true}).waitFor();await noOverflow('Online library');await nav.getByRole('button',{name:'Коллекция',exact:true}).click();
     await page.locator('#searchInput').fill('Тестовый поиск');
     assert.equal(await page.locator('#searchInput').inputValue(),'Тестовый поиск');
-    await page.getByRole('button',{name:width>=1100?'Раздел Манга':'Манга',exact:true}).click();
-    assert.ok((await page.locator(width>=1100?'.library-sidebar .is-active':'.chip-active').textContent()).includes('Манга'));
-    await page.getByRole('button',{name:width>=1100?'Раздел Избранное':'Избранное',exact:true}).click();
-    assert.ok((await page.locator(width>=1100?'.library-sidebar button[aria-label="Раздел Избранное"]':'.chip-active').textContent()).includes('Избранное'));
+    // Every layout picks collection sections from the sidebar; the chip row only appears between 1001 and 1099px.
+    await page.getByRole('button',{name:'Раздел Манга',exact:true}).click();
+    assert.ok((await page.locator('.library-sidebar .is-active').textContent()).includes('Манга'));
+    await page.getByRole('button',{name:'Раздел Избранное',exact:true}).click();
+    assert.ok((await page.locator('.library-sidebar button[aria-label="Раздел Избранное"].is-active').textContent()).includes('Избранное'));
     await noOverflow('Library');
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
     await page.getByRole('heading',{name:'Библиотека',exact:true,level:1}).waitFor();
@@ -87,15 +89,17 @@ async function run(){
     assert.ok(popup.y>=0&&popup.y+popup.height<=860-(navBox?.height||0),'Autocomplete stays inside the visible area at '+width+'px');
     await page.locator('#catalogSearch').press('ArrowDown');
     await page.locator('#catalogSearch').press('Enter');
-    await page.getByRole('heading',{name:'Naruto',exact:true}).waitFor();
+    // The paused player repeats the title in its own overview, so read the page hero.
+    await page.locator('.title-hero').getByRole('heading',{name:'Naruto',exact:true}).waitFor();
     await page.getByRole('button',{name:'Сохранить на Google Диск',exact:true}).click();assert.equal(await page.locator('#importVideoBtn').isDisabled(),true,'Locked users cannot start a Drive import');
     await noOverflow('Catalogue title detail');
     await page.getByRole('button',{name:'К результатам поиска'}).click();
     await noOverflow('Server import');
     await page.screenshot({path:path.join(output,'import-'+width+'.png'),fullPage:true});
     if(width===390)await require('./catalog-browser.cjs')(page);
-    await page.locator('#profileBtn').click();
-    await page.getByRole('heading',{name:'Профиль',exact:true}).waitFor();
+    // The profile button opens a menu; account sign-in lives in the settings centre.
+    await page.locator('#profileBtn').click();await page.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
+    await page.locator('.cc-nav').getByRole('button',{name:'Профиль'}).waitFor();await page.locator('#loginBtn').waitFor();
     assert.equal(await page.locator('#loginBtn').isVisible(),true);
     await noOverflow('Profile');
     await page.locator('#loginBtn').click();
@@ -105,8 +109,9 @@ async function run(){
     await noOverflow('Automatic library setup');
     await page.screenshot({path:path.join(output,'setup-'+width+'.png'),fullPage:true});
     await nav.getByRole('button',{name:'История',exact:true}).click();
-    await page.getByRole('heading',{name:'Недавно открытое',exact:true}).waitFor();
-    await page.getByRole('heading',{name:'История пуста',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'История',exact:true,level:1}).waitFor();
+    // History is shared by the catalogue and the collection: the catalogue title opened above is listed.
+    await page.locator('.history-card').filter({hasText:'Naruto'}).first().waitFor();
     await noOverflow('History');
     assert.deepEqual(errors,[],'No runtime errors at '+width+'px');
     await context.close();

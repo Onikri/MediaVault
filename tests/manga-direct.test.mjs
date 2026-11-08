@@ -85,6 +85,16 @@ test('retrying a failed renderer reuses translated JSON and does not call Google
  let renders=0;const {c,calls}=chapter({renderPage:async(blob,page)=>{if(!renders++)throw Error('renderer fixture');return {regions:page.regions,timings:{}};}}),signal=new AbortController().signal;
  await assert.rejects(c.render(new Blob(['first']),0,'auto',null,{},signal),error=>error.stage==='render');await c.render(new Blob(['first']),0,'auto',null,{},signal);assert.equal(calls.length,1);c.close();
 });
+test('closing a page right before lettering leaves no unhandled render rejection',async()=>{
+ const abort=new AbortController(),unhandled=[],onUnhandled=error=>unhandled.push(error);let renders=0;
+ const {c}=chapter({renderPage:async(blob,p)=>{renders++;await new Promise(resolve=>setTimeout(resolve,5));return {regions:p.regions,timings:{}};}});
+ process.on('unhandledRejection',onUnhandled);
+ try{
+  // The reader aborts a page job when it re-renders; here that lands just as lettering starts.
+  await assert.rejects(c.render(new Blob(['page']),0,'auto',value=>{if(value.phase==='cleaning')abort.abort();},{},abort.signal),{name:'AbortError'});
+  await new Promise(resolve=>setTimeout(resolve,30));assert.deepEqual(unhandled,[]);assert.equal(renders,0,'An aborted page is not lettered');
+ }finally{process.off('unhandledRejection',onUnhandled);c.close();}
+});
 test('personal keys are separated by user and never stored in localStorage',()=>{
  setDirectKey('one','fixture-one');setDirectKey('two','fixture-two');assert.equal(directKey('one'),'fixture-one');assert.equal(directKey('two'),'fixture-two');setDirectKey('one','');assert.equal(directKey('one'),'');assert.throws(()=>setDirectKey('x','bad\nkey'),/Проверь/);setDirectKey('two','');
 });

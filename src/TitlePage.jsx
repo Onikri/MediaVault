@@ -142,8 +142,12 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
       if(controller.signal.aborted)return;
       const merged={...value,...detail,name:[detail.name,value.name].find(hasRussian)||detail.name||value.name,description:detail.description||value.description,image:detail.image||value.image};
       setCharacter(merged);
-      const updated={...profile,characters:(profile?.characters||[]).map(c=>c.id===value.id?{...c,...merged}:c)};setProfile(updated);
-      if(!online&&live.current.admin&&live.current.driveWritable&&!saveInProgress.current)actions.saveTitleProfile(title.id,updated,[],{background:true});
+      // The dossier may have finished loading while this character was fetched:
+      // merge into the newest profile and store only the characters, so a stale
+      // copy of the page state never overwrites links and stills in Drive.
+      const withCharacter=source=>({...source,characters:(source?.characters||[]).map(c=>c.id===value.id?{...c,...merged}:c)});
+      const characters=withCharacter(currentProfile.current).characters;setProfile(old=>withCharacter(old));
+      if(!online&&live.current.admin&&live.current.driveWritable&&!saveInProgress.current)actions.saveTitleProfile(title.id,{characters},[],{background:true});
     }catch(cause){if(!controller.signal.aborted)setCharacterError(cause.message||'Каталоги пока не ответили. Сохранённые сведения доступны.');
     }finally{if(!controller.signal.aborted)setCharacterBusy(false);}
   }
