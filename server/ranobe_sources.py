@@ -6,6 +6,7 @@ plugins/ukrainian/smakolykytl.ts) and the Keiyoushi Zenko extension. Chapters
 are returned as plain paragraphs: no scripts, links, ads or site markup reach
 the reader. Paid or draft chapters are skipped, never presented as readable.
 """
+import html
 import json
 import re
 import threading
@@ -22,7 +23,9 @@ ZENKO = 'https://zenko.online'
 ZENKO_API = 'https://api.zenko.online'
 SMAK = 'https://smakolykytl.site'
 SMAK_API = 'https://api.smakolykytl.site/api/user'
-SOURCES = (('ranobehub', 'RanobeHub', 'ru'), ('zenko-novel', 'Zenko · UA', 'uk'), ('smakolyky', 'Смаколики · UA', 'uk'))
+SOURCES = (('ranobehub', 'RanobeHub', 'ru'), ('zenko-novel', 'Zenko · UA', 'uk'), ('smakolyky', 'Смаколики · UA', 'uk'), ('baka', 'Бака · UA', 'uk'))
+BAKA = 'https://baka.in.ua'
+HIKKA = 'https://api.hikka.io'
 MAX_CHAPTERS = 3000
 MAX_PARAGRAPHS = 4000
 _cache = {}
@@ -144,7 +147,47 @@ def _smak_search(query, http):
                'cover': str(image.get('url') or '') if str(image.get('url') or '').startswith('https://') else ''}
 
 
-SEARCH = {'ranobehub': _hub_search, 'zenko-novel': _zenko_search, 'smakolyky': _smak_search}
+def _hikka_reads(query, http, title=None):
+    """Ukrainian 'where to read' links Hikka publishes for a novel, matched by MAL ID or exact title."""
+    text, _, _ = http.document(HIKKA + '/novel?page=1&size=10', method='POST', data=json.dumps({'query': query[:120]}).encode(),
+                               headers={'Content-Type': 'application/json', 'Accept': 'application/json'}, action='hikka-search')
+    try:
+        rows = json.loads(text).get('list') or []
+    except (ValueError, AttributeError):
+        raise SourceError('Hikka вернула неизвестный формат.') from None
+    mal = str(((title or {}).get('ids') or {}).get('mal') or '')
+    for item in rows[:10]:
+        if not isinstance(item, dict) or not re.fullmatch(r'[a-z0-9-]{1,120}', str(item.get('slug', ''))): continue
+        names = _names(item.get('title_ua'), item.get('title_en'), item.get('title_original'))
+        if mal and str(item.get('mal_id') or '') != mal: continue
+        if not mal and title and not match_title({**title, 'kind': None}, {'title': names[0] if names else '', 'aliases': names})[0]: continue
+        detail = _json(http, HIKKA + '/novel/' + item['slug'])
+        for link in detail.get('external') or []:
+            url = str((link or {}).get('url') or '')
+            route = re.fullmatch(r'https://baka\.in\.ua/fictions/([A-Za-z0-9_-]{1,160})/?', url)
+            if (link or {}).get('type') == 'read' and route:
+                yield names, BAKA + '/fictions/' + route[1]
+
+
+def _baka_search(query, http, title=None):
+    """Hikka's links can be stale or redirect to the same book: open each once,
+    keep only live pages, de-duplicate by the final address and use its heading."""
+    seen = set()
+    for names, url in list(_hikka_reads(query, http, title))[:6]:
+        try:
+            text, final, _ = http.document(url, action='ranobe')
+        except SourceError:
+            continue
+        route = re.fullmatch(r'/fictions/([A-Za-z0-9_-]{1,160})/?', urlsplit(final).path)
+        if urlsplit(final).hostname != 'baka.in.ua' or not route or route[1] in seen: continue
+        seen.add(route[1])
+        heading = BeautifulSoup(text, 'html.parser').find('h1')
+        yield {'provider': 'baka', 'providerName': 'Бака · UA', 'language': 'uk',
+               'title': heading.get_text(' ', strip=True)[:300] if heading else (names[0] if names else route[1]),
+               'aliases': names, 'url': BAKA + '/fictions/' + route[1], 'description': '', 'cover': ''}
+
+
+SEARCH = {'ranobehub': _hub_search, 'zenko-novel': _zenko_search, 'smakolyky': _smak_search, 'baka': _baka_search}
 
 
 def search(title, language='all'):
@@ -162,9 +205,11 @@ def search(title, language='all'):
         results, status, message = [], 'empty', 'Точное совпадение не найдено.'
         try:
             for query in aliases(title)[:3]:
-                for candidate in SEARCH[identity](query, http):
+                found = SEARCH[identity](query, http, title) if identity == 'baka' else SEARCH[identity](query, http)
+                for candidate in found:
                     if any(r['url'] == candidate['url'] for r in results): continue
-                    accepted, evidence = match_title(wanted, candidate)
+                    # Baka links come from Hikka, already matched by MAL ID or exact title.
+                    accepted, evidence = (True, 'hikka') if identity == 'baka' else match_title(wanted, candidate)
                     if accepted: results.append({**candidate, 'kind': 'ranobe', 'matchEvidence': evidence})
                 if results: break
             if results: status, message = 'ok', 'Найдено: ' + str(len(results))
@@ -193,6 +238,11 @@ def search(title, language='all'):
 def _route(url):
     parts = urlsplit(url)
     host = (parts.hostname or '').lower()
+    if host == 'baka.in.ua' and parts.scheme == 'https':
+        book = re.fullmatch(r'/fictions/([A-Za-z0-9_-]{1,160})/?', parts.path)
+        chapter = re.fullmatch(r'/chapters/([A-Za-z0-9_-]{1,200})/?', parts.path)
+        if book: return 'baka', book[1], ''
+        if chapter: return 'baka', parse_qs(parts.query).get('mv_book', [''])[0], chapter[1]
     selected = parse_qs(parts.query).get('mv_chapter', [''])[0]
     if selected and not selected.isdigit(): raise SourceError('Некорректная ссылка на главу.')
     for identity, pattern, hosts in (('ranobehub', r'/ranobe/(\d{1,9})(?:-[^/]*)?/?', {'ranobehub.org'}),
@@ -201,6 +251,38 @@ def _route(url):
         match = re.fullmatch(pattern, parts.path)
         if host in hosts and match and parts.scheme == 'https': return identity, match[1], selected
     raise SourceError('Эта ссылка не относится к поддерживаемому источнику ранобэ.')
+
+
+def _baka_book(book, http):
+    """Baka lists chapters per volume section (Turbo frames); free chapters link to /chapters/."""
+    text, final, _ = http.document(BAKA + '/fictions/' + book + '?order=asc', action='ranobe')
+    route = re.fullmatch(r'/fictions/([A-Za-z0-9_-]{1,160})/?', urlsplit(final).path)
+    if urlsplit(final).hostname != 'baka.in.ua' or not route: raise SourceError('Бака перенаправила на іншу сторінку.')
+    book = route[1]
+    soup = BeautifulSoup(text, 'html.parser')
+    heading = soup.find('h1')
+    title = (heading.get_text(' ', strip=True) if heading else book)[:300]
+    sections = sorted(set(re.findall(r'section=(v-\d{1,4}(?:\.\d{1,3})?)', html.unescape(text))), key=lambda v: float(v[2:]))
+    chapters, seen = [], set()
+
+    def collect(page, volume):
+        for link in BeautifulSoup(page, 'html.parser').select('a[href^="/chapters/"]'):
+            slug = re.fullmatch(r'/chapters/([A-Za-z0-9_-]{1,200})', link.get('href', ''))
+            if not slug or slug[1] in seen: continue
+            label = ' '.join(link.get_text(' ', strip=True).split())
+            number = re.search(r'Розділ\s+(\d+(?:[.,]\d+)?)', label)
+            if not number: continue
+            seen.add(slug[1])
+            name = label.split('—', 1)[1].strip() if '—' in label else ''
+            chapters.append({'number': _number(number[1], len(chapters) + 1), 'season': volume, 'title': name[:200],
+                             'url': BAKA + '/chapters/' + slug[1] + '?' + urlencode({'mv_book': book})})
+
+    for section in sections[:60]:
+        page, _, _ = http.document(BAKA + '/fictions/' + book + '/chapter_section?' + urlencode({'order': 'asc', 'section': section}),
+                                   headers={'Accept': 'text/vnd.turbo-stream.html, text/html'}, action='ranobe')
+        collect(page, _number(section[2:], 1))
+    if not sections: collect(text, 1)
+    return title, chapters
 
 
 def _chapter_url(identity, book, chapter):
@@ -246,6 +328,9 @@ def inspect(url, http=None):
                 chapters.append({'number': _number(number, len(chapters) + 1), 'season': volume, 'title': name,
                                  'translator': ' '.join(str((row.get('publisher') or {}).get('name') or '').split())[:120] if isinstance(row.get('publisher'), dict) else '',
                                  'url': _chapter_url(identity, book, str(row['id']))})
+        elif identity == 'baka':
+            title, chapters = _baka_book(book, http)
+            names = [title]
         else:
             project = next((p for p in _smak_projects(http) if str(p.get('id')) == book), None)
             if not project: raise SourceError('Проєкт Смаколиків не знайдено.')
@@ -288,6 +373,14 @@ def chapter(url, http=None):
             title = zenko_chapter(data.get('name'))[2]
             pages = sorted((p for p in data.get('pages') or [] if isinstance(p, dict)), key=lambda p: p.get('order', 0))
             paragraphs = [line for page in pages for line in html_paragraphs(page.get('content'))]
+        elif identity == 'baka':
+            text, final, _ = http.document(BAKA + '/chapters/' + selected, action='ranobe')
+            if urlsplit(final).hostname != 'baka.in.ua' or urlsplit(final).path.startswith('/login'):
+                raise SourceError('Розділ доступний лише після входу на сайті Бака.')
+            soup = BeautifulSoup(text, 'html.parser')
+            body = soup.select_one('div.prose') or soup.select_one('.trix-content')
+            heading = soup.find('h1')
+            title, paragraphs = (heading.get_text(' ', strip=True) if heading else ''), html_paragraphs(str(body) if body else '')
         else:
             data = _json(http, SMAK_API + '/chapters/' + selected).get('chapter') or {}
             title, paragraphs = data.get('title') or '', tiptap_paragraphs(data.get('content'))

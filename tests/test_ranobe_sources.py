@@ -59,3 +59,52 @@ class RanobeTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class BakaTests(unittest.TestCase):
+    """baka.in.ua pages and Hikka answers captured from the VM on 2026-11-08 (trimmed)."""
+    def http(self):
+        class Http(PublicHttp):
+            def document(self,value,*,method='GET',data=None,headers=None,action=None,**_):
+                public_url(value,resolve_dns=False)
+                if 'api.hikka.io/novel?' in value:
+                    assert method=='POST' and action=='hikka-search';return read('hikka_search.json'),value,'application/json'
+                if 'api.hikka.io/novel/' in value:return read('hikka_detail.json'),value,'application/json'
+                if '/chapter_section?' in value:return read('baka_section.html'),value,'text/html'
+                if 'baka.in.ua/chapters/' in value:return read('baka_chapter.html'),value,'text/html'
+                if value.startswith('https://baka.in.ua/fictions/overlord-knyha-2'):raise SourceError('HTTP 404')
+                if value.startswith('https://baka.in.ua/fictions/'):return read('baka_book.html'),'https://baka.in.ua/fictions/overlord-ukrainskoiu-knyha-1','text/html'
+                raise SourceError('offline fixture '+value)
+        return Http()
+
+    def test_hikka_links_are_checked_and_deduplicated(self):
+        rows=list(rs._baka_search('Overlord',self.http(),{'title':'Повелитель','ids':{'mal':'81669'}}))
+        self.assertEqual([r['url'] for r in rows],['https://baka.in.ua/fictions/overlord-ukrainskoiu-knyha-1'])
+        self.assertEqual(rows[0]['title'],'Оверлорд Українською')
+
+    def test_book_sections_and_chapter_text(self):
+        book=rs.inspect('https://baka.in.ua/fictions/overlord-ukrainskoiu-knyha-1',self.http())
+        self.assertEqual(book['language'],'uk');self.assertGreater(len(book['episodes']),3)
+        self.assertEqual(book['episodes'][1]['title'],'Кінець і початок')
+        text=rs.chapter(book['episodes'][1]['url'],self.http())
+        self.assertGreater(len(text['paragraphs']),3)
+
+    def test_hikka_post_only_accepts_a_query(self):
+        with self.assertRaises(SourceError):
+            PublicHttp().document('https://api.hikka.io/novel?page=1&size=10',method='POST',data=b'{"query": "x", "admin": true}',action='hikka-search')
+
+
+class HikkaBodyTests(unittest.TestCase):
+    def test_extra_fields_inside_quotes_are_rejected(self):
+        with self.assertRaises(SourceError):
+            PublicHttp().document('https://api.hikka.io/novel?page=1&size=10',method='POST',data=b'{"query": "x", "admin": "y"}',action='hikka-search')
+
+    def test_valid_hikka_query_passes_the_allowlist(self):
+        import json as _json
+        class Reached(Exception):pass
+        http=PublicHttp()
+        def stop(*args,**kwargs):raise Reached()
+        http.session.request=stop
+        http.session.get=stop;http.session.post=stop
+        with self.assertRaises(Reached):
+            http.document('https://api.hikka.io/novel?page=1&size=10',method='POST',data=_json.dumps({'query':'Повелитель "x"'}).encode(),action='hikka-search')

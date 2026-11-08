@@ -1,7 +1,9 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import Narration from './tts/Narration.jsx';
 import ReaderShell from './ReaderShell.jsx';
 import {splitBookText,decodeBookText,fictionBook,bookProgress,saveBookProgress,bookPreferences,saveBookPreferences,bookPageCapacity,paginateBookRows,pageAtOffset} from './book-content.js';
 import './reader-surface.css';
+import './ranobe.css';
 
 function PdfPage({document:pdf,index,active,onVisible,available,maxWidth}){
  const host=useRef(null),canvas=useRef(null),[near,setNear]=useState(active),[ratio,setRatio]=useState(.707),[error,setError]=useState('');
@@ -10,7 +12,7 @@ function PdfPage({document:pdf,index,active,onVisible,available,maxWidth}){
  return <figure ref={host} data-book-page={index} className="reader-pdf-page" style={{aspectRatio:ratio}}><canvas ref={canvas} role="img" aria-label={'Страница PDF '+(index+1)}/>{error&&<p role="alert">{error}</p>}</figure>;
 }
 
-export default function BookReader({item,userId,libraryId,onClose,readWhole,inline=false}){
+export default function BookReader({item,userId,libraryId,onClose,readWhole,inline=false,readerService,service=readerService}){
  const loadedItem=useRef(null),textRows=useRef([]),root=useRef(null),epubHost=useRef(null),epub=useRef(null),view=useRef(null),pdf=useRef(null),live=useRef({readWhole}),saved=useRef(null);live.current={readWhole};
  const [viewport,setViewport]=useState(()=>({width:innerWidth,height:innerHeight}));
  const [prefs,setPrefs]=useState(()=>bookPreferences(userId)),[settings,setSettings]=useState(false),[pages,setPages]=useState([]),[page,setPage]=useState(0),[total,setTotal]=useState(0),[toc,setToc]=useState([]),[busy,setBusy]=useState(true),[error,setError]=useState(''),[kind,setKind]=useState(''),[epubReady,setEpubReady]=useState(0),[epubLabel,setEpubLabel]=useState('Книга');
@@ -44,6 +46,22 @@ export default function BookReader({item,userId,libraryId,onClose,readWhole,inli
  useEffect(()=>{if(!total||loadedItem.current!==item.id)return;saveBookProgress(userId,libraryId,item.id,{page,pages:total,...(pages.length?{offset:pages.slice(0,page).reduce((sum,row)=>sum+row.content.length,0)}:{})});},[page,total,item.id,userId,libraryId]);
  useEffect(()=>{if(!textRows.current.length)return;const offset=pages.slice(0,page).reduce((sum,row)=>sum+row.content.length,0),fitted=paginateBookRows(textRows.current,bookPageCapacity(Math.min(prefs.width,viewport.width),viewport.height,prefs.size,prefs.lineHeight));setPages(fitted);setTotal(fitted.length);setPage(pageAtOffset(fitted,offset));setToc(fitted.map((row,i)=>({label:row.title,index:i})));},[prefs.size,prefs.width,prefs.lineHeight,viewport]);
  useEffect(()=>{const rendition=view.current;if(!rendition)return;const paper={paper:'#eee7da',dark:'#161718',black:'#000'}[prefs.theme],ink=prefs.theme==='paper'?'#25231f':'#e5e0d7';rendition.themes.default({'body':{'background':paper+'!important','color':ink+'!important','font-family':(prefs.font==='serif'?'Georgia,serif':'system-ui,sans-serif')+'!important','line-height':prefs.lineHeight+'!important','padding':'28px 22px!important'},'p':{'line-height':prefs.lineHeight+'!important'},'img':{'max-width':'100%!important','height':'auto!important'}});rendition.themes.fontSize(prefs.size+'px');rendition.flow(prefs.mode==='scroll'?'scrolled-doc':'paginated');},[prefs,epubReady]);
+ const [speaking,setSpeaking]=useState(null),[voiceSection,setVoiceSection]=useState(null),[continueVoice,setContinueVoice]=useState(false);
+ const section=useMemo(()=>{
+  if(!pages.length||!['txt','fb2'].includes(kind))return null;
+  const title=pages[Math.min(page,pages.length-1)]?.title;let first=page,last=page;
+  while(first>0&&pages[first-1].title===title)first--;
+  while(last<pages.length-1&&pages[last+1].title===title)last++;
+  const rows=[];for(let i=first;i<=last;i++)pages[i].content.split('\n\n').forEach((text,n)=>rows.push({text,page:i,n}));
+  return {title,first,last,rows,key:item.id+':'+first+':'+pages.length};
+ },[pages,page,kind,item.id]);
+ const narrated=voiceSection&&section&&voiceSection.key!==section.key&&speaking?voiceSection:section;
+ const language=useMemo(()=>{const sample=(narrated?.rows||[]).slice(0,40).map(r=>r.text).join(' ');return (sample.match(/[іїєґ]/gi)||[]).length>(sample.length/400)?'uk':'ru';},[narrated?.key]);
+ function follow(row){
+  const at=narrated?.rows[row.p];if(!at)return;
+  setVoiceSection(narrated);setSpeaking({page:at.page,n:at.n});
+  if(at.page!==page)setPage(at.page);
+ }
  function choose(n){setPage(Math.max(0,Math.min(total-1,n)));if(prefs.mode==='scroll')root.current?.querySelector('[data-book-page="'+n+'"]')?.scrollIntoView({behavior:'smooth',block:'start'});}
  const previous=()=>kind==='epub'?view.current?.prev().catch(e=>setError(e.message)):choose(page-1),next=()=>kind==='epub'?view.current?.next().catch(e=>setError(e.message)):choose(page+1);
  const options=<div className="reader-book-settings"><p className="reader-hint">Настрой один раз — параметры сохранятся для твоего профиля.</p><label>Чтение<select aria-label="Режим чтения книги" value={prefs.mode} onChange={e=>update({mode:e.target.value})}><option value="pages">По страницам</option><option value="scroll">Непрерывная лента</option></select></label><label>Тема<select aria-label="Тема книги" value={prefs.theme} onChange={e=>update({theme:e.target.value})}><option value="paper">Бумага</option><option value="dark">Тёмная</option><option value="black">Чёрная · OLED</option></select></label>{kind!=='pdf'&&<><label>Шрифт<select aria-label="Шрифт книги" value={prefs.font} onChange={e=>update({font:e.target.value})}><option value="serif">Книжный</option><option value="sans">Без засечек</option></select></label><label>Размер текста<select aria-label="Размер текста книги" value={prefs.size} onChange={e=>update({size:Number(e.target.value)})}>{[16,18,20,22,24,28].map(v=><option key={v} value={v}>{v} px</option>)}</select></label><label>Интерлиньяж<select aria-label="Межстрочный интервал" value={prefs.lineHeight} onChange={e=>update({lineHeight:Number(e.target.value)})}>{[1.5,1.75,2].map(v=><option key={v} value={v}>{v}</option>)}</select></label></>}<label>Ширина<select aria-label="Ширина книги" value={prefs.width} onChange={e=>update({width:Number(e.target.value)})}>{[560,720,900,1100].map(v=><option key={v} value={v}>{v} px</option>)}</select></label></div>;
@@ -54,7 +72,13 @@ export default function BookReader({item,userId,libraryId,onClose,readWhole,inli
    {busy&&<div className="reader-book-loading" role="status">Открываем книгу…</div>}{error&&<p className="reader-book-error" role="alert">{error}</p>}
    <div className="reader-epub" ref={epubHost} style={{display:kind==='epub'?'block':'none'}}/>
    {!busy&&!error&&kind==='pdf'&&pdf.current&&indices.map(i=><PdfPage key={i} document={pdf.current} index={i} active={prefs.mode==='pages'} available={viewport} maxWidth={prefs.width}/>) }
-   {!busy&&!error&&['txt','fb2'].includes(kind)&&indices.map(i=><article className="reader-prose" translate="no" data-book-page={i} key={i}>{pages[i]?.content.split('\n\n').map((p,n)=><p key={n}>{p}</p>)}</article>)}
+   {!busy&&!error&&['txt','fb2'].includes(kind)&&indices.map(i=><article className="reader-prose ranobe-prose" translate="no" data-book-page={i} key={i}>{pages[i]?.content.split('\n\n').map((p,n)=><p key={n} className={speaking?.page===i&&speaking.n===n?'is-speaking':undefined}>{p}</p>)}</article>)}
+   {!busy&&!error&&narrated?.rows.length>0&&<div className="ranobe-narration-dock book-narration-dock" onClick={e=>e.stopPropagation()}>
+    <Narration key={narrated.key} paragraphs={narrated.rows.map(r=>r.text)} language={language} bookKey={'book:'+item.id} chapterKey={narrated.key}
+     title={item.name+(narrated.title?' · '+narrated.title:'')} service={service} userId={userId} startParagraph={Math.max(0,narrated.rows.findIndex(r=>r.page>=page))}
+     autoplay={continueVoice} onAutoplayHandled={()=>setContinueVoice(false)}
+     onSpeaking={follow} onFinished={()=>{const next=narrated.last+1;if(next<pages.length){setVoiceSection(null);setSpeaking(null);setContinueVoice(true);setPage(next);}}}/>
+   </div>}
   </div>
  </ReaderShell>;
 }

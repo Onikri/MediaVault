@@ -21,3 +21,5 @@
 .ranobe-chapter-end{display:flex;justify-content:center;padding:32px 0 160px}
 .ranobe-narration-dock{position:sticky;bottom:max(16px,env(safe-area-inset-bottom));z-index:3;padding:0 16px;transition:bottom .25s ease}
 .immersive-reader[data-chrome=true] .ranobe-narration-dock{bottom:118px}
+.book-flow-pages .book-narration-dock{position:absolute;left:0;right:0;bottom:max(16px,env(safe-area-inset-bottom))}
+.immersive-reader[data-chrome=true] .book-flow-pages .book-narration-dock{bottom:118px}

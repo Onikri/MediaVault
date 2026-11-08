@@ -36,7 +36,7 @@ export default function RanobeSources({item,service,state}){
    <label>Язык перевода<select aria-label="Язык перевода ранобэ" value={language} onChange={e=>setContentLanguage(e.target.value)}>{CONTENT_LANGUAGES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
    <button type="button" className="text-link" disabled={search.loading} onClick={()=>setRevision(v=>v+1)} aria-label="Повторить поиск ранобэ"><RefreshCw size={14}/>Повторить</button>
   </div>
-  {search.loading?<p className="discovery-status" role="status"><span className="loading-ring"/>Ищем перевод в RanobeHub, Zenko и Смаколиках…</p>
+  {search.loading?<p className="discovery-status" role="status"><span className="loading-ring"/>Ищем перевод в RanobeHub, Zenko, Смаколиках и Баке…</p>
   :search.error?<p className="inline-error" role="alert">{search.error}</p>
   :!search.results.length?<p className="fine">Точный перевод пока не найден{search.providers.some(p=>p.status==='unavailable')?'; часть источников не ответила':''}. Можно открыть файл книги ниже.</p>
   :<div className="manga-source-list ranobe-source-list">{search.results.map(row=><button type="button" key={row.url} aria-pressed={source?.url===row.url} disabled={busy} onClick={()=>choose(row)}>
@@ -49,7 +49,7 @@ export default function RanobeSources({item,service,state}){
    <ol className="ranobe-chapter-list">{book.episodes.slice(0,count).map((c,i)=><li key={c.url}><button type="button" aria-current={i===resume||undefined} onClick={()=>setOpen({index:i,paragraph:0})}><span>{book.seasons?.length>1?'Т. '+c.season+' · ':''}{c.number}</span><span translate="no">{c.title}</span></button></li>)}</ol>
    {book.episodes.length>count&&<button type="button" className="btn btn-secondary" onClick={()=>setCount(n=>n+100)}>Показать ещё главы</button>}
   </div>}
-  <details className="ranobe-file"><summary>Открыть книгу из файла или по ссылке</summary><OnlineBooks userId={userId}/></details>
+  <details className="ranobe-file"><summary>Открыть книгу из файла или по ссылке</summary><OnlineBooks userId={userId} service={service}/></details>
   {open&&book&&<Suspense fallback={null}><RanobeReader book={book} item={item} start={open} service={service} userId={userId} onClose={()=>setOpen(null)}/></Suspense>}
  </section>;
 }

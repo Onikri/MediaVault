@@ -110,6 +110,8 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         # Light-novel text APIs (RanobeHub, Smakolyky).
         or host == "ranobehub.org" and bool(re.fullmatch(r"/api/(?:search|books/\d{1,9}/chapters|chapters/\d{1,9})", url.path))
         or host == "api.smakolykytl.site" and bool(re.fullmatch(r"/api/user/(?:projects(?:/\d{1,9}/books)?|chapters/\d{1,9})", url.path))
+        # Hikka: Ukrainian catalogue of anime, manga and novels (public search and details).
+        or host == "api.hikka.io" and bool(re.fullmatch(r"/(?:novel|anime|manga)(?:/[a-z0-9-]{1,120})?|/integrations/mal/(?:anime|manga|novel)/\d{1,9}", url.path))
         or host == "api.zenko.online" and bool(re.fullmatch(r"/(?:titles(?:/\d{1,9}(?:/chapters)?)?|chapters/\d{1,9})", url.path))
     )
     if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
@@ -230,14 +232,16 @@ class PublicHttp:
                               and data.get('s') in {'1','2','3'} and data.get('t')=='0')
             honey_chapters=(url=='https://data.api.honey-manga.com.ua/v2/chapter/cursor-list' and isinstance(data,bytes) and len(data)<=256
                             and bool(re.fullmatch(rb'\{"page": \d{1,3}, "pageSize": 100, "sortOrder": "ASC", "mangaId": "[0-9a-f-]{36}"\}',data)))
-            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog or honey_chapters):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            hikka_search=(action=='hikka-search' and urlsplit(url).hostname=='api.hikka.io' and urlsplit(url).path in {'/novel','/anime','/manga'}
+                          and isinstance(data,bytes) and len(data)<=512 and bool(re.fullmatch(rb'\{"query": "(?:[^"\\]|\\.){1,400}"\}',data)))
+            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog or honey_chapters or hikka_search):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if chan_search:
                 # The public search box's Next.js action. The caller supplies only the title.
                 outgoing.update({'Next-Action': '7fe1df09f7c8151b600f1a3e496cdda2e7ed7f0f95',
                                  'Accept': 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8',
                                  'Origin': 'https://hentaichan.cc', 'Referer': 'https://hentaichan.cc/'})
                 data = json.dumps([{'name': data, 'page': 1, 'limit': 24}]).encode()
-            if manga_form:outgoing['Content-Type']='application/json'
+            if manga_form or honey_chapters or hikka_search:outgoing['Content-Type']='application/json'
             if player_form:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
                 outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"

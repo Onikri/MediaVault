@@ -5,6 +5,7 @@ import {useEffect,useRef,useState,useMemo} from 'react';
 import {useReducedMotion} from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {ArrowLeft,Play,Star,ChevronRight,RefreshCw,Cloud,CloudUpload,Users,X,ExternalLink,Film,BookOpen,Bookmark,Download,FolderOpen} from 'lucide-react';
+import {useUkrainianTitle} from './use-ukrainian-title.js';
 import {loadTitleProfile,loadCharacter,searchRussianTitles,russianText,hasRussian,profileNeedsRefresh,scheduleProfileRetry} from './title-metadata.js';
 import {useArtwork,fetchArtwork} from './title-artwork.js';
 import {titleParts,SECTION_LABELS} from './library-model.js';
@@ -161,7 +162,8 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
     try{const result=await actions.saveTitleProfile(title.id,{...(profile||{}),userRatings:{...(profile?.userRatings||{}),[state.user.sub]:value}});if(result)setProfile(result);}
     catch(cause){setError(cause.message);}finally{setRatingBusy(false);}
   }
-  const p=profile||{},name=p.title&&p.title!=='Название уточняется'?p.title:title.name,parts=titleParts(title),currentPart=parts.find(value=>value.name===part)||parts[0];
+  const ukrainian=useUkrainianTitle(server||state?.server,title.section||title.profile?.kind,title.metadataId||title.profile?.sourceId||title.profile?.ids?.mal);
+  const p=ukrainian?{...(profile||{}),title:ukrainian.title,description:ukrainian.description||profile?.description}:(profile||{}),name=p.title&&p.title!=='Название уточняется'?p.title:title.name,parts=titleParts(title),currentPart=parts.find(value=>value.name===part)||parts[0];
   const video=selected&&title.items.some(item=>item.id===selected.id)?selected:null;
   const voices=[...new Set(title.items.filter(i=>i.category==='video').map(i=>voiceLabel(i)))];
   const facts=[['Тип',p.format||SECTION_LABELS[title.section]||'Произведение'],['Тема',p.themes?.join(', ')],['Статус',p.status],['Выпуск',day(p.startDate)+(p.endDate?' — '+day(p.endDate):'')],['Первоисточник',p.origin],['Эпизоды',p.episodes?[p.episodesAired&&p.episodesAired!==p.episodes?p.episodesAired+' из':'',p.episodes].filter(Boolean).join(' '):null],['Длительность',p.duration?p.duration+' мин.':null],['Рейтинг',p.ratingCode],['Возраст',p.rating],['Озвучка',voices.join(', ')],['Режиссёры',p.directors?.join(', ')],['Студия',p.studios?.join(', ')]];
