@@ -109,9 +109,17 @@ def discover(selected):
                             'providerName': found['player'] + ' · Kinobox', 'ids': selected.get('ids') or {},
                             'dubs': found['dubs'], 'episodes': episodes[:1] if kind == 'movie' else [],
                             'seasons': found.get('seasons') or [], 'complete': True, 'pending': False, 'scannedPages': 1})
+        # Alloha plays through browser profiles with a use limit; when all are
+        # spent it refuses every title, so its voices are not offered then.
+        from alloha_profiles import playback_available
+        paused = not playback_available() and any(is_alloha_player(s['url']) for s in sources)
+        if paused: sources = [s for s in sources if not is_alloha_player(s['url'])]
+        # Collaps plays over plain HTTP: offer it first.
+        sources.sort(key=lambda s: 0 if s['providerName'].startswith('Collaps') else 1)
         count = sum(len(s['dubs']) for s in sources)
         message = ('Найдено озвучек: ' + str(count) + '. ' if count else 'Поддерживаемых плееров для этого ID нет. ') + \
-                  ('Плееры без поддержки: ' + ', '.join(sorted(set(unsupported))) + '.' if unsupported else '')
+                  ('Плееры без поддержки: ' + ', '.join(sorted(set(unsupported))) + '. ' if unsupported else '') + \
+                  ('Alloha временно недоступна: исчерпан лимит браузерных профилей.' if paused else '')
         value = {'provider': 'kinobox', 'name': name, 'status': 'ok' if count else 'no_players' if rows else 'no_match',
                  'message': message.strip(), 'sources': sources, 'complete': True}
     except (SourceError, OSError) as error:

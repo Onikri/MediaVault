@@ -18,9 +18,29 @@ class Http(PublicHttp):
 class KinoboxTests(unittest.TestCase):
     def setUp(self):kinobox_source._cache.clear()
 
-    def run_discover(self,kind):
-        with patch.object(kinobox_source,'PublicHttp',lambda **_:Http()):
+    def run_discover(self,kind,alloha=True):
+        import alloha_profiles
+        with patch.object(kinobox_source,'PublicHttp',lambda **_:Http()),patch.object(alloha_profiles,'playback_available',lambda *a:alloha):
             return kinobox_source.discover({'title':'Во все тяжкие','kind':kind,'ids':{'imdb':'tt0903747'}})
+
+    def test_spent_alloha_profiles_hide_alloha_voices_and_collaps_comes_first(self):
+        value=self.run_discover('tv')
+        self.assertTrue(value['sources'][0]['providerName'].startswith('Collaps'))
+        kinobox_source._cache.clear()
+        movie=self.run_discover('movie',alloha=False)
+        self.assertFalse(any(s['providerName'].startswith('Alloha') for s in movie['sources']))
+        self.assertIn('Alloha временно недоступна',movie['message'])
+
+    def test_profile_state_file_decides_availability(self):
+        import json,tempfile,time,alloha_profiles
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            (root/'active.json').write_text(json.dumps({'id':'a'}));(root/'candidates.json').write_text(json.dumps({'id':'b'}))
+            (root/'health.json').write_text(json.dumps({'a':{'successes':18,'retired':True},'b':{'successes':3,'quarantine_until':time.time()+600}}))
+            self.assertFalse(alloha_profiles.playback_available(root))
+            (root/'health.json').write_text(json.dumps({'a':{'successes':18,'retired':True}}))
+            self.assertTrue(alloha_profiles.playback_available(root),'a new candidate without history is usable')
+        self.assertTrue(alloha_profiles.playback_available(Path(folder)/'missing'),'unknown state lets playback try')
 
     def test_serial_uses_collaps_dubs_including_lostfilm_and_ukrainian(self):
         value=self.run_discover('tv')

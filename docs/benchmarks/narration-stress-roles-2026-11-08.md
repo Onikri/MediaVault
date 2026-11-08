@@ -24,7 +24,8 @@ Script: `scratchpad stress_probe.py` (not committed), audio in `.codex-local/ben
 
 One gold label was wrong (`стоя́ли` is correct); RUAccent's remaining misses are the
 hardest pairs on purpose (`замо́к/за́мок`, `мука́/му́ка`, `хлопо́к/хло́пок`).
-Decision: RUAccent places stresses; Google models do roles and emotions only.
+Decision then: RUAccent places stresses; Google models do roles and emotions only.
+**Later the same day the owner removed RUAccent from the server** (narration quality did not satisfy them); only bible name stresses remain.
 
 ## Title bible and chapter roles on «Война и мир», т. 1, гл. II (actual inference)
 
@@ -44,3 +45,13 @@ Decision: RUAccent places stresses; Google models do roles and emotions only.
 bible/roles answers and the `/tts/accent` answer; it checks that stressed text reaches the
 synthesiser, that names and emotions are drawn in the text and the cast panel shows the
 models in use.
+
+## Role pass speed (actual inference, same chapter, 2026-11-08)
+
+| Model | Time for 32 segments | Speakers right in 14 dialogue lines |
+|---|---|---|
+| Gemma 4 26B A4B | 24 s | 11 |
+| Gemini 3.5 Flash Lite | 3 s | 14 (one narration fragment attributed too) |
+
+Gemini 3.5 Flash Lite became the default role model; the chapter pass no longer waits for
+the title bible and long chapters are sent in parallel parts.

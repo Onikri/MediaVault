@@ -80,11 +80,12 @@ export function heuristicRoles(paragraphs){
 }
 
 // ---------------------------------------------------------------- model pass
-// Gemma 4 (by default) reads the chapter with the title bible: every segment
+// Gemini 3.5 Flash Lite (by default; 3 s per chapter, Gemma 4 26B took 24 s)
+// reads the chapter with the title bible when it is ready: every segment
 // gets its speaker (a bible name), emotion and intensity — narration included,
 // so the narrator also reads tense or sad scenes in their tone.
 
-export const ROLE_MODEL='gemma-4-26b-a4b-it';
+export const ROLE_MODEL='gemini-3.5-flash-lite';
 const schema={type:'OBJECT',properties:{
  characters:{type:'ARRAY',items:{type:'OBJECT',properties:{name:{type:'STRING'},gender:{type:'STRING',enum:['m','f','u']},age:{type:'STRING',enum:['child','teen','young','adult','old']}},required:['name','gender','age']}},
  lines:{type:'ARRAY',items:{type:'OBJECT',properties:{i:{type:'INTEGER'},speaker:{type:'STRING'},emotion:{type:'STRING',enum:EMOTIONS},intensity:{type:'NUMBER'},tags:{type:'ARRAY',items:{type:'STRING',enum:['laugh','sigh','breath']}}},required:['i','speaker','emotion','intensity']}}},
@@ -127,15 +128,18 @@ export function applyRoles(segments,answer,bible=null){
  return {segments:updated,characters};
 }
 
+// Long chapters are sent in parts at the same time; each part carries the
+// heuristic speakers just before it as context.
 export async function modelRoles(segments,{known=[],bible=null,context={},service,userId,model=ROLE_MODEL,signal}={}){
  if(!segments.length)return {segments,characters:[]};
- let current=segments,characters=[...known];
- const cast=bible?.characters?.length?bible.characters:characters;
- for(let i=0;i<segments.length;i+=160){
-  signal?.throwIfAborted();
-  const part=segments.slice(i,i+160);
-  const recent=[...new Set(current.slice(0,i).filter(s=>s.kind!=='narration'&&s.speaker).map(s=>s.speaker).reverse())];
-  const answer=await generate({service,userId,model,signal,timeout:120000,request:rolesRequest(part,[...cast,...characters.filter(c=>!cast.some(k=>k.name===c.name))],{...context,recent:[...recent,...(context.recent||[])]})});
+ const cast=bible?.characters?.length?bible.characters:known;
+ const parts=[];for(let i=0;i<segments.length;i+=120)parts.push(i);
+ const answers=await Promise.all(parts.map(i=>{
+  const recent=[...new Set(segments.slice(Math.max(0,i-40),i).filter(s=>s.kind!=='narration'&&s.speaker).map(s=>s.speaker).reverse())];
+  return generate({service,userId,model,signal,timeout:90000,request:rolesRequest(segments.slice(i,i+120),cast,{...context,recent:[...recent,...(context.recent||[])]})});
+ }));
+ let current=segments;const characters=[];
+ for(const answer of answers){
   const applied=applyRoles(current,answer,bible);current=applied.segments;
   for(const c of applied.characters)if(!characters.some(k=>k.name===c.name))characters.push(c);
  }

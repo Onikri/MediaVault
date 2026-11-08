@@ -5,9 +5,9 @@
 import {restoreDirectKeys,rememberDirectKey} from '../manga-direct-key.js';
 
 export const ROLE_MODELS=[
+ ['gemini-3.5-flash-lite','Gemini 3.5 Flash Lite · быстро'],
  ['gemma-4-26b-a4b-it','Gemma 4 · 26B A4B'],
  ['gemma-4-31b-it','Gemma 4 · 31B'],
- ['gemini-3.5-flash-lite','Gemini 3.5 Flash Lite'],
 ];
 export const BIBLE_MODELS=[
  ['gemini-3.5-flash-lite','Gemini 3.5 Flash Lite'],
