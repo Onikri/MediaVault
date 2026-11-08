@@ -34,7 +34,7 @@ def get(url,http):
         if urlsplit(url).hostname=='api.cdnlibs.org':
             # LibGroup identifies its public catalogue with a site header, not
             # only the search parameter. Without it this API returns HTTP403.
-            site_id=getattr(http,'lib_site_id',1);root=LIB_SITES[site_id][2]
+            site_id=getattr(http,'lib_site_id',1);root=LIB_SITES[site_id][2] if site_id in LIB_SITES else 'https://ranobelib.me'  # 3: RanobeLib (ranobe_ru)
             client.session.headers.update({'Site-Id':str(site_id),'Accept':'application/json'})
             text,_,_=client.document(url,headers={'Referer':root+'/'})
         else:text,_,_=client.document(url)

@@ -23,7 +23,7 @@ ZENKO = 'https://zenko.online'
 ZENKO_API = 'https://api.zenko.online'
 SMAK = 'https://smakolykytl.site'
 SMAK_API = 'https://api.smakolykytl.site/api/user'
-SOURCES = (('ranobehub', 'RanobeHub', 'ru'), ('zenko-novel', 'Zenko · UA', 'uk'), ('smakolyky', 'Смаколики · UA', 'uk'), ('baka', 'Бака · UA', 'uk'))
+SOURCES = (('ranobehub', 'RanobeHub', 'ru'), ('ranobelib', 'RanobeLib', 'ru'), ('jaomix', 'Jaomix', 'ru'), ('rulate', 'Rulate', 'ru'), ('zenko-novel', 'Zenko · UA', 'uk'), ('smakolyky', 'Смаколики · UA', 'uk'), ('baka', 'Бака · UA', 'uk'))
 BAKA = 'https://baka.in.ua'
 HIKKA = 'https://api.hikka.io'
 MAX_CHAPTERS = 3000
@@ -187,7 +187,8 @@ def _baka_search(query, http, title=None):
                'aliases': names, 'url': BAKA + '/fictions/' + route[1], 'description': '', 'cover': ''}
 
 
-SEARCH = {'ranobehub': _hub_search, 'zenko-novel': _zenko_search, 'smakolyky': _smak_search, 'baka': _baka_search}
+import ranobe_ru
+SEARCH = {'ranobehub': _hub_search, 'zenko-novel': _zenko_search, 'smakolyky': _smak_search, 'baka': _baka_search, **ranobe_ru.SEARCH}
 
 
 def search(title, language='all'):
@@ -215,6 +216,9 @@ def search(title, language='all'):
                     accepted, evidence = (True, 'hikka') if identity == 'baka' else match_title(wanted, candidate)
                     if accepted: results.append({**candidate, 'kind': 'ranobe', 'matchEvidence': evidence})
                 if results: break
+            # Exact titles first; sites list many fan-fics that only share the headline.
+            strong = [r for r in results if r['matchEvidence'] in {'external_id', 'exact_title', 'title_and_season', 'hikka'}]
+            results = (strong or results)[:3]
             if results: status, message = 'ok', 'Найдено: ' + str(len(results))
         except SourceError as error:
             status, message = 'unavailable', str(error)
@@ -293,10 +297,26 @@ def _chapter_url(identity, book, chapter):
     return base + book + '?' + urlencode({'mv_chapter': chapter})
 
 
+def _inspect_ru(url, http=None):
+    own = http is None
+    http = http or PublicHttp(timeout=(3, 10), deadline=time.monotonic() + 60)
+    try:
+        identity, base, title, names, chapters = ranobe_ru.book(url, http)
+    finally:
+        if own: http.close()
+    chapters.sort(key=lambda c: (c['season'], c['number']))
+    for c in chapters:
+        c['language'] = 'ru'; c['title'] = c['title'] or 'Глава ' + str(c['number'])
+    return {'provider': identity, 'providerName': dict((s[0], s[1]) for s in SOURCES)[identity], 'kind': 'ranobe',
+            'title': title, 'aliases': names, 'url': base, 'language': 'ru', 'episodes': chapters,
+            'seasons': [{'number': n, 'name': 'Том ' + str(n)} for n in sorted({c['season'] for c in chapters})]}
+
+
 def inspect(url, http=None):
     """Book and its free chapter list (volume, number, title, url)."""
     import book_sources
     if book_sources.route(url): return book_sources.inspect(url)
+    if ranobe_ru.route(url): return _inspect_ru(url, http)
     identity, book, _ = _route(url)
     own = http is None
     http = http or PublicHttp(timeout=(3, 10), deadline=time.monotonic() + 40)
@@ -364,6 +384,15 @@ def chapter(url, http=None):
     """Plain paragraphs of one chapter."""
     import book_sources
     if book_sources.route(url): return book_sources.chapter(url)
+    if ranobe_ru.route(url):
+        own = http is None
+        http = http or PublicHttp(timeout=(3, 10), deadline=time.monotonic() + 25)
+        try:
+            title, paragraphs = ranobe_ru.chapter(url, http)
+        finally:
+            if own: http.close()
+        if not paragraphs: raise SourceError('Глава пуста или доступна только на сайте источника.')
+        return {'provider': ranobe_ru.route(url)[0], 'url': url, 'title': title[:200], 'language': 'ru', 'paragraphs': paragraphs[:MAX_PARAGRAPHS]}
     identity, book, selected = _route(url)
     if not selected: raise SourceError('Выбери конкретную главу.')
     own = http is None
