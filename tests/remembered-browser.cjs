@@ -38,7 +38,7 @@ module.exports=async function({browser,base,installProvider,OWNER,PHRASE,catalog
   await page.goto(base+'?library='+catalogId);
   await page.getByRole('region',{name:'Cookies и запоминание устройства'}).waitFor();
   await page.getByRole('button',{name:'Принять и запомнить',exact:true}).click();
-  await page.locator('#profileBtn').click();await page.locator('#loginBtn').click();
+  await page.locator('#profileBtn').click();await page.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();await page.locator('#loginBtn').click();
   await page.locator('#passphrase').fill(PHRASE);await page.locator('#unlockBtn').click();
   await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));
   await page.waitForFunction(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('mediavault-trusted-device-v1',1);q.onsuccess=()=>r(q.result);});try{return await new Promise(r=>{const q=db.transaction('records').objectStore('records').getAll();q.onsuccess=()=>r(q.result.some(v=>v?.libraryId&&v?.data));});}finally{db.close();}});
@@ -60,7 +60,7 @@ module.exports=async function({browser,base,installProvider,OWNER,PHRASE,catalog
   await page.locator('.device-settings').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));
   await page.locator('#profileBtn').click();await page.locator('.profile-menu').getByRole('button',{name:'Выйти'}).click();await page.reload();
-  await page.locator('#profileBtn').click();assert.equal(await page.locator('#loginBtn').isEnabled(),true,'Logout does not silently log the account back in');
+  await page.locator('#profileBtn').click();await page.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();assert.equal(await page.locator('#loginBtn').isEnabled(),true,'Logout does not silently log the account back in');
   console.log('PASS: cookie consent; opt-in device persistence; non-exportable key; real signatures; automatic Google + vault restore; WebAuthn PRF wrapping and unlock with a virtual platform authenticator; logout.');
  }finally{await context.close();}
 };
