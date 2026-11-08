@@ -18,7 +18,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
  window.checkBinary=async()=>{let outgoing;const client=createImportClient('https://vm.example',()=>null,async(url,options)=>{outgoing=options;return{ok:true,json:async()=>({ok:true})}});await client.request('/upload',{method:'PUT',body:blob,auth:false});return{binary:outgoing.body instanceof Blob,type:outgoing.headers['Content-Type'],size:outgoing.body.size}};
  createRoot(document.getElementById('root')).render(<main style={{padding:12}}><ReaderChapterExport scope={scope} total={2} item={{id:chapter,name:'Тестовая глава',episode:1,sourceURL:'https://mangapill.com/chapters/fixture'}} settings={{directInput:'vision',directModel:'gemini-3.5-flash-lite',directBatchPages:2,inpaint:'fast',font:'auto',language:'Japanese',direction:'rtl',directDetector:'rtdetr'}} service={service}/></main>);
  `);
- const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium'});
  for(const width of [360,1280]){
   const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));

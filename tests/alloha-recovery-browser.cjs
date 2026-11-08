@@ -11,7 +11,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),assert=require('n
  function DiscoveryDemo(){const result=useSourceDiscovery({id:'expired-source',kind:'anime',title:'Source'},discoveryService);return <output id="discovered">{(result.data?.voices||[]).flatMap(v=>v.variants.map(r=>r.id)).join(',')}</output>;}
  function Demo(){const[variants,setVariants]=useState([old]);window.addHealthyVariant=()=>setVariants(v=>[...v,{...fresh,id:'another'}]);const discovery={data:{voices:[{id:'dub',name:'Дублированный',variants}]},loading:false,retry:()=>{window.refreshes++;setTimeout(()=>setVariants([old,fresh]),40);}};return <><DiscoveryDemo/><OnlineWatch item={{id:'recovery',kind:'anime',title:'Проверка Alloha'}} profile={{title:'Проверка Alloha'}} discovery={discovery} service={service} userId="test"/></>;}createRoot(document.getElementById('root')).render(<Demo/>);
  `);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/recovery-ui',logLevel:'error',server:{port:0,strictPort:false,host:'127.0.0.1'}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/recovery-ui',logLevel:'error',server:{watch:null,port:0,strictPort:false,host:'127.0.0.1'}});await vite.listen();
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',r=>r.request().url().startsWith('http://127.0.0.1:')?r.continue():r.abort());
  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/recovery-ui/index.html');

@@ -23,7 +23,7 @@ const service={server:'https://online.fixture',status:'connected',session:{serve
 }};
 createRoot(document.getElementById('root')).render(<MangaReader item={item} catalog={{items:[item]}} userId="online-owner" libraryId="online" readerService={service} onClose={()=>{}}/>);
 `);
- const{createServer}=await import('vite');vite=await createServer({root,logLevel:'error',server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ const{createServer}=await import('vite');vite=await createServer({root,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
  for(const width of[390,1366]){
   const context=await browser.newContext({viewport:{width,height:950}}),page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(()=>localStorage.setItem('mv_lmt_settings:online-owner',JSON.stringify({version:8,engine:'vm',directDetector:'en-fast',inpaint:'fast',font:'auto',directRenderVersion:2,cache:false})));

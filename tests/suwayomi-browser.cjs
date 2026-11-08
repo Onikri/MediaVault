@@ -17,7 +17,7 @@ const service={status:'connected',session:{serverVersion:15,driveConnected:true}
 }};
 function App(){const[view,setView]=useState(false);return <main style={{maxWidth:700,margin:'30px auto',padding:12}}><button onClick={()=>setView(true)}>Проверить поиск</button>{view?<MangaImport state={{admin:true,catalog:{},libraryId:'fixture',user:{sub:'fixture'}}} service={service} item={{id:'42',kind:'manga',title:'Demo Manga'}}/>:<MangaSourceManager service={service} onInstalled={()=>window.refreshed=true}/>}</main>;}
 createRoot(document.getElementById('root')).render(<App/>);`);
- const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:5194}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+ const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:5194}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
  for(const width of[360,1440]){
   const page=await browser.newPage({viewport:{width,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5194/test-output/suwayomi-harness.html');
   assert.equal(await page.getByLabel('Язык дополнительных источников').count(),0);await page.locator('summary').click();await page.getByRole('button',{name:'Подключить: Manga Source',exact:true}).click();await page.getByRole('button',{name:'Подключён: Manga Source',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.installs),1);

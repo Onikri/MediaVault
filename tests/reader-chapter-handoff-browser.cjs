@@ -12,7 +12,7 @@ const readRange=async(item,a,b,{signal})=>{if(item.episode===21){if(!window.firs
 function Demo(){const[item,setItem]=useState(items[0]),[open,setOpen]=useState(true);window.closeReader=()=>setOpen(false);return open?<MangaReader item={item} catalog={{items}} userId="handoff" libraryId="drive-fixture" onClose={()=>setOpen(false)} onSelectItem={setItem} readWhole={readWhole} readRange={readRange}/>:<p>Закрыто</p>;}
 createRoot(document.getElementById('root')).render(<Demo/>);
 `);
- const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/chapter-handoff-vite',logLevel:'error',server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});
+ const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/chapter-handoff-vite',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});
  for(const width of[390,1366]){
   const context=await browser.newContext({viewport:{width,height:950}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>localStorage.setItem('mediavault_reader_v3:handoff:manga',JSON.stringify({nextChapter:true,translate:false,preload:2,fit:'page'})));

@@ -14,7 +14,7 @@ const service={server:'https://fixture.example',status:'connected',request:async
 const item={id:'blocks-chapter',name:'Проверка блоков',category:'manga',collectionId:'title',translationInfo:{language:'en'},metadata:{format:new URLSearchParams(location.search).get('webtoon')?'manhwa':'manga'}};
 createRoot(document.getElementById('root')).render(<MangaReader item={item} catalog={{items:[item]}} userId="blocks-browser" libraryId="fixture" readWhole={async()=>chapter} readerService={service} onClose={()=>{}}/>);
 `);
- const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/blocks-browser-vite',logLevel:'error',server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();
+ const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/blocks-browser-vite',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});
  for(const width of[390,1366])for(const scenario of['manga','webtoon','seam']){
   const webtoon=scenario!=='manga',seam=scenario==='seam';

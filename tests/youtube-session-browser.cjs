@@ -7,7 +7,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
  import React from'react';import{createRoot}from'react-dom/client';import YouTubeServerSession from'/src/YouTubeServerSession.jsx';import'/src/styles.css';import'/src/music-dock.css';
  const service={status:'connected',server:location.origin,request:async(p,o={})=>{const r=await fetch(p,{method:o.method||'GET',headers:{'Content-Type':'application/json'},body:o.body?JSON.stringify(o.body):undefined,signal:o.signal});const d=await r.json();if(!r.ok)throw Error(d.detail);return d;}};
  createRoot(document.getElementById('root')).render(<YouTubeServerSession enabled service={service}/>);`);
- const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
+ const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of [390,1440]){
   const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));let configured=false,uploads=0,closed=0,failed=false;
   const fixture='# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSAPISID\tfixture-owner-session\n';

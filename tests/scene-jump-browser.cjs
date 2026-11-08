@@ -24,7 +24,7 @@ let browser,vite,last;
  }};
  createRoot(document.getElementById('root')).render(<ThemeProvider><main className="app-main" style={{width:'100%',maxWidth:1000,margin:'0 auto'}}><OnlineWatch item={item} profile={profile} discovery={discovery} service={service} userId="test"/></main></ThemeProvider>);
  `);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-scene-jump',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-scene-jump',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  // Both browser policies: autoplay allowed (plays by itself) and a click
  // required (waits paused at the moment). No user gesture precedes the jump.
  for(const [policy,width] of [['no-user-gesture-required',1440],['document-user-activation-required',390],['document-user-activation-required',1440]]){

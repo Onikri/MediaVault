@@ -5,7 +5,7 @@ let browser,vite;
 (async()=>{
  const root=path.resolve(__dirname,'..'),out=path.join(root,'.codex-local/test-output/empty-review');await fs.mkdir(out,{recursive:true});
  await fs.writeFile(path.join(out,'index.html'),'<meta charset="utf-8"><script type="module">import{renderComicPage}from"/src/manga-renderer.js";import{paintBlockSheets}from"/src/manga-blocks.js";import{reviewEmptyTranslations}from"/src/manga-empty-review.js";window.libs={renderComicPage,paintBlockSheets,reviewEmptyTranslations};</script>');
- const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/empty-review-vite',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/empty-review-vite',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/empty-review/index.html');await page.waitForFunction(()=>window.libs);
  const result=await page.evaluate(async()=>{

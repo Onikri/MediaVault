@@ -11,7 +11,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  function App(){const ref=useRef(null),warm=warmup({entry:{url:'https://media.example/episode'},sourceUrl:'https://media.example/title',quality:'best',service,enabled:true,anchor:ref});const lyrics=useLyrics(track,knownMusicDuration(track,0,{durationMs:227000}),true,service);return <><Drive enabled service={service}/><button ref={ref} onClick={warm}>Warm</button><output>{lyrics.phase} {lyrics.plainText}</output></>;}
  createRoot(document.getElementById('root')).render(<App/>);
  `);
- const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
+ const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of[390,1440]){
   const page=await browser.newPage({viewport:{width,height:850}}),errors=[],warm=[],closed=[],lyrics=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/google/connection**',r=>r.fulfill({json:{configured:true,connected:false,needsConsent:true,state:'needs_consent',checkedAt:1}}));

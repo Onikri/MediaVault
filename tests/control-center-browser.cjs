@@ -6,7 +6,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
 (async()=>{
  await fs.mkdir(dir,{recursive:true});await fs.mkdir(path.join(ROOT,'test-output'),{recursive:true});
  await fs.writeFile(path.join(ROOT,'test-output/control-center.html'),'<!doctype html><html lang="ru" data-blossom><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/tests/control-center-harness.jsx"></script></html>');
- const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  const base='http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/control-center.html';
  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox']});
  for(const width of [375,900,1440]){

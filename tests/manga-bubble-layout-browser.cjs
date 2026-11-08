@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
 (async()=>{
  const root=path.resolve(__dirname,'..'),out=path.join(root,'.codex-local/test-output/bubble-layout');await fs.mkdir(out,{recursive:true});
  await fs.writeFile(path.join(out,'index.html'),'<meta charset="utf-8"><script type="module">import{renderComicPage}from"/src/manga-renderer.js";window.render=renderComicPage;</script>');
- const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/bubble-layout-vite',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});const page=await browser.newPage();await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/bubble-layout/index.html');await page.waitForFunction(()=>window.render);
+ const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/bubble-layout-vite',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});const page=await browser.newPage();await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/bubble-layout/index.html');await page.waitForFunction(()=>window.render);
  const rows=await page.evaluate(async()=>{
   const results=[];
   for(const [kind,boxes]of [['columns',[[140,110,240,330],[260,110,360,330]]],['stacked',[[180,100,280,200],[180,300,280,400]]],['diagonal',[[260,100,360,200],[140,280,240,380]]]]){

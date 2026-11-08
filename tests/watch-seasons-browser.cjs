@@ -25,7 +25,7 @@ let browser,vite,last;
  function Local(){const[current,setCurrent]=useState(assets[0]);return <ThemeProvider><main className="app-main"><Player autoPlay item={current} source={'${base}fixture.mp4?item='+current.id} catalog={{items:assets,storage:{collections:[{id:'local',name:'Коллекция',section:'anime'}]}}} onSelectItem={item=>{window.localChoices=(window.localChoices||0)+1;setCurrent(item);}}/></main></ThemeProvider>}
  createRoot(document.getElementById('root')).render(location.search.includes('local')?<Local/>:<Demo/>);
  `);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-watch-seasons',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-watch-seasons',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});
  for(const width of [390,1440]){
   const page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'}),errors=[];last=page;page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});page.setDefaultTimeout(8000);

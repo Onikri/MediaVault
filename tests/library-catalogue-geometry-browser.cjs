@@ -5,7 +5,7 @@ let vite,browser,last;
  const root=process.cwd(),dir=path.join(root,'.codex-local/test-output/library-layout'),base='/.codex-local/test-output/library-layout/';await fs.mkdir(dir,{recursive:true});
  await fs.writeFile(path.join(dir,'index.html'),'<meta name="viewport" content="width=device-width"><div id="root"></div><script type="module" src="'+base+'fixture.jsx"></script>');
  await fs.writeFile(path.join(dir,'fixture.jsx'),`import React from'react';import{createRoot}from'react-dom/client';import App from'/src/App.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/import-layout.css';window.MEDIA_VAULT_CONFIG={importServerUrl:'https://fixture.example'};createRoot(document.getElementById('root')).render(<App/>);`);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-library-layout',logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();
+ const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-library-layout',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of [390,1024,1669]){
   const page=await browser.newPage({viewport:{width,height:960},reducedMotion:'reduce'});last=page;const errors=[];page.on('pageerror',e=>errors.push(e.message));

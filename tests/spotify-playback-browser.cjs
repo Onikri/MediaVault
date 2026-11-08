@@ -10,7 +10,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
 
  createRoot(document.getElementById('root')).render(<><header style={{display:'flex',justifyContent:'flex-end',padding:20}}><MiniMusicPlayer service={service} placement="nav" userId="spotify-test"/></header><main style={{padding:20,maxWidth:700}}><MusicConnections/></main></>);
  `);
- const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
+ const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1280,height:950}}),page=await context.newPage(),errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'*'};
  await context.route('**/spotify-callback.html?**',async r=>r.fulfill({contentType:'text/html',body:await fs.readFile(path.join(ROOT,'spotify-callback.html'),'utf8')}));

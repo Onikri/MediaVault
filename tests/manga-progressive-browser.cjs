@@ -12,7 +12,7 @@ const ROOT=process.cwd(),DIR=path.join(ROOT,'.codex-local/test-output/manga-prog
  if(p==='/manga/search')return{results:[],providers:[]};if(p==='/discovery/manga/search')return{id:'done',state:'done',results:[]};return{};
  }};createRoot(document.getElementById('root')).render(<MangaImport compact destination="online" item={title} state={{user:{sub:'fixture'}}} service={service}/>);
  `);
- const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
+ const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of[390,1440])for(const verified of[true,false]){
   const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/manga-progressive/index.html');
   await page.getByText('Chapter 1',{exact:true}).waitFor();await page.getByText('Главы получены · проверяем загрузку страницы…',{exact:true}).waitFor();const read=page.getByRole('button',{name:'Читать сейчас',exact:true});assert.equal(await read.isEnabled(),false);assert.equal(await page.evaluate(()=>calls.filter(p=>p==='/manga/inspect').length),1,'Auto selection reuses the already loaded chapter metadata');
