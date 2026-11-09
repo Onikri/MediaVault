@@ -8,10 +8,11 @@ import {createNarrator,utterancesOf,playClip} from './player.js';
 import {buildBible,savedBible,saveBible,forgetBible,applyLexicon,TIMBRES,AGES} from './bible.js';
 import {ROLE_MODELS,BIBLE_MODELS,personalKey,savePersonalKey} from './google.js';
 import {roleColors,emotionLabel} from './RoleText.jsx';
+import {geminiCast,geminiNarrator,geminiRows,geminiClip,wholeClip,GEMINI_VOICES,geminiVoiceLabel,savedGeminiCast,saveGeminiCast} from './gemini-voice.js';
 import './narration.css';
 
 const PREFS='mediavault_tts_prefs_v2';
-const DEFAULTS={pace:1,narrator:'auto',roles:true,rolesModel:ROLE_MODEL,bibleModel:'gemini-3.5-flash-lite'};
+const DEFAULTS={engine:'gemini',geminiNarrator:'auto',pace:1,narrator:'auto',roles:true,rolesModel:ROLE_MODEL,bibleModel:'gemini-3.5-flash-lite'};
 // Only models offered in the panel are kept (non-Lite Flash is never used).
 function readPrefs(){try{const value={...DEFAULTS,...JSON.parse(localStorage.getItem(PREFS)||'{}')};if(!BIBLE_MODELS.some(([id])=>id===value.bibleModel))value.bibleModel=DEFAULTS.bibleModel;if(!ROLE_MODELS.some(([id])=>id===value.rolesModel))value.rolesModel=DEFAULTS.rolesModel;return value;}catch{return {...DEFAULTS};}}
 const mb=bytes=>Math.round(bytes/1048576);
@@ -20,6 +21,8 @@ const voiceName=v=>(v[0]==='F'?'Женский ':'Мужской ')+v.slice(1);
 const TIMBRE_LABELS={neutral:'обычный',warm:'тёплый',bright:'звонкий',dark:'низкий, глухой',breathy:'с придыханием',rough:'хрипловатый',nasal:'носовой',soft:'мягкий'};
 const AGE_LABELS={child:'ребёнок',teen:'подросток',young:'молодой',adult:'взрослый',old:'пожилой'};
 const SAMPLE={ru:'Здравствуй. Так звучит мой голос в этой книге.',uk:'Привіт. Так звучить мій голос у цій книжці.'};
+const GEMINI_OPTIONS=<><optgroup label="Мужские голоса">{GEMINI_VOICES.filter(v=>v[1]==='m').map(([n])=><option key={n} value={n}>{geminiVoiceLabel(n)}</option>)}</optgroup>
+ <optgroup label="Женские голоса">{GEMINI_VOICES.filter(v=>v[1]==='f').map(([n])=><option key={n} value={n}>{geminiVoiceLabel(n)}</option>)}</optgroup></>;
 const wait=(ms,signal)=>new Promise((resolve,reject)=>{const t=setTimeout(resolve,ms);signal?.addEventListener('abort',()=>{clearTimeout(t);reject(signal.reason);},{once:true});});
 
 // Narration for one chapter. onSpeaking({p,segment}) highlights the text;
@@ -30,10 +33,15 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  const [segments,setSegments]=useState([]),[characters,setCharacters]=useState([]),[analysis,setAnalysis]=useState(''),[cast,setCast]=useState(()=>savedCast(bookKey));
  const [bible,setBible]=useState(()=>savedBible(bookKey)),[bibleState,setBibleState]=useState(''),[bibleRevision,setBibleRevision]=useState(0);
  const [state,setState]=useState({playing:false,index:0,total:0}),[provider,setProvider]=useState(''),[castOpen,setCastOpen]=useState(false),[consent,setConsent]=useState(ttsConsent);
+ const [geminiSaved,setGeminiSaved]=useState(()=>savedGeminiCast(bookKey));
  const [hasKey,setHasKey]=useState(null),[keyDraft,setKeyDraft]=useState(''),[sampling,setSampling]=useState('');
- const narrator=useRef(null),live=useRef({}),rowsRef=useRef([]),wantPlay=useRef(false);live.current={onSpeaking,onFinished};
+ const narrator=useRef(null),speech=useRef({}),localProvider=useRef(''),live=useRef({}),rowsRef=useRef([]),wantPlay=useRef(false);live.current={onSpeaking,onFinished};
  function update(change){setPrefs(old=>{const next={...old,...change};try{localStorage.setItem(PREFS,JSON.stringify(next));}catch{}return next;});}
  const meta=useMemo(()=>({title:book?.title||title,aliases:book?.aliases||[],authors:book?.authors||[],description:book?.description||'',year:book?.year||null,kind:book?.kind||'book',language}),[book?.title,title,language]);
+ // Gemini native audio voices come from the server (version 59+); Supertonic runs on the device.
+ const geminiReady=!!service?.request&&Number(service?.session?.serverVersion)>=59;
+ const engine=prefs.engine==='gemini'&&geminiReady?'gemini':'supertonic';
+ speech.current={service,userId};
 
  // 1. Title bible: once per book, the strongest free model studies the cast.
  useEffect(()=>{
@@ -63,7 +71,10 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  const voices=useMemo(()=>castVoices(segments,characters,{narrator:prefs.narrator,saved:cast,bible}),[segments,characters,prefs.narrator,cast,bible]);
  const narratorVoice=useMemo(()=>narratorCast(bible,prefs.narrator),[bible,prefs.narrator]);
  useEffect(()=>{saveCast(bookKey,voices);},[bookKey,voices]);
- const rows=useMemo(()=>utterancesOf(spoken,{cast:voices,narrator:narratorVoice,pace:prefs.pace}),[spoken,voices,narratorVoice,prefs.pace]);
+ const geminiNarratorVoice=useMemo(()=>geminiNarrator(bible,prefs.geminiNarrator),[bible,prefs.geminiNarrator]);
+ const geminiVoices=useMemo(()=>geminiCast(voices,{narrator:geminiNarratorVoice,saved:geminiSaved}),[voices,geminiNarratorVoice,geminiSaved]);
+ const rows=useMemo(()=>engine==='gemini'?geminiRows(spoken,{cast:voices,voices:geminiVoices,narrator:geminiNarratorVoice,bible,pace:prefs.pace})
+  :utterancesOf(spoken,{cast:voices,narrator:narratorVoice,pace:prefs.pace}),[engine,spoken,voices,narratorVoice,geminiVoices,geminiNarratorVoice,bible,prefs.pace]);
  rowsRef.current=rows;
  const colors=useMemo(()=>roleColors(voices),[voices]);
  // The reader draws the same roles in the text (names, colours, emotions).
@@ -71,7 +82,9 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
 
  useEffect(()=>{
   // CPU: 4 flow steps (measured CER: 3 steps ru 1.6% / uk 4.7%, 5 steps 0.5% / 0.8%).
-  narrator.current=createNarrator({language,steps:provider==='wasm'?4:5,
+  const gemini=provider==='gemini';
+  narrator.current=createNarrator({language,steps:provider==='wasm'?4:5,lookahead:gemini?3:4,
+   synth:gemini?(row,i,signal,lang)=>geminiClip({...speech.current,text:row.text,voice:row.voice,style:row.style,language:lang,signal}):null,
    onSegment:row=>live.current.onSpeaking?.(row),onState:setState,onEnd:()=>live.current.onFinished?.(),onError:e=>{setError(e.message||'Озвучка остановилась.');}});
   const rows=rowsRef.current,first=Math.max(0,rows.findIndex(r=>r.p>=startParagraph));
   narrator.current.load(rows,{start:first,label:title});
@@ -87,19 +100,25 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
   if(was)player.play();
  },[rows]);
 
+ // Switching engines keeps the place; the Supertonic model stays loaded.
+ useEffect(()=>{
+  if(engine==='gemini'&&provider!=='gemini'){narrator.current?.pause();setProvider('gemini');setPhase(p=>p==='ready'?'ready':'idle');}
+  else if(engine!=='gemini'&&provider==='gemini'){narrator.current?.pause();setProvider(localProvider.current);setPhase(localProvider.current&&engineReady()?'ready':'idle');}
+ },[engine]);
  async function begin(agreed=consent){
   setError('');
+  if(engine==='gemini'){setPhase('ready');if(provider==='gemini')narrator.current?.play();else{wantPlay.current=true;setProvider('gemini');}return;}
   if(!agreed){setPhase('consent');return;}
   try{
    if(!engineReady())setPhase('downloading');
    const loaded=await startNarrationEngine({progress:value=>{if(value.phase==='start')setPhase('starting');else setProgress(value);}});
-   setPhase('ready');
+   setPhase('ready');localProvider.current=loaded.provider;
    if(loaded.provider===provider)narrator.current?.play();else{wantPlay.current=true;setProvider(loaded.provider);}
   }catch(e){setPhase('idle');setError(e.message||'Не удалось запустить озвучку.');}
  }
- useEffect(()=>{if(autoplay&&rows.length){onAutoplayHandled?.();if(engineReady())narrator.current?.play();else begin();}},[autoplay,rows.length,provider]);
+ useEffect(()=>{if(autoplay&&rows.length){onAutoplayHandled?.();if(engine==='gemini'?phase==='ready'&&provider==='gemini':engineReady())narrator.current?.play();else begin();}},[autoplay,rows.length,provider]);
  function accept(){setTtsConsent(true);setConsent(true);setPhase('idle');begin(true);}
- function toggle(){if(narrator.current?.playing)narrator.current.pause();else if(phase==='ready'&&engineReady())narrator.current?.play();else begin();}
+ function toggle(){if(narrator.current?.playing)narrator.current.pause();else if(phase==='ready'&&(engine==='gemini'?provider==='gemini':engineReady()))narrator.current?.play();else begin();}
  if(commandRef)commandRef.current={toggle,playing:state.playing,busy:phase==='downloading'||phase==='starting'};
  useEffect(()=>{onPlaying?.(state.playing);},[state.playing]);
  useEffect(()=>{if(castOpen)personalKey(userId).then(k=>setHasKey(!!k)).catch(()=>setHasKey(false));},[castOpen,userId]);
@@ -113,6 +132,13 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
   }catch(e){setError(e.message||'Не удалось проиграть пример голоса.');}
   finally{setSampling('');}
  }
+ async function previewGemini(name,voice){
+  setSampling(name);
+  try{await playClip(await wholeClip(geminiClip({service,userId,text:SAMPLE[language]||SAMPLE.ru,voice,style:'',language})),{});}
+  catch(e){setError(e.message||'Не удалось проиграть пример голоса.');}
+  finally{setSampling('');}
+ }
+ function chooseGemini(name,voice){setGeminiSaved(old=>{const next={...old,[name]:voice};saveGeminiCast(bookKey,next);return next;});}
  function change(name,patch){
   setCast(old=>{const base={...voices[name],...old[name]};const next={...base,...patch,saved:true};
    if('pitch' in patch)next.rate=Math.pow(2,next.pitch/12);
@@ -145,7 +171,7 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
    </>:<button type="button" className="narration-start" disabled={busy||!rows.length} onClick={()=>begin()}><Headphones size={17}/>{busy?(phase==='starting'?'Запускаем голос…':'Загружаем голос '+Math.round((progress?.loaded||0)/Math.max(1,progress?.total||TTS_BYTES)*100)+'%'):'Слушать главу'}</button>}
    <label className="narration-pace">Темп<select aria-label="Темп озвучки" value={prefs.pace} onChange={e=>update({pace:Number(e.target.value)})}>{[.8,.9,1,1.1,1.2,1.35].map(v=><option key={v} value={v}>{v}×</option>)}</select></label>
    <button type="button" aria-label="Роли и голоса" aria-expanded={castOpen} onClick={()=>setCastOpen(v=>!v)}><Users size={16}/><span>{people.length}</span></button>
-   {state.playing&&<small className="narration-status">{state.buffering?'Готовим фразу…':provider==='webgpu'?'Видеокарта':'Процессор'}</small>}
+   {state.playing&&<small className="narration-status">{state.buffering?'Готовим фразу…':provider==='gemini'?'Gemini':provider==='webgpu'?'Видеокарта':'Процессор'}</small>}
   </div>
   {error&&<p className="inline-error" role="alert">{error}</p>}
   {castOpen&&<div className="narration-cast">
@@ -160,15 +186,21 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
    <label>Роли и эмоции<select aria-label="Модель разметки ролей" value={prefs.rolesModel} onChange={e=>update({rolesModel:e.target.value})}>{ROLE_MODELS.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
    <label>Персонажи книги<select aria-label="Модель карточки персонажей" value={prefs.bibleModel} onChange={e=>update({bibleModel:e.target.value})}>{BIBLE_MODELS.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
    {prefs.roles&&<button type="button" className="text-link narration-restudy" disabled={bibleState==='running'} onClick={restudy}><RefreshCw size={13}/>Изучить персонажей заново</button>}
-   <label>Рассказчик<span className="narration-voice-controls"><button type="button" className="narration-sample" aria-label="Пример голоса рассказчика" disabled={!!sampling} onClick={()=>preview('narrator',narratorVoice)}><Volume2 size={15}/></button><select aria-label="Голос рассказчика" value={prefs.narrator} onChange={e=>update({narrator:e.target.value})}><option value="auto">{bible?.narrator?'По книге · '+(TIMBRE_LABELS[bible.narrator.timbre]||''):'Автоматически'}</option>{PRESET_VOICES.map(v=><option key={v} value={v}>{voiceName(v)}</option>)}</select></span></label>
+   <label>Голоса<select aria-label="Движок озвучки" value={engine} onChange={e=>update({engine:e.target.value})}><option value="gemini" disabled={!geminiReady}>Gemini · живые голоса{geminiReady?'':' (нужен сервер)'}</option><option value="supertonic">Supertonic · на устройстве</option></select></label>
+   {engine==='gemini'&&<p className="fine">Фразы озвучивает Gemini 2.5 Flash Native Audio через сервер MediaVault: текст уходит в Google, голоса синтезированы нейросетью.</p>}
+   {engine==='gemini'?<label>Рассказчик<span className="narration-voice-controls is-single"><button type="button" className="narration-sample" aria-label="Пример голоса рассказчика" disabled={!!sampling} onClick={()=>previewGemini('narrator',geminiNarratorVoice)}><Volume2 size={15}/></button><select aria-label="Голос рассказчика" value={prefs.geminiNarrator} onChange={e=>update({geminiNarrator:e.target.value})}><option value="auto">По книге · {geminiNarratorVoice}</option><option value="m">Мужской · Charon</option><option value="f">Женский · Kore</option>{GEMINI_OPTIONS}</select></span></label>
+   :<label>Рассказчик<span className="narration-voice-controls"><button type="button" className="narration-sample" aria-label="Пример голоса рассказчика" disabled={!!sampling} onClick={()=>preview('narrator',narratorVoice)}><Volume2 size={15}/></button><select aria-label="Голос рассказчика" value={prefs.narrator} onChange={e=>update({narrator:e.target.value})}><option value="auto">{bible?.narrator?'По книге · '+(TIMBRE_LABELS[bible.narrator.timbre]||''):'Автоматически'}</option>{PRESET_VOICES.map(v=><option key={v} value={v}>{voiceName(v)}</option>)}</select></span></label>}
    <ul>{people.map(([name,value])=><li key={name}>
     <div className="narration-person"><span translate="no" style={{color:colors[name]}}>{name}</span><small>{[value.gender==='f'?'женский':value.gender==='m'?'мужской':'',AGE_LABELS[value.age]].filter(Boolean).join(', ')}{value.traits?' · ':''}<span translate="no">{value.traits}</span></small></div>
-    <span className="narration-voice-controls">
+    {engine==='gemini'?<span className="narration-voice-controls is-single">
+     <button type="button" className="narration-sample" aria-label={'Пример голоса: '+name} aria-pressed={sampling===name} disabled={!!sampling} onClick={()=>previewGemini(name,geminiVoices[name])}><Volume2 size={15}/></button>
+     <select aria-label={'Голос: '+name} value={geminiVoices[name]} onChange={e=>chooseGemini(name,e.target.value)}>{GEMINI_OPTIONS}</select>
+    </span>:<span className="narration-voice-controls">
      <button type="button" className="narration-sample" aria-label={'Пример голоса: '+name} aria-pressed={sampling===name} disabled={!!sampling} onClick={()=>preview(name,value)}><Volume2 size={15}/></button>
      <select aria-label={'Голос: '+name} value={Object.keys(value.voice)[0]} onChange={e=>change(name,{voice:{[e.target.value]:1}})}>{PRESET_VOICES.map(v=><option key={v} value={v}>{voiceName(v)} · {PRESET_TRAITS[v].f0} Гц</option>)}</select>
      <select aria-label={'Высота голоса: '+name} value={Math.round(value.pitch||0)} onChange={e=>change(name,{pitch:Number(e.target.value)})}>{[-4,-3,-2,-1,0,1,2,3,4].map(v=><option key={v} value={v}>{v>0?'+'+v:v} пт</option>)}</select>
      <select aria-label={'Тембр: '+name} value={value.timbre||'neutral'} onChange={e=>change(name,{timbre:e.target.value})}>{TIMBRES.map(t=><option key={t} value={t}>{TIMBRE_LABELS[t]}</option>)}</select>
-    </span></li>)}</ul>
+    </span>}</li>)}</ul>
    {!people.length&&<p className="fine">В этой главе нет реплик персонажей — читает рассказчик.</p>}
   </div>}
  </div>;

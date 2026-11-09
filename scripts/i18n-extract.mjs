@@ -14,8 +14,9 @@ import {transformSync} from 'esbuild';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const CYRILLIC=/[А-Яа-яЁёІіЇїЄєҐґ]/;
 const OUT=path.join(ROOT,'src/i18n/source-strings.json');
-// Pure data modules (number words for speech synthesis) contain no interface text.
-const DATA_FILES=new Set(['src/tts/text.js']);
+// Pure data modules (number words for speech synthesis) and model directions
+// (how the Gemini voice should deliver a line) contain no interface text.
+const DATA_FILES=new Set(['src/tts/text.js','src/tts/gemini-direction.js']);
 
 // Long instructions and anything that talks to a model are not interface text.
 export function isPrompt(text){

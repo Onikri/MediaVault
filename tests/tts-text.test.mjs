@@ -102,3 +102,35 @@ test('the title bible is validated, aliases resolve to names and lexicon stresse
  assert.deepEqual(payload.characters[0].aliases,['Наташа','Натали']);assert.deepEqual(payload.recentSpeakers,['Пьер']);
  assert.equal(payload.segments.length,2,'narration is sent too, for the narrator tone');
 });
+
+import {pickGeminiVoice,geminiNarrator,geminiCast,geminiRows,styleFor,pcmDecoder,GEMINI_VOICES} from '../src/tts/gemini-voice.js';
+
+test('Gemini voices: male and female narrators, characters cast by gender without repeats',()=>{
+ const gender=Object.fromEntries(GEMINI_VOICES.map(([n,g])=>[n,g]));
+ assert.equal(GEMINI_VOICES.length,30);
+ assert.equal(geminiNarrator(null,'m'),'Charon');assert.equal(geminiNarrator(null,'f'),'Kore');assert.equal(geminiNarrator(null,'Sulafat'),'Sulafat');
+ assert.equal(gender[geminiNarrator({narrator:{gender:'f',age:'adult',timbre:'warm'}})],'f');
+ assert.equal(gender[pickGeminiVoice({gender:'f',age:'old'})],'f');assert.equal(pickGeminiVoice({gender:'m',age:'old',timbre:'rough'}),'Algenib');
+ const cast={Анна:{gender:'f',age:'young'},Пётр:{gender:'m',age:'young'},Мария:{gender:'f',age:'young'},Иван:{gender:'m',age:'adult'}};
+ const voices=geminiCast(cast,{narrator:'Charon'});
+ assert.equal(new Set(Object.values(voices)).size,4);assert.ok(!Object.values(voices).includes('Charon'));
+ for(const [name,c] of Object.entries(cast))assert.equal(gender[voices[name]],c.gender,name);
+ assert.equal(geminiCast(cast,{narrator:'Charon',saved:{Анна:'Gacrux',Пётр:'bad'}}).Анна,'Gacrux');
+});
+
+test('Gemini rows: verbatim text without stress marks, delivery as a direction',()=>{
+ const segments=[{id:0,p:0,kind:'narration',text:'Дождь стучал по крыше.'},{id:1,p:1,kind:'speech',speaker:'Анна',emotion:'sarcastic',intensity:.8,text:'— Бежал он!',spoken:'— Бежа́л он!'}];
+ const rows=geminiRows(segments,{cast:{Анна:{gender:'f',age:'young',traits:'ироничная'}},voices:{Анна:'Aoede'},narrator:'Charon',bible:{tone:'спокойный'},pace:1.2});
+ assert.deepEqual(rows.map(r=>r.voice),['Charon','Aoede']);
+ assert.equal(rows[1].text,'— Бежал он!');
+ assert.match(rows[0].style,/авторский текст.*спокойный/);assert.match(rows[1].style,/Анна \(молодая женщина\).*ироничная.*с сарказмом.*сильно.*быстрее/);
+ assert.equal(styleFor({kind:'speech',emotion:'neutral'},null),'реплика персонажа');
+ const long=geminiRows([{id:0,p:0,kind:'narration',text:'Слово. '.repeat(200)}],{cast:{},voices:{},narrator:'Charon'});
+ assert.ok(long.length>1&&long.every(r=>r.text.length<=300));
+});
+
+test('PCM decoder joins a sample split across network chunks',()=>{
+ const decode=pcmDecoder();
+ const a=decode(new Uint8Array([0x00,0x40,0x00]));const b=decode(new Uint8Array([0xc0]));
+ assert.deepEqual([...a],[0.5]);assert.deepEqual([...b],[-0.5]);
+});

@@ -319,7 +319,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 58, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 59, "geminiVoice":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":2, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -337,6 +337,8 @@ system_status.install(app,owner,lambda:os.getenv("DATA_DIR","/data"),drive_crede
 
 import google_pool
 google_pool.install(app,owner,lambda:store)
+import gemini_voice
+gemini_voice.install(app,owner,google_pool.saved)
 import kodik_api
 kodik_api.install(app,owner,lambda:store)
 import lostfilm_catalog

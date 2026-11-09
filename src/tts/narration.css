@@ -55,3 +55,4 @@
 .narration-person small{font-weight:400;color:#c9c3ba;font-size:11.5px;line-height:1.35}
 .narration-voice-controls{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
 .narration-voice-controls select{max-width:150px}
+.narration-voice-controls.is-single{flex-wrap:nowrap}.narration-voice-controls.is-single select{max-width:min(210px,52vw)}
