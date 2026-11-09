@@ -29,3 +29,13 @@ export function saveRanobeProgress(user,book,value,storage=globalThis.localStora
  try{storage.setItem(key(user,book),JSON.stringify({chapter:String(value.chapter),paragraph:Math.max(0,Number(value.paragraph)||0),title:String(value.title||'').slice(0,200),updatedAt:Date.now()}));}catch{}
 }
 export const providerLanguage=code=>({uk:'Українська',ru:'Русский',en:'English'})[code]||code?.toUpperCase()||'';
+
+// The open reader lives in the page address (#watch=…&read=N), so a reload
+// returns to reading instead of the title page. The exact chapter and
+// paragraph come from the saved progress of the book.
+export function readerInAddress(hash=globalThis.location?.hash||''){const value=Number(new URLSearchParams(hash.slice(1)).get('read'));return Number.isInteger(value)&&value>0?value-1:-1;}
+export function addressWithReader(hash,index){
+ const params=new URLSearchParams(hash.slice(1));if(!params.get('watch'))return null;
+ if(index>=0)params.set('read',String(index+1));else params.delete('read');
+ return '#'+params.toString();
+}

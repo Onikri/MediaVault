@@ -1,4 +1,5 @@
 import {deviceStore} from './device-storage.js';
+import {rememberedDeviceId,saveRememberedDeviceId} from './privacy.js';
 const encode=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
 const text=new TextEncoder();
 async function request(server,path,body,token){
@@ -14,7 +15,7 @@ export async function rememberGoogleSession(server,token,user){
   let record=await deviceStore('get','auth');
   if(record?.sub===user.sub&&record.server===server){
     if(record.pendingURL&&record.pendingUntil>Date.now())return finishConsent(record);
-    try{await request(server,'/devices/restore',await proof(record));return record;}catch(error){
+    try{await request(server,'/devices/restore',await proof(record));saveRememberedDeviceId(record.id);return record;}catch(error){
       if(error.status!==401)throw error;
       const repaired=await request(server,'/devices/reconnect',{id:record.id},token);
       record={...record,pendingURL:repaired.url,pendingUntil:Date.now()+540000};
@@ -22,9 +23,11 @@ export async function rememberGoogleSession(server,token,user){
     }
   }
   const keys=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
-  const registered=await request(server,'/devices/register',{public_key:await crypto.subtle.exportKey('jwk',keys.publicKey)},token);
+  // A record lost with cleared site storage is replaced on the server, not left behind.
+  const previous=record?.server===server?record.id:rememberedDeviceId();
+  const registered=await request(server,'/devices/register',{public_key:await crypto.subtle.exportKey('jwk',keys.publicKey),...(previous?{replaces:previous}:{})},token);
   record={id:registered.id,privateKey:keys.privateKey,server,sub:user.sub,...(registered.url?{pendingURL:registered.url,pendingUntil:Date.now()+540000}:{})};
-  await deviceStore('put','auth',record);
+  await deviceStore('put','auth',record);saveRememberedDeviceId(record.id);
   return record.pendingURL?finishConsent(record):record;
 }
 async function finishConsent(record){
@@ -36,8 +39,9 @@ async function finishConsent(record){
     await request(server,'/devices/restore',await proof(record));
     delete record.pendingURL;delete record.pendingUntil;await deviceStore('put','auth',record);return record;
 }
-export async function restoreGoogleSession(){const record=await deviceStore('get','auth');if(!record)return null;return request(record.server,'/devices/restore',await proof(record));}
+export async function restoreGoogleSession(){const record=await deviceStore('get','auth');if(!record)return null;const result=await request(record.server,'/devices/restore',await proof(record));saveRememberedDeviceId(record.id);return result;}
+export async function hasRememberedSession(){return !!(await deviceStore('get','auth').catch(()=>null));}
 export async function forgetGoogleSession(){
   const record=await deviceStore('get','auth');
-  try{if(record)await request(record.server,'/devices/remove',await proof(record));}finally{await deviceStore('delete','auth');}
+  try{if(record)await request(record.server,'/devices/remove',await proof(record));}finally{saveRememberedDeviceId('');await deviceStore('delete','auth');}
 }

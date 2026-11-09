@@ -97,6 +97,24 @@ class DeviceSessions(unittest.TestCase):
         self.assertEqual(api.store.setting('device:'+identity)['key'],before['key'])
         self.assertEqual(api.store.setting('device-index:'+self.identity['sub'])['ids'],identities)
 
+    def test_browser_with_cleared_storage_replaces_its_old_record(self):
+        old=self.register()
+        r=self.client.post('/devices/register',json={'public_key':self.jwk,'replaces':old},headers={'Authorization':'Bearer short-google-fixture'})
+        self.assertEqual(r.status_code,200,r.text);new=r.json()['id']
+        self.assertIsNone(api.store.setting('device:'+old));self.assertEqual(api.store.setting('device-index:'+self.identity['sub'])['ids'],[new])
+        # Another account's device id is never removed through «replaces».
+        api.store.setting('device:'+'x'*43,{'sub':'someone-else','expires':9e12,'ready':True,'key':self.jwk})
+        r=self.client.post('/devices/register',json={'public_key':self.jwk,'replaces':'x'*43},headers={'Authorization':'Bearer short-google-fixture'})
+        self.assertEqual(r.status_code,200,r.text);self.assertIsNotNone(api.store.setting('device:'+'x'*43))
+
+    def test_eleventh_device_retires_the_oldest_instead_of_refusing(self):
+        identities=[self.register() for _ in range(10)]
+        for n,identity in enumerate(identities):
+            value=api.store.setting('device:'+identity);value['expires']=9e9+n;api.store.setting('device:'+identity,value)
+        newest=self.register()
+        ids=api.store.setting('device-index:'+self.identity['sub'])['ids']
+        self.assertEqual(len(ids),10);self.assertNotIn(identities[0],ids);self.assertIn(newest,ids);self.assertIsNone(api.store.setting('device:'+identities[0]))
+
     def test_reconnect_requires_live_google_identity_and_matching_account(self):
         identity=self.register()
         self.assertEqual(self.client.post('/devices/reconnect',json={'id':identity}).status_code,401)
