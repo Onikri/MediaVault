@@ -235,7 +235,7 @@ async function russianBookTitles(items,signal,fetcher){
 export function catalogProviders(kind,query,server){
   // Kinobox (Kinopoisk) is the Russian film base: popular lists without a
   // query and Russian titles. IMDb/TVmaze/Wikidata add English titles when searching.
-  if(['movie','tv'].includes(kind))return [...(server?['kinobox']:[]),...(server&&query?['imdb']:[]),...(query?['tvmaze','wikidata']:[])];
+  if(['movie','tv'].includes(kind))return [...(server?['kinobox']:[]),...(server&&query?['imdb']:[]),...(query?(kind==='tv'?['tvmaze','wikidata']:['wikidata']):[])];
   // Shikimori is the Russian base; AniList/Kitsu/Jikan are English. Duplicates merge.
   if(kind==='ranobe')return ['shikimori','anilist','kitsu',...(query?['jikan']:[])];
   if(kind==='book')return ['openlibrary',...(query?['fantlab']:[])];

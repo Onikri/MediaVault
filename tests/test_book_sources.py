@@ -100,6 +100,23 @@ class Search(unittest.TestCase):
         self.assertEqual({p['status'] for p in value['providers']}, {'unavailable'})
         self.assertEqual([p['provider'] for p in value['providers']], ['gutenberg', 'wikisource-ru'])
 
+    def test_audio_only_entry_does_not_shadow_a_readable_edition(self):
+        bs._get = lambda *args, **kwargs: OPDS.replace(
+            '<content type="text">Jane Austen</content></entry>',
+            '<content type="text">Jane Austen</content><link rel="http://opds-spec.org/acquisition" type="audio/mpeg"/></entry>',
+            1)
+        self.assertEqual(bs._gutenberg_search({'title': 'Pride and Prejudice', 'authors': ['Jane Austen']}, ['en']), [])
+
+    def test_gutenberg_falls_back_to_readable_plain_text(self):
+        def fake(url, **kwargs):
+            if not url.endswith('.txt.utf-8'):
+                raise bs.MissingBook('404')
+            return 'Title: A Japanese book\nLanguage: Japanese\n*** START OF THE PROJECT GUTENBERG EBOOK BOOK ***\n\n第一章。\n\n本文。\n\n*** END OF THE PROJECT GUTENBERG EBOOK BOOK ***'
+        bs._get = fake
+        data = bs._gutenberg_book('123')
+        self.assertEqual(data['language'], 'ja')
+        self.assertEqual(data['chapters'][0]['paragraphs'], ['第一章。', '本文。'])
+
 
 class Routing(unittest.TestCase):
     def test_routes_accept_only_book_pages(self):

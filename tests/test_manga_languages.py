@@ -11,7 +11,7 @@ class MangaLanguages(unittest.TestCase):
   class Http:
    def __init__(self,**kwargs):pass
    def close(self):pass
-   def document(self,url):
+   def document(self,url,**kwargs):
     calls.append(url);host=urlsplit(url).hostname
     if host=='mangahub.ru':text='<div class="item-grid"><a class="fw-medium" href="/title/demo">Demo Manga</a></div>'
     elif host=='mangapill.com':text='<div><div><a class="mb-2" href="/manga/42/demo"><div class="font-black">Demo Manga</div></a></div></div>'

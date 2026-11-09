@@ -35,6 +35,15 @@ class SourceTemporaryError(SourceError):
     """A network failure or temporary upstream response."""
 
 
+class SourceRateLimitError(SourceError):
+    def __init__(self, retry_after):
+        super().__init__("Источник вернул HTTP 429.")
+        try:
+            self.retry_after = min(900, max(1, int(retry_after)))
+        except (TypeError, ValueError):
+            self.retry_after = 60
+
+
 # Use the same public browser UA as the player adapters' returned stream headers.
 # Some embeds reject a non-browser UA before their HTML can be parsed.
 USER_AGENT = DEFAULT_USER_AGENT
@@ -110,6 +119,7 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         # Ukrainian manga readers' public catalogues (Zenko).
         # Light-novel text APIs (RanobeHub, Smakolyky).
         or host == "ranobehub.org" and bool(re.fullmatch(r"/api/(?:search|books/\d{1,9}/chapters|chapters/\d{1,9})", url.path))
+        or host == "api.syosetu.com" and url.path == "/novelapi/api/"
         or host == "api.smakolykytl.site" and bool(re.fullmatch(r"/api/user/(?:projects(?:/\d{1,9}/books)?|chapters/\d{1,9})", url.path))
         # Hikka: Ukrainian catalogue of anime, manga and novels (public search and details).
         or host == "api.hikka.io" and bool(re.fullmatch(r"/(?:novel|anime|manga)(?:/[a-z0-9-]{1,120})?|/integrations/mal/(?:anime|manga|novel)/\d{1,9}", url.path))
@@ -283,6 +293,8 @@ class PublicHttp:
             if not 200 <= response.status_code < 300:
                 status = response.status_code
                 response.close()
+                if status == 429:
+                    raise SourceRateLimitError(response.headers.get('Retry-After'))
                 if status in {401, 403}:
                     raise SourceAccessError("Источник требует вход, проверку браузера или ограничивает доступ.")
                 if status in {408, 502, 504} or status == 503 and not response.headers.get('Retry-After'):

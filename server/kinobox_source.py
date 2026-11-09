@@ -13,11 +13,13 @@ import threading
 import time
 from urllib.parse import urlencode
 
-from source_parser import PublicHttp, SourceError, public_url, is_alloha_player
+from source_parser import PublicHttp, SourceError, SourceRateLimitError, public_url, is_alloha_player
 
 API = 'https://fbphdplay.top/api/players'
 _cache = {}
 _lock = threading.RLock()
+_api_lock = threading.Lock()
+_retry_at = 0.0
 
 
 def _ids(selected):
@@ -31,9 +33,17 @@ def _ids(selected):
 
 
 def players(selected, http):
+    global _retry_at
     query = _ids(selected)
     if not query: return None
-    text, _, _ = http.document(API + '?' + urlencode(query), headers={'Accept': 'application/json'})
+    with _api_lock:
+        if _retry_at > time.monotonic():
+            raise SourceError('Балансер Kinobox временно ограничил запросы. Проверяем другие источники.')
+        try:
+            text, _, _ = http.document(API + '?' + urlencode(query), headers={'Accept': 'application/json'})
+        except SourceRateLimitError as error:
+            _retry_at = time.monotonic() + error.retry_after
+            raise
     try:
         value = json.loads(text)
     except ValueError:

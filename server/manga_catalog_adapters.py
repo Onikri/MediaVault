@@ -12,6 +12,7 @@ LIB='https://api.cdnlibs.org'
 LIB_SITES={1:('mangalib','MangaLib','https://mangalib.me'),2:('slashlib','SlashLib','https://v2.shlib.life'),4:('hentailib','HentaiLib','https://hentailib.me')}
 DEX_LANGUAGES=('ru','uk','en','ja','ko')
 CONTENT_RATINGS=('safe','suggestive','erotica','pornographic')
+DEX_USER_AGENT='MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal catalogue)'
 def lib_context(http,site_id):
     if site_id not in LIB_SITES:raise SourceError('Неизвестный каталог LibGroup.')
     return SimpleNamespace(timeout=getattr(http,'timeout',(3,7)),deadline=getattr(http,'deadline',None) or time.monotonic()+30,lib_site_id=site_id)
@@ -39,7 +40,8 @@ def get(url,http):
             site_id=getattr(http,'lib_site_id',1);root=LIB_SITES[site_id][2] if site_id in LIB_SITES else 'https://ranobelib.me'  # 3: RanobeLib (ranobe_ru)
             client.session.headers.update({'Site-Id':str(site_id),'Accept':'application/json'})
             text,_,_=client.document(url,headers={'Referer':root+'/'})
-        else:text,_,_=client.document(url)
+        else:
+            text,_,_=client.document(url,headers={'User-Agent':DEX_USER_AGENT})
         try:data=json.loads(text)
         except ValueError:raise SourceError('Читалка не предоставила данные.') from None
         if not isinstance(data,dict):raise SourceError('Неизвестный формат данных читалки.')
@@ -63,7 +65,7 @@ def dex_search(query,language,http):
 
 def dex_available(url,http):
     p=urlsplit(url);identity=p.path.split('/')[2];lang=parse_qs(p.query).get('lang',['ru'])[0]
-    data=get('https://api.mangadex.org/manga/'+identity+'/feed?'+urlencode([('translatedLanguage[]',lang),('limit',1),('includeExternalUrl',0)]+[('contentRating[]',r) for r in CONTENT_RATINGS]),http)
+    data=get('https://api.mangadex.org/manga/'+identity+'/feed?'+urlencode([('translatedLanguage[]',lang),('limit',5),('includeExternalUrl',0)]+[('contentRating[]',r) for r in CONTENT_RATINGS]),http)
     return any(v.get('attributes',{}).get('pages') and not v.get('attributes',{}).get('externalUrl') for v in data.get('data',[]))
 
 def lib_search(query,http,site_id=1,details=False):

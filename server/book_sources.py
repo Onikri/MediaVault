@@ -1,7 +1,7 @@
 """Public-domain book texts: Project Gutenberg and Wikisource.
 
 Both are legal, free full texts: Gutenberg works are public domain in the US,
-Wikisource holds public-domain and freely licensed texts (ru/uk editions).
+Wikisource holds public-domain and freely licensed texts.
 A book is split into chapters by its own headings (Gutenberg HTML) or by its
 subpages (Wikisource), and chapters are returned as plain paragraphs, in the
 same shape as the ranobe sources, so the reader and narration are shared.
@@ -9,12 +9,14 @@ Only the fixed hosts below are contacted.
 """
 from __future__ import annotations
 
+import html as html_tools
 import json
 import re
 import threading
 import time
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import quote, unquote, urlencode, urlsplit, parse_qs
+from urllib.parse import quote, unquote, urlencode, urljoin, urlsplit, parse_qs
 
 import requests
 from bs4 import BeautifulSoup
@@ -29,15 +31,19 @@ from source_parser import SourceError
 
 USER_AGENT = "MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal catalogue)"
 GUTENBERG = "https://www.gutenberg.org"
-WIKISOURCE = {"ru", "uk"}
-HOSTS = {"www.gutenberg.org", "ru.wikisource.org", "uk.wikisource.org"}
+WIKISOURCE = {"ru": "Викитека", "uk": "Вікіджерела", "en": "Wikisource", "ja": "ウィキソース", "ko": "위키문헌"}
+HOSTS = {"www.gutenberg.org", *(code + ".wikisource.org" for code in WIKISOURCE)}
 MAX_BYTES = 24 * 1024 * 1024
 MAX_CHAPTERS = 3000
 MAX_PARAGRAPHS = 4000
 PART = 120  # paragraphs per part when a text has no headings
-SOURCES = (("gutenberg", "Project Gutenberg"), ("wikisource-ru", "Викитека"), ("wikisource-uk", "Вікіджерела"))
+SOURCES = (("gutenberg", "Project Gutenberg"), *((f"wikisource-{code}", name) for code, name in WIKISOURCE.items()))
 _cache: dict = {}
 _lock = threading.RLock()
+
+
+class MissingBook(SourceError):
+    pass
 
 
 def _remember(key, ttl, make):
@@ -54,29 +60,34 @@ def _remember(key, ttl, make):
 
 
 def _get(url, *, params=None, accept="application/json"):
-    if (urlsplit(url).hostname or "") not in HOSTS or urlsplit(url).scheme != "https":
-        raise SourceError("Этот адрес не относится к библиотекам книг.")
+    headers = {"User-Agent": USER_AGENT, "Accept": accept}
     try:
-        with requests.get(url, params=params, headers={"User-Agent": USER_AGENT, "Accept": accept}, timeout=(5, 25), stream=True) as response:
-            if (urlsplit(response.url).hostname or "") not in HOSTS:
-                raise SourceError("Библиотека перенаправила на посторонний сайт.")
-            if response.status_code == 404:
-                raise SourceError("Книга не найдена в библиотеке.")
-            if response.status_code == 429:
-                raise SourceError("Библиотека ограничила частоту запросов. Попробуй немного позже.")
-            response.raise_for_status()
-            raw = bytearray()
-            for block in response.iter_content(262144):
-                raw.extend(block)
-                if len(raw) > MAX_BYTES:
-                    raise SourceError("Книга слишком велика для онлайн-чтения.")
-            return bytes(raw).decode(response.encoding or "utf-8", errors="replace")
+        for _ in range(5):
+            parts = urlsplit(url)
+            if parts.scheme != "https" or parts.netloc not in HOSTS:
+                raise SourceError("Этот адрес не относится к библиотекам книг.")
+            with requests.get(url, params=params, headers=headers, timeout=(5, 15), stream=True, allow_redirects=False) as response:
+                if response.is_redirect:
+                    url, params = urljoin(url, response.headers["Location"]), None
+                    continue
+                if response.status_code == 404:
+                    raise MissingBook("Книга не найдена в библиотеке.")
+                if response.status_code == 429:
+                    raise SourceError("Библиотека ограничила частоту запросов. Попробуй немного позже.")
+                response.raise_for_status()
+                raw = bytearray()
+                for block in response.iter_content(262144):
+                    raw.extend(block)
+                    if len(raw) > MAX_BYTES:
+                        raise SourceError("Книга слишком велика для онлайн-чтения.")
+                return bytes(raw).decode(response.encoding or "utf-8", errors="replace")
+        raise SourceError("Слишком много перенаправлений библиотеки.")
     except requests.RequestException:
         raise SourceError("Библиотека сейчас недоступна.") from None
 
 
 def _norm(value):
-    value = str(value or "").casefold().replace("ё", "е")
+    value = unicodedata.normalize("NFKC", str(value or "")).casefold().replace("ё", "е")
     return " ".join(re.sub(r"[^\w]+", " ", value).split())
 
 
@@ -126,15 +137,19 @@ def _gutenberg_search(title, languages):
             author = _clean(entry.find("content").get_text() if entry.find("content") else "")
             if not identity or not _title_match(re.split(r"[;:]", name)[0], aliases):
                 continue
+            links = entry.find_all("link", rel=re.compile(r"^http://opds-spec\.org/acquisition"))
+            if links and not any(link.get("type", "").startswith(("text/", "application/xhtml+xml")) for link in links):
+                continue
             if surnames and author and not surnames & {_norm(p) for p in re.split(r"[\s,]+", author)}:
                 continue
             url = GUTENBERG + "/ebooks/" + identity[1]
             if any(r["url"] == url for r in results):
                 continue
-            language = languages[0] if len(languages) == 1 else "ru" if re.search("[а-яё]", name, re.I) else "uk" if re.search("[іїєґ]", name, re.I) else "en"
+            lang_node = entry.find(["dc:language", "dcterms:language"])
+            language = languages[0] if len(languages) == 1 else _clean(lang_node.get_text())[:2] if lang_node else "und"
             results.append({"provider": "gutenberg", "providerName": "Project Gutenberg", "title": name[:300],
                             "translator": author[:120], "url": url, "language": language})
-        if results:
+        if len(results) >= 4:
             break
     return results[:4]
 
@@ -142,7 +157,9 @@ def _gutenberg_search(title, languages):
 def _wikisource_search(title, language):
     aliases, surnames, results = _aliases(title), _surnames(title), []
     api = f"https://{language}.wikisource.org/w/api.php"
-    for alias in aliases[:3]:
+    script = {"ja": r"[ぁ-ヿ一-鿿]", "ko": r"[가-힣]", "en": r"[a-z]", "ru": r"[а-яё]", "uk": r"[а-яіїєґ]"}[language]
+    localized = [alias for alias in aliases if re.search(script, alias, re.I)]
+    for alias in (localized or ([] if language in {"ja", "ko"} else aliases))[:3]:
         data = json.loads(_get(api, params={"action": "query", "list": "search", "srsearch": f'intitle:"{alias}"',
                                             "srnamespace": 0, "srlimit": 12, "format": "json"}))
         for row in (data.get("query") or {}).get("search") or []:
@@ -156,7 +173,7 @@ def _wikisource_search(title, language):
             url = f"https://{language}.wikisource.org/wiki/" + quote(page.replace(" ", "_"))
             if any(r["url"] == url for r in results):
                 continue
-            results.append({"provider": "wikisource-" + language, "providerName": "Викитека" if language == "ru" else "Вікіджерела",
+            results.append({"provider": "wikisource-" + language, "providerName": WIKISOURCE[language],
                             "title": page[:300], "translator": "", "url": url, "language": language})
         if results:
             break
@@ -170,12 +187,12 @@ def _wikisource_search(title, language):
 def search(title, language="all"):
     if not isinstance(title, dict) or not _aliases(title):
         raise SourceError("Выбери конкретную книгу из каталога.")
-    if language not in {"all", "ru", "uk"}:
-        raise SourceError("Выбери язык: все, русский или украинский.")
-    jobs = [("gutenberg", "Project Gutenberg", language if language != "all" else "all", lambda: _gutenberg_search(title, ["ru", "uk", "en"] if language == "all" else [language]))]
-    for code in ("ru", "uk"):
+    if language not in {"all", *WIKISOURCE}:
+        raise SourceError("Выбери поддерживаемый язык книги.")
+    jobs = [("gutenberg", "Project Gutenberg", language, lambda: _gutenberg_search(title, list(WIKISOURCE) if language == "all" else [language]))]
+    for code, name in WIKISOURCE.items():
         if language in {"all", code}:
-            jobs.append(("wikisource-" + code, "Викитека" if code == "ru" else "Вікіджерела", code, lambda code=code: _wikisource_search(title, code)))
+            jobs.append(("wikisource-" + code, name, code, lambda code=code: _wikisource_search(title, code)))
 
     def work(job):
         identity, name, lang, run = job
@@ -272,7 +289,23 @@ def _chapters_from_html(html, *, drop=()):
 
 def _gutenberg_book(identity):
     def make():
-        html = _get(GUTENBERG + "/cache/epub/" + identity + "/pg" + identity + "-images.html", accept="text/html")
+        base = GUTENBERG + "/ebooks/" + identity
+        try:
+            html = _get(GUTENBERG + "/cache/epub/" + identity + "/pg" + identity + "-images.html", accept="text/html")
+        except MissingBook:
+            try:
+                html = _get(base + ".html", accept="text/html")
+            except MissingBook:
+                text = _get(base + ".txt.utf-8", accept="text/plain")
+                if text.lstrip().startswith("<"):
+                    raise SourceError("Библиотека не предоставила текст книги.")
+                parts = re.split(r"^\*{3}\s*(?:START|END) OF (?:THE|THIS) PROJECT GUTENBERG EBOOK.*$", text, flags=re.M | re.I)
+                title = re.search(r"^Title:\s*(.+)$", parts[0], re.M | re.I)
+                original = re.search(r"^Language:\s*(\w+)", parts[0], re.M | re.I)
+                language = {"english": "en", "russian": "ru", "ukrainian": "uk", "japanese": "ja", "korean": "ko"}.get(original[1].lower() if original else "", "und")
+                paragraphs = [p.strip() for p in re.split(r"\r?\n\s*\r?\n", parts[1] if len(parts) > 1 else text) if p.strip()]
+                html = (f'<html lang="{language}"><head><title>' + html_tools.escape(title[1] if title else "Project Gutenberg " + identity)
+                        + "</title></head><body>" + "".join("<p>" + html_tools.escape(p) + "</p>" for p in paragraphs) + "</body></html>")
         head = BeautifulSoup(html[:200000], "html.parser")
         meta = lambda name: _clean((head.find("meta", attrs={"name": name}) or {}).get("content", "")) if head.find("meta", attrs={"name": name}) else ""
         title = meta("dc.title") or _clean(head.title.get_text() if head.title else "").split(" | ")[0] or "Project Gutenberg " + identity
@@ -282,7 +315,7 @@ def _gutenberg_book(identity):
         chapters = _chapters_from_html(html)
         if not chapters:
             raise SourceError("Не удалось разобрать текст книги.")
-        return {"title": title[:300], "authors": [author] if author else [], "language": language if language in {"ru", "uk", "en"} else "en", "chapters": chapters}
+        return {"title": title[:300], "authors": [author] if author else [], "language": language if language in WIKISOURCE else "und", "chapters": chapters}
     return _remember(("gutenberg", identity), 6 * 3600, make)
 
 
@@ -337,7 +370,7 @@ def _wikisource_book(language, page):
 def route(url):
     parts = urlsplit(str(url or ""))
     host = (parts.hostname or "").lower()
-    if parts.scheme != "https":
+    if parts.scheme != "https" or parts.netloc != host or host not in HOSTS:
         return None
     selected = parse_qs(parts.query).get("mv_chapter", [""])[0]
     if selected and not selected.isdigit():
@@ -346,10 +379,10 @@ def route(url):
         match = re.fullmatch(r"/ebooks/(\d{1,7})/?", parts.path)
         if match:
             return "gutenberg", match[1], selected
-    if host in {"ru.wikisource.org", "uk.wikisource.org"}:
-        match = re.fullmatch(r"/wiki/([^?#]{1,300})", parts.path)
+    if host.removesuffix(".wikisource.org") in WIKISOURCE:
+        match = re.fullmatch(r"/wiki/([^?#]{1,300})", unquote(parts.path))
         if match:
-            page = unquote(match[1]).replace(" ", "_")
+            page = match[1].replace(" ", "_")
             if ":" in page.split("/")[0] or "/" in page:
                 raise SourceError("Открой страницу самого произведения в Викитеке.")
             return "wikisource-" + host[:2], page, selected

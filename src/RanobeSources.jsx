@@ -2,7 +2,7 @@ import {lazy,Suspense,useEffect,useMemo,useRef,useState} from 'react';
 import {RetainedMediaSlot,useRetainedWorkspace} from './RetainedMedia.jsx';
 import {BookOpen,Check,ArrowRight,RefreshCw,Play} from 'lucide-react';
 import {searchRanobe,inspectRanobe,ranobeProgress,providerLanguage,readerInAddress,addressWithReader} from './ranobe-client.js';
-import {useContentLanguage,CONTENT_LANGUAGES,setContentLanguage} from './content-language.js';
+import {useContentLanguage,CONTENT_LANGUAGES} from './content-language.js';
 import {OnlineBooks} from './OnlineLibrary.jsx';
 import './ranobe.css';
 const RanobeReader=lazy(()=>import('./RanobeReader.jsx'));
@@ -14,12 +14,16 @@ function rememberReader(index){const hash=addressWithReader(location.hash,index)
 
 // Sources, chapters and the reader for one ranobe or book title on its page.
 // Ranobe: fan translations (RanobeHub, Zenko, Smakolyky, Baka).
-// Books: public-domain full texts (Project Gutenberg, Wikisource ru/uk).
+// Books: public-domain full texts (Project Gutenberg and Wikisource).
 export default function RanobeSources({item,service,state}){
- const language=useContentLanguage(),userId=state.user?.sub,isBook=item.kind==='book';
+ const defaultLanguage=useContentLanguage(),userId=state.user?.sub,isBook=item.kind==='book';
+ const [readingLanguage,setReadingLanguage]=useState(null);
+ const extendedLanguages=Number(service?.session?.serverVersion)>=61;
+ const languages=extendedLanguages?[...CONTENT_LANGUAGES,...(isBook?[['en','English'],['ja','日本語'],['ko','한국어']]:[['ja','日本語']])]:CONTENT_LANGUAGES;
+ const language=languages.some(([id])=>id===readingLanguage)?readingLanguage:defaultLanguage;
  const [search,setSearch]=useState({loading:false,error:'',results:[],providers:[]}),[revision,setRevision]=useState(0);
  const [source,setSource]=useState(null),[opened,setOpened]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const [open,setOpenState]=useState(null),[count,setCount]=useState(30),restored=useRef(false);
+ const [open,setOpenState]=useState(null),[count,setCount]=useState(30),restored=useRef(false),inspection=useRef(null);
  function setOpen(value){setOpenState(value);rememberReader(value?value.index:-1);}
  const workspace=useRetainedWorkspace(),retainedId='ranobe:'+(userId||'guest')+':'+item.id;
  // Read, not subscribed: the slot writes its element into the store on every
@@ -36,17 +40,22 @@ export default function RanobeSources({item,service,state}){
  const ready=service?.status==='connected'&&Number(service.session?.serverVersion)>=(isBook?56:55);
  useEffect(()=>{
   if(!ready)return;const abort=new AbortController();
-  setSearch(old=>({...old,loading:true,error:''}));setSource(null);setOpened(null);
+  setSearch({loading:true,error:'',results:[],providers:[]});setSource(null);setOpened(null);setBusy(false);setError('');
   searchRanobe(service,item,language,{signal:abort.signal}).then(data=>{
+   if(abort.signal.aborted)return;
    setSearch({loading:false,error:'',results:data.results||[],providers:data.providers||[]});
    const saved=(data.results||[]).find(r=>ranobeProgress(userId,r.url));
    if(saved||data.results?.length)choose(saved||data.results[0]);
   }).catch(e=>{if(!abort.signal.aborted)setSearch({loading:false,error:e.message||'Источники не ответили.',results:[],providers:[]});});
-  return()=>abort.abort();
+  return()=>{abort.abort();inspection.current?.abort();};
  },[ready,item.id,language,revision]);
  async function choose(row){
+  inspection.current?.abort();
+  const abort=new AbortController();inspection.current=abort;
   setSource(row);setOpened(null);setError('');setBusy(true);setCount(30);
-  try{setOpened(await inspectRanobe(service,row.url,item));}catch(e){setError(e.message||'Не удалось получить список глав.');}finally{setBusy(false);}
+  try{const book=await inspectRanobe(service,row.url,item,{signal:abort.signal});if(!abort.signal.aborted)setOpened(book);}
+  catch(e){if(!abort.signal.aborted)setError(e.message||'Не удалось получить список глав.');}
+  finally{if(inspection.current===abort){inspection.current=null;if(!abort.signal.aborted)setBusy(false);}}
  }
  const progress=opened?ranobeProgress(userId,opened.url):null;
  const resume=useMemo(()=>progress&&opened?opened.episodes.findIndex(c=>c.url===progress.chapter):-1,[opened,progress?.chapter]);
@@ -62,12 +71,12 @@ export default function RanobeSources({item,service,state}){
  if(!ready)return <><p className="fine">{isBook?'Чтение книг из библиотек':'Чтение ранобэ из источников'} появится после обновления сервера MediaVault.</p>{files}</>;
  return <section className="ranobe-sources" aria-label={isBook?'Книга онлайн':'Ранобэ онлайн'}>
   <div className="ranobe-toolbar">
-   <label>{isBook?'Язык текста':'Язык перевода'}<select aria-label={isBook?'Язык текста книги':'Язык перевода ранобэ'} value={language} onChange={e=>setContentLanguage(e.target.value)}>{CONTENT_LANGUAGES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+   <label>{isBook?'Язык текста':'Язык перевода'}<select aria-label={isBook?'Язык текста книги':'Язык перевода ранобэ'} value={language} onChange={e=>setReadingLanguage(e.target.value)}>{languages.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
    <button type="button" className="text-link" disabled={search.loading} onClick={()=>setRevision(v=>v+1)} aria-label="Повторить поиск текста"><RefreshCw size={14}/>Повторить</button>
   </div>
-  {search.loading?<p className="discovery-status" role="status"><span className="loading-ring"/>{isBook?'Ищем полный текст в Project Gutenberg и Викитеке…':'Ищем перевод в RanobeLib, RanobeHub, Jaomix, Rulate, Zenko, Смаколиках и Баке…'}</p>
+  {search.loading?<p className="discovery-status" role="status"><span className="loading-ring"/>{isBook?'Ищем полный текст в библиотеках…':'Ищем доступные издания и переводы…'}</p>
   :search.error?<p className="inline-error" role="alert">{search.error}</p>
-  :!search.results.length?<p className="fine">{isBook?'Свободного текста этой книги в Project Gutenberg и Викитеке нет: обычно это значит, что книга ещё под авторским правом':'Точный перевод пока не найден'}{search.providers.some(p=>p.status==='unavailable')?'; часть источников не ответила':''}. Можно открыть свой файл ниже.</p>
+  :!search.results.length?<p className="fine">{isBook?'Свободный текст книги пока не найден':'Доступное издание пока не найдено'}.{search.providers.some(p=>p.status==='unavailable')?' Часть источников не ответила.':''} Можно открыть свой файл ниже.</p>
   :<div className="manga-source-list ranobe-source-list">{search.results.map(row=><button type="button" key={row.url} aria-pressed={source?.url===row.url} disabled={busy} onClick={()=>choose(row)}>
    <span className="manga-source-icon"><BookOpen size={18}/></span><span><strong>{row.providerName}</strong><small translate="no">{row.title}{row.translator?' · '+row.translator:''}</small></span><em>{providerLanguage(row.language)}</em>{source?.url===row.url?<Check size={16}/>:<ArrowRight size={15}/>}</button>)}</div>}
   {busy&&<p className="discovery-status" role="status"><span className="loading-ring"/>{isBook?'Готовим книгу и оглавление…':'Загружаем главы…'}</p>}

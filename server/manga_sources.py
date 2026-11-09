@@ -45,11 +45,12 @@ SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan
        MangaSite('naver-webtoon','Naver Webtoon · KO','https://comic.naver.com/webtoon','naver',languages=('ko',),format='manhwa'),
        MangaSite('naver-best','Naver Best Challenge · KO','https://comic.naver.com/bestChallenge','naver',languages=('ko',),format='manhwa'),
        MangaSite('naver-challenge','Naver Challenge · KO','https://comic.naver.com/challenge','naver',languages=('ko',),format='manhwa'),
-       MangaSite('toonkor','Toonkor · KO','https://toonkor7.org','toonkor',hosts=('toonkor0.org','toonkor2.org'),languages=('ko',),format='manhwa'),
+       MangaSite('toonkor','Toonkor · KO','https://004.toonkor.net','toonkor',hosts=('toonkor7.org','toonkor0.org','toonkor2.org'),languages=('ko',),format='manhwa'),
        MangaSite('honey-manga','Honey Manga · UA','https://honey-manga.com.ua','honey',languages=('uk',)),
        MangaSite('zenko','Zenko · UA','https://zenko.online','zenko',languages=('uk',)),
        MangaSite('webtoons','WEBTOON · EN · Originals и Canvas','https://www.webtoons.com','webtoons',hosts=('webtoons.com','m.webtoons.com'),languages=('en',),format='webtoon'))
 _cache={};_lock=threading.RLock()
+MANGACHAN_HEADERS={'User-Agent':'MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal catalogue)'}
 def site_for(url):
     from suwayomi_bridge import parse_reference
     if parse_reference(url):return MangaSite("suwayomi","Дополнительные источники",os.getenv("PUBLIC_URL",""),"suwayomi",languages=("ru","uk","en","ja","ko"))
@@ -160,7 +161,8 @@ def search_title(title,language='auto',format='all'):
                     from manga_raw_adapters import search
                     candidates=search(query,site,http)
                 else:
-                    text,final,_=http.document(search_url(site,query))
+                    options={'headers':MANGACHAN_HEADERS} if site.family=='chan' else {}
+                    text,final,_=http.document(search_url(site,query),**options)
                     if site_for(final)!=site:raise SourceError('Источник перенаправил поиск на другой сайт.')
                     candidates=parse_search(text,final,site)
                 for value in candidates:
@@ -278,7 +280,8 @@ def inspect(url,http=None):
         if initial and initial.family in {'dex','lib'}:
             from manga_catalog_adapters import inspect_catalog
             return inspect_catalog(url,http)
-        text,final,_=http.document(public_url(url,resolve_dns=False));soup=BeautifulSoup(text,'html.parser');guard(soup);site=site_for(final)
+        options={'headers':MANGACHAN_HEADERS} if initial and initial.family=='chan' else {}
+        text,final,_=http.document(public_url(url,resolve_dns=False),**options);soup=BeautifulSoup(text,'html.parser');guard(soup);site=site_for(final)
         if not site:raise SourceError('Для этой читалки пока нет проверенного адаптера.')
         heading=soup.select_one('.cr-hero-names__main,.detail-panel h1,h1,.card header .text-base span,meta[itemprop=name]')
         title=clean(heading.get('content') or heading.get_text(' ',strip=True)) if heading else clean(soup.title.get_text().split(' — ')[0] if soup.title else '')

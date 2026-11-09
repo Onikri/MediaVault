@@ -28,7 +28,7 @@ export function ranobeProgress(user,book,storage=globalThis.localStorage){
 export function saveRanobeProgress(user,book,value,storage=globalThis.localStorage){
  try{storage.setItem(key(user,book),JSON.stringify({chapter:String(value.chapter),paragraph:Math.max(0,Number(value.paragraph)||0),title:String(value.title||'').slice(0,200),updatedAt:Date.now()}));}catch{}
 }
-export const providerLanguage=code=>({uk:'Українська',ru:'Русский',en:'English'})[code]||code?.toUpperCase()||'';
+export const providerLanguage=code=>({uk:'Українська',ru:'Русский',en:'English',ja:'日本語',ko:'한국어',und:'Язык уточняется'})[code]||code?.toUpperCase()||'';
 
 // The open reader lives in the page address (#watch=…&read=N), so a reload
 // returns to reading instead of the title page. The exact chapter and

@@ -17,13 +17,14 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from bs4 import BeautifulSoup
 from source_parser import PublicHttp, SourceError
 from title_identity import aliases, match_title
+import ranobe_jp
 
 HUB = 'https://ranobehub.org'
 ZENKO = 'https://zenko.online'
 ZENKO_API = 'https://api.zenko.online'
 SMAK = 'https://smakolykytl.site'
 SMAK_API = 'https://api.smakolykytl.site/api/user'
-SOURCES = (('ranobehub', 'RanobeHub', 'ru'), ('ranobelib', 'RanobeLib', 'ru'), ('jaomix', 'Jaomix', 'ru'), ('rulate', 'Rulate', 'ru'), ('zenko-novel', 'Zenko · UA', 'uk'), ('smakolyky', 'Смаколики · UA', 'uk'), ('baka', 'Бака · UA', 'uk'))
+SOURCES = (('ranobehub', 'RanobeHub', 'ru'), ('ranobelib', 'RanobeLib', 'ru'), ('jaomix', 'Jaomix', 'ru'), ('rulate', 'Rulate', 'ru'), ('zenko-novel', 'Zenko · UA', 'uk'), ('smakolyky', 'Смаколики · UA', 'uk'), ('baka', 'Бака · UA', 'uk'), ranobe_jp.SOURCE)
 BAKA = 'https://baka.in.ua'
 HIKKA = 'https://api.hikka.io'
 MAX_CHAPTERS = 3000
@@ -196,7 +197,7 @@ def search(title, language='all'):
         import book_sources
         return book_sources.search(title, language)
     if not isinstance(title, dict) or not aliases(title): raise SourceError('Выбери конкретное ранобэ из каталога.')
-    if language not in {'all', 'ru', 'uk'}: raise SourceError('Выбери язык: все, русский или украинский.')
+    if language not in {'all', 'ru', 'uk', 'ja'}: raise SourceError('Выбери поддерживаемый язык ранобэ.')
     key = json.dumps([language, aliases(title), title.get('ids')], ensure_ascii=False, sort_keys=True)
     with _lock:
         hit = _cache.get(key)
@@ -208,7 +209,9 @@ def search(title, language='all'):
         http = PublicHttp(timeout=(3, 8), deadline=time.monotonic() + 20)
         results, status, message = [], 'empty', 'Точное совпадение не найдено.'
         try:
-            for query in aliases(title)[:3]:
+            if identity == ranobe_jp.SOURCE[0]:
+                results = ranobe_jp.search(title, http)
+            for query in aliases(title)[:3] if identity != ranobe_jp.SOURCE[0] else ():
                 found = SEARCH[identity](query, http, title) if identity == 'baka' else SEARCH[identity](query, http)
                 for candidate in found:
                     if any(r['url'] == candidate['url'] for r in results): continue
@@ -316,6 +319,13 @@ def inspect(url, http=None):
     """Book and its free chapter list (volume, number, title, url)."""
     import book_sources
     if book_sources.route(url): return book_sources.inspect(url)
+    if ranobe_jp.route(url):
+        own = http is None
+        http = http or PublicHttp(timeout=(3, 10), deadline=time.monotonic() + 20)
+        try:
+            return ranobe_jp.inspect(url, http)
+        finally:
+            if own: http.close()
     if ranobe_ru.route(url): return _inspect_ru(url, http)
     identity, book, _ = _route(url)
     own = http is None
@@ -384,6 +394,13 @@ def chapter(url, http=None):
     """Plain paragraphs of one chapter."""
     import book_sources
     if book_sources.route(url): return book_sources.chapter(url)
+    if ranobe_jp.route(url):
+        own = http is None
+        http = http or PublicHttp(timeout=(3, 10), deadline=time.monotonic() + 20)
+        try:
+            return ranobe_jp.chapter(url, http, html_paragraphs)
+        finally:
+            if own: http.close()
     if ranobe_ru.route(url):
         own = http is None
         http = http or PublicHttp(timeout=(3, 10), deadline=time.monotonic() + 25)

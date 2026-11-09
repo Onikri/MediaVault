@@ -34,17 +34,27 @@ def player_name(url):
 # Ukrainian dubs: Ukrainian-only letters, explicit markers, or studios that only
 # publish in Ukrainian. Russian labels never contain і/ї/є/ґ.
 UKRAINIAN_VOICE=re.compile(r"[іїєґ]|укр|україн|ukrain|\bukr\b|\bua\b|\(ua\)|uateam|fanvoxua|так\s*треба|tak\s*treba|amanogawa|unimay|inari\s*dub|dniprofilm|le\s*doyen|postmodern|\bqtv\b|\bictv\b|1\+1|\b[іi]нтер\b|новий\s*канал|cinemaker|gwean|струґачка|струга?чка",re.I)
+RUSSIAN_VOICE=re.compile(r"\b(?:рус(?:ский|ская|ские|ская озвучка)?|russian|rus|ru|ani\s*dub|ani\s*libria(?:\.tv)?|ani\s*liberty(?:\.tv)?|анилибрия|animevost|animedia|studio\s*band|студийн(?:ая|ой)\s*баз[аы]|lost\s*film(?:\.tv)?|new\s*studio|кубик\s+в\s+кубе)\b",re.I)
+ORIGINAL_LANGUAGES=(
+    ('en', re.compile(r'\b(?:английск\w*|english)\b',re.I)),
+    ('ja', re.compile(r'\b(?:японск\w*|japanese)\b|日本語',re.I)),
+    ('ko', re.compile(r'\b(?:корейск\w*|korean)\b|한국어',re.I)),
+)
 
 
 def voice_language(name, current='und'):
-    """Only promotes unknown/Russian-defaulted labels to Ukrainian; never guesses Russian."""
-    if current in {'und','ru'} and UKRAINIAN_VOICE.search(str(name or '')):return 'uk'
+    label = str(name or '')
+    if current in {'und','ru'} and UKRAINIAN_VOICE.search(label):return 'uk'
+    if current in {'und','ru'}:
+        for language, pattern in ORIGINAL_LANGUAGES:
+            if pattern.search(label):return language
+    if current=='und' and RUSSIAN_VOICE.search(label):return 'ru'
     return current or 'und'
 
 
 def alloha_voice_language(name):
     if re.search(r'оригинал|original', name, re.I):
-        return 'und'
+        return voice_language(name)
     return voice_language(name, 'ru')
 
 

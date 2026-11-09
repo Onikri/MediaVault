@@ -164,7 +164,7 @@ def search_source(source,query):
     except SourceError:
         # A failing extension must not make its still-readable public HTML
         # catalogue disappear. Reuse only the adapter for the SAME source host.
-        from manga_sources import site_for,search_url,parse_search
+        from manga_sources import MANGACHAN_HEADERS,site_for,search_url,parse_search
         from source_parser import PublicHttp
         site=site_for(source.get('baseUrl',''))
         if not site or site.family not in {'pill','katana','poisk','hub','chan','buff'}:raise
@@ -172,7 +172,8 @@ def search_source(source,query):
         try:
             rows=[]
             for term in source.get('_queries',[query]):
-                text,final,_=http.document(search_url(site,term))
+                options={'headers':MANGACHAN_HEADERS} if site.family=='chan' else {}
+                text,final,_=http.document(search_url(site,term),**options)
                 if site_for(final)!=site:raise SourceError('Источник перенаправил поиск на другой сайт.')
                 for value in parse_search(text,final,site):
                     if selected and not match_title(selected,value)[0]:continue
