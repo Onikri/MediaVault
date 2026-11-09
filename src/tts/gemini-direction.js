@@ -13,7 +13,7 @@ export function styleFor(segment,character,{tone='',pace=1}={}){
  if(segment.kind==='narration')parts.push('авторский текст: ровно и выразительно, как в хорошей аудиокниге'+(tone?', тон книги — '+tone:''));
  else{
   const who=character?.gender==='f'?AGE_F[character.age]||'женщина':character?.gender==='m'?AGE[character.age]||'мужчина':'';
-  parts.push((segment.kind==='thought'?'мысли персонажа, тише и задумчивее':'реплика персонажа')+(segment.speaker?' '+segment.speaker:'')+(who?' ('+who+')':''));
+  parts.push((segment.kind==='thought'?'прочитать мысли героя, тише и задумчивее':'прочитать реплику героя')+(segment.speaker?' '+segment.speaker:'')+(who?' ('+who+')':''));
   if(character?.traits)parts.push('характер: '+character.traits);
   if(character?.speech)parts.push('манера речи: '+character.speech);
   const emotion=segment.emotion&&segment.emotion!=='neutral'?EMOTION_DIRECTION[segment.emotion]:'';

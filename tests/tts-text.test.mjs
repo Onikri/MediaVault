@@ -122,9 +122,9 @@ test('Gemini rows: verbatim text without stress marks, delivery as a direction',
  const segments=[{id:0,p:0,kind:'narration',text:'Дождь стучал по крыше.'},{id:1,p:1,kind:'speech',speaker:'Анна',emotion:'sarcastic',intensity:.8,text:'— Бежал он!',spoken:'— Бежа́л он!'}];
  const rows=geminiRows(segments,{cast:{Анна:{gender:'f',age:'young',traits:'ироничная'}},voices:{Анна:'Aoede'},narrator:'Charon',bible:{tone:'спокойный'},pace:1.2});
  assert.deepEqual(rows.map(r=>r.voice),['Charon','Aoede']);
- assert.equal(rows[1].text,'— Бежал он!');
+ assert.equal(rows[1].text,'Бежал он!');
  assert.match(rows[0].style,/авторский текст.*спокойный/);assert.match(rows[1].style,/Анна \(молодая женщина\).*ироничная.*с сарказмом.*сильно.*быстрее/);
- assert.equal(styleFor({kind:'speech',emotion:'neutral'},null),'реплика персонажа');
+ assert.equal(styleFor({kind:'speech',emotion:'neutral'},null),'прочитать реплику героя');
  const long=geminiRows([{id:0,p:0,kind:'narration',text:'Слово. '.repeat(200)}],{cast:{},voices:{},narrator:'Charon'});
  assert.ok(long.length>1&&long.every(r=>r.text.length<=300));
 });
@@ -133,4 +133,13 @@ test('PCM decoder joins a sample split across network chunks',()=>{
  const decode=pcmDecoder();
  const a=decode(new Uint8Array([0x00,0x40,0x00]));const b=decode(new Uint8Array([0xc0]));
  assert.deepEqual([...a],[0.5]);assert.deepEqual([...b],[-0.5]);
+});
+
+test('quotations: dialogue is speech, a quoted name inside a sentence stays author text',()=>{
+ assert.deepEqual(splitParagraph('Он прочитал вывеску «Аптека» и вошёл.').map(p=>p.kind),['narration']);
+ assert.deepEqual(splitParagraph('«Ты где был?» — спросила она.').map(p=>p.kind),['speech','narration']);
+ assert.deepEqual(splitParagraph('«Нет», — ответил он. «Ни за что!»').map(p=>p.kind),['speech','narration','speech']);
+ assert.deepEqual(splitParagraph('Она сказала: „Подожди меня“ — и ушла.').map(p=>p.kind),['narration','speech','narration']);
+ const rows=geminiRows(heuristicRoles(['«Нет», — ответил он.']),{cast:{},voices:{},narrator:'Charon'});
+ assert.deepEqual(rows.map(r=>r.text),['Нет','ответил он.'],'no leading «, —» and no punctuation-only parts');
 });

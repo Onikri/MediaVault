@@ -82,7 +82,9 @@ export function geminiRows(segments,{cast,voices,narrator,bible,pace=1}){
   const own=segment.kind!=='narration'&&segment.speaker&&voices[segment.speaker];
   const voice=own||(segment.kind!=='narration'&&segment.gender==='f'?pickGeminiVoice({gender:'f'},new Set([narrator])):segment.kind!=='narration'&&segment.gender==='m'?pickGeminiVoice({gender:'m'},new Set([narrator])):narrator);
   const style=styleFor(segment,own?cast[segment.speaker]:segment.gender?{gender:segment.gender}:null,{tone:bible?.tone,pace});
-  const parts=chunks(segment.spoken||segment.text);
+  // Leading author punctuation («, — ответил он») is not read; a part with no
+  // letters or digits is not sent at all (the model has nothing to say).
+  const parts=chunks(segment.spoken||segment.text).map(t=>t.replace(/^[\s,;:.—–-]+/,'')).filter(t=>/[\p{L}\p{N}]/u.test(t));
   parts.forEach((text,i)=>rows.push({segment:segment.id,p:segment.p,text,voice,style,rate:1,gain:1,eq:{low:0,mid:0,high:0},
    pause:i===parts.length-1?(segment.kind==='narration'?.3:.22):.08,kind:segment.kind}));
  }

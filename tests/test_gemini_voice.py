@@ -36,7 +36,9 @@ class GeminiVoiceTests(unittest.TestCase):
   self.assertEqual(setup['model'],'models/'+voice.MODEL)
   self.assertEqual(setup['generationConfig']['speechConfig']['voiceConfig']['prebuiltVoiceConfig']['voiceName'],'Kore')
   prompt=setup['systemInstruction']['parts'][0]['text'];self.assertIn('ДОСЛОВНО',prompt);self.assertIn('эмоция: сердито',prompt)
-  self.assertEqual(self.sockets[0].sent[1],{'realtimeInput':{'text':'— Ты опоздал, — сказала она.'}})
+  self.assertEqual(self.sockets[0].sent[1],{'realtimeInput':{'text':'Прочитай вслух дословно фрагмент книги:\n— Ты опоздал, — сказала она.'}})
+  self.assertEqual(setup['generationConfig']['thinkingConfig'],{'thinkingBudget':0},'thinking ate the audio of short lines')
+  self.assertIn('никогда не отвечай',prompt)
  def test_quota_refusal_moves_to_the_next_server_key(self):
   closed=websockets.ConnectionClosedError(websockets.frames.Close(1011,'RESOURCE_EXHAUSTED: quota exceeded'),None)
   first=self.speak().status_code;used=self.sockets[0].key
@@ -59,6 +61,13 @@ class GeminiVoiceTests(unittest.TestCase):
   self.assertEqual(self.speak(voice='Alice').status_code,422);self.assertEqual(self.speak(language='en').status_code,422);self.assertEqual(self.sockets,[])
  def test_session_without_audio_is_an_error(self):
   self.scripts={r['key']:[{'setupComplete':{}},{'serverContent':{'turnComplete':True}}] for r in self.keys}
-  self.assertEqual(self.speak().status_code,502)
+  self.assertEqual(self.speak().status_code,502);self.assertEqual(len(self.sockets),3,'each key tried once')
+ def test_a_silent_turn_moves_to_the_next_key(self):
+  silent=[{'setupComplete':{}},{'serverContent':{'turnComplete':True}}]
+  self.scripts={r['key']:silent for r in self.keys[:2]};self.scripts[self.keys[2]['key']]=SPOKEN
+  for _ in range(3):
+   self.sockets.clear();response=self.speak()
+   if self.sockets[0].key!=self.keys[2]['key']:break
+  self.assertEqual(response.status_code,200);self.assertEqual(response.content,b'\x01\x00\x02\x00\x03\x00');self.assertEqual(self.sockets[-1].key,self.keys[2]['key'])
 
 if __name__=='__main__':unittest.main()

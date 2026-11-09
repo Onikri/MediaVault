@@ -56,10 +56,10 @@ export function localClip(row,i,{language,steps}){
 
 export function createNarrator({language='ru',steps=5,lookahead=4,synth=null,onSegment=()=>{},onState=()=>{},onEnd=()=>{},onError=()=>{}}={}){
  let queue=[],index=0,playing=false,generation=0,title='',abort=new AbortController(),current=null;
- const ready=new Map();
+ const ready=new Map(),retried=new Set();let failures=0;
  const state=extra=>onState({playing,index,total:queue.length,...extra});
  const make=synth||((row,i)=>localClip(row,i,{language,steps}));
- function reset(){generation++;abort.abort();abort=new AbortController();ready.clear();current?.cancel();current=null;}
+ function reset(){generation++;abort.abort();abort=new AbortController();ready.clear();retried.clear();failures=0;current?.cancel();current=null;}
 
  function prefetch(){
   for(let i=index;i<Math.min(queue.length,index+lookahead);i++)if(!ready.has(i))ready.set(i,make(queue[i],i,abort.signal,language));
@@ -102,7 +102,14 @@ export function createNarrator({language='ru',steps=5,lookahead=4,synth=null,onS
   const result=await playRow(clip,row,version);
   if(version!==generation||!playing||result==='cancelled')return;
   current=null;
-  if(result instanceof Error||(result&&result!=='ended')){playing=false;state();onError(result);return;}
+  if(result instanceof Error||(result&&result!=='ended')){
+   // One failed phrase must not stop the chapter: ask once more, then skip it.
+   // Three failures in a row (no network, no quota) stop and report.
+   if(!retried.has(index)){retried.add(index);ready.set(index,make(row,index,abort.signal,language));playNext();return;}
+   if(++failures<3){index++;playNext();return;}
+   failures=0;playing=false;state();onError(result);return;
+  }
+  failures=0;
   setTimeout(()=>{if(version!==generation)return;index++;playNext();},row.pause*1000);
  }
 

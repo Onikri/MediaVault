@@ -46,8 +46,13 @@ export function splitParagraph(text){
   const parts=value.replace(dash,'').split(/\s[—–]\s/);
   return parts.map((part,i)=>({kind:i%2===0?'speech':'narration',text:part.trim()})).filter(p=>p.text);
  }
+ // A quotation is speech when it opens the paragraph or a sentence, follows a
+ // colon or is followed by the author's dash («Нет», — ответил он). Quotes in
+ // the middle of a sentence (a sign, a title, a nickname) stay author text.
  const quoted=[];let last=0;
  for(const m of value.matchAll(/[«„"]([^«»„"“”]{2,})[»“”"]/g)){
+  const before=value.slice(0,m.index),after=value.slice(m.index+m[0].length);
+  if(!(/(^|[.!?…:]\s*|[—–]\s*)$/.test(before.trimEnd()?before:'')||/^\s*[,.!?…]?\s*[—–]/.test(after)))continue;
   if(m.index>last)quoted.push({kind:'narration',text:value.slice(last,m.index).trim()});
   quoted.push({kind:'speech',text:m[1].trim()});last=m.index+m[0].length;
  }

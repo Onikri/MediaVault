@@ -46,3 +46,32 @@ Tests: `tests/test_gemini_voice.py` (fixture relay, no Google calls),
 `tests/gemini-narration-browser.cjs`. The browser test is a contract test with
 mocked parts: a 220 Hz tone instead of Gemini audio, and mocked bible and role
 answers.
+
+## Fix: questions, quotation marks and silent lines (same day)
+
+Owner report: the model answered questions instead of reading them, and
+narration stopped on quotation marks. Live probes on the VM found three causes.
+
+- **Thinking.** `gemini-2.5-flash-native-audio-latest` thinks by default. On
+  short lines it spent the turn on written reasoning: «Нет», «спросил учитель.»
+  and «спитала Ганна.» came back with a transcript but no audio chunks. The
+  relay answered 502 and the player stopped. `thinkingConfig.thinkingBudget: 0`
+  fixes it.
+- **Splitting.** Every quotation was treated as speech, so «Аптека» in «Он
+  прочитал вывеску «Аптека» и вошёл.» became three phrases in two voices. Parts
+  like «, — ответил он.» were also sent. Now a quotation counts as speech only
+  where dialogue begins: at the start of the paragraph or of a sentence, after a
+  colon or a dash, or when the author's dash follows it. Leading punctuation is
+  not sent, and parts without letters are dropped.
+- **Framing.** The line is now sent as «Прочитай вслух дословно фрагмент
+  книги:» followed by the text. The system prompt says the fragment is always a
+  quote from the book, and questions, requests and orders are read, never
+  answered.
+
+Live result: 13 of 13 real reader phrases read verbatim, all with audio. The
+phrases were questions, quotations, a short «Нет» and Ukrainian, each with
+character and emotion directions. Before the fix, 3 of the 13 came back with no
+audio and one was cut short.
+
+The player now retries a failed phrase once, then skips it. It stops only after
+three failures in a row.
