@@ -1,10 +1,15 @@
 import {lazy,Suspense,useEffect,useMemo,useRef,useState} from 'react';
+import {RetainedMediaSlot,useRetainedWorkspace} from './RetainedMedia.jsx';
 import {BookOpen,Check,ArrowRight,RefreshCw,Play} from 'lucide-react';
 import {searchRanobe,inspectRanobe,ranobeProgress,providerLanguage,readerInAddress,addressWithReader} from './ranobe-client.js';
 import {useContentLanguage,CONTENT_LANGUAGES,setContentLanguage} from './content-language.js';
 import {OnlineBooks} from './OnlineLibrary.jsx';
 import './ranobe.css';
 const RanobeReader=lazy(()=>import('./RanobeReader.jsx'));
+// A reader minimized to the tray outlives its title page. «Вернуться к чтению»
+// reopens it through the page that is mounted now, or navigates back to the
+// title page, which then reopens it at once from the kept book.
+const reopeners=new Map(),pendingReopen=new Set();
 function rememberReader(index){const hash=addressWithReader(location.hash,index);if(hash&&hash!==location.hash)history.replaceState(history.state,'',location.pathname+location.search+hash);}
 
 // Sources, chapters and the reader for one ranobe or book title on its page.
@@ -16,6 +21,18 @@ export default function RanobeSources({item,service,state}){
  const [source,setSource]=useState(null),[opened,setOpened]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [open,setOpenState]=useState(null),[count,setCount]=useState(30),restored=useRef(false);
  function setOpen(value){setOpenState(value);rememberReader(value?value.index:-1);}
+ const workspace=useRetainedWorkspace(),retainedId='ranobe:'+(userId||'guest')+':'+item.id;
+ // Read, not subscribed: the slot writes its element into the store on every
+ // render, so a subscription here would loop.
+ const held=workspace?.rows.get(retainedId)||null;
+ useEffect(()=>{
+  const reopen=()=>{const row=workspace?.rows.get(retainedId);if(row?.data)setOpen(row.data.start||{index:0,paragraph:0});};
+  reopeners.set(retainedId,reopen);if(pendingReopen.delete(retainedId))reopen();
+  return()=>{if(reopeners.get(retainedId)===reopen)reopeners.delete(retainedId);};
+ },[retainedId]);
+ const minimize=()=>setOpen(null);
+ const close=()=>{if(workspace?.rows.has(retainedId))workspace.close(retainedId);else setOpen(null);};
+ const restore=()=>{const reopen=reopeners.get(retainedId);if(reopen){reopen();return;}pendingReopen.add(retainedId);const route=workspace?.rows.get(retainedId)?.route;if(route&&location.hash!==route)location.hash=route;};
  const ready=service?.status==='connected'&&Number(service.session?.serverVersion)>=(isBook?56:55);
  useEffect(()=>{
   if(!ready)return;const abort=new AbortController();
@@ -62,6 +79,8 @@ export default function RanobeSources({item,service,state}){
    {opened.episodes.length>count&&<button type="button" className="btn btn-secondary" onClick={()=>setCount(n=>n+100)}>{isBook?'Показать всё оглавление':'Показать ещё главы'}</button>}
   </div>}
   {files}
-  {open&&opened&&<Suspense fallback={null}><RanobeReader book={opened} item={item} start={open} service={service} userId={userId} onClose={()=>setOpen(null)}/></Suspense>}
+  {open&&(opened||held?.data?.book)&&<RetainedMediaSlot id={retainedId} kind="reader" overlay userId={userId} label={(opened||held.data.book).title} data={{book:opened||held.data.book,start:open}} restore={restore}>
+   <Suspense fallback={null}><RanobeReader book={opened||held.data.book} item={item} start={open} service={service} userId={userId} onClose={close} onMinimize={workspace?minimize:undefined} onStop={()=>setOpenState(null)}/></Suspense>
+  </RetainedMediaSlot>}
  </section>;
 }

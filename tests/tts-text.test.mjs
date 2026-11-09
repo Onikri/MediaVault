@@ -143,3 +143,16 @@ test('quotations: dialogue is speech, a quoted name inside a sentence stays auth
  const rows=geminiRows(heuristicRoles(['«Нет», — ответил он.']),{cast:{},voices:{},narrator:'Charon'});
  assert.deepEqual(rows.map(r=>r.text),['Нет','ответил он.'],'no leading «, —» and no punctuation-only parts');
 });
+
+import {describeVoice,NARRATOR_NOTE} from '../src/tts/gemini-voice.js';
+test('voice descriptions: from the bible, and the listener’s own words win',()=>{
+ assert.equal(describeVoice({gender:'m',age:'old',timbre:'rough',pitch:-2,pace:.9}),'голос пожилого человека, старческий, хрипловатый, очень низкий, говорит медленно');
+ assert.equal(describeVoice({gender:'f',age:'child',timbre:'bright',pitch:1}),'детский голос, звонкий, выше обычного');
+ const segments=[{id:0,p:0,kind:'narration',text:'Ночь.'},{id:1,p:1,kind:'speech',speaker:'Старик',text:'Кто там?'}];
+ const cast={Старик:{gender:'m',age:'old',timbre:'rough'}},bible={narrator:{gender:'m',age:'adult',timbre:'warm',style:'спокойно'}};
+ let rows=geminiRows(segments,{cast,voices:{Старик:'Algenib'},narrator:'Charon',bible});
+ assert.match(rows[0].style,/голос рассказчика: тёплый, спокойно/);assert.match(rows[1].style,/голос героя: голос пожилого человека, старческий, хрипловатый/);
+ rows=geminiRows(segments,{cast,voices:{Старик:'Algenib'},narrator:'Charon',bible,saved:{Старик:{voice:'Algenib',note:'шёпотом, как призрак'},[NARRATOR_NOTE]:{note:'бодрый молодой голос'}}});
+ assert.match(rows[0].style,/голос рассказчика: бодрый молодой голос/);assert.match(rows[1].style,/голос героя: шёпотом, как призрак/);
+ assert.equal(geminiCast(cast,{narrator:'Charon',saved:{Старик:{voice:'Puck',note:'x'}}}).Старик,'Puck','a saved {voice, note} keeps its voice');
+});

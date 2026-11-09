@@ -1,15 +1,21 @@
 import ReaderPageTrack from './ReaderPageTrack.jsx';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import {ArrowLeft,ChevronLeft,ChevronRight,Settings2,Maximize,Minimize,List,Grid2X2,X} from 'lucide-react';
+import {ArrowLeft,ChevronLeft,ChevronRight,Settings2,Maximize,Minimize,Minimize2,List,Grid2X2,X} from 'lucide-react';
 import './reader-shell.css';
 import './reader-morph.css';
+import './reader-rail.css';
 
 // Chrome overlays the reading surface. Opening a panel never resizes a page.
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='horizontal',navigationDirection='reading',chapterControl,gesturesEnabled=true}){
+// layout="rail" (text readers): one fixed column of controls on the right,
+// always visible — nothing appears on hover, so nothing moves under the
+// pointer. dock (the narration player) sits at the bottom of the rail;
+// onMinimize hides the reader to the tray while its voice keeps reading.
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='horizontal',navigationDirection='reading',chapterControl,gesturesEnabled=true,layout='overlay',dock=null,onMinimize,navigationLabels}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({});
+ const rail=layout==='rail';
  const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[hint,setHint]=useState(true),[fullscreenError,setFullscreenError]=useState('');
- methods.current={onClose,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel};
+ methods.current={onClose,onMinimize,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel,rail};
  const navigation=navigationDirection==='reading'?direction:navigationDirection==='left'?'rtl':'ltr';methods.current.direction=navigation;
  const hide=useCallback(()=>{clearTimeout(timer.current);setVisible(false);},[]);
  const show=useCallback(()=>{clearTimeout(timer.current);setVisible(true);timer.current=setTimeout(()=>{if(!root.current?.querySelector('.reader-chrome:focus-within'))setVisible(false);},2800);},[]);
@@ -26,11 +32,11 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
   if(embedded&&!root.current?.contains(document.activeElement)&&document.fullscreenElement!==root.current&&!document.fullscreenElement?.contains(root.current))return;
   if(e.defaultPrevented||e.target.closest?.('input,textarea,select,[contenteditable=true]')||dialog&&dialog!==root.current&&!dialog.contains(root.current)||m.settingsOpen||m.panel)return;
   if(e.key==='Tab'&&!embedded){
-   if(!visible){e.preventDefault();show();requestAnimationFrame(()=>root.current?.querySelector('.reader-top button')?.focus());return;}
+   if(!visible&&!m.rail){e.preventDefault();show();requestAnimationFrame(()=>root.current?.querySelector('.reader-top button')?.focus());return;}
    const controls=[...root.current.querySelectorAll('button:not(:disabled),input:not(:disabled),a[href]')].filter(node=>!node.closest('[inert]')&&node.getClientRects().length);
    const first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}return;
   }
-  if(e.key==='Escape'){e.preventDefault();if(visible)hide();else m.onClose?.();return;}
+  if(e.key==='Escape'){e.preventDefault();if(m.rail)(m.onMinimize||m.onClose)?.();else if(visible)hide();else m.onClose?.();return;}
   if(e.key.toLowerCase()==='f'){e.preventDefault();fullscreen();return;}
   if(m.paged&&['ArrowLeft','ArrowRight',' '].includes(e.key)){
    e.preventDefault();const delta=e.key===' '?1:(e.key==='ArrowRight'?1:-1)*(m.direction==='rtl'?-1:1);
@@ -48,10 +54,27 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
   if(paged&&gesturesEnabled&&Math.abs(dx)>60){const forward=(dx<0)===(navigation!=='rtl');if(forward&&canNext)onNext?.();if(!forward&&canPrevious)onPrevious?.();hide();return;}
   if(Math.abs(dx)>12||Math.abs(dy)>12)return;
   if(paged&&gesturesEnabled){const bounds=e.currentTarget.getBoundingClientRect(),fraction=(e.clientX-bounds.left)/bounds.width;if(fraction<.26||fraction>.74){const forward=(fraction>.74)===(navigation!=='rtl');if(forward&&canNext)onNext?.();if(!forward&&canPrevious)onPrevious?.();hide();return;}}
+  if(rail)return;
   setHint(false);visible?hide():show();
  }
- return <section id="viewer" ref={root} tabIndex={-1} className={'mv-viewer immersive-reader'+(progressOrientation==='vertical'?' reader-vertical-tools':'')+' reader-theme-'+theme+' '+className+(inline?' mv-viewer-inline':'')+(embedded?' reader-embedded':'')} style={{'--reader-chrome-width':Math.max(320,Math.min(1800,Number(chromeWidth)||1200))+'px'}} data-chrome={visible||!!activePanel} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={title}>
-  <div className="immersive-stage" onPointerDown={pointerDown} onPointerUp={pointerUp} onPointerCancel={()=>gesture.current=null} onPointerMove={e=>{if(e.pointerType==='mouse'&&!e.buttons){const r=e.currentTarget.getBoundingClientRect();if(e.clientY-r.top<65||r.bottom-e.clientY<65)show();}}}>{children}</div>
+ return <section id="viewer" ref={root} tabIndex={-1} className={'mv-viewer immersive-reader'+(progressOrientation==='vertical'?' reader-vertical-tools':'')+' reader-theme-'+theme+' '+className+(inline?' mv-viewer-inline':'')+(embedded?' reader-embedded':'')} style={{'--reader-chrome-width':Math.max(320,Math.min(1800,Number(chromeWidth)||1200))+'px'}} data-chrome={rail||visible||!!activePanel} data-layout={layout} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={title}>
+  <div className="immersive-stage" onPointerDown={pointerDown} onPointerUp={pointerUp} onPointerCancel={()=>gesture.current=null} onPointerMove={e=>{if(!rail&&e.pointerType==='mouse'&&!e.buttons){const r=e.currentTarget.getBoundingClientRect();if(e.clientY-r.top<65||r.bottom-e.clientY<65)show();}}}>{children}</div>
+  {rail?<aside className="reader-rail" aria-label="Управление читалкой">
+   <div className="reader-rail-group">
+    <button className="reader-control" aria-label="Закрыть читалку" title="Закрыть" onClick={onClose}><X size={19}/></button>
+    {onMinimize&&<button className="reader-control" aria-label="Свернуть читалку" title="Свернуть — голос продолжит читать" onClick={onMinimize}><Minimize2 size={18}/></button>}
+    {contents&&<button className="reader-control" aria-label="Главы и тома" title="Оглавление" onClick={()=>openPanel('contents')}><List size={19}/></button>}
+    {settings&&<button className="reader-control" aria-label="Настройки читалки" title="Текст и тема" aria-expanded={settingsOpen} onClick={()=>openPanel('settings')}><Settings2 size={19}/></button>}
+    <button className="reader-control reader-fullscreen" aria-label={full?'Выйти из полного экрана':'На весь экран'} title={full?'Обычный размер':'На весь экран'} onClick={fullscreen}>{full?<Minimize size={18}/>:<Maximize size={18}/>}</button>
+   </div>
+   <div className="reader-rail-group reader-rail-pages">
+    <button className="reader-control" aria-label={navigationLabels?.previous||'Назад'} title={navigationLabels?.previous||'Назад'} disabled={!canPrevious} onClick={onPrevious}><ChevronLeft size={20}/></button>
+    <span className="reader-rail-count" aria-live="polite" title={progress?.label}>{progress?.current||0}<small>из {progress?.total||0}</small></span>
+    <button className="reader-control" aria-label={navigationLabels?.next||'Вперёд'} title={navigationLabels?.next||'Вперёд'} disabled={!canNext} onClick={onNext}><ChevronRight size={20}/></button>
+   </div>
+   {dock&&<div className="reader-rail-dock">{dock}</div>}
+   {fullscreenError&&<small className="reader-rail-note" role="status">{fullscreenError}</small>}
+  </aside>:<>
   <div className="reader-chrome reader-top" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
    <button className="reader-control" aria-label="Закрыть просмотр" onClick={onClose}><ArrowLeft size={20}/></button>
    <div className="reader-title-group"><div className="mv-viewer-title"><strong>{title}</strong></div>{chapterControl}</div>
@@ -65,7 +88,8 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
    </div>
    {status&&<div className="reader-quiet-status">{status}</div>}{fullscreenError&&<small role="status">{fullscreenError}</small>}
   </div>
-  {hint&&!visible&&!activePanel&&<div className="reader-gesture-hint" aria-hidden="true">Касание центра — меню{paged?' · По краям — листать':''}</div>}
+  </>}
+  {!rail&&hint&&!visible&&!activePanel&&<div className="reader-gesture-hint" aria-hidden="true">Касание центра — меню{paged?' · По краям — листать':''}</div>}
   {debug}
   <Dialog.Root open={!!activePanel} onOpenChange={open=>!open&&closePanel()}><Dialog.Portal container={full?root.current:undefined}><Dialog.Overlay className="reader-panel-backdrop"/><Dialog.Content className={'reader-panel reader-panel-'+activePanel} data-reader-panel onCloseAutoFocus={e=>{e.preventDefault();root.current?.focus({preventScroll:true});}}>
    <header><div><Dialog.Title>{activePanel==='settings'?'Настройки читалки':activePanel==='contents'?'Главы и тома':'Превью страниц'}</Dialog.Title></div><Dialog.Close className="reader-control" aria-label={activePanel==='settings'?'Закрыть настройки читалки':'Закрыть панель читалки'}><X size={20}/></Dialog.Close></header>

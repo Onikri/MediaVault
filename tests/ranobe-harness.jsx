@@ -4,6 +4,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import '/src/styles.css';import '/src/site-layout.css';import '/src/interface-refinement.css';
 import RanobeSources from '/src/RanobeSources.jsx';
+import {RetainedMediaProvider,VideoDock} from '/src/RetainedMedia.jsx';
 const paragraphs=['Ночь опустилась на город, и только в окне старой библиотеки ещё горел свет.','— Ты опять опоздал, — недовольно сказала Мирэй.','— Прости, я заблудился, — виновато ответил Кайто.','Ветер принёс запах дождя.'];
 const book={provider:'ranobehub',providerName:'RanobeHub',kind:'ranobe',title:'Повелитель',aliases:['Повелитель'],url:'https://ranobehub.org/ranobe/206',language:'ru',
  episodes:[1,2].map(n=>({number:n,season:1,title:'Глава '+n,url:'https://ranobehub.org/ranobe/206?mv_chapter='+n,language:'ru',translator:''})),seasons:[{number:1,name:'Том 1'}]};
@@ -12,7 +13,7 @@ window.requests=[];window.speak=[];
 // (not Gemini audio) in three chunks, like the Live relay streams PCM.
 const gemini=new URLSearchParams(location.search).get('engine')==='gemini';
 function tone(){
- const rate=24000,samples=new Int16Array(rate*.45);for(let i=0;i<samples.length;i++)samples[i]=Math.sin(i/rate*2*Math.PI*220)*8000;
+ const rate=24000,samples=new Int16Array(rate*(new URLSearchParams(location.search).get('tray')?1.6:.45));for(let i=0;i<samples.length;i++)samples[i]=Math.sin(i/rate*2*Math.PI*220)*8000;
  const bytes=new Uint8Array(samples.buffer),cuts=[0,4801,9600,bytes.length];
  return new Response(new ReadableStream({async start(c){for(let i=0;i<3;i++){await new Promise(r=>setTimeout(r,60));c.enqueue(bytes.slice(cuts[i],cuts[i+1]));}c.close();}}));
 }
@@ -38,4 +39,11 @@ const service={status:'connected',session:{serverVersion:gemini?59:58},request:a
  throw Error('unexpected '+path);
 }};
 localStorage.setItem('mv_lmt_settings:fixture',JSON.stringify({engine:'vm'}));
-createRoot(document.getElementById('root')).render(<RanobeSources item={{id:'ranobe:1',title:'Повелитель',aliases:['Overlord'],kind:'ranobe',ids:{}}} service={service} state={{user:{sub:'fixture'}}}/>);
+const title=<RanobeSources item={{id:'ranobe:1',title:'Повелитель',aliases:['Overlord'],kind:'ranobe',ids:{}}} service={service} state={{user:{sub:'fixture'}}}/>;
+// ?tray=1: the site workspace with its tray, and a second page to leave to.
+function Site(){
+ const [page,setPage]=React.useState('title');
+ React.useEffect(()=>{const back=()=>setPage('title');addEventListener('hashchange',back);return()=>removeEventListener('hashchange',back);},[]);
+ return <RetainedMediaProvider><header className="fixture-header" style={{display:"flex",justifyContent:"flex-end",gap:8,padding:8}}><VideoDock/><button type="button" onClick={()=>setPage(p=>p==='title'?'other':'title')}>{page==='title'?'Другая страница':'К тайтлу'}</button></header>{page==='title'?title:<p className="fixture-other">Другая страница сайта</p>}</RetainedMediaProvider>;
+}
+createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).get('tray')?<Site/>:title);

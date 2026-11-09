@@ -1,0 +1,88 @@
+/* Text readers (ranobe, books): every control lives in one column on the
+   right edge and never moves. The column holds three quiet groups — reader,
+   pages, voice — spread top, middle and bottom. Colours come from the
+   reader theme (paper, dark, black), so the rail reads as part of the page. */
+.immersive-reader[data-layout=rail]{--rail-size:52px;--rail-gap:14px;--rail-tint:color-mix(in srgb,var(--reader-ink) 6%,var(--reader-paper));--rail-ink:color-mix(in srgb,var(--reader-ink) 74%,var(--reader-paper));--rail-hover:color-mix(in srgb,var(--reader-ink) 11%,transparent)}
+.immersive-reader[data-layout=rail] .immersive-stage{right:calc(var(--rail-size) + var(--rail-gap) * 2)}
+.reader-rail{position:absolute;z-index:10;top:max(var(--rail-gap),env(safe-area-inset-top));bottom:max(var(--rail-gap),env(safe-area-inset-bottom));right:var(--rail-gap);width:var(--rail-size);display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:12px;color:var(--rail-ink);font-family:var(--font-ui,system-ui,sans-serif);pointer-events:none}
+.reader-rail>*{pointer-events:auto}
+.reader-rail-group,.reader-rail-dock .narration-bar{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;padding:4px;box-sizing:border-box;border-radius:18px;background:var(--rail-tint)}
+.reader-rail .reader-control{min-width:44px;min-height:44px;width:44px;height:44px;border-radius:13px;color:inherit}
+.reader-rail .reader-control:hover:not(:disabled){background:var(--rail-hover);color:var(--reader-ink)}
+.reader-rail .reader-control:focus-visible,.reader-rail-dock button:focus-visible,.reader-rail-dock select:focus-visible{outline:2px solid var(--color-blossom,#ee3c35);outline-offset:1px}
+.reader-rail-count{display:flex;flex-direction:column;align-items:center;padding:2px 0 4px;font:650 14px/1.15 var(--font-ui,system-ui);font-variant-numeric:tabular-nums;color:var(--reader-ink);cursor:default}
+.reader-rail-count small{font-weight:500;font-size:10.5px;color:var(--rail-ink)}
+.reader-rail-note{margin:0;display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:var(--rail-tint);opacity:.45;font-size:10px;text-align:center}
+.reader-rail-dock{width:100%}
+
+/* The narration player inside the rail: play on top, then phrase steps,
+   pace and the cast. Fixed size: buffering only changes the play icon. */
+.reader-rail-dock .narration{width:auto;margin:0;gap:0;color:var(--rail-ink)}
+.reader-rail-dock .narration-bar{box-shadow:none;backdrop-filter:none;border-radius:18px}
+.reader-rail-dock .narration-bar button{width:44px;height:44px;min-width:44px;padding:0;border-radius:13px;color:inherit;background:none}
+.reader-rail-dock .narration-bar button:hover:not(:disabled){background:var(--rail-hover);color:var(--reader-ink)}
+.reader-rail-dock .narration-bar button:disabled{opacity:.35}
+.reader-rail-dock .narration-bar .narration-main{background:var(--color-blossom,#ee3c35);color:#fff;border-radius:50%;margin-bottom:2px}
+.reader-rail-dock .narration-bar .narration-main:hover:not(:disabled){background:color-mix(in srgb,var(--color-blossom,#ee3c35) 86%,#000);color:#fff}
+.reader-rail-dock .narration-bar .narration-main:disabled{opacity:.6}
+.reader-rail-dock .narration-pace{margin:0;display:block}
+.reader-rail-dock .narration-pace select{width:44px;height:32px;padding:0;border:0;border-radius:10px;background:none;color:inherit;font:600 12px/1 var(--font-ui,system-ui);text-align:center;text-align-last:center;appearance:none;-webkit-appearance:none;cursor:pointer}
+.reader-rail-dock .narration-pace select:hover{background:var(--rail-hover)}
+.reader-rail-dock .narration-people{position:relative}
+.reader-rail-dock .narration-people span{position:absolute;right:5px;top:5px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:var(--reader-ink);color:var(--reader-paper);font:700 9.5px/15px var(--font-ui,system-ui);text-align:center}
+.narration-ring{width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:narration-spin .8s linear infinite}
+.narration-main[aria-busy=true] svg{animation:narration-breathe 1.2s ease-in-out infinite}
+@keyframes narration-spin{to{transform:rotate(360deg)}}
+@keyframes narration-breathe{50%{opacity:.45}}
+
+/* Panels open beside the rail, anchored to its bottom: the bar never moves. */
+.reader-rail-dock .narration-consent,.reader-rail-dock .narration-cast{position:fixed;z-index:20;right:calc(var(--rail-size) + var(--rail-gap) * 2);bottom:var(--rail-gap);width:min(400px,calc(100vw - var(--rail-size) - var(--rail-gap) * 4));max-height:min(78dvh,720px);overflow:auto;box-sizing:border-box;color:#ece9e3;box-shadow:0 18px 60px #0005}
+.reader-rail-dock .inline-error{position:fixed;z-index:20;right:calc(var(--rail-size) + var(--rail-gap) * 2);bottom:var(--rail-gap);max-width:min(360px,calc(100vw - 110px));margin:0;padding:10px 14px;border-radius:14px;background:#2a1716f2;color:#ffd6d1;font-size:13px}
+.narration-cast-pace{display:none!important}
+.narration-note{display:grid!important;gap:6px;margin-top:6px!important}
+.narration-note span{font-size:12px;color:#c9c3ba}
+.narration-note input,.narration-note-input{width:100%;box-sizing:border-box;height:34px;margin-top:6px;padding:0 10px;border:0;border-radius:10px;background:#0005;color:inherit;font:13px/1 var(--font-ui,system-ui)}
+.narration-note-input{flex:1 0 100%}
+.narration-note input::placeholder,.narration-note-input::placeholder{color:#a9a39b}
+
+/* Text: a wider measure, centred in the space left of the rail. The width
+   setting is now the line length itself, not line length plus margins. */
+.text-reader .reader-prose{--prose-pad:clamp(22px,5vw,56px);max-width:calc(var(--book-width) + var(--prose-pad) * 2);padding-inline:var(--prose-pad);box-sizing:border-box}
+.reader-prose-head{margin:clamp(12px,5vh,48px) 0 1.6em}
+.reader-prose-head small{display:block;margin-bottom:.5em;font:500 13px/1.3 var(--font-ui,system-ui);color:color-mix(in srgb,var(--reader-ink) 55%,var(--reader-paper))}
+.text-reader .ranobe-prose .reader-prose-head h2{margin:0;font:700 calc(var(--book-size) * 1.45)/1.2 var(--book-font);letter-spacing:-.01em}
+
+/* Listening: the paragraph being read stays at full ink, the rest steps
+   back, and a hairline in the speaker's colour marks it in the margin. */
+.text-reader .ranobe-prose p{position:relative;transition:opacity .35s ease}
+.text-reader .ranobe-prose.is-listening p:not(.is-speaking){opacity:.42}
+.text-reader .ranobe-prose p.is-speaking{background:none}
+.text-reader .ranobe-prose p.is-speaking::before{content:'';position:absolute;left:calc(var(--prose-pad,24px) * -.5 - 2px);top:.35em;bottom:.35em;width:3px;border-radius:2px;background:var(--speaking-role,var(--color-blossom,#ee3c35))}
+.text-reader .role-segment.is-speaking{background:color-mix(in srgb,var(--role,var(--color-blossom,#ee3c35)) 14%,transparent)}
+@media (prefers-reduced-motion:reduce){.text-reader .ranobe-prose p{transition:none}}
+
+.ranobe-chapter-end{display:flex;justify-content:center;padding:40px 0 30vh}
+.reader-next-chapter{display:grid;gap:4px;justify-items:center;padding:14px 22px;border:0;border-radius:16px;background:var(--rail-tint,#8881);color:var(--reader-ink);font:650 15px/1.2 var(--font-ui,system-ui);cursor:pointer}
+.reader-next-chapter small{font-weight:500;font-size:12.5px;color:color-mix(in srgb,var(--reader-ink) 60%,var(--reader-paper))}
+.reader-next-chapter:hover{background:color-mix(in srgb,var(--reader-ink) 12%,var(--reader-paper))}
+
+/* Phones: the same rail becomes one still bar along the bottom edge. */
+@media (max-width:720px){
+ .immersive-reader[data-layout=rail]{--rail-size:56px;--rail-gap:8px}
+ .immersive-reader[data-layout=rail] .immersive-stage{right:0;bottom:calc(var(--rail-size) + var(--rail-gap) * 2)}
+ .reader-rail{top:auto;left:var(--rail-gap);right:var(--rail-gap);width:auto;height:var(--rail-size);flex-direction:row;gap:6px}
+ .reader-rail-group,.reader-rail-dock .narration-bar{flex-direction:row;width:auto;height:100%;padding:4px;border-radius:16px}
+ .reader-rail .reader-control,.reader-rail-dock .narration-bar button{width:40px;min-width:40px;height:40px;min-height:40px}
+ .reader-rail .reader-fullscreen,.reader-rail-count,.reader-rail-dock .narration-skip,.reader-rail-dock .narration-pace{display:none}
+ .reader-rail-dock{width:auto}
+ .reader-rail-dock .narration-bar .narration-main{margin:0}
+ .reader-rail-dock .narration-consent,.reader-rail-dock .narration-cast,.reader-rail-dock .inline-error{left:var(--rail-gap);right:var(--rail-gap);width:auto;max-width:none;bottom:calc(var(--rail-size) + var(--rail-gap) * 2)}
+ .narration-cast-pace{display:flex!important}
+ .text-reader .ranobe-prose p.is-speaking::before{left:-12px}
+}
+
+/* Mini window (picture in picture from the tray): just the player. */
+.text-reader.is-mini{position:relative!important;inset:auto!important;height:auto!important;min-height:0!important;background:none}
+.text-reader.is-mini .immersive-stage,.text-reader.is-mini .reader-rail-group{display:none}
+.text-reader.is-mini .reader-rail{position:static;width:auto;height:auto;padding:8px;flex-direction:row;justify-content:center}
+.text-reader.is-mini .reader-rail-dock .narration-bar{flex-direction:row;width:auto}

@@ -12,17 +12,24 @@ export function useRetainedMedia(active,descriptor,onStop){
  useEffect(()=>{if(!owner)return;if(active)owner.store.activate(owner.id,descriptor);else owner.store.deactivate(owner.id);},[owner?.id,!!active,descriptor?.label,descriptor?.kind]);
  return owner?.mode||'attached';
 }
+// A retained reader reports its own state to the tray: {playing, toggle}.
+export function useRetainedReport(){
+ const owner=useContext(Owner);
+ return useMemo(()=>owner?change=>owner.store.media(owner.id,change):()=>{},[owner?.id,owner?.store]);
+}
 export function RetainedMediaProvider({children}){
  const [store]=useState(createRetainedMediaStore),snapshot=useSyncExternalStore(store.subscribe,store.getSnapshot);
  useEffect(()=>{const close=()=>store.clear();addEventListener('mediavault-locked',close);return()=>{removeEventListener('mediavault-locked',close);store.clear();};},[store]);
  return <Workspace.Provider value={store}>{children}{createPortal(snapshot.rows.map(row=><RetainedHost key={row.id} row={row} store={store} popup={snapshot.popup===row.id} active={snapshot.active===row.id}/>),document.body)}</Workspace.Provider>;
 }
-export function RetainedMediaSlot({id,label,kind='video',userId,resumeItemId,restore,children}){
- const store=useContext(Workspace),anchor=useRef(null),live=useRef({label,kind,userId,resumeItemId,restore});live.current={label,kind,userId,resumeItemId,restore};
+// overlay: the media covers the screen itself (a full-screen reader), so the
+// slot takes no room in the page. data: what a page needs to show it again.
+export function RetainedMediaSlot({id,label,kind='video',userId,resumeItemId,restore,overlay=false,data,children}){
+ const store=useContext(Workspace),anchor=useRef(null),live=useRef({label,kind,userId,resumeItemId,restore,data});live.current={label,kind,userId,resumeItemId,restore,data};
  useLayoutEffect(()=>{if(!store)return;store.attach(id,{...live.current,route:location.hash||'#home'},anchor.current,children);},[store,id,children]);
  useLayoutEffect(()=>{if(!store)return;const node=anchor.current;return()=>store.detach(id,node);},[store,id]);
  if(!store)return children;
- return <div ref={anchor} className={'retained-media-slot is-'+kind} data-retained-slot={id}/>;
+ return <div ref={anchor} className={'retained-media-slot is-'+kind+(overlay?' is-overlay':'')} data-retained-slot={id}/>;
 }
 function RetainedHost({row,store,popup,active}){
  const root=useRef(null),[box,setBox]=useState({position:'absolute',top:0,left:0,width:900}),attached=!!row.anchor?.isConnected,mode=popup&&active?'popup':attached?'attached':'hidden';
@@ -48,20 +55,21 @@ function Dock({store}){
  const state=useSyncExternalStore(store.subscribe,store.getSnapshot),active=state.rows.find(r=>r.id===state.active),[open,setOpen]=useState(false),trigger=useRef(null),panel=useRef(null),[box,setBox]=useState({right:16,top:70}),reduced=useReducedMotion();
  useEffect(()=>{if(!open)return;const update=()=>{const r=trigger.current?.getBoundingClientRect();if(r)setBox({right:Math.max(12,innerWidth-r.right),top:r.bottom+10});};update();addEventListener('resize',update);addEventListener('scroll',update,true);const outside=e=>{if(!panel.current?.contains(e.target)&&!trigger.current?.contains(e.target))setOpen(false);};const key=e=>{if(e.key==='Escape'){setOpen(false);trigger.current?.focus();}};document.addEventListener('pointerdown',outside);document.addEventListener('keydown',key);return()=>{removeEventListener('resize',update);removeEventListener('scroll',update,true);document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',key);};},[open]);
  if(!active&&!state.history.length)return null;
- const toggle=()=>{const video=active?.host?.querySelector('video.mv-player-media');if(video){if(video.paused)video.play().catch(()=>{});else video.pause();}};
+ const toggle=()=>{if(active?.toggle){active.toggle();return;}const video=active?.host?.querySelector('video.mv-player-media');if(video){if(video.paused)video.play().catch(()=>{});else video.pause();}};
  const recent=state.history.filter(item=>item.id!==active?.id).slice(0,6);
- const playing=!!active?.playing&&active?.kind!=='reader',progress=active?.duration?Math.min(1,(active.time||0)/active.duration):0;
+ // A reader with a voice plays like any other media: pause and resume from the tray.
+ const voiced=active?.kind==='reader'&&!!active.toggle,playing=!!active?.playing&&(active?.kind!=='reader'||voiced),progress=active?.duration?Math.min(1,(active.time||0)/active.duration):0;
  const clock=v=>{v=Math.max(0,Math.floor(v||0));const h=Math.floor(v/3600),m=Math.floor(v%3600/60),s=String(v%60).padStart(2,'0');return h?h+':'+String(m).padStart(2,'0')+':'+s:m+':'+s;};
  return <><button ref={trigger} className={'retained-dock'+(active?' is-live':'')+(playing?' is-playing':'')} title={active?.label||'История просмотра'} aria-label="Плеер в фоне" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>{playing?<span className="retained-eq" aria-hidden="true"><i/><i/><i/></span>:active?.kind==='reader'?<BookOpen size={18}/>:<Video size={18}/>}</button>{createPortal(<AnimatePresence>{open&&<motion.section ref={panel} role="dialog" aria-label={active?'Сейчас в фоне':'Недавний просмотр'} className="retained-dock-panel" style={box} initial={{opacity:0,scale:reduced?1:.94,y:reduced?0:-4}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:reduced?1:.96}} transition={{type:'spring',stiffness:420,damping:34}}>
   {active&&<div className="retained-player">
    <div className="retained-cover">{active.preview?<img src={active.preview} alt=""/>:<span className="retained-cover-empty">{active.kind==='reader'?<BookOpen size={28}/>:<Video size={28}/>}</span>}
-    {active.kind!=='reader'&&<button className="retained-cover-play" aria-label={playing?'Пауза':'Продолжить'} onClick={toggle}>{playing?<Pause size={20}/>:<Play size={20}/>}</button>}
+    {(active.kind!=='reader'||voiced)&&<button className="retained-cover-play" aria-label={playing?'Пауза':'Продолжить'} onClick={toggle}>{playing?<Pause size={20}/>:<Play size={20}/>}</button>}
    </div>
-   <p className="retained-eyebrow">{playing?<><span className="retained-eq" aria-hidden="true"><i/><i/><i/></span>Сейчас играет</>:active.kind==='reader'?'Открыто чтение':'На паузе'}</p>
+   <p className="retained-eyebrow">{playing?<><span className="retained-eq" aria-hidden="true"><i/><i/><i/></span>{voiced?'Читает голос':'Сейчас играет'}</>:voiced?'Озвучка на паузе':active.kind==='reader'?'Открыто чтение':'На паузе'}</p>
    <strong className="retained-title">{active.label}</strong>
    {active.kind!=='reader'&&active.duration>0&&<div className="retained-progress" role="progressbar" aria-label="Прогресс просмотра" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress*100)}><span style={{transform:`scaleX(${progress})`}}/><small>{clock(active.time)}</small><small>{clock(active.duration)}</small></div>}
    <div className="retained-dock-actions">
-    <button className="is-primary" onClick={()=>{store.return(active.id);setOpen(false);}}><ArrowUpRight size={16}/>Вернуться к просмотру</button>
+    <button className="is-primary" onClick={()=>{store.return(active.id);setOpen(false);}}><ArrowUpRight size={16}/>{active.kind==='reader'?'Вернуться к чтению':'Вернуться к просмотру'}</button>
     <button aria-label="Картинка в картинке" title="Картинка в картинке" onClick={()=>{store.popup(active.id);setOpen(false);}}><PictureInPicture2 size={17}/></button>
     <button className="is-close" aria-label={active.kind==='reader'?'Закрыть читалку':'Закрыть просмотр'} title="Закрыть" onClick={()=>{store.close(active.id);setOpen(false);}}><X size={17}/></button>
    </div>

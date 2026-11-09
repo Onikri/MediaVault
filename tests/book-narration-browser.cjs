@@ -36,9 +36,9 @@ let browser,vite;
  for(const format of ['pdf','epub']){
   await page.goto(url+'?format='+format,{waitUntil:'domcontentloaded'});
   await page.getByRole('button',{name:'Слушать главу'}).waitFor({timeout:120000});
-  assert.equal(await page.locator('.reader-listen').count(),1,'top-bar listen control');
+  assert.equal(await page.locator('.reader-rail .narration-main').count(),1,'listen control in the rail');
   await page.getByRole('button',{name:'Слушать главу'}).click();
-  await page.waitForFunction(()=>/Оксана|Вітер|Тарас/.test(document.querySelector('.narration-caption')?.textContent||''),null,{timeout:240000});
+  await page.waitForFunction(()=>document.querySelector('.reader-rail .narration-main')?.getAttribute('aria-label')==='Пауза озвучки',null,{timeout:240000});
   await page.getByRole('button',{name:'Роли и голоса'}).click();
   const roles=await page.locator('.narration-cast li').allInnerTexts();
   assert.ok(roles.some(t=>t.includes('Оксана'))&&roles.some(t=>t.includes('Тарас')),format+' speakers: '+roles.join(' | '));

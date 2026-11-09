@@ -38,3 +38,8 @@
 .retained-popup-heading button.is-close:hover{background:color-mix(in srgb,var(--color-blossom) 30%,var(--color-canvas));color:#fff}
 .retained-dock-panel .retained-dock-actions button.is-close:hover{background:color-mix(in srgb,var(--color-blossom) 24%,var(--color-surface));color:#fff}
 .retained-media-host[data-mode=popup]>.retained-popup-heading{position:relative;z-index:30;background:var(--color-canvas-soft)}
+
+/* A full-screen reader kept in the workspace: no room in the page, and above
+   the site header while it is open. */
+.retained-media-slot.is-overlay{min-height:0;height:0!important;aspect-ratio:auto}
+.retained-media-host[data-mode=attached]:has(.text-reader){z-index:100}

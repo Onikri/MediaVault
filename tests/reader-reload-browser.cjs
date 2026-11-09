@@ -23,7 +23,7 @@ let browser,vite;
  assert.match(await page.locator('.reader-shell, [role=dialog], body').first().innerText(),/Глава 1/);
  // Closing the reader removes it from the address; a reload stays on the title.
  // Controls hide while reading: a tap in the middle shows them.
- const close=page.getByRole('button',{name:'Закрыть просмотр'});
+ const close=page.getByRole('button',{name:'Закрыть читалку'});
  for(let i=0;i<3&&!await close.isVisible().catch(()=>false);i++){await page.mouse.click(500,450);await page.waitForTimeout(400);}
  await close.click();
  await page.waitForFunction(()=>!new URLSearchParams(location.hash.slice(1)).get('read'));

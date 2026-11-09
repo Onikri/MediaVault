@@ -5,8 +5,8 @@
 // Emotions are not imitated with EQ here: the model is told how to deliver.
 import {personalKey} from './google.js';
 import {sentences} from './text.js';
-import {styleFor} from './gemini-direction.js';
-export {styleFor,EMOTION_DIRECTION} from './gemini-direction.js';
+import {styleFor,describeVoice} from './gemini-direction.js';
+export {styleFor,EMOTION_DIRECTION,describeVoice} from './gemini-direction.js';
 
 export const GEMINI_VOICE_MODEL='gemini-2.5-flash-native-audio-latest';
 export const GEMINI_RATE=24000;
@@ -59,12 +59,17 @@ export function geminiNarrator(bible,choice='auto'){
 export function geminiCast(cast,{narrator,saved={}}={}){
  const used=new Set([narrator]),result={};
  for(const [name,value] of Object.entries(cast)){
-  const voice=GENDER[saved[name]]?saved[name]:pickGeminiVoice(value,used);
+  const own=typeof saved[name]==='object'?saved[name]?.voice:saved[name];
+  const voice=GENDER[own]?own:pickGeminiVoice(value,used);
   used.add(voice);result[name]=voice;
  }
  return result;
 }
 const SAVED='mediavault_tts_gemini_cast_v1:';
+// Saved per book: {name: voice} or {name: {voice, note}}; the narrator's note
+// is kept under NARRATOR_NOTE.
+export const NARRATOR_NOTE='@narrator';
+export function voiceNote(saved,name){const value=saved?.[name];return typeof value==='object'&&value?String(value.note||''):'';}
 export function savedGeminiCast(book){try{return JSON.parse(localStorage.getItem(SAVED+book)||'{}')||{};}catch{return {};}}
 export function saveGeminiCast(book,value){try{localStorage.setItem(SAVED+book,JSON.stringify(value));}catch{}}
 
@@ -76,12 +81,13 @@ function chunks(text,limit=300){
  for(const part of sentences(String(text).replace(/́/g,''),limit)){if(out.length&&(out.at(-1)+' '+part).length<=limit)out[out.length-1]+=' '+part;else out.push(part);}
  return out.filter(Boolean);
 }
-export function geminiRows(segments,{cast,voices,narrator,bible,pace=1}){
+export function geminiRows(segments,{cast,voices,narrator,bible,pace=1,saved={}}){
+ const narratorNote=voiceNote(saved,NARRATOR_NOTE)||(bible?.narrator?describeVoice(bible.narrator,{narrator:true}):'');
  const rows=[];
  for(const segment of segments){
   const own=segment.kind!=='narration'&&segment.speaker&&voices[segment.speaker];
   const voice=own||(segment.kind!=='narration'&&segment.gender==='f'?pickGeminiVoice({gender:'f'},new Set([narrator])):segment.kind!=='narration'&&segment.gender==='m'?pickGeminiVoice({gender:'m'},new Set([narrator])):narrator);
-  const style=styleFor(segment,own?cast[segment.speaker]:segment.gender?{gender:segment.gender}:null,{tone:bible?.tone,pace});
+  const style=styleFor(segment,own?cast[segment.speaker]:segment.gender?{gender:segment.gender}:null,{tone:bible?.tone,pace,note:own?voiceNote(saved,segment.speaker):'',narratorNote});
   // Leading author punctuation («, — ответил он») is not read; a part with no
   // letters or digits is not sent at all (the model has nothing to say).
   const parts=chunks(segment.spoken||segment.text).map(t=>t.replace(/^[\s,;:.—–-]+/,'')).filter(t=>/[\p{L}\p{N}]/u.test(t));

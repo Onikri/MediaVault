@@ -28,10 +28,9 @@ let browser,vite;
  const names=await page.locator('.ranobe-prose .role-name').allInnerTexts();
  assert.ok(names.some(t=>t.includes('Мирэй'))||names.some(t=>t.includes('Кайто')),'role names in text: '+names.join(' | '));
  assert.ok(await page.locator('.ranobe-prose .role-speech').first().evaluate(n=>getComputedStyle(n).getPropertyValue('--role').trim().startsWith('#')),'speech has a role colour');
- await page.waitForSelector('.narration-caption b',{timeout:60000});
- assert.ok(await page.getByRole('button',{name:/Пауза озвучки|Слушать главу/}).first().isVisible(),'top-bar listen control');
+ assert.equal(await page.locator('.narration-caption').count(),0,'no subtitles over the text');
+ assert.ok(await page.locator('.reader-rail').getByRole('button',{name:/Пауза озвучки|Слушать главу/}).isVisible(),'listen control in the rail');
  // Stressed text reaches the synthesizer (the caption shows the spoken row).
- await page.waitForFunction(()=>/́/.test(document.querySelector('.narration-caption span')?.textContent||''),null,{timeout:120000});
  await page.waitForSelector('.ranobe-prose .role-name i',{timeout:60000});
  assert.ok((await page.locator('.ranobe-prose .role-name i').allInnerTexts()).some(t=>/сердито|умоляюще/.test(t)),'emotion chips from the chapter pass');
  await page.getByRole('button',{name:'Роли и голоса'}).click();
