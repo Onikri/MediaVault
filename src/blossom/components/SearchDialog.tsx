@@ -26,15 +26,21 @@ function coordinates(){
  const target=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();
  const innerElement=document.querySelector<HTMLElement>('.blossom-navbar .header-inner'),inner=innerElement?.getBoundingClientRect();
  const total=inner?.width??window.innerWidth;
- let width:number;
- if(window.innerWidth<=640)width=total-20;
- else{
-  // The field grows into whatever the brand/nav and the action icons leave free,
-  // so the search (and its filters) use the wide header instead of a fixed 340px.
-  const brand=innerElement?.querySelector<HTMLElement>('.header-brand-area')?.scrollWidth??0,actions=innerElement?.querySelector<HTMLElement>('.header-actions')?.scrollWidth??0;
-  width=Math.max(MIN_WIDTH,Math.min(MAX_WIDTH,total-2*Math.max(brand,actions)-48));
+ let width:number,left:number;
+ const actionsElement=innerElement?.querySelector<HTMLElement>('.header-actions');
+ if(window.innerWidth<=640){width=total-20;left=(total-width)/2;}
+ else if(target?.width&&actionsElement&&inner){
+  // The search sits on the right, beside the action icons: the field grows
+  // leftwards from its button into what the brand leaves free (the sections
+  // step aside while it is open), and closes back into the button.
+  const brand=innerElement?.querySelector<HTMLElement>('.header-brand-area'),brandRight=brand?brand.getBoundingClientRect().left-inner.left+brand.scrollWidth:0;
+  const slotRight=actionsElement.getBoundingClientRect().left-inner.left-6;
+  width=Math.max(MIN_WIDTH,Math.min(MAX_WIDTH,slotRight-brandRight-24));left=slotRight-width;
+ }else{
+  const brand=innerElement?.querySelector<HTMLElement>('.header-brand-area')?.scrollWidth??0,actions=actionsElement?.scrollWidth??0;
+  width=Math.max(MIN_WIDTH,Math.min(MAX_WIDTH,total-2*Math.max(brand,actions)-48));left=(total-width)/2;
  }
- const height=38,left=(total-width)/2;
+ const height=38;
  const top=inner?(inner.height-height)/2:(target?.top??18);
  return {width,left,top,height,anchorX:target?target.left+target.width/2-(inner?.left??0)-left-width/2:0,seedWidth:target?.width??38};
 }
