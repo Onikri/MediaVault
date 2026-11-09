@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readWatch,saveWatch,orderedVoices,variantsFor,onlineEpisodeId} from '../src/watch-session.js';
+import {readWatch,saveWatch,orderedVoices,variantsFor,episodeAlternatives,onlineEpisodeId} from '../src/watch-session.js';
 import {animeSeason,browseHref,browseRoute,voiceEpisodeCount} from '../src/anime-navigation.js';
 test('facet routes preserve Cyrillic labels and special studio characters without executable URLs',()=>{
  const href=browseHref('studio','','34','Studio & Name');assert.ok(href.startsWith('#'));
@@ -31,6 +31,14 @@ test('preference ordering uses observed personal choices without invented public
 test('source fallback keeps the chosen studio and exact episode',()=>{
  const voice={variants:[{id:'x',player:'Kodik',episodes:[{number:1}]},{id:'y',player:'Alloha',episodes:[{number:7}]},{id:'z',player:'Kodik',episodes:[{number:7}]}]};
  assert.deepEqual(variantsFor(voice,7,new Set(['y'])).map(v=>v.id),['z','x']);
+});
+
+test('alternatives match the requested season and episode and prefer the current language',()=>{
+ const track=(id,language,season,number,url='https://source.example/episode',kind='voice')=>({id,language,kind,variants:[{id,episodes:[{season,number,url}]}]});
+ const current=track('current','ru',2,3);
+ const voices=[current,track('uk','uk',2,3),track('ru','ru',2,3),track('wrong-season','ru',1,3),
+  track('wrong-episode','ru',2,4),track('unresolved','ru',2,3,''),track('subs','ru',2,3,undefined,'subtitles')];
+ assert.deepEqual(episodeAlternatives(voices,current,2,3).map(v=>v.voice.id),['ru','uk']);
 });
 
 import {bestQualityRow,qualityHeights,streamBufferPolicy,contiguousBufferEnd} from '../src/watch-quality.js';

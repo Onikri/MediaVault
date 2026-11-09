@@ -335,9 +335,10 @@ class NativeSession:
                 # Content-Range, which the proxy needs for native byte ranges.
                 result['headers'].update(self.response_headers.pop(result['url'], {}))
             except Exception as error:
-                if self.response_status.get(url) in {401, 403, 429}:
+                status = self.response_status.get(url)
+                if status in {401, 403, 429}:
                     raise SourceRefused('Source refused the browser media request') from None
-                raise SourceInvalid('Source browser request failed') from error
+                raise SourceInvalid('Source browser request failed', status=status) from error
         if result['status'] in {401, 403, 429}:
             raise SourceRefused(f'Source returned HTTP {result["status"]}')
         if not 200 <= result['status'] < 300:

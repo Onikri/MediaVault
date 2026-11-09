@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
-from source_parser import PublicHttp,Resolver,public_url,playback_headers,parse_page
+from source_parser import PublicHttp,Resolver,SourceError,public_url,playback_headers,parse_page
 from player_compat import KodikPlayer
 from anime_dl_core.errors import ExtractionError
 
@@ -74,6 +74,18 @@ class PlayerContractTests(unittest.TestCase):
         value=playback_headers({'Cookie':'private-google-fixture','Authorization':'Bearer private-fixture','Referer':'https://animego.org/'})
         self.assertNotIn('Cookie',value);self.assertNotIn('Authorization',value)
         self.assertEqual(value['Referer'],'https://animego.org/')
+
+    def test_collaps_origin_survives_a_second_header_validation(self):
+        embed = 'https://api.nextembed.ws/embed/movie/163'
+        first = playback_headers({'Referer': embed, 'Origin': embed})
+        self.assertEqual(playback_headers(first), first)
+        self.assertEqual(first['Origin'], 'https://api.nextembed.ws')
+        for value in ('https://api.nextembed.ws/', 'https://api.nextembed.ws/api/private',
+                      'https://api.unlisted.example/'):
+            with self.assertRaises(SourceError):
+                public_url(value, resolve_dns=False)
+        with self.assertRaises(SourceError):
+            playback_headers({'Origin': 'https://api.nextembed.ws/api/private'})
 
     def test_kodik_endpoint_handles_whitespace_quotes_and_rejects_ambiguous_or_foreign_paths(self):
         for script in ['url:atob("L2Z0b3I=")', '"url" : window.atob( "L2Z0b3I=" )', r'url:atob(\"L2Z0b3I=\")']:

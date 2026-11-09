@@ -20,6 +20,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import requests
 from anime_dl_core.http import DEFAULT_USER_AGENT
+from ua_players import COLLAPS_HOSTS
 
 
 class SourceError(RuntimeError):
@@ -103,7 +104,7 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         or host in {"anilibria.top", "aniliberty.top", "api.anilibria.app"}
         and bool(re.fullmatch(r"/api/v1/(?:anime/releases/[a-zA-Z0-9_-]+|app/search/releases)", url.path))
         # Collaps public embed (one film/serial page) and the Kinobox player balancer.
-        or host in {"api.nextembed.ws", "api.bhcesh.me", "api.namy.ws", "api.delivembd.ws"}
+        or host in COLLAPS_HOSTS
         and bool(re.fullmatch(r"/embed/(?:movie|kp|imdb)/[a-zA-Z0-9]{1,24}", url.path))
         or host == "fbphdplay.top" and url.path == "/api/players"
         # Ukrainian manga readers' public catalogues (Zenko).
@@ -126,6 +127,9 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
     return urlunsplit(("https", host, url.path or "/", url.query, ""))
 
 
+_COLLAPS_ORIGINS = frozenset(f"https://{host}" for host in COLLAPS_HOSTS)
+
+
 def playback_headers(headers=None):
     """Allow only public playback headers; never forward cookies or authorization."""
     result = {"User-Agent": USER_AGENT}
@@ -136,7 +140,10 @@ def playback_headers(headers=None):
         if not isinstance(value, str) or len(value) > 8192 or "\r" in value or "\n" in value:
             raise SourceError("Некорректный заголовок плеера.")
         if name in {"Referer", "Origin"}:
-            value = requests.utils.requote_uri(public_url(value, resolve_dns=False))
+            # Origin is sanitized again on every manifest/segment request.
+            # The bare Collaps origin is a header, never a request target.
+            collaps_origin = name == "Origin" and value.removesuffix("/") in _COLLAPS_ORIGINS
+            value = requests.utils.requote_uri(public_url(value, resolve_dns=False, allow_api=collaps_origin))
             if name == "Origin":
                 parsed = urlsplit(value)
                 value = f"{parsed.scheme}://{parsed.netloc}"

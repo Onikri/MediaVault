@@ -268,7 +268,7 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             current_choices.append(item)
         for value in current_choices:
             item=value if 'player' in value else choice(value['name'],value['url'],identity=value['id'],kind=value.get('kind',''))
-            item.setdefault('referer',url)
+            item.setdefault('referer', (referer or url) if is_alloha_player(url) else url)
             key=(item['url'],item['name'],item.get('kind'))
             if key not in choice_seen:choices.append(item);choice_seen.add(key)
         # Report direct/public single-player variants even when the page has no translation name.

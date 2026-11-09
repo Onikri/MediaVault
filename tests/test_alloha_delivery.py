@@ -156,6 +156,36 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(url.endswith('first.m4s') for url, _ in requests))
         self.assertEqual((await self.client.get('/play/'+data['id']+'/1/720.m3u8')).status_code, 200)
 
+    async def test_missing_quality_uses_same_audio_and_removes_failed_rendition(self):
+        original_fetch = Source.fetch
+
+        async def missing(self, url, byte_range):
+            if url == ORIGIN + '1-1080.m3u8':
+                raise SourceInvalid('Missing rendition', status=404)
+            return await original_fetch(self, url, byte_range)
+
+        body = SimpleNamespace(url=IFRAME, quality='1080', client_id='viewer')
+        with patch.object(Source, 'fetch', missing):
+            data = await self.service.prepare_online(body, 'owner')
+        session = self.service.sessions[data['id']]
+        self.assertEqual(session.active, '1')
+        self.assertEqual(session.online_quality, '720')
+        self.assertEqual(data['qualities'], [720])
+        self.assertFalse(self.profiles.unavailable_urls)
+        self.assertEqual(len(Source.opened), 1)
+
+    async def test_missing_secondary_rendition_does_not_hide_ready_primary(self):
+        original_fetch = Source.fetch
+
+        async def missing(self, url, byte_range):
+            if '/2-' in url:
+                raise SourceInvalid('Missing track', status=410)
+            return await original_fetch(self, url, byte_range)
+
+        with patch.object(Source, 'fetch', missing):
+            data = await self.resolve()
+        self.assertEqual([track['id'] for track in data['translations']], ['1'])
+
     async def test_contract_rewrites_every_resource_and_checks_actual_segments(self):
         data = await self.resolve()
         self.assertEqual(set(data), {'sid', 'active_id', 'skip', 'subtitles', 'translations'})
