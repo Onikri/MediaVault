@@ -1,0 +1,730 @@
+{
+ "data": {
+  "items": [
+   {
+    "id": 406148,
+    "type": "Series",
+    "year": 2006,
+    "title": {
+     "russian": "Тетрадь смерти",
+     "original": "Desu noto"
+    },
+    "genres": [
+     {
+      "id": 1750,
+      "name": "аниме",
+      "position": 1
+     },
+     {
+      "id": 14,
+      "name": "мультфильм",
+      "position": 2
+     },
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 3
+     },
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 4
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 5
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 6
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 7
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 463596,
+    "type": "Film",
+    "year": 2017,
+    "title": {
+     "russian": "Тетрадь смерти",
+     "original": "Death Note"
+    },
+    "genres": [
+     {
+      "id": 1,
+      "name": "ужасы",
+      "position": 1
+     },
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 2
+     },
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 3
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 4
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 5
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 6
+     }
+    ],
+    "countries": [
+     {
+      "id": 1,
+      "name": "США",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 257534,
+    "type": "Film",
+    "year": 2006,
+    "title": {
+     "russian": "Тетрадь смерти",
+     "original": "Death Note"
+    },
+    "genres": [
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 1
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 2
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 3
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 4
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 922144,
+    "type": "Series",
+    "year": 2015,
+    "title": {
+     "russian": "Тетрадь смерти",
+     "original": "Death Note: Desu nôto"
+    },
+    "genres": [
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 1
+     },
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 2
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 3
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 4
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 5
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 257649,
+    "type": "Film",
+    "year": 2006,
+    "title": {
+     "russian": "Тетрадь смерти 2",
+     "original": "Death Note: The Last Name"
+    },
+    "genres": [
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 1
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 2
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 3
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 4
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 803434,
+    "type": "Film",
+    "year": 2007,
+    "title": {
+     "russian": "Тетрадь смерти: Перезапись. Глазами Бога",
+     "original": "Death Note: R - Genshi Suru Kami"
+    },
+    "genres": [
+     {
+      "id": 1750,
+      "name": "аниме",
+      "position": 1
+     },
+     {
+      "id": 14,
+      "name": "мультфильм",
+      "position": 2
+     },
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 3
+     },
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 4
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 5
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 6
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 7
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 295065,
+    "type": "Film",
+    "year": 2008,
+    "title": {
+     "russian": "Тетрадь смерти 3",
+     "original": "L: Change the World"
+    },
+    "genres": [
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 1
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 2
+     },
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 3
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 968299,
+    "type": "Film",
+    "year": 2016,
+    "title": {
+     "russian": "Тетрадь смерти: Зажги новый мир",
+     "original": "Desu Noto Light up the NEW world"
+    },
+    "genres": [
+     {
+      "id": 2,
+      "name": "фантастика",
+      "position": 1
+     },
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 2
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 3
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 4
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 1038631,
+    "type": "Series",
+    "year": 2016,
+    "title": {
+     "russian": "Тетрадь смерти: Новое поколение",
+     "original": "Death Note - Desu nôto: New Generation"
+    },
+    "genres": [
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 1
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 2
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 3
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 811653,
+    "type": "Film",
+    "year": 2008,
+    "title": {
+     "russian": "Тетрадь смерти: Перезапись. Наследники L",
+     "original": "Death Note: R2 - L o Tsugu Mono"
+    },
+    "genres": [
+     {
+      "id": 1750,
+      "name": "аниме",
+      "position": 1
+     },
+     {
+      "id": 14,
+      "name": "мультфильм",
+      "position": 2
+     },
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 3
+     },
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 4
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 5
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 6
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 7
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 5055803,
+    "type": "Series",
+    "year": null,
+    "title": {
+     "russian": "Тетрадь смерти",
+     "original": "Death Note"
+    },
+    "genres": [
+     {
+      "id": 1,
+      "name": "ужасы",
+      "position": 1
+     },
+     {
+      "id": 5,
+      "name": "фэнтези",
+      "position": 2
+     },
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 3
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 4
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 5
+     }
+    ],
+    "countries": [
+     {
+      "id": 1,
+      "name": "США",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 1253941,
+    "type": "Film",
+    "year": 2019,
+    "title": {
+     "russian": "Здравствуй, мир",
+     "original": "Hello World"
+    },
+    "genres": [
+     {
+      "id": 1750,
+      "name": "аниме",
+      "position": 1
+     },
+     {
+      "id": 14,
+      "name": "мультфильм",
+      "position": 2
+     },
+     {
+      "id": 7,
+      "name": "мелодрама",
+      "position": 3
+     },
+     {
+      "id": 2,
+      "name": "фантастика",
+      "position": 4
+     }
+    ],
+    "countries": [
+     {
+      "id": 9,
+      "name": "Япония",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 696216,
+    "type": "Film",
+    "year": 2013,
+    "title": {
+     "russian": "Толстая тетрадь",
+     "original": "A nagy füzet"
+    },
+    "genres": [
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 1
+     },
+     {
+      "id": 19,
+      "name": "военный",
+      "position": 2
+     }
+    ],
+    "countries": [
+     {
+      "id": 49,
+      "name": "Венгрия",
+      "position": 1
+     },
+     {
+      "id": 3,
+      "name": "Германия",
+      "position": 2
+     },
+     {
+      "id": 57,
+      "name": "Австрия",
+      "position": 3
+     },
+     {
+      "id": 8,
+      "name": "Франция",
+      "position": 4
+     }
+    ]
+   },
+   {
+    "id": 54333,
+    "type": "Film",
+    "year": 1977,
+    "title": {
+     "russian": "Смерть негодяя",
+     "original": "Mort d'un pourri"
+    },
+    "genres": [
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 1
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 2
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 3
+     }
+    ],
+    "countries": [
+     {
+      "id": 8,
+      "name": "Франция",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 474993,
+    "type": "Film",
+    "year": 1969,
+    "title": {
+     "russian": "У Лукоморья",
+     "original": null
+    },
+    "genres": [
+     {
+      "id": 15,
+      "name": "короткометражка",
+      "position": 1
+     },
+     {
+      "id": 456,
+      "name": "детский",
+      "position": 2
+     }
+    ],
+    "countries": [
+     {
+      "id": 13,
+      "name": "СССР",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 469182,
+    "type": "Series",
+    "year": 2007,
+    "title": {
+     "russian": "Копье судьбы",
+     "original": "La lance de la destinée"
+    },
+    "genres": [
+     {
+      "id": 4,
+      "name": "триллер",
+      "position": 1
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 2
+     },
+     {
+      "id": 16,
+      "name": "криминал",
+      "position": 3
+     },
+     {
+      "id": 17,
+      "name": "детектив",
+      "position": 4
+     },
+     {
+      "id": 10,
+      "name": "приключения",
+      "position": 5
+     }
+    ],
+    "countries": [
+     {
+      "id": 8,
+      "name": "Франция",
+      "position": 1
+     },
+     {
+      "id": 3,
+      "name": "Германия",
+      "position": 2
+     },
+     {
+      "id": 41,
+      "name": "Бельгия",
+      "position": 3
+     }
+    ]
+   },
+   {
+    "id": 647160,
+    "type": "Film",
+    "year": 2009,
+    "title": {
+     "russian": "Смерть желтопузика",
+     "original": "Yellow Belly End"
+    },
+    "genres": [
+     {
+      "id": 14,
+      "name": "мультфильм",
+      "position": 1
+     },
+     {
+      "id": 15,
+      "name": "короткометражка",
+      "position": 2
+     }
+    ],
+    "countries": [
+     {
+      "id": 11,
+      "name": "Великобритания",
+      "position": 1
+     }
+    ]
+   },
+   {
+    "id": 66190,
+    "type": "Film",
+    "year": 1957,
+    "title": {
+     "russian": "Сокровище капитана Мартенса",
+     "original": "Skarb kapitana Martensa"
+    },
+    "genres": [
+     {
+      "id": 3,
+      "name": "боевик",
+      "position": 1
+     },
+     {
+      "id": 8,
+      "name": "драма",
+      "position": 2
+     }
+    ],
+    "countries": [
+     {
+      "id": 32,
+      "name": "Польша",
+      "position": 1
+     }
+    ]
+   }
+  ]
+ }
+}

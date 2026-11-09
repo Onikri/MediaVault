@@ -9,6 +9,10 @@ import source_discovery
 from player_catalog import choice
 
 class DiscoveryCompletenessTests(unittest.TestCase):
+    def setUp(self):
+        # Fixture titles must not reach the live Kinobox anime search.
+        guard=patch('kinobox_source.anime_kinopoisk',return_value=None);guard.start();self.addCleanup(guard.stop)
+
     def test_public_refresh_does_not_reuse_cached_alloha_inspection(self):
         selected={'title':'Refresh Alloha','kind':'anime'}
         key=repr((None,source_discovery.aliases(selected),None,'anime'))

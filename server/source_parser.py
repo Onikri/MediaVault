@@ -115,7 +115,7 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         # Collaps public embed (one film/serial page) and the Kinobox player balancer.
         or host in COLLAPS_HOSTS
         and bool(re.fullmatch(r"/embed/(?:movie|kp|imdb)/[a-zA-Z0-9]{1,24}", url.path))
-        or host == "fbphdplay.top" and url.path == "/api/players"
+        or host == "fbphdplay.top" and url.path in {"/api/players", "/api/movies/search"}
         # Ukrainian manga readers' public catalogues (Zenko).
         # Light-novel text APIs (RanobeHub, Smakolyky).
         or host == "ranobehub.org" and bool(re.fullmatch(r"/api/(?:search|books/\d{1,9}/chapters|chapters/\d{1,9})", url.path))

@@ -59,5 +59,49 @@ class KinoboxTests(unittest.TestCase):
     def test_without_ids_nothing_is_requested(self):
         self.assertEqual(kinobox_source.discover({'title':'X','kind':'movie','ids':{}})['status'],'no_match')
 
+    # Search answer captured 2026-11-09 for «Тетрадь смерти» (18 hits: the
+    # anime, live-action films, the 2015 drama, the anime film recap …).
+    def anime(self,**card):
+        search=(FIXTURES/'kinobox_search_death_note.json').read_text(encoding='utf-8');asked=[]
+        class SearchHttp(PublicHttp):
+            def document(self,value,**_):
+                asked.append(value)
+                if value.startswith(kinobox_source.SEARCH):return search,value,'application/json'
+                raise SourceError('offline fixture')
+        base={'title':'Тетрадь смерти','titles':{'en':'Death Note','ja':'デスノート'},'year':2006,'format':'TV','kind':'anime','ids':{'mal':'1535'}}
+        return kinobox_source.anime_kinopoisk({**base,**card},SearchHttp()),asked
+
+    def test_anime_card_gets_the_kinopoisk_id_only_for_the_anime_series(self):
+        found,asked=self.anime()
+        self.assertEqual(found,'406148')
+        self.assertEqual(len(asked),1,'the Russian title already matched')
+        self.assertIsNone(self.anime(format='Movie')[0],'no anime film of 2006 has this title')
+        self.assertIsNone(self.anime(year=2015)[0],'the 2015 series is live action')
+        self.assertIsNone(self.anime(year=None)[0])
+        self.assertIsNone(self.anime(title='Совсем другое',titles={})[0])
+
+    def test_two_matching_hits_mean_no_id(self):
+        import json
+        data=json.loads((FIXTURES/'kinobox_search_death_note.json').read_text(encoding='utf-8'))
+        twin=dict(next(r for r in data['data']['items'] if r['id']==406148),id=999)
+        data['data']['items'].append(twin)
+        class SearchHttp(PublicHttp):
+            def document(self,value,**_):return json.dumps(data),value,'application/json'
+        self.assertIsNone(kinobox_source.anime_kinopoisk({'title':'Тетрадь смерти','year':2006,'format':'TV','kind':'anime'},SearchHttp()))
+
+    def test_anime_discovery_asks_the_balancer_with_the_matched_id(self):
+        import alloha_profiles
+        search=(FIXTURES/'kinobox_search_death_note.json').read_text(encoding='utf-8');asked=[]
+        class Both(PublicHttp):
+            def document(self,value,**_):
+                asked.append(value)
+                if value.startswith(kinobox_source.SEARCH):return search,value,'application/json'
+                if value.startswith(kinobox_source.API):return '{"data":[]}',value,'application/json'
+                raise SourceError('offline fixture')
+        with patch.object(kinobox_source,'PublicHttp',lambda **_:Both()),patch.object(alloha_profiles,'playback_available',lambda *a:True):
+            value=kinobox_source.discover({'title':'Тетрадь смерти','year':2006,'format':'TV','kind':'anime','ids':{'mal':'1535'}})
+        self.assertIn(kinobox_source.API+'?kinopoisk=406148',asked)
+        self.assertEqual(value['status'],'no_match')
+
 
 if __name__=='__main__':unittest.main()

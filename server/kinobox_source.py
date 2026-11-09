@@ -16,6 +16,7 @@ from urllib.parse import urlencode
 from source_parser import PublicHttp, SourceError, SourceRateLimitError, public_url, is_alloha_player
 
 API = 'https://fbphdplay.top/api/players'
+SEARCH = 'https://fbphdplay.top/api/movies/search'
 _cache = {}
 _lock = threading.RLock()
 _api_lock = threading.Lock()
@@ -30,6 +31,54 @@ def _ids(selected):
     if re.fullmatch(r'tt\d{5,10}', imdb): query['imdb'] = imdb
     if re.fullmatch(r'\d{1,9}', kinopoisk): query['kinopoisk'] = kinopoisk
     return query
+
+
+def _search(query, http):
+    global _retry_at
+    with _api_lock:
+        if _retry_at > time.monotonic():
+            raise SourceError('Балансер Kinobox временно ограничил запросы. Проверяем другие источники.')
+        try:
+            text, _, _ = http.document(SEARCH + '?' + urlencode({'query': query}), headers={'Accept': 'application/json'})
+        except SourceRateLimitError as error:
+            _retry_at = time.monotonic() + error.retry_after
+            raise
+    try:
+        rows = (json.loads(text).get('data') or {}).get('items')
+    except (ValueError, AttributeError):
+        raise SourceError('Каталог Kinobox вернул неизвестный формат.') from None
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def anime_kinopoisk(selected, http):
+    """Kinopoisk ID for a MAL/Shikimori anime card, only on an unambiguous match.
+
+    Anime cards carry no IMDb/Kinopoisk ID, so Kinobox (Collaps, Alloha) would
+    never be asked. A Kinobox search hit counts only when it is marked «аниме»,
+    started the same year, has the same film/series type and one of its titles
+    equals one of the card's titles. Two different hits mean no ID at all.
+    """
+    from title_identity import aliases, normalized
+    names = aliases(selected)
+    wanted = {normalized(name) for name in names if len(normalized(name)) >= 2}
+    year = str(selected.get('year') or selected.get('startDate') or '')[:4]
+    if not wanted or not re.fullmatch(r'(?:19|20)\d\d', year):
+        return None
+    form = str(selected.get('format') or '').casefold()
+    kind = 'Film' if re.search(r'movie|фильм', form) else None if not form else 'Series'
+    queries = [next((n for n in names if re.search('[А-Яа-яЁё]', n)), None), next((n for n in names if re.search('[A-Za-z]', n)), None)]
+    found = {}
+    for query in dict.fromkeys(q for q in queries if q):
+        for row in _search(query[:160], http):
+            titles = row.get('title') or {}
+            genres = {str(g.get('name') or '').casefold() for g in row.get('genres') or [] if isinstance(g, dict)}
+            if ('аниме' in genres and str(row.get('year') or '') == year and (kind is None or row.get('type') == kind)
+                    and re.fullmatch(r'\d{1,12}', str(row.get('id') or ''))
+                    and {normalized(titles.get('russian')), normalized(titles.get('original'))} & wanted):
+                found[str(row['id'])] = row
+        if found:
+            break
+    return next(iter(found)) if len(found) == 1 else None
 
 
 def players(selected, http):
@@ -91,9 +140,33 @@ def inspect_player(row, kind, http):
     return None
 
 
+def aliases_key(selected):
+    from title_identity import aliases
+    return tuple(aliases(selected))
+
+
 def discover(selected):
     name = 'Kinobox · Alloha, Collaps'
     kind = selected.get('kind', 'anime')
+    if not _ids(selected) and kind == 'anime':
+        signature = hashlib.sha256(repr(('anime-kp', aliases_key(selected), selected.get('year'), selected.get('format'))).encode()).hexdigest()
+        with _lock:
+            cached = _cache.get(signature)
+        if cached and cached[0] > time.monotonic():
+            kinopoisk = cached[1]
+        else:
+            http = PublicHttp(timeout=(3, 8), deadline=time.monotonic() + 15)
+            try:
+                kinopoisk = anime_kinopoisk(selected, http)
+            except (SourceError, OSError):
+                kinopoisk = None
+            finally:
+                http.close()
+            with _lock:
+                if len(_cache) >= 100: _cache.pop(next(iter(_cache)))
+                _cache[signature] = (time.monotonic() + (86400 if kinopoisk else 3600), kinopoisk)
+        if kinopoisk:
+            selected = {**selected, 'ids': {**(selected.get('ids') or {}), 'kinopoisk': kinopoisk}}
     if not _ids(selected):
         return {'provider': 'kinobox', 'name': name, 'status': 'no_match', 'message': 'Нужен точный ID IMDb или Кинопоиска.', 'sources': [], 'complete': True}
     signature = hashlib.sha256(repr((_ids(selected), kind)).encode()).hexdigest()
