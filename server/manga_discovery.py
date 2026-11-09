@@ -11,6 +11,12 @@ import suwayomi_bridge as bridge
 
 LANGUAGES={'all',*bridge.LANGUAGES}
 DISCOVERY_VERSION=3
+# A source that failed its search twice in a row (challenge, login wall,
+# timeout, DNS, HTTP 5xx) is left out of ordinary searches for a growing
+# pause. It stays installed and listed with the reason; «Повторить поиск»
+# (refresh) or choosing it explicitly asks it at once. One failure never
+# removes a source: an empty answer or a single outage is not evidence.
+SEARCH_BACKOFF=(3600,6*3600,24*3600)
 NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'SlashLib':2,'MangaDex':0,'Senkognito':None}
 def language_queries(values,language):
     pattern={'ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[language]
@@ -211,6 +217,8 @@ class Discovery:
                 metadata TEXT NOT NULL,updated REAL NOT NULL);
               CREATE INDEX IF NOT EXISTS titles_source_name ON titles(source_id,title_norm);
               CREATE INDEX IF NOT EXISTS titles_language_name ON titles(language,title_norm);
+              CREATE TABLE IF NOT EXISTS reachability(source_id TEXT PRIMARY KEY,name TEXT NOT NULL,language TEXT NOT NULL,
+                failures INTEGER NOT NULL,code TEXT NOT NULL,message TEXT NOT NULL,last_ok REAL NOT NULL,last_fail REAL NOT NULL,skip_until REAL NOT NULL);
             ''')
             if self.db.execute('PRAGMA user_version').fetchone()[0]<1:
                 stale=[];sources=set()
@@ -285,6 +293,7 @@ class Discovery:
         now=self.clock()
         with self.condition,self.db:
             self._prune(now)
+            paused={} if refresh or source_ids else {r['source_id']:dict(r) for r in self.db.execute('SELECT * FROM reachability WHERE skip_until>?',(now,))}
             hit=self.db.execute("SELECT id FROM jobs WHERE owner=? AND signature=? AND (state='running' OR state='done' AND updated>? AND ?=0) AND expires>? ORDER BY created DESC LIMIT 1",(owner,signature,now-self.cache_ttl,int(bool(refresh)),now)).fetchone()
             if hit:return self._snapshot(owner,hit['id'])
             if self.db.execute("SELECT count(*) FROM jobs WHERE state='running'").fetchone()[0]>=self.max_jobs or self.db.execute("SELECT count(*) FROM jobs WHERE state='running' AND owner=?",(owner,)).fetchone()[0]>=self.per_owner:raise SearchLimit('Поиск уже выполняется. Дождись результата или останови предыдущий.')
@@ -295,7 +304,12 @@ class Discovery:
                 # A stale metadata index is useful immediately, but is not counted
                 # as a fresh provider response and never suppresses its refresh.
                 seed=self._indexed(key,sid) if not hit else json.loads(hit['results'])
-                self.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',(identity,sid,json.dumps(source,ensure_ascii=False),'done' if hit else 'queued',json.dumps(seed,ensure_ascii=False),int(bool(hit))))
+                pause=paused.get(sid) if not hit else None
+                self.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',(identity,sid,json.dumps(source,ensure_ascii=False),'done' if hit else 'skipped' if pause else 'queued',json.dumps([{**v,'stale':True} for v in seed] if pause else seed,ensure_ascii=False),int(bool(hit))))
+                if pause:
+                    until=time.strftime('%H:%M',time.gmtime(pause['skip_until']))
+                    self.db.execute('INSERT OR REPLACE INTO work_diagnostics VALUES(?,?,?)',(identity,sid,json.dumps({'code':'paused','reason':pause['code'],'failures':pause['failures'],'retryAt':pause['skip_until'],
+                        'message':f"Пропущен: {pause['failures']} отказа подряд ({pause['message'].rstrip('.')}). Снова спросим после {until} UTC или сразу по кнопке «Повторить».",'elapsedMs':0},ensure_ascii=False)))
             if selected and self.db.execute("SELECT count(*) FROM work WHERE job=? AND state='queued'",(identity,)).fetchone()[0]==0:self.db.execute("UPDATE jobs SET state='done' WHERE id=?",(identity,))
             self.condition.notify_all()
             return self._snapshot(owner,identity)
@@ -407,6 +421,7 @@ class Discovery:
                     expected=json.loads(latest['source']).get('_alias_title')
                     if expected and not any(match_title(expected,v)[0] for v in values):state='queued'
                 encoded=json.dumps(values,ensure_ascii=False)
+                if state in {'done','unavailable'}:self._reachability(json.loads(row['source']),row['source_id'],state=='done',details,now)
                 self.db.execute('UPDATE work SET state=?,results=? WHERE job=? AND source_id=?',(state,encoded,row['job'],row['source_id']))
                 if state!='queued':self.db.execute('INSERT OR REPLACE INTO work_diagnostics VALUES(?,?,?)',(row['job'],row['source_id'],json.dumps(details,ensure_ascii=False)))
                 # Failed upstream requests are not persisted as successful empty
@@ -417,6 +432,17 @@ class Discovery:
                 remaining=self.db.execute("SELECT count(*) FROM work WHERE job=? AND state IN ('queued','running')",(row['job'],)).fetchone()[0]
                 self.db.execute('UPDATE jobs SET updated=?,state=? WHERE id=?',(now,'running' if remaining else 'done',row['job']))
                 self.condition.notify_all()
+
+    def _reachability(self,source,sid,ok,details,now):
+        old=self.db.execute('SELECT failures,last_ok FROM reachability WHERE source_id=?',(sid,)).fetchone()
+        failures=0 if ok else (old['failures'] if old else 0)+1
+        pause=SEARCH_BACKOFF[min(failures-2,len(SEARCH_BACKOFF)-1)] if failures>=2 else 0
+        self.db.execute('INSERT OR REPLACE INTO reachability VALUES(?,?,?,?,?,?,?,?,?)',(sid,str(source.get('name',''))[:120],str(source.get('lang',''))[:8],failures,
+            '' if ok else str(details.get('code','source'))[:40],'' if ok else str(details.get('message',''))[:300],now if ok else (old['last_ok'] if old else 0),0 if ok else now,now+pause if pause else 0))
+
+    def reachability(self):
+        with self.lock:
+            return [dict(r) for r in self.db.execute('SELECT * FROM reachability WHERE failures>0 ORDER BY language,name')]
 
     def close(self):
         with self.condition:self.stopping=True;self.condition.notify_all()

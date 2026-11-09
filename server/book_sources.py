@@ -33,6 +33,8 @@ USER_AGENT = "MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal cat
 GUTENBERG = "https://www.gutenberg.org"
 WIKISOURCE = {"ru": "Викитека", "uk": "Вікіджерела", "en": "Wikisource", "ja": "ウィキソース", "ko": "위키문헌"}
 HOSTS = {"www.gutenberg.org", *(code + ".wikisource.org" for code in WIKISOURCE)}
+# Catalogue hosts asked only for the original title of a work (never texts).
+TITLE_HOSTS = {"openlibrary.org", "api.fantlab.ru"}
 MAX_BYTES = 24 * 1024 * 1024
 MAX_CHAPTERS = 3000
 MAX_PARAGRAPHS = 4000
@@ -65,7 +67,7 @@ def _get(url, *, params=None, accept="application/json"):
     try:
         for _ in range(5):
             parts = urlsplit(url)
-            if parts.scheme != "https" or parts.netloc not in HOSTS:
+            if parts.scheme != "https" or parts.netloc not in HOSTS | TITLE_HOSTS:
                 raise SourceError("Этот адрес не относится к библиотекам книг.")
             with requests.get(url, params=params, headers=headers, timeout=(5, 15), stream=True, allow_redirects=False) as response:
                 if response.is_redirect:
@@ -96,15 +98,20 @@ def _norm(value):
 
 
 def _aliases(title):
-    values = [title.get("title"), *(title.get("titles") or {}).values(), *(title.get("aliases") or [])]
+    values = [title.get("title"), *(title.get("titles") or {}).values(), *(title.get("aliases") or []), *(title.get("_original") or [])]
     result = []
     for value in values:
         value = " ".join(str(value or "").split())[:200]
+        variants = [value, re.split(r"[:.(]", value)[0].strip()]
+        if "&" in value:
+            # "Гордость & предубеждение" is filed as "Гордость и предубеждение".
+            word = "и" if re.search(r"[а-яёіїєґ]", value, re.I) else "and"
+            variants.insert(0, re.sub(r"\s*&\s*", f" {word} ", value))
         # "Title: subtitle" — the main title is what libraries file it under.
-        for variant in (value, re.split(r"[:.(]", value)[0].strip()):
+        for variant in variants:
             if len(_norm(variant)) >= 2 and variant not in result:
                 result.append(variant)
-    return result[:6]
+    return result[:8]
 
 
 def _surnames(title):
@@ -140,7 +147,8 @@ def _gutenberg_formats(identity):
 def _gutenberg_search(title, languages):
     """Gutenberg's own OPDS search (fast); "l.xx" limits the language."""
     aliases, surnames, results = _aliases(title), _surnames(title), []
-    for alias in aliases[:3]:
+    # Gutenberg files most books under their Latin-script title.
+    for alias in sorted(aliases, key=lambda a: not re.search(r"[a-z]", a, re.I))[:3]:
         query = alias + (" l." + languages[0] if len(languages) == 1 else "")
         text = _get(GUTENBERG + "/ebooks/search.opds/", params={"query": query}, accept="application/atom+xml")
         with warnings.catch_warnings():
@@ -226,7 +234,34 @@ def _wikisource_search(title, language):
     return results[:4]
 
 
+def _original_titles(title):
+    """Original (Latin-script) title of a catalogue work that arrived only with
+    its Russian or Ukrainian name: Open Library and Fantlab know it by id."""
+    if any(re.search(r"[a-z]", a, re.I) for a in _aliases(title)):
+        return []
+    ids, found = title.get("ids") or {}, []
+    library, fantlab = str(ids.get("openlibrary") or ""), str(ids.get("fantlab") or "")
+
+    def lookup(kind, identity):
+        def load():
+            try:
+                if kind == "openlibrary":
+                    return str(json.loads(_get(f"https://openlibrary.org/works/{identity}.json")).get("title") or "")[:200]
+                return str(json.loads(_get(f"https://api.fantlab.ru/work/{identity}")).get("work_name_orig") or "")[:200]
+            except (SourceError, ValueError, AttributeError):
+                return ""
+        return _remember(("original", kind, identity), 24 * 3600, load)
+
+    if re.fullmatch(r"OL\d{1,12}W", library):
+        found.append(lookup("openlibrary", library))
+    if re.fullmatch(r"\d{1,9}", fantlab) and not any(found):
+        found.append(lookup("fantlab", fantlab))
+    return [value for value in found if value]
+
+
 def search(title, language="all"):
+    if isinstance(title, dict) and "_original" not in title:
+        title = {**title, "_original": _original_titles(title)}
     if not isinstance(title, dict) or not _aliases(title):
         raise SourceError("Выбери конкретную книгу из каталога.")
     if language not in {"all", *WIKISOURCE}:
@@ -256,7 +291,14 @@ def search(title, language="all"):
                 "providers": [{k: p[k] for k in ("provider", "name", "language", "status", "message")} for p in providers],
                 "language": language, "checkedAt": int(time.time())}
 
-    return _remember(key, 600, make)
+    found = _remember(key, 600, make)
+    if language != "all" and not found["results"]:
+        # No free text in the reader's language: offer the original edition
+        # instead of an empty shelf (the reader shows its language).
+        wider = search(title, "all")
+        if wider["results"]:
+            return {**wider, "language": language, "fallback": "all", "providers": found["providers"] + wider["providers"]}
+    return found
 
 
 # ------------------------------------------------------------ text
@@ -271,6 +313,8 @@ def _chapters_from_html(html, *, drop=()):
     for node in soup.select("script,style,noscript,table,img,figure,sup.reference,.reference,ol.references,.mw-references-wrap,"
                             ".ws-noexport,.noprint,.caption,.pagenum,.pageno,.ws-pagenum,.pg-boilerplate,#pg-header,#pg-footer,#pg-machine-header,.toc,pre," + ",".join(drop or ["x-none"])):
         node.decompose()
+    for node in soup.find_all("br"):
+        node.replace_with(" ")
     body = soup.body or soup
     chapters, pending = [], ""
     wanted = {"h1", "h2", "h3", "h4", "p", "blockquote", "center"}
@@ -279,7 +323,9 @@ def _chapters_from_html(html, *, drop=()):
             node.name = "h3"
         if node.name in {"p", "blockquote", "center"} and node.find_parent(["p", "blockquote", "center"]):
             continue
-        text = re.sub(r"\{[ivxlcdm\d]+\}", " ", _clean(node.get_text(" ")), flags=re.I).strip()
+        # Inline markup is joined as written: a drop cap "<span>I</span>t is"
+        # stays "It is" (line breaks were turned into spaces above).
+        text = re.sub(r"\{[ivxlcdm\d]+\}", " ", _clean(node.get_text("")), flags=re.I).strip()
         if not text or re.fullmatch(r"[*\-_=·.—–\s]{3,}", text):
             continue
         if node.name == "h1":

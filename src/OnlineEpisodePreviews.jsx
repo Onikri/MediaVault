@@ -1,3 +1,4 @@
+import {prepareOnline,releaseOnline,onlineMediaUrl} from './collaps-direct.js';
 import {useEffect,useRef} from 'react';
 import {captureEpisodePreview,readEpisodePreview} from './episode-preview-cache.js';
 import {episodePreviewKey,isShortEpisodeClip} from './watch-session.js';
@@ -39,12 +40,12 @@ export default function OnlineEpisodePreviews({entries,active,service,sourceUrl,
    const cached=await readEpisodePreview(key);if(cached){publish.current(entry.number,cached);continue;}
    let lease;
    try{
-    const data=await service.request('/online/prepare',{method:'POST',body:{url:entry.url,referer:sourceUrl,kind:'video',quality:'360',clientId:client.current+'-'+index,...(Number(service.session?.serverVersion)>=49?{purpose:'preview'}:{})},signal:abort.signal});lease=data.id;
+    const data=await prepareOnline(service,{url:entry.url,referer:sourceUrl,kind:'video',quality:'360',clientId:client.current+'-'+index,...(Number(service.session?.serverVersion)>=49?{purpose:'preview'}:{})},{signal:abort.signal});lease=data;
     if(abort.signal.aborted)continue;
-    const image=await frame(service.server.replace(/\/$/,'')+data.url,data.type,abort.signal,false,undefined,minimumDuration);
+    const image=await frame(onlineMediaUrl(service,data),data.type,abort.signal,false,undefined,minimumDuration);
     if(image&&!abort.signal.aborted)publish.current(entry.number,image);
    }catch{if(abort.signal.aborted)return;}
-   finally{if(lease)service.request('/online/'+lease,{method:'DELETE',keepalive:true}).catch(()=>{});}
+   finally{if(lease)releaseOnline(service,lease);}
   }}await Promise.all([lane(0),lane(1)]);})();
   return()=>abort.abort();
  },[entries,active,sourceUrl,sourceId,identity,season,userId,service.server,minimumDuration]);

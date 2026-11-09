@@ -67,7 +67,10 @@ if expected_version>=51:
     execute(['docker','run','--rm','--network','none','--entrypoint','python',image,'-c','import api; assert api.health()["mangaTranslationExport"]'])
 override=work/('release-'+revision[:12]+'.yaml')
 if override.exists():raise SystemExit('Release override already exists. Inspect the previous attempt before retrying.')
-override.write_text('services:\n  importer:\n    image: '+image+'\n')
+# systemd-resolved's stub on the VM drops DNAME answers (CDN hosts behind
+# interkh.com and similar), so Docker's embedded DNS forwards to the Oracle VCN
+# resolver directly, with a public resolver as a fallback.
+override.write_text('services:\n  importer:\n    image: '+image+'\n    dns: [169.254.169.254, 1.1.1.1]\n')
 updated=[*base,'-f',str(override)]
 maintenance=work/('maintenance-'+revision[:12]+'.yaml')
 maintenance.write_text('services:\n  importer:\n    environment:\n      MEDIA_VAULT_DISABLE_WORKER: "1"\n')

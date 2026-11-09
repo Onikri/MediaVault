@@ -100,6 +100,29 @@ class Search(unittest.TestCase):
         self.assertEqual({p['status'] for p in value['providers']}, {'unavailable'})
         self.assertEqual([p['provider'] for p in value['providers']], ['gutenberg', 'wikisource-ru'])
 
+    def test_reader_language_without_text_offers_the_original_edition(self):
+        import json
+        bs._cache.clear()
+        calls = []
+        def fake(url, *, params=None, accept=''):
+            calls.append((url, params))
+            if url.startswith('https://openlibrary.org/works/'):
+                return json.dumps({'title': 'Pride and Prejudice'})
+            if 'gutenberg' in url:
+                return OPDS if 'l.' not in params['query'] and 'Pride' in params['query'] else '<feed></feed>'
+            return json.dumps({'query': {'search': []}})
+        bs._get = fake
+        # A card known only by its Russian name ("&" as written on the cover).
+        value = bs.search({'title': 'Гордость & предубеждение', 'ids': {'openlibrary': 'OL66554W'}, 'kind': 'book'}, 'ru')
+        self.assertEqual(value['fallback'], 'all')
+        self.assertEqual([r['url'] for r in value['results']][:1], ['https://www.gutenberg.org/ebooks/1342'])
+        self.assertIn('Гордость и предубеждение', bs._aliases({'title': 'Гордость & предубеждение'}))
+        self.assertTrue(any(u == 'https://openlibrary.org/works/OL66554W.json' for u, _ in calls))
+
+    def test_inline_drop_cap_stays_inside_its_word(self):
+        rows = bs._chapters_from_html('<h2>Chapter I.</h2><p><span class="dropcap">I</span>t is a truth.<br>Next line.</p>')
+        self.assertEqual(rows[0]['paragraphs'], ['It is a truth. Next line.'])
+
     def test_english_wikisource_filters_indices_without_dropping_editions(self):
         def fake(url, *, params, **kwargs):
             self.assertIn('-incategory:"Versions pages"', params['srsearch'])

@@ -43,7 +43,7 @@ export default function RanobeSources({item,service,state}){
   setSearch({loading:true,error:'',results:[],providers:[]});setSource(null);setOpened(null);setBusy(false);setError('');
   searchRanobe(service,item,language,{signal:abort.signal}).then(data=>{
    if(abort.signal.aborted)return;
-   setSearch({loading:false,error:'',results:data.results||[],providers:data.providers||[]});
+   setSearch({loading:false,error:'',results:data.results||[],providers:data.providers||[],fallback:data.fallback==='all'});
    const saved=(data.results||[]).find(r=>ranobeProgress(userId,r.url));
    if(saved||data.results?.length)choose(saved||data.results[0]);
   }).catch(e=>{if(!abort.signal.aborted)setSearch({loading:false,error:e.message||'Источники не ответили.',results:[],providers:[]});});
@@ -77,8 +77,8 @@ export default function RanobeSources({item,service,state}){
   {search.loading?<p className="discovery-status" role="status"><span className="loading-ring"/>{isBook?'Ищем полный текст в библиотеках…':'Ищем доступные издания и переводы…'}</p>
   :search.error?<p className="inline-error" role="alert">{search.error}</p>
   :!search.results.length?<p className="fine">{isBook?'Свободный текст книги пока не найден':'Доступное издание пока не найдено'}.{search.providers.some(p=>p.status==='unavailable')?' Часть источников не ответила.':''} Можно открыть свой файл ниже.</p>
-  :<div className="manga-source-list ranobe-source-list">{search.results.map(row=><button type="button" key={row.url} aria-pressed={source?.url===row.url} disabled={busy} onClick={()=>choose(row)}>
-   <span className="manga-source-icon"><BookOpen size={18}/></span><span><strong>{row.providerName}</strong><small translate="no">{row.title}{row.translator?' · '+row.translator:''}</small></span><em>{providerLanguage(row.language)}</em>{source?.url===row.url?<Check size={16}/>:<ArrowRight size={15}/>}</button>)}</div>}
+  :<>{search.fallback&&<p className="fine">{isBook?'На выбранном языке свободного текста нет — ниже издания на других языках, обычно на языке оригинала.':'На выбранном языке перевода нет — ниже издания на других языках.'}</p>}<div className="manga-source-list ranobe-source-list">{search.results.map(row=><button type="button" key={row.url} aria-pressed={source?.url===row.url} disabled={busy} onClick={()=>choose(row)}>
+   <span className="manga-source-icon"><BookOpen size={18}/></span><span><strong>{row.providerName}</strong><small translate="no">{row.title}{row.translator?' · '+row.translator:''}</small></span><em>{providerLanguage(row.language)}</em>{source?.url===row.url?<Check size={16}/>:<ArrowRight size={15}/>}</button>)}</div></>}
   {busy&&<p className="discovery-status" role="status"><span className="loading-ring"/>{isBook?'Готовим книгу и оглавление…':'Загружаем главы…'}</p>}
   {error&&<p className="inline-error" role="alert">{error}</p>}
   {opened&&<div className="ranobe-book">

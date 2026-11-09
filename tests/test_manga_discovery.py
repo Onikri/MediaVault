@@ -192,6 +192,26 @@ class MangaDiscoveryTests(unittest.TestCase):
     cancelled=manager.cancel('A',first['id']);self.assertEqual(cancelled['state'],'cancelled')
     gate.set();wait_done(manager,'B',second['id']);self.assertEqual(manager.status('A',first['id'])['state'],'cancelled')
     self.assertLessEqual(calls.count('1'),2)
+ def test_repeated_search_failures_pause_a_source_with_reason_until_refresh(self):
+    sources=[{'id':'1','name':'Walled','lang':'ru'},{'id':'2','name':'Open','lang':'ru'}];calls=[];fail={'1'};now=[1000.0]
+    def fetch(source,query):
+        calls.append(source['id'])
+        if source['id'] in fail:raise discovery.bridge.bridge_error(403,'cloudflare challenge')
+        return fixture(source,query)
+    with patch.object(discovery,'installed_sources',return_value=sources):
+        manager=self.manager(fetch=fetch,workers=1,cache_ttl=0,clock=lambda:now[0])
+        for query in ('Первый','Второй'):wait_done(manager,'A',manager.start('A',query)['id']);now[0]+=1
+        self.assertEqual(calls.count('1'),2)
+        paused=wait_done(manager,'A',manager.start('A','Третий')['id'])
+        self.assertEqual(calls.count('1'),2)  # not contacted while paused
+        row={p['id']:p for p in paused['providers']}['1']
+        self.assertEqual((row['state'],row['code'],row['failures']),('skipped','paused',2));self.assertIn('Повторить',row['message'])
+        self.assertEqual(paused['progress']['completed'],2)
+        # One failure alone never pauses; a refresh asks at once and success clears the pause.
+        fail.clear();wait_done(manager,'A',manager.start('A','Третий',refresh=True)['id'])
+        self.assertEqual(calls.count('1'),3);self.assertEqual(manager.reachability(),[])
+        fail.add('1');now[0]+=1;wait_done(manager,'A',manager.start('A','Четвёртый')['id'])
+        self.assertEqual(manager.reachability()[0]['skip_until'],0)
  def test_upstream_failures_are_reported_separately_and_queries_are_sql_parameters(self):
     def fetch(s,q):
         if s['id']=='2':raise SourceError('secret upstream details')

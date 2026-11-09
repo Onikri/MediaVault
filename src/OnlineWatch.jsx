@@ -9,6 +9,7 @@ import {SourceBadges,sourceOf,sourcesOfVoice} from './source-badges.jsx';
 import PlaybackReveal from './PlaybackReveal.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import OnlineViewer from './OnlineViewer.jsx';
+import {prepareOnline,releaseOnline,onlineMediaUrl} from './collaps-direct.js';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import OnlineEpisodePreviews from './OnlineEpisodePreviews.jsx';
 import {readSceneJump,consumeSceneJump} from './scene-search.js';
@@ -156,16 +157,16 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
    if(!id)return;const group=voices.find(v=>v.id===id);if(!group)throw Error('Сохранённая дорожка пока недоступна.');
    const value=await resolve(group,episode,abort.signal,new Set()),entry=value.entries.find(e=>Number(e.number)===Number(episode));
    if(!entry)throw Error('Дорожка для этой серии не опубликована.');
-   const data=await service.request('/online/prepare',{method:'POST',body:{url:entry.url,referer:value.variant.sourceUrl,kind:'video',quality:'best',clientId:trackClient.current+':'+mode},signal:abort.signal});
-   if(closed){service.request('/online/'+data.id,{method:'DELETE',keepalive:true}).catch(()=>{});return;}
-   leases.push(data.id);
-   if(mode==='audio')setAudio({url:service.server.replace(/\/$/,'')+data.url,type:data.type,name:group.name});
+   const data=await prepareOnline(service,{url:entry.url,referer:value.variant.sourceUrl,kind:'video',quality:'best',clientId:trackClient.current+':'+mode},{signal:abort.signal});
+   if(closed){releaseOnline(service,data);return;}
+   leases.push(data);
+   if(mode==='audio')setAudio({url:onlineMediaUrl(service,data),type:data.type,name:group.name});
    else if(data.subtitles?.length)setCaptions(data.subtitles.map(t=>({...t,url:service.server.replace(/\/$/,'')+t.url})));
-   else {leases.splice(leases.indexOf(data.id),1);service.request('/online/'+data.id,{method:'DELETE',keepalive:true}).catch(()=>{});throw Error('У этой версии субтитры вшиты в изображение. Отдельная дорожка не опубликована; можно загрузить SRT/VTT.');}
+   else {leases.splice(leases.indexOf(data),1);releaseOnline(service,data);throw Error('У этой версии субтитры вшиты в изображение. Отдельная дорожка не опубликована; можно загрузить SRT/VTT.');}
   };
   Promise.allSettled([prepare(effectiveAudioId,'audio'),prepare(subtitleId,'captions')]).then(results=>{if(!closed){const rejected=results.find(v=>v.status==='rejected');if(rejected)setTrackError(rejected.reason.message);setTrackBusy(false);}});
-  const timer=setInterval(()=>leases.forEach(id=>service.request('/online/'+id+'/heartbeat',{method:'POST'}).catch(()=>{})),35000);
-  return()=>{closed=true;abort.abort();clearInterval(timer);leases.forEach(id=>service.request('/online/'+id,{method:'DELETE',keepalive:true}).catch(()=>{}));};
+  const timer=setInterval(()=>leases.forEach(data=>{if(!data.direct)service.request('/online/'+data.id+'/heartbeat',{method:'POST'}).catch(()=>{});}),35000);
+  return()=>{closed=true;abort.abort();clearInterval(timer);leases.forEach(data=>releaseOnline(service,data));};
  },[effectiveAudioId,subtitleId,episode,season,playing,service.server]);
  const current=viewEntries.find(e=>Number(e.number)===Number(episode))||viewEntries[0];
  // Browsing another season is metadata work; it never mutates the active session.
