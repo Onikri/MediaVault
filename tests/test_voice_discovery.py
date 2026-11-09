@@ -47,6 +47,26 @@ class PlayerCatalogTests(unittest.TestCase):
         self.assertIn('translation=10',second['episodes'][0]['url'])
         with self.assertRaises(SourceError):inspect_catalog(url,text,url,Http({}),dub_url=choices[0]['url'].replace('translation=10','translation=99'),season=2)
 
+    def test_alloha_inspection_uses_referer_and_reads_array_season(self):
+        from site_adapters import inspect_source
+        url = 'https://theatre.stravers.live/?token_movie=fixture&token=public'
+        ru = {'id_translation': 34, 'translation': 'LostFilm'}
+        uk = {'id_translation': 154, 'translation': 'Украинский'}
+        original = {'id_translation': 93, 'translation': 'Оригинальный'}
+        table = {'all': {'1': {'1': {'a': ru}}, '2': [{}, {'a': ru, 'b': uk}, [uk, uk, original]]}}
+        text = "<script>const fileList = JSON.parse('" + json.dumps(table) + "');</script>"
+        http = Http({url: text})
+        data = inspect_source(url, http=http, kind='tv', season=2)
+        self.assertEqual(http.calls[0], (url, {'headers': {'Referer': url}}))
+        self.assertEqual([s['number'] for s in data['seasons']], [1, 2])
+        dubs = {dub['name']: dub for dub in data['dubs']}
+        self.assertEqual(dubs['LostFilm']['language'], 'ru')
+        self.assertEqual(dubs['Украинский']['language'], 'uk')
+        self.assertEqual(dubs['Оригинальный']['language'], 'und')
+        selected = inspect_source(url, http=http, kind='tv', season=2, dub_url=dubs['Украинский']['url'])
+        self.assertEqual([(e['season'], e['number']) for e in selected['episodes']], [(2, 1), (2, 2)])
+        self.assertIn('season=2&episode=2&translation=154', selected['episodes'][1]['url'])
+
     def test_parser_retains_two_translations_of_one_episode(self):
         page=parse_page('<a href="/episode-1?translation=1">1 серия</a><a href="/episode-1?translation=2">1 серия</a>','https://example.com/show')
         self.assertEqual(len(page.episodes),2)

@@ -43,13 +43,13 @@ def players(selected, http):
     return [r for r in rows if isinstance(r, dict)]
 
 
-def _movie_alloha(row, kind):
-    from player_catalog import choice, voice_language
+def _movie_alloha(row):
+    from player_catalog import alloha_voice_language, choice
     result = []
     for item in row.get('translations') or []:
         if not isinstance(item, dict) or not item.get('name') or not item.get('iframeUrl'): continue
         name = ' '.join(str(item['name']).split())[:120]
-        language = 'en' if re.search(r'оригинал|original', name, re.I) else voice_language(name, 'ru')
+        language = alloha_voice_language(name)
         try:
             url = public_url(item['iframeUrl'], resolve_dns=False)
         except SourceError:
@@ -74,10 +74,9 @@ def inspect_player(row, kind, http):
         return {'url': iframe, 'player': 'Collaps', 'dubs': collaps_choices(iframe, text)}
     if kind_name.casefold() == 'alloha' and is_alloha_player(iframe):
         if kind == 'movie':
-            return {'url': iframe, 'player': 'Alloha', 'dubs': _movie_alloha(row, kind)}
+            return {'url': iframe, 'player': 'Alloha', 'dubs': _movie_alloha(row)}
         text, final, _ = http.document(iframe, headers={'Referer': iframe})
         dubs, seasons = alloha_choices(text, final)
-        if not dubs: dubs = _movie_alloha(row, kind)
         return {'url': iframe, 'player': 'Alloha', 'dubs': dubs, 'seasons': seasons}
     return None
 

@@ -42,6 +42,12 @@ def voice_language(name, current='und'):
     return current or 'und'
 
 
+def alloha_voice_language(name):
+    if re.search(r'оригинал|original', name, re.I):
+        return 'und'
+    return voice_language(name, 'ru')
+
+
 def translation_kind(name, explicit=''):
     text=str(explicit or name).casefold()
     return 'subtitles' if re.search(r'subtitle|субтит|\bsubs?\b',text) else 'voice'
@@ -81,23 +87,38 @@ def alloha_choices(text,base,*,season=None):
                 if not isinstance(row,dict) or not isinstance(row.get('id_translation'),int) or not row.get('translation'):continue
                 identity=str(row['id_translation']);label=str(row['translation'])[:120]
                 target=urlunsplit(parts._replace(query=urlencode({**params,'translation':identity}),fragment=''))
-                language='uk' if re.search(r'украин|укр\.',label,re.I) else 'und'
+                language=alloha_voice_language(label)
                 groups.setdefault(identity,choice(label,target,identity='alloha:'+identity,player='Alloha',language=language,
                     episodes=[{'number':1,'season':1,'url':target,'title':'Фильм'}]))
         return list(groups.values()),[]
     def url(season,episode,translation):
         return urlunsplit(parts._replace(query=urlencode({**params,'season':season,'episode':episode,'translation':translation}),fragment=''))
-    for season,episodes in (data.get('all') or {}).items():
-        if not str(season).isdigit() or not isinstance(episodes,dict):continue
-        seasons.append({'number':int(season),'name':'Сезон '+str(season),'url':None})
-        if selected and selected!=str(season):continue
-        for number,variants in episodes.items():
-            if not str(number).isdigit() or not isinstance(variants,dict):continue
-            for row in variants.values():
-                if not isinstance(row,dict) or not isinstance(row.get('id_translation'),int) or not row.get('translation'):continue
-                identity=str(row['id_translation']);entry={'number':int(number),'season':int(season),'url':url(season,number,identity),'title':'Серия '+str(number)}
-                group=groups.setdefault(identity,{'name':str(row['translation'])[:120],'entries':[]});group['entries'].append(entry)
-    return [choice(v['name'],v['entries'][0]['url'],identity='alloha:'+key,player='Alloha',language='ru',episodes=v['entries']) for key,v in groups.items()],seasons
+    for season, episodes in (data.get('all') or {}).items():
+        if not str(season).isdigit() or not isinstance(episodes, (dict, list)):
+            continue
+        seasons.append({'number': int(season), 'name': 'Сезон ' + str(season), 'url': None})
+        if selected and selected != str(season):
+            continue
+        entries = episodes.items() if isinstance(episodes, dict) else enumerate(episodes)
+        for number, variants in entries:
+            if not str(number).isdigit() or not isinstance(variants, (dict, list)):
+                continue
+            rows = variants.values() if isinstance(variants, dict) else variants
+            for row in rows:
+                if not isinstance(row, dict) or not isinstance(row.get('id_translation'), int) or not row.get('translation'):
+                    continue
+                identity = str(row['id_translation'])
+                entry = {'number': int(number), 'season': int(season), 'url': url(season, number, identity),
+                         'title': 'Спецвыпуск' if int(number) == 0 else 'Серия ' + str(number)}
+                group = groups.setdefault(identity, {'name': str(row['translation'])[:120], 'entries': {}})
+                group['entries'].setdefault((int(season), int(number)), entry)
+    choices = []
+    for identity, value in groups.items():
+        entries = sorted(value['entries'].values(), key=lambda entry: (entry['season'], entry['number']))
+        first = next((entry for entry in entries if entry['number'] > 0), entries[0])
+        choices.append(choice(value['name'], first['url'], identity='alloha:' + identity, player='Alloha',
+                              language=alloha_voice_language(value['name']), episodes=entries))
+    return choices, sorted(seasons, key=lambda item: item['number'])
 
 
 def animego_buttons(text,base):

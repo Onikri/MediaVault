@@ -65,8 +65,10 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   const key=identity+':'+candidate.id+':'+selectedSeason;if(cache.current.has(key))return cache.current.get(key);
   const seasonUrl=seasonUrls.current.get(key);
   let data,continuation,progress=-1,stalled=0;
-  if(candidate.provider==='hentaichan-video'&&candidate.episodes?.length){
-   data={episodes:candidate.episodes,seasons:[]};
+  const published=candidate.episodes?.length&&candidate.episodes.every(entry=>entry.url);
+  if(published&&['hentaichan-video','kinobox'].includes(candidate.provider)){
+   const numbers=[...new Set(candidate.episodes.map(entry=>Number(entry.season)||1))].sort((a,b)=>a-b);
+   data={episodes:candidate.episodes,seasons:candidate.provider==='kinobox'?numbers.map(number=>({number,name:'Сезон '+number})):[]};
   }else{
    do{data=await service.request('/sources/inspect',{method:'POST',body:{url:seasonUrl||candidate.sourceUrl,...(!seasonUrl?{dub_url:candidate.url}:{}),season:Number(selectedSeason),kind:item.kind||'anime',...(continuation?{continuation}:{})},signal});
     continuation=data.continuation;stalled=continuation&&data.scannedPages===progress?stalled+1:0;progress=data.scannedPages;
