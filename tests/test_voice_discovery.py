@@ -67,6 +67,33 @@ class PlayerCatalogTests(unittest.TestCase):
         self.assertEqual([(e['season'], e['number']) for e in selected['episodes']], [(2, 1), (2, 2)])
         self.assertIn('season=2&episode=2&translation=154', selected['episodes'][1]['url'])
 
+    def test_ukrainian_film_page_preserves_published_original_title_and_year(self):
+        url = 'https://eneyida.tv/9366-duna-chastyna-druga.html'
+        page = ('<meta property="og:title" content="Дюна: Частина друга 2024 дивитися українською онлайн">'
+                '<h1>Дюна: Частина друга</h1><div class="full_header-subtitle">Dune: Part Two</div>')
+        result = inspect_catalog(url, page, url, Http({}), provider='eneyida')
+        self.assertEqual(result['year'], 2024)
+        selected = {'title': 'Дюна: Часть вторая', 'aliases': ['Dune: Part Two'], 'year': 2024, 'kind': 'movie'}
+        self.assertTrue(match_title(selected, result)[0])
+        self.assertFalse(match_title({**selected, 'year': 1984}, result)[0])
+
+    def test_film_discovery_keeps_ukrainian_page_found_by_original_title(self):
+        import source_discovery
+        from site_adapters import BY_ID
+        url = 'https://eneyida.tv/9366-duna-chastyna-druga.html'
+        selected = {'title': 'Дюна: Часть вторая', 'originalTitle': 'Dune: Part Two', 'year': 2024, 'kind': 'movie'}
+        row = {'title': 'Дюна: Частина друга', 'aliases': ['Dune: Part Two'], 'url': url, 'year': 2024}
+        player = choice('Украинский', 'https://hdvbua.pro/vid/42', language='uk')
+        inspected = {**row, 'dubs': [player], 'complete': True}
+        empty = {'sources': [], 'complete': True}
+        with patch.object(source_discovery, 'SITES', [BY_ID['eneyida']]), patch.object(
+                source_discovery, 'search_site', return_value={'status': 'ok', 'results': [row]}) as search, patch.object(
+                source_discovery, 'inspect_source', return_value=inspected), patch('kodik_api.discover', return_value=empty), patch(
+                'kinobox_source.discover', return_value=empty), patch('source_index.save'):
+            result = source_discovery._discover(selected, refresh=True)
+        self.assertEqual(search.call_args.args[1], 'Dune: Part Two')
+        self.assertEqual([voice['language'] for voice in result['voices']], ['uk'])
+
     def test_parser_retains_two_translations_of_one_episode(self):
         page=parse_page('<a href="/episode-1?translation=1">1 серия</a><a href="/episode-1?translation=2">1 серия</a>','https://example.com/show')
         self.assertEqual(len(page.episodes),2)

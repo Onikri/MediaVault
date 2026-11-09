@@ -54,7 +54,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  }
  const sourceReady=Number(service.session?.serverVersion||0)<47||inspection?.readable===true;
  useEffect(()=>{const result=sourceInfo[url];if(!result||!inspection?.fromSourceInfo)return;if(result.readable!==undefined||result.state==='error'){
-  setInspection(old=>old?.fromSourceInfo?{...old,readable:result.readable===true,readabilityError:result.readabilityError||result.error}:old);
+  setInspection(old=>old?.fromSourceInfo?{...old,readable:result.readable===true,readabilityError:result.readabilityError||result.error,verifiedChapterUrl:result.verifiedChapterUrl}:old);
   if(result.readable===false||result.state==='error')setError(result.readabilityError||result.error||'Источник не отдал страницу.');
  }},[url,sourceInfo[url]?.readable,sourceInfo[url]?.state]);
  async function inspect(value,automatic=false){
@@ -65,7 +65,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
    if(version!==generation.current)return;
    if(!['ru','uk','en','ja','ko'].includes(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
    if(!data.episodes?.length)throw Error('У этого тайтла нет открытых глав на языке «'+mangaLanguageName(data.language)+'».');
-   setInspection({...data,readable:undefined,...(cached?{readable:cached.readable,readabilityError:cached.readabilityError,fromSourceInfo:true}:{})});setVolume('all');setTeam('');setOne(data.episodes[0].url);setFirst(String(data.episodes[0].number));setLast(String(data.episodes.at(-1).number));if(!item)setCollection(data.title);setBusy('');
+   setInspection({...data,readable:undefined,...(cached?{readable:cached.readable,readabilityError:cached.readabilityError,verifiedChapterUrl:cached.verifiedChapterUrl,fromSourceInfo:true}:{})});setVolume('all');setTeam('');setOne(data.episodes[0].url);setFirst(String(data.episodes[0].number));setLast(String(data.episodes.at(-1).number));if(!item)setCollection(data.title);setBusy('');
    if(cached)return;
    const result=await service.request('/manga/summary',{method:'POST',body:{url:value,...(item?{title:searchTitle}:{}),verifyPages:Number(service.session?.serverVersion)>=47,refresh:!automatic}});
    if(version!==generation.current)return;setInspection(old=>old?{...old,...result}:old);
@@ -79,7 +79,12 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
   const job={version:3,library_id:state.libraryId,sources:[inspection.url||url],collection:collection.trim(),season:volume==='all'?1:Number(volume),episodes:'all',quality,resume:true,section:'manga',metadata:{...mangaMetadata(item),format:inspection.format||item?.format||'manga',readingMode:inspection.readingMode,sourceLanguage:inspection.language,...(!item?{title:collection.trim(),cover:inspection.cover}: {})},dub:team,translation:{name:team||(inspection.language==='ru'?'Перевод':'Оригинал · '+inspection.language.toUpperCase()),kind:'manga',language:inspection.language},provider:inspection.provider,entries:chosen.map(e=>({number:e.number,url:e.url,title:e.title||'Глава '+e.number,season:Number(e.season||1)}))};
   setBusy('submit');try{await service.submit(job);onSubmitted?.();}catch(cause){setError(cause.message);}finally{setBusy('');}
  }
- const reader=online&&inspection&&<OnlineViewer inline={compact} onEntryChange={e=>setOne(e.url)} kind="manga" entries={compact?selectChapters(inspection.episodes,{volume,team,language:inspection.language}):chosen} initial={compact?(selectChapters(inspection.episodes,{volume,team,language:inspection.language}).find(e=>e.url===one)||selectChapters(inspection.episodes,{volume,team,language:inspection.language})[0]):chosen[0]} title={collection} service={service} userId={state.user?.sub} language={inspection.language} metadata={{...item,format:inspection.format||item?.format,readingMode:inspection.readingMode}} onClose={()=>setOnline(false)}/>;
+ const readerEntries=inspection&&compact?selectChapters(inspection.episodes,{volume,team,language:inspection.language}):chosen;
+ const selectedChapter=compact?readerEntries.find(e=>e.url===one)||readerEntries[0]:readerEntries[0];
+ const verifiedChapter=mode==='all'&&inspection?.verifiedChapterUrl&&selectedChapter?.url===inspection.episodes?.[0]?.url
+  ?readerEntries.find(e=>e.url===inspection.verifiedChapterUrl):null;
+ const initialChapter=verifiedChapter||selectedChapter;
+ const reader=online&&inspection&&<OnlineViewer inline={compact} onEntryChange={e=>setOne(e.url)} kind="manga" entries={readerEntries} initial={initialChapter} title={collection} service={service} userId={state.user?.sub} language={inspection.language} metadata={{...item,format:inspection.format||item?.format,readingMode:inspection.readingMode}} onClose={()=>setOnline(false)}/>;
  if(compact&&destination==='online')return <div className="title-playback-controls manga-playback-controls">
   <div className="title-playback-selectors"><label className="form-field input-label">Язык глав<select className="field-input" aria-label="Язык источника манги" value={language} onChange={e=>{setLanguage(e.target.value);setSourceIds([]);}}>{MANGA_LANGUAGES.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><SourceFilter label="Искать на сайтах" service={service} language={language} value={sourceIds} onChange={setSourceIds}/></div>
   <TitleSourcePicker requireVerified={Number(service.session?.serverVersion)>=47} key={item?.id||'manual'} sources={visibleSources} value={url} info={displayInfo} loading={searching||globalSearch.state==='running'} onChoose={value=>{setOnline(false);inspect(value);}}/>

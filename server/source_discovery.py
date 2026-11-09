@@ -59,7 +59,13 @@ def _discover(selected,*,refresh=False,continuing=False):
             try:
                 matches=[{**s,'kind':selected.get('kind','anime'),'matchEvidence':s.get('matchEvidence','exact_title')} for s in (hit[1]['sources'] if hit and hit[0]>time.monotonic() else []) if s.get('provider')==site.id]
                 status='empty';message='Точное совпадение тайтла и сезона не найдено.'
-                for query in queries:
+                site_queries = queries
+                if site.id in {'eneyida', 'uaserials'}:
+                    # These catalogues index original and Ukrainian names.
+                    localized = [v for v in names if re.search(r'[іїєґ]', v, re.I)]
+                    original = [v for v in names if re.search(r'[a-z]', v, re.I) and not re.search(r'[а-яіїєґ]', v, re.I)]
+                    site_queries = list(dict.fromkeys([*localized[:1], *original[:2], *queries]))[:4]
+                for query in site_queries:
                     response=search_site(site,query,http=http)
                     status=response['status'];message=response.get('message',message)
                     for candidate in response['results']:
@@ -92,12 +98,14 @@ def _discover(selected,*,refresh=False,continuing=False):
                         if selected.get('year') and not verified.get('year') and evidence!='external_id':
                             status='unverified';message='Название совпадает, но год или внешний ID не подтверждён страницей.';continue
                         # HTML title must not contradict the selected identity. Search snippets can be stale.
-                        import re
                         page_title=re.split(r'\s+(?:смотреть|watch)\b|\s+[|–—]\s+',value.get('title',''),flags=re.I)[0]
-                        # A Ukrainian page heading cannot equal Russian/English catalogue titles;
-                        # those pages were already matched by the card's original-title alias.
-                        if page_title and not re.search(r'[іїєґ]',page_title,re.I) and not match_title(selected,{'title':page_title,'kind':selected.get('kind','anime')})[0]:
-                            continue
+                        detail = {'title': page_title, 'aliases': value.get('aliases', []),
+                                  'ids': value.get('ids') or {}, 'kind': selected.get('kind', 'anime')}
+                        if page_title and not match_title(selected, detail)[0]:
+                            # Some older Ukrainian pages publish only their localized
+                            # heading. The card has already passed the identity check.
+                            if value.get('aliases') or site.id not in {'eneyida', 'uaserials'} or not re.search(r'[іїєґ]', page_title, re.I):
+                                continue
                         inspected.append({**value,'title':candidate['title'],'providerName':site.name,'matchEvidence':candidate['matchEvidence']})
                     except Exception:
                         status='unavailable';message='Страница найдена, плееры временно не ответили.'

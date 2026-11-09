@@ -6,7 +6,7 @@ Only openly accessible chapters are accepted. Availability is reported by caller
 import json,re,time
 from types import SimpleNamespace
 from urllib.parse import urlencode,urlsplit,parse_qs,quote
-from source_parser import PublicHttp,SourceError,public_url
+from source_parser import PublicHttp,SourceAccessError,SourceError,public_url
 UUID=r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}'
 LIB='https://api.cdnlibs.org'
 LIB_SITES={1:('mangalib','MangaLib','https://mangalib.me'),2:('slashlib','SlashLib','https://v2.shlib.life'),4:('hentailib','HentaiLib','https://hentailib.me')}
@@ -25,6 +25,8 @@ def lib_identity(data):
     return {'identityTitles':titles,'year':int(year[0]) if year else None}
 def api_url(value):
     p=urlsplit(value)
+    if p.hostname in {'mangadex.org','api.mangadex.org'} and p.path.rstrip('/')=='/edge/challenge':
+        raise SourceAccessError('MangaDex перенаправил публичный API на браузерную проверку.')
     allowed=(p.hostname=='api.mangadex.org' and re.fullmatch(rf'/(?:manga(?:/{UUID}(?:/feed)?)?|chapter/{UUID}|at-home/server/{UUID})',p.path)) or (p.hostname=='api.cdnlibs.org' and re.fullmatch(r'/api/(?:manga(?:/[\w-]+(?:/chapters|/chapter)?)?|constants)',p.path))
     if not allowed:raise SourceError('Этот адрес не относится к публичной читалке.')
     return public_url(value,allow_api=True)

@@ -321,6 +321,10 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
     if provider=='jutsu':
         page.title=re.sub(r'^Смотреть\s+','',page.title,flags=re.I)
         page.title=re.sub(r'\s+все серии(?: и сезоны)?\s*$','',page.title,flags=re.I)
+    original_selector = {'eneyida': '.full_header-subtitle',
+                         'uaserials': '[itemprop="alternativeHeadline"]'}.get(provider)
+    original = soup.select_one(original_selector) if original_selector else None
+    page_aliases = [original.get_text(' ', strip=True)[:300]] if original else []
     ids={}
     for namespace,expression in [('mal',r'myanimelist\.net/anime/(\d+)'),('shikimori',r'shikimori\.(?:one|io|me)/animes/(?:[a-z])?(\d+)')]:
         found={re.search(expression,a.get('href',''))[1] for a in soup.select('a[href]') if re.search(expression,a.get('href',''))}
@@ -337,12 +341,18 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             value=node.get_text(' ',strip=True)
             matched=re.fullmatch(r'(?:Год(?:\s+(?:выхода|выпуска))?|Year)\s*:?\s*((?:19|20)\d{2})(?:\s*г\.?)?',value,re.I)
             if matched:year=int(matched[1]);break
+    if year is None and original_selector:
+        meta_title = soup.select_one('meta[property="og:title"]')
+        match = re.search(r'\b((?:19|20)\d{2})\s+(?:дивитися\s+)?українською\b',
+                          meta_title.get('content', '') if meta_title else '', re.I)
+        if match:
+            year = int(match[1])
     releases=[{'date':e.get('datetime'),'label':e.parent.get_text(' ',strip=True)[:180]} for e in soup.select('.episode time[datetime], .release time[datetime], .schedule time[datetime], [data-episode] time[datetime]')][:100]
     state['episodes']=episodes;state['seasons']=seasons
     report_diagnostics=list(diagnostics)
     if pending:report_diagnostics.append({'status':'incomplete','message':'Проверка не завершена; оставшиеся плееры не считаются отсутствующими.'})
     complete=not pending and not any(d.get('status')=='unavailable' for d in diagnostics)
     import copy
-    return copy.deepcopy({'provider':provider,'providerName':provider_name,'title':page.title,'url':final,'dubs':choices,'complete':complete,'pending':bool(pending),'scannedPages':len(seen),
+    return copy.deepcopy({'provider':provider,'providerName':provider_name,'title':page.title,'aliases':page_aliases,'url':final,'dubs':choices,'complete':complete,'pending':bool(pending),'scannedPages':len(seen),
             'seasons':sorted(season_values.values(),key=lambda e:e['number']),'episodes':episodes,'releases':releases,
             'available':bool(episodes or choices),'diagnostics':report_diagnostics,'ids':ids,'year':year})

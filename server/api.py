@@ -723,7 +723,7 @@ def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
 @app.post('/manga/summary')
 def manga_summary(body:MangaInspection,subject=Depends(viewer)):
     value=manga_inspect(body,subject)
-    return {key:value.get(key) for key in ('provider','providerName','language','chapterCount','volumeCount','truncated','readable','readabilityError','verifiedPages','pagesCheckedAt') if key in value}
+    return {key:value.get(key) for key in ('provider','providerName','language','chapterCount','volumeCount','truncated','readable','readabilityError','verifiedPages','verifiedChapterUrl','pagesCheckedAt') if key in value}
 
 @app.get('/discovery/manga/health')
 def manga_source_health(subject=Depends(owner)):
