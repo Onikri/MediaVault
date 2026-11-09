@@ -26,6 +26,8 @@ class Strict(BaseModel):
 
 class Registration(Strict):
     public_key: dict
+    # The previous record of this browser, lost when site storage was cleared.
+    replaces: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{32,100}$')
 
 
 class Device(Strict):
@@ -82,8 +84,16 @@ def install(app, api):
         ready = admin and bool(api.store.setting('google:' + user['sub']))
         with api.store.lock:
             identities=api.store.setting('device-index:'+user['sub']) or {'ids':[]}
-            active=[i for i in identities['ids'] if (api.store.setting('device:'+i) or {}).get('expires',0)>time.time()]
-            if len(active)>=10:raise HTTPException(429,'У аккаунта уже 10 запомненных устройств. Удали ненужное устройство перед добавлением нового.')
+            def drop(identity):
+                api.store.consume('device:' + identity)
+                api.store.consume('device-google:' + identity)
+            if body.replaces and (api.store.setting('device:' + body.replaces) or {}).get('sub') == user['sub']:
+                drop(body.replaces)
+            records={i:api.store.setting('device:'+i) or {} for i in identities['ids']}
+            active=sorted((i for i,v in records.items() if v.get('expires',0)>time.time()),key=lambda i:records[i]['expires'])
+            # The account owner signs in with Google here, so the oldest
+            # remembered device gives way instead of refusing the new one.
+            while len(active)>=10:drop(active.pop(0))
             api.store.setting('device:' + identity, {'key': {k: body.public_key[k] for k in ('kty','crv','x','y')}, 'sub': user['sub'], 'admin': admin,
                                                   'expires': time.time() + (90 * 86400 if ready else 600), 'ready': ready})
             api.store.setting('device-index:'+user['sub'],{'ids':[*active,identity]})

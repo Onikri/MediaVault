@@ -4,8 +4,8 @@ import {CHUNK_SIZE,newSalt,deriveVaultMaterial,bytesToBase64,openChunk,sealIndex
 import {driveDownload,readEnvelope,findLibraries,createFolder,folderExists,uploadSmall,
   inviteReader} from "../drive.js";
 import {createUploadService} from "./upload.js";
-import {privacyPreferences,savePrivacyPreferences} from './privacy.js';
-import {rememberGoogleSession,restoreGoogleSession,forgetGoogleSession} from './device-auth.js';
+import {privacyPreferences,savePrivacyPreferences,keepStorage,rememberedDeviceId} from './privacy.js';
+import {rememberGoogleSession,restoreGoogleSession,forgetGoogleSession,hasRememberedSession} from './device-auth.js';
 import {saveTrustedVault,openTrustedVault,trustedVault,forgetTrustedVault,biometricAvailable} from './trusted-vault.js';
 import {deviceStore} from './device-storage.js';
 import {uiLocale} from './i18n/index.js';
@@ -34,7 +34,7 @@ function initialState(){
     libraryId:storedLibrary(),status:"Не подключено",notice:setupNotice(),toast:null,
     busy:"",uploadProgress:[],driveConnected:false,driveWritable:false,
     libraryOptions:[],libraryDiscovery:"idle",libraryDiscoveryError:"",workerReady:false,authConfigured:isConfigured(),
-    remembering:privacyPreferences().remember,remembered:false,restoring:false,biometric:false,deviceError:''};
+    remembering:privacyPreferences().remember,remembered:false,restoring:false,biometric:false,deviceError:'',storageKept:null};
 }
 function cancelled(){return new DOMException("Операция отменена","AbortError");}
 async function hashEmail(email){
@@ -544,7 +544,8 @@ function createController(get,patch){
     forgetGoogleSession().catch(()=>{});
     deviceStore('delete','wrap-key').catch(()=>{});
     if(get().user&&get().libraryId)forgetTrustedVault(get().user.sub,get().libraryId).catch(()=>{});
-    savePrivacyPreferences(false);
+    // Signing out forgets this device; the next sign-in asks again (banner).
+    savePrivacyPreferences(true,{chosen:false});
     uploads.cancel();
     epoch++;readerChunks.clear();readerChunkRequests.clear();window.dispatchEvent(new Event('mediavault-locked'));salt=null;serverKey?.fill(0);serverKey=null;
     clearTimeout(tokenTimer);clearTimeout(toastTimer);
@@ -584,6 +585,7 @@ function createController(get,patch){
     await rememberGoogleSession(server,driveToken(),get().user);
     if(expected!==epoch||!privacyPreferences().remember){await forgetGoogleSession().catch(()=>{});throw cancelled();}
     reconnectRequired=false;patch({remembered:true,deviceError:''});
+    keepStorage().then(kept=>patch({storageKept:kept}));
     await saveTrustedCurrent();return true;
   }
   async function rememberAccount(){return run('remember',async()=>{savePrivacyPreferences(true);patch({remembering:true});return rememberAccountInternal();});}
@@ -601,6 +603,13 @@ function createController(get,patch){
   }
   async function restoreLogin(){
     if(!privacyPreferences().remember)return false;
+    // Nothing saved here: no restore attempt and no error. A device cookie
+    // without the IndexedDB key means the browser cleared site storage.
+    if(!await hasRememberedSession()){
+      if(rememberedDeviceId()&&!get().user&&!reconnectRequired){reconnectRequired=true;patch({deviceError:'Браузер очистил данные сайта, обычно из-за нехватки места на диске. Войди через Google — устройство запомнится снова.'});let told=false;try{told=!!sessionStorage.getItem('mv_storage_cleared_told');sessionStorage.setItem('mv_storage_cleared_told','1');}catch{}if(!told)toast('Браузер очистил сохранённый вход (мало места на диске). Войди через Google ещё раз.',true);}
+      return false;
+    }
+    keepStorage().then(kept=>patch({storageKept:kept}));
     return run('restore',async expected=>{
       patch({restoring:true});
       try{await renewSession();await discoverLibrary(expected);await tryTrustedLibrary(expected);return true;}
