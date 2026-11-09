@@ -1,4 +1,4 @@
-"""Drive-only Alloha adapter. Worker threads share the API's native browser pool.
+"""Alloha export adapter. Worker threads share the API's Alloha sessions.
 
 No signed URL/cookie is written to a checkpoint. Media is private temporary
 source material; VaultDrive alone encrypts and uploads the finished file.
@@ -51,17 +51,18 @@ class AllohaImporter:
             self.next_request = time.monotonic() + self.interval
 
     def stream(self, iframe, directory, *, quality='best', progress=lambda _: None,
-               cancelled=None, checkpoint=None, referer=None):
+               cancelled=None, checkpoint=None, referer=None, mode=None):
         from alloha_stream import StreamingVideo
         if not is_alloha_player(iframe):
             raise SourceError('Потоковый импорт предназначен только для Alloha.')
-        return StreamingVideo(AllohaImportHttp(self, iframe, quality, progress, cancelled, None, referer=referer), directory, checkpoint=checkpoint)
+        return StreamingVideo(AllohaImportHttp(self, iframe, quality, progress, cancelled, None,
+                                               referer=referer, mode=mode), directory, checkpoint=checkpoint)
 
     def download(self, iframe, directory, *, quality='best', progress=lambda _: None,
-                 cancelled=None, checkpoint=None, referer=None):
+                 cancelled=None, checkpoint=None, referer=None, mode=None):
         if not is_alloha_player(iframe):
             raise SourceError('Нативный импорт предназначен только для Alloha.')
-        http = AllohaImportHttp(self, iframe, quality, progress, cancelled, checkpoint, referer=referer)
+        http = AllohaImportHttp(self, iframe, quality, progress, cancelled, checkpoint, referer=referer, mode=mode)
         try:
             http.call(http.open())
             return download_episode({'type': 'hls', 'url': PREFIX+'root', 'headers': {}},
@@ -72,10 +73,12 @@ class AllohaImporter:
 
 class AllohaImportHttp:
     """The synchronous HLS downloader never receives an upstream CDN URL."""
-    def __init__(self, importer, iframe, quality, progress, cancelled, checkpoint, *, referer=None):
+    def __init__(self, importer, iframe, quality, progress, cancelled, checkpoint, *, referer=None, mode=None):
         self.importer, self.service = importer, importer.service
         self.iframe, self.quality, self.progress = iframe, quality, progress
         self.referer = referer
+        self.mode = mode
+        self.effective_mode = None
         self.cancelled = cancelled or (lambda: False)
         self.checkpoint = Path(checkpoint) if checkpoint else None
         self.session = None
@@ -113,8 +116,10 @@ class AllohaImportHttp:
     async def open(self):
         await self.close()
         data = await self.service.resolve(self.iframe, audio=self.audio,
-                                          online_quality=self.selected or self.quality, referer=self.referer)
+                                          online_quality=self.selected or self.quality, referer=self.referer,
+                                          mode=self.effective_mode or self.mode)
         self.session = self.service.session(data['sid'])
+        self.effective_mode = self.session.mode
         self.audio = self.session.active
         label = self.session.translations[self.audio]['name']
         if self.audio_name is not None and label != self.audio_name:

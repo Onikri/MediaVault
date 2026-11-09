@@ -84,7 +84,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.profiles = Profiles()
-        self.service = AllohaDelivery(self.temp.name, profiles=self.profiles, factory=Source, queue_timeout=.03)
+        self.service = AllohaDelivery(self.temp.name, profiles=self.profiles, factory=Source, queue_timeout=.03, default_mode='browser')
         self.service.external_address = '1.1.1.1'
         self.app = FastAPI()
         install(self.app, self.service)
@@ -100,6 +100,24 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.get('/resolve', params={'iframe': IFRAME})
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
+
+    async def test_bnsi_refusal_uses_the_browser_for_the_same_iframe(self):
+        from alloha_browser import SourceRefused
+        class Refused:
+            def __init__(self, iframe, *, referer=None):
+                self.iframe=iframe
+            async def open(self, audio=None):
+                raise SourceRefused('CDN refused the signed URL',status=403,reason='session_blocked')
+            async def close(self):
+                pass
+        self.service.default_mode='bnsi'
+        self.service.direct_factory=Refused
+        data=await self.resolve()
+        session=self.service.session(data['sid'])
+        self.assertEqual((session.mode,session.iframe),('browser',IFRAME))
+        self.assertEqual(len(Source.opened),1)
+        await self.service.close_session(session)
+        self.assertEqual(self.service.slots._value,2)
 
     async def test_authenticated_viewer_state_and_closed_native_lease(self):
         import online_sessions

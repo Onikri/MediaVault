@@ -2,6 +2,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {clearGuestSession,readGuestSession,useGuestSession} from './guest-session.js';
 import {notificationStore} from './notification-store.js';
 import {profileNeedsRefresh,previewNeedsRetry} from './title-metadata.js';
+import {allohaJob,allohaRequest} from './alloha-connector.js';
 
 // The server pass walks the whole library, so it is requested only when a frame
 // or dossier is actually due under the shared back-off, and at most once per
@@ -135,7 +136,7 @@ export function useImportService(state,actions){
   }
   async function submit(job){
     if(!session?.driveConnected)throw Error('Подключи Google Drive к серверу перед первым импортом.');
-    const task=await client.request('/jobs',{method:'POST',body:{job,vault_key:actions.getServerKey()},headers:{'Idempotency-Key':crypto.randomUUID()}});
+    const task=await client.request('/jobs',{method:'POST',body:{job:allohaJob(job,session.serverVersion),vault_key:actions.getServerKey()},headers:{'Idempotency-Key':crypto.randomUUID()}});
     setJobs(old=>[task,...old.filter(value=>value.id!==task.id)]);return task;
   }
   async function enrichLibrary(titleId){
@@ -156,7 +157,8 @@ export function useImportService(state,actions){
     enrichLibrary().catch(()=>{enrichmentRequested.current='';try{localStorage.removeItem(enrichCooldownKey(state.libraryId));}catch{}});
   },[state.catalog,!!state.busy,session?.driveConnected,session?.serverVersion]);
   async function operation(id,op){const task=await client.request('/jobs/'+encodeURIComponent(id)+'/'+op,{method:'POST'});setJobs(old=>old.map(value=>value.id===id?task:value));return task;}
+  const request=useMemo(()=>(path,options)=>client.request(path,allohaRequest(path,options,session?.serverVersion)),[client,session?.serverVersion]);
   return {server,setServer,status,error,session,jobs,active,connect,submit,refresh,configureGoogle,enrichLibrary,
     openReaderChapter:(item,names,direction,signal,model)=>client.request('/api/v1/chapters',{method:'POST',body:{library_id:live.current.libraryId,item_id:item.id,vault_key:actions.getServerKey(),names,direction,...(model?{model}:{})},signal}),
-    request:client.request,cancel:id=>operation(id,'cancel'),resume:id=>operation(id,'resume')};
+    request,cancel:id=>operation(id,'cancel'),resume:id=>operation(id,'resume')};
 }

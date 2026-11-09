@@ -12,6 +12,7 @@ import ControlCenter from './control/ControlCenter.jsx';
 import MangaSourceManager from './MangaSourceManager.jsx';
 import {roomLink} from './watch-room.js';
 import KodikConnection from './KodikConnection.jsx';
+import AllohaConnection from './AllohaConnection.jsx';
 import {readOnlineTitle} from './title-route.js';
 import React,{lazy,Suspense,useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {motion,useReducedMotion} from 'motion/react';
@@ -270,7 +271,7 @@ function MediaVaultApp(){
 </>,
         appearance:<><LanguageSettings/><AppearanceSettings/></>,
         storage:!guest||state.user?<>{state.catalog&&<section className="settings-card"><div className="section-heading"><h2 className="section-title">Твоя коллекция</h2><span className="status-pill connected"><Icon name="check" size={13}/> Открыта</span></div><div className="profile-stats"><div><strong>{items.length}</strong><span>{plural(items.length)}</span></div><div><strong>{formatSize(totalSize)}</strong><span>в твоём Drive</span></div><div><strong>{state.admin?'Владелец':'Зритель'}</strong><span>твой доступ</span></div></div><button className="btn btn-secondary" onClick={()=>go('collection')}>В мою коллекцию<Icon name="arrow" size={17}/></button></section>}<section className="settings-card connection-settings-card"><h2>Подключения и импорт</h2><p className="fine">Настройки соединения с сервером и Google Диском доступны только в профиле.</p><ImportSettings service={importService} state={state} onConnect={showLibrarySetup}/><div className="connection-settings-status" role="status"><span className={importService.status==='connected'?'is-ready':''}>{importService.status==='connected'?'Сервер подключён':'Сервер не подключён'}</span><span>{state.driveConnected?'Браузер: Google Диск подключён':'Браузер: Google Диск не подключён'}</span></div></section><DriveServerStatus service={importService} enabled={!!(state.admin&&state.user)}/></>:null,
-        sources:!guest||state.user?<><KodikConnection service={importService}/><YouTubeServerSession service={importService} enabled={!!(state.admin&&state.user)}/><MusicConnections userId={state.user?.sub}/>{state.admin&&importService.status==='connected'&&Number(importService.session?.serverVersion)>=14&&<section className="settings-card manga-sources-card"><h2>Читалки манги</h2><p className="fine">Расширения Suwayomi на ВМ. Подключённые читалки появятся в общем поиске переводов.</p><MangaSourceManager service={importService}/></section>}</>:null,
+        sources:!guest||state.user?<><AllohaConnection service={importService}/><KodikConnection service={importService}/><YouTubeServerSession service={importService} enabled={!!(state.admin&&state.user)}/><MusicConnections userId={state.user?.sub}/>{state.admin&&importService.status==='connected'&&Number(importService.session?.serverVersion)>=14&&<section className="settings-card manga-sources-card"><h2>Читалки манги</h2><p className="fine">Расширения Suwayomi на ВМ. Подключённые читалки появятся в общем поиске переводов.</p><MangaSourceManager service={importService}/></section>}</>:null,
         privacy:<DeviceSettings state={state} actions={{...actions,biometricUnlock:()=>{unlockedHere.current=true;return actions.biometricUnlock();}}}/>
       }}/>}
     </motion.main>

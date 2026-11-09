@@ -23,13 +23,12 @@ class KinoboxTests(unittest.TestCase):
         with patch.object(kinobox_source,'PublicHttp',lambda **_:Http()),patch.object(alloha_profiles,'playback_available',lambda *a:alloha):
             return kinobox_source.discover({'title':'Во все тяжкие','kind':kind,'ids':{'imdb':'tt0903747'}})
 
-    def test_spent_alloha_profiles_hide_alloha_voices_and_collaps_comes_first(self):
+    def test_collaps_comes_first_and_alloha_does_not_depend_on_browser_profiles(self):
         value=self.run_discover('tv')
         self.assertTrue(value['sources'][0]['providerName'].startswith('Collaps'))
         kinobox_source._cache.clear()
         movie=self.run_discover('movie',alloha=False)
-        self.assertFalse(any(s['providerName'].startswith('Alloha') for s in movie['sources']))
-        self.assertIn('Alloha временно недоступна',movie['message'])
+        self.assertTrue(any(s['providerName'].startswith('Alloha') for s in movie['sources']))
 
     def test_profile_state_file_decides_availability(self):
         import json,tempfile,time,alloha_profiles

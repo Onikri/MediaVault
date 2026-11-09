@@ -76,7 +76,7 @@ class AllohaImportTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         NativeSource.sources=[];NativeSource.calls=Counter();NativeSource.fail_second=False;NativeSource.fail_always=False;NativeSource.duration_changed=False;NativeSource.master=False
         self.directory=tempfile.TemporaryDirectory();self.root=Path(self.directory.name)
-        self.service=AllohaDelivery(self.root/'service',profiles=Profiles(),factory=NativeSource,queue_timeout=.02)
+        self.service=AllohaDelivery(self.root/'service',profiles=Profiles(),factory=NativeSource,queue_timeout=.02,default_mode='browser')
         self.service.external_address='1.1.1.1'
         self.importer=AllohaImporter(self.service,asyncio.get_running_loop(),interval=0)
     async def asyncTearDown(self):
@@ -110,6 +110,84 @@ class AllohaImportTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(list(self.root.glob('mediavault-episode-*')),[])
             self.assertEqual(list(cache.iterdir()),[])
         finally:vault.close()
+
+    async def test_bnsi_proxy_local_mp4_and_encrypted_drive(self):
+        """One HLS fixture exercises the real HTTP resolver, remux and encryption."""
+        import httpx
+        from alloha_bnsi import BnsiSession, borth
+        from local_exports import Export, Exports, install, produce
+        from fastapi import FastAPI
+        from media_download import verify_video
+        calls = Counter()
+        title = {'type':'movie','active':{'typeList':'theatrical','id':'release','id_translation':66},
+                 'all':{'theatrical':{'t66':{'release':{'id':'release','id_translation':66}}}}}
+        iframe = IFRAME+'&token=test'
+        def upstream(request):
+            calls[request.url.path] += 1
+            if request.url.path == '/':
+                return httpx.Response(200,text='<meta content="abc123" name="viewporti"><script>const fileList=JSON.parse(\''+json.dumps(title)+'\');</script>')
+            if request.url.path == '/bnsi/movies/release':
+                self.assertEqual(request.headers['Borth'],borth('abc123'))
+                self.assertEqual(request.headers['Origin'],'https://alloha.yani.tv')
+                self.assertIn(b'audio=66',request.content)
+                return httpx.Response(200,json={'hlsSource':[{'label':'Dub','audioId':1,'default':True,
+                    'quality':{'720':'https://cdn.example.com/index.m3u8','2160':'https://cdn.example.com/index.m3u8'}}], 'skipTime':'0-1'})
+            self.assertEqual(request.headers['Origin'],'https://alloha.yani.tv')
+            path=NativeSource.fixture/Path(request.url.path).name
+            if path.suffix=='.m3u8':
+                return httpx.Response(200,content=path.read_bytes())
+            return httpx.Response(200,content=path.read_bytes(),headers={'Content-Type':'video/mp4'})
+        self.service.default_mode='bnsi'
+        self.service.direct_factory=lambda url,**kwargs:BnsiSession(url,**kwargs,client=httpx.AsyncClient(transport=httpx.MockTransport(upstream)))
+        with patch('alloha_bnsi.browser_destination',side_effect=lambda url,**_:url):
+            result=await self.service.resolve(iframe,online_quality='720')
+            session=self.service.session(result['sid'])
+            self.assertEqual(session.mode,'bnsi')
+            self.assertEqual(result['skip'],[[0,1]])
+            self.assertIsNone(session.profile)
+            await self.service.close_session(session)
+            browser=await self.service.resolve(iframe,online_quality='720',mode='browser')
+            self.assertEqual(self.service.session(browser['sid']).mode,'browser')
+            await self.service.close_session(self.service.session(browser['sid']))
+            directory=self.root/'local';directory.mkdir()
+            export=Export('test','owner',iframe,'video','720',0,0,directory,alloha_mode='bnsi',alloha_importer=self.importer)
+            output=await asyncio.to_thread(produce,export,lambda _:None,128*1024**2,0)
+            self.assertTrue(any(s['codec_type']=='audio' for s in verify_video(output)['streams']))
+            exports=Exports(self.root/'exports',start_worker=False)
+            app=FastAPI()
+            app.state.alloha_importer=self.importer
+            install(app,lambda:'owner')
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://service') as client:
+                with patch('local_exports.manager',return_value=exports):
+                    response=await client.post('/online/exports',json={'url':iframe,'kind':'video','quality':'2160','allohaMode':'bnsi'})
+                    self.assertEqual(response.status_code,202,response.text)
+                    entry=response.json()
+                    self.assertNotIn('bytes',entry)
+                    response=await client.get(entry['downloadUrl'])
+                    self.assertEqual(response.status_code,200,response.text[:200])
+                    self.assertTrue(response.headers['content-type'].startswith('video/mp4'))
+                    self.assertEqual(exports.status('owner',entry['id'])['state'],'downloaded')
+                    self.assertFalse(list(exports.root.iterdir()))
+                    streamed=self.root/'streamed-device.mp4';streamed.write_bytes(response.content)
+                    self.assertTrue(any(s['codec_type']=='audio' for s in verify_video(streamed)['streams']))
+            drive=FakeDrive();vault=VaultDrive(drive,sleep=lambda _:None);library=vault.initialize(PHRASE)
+            job={'version':3,'library_id':library,'sources':[iframe],'collection':'BNSI',
+                 'quality':'720','section':'anime','entries':[{'number':1,'season':1,'url':iframe}],
+                 'alloha_mode':'bnsi'}
+            try:
+                result=await asyncio.to_thread(run_job,job,vault,alloha_streamer=self.importer.stream,
+                    alloha_cache=self.root/'bnsi-checkpoint',temporary_dir=self.root,log=lambda _:None)
+                self.assertEqual(result['saved'],1)
+                item=vault.refresh()['items'][0]
+                restored=self.root/'restored.mp4'
+                parts=[drive.download(c['fileId']) for c in item['chunks']]
+                restored.write_bytes(b''.join(open_chunk(part,vault._key,item['id'],i,c['iv'])
+                    for i,(part,c) in enumerate(zip(parts,item['chunks']))))
+                self.assertNotEqual(parts[0],output.read_bytes())
+                self.assertTrue(any(s['codec_type']=='audio' for s in verify_video(restored)['streams']))
+                self.assertGreaterEqual(calls['/bnsi/movies/release'],3)
+                self.assertFalse(list(self.root.glob('mediavault-episode-*')))
+            finally:vault.close()
 
     async def test_failed_stream_validation_never_publishes_truncated_film(self):
         import io

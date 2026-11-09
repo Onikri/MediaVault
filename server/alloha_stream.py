@@ -1,7 +1,7 @@
-"""Bounded Alloha -> fragmented MP4 pipe -> encrypted Drive chunks.
+"""Bounded Alloha -> fragmented MP4 pipe for local export or encrypted Drive.
 
-Only loopback manifests reach ffmpeg. NativeSession owns all upstream I/O.
-No film, HLS media cache or unencrypted chunk is retained on disk.
+Only loopback manifests reach ffmpeg. The selected Alloha transport owns upstream I/O.
+The Drive caller consumes the pipe without materializing the film on disk.
 """
 from contextlib import contextmanager, suppress
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer

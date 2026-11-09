@@ -33,7 +33,7 @@ def validate_job(value):
     # Reject accidental pasted credentials rather than saving or forwarding them.
     allowed = {"version", "library_id", "sources", "collection", "episodes", "quality", "resume", "season"}
     if value["version"] >= 2:
-        allowed |= {"section", "metadata", "entries", "dub", "provider", "translation"}
+        allowed |= {"section", "metadata", "entries", "dub", "provider", "translation", "alloha_mode"}
     if set(value) - allowed:
         raise SourceError("В задании есть лишние поля. Скопируй новое задание с сайта.")
     library = value.get("library_id", "")
@@ -56,6 +56,9 @@ def validate_job(value):
     section = value.get("section", "anime")
     if section not in {"anime", "video", "manga", "ranobe", "book"}:
         raise SourceError("Неизвестный раздел импорта.")
+    alloha_mode = value.get('alloha_mode')
+    if alloha_mode is not None and alloha_mode not in ('bnsi', 'browser'):
+        raise SourceError('Неизвестный режим подключения Alloha.')
     from manga_sources import chapter_ranges
     selected = None if section=='manga' else episode_selection(value.get('episodes','all'))
     chapters = chapter_ranges(value.get('episodes','all')) if section=='manga' else None
@@ -91,7 +94,8 @@ def validate_job(value):
             raise SourceError('Некорректные параметры перевода.')
     return {"version":value['version'],"library_id": library, "sources": sources, "collection": collection,
             "quality": quality, "selected": selected, "chapters":chapters,"season": int(season), "section": section,
-            "metadata": metadata, "entries": prepared, "translation":translation, "dub": str(value.get("dub", ""))[:120]}
+            "metadata": metadata, "entries": prepared, "translation":translation, "dub": str(value.get("dub", ""))[:120],
+            "alloha_mode": alloha_mode}
 
 
 def source_identity(url):
@@ -277,13 +281,15 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                                 if native and alloha_streamer:
                                     checkpoint = Path(alloha_cache) / __import__('hashlib').sha256((identity+collection).encode()).hexdigest() if alloha_cache else None
                                     streaming = alloha_streamer(native['url'], temporary, quality=job['quality'], progress=report,
-                                                               cancelled=cancelled, checkpoint=checkpoint, referer=native.get('headers', {}).get('Referer') or parent)
+                                                               cancelled=cancelled, checkpoint=checkpoint, referer=native.get('headers', {}).get('Referer') or parent,
+                                                               **({'mode': job['alloha_mode']} if job['alloha_mode'] else {}))
                                     path = None
                                 elif native and alloha_downloader:
                                     checkpoint = Path(alloha_cache) / __import__('hashlib').sha256((identity+collection).encode()).hexdigest() if alloha_cache else None
                                     path = alloha_downloader(native['url'], temporary, quality=job["quality"], progress=report,
                                                              cancelled=cancelled, checkpoint=checkpoint,
-                                                             referer=native.get('headers', {}).get('Referer') or parent)
+                                                             referer=native.get('headers', {}).get('Referer') or parent,
+                                                             **({'mode': job['alloha_mode']} if job['alloha_mode'] else {}))
                                 else:
                                     streams=expand_stream_qualities(page.streams,resolver.http)
                                     stream = pick_stream(streams, job["quality"])

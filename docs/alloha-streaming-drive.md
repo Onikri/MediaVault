@@ -6,10 +6,10 @@ is required.
 
 ## Data path
 
-1. The existing native browser session opens the published iframe from its real
-   publisher context. One verified browser profile stays fixed for that session.
+1. The configured Alloha transport opens the published iframe. Direct BNSI is
+   the default; the browser connector uses a verified profile and keeps it fixed.
 2. A private loopback HTTP server presents checked HLS manifests and segments to
-   ffmpeg. Only the browser transport contacts the upstream CDN. CDN URLs,
+   ffmpeg. Only the selected Alloha transport contacts the upstream CDN. CDN URLs,
    session cookies and request headers never reach ffmpeg or Drive metadata.
 3. ffmpeg copies the original codecs into fragmented MP4 on stdout. It does not
    transcode. The initial header sample is bounded to 4 MiB and immediately

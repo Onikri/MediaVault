@@ -1,10 +1,10 @@
 import {mangaExportJobs} from './manga-export-client.js';
-export async function exportLocally({entries,kind,referer,quality='best',service,onProgress=()=>{},signal,manga,cacheContext}){
+export async function exportLocally({entries,kind,referer,quality='best',service,onProgress=()=>{},signal,manga,cacheContext,name}){
  if(!entries.length)throw Error('Выбери опубликованную главу или серию.');
  if(Number(service.session?.serverVersion)<16)throw Error('Для сохранения на устройство обнови сервер до версии 16.');
  if(manga&&Number(service.session?.serverVersion)<50)throw Error('Для перевода перед скачиванием нужен сервер версии 50.');
  if(manga)onProgress('Проверяем настройки и готовые страницы в кэше…');
- const tasks=manga?await mangaExportJobs(entries,{...manga,quality},cacheContext):entries.map(entry=>({body:{url:entry.url,kind,quality,...(kind==='video'&&referer?{referer}:{})},uploads:[]}));
+ const tasks=manga?await mangaExportJobs(entries,{...manga,quality},cacheContext):entries.map(entry=>({body:{url:entry.url,kind,quality,...(kind==='video'&&referer?{referer}:{}),...(name?{name:String(name).slice(0,120)}:{})},uploads:[]}));
  if(!tasks.length)throw Error('В выбранном интервале нет глав.');
  const downloads=[];
  for(let index=0;index<tasks.length;index++){

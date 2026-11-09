@@ -25,7 +25,9 @@ def request_delay():
 
 
 class SourceRefused(Exception):
-    pass
+    def __init__(self, message, *, status=None, reason=None):
+        super().__init__(message)
+        self.status, self.reason = status, reason
 
 
 class SourceInvalid(Exception):

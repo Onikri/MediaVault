@@ -5,13 +5,15 @@ Completed files are streamed through short-lived, unguessable capabilities.
 """
 from dataclasses import dataclass,field
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote,urlsplit
 import hashlib,os,re,secrets,shutil,subprocess,tempfile,threading,time
 from fastapi import Depends,HTTPException,Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse,StreamingResponse
+from anyio import CancelScope,to_thread
+from typing import Literal
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel,ConfigDict,Field
-from source_parser import PublicHttp,Resolver,SourceError,public_url
+from source_parser import PublicHttp,Resolver,SourceError,is_alloha_player,public_url
 from manga_export import Options as MangaOptions, cached_path, verify_image
 
 GiB=1024**3
@@ -30,6 +32,31 @@ class LeaseFileResponse(FileResponse):
             complete=scope.get('method')=='GET' and not any(k.lower()==b'range' for k,v in scope.get('headers',[]))
         finally:self.release(complete)
 
+class AllohaDownloadResponse(StreamingResponse):
+    """Stream a verified MP4 from the remuxer without staging a full 4K file."""
+    def __init__(self,job,manager,filename,video,opened):
+        self.job,self.manager,self.opened=job,manager,opened
+        self.complete=False
+        def stream():
+            while block:=video.read(1024*1024):
+                yield block
+            video.validate()  # Fail the HTTP transfer instead of accepting a partial MP4.
+            self.complete=True
+        super().__init__(stream(),media_type='video/mp4',headers={
+            'Content-Disposition':"attachment; filename=video.mp4; filename*=UTF-8''"+quote(filename),
+            'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
+
+    async def __call__(self,scope,receive,send):
+        sent=False
+        try:
+            await super().__call__(scope,receive,send)
+            sent=self.complete
+        finally:
+            with CancelScope(shield=True):
+                if not sent:self.job.cancel.set()
+                try:await to_thread.run_sync(self.opened.__exit__,None,None,None)
+                finally:self.manager.release(self.job,sent,aborted=not sent)
+
 def validate_request(url,kind,quality):
     if kind not in {'video','manga'} or quality!='best' and not re.fullmatch(r'[1-9][0-9]{1,3}',str(quality)):raise ValueError('Некорректный формат или качество скачивания.')
     public_url(url,resolve_dns=False)
@@ -47,7 +74,7 @@ def validate_request(url,kind,quality):
         site=site_for(url);host=urlsplit(url).hostname or ''
         player=any(p.matches(url) for p in (KodikPlayer,AniboomPlayer,AnimediaPlayer,SibnetPlayer,CvhPlayer,VkPlayer,AnilibriaPlayer,SovetRomanticaPlayer))
         cvh=host=='plapi.cdnvideohub.com' and bool(re.fullmatch(r'/api/v1/player/sv/video/\d+',urlsplit(url).path))
-        if not (site and site.kind=='anime' or player or cvh or host.endswith(('.stravers.live','.thealloha.club','.alloha.tv'))):raise ValueError('Выбери серию в поддерживаемом источнике или плеере.')
+        if not (site and site.kind=='anime' or player or cvh or is_alloha_player(url)):raise ValueError('Выбери серию в поддерживаемом источнике или плеере.')
 
 @dataclass
 class Export:
@@ -72,6 +99,16 @@ class Export:
     manga:dict|None=None
     staged:dict|None=None
     name:str=''
+    alloha_mode:str|None=None
+    alloha_importer:object=None
+
+    @property
+    def alloha(self):
+        return self.kind=='video' and is_alloha_player(self.url)
+
+    @property
+    def pipe_to_device(self):
+        return self.alloha and self.alloha_importer is not None and (self.quality=='best' or int(self.quality)>=1440)
 
 class Budget:
     def __init__(self,job,maximum,reserve=GiB,deadline=1800):
@@ -139,6 +176,18 @@ def produce(job,progress,maximum,reserve):
             else:
                 from manga_download import download_chapter
                 result=download_chapter(job.url,job.directory,http,progress=update,quality=job.quality)
+        elif job.alloha and job.alloha_importer:
+            budget.deadline=time.monotonic()+3*3600
+            result=job.directory/'video.mp4'
+            def report(value):
+                update({**value,'message':str(value.get('operation','')).replace(' → шифрование → Drive','')})
+            video=job.alloha_importer.stream(job.url,job.directory,quality=job.quality,referer=job.referer,
+                                             mode=job.alloha_mode,progress=report,cancelled=job.cancel.is_set)
+            with video.opened(), result.open('wb') as out:
+                while block:=video.read(1024*1024):
+                    budget.consume(len(block));out.write(block)
+                    update({'phase':'downloading'})
+                video.validate()
         elif job.staged:
             # Browser-uploaded segments (staged_video): the same ffmpeg remux, no CDN request.
             from media_download import assemble
@@ -185,16 +234,17 @@ class Exports:
         value={'id':job.id,'kind':job.kind,'state':job.state,'progress':dict(job.progress),'expiresAt':job.expires}
         if job.error:value['error']=job.error
         if job.staged:value['segments']={'received':len(job.staged['sizes']),'total':len(job.staged['files'])}
-        if job.state=='done' and job.file:
+        if job.state=='done' and (job.file or job.pipe_to_device):
             if job.capability_expires<=self.clock():job.capability=secrets.token_urlsafe(32);job.capability_expires=self.clock()+900
             value.update(downloadUrl='/online/exports/file/'+job.capability,downloadExpiresAt=job.capability_expires,
-                         filename=(re.sub(r'[<>:"/\\|?*\x00-\x1f]','_',job.manga['name']).strip(' .') or 'Манга')+'.'+job.manga['format'] if job.manga else (re.sub(r'[<>:"/\\|?*\x00-\x1f]','_',job.name).strip(' .') or 'MediaVault-'+job.id[:8])+('.cbz' if job.kind=='manga' else '.mp4'),bytes=job.file.stat().st_size)
+                         filename=(re.sub(r'[<>:"/\\|?*\x00-\x1f]','_',job.manga['name']).strip(' .') or 'Манга')+'.'+job.manga['format'] if job.manga else (re.sub(r'[<>:"/\\|?*\x00-\x1f]','_',job.name).strip(' .') or 'MediaVault-'+job.id[:8])+('.cbz' if job.kind=='manga' else '.mp4'))
+            if job.file:value['bytes']=job.file.stat().st_size
         return value
     def _owned(self,owner,identity):
         job=self.jobs.get(identity)
         if job is None or job.owner!=owner or job.expires<self.clock():raise ExportMissing()
         return job
-    def start(self,owner,url,kind,quality='best',referer=None,manga=None,stream=None,name=''):
+    def start(self,owner,url,kind,quality='best',referer=None,manga=None,stream=None,name='',alloha_mode=None,alloha_importer=None):
         manga=MangaOptions.model_validate(manga).model_dump() if manga is not None else None
         staged=None
         if stream is not None:
@@ -212,7 +262,7 @@ class Exports:
         referer=public_url(referer,resolve_dns=False) if referer else None
         with self.condition:
             self._cleanup()
-            same=None if staged else next((j for j in self.jobs.values() if j.owner==owner and j.url==url and j.kind==kind and j.quality==quality and j.referer==referer and j.manga==manga and j.state in {'staging','queued','running','done'}),None)
+            same=None if staged else next((j for j in self.jobs.values() if j.owner==owner and j.url==url and j.kind==kind and j.quality==quality and j.referer==referer and j.manga==manga and j.alloha_mode==alloha_mode and j.state in {'staging','queued','running','done'}),None)
             if same:return self._snapshot(same)
             active=[j for j in self.jobs.values() if j.running or j.state in {'queued','staging'}]
             if len(active)>=4 or sum(j.owner==owner for j in active)>=2:raise ExportLimit('Дождись скачивания или останови предыдущее задание.')
@@ -221,6 +271,11 @@ class Exports:
             if shutil.disk_usage(self.root).free<self.reserve+32*1024**2:raise ExportLimit('На сервере недостаточно места для временного скачивания.')
             identity=secrets.token_hex(16);now=self.clock();job=Export(identity,owner,url,kind,quality,now,now+self.ttl,self.root/identity,referer=referer)
             job.manga=manga;job.staged=staged;job.name=str(name or '')[:120]
+            job.alloha_mode=alloha_mode;job.alloha_importer=alloha_importer
+            if job.pipe_to_device:
+                job.state='done';job.progress={'phase':'ready'}
+                self.jobs[identity]=job
+                return self._snapshot(job)
             if staged:
                 job.state='staging';job.progress={'phase':'staging'};job.directory.mkdir(mode=0o700)
                 self.jobs[identity]=job;return {**self._snapshot(job),'resources':staged['urls']}
@@ -282,13 +337,20 @@ class Exports:
     def acquire(self,capability):
         with self.lock:
             self._cleanup();job=next((j for j in self.jobs.values() if j.capability==capability and j.state=='done' and j.capability_expires>self.clock()),None)
-            if not job or not job.file or not job.file.is_file():raise ExportMissing()
+            if not job or (not job.pipe_to_device and (not job.file or not job.file.is_file())):raise ExportMissing()
+            if job.pipe_to_device:
+                if job.leases:raise ExportLimit('Этот файл уже передаётся.')
+                job.cancel.clear()
+                job.expires=max(job.expires,self.clock()+4*3600)
             job.leases+=1;return job,self._snapshot(job)
-    def release(self,job,completed=False):
+    def release(self,job,completed=False,aborted=False):
         with self.lock:
             job.leases=max(0,job.leases-1)
             if completed and not job.leases and job.state=='done':
                 job.state='downloaded';job.capability='';job.file=None;self._remove(job.directory)
+            elif aborted and job.pipe_to_device and not job.leases:
+                job.expires=min(job.expires,self.clock()+self.ttl)
+                self._remove(job.directory)
             self._cleanup()
     def _worker(self):
         while True:
@@ -298,12 +360,15 @@ class Exports:
                 job=next((j for j in self.jobs.values() if j.state=='queued'),None)
                 if job is None:self.condition.wait(timeout=10);continue
                 job.state='running';job.running=True;job.progress={'phase':'preparing'};job.directory.mkdir(mode=0o700,exist_ok=True)
+                if job.alloha and job.alloha_importer:job.expires=max(job.expires,self.clock()+3*3600+600)
             def progress(value):
                 if job.cancel.is_set():raise ExportCancelled()
                 with self.lock:
                     job.progress={k:v for k,v in value.items() if k in {'phase','message','page','chapter','chaptersTotal','loaded','total','downloadedBytes','pagesLoaded','pagesTotal'} and isinstance(v,(str,int,float))}
             try:
-                maximum=min(GiB if job.kind=='manga' else 2*GiB,max(0,(shutil.disk_usage(self.root).free-self.reserve-128*1024**2)//2))
+                streaming=job.alloha and job.alloha_importer
+                free=max(0,shutil.disk_usage(self.root).free-self.reserve-128*1024**2)
+                maximum=min(12*GiB if streaming else GiB if job.kind=='manga' else 2*GiB,free if streaming else free//2)
                 if maximum<16*1024**2:raise ExportProblem('На сервере недостаточно места для временного файла.')
                 path=Path(self.producer(job,progress,maximum,self.reserve)).resolve()
                 if job.cancel.is_set():raise ExportCancelled()
@@ -331,7 +396,7 @@ class Exports:
         with self.condition:
             self.stopping=True
             for job in self.jobs.values():
-                if job.running or job.state in {'queued','staging'}:job.cancel.set()
+                if job.running or job.state in {'queued','staging'} or job.pipe_to_device and job.leases:job.cancel.set()
             self.condition.notify_all()
         if self.thread.is_alive():self.thread.join(timeout=6)
 
@@ -361,12 +426,14 @@ class ExportRequest(BaseModel):
     manga:MangaOptions|None=None
     stream:StagedStream|None=None
     name:str=Field(default='',max_length=120)
+    alloha_mode:Literal['bnsi','browser']|None=Field(default=None,alias='allohaMode')
 
 def install(app,owner):
     @app.post('/online/exports',status_code=202)
     def create_export(body:ExportRequest,subject=Depends(owner)):
         try:return manager().start(subject,body.url,body.kind,body.quality,referer=body.referer,manga=body.manga.model_dump() if body.manga else None,
-                                   stream=body.stream.model_dump() if body.stream else None,name=body.name)
+                                   stream=body.stream.model_dump() if body.stream else None,name=body.name,
+                                   alloha_mode=body.alloha_mode,alloha_importer=getattr(app.state,'alloha_importer',None))
         except (ValueError,SourceError) as error:raise HTTPException(422,str(error)) from None
         except ExportLimit as error:raise HTTPException(429,str(error)) from None
     @app.put('/online/exports/{identity}/pages/{chapter}/{page}')
@@ -394,6 +461,17 @@ def install(app,owner):
     def export_file(capability:str):
         try:job,value=manager().acquire(capability)
         except ExportMissing:raise HTTPException(410,'Ссылка скачивания истекла. Открой готовое задание снова.') from None
+        except ExportLimit as error:raise HTTPException(429,str(error)) from None
+        if job.pipe_to_device:
+            try:
+                video=job.alloha_importer.stream(job.url,job.directory,quality=job.quality,referer=job.referer,
+                                                 mode=job.alloha_mode,cancelled=job.cancel.is_set)
+                opened=video.opened()
+                opened.__enter__()
+            except Exception as error:
+                manager().release(job,aborted=True)
+                raise HTTPException(502,str(error) if isinstance(error,SourceError) else 'Alloha не подготовил видео.') from None
+            return AllohaDownloadResponse(job,manager(),value['filename'],video,opened)
         try:
             mime={'pdf':'application/pdf','zip':'application/zip','cbz':'application/vnd.comicbook+zip'}[job.manga['format']] if job.manga else 'application/vnd.comicbook+zip' if job.kind=='manga' else 'video/mp4'
             return LeaseFileResponse(job.file,filename=value['filename'],media_type=mime,

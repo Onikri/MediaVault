@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response,StreamingResponse
 from pydantic import BaseModel,ConfigDict,Field
 from source_parser import PublicHttp,Resolver,SourceAccessError,SourceError,is_alloha_player,public_url
+from typing import Literal
 
 @dataclass
 class Session:
@@ -110,6 +111,7 @@ class Prepare(BaseModel):
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
     purpose:str=Field(default='playback',pattern='^(playback|preview)$')
     refresh:bool=False
+    alloha_mode:Literal['bnsi','browser']|None=Field(default=None,alias='allohaMode')
     client_id:str=Field(default='',alias='clientId',max_length=100,pattern=r'^[A-Za-z0-9:_-]*$')
 
 _hls_option=[]
@@ -300,7 +302,7 @@ def install(app,owner,exports_owner=None):
                 if not service or token not in service.sessions:
                     raise HTTPException(410,'Сессия Alloha завершена.')
                 session=service.sessions[token]
-                if session.closed or session.expires<=service.clock() or session.source.socket_closed:
+                if session.closed or session.expires<=service.clock() or getattr(session.source,'socket_closed',False):
                     raise HTTPException(410,'Сессия Alloha завершена.')
                 return {'expiresIn': max(0, int(session.expires-service.clock()))}
             s.expires=time.monotonic()+LEASE_SECONDS
