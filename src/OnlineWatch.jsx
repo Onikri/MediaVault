@@ -39,12 +39,14 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const identity=String(item.ids?.mal||item.id),saved=useRef(readWatch(userId,identity));
  const playbackMetadata=useMemo(()=>({...profile,ids:item.ids}),[profile,item.ids]);
  const languageFilter=useContentLanguage();
- const voices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,catalogueSeasonHint(item)),saved.current,{filter:languageFilter,prefer:preferredVoiceLanguage(languageFilter),preferName:voiceHintFor(item)}),[discovery.data,item,languageFilter]);
+ const titleSeason=catalogueSeasonHint(item);
+ const titleVoices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,titleSeason),saved.current,{filter:languageFilter,prefer:preferredVoiceLanguage(languageFilter),preferName:voiceHintFor(item)}),[discovery.data,item,titleSeason,languageFilter]);
  // A scene found by frame search names this work's own episode, so the saved
  // season of earlier viewing must not override it.
  const sceneJump=useRef(readSceneJump(identity));
  const initialSeason=catalogueSeasonHint(basisItem)||(sceneJump.current?1:saved.current.season)||1;
  const [voiceId,setVoiceId]=useState(saved.current.voiceId||''),[episode,setEpisode]=useState(sceneJump.current?.episode||saved.current.episode||1),[season,setSeason]=useState(initialSeason);
+ const voices=useMemo(()=>titleSeason?titleVoices:voicesForCatalogue(titleVoices,discovery.data?.sources,season),[titleVoices,discovery.data?.sources,titleSeason,season]);
  const [browseSeason,setBrowseSeason]=useState(initialSeason),[browseData,setBrowseData]=useState(null),[browseBusy,setBrowseBusy]=useState(false),[browseError,setBrowseError]=useState(''),[browseAttempt,setBrowseAttempt]=useState(0);
  const [audioId,setAudioId]=useState(saved.current.audioId||''),[subtitleId,setSubtitleId]=useState(saved.current.subtitleId||'');
  const [entries,setEntries]=useState([]),[seasons,setSeasons]=useState([]),[variant,setVariant]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[playing,setPlaying]=useState(false),[count,setCount]=useState(24);
@@ -57,7 +59,9 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const trackClient=useRef('watch-'+crypto.randomUUID());
  const failed=useRef(new Set()),cache=useRef(new Map()),seasonUrls=useRef(new Map()),tracked=useRef('');
  const refreshedAlloha=useRef(new Set());
- const voice=voices.find(v=>v.id===voiceId||v.aliases?.includes(voiceId))||voices[0];activeVoiceName.current=voice?.name||'';
+ const voice=voices.find(v=>v.id===voiceId||v.aliases?.includes(voiceId))
+  ||(voiceId&&voices.find(v=>v.kind!=='subtitles'&&voiceEpisodeCount(v,season)))||voices[0];activeVoiceName.current=voice?.name||'';
+ const browseVoice=titleVoices.find(v=>v.id===voice?.id);
  const allohaRevision=(voice?.variants||[]).filter(isAllohaVariant).map(v=>v.id+':'+v.url).join('|');
  function persist(change){saved.current=saveWatch(userId,identity,change);}
  useEffect(()=>{if(voice&&voice.id!==voiceId)setVoiceId(voice.id);},[voice?.id,voiceId]);
@@ -91,10 +95,10 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
    catch(e){signal.throwIfAborted();last=e;}
   }throw last||Error('Эта серия не ответила ни в одном источнике выбранной озвучки.');
  }
- useEffect(()=>{if(!voice)return;const abort=new AbortController(),resolving=voice.id;settledVoice.current='';setBusy(true);setVariant(null);setError('');
+ useEffect(()=>{if(!voice){setEntries(noEntries);setVariant(null);setBusy(false);setError('');return;}const abort=new AbortController(),resolving=voice.id;settledVoice.current='';setBusy(true);setVariant(null);setError('');
   resolve(voice,episode,abort.signal,failed.current,season,playing||!!sceneJump.current).then(value=>{if(abort.signal.aborted)return;setEntries(value.entries);setSeasons(value.seasons);setVariant(value.variant);if(value.season!==season){setSeason(value.season);setBrowseSeason(value.season);}const selected=value.entries.find(e=>Number(e.number)===Number(episode))||value.entries[0];setEpisode(Number(selected.number));persist({voiceId:voice.id,episode:Number(selected.number),season:value.season});settledVoice.current=resolving;}).catch(e=>{if(!abort.signal.aborted){setVariant(null);setError(e.message);settledVoice.current=resolving;}}).finally(()=>!abort.signal.aborted&&setBusy(false));
   return()=>abort.abort();
- },[voice?.id,season,attempt,service.server]);
+ },[voice?.id,allohaRevision,season,attempt,service.server]);
  useEffect(()=>{
   if(variant&&failed.current.has(variant.id)&&variantsFor(voice,episode,failed.current).length)setAttempt(n=>n+1);
  },[allohaRevision]);
@@ -171,11 +175,11 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const current=viewEntries.find(e=>Number(e.number)===Number(episode))||viewEntries[0];
  // Browsing another season is metadata work; it never mutates the active session.
  useEffect(()=>{
-  if(browseSeason===season||!voice){setBrowseBusy(false);return;}
+  if(browseSeason===season||!browseVoice){setBrowseBusy(false);return;}
   const abort=new AbortController();setBrowseData(null);setBrowseBusy(true);setBrowseError('');
-  resolve(voice,1,abort.signal,new Set(),browseSeason,false).then(value=>{if(!abort.signal.aborted)setBrowseData({...value,season:browseSeason});}).catch(e=>{if(!abort.signal.aborted)setBrowseError(e.message);}).finally(()=>{if(!abort.signal.aborted)setBrowseBusy(false);});
+  resolve(browseVoice,1,abort.signal,new Set(),browseSeason,false).then(value=>{if(!abort.signal.aborted)setBrowseData({...value,season:browseSeason});}).catch(e=>{if(!abort.signal.aborted)setBrowseError(e.message);}).finally(()=>{if(!abort.signal.aborted)setBrowseBusy(false);});
   return()=>abort.abort();
- },[browseSeason,season,voice?.id,browseAttempt,service.server]);
+ },[browseSeason,season,browseVoice?.id,browseAttempt,service.server]);
  const browsingOther=browseSeason!==season;
  const foreignBusy=browsingCatalog&&(foreign.busy||foreign.loading),foreignError=browsingCatalog&&(foreign.error||foreign.discovery.error);
  const displayRows=browsingCatalog?foreign.row:browsingOther?(browseData?.season===browseSeason?browseData:null):{entries:viewEntries,variant:viewVariant,voiceId:videoVoiceId};
@@ -265,7 +269,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  // Without a profile the page never reaches the server, so there is nothing to
  // search yet: say so instead of offering an empty voice picker.
  const signedOut=['disconnected','unconfigured'].includes(service.status)&&!service.session,locked=guestLocked(service.session,item);
- const idleCurrent=browsingCatalog?foreign.row?.entries[0]:current,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
+ const idleCurrent=browsingCatalog?foreign.row?.entries[0]:viewVariant?current:null,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
  const warmCurrent=usePlaybackWarmup({entry:idleCurrent,sourceUrl:idleVariant?.sourceUrl,quality,service,enabled:!playing&&!idleBusy&&!isAllohaVariant(idleVariant),anchor:sourceButton});
  const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:audioId||voice?.id,
   onVoice:id=>{const value=id===voice?.id?'':id;setAudioId(value);persist({audioId:value});},
@@ -280,7 +284,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
      <h1>{profile.title||item.title}</h1>
      {locked?<p className="mvx-meta" role="status"><span>Владелец пока не открыл тебе этот тайтл. Попроси его добавить тайтл в твой гостевой доступ.</span></p>
       :signedOut?<p className="mvx-meta" role="status"><span>Чтобы смотреть онлайн, войди в профиль: озвучки ищет твой сервер MediaVault</span></p>
-      :!voices.length&&discovery.data&&!discovery.loading?<p className="mvx-meta" role="status"><span>Ни один сайт-источник пока не опубликовал этот тайтл с озвучкой или субтитрами. Загляни позже — поиск повторится при следующем открытии.</span></p>
+      :!voices.length&&discovery.data&&!discovery.loading?<p className="mvx-meta" role="status"><span>{titleVoices.length?'Найденные озвучки доступны в других сезонах.':'Источники пока не нашли этот тайтл с озвучкой или субтитрами.'}</span></p>
       :idleBusy?<p className="mvx-meta mvx-idle-busy" role="status"><span className="mvx-spinner"/><span>Подбираем озвучки, качества и серии</span></p>
       :<p className="mvx-meta">{idleCurrent&&<span>Серия {idleCurrent.number}</span>}{(browsingCatalog?familySeason?.name:activeFamilySeason?.name)&&<span>{browsingCatalog?familySeason?.name:activeFamilySeason?.name}</span>}{voice&&<span>{voice.name}</span>}<span>{quality==='best'?'Лучшее качество':quality+'p'}</span></p>}
      {locked?<button type="button" className="mvx-primary" disabled>Нет доступа</button>

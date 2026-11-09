@@ -37,7 +37,7 @@ export function voicesForCatalogue(voices,sources,season){
  return voices.map(voice=>({...voice,variants:voice.variants.flatMap(variant=>{
   if(!bundled.has(variant.sourceUrl)||!variant.episodes?.length)return [variant];
   const episodes=variant.episodes.filter(e=>Number(e.season||1)===Number(season));
-  return episodes.length?[{...variant,episodes,url:episodes[0].url}]:[];
+  return episodes.length?[{...variant,episodes,url:episodes[0].url||variant.url}]:[];
  })})).filter(voice=>voice.variants.length);
 }
 

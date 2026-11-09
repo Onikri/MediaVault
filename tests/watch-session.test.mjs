@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readWatch,saveWatch,orderedVoices,variantsFor,episodeAlternatives,onlineEpisodeId} from '../src/watch-session.js';
+import {readWatch,saveWatch,orderedVoices,variantsFor,episodeAlternatives,onlineEpisodeId,voicesForCatalogue} from '../src/watch-session.js';
 import {animeSeason,browseHref,browseRoute,voiceEpisodeCount} from '../src/anime-navigation.js';
 test('facet routes preserve Cyrillic labels and special studio characters without executable URLs',()=>{
  const href=browseHref('studio','','34','Studio & Name');assert.ok(href.startsWith('#'));
@@ -14,6 +14,21 @@ test('calendar seasons follow the actual first release date and reject missing o
 test('voice episode counts deduplicate sources within the selected season',()=>{
  const v={variants:[{episodes:[{number:1,season:1},{number:2,season:1}]},{episodes:[{number:1,season:1},{number:1,season:2},{number:'unknown'}]}]};
  assert.equal(voiceEpisodeCount(v,1),2);assert.equal(voiceEpisodeCount(v,2),1);
+});
+test('the selected season hides Alloha dubs published only for later seasons',()=>{
+ const sourceUrl='https://alloha.yani.tv/';
+ const season1={number:1,season:1,url:sourceUrl+'?season=1&episode=1'};
+ const season2={number:1,season:2,url:sourceUrl+'?season=2&episode=1'};
+ const band={id:'band',name:'Студийная Банда',variants:[{sourceUrl,player:'Alloha',url:season2.url,episodes:[season2,{number:1,season:3}]}]};
+ const amazing={id:'amazing',name:'Amazing Dubbing',variants:[{sourceUrl,player:'Alloha',url:season2.url,episodes:[season1,season2]}]};
+ const voices=[band,amazing],sources=[{url:sourceUrl,seasons:[{number:1},{number:2},{number:3}]}];
+ const first=voicesForCatalogue(voices,sources,1);
+ assert.deepEqual(first.map(v=>v.id),['amazing']);
+ assert.equal(first[0].variants[0].url,season1.url);
+ assert.deepEqual(voicesForCatalogue(voices,sources,2).map(v=>v.id),['band','amazing']);
+ assert.equal(amazing.variants[0].episodes.length,2);
+ const cached={...amazing,variants:[{...amazing.variants[0],episodes:[{number:1,season:1},{number:1,season:2}]}]};
+ assert.equal(voicesForCatalogue([cached],sources,1)[0].variants[0].url,season2.url);
 });
 test('online resume keeps logical episode and voice across changing source tokens, isolated by account',()=>{
  const entries=new Map(),storage={getItem:k=>entries.get(k),setItem:(k,v)=>entries.set(k,v)};
