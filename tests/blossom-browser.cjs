@@ -78,11 +78,12 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   if(width>640){const actionsAfter=await page.locator('.blossom-navbar .header-actions').boundingBox();
    assert.ok(actionsAfter.x>=actionsBefore-2,'right music and profile controls do not overlap opening search');
    assert.ok(slotExpanded.x+slotExpanded.width<=actionsAfter.x+2,'expanded search keeps a separate right-hand lane');
-   const leftNav=width>1000?await page.locator('.desktop-nav .nav-link').last().boundingBox():await page.locator('.header-brand-area .brand.logo').boundingBox();
-   assert.ok(leftNav.x+leftNav.width<=slotExpanded.x+2,'left navigation cannot overlap expanded search');}
+   // The sections step aside while the field is open; the brand stays clear of it.
+   const leftNav=await page.locator('.header-brand-area .brand.logo').boundingBox();
+   assert.ok(leftNav.x+leftNav.width<=slotExpanded.x+2,'the brand cannot overlap expanded search');}
   assert.equal(await dialog.locator('kbd').count(),0,'search displays no hotkey legends');
   assert.equal(await page.locator('.header-center-search kbd').count(),0,'navbar search displays no hotkey legend');
-  if(width===1280){await page.waitForTimeout(400);const navLinkAfter=(await page.locator('.desktop-nav .nav-link').first().boundingBox()).width;assert.ok(navLinkAfter<navLinkBefore,'text navigation shrinks when search opens');const first=await page.locator('.desktop-nav .nav-link').first().boundingBox();const item=await page.locator('.desktop-nav').boundingBox();assert.ok(Math.abs(first.y+first.height/2-item.y-item.height/2)<1,'navigation links stay vertically centered');}
+  if(width===1280){await page.waitForTimeout(400);const nav=await page.locator('.desktop-nav').evaluate(n=>({opacity:getComputedStyle(n).opacity,width:n.getBoundingClientRect().width,events:getComputedStyle(n).pointerEvents}));assert.ok(nav.opacity==='0'&&nav.width<1&&nav.events==='none','sections step aside while the search is open');}
   assert.equal(await page.locator('.morph-search-backdrop').count(),0,'search uses original floating glass panel without modal backdrop');
   await page.screenshot({path:path.join(dir,'search-'+width+'.png')});await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).inputValue(),'','first Escape clears the query like MorphingSearchChips');
