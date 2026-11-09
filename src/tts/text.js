@@ -34,7 +34,7 @@ export function numberWords(value,lang='ru'){
 export function speakable(text,lang='ru'){
  let value=String(text||'').normalize('NFC');
  value=value.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'');
- value=value.replace(/[«»„“”]/g,'"').replace(/[‘’ʼ`´]/g,'’').replace(/[–‑—]/g,'-');
+ value=value.replace(/[«»„“”]/g,'"').replace(/[‘’ʼ`´]/g,'’').replace(/[–‑—―]/g,'-');
  // A dialogue dash at the start of a line is layout, not speech.
  value=value.replace(/^\s*-\s+/,'');
  value=value.replace(/(\d+)[.,](\d+)/g,(m,a,b)=>numberWords(a,lang)+(lang==='uk'?' кома ':' запятая ')+numberWords(b,lang));

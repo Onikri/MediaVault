@@ -39,7 +39,7 @@ export default function RoleText({text,segments,colors,speaking,show=true}){
   const chip=label&&<b key={'n'+i} className="role-name" style={color?{'--role':color}:undefined} aria-label={(uiLanguage()==='uk'?'Говорить ':'Говорит ')+segment.speaker+(mood?', '+mood:'')}>{segment.speaker}{mood&&<i>{mood}</i>}</b>;
   const before=at>cursor?text.slice(cursor,at):'';
   // "— Line": the name goes before the dialogue dash, like a script.
-  const dash=chip&&/^\s*[—–-]\s*$/.test(before);
+  const dash=chip&&/^\s*[—–―-]\s*$/.test(before);
   if(dash)out.push(chip);
   if(before)out.push(before);
   out.push(<span key={i} data-segment={segment.id} className={'role-segment'+(speech?' role-speech':'')+(segment.kind==='thought'?' role-thought':'')+(segment.id===speaking?' is-speaking':'')} style={color?{'--role':color}:undefined}>

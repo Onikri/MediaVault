@@ -212,3 +212,62 @@ test('voice descriptions: from the bible, and the listener’s own words win',()
  assert.match(rows[0].style,/голос рассказчика: бодрый молодой голос/);assert.match(rows[1].style,/голос героя: шёпотом, как призрак/);
  assert.equal(geminiCast(cast,{narrator:'Charon',saved:{Старик:{voice:'Puck',note:'x'}}}).Старик,'Puck','a saved {voice, note} keeps its voice');
 });
+
+const split=text=>splitParagraph(text).map(p=>p.kind[0]+':'+p.text);
+test('author words inside a line go to the narrator: hyphens and dashes without spaces',()=>{
+ assert.deepEqual(split('- Ну и что будем с ними делать?- спросил я управляющего, что сидел здесь с самого начала.'),
+  ['s:Ну и что будем с ними делать?','n:спросил я управляющего, что сидел здесь с самого начала.']);
+ assert.deepEqual(split('- Тоука, у нас в стойке лежала верёвка, не могла бы ты принести мне её?- попросил он Тоуку и она сразу убежала.- И Канеки, не мог бы ты принести стулья?'),
+  ['s:Тоука, у нас в стойке лежала верёвка, не могла бы ты принести мне её?','n:попросил он Тоуку и она сразу убежала.','s:И Канеки, не мог бы ты принести стулья?']);
+ assert.deepEqual(split('- Откуда ты...- недоумевал Аято.'),['s:Откуда ты...','n:недоумевал Аято.']);
+ assert.deepEqual(split('- Ну как дела?- задал риторический вопрос я.- Вы случайно не Ризе искали?'),
+  ['s:Ну как дела?','n:задал риторический вопрос я.','s:Вы случайно не Ризе искали?']);
+});
+
+test('author words: every dash, with and without spaces, after ? ! . … ... and ,',()=>{
+ assert.deepEqual(split('― Привет,― сказал он,― как дела?'),['s:Привет,','n:сказал он,','s:как дела?']);
+ assert.deepEqual(split('– Где ты?– спросила она.'),['s:Где ты?','n:спросила она.']);
+ assert.deepEqual(split('—Куда?—удивился Кайто.—Стой!'),['s:Куда?','n:удивился Кайто.','s:Стой!']);
+ assert.deepEqual(split('- Привет, - сказал он. - Как дела?'),['s:Привет,','n:сказал он.','s:Как дела?']);
+ assert.deepEqual(split('- Слушай…- протянул Кайто, глядя в окно.- Ты ведь не уйдёшь?'),['s:Слушай…','n:протянул Кайто, глядя в окно.','s:Ты ведь не уйдёшь?']);
+ assert.deepEqual(split('- Стой!- крикнула Оксана.'),['s:Стой!','n:крикнула Оксана.']);
+ assert.deepEqual(split('- Где?- Спросил он.'),['s:Где?','n:Спросил он.'],'a capital verb with its subject');
+ assert.deepEqual(split('- Знаешь,- говорит она,- я передумала.'),['s:Знаешь,','n:говорит она,','s:я передумала.']);
+ assert.deepEqual(split('- Де ти був?- запитала Оксана.'),['s:Де ти був?','n:запитала Оксана.']);
+ // Spaced en and em dashes alternate exactly as before.
+ assert.deepEqual(split('— Ты опять опоздал, — недовольно сказала Мирэй. — Почему?'),['s:Ты опять опоздал,','n:недовольно сказала Мирэй.','s:Почему?']);
+ assert.deepEqual(split('— Москва — столица.'),['s:Москва','n:столица.']);
+});
+
+test('author words in quotations with any dash',()=>{
+ assert.deepEqual(split('«Ну как дела?»- задал риторический вопрос я. «Вы случайно не Ризе искали?»'),
+  ['s:Ну как дела?','n:- задал риторический вопрос я.','s:Вы случайно не Ризе искали?']);
+ assert.deepEqual(split('„Подожди“ ― попросила она.'),['s:Подожди','n:― попросила она.']);
+ assert.deepEqual(split('"Стой!" - крикнул он.'),['s:Стой!','n:- крикнул он.']);
+ const rows=geminiRows(heuristicRoles(['«Нет»- ответил он.']),{cast:{},voices:{},narrator:'Charon'});
+ assert.deepEqual(rows.map(r=>r.text),['Нет','ответил он.']);
+});
+
+test('author words: hyphens in words, plain dashes and doubtful lines stay as they were',()=>{
+ assert.deepEqual(split('- Кто-то из-за угла вышел.'),['s:Кто-то из-за угла вышел.']);
+ assert.deepEqual(split('- Я - твой отец.'),['s:Я - твой отец.']);
+ assert.deepEqual(split('- Где ты был?- Я сказал тебе, жди!'),['s:Где ты был?- Я сказал тебе, жди!'],'a new capital sentence is still speech');
+ assert.deepEqual(split('- Где ты был?- Сказал же, дома.'),['s:Где ты был?- Сказал же, дома.'],'a capital verb without a subject');
+ assert.deepEqual(split('- Пойдём.- Он сел на стул.'),['s:Пойдём.- Он сел на стул.'],'no speech or thought verb');
+ assert.deepEqual(split('- Ну,- начало положено.'),['s:Ну,- начало положено.'],'a noun that looks like a verb');
+ assert.deepEqual(split('- Да,- прошу тебя.'),['s:Да,- прошу тебя.'],'a present form without a subject');
+ assert.deepEqual(split('- Привет- сказал он.'),['s:Привет- сказал он.'],'no punctuation before the dash');
+ assert.deepEqual(split('Он шёл домой - было поздно.'),['n:Он шёл домой - было поздно.']);
+ assert.deepEqual(split('Он шёл домой, - сказал он мне.'),['n:Он шёл домой, - сказал он мне.'],'author text without a dialogue dash');
+ assert.deepEqual(split('Стадион «Зенит»-Арена был полон.'),['n:Стадион «Зенит»-Арена был полон.']);
+});
+
+test('author words inside a line are read by the narrator and keep the speaker around them',()=>{
+ const segments=heuristicRoles(['- Ну как дела?- задал риторический вопрос я.- Вы случайно не Ризе искали?']);
+ assert.deepEqual(segments.map(s=>s.kind),['speech','narration','speech']);
+ const parsed=parseRoles({lines:['0|S|Канеки|neutral|3','2|S|Канеки|neutral|3'],moods:[],cast:['Канеки|m|young|спокойный']});
+ const out=applyRoles(segments,parsed);
+ assert.deepEqual(out.map(s=>s.speaker),['Канеки','','Канеки']);
+ const rows=geminiRows(out,{cast:{Канеки:{gender:'m'}},voices:{Канеки:'Puck'},narrator:'Charon'});
+ assert.deepEqual(rows.map(r=>r.voice),['Puck','Charon','Puck']);
+});

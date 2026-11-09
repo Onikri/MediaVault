@@ -56,15 +56,78 @@ export function quotations(value){
  return out;
 }
 
+// The author's words inside a line ("— Где?- спросил я.- Ты…"). Novels and
+// fan translations write them in many ways: a hyphen, an en or em dash or a
+// horizontal bar, with or without spaces, after ? ! . … , — so a dash counts
+// only after the line's closing punctuation, and only when a speech or
+// thought verb with its subject follows. In doubt the paragraph stays as it was.
+const AUTHOR_STEMS=('спроси попроси проси переспроси сказа ответи отвеча спрашива крикну вскрикну выкрикну окликну закрича крича вскрича заора ора '+
+ 'завопи пискну прошепта шепта шепну буркну воскликну пробормота бормота пробубни промямли пролепета лепета рявкну гаркну рыкну прорыча '+
+ 'выдохну протяну усмехну ухмыльну улыбну засмея рассмея хохотну хихикну хмыкну фыркну прысну вздохну всхлипну простона застона ахну охну '+
+ 'добави продолжи замети возрази согласи переби перебива прерва позва отозва откликну подтверди уточни уточня повтори напомни '+
+ 'недоумева удиви удивля изуми поинтересова интересова говори проговори заговори объясни поясни предложи потребова приказа скомандова '+
+ 'обрати зада подума дума задума размышля реши вспомни призна сообщи заяви объяви рассказа пошути съязви огрызну отреза броси процеди '+
+ 'прохрипе прошипе пропе пожалова возмути вмеша подхвати отреагирова выпали выдави поддакну отмахну кивну замолча помолча запну нача '+
+ 'взмоли встави парирова растеря опеши обиде спохвати ляпну сболтну заикну подмигну откашля прокашля '+
+ 'відпові запита спита перепита прошепоті прошепота вигукну пробурмоті зітхну засмія усміхну посміхну дода зауважи заперечи мови промови '+
+ 'озва поцікави здивува хмикну пирхну').split(' ');
+// Past forms (masculine, feminine, plural; Ukrainian -в) with -ся/-сь. Neuter
+// -ло is left out: "начало", "дело" are nouns.
+const AUTHOR_PAST=new RegExp('^(?:'+AUTHOR_STEMS.join('|')+')(?:л|ла|ли|в)(?:ся|сь)?$');
+const AUTHOR_PAST_OTHER=new Set('произнес произнесла произнесли осекся осеклась осеклись'.split(' '));
+// Present forms also occur inside a line ("Да, прошу тебя"): they need a subject.
+const AUTHOR_PRESENT=new Set(('говорит говорю спрашивает спрашиваю отвечает отвечаю кричит шепчет бормочет просит добавляет продолжает '+
+ 'вздыхает думает думаю недоумевает интересуется уточняет возражает усмехается улыбается смеется каже кажу питає відповідає шепоче думає').split(' '));
+const SUBJECTS=new Set('я он она оно они мы ты вы кто-то він вона воно вони ми ти ви хтось'.split(' '));
+const plainWord=w=>w.toLowerCase().replace(/ё/g,'е');
+const pastVerb=w=>AUTHOR_PAST.test(plainWord(w))||AUTHOR_PAST_OTHER.has(plainWord(w));
+const authorVerb=w=>pastVerb(w)||AUTHOR_PRESENT.has(plainWord(w));
+const isName=w=>/^\p{Lu}[\p{Ll}’'-]+$/u.test(w)&&!NOT_NAMES.has(w)&&!authorVerb(w);
+// rest: the text right after the dash. The insert ends at its first sentence end.
+export function authorInsert(rest){
+ const insert=String(rest).split(/[.!?…;:]|[—–―]|\s-\s|,\s*-/)[0];
+ const words=(insert.match(/[\p{L}’'-]+/gu)||[]).slice(0,6);
+ if(!words.length)return false;
+ const at=words.slice(0,3).findIndex(authorVerb);
+ if(at<0)return false;
+ const subject=words.some((w,i)=>i!==at&&(SUBJECTS.has(plainWord(w))||isName(w)));
+ // After ? ! … , the author's words start in lower case; a capital first word
+ // is a new line unless it is the verb itself ("Спросил он").
+ if(/^\p{Lu}/u.test(words[0]))return at===0&&subject;
+ return subject||(at===0&&pastVerb(words[0]));
+}
+
+const DIALOGUE_DASH=/^[—–―-]\s*/;
+// "— Speech, — author. — Speech." Spaced en and em dashes alternate the parts
+// as before; other dashes (a hyphen, a bar, a dash without spaces) only after
+// the closing punctuation of the part: ?! . … , and, to leave the line, the
+// author's words checked by authorInsert.
+function splitDialogue(value){
+ const body=value.replace(DIALOGUE_DASH,''),parts=[];
+ let kind='speech',from=0;
+ for(const m of body.matchAll(/(\s*)([—–―-])(\s*)/g)){
+  const at=m.index,end=at+m[0].length,rest=body.slice(end);
+  if(at<=from||!rest.trim())continue;
+  const classic=m[1]&&m[3]&&/[—–]/.test(m[2]);
+  const punct=(/[,.!?…]["»”']?$/.exec(body.slice(from,at))||[''])[0];
+  let cut=classic;
+  if(!cut&&punct){
+   if(kind==='speech')cut=authorInsert(rest);
+   // Back to the line: after a comma, or a new sentence with a capital.
+   else cut=punct.startsWith(',')||/^["«„“]?\p{Lu}/u.test(rest);
+  }
+  if(!cut)continue;
+  parts.push({kind,text:body.slice(from,at).trim()});
+  from=end;kind=kind==='speech'?'narration':'speech';
+ }
+ parts.push({kind,text:body.slice(from).trim()});
+ return parts.filter(p=>p.text);
+}
+
 // Split one paragraph into speech and author parts.
 export function splitParagraph(text){
  const value=String(text||'').trim();if(!value)return [];
- const dash=/^[—–-]\s*/;
- if(dash.test(value)){
-  // "— Speech, — author. — Speech." : parts alternate around " — ".
-  const parts=value.replace(dash,'').split(/\s[—–]\s/);
-  return parts.map((part,i)=>({kind:i%2===0?'speech':'narration',text:part.trim()})).filter(p=>p.text);
- }
+ if(DIALOGUE_DASH.test(value))return splitDialogue(value);
  // A quotation is speech when it opens the paragraph or a sentence, follows a
  // colon or is followed by the author's dash («Нет», — ответил он). Quotes in
  // the middle of a sentence (a sign, a title, a nickname) stay author text.
@@ -72,7 +135,9 @@ export function splitParagraph(text){
  const quoted=[];let last=0;
  for(const [from,to] of quotations(value)){
   const before=value.slice(0,from),after=value.slice(to);
-  if(!(/(^|[.!?…:]\s*|[—–]\s*)$/.test(before.trimEnd()?before:'')||/^\s*[,.!?…]?\s*[—–]/.test(after)))continue;
+  // A hyphen counts as the author's dash only with a space or after
+  // punctuation: «Зенит»-Арена is a name, «Нет»- ответил он is dialogue.
+  if(!(/(^|[.!?…:]\s*|[—–―]\s*|(?:^|\s|[.!?…,])-\s*)$/.test(before.trimEnd()?before:'')||/^(?:\s*[,.!?…]?\s*[—–―]|\s*[,.!?…]\s*-|\s*-\s)/.test(after)))continue;
   const inner=value.slice(from+1,value[to-1]&&CLOSE.has(value[to-1])?to-1:to).trim();if(inner.length<2)continue;
   if(from>last)quoted.push({kind:'narration',text:value.slice(last,from).trim()});
   quoted.push({kind:'speech',text:inner,quote:true});last=to;
