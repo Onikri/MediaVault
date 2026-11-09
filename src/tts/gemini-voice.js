@@ -51,16 +51,19 @@ export function geminiNarrator(bible,choice='auto'){
  if(choice==='m'||choice==='f')return NARRATORS[choice];
  const n=bible?.narrator;
  if(!n)return NARRATORS.m;
+ if(GENDER[n.geminiVoice])return n.geminiVoice;
  return n.gender==='f'?(n.timbre==='warm'||n.timbre==='soft'?'Sulafat':'Kore'):(n.age==='old'||n.timbre==='dark'?'Schedar':'Charon');
 }
 
 // cast: the Supertonic casting (gender, age, timbre per character) reused for
-// order and character facts; saved: the listener's own choices {name: voice}.
-export function geminiCast(cast,{narrator,saved={}}={}){
+// order and character facts; saved: the listener's own choices {name: voice};
+// self: the hero who tells a first-person story — they speak with the narrator's voice.
+// The director's pick (geminiVoice) is used while no one else has that voice.
+export function geminiCast(cast,{narrator,saved={},self=''}={}){
  const used=new Set([narrator]),result={};
  for(const [name,value] of Object.entries(cast)){
   const own=typeof saved[name]==='object'?saved[name]?.voice:saved[name];
-  const voice=GENDER[own]?own:pickGeminiVoice(value,used);
+  const voice=GENDER[own]?own:name===self?narrator:GENDER[value.geminiVoice]&&!used.has(value.geminiVoice)?value.geminiVoice:pickGeminiVoice(value,used);
   used.add(voice);result[name]=voice;
  }
  return result;
@@ -82,7 +85,7 @@ function chunks(text,limit=300){
  return out.filter(Boolean);
 }
 export function geminiRows(segments,{cast,voices,narrator,bible,pace=1,saved={}}){
- const narratorNote=voiceNote(saved,NARRATOR_NOTE)||(bible?.narrator?describeVoice(bible.narrator,{narrator:true}):'');
+ const narratorNote=voiceNote(saved,NARRATOR_NOTE)||(bible?.narrator?bible.narrator.voice||describeVoice(bible.narrator,{narrator:true}):'');
  const rows=[];
  for(const segment of segments){
   const own=segment.kind!=='narration'&&segment.speaker&&voices[segment.speaker];
@@ -117,7 +120,7 @@ export function geminiClip({service,userId,text,voice,style,language,signal}){
  (async()=>{
   const key=await personalKey(userId).catch(()=>'');
   const response=await service.request('/reader/google/speak',{method:'POST',raw:true,signal:signal||AbortSignal.timeout(180000),
-   body:{...(key?{key}:{}),text,voice,style,language:language==='uk'?'uk':'ru'}});
+   body:{...(key?{key,...(Number(service?.session?.serverVersion)>=60?{pool:true}:{})}:{}),text,voice,style,language:language==='uk'?'uk':'ru'}});
   const reader=response.body.getReader(),decode=pcmDecoder();
   for(;;){const {done,value}=await reader.read();if(done)break;const samples=decode(value);if(samples.length){clip.chunks.push(samples);update();}}
  })().catch(error=>{if(!signal?.aborted)clip.error=error;}).finally(()=>{clip.done=true;update();});

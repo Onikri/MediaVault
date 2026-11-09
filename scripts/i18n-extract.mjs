@@ -16,7 +16,7 @@ const CYRILLIC=/[А-Яа-яЁёІіЇїЄєҐґ]/;
 const OUT=path.join(ROOT,'src/i18n/source-strings.json');
 // Pure data modules (number words for speech synthesis) and model directions
 // (how the Gemini voice should deliver a line) contain no interface text.
-const DATA_FILES=new Set(['src/tts/text.js','src/tts/gemini-direction.js']);
+const DATA_FILES=new Set(['src/tts/text.js','src/tts/gemini-direction.js','src/tts/role-prompts.js']);
 
 // Long instructions and anything that talks to a model are not interface text.
 export function isPrompt(text){

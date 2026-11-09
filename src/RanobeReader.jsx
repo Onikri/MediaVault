@@ -73,7 +73,8 @@ export default function RanobeReader({book,item,start,service,userId,onClose,onM
  const narration=chapter&&<Narration key={entry.url} paragraphs={chapter.paragraphs} language={chapter.language||book.language} bookKey={book.url} chapterKey={entry.url}
   title={book.title+' · '+(chapter.title||entry.title)} book={{title:item?.title||book.title,aliases:item?.aliases,authors:item?.authors,description:item?.description,year:item?.year,kind:item?.kind||'ranobe'}} service={service} userId={userId} startParagraph={startParagraph} autoplay={continueVoice}
   onAutoplayHandled={()=>setContinueVoice(false)} onSpeaking={speakingRow} onFinished={()=>go(index+1,{keepVoice:true})}
-  onScript={setScript} commandRef={voice} onPlaying={setVoicePlaying}/>;
+  onScript={setScript} commandRef={voice} onPlaying={setVoicePlaying}
+  next={book.episodes[index+1]?{key:book.episodes[index+1].url,load:()=>readRanobeChapter(service,book.episodes[index+1].url,item).then(d=>d.paragraphs)}:null}/>;
  const byParagraph=script?segmentsByParagraph(script.segments):null;
  // The margin mark of the paragraph being read takes the speaker's colour.
  const speakerColor=speakingSegment!=null&&script?script.colors?.[script.segments.find(x=>x.id===speakingSegment)?.speaker]:undefined;

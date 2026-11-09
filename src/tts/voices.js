@@ -77,7 +77,8 @@ export function castVoices(segments,characters=[],{narrator='auto',saved={},bibl
   // Same preset twice: separate the two by pitch and timbre.
   if(used.has(Object.keys(value.voice)[0])){value.pitch=Math.max(-4,Math.min(4,value.pitch+(stableHash(name)%2?1.5:-1.5)));value.rate=Math.pow(2,value.pitch/12);value.eq={...value.eq,high:(value.eq.high||0)+(stableHash(name)%2?2:-2)};}
   used.add(Object.keys(value.voice)[0]);
-  cast[name]={...value,traits:c.traits||'',speech:c.speech||'',importance:c.importance||''};
+  // description and geminiVoice: the director's words for this voice and its Gemini pick.
+  cast[name]={...value,traits:c.traits||'',speech:c.speech||'',importance:c.importance||'',description:c.voice||'',geminiVoice:c.geminiVoice||''};
  }
  return cast;
 }

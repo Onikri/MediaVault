@@ -32,6 +32,9 @@ class Generate(BaseModel):
     slot:int|None=Field(default=None,ge=0,le=2)
     model:str
     request:dict
+    # Narration: a personal key joins the owner's server keys instead of
+    # replacing them (one more worker for the chapter passes).
+    pool:bool=False
 
 def install(app,owner,get_store):
     global _store
@@ -90,7 +93,8 @@ def install(app,owner,get_store):
             key=body.key.get_secret_value().strip()
             if not key or len(key)>512 or any(c.isspace() for c in key):raise HTTPException(422,'Проверь личный ключ Google.')
             known=next((r for r in rows if r['key']==key),{})
-            rows=[{'slot':None,'key':key,'project':known.get('project') or 'personal-shared'}]
+            mine={'slot':known.get('slot'),'key':key,'project':known.get('project') or 'personal-shared'}
+            rows=[mine]+([r for r in rows if r['key']!=key and (body.model in r.get('models',MODELS) or body.model in LATER_MODELS)] if body.pool and body.slot is None else [])
         else:
             rows=[r for r in rows if body.model in r.get('models',MODELS) or body.model in LATER_MODELS]
         if not rows:raise HTTPException(422,'Добавь серверный ключ Google для выбранной модели.')
@@ -99,19 +103,22 @@ def install(app,owner,get_store):
         # another project: the spent project gets its cooldown and is skipped.
         # A pinned slot (the manga queue spreads pages over keys) never moves.
         from google_gateway_limits import identity as key_identity,project as key_project
-        spare=[] if personal or body.slot is not None else list(rows)
+        spare=[] if body.slot is not None or (personal and not body.pool) else list(rows)
+        from google_gateway_limits import estimate
+        tokens=estimate(request)
         try:
             while True:
-                lease=await state().acquire(spare or rows,model,preferred=body.slot,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),disconnected=connection.is_disconnected)
+                lease=await state().acquire(spare or rows,model,preferred=body.slot,tokens=tokens,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),disconnected=connection.is_disconnected)
                 row,call=lease
                 network.update(activity,'translating',slot=row.get('slot'))
                 if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
                 # Exactly the same request body as personal mode. No countTokens
-                # round trip or unrelated Gemma TPM budget on Gemini vision calls.
+                # round trip: the TPM budget uses the size estimate of the body.
                 async with httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':row['key']}) as client:
                     response=await client.post('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',json=request)
                 status_code=response.status_code
-                if status_code==429 and spare:
+                # 429 (quota) or 5xx (overloaded) moves to another key once.
+                if (status_code==429 or status_code>=500) and spare:
                     state().finish(row,model,call,status_code,None,response);lease=None
                     spare=[r for r in spare if key_identity(r['key'])!=key_identity(row['key']) and key_project(r)!=key_project(row)]
                     if spare:
