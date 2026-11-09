@@ -4,7 +4,7 @@ The browser supplies UA, Client Hints, TLS and HTTP/2 together. This module
 never assembles or overrides those headers. ARM64 uses Debian's actual browser,
 since Chrome for Testing does not publish a Linux ARM64 binary.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import asyncio
 import hashlib
 from importlib.metadata import version as package_version
@@ -23,6 +23,7 @@ import httpx
 PROFILES_PER_CHANNEL = 6
 PROFILE_REFRESH_INTERVAL = 3600
 PROFILE_RETRY_INTERVAL = 60
+PROFILE_SESSION_LIMIT = 18
 
 
 def profile_ids(identifier):
@@ -41,6 +42,8 @@ class Profile:
     retired: bool = False
     reservations: int = 0
     in_use: int = 0
+    slot: str = ''
+    generation: int = 0
 
 
 class NativeProfiles:
@@ -58,7 +61,10 @@ class NativeProfiles:
             self.health = {}
 
     def restore(self, profile):
-        record = self.health.get(profile.id, {})
+        record = self.health.get(profile.slot or profile.id, {})
+        profile.generation = max(0, int(record.get('generation', 0)))
+        if profile.slot and profile.generation:
+            profile.id = f'{profile.slot}-renewed-{profile.generation}'
         profile.successes = int(record.get('successes', 0))
         profile.refusals = int(record.get('refusals', 0))
         profile.retired = bool(record.get('retired', False))
@@ -68,7 +74,8 @@ class NativeProfiles:
         return profile
 
     def save(self, profile):
-        self.health[profile.id] = {'successes': profile.successes, 'refusals': profile.refusals,
+        self.health[profile.slot or profile.id] = {'successes': profile.successes, 'refusals': profile.refusals,
+                                  'generation': profile.generation,
                                   'retired': profile.retired,
                                   'quarantine_until': time.time() + max(0, profile.quarantine_until - self.clock()),
                                   'failed_iframes': {key: time.time() + until - self.clock()
@@ -236,11 +243,37 @@ class NativeProfiles:
     def install(self, release):
         # Old sessions retain their profile objects until they finish.
         family = release.channel.split('/', 1)[0]
-        current = {p.id: p for p in self.profiles if p.channel.split('/', 1)[0] == family}
-        updated = [current.get(identifier) or self.restore(Profile(identifier, release.executable,
-                                                                release.version, release.channel))
-                   for identifier in profile_ids(release.id)]
-        self.profiles = [p for p in self.profiles if p.id not in current] + updated
+        current = {p.slot: p for p in self.profiles if p.channel.split('/', 1)[0] == family}
+        updated = [current.get(slot) or self.restore(Profile(slot, release.executable,
+                                                             release.version, release.channel, slot=slot))
+                   for slot in profile_ids(release.id)]
+        self.profiles = [p for p in self.profiles if p.slot not in current] + updated
+        for profile in updated:
+            if profile.retired and profile.successes >= PROFILE_SESSION_LIMIT:
+                self.renew(profile)
+
+    def publish_candidates(self):
+        target = self.directory / 'candidates.json'
+        temporary = target.with_suffix('.pending')
+        temporary.write_text(json.dumps([{'id': p.id, 'slot': p.slot, 'version': p.version, 'channel': p.channel}
+                                         for p in self.profiles]))
+        temporary.replace(target)
+
+    def renew(self, profile):
+        generation = profile.generation + 1
+        replacement = replace(profile, id=f'{profile.slot}-renewed-{generation}', generation=generation,
+                              successes=0, retired=False, reservations=0, in_use=0)
+        for (key, identity), until in list(self.failed_for_iframe.items()):
+            if identity == profile.id:
+                self.failed_for_iframe.pop((key, identity))
+                if until > self.clock():
+                    self.failed_for_iframe[key, replacement.id] = until
+        self.save(replacement)
+        self.profiles[self.profiles.index(profile)] = replacement
+
+    def current_profile(self, profile):
+        # A refusal from a live session can arrive after its slot was renewed.
+        return next((p for p in self.profiles if profile.slot and p.slot == profile.slot), profile)
 
     async def refresh(self):
         async with self.lock:
@@ -252,13 +285,8 @@ class NativeProfiles:
                     self.install(release)
             retry = any(isinstance(release, BaseException) for release in releases)
             self.next_check = self.clock() + (PROFILE_RETRY_INTERVAL if retry else PROFILE_REFRESH_INTERVAL)
-            if not self.profiles:
-                return
-            target = self.directory / 'candidates.json'
-            temporary = target.with_suffix('.pending')
-            temporary.write_text(json.dumps([{'id': p.id, 'version': p.version, 'channel': p.channel}
-                                             for p in self.profiles]))
-            temporary.replace(target)
+            if self.profiles:
+                self.publish_candidates()
 
     def choose(self, iframe):
         now = self.clock()
@@ -270,7 +298,7 @@ class NativeProfiles:
             if self.failed_for_iframe.get((identity, profile.id), 0) > now:
                 recent_failures[channel] = recent_failures.get(channel, 0) + 1
             elif (not profile.retired and profile.quarantine_until <= now
-                  and profile.successes + profile.reservations < 18):
+                  and profile.successes + profile.reservations < PROFILE_SESSION_LIMIT):
                 candidates.append(profile)
         # Prefer another native release after an iframe fails on this one.
         return min(candidates, key=lambda p: (p.refusals, p.in_use, recent_failures.get(p.channel, 0), p.successes),
@@ -278,16 +306,21 @@ class NativeProfiles:
 
     def ready(self, profile):
         profile.successes += 1
-        if profile.successes >= 18:
+        if profile.successes >= PROFILE_SESSION_LIMIT:
             profile.retired = True
         # Promotion follows a real segment check, never merely a new release.
         target = self.directory / 'active.json'
         temporary = target.with_suffix('.pending')
         temporary.write_text(json.dumps({'id': profile.id, 'version': profile.version, 'channel': profile.channel}))
         temporary.replace(target)
-        self.save(profile)
+        if profile.retired and profile.slot and self.current_profile(profile) is profile and profile in self.profiles:
+            self.renew(profile)
+            self.publish_candidates()
+        else:
+            self.save(profile)
 
     def refused(self, profile, iframe):
+        profile = self.current_profile(profile)
         profile.refusals += 1
         identity = hashlib.sha256(iframe.encode()).hexdigest()
         self.failed_for_iframe[(identity, profile.id)] = self.clock() + 120
@@ -299,6 +332,7 @@ class NativeProfiles:
     def unavailable(self, profile, iframe):
         # Missing pages and malformed metadata concern this URL, not every
         # other title using a healthy browser. Avoid repeated URL probes.
+        profile = self.current_profile(profile)
         identity = hashlib.sha256(iframe.encode()).hexdigest()
         self.failed_for_iframe[(identity, profile.id)] = self.clock() + 120
         self.save(profile)
@@ -321,7 +355,7 @@ def playback_available(directory=None):
     except (OSError, ValueError):
         candidates = None
     if isinstance(candidates, list):
-        ids = {str(row['id']) for row in candidates if isinstance(row, dict) and row.get('id')}
+        ids = {str(row.get('slot') or row['id']) for row in candidates if isinstance(row, dict) and row.get('id')}
     else:
         ids = set(health)
         try:
@@ -338,4 +372,4 @@ def playback_available(directory=None):
                 ids.update(profile_ids(identifier))
     now = time.time()
     return any(i not in health or (not health[i].get('retired') and float(health[i].get('quarantine_until') or 0) <= now
-                                   and int(health[i].get('successes') or 0) < 18) for i in ids)
+                                   and int(health[i].get('successes') or 0) < PROFILE_SESSION_LIMIT) for i in ids)
