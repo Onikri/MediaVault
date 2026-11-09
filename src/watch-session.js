@@ -18,6 +18,14 @@ export function variantsFor(voice,episode,failed=new Set()){
  return [...(voice?.variants||[])].filter(v=>!failed.has(v.id)).sort((a,b)=>rank(a)-rank(b));
 }
 
+export function episodeAlternatives(voices, current, season, episode) {
+ return voices.flatMap(voice=>{
+  if(voice.id===current?.id||voice.kind==='subtitles')return [];
+  const variant=variantsFor(voice,episode).find(v=>v.episodes?.some(e=>e.url&&Number(e.number)===Number(episode)&&Number(e.season||1)===Number(season)));
+  return variant?[{voice,variant}]:[];
+ }).sort((a,b)=>Number(b.voice.language===current?.language)-Number(a.voice.language===current?.language)).slice(0,3);
+}
+
 // A catalogue sequel can be season 1 at one publisher and season 2 in a
 // bundled player. Scope only bundled sources; keep standalone numbering intact.
 export function voicesForCatalogue(voices,sources,season){

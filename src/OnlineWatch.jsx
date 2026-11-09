@@ -15,7 +15,7 @@ import {readSceneJump,consumeSceneJump} from './scene-search.js';
 import {guestLocked} from './guest-session.js';
 import {onlineEpisodeId} from './watch-session.js';
 import {useContentLanguage,setContentLanguage,preferredVoiceLanguage,CONTENT_LANGUAGES,voiceHintFor} from './content-language.js';
-import {readWatch,saveWatch,orderedVoices,variantsFor,episodePreviewKey,minimumEpisodeDuration,voicesForCatalogue,isAllohaVariant,previewSource,previewEntry} from './watch-session.js';
+import {readWatch,saveWatch,orderedVoices,variantsFor,episodeAlternatives,episodePreviewKey,minimumEpisodeDuration,voicesForCatalogue,isAllohaVariant,previewSource,previewEntry} from './watch-session.js';
 import {readEpisodePreview,saveEpisodePreview} from './episode-preview-cache.js';
 import './watch-page.css';
 import EpisodeMotionPreview from './EpisodeMotionPreview.jsx';
@@ -65,8 +65,10 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   const key=identity+':'+candidate.id+':'+selectedSeason;if(cache.current.has(key))return cache.current.get(key);
   const seasonUrl=seasonUrls.current.get(key);
   let data,continuation,progress=-1,stalled=0;
-  if(candidate.provider==='hentaichan-video'&&candidate.episodes?.length){
-   data={episodes:candidate.episodes,seasons:[]};
+  const published=candidate.episodes?.length&&candidate.episodes.every(entry=>entry.url);
+  if(published&&['hentaichan-video','kinobox'].includes(candidate.provider)){
+   const numbers=[...new Set(candidate.episodes.map(entry=>Number(entry.season)||1))].sort((a,b)=>a-b);
+   data={episodes:candidate.episodes,seasons:candidate.provider==='kinobox'?numbers.map(number=>({number,name:'Сезон '+number})):[]};
   }else{
    do{data=await service.request('/sources/inspect',{method:'POST',body:{url:seasonUrl||candidate.sourceUrl,...(!seasonUrl?{dub_url:candidate.url}:{}),season:Number(selectedSeason),kind:item.kind||'anime',...(continuation?{continuation}:{})},signal});
     continuation=data.continuation;stalled=continuation&&data.scannedPages===progress?stalled+1:0;progress=data.scannedPages;
@@ -218,6 +220,10 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  }
  function preview(number,image,selectedSeason=season,sourceId=viewVariant?.id,workIdentity=identity){setPreviewStore(old=>({...old,[workIdentity+':'+selectedSeason+':'+sourceId+':'+number]:image}));saveEpisodePreview(episodePreviewKey(workIdentity,selectedSeason,number,sourceId,userId),image);}
  const heights=qualityHeights(knownRows);
+ const alternativeActions=episodeAlternatives(voices,voice,season,episode).map(({voice:option,variant:mirror})=>
+  <button key={option.id} type="button" className="btn btn-secondary" onClick={()=>changeVoice(option.id,'best')}>
+   {option.name} · {mirror.providerName||mirror.player}
+  </button>);
  const offeredVoices=quality==='best'||bestVideo?voices:voices.filter(v=>v.id===voice?.id||knownRows.some(r=>r.voiceId===v.id&&r.qualities.includes(Number(quality)))||!knownRows.some(r=>r.voiceId===v.id));
  function changeQuality(value){setQuality(value);persist({quality:value});if(value!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(Number(value)))){const row=bestQualityRow(knownRows,{quality:value,anyVoice:true});if(row)changeVoice(row.voiceId,value);}}
  function changeVideoMode(checked){setBestVideo(checked);if(checked)startScan('all');persist({bestVideo:checked});if(!checked&&quality!=='best'&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(Number(quality)))){setQuality('best');persist({quality:'best'});}}
@@ -266,7 +272,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   onCaptionVoice:id=>{setSubtitleId(id);persist({subtitleId:id});},audio,externalCaptions:captions,trackBusy,trackError};
  return <div className="online-watch">
   <OnlineEpisodePreviews minimumDuration={minimumEpisodeDuration(displayProfile)} entries={previewTargets} active={!playing&&!busy&&!browseBusy&&!foreignBusy&&!hovering} service={service} sourceUrl={previewVariant?.sourceUrl} sourceId={displayVariant?.id} identity={displayIdentity} season={displaySeason} userId={userId} onPreview={(number,image)=>preview(number,image,displaySeason,displayVariant?.id,displayIdentity)}/>
-  <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
+  <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} errorActions={alternativeActions} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
    :<div className="watch-idle mv-player mvx mvx-idle watch-player-idle" style={profile.cover?{'--watch-poster':`url("${profile.cover.replace(/["\\]/g,'')}")`}:undefined}>
     <div className="mvx-idle-poster" aria-hidden="true"/>
     <div className="mvx-overview mvx-idle-overview">
@@ -291,7 +297,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
     {sourceSettings&&<PlayerSettings anchor={sourceButton} initialPage={sourceOpen} sections={sourceSections} footer={<p className="mvx-help" role="status">{qualityScan.busy&&scanScope?'Проверяем качества: '+qualityScan.done+' из '+qualityScan.total:heights.length?'Доступно до '+heights[0]+'p.':'Качества появятся после запуска.'}{bestVideo&&videoVoiceId!==voice?.id?' Видео берётся из версии '+(voices.find(v=>v.id===videoVoiceId)?.name||'другой озвучки')+'.':''}</p>} onClose={()=>setSourceSettings(false)}/>}
    </div>}</PlaybackReveal>
   {!playing&&episodeBrowser}
-  {!browsingCatalog&&error&&<div className="inline-error" role="alert">{error}<button className="text-link" onClick={()=>{failed.current.clear();setAttempt(n=>n+1);}}>Повторить</button></div>}
+  {!browsingCatalog&&error&&<div className="inline-error" role="alert">{error}<button className="text-link" onClick={()=>{failed.current.clear();setAttempt(n=>n+1);}}>Повторить</button>{alternativeActions}</div>}
   {!browsingCatalog&&!locked&&discovery.error&&<p className="fine">{discovery.error}<button className="text-link" onClick={discovery.retry}>Повторить поиск</button></p>}
   {!!saved.current.usage&&<p className="watch-personal-note">«Твой выбор» — история просмотров на этом устройстве.</p>}
  </div>;

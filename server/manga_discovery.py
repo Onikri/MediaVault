@@ -6,7 +6,7 @@ search responses are candidates, not claims that chapters are readable.
 from pathlib import Path
 from urllib.parse import urljoin
 import hashlib,json,os,re,secrets,sqlite3,threading,time,unicodedata
-from source_parser import SourceAccessError,SourceError,public_url
+from source_parser import SourceAccessError,SourceError,SourceTemporaryError,public_url
 import suwayomi_bridge as bridge
 
 LANGUAGES={'all',*bridge.LANGUAGES}
@@ -382,6 +382,11 @@ class Discovery:
             except SourceAccessError:
                 values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
                 details={'code':'restricted','message':'Источник требует вход, проверку браузера или ограничивает доступ.'}
+            except SourceTemporaryError as error:
+                values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
+                status = re.fullmatch(r'Источник вернул HTTP (\d{3})\.', str(error))
+                details = ({'code': 'upstream', 'message': f'Источник вернул HTTP {status[1]}.'} if status else
+                           {'code': 'network', 'message': 'Источник не ответил по сети в пределах лимита.'})
             except SourceError:
                 values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
                 details={'code':'source','message':'Не удалось получить данные публичного каталога.'}

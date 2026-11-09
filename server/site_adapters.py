@@ -11,7 +11,7 @@ from urllib.parse import urlencode, urljoin, urlsplit
 from bs4 import BeautifulSoup
 
 from hentaichan_video import HOSTS as HENTAICHAN_HOSTS, ROOT as HENTAICHAN_ROOT
-from source_parser import PublicHttp, Resolver, SourceError, episode_number, parse_page, public_url
+from source_parser import PublicHttp, Resolver, SourceError, episode_number, is_alloha_player, parse_page, public_url
 
 
 @dataclass(frozen=True)
@@ -228,7 +228,10 @@ def inspect_source(url, *, http=None, dub_url=None, season=None, kind="anime",st
                 return inspect(original, provider, http, dub_url=dub_url, state=state)
         if state is not None and state.get('_root'):text,final=state['_root']
         else:
-            text, final, _ = http.document(original)
+            if is_alloha_player(original):
+                text, final, _ = http.document(original, headers={'Referer': original})
+            else:
+                text, final, _ = http.document(original)
             if state is not None:state['_root']=(text,final)
         page = parse_page(text, final)
         choices, seasons = player_choices(text, final)

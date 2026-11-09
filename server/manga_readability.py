@@ -27,29 +27,43 @@ def verify(value,refresh=False):
         from manga_sources import inspect
         from suwayomi_bridge import parse_reference,page_image
         from manga_download import image_extension
-        entries=value.get('episodes') or []
-        if not entries:result={'readable':False,'readabilityError':'У этого тайтла нет открытых глав на выбранном языке.','verifiedPages':0}
-        else:
-            http=PublicHttp(timeout=(3,8),deadline=time.monotonic()+35)
+        entries = value.get('episodes') or []
+        targets = [value['url']] if value.get('pages') else list(dict.fromkeys(e['url'] for e in entries))[:3]
+        result = {'readable': False, 'verifiedPages': 0,
+                  'readabilityError': 'У этого тайтла нет открытых глав на выбранном языке.'}
+        if targets:
+            http = PublicHttp(timeout=(3, 8), deadline=time.monotonic()+35)
             try:
-                chapter=value if value.get('pages') else inspect(entries[0]['url'],http)
-                pages=chapter.get('pages') or []
-                if not pages:raise SourceError('Источник не предоставил страницы открытой главы.')
-                if parse_reference(pages[0]):raw=page_image(pages[0])[0]
-                else:
-                    response=None
+                for target in targets:
                     try:
-                        response,_=http._open(pages[0],headers={'Referer':chapter['url']});raw=bytearray()
-                        for block in response.iter_content(65536):
-                            raw.extend(block)
-                            if len(raw)>30*1024*1024 or time.monotonic()>http.deadline:raise SourceError('Источник не успел загрузить страницу в пределах лимита.')
-                    finally:
-                        if response is not None:response.close()
-                if not image_extension(raw[:32]):raise SourceError('Источник вернул заглушку вместо страницы.')
-                result={'readable':True,'verifiedPages':1,'readabilityError':''}
-            except Exception as error:
-                result={'readable':False,'verifiedPages':0,'readabilityError':str(error) if isinstance(error,SourceError) else 'Не удалось загрузить страницу источника.'}
-            finally:http.close()
+                        chapter = value if value.get('pages') else inspect(target, http)
+                        pages = chapter.get('pages') or []
+                        if not pages:
+                            raise SourceError('Источник не предоставил страницы открытой главы.')
+                        if parse_reference(pages[0]):
+                            raw = page_image(pages[0])[0]
+                        else:
+                            response, _ = http._open(pages[0], headers={'Referer': chapter['url']})
+                            try:
+                                raw = bytearray()
+                                for block in response.iter_content(65536):
+                                    raw.extend(block)
+                                    if len(raw) > 30*1024*1024 or time.monotonic() > http.deadline:
+                                        raise SourceError('Источник не успел загрузить страницу в пределах лимита.')
+                            finally:
+                                response.close()
+                        if not image_extension(raw[:32]):
+                            raise SourceError('Источник вернул заглушку вместо страницы.')
+                        result = {'readable': True, 'verifiedPages': 1, 'readabilityError': '',
+                                  'verifiedChapterUrl': target}
+                        break
+                    except Exception as error:
+                        result['readabilityError'] = (str(error) if isinstance(error, SourceError)
+                                                      else 'Не удалось загрузить страницу источника.')
+                        if time.monotonic() >= http.deadline:
+                            break
+            finally:
+                http.close()
         result['pagesCheckedAt']=int(time.time())
         with _lock:
             if len(_cache)>=256:_cache.pop(next(iter(_cache)))

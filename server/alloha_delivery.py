@@ -384,6 +384,7 @@ class AllohaDelivery:
             await source.open(audio)
             data = await source.metadata()
             session.active, session.active_id = str(data['active']), str(data['active_id'])
+            missing_active = None
             for value in data['sources']:
                 identifier = str(value.get('audioId', ''))
                 if not IDENTIFIER.fullmatch(identifier):
@@ -398,19 +399,37 @@ class AllohaDelivery:
                         continue
                     url = public_url(url.split(' or ')[0].strip(), resolve_dns=False)
                     published[label] = url
+                candidates = list(published)
                 if online_quality is not None and published:
-                    session.published_qualities = sorted(map(int, published), reverse=True)
-                    selected = (max(published, key=int) if online_quality == 'best'
-                                else self.select_quality(published, online_quality))
-                    published = {selected: published[selected]}
-                for label, url in published.items():
-                    await self.ready(session, url, label)
+                    requested = max(map(int, published)) if online_quality == 'best' else int(online_quality)
+                    # Prefer the nearest lower quality on the same published track.
+                    candidates.sort(key=lambda q: (int(q) > requested, abs(int(q) - requested)))
+                    candidates = candidates[:4]
+                missing = set()
+                for label in candidates:
+                    url = published[label]
+                    try:
+                        await self.ready(session, url, label)
+                    except SourceInvalid as error:
+                        if error.status not in {404, 410}:
+                            raise
+                        self.log(session, error.status, url)
+                        missing.add(label)
+                        if identifier == session.active:
+                            missing_active = error
+                        continue
                     self.register(session, url, 'manifest')
                     qualities[label] = url
+                    if online_quality is not None:
+                        break
+                if online_quality is not None:
+                    session.published_qualities = sorted((int(q) for q in published if q not in missing), reverse=True)
                 if qualities:
                     session.translations[identifier] = {'name': str(value.get('label') or identifier)[:160],
                                                          'default': identifier == session.active, 'qualities': qualities}
             if session.active not in session.translations:
+                if missing_active:
+                    raise missing_active
                 raise SourceInvalid('Active audio has no ready media')
             for interval in data.get('skip', []):
                 if (isinstance(interval, (list, tuple)) and len(interval) == 2

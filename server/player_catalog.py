@@ -42,6 +42,12 @@ def voice_language(name, current='und'):
     return current or 'und'
 
 
+def alloha_voice_language(name):
+    if re.search(r'оригинал|original', name, re.I):
+        return 'und'
+    return voice_language(name, 'ru')
+
+
 def translation_kind(name, explicit=''):
     text=str(explicit or name).casefold()
     return 'subtitles' if re.search(r'subtitle|субтит|\bsubs?\b',text) else 'voice'
@@ -81,23 +87,38 @@ def alloha_choices(text,base,*,season=None):
                 if not isinstance(row,dict) or not isinstance(row.get('id_translation'),int) or not row.get('translation'):continue
                 identity=str(row['id_translation']);label=str(row['translation'])[:120]
                 target=urlunsplit(parts._replace(query=urlencode({**params,'translation':identity}),fragment=''))
-                language='uk' if re.search(r'украин|укр\.',label,re.I) else 'und'
+                language=alloha_voice_language(label)
                 groups.setdefault(identity,choice(label,target,identity='alloha:'+identity,player='Alloha',language=language,
                     episodes=[{'number':1,'season':1,'url':target,'title':'Фильм'}]))
         return list(groups.values()),[]
     def url(season,episode,translation):
         return urlunsplit(parts._replace(query=urlencode({**params,'season':season,'episode':episode,'translation':translation}),fragment=''))
-    for season,episodes in (data.get('all') or {}).items():
-        if not str(season).isdigit() or not isinstance(episodes,dict):continue
-        seasons.append({'number':int(season),'name':'Сезон '+str(season),'url':None})
-        if selected and selected!=str(season):continue
-        for number,variants in episodes.items():
-            if not str(number).isdigit() or not isinstance(variants,dict):continue
-            for row in variants.values():
-                if not isinstance(row,dict) or not isinstance(row.get('id_translation'),int) or not row.get('translation'):continue
-                identity=str(row['id_translation']);entry={'number':int(number),'season':int(season),'url':url(season,number,identity),'title':'Серия '+str(number)}
-                group=groups.setdefault(identity,{'name':str(row['translation'])[:120],'entries':[]});group['entries'].append(entry)
-    return [choice(v['name'],v['entries'][0]['url'],identity='alloha:'+key,player='Alloha',language='ru',episodes=v['entries']) for key,v in groups.items()],seasons
+    for season, episodes in (data.get('all') or {}).items():
+        if not str(season).isdigit() or not isinstance(episodes, (dict, list)):
+            continue
+        seasons.append({'number': int(season), 'name': 'Сезон ' + str(season), 'url': None})
+        if selected and selected != str(season):
+            continue
+        entries = episodes.items() if isinstance(episodes, dict) else enumerate(episodes)
+        for number, variants in entries:
+            if not str(number).isdigit() or not isinstance(variants, (dict, list)):
+                continue
+            rows = variants.values() if isinstance(variants, dict) else variants
+            for row in rows:
+                if not isinstance(row, dict) or not isinstance(row.get('id_translation'), int) or not row.get('translation'):
+                    continue
+                identity = str(row['id_translation'])
+                entry = {'number': int(number), 'season': int(season), 'url': url(season, number, identity),
+                         'title': 'Спецвыпуск' if int(number) == 0 else 'Серия ' + str(number)}
+                group = groups.setdefault(identity, {'name': str(row['translation'])[:120], 'entries': {}})
+                group['entries'].setdefault((int(season), int(number)), entry)
+    choices = []
+    for identity, value in groups.items():
+        entries = sorted(value['entries'].values(), key=lambda entry: (entry['season'], entry['number']))
+        first = next((entry for entry in entries if entry['number'] > 0), entries[0])
+        choices.append(choice(value['name'], first['url'], identity='alloha:' + identity, player='Alloha',
+                              language=alloha_voice_language(value['name']), episodes=entries))
+    return choices, sorted(seasons, key=lambda item: item['number'])
 
 
 def animego_buttons(text,base):
@@ -247,7 +268,7 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             current_choices.append(item)
         for value in current_choices:
             item=value if 'player' in value else choice(value['name'],value['url'],identity=value['id'],kind=value.get('kind',''))
-            item.setdefault('referer',url)
+            item.setdefault('referer', (referer or url) if is_alloha_player(url) else url)
             key=(item['url'],item['name'],item.get('kind'))
             if key not in choice_seen:choices.append(item);choice_seen.add(key)
         # Report direct/public single-player variants even when the page has no translation name.
@@ -300,6 +321,10 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
     if provider=='jutsu':
         page.title=re.sub(r'^Смотреть\s+','',page.title,flags=re.I)
         page.title=re.sub(r'\s+все серии(?: и сезоны)?\s*$','',page.title,flags=re.I)
+    original_selector = {'eneyida': '.full_header-subtitle',
+                         'uaserials': '[itemprop="alternativeHeadline"]'}.get(provider)
+    original = soup.select_one(original_selector) if original_selector else None
+    page_aliases = [original.get_text(' ', strip=True)[:300]] if original else []
     ids={}
     for namespace,expression in [('mal',r'myanimelist\.net/anime/(\d+)'),('shikimori',r'shikimori\.(?:one|io|me)/animes/(?:[a-z])?(\d+)')]:
         found={re.search(expression,a.get('href',''))[1] for a in soup.select('a[href]') if re.search(expression,a.get('href',''))}
@@ -316,12 +341,18 @@ def inspect_catalog(original,text,final,http,*,dub_url=None,season=None,provider
             value=node.get_text(' ',strip=True)
             matched=re.fullmatch(r'(?:Год(?:\s+(?:выхода|выпуска))?|Year)\s*:?\s*((?:19|20)\d{2})(?:\s*г\.?)?',value,re.I)
             if matched:year=int(matched[1]);break
+    if year is None and original_selector:
+        meta_title = soup.select_one('meta[property="og:title"]')
+        match = re.search(r'\b((?:19|20)\d{2})\s+(?:дивитися\s+)?українською\b',
+                          meta_title.get('content', '') if meta_title else '', re.I)
+        if match:
+            year = int(match[1])
     releases=[{'date':e.get('datetime'),'label':e.parent.get_text(' ',strip=True)[:180]} for e in soup.select('.episode time[datetime], .release time[datetime], .schedule time[datetime], [data-episode] time[datetime]')][:100]
     state['episodes']=episodes;state['seasons']=seasons
     report_diagnostics=list(diagnostics)
     if pending:report_diagnostics.append({'status':'incomplete','message':'Проверка не завершена; оставшиеся плееры не считаются отсутствующими.'})
     complete=not pending and not any(d.get('status')=='unavailable' for d in diagnostics)
     import copy
-    return copy.deepcopy({'provider':provider,'providerName':provider_name,'title':page.title,'url':final,'dubs':choices,'complete':complete,'pending':bool(pending),'scannedPages':len(seen),
+    return copy.deepcopy({'provider':provider,'providerName':provider_name,'title':page.title,'aliases':page_aliases,'url':final,'dubs':choices,'complete':complete,'pending':bool(pending),'scannedPages':len(seen),
             'seasons':sorted(season_values.values(),key=lambda e:e['number']),'episodes':episodes,'releases':releases,
             'available':bool(episodes or choices),'diagnostics':report_diagnostics,'ids':ids,'year':year})

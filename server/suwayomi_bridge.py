@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlsplit,urljoin,parse_qs
 import json,os,re,threading,time,sqlite3
 import requests
-from source_parser import SourceError,public_url
+from source_parser import SourceAccessError,SourceError,public_url
 
 PREFIX='/__manga/suwayomi/'
 LANGUAGES={'ru','uk','en','ja','ko'}
@@ -25,6 +25,8 @@ def bridge_error(status, text, image=False):
         (('cef is disabled','webview.getfactory'),'webview','Для этого расширения на сервере отключён браузер WebView. Требуется восстановить среду Suwayomi.'),
         (('no chapters found','no chapter found'),'no-chapters','Источник отвечает, но не опубликовал открытые главы этого тайтла на выбранном языке.'),
         (('cloudflare bypass currently disabled','bypass site protection','necessary cookies'),'challenge','Источник требует браузерную проверку.'),
+        (('запретил доступ из вашей сети','not available from your network'),'network-restricted','Источник запретил доступ из сети сервера.'),
+        (('sslhandshakeexception','certificate verify failed','unable to find valid certification path'),'tls','Не удалось проверить TLS-сертификат источника.'),
         (('your country is not supported','only available in japan','only be used from japan','not available in your region'),'region','Источник ограничил доступ из региона сервера.'),
         (('timed out','timeout'),'timeout','Источник не успел ответить.'),
         (('name or service not known','failure in name resolution','unknownhostexception'),'dns','Домен источника не разрешается.'),
@@ -32,7 +34,11 @@ def bridge_error(status, text, image=False):
         (('username or password cannot be empty','requires a login'),'login','Источник требует вход.'),
     ):
         if any(term in text for term in terms):return BridgeError(code,message)
-    code={401:'login',403:'restricted',404:'missing',429:'rate-limit'}.get(status,'upstream')
+    # Extensions often wrap the origin's status in their own HTTP 500.
+    origin = re.search(r'\bhttp(?:\s+error)?[:\s]+([45]\d{2})\b', text)
+    if status >= 500 and origin:
+        status = int(origin[1])
+    code={401:'login',403:'restricted',404:'missing',408:'timeout',429:'rate-limit',504:'timeout'}.get(status,'upstream')
     return BridgeError(code,f'Ошибка источника (HTTP {status}). Не удалось получить '+('страницу главы.' if image else 'данные читалки.'))
 
 def configured():return bool(os.getenv('SUWAYOMI_URL') and os.getenv('SUWAYOMI_AUTH_FILE') and os.getenv('PUBLIC_URL','').startswith('https://'))
@@ -190,6 +196,7 @@ def inspect(value):
     manga,chapter,page=ids
     if page is not None:raise SourceError('Открой главу, а не отдельную страницу.')
     client=Client()
+    native_access_error = None
     try:
         # LibGroup can fail before chapter/page calls while initializing its
         # Android WebView. Resolve its already indexed identity first and use
@@ -200,14 +207,18 @@ def inspect(value):
             if native:=native_reader_url(client,saved,saved_source,manga,chapter):
                 from manga_sources import inspect as native_inspect
                 return native_inspect(native)
-        except SourceError:
+        except SourceError as error:
+            if isinstance(error, SourceAccessError):
+                native_access_error = error
             # The normal path retains bounded retries and indexed NovelCool
             # recovery for providers without a public catalogue adapter.
             if 'native' in locals() and native and saved_source.get('name')!='MangaDex':raise
         try:data=client.get(f'/manga/{manga}',{'onlineFetch':'true' if chapter is None else 'false'},timeout=25)
-        except SourceError:
+        except SourceError as error:
             recovered=inspect_indexed_reader(value)
             if recovered is not None:return recovered
+            if native_access_error and isinstance(error, BridgeError) and error.code=='upstream':
+                raise native_access_error from None
             raise
         source=data.get('source') or client.get('/source/'+str(data['sourceId']))
         lang=source.get('lang','')
@@ -216,9 +227,11 @@ def inspect(value):
             languages=mangaball_languages(client,manga)
             if languages is not None and lang not in languages:raise SourceError('Manga Ball не опубликовал главы этого тайтла на выбранном языке. Доступные языки: '+(', '.join(sorted(languages)).upper() or 'нет')+'.')
         try:chapters=client.get(f'/manga/{manga}/chapters',{'onlineFetch':'true' if chapter is None else 'false'},timeout=30)
-        except SourceError:
+        except SourceError as error:
             recovered=inspect_indexed_reader(value)
             if recovered is not None:return recovered
+            if native_access_error and isinstance(error, BridgeError) and error.code=='upstream':
+                raise native_access_error from None
             # MangaDex can fail in its extension while its public API still
             # answers. Resolve the SAME title UUID and language, never another
             # title/provider. Native chapter URLs keep reading/download working.

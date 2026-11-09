@@ -20,6 +20,20 @@ class ReadabilityTests(unittest.TestCase):
             result=readable.verify(value,refresh=True);self.assertTrue(result['readable']);self.assertEqual(result['verifiedPages'],1)
             self.assertTrue(readable.verify(value)['readable']);self.assertEqual(http.return_value._open.call_count,2)
 
+    def test_closed_first_chapter_does_not_hide_readable_second_chapter(self):
+        first, second = 'https://source.example/1', 'https://source.example/2'
+        value = {'url': 'https://source.example/title', 'episodes': [{'url': first}, {'url': second}]}
+        with patch('manga_sources.inspect', side_effect=[SourceError('Chapter unavailable'),
+                   {'url': second, 'pages': ['https://pages.example/2.jpg']}]) as inspect, patch.object(readable, 'PublicHttp') as http:
+            http.return_value.deadline = time.monotonic() + 60
+            response = MagicMock()
+            response.iter_content.return_value = [b'\xff\xd8\xffpage-fixture']
+            http.return_value._open.return_value = (response, 'https://pages.example/2.jpg')
+            result = readable.verify(value)
+            self.assertTrue(result['readable'])
+            self.assertEqual(result['verifiedChapterUrl'], second)
+            self.assertEqual([call.args[0] for call in inspect.call_args_list], [first, second])
+
     def test_failed_reader_is_filtered_but_a_different_language_is_not(self):
         with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{'DISCOVERY_CACHE_DIR':folder}):
             health.record('1','Manga Ball','en','restricted','image','Источник не отдаёт страницы.')
