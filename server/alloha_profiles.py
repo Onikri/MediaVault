@@ -20,6 +20,15 @@ import time
 import httpx
 
 
+PROFILES_PER_CHANNEL = 6
+PROFILE_REFRESH_INTERVAL = 3600
+PROFILE_RETRY_INTERVAL = 60
+
+
+def profile_ids(identifier):
+    return [identifier, *(f"{identifier}-slot-{slot}" for slot in range(2, PROFILES_PER_CHANNEL + 1))]
+
+
 @dataclass
 class Profile:
     id: str
@@ -41,7 +50,7 @@ class NativeProfiles:
         self.clock = clock
         self.profiles = []
         self.lock = asyncio.Lock()
-        self.last_check = 0
+        self.next_check = 0
         self.failed_for_iframe = {}
         try:
             self.health = json.loads((self.directory / 'health.json').read_text())
@@ -201,56 +210,71 @@ class NativeProfiles:
         (self.directory / 'playwright-release.json').write_text(json.dumps(installed))
         return Profile(identifier, str(candidates[0]), descriptor['browserVersion'], 'playwright/' + release)
 
+    async def _debian_profile(self):
+        executable = os.getenv('CHROMIUM_PATH') or shutil.which('chromium')
+        if not executable:
+            raise RuntimeError('Native Chromium is not installed')
+        package, architecture = (await self._command(
+            'dpkg-query', '-W', '-f=${Version} ${Architecture}', 'chromium')).split()
+        release = Path('/etc/os-release').read_text()
+        codename = re.search(r'^VERSION_CODENAME=([a-z]+)$', release, re.M)
+        if not codename:
+            raise RuntimeError('Unsupported browser release channel')
+        packages = await self._release(codename[1], architecture)
+        if 'chromium' not in packages or 'chromium-common' not in packages:
+            raise RuntimeError('Signed release has no native Chromium packages')
+        if package != packages['chromium']['Version']:
+            executable = await self._native_binary(packages, architecture)
+            package = packages['chromium']['Version']
+        native = await self._command(executable, '--version')
+        version = re.search(r'\d+\.\d+\.\d+\.\d+', native)
+        if not version or not package.startswith(version[0] + '-'):
+            raise RuntimeError('Installed browser is not in the signed release channel')
+        return Profile(f'debian-{architecture}-chromium-{package}', executable, version[0],
+                       'debian-security/' + codename[1])
+
+    def install(self, release):
+        # Old sessions retain their profile objects until they finish.
+        family = release.channel.split('/', 1)[0]
+        current = {p.id: p for p in self.profiles if p.channel.split('/', 1)[0] == family}
+        updated = [current.get(identifier) or self.restore(Profile(identifier, release.executable,
+                                                                release.version, release.channel))
+                   for identifier in profile_ids(release.id)]
+        self.profiles = [p for p in self.profiles if p.id not in current] + updated
+
     async def refresh(self):
         async with self.lock:
-            if self.last_check and self.clock() - self.last_check < 3600:
+            if self.clock() < self.next_check:
                 return
-            executable = os.getenv('CHROMIUM_PATH') or shutil.which('chromium')
-            if not executable:
-                raise RuntimeError('Native Chromium is not installed')
-            package, architecture = (await self._command(
-                'dpkg-query', '-W', '-f=${Version} ${Architecture}', 'chromium')).split()
-            release = Path('/etc/os-release').read_text()
-            codename = re.search(r'^VERSION_CODENAME=([a-z]+)$', release, re.M)
-            if not codename:
-                raise RuntimeError('Unsupported browser release channel')
-            packages = await self._release(codename[1], architecture)
-            if 'chromium' not in packages or 'chromium-common' not in packages:
-                raise RuntimeError('Signed release has no native Chromium packages')
-            if package != packages['chromium']['Version']:
-                executable = await self._native_binary(packages, architecture)
-                package = packages['chromium']['Version']
-            native = await self._command(executable, '--version')
-            version = re.search(r'\d+\.\d+\.\d+\.\d+', native)
-            if not version or not package.startswith(version[0] + '-'):
-                raise RuntimeError('Installed browser is not in the signed release channel')
-            identifier = f'debian-{architecture}-chromium-{package}'
-            if not any(p.id == identifier for p in self.profiles):
-                self.profiles.append(self.restore(Profile(identifier, executable, version[0], 'debian-security/' + codename[1])))
-            # A package upgrade cannot be used to launch an older fingerprint.
-            for profile in self.profiles:
-                if profile.channel.startswith('debian-security/') and profile.id != identifier:
-                    profile.retired = True
-            try:
-                fallback = await self._playwright_profile()
-                if not any(p.id == fallback.id for p in self.profiles):
-                    self.profiles.append(self.restore(fallback))
-            except (OSError, RuntimeError, httpx.HTTPError, StopIteration):
-                pass  # The signed Debian profile remains a complete native profile.
-            self.last_check = self.clock()
+            releases = await asyncio.gather(self._debian_profile(), self._playwright_profile(), return_exceptions=True)
+            for release in releases:
+                if isinstance(release, Profile):
+                    self.install(release)
+            retry = any(isinstance(release, BaseException) for release in releases)
+            self.next_check = self.clock() + (PROFILE_RETRY_INTERVAL if retry else PROFILE_REFRESH_INTERVAL)
+            if not self.profiles:
+                return
             target = self.directory / 'candidates.json'
             temporary = target.with_suffix('.pending')
-            temporary.write_text(json.dumps({'id': identifier, 'version': version[0],
-                                              'channel': 'debian-security/' + codename[1]}))
+            temporary.write_text(json.dumps([{'id': p.id, 'version': p.version, 'channel': p.channel}
+                                             for p in self.profiles]))
             temporary.replace(target)
 
     def choose(self, iframe):
         now = self.clock()
         identity = hashlib.sha256(iframe.encode()).hexdigest()
-        candidates = [p for p in self.profiles if not p.retired and p.quarantine_until <= now
-                      and p.successes + p.reservations < 18
-                      and self.failed_for_iframe.get((identity, p.id), 0) <= now]
-        return min(candidates, key=lambda p: (p.refusals, p.in_use, p.successes)) if candidates else None
+        recent_failures = {}
+        candidates = []
+        for profile in self.profiles:
+            channel = profile.channel
+            if self.failed_for_iframe.get((identity, profile.id), 0) > now:
+                recent_failures[channel] = recent_failures.get(channel, 0) + 1
+            elif (not profile.retired and profile.quarantine_until <= now
+                  and profile.successes + profile.reservations < 18):
+                candidates.append(profile)
+        # Prefer another native release after an iframe fails on this one.
+        return min(candidates, key=lambda p: (p.refusals, p.in_use, recent_failures.get(p.channel, 0), p.successes),
+                   default=None)
 
     def ready(self, profile):
         profile.successes += 1
@@ -287,21 +311,31 @@ def playback_available(directory=None):
     offer Alloha voices. Reads the persisted state only; an unknown state is
     treated as available (playback then reports its own error).
     """
-    import os
     root = Path(directory) if directory else Path(os.getenv('DATA_DIR') or Path(__file__).resolve().parents[1]) / '.codex-local' / 'alloha-delivery' / 'profiles'
     try:
         health = json.loads((root / 'health.json').read_text())
     except (OSError, ValueError):
         return True
-    ids = set(health)
-    for name in ('active.json', 'candidates.json'):
+    try:
+        candidates = json.loads((root / 'candidates.json').read_text())
+    except (OSError, ValueError):
+        candidates = None
+    if isinstance(candidates, list):
+        ids = {str(row['id']) for row in candidates if isinstance(row, dict) and row.get('id')}
+    else:
+        ids = set(health)
         try:
-            value = json.loads((root / name).read_text())
+            active = json.loads((root / 'active.json').read_text())
         except (OSError, ValueError):
-            continue
-        for row in value if isinstance(value, list) else [value]:
+            active = None
+        for row in (candidates, active):
             if isinstance(row, dict) and row.get('id'):
                 ids.add(str(row['id']))
+        # Old installations recorded only the Debian release in candidates.json.
+        # Let discovery offer the new slots while the initial refresh runs.
+        for identifier in list(ids):
+            if identifier.startswith(('debian-', 'playwright-chromium-')) and '-slot-' not in identifier:
+                ids.update(profile_ids(identifier))
     now = time.time()
     return any(i not in health or (not health[i].get('retired') and float(health[i].get('quarantine_until') or 0) <= now
                                    and int(health[i].get('successes') or 0) < 18) for i in ids)

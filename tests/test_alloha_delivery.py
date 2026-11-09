@@ -6,13 +6,14 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'server'))
 from fastapi import FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient
 from alloha_browser import NativeSession, SourceInvalid, SourceRefused
 from alloha_delivery import AllohaDelivery, SegmentCache, install
-from alloha_profiles import NativeProfiles, Profile
+from alloha_profiles import NativeProfiles, Profile, playback_available
 
 IFRAME = 'https://alloha.yani.tv/?translation=66'
 ORIGIN = 'https://cdn.example.com/'
@@ -270,6 +271,42 @@ class BootstrapTests(unittest.IsolatedAsyncioTestCase):
         await session.observe(SimpleNamespace(url=IFRAME, status=403, request=SimpleNamespace(resource_type='document')))
         with self.assertRaises(SourceRefused):
             await asyncio.wait_for(session.wait_player(), .5)
+
+
+class ProfileRefreshTests(unittest.IsolatedAsyncioTestCase):
+    async def test_pool_keeps_legacy_health_and_refreshes_channels_independently(self):
+        with tempfile.TemporaryDirectory() as directory:
+            now = [1000]
+            pool = NativeProfiles(directory, clock=lambda: now[0])
+            debian = Profile('debian-original', '/fixture', '1.2.3.4', 'debian-security/bookworm')
+            playwright = Profile('playwright-original', '/fixture', '2.3.4.5', 'playwright/1')
+            debian.retired = True
+            pool.save(debian)
+            debian.retired = False
+            with patch.object(pool, '_debian_profile', AsyncMock(return_value=debian)), patch.object(
+                    pool, '_playwright_profile', AsyncMock(return_value=playwright)):
+                await pool.refresh()
+            self.assertEqual(len(pool.profiles), 12)
+            self.assertEqual(len({profile.id for profile in pool.profiles}), 12)
+            self.assertTrue(next(profile for profile in pool.profiles if profile.id == debian.id).retired)
+            first = pool.choose(IFRAME)
+            pool.refused(first, IFRAME)
+            self.assertEqual(pool.choose(IFRAME).channel, playwright.channel)
+
+            fallback = next(profile for profile in pool.profiles if profile.id == playwright.id)
+            now[0] += 3601
+            upgrade = Profile('debian-updated', '/fixture', '3.4.5.6', debian.channel)
+            with patch.object(pool, '_debian_profile', AsyncMock(return_value=upgrade)), patch.object(
+                    pool, '_playwright_profile', AsyncMock(side_effect=RuntimeError('release unavailable'))):
+                await pool.refresh()
+            self.assertEqual(len(pool.profiles), 12)
+            self.assertNotIn(debian.id, {profile.id for profile in pool.profiles})
+            self.assertIs(next(profile for profile in pool.profiles if profile.id == playwright.id), fallback)
+            self.assertTrue(playback_available(directory))
+            for profile in pool.profiles:
+                profile.retired = True
+                pool.save(profile)
+            self.assertFalse(playback_available(directory))
 
 
 class ProfileTests(unittest.TestCase):

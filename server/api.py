@@ -254,6 +254,7 @@ async def lifespan(application):
     else:
         catalog_stop = None
     await lyrics_relay.start()
+    application.state.alloha_delivery.start_profile_refresh()
     yield
     stopping.set()
     try:

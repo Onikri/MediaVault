@@ -25,7 +25,7 @@ import httpx
 import m3u8
 
 from alloha_browser import NativeSession, SourceInvalid, SourceRefused
-from alloha_profiles import NativeProfiles
+from alloha_profiles import NativeProfiles, PROFILE_RETRY_INTERVAL
 from source_parser import is_alloha_player, public_url
 
 logger = logging.getLogger('mediavault.alloha')
@@ -143,6 +143,7 @@ class AllohaDelivery:
         self.slots = asyncio.Semaphore(2)
         self.external_address = os.getenv('ALLOHA_EXTERNAL_ADDRESS', '')
         self.reaper = None
+        self.profile_refresher = None
         self.stopping = False
         self.preparing = set()
         self.closures = set()
@@ -175,6 +176,18 @@ class AllohaDelivery:
         self.logger.propagate = False
         self.stopping = False
         self.reaper = asyncio.create_task(self.expire_loop())
+
+    def start_profile_refresh(self):
+        if self.profile_refresher is None:
+            self.profile_refresher = asyncio.create_task(self.refresh_profiles())
+
+    async def refresh_profiles(self):
+        while True:
+            try:
+                await self.profiles.refresh()
+            except Exception as error:
+                logger.warning('Alloha profile refresh failed (%s)', type(error).__name__)
+            await asyncio.sleep(PROFILE_RETRY_INTERVAL)
 
     async def expire_loop(self):
         try:
@@ -210,6 +223,10 @@ class AllohaDelivery:
 
     async def close(self):
         self.stopping = True
+        if self.profile_refresher:
+            self.profile_refresher.cancel()
+            await asyncio.gather(self.profile_refresher, return_exceptions=True)
+            self.profile_refresher = None
         if self.reaper:
             self.reaper.cancel()
             await self.reaper
@@ -567,6 +584,7 @@ def install(app, service=None):
 
 @asynccontextmanager
 async def lifespan(app):
+    app.state.alloha_delivery.start_profile_refresh()
     try:
         yield
     finally:
