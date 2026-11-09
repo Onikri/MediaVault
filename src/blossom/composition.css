@@ -551,19 +551,3 @@ html[data-blossom] .library-layout-list .anime-card.media-open .card-caption-det
 }
 
 html[data-blossom] .library-layout-list .anime-card .card-caption .media-name{align-self:stretch;width:100%;margin:0}
-
-/* Header: the brand alone on the left; sections, search and the action icons
-   together on the right (the right side was the empty one). Four columns: the
-   first takes the free space. The search column still follows --search-slot,
-   so the search field and the expanded player keep their morph; while the
-   field is open the sections step aside. Phones keep their bottom dock. */
-@media(min-width:641px){
- html[data-blossom] header.blossom-navbar .header-inner{--search-slot:38px;grid-template-columns:minmax(0,1fr) auto minmax(38px,var(--search-slot)) auto}
- html[data-blossom] header.blossom-navbar.is-scrolled .header-inner,html[data-blossom] header.blossom-navbar.is-player-expanded .header-inner{--search-slot:38px}
- html[data-blossom] header.blossom-navbar .header-brand-area{grid-column:1}
- html[data-blossom] header.blossom-navbar .desktop-nav{grid-column:2;grid-row:1;justify-self:end;margin:0 4px 0 0;transition:opacity .2s ease}
- html[data-blossom] header.blossom-navbar .header-center-search{grid-column:3;justify-content:flex-end}
- html[data-blossom] header.blossom-navbar .header-actions{grid-column:4;grid-row:1;margin-left:0}
- html[data-blossom] header.blossom-navbar.is-search-open .desktop-nav,html[data-blossom] header.blossom-navbar.is-search-expanded .desktop-nav{opacity:0;pointer-events:none;max-width:0;overflow:hidden;margin:0}
-}
-@media(prefers-reduced-motion:reduce){html[data-blossom] header.blossom-navbar .desktop-nav{transition:none}}
