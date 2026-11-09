@@ -31,7 +31,7 @@ export function voiceChain(ctx,{rate=1,eq={},gain=1}={}){
  const high=ctx.createBiquadFilter();high.type='highshelf';high.frequency.value=6500;high.gain.value=Math.max(-12,Math.min(12,eq.high||0));
  const level=ctx.createGain();level.gain.value=Math.min(1.6,gain);
  low.connect(mid).connect(high).connect(level).connect(ctx.destination);
- return {input:low,rate};
+ return {input:low,rate,dispose(){for(const node of [low,mid,high,level])try{node.disconnect();}catch{}}};
 }
 
 let previewContext=null;
@@ -43,23 +43,50 @@ export async function playClip(result,options={}){
  return new Promise(resolve=>{source.onended=resolve;source.start();});
 }
 
-export function createNarrator({language='ru',steps=5,lookahead=4,onSegment=()=>{},onState=()=>{},onEnd=()=>{},onError=()=>{}}={}){
- let queue=[],index=0,playing=false,generation=0,source=null,title='';
+// synth(row, index, signal, language) → clip {chunks:Float32Array[], done,
+// error, sampleRate, provider, wake}. Without it the Supertonic worker is used.
+// Chunks are scheduled as they arrive, so a streamed voice starts at once.
+export function localClip(row,i,{language,steps}){
+ const clip={chunks:[],done:false,error:null,sampleRate:44100,provider:'',wake:null};
+ synthesize({text:row.text,lang:language,voice:row.voice,steps,speed:row.speed/(row.rate||1),tags:row.tags,seed:7+i%5})
+  .then(result=>{clip.sampleRate=result.sampleRate;clip.provider=result.provider;clip.chunks.push(result.audio);},error=>{clip.error=error;})
+  .finally(()=>{clip.done=true;clip.wake?.();});
+ return clip;
+}
+
+export function createNarrator({language='ru',steps=5,lookahead=4,synth=null,onSegment=()=>{},onState=()=>{},onEnd=()=>{},onError=()=>{}}={}){
+ let queue=[],index=0,playing=false,generation=0,title='',abort=new AbortController(),current=null;
  const ready=new Map();
  const state=extra=>onState({playing,index,total:queue.length,...extra});
+ const make=synth||((row,i)=>localClip(row,i,{language,steps}));
+ function reset(){generation++;abort.abort();abort=new AbortController();ready.clear();current?.cancel();current=null;}
 
  function prefetch(){
-  const version=generation;
-  for(let i=index;i<Math.min(queue.length,index+lookahead);i++){
-   if(ready.has(i))continue;
-   const row=queue[i];
-   ready.set(i,synthesize({text:row.text,lang:language,voice:row.voice,steps,speed:row.speed/(row.rate||1),tags:row.tags,seed:7+i%5}).then(result=>{
-    if(version!==generation)return null;
-    const buffer=audioContext().createBuffer(1,result.audio.length,result.sampleRate);buffer.copyToChannel(result.audio,0);
-    return {buffer,ms:result.ms,provider:result.provider};
-   }));
-  }
-  for(const key of ready.keys())if(key<index-1)ready.delete(key);
+  for(let i=index;i<Math.min(queue.length,index+lookahead);i++)if(!ready.has(i))ready.set(i,make(queue[i],i,abort.signal,language));
+  for(const key of ready.keys())if(key<index)ready.delete(key);
+ }
+
+ // Plays one clip through the row's voice chain; resolves when its audio ends.
+ function playRow(clip,row,version){
+  const ctx=audioContext(),chain=voiceChain(ctx,row),sources=[];
+  let at=ctx.currentTime+.05,scheduled=0,timer=null,finished=false;
+  return new Promise(resolve=>{
+   const end=value=>{if(finished)return;finished=true;clearTimeout(timer);clip.wake=null;setTimeout(()=>chain.dispose(),200);resolve(value);};
+   current={cancel(){for(const s of sources)try{s.stop();}catch{}end('cancelled');}};
+   const pump=()=>{
+    if(version!==generation||!playing)return end('cancelled');
+    while(scheduled<clip.chunks.length){
+     const data=clip.chunks[scheduled++],buffer=ctx.createBuffer(1,data.length,clip.sampleRate);buffer.copyToChannel(data,0);
+     const source=ctx.createBufferSource();source.buffer=buffer;source.playbackRate.value=row.rate||1;source.connect(chain.input);
+     at=Math.max(at,ctx.currentTime+.02);source.start(at);at+=buffer.duration/(row.rate||1);sources.push(source);
+     if(scheduled===1)state({buffering:false,provider:clip.provider});
+    }
+    if(!clip.done)return;
+    if(clip.error&&!scheduled)return end(clip.error);
+    clearTimeout(timer);timer=setTimeout(()=>end('ended'),Math.max(0,(at-ctx.currentTime)*1000));
+   };
+   clip.wake=pump;pump();
+  });
  }
 
  async function playNext(){
@@ -68,15 +95,15 @@ export function createNarrator({language='ru',steps=5,lookahead=4,onSegment=()=>
   const version=generation,row=queue[index];
   onSegment(row);
   prefetch();
-  let item;
-  try{state({buffering:true});item=await ready.get(index);}catch(error){if(version===generation){playing=false;state();onError(error);}return;}
-  if(version!==generation||!playing||!item)return;
+  const clip=ready.get(index);
+  if(!clip.chunks.length)state({buffering:true});
   const ctx=audioContext();if(ctx.state==='suspended')await ctx.resume();
-  source=ctx.createBufferSource();source.buffer=item.buffer;source.playbackRate.value=row.rate||1;
-  source.connect(voiceChain(ctx,row).input);
-  state({buffering:false,provider:item.provider});
-  source.onended=()=>{if(version!==generation||!playing)return;source=null;setTimeout(()=>{if(version!==generation)return;index++;playNext();},row.pause*1000);};
-  source.start();
+  if(version!==generation||!playing)return;
+  const result=await playRow(clip,row,version);
+  if(version!==generation||!playing||result==='cancelled')return;
+  current=null;
+  if(result instanceof Error||(result&&result!=='ended')){playing=false;state();onError(result);return;}
+  setTimeout(()=>{if(version!==generation)return;index++;playNext();},row.pause*1000);
  }
 
  function claimMedia(){
@@ -95,14 +122,14 @@ export function createNarrator({language='ru',steps=5,lookahead=4,onSegment=()=>
  document.addEventListener('play',onVideo,true);
 
  const api={
-  load(rows,{start=0,label=''}={}){generation++;source?.stop?.();source=null;ready.clear();queue=rows;index=Math.max(0,Math.min(start,rows.length));title=label;state();},
+  load(rows,{start=0,label=''}={}){reset();queue=rows;index=Math.max(0,Math.min(start,rows.length));title=label;state();},
   async play(){
    if(playing||!queue.length)return;
    playing=true;dispatchEvent(new CustomEvent(TTS_EVENT));claimMedia();
    const ctx=audioContext();if(ctx.state==='suspended')await ctx.resume();
-   generation++;ready.clear();playNext();
+   reset();playNext();
   },
-  pause(){if(!playing)return;playing=false;generation++;try{source?.stop();}catch{}source=null;state();},
+  pause(){if(!playing)return;playing=false;reset();state();},
   skip(step){const was=playing;api.pause();index=Math.max(0,Math.min(queue.length-1,index+step));state();if(was)api.play();},
   seekSegment(segmentId){const at=queue.findIndex(r=>r.segment===segmentId);if(at>=0){const was=playing;api.pause();index=at;state();if(was)api.play();}},
   get playing(){return playing;},get index(){return index;},get queue(){return queue;},

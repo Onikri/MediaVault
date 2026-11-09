@@ -7,9 +7,18 @@ import RanobeSources from '/src/RanobeSources.jsx';
 const paragraphs=['Ночь опустилась на город, и только в окне старой библиотеки ещё горел свет.','— Ты опять опоздал, — недовольно сказала Мирэй.','— Прости, я заблудился, — виновато ответил Кайто.','Ветер принёс запах дождя.'];
 const book={provider:'ranobehub',providerName:'RanobeHub',kind:'ranobe',title:'Повелитель',aliases:['Повелитель'],url:'https://ranobehub.org/ranobe/206',language:'ru',
  episodes:[1,2].map(n=>({number:n,season:1,title:'Глава '+n,url:'https://ranobehub.org/ranobe/206?mv_chapter='+n,language:'ru',translator:''})),seasons:[{number:1,name:'Том 1'}]};
-window.requests=[];
-const service={status:'connected',session:{serverVersion:58},request:async(path,{body}={})=>{
+window.requests=[];window.speak=[];
+// ?engine=gemini: a v59 server whose /reader/google/speak streams a MOCK tone
+// (not Gemini audio) in three chunks, like the Live relay streams PCM.
+const gemini=new URLSearchParams(location.search).get('engine')==='gemini';
+function tone(){
+ const rate=24000,samples=new Int16Array(rate*.45);for(let i=0;i<samples.length;i++)samples[i]=Math.sin(i/rate*2*Math.PI*220)*8000;
+ const bytes=new Uint8Array(samples.buffer),cuts=[0,4801,9600,bytes.length];
+ return new Response(new ReadableStream({async start(c){for(let i=0;i<3;i++){await new Promise(r=>setTimeout(r,60));c.enqueue(bytes.slice(cuts[i],cuts[i+1]));}c.close();}}));
+}
+const service={status:'connected',session:{serverVersion:gemini?59:58},request:async(path,{body}={})=>{
  window.requests.push(path);
+ if(path==='/reader/google/speak'){window.speak.push(body);return tone();}
  if(path==='/ranobe/search')return {results:[{provider:'ranobehub',providerName:'RanobeHub',language:'ru',title:'Повелитель',aliases:['Overlord'],url:book.url}],providers:[]};
  if(path==='/ranobe/inspect')return book;
  if(path==='/ranobe/chapter')return {title:'Глава '+body.url.slice(-1),language:'ru',paragraphs};
