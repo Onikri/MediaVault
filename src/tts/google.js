@@ -17,14 +17,26 @@ export const BIBLE_MODELS=[
 export async function personalKey(userId){return (await restoreDirectKeys(String(userId||'anonymous')))[0]||'';}
 export async function savePersonalKey(userId,value){await rememberDirectKey(String(userId||'anonymous'),String(value||'').trim());}
 
-export async function generate({service,userId,model,request,signal,timeout=120000}){
+// pool: narration lets a personal key work next to the server keys
+// (the gateway spreads the parts of a chapter over all of them).
+// Thinking settings differ by model: Gemma refuses a thinking level (HTTP 400,
+// checked 2026-11-09) and 2.5 Lite takes a budget instead.
+export function forModel(request,model){
+ const config=request?.generationConfig;if(!config?.thinkingConfig)return request;
+ if(model.startsWith('gemma-')){const {thinkingConfig,...rest}=config;return {...request,generationConfig:rest};}
+ if(model.startsWith('gemini-2.5'))return {...request,generationConfig:{...config,thinkingConfig:{thinkingBudget:0}}};
+ return request;
+}
+
+export async function generate({service,userId,model,request,signal,timeout=120000,pool=false}){
  if(!service?.request)throw Error('Для разбора текста подключи сервер MediaVault в профиле.');
+ request=forModel(request,model);
  const key=await personalKey(userId);
  let attempt=0;
  for(;;){
   try{
    return await service.request('/reader/google/generate',{method:'POST',signal:AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(timeout)]),
-    body:{...(key?{key}:{}),model,request}});
+    body:{...(key?{key}:{}),...(pool&&key&&Number(service?.session?.serverVersion)>=60?{pool:true}:{}),model,request}});
   }catch(error){
    // Free-tier minute limits: wait the advertised time a couple of times.
    const wait=Number(error?.retryAfter)||(/повтор через (\d+)/.exec(error?.message||'')?.[1]|0);

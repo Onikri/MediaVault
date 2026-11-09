@@ -38,6 +38,8 @@ class Speak(BaseModel):
     voice: str
     style: str = Field(default='', max_length=400)
     language: str = Field(default='ru', pattern='^(ru|uk)$')
+    # The personal key joins the server keys instead of replacing them.
+    pool: bool = False
 
 
 class LiveError(Exception):
@@ -119,6 +121,10 @@ def install(app, owner, saved):
             key = body.key.get_secret_value().strip()
             if not key or len(key) > 512 or any(c.isspace() for c in key): raise HTTPException(422, 'Проверь личный ключ Google.')
             keys = [key]
+            if body.pool:
+                keys += [r['key'] for r in saved() if r['key'] != key]
+                start = next(_turn) % len(keys)
+                keys = keys[start:] + keys[:start]
         else:
             rows = saved()
             if not rows: raise HTTPException(422, 'Добавь серверный ключ Google для озвучки.')

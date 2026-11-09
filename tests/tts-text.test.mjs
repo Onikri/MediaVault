@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {numberWords,speakable,modelText,sentences} from '../src/tts/text.js';
-import {heuristicRoles,splitParagraph,applyRoles,rolesRequest,EMOTIONS} from '../src/tts/roles.js';
-import {parseBible,aliasMap,applyLexicon} from '../src/tts/bible.js';
+import {heuristicRoles,splitParagraph,applyRoles,rolesRequest,parseRoles,quotations,EMOTIONS} from '../src/tts/roles.js';
+import {parseBible,aliasMap,applyLexicon,mergeCast,reconcileRequest} from '../src/tts/bible.js';
+import {planChunks,analyseChapter} from '../src/tts/director.js';
 import {castVoices,delivery,voiceFor,designVoice,narratorCast} from '../src/tts/voices.js';
 import {utterancesOf} from '../src/tts/player.js';
 
@@ -46,15 +47,72 @@ test('heuristic finds speakers, gender, alternation and emotion',()=>{
  assert.equal(speech[4].gender,'f');
 });
 
-test('model answer updates speakers and emotions, ignores junk',()=>{
- const segments=heuristicRoles(['— Стой! — крикнул кто-то.']);
- const answer={candidates:[{content:{parts:[{text:JSON.stringify({characters:[{name:'Страж',gender:'m',age:'old'}],lines:[{i:0,speaker:'Страж',emotion:'shout',intensity:2,tags:['laugh','bogus']},{i:'x'}]})}]}}]};
- const {segments:out,characters}=applyRoles(segments,answer);
- assert.equal(out[0].speaker,'Страж');assert.equal(out[0].intensity,1);assert.deepEqual(out[0].tags,['laugh']);
- assert.equal(characters[0].age,'old');
- assert.throws(()=>applyRoles(segments,{candidates:[{content:{parts:[{text:'not json'}]}}]}));
- const request=rolesRequest(segments,[],{title:'X'});
- assert.equal(request.generationConfig.responseMimeType,'application/json');
+test('worker answer: compact lines, numbers past the list are new speakers, junk ignored',()=>{
+ const segments=heuristicRoles(['— Стой! — крикнул кто-то.','«Глава первая: о мане»','Шелест страниц.']);
+ const answer={candidates:[{content:{parts:[{text:JSON.stringify({lines:['0|S|2|shouting|9|laugh','2|N||neutral|1','x|S|1|joy|3'],moods:['1-3|sad|5'],cast:['Страж|m|old|хриплый бас','Страж|m|old|повтор']})}]}}]};
+ const parsed=parseRoles(answer);
+ assert.equal(parsed.cast.length,1,'one card per name');
+ const out=applyRoles(segments,parsed,{cast:[{name:'Мирэй',gender:'f',age:'young'}]});
+ assert.equal(out[0].speaker,'Страж','number 2 = first new speaker after a one-name list');
+ assert.equal(out[0].emotion,'shout','emotion synonym mapped');assert.equal(out[0].intensity,1);assert.deepEqual(out[0].tags,['laugh']);assert.equal(out[0].gender,'m');
+ const quote=out.find(s=>s.text.startsWith('Глава первая'));
+ assert.equal(quote.kind,'narration','a quoted book title the model marked N is read by the narrator');
+ assert.equal(quote.speaker,'');assert.equal(quote.emotion,'sad','author text takes the mood of its range');
+ assert.throws(()=>parseRoles({candidates:[{content:{parts:[{text:'not json'}]}}]}));
+ const request=rolesRequest(segments,[{name:'Мирэй',aliases:['Мира'],gender:'f',age:'young'}],{title:'X',before:segments.slice(0,1)});
+ const text=request.contents[0].parts[0].text;
+ assert.match(text,/1 Мирэй = Мира · f young/);assert.match(text,/Контекст перед куском/);assert.match(text,/\d+ Q Глава первая/,'an unattributed quotation is left for the model to decide');
+ assert.equal(request.generationConfig.thinkingConfig.thinkingLevel,'LOW');
+ assert.ok(request.generationConfig.maxOutputTokens<=8192);
+});
+
+test('nested quotations stay inside the outer one; an open quotation runs to the end',()=>{
+ const value='«Самоубийство Клейна странное. Не будет ли “несчастных случаев”, если уйдёт?»';
+ assert.deepEqual(quotations(value),[[0,value.length]]);
+ assert.deepEqual(splitParagraph(value).map(p=>p.kind),['speech']);
+ assert.equal(splitParagraph('«Первая часть письма, продолжение в следующем абзаце.')[0].kind,'speech');
+ assert.deepEqual(splitParagraph('На вывеске было написано «Аптека» крупными буквами.').map(p=>p.kind),['narration']);
+});
+
+test('chapter parts: a small part at the reading position first, paragraphs never split',()=>{
+ const paragraphs=Array.from({length:120},(_,i)=>i%3?'— Реплика номер '+i+', — сказал он. — И ещё одна.':'Длинный авторский абзац '+'слово '.repeat(60));
+ const segments=heuristicRoles(paragraphs);
+ const parts=planChunks(segments,{start:60});
+ assert.equal(segments[parts[0][0]].p,60,'first part starts where the reader is');
+ const size=([a,b])=>segments.slice(a,b).reduce((n,s)=>n+Math.min(s.text.length,430),0);
+ assert.ok(size(parts[0])<size(parts[1]),'first part is the small one');
+ const covered=parts.flatMap(([a,b])=>Array.from({length:b-a},(_,i)=>a+i)).sort((x,y)=>x-y);
+ assert.deepEqual(covered,segments.map((_,i)=>i),'every segment exactly once');
+ for(const [a,b] of parts)if(b<segments.length)assert.notEqual(segments[b].p,segments[b-1].p,'a part ends at a paragraph border');
+});
+
+test('director: parts go out together, a refused part is halved, new speakers are merged into the bible',async()=>{
+ const paragraphs=Array.from({length:40},(_,i)=>i===25?'«Запретный абзац»':i%2?'— Реплика '+i+', — сказала Мирэй.':'Автор '+'текст '.repeat(40));
+ const bible={version:2,model:'gemini-3.5-flash-lite',pov:'third',narratorName:'',tone:'',narrator:{gender:'m',age:'adult'},characters:[{name:'Мирэй',aliases:[],gender:'f',age:'young',importance:'main'}],lexicon:[]};
+ let inFlight=0,peak=0;const calls=[];
+ const service={request:async(path,{body})=>{
+  inFlight++;peak=Math.max(peak,inFlight);await new Promise(r=>setTimeout(r,20));inFlight--;
+  const system=body.request.systemInstruction.parts[0].text,user=body.request.contents[0].parts[0].text;calls.push({model:body.model,pool:body.pool,system});
+  const wrap=value=>({candidates:[{content:{parts:[{text:JSON.stringify(value)}]}}],usageMetadata:{promptTokenCount:1000,candidatesTokenCount:50}});
+  if(system.includes('ведёшь список'))return wrap({same:['Незнакомка=1'],characters:[{name:'Стражник',aliases:[],gender:'m',age:'adult',importance:'minor',timbre:'rough',voice:'хриплый бас',geminiVoice:'Algenib'}]});
+  const rows=user.split('Сегменты:\n')[1].split('\n').map(l=>/^(\d+) ([NSTQ])/.exec(l)).filter(Boolean);
+  if(user.includes('Запретный')&&rows.length>4)return {promptFeedback:{blockReason:'PROHIBITED_CONTENT'}};
+  return wrap({lines:rows.filter(r=>r[2]!=='N').map(r=>r[1]+'|S|'+(Number(r[1])%4===1?'Незнакомка':Number(r[1])%4===3?'Стражник':'1')+'|calm|4'),moods:[],cast:['Незнакомка|f|young|тихий','Стражник|m|adult|хриплый']});
+ }};
+ const updates=[];let merged=null;
+ const result=await analyseChapter({paragraphs,bookKey:'book:test',chapterKey:'ch:1',bible,meta:{title:'Тест',language:'ru'},service,userId:'u',start:10,onUpdate:v=>updates.push(v),onBible:b=>{merged=b;}});
+ assert.ok(peak>=3,'parts are sent in parallel: '+peak);
+ assert.ok(updates.length>=3&&updates.some(u=>!u.done&&u.stats.done>0),'answers applied as they arrive');
+ assert.ok(result.stats.refused>=1,'refused part was split');assert.equal(result.stats.failed,0);
+ const forbidden=result.segments.find(s=>s.text.includes('Запретный'));assert.notEqual(forbidden.source,'model','only the refused paragraph stays untagged');
+ assert.ok(result.segments.filter(s=>s.source==='model').length>result.segments.length*.8);
+ const speakers=new Set(result.segments.filter(s=>s.kind!=='narration').map(s=>s.speaker));
+ assert.ok(speakers.has('Мирэй')&&speakers.has('Стражник')&&!speakers.has('Незнакомка'),'director merged «Незнакомка» into Мирэй: '+[...speakers]);
+ assert.ok(merged.characters.some(c=>c.name==='Стражник'&&c.geminiVoice==='Algenib'));
+ assert.ok(merged.characters.find(c=>c.name==='Мирэй').aliases.includes('Незнакомка'));
+ const again=await analyseChapter({paragraphs,bookKey:'book:test',chapterKey:'ch:1',bible,meta:{title:'Тест'},service,userId:'u',onUpdate:()=>{}});
+ assert.equal(again.cached,true,'a chapter is analysed once');
+ assert.match(reconcileRequest(bible,[{name:'X',gender:'m',age:'adult',lines:['Привет']}]).contents[0].parts[0].text,/- X · m adult · «Привет»/);
 });
 
 test('casting gives distinct voices by gender and keeps the narrator apart',()=>{
@@ -91,16 +149,14 @@ test('the title bible is validated, aliases resolve to names and lexicon stresse
  assert.equal(applyLexicon('Наташа Ростова и Пье́р.',bible),'Наташа Росто́ва и Пье́р.');
  assert.throws(()=>parseBible({characters:'x'}));
  const segments=heuristicRoles(['— Иди сюда, — сказала Натали.']);
- const answer={candidates:[{content:{parts:[{text:JSON.stringify({characters:[{name:'Натали',gender:'f',age:'teen'}],lines:[{i:0,speaker:'Натали',emotion:'pleading',intensity:.8},{i:1,speaker:'',emotion:'calm',intensity:.9}]})}]}}]};
- const {segments:out,characters}=applyRoles(segments,answer,bible);
- assert.equal(out[0].speaker,'Наташа Ростова');assert.equal(out[0].emotion,'pleading');
+ const out=applyRoles(segments,parseRoles({lines:['0|S|Натали|pleading|7'],moods:['1-1|calm|9'],cast:[]}),{cast:bible.characters,canonical:aliasMap(bible)});
+ assert.equal(out[0].speaker,'Наташа Ростова','an alias resolves to the bible name');assert.equal(out[0].emotion,'pleading');
  assert.equal(out[1].emotion,'calm');assert.ok(out[1].intensity<=.7,'narrator tone is kept moderate');
- assert.deepEqual(characters,[],'aliases of bible characters are not new characters');
  assert.ok(EMOTIONS.length>=24);
- const request=rolesRequest(segments,bible.characters,{title:'Война и мир',recent:['Пьер']});
- const payload=JSON.parse(request.contents[0].parts[0].text);
- assert.deepEqual(payload.characters[0].aliases,['Наташа','Натали']);assert.deepEqual(payload.recentSpeakers,['Пьер']);
- assert.equal(payload.segments.length,2,'narration is sent too, for the narrator tone');
+ const {bible:next,rename}=mergeCast(bible,{same:['Натали Ростова=1','Гость=Незнакомец'],characters:[{name:'Незнакомец',gender:'m',age:'old',importance:'minor',timbre:'dark',voice:'глухой старческий голос',geminiVoice:'Algenib'}]},[{name:'Натали Ростова'},{name:'Гость'},{name:'Незнакомец'}]);
+ assert.equal(rename.get('Натали Ростова'),'Наташа Ростова');assert.equal(rename.get('Гость'),'Незнакомец');
+ assert.ok(next.characters.find(c=>c.name==='Наташа Ростова').aliases.includes('Натали Ростова'));
+ assert.equal(next.characters.at(-1).geminiVoice,'Algenib');
 });
 
 import {pickGeminiVoice,geminiNarrator,geminiCast,geminiRows,styleFor,pcmDecoder,GEMINI_VOICES} from '../src/tts/gemini-voice.js';

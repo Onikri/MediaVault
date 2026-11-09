@@ -130,6 +130,21 @@ export function createNarrator({language='ru',steps=5,lookahead=4,synth=null,onS
 
  const api={
   load(rows,{start=0,label=''}={}){reset();queue=rows;index=Math.max(0,Math.min(start,rows.length));title=label;state();},
+  // New rows while playing (roles arrive part by part): the phrase being read
+  // goes on, prepared phrases whose text, voice and direction are unchanged
+  // are kept, the others are made again when their turn comes.
+  update(rows){
+   const key=r=>JSON.stringify([r.segment,r.text,r.voice,r.style||'',r.rate,r.eq,r.gain]);
+   const now=queue[index],kept=new Map();
+   for(const [i,clip] of ready)if(queue[i]&&i>index)kept.set(key(queue[i]),clip);
+   let at=now?rows.findIndex(r=>r.segment===now.segment&&r.text===now.text):-1;
+   if(at<0)at=Math.max(0,rows.findIndex(r=>r.p>=(now?.p??0)));
+   const current=ready.get(index);
+   queue=rows;index=Math.min(at,Math.max(0,rows.length-1));ready.clear();retried.clear();
+   if(current)ready.set(index,current);
+   for(let i=index+1;i<rows.length&&i<=index+lookahead;i++){const clip=kept.get(key(rows[i]));if(clip)ready.set(i,clip);}
+   state();
+  },
   async play(){
    if(playing||!queue.length)return;
    playing=true;dispatchEvent(new CustomEvent(TTS_EVENT));claimMedia();

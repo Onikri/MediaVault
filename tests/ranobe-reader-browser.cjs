@@ -44,6 +44,10 @@ let browser,vite;
  // Two voices actually speak: wait until the dialogue paragraph is highlighted.
  await page.waitForSelector('.ranobe-prose p.is-speaking[data-p="1"]',{timeout:240000});
  assert.ok(await page.evaluate(()=>window.requests.includes('/reader/google/generate')&&!window.requests.includes('/tts/accent')),'bible, roles and stress requested (mocked answers)');
+ // The director: the next chapter's roles are prepared in the background
+ // (bible + chapter 1 part + chapter 2 part).
+ await page.waitForFunction(()=>(window.generate||[]).length>=3,null,{timeout:30000});
+ assert.match(facts,/Flash Lite[^\n]* · [\d.]+ с · \d+ тыс\. токенов|Размечаем главу/,'roles show time and tokens: '+facts);
  assert.deepEqual(errors,[]);
  console.log('Ranobe reader + narration: OK (real Supertonic inference; fixture server; MOCKED Google bible/roles answers).');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

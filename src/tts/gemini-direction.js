@@ -32,7 +32,7 @@ export function styleFor(segment,character,{tone='',pace=1,note='',narratorNote=
   parts.push((segment.kind==='thought'?'прочитать мысли героя, тише и задумчивее':'прочитать реплику героя')+(segment.speaker?' '+segment.speaker:'')+(who?' ('+who+')':''));
   if(character?.traits)parts.push('характер: '+character.traits);
   if(character?.speech)parts.push('манера речи: '+character.speech);
-  const voice=note||describeVoice(character||{});if(voice)parts.push('голос героя: '+voice);
+  const voice=note||character?.description||describeVoice(character||{});if(voice)parts.push('голос героя: '+voice);
   const emotion=segment.emotion&&segment.emotion!=='neutral'?EMOTION_DIRECTION[segment.emotion]:'';
   if(emotion)parts.push('эмоция: '+emotion+((segment.intensity??.5)>=.75?', сильно':(segment.intensity??.5)<=.35?', слегка':''));
  }

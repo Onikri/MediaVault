@@ -5,7 +5,7 @@ from unittest.mock import patch
 import httpx
 from fastapi import FastAPI
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
-from google_gateway_limits import GoogleGatewayLimits,GatewayLimited,provider_limit
+from google_gateway_limits import GoogleGatewayLimits,GatewayLimited,provider_limit,learned_limit,estimate,GAP,BUDGETS
 from task_store import TaskStore
 import google_pool
 
@@ -22,7 +22,7 @@ class GatewayLimitsTests(unittest.IsolatedAsyncioTestCase):
   for r,call in leases:self.state.finish(r,self.model,call,200,{'promptTokenCount':100,'candidatesTokenCount':20})
   for row in self.rows:
    status=self.state.snapshot(row)['models'][self.model];self.assertEqual(status['requestsLastMinute'],1);self.assertEqual(status['inputTokensLastMinute'],100);self.assertIsNone(status['providerRemaining'])
-  self.assertEqual(self.state.busy,set())
+  self.assertFalse(self.state.busy)
 
  async def test_unknown_or_shared_projects_do_not_invent_three_budgets(self):
   for row in self.rows:row['project']=''
@@ -41,10 +41,42 @@ class GatewayLimitsTests(unittest.IsolatedAsyncioTestCase):
 
  async def test_request_pacing_is_durable_per_profile_and_cancelled_wait_does_not_take_a_key(self):
   row,call=await self.state.acquire(self.rows,self.model,preferred=0);self.state.finish(row,self.model,call,200)
-  fresh=GoogleGatewayLimits(self.path,lambda:self.now[0]);self.assertEqual(fresh.delay(row,self.model),4)
+  fresh=GoogleGatewayLimits(self.path,lambda:self.now[0]);self.assertEqual(fresh.delay(row,self.model),GAP)
   async def disconnected():return True
   with self.assertRaises(asyncio.CancelledError):await fresh.acquire(self.rows,self.model,disconnected=disconnected)
-  self.assertEqual(fresh.busy,set())
+  self.assertFalse(fresh.busy)
+
+ async def test_narration_spreads_over_least_busy_keys_two_in_flight_each(self):
+  leases=[await self.state.acquire(self.rows,self.model) for _ in range(3)]
+  self.assertEqual({r['slot'] for r,_ in leases},{0,1,2},'one per key before a second one')
+  self.now[0]+=GAP;more=[await self.state.acquire(self.rows,self.model) for _ in range(3)]
+  self.assertEqual(sorted(self.state.busy.values()),[2,2,2])
+  self.now[0]+=GAP
+  with self.assertRaises(GatewayLimited):await self.state.acquire(self.rows,self.model,max_wait=0)
+  for r,call in leases+more:self.state.finish(r,self.model,call,200)
+  self.assertFalse(self.state.busy)
+
+ async def test_requests_per_minute_input_tokens_and_day_budgets(self):
+  rpm,tpm,rpd=BUDGETS[self.model];row=self.rows[0]
+  for _ in range(rpm):
+   lease=await self.state.acquire([row],self.model);self.state.finish(*lease[:1],self.model,lease[1],200);self.now[0]+=GAP
+  self.assertGreater(self.state.delay(row,self.model),30,'RPM spent: wait for the oldest call to leave the minute')
+  self.now[0]+=60
+  big=await self.state.acquire([row],self.model,tokens=tpm-100);self.state.finish(big[0],self.model,big[1],200,{'promptTokenCount':tpm-100})
+  self.now[0]+=GAP;self.assertGreater(self.state.delay(row,self.model,tokens=500),50,'TPM: the next request waits for the big one to expire')
+  self.assertEqual(self.state.delay(row,self.model,tokens=50),0)
+  self.assertEqual(self.state.snapshot(row)['models'][self.model]['tpmBudget'],tpm)
+  self.assertEqual(self.state.snapshot(row)['models'][self.model]['requestsToday'],rpm+1)
+
+ async def test_google_quota_values_replace_the_policy_budget(self):
+  self.assertEqual(learned_limit({'quotaId':'GenerateRequestsPerDayPerProjectPerModel-FreeTier','quotaValue':'20'}),('rpd',20))
+  self.assertEqual(learned_limit({'quotaId':'GenerateContentInputTokensPerModelPerMinute-FreeTier','quotaValue':'250000'}),('tpm',250000))
+  self.assertIsNone(learned_limit({'quotaId':'Other','quotaValue':'x'}))
+  row,call=await self.state.acquire(self.rows,self.model,preferred=0)
+  response=httpx.Response(429,json={'error':{'details':[{'@type':'type.googleapis.com/google.rpc.QuotaFailure','violations':[{'quotaId':'GenerateRequestsPerMinutePerProjectPerModel-FreeTier','quotaValue':'5'}]}]}})
+  self.state.finish(row,self.model,call,429,response=response)
+  fresh=GoogleGatewayLimits(self.path,lambda:self.now[0]);self.assertEqual(fresh.snapshot(row)['models'][self.model]['rpmBudget'],5)
+  self.assertGreater(estimate({'contents':[{'parts':[{'text':'Привет, мир. '*100}]}]}),300)
 
  async def test_http_date_retry_and_invalid_credentials_are_recorded_without_error_text(self):
   delay,_=provider_limit(httpx.Response(503,headers={'Retry-After':'Thu, 01 Jan 1970 00:17:00 GMT'}),1000);self.assertEqual(delay,20)
@@ -83,3 +115,18 @@ class GatewayApiParallelTests(unittest.IsolatedAsyncioTestCase):
    with patch('google_pool.httpx.AsyncClient',lambda **kw:real(transport=httpx.MockTransport(provider),**kw)):
     response=await client.post('/reader/google/generate',json={'key':'fixture-personal-secret','model':google_pool.MODELS[0],'request':{'contents':[]}})
   self.assertEqual(response.status_code,401);self.assertEqual(seen,['fixture-personal-secret']);self.assertNotIn('fixture-personal-secret',response.text)
+
+ async def test_narration_pool_adds_server_keys_and_overloaded_key_moves_on(self):
+  temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup);store=TaskStore(temp.name);self.addCleanup(store.database.close);store.setting(google_pool.SETTING,{'slots':profiles()})
+  previous=google_pool._store;self.addCleanup(setattr,google_pool,'_store',previous)
+  with patch.dict(os.environ,{'DATA_DIR':temp.name}):
+   app=FastAPI();google_pool.install(app,lambda:'owner',lambda:store);real=httpx.AsyncClient;seen=[]
+   def provider(request):
+    seen.append(request.headers['x-goog-api-key'])
+    if len(seen)==1:return httpx.Response(503,json={'error':{'message':'overloaded'}})
+    return httpx.Response(200,json={'candidates':[],'usageMetadata':{'promptTokenCount':10}})
+   async with real(transport=httpx.ASGITransport(app=app),base_url='http://fixture') as client:
+    with patch('google_pool.httpx.AsyncClient',lambda **kw:real(transport=httpx.MockTransport(provider),**kw)):
+     response=await client.post('/reader/google/generate',json={'key':'fixture-personal-secret','pool':True,'model':google_pool.MODELS[0],'request':{'contents':[]}})
+  self.assertEqual(response.status_code,200);self.assertEqual(len(seen),2);self.assertNotEqual(seen[0],seen[1])
+  self.assertIn(seen[1],{'fixture-private-credential-'+str(i) for i in range(3)}|{'fixture-personal-secret'})
