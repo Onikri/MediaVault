@@ -96,6 +96,16 @@ export function authorInsert(rest){
  if(/^\p{Lu}/u.test(words[0]))return at===0&&subject;
  return subject||(at===0&&pastVerb(words[0]));
 }
+// After ? ! or a full stop a new line starts with a capital, so words in lower
+// case right after the dash are the author's — "- Что?- она посмотрела на
+// меня", "поняла.- попытался отмазаться я" — when a past-tense verb is among
+// the first words. Not after … or a comma: a line goes on there in lower case
+// ("Я думал...- что ты ушёл").
+function actionInsert(rest){
+ if(!/^\s*\p{Ll}/u.test(rest))return false;
+ const insert=String(rest).split(/[.!?…;:]|[—–―]|\s-\s|,\s*-/)[0];
+ return (insert.match(/[\p{L}’'-]+/gu)||[]).slice(0,4).some(w=>/^\p{Ll}{2,}(?:(?:л|ла|ли)(?:ся|сь)?|в(?:ся|сь))$/u.test(w)&&!/^(?:мал|бал|зал|пол|стол|вол|кол|тыл|пыл|ил|мел|вал|был|была|были|ли|или|али|мол|пусть)$/.test(plainWord(w)));
+}
 
 const DIALOGUE_DASH=/^[—–―-]\s*/;
 // "— Speech, — author. — Speech." Spaced en and em dashes alternate the parts
@@ -112,7 +122,7 @@ function splitDialogue(value){
   const punct=(/[,.!?…]["»”']?$/.exec(body.slice(from,at))||[''])[0];
   let cut=classic;
   if(!cut&&punct){
-   if(kind==='speech')cut=authorInsert(rest);
+   if(kind==='speech')cut=authorInsert(rest)||(/[?!.]/.test(punct[0])&&!/(?:\.\.|…)["»”']?$/.test(body.slice(from,at))&&actionInsert(rest));
    // Back to the line: after a comma, or a new sentence with a capital.
    else cut=punct.startsWith(',')||/^["«„“]?\p{Lu}/u.test(rest);
   }

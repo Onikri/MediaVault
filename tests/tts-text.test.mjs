@@ -271,3 +271,18 @@ test('author words inside a line are read by the narrator and keep the speaker a
  const rows=geminiRows(out,{cast:{Канеки:{gender:'m'}},voices:{Канеки:'Puck'},narrator:'Charon'});
  assert.deepEqual(rows.map(r=>r.voice),['Puck','Charon','Puck']);
 });
+
+test('author words with action verbs: lower case after ? ! . and a dash',()=>{
+ assert.deepEqual(split('- Тоука, ты всё не так поняла.- попытался отмазаться я.'),['s:Тоука, ты всё не так поняла.','n:попытался отмазаться я.']);
+ assert.deepEqual(split('- И что же?- она гневно посмотрела на меня.'),['s:И что же?','n:она гневно посмотрела на меня.']);
+ assert.deepEqual(split('- Привет, братик Канеки!- поприветствовала меня Хинами.'),['s:Привет, братик Канеки!','n:поприветствовала меня Хинами.']);
+ assert.deepEqual(split('- Спасительница!- я резко спрятался за Хинами.'),['s:Спасительница!','n:я резко спрятался за Хинами.']);
+ assert.deepEqual(split('- Успокойся!- крикнул я.- Сейчас во всём разберёмся.'),['s:Успокойся!','n:крикнул я.','s:Сейчас во всём разберёмся.']);
+ assert.deepEqual(split('- Що?- вона подивилася на мене.'),['s:Що?','n:вона подивилася на мене.']);
+ // Lower case after … or a comma goes on with the line; no past verb — doubt.
+ assert.deepEqual(split('- Я думал...- что ты ушёл.'),['s:Я думал...- что ты ушёл.']);
+ assert.deepEqual(split('- Я думал…- что ты ушёл.'),['s:Я думал…- что ты ушёл.']);
+ assert.deepEqual(split('- Да,- она ушла.'),['s:Да,- она ушла.']);
+ assert.deepEqual(split('- Кто?- я?'),['s:Кто?- я?']);
+ assert.deepEqual(split('- Ах, он так думает.'),['s:Ах, он так думает.']);
+});
