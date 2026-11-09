@@ -76,9 +76,12 @@ export function directMaster(manifest,base,maxHeight=null){
  return lines.map(line=>line.startsWith('#')?line.replace(/URI="([^"]+)"/g,(_,uri)=>'URI="'+new URL(uri,base).href+'"'):line.trim()?new URL(line.trim(),base).href:line).join('\n')+'\n';
 }
 
-export async function prepareCollaps(value,{quality='best',signal,fetcher=fetch}={}){
+export const collapsRequest=(fetcher,signal)=>url=>fetcher(url,{signal,credentials:'omit',referrerPolicy:'strict-origin-when-cross-origin'});
+
+// The embed page → the episode's master playlist, exactly as Collaps' own player reads it.
+export async function collapsMaster(value,{signal,fetcher=fetch}={}){
  const selection=collapsSelection(value);if(!selection)throw Error('Это не плеер Collaps.');
- const request=url=>fetcher(url,{signal,credentials:'omit',referrerPolicy:'strict-origin-when-cross-origin'});
+ const request=collapsRequest(fetcher,signal);
  const page=await request(selection.embed);
  if(!page.ok)throw Object.assign(Error('Collaps не открыл плеер (HTTP '+page.status+').'),{status:page.status});
  const text=await page.text(),stream=collapsStream(text,selection);
@@ -86,8 +89,12 @@ export async function prepareCollaps(value,{quality='best',signal,fetcher=fetch}
  const token=pageToken(text),address=token&&!stream.includes('&'+token)?stream+'&'+token:stream;
  const master=await request(address);
  if(!master.ok)throw Object.assign(Error('Collaps не отдал поток (HTTP '+master.status+').'),{status:master.status});
- const raw=await master.text(),maxHeight=quality==='best'?null:Number(quality);
- const playlist=directMaster(preferAudio(raw,selection.audio),master.url||address,maxHeight);
+ return {selection,raw:await master.text(),base:master.url||address};
+}
+
+export async function prepareCollaps(value,{quality='best',signal,fetcher=fetch}={}){
+ const {selection,raw,base}=await collapsMaster(value,{signal,fetcher}),maxHeight=quality==='best'?null:Number(quality);
+ const playlist=directMaster(preferAudio(raw,selection.audio),base,maxHeight);
  const qualities=[...new Set([...raw.matchAll(/RESOLUTION=\d+x(\d+)/g)].map(m=>Number(m[1])))].sort((a,b)=>b-a);
  const url=URL.createObjectURL(new Blob([playlist],{type:'application/vnd.apple.mpegurl'}));
  return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,subtitles:[],sourceIntervals:[]};

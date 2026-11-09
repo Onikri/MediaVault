@@ -205,7 +205,8 @@ def worker():
                                  temporary_dir=store.directory / "temporary",start_index=task['progress'].get('cursor',0),max_files=1,on_saved=saved,
                                  alloha_downloader=app.state.alloha_importer.download,
                                  alloha_streamer=app.state.alloha_importer.stream,
-                                 alloha_cache=store.directory / ".codex-local" / "alloha-import" / task_id)
+                                 alloha_cache=store.directory / ".codex-local" / "alloha-import" / task_id,
+                                 staged_source=lambda identity,directory,owner=task['owner']:__import__('local_exports').manager().take(owner,identity,directory))
             if stopping.is_set():continue
             result={**result,**{key:base_counts[key]+result[key] for key in base_counts}}
             if cancelled():
@@ -287,7 +288,7 @@ async def limits(request: Request, call_next):
         if request.headers.get("origin") not in (None, ORIGIN):
             return JSONResponse({"detail": "Origin denied"}, status_code=403)
     if request.method in {"POST","PUT","PATCH"}:
-        maximum=30*1024*1024 if re.fullmatch(r"/online/exports/[0-9a-f]{32}/pages/\d+/\d+",request.url.path) else 20*1024*1024 if request.url.path=="/reader/google/generate" else 14*1024*1024 if request.url.path=="/reader/translate" else 2*1024*1024 if request.url.path=="/music/youtube/session" else 512*1024
+        maximum=30*1024*1024 if re.fullmatch(r"/online/exports/[0-9a-f]{32}/(?:pages/\d+/\d+|segments/\d+)",request.url.path) else 20*1024*1024 if request.url.path=="/reader/google/generate" else 14*1024*1024 if request.url.path=="/reader/translate" else 2*1024*1024 if request.url.path=="/music/youtube/session" else 512*1024
         try:
             if int(request.headers.get("content-length", "0")) > maximum:
                 return JSONResponse({"detail": "Request too large"}, status_code=413)
@@ -320,7 +321,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 62, "geminiVoice":True, "bookLanguageFallback":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":3, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 63, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":3, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 

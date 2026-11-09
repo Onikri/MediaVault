@@ -232,7 +232,12 @@ def download_episode(stream, directory, *, http, quality="best", progress=lambda
         inputs = [path]
     else:
         raise SourceError("Поддерживаются публичные MP4 и HLS.")
-    output = directory / "episode.mp4"
+    return assemble(inputs, directory, progress=progress, run=run)
+
+
+def assemble(inputs, directory, *, progress=lambda _: None, run=subprocess.run):
+    """Remux local HLS playlists/MP4 into one MP4 without re-encoding."""
+    output = Path(directory) / "episode.mp4"
     args = ["ffmpeg", "-nostdin", "-v", "error", "-y"]
     for path in inputs:
         args += ["-protocol_whitelist", "file,crypto"]

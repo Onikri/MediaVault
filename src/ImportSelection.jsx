@@ -8,6 +8,7 @@ import {kinds,ReleaseCalendar} from './ImportParts.jsx';
 import MangaImport from './MangaImport.jsx';
 import OnlineViewer from './OnlineViewer.jsx';
 import {exportLocally} from './local-export.js';
+import {isCollaps,saveCollapsLocally,saveCollapsToDrive} from './collaps-save.js';
 import {selectedVideoEntries} from './import-selection-model.js';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import OnlineWatch from './OnlineWatch.jsx';
@@ -65,7 +66,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
   function startOnline(){if(!inspection||!onlineEntries.length||selectionError){setError(selectionError||'Выбери опубликованные серии для просмотра.');return;}if(inspection.dubs?.length&&!dub){setError('Выбери озвучку.');return;}setOnline(true);}
   async function submit(event){
     event.preventDefault();setError('');
-    if(destination==='online'){startOnline();return;}if(destination==='local'){if(!onlineEntries.length||selectionError){setError(selectionError||'Выбери серии.');return;}setBusy('local');const controller=new AbortController();localAbort.current=controller;try{await exportLocally({signal:controller.signal,entries:onlineEntries,kind:'video',referer:url,quality,service,onProgress:setLocalProgress});setLocalProgress('Файлы переданы браузеру для сохранения.');}catch(e){setError(e.message);}finally{setBusy('');}return;}
+    if(destination==='online'){startOnline();return;}if(destination==='local'){if(!onlineEntries.length||selectionError){setError(selectionError||'Выбери серии.');return;}setBusy('local');const controller=new AbortController();localAbort.current=controller;try{if(onlineEntries.every(entry=>isCollaps(entry.url)))await saveCollapsLocally({signal:controller.signal,entries:onlineEntries,quality,service,name:collection.trim()||item?.title||'',onProgress:setLocalProgress});else await exportLocally({signal:controller.signal,entries:onlineEntries,kind:'video',referer:url,quality,service,onProgress:setLocalProgress});setLocalProgress('Файлы переданы браузеру для сохранения.');}catch(e){setError(e.message);}finally{setBusy('');}return;}
     if(!ready){setError('Открой библиотеку владельца и подключи сервер к Google Drive.');return;}
     if(service.session?.serverVersion&&service.session.serverVersion<7){setError('Обнови сервер импорта для полного выбора озвучек и качеств.');return;}
     if(!url||!collection.trim()){setError('Выбери источник и название тайтла.');return;}
@@ -80,6 +81,14 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
       entries:published.map(entry=>({number:entry.number,url:entry.url,title:entry.title||'',...(entry.description?{description:entry.description}:{}),season:Number(entry.season||season)})),
       dub:variant?.name||inspection.dubs?.find(d=>d.url===dub)?.name||'',provider:inspection.provider,
       ...(selectedTranslation?.kind?{translation:{name:selectedTranslation.name,kind:selectedTranslation.kind,language:selectedTranslation.language||'und',player:selectedTranslation.player||'',variantId:selectedTranslation.id}}:{})};
+    if(onlineEntries.length&&onlineEntries.every(entry=>isCollaps(entry.url))){
+      // Collaps serves only the viewer's connection: the browser hands each episode to the server import.
+      if(selectionError){setError(selectionError);return;}
+      setBusy('local');const controller=new AbortController();localAbort.current=controller;
+      try{await saveCollapsToDrive({service,job,signal:controller.signal,onProgress:setLocalProgress,entries:onlineEntries.map(entry=>({number:entry.number,url:entry.url,title:entry.title||'',...(entry.description?{description:entry.description}:{}),season:Number(entry.season||season)}))});setLocalProgress('Все серии переданы в импорт на Google Диск.');onSubmitted();}
+      catch(e){setError(e.name==='AbortError'?'Сохранение остановлено. Уже переданные серии сохранятся.':e.message);}finally{setBusy('');}
+      return;
+    }
     setBusy('submit');try{await service.submit(job);onSubmitted();}catch(cause){setError(cause.message);}finally{setBusy('');}
   }
   if(kind==='manga'){const node=<MangaImport compact={compact} destination={destination} state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary}/>;return compact&&destination==='online'?<RetainedMediaSlot userId={state.user?.sub} id={'manga:'+state.user?.sub+':'+(item?.id||'manual')} label={item?.title||'Манга'} kind="reader">{node}</RetainedMediaSlot>:node;}

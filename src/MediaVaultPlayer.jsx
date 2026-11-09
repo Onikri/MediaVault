@@ -117,7 +117,7 @@ function DubMenu({label,options,value,onPick,current:currentSource}){
   </div>;
 }
 
-export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onPlaybackRecovered,minimumDuration=0,onRejectedSource,onlineControls,onPreview,onClose,autoPlay=false,characterService,extensions=[],apiRef,roomControl}){
+export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onPlaybackRecovered,minimumDuration=0,onRejectedSource,onlineControls,onPreview,onClose,autoPlay=false,characterService,extensions=[],apiRef,roomControl,onDownload}){
   const controller=usePlayerController({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose,autoPlay,characterService,roomControl});
   const {episodeOst,songTheme,timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,setGpuAttempt,gpuAttempt,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress}=controller;
   const api=usePlayerSession(controller);
@@ -168,7 +168,10 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   // Online sessions are capability URLs: the server remuxes the playing
   // quality into one MP4 (no re-encode). Rooms relay someone else's stream.
   const onlineMatch=/^(https?:\/\/[^/]+)\/online\/([\w-]{20,80})\/([\w-]{10,40})$/.exec(source||'');
-  const canDownload=!roomControl&&!room.info&&(!!onlineMatch||String(source||'').startsWith('blob:'));
+  // A blob HLS master (Collaps in the viewer's browser) is a playlist, not a file: it saves through onDownload.
+  const playlistBlob=item?.onlineType==='hls'&&String(source||'').startsWith('blob:');
+  const canDownload=!roomControl&&!room.info&&(!!onlineMatch||!!onDownload||String(source||'').startsWith('blob:')&&!playlistBlob);
+  const [downloadStatus,setDownloadStatus]=useState('');
   const [downloadOpen,setDownloadOpen]=useState(false),downloadButton=useRef(null),roomButton=useRef(null);
   const title=cleanTitle(library.title);
   const defaultName=[title,episode?.label].filter(Boolean).join(' · ')||'MediaVault';
@@ -179,6 +182,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     const name=(label||'').trim()||defaultName;
     const current=streaming.levels.find(l=>l.index===streaming.level)?.height,best=Math.max(0,...streaming.levels.map(l=>l.height||0));
     const requested=onlineControls?.quality&&onlineControls.quality!=='best'?Number(onlineControls.quality):0;
+    if(onDownload){setDownloadStatus('Готовим файл…');Promise.resolve(onDownload(chosen||current||requested||0,name,setDownloadStatus)).then(()=>setDownloadStatus('')).catch(error=>setDownloadStatus(error.name==='AbortError'?'':error.message));return;}
     const href=onlineMatch?onlineMatch[1]+'/online/'+onlineMatch[2]+'/'+onlineMatch[3]+'/download?'+new URLSearchParams({height:String(chosen||current||requested||best||0),name}):source;
     const link=document.createElement('a');link.href=href;link.download=name+'.mp4';link.rel='noopener';document.body.append(link);link.click();link.remove();
   }
@@ -434,5 +438,6 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       <div className="mvx-button-row"><button type="button" onClick={()=>setDownloadOpen(false)}>Отмена</button><button type="button" className="is-primary" onClick={()=>{download(downloadHeight,downloadName);setDownloadOpen(false);}}><Download size={15}/>Скачать</button></div>
     </PlayerPopover>}</AnimatePresence>
     {gpuWarning&&<p className="mvx-warning" role="status">{gpuWarning}</p>}
+    {downloadStatus&&<p className="mvx-warning" role="status">{downloadStatus}</p>}
   </div>{room.info&&(chatSlot?createPortal(<aside className="player-room-conversation is-sidebar"><RoomConversation conversation={room.conversation}/></aside>,chatSlot):<aside className="player-room-conversation"><RoomConversation conversation={room.conversation}/></aside>)}</div></PlayerContext.Provider>;
 }

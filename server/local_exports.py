@@ -70,6 +70,8 @@ class Export:
     leases:int=0
     cancel:threading.Event=field(default_factory=threading.Event)
     manga:dict|None=None
+    staged:dict|None=None
+    name:str=''
 
 class Budget:
     def __init__(self,job,maximum,reserve=GiB,deadline=1800):
@@ -137,6 +139,11 @@ def produce(job,progress,maximum,reserve):
             else:
                 from manga_download import download_chapter
                 result=download_chapter(job.url,job.directory,http,progress=update,quality=job.quality)
+        elif job.staged:
+            # Browser-uploaded segments (staged_video): the same ffmpeg remux, no CDN request.
+            from media_download import assemble
+            from staged_video import write_playlists
+            result=assemble(write_playlists(job.directory,job.staged),job.directory,progress=update,run=budget.run)
         else:
             from media_download import download_episode,pick_stream
             page=Resolver(http).resolve(job.url,referer=job.referer) if job.referer else Resolver(http).resolve(job.url);budget.check()
@@ -173,22 +180,28 @@ class Exports:
                 job.cancel.set()
                 if job.running or job.leases:continue
                 self._remove(job.directory);del self.jobs[identity]
-            elif job.state in {'cancelled','error','downloaded'} and not job.running and not job.leases:self._remove(job.directory)
+            elif job.state in {'cancelled','error','downloaded','taken'} and not job.running and not job.leases:self._remove(job.directory)
     def _snapshot(self,job):
         value={'id':job.id,'kind':job.kind,'state':job.state,'progress':dict(job.progress),'expiresAt':job.expires}
         if job.error:value['error']=job.error
+        if job.staged:value['segments']={'received':len(job.staged['sizes']),'total':len(job.staged['files'])}
         if job.state=='done' and job.file:
             if job.capability_expires<=self.clock():job.capability=secrets.token_urlsafe(32);job.capability_expires=self.clock()+900
             value.update(downloadUrl='/online/exports/file/'+job.capability,downloadExpiresAt=job.capability_expires,
-                         filename=(re.sub(r'[<>:"/\\|?*\x00-\x1f]','_',job.manga['name']).strip(' .') or 'Манга')+'.'+job.manga['format'] if job.manga else 'MediaVault-'+job.id[:8]+('.cbz' if job.kind=='manga' else '.mp4'),bytes=job.file.stat().st_size)
+                         filename=(re.sub(r'[<>:"/\\|?*\x00-\x1f]','_',job.manga['name']).strip(' .') or 'Манга')+'.'+job.manga['format'] if job.manga else (re.sub(r'[<>:"/\\|?*\x00-\x1f]','_',job.name).strip(' .') or 'MediaVault-'+job.id[:8])+('.cbz' if job.kind=='manga' else '.mp4'),bytes=job.file.stat().st_size)
         return value
     def _owned(self,owner,identity):
         job=self.jobs.get(identity)
         if job is None or job.owner!=owner or job.expires<self.clock():raise ExportMissing()
         return job
-    def start(self,owner,url,kind,quality='best',referer=None,manga=None):
+    def start(self,owner,url,kind,quality='best',referer=None,manga=None,stream=None,name=''):
         manga=MangaOptions.model_validate(manga).model_dump() if manga is not None else None
-        if manga:
+        staged=None
+        if stream is not None:
+            from staged_video import browser_only,plan
+            if kind!='video' or manga or not browser_only(url):raise ValueError('Передать серию из браузера можно только для Collaps.')
+            staged=plan(stream)
+        elif manga:
             if kind!='manga':raise ValueError('Настройки глав доступны только для манги.')
             if not manga['chapters'] and not (manga['originals'] or manga['mode']=='cached' and manga['cached']):raise ValueError('Выбери главы или готовые страницы из кэша.')
             for chapter in manga['chapters']:validate_request(chapter['url'],'manga',quality)
@@ -199,7 +212,7 @@ class Exports:
         referer=public_url(referer,resolve_dns=False) if referer else None
         with self.condition:
             self._cleanup()
-            same=next((j for j in self.jobs.values() if j.owner==owner and j.url==url and j.kind==kind and j.quality==quality and j.referer==referer and j.manga==manga and j.state in {'staging','queued','running','done'}),None)
+            same=None if staged else next((j for j in self.jobs.values() if j.owner==owner and j.url==url and j.kind==kind and j.quality==quality and j.referer==referer and j.manga==manga and j.state in {'staging','queued','running','done'}),None)
             if same:return self._snapshot(same)
             active=[j for j in self.jobs.values() if j.running or j.state in {'queued','staging'}]
             if len(active)>=4 or sum(j.owner==owner for j in active)>=2:raise ExportLimit('Дождись скачивания или останови предыдущее задание.')
@@ -207,7 +220,10 @@ class Exports:
             if len(ready)>=8 or sum(j.owner==owner for j in ready)>=4:raise ExportLimit('Скачай готовые файлы и убери их из списка перед новым заданием.')
             if shutil.disk_usage(self.root).free<self.reserve+32*1024**2:raise ExportLimit('На сервере недостаточно места для временного скачивания.')
             identity=secrets.token_hex(16);now=self.clock();job=Export(identity,owner,url,kind,quality,now,now+self.ttl,self.root/identity,referer=referer)
-            job.manga=manga
+            job.manga=manga;job.staged=staged;job.name=str(name or '')[:120]
+            if staged:
+                job.state='staging';job.progress={'phase':'staging'};job.directory.mkdir(mode=0o700)
+                self.jobs[identity]=job;return {**self._snapshot(job),'resources':staged['urls']}
             if manga and (manga['cached'] or manga['originals']):
                 job.state='staging';job.progress={'phase':'staging'};job.directory.mkdir(mode=0o700)
             self.jobs[identity]=job;self.condition.notify_all();return self._snapshot(job)
@@ -223,10 +239,37 @@ class Exports:
             if size-previous+len(data)>GiB:raise ExportLimit('Кэш выбранных глав превышает 1 ГБ.')
             if shutil.disk_usage(self.root).free<self.reserve+len(data):raise ExportLimit('На сервере недостаточно места для страниц.')
             path.write_bytes(data);return self._snapshot(job)
+    def put_segment(self,owner,identity,index,data):
+        from staged_video import path
+        with self.lock:
+            job=self._owned(owner,identity)
+            if job.state!='staging' or not job.staged:raise ExportLimit('Приём сегментов уже завершён.')
+            if not 0<=index<len(job.staged['files']):raise ValueError('Такого сегмента в серии нет.')
+            if not data:raise ValueError('Источник вернул пустой сегмент.')
+            sizes=job.staged['sizes'];total=sum(sizes.values())-sizes.get(index,0)+len(data)
+            if total>2*GiB:raise ExportLimit('Серия превышает 2 ГБ. Выбери качество ниже.')
+            if shutil.disk_usage(self.root).free<self.reserve+2*len(data):raise ExportLimit('На сервере недостаточно места для серии.')
+            target=path(job.directory,job.staged,index);target.parent.mkdir(mode=0o700,exist_ok=True)
+            target.write_bytes(data);sizes[index]=len(data)
+            # A slow uplink keeps the job alive while segments keep arriving.
+            job.expires=max(job.expires,self.clock()+self.ttl)
+            return {'id':job.id,'state':job.state,'segments':{'received':len(sizes),'total':len(job.staged['files'])}}
+    def take(self,owner,identity,directory):
+        """Hand a finished staged MP4 to the Drive import worker (same volume, a rename)."""
+        with self.condition:
+            job=self._owned(owner,identity)
+            if job.state!='done' or not job.file or not job.file.is_file() or job.leases:raise ExportProblem('Серия из браузера ещё не собрана или уже сохранена.')
+            target=Path(directory)/'episode.mp4';shutil.move(str(job.file),target)
+            job.state='taken';job.progress={'phase':'taken'};job.file=None;job.capability=''
+            self._cleanup();self.condition.notify_all();return target
     def enqueue(self,owner,identity):
         with self.condition:
             job=self._owned(owner,identity)
             if job.state!='staging':return self._snapshot(job)
+            if job.staged:
+                from staged_video import missing
+                if missing(job.directory,job.staged):raise ValueError('Браузер передал не все сегменты серии.')
+                job.state='queued';job.progress={'phase':'queued'};self.condition.notify_all();return self._snapshot(job)
             if any(not cached_path(job,v['chapter'],v['page'],source).is_file() for group,source in [('cached',False),('originals',True)] for v in job.manga[group]):raise ValueError('Загружены не все страницы главы.')
             job.state='queued';job.progress={'phase':'queued'};self.condition.notify_all();return self._snapshot(job)
     def status(self,owner,identity):
@@ -299,6 +342,16 @@ def manager():
         if _manager is None:_manager=Exports(os.getenv('DATA_DIR','/data'))
         return _manager
 
+class StagedTrack(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    url:str=Field(max_length=8192)
+    text:str=Field(max_length=4*1024*1024)
+
+class StagedStream(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    video:StagedTrack
+    audio:StagedTrack|None=None
+
 class ExportRequest(BaseModel):
     model_config=ConfigDict(extra='forbid')
     url:str=Field(default='',max_length=8192)
@@ -306,11 +359,14 @@ class ExportRequest(BaseModel):
     kind:str=Field(pattern='^(video|manga)$')
     quality:str=Field(default='best',pattern='^(best|[1-9][0-9]{1,3})$')
     manga:MangaOptions|None=None
+    stream:StagedStream|None=None
+    name:str=Field(default='',max_length=120)
 
 def install(app,owner):
     @app.post('/online/exports',status_code=202)
     def create_export(body:ExportRequest,subject=Depends(owner)):
-        try:return manager().start(subject,body.url,body.kind,body.quality,referer=body.referer,manga=body.manga.model_dump() if body.manga else None)
+        try:return manager().start(subject,body.url,body.kind,body.quality,referer=body.referer,manga=body.manga.model_dump() if body.manga else None,
+                                   stream=body.stream.model_dump() if body.stream else None,name=body.name)
         except (ValueError,SourceError) as error:raise HTTPException(422,str(error)) from None
         except ExportLimit as error:raise HTTPException(429,str(error)) from None
     @app.put('/online/exports/{identity}/pages/{chapter}/{page}')
@@ -318,6 +374,14 @@ def install(app,owner):
         data=await request.body()
         if len(data)>30*1024**2:raise HTTPException(413,'Страница превышает 30 МБ.')
         try:return await run_in_threadpool(manager().put_page,subject,identity,chapter,page,data,request.query_params.get('source')=='1')
+        except (ValueError,SourceError) as error:raise HTTPException(422,str(error)) from None
+        except ExportMissing:raise HTTPException(404,'Задание скачивания не найдено.') from None
+        except ExportLimit as error:raise HTTPException(429,str(error)) from None
+    @app.put('/online/exports/{identity}/segments/{index}')
+    async def upload_segment(identity:str,index:int,request:Request,subject=Depends(owner)):
+        data=await request.body()
+        if len(data)>30*1024**2:raise HTTPException(413,'Сегмент превышает 30 МБ.')
+        try:return await run_in_threadpool(manager().put_segment,subject,identity,index,data)
         except (ValueError,SourceError) as error:raise HTTPException(422,str(error)) from None
         except ExportMissing:raise HTTPException(404,'Задание скачивания не найдено.') from None
         except ExportLimit as error:raise HTTPException(429,str(error)) from None

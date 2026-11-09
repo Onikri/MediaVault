@@ -64,8 +64,11 @@ def validate_job(value):
         raise SourceError("Слишком много файлов в одном задании.")
     prepared = []
     for entry in entries:
-        if not isinstance(entry, dict) or set(entry) - {"number", "url", "title", "season", "description"}:
+        if not isinstance(entry, dict) or set(entry) - {"number", "url", "title", "season", "description", "export"}:
             raise SourceError("Некорректный список опубликованных серий.")
+        export = entry.get("export")
+        if export is not None and (section == 'manga' or not isinstance(export, str) or not re.fullmatch(r"[0-9a-f]{32}", export)):
+            raise SourceError("Некорректная серия, переданная из браузера.")
         number, entry_season = entry.get("number"), entry.get("season", season)
         if section=='manga':
             from manga_sources import chapter_number
@@ -75,7 +78,8 @@ def validate_job(value):
         if isinstance(entry_season, bool) or not isinstance(entry_season, int) or not 1 <= entry_season <= 1000:
             raise SourceError("Некорректный сезон серии.")
         prepared.append({"number": number, "url": public_url(entry.get("url"), resolve_dns=False),
-                         "title": str(entry.get("title", ""))[:300], "description":str(entry.get("description", ""))[:6000], "season": entry_season})
+                         "title": str(entry.get("title", ""))[:300], "description":str(entry.get("description", ""))[:6000], "season": entry_season,
+                         **({"export": export} if export else {})})
     metadata = value.get("metadata") or {}
     if not isinstance(metadata, dict) or len(json.dumps(metadata).encode()) > 100000:
         raise SourceError("Слишком большое описание тайтла.")
@@ -183,7 +187,7 @@ def video_import_source(job, entry, http):
     return url, parent
 
 
-def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None, alloha_downloader=None, alloha_cache=None, alloha_streamer=None):
+def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None, alloha_downloader=None, alloha_cache=None, alloha_streamer=None, staged_source=None):
     job = validate_job(value)
     if getattr(vault, "library_id", None) != job["library_id"]:
         raise SourceError("Открытая библиотека не совпадает с заданием.")
@@ -249,6 +253,18 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                     elif category == "book":
                         path = download_text(entry["url"], temporary, resolver.http)
                         page = type("Chapter", (), {"title": entry["title"]})()
+                    elif entry.get("export"):
+                        # The viewer's browser fetched this episode (CDN refuses servers) and the
+                        # server already remuxed it: take that MP4 instead of contacting the CDN.
+                        if not staged_source:
+                            raise SourceError("Серию из браузера можно сохранить только на сервере импорта.")
+                        emit({"operation": "Берём серию, собранную из браузера"})
+                        try:
+                            path = staged_source(entry["export"], temporary)
+                        except SourceError:
+                            raise
+                        except Exception:
+                            raise SourceError("Серия из браузера больше не лежит на сервере. Сохрани её заново.") from None
                     else:
                         emit({"operation": "Подключаемся к источнику видео"})
                         url, parent = video_import_source(job, entry, resolver.http)
