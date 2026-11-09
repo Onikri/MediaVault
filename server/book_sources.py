@@ -37,6 +37,7 @@ MAX_BYTES = 24 * 1024 * 1024
 MAX_CHAPTERS = 3000
 MAX_PARAGRAPHS = 4000
 PART = 120  # paragraphs per part when a text has no headings
+BOOK_FORMATS = ("text/plain", "text/html", "application/xhtml+xml", "application/epub+zip", "application/x-mobipocket-ebook")
 SOURCES = (("gutenberg", "Project Gutenberg"), *((f"wikisource-{code}", name) for code, name in WIKISOURCE.items()))
 _cache: dict = {}
 _lock = threading.RLock()
@@ -68,7 +69,10 @@ def _get(url, *, params=None, accept="application/json"):
                 raise SourceError("Этот адрес не относится к библиотекам книг.")
             with requests.get(url, params=params, headers=headers, timeout=(5, 15), stream=True, allow_redirects=False) as response:
                 if response.is_redirect:
-                    url, params = urljoin(url, response.headers["Location"]), None
+                    url = urljoin(url, response.headers["Location"])
+                    if url.startswith("http://www.gutenberg.org/") and parts.netloc == "www.gutenberg.org":
+                        url = "https://" + url.removeprefix("http://")
+                    params = None
                     continue
                 if response.status_code == 404:
                     raise MissingBook("Книга не найдена в библиотеке.")
@@ -122,6 +126,17 @@ def _title_match(candidate, aliases):
 
 # ------------------------------------------------------------ search
 
+def _gutenberg_formats(identity):
+    def load():
+        text = _get(GUTENBERG + "/ebooks/" + identity + ".opds", accept="application/atom+xml")
+        feed = BeautifulSoup(text, "html.parser")
+        links = feed.find_all("link", rel=re.compile(r"^http://opds-spec\.org/acquisition"))
+        readable = any(link.get("type", "").startswith(BOOK_FORMATS) for link in links)
+        language = feed.find(["dc:language", "dcterms:language"])
+        return readable, _clean(language.get_text())[:2] if language else "und"
+    return _remember(("gutenberg-formats", identity), 6 * 3600, load)
+
+
 def _gutenberg_search(title, languages):
     """Gutenberg's own OPDS search (fast); "l.xx" limits the language."""
     aliases, surnames, results = _aliases(title), _surnames(title), []
@@ -137,8 +152,10 @@ def _gutenberg_search(title, languages):
             author = _clean(entry.find("content").get_text() if entry.find("content") else "")
             if not identity or not _title_match(re.split(r"[;:]", name)[0], aliases):
                 continue
+            if re.search(r"[,;:]\s*(?:a play|a dramatization|study guide)\b", name, re.I) and _norm(name) not in {_norm(alias) for alias in aliases}:
+                continue
             links = entry.find_all("link", rel=re.compile(r"^http://opds-spec\.org/acquisition"))
-            if links and not any(link.get("type", "").startswith(("text/", "application/xhtml+xml")) for link in links):
+            if links and not any(link.get("type", "").startswith(BOOK_FORMATS) for link in links):
                 continue
             if surnames and author and not surnames & {_norm(p) for p in re.split(r"[\s,]+", author)}:
                 continue
@@ -147,11 +164,26 @@ def _gutenberg_search(title, languages):
                 continue
             lang_node = entry.find(["dc:language", "dcterms:language"])
             language = languages[0] if len(languages) == 1 else _clean(lang_node.get_text())[:2] if lang_node else "und"
+            details = bool(entry.find("link", rel="subsection", href="/ebooks/" + identity[1] + ".opds"))
             results.append({"provider": "gutenberg", "providerName": "Project Gutenberg", "title": name[:300],
-                            "translator": author[:120], "url": url, "language": language})
-        if len(results) >= 4:
+                            "translator": author[:120], "url": url, "language": language, "_formats": identity[1] if details and not links else ""})
+        if len(results) >= 6:
             break
-    return results[:4]
+
+    def verify_formats(row):
+        identity = row.pop("_formats")
+        if not identity:
+            return row
+        try:
+            readable, language = _gutenberg_formats(identity)
+        except SourceError:
+            return row
+        if row["language"] == "und":
+            row["language"] = language
+        return row if readable else None
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        return [row for row in pool.map(verify_formats, results[:6]) if row][:4]
 
 
 def _wikisource_search(title, language):
@@ -159,16 +191,27 @@ def _wikisource_search(title, language):
     api = f"https://{language}.wikisource.org/w/api.php"
     script = {"ja": r"[ぁ-ヿ一-鿿]", "ko": r"[가-힣]", "en": r"[a-z]", "ru": r"[а-яё]", "uk": r"[а-яіїєґ]"}[language]
     localized = [alias for alias in aliases if re.search(script, alias, re.I)]
+    exclude = ' -incategory:"Mainspace disambiguation pages" -incategory:"Versions pages"' if language == "en" else ""
+
+    def author_in_title(page):
+        ending = re.search(r"\(([^()]+)\)\s*$", page)
+        if not ending or re.search(r"\d{4}|\b(?:edition|version|translation)\b", ending[1], re.I):
+            return set()
+        return {_norm(p) for p in re.split(r"[\s,]+", ending[1])}
+
     for alias in (localized or ([] if language in {"ja", "ko"} else aliases))[:3]:
-        data = json.loads(_get(api, params={"action": "query", "list": "search", "srsearch": f'intitle:"{alias}"',
+        phrase = alias.replace('"', " ")
+        data = json.loads(_get(api, params={"action": "query", "list": "search", "srsearch": f'intitle:"{phrase}"' + exclude,
                                             "srnamespace": 0, "srlimit": 12, "format": "json"}))
         for row in (data.get("query") or {}).get("search") or []:
             page = str(row.get("title") or "")
             # Subpages are chapters of another page; "(ДО)" is pre-reform spelling.
             if "/" in page or re.search(r"\(ДО\)|\bДО\)$", page) or not _title_match(page, aliases):
                 continue
-            author = re.search(r"\(([^()]+)\)\s*$", page)
-            if surnames and author and not surnames & {_norm(p) for p in re.split(r"[\s,]+", author[1])}:
+            if language == "en" and re.search(r"\([^)]*\b(?:film|television|screenplay)\b[^)]*\)$", page, re.I):
+                continue
+            author = author_in_title(page)
+            if surnames and author and not surnames & author:
                 continue
             url = f"https://{language}.wikisource.org/wiki/" + quote(page.replace(" ", "_"))
             if any(r["url"] == url for r in results):
@@ -177,10 +220,9 @@ def _wikisource_search(title, language):
                             "title": page[:300], "translator": "", "url": url, "language": language})
         if results:
             break
-    if surnames:
-        results.sort(key=lambda r: not (re.search(r"\(([^()]+)\)$", r["title"]) and surnames & {_norm(p) for p in re.split(r"[\s,]+", re.search(r"\(([^()]+)\)$", r["title"])[1])}))
-        if any(re.search(r"\([^()]+\)$", r["title"]) for r in results):
-            results = [r for r in results if re.search(r"\([^()]+\)$", r["title"])]
+    matching_author = [r for r in results if surnames & author_in_title(r["title"])]
+    if matching_author:
+        results = matching_author
     return results[:4]
 
 
@@ -342,7 +384,11 @@ def _wikisource_book(language, page):
         html = _wiki_html(language, page)
         subpages = _subpages(html, page)[:MAX_CHAPTERS]
         chapters = []
-        if len(subpages) >= 2:
+        if subpages and language in {"en", "ja", "ko"}:
+            # Build the TOC from the edition page. Fetch a subpage only when
+            # the reader selects it, so one broken chapter cannot block entry.
+            chapters = [{"title": name, "page": target} for target, name in subpages]
+        elif len(subpages) >= 2:
             # Volumes that only list their own chapters are expanded one level.
             first = _wiki_page(language, subpages[0][0]) if len(subpages) <= 40 else ""
             nested = first and len(_subpages(first, subpages[0][0])) >= 2 and sum(len(c["paragraphs"]) for c in _chapters_from_html(first)) < 8

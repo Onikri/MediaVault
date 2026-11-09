@@ -100,12 +100,39 @@ class Search(unittest.TestCase):
         self.assertEqual({p['status'] for p in value['providers']}, {'unavailable'})
         self.assertEqual([p['provider'] for p in value['providers']], ['gutenberg', 'wikisource-ru'])
 
+    def test_english_wikisource_filters_indices_without_dropping_editions(self):
+        def fake(url, *, params, **kwargs):
+            self.assertIn('-incategory:"Versions pages"', params['srsearch'])
+            return '{"query":{"search":[{"title":"Frankenstein, or the Modern Prometheus (First Edition, 1818)"}]}}'
+        bs._get = fake
+        rows = bs._wikisource_search({'title':'Frankenstein','authors':['Mary Shelley']}, 'en')
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['language'], 'en')
+
+    def test_new_wikisource_toc_does_not_fetch_every_chapter(self):
+        from unittest.mock import patch
+        root = '<a rel="mw:WikiLink" href="./Book/Chapter_1">Chapter 1</a>'
+        with patch.object(bs, '_wiki_html', return_value=root) as fetch:
+            data = bs._wikisource_book('en', 'Book')
+        self.assertEqual(data['chapters'], [{'title':'Chapter 1','page':'Book/Chapter_1'}])
+        fetch.assert_called_once_with('en', 'Book')
+
     def test_audio_only_entry_does_not_shadow_a_readable_edition(self):
         bs._get = lambda *args, **kwargs: OPDS.replace(
             '<content type="text">Jane Austen</content></entry>',
             '<content type="text">Jane Austen</content><link rel="http://opds-spec.org/acquisition" type="audio/mpeg"/></entry>',
             1)
         self.assertEqual(bs._gutenberg_search({'title': 'Pride and Prejudice', 'authors': ['Jane Austen']}, ['en']), [])
+
+    def test_gutenberg_detail_identifies_text_edition_and_actual_language(self):
+        search = OPDS.replace(
+            '<content type="text">Jane Austen</content></entry>',
+            '<content type="text">Jane Austen</content><link rel="subsection" href="/ebooks/1342.opds"/></entry>',
+            1)
+        detail = '<feed><entry><dcterms:language>en</dcterms:language><link rel="http://opds-spec.org/acquisition" type="application/epub+zip"/></entry></feed>'
+        bs._get = lambda url, **kwargs: search if url.endswith('search.opds/') else detail
+        rows = bs._gutenberg_search({'title':'Pride and Prejudice','authors':['Jane Austen']}, ['ru','uk','en'])
+        self.assertEqual([r['language'] for r in rows], ['en'])
 
     def test_gutenberg_falls_back_to_readable_plain_text(self):
         def fake(url, **kwargs):
