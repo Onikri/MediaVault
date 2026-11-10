@@ -13,6 +13,8 @@ let vite,browser,lastPage;
  const profile={title:'Дандадан',sourceId:'57334',cover:'https://fixture.example/poster.svg',year:2024,format:'ТВ-сериал',status:'Вышел',episodes:12,duration:24,score:8.46,description:'Момо верит в призраков, Окарун — в пришельцев. Один спор приводит их к встрече с обоими. История о дружбе, первой любви и странных приключениях.',genres:['Комедия','Экшен','Сверхъестественное'],characters:[{id:'momo',name:'Момо Аясэ',role:'Главная героиня',image:'https://fixture.example/poster.svg'},{id:'okarun',name:'Кэн Такакура',role:'Главный герой',image:'https://fixture.example/poster.svg'}]};
  const voices=['a','b'].map((id,i)=>({id,name:i?'Команда Б':'Команда А',language:'ru',kind:'voice',variants:[{id:'v'+id,name:i?'Команда Б':'Команда А',url:'https://source.example/'+id,sourceUrl:'https://source.example/title',player:'Kodik',episodes:[1,2,3,4,5,6,7,8,9,10,11,12].map(number=>({number,url:'https://source.example/'+id+'/'+number}))}]}));
  voices[0].variants.push({...voices[0].variants[0],id:'a-hd',url:'https://source.example/a-hd'});
+// Subtitle versions: Kodik's carries the text in the picture (no track); the other publishes a VTT.
+for(const [id,name] of [['c','Crunchyroll.Subtitles'],['d','Студия субтитров']])voices.push({id,name,language:'ru',kind:'subtitles',variants:[{id:'v'+id,name,url:'https://source.example/'+id,sourceUrl:'https://source.example/title',player:'Kodik',episodes:[1,2,3,4,5,6,7,8,9,10,11,12].map(number=>({number,url:'https://source.example/'+id+'/'+number}))}]});
  const service={server:'https://fixture.example',session:{serverVersion:35},request:async(p,o={})=>{const r=await fetch('https://fixture.example'+p,{method:o.method||'GET',body:o.body?JSON.stringify(o.body):undefined,signal:o.signal});if(!r.ok)throw Error('Fixture HTTP '+r.status);return r.json();}};
  const discovery={data:{voices,providers:[],complete:true},loading:false,retry:()=>{}};
  function Demo(){const [revision,setRevision]=useState(0);return <main className="app-main"><button id="remount" onClick={()=>setRevision(n=>n+1)}>Открыть страницу заново</button><TitlePage key={revision} title={{id:item.id,name:item.title,section:'anime',category:'video',items:[],parts:[],online:true}} state={{user:{sub:'viewer'},catalog:{items:[]}}} actions={{}} online onlineProfile={profile} onlineFacts={[["Язык","Русский"],["Формат","ТВ-сериал"]]} onBack={()=>{}} onRelated={()=>{}} server={service.server} materials={<OnlineWatch item={item} profile={profile} discovery={discovery} service={service} userId="viewer"/>}/></main>};createRoot(document.getElementById('root')).render(<Demo/>);`;
@@ -32,9 +34,10 @@ let vite,browser,lastPage;
     const b=req.postDataJSON(),studio=b.dub_url.split('/').at(-1);return json({episodes:Array.from({length:12},(_,i)=>({number:i+1,season:1,url:'https://source.example/'+studio+'/'+(i+1)}))});
    }
    if(url.pathname==='/sources/qualities'){qualityRequests++;if(holdQuality)await new Promise(resolve=>releaseQuality=resolve);const b=req.postDataJSON(),qualities=b.url.includes('/b/')?[2160,720,360]:b.url.includes('/a-hd/')?[1080,720,360]:[720,360];return json({qualities,best:qualities[0],original:false});}
-   if(url.pathname==='/online/prepare'){const b=req.postDataJSON();requests.push(b);const id='lease'+(++leases);if(b.clientId?.startsWith('previews-'))previewLeases.add(id);return json({id,type:'hls',url:'/online/'+id+'/master.m3u8',qualities:[720,360],expiresIn:120,subtitles:[{id:'ru',name:'Русские',language:'ru',url:'/online/'+id+'/sub.vtt'}]});}
+   if(url.pathname==='/online/prepare'){const b=req.postDataJSON();requests.push(b);const id='lease'+(++leases);if(b.clientId?.startsWith('previews-'))previewLeases.add(id);const tracks=b.url.includes('/c/')?[]:b.url.includes('/d/')?[{id:'ru',name:'Студия субтитров',language:'ru',url:'/online/'+id+'/studio.vtt'}]:[{id:'ru',name:'Русские',language:'ru',url:'/online/'+id+'/sub.vtt'}];return json({id,type:'hls',url:'/online/'+id+'/master.m3u8',qualities:[720,360],expiresIn:120,subtitles:tracks});}
    if(url.pathname.endsWith('/heartbeat')||req.method()==='DELETE')return json({closed:true,expiresIn:120});
    if(url.pathname.endsWith('/master.m3u8'))return route.fulfill({contentType:'application/vnd.apple.mpegurl',headers:cors,body:'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=640x360,NAME="360p"\n360.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=1280x720,NAME="720p"\n720.m3u8\n'});
+   if(url.pathname.endsWith('/studio.vtt'))return route.fulfill({contentType:'text/vtt',headers:cors,body:'WEBVTT\n\n00:00:00.000 --> 00:10:00.000\nСубтитры студии\n'});
    if(url.pathname.endsWith('/sub.vtt'))return route.fulfill({contentType:'text/vtt',headers:cors,body:'WEBVTT\n\n00:00:01.000 --> 00:00:30.000\nНезависимые субтитры\n'});
    if(/\/(?:360|720)(?:\.m3u8|-\d+\.ts)$/.test(url.pathname)){if(networkDown)return route.abort('internetdisconnected');const file=path.basename(url.pathname),body=await fs.readFile(path.join(DIR,file));if(previewLeases.has(url.pathname.split('/')[2])&&file.startsWith('720'))previewHighLevels.push(file);return route.fulfill({contentType:file.endsWith('.ts')?'video/mp2t':'application/vnd.apple.mpegurl',headers:cors,body});}
    if(url.pathname.startsWith('/music/timings/'))return json({intervals:[{type:'op',start:2,end:6,source:'AniSkip'}]});
@@ -58,7 +61,7 @@ let vite,browser,lastPage;
   const openPlayerSettings=async()=>{await page.getByRole('button',{name:'Настройки плеера',exact:true}).click();await sheet().waitFor();};
   const closePlayer=async()=>{await openPlayerSettings();await sheet().getByRole('button',{name:'Закрыть встроенный просмотр',exact:true}).click();await page.locator('.mv-player-stage>video').waitFor({state:'detached'});};
   await openSources();await row('Озвучка').click();
-  assert.deepEqual(await choices('Озвучка').getByRole('radio').evaluateAll(ns=>ns.map(n=>n.querySelector('strong').childNodes[0].textContent)),['Команда А','Команда Б']);
+  assert.deepEqual(await choices('Озвучка').getByRole('radio').evaluateAll(ns=>ns.map(n=>n.querySelector('strong').childNodes[0].textContent)),['Команда А','Команда Б','Студия субтитров','Crunchyroll.Subtitles'],'Subtitle versions come after the dubs');
   const colors=await choices('Озвучка').getByRole('radio').first().evaluate(n=>({color:getComputedStyle(n).color,background:getComputedStyle(n.closest('.player-popover')).backgroundColor}));
   assert.notEqual(colors.background,colors.color,'Voice choices stay legible on the sheet');
   await closeSheet();
@@ -124,6 +127,18 @@ let vite,browser,lastPage;
   // While a video plays, the episode grid lives in the player's episode panel.
   await showEpisodes(page);assert.equal(await page.locator('.watch-episode-grid .title-episode-card').nth(1).locator('img').evaluate(n=>n.src.startsWith('data:image/')),true,'Preview survives page remount');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
+  // Captions from another version: a published track is switched on by itself;
+  // burned-in subtitles switch the video to that version and say so.
+  const closeEpisodes=page.getByRole('button',{name:'Закрыть серии',exact:true});if(await closeEpisodes.isVisible().catch(()=>false))await closeEpisodes.click();
+  await openPlayerSettings();await row('Субтитры').click();
+  await choices('Источник субтитров').getByRole('radio',{name:/^Студия субтитров/}).click();
+  await page.locator('.mvx-captions').getByText('Субтитры студии').waitFor({timeout:20000});
+  assert.match(await rowValue('Субтитры'),/Студия субтитров/);
+  await choices('Источник субтитров').getByRole('radio',{name:/^Crunchyroll\.Subtitles/}).click();
+  await sheet().getByText('Субтитры «Crunchyroll.Subtitles» вшиты в видео этой версии: включили её.').waitFor({timeout:20000});
+  for(let i=0;i<40&&!requests.some(b=>/source\.example\/c\/\d+$/.test(b.url)&&!String(b.clientId||'').includes(':captions'));i++)await page.waitForTimeout(250);
+  assert.ok(requests.some(b=>/source\.example\/c\/\d+$/.test(b.url)&&!String(b.clientId||'').includes(':captions')),'the Crunchyroll version becomes the video');
+  await page.keyboard.press('Escape');await page.keyboard.press('Escape');await sheet().waitFor({state:'detached'});
   await context.close();console.log('PASS embedded title, legible voice choices, adaptive HLS, independent synchronized audio/captions, AniSkip, durable resume/preview at '+width+'px');
  }
 })().catch(async e=>{console.error(e);if(lastPage){await lastPage.screenshot({path:path.join(DIR,'failure.png'),fullPage:true});console.error((await lastPage.locator('body').innerText()).slice(0,2500));}process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();for(const file of [harness,harness.replace('.html','.jsx')])await fs.rm(file,{force:true});});

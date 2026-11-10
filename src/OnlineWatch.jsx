@@ -55,7 +55,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const [quality,setQuality]=useState(saved.current.quality||'best'),[bestVideo,setBestVideo]=useState(!!saved.current.bestVideo);
  const frozen=useRef(null);
  const [scanScope,setScanScope]=useState(''),[scanRun,setScanRun]=useState(0),[applyRevision,setApplyRevision]=useState(0),[preparedRows,setPreparedRows]=useState([]);
- const [previewStore,setPreviewStore]=useState({}),[audio,setAudio]=useState(null),[captions,setCaptions]=useState([]),[trackError,setTrackError]=useState(''),[trackBusy,setTrackBusy]=useState(false);
+ const [previewStore,setPreviewStore]=useState({}),[audio,setAudio]=useState(null),[captions,setCaptions]=useState([]),[trackError,setTrackError]=useState(''),[trackBusy,setTrackBusy]=useState(false),[captionNotice,setCaptionNotice]=useState(''),burnedCaptions=useRef(null);
  const trackClient=useRef('watch-'+crypto.randomUUID());
  const failed=useRef(new Set()),cache=useRef(new Map()),seasonUrls=useRef(new Map()),tracked=useRef('');
  const refreshedAlloha=useRef(new Set());
@@ -166,7 +166,9 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
    leases.push(data);
    if(mode==='audio')setAudio({url:onlineMediaUrl(service,data),type:data.type,name:group.name});
    else if(data.subtitles?.length)setCaptions(data.subtitles.map(t=>({...t,url:service.server.replace(/\/$/,'')+t.url})));
-   else {leases.splice(leases.indexOf(data),1);releaseOnline(service,data);throw Error('У этой версии субтитры вшиты в изображение. Отдельная дорожка не опубликована; можно загрузить SRT/VTT.');}
+   // Kodik subtitle versions carry the text in the picture: the only way to
+   // see them is to watch that version, so the player switches to it.
+   else {leases.splice(leases.indexOf(data),1);releaseOnline(service,data);if(!closed)burnedCaptions.current?.(group);}
   };
   Promise.allSettled([prepare(effectiveAudioId,'audio'),prepare(subtitleId,'captions')]).then(results=>{if(!closed){const rejected=results.find(v=>v.status==='rejected');if(rejected)setTrackError(rejected.reason.message);setTrackBusy(false);}});
   const timer=setInterval(()=>leases.forEach(data=>{if(!data.direct)service.request('/online/'+data.id+'/heartbeat',{method:'POST'}).catch(()=>{});}),35000);
@@ -210,7 +212,8 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
 
 
  const spoken=voices.filter(v=>v.kind!=='subtitles');
- function changeVoice(id,nextQuality=quality){manualVoice.current=true;failed.current.clear();setVoiceId(id);setAudioId('');setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
+ burnedCaptions.current=group=>{changeVoice(group.id);setCaptionNotice('Субтитры «'+group.name+'» вшиты в видео этой версии: включили её.');};
+ function changeVoice(id,nextQuality=quality){setCaptionNotice('');manualVoice.current=true;failed.current.clear();setVoiceId(id);setAudioId('');setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
  function fallback(){
   if(!viewVariant)return false;
   failed.current.add(viewVariant.id);
@@ -274,7 +277,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:audioId||voice?.id,
   onVoice:id=>{const value=id===voice?.id?'':id;setAudioId(value);persist({audioId:value});},
   captionVoices:voices.filter(v=>v.kind==='subtitles').map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),subtitleId,
-  onCaptionVoice:id=>{setSubtitleId(id);persist({subtitleId:id});},audio,externalCaptions:captions,trackBusy,trackError};
+  onCaptionVoice:id=>{setCaptionNotice('');setSubtitleId(id);persist({subtitleId:id});},audio,externalCaptions:captions,trackBusy,trackError,captionNotice};
  return <div className="online-watch">
   <OnlineEpisodePreviews minimumDuration={minimumEpisodeDuration(displayProfile)} entries={previewTargets} active={!playing&&!busy&&!browseBusy&&!foreignBusy&&!hovering} service={service} sourceUrl={previewVariant?.sourceUrl} sourceId={displayVariant?.id} identity={displayIdentity} season={displaySeason} userId={userId} onPreview={(number,image)=>preview(number,image,displaySeason,displayVariant?.id,displayIdentity)}/>
   <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} errorActions={alternativeActions} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>

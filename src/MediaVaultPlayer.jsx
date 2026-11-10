@@ -175,6 +175,13 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   const canDownload=!roomControl&&!room.info&&(!!onlineMatch||!!onDownload||String(source||'').startsWith('blob:')&&!playlistBlob);
   const [downloadStatus,setDownloadStatus]=useState('');
   const [subtitleSaving,setSubtitleSaving]=useState(''),[subtitleError,setSubtitleError]=useState('');
+  // A caption source picked from another version is switched on once its track arrives.
+  const captionPick=useRef(false);
+  useEffect(()=>{
+    if(!captionPick.current)return;
+    const names=(onlineControls?.externalCaptions||[]).map(t=>t.name),track=availableTracks.find(t=>t.element&&names.includes(t.name));
+    if(track){captionPick.current=false;setSubtitle(track.id);}
+  },[availableTracks,onlineControls?.externalCaptions]);
   useEffect(()=>setSubtitleError(''),[source]);
   const [downloadOpen,setDownloadOpen]=useState(false),downloadButton=useRef(null),roomButton=useRef(null);
   const title=cleanTitle(library.title);
@@ -264,7 +271,8 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       {id:'captions',label:'Субтитры',value:subtitleLabel,content:<>
         <Choices label="Субтитры" value={subtitle} options={subtitleOptions} onPick={setSubtitle}/>
         {subtitleError&&<p className="mvx-help" role="alert">{subtitleError}</p>}
-        {onlineControls?.captionVoices?.length>0&&<><h3 className="mvx-subhead">Из другой версии</h3><Choices label="Источник субтитров" value={onlineControls.subtitleId||''} options={[{value:'',label:'Дорожки текущего видео'},...onlineControls.captionVoices.map(v=>({value:v.id,label:v.name,badges:<SourceBadges sources={v.sources}/>}))]} onPick={id=>onlineControls.onCaptionVoice(id)}/></>}
+        {onlineControls?.captionVoices?.length>0&&<><h3 className="mvx-subhead">Из другой версии</h3><Choices label="Источник субтитров" value={onlineControls.subtitleId||''} options={[{value:'',label:'Дорожки текущего видео'},...onlineControls.captionVoices.map(v=>({value:v.id,label:v.name,badges:<SourceBadges sources={v.sources}/>}))]} onPick={id=>{captionPick.current=!!id;onlineControls.onCaptionVoice(id);}}/>
+          {onlineControls.captionNotice?<Note role="status">{onlineControls.captionNotice}</Note>:onlineControls.subtitleId&&(onlineControls.trackBusy||onlineControls.trackError)&&<Note role="status">{onlineControls.trackError||'Подключаем субтитры…'}</Note>}</>}
         <button type="button" className="mvx-link" onClick={()=>subtitleInput.current?.click()}><Subtitles size={16}/>Загрузить файл SRT или VTT</button>
         <Slider label="Размер" ariaLabel="Размер субтитров" min={16} max={40} step={2} value={prefs.subSize} format={v=>v+' px'} onChange={v=>changePrefs({subSize:v})}/>
         <Slider label="Отступ снизу" ariaLabel="Отступ субтитров" min={3} max={22} step={1} value={prefs.subOffset} format={v=>v+'%'} onChange={v=>changePrefs({subOffset:v})}/>
