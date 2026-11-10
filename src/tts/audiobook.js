@@ -57,9 +57,11 @@ const abortError=()=>Object.assign(Error('Сохранение остановл�
 function joined(chunks){if(chunks.length===1)return chunks[0];const out=new Float32Array(chunks.reduce((n,c)=>n+c.length,0));let at=0;for(const c of chunks){out.set(c,at);at+=c.length;}return out;}
 
 // Phrases in reading order as {row, audio:Float32Array, sampleRate}. A phrase
-// that fails is asked once more; a second failure stops the file (a book with
-// a missing phrase is worse than none).
-export async function* chapterAudio({rows,language,store,make,signal,ahead=2,onProgress=()=>{}}){
+// that fails (quota, a dropped stream) is asked again after a pause, three
+// tries in all; then the file stops (a book with a missing phrase is worse
+// than none) and the voiced phrases stay for the next attempt.
+const pause=(ms,signal)=>new Promise((resolve,reject)=>{const t=setTimeout(resolve,ms);signal?.addEventListener('abort',()=>{clearTimeout(t);reject(abortError());},{once:true});});
+export async function* chapterAudio({rows,language,store,make,signal,ahead=2,attempts=3,retryDelay=1500,onProgress=()=>{}}){
  const pending=new Map();let made=0,done=0;
  const start=i=>{
   if(i>=rows.length||pending.has(i))return;
@@ -71,7 +73,8 @@ export async function* chapterAudio({rows,language,store,make,signal,ahead=2,onP
     await settled(clip);
     if(signal?.aborted)throw abortError();
     if(usableClip(clip))return clip;
-    if(attempt)throw Object.assign(Error('Фраза '+(i+1)+' не озвучилась: '+(clip.error?.message||'нет звука')+'. Готовые фразы сохранены, повтори позже.'),{phrase:i});
+    if(attempt<attempts-1){await pause(retryDelay*(attempt+1),signal);continue;}
+    throw Object.assign(Error('Фраза '+(i+1)+' не озвучилась: '+(clip.error?.message||'нет звука')+'. Готовые фразы сохранены, повтори позже.'),{phrase:i});
    }
   })();
   job.catch(()=>{});pending.set(i,job);

@@ -6,21 +6,33 @@ verbatim reading and streams 24 kHz mono 16-bit PCM back as Google sends it.
 The first audio is awaited before answering, so a key or quota problem is an
 HTTP status rather than a broken stream. A quota refusal moves the utterance
 to the next server key; a personal key is used alone.
+
+The Live model often ends the turn without a sound on short lines («Да.»,
+«— Ага.», a name): measured on 2026-11-10, 9 of 10 such lines were silent
+whatever the prompt, and asking again or on another key changed nothing. Those
+lines are read by the Lite speech model instead, in the same voice. It reads
+plain text verbatim but says any added instruction aloud, so it gets the text
+alone.
 """
 import asyncio
 import base64
 import itertools
 import json
 
+import httpx
 import websockets
 from fastapi import Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 MODEL = 'gemini-2.5-flash-native-audio-latest'
 URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
 RATE = 24000
 MAX_SECONDS = 150
+# Less than this much audio from the Live model counts as silence (a breath).
+MIN_AUDIO = int(0.25 * RATE * 2)
+TTS_MODEL = 'gemini-3.8-flash-lite-tts'
+TTS_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + TTS_MODEL + ':generateContent'
 # The prebuilt voices of the Gemini speech models.
 VOICES = frozenset((
     'Zephyr', 'Kore', 'Leda', 'Aoede', 'Callirrhoe', 'Autonoe', 'Despina', 'Erinome', 'Laomedeia', 'Achernar',
@@ -113,6 +125,58 @@ async def pcm(key, body, connect=None):
         raise _refusal(error) from None
 
 
+def wav_pcm(raw):
+    """16-bit PCM from a WAV answer (or raw PCM as it is)."""
+    if raw[:4] != b'RIFF' or raw[8:12] != b'WAVE': return raw
+    at = 12
+    while at + 8 <= len(raw):
+        size = int.from_bytes(raw[at + 4:at + 8], 'little')
+        if raw[at:at + 4] == b'data': return raw[at + 8:at + 8 + size]
+        at += 8 + size + (size & 1)
+    return b''
+
+
+async def _post(url, key, payload):
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(url, headers={'x-goog-api-key': key}, json=payload)
+    return response.status_code, response.json() if response.content else {}
+
+
+async def spoken_line(key, body):
+    """The whole line from the Lite speech model as 24 kHz PCM."""
+    payload = {'contents': [{'parts': [{'text': body.text}]}],
+               'generationConfig': {'responseModalities': ['AUDIO'],
+                                    'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': body.voice}}}}}
+    try:
+        status, answer = await _post(TTS_URL, key, payload)
+    except (httpx.HTTPError, ValueError):
+        raise LiveError(502, 'Google прервал озвучку.') from None
+    if status in (401, 403): raise LiveError(403, 'Google не принял ключ для озвучки.')
+    if status == 429: raise LiveError(429, 'Квота озвучки Google исчерпана.')
+    if status != 200: raise LiveError(502, 'Google прервал озвучку.')
+    for candidate in answer.get('candidates') or []:
+        for part in (candidate.get('content') or {}).get('parts') or []:
+            inline = part.get('inlineData') or {}
+            if inline.get('data'):
+                data = wav_pcm(base64.b64decode(inline['data']))
+                if len(data) >= 2: return data[:len(data) & ~1]
+    raise LiveError(502, 'Google не прислал звук.')
+
+
+async def opening(stream):
+    """The first audio of a Live turn: (chunks, ended). Ended with less than
+    MIN_AUDIO means the model stayed (almost) silent."""
+    chunks, size = [], 0
+    while size < MIN_AUDIO:
+        try:
+            chunk = await stream.__anext__()
+        except StopAsyncIteration:
+            return chunks, True
+        chunks.append(chunk)
+        size += len(chunk)
+    return chunks, False
+
+
 def install(app, owner, saved):
     @app.post('/reader/google/speak')
     async def speak(body: Speak, connection: Request, subject=Depends(owner)):
@@ -130,23 +194,26 @@ def install(app, owner, saved):
             if not rows: raise HTTPException(422, 'Добавь серверный ключ Google для озвучки.')
             start = next(_turn) % len(rows)
             keys = [r['key'] for r in rows[start:] + rows[:start]]
-        error = None
+        error, silent = None, False
+        headers = {'Cache-Control': 'no-store', 'X-Audio-Format': 'pcm_s16le;rate=24000;channels=1'}
         for key in keys:
             stream = pcm(key, body)
             try:
-                first = await stream.__anext__()
+                head, ended = await opening(stream)
             except LiveError as refused:
                 error = refused
                 if refused.status == 429: continue
                 break
-            except StopAsyncIteration:
-                # The model ended the turn silently: the next key gets one more try.
-                error = LiveError(502, 'Google не прислал звук.')
-                continue
+            if ended and sum(map(len, head)) < MIN_AUDIO:
+                # Silence is the model's answer to this line, not a key problem:
+                # another Live session stays silent too, the speech model reads it.
+                await stream.aclose()
+                silent = True
+                break
 
-            async def audio(stream=stream, first=first):
+            async def audio(stream=stream, head=head):
                 try:
-                    yield first
+                    for chunk in head: yield chunk
                     async for chunk in stream:
                         if await connection.is_disconnected(): return
                         yield chunk
@@ -154,6 +221,14 @@ def install(app, owner, saved):
                     return
                 finally:
                     await stream.aclose()
-            return StreamingResponse(audio(), media_type='application/octet-stream',
-                                     headers={'Cache-Control': 'no-store', 'X-Audio-Format': 'pcm_s16le;rate=24000;channels=1'})
+            return StreamingResponse(audio(), media_type='application/octet-stream', headers=headers)
+        if silent:
+            for key in keys:
+                try:
+                    data = await spoken_line(key, body)
+                except LiveError as refused:
+                    error = refused
+                    if refused.status == 429: continue
+                    break
+                return Response(data, media_type='application/octet-stream', headers={**headers, 'X-Audio-Model': TTS_MODEL})
         raise HTTPException(error.status, error.message)

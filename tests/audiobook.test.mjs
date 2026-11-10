@@ -41,11 +41,18 @@ test('the chapter asks the engine only for missing phrases, two at a time, in re
  assert.equal(chapterReadiness(rows,store,'ru').missing,0);
 });
 
-test('a phrase is asked once more, then the file stops with a clear reason',async()=>{
+test('a failing phrase is asked three times with a pause, then the file stops with a clear reason',async()=>{
  const store=createClipStore();let calls=0;
  const make=()=>{calls++;return clip([],{error:Error('нет ответа')});};
- await assert.rejects(async()=>{for await(const _ of chapterAudio({rows:[row('Сбой')],language:'ru',store,make}));},/Фраза 1 не озвучилась: нет ответа/);
- assert.equal(calls,2);
+ await assert.rejects(async()=>{for await(const _ of chapterAudio({rows:[row('Сбой')],language:'ru',store,make,retryDelay:1}));},/Фраза 1 не озвучилась: нет ответа/);
+ assert.equal(calls,3);
+});
+
+test('a phrase that fails once is voiced on the next try',async()=>{
+ const store=createClipStore();let calls=0;
+ const make=()=>++calls===1?clip([],{error:Error('квота')}):clip([.3]);
+ const parts=[];for await(const part of chapterAudio({rows:[row('Да.')],language:'ru',store,make,retryDelay:1}))parts.push(part);
+ assert.equal(calls,2);assert.equal(parts.length,1);
 });
 
 test('plain Gemini phrases are written as they are',async()=>{
