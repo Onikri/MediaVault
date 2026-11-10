@@ -132,7 +132,8 @@ jobs:
             npm run test:cards &&
             npm run test:suwayomi &&
             npm run test:world &&
-            npm run test:music-nav
+            npm run test:music-nav &&
+            npm run test:downloads
           } 2>&1 | tee test-output/browser-ci.log
           result=${PIPESTATUS[0]}
           {

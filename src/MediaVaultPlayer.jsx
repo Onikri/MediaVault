@@ -33,6 +33,8 @@ import PlayerExtensionSlot from './PlayerExtensionSlot.jsx';
 import {createPortal} from 'react-dom';
 import {UPSCALERS,upscalerById,autoUpscaler,migrateUpscaler} from './upscaler-catalog.js';
 import {SourceBadges} from './source-badges.jsx';
+import {readSubtitleTrack,subtitleFileName,subtitleMime} from './subtitle-export.js';
+import {saveBlob} from './use-player-actions.js';
 import {useColorGrade,readCustomPresets,writeCustomPresets} from './color-grade.js';
 import './player-shell.css';
 
@@ -119,7 +121,7 @@ function DubMenu({label,options,value,onPick,current:currentSource}){
 
 export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onPlaybackRecovered,minimumDuration=0,onRejectedSource,onlineControls,onPreview,onClose,autoPlay=false,characterService,extensions=[],apiRef,roomControl,onDownload}){
   const controller=usePlayerController({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose,autoPlay,characterService,roomControl});
-  const {episodeOst,songTheme,timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,setGpuAttempt,gpuAttempt,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress}=controller;
+  const {episodeOst,songTheme,timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,setGpuAttempt,gpuAttempt,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,localSubtitle}=controller;
   const api=usePlayerSession(controller);
   const room=useHostRoom(api,characterService,item,source,characterContext,!roomControl,onlineControls);
   useImperativeHandle(apiRef,()=>api,[api]);
@@ -172,6 +174,8 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   const playlistBlob=item?.onlineType==='hls'&&String(source||'').startsWith('blob:');
   const canDownload=!roomControl&&!room.info&&(!!onlineMatch||!!onDownload||String(source||'').startsWith('blob:')&&!playlistBlob);
   const [downloadStatus,setDownloadStatus]=useState('');
+  const [subtitleSaving,setSubtitleSaving]=useState(''),[subtitleError,setSubtitleError]=useState('');
+  useEffect(()=>setSubtitleError(''),[source]);
   const [downloadOpen,setDownloadOpen]=useState(false),downloadButton=useRef(null),roomButton=useRef(null);
   const title=cleanTitle(library.title);
   const defaultName=[title,episode?.label].filter(Boolean).join(' · ')||'MediaVault';
@@ -210,7 +214,19 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   else{const same=episode?.variants.filter(v=>v.item.id===item.id||v.label===currentVariant?.label)||[];quality={value:item.id,options:same.map(v=>({value:v.item.id,label:variantQuality(v)})),pick:value=>choose(episode.variants.find(v=>v.item.id===value)?.item,true)};}
   const qualityLabel=quality.options.find(o=>String(o.value)===String(quality.value))?.label||'Исходное';
   const audioList=streaming.audio.length?streaming.audio:audioTracks;
-  const subtitleOptions=[{value:'off',label:'Выключены'},...streaming.subtitles.map(t=>({value:'hls:'+t.index,label:t.name})),...availableTracks.map(t=>({value:t.id,label:t.name}))];
+  // «Скачать» in each track row: a file track is saved as it is (SRT, VTT,
+  // ASS), a stream track is assembled into one VTT file.
+  async function saveSubtitle(value,name){
+    if(subtitleSaving)return;
+    setSubtitleSaving(value);setSubtitleError('');
+    try{
+      const {text,format}=await readSubtitleTrack(value,{video:videoRef.current,hlsUrl:streaming.subtitleUrl,localFile:value==='local'?localSubtitle?.current:null});
+      saveBlob(new Blob([text],{type:subtitleMime(format)}),subtitleFileName([title,episode?.label,name],format));
+    }catch(error){setSubtitleError(error.message||'Не удалось скачать субтитры.');}
+    finally{setSubtitleSaving('');}
+  }
+  const subtitleAction=(value,name)=>({label:subtitleSaving===value?'Скачиваем…':'Скачать',ariaLabel:'Скачать субтитры: '+name,icon:<Download size={15} aria-hidden="true"/>,busy:subtitleSaving===value,disabled:!!subtitleSaving,onClick:()=>saveSubtitle(value,name)});
+  const subtitleOptions=[{value:'off',label:'Выключены'},...streaming.subtitles.map(t=>({value:'hls:'+t.index,label:t.name,action:subtitleAction('hls:'+t.index,t.name)})),...availableTracks.filter(t=>t.element||!streaming.subtitles.some(h=>h.name===t.name)).map(t=>({value:t.id,label:t.name,action:subtitleAction(t.id,t.name)}))];
   const subtitleLabel=subtitleOptions.find(o=>o.value===subtitle)?.label||'Выключены';
   // Dub in the bar: online voices (separate audio) or local file variants.
   const dub=onlineControls?.voices?.length>1?{label:'Озвучка',value:onlineControls.voiceId||'',options:onlineControls.voices.map(v=>({value:v.id,label:v.name,sources:v.sources})),pick:id=>onlineControls.onVoice(id),current:onlineControls.currentSource}
@@ -247,6 +263,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       {id:'speed',label:'Скорость',value:prefs.speed===1?'Обычная':prefs.speed+'×',content:picker('Скорость',prefs.speed,[0.5,0.75,1,1.25,1.5,1.75,2].map(v=>({value:v,label:v===1?'Обычная':v+'×'})),v=>changePrefs({speed:Number(v)}))},
       {id:'captions',label:'Субтитры',value:subtitleLabel,content:<>
         <Choices label="Субтитры" value={subtitle} options={subtitleOptions} onPick={setSubtitle}/>
+        {subtitleError&&<p className="mvx-help" role="alert">{subtitleError}</p>}
         {onlineControls?.captionVoices?.length>0&&<><h3 className="mvx-subhead">Из другой версии</h3><Choices label="Источник субтитров" value={onlineControls.subtitleId||''} options={[{value:'',label:'Дорожки текущего видео'},...onlineControls.captionVoices.map(v=>({value:v.id,label:v.name,badges:<SourceBadges sources={v.sources}/>}))]} onPick={id=>onlineControls.onCaptionVoice(id)}/></>}
         <button type="button" className="mvx-link" onClick={()=>subtitleInput.current?.click()}><Subtitles size={16}/>Загрузить файл SRT или VTT</button>
         <Slider label="Размер" ariaLabel="Размер субтитров" min={16} max={40} step={2} value={prefs.subSize} format={v=>v+' px'} onChange={v=>changePrefs({subSize:v})}/>
@@ -333,7 +350,8 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
           onPlay={()=>{setPlaying(true);onPlaybackChange?.(true);}} onPlaying={()=>onPlaybackRecovered?.()} onPause={()=>{setPlaying(false);onPlaybackChange?.(false);if(videoRef.current?.readyState>=1)writeProgress(userId,libraryId,item,videoRef.current?.currentTime||0,videoRef.current?.duration);}}
           onDurationChange={event=>{if(!isShortEpisodeClip(event.currentTarget.duration,minimumDuration))loaded();}} onEnded={ended} onCanPlay={bridgeDone}
           onError={()=>{if(source)diagnoseVideoFailure({video:videoRef.current,source}).then(message=>onError?.(Error(message))).catch(()=>{});}}
-          aria-label="Воспроизвести или приостановить видео">{localTrack&&<track key={localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}{onlineControls?.externalCaptions?.map(t=><track key={t.url} kind="subtitles" src={t.url} srcLang={t.language||'ru'} label={t.name}/>)}</video>
+          aria-label="Воспроизвести или приостановить видео">{/* Keyed by source: hls.js empties every subtitle track when it leaves a
+            stream, and a <track> never loads its file twice, so each stream gets fresh ones. */}{localTrack&&<track key={source+'|'+localTrack} kind="subtitles" src={localTrack} srcLang="ru" label="Загруженные субтитры"/>}{onlineControls?.externalCaptions?.map(t=><track key={source+'|'+t.url} kind="subtitles" src={t.url} srcLang={t.language||'ru'} label={t.name}/>)}</video>
         {onlineControls?.audio&&<video ref={external.ref} hidden style={{display:'none'}} className="mv-external-audio" src={onlineControls?.audio?.type==='hls'?undefined:onlineControls?.audio?.url} crossOrigin="anonymous" playsInline preload="metadata" aria-hidden="true" onError={()=>{if(onlineControls?.audio)setAudioError('Отдельная озвучка не ответила. Включён исходный звук.');}}/>}
         {bridge&&<img className="mvx-bridge" src={bridge} alt="" aria-hidden="true"/>}
         <canvas key={engine+':'+deviceProfile+':'+prefs.neuralMode+':'+gpuAttempt} ref={canvasRef} className="mv-player-canvas mvx-canvas" aria-hidden="true"/>

@@ -45,7 +45,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   useEffect(()=>{const v=videoRef.current;const enter=()=>setIsPip(true),leave=()=>setIsPip(false);v?.addEventListener('enterpictureinpicture',enter);v?.addEventListener('leavepictureinpicture',leave);return()=>{v?.removeEventListener('enterpictureinpicture',enter);v?.removeEventListener('leavepictureinpicture',leave);};},[]);
   useEffect(()=>{const update=()=>setIsFullscreen(document.fullscreenElement===stageRef.current);document.addEventListener('fullscreenchange',update);return()=>document.removeEventListener('fullscreenchange',update);},[]);
   const {panel,setPanel,musicOpen,setMusicOpen,theater,setTheater,settingsTab,setSettingsTab}=usePlayerUi();
-  const [localTrack,setLocalTrack]=useState('');
+  const [localTrack,setLocalTrack]=useState(''),localSubtitle=useRef(null);
   const [controlsVisible,setControlsVisible]=useState(true);
   const hideTimer=useRef(null),lastReveal=useRef(0);
   const settingsButton=useRef(null),musicButton=useRef(null);
@@ -162,14 +162,19 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
     // view, which cannot show it, so the selected track is drawn natively there.
     let native=media.webkitDisplayingFullscreen===true;
     const apply=()=>tracks.forEach((track,index)=>{
-      if(!subtitle.startsWith('hls:'))track.mode=(subtitle===(track.label==='Загруженные субтитры'?'local':'native:'+index))?(native?'showing':'hidden'):'disabled';
+      if(subtitle.startsWith('hls:'))return;
+      const mode=(subtitle===(track.label==='Загруженные субтитры'?'local':'native:'+index))?(native?'showing':'hidden'):'disabled';
+      if(track.mode!==mode)track.mode=mode;
     });
+    // hls.js switches text tracks of the whole element; the chosen one is put back.
+    const guard=()=>{if(!subtitle.startsWith('hls:')&&tracks.some((track,index)=>track.mode!=='disabled'!==(subtitle===(track.label==='Загруженные субтитры'?'local':'native:'+index))))apply();};
     const begin=()=>{native=true;apply();setSubtitleText('');},end=()=>{native=false;apply();refresh();};
     apply();
     tracks.forEach(track=>track.addEventListener?.('cuechange',refresh));
+    media.textTracks?.addEventListener?.('change',guard);
     media.addEventListener('webkitbeginfullscreen',begin);media.addEventListener('webkitendfullscreen',end);
     refresh();
-    return()=>{tracks.forEach(track=>track.removeEventListener?.('cuechange',refresh));media.removeEventListener('webkitbeginfullscreen',begin);media.removeEventListener('webkitendfullscreen',end);};
+    return()=>{media.textTracks?.removeEventListener?.('change',guard);tracks.forEach(track=>track.removeEventListener?.('cuechange',refresh));media.removeEventListener('webkitbeginfullscreen',begin);media.removeEventListener('webkitendfullscreen',end);};
   },[subtitle,availableTracks,localTrack,source]);
   useEffect(()=>{
     if(!source||!prefs.gpu||gpuSuspended||!canvasRef.current||!videoRef.current){
@@ -251,7 +256,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const lastCaption=useRef('');
   function toggleCaptions(){
     if(subtitle!=='off'){lastCaption.current=subtitle;setSubtitle('off');return;}
-    const options=[...streaming.subtitles.map(t=>'hls:'+t.index),...availableTracks.map(t=>t.id)];
+    const options=[...streaming.subtitles.map(t=>'hls:'+t.index),...availableTracks.filter(t=>t.element||!streaming.subtitles.some(h=>h.name===t.name)).map(t=>t.id)];
     const value=options.includes(lastCaption.current)?lastCaption.current:options[0];
     if(value)setSubtitle(value);else{setSettingsTab('captions');openPanel('settings');}
   }
@@ -282,6 +287,7 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
       if(file.size>5*1024*1024)throw Error('Субтитры должны быть меньше 5 МБ.');
       const content=toWebVtt(await file.text(),file.name);
       setLocalTrack(URL.createObjectURL(new Blob([content],{type:'text/vtt'})));
+      localSubtitle.current={name:file.name,text:await file.text()};
       setSubtitle('local');setSubtitleText('');
     }catch(cause){onError?.(cause);}
   }
@@ -332,6 +338,6 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
   const hiddenControls=playing&&panel==='watch'&&!musicOpen&&!controlsVisible;
   const progress=seekable?Math.min(100,previewTime/duration*100):0;
   return {
-    episodeOst,songTheme,timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,item,source,nextEpisode:next?nextEpisode:null,toggleCaptions,previous,setTheater
+    episodeOst,songTheme,timeline,canvasRef,stageRef,railRef,videoRef,health,streaming,reducedMotion,prefs,hoverSeek,setHoverSeek,seekTimer,time,duration,buffered,setBuffered,playing,setPlaying,muted,setMuted,audioError,setAudioError,external,previewCaptured,isFullscreen,isPip,panel,musicOpen,setMusicOpen,theater,settingsTab,setSettingsTab,localTrack,settingsButton,musicButton,cinema,musicIdentity,episodeMusic,dismissedCue,setDismissedCue,settingsOpen,scene,subtitle,setSubtitle,availableTracks,audioTracks,activeAudio,subtitleText,gpuActive,gpuWarning,neuralStats,gpuAttempt,setGpuAttempt,mobileDevice,deviceProfile,engine,colors,color,colorFilter,engineName,retryGpu,opening,openingDraft,setOpeningDraft,introOffset,setIntroOffset,effectiveOpening,ending,activeTheme,currentSong,subtitleInput,library,seasons,episodes,season,shelfSeason,setBrowsedSeasonId,episode,characterContext,index,revealControls,scrollEpisodes,openPanel,changePrefs,seek,onTime,loaded,choose,ended,toggle,fullscreen,switchAudio,attachSubtitle,setIntro,markEnd,gestures,actions,previewTime,effectiveVolume,pip,seekable,skipRange,canSkip,hiddenControls,progress,item,source,nextEpisode:next?nextEpisode:null,toggleCaptions,previous,setTheater,localSubtitle
   };
 }

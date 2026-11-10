@@ -20,7 +20,13 @@ export function getOpening(item,libraryId){
   }catch{}
   return openingBounds(item.opening||item.intro);
 }
-export const tracksOf=video=>Array.from(video?.textTracks||[]).map((track,index)=>({
-  id:track.label==='Загруженные субтитры'?'local':'native:'+index,
-  name:track.label||(track.language?track.language:'Дорожка '+(index+1))
-}));
+// element: the track comes from a <track> (a file); without one it was added
+// by the stream itself (hls.js mirrors its subtitle playlists this way).
+export const tracksOf=video=>{
+  const elements=new Set(Array.from(video?.querySelectorAll?.('track')||[]).map(node=>node.track));
+  return Array.from(video?.textTracks||[]).map((track,index)=>({
+    id:track.label==='Загруженные субтитры'?'local':'native:'+index,
+    name:track.label||(track.language?track.language:'Дорожка '+(index+1)),
+    element:elements.has(track)
+  }));
+};

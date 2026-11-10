@@ -1,11 +1,12 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Play,Pause,SkipBack,SkipForward,Users,Headphones,X,Volume2,RefreshCw,KeyRound} from 'lucide-react';
+import {Play,Pause,SkipBack,SkipForward,Users,Headphones,X,Volume2,RefreshCw,KeyRound,Download} from 'lucide-react';
 import {TTS_BYTES,ttsConsent,setTtsConsent,PRESET_VOICES} from './model.js';
 import {startNarrationEngine,engineReady,synthesize} from './engine.js';
 import {heuristicRoles,ROLE_MODEL} from './roles.js';
 import {analyseChapter,detach,prefetchChapter,studyBook,adoptBible,forgetStudy} from './director.js';
 import {castVoices,narratorCast,savedCast,saveCast,PRESET_TRAITS} from './voices.js';
-import {createNarrator,utterancesOf,playClip} from './player.js';
+import {createNarrator,utterancesOf,playClip,localClip,voiceChain} from './player.js';
+import {createClipStore,chapterReadiness,chapterAudio,renderPhrase,audiobookWriter,audiobookFileName} from './audiobook.js';
 import {savedBible,forgetBible,applyLexicon,TIMBRES} from './bible.js';
 import {ROLE_MODELS,BIBLE_MODELS,personalKey,savePersonalKey} from './google.js';
 import {roleColors,emotionLabel} from './RoleText.jsx';
@@ -29,13 +30,20 @@ const wait=(ms,signal)=>new Promise((resolve,reject)=>{const t=setTimeout(resolv
 // onFinished() lets the reader open the next chapter and continue.
 // book: {title, aliases, authors, description, year, kind} for the title bible.
 // next: {key, load()} of the following chapter — its roles are prepared in the background.
-export default function Narration({paragraphs,language,bookKey,chapterKey,title,book,service,userId,startParagraph=0,autoplay=false,onSpeaking,onFinished,onAutoplayHandled,onScript,commandRef,onPlaying,next}){
+function saveFile(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+
+export default function Narration({paragraphs,language,bookKey,chapterKey,title,chapter='',book,service,userId,startParagraph=0,autoplay=false,onSpeaking,onFinished,onAutoplayHandled,onScript,commandRef,onPlaying,next}){
  const [prefs,setPrefs]=useState(readPrefs),[phase,setPhase]=useState('idle'),[progress,setProgress]=useState(null),[error,setError]=useState('');
  const [segments,setSegments]=useState([]),[characters,setCharacters]=useState([]),[analysis,setAnalysis]=useState(''),[cast,setCast]=useState(()=>savedCast(bookKey));
  const [bible,setBible]=useState(()=>savedBible(bookKey)),[bibleState,setBibleState]=useState(''),[bibleRevision,setBibleRevision]=useState(0);
  const [state,setState]=useState({playing:false,index:0,total:0}),[provider,setProvider]=useState(''),[castOpen,setCastOpen]=useState(false),[consent,setConsent]=useState(ttsConsent);
  const [geminiSaved,setGeminiSaved]=useState(()=>savedGeminiCast(bookKey));
  const [hasKey,setHasKey]=useState(null),[keyDraft,setKeyDraft]=useState(''),[sampling,setSampling]=useState(''),[roleStats,setRoleStats]=useState(null);
+ // Phrases voiced in this chapter (the reader keys Narration by chapter): played
+ // again and saved into the audiobook without a second request.
+ const store=useRef(null);store.current||=createClipStore();
+ const [audiobook,setAudiobook]=useState(null),audiobookAbort=useRef(null);
+ useEffect(()=>()=>audiobookAbort.current?.abort(),[]);
  const narrator=useRef(null),speech=useRef({}),localProvider=useRef(''),live=useRef({}),rowsRef=useRef([]),wantPlay=useRef(false);live.current={onSpeaking,onFinished};
  function update(change){setPrefs(old=>{const next={...old,...change};try{localStorage.setItem(PREFS,JSON.stringify(next));}catch{}return next;});}
  const meta=useMemo(()=>({title:book?.title||title,aliases:book?.aliases||[],authors:book?.authors||[],description:book?.description||'',year:book?.year||null,kind:book?.kind||'book',language}),[book?.title,title,language]);
@@ -85,11 +93,56 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  // The reader draws the same roles in the text (names, colours, emotions).
  useEffect(()=>{onScript?.({segments,cast:voices,colors,narrator:prefs.narrator,analysis});},[segments,voices,colors,prefs.narrator,analysis]);
 
+ // The same engine and voices for playback and for the audiobook file.
+ function clipMaker(gemini,steps){
+  return (row,i,signal,lang)=>gemini?geminiClip({...speech.current,text:row.text,voice:row.voice,style:row.style,language:lang,signal}):localClip(row,i,{language:lang,steps});
+ }
+ const bookTitle=String(book?.title||title||'').trim(),chapterTitle=String(chapter||'').trim()||(title&&bookTitle&&title.startsWith(bookTitle)?title.slice(bookTitle.length).replace(/^\s*·\s*/,''):title)||'';
+ function openAudiobook(){
+  if(audiobook?.phase==='running')return;
+  setAudiobook({phase:'confirm',...chapterReadiness(rowsRef.current,store.current,language)});
+ }
+ // Chapter → one file: stored phrases first, missing ones from the engine,
+ // two at a time; each phrase rendered as it sounds in the reader.
+ async function saveAudiobook(){
+  const rows=rowsRef.current.slice(),gemini=engine==='gemini';
+  if(!rows.length)return;
+  const readiness=chapterReadiness(rows,store.current,language);
+  if(!gemini&&readiness.missing&&!engineReady()){
+   if(!consent){setAudiobook(null);setPhase('consent');return;}
+   setAudiobook({phase:'running',done:0,total:rows.length,made:0,loading:0});
+   try{const loaded=await startNarrationEngine({progress:value=>{if(value.phase==='download')setAudiobook(old=>old&&{...old,loading:Math.round((value.loaded||0)/Math.max(1,value.total||TTS_BYTES)*100)});}});localProvider.current=loaded.provider;}
+   catch(e){setAudiobook({phase:'error',error:e.message||'Не удалось запустить озвучку.'});return;}
+  }
+  const abort=new AbortController();audiobookAbort.current?.abort();audiobookAbort.current=abort;
+  const make=clipMaker(gemini,localProvider.current==='wasm'?4:5);
+  const tags={title:chapterTitle||bookTitle,album:bookTitle,artist:(book?.authors||[]).join(', '),genre:'Audiobook',language,
+   comment:'Синтезированная озвучка MediaVault: '+(gemini?'Gemini 2.5 Flash Native Audio':'Supertonic 3')};
+  setAudiobook({phase:'running',done:0,total:rows.length,made:0});
+  let writer=null;
+  try{
+   for await(const part of chapterAudio({rows,language,store:store.current,make,signal:abort.signal,ahead:2,
+    onProgress:value=>{if(!abort.signal.aborted)setAudiobook(old=>old&&{...old,...value});}})){
+    writer||=await audiobookWriter(part.sampleRate,{tags});
+    await writer.write(await renderPhrase(part,part.row,writer.rate,voiceChain));
+    await writer.write(new Float32Array(Math.round((part.row.pause||0)*writer.rate)));
+   }
+   const name=audiobookFileName(bookTitle,chapterTitle,writer.ext);
+   saveFile(await writer.finish(),name);
+   if(!abort.signal.aborted)setAudiobook({phase:'done',name,seconds:Math.max(1,Math.round(writer.seconds))});
+  }catch(e){
+   writer?.close();
+   if(abort.signal.aborted||e.name==='AbortError')setAudiobook(old=>old?.phase==='running'?null:old);
+   else setAudiobook({phase:'error',error:e.message||'Не удалось сохранить аудиокнигу.'});
+  }finally{if(audiobookAbort.current===abort)audiobookAbort.current=null;}
+ }
+ function stopAudiobook(){audiobookAbort.current?.abort();setAudiobook(null);}
+
  useEffect(()=>{
   // CPU: 4 flow steps (measured CER: 3 steps ru 1.6% / uk 4.7%, 5 steps 0.5% / 0.8%).
-  const gemini=provider==='gemini';
+  const gemini=provider==='gemini',raw=clipMaker(gemini,provider==='wasm'?4:5);
   narrator.current=createNarrator({language,steps:provider==='wasm'?4:5,lookahead:gemini?3:4,
-   synth:gemini?(row,i,signal,lang)=>geminiClip({...speech.current,text:row.text,voice:row.voice,style:row.style,language:lang,signal}):null,
+   synth:(row,i,signal,lang)=>store.current.obtain(row,lang,()=>raw(row,i,signal,lang)),
    onSegment:row=>live.current.onSpeaking?.(row),onState:setState,onEnd:()=>live.current.onFinished?.(),onError:e=>{setError(e.message||'Озвучка остановилась.');}});
   const rows=rowsRef.current,first=Math.max(0,rows.findIndex(r=>r.p>=startParagraph));
   narrator.current.load(rows,{start:first,label:title});
@@ -179,8 +232,33 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
    <button type="button" className="narration-skip" aria-label="Следующая фраза" title="Следующая фраза" disabled={!(phase==='ready'||state.playing)} onClick={()=>narrator.current?.skip(1)}><SkipForward size={15}/></button>
    <label className="narration-pace" title="Темп чтения"><span className="sr-only">Темп</span><select aria-label="Темп озвучки" value={prefs.pace} onChange={e=>update({pace:Number(e.target.value)})}>{[.8,.9,1,1.1,1.2,1.35].map(v=><option key={v} value={v}>{v}×</option>)}</select></label>
    <button type="button" className="narration-people" aria-label="Роли и голоса" title="Роли и голоса" aria-expanded={castOpen} onClick={()=>setCastOpen(v=>!v)}><Users size={16}/>{people.length>0&&<span>{people.length}</span>}</button>
+   <button type="button" className="narration-save" aria-label="Сохранить главу аудиокнигой" title="Сохранить главу аудиокнигой" aria-expanded={!!audiobook} aria-busy={audiobook?.phase==='running'||undefined} disabled={!rows.length} onClick={()=>audiobook?setAudiobook(old=>old.phase==='running'?old:null):openAudiobook()}><Download size={16}/></button>
    <small className="narration-status sr-only" aria-live="polite">{busy?loadingText:state.playing?(state.buffering?'Готовим фразу…':provider==='gemini'?'Gemini':provider==='webgpu'?'Видеокарта':'Процессор'):''}</small>
   </div>
+  {audiobook&&<div className="narration-book" role="region" aria-label="Аудиокнига из главы">
+   {audiobook.phase==='confirm'&&<>
+    <p><strong>Аудиокнига из этой главы</strong></p>
+    <p>{audiobook.missing?'Готово '+audiobook.ready+' из '+audiobook.total+' фраз.':'Вся глава уже озвучена: новых запросов не будет.'}</p>
+    {audiobook.missing>0&&<p>{engine==='gemini'?'Остальные '+audiobook.missing+' фраз озвучит Gemini теми же голосами, по одному запросу на фразу.':'Остальные '+audiobook.missing+' фраз озвучит Supertonic на этом устройстве.'}</p>}
+    <p className="fine">Один файл Opus (WAV, если браузер не умеет Opus) с названием книги и главы.</p>
+    <div className="narration-actions"><button type="button" className="btn btn-primary" onClick={saveAudiobook}>Сохранить файл</button><button type="button" className="btn btn-secondary" onClick={()=>setAudiobook(null)}>Отмена</button></div>
+   </>}
+   {audiobook.phase==='running'&&<>
+    <p aria-live="polite">{audiobook.loading!=null&&!audiobook.done?'Загружаем голос '+audiobook.loading+'%':'Собираем аудиокнигу: '+audiobook.done+' из '+audiobook.total+' фраз'}</p>
+    <div className="narration-progress" role="progressbar" aria-label="Готовность аудиокниги" aria-valuemin={0} aria-valuemax={audiobook.total} aria-valuenow={audiobook.done}><span style={{width:(audiobook.done/Math.max(1,audiobook.total)*100)+'%'}}/></div>
+    {audiobook.made>0&&<p className="fine">{'Досинтезировано фраз: '+audiobook.made}</p>}
+    <div className="narration-actions"><button type="button" className="btn btn-secondary" onClick={stopAudiobook}>Остановить</button></div>
+   </>}
+   {audiobook.phase==='done'&&<>
+    <p role="status">{'Аудиокнига сохранена: '+(audiobook.seconds<60?audiobook.seconds+' с':Math.round(audiobook.seconds/60)+' мин.')}</p>
+    <p className="fine" translate="no">{audiobook.name}</p>
+    <div className="narration-actions"><button type="button" className="btn btn-secondary" onClick={()=>setAudiobook(null)}>Готово</button></div>
+   </>}
+   {audiobook.phase==='error'&&<>
+    <p className="narration-book-error" role="alert">{audiobook.error}</p>
+    <div className="narration-actions"><button type="button" className="btn btn-primary" onClick={saveAudiobook}>Повторить</button><button type="button" className="btn btn-secondary" onClick={()=>setAudiobook(null)}>Закрыть</button></div>
+   </>}
+  </div>}
   {error&&<p className="inline-error" role="alert">{error}</p>}
   {castOpen&&<div className="narration-cast">
    <header><strong>Роли и голоса</strong><button type="button" aria-label="Закрыть роли" onClick={()=>setCastOpen(false)}><X size={15}/></button></header>

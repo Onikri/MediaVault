@@ -113,17 +113,18 @@ export function pcmDecoder(){
  };
 }
 
-// A clip fills while the server streams; the player listens through clip.wake.
+// A clip fills while the server streams; the player listens through clip.wake,
+// the chapter store through clip.ready. An interrupted clip is marked aborted.
 export function geminiClip({service,userId,text,voice,style,language,signal}){
  const clip={chunks:[],done:false,error:null,sampleRate:GEMINI_RATE,provider:'gemini',wake:null};
  const update=()=>clip.wake?.();
- (async()=>{
+ clip.ready=(async()=>{
   const key=await personalKey(userId).catch(()=>'');
   const response=await service.request('/reader/google/speak',{method:'POST',raw:true,signal:signal||AbortSignal.timeout(180000),
    body:{...(key?{key,...(Number(service?.session?.serverVersion)>=60?{pool:true}:{})}:{}),text,voice,style,language:language==='uk'?'uk':'ru'}});
   const reader=response.body.getReader(),decode=pcmDecoder();
   for(;;){const {done,value}=await reader.read();if(done)break;const samples=decode(value);if(samples.length){clip.chunks.push(samples);update();}}
- })().catch(error=>{if(!signal?.aborted)clip.error=error;}).finally(()=>{clip.done=true;update();});
+ })().catch(error=>{if(signal?.aborted)clip.aborted=true;else clip.error=error;}).finally(()=>{clip.done=true;update();});
  return clip;
 }
 

@@ -128,7 +128,7 @@ export default function BookReader({item,userId,libraryId,onClose,readWhole,inli
  const contents=<nav className="reader-chapter-list">{toc.length?toc.flatMap(function row(entry,i){return [<button key={entry.href||entry.index||i} translate="no" aria-current={entry.index===page} onClick={()=>entry.href?view.current?.display(entry.href).catch(e=>setError(e.message)):choose(entry.index)}>{entry.label}</button>,...(entry.subitems||[]).flatMap(row)];}):<p className="reader-empty">В файле нет отдельного оглавления.</p>}</nav>;
  const indices=prefs.mode==='scroll'?Array.from({length:total},(_,i)=>i):[page];
  const narration=!busy&&!error&&narrated?.rows.length>0?<Narration key={narrated.key} paragraphs={narrated.rows.map(r=>r.text)} language={language} bookKey={'book:'+item.id} chapterKey={narrated.key}
-  title={item.name+(narrated.title?' · '+narrated.title:'')} book={{title:String(item.name||'').replace(/\.(epub|pdf|fb2|txt)$/i,''),kind:'book'}} service={service} userId={userId} startParagraph={Math.max(0,narrated.rows.findIndex(r=>r.page>=page))}
+  title={item.name+(narrated.title?' · '+narrated.title:'')} chapter={narrated.title||''} book={{title:String(item.name||'').replace(/\.(epub|pdf|fb2|txt)$/i,''),kind:'book'}} service={service} userId={userId} startParagraph={Math.max(0,narrated.rows.findIndex(r=>r.page>=page))}
   autoplay={continueVoice} onAutoplayHandled={()=>setContinueVoice(false)}
   onSpeaking={follow} onFinished={nextSection} onScript={setScript} commandRef={voice} onPlaying={setVoicePlaying}/>
   :kind==='pdf'&&!busy&&!error?<p className="reader-rail-note" title="На этой странице нет текстового слоя"><Headphones size={16}/></p>:null;

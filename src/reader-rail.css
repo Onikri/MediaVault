@@ -36,7 +36,7 @@
 @keyframes narration-breathe{50%{opacity:.45}}
 
 /* Panels open beside the rail, anchored to its bottom: the bar never moves. */
-.reader-rail-dock .narration-consent,.reader-rail-dock .narration-cast{position:fixed;z-index:20;right:calc(var(--rail-size) + var(--rail-gap) * 2);bottom:var(--rail-gap);width:min(400px,calc(100vw - var(--rail-size) - var(--rail-gap) * 4));max-height:min(78dvh,720px);overflow:auto;box-sizing:border-box;color:#ece9e3;box-shadow:0 18px 60px #0005}
+.reader-rail-dock .narration-consent,.reader-rail-dock .narration-cast,.reader-rail-dock .narration-book{position:fixed;z-index:20;right:calc(var(--rail-size) + var(--rail-gap) * 2);bottom:var(--rail-gap);width:min(400px,calc(100vw - var(--rail-size) - var(--rail-gap) * 4));max-height:min(78dvh,720px);overflow:auto;box-sizing:border-box;color:#ece9e3;box-shadow:0 18px 60px #0005}
 .reader-rail-dock .inline-error{position:fixed;z-index:20;right:calc(var(--rail-size) + var(--rail-gap) * 2);bottom:var(--rail-gap);max-width:min(360px,calc(100vw - 110px));margin:0;padding:10px 14px;border-radius:14px;background:#2a1716f2;color:#ffd6d1;font-size:13px}
 .narration-cast-pace{display:none!important}
 .narration-note{display:grid!important;gap:6px;margin-top:6px!important}
@@ -76,7 +76,7 @@
  .reader-rail .reader-fullscreen,.reader-rail-count,.reader-rail-dock .narration-skip,.reader-rail-dock .narration-pace{display:none}
  .reader-rail-dock{width:auto}
  .reader-rail-dock .narration-bar .narration-main{margin:0}
- .reader-rail-dock .narration-consent,.reader-rail-dock .narration-cast,.reader-rail-dock .inline-error{left:var(--rail-gap);right:var(--rail-gap);width:auto;max-width:none;bottom:calc(var(--rail-size) + var(--rail-gap) * 2)}
+ .reader-rail-dock .narration-consent,.reader-rail-dock .narration-cast,.reader-rail-dock .narration-book,.reader-rail-dock .inline-error{left:var(--rail-gap);right:var(--rail-gap);width:auto;max-width:none;bottom:calc(var(--rail-size) + var(--rail-gap) * 2)}
  .narration-cast-pace{display:flex!important}
  .text-reader .ranobe-prose p.is-speaking::before{left:-12px}
 }

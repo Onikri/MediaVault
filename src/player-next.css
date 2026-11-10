@@ -239,6 +239,12 @@
 .mvx-choice small{display:block;font-size:12px;color:var(--mvx-muted);margin-top:1px}
 .mvx-choice[aria-checked=true] strong{font-weight:600}
 .mvx-choice[aria-checked=true]>svg{color:var(--mvx-accent)}
+.mvx-choice-row{display:flex;align-items:center;gap:2px}
+.mvx-choice-row>.mvx-choice{flex:1;min-width:0}
+.mvx-sheet .mvx-choice-action{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:36px;padding:0 10px;border:0;border-radius:10px;background:none;color:var(--mvx-muted);font-size:12px;cursor:pointer}
+.mvx-sheet .mvx-choice-action:hover,.mvx-sheet .mvx-choice-action:focus-visible{background:var(--mvx-raised);color:var(--mvx-text);outline:none}
+.mvx-sheet .mvx-choice-action:disabled{opacity:.6;cursor:progress}
+@media (max-width:420px){.mvx-sheet .mvx-choice-action span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}}
 .mvx-field{display:grid;gap:8px;padding:6px 10px}
 .mvx-field-label{display:flex;justify-content:space-between;font-size:13px;color:var(--mvx-muted)}
 .mvx-field-label output{color:var(--mvx-text);font-variant-numeric:tabular-nums}

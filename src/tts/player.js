@@ -48,7 +48,7 @@ export async function playClip(result,options={}){
 // Chunks are scheduled as they arrive, so a streamed voice starts at once.
 export function localClip(row,i,{language,steps}){
  const clip={chunks:[],done:false,error:null,sampleRate:44100,provider:'',wake:null};
- synthesize({text:row.text,lang:language,voice:row.voice,steps,speed:row.speed/(row.rate||1),tags:row.tags,seed:7+i%5})
+ clip.ready=synthesize({text:row.text,lang:language,voice:row.voice,steps,speed:row.speed/(row.rate||1),tags:row.tags,seed:7+i%5})
   .then(result=>{clip.sampleRate=result.sampleRate;clip.provider=result.provider;clip.chunks.push(result.audio);},error=>{clip.error=error;})
   .finally(()=>{clip.done=true;clip.wake?.();});
  return clip;

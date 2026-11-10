@@ -17,10 +17,15 @@ export function Choices({label,options,value,onPick}){
   return <div className="mvx-choices" role="radiogroup" aria-label={label}>
     {options.map(option=>{
       const checked=String(option.value)===String(value);
-      return <button type="button" key={option.value} role="radio" aria-checked={checked} className="mvx-choice" disabled={option.disabled} onClick={()=>onPick(option.value)}>
+      const choice=<button type="button" key={option.value} role="radio" aria-checked={checked} className="mvx-choice" disabled={option.disabled} onClick={()=>onPick(option.value)}>
         <span><strong>{option.label}{option.badges}</strong>{option.hint&&<small>{option.hint}</small>}</span>
         {checked&&<Check size={16} aria-hidden="true"/>}
       </button>;
+      // A row may carry one action of its own (subtitles: «Скачать»), next to the choice.
+      const action=option.action;
+      return action?<div key={option.value} className="mvx-choice-row">{choice}
+        <button type="button" className="mvx-choice-action" aria-label={action.ariaLabel||action.label} aria-busy={action.busy||undefined} disabled={action.disabled} onClick={action.onClick}>{action.icon}<span>{action.label}</span></button>
+      </div>:choice;
     })}
   </div>;
 }

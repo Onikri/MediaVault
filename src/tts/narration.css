@@ -1,7 +1,7 @@
 /* Narration controls live in the reader's bottom float. No borders: tone only. */
 .narration{display:flex;flex-direction:column;gap:10px;width:min(560px,calc(100vw - 32px));margin:0 auto;color:#ece9e3}
 /* Panels open upward from the bar so they never leave the screen. */
-.narration-consent{order:-2}.narration-cast{order:-1}
+.narration-consent{order:-2}.narration-cast,.narration-book{order:-1}
 .narration-bar{display:flex;align-items:center;gap:6px;padding:6px;border-radius:999px;background:#1f1c22f0;backdrop-filter:blur(18px);box-shadow:0 10px 30px #0004}
 .narration-bar button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;min-width:38px;padding:0 10px;border:0;border-radius:999px;background:none;color:inherit;font:600 13px var(--font-ui,inherit);cursor:pointer}
 .narration-bar button:hover:not(:disabled),.narration-bar button:focus-visible{outline:none;background:color-mix(in srgb,currentColor 10%,transparent)}
@@ -56,3 +56,11 @@
 .narration-voice-controls{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
 .narration-voice-controls select{max-width:150px}
 .narration-voice-controls.is-single{flex-wrap:nowrap}.narration-voice-controls.is-single select{max-width:min(210px,52vw)}
+
+/* Audiobook from the chapter: a panel above the bar, progress as a thin fill. */
+.narration-book{padding:14px 18px;border-radius:20px;background:#1f1c22f5;backdrop-filter:blur(18px);font-size:13.5px;line-height:1.55}
+.narration-book p{margin:0 0 8px}.narration-book .fine{font-size:12px;overflow-wrap:anywhere}
+.narration-progress{height:4px;margin:2px 0 10px;border-radius:99px;background:color-mix(in srgb,currentColor 12%,transparent);overflow:hidden}
+.narration-progress span{display:block;height:100%;border-radius:inherit;background:var(--color-blossom,#ee3c35);transition:width .3s ease}
+.narration-book .narration-book-error{color:#ffd6d1}
+.narration-book .btn-secondary{border:0;box-shadow:none;background:color-mix(in srgb,currentColor 10%,transparent);color:inherit}
