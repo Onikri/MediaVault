@@ -21,7 +21,7 @@ def fingerprint(key):return hashlib.sha256(key.encode()).hexdigest()[:16]
 def safe_status(rows):return {'configured':bool(rows),'keyCount':len(rows),'slots':[{'slot':r['slot'],'configured':True,'project':r.get('project',''),'availableModels':r.get('models',[])} for r in rows],'maxParallel':min(3,len(rows))}
 class KeySlot(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    slot:int=Field(ge=0,le=2)
+    slot:int=Field(ge=0,le=5)
     key:SecretStr|None=None
     project:str=Field(default='',max_length=100,pattern=r'^[A-Za-z0-9_.-]*$')
 class KeyPool(BaseModel):
@@ -29,7 +29,7 @@ class KeyPool(BaseModel):
 class Generate(BaseModel):
     model_config=ConfigDict(extra='forbid')
     key:SecretStr|None=None
-    slot:int|None=Field(default=None,ge=0,le=2)
+    slot:int|None=Field(default=None,ge=0,le=5)
     model:str
     request:dict
     # Narration: a personal key joins the owner's server keys instead of

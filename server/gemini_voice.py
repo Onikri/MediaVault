@@ -10,7 +10,7 @@ to the next server key; a personal key is used alone.
 The Live model often ends the turn without a sound on short lines («Да.»,
 «— Ага.», a name): measured on 2026-11-10, 9 of 10 such lines were silent
 whatever the prompt, and asking again or on another key changed nothing. Those
-lines are read by the Lite speech model instead, in the same voice. It reads
+lines are read by the 3.8 Flash speech model instead (owner's choice, 2026-11-10: same daily limits as Lite), in the same voice. It reads
 plain text verbatim but says any added instruction aloud, so it gets the text
 alone.
 """
@@ -31,7 +31,7 @@ RATE = 24000
 MAX_SECONDS = 150
 # Less than this much audio from the Live model counts as silence (a breath).
 MIN_AUDIO = int(0.25 * RATE * 2)
-TTS_MODEL = 'gemini-3.8-flash-lite-tts'
+TTS_MODEL = 'gemini-3.8-flash-tts'
 TTS_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + TTS_MODEL + ':generateContent'
 # The prebuilt voices of the Gemini speech models.
 VOICES = frozenset((
@@ -143,7 +143,7 @@ async def _post(url, key, payload):
 
 
 async def spoken_line(key, body):
-    """The whole line from the Lite speech model as 24 kHz PCM."""
+    """The whole line from the 3.8 Flash speech model as 24 kHz PCM."""
     payload = {'contents': [{'parts': [{'text': body.text}]}],
                'generationConfig': {'responseModalities': ['AUDIO'],
                                     'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': body.voice}}}}}

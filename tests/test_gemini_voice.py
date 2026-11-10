@@ -75,10 +75,10 @@ class GeminiVoiceTests(unittest.TestCase):
   self.scripts={r['key']:SILENT for r in self.keys}
   response=self.client.post('/reader/google/speak',json={'text':'Да.','voice':'Charon','style':'эмоция: устало','language':'ru'})
   self.assertEqual(response.status_code,200,response.text);self.assertEqual(response.content,SPEECH,'WAV header removed')
-  self.assertEqual(response.headers['x-audio-model'],'gemini-3.8-flash-lite-tts')
+  self.assertEqual(response.headers['x-audio-model'],'gemini-3.8-flash-tts')
   self.assertEqual(len(self.sockets),1,'silence is not asked again on other Live keys')
   url,key,payload=self.posts[0]
-  self.assertIn('gemini-3.8-flash-lite-tts:generateContent',url);self.assertEqual(key,self.sockets[0].key)
+  self.assertIn('gemini-3.8-flash-tts:generateContent',url);self.assertEqual(key,self.sockets[0].key)
   self.assertEqual(payload['contents'],[{'parts':[{'text':'Да.'}]}],'plain text only: this model reads instructions aloud')
   self.assertEqual(payload['generationConfig']['speechConfig']['voiceConfig']['prebuiltVoiceConfig']['voiceName'],'Charon')
  def test_a_breath_counts_as_silence(self):
