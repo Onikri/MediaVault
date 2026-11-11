@@ -11,7 +11,7 @@ from source_parser import SourceAccessError,SourceError,public_url
 
 PREFIX='/__manga/suwayomi/'
 LANGUAGES={'ru','uk','en','ja','ko'}
-_cache={};_lock=threading.RLock();_install_lock=threading.Lock()
+_cache={};_lock=threading.RLock();_install_lock=threading.Lock();_origins={}
 
 class BridgeError(SourceError):
     def __init__(self, code, message):
@@ -40,6 +40,43 @@ def bridge_error(status, text, image=False):
         status = int(origin[1])
     code={401:'login',403:'restricted',404:'missing',408:'timeout',429:'rate-limit',504:'timeout'}.get(status,'upstream')
     return BridgeError(code,f'Ошибка источника (HTTP {status}). Не удалось получить '+('страницу главы.' if image else 'данные читалки.'))
+
+# Geo walls that answer the VM with 403 (Comici/CloudFront publishers say
+# "アクセスを制限しております"). Matched on the origin's own home page only.
+GEO_WALL=('アクセスを制限','一部の通信環境','block access from your country','not available in your country',
+          'only available in japan','only be used from japan','your country is not supported','not available in your region')
+ORIGIN_TTL=6*3600
+
+def origin_block(base_url,fetch=None,clock=time.monotonic):
+    """Explain an extension's bare "Server Error" by asking its public home page once.
+
+    Suwayomi turns an uncaught HttpException into an empty HTTP 500, so the
+    origin's real answer (often a regional 403) is lost. One GET per host per
+    six hours, no cookies, no retries, bounded body; returns a BridgeError or None.
+    """
+    try:url=public_url(str(base_url or '').rstrip('/')+'/',allow_api=False)
+    except SourceError:return None
+    host=urlsplit(url).hostname;now=clock()
+    with _lock:hit=_origins.get(host)
+    if hit and hit[0]>now:return hit[1]
+    result=None;response=None
+    try:
+        get=fetch or (lambda u:requests.get(u,timeout=(3,6),allow_redirects=False,stream=True,
+            headers={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36','Accept-Language':'ja,en;q=0.8'}))
+        response=get(url);raw=b''
+        for block in response.iter_content(4096):
+            raw+=block[:16384-len(raw)]
+            if len(raw)>=16384:break
+        text=raw.decode('utf-8',errors='replace').casefold()
+        if response.status_code in {401,403,451} and any(term in text for term in GEO_WALL):
+            result=BridgeError('region','Источник открыт только из своей страны (обычно Япония) и закрыт для сервера.')
+        elif response.status_code>=400:
+            result=bridge_error(response.status_code,text)
+    except requests.RequestException:result=None
+    finally:
+        if response is not None:response.close()
+    with _lock:_origins[host]=(now+ORIGIN_TTL,result)
+    return result
 
 def configured():return bool(os.getenv('SUWAYOMI_URL') and os.getenv('SUWAYOMI_AUTH_FILE') and os.getenv('PUBLIC_URL','').startswith('https://'))
 def reference(manga,chapter=None,page=None):

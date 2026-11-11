@@ -123,7 +123,9 @@
 .source-result small { font-size: 11px; color: var(--color-petal); margin-top: 4px; overflow-wrap: anywhere; }
 .source-result svg { flex-shrink: 0; color: var(--accent); }
 .provider-diagnostics { color: var(--muted); font-size: 10px; margin: 12px 0; }
-.provider-diagnostics summary { cursor: pointer; }
+.provider-diagnostics summary { cursor: pointer; border-radius: 6px; padding: 4px 6px; margin-inline: -6px; }
+.provider-diagnostics summary:focus, .provider-diagnostics summary:focus-visible { outline: 0 !important; box-shadow: none !important; }
+.provider-diagnostics summary:hover, .provider-diagnostics summary:focus-visible { background: #ffffff0f; }
 .provider-diagnostics p { margin: 7px 0; }
 .episode-selection { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
 .episode-selection-legend { font-size: 12px; font-weight: 650; margin-bottom: 12px; }

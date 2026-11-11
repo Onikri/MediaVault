@@ -28,6 +28,15 @@ async function connect(){
  url.searchParams.set('engine',TRANSLATION_VERSION+':fifo-v1:'+new URL(import.meta.url).pathname);
  frame.src=url.href;document.body.append(frame);return ready;
 }
+// Reader callbacks (e.g. onRecovered) live on the same config object but cannot
+// cross a MessagePort; send only structured-cloneable settings to the engine.
+export function portableConfig(value){
+ if(typeof value==='function'||typeof value==='symbol')return undefined;
+ if(Array.isArray(value))return value.map(portableConfig);
+ if(!value||typeof value!=='object'||Object.getPrototypeOf(value)!==Object.prototype)return value;
+ const out={};for(const[key,item]of Object.entries(value)){const next=portableConfig(item);if(next!==undefined||item===undefined)out[key]=next;}
+ return out;
+}
 export async function translateLmt(blob,config,signal,status){
  if(!config.allowDownloads)throw Error('Разреши загрузку моделей в настройках LMT.');
  signal?.throwIfAborted();const port=await connect();signal?.throwIfAborted();
@@ -39,7 +48,7 @@ export async function translateLmt(blob,config,signal,status){
   signal?.addEventListener('abort',abort,{once:true});
   const finish=fn=>v=>{signal?.removeEventListener('abort',abort);fn(v);};
   pending.set(id,{resolve:finish(resolve),reject:finish(reject),status});
-  try{port.postMessage({type:'translate',id,bytes,config},[bytes]);}catch(e){pending.delete(id);finish(reject)(e);}
+  try{port.postMessage({type:'translate',id,bytes,config:portableConfig(config)},[bytes]);}catch(e){pending.delete(id);finish(reject)(e);}
  });
 }
 globalThis.addEventListener?.('mediavault-locked',()=>stopLmt());

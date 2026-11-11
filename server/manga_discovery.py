@@ -167,13 +167,17 @@ def search_source(source,query):
                     found[value['id']]=value
             if found:break
         return list(found.values())
-    except SourceError:
+    except SourceError as error:
         # A failing extension must not make its still-readable public HTML
         # catalogue disappear. Reuse only the adapter for the SAME source host.
         from manga_sources import MANGACHAN_HEADERS,site_for,search_url,parse_search
         from source_parser import PublicHttp
         site=site_for(source.get('baseUrl',''))
-        if not site or site.family not in {'pill','katana','poisk','hub','chan','buff'}:raise
+        if not site or site.family not in {'pill','katana','poisk','hub','chan','buff'}:
+            # Suwayomi reports the origin's 403/404 as a bare HTTP 500.
+            if isinstance(error,bridge.BridgeError) and error.code=='upstream' and 'http 500' in str(error).casefold():
+                raise bridge.origin_block(source.get('baseUrl')) or error
+            raise
         http=PublicHttp(timeout=(3,6),deadline=time.monotonic()+12)
         try:
             rows=[]
@@ -437,6 +441,8 @@ class Discovery:
         old=self.db.execute('SELECT failures,last_ok FROM reachability WHERE source_id=?',(sid,)).fetchone()
         failures=0 if ok else (old['failures'] if old else 0)+1
         pause=SEARCH_BACKOFF[min(failures-2,len(SEARCH_BACKOFF)-1)] if failures>=2 else 0
+        # A regional wall is the origin's own statement, not a flaky outage.
+        if not ok and details.get('code')=='region':pause=SEARCH_BACKOFF[-1]
         self.db.execute('INSERT OR REPLACE INTO reachability VALUES(?,?,?,?,?,?,?,?,?)',(sid,str(source.get('name',''))[:120],str(source.get('lang',''))[:8],failures,
             '' if ok else str(details.get('code','source'))[:40],'' if ok else str(details.get('message',''))[:300],now if ok else (old['last_ok'] if old else 0),0 if ok else now,now+pause if pause else 0))
 
