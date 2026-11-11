@@ -3,7 +3,7 @@
 RPM is a local admission budget, not a claim about the project's Google balance.
 Only Google-reported quota dimensions and retry delays are provider facts.
 """
-import asyncio,hashlib,json,math,sqlite3,time
+import asyncio,hashlib,json,math,random,sqlite3,time
 from contextlib import closing
 from datetime import datetime,timedelta
 from email.utils import parsedate_to_datetime
@@ -90,7 +90,8 @@ class GoogleGatewayLimits:
             db.executescript('''CREATE TABLE IF NOT EXISTS calls(id INTEGER PRIMARY KEY,credential TEXT,project TEXT,model TEXT,at REAL,status INTEGER,input_tokens INTEGER,output_tokens INTEGER);
             CREATE INDEX IF NOT EXISTS calls_window ON calls(project,model,at);
             CREATE TABLE IF NOT EXISTS health(scope TEXT,model TEXT,until REAL,status INTEGER,at REAL,quotas TEXT,PRIMARY KEY(scope,model));
-            CREATE TABLE IF NOT EXISTS learned(project TEXT,model TEXT,kind TEXT,value INTEGER,at REAL,PRIMARY KEY(project,model,kind));''')
+            CREATE TABLE IF NOT EXISTS learned(project TEXT,model TEXT,kind TEXT,value INTEGER,at REAL,PRIMARY KEY(project,model,kind));
+            CREATE TABLE IF NOT EXISTS admissions(project TEXT,model TEXT,next_at REAL,PRIMARY KEY(project,model));''')
         Path(path).chmod(0o600)
 
     def budget(self,db,group,model):
@@ -104,8 +105,10 @@ class GoogleGatewayLimits:
             window=db.execute('SELECT at,COALESCE(input_tokens,0) FROM calls WHERE project=? AND model=? AND at>? ORDER BY at',(group,model,now-60)).fetchall()
             limited=db.execute('SELECT MAX(until) FROM health WHERE scope IN (?,?) AND model=?',(group,credential,model)).fetchone()[0] or 0
             budget=self.budget(db,group,model);day_start,day_end=pacific_day(now)
+            admission=db.execute('SELECT next_at FROM admissions WHERE project=? AND model=?',(group,model)).fetchone()
             today=db.execute('SELECT COUNT(*) FROM calls WHERE project=? AND model=? AND at>=?',(group,model,day_start)).fetchone()[0]
         waits=[limited-now]
+        if admission:waits.append(admission[0]-now)
         if window:waits.append(window[-1][0]+GAP-now)
         if len(window)>=budget['rpm']:waits.append(window[-budget['rpm']][0]+60-now)
         used=sum(t for _,t in window)
@@ -136,6 +139,11 @@ class GoogleGatewayLimits:
                     with closing(sqlite3.connect(self.path)) as db,db:
                         db.execute('DELETE FROM calls WHERE at<?',(self.clock()-86400*2,))
                         call=db.execute('INSERT INTO calls(credential,project,model,at,input_tokens) VALUES(?,?,?,?,?)',(credential,project(row),model,self.clock(),tokens or None)).lastrowid
+                        # Stagger starts within a project while its RPM/TPM budget
+                        # and Google Retry-After remain the admission constraints.
+                        if row.get('subscription'):
+                            next_at=self.clock()+GAP+random.uniform(0,.5)
+                            db.execute('INSERT OR REPLACE INTO admissions VALUES(?,?,?)',(project(row),model,next_at))
                     return row,call
             seconds=min(waits) if waits else 1
             if seconds>max_wait or time.monotonic()-start>=max_wait:raise GatewayLimited(seconds)

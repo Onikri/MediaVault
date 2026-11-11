@@ -84,8 +84,10 @@ class DeviceSessions(unittest.TestCase):
             r=self.client.post('/devices/register',json={'public_key':jwk},headers={'Authorization':'Bearer short-google-fixture'})
             self.assertEqual(r.status_code,422)
 
-    def test_expired_device_requires_new_google_login(self):
+    def test_confirmed_device_survives_the_legacy_expiration_date(self):
         identity=self.register();value=api.store.setting('device:'+identity);value['expires']=0;api.store.setting('device:'+identity,value)
+        self.assertEqual(self.client.post('/devices/challenge',json={'id':identity}).status_code,200)
+        value['ready']=False;api.store.setting('device:'+identity,value)
         self.assertEqual(self.client.post('/devices/challenge',json={'id':identity}).status_code,401)
 
     def test_reconnect_repairs_same_device_even_at_limit_without_replacing_signing_key(self):
@@ -107,13 +109,13 @@ class DeviceSessions(unittest.TestCase):
         r=self.client.post('/devices/register',json={'public_key':self.jwk,'replaces':'x'*43},headers={'Authorization':'Bearer short-google-fixture'})
         self.assertEqual(r.status_code,200,r.text);self.assertIsNotNone(api.store.setting('device:'+'x'*43))
 
-    def test_eleventh_device_retires_the_oldest_instead_of_refusing(self):
+    def test_new_device_does_not_sign_out_an_existing_device(self):
         identities=[self.register() for _ in range(10)]
         for n,identity in enumerate(identities):
             value=api.store.setting('device:'+identity);value['expires']=9e9+n;api.store.setting('device:'+identity,value)
         newest=self.register()
         ids=api.store.setting('device-index:'+self.identity['sub'])['ids']
-        self.assertEqual(len(ids),10);self.assertNotIn(identities[0],ids);self.assertIn(newest,ids);self.assertIsNone(api.store.setting('device:'+identities[0]))
+        self.assertEqual(len(ids),11);self.assertIn(identities[0],ids);self.assertIn(newest,ids);self.assertIsNotNone(api.store.setting('device:'+identities[0]))
 
     def test_reconnect_requires_live_google_identity_and_matching_account(self):
         identity=self.register()

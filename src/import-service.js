@@ -28,14 +28,24 @@ export function validateServer(value){
 function storedServer(){try{return validateServer(window.MEDIA_VAULT_CONFIG?.importServerUrl||localStorage.getItem('mediavault_import_server')||'');}catch{return '';}}
 export function createImportClient(server,googleToken,fetcher=fetch,guestSession=()=>null){
   let session=null,signing=null;
-  async function request(path,{method='GET',body,auth=true,headers={},signal,raw=false,keepalive=false}={}){
+  async function request(path,options={}){
+    const {method='GET',body,auth=true,headers={},signal,raw=false,keepalive=false}=options;
     if(!server)throw Error('Сервер импорта ещё не подключён.');
     if(auth&&!session){if(keepalive)throw Error('Сессия уже закрыта.');await authenticate();}
     const binary=body instanceof Blob||body instanceof ArrayBuffer||ArrayBuffer.isView(body);
     const response=await fetcher(server+path,{method,keepalive,signal:signal||AbortSignal.timeout(['/manga/inspect','/manga/summary'].includes(path)?120000:path==='/manga/search'?45000:['/sources/discover','/sources/calendar'].includes(path)?90000:path==='/sources/search'||path.startsWith('/sources/search?')?65000:path.startsWith('/sources/')?25000:20000),headers:{...(body?{'Content-Type':binary?'application/octet-stream':'application/json'}:{}),...(auth?{Authorization:'Bearer '+session.token}:{}),...headers},...(body?{body:binary?body:JSON.stringify(body)}:{})});
     if(raw&&response.ok)return response;
     const result=await response.json().catch(()=>({}));
-    if(!response.ok){if(response.status===401)session=null;throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status});}
+    if(!response.ok){
+      if(response.status===401&&auth){
+        session=null;
+        if(!options.reauthenticated&&!keepalive){
+          await authenticate();
+          return request(path,{...options,reauthenticated:true});
+        }
+      }
+      throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status});
+    }
     return result;
   }
   async function authenticate(){
@@ -43,7 +53,8 @@ export function createImportClient(server,googleToken,fetcher=fetch,guestSession
     signing=(async()=>{
       const health=await request('/health',{auth:false});
       if(health.application!=='MediaVault'||health.version<4||health.origin!==window.location.origin)throw Error('Этот адрес не подтвердил конфигурацию MediaVault.');
-      const guest=!googleToken()&&guestSession();
+      const token=await googleToken();
+      const guest=!token&&guestSession();
       if(guest){
         // Guest profile: the owner-issued session token is the server session.
         const response=await fetcher(server+'/guests/me',{signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+guest.token}});
@@ -51,8 +62,8 @@ export function createImportClient(server,googleToken,fetcher=fetch,guestSession
         if(!response.ok){if(response.status===401||response.status===403)clearGuestSession();throw Error(typeof data.detail==='string'?data.detail:'Сервер не подтвердил гостевой вход.');}
         session={token:guest.token,guest:data.guest,role:'guest',driveConnected:false,serverVersion:health.version};return session;
       }
-      if(!googleToken())throw Error('Сначала войди через Google.');
-      const response=await fetcher(server+'/auth/session',{method:'POST',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+googleToken()}});
+      if(!token)throw Error('Сначала войди через Google.');
+      const response=await fetcher(server+'/auth/session',{method:'POST',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+token}});
       const data=await response.json();if(!response.ok)throw Error(data.detail||'Сервер не подтвердил вход.');
       session={...data,serverVersion:health.version};return session;
     })();
@@ -65,7 +76,7 @@ export function useImportService(state,actions){
   const [server,setAddress]=useState(storedServer),[status,setStatus]=useState('idle'),[error,setError]=useState(''),[session,setSession]=useState(null),[jobs,setJobs]=useState([]);
   const live=useRef(state);live.current=state;
   const guest=useGuestSession(),guestToken=!state.user?guest?.token||'':'';
-  const client=useMemo(()=>createImportClient(server,()=>live.current.token,fetch,()=>guestToken?readGuestSession():null),[server,state.user?.sub,guestToken]);
+  const client=useMemo(()=>createImportClient(server,()=>live.current.user?actions.ensureSession():null,fetch,()=>guestToken?readGuestSession():null),[server,state.user?.sub,guestToken]);
   const refreshSignature=useRef('');
   const enrichmentRequested=useRef('');
   const previousJobs=useRef(new Map());

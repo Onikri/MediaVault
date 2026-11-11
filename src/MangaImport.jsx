@@ -1,3 +1,4 @@
+import ShareTitleButton from './ShareTitleButton.jsx';
 import MangaExportSettings from './MangaExportSettings.jsx';
 import {defaultMangaExport,exportTranslation} from './manga-export-options.js';
 import {readLmt} from './LmtSettings.jsx';
@@ -100,6 +101,9 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
    </button>]:[];
   }).slice(0,3);
  }
+ const share=inspection&&<ShareTitleButton service={service} title={{...item,title:collection}}
+  kind="manga" entries={readerEntries} initial={initialChapter} referer={inspection.url}
+  dub={team} language={inspection.language} userId={state.user?.sub}/>;
  const reader=online&&inspection&&<OnlineViewer inline={compact} onEntryChange={e=>setOne(e.url)} kind="manga" entries={readerEntries} initial={initialChapter} title={collection} service={service} userId={state.user?.sub} language={inspection.language} errorActions={chapterAlternatives} metadata={{...item,format:inspection.format||item?.format,readingMode:inspection.readingMode}} onClose={()=>setOnline(false)}/>;
  if(compact&&destination==='online')return <div className="title-playback-controls manga-playback-controls">
   <div className="title-playback-selectors"><label className="form-field input-label">Язык глав<select className="field-input" aria-label="Язык источника манги" value={language} onChange={e=>{setLanguage(e.target.value);setSourceIds([]);}}>{MANGA_LANGUAGES.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><SourceFilter label="Искать на сайтах" service={service} language={language} value={sourceIds} onChange={setSourceIds}/></div>
@@ -111,12 +115,12 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
   {busy==='inspect'&&<p className="fine" role="status">Загружаем главы…</p>}{error&&<div className="inline-error" role="alert"><p>{error}</p>{alternateSources.slice(0,3).map(source=>
    <button key={source.url} type="button" className="btn btn-secondary" onClick={()=>inspect(source.url)}>{source.providerName}</button>)}</div>}
   {inspection&&!sourceReady&&!error&&<p className="fine" role="status">Главы получены · проверяем загрузку страницы…</p>}
-  {reader}
+  {share}{reader}
   {inspection?<><ChapterChooser active={sourceReady&&!online} cards entries={selectChapters(inspection.episodes,{volume,team,language:inspection.language})} value={one} onChoose={e=>{setMode('single');setOne(e.url);startReader();}} service={service}/>{!online&&<button type="button" className="btn btn-primary" disabled={!chosen.length||!!busy||!sourceReady} onClick={startReader}><BookOpen size={16}/>Читать сейчас</button>}</>:<div className="title-playback-empty"><BookOpen size={28}/><p>{searching||globalSearch.state==='running'?'Ищем доступные главы…':'Выбери источник, чтобы увидеть главы.'}</p></div>}
   {globalSearch.progress&&globalSearch.state==='running'&&<p className="fine" role="status">Источники: {globalSearch.progress.completed} / {globalSearch.progress.total}</p>}
   <details className="title-source-tools"><summary>Другой источник или своя ссылка</summary><div className="form-actions"><input className="field-input" aria-label="Ссылка на мангу" type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://…"/><button type="button" className="btn btn-secondary" disabled={!url||!!busy} onClick={()=>inspect(url)}>Проверить</button></div><button type="button" className="text-link" onClick={()=>setRevision(n=>n+1)}>Обновить источники</button></details>
  </div>;
- return <>{reader}<form className={"import-selection import-compact manga-import export-workspace destination-"+destination} onSubmit={submit}>
+ return <>{share}{reader}<form className={"import-selection import-compact manga-import export-workspace destination-"+destination} onSubmit={submit}>
   <div className="section-heading"><div><span className="eyebrow">ОТ СТРАНИЦЫ К ИСТОРИИ</span><h3>Манга · Манхва · Вебтуны</h3></div><span className="manga-language">{language==='all'?(rawAware?'RU · EN · JA · KO':'RU · EN'):language.toUpperCase()}</span></div>
   <ol className="import-step-rail" aria-label="Этапы выбора"><li data-active={!inspection}>Источник</li><li data-active={!!inspection}>Главы и перевод</li><li>{destination==='online'?'Чтение':destination==='local'?'На устройство':'Google Диск'}</li></ol>
   {!compact&&<label className="form-field input-label">Язык глав<select className="field-input" aria-label="Язык источника манги" value={language} disabled={busy==='submit'} onChange={e=>setLanguage(e.target.value)}>{MANGA_LANGUAGES.map(([id,label])=><option key={id} value={id} disabled={['ja','ko'].includes(id)&&!rawAware}>{label}</option>)}</select></label>}

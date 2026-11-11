@@ -47,7 +47,7 @@ def install(app, api):
 
     def device(identity):
         value = api.store.setting('device:' + identity)
-        if not value or value.get('expires', 0) < time.time():
+        if not value or (not value.get('ready') and (value.get('expires') or 0) < time.time()):
             raise HTTPException(401, 'Срок запоминания устройства истёк. Войди через Google один раз.')
         return value
 
@@ -90,12 +90,12 @@ def install(app, api):
             if body.replaces and (api.store.setting('device:' + body.replaces) or {}).get('sub') == user['sub']:
                 drop(body.replaces)
             records={i:api.store.setting('device:'+i) or {} for i in identities['ids']}
-            active=sorted((i for i,v in records.items() if v.get('expires',0)>time.time()),key=lambda i:records[i]['expires'])
-            # The account owner signs in with Google here, so the oldest
-            # remembered device gives way instead of refusing the new one.
-            while len(active)>=10:drop(active.pop(0))
+            active=sorted((i for i,v in records.items() if v.get('ready') or (v.get('expires') or 0)>time.time()),
+                          key=lambda i:records[i].get('last_seen') or records[i].get('expires') or 0)
+            # Ready devices remain authorized until their owner signs out.
             api.store.setting('device:' + identity, {'key': {k: body.public_key[k] for k in ('kty','crv','x','y')}, 'sub': user['sub'], 'admin': admin,
-                                                  'expires': time.time() + (90 * 86400 if ready else 600), 'ready': ready})
+                                                  'expires': None if ready else time.time() + 600,
+                                                  'last_seen':time.time(), 'ready': ready})
             api.store.setting('device-index:'+user['sub'],{'ids':[*active,identity]})
         result = {'id': identity, 'ready': ready}
         if not ready:
@@ -153,6 +153,11 @@ def install(app, api):
         if user['sub'] != value['sub']:
             raise HTTPException(401, 'Сохранён другой аккаунт. Войди через Google.')
         scopes = saved.get('scope') or ('openid email profile https://www.googleapis.com/auth/drive' if value.get('admin') else 'openid email profile https://www.googleapis.com/auth/drive.readonly')
+        with api.store.lock:
+            current=api.store.setting('device:'+body.id)
+            if not current or not current.get('ready'):
+                raise HTTPException(401,'Сохранённый вход завершён на этом устройстве.')
+            api.store.setting('device:'+body.id,{**current,'expires':None,'last_seen':time.time()})
         return {'access_token': credentials.token, 'expires_in': 3500, 'scope': scopes, 'user': user}
 
     @app.post('/devices/remove')

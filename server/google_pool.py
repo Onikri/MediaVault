@@ -4,6 +4,7 @@ from pathlib import Path
 import httpx
 from fastapi import Depends,HTTPException,Request
 from pydantic import BaseModel,Field,SecretStr,ConfigDict
+from typing import Literal
 MODELS=('gemini-3.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
 # Models added after key slots were saved are allowed on every slot. (Owner rule: no non-Lite Flash.)
 LATER_MODELS=()
@@ -12,20 +13,23 @@ SETTING='reader:google-keys';_store=lambda:None
 def saved():
     store=_store()
     value=store.setting(SETTING) if store else None
-    if value is not None:return value.get('slots',[])
+    if value is not None:
+        return [{**row,'subscription':row.get('subscription') or ('pro' if row['slot']<3 else 'free')}
+                for row in value.get('slots',[])]
     from gemma_translate import key_path
     path=key_path()
     if path.is_file():return [{'slot':0,'key':path.read_text('utf-8-sig').strip(),'project':'','models':list(MODELS)}]
     return []
 def fingerprint(key):return hashlib.sha256(key.encode()).hexdigest()[:16]
-def safe_status(rows):return {'configured':bool(rows),'keyCount':len(rows),'slots':[{'slot':r['slot'],'configured':True,'project':r.get('project',''),'availableModels':r.get('models',[])} for r in rows],'maxParallel':min(3,len(rows))}
+def safe_status(rows):return {'configured':bool(rows),'keyCount':len(rows),'slots':[{'slot':r['slot'],'configured':True,'project':r.get('project',''),'subscription':r.get('subscription','free'),'availableModels':r.get('models',[])} for r in rows],'maxParallel':min(6,len(rows))}
 class KeySlot(BaseModel):
     model_config=ConfigDict(extra='forbid')
     slot:int=Field(ge=0,le=5)
     key:SecretStr|None=None
     project:str=Field(default='',max_length=100,pattern=r'^[A-Za-z0-9_.-]*$')
+    subscription:Literal['pro','free']|None=None
 class KeyPool(BaseModel):
-    slots:list[KeySlot]=Field(min_length=1,max_length=3)
+    slots:list[KeySlot]=Field(min_length=1,max_length=6)
 class Generate(BaseModel):
     model_config=ConfigDict(extra='forbid')
     key:SecretStr|None=None
@@ -36,7 +40,7 @@ class Generate(BaseModel):
     # replacing them (one more worker for the chapter passes).
     pool:bool=False
 
-def install(app,owner,get_store):
+def install(app,owner,get_store,translator=None):
     global _store
     _store=get_store
     from google_gateway_limits import GoogleGatewayLimits,GatewayLimited
@@ -61,7 +65,13 @@ def install(app,owner,get_store):
         metadata=status_rows()
         return {**network.snapshot(subject),'keys':metadata['slots'],'quotaNote':metadata['quotaNote']}
     @app.get('/reader/google/keys')
-    async def status(subject=Depends(owner)):return status_rows()
+    async def status(subject=Depends(translator or owner)):
+        if str(subject).startswith('guest:'):
+            raise HTTPException(403,'Настройки ключей доступны владельцу.')
+        result=status_rows()
+        if str(subject).startswith('share:'):
+            result['slots']=[{k:v for k,v in row.items() if k in {'slot','configured','availableModels'}} for row in result['slots']]
+        return result
     @app.post('/reader/google/keys')
     async def configure(body:KeyPool,subject=Depends(owner)):
         if len({s.slot for s in body.slots})!=len(body.slots):raise HTTPException(422,'Повторяется номер ключа.')
@@ -76,7 +86,8 @@ def install(app,owner,get_store):
                 names={m.get('name','').removeprefix('models/') for m in response.json().get('models',[])}
                 available=[m for m in MODELS if m in names]
                 if not available:raise HTTPException(422,'Для ключа '+str(s.slot+1)+' нет поддерживаемых моделей.')
-                return {'slot':s.slot,'key':key,'project':s.project,'models':available}
+                return {'slot':s.slot,'key':key,'project':s.project,'models':available,
+                        'subscription':s.subscription or previous.get(s.slot,{}).get('subscription','free')}
             rows=[r for r in await asyncio.gather(*(check(s) for s in body.slots)) if r]
         if len({r['key'] for r in rows})!=len(rows):raise HTTPException(422,'Один и тот же ключ добавлен несколько раз.')
         store=_store()
@@ -84,7 +95,9 @@ def install(app,owner,get_store):
         store.setting(SETTING,{'slots':rows,'updated':time.time()})
         return status_rows()
     @app.post('/reader/google/generate')
-    async def generate(body:Generate,connection:Request,subject=Depends(owner)):
+    async def generate(body:Generate,connection:Request,subject=Depends(translator or owner)):
+        if str(subject).startswith('guest:'):
+            raise HTTPException(403,'Перевод серверными ключами доступен по ссылке владельца на тайтл.')
         if body.model not in MODELS:raise HTTPException(422,'Выбери поддерживаемую модель Google.')
         request=body.request
         if set(request)-{'systemInstruction','contents','generationConfig','safetySettings'} or not isinstance(request.get('contents'),list) or len(json.dumps(request))>18*1024*1024:raise HTTPException(422,'Некорректный запрос перевода.')
@@ -131,7 +144,7 @@ def install(app,owner,get_store):
             try:result=response.json()
             except ValueError:raise HTTPException(502,'Google вернул некорректный JSON.') from None
             usage=result.get('usageMetadata',{})
-            result['mediavaultGateway']={'slot':row.get('slot'),'personal':personal,'maxParallel':3}
+            result['mediavaultGateway']={'slot':row.get('slot'),'personal':personal,'maxParallel':min(6,len(rows))}
             network.update(activity,'done',status_code)
             return result
         except GatewayLimited as error:

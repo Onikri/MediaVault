@@ -39,10 +39,10 @@ export class DirectChapter{
   if(this.recovered.has(index)){this.finish(job,this.recovered.get(index));return job;}
   if(!background&&this.config.chapterPipeline!==false&&!this.chapterStarted){this.chapterStarted=true;if(index>=this.batchSize())this.focus(index,true);for(let n=0;n<this.entries.length;n++)if(!this.jobs.has(n))this.request(n,null,true);}
   if(!background&&this.config.chapterPipeline!==false){const{count,start}=this.packetRange(index);for(let n=start;n<Math.min(start+count,this.entries.length);n++)if(!this.jobs.has(n))this.request(n,null,true);}
-  if(!background&&this.config.directInput!=='blocks'&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(3,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n))this.request(n,null,true);}
+  if(!background&&this.config.directInput!=='blocks'&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(6,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n))this.request(n,null,true);}
   queueMicrotask(()=>this.drain());return job;
  }
- personalSlot(key){return this.getKey===directKey?([0,1,2].find(i=>directKey(keySlotScope(this.keyScope,i))===key)??0):0;}
+ personalSlot(key){return this.getKey===directKey?([0,1,2,3,4,5].find(i=>directKey(keySlotScope(this.keyScope,i))===key)??0):0;}
  batchSize(){return this.config.directBatchPages===1?1:this.config.directBatchPages===3?3:2;}
  packetRange(index){let count=this.config.chapterPipeline===false?1:this.config.directInput==='blocks'?9:this.batchSize();if(count===2&&this.entries.length>1&&this.entries.length%2&&index>=this.entries.length-3)return{count:3,start:this.entries.length-3};return{count,start:Math.floor(index/count)*count};}
  async jsonCacheId(blob,index){
@@ -62,7 +62,7 @@ export class DirectChapter{
  async drain(){
   if(this.config.chapterPipeline!==false)return drainOrderedChapter(this);
   if(this.config.directInput==='blocks')return drainBlockChapter(this);
-  const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1);if(this.active>=Math.min(3,capacity)||this.controller.signal.aborted)return;this.active++;
+  const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1);if(this.active>=Math.min(6,capacity)||this.controller.signal.aborted)return;this.active++;
   try{while(!this.controller.signal.aborted){
    const pending=[...this.jobs.values()].filter(j=>j.state==='queued'),first=pending.find(j=>!j.background)||pending[0];if(!first)break;
    const block=Math.floor(first.index/this.batchSize());let group=pending.filter(j=>Math.floor(j.index/this.batchSize())===block).sort((a,b)=>a.index-b.index);

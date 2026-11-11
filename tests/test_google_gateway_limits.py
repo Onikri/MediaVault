@@ -83,6 +83,29 @@ class GatewayLimitsTests(unittest.IsolatedAsyncioTestCase):
   delay,_=provider_limit(httpx.Response(403,json={'error':{'message':'private'}}),1000);self.assertEqual(delay,900)
 
 class GatewayApiParallelTests(unittest.IsolatedAsyncioTestCase):
+ async def test_six_configured_keys_can_translate_concurrently(self):
+  temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
+  store=TaskStore(temp.name);self.addCleanup(store.database.close)
+  rows=[{'slot':i,'key':'fixture-private-key-'+str(i),'project':'independent-'+str(i),
+         'subscription':'pro' if i<3 else 'free','models':list(google_pool.MODELS)} for i in range(6)]
+  store.setting(google_pool.SETTING,{'slots':rows})
+  previous=google_pool._store;self.addCleanup(setattr,google_pool,'_store',previous)
+  app=FastAPI();google_pool.install(app,lambda:'owner',lambda:store)
+  real=httpx.AsyncClient;seen=set();started=asyncio.Event()
+  async def provider(request):
+   seen.add(request.headers['x-goog-api-key'])
+   if len(seen)==6:started.set()
+   await asyncio.wait_for(started.wait(),3)
+   return httpx.Response(200,json={'candidates':[]})
+  async with real(transport=httpx.ASGITransport(app=app),base_url='http://fixture') as client:
+   with patch('google_pool.httpx.AsyncClient',lambda **kw:real(transport=httpx.MockTransport(provider),**kw)):
+    replies=await asyncio.gather(*(client.post('/reader/google/generate',json={'slot':i,'model':google_pool.MODELS[0],'request':{'contents':[]}}) for i in range(6)))
+   self.assertEqual([r.status_code for r in replies],[200]*6)
+   status=(await client.get('/reader/google/keys')).json()
+   self.assertEqual(status['maxParallel'],6)
+   self.assertEqual([row['subscription'] for row in status['slots']],['pro']*3+['free']*3)
+   self.assertNotIn('fixture-private',json.dumps(status))
+
  async def test_three_requests_are_concurrent_without_token_counting_or_client_secret_export(self):
   temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup);directory=temp.name
   with patch.dict(os.environ,{'DATA_DIR':directory}):

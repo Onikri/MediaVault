@@ -82,7 +82,7 @@ def token_payload(authorization):
 def owner(authorization: str = Header(default="")):
     payload = token_payload(authorization)
     # Guest sessions share the signing key but never reach owner endpoints.
-    if payload.get("role") == "guest" or str(payload["sub"]).startswith("guest:"):
+    if payload.get("role") in {"guest","share"} or str(payload["sub"]).startswith(("guest:","share:")):
         raise HTTPException(403, "Это действие доступно только владельцу MediaVault.")
     return payload["sub"]
 
@@ -100,9 +100,11 @@ def guest_may_open(subject, title):
     guest_activity.opened(identity, title)
 
 
-def viewer(authorization: str = Header(default="")):
+def viewer(request:Request=None, authorization: str = Header(default="")):
     """Owner or an active guest profile: online viewing, reading and music only."""
     payload = token_payload(authorization)
+    if payload.get('role')=='share':
+        return app.state.title_shares.subject(authorization,request)
     if payload.get("role") == "guest" or str(payload["sub"]).startswith("guest:"):
         return guest_subject(authorization).get("id") and payload["sub"]
     return payload["sub"]
@@ -321,7 +323,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 64, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":3, "googleParallelKeys":3, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 65,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":3, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -338,7 +340,7 @@ drive_grants.install(app,owner,lambda:store,drive_credentials)
 system_status.install(app,owner,lambda:os.getenv("DATA_DIR","/data"),drive_credentials,lambda:store)
 
 import google_pool
-google_pool.install(app,owner,lambda:store)
+google_pool.install(app,owner,lambda:store,translator=viewer)
 import gemini_voice
 gemini_voice.install(app,owner,google_pool.saved)
 import kodik_api
@@ -364,6 +366,8 @@ import guest_activity as guest_activity_module
 guest_activity = guest_activity_module.Activity(lambda: store)
 app.state.guest_activity = guest_activity
 guest_subject,_,_=guest_profiles.install(app,owner,lambda:store,sign_payload,token_payload,activity=guest_activity)
+import title_shares
+title_shares.install(app,owner,lambda:store,sign_payload,token_payload)
 
 
 def activity_subject(authorization):
@@ -443,7 +447,7 @@ def oauth_callback(state: str = "", code: str = "", error: str = ""):
         device = store.setting('device:' + pending['device'])
         if not device or device['sub'] != user['sub']:
             raise HTTPException(403, 'Устройство больше не зарегистрировано.')
-        store.setting('device:' + pending['device'], {**device, 'ready': True, 'expires':time.time()+90*86400})
+        store.setting('device:' + pending['device'], {**device, 'ready': True, 'expires':None,'last_seen':time.time()})
     for task in store.list(user["sub"]):
         if task["status"] == "waiting_auth":
             store.update(task["id"], status="queued")

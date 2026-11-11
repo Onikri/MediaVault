@@ -5,7 +5,7 @@ import {driveDownload,readEnvelope,findLibraries,createFolder,folderExists,uploa
   inviteReader} from "../drive.js";
 import {createUploadService} from "./upload.js";
 import {privacyPreferences,savePrivacyPreferences,keepStorage,rememberedDeviceId} from './privacy.js';
-import {rememberGoogleSession,restoreGoogleSession,forgetGoogleSession,hasRememberedSession} from './device-auth.js';
+import {rememberGoogleSession,restoreGoogleSession,forgetGoogleSession,hasRememberedSession,rememberedAccount} from './device-auth.js';
 import {saveTrustedVault,openTrustedVault,trustedVault,forgetTrustedVault,biometricAvailable} from './trusted-vault.js';
 import {deviceStore} from './device-storage.js';
 import {uiLocale} from './i18n/index.js';
@@ -283,11 +283,11 @@ function createController(get,patch){
       patch({user,admin,status:admin?"Администратор · Google":"Пользователь · Google",
         notice:{title:"Разреши доступ к файлам",text:"Доступ к Google Drive запрашивается вместе со входом. Подтверди его в окне Google."}});
       acceptDriveToken(result);
-      await discoverLibrary(expected);
       if(privacyPreferences().remember){
         await rememberAccountInternal().catch(cause=>patch({deviceError:cause.message}));
-        await tryTrustedLibrary(expected);
       }
+      await discoverLibrary(expected);
+      if(privacyPreferences().remember)await tryTrustedLibrary(expected);
       toast(get().catalog?'Библиотека открыта на этом устройстве.':get().libraryDiscovery==="found"?"Библиотека найдена. Введи свою секретную фразу.":admin?"Осталось придумать секретную фразу — остальное создадим автоматически.":"Вход выполнен. Для доступа нужно приглашение владельца.");
       return true;
     });
@@ -594,12 +594,19 @@ function createController(get,patch){
     const expected=epoch;
     restoring=(async()=>{
       const result=await restoreGoogleSession();if(!result)throw Object.assign(Error('На этом устройстве пока не сохранён вход.'),{status:401});
-      const user=await userFromToken(result.access_token);assertEpoch(expected);
+      const user=result.user?.email_verified&&result.user?.sub&&result.user?.email?result.user:await userFromToken(result.access_token);assertEpoch(expected);
       if(get().user&&user.sub!==get().user.sub)throw Error('Сохранён другой аккаунт. Войди через Google.');
       reconnectRequired=false;patch({user,admin:(await hashEmail(user.email))===configuration().adminEmailSha256,remembered:true,deviceError:''});
       acceptDriveToken(result);await syncWorker();return true;
     })();
     try{return await restoring;}finally{restoring=null;}
+  }
+  async function ensureSession(){
+    if(!tokenAlive()||get().tokenExpiresAt-Date.now()<60000){
+      if(!privacyPreferences().remember)throw Error('Подключи Google Drive заново.');
+      await renewSession();
+    }
+    return driveToken();
   }
   async function restoreLogin(){
     if(!privacyPreferences().remember)return false;
@@ -612,6 +619,9 @@ function createController(get,patch){
     keepStorage().then(kept=>patch({storageKept:kept}));
     return run('restore',async expected=>{
       patch({restoring:true});
+      const cached=await rememberedAccount().catch(()=>null);
+      assertEpoch(expected);
+      if(cached&&!get().user)patch({user:cached,admin:(await hashEmail(cached.email))===configuration().adminEmailSha256,remembered:true});
       try{await renewSession();await discoverLibrary(expected);await tryTrustedLibrary(expected);return true;}
       catch(cause){if(expected===epoch){patch({deviceError:cause.message||'Не удалось открыть сохранённую библиотеку. Введи секретную фразу один раз.'});if(cause?.status===401||cause?.status===403)reconnectRequired=true;else renewalFailed(cause);}return false;}
       finally{if(expected===epoch)patch({restoring:false});}
@@ -635,12 +645,14 @@ function createController(get,patch){
     patch({workerReady:false});
     if(workerSession())syncWorker().catch(error);
   }
-  function onFocus(){if(get().busy)return;if(privacyPreferences().remember){if(!reconnectRequired&&(!get().token||!tokenAlive())){if(!get().user&&!get().busy)restoreLogin();else renewSession().catch(cause=>renewalFailed(cause));}}else if(get().token&&!tokenAlive())expireDrive();}
+  function onFocus(){if(get().busy||document.visibilityState==='hidden')return;if(privacyPreferences().remember){if(!reconnectRequired&&(!get().token||Date.now()+120000>=get().tokenExpiresAt)){if(!get().user&&!get().busy)restoreLogin();else renewSession().catch(cause=>renewalFailed(cause));}}else if(get().token&&!tokenAlive())expireDrive();}
   function mount(){
     mounted=true;
     navigator.serviceWorker?.addEventListener("message",onMessage);
     navigator.serviceWorker?.addEventListener("controllerchange",onControllerChange);
     window.addEventListener("focus",onFocus);
+    window.addEventListener("pageshow",onFocus);
+    document.addEventListener("visibilitychange",onFocus);
     window.addEventListener('mediavault-privacy',onPrivacy);
     scheduleExpiry();
     registerWorker().catch(cause=>console.warn("Service Worker недоступен:",cause));
@@ -653,10 +665,12 @@ function createController(get,patch){
     navigator.serviceWorker?.removeEventListener("message",onMessage);
     navigator.serviceWorker?.removeEventListener("controllerchange",onControllerChange);
     window.removeEventListener("focus",onFocus);
+    window.removeEventListener("pageshow",onFocus);
+    document.removeEventListener("visibilitychange",onFocus);
     window.removeEventListener('mediavault-privacy',onPrivacy);
     clearWorkerSession();
   }
-  return {mount,unmount,actions:{login,connectDrive,logout,unlock,createLibrary,uploadFiles,importStream,importVideo,rememberAccount,restoreLogin,biometricUnlock,enableBiometric,biometricAvailable,notify:toast,
+  return {mount,unmount,actions:{login,connectDrive,logout,unlock,createLibrary,uploadFiles,importStream,importVideo,rememberAccount,restoreLogin,ensureSession,biometricUnlock,enableBiometric,biometricAvailable,notify:toast,
     getServerKey:()=>{if(!get().admin||!get().catalog||!serverKey)throw Error("Открой библиотеку владельца.");return bytesToBase64(serverKey);},
     getState:uploads.getState,findMyLibrary,refreshCatalog,invite,copyInvite,inviteUrl,readWhole,readRange,readArtwork,saveTitleProfile,prepareStream,error,clearToast}};
 }

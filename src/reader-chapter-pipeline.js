@@ -66,11 +66,13 @@ export class ChapterPreparation{
 export async function drainOrderedChapter(c){
  if(c.dispatching||c.controller.signal.aborted)return;c.dispatching=true;
  const inFlight=c.inFlight||(c.inFlight=new Set());
+ const parallel=Math.min(6,Math.max(1,c.serverSlots.length||(c.getKey===directKey?6:1)));
+ const pageBuffer=Math.max(9,parallel*c.batchSize());
  try{
   c.preparation.start();
   while(!c.controller.signal.aborted){
    if(c.priorityBarrier){if(inFlight.size){await Promise.allSettled([...inFlight]);continue;}c.priorityBarrier=false;}
-   if(inFlight.size>=3||(c.activePages||0)+c.batchSize()>9&&inFlight.size){await Promise.race(inFlight);continue;}
+   if(inFlight.size>=parallel||(c.activePages||0)+c.batchSize()>pageBuffer&&inFlight.size){await Promise.race(inFlight);continue;}
    const pending=c.pendingJobs();
    if(!pending.length){
     if(inFlight.size){await Promise.allSettled([...inFlight]);continue;}
@@ -88,8 +90,8 @@ export async function drainOrderedChapter(c){
    }
    const first=pending[0],group=[],sources=[],epoch=c.priorityEpoch,priority=c.priorityPages.has(first.index);let key;
    try{
-    const blocks=c.config.directInput==='blocks',max=blocks?9-(c.activePages||0):c.packetRange(first.index).count;let pixels=0,regions=0;
-    if(!blocks&&(c.activePages||0)+max>9&&inFlight.size){await Promise.race(inFlight);continue;}
+    const blocks=c.config.directInput==='blocks',max=blocks?pageBuffer-(c.activePages||0):c.packetRange(first.index).count;let pixels=0,regions=0;
+    if(!blocks&&(c.activePages||0)+max>pageBuffer&&inFlight.size){await Promise.race(inFlight);continue;}
     for(const job of pending){
      if(c.priorityPages.has(job.index)!==priority||group.length>=max||group.length&&job.index!==group.at(-1).index+1)break;
      const source=await c.preparation.get(job.index);

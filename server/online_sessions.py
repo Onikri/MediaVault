@@ -235,6 +235,8 @@ def install(app,owner,exports_owner=None):
 
     @app.post('/online/prepare')
     async def prepare(body:Prepare,request:Request,subject=Depends(owner)):
+        shares=getattr(app.state,'title_shares',None)
+        if shares:shares.authorize_source(subject,body)
         # A hover preview can be cancelled while upstream parsing is still
         # running. Do not leave its newly created two-hour capability occupying
         # one of the owner's four slots after that browser has disconnected.
