@@ -10,7 +10,10 @@ class UkrainianVoiceTests(unittest.TestCase):
             self.assertEqual(voice_language(label),'uk',label)
 
     def test_russian_and_known_languages_are_not_changed(self):
-        for label in ['AniLibria','LostFilm','Кубик в Кубе','Дублированный','Гоблин']:
+        # Known Russian studios are labelled Russian (2a04b62); generic labels stay unknown.
+        for label in ['AniLibria','LostFilm','Кубик в Кубе']:
+            self.assertEqual(voice_language(label),'ru',label)
+        for label in ['Дублированный','Гоблин']:
             self.assertEqual(voice_language(label),'und',label)
         self.assertEqual(voice_language('Украинский','en'),'en')
         self.assertEqual(voice_language('Сербин','ru'),'ru')
