@@ -96,6 +96,31 @@ class NetworkRecoveryTests(unittest.TestCase):
                 path.write_text(json.dumps(bad))
                 self.assertEqual(routes.configuration(), {})
 
+    def test_rawuwu_missing_empty_pagination_is_not_a_broken_source(self):
+        from manga_search_recovery import rawuwu_empty
+        class Http:
+            def __init__(self, data, final='https://rawuwu.net/spa/search'):
+                self.data, self.final, self.closed = data, final, False
+            def document(self, url):
+                self.url = url
+                return json.dumps(self.data), self.final, {}
+            def close(self):
+                self.closed = True
+        source = {'name': 'Raw UwU', 'baseUrl': 'https://rawuwu.net'}
+        empty = {'manga_list': [], 'pagi': {'current': 1, 'offset': 0}}
+        for data, final, expected in [(empty, 'https://rawuwu.net/spa/search', True),
+                                       ({**empty, 'manga_list': [{'name': 'other'}]}, 'https://rawuwu.net/spa/search', False),
+                                       (empty, 'https://other.example/', False), ({}, 'https://rawuwu.net/spa/search', False)]:
+            http = Http(data, final)
+            self.assertEqual(rawuwu_empty(source, 'Vagabond', lambda **_: http), expected)
+            self.assertTrue(http.closed)
+        error = bridge.bridge_error(400, "kotlinx.serialization.MissingFieldException: Field 'button' is required")
+        self.assertEqual(error.code, 'format')
+        with patch.object(bridge, 'Client') as client, patch('manga_search_recovery.rawuwu_empty', return_value=True) as recover:
+            client.return_value.get.side_effect = error
+            self.assertEqual(discovery.search_source({**source, 'id': '3', 'lang': 'ja', '_queries': ['バガボンド', 'Vagabond']}, 'Бродяга'), [])
+            self.assertEqual(recover.call_count, 2)
+
     def test_origin_diagnostics_use_the_same_route_and_drop_old_cached_regional_result(self):
         class Reply:
             status_code = 200

@@ -20,6 +20,7 @@ class BridgeError(SourceError):
 
 
 def bridge_error(status, text, image=False):
+    text=str(text or '').casefold()
     for terms, code, message in (
         (('no space left on device','disk quota exceeded'),'storage','На сервере источников заполнен кэш страниц. Требуется очистка кэша; повторное открытие главы не поможет.'),
         (('cef is disabled','webview.getfactory'),'webview','Для этого расширения на сервере отключён браузер WebView. Требуется восстановить среду Suwayomi.'),
@@ -27,6 +28,7 @@ def bridge_error(status, text, image=False):
         (('cloudflare bypass currently disabled','bypass site protection','necessary cookies'),'challenge','Источник требует браузерную проверку.'),
         (('запретил доступ из вашей сети','not available from your network'),'network-restricted','Источник запретил доступ из сети сервера.'),
         (('sslhandshakeexception','certificate verify failed','unable to find valid certification path'),'tls','Не удалось проверить TLS-сертификат источника.'),
+        (('missingfieldexception','serializationexception'),'format','Расширение не распознало изменившийся ответ источника.'),
         (('your country is not supported','only available in japan','only be used from japan','not available in your region'),'region','Источник ограничил доступ из региона сервера.'),
         (('timed out','timeout'),'timeout','Источник не успел ответить.'),
         (('name or service not known','failure in name resolution','unknownhostexception'),'dns','Домен источника не разрешается.'),

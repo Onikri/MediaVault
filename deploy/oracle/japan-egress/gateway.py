@@ -29,7 +29,9 @@ HOSTS = (
     # Country-limited public catalogues. Account/purchase requirements remain.
     'cmoa.jp', 'novema.jp', 'booklive.jp', 'bookwalker.jp', 'music-book.jp',
     'sokuyomi.jp', 'manga.fod.fujitv.co.jp', 'manga.line.me', 'book.dmm.com',
-    'book.dmm.co.jp', 'yomonga.com',
+    'book.dmm.co.jp', 'yomonga.com', 'honto.jp',
+    # These public sources returned200 from Japan and403 from Oracle in live checks.
+    'mangafire.to', 'soraraw.com',
 )
 STOP = False
 

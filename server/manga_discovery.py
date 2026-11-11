@@ -160,6 +160,9 @@ def search_source(source,query):
         for term in source.get('_queries',[query]):
             try:data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=12)
             except bridge.BridgeError as error:
+                if source.get('name')=='Raw UwU' and error.code in {'format','query'}:
+                    from manga_search_recovery import rawuwu_empty
+                    if rawuwu_empty(source,term):responded=True;continue
                 if error.code!='query':raise
                 query_error=error;continue
             responded=True
