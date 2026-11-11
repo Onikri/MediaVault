@@ -101,6 +101,91 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    async def test_lookahead_overlaps_client_delivery_and_deduplicates_the_next_request(self):
+        data = await self.resolve()
+        playlist = await self.client.get(data['translations'][0]['play']['1080'])
+        urls = [line for line in playlist.text.splitlines() if line.startswith('/hls/')]
+        started, release = asyncio.Event(), asyncio.Event()
+        original = Source.fetch
+        requests = []
+        async def delayed(source, url, byte_range):
+            if url.endswith('second.m4s'):
+                requests.append(url)
+                started.set()
+                await release.wait()
+            return await original(source, url, byte_range)
+        with patch.object(Source, 'fetch', delayed):
+            first = await self.client.get(urls[0])
+            self.assertEqual(first.status_code, 200)
+            await asyncio.wait_for(started.wait(), 1)
+            # Current fragment has already been returned while the next loads.
+            following = asyncio.create_task(self.client.get(urls[1]))
+            await asyncio.sleep(.02)
+            self.assertFalse(following.done())
+            self.assertEqual(len(requests), 1)
+            release.set()
+            self.assertEqual((await following).status_code, 200)
+            self.assertEqual(len(requests), 1)
+
+    async def test_closing_session_cancels_lookahead_before_closing_source(self):
+        data = await self.resolve()
+        playlist = await self.client.get(data['translations'][0]['play']['1080'])
+        url = next(line for line in playlist.text.splitlines() if line.startswith('/hls/'))
+        started, cancelled = asyncio.Event(), asyncio.Event()
+        original = Source.fetch
+        async def delayed(source, url, byte_range):
+            if url.endswith('second.m4s'):
+                started.set()
+                try:await asyncio.Event().wait()
+                finally:cancelled.set()
+            return await original(source, url, byte_range)
+        with patch.object(Source, 'fetch', delayed):
+            await self.client.get(url)
+            await asyncio.wait_for(started.wait(), 1)
+            session = self.service.session(data['sid'])
+            await asyncio.wait_for(self.service.close_session(session), 1)
+            self.assertTrue(cancelled.is_set())
+            self.assertTrue(session.source.closed)
+            self.assertFalse(session.transfers)
+            self.assertFalse(session.prefetches)
+
+    async def test_refused_lookahead_is_not_retried_through_the_same_session(self):
+        data = await self.resolve()
+        playlist = await self.client.get(data['translations'][0]['play']['1080'])
+        urls = [line for line in playlist.text.splitlines() if line.startswith('/hls/')]
+        original = Source.fetch
+        attempts = []
+        async def refused(source, url, byte_range):
+            if url.endswith('second.m4s'):
+                attempts.append(url)
+                raise SourceRefused('fixture refusal', status=403)
+            return await original(source, url, byte_range)
+        with patch.object(Source, 'fetch', refused):
+            await self.client.get(urls[0])
+            session=self.service.session(data['sid'])
+            for _ in range(50):
+                if attempts and not session.prefetches:break
+                await asyncio.sleep(.01)
+            response=await self.client.get(urls[1])
+            self.assertEqual(response.status_code,409)
+            self.assertEqual(len(attempts),1)
+
+    async def test_lookahead_stops_after_one_segment_and_skips_byte_ranges(self):
+        data = await self.resolve()
+        session = self.service.session(data['sid'])
+        raw = '#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nfirst.m4s\n#EXTINF:6,\nsecond.m4s\n#EXTINF:6,\nthird.m4s\n#EXT-X-ENDLIST\n'
+        text = self.service.rewrite(session,raw,ORIGIN+'video.m3u8')
+        urls = [line for line in text.splitlines() if line.startswith('/hls/')]
+        await self.client.get(urls[0])
+        for _ in range(50):
+            if not session.prefetches:break
+            await asyncio.sleep(.01)
+        self.assertTrue(any(url.endswith('second.m4s') for url,_ in session.source.requests))
+        self.assertFalse(any(url.endswith('third.m4s') for url,_ in session.source.requests))
+        session.next_segments.clear()
+        self.service.rewrite(session,'#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\n#EXT-X-BYTERANGE:100@0\nvideo.mp4\n#EXTINF:6,\n#EXT-X-BYTERANGE:100@100\nvideo.mp4\n#EXT-X-ENDLIST\n',ORIGIN+'range.m3u8')
+        self.assertFalse(session.next_segments)
+
     async def test_bnsi_refusal_uses_the_browser_for_the_same_iframe(self):
         from alloha_browser import SourceRefused
         class Refused:

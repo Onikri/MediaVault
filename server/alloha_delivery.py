@@ -35,6 +35,17 @@ RANGE = re.compile(r'bytes=(?:\d+-\d*|-\d+)$')
 IDENTIFIER = re.compile(r'[A-Za-z0-9_-]{1,100}$')
 
 
+async def cache_io(function, *args):
+    # Cancelling a prefetch does not stop to_thread. Finish its disk operation
+    # before teardown can remove the cache or close the session.
+    task = asyncio.create_task(asyncio.to_thread(function, *args))
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        await task
+        raise
+
+
 def invalid(message='Источник вернул неподдерживаемый поток.'):
     return HTTPException(502, message)
 
@@ -131,6 +142,9 @@ class DeliverySession:
     closed: bool = False
     switch_lock: object = field(default_factory=asyncio.Lock)
     io_lock: object = field(default_factory=asyncio.Lock)
+    next_segments: dict = field(default_factory=dict)
+    transfers: dict = field(default_factory=dict)
+    prefetches: set = field(default_factory=set)
 
 
 class AllohaDelivery:
@@ -210,6 +224,13 @@ class AllohaDelivery:
             return
         session.closed = True
         self.sessions.pop(session.sid, None)
+        pending = (set(session.transfers.values()) | session.prefetches) - {asyncio.current_task()}
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        session.transfers.clear()
+        session.prefetches.clear()
         for key, value in list(self.online_clients.items()):
             if value == session.sid:
                 self.online_clients.pop(key, None)
@@ -247,10 +268,10 @@ class AllohaDelivery:
             self.log_handler.close()
             self.log_handler = None
 
-    def log(self, session, status, url, *, reason=None):
+    def log(self, session, status, url, *, reason=None, **timing):
         self.logger.info(json.dumps({'sid': session.sid, 'profile': session.profile.id if session.profile else 'bnsi',
                                 'external_address': session.address, 'status': status,
-                                'source_host': urlsplit(url).hostname, **({'reason': reason} if reason else {})}, ensure_ascii=True))
+                                'source_host': urlsplit(url).hostname, **({'reason': reason} if reason else {}), **timing}, ensure_ascii=True))
 
     async def failed(self, session, error, url):
         if not session.closed and session.profile is not None:
@@ -285,10 +306,11 @@ class AllohaDelivery:
         return '/hls/' + session.sid + '?u=' + session.resource_ids[url]
 
     async def fetch(self, session, url, *, kind='media', byte_range='', probe=False, cache=True):
+        started = self.clock()
         if cache and kind != 'manifest' and not probe:
-            cached = await asyncio.to_thread(self.cache.get, url, byte_range)
+            cached = await cache_io(self.cache.get, url, byte_range)
             if cached:
-                self.log(session, cached[2], url)
+                self.log(session, cached[2], url, cached=True, elapsed_ms=round((self.clock()-started)*1000), bytes=len(cached[0]))
                 return cached
         if session.mode == 'bnsi':
             try:
@@ -299,7 +321,7 @@ class AllohaDelivery:
         else:
             value = await session.source.fetch(url, byte_range)
         raw, headers, status, final = value
-        self.log(session, status, final)
+        self.log(session, status, final, cached=False, elapsed_ms=round((self.clock()-started)*1000), bytes=len(raw))
         if kind == 'manifest':
             if not raw.lstrip().startswith(b'#EXTM3U') or len(raw) > 4 * 1024 * 1024:
                 raise SourceInvalid('Source returned a non-HLS document')
@@ -309,8 +331,44 @@ class AllohaDelivery:
         else:
             media(raw, headers)
         if cache and kind != 'manifest' and not probe:
-            await asyncio.to_thread(self.cache.put, url, byte_range, value)
+            await cache_io(self.cache.put, url, byte_range, value)
         return value
+
+    async def transfer(self, session, url, kind, byte_range=''):
+        """Join an in-flight lookahead instead of fetching the same segment twice."""
+        key = (url, byte_range)
+        task = session.transfers.get(key)
+        if task is None:
+            async def load():
+                async with session.io_lock:
+                    self.session(session.sid)
+                    return await self.fetch(session, url, kind=kind, byte_range=byte_range)
+            task = asyncio.create_task(load())
+            session.transfers[key] = task
+            def finished(done):
+                # Retain a failed speculative request until demanded: never send
+                # the same refused request again through the same source session.
+                if done.cancelled() or done.exception() is None:
+                    if session.transfers.get(key) is done:
+                        session.transfers.pop(key, None)
+            task.add_done_callback(finished)
+        return await asyncio.shield(task)
+
+    def lookahead(self, session, url, byte_range):
+        following = session.next_segments.get(url)
+        # One segment per request, at most two queued (video + audio). No chain,
+        # whole-film download, parallel source bursts or ranged-file speculation.
+        if (byte_range or not following or session.closed or len(session.prefetches) >= 2
+                or (following, '') in session.transfers):
+            return
+        async def preload():
+            try:
+                await self.transfer(session, following, 'media')
+            except (HTTPException, SourceRefused, SourceInvalid):
+                pass  # The demand path reports the saved error and renews normally.
+        task = asyncio.create_task(preload())
+        session.prefetches.add(task)
+        task.add_done_callback(session.prefetches.discard)
 
     async def playlist(self, session, url):
         cached = session.manifests.get(url)
@@ -547,6 +605,12 @@ class AllohaDelivery:
     def rewrite(self, session, text, base):
         if not text.lstrip().startswith('#EXTM3U'):
             raise SourceInvalid('Source returned a non-HLS document')
+        playlist = m3u8.loads(text, uri=base)
+        # Build the adjacency from each media track separately. Init/key URIs
+        # and byte-range playlists must never be treated as complete segments.
+        if playlist.is_endlist and playlist.segments and not any(s.byterange for s in playlist.segments):
+            for current, following in zip(playlist.segments, playlist.segments[1:]):
+                session.next_segments[current.absolute_uri] = following.absolute_uri
         lines, next_manifest = [], False
         for line in text.splitlines():
             stripped = line.strip()
@@ -602,10 +666,11 @@ class AllohaDelivery:
             if kind == 'manifest':
                 text, final = await self.playlist(session, url)
                 return Response(self.rewrite(session, text, final), media_type='application/vnd.apple.mpegurl', headers={'Cache-Control': 'no-store'})
-            async with session.io_lock:
-                self.session(sid)
-                raw, headers, status, _ = await self.fetch(session, url, kind=kind, byte_range=byte_range)
+            started = self.clock()
+            raw, headers, status, _ = await self.transfer(session, url, kind, byte_range)
+            self.lookahead(session, url, byte_range)
             outgoing = {'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff'}
+            outgoing['Server-Timing'] = 'alloha;dur=' + str(round((self.clock()-started)*1000))
             if status == 206:
                 if not headers.get('content-range'):
                     raise SourceInvalid('Source omitted the partial response range')

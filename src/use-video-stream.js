@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {streamBufferPolicy,initialStreamLevel,bitrateBufferPolicy} from './watch-quality.js';
-export default function useVideoStream(ref,source,type,onError,{preview=false,audioOnly=false,quality='best',startPosition=0,sessionRecovery=false}={}){
+export default function useVideoStream(ref,source,type,onError,{preview=false,audioOnly=false,quality='best',startPosition=0,sessionRecovery=false,alloha=false}={}){
  const engine=useRef(null),report=useRef(onError),requested=useRef(quality);report.current=onError;requested.current=quality;
  const [levels,setLevels]=useState([]),[level,setLevelState]=useState(-1),[audio,setAudio]=useState([]),[subtitles,setSubtitles]=useState([]);
  const hls=type==='hls'||/\.m3u8(?:\?|$)/i.test(source||'');
@@ -8,7 +8,7 @@ export default function useVideoStream(ref,source,type,onError,{preview=false,au
   import('hls.js').then(({default:Hls})=>{if(closed)return;
    if(!Hls.isSupported()){if(v.canPlayType('application/vnd.apple.mpegurl')){v.src=source;return;}throw Error('Этот браузер не поддерживает HLS.');}
    const connection=navigator.connection;
-   const buffer=streamBufferPolicy({preview,audioOnly,saveData:!!connection?.saveData,memory:navigator.deviceMemory||8});
+   const buffer=streamBufferPolicy({preview,audioOnly,saveData:!!connection?.saveData,memory:navigator.deviceMemory||8,alloha});
    instance=new Hls({autoStartLoad:false,testBandwidth:false,...buffer,renderTextTracksNatively:true});engine.current=instance;let recovery=0;
    instance.on(Hls.Events.LEVEL_SWITCHING,(_,data)=>{const limits=bitrateBufferPolicy(buffer,instance.levels[data.level]?.bitrate);instance.config.maxBufferLength=limits.maxBufferLength;instance.config.maxMaxBufferLength=limits.maxMaxBufferLength;});
    instance.on(Hls.Events.MANIFEST_PARSED,()=>{const rows=instance.levels.map((l,i)=>({index:i,height:Number.parseInt(l.attrs?.NAME||l.name)||l.height,bitrate:l.bitrate}));setLevels(rows);instance.startLevel=initialStreamLevel(rows,{preview,audioOnly,saveData:!!connection?.saveData,downlink:connection?.downlink,memory:navigator.deviceMemory||8});if(preview||audioOnly)instance.autoLevelCapping=0;if(requested.current!=='best'){const selected=rows.find(l=>l.height===Number(requested.current));if(selected){instance.startLevel=selected.index;instance.loadLevel=selected.index;setLevelState(selected.index);}}instance.startLoad(Math.max(0,Number(startPosition)||0));});
@@ -20,7 +20,7 @@ export default function useVideoStream(ref,source,type,onError,{preview=false,au
    instance.loadSource(source);instance.attachMedia(v);
   }).catch(e=>!closed&&report.current?.(e));
   return()=>{closed=true;instance?.destroy();if(engine.current===instance)engine.current=null;};
- },[ref,source,hls,preview,audioOnly,sessionRecovery]);
+ },[ref,source,hls,preview,audioOnly,sessionRecovery,alloha]);
  useEffect(()=>{const instance=engine.current;if(!instance?.levels?.length)return;const index=quality==='best'?-1:instance.levels.findIndex(l=>Number.parseInt(l.attrs?.NAME||l.name||l.height)===Number(quality));instance.nextLevel=index;setLevelState(index);},[quality]);
  return {hls,levels,level,setLevel:n=>{if(engine.current){engine.current.nextLevel=n;setLevelState(n);}},audio,setAudio:n=>{if(engine.current)engine.current.audioTrack=n;},subtitles,subtitleUrl:n=>engine.current?.subtitleTracks?.[n]?.url||'',setSubtitle:n=>{const e=engine.current;if(!e)return;
   // Every switch makes hls.js disable all labelled text tracks, the page's own

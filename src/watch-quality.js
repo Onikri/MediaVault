@@ -5,12 +5,18 @@ export function bestQualityRow(rows,{voiceId,quality='best',anyVoice=false,faile
   .sort((a,b)=>(b.qualities[0]||0)-(a.qualities[0]||0)||Number(b.voiceId===voiceId)-Number(a.voiceId===voiceId))[0];
 }
 export function contiguousBufferEnd(ranges,time){for(let i=0;i<ranges.length;i++)if(ranges.start(i)<=time+.1&&ranges.end(i)>=time)return ranges.end(i);return time;}
-export function streamBufferPolicy({preview=false,audioOnly=false,saveData=false,memory=8}={}){
+export function streamBufferPolicy({preview=false,audioOnly=false,saveData=false,memory=8,alloha=false}={}){
  const small=memory<=4;
+ if(alloha&&!preview&&!audioOnly&&!saveData)return {...streamBufferPolicy({memory}),maxBufferLength:small?60:90,maxMaxBufferLength:small?75:120,maxBufferSize:(small?48:128)*1024*1024};
  return {maxBufferLength:preview?6:saveData?15:small?40:75,maxMaxBufferLength:preview?12:saveData?20:small?60:90,
   maxBufferSize:(preview?4:saveData?12:small?32:64)*1024*1024,backBufferLength:preview?0:saveData?5:small?8:15,
   abrBandWidthFactor:.9,abrBandWidthUpFactor:.65,abrMaxWithRealBitrate:true,maxStarvationDelay:2,maxLoadingDelay:4,
   startFragPrefetch:!preview,capLevelToPlayerSize:false,...(audioOnly?{maxBufferSize:40*1000*1000}:{} )};
+}
+export function startupBufferReady(video,seconds,waitingMs){
+ if(!seconds||!video.paused||waitingMs>=6000)return true;
+ const remaining=Number.isFinite(video.duration)?Math.max(0,video.duration-video.currentTime-.1):seconds;
+ return contiguousBufferEnd(video.buffered,video.currentTime)-video.currentTime>=Math.min(seconds,remaining);
 }
 export function bitrateBufferPolicy(policy,bitrate){if(!(bitrate>0))return policy;const seconds=Math.max(6,policy.maxBufferSize*8/bitrate);return {...policy,maxBufferLength:Math.min(policy.maxBufferLength,seconds),maxMaxBufferLength:Math.min(policy.maxMaxBufferLength,seconds)};}
 export function initialStreamLevel(levels,{preview=false,audioOnly=false,saveData=false,downlink,memory=8}={}){
