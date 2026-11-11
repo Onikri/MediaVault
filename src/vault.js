@@ -8,6 +8,7 @@ import {privacyPreferences,savePrivacyPreferences,keepStorage,rememberedDeviceId
 import {rememberGoogleSession,restoreGoogleSession,forgetGoogleSession,hasRememberedSession,rememberedAccount} from './device-auth.js';
 import {saveTrustedVault,openTrustedVault,trustedVault,forgetTrustedVault,biometricAvailable} from './trusted-vault.js';
 import {deviceStore} from './device-storage.js';
+import {saveAccountSession,readAccountSession,clearAccountSession} from './account-session.js';
 import {uiLocale} from './i18n/index.js';
 
 export const labels={all:"Все материалы",video:"Видео",audio:"Музыка",manga:"Манга",
@@ -34,7 +35,7 @@ function initialState(){
     libraryId:storedLibrary(),status:"Не подключено",notice:setupNotice(),toast:null,
     busy:"",uploadProgress:[],driveConnected:false,driveWritable:false,
     libraryOptions:[],libraryDiscovery:"idle",libraryDiscoveryError:"",workerReady:false,authConfigured:isConfigured(),
-    remembering:privacyPreferences().remember,remembered:false,restoring:false,biometric:false,deviceError:'',storageKept:null};
+    remembering:privacyPreferences().remember,remembered:false,restoring:true,biometric:false,deviceError:'',storageKept:null};
 }
 function cancelled(){return new DOMException("Операция отменена","AbortError");}
 async function hashEmail(email){
@@ -221,6 +222,12 @@ function createController(get,patch){
       driveConnected:true,driveWritable:rights.writable,status:"Google Drive подключён"});
     scheduleExpiry();
   }
+  async function cacheAccount(result){
+    const expected=epoch;
+    await saveAccountSession(result,get().user,{remember:privacyPreferences().remember,current:()=>mounted&&expected===epoch})
+      .catch(()=>{if(expected===epoch)patch({deviceError:'Браузер не сохранил вход. Разреши хранение данных этого сайта.'});});
+    assertEpoch(expected);
+  }
   async function discoverLibrary(expected){
     patch({libraryDiscovery:"searching",libraryDiscoveryError:"",notice:null});
     try{
@@ -261,6 +268,7 @@ function createController(get,patch){
     if(actual.sub!==originalUser.sub)throw Error("Выбери тот же Google-аккаунт, что и при входе.");
     assertEpoch(expected);
     acceptDriveToken(result);
+    await cacheAccount(result);
     await syncWorker();
     assertEpoch(expected);
   }
@@ -283,6 +291,7 @@ function createController(get,patch){
       patch({user,admin,status:admin?"Администратор · Google":"Пользователь · Google",
         notice:{title:"Разреши доступ к файлам",text:"Доступ к Google Drive запрашивается вместе со входом. Подтверди его в окне Google."}});
       acceptDriveToken(result);
+      await cacheAccount(result);
       if(privacyPreferences().remember){
         await rememberAccountInternal().catch(cause=>patch({deviceError:cause.message}));
       }
@@ -539,9 +548,10 @@ function createController(get,patch){
     assertEpoch(expected);
     return new URL("__media__/"+encodeURIComponent(item.id),baseUrl()).href;
   }
-  function logout(){
+  function logout({external=false}={}){
+    if(!external)clearAccountSession().catch(()=>{});
     if(get().user?.sub)forgetRememberedDirectKey(String(get().user.sub)).catch(()=>{});
-    forgetGoogleSession().catch(()=>{});
+    if(!external)forgetGoogleSession().catch(()=>{});
     deviceStore('delete','wrap-key').catch(()=>{});
     if(get().user&&get().libraryId)forgetTrustedVault(get().user.sub,get().libraryId).catch(()=>{});
     // Signing out forgets this device; the next sign-in asks again (banner).
@@ -583,7 +593,8 @@ function createController(get,patch){
     const server=configuration().importServerUrl;if(!server)throw Error('Не настроен сервер сохранённого входа.');
     const expected=epoch;
     await rememberGoogleSession(server,driveToken(),get().user);
-    if(expected!==epoch||!privacyPreferences().remember){await forgetGoogleSession().catch(()=>{});throw cancelled();}
+    if(expected!==epoch)throw cancelled();
+    if(!privacyPreferences().remember){await forgetGoogleSession().catch(()=>{});throw cancelled();}
     reconnectRequired=false;patch({remembered:true,deviceError:''});
     keepStorage().then(kept=>patch({storageKept:kept}));
     await saveTrustedCurrent();return true;
@@ -593,11 +604,12 @@ function createController(get,patch){
     if(restoring)return restoring;
     const expected=epoch;
     restoring=(async()=>{
+      if(tokenAlive()&&!await hasRememberedSession())await rememberAccountInternal();
       const result=await restoreGoogleSession();if(!result)throw Object.assign(Error('На этом устройстве пока не сохранён вход.'),{status:401});
       const user=result.user?.email_verified&&result.user?.sub&&result.user?.email?result.user:await userFromToken(result.access_token);assertEpoch(expected);
       if(get().user&&user.sub!==get().user.sub)throw Error('Сохранён другой аккаунт. Войди через Google.');
       reconnectRequired=false;patch({user,admin:(await hashEmail(user.email))===configuration().adminEmailSha256,remembered:true,deviceError:''});
-      acceptDriveToken(result);await syncWorker();return true;
+      acceptDriveToken(result);await cacheAccount(result);await syncWorker();return true;
     })();
     try{return await restoring;}finally{restoring=null;}
   }
@@ -609,12 +621,34 @@ function createController(get,patch){
     return driveToken();
   }
   async function restoreLogin(){
-    if(!privacyPreferences().remember)return false;
+    const expected=epoch,remember=privacyPreferences().remember;
+    patch({restoring:true});
+    const cached=await readAccountSession(remember).catch(()=>null)
+      ||(remember?await readAccountSession(false).catch(()=>null):null);
+    if(expected!==epoch||!mounted)return false;
+    if(cached){
+      patch({user:cached.user,admin:(await hashEmail(cached.user.email))===configuration().adminEmailSha256});
+      if(cached.valid){
+        return run('restore',async expected=>{
+          try{
+            acceptDriveToken(cached);
+            if(remember)await cacheAccount(cached);
+            try{await discoverLibrary(expected);}catch(cause){
+              if(cause?.status!==401||!remember)throw cause;
+              await renewSession();await discoverLibrary(expected);
+            }
+            if(remember){await tryTrustedLibrary(expected);rememberAccountInternal().catch(cause=>{if(expected===epoch)patch({deviceError:cause.message});});}
+            return true;
+          }finally{if(expected===epoch)patch({restoring:false});}
+        });
+      }
+    }
+    if(!remember){patch({restoring:false});return false;}
     // Nothing saved here: no restore attempt and no error. A device cookie
     // without the IndexedDB key means the browser cleared site storage.
     if(!await hasRememberedSession()){
       if(rememberedDeviceId()&&!get().user&&!reconnectRequired){reconnectRequired=true;patch({deviceError:'Браузер очистил данные сайта, обычно из-за нехватки места на диске. Войди через Google — устройство запомнится снова.'});let told=false;try{told=!!sessionStorage.getItem('mv_storage_cleared_told');sessionStorage.setItem('mv_storage_cleared_told','1');}catch{}if(!told)toast('Браузер очистил сохранённый вход (мало места на диске). Войди через Google ещё раз.',true);}
-      return false;
+      patch({restoring:false});return false;
     }
     keepStorage().then(kept=>patch({storageKept:kept}));
     return run('restore',async expected=>{
@@ -630,6 +664,7 @@ function createController(get,patch){
   async function biometricUnlock(){return run('biometric',expected=>tryTrustedLibrary(expected,true));}
   async function enableBiometric(){return run('biometric',async()=>{if(!get().catalog)throw Error('Сначала открой библиотеку секретной фразой.');savePrivacyPreferences(true);await forgetTrustedVault(get().user.sub,get().libraryId);await saveTrustedCurrent(true);toast('Библиотека защищена биометрией или PIN устройства.');return true;});}
   function onPrivacy(event){patch({remembering:!!event.detail.remember,...(!event.detail.remember?{remembered:false,biometric:false}:{})});}
+  function onAccountStorage(event){if(event.key==='mediavault_login_epoch'&&event.newValue!==event.oldValue)logout({external:true});}
   function onMessage(event){
     if(event.data?.type==="SESSION_REQUIRED"){
       const payload=workerSession();
@@ -654,6 +689,7 @@ function createController(get,patch){
     window.addEventListener("pageshow",onFocus);
     document.addEventListener("visibilitychange",onFocus);
     window.addEventListener('mediavault-privacy',onPrivacy);
+    window.addEventListener('storage',onAccountStorage);
     scheduleExpiry();
     registerWorker().catch(cause=>console.warn("Service Worker недоступен:",cause));
     restoreLogin();
@@ -668,6 +704,7 @@ function createController(get,patch){
     window.removeEventListener("pageshow",onFocus);
     document.removeEventListener("visibilitychange",onFocus);
     window.removeEventListener('mediavault-privacy',onPrivacy);
+    window.removeEventListener('storage',onAccountStorage);
     clearWorkerSession();
   }
   return {mount,unmount,actions:{login,connectDrive,logout,unlock,createLibrary,uploadFiles,importStream,importVideo,rememberAccount,restoreLogin,ensureSession,biometricUnlock,enableBiometric,biometricAvailable,notify:toast,

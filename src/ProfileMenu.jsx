@@ -28,13 +28,14 @@ export default function ProfileMenu({state,guest,importActive,onNavigate,onDownl
  {createPortal(<AnimatePresence>{open&&<motion.section ref={panel} role="dialog" aria-label="Профиль" className="profile-menu" style={box} initial={reduce?false:{opacity:0,scale:.94,y:-4}} animate={{opacity:1,scale:1,y:0}} exit={reduce?{opacity:0}:{opacity:0,scale:.96}} transition={{type:'spring',stiffness:420,damping:34}}>
   <header className="profile-menu-identity">
    {user&&<ProfileAvatar user={user} className="profile-menu-avatar"/>}
-   <div><strong>{user?name:'Ты не вошёл'}</strong><small>{user?(user.email||role):'Войди, чтобы смотреть онлайн и открыть коллекцию'}</small></div>
+   <div><strong>{user?name:state.restoring?'Восстанавливаем вход…':'Ты не вошёл'}</strong><small>{user?(user.email||role):state.restoring?'Проверяем сохранённую сессию':'Войди, чтобы смотреть онлайн и открыть коллекцию'}</small></div>
   </header>
   {(state.user||guest)&&<p className="profile-menu-role"><span>{role}</span>{until&&<span>{until}</span>}</p>}
-  {!state.user&&!guest&&<div className="profile-menu-login">
+  {!guest&&!state.restoring&&(!state.user||!state.driveConnected)&&<div className="profile-menu-login">
    <button type="button" className="profile-menu-primary" onClick={go(onLogin)}><LogIn size={16}/>Войти через Google</button>
    <button type="button" className="profile-menu-secondary" onClick={go(onGuestLogin)}><UserPlus size={16}/>Вход по приглашению</button>
   </div>}
+  {state.deviceError&&<p className="device-help" role="status">{state.deviceError}</p>}
   <nav className="profile-menu-list" aria-label="Профиль">{items.map(item=><button type="button" key={item.id} onClick={go(item.run)}><item.icon size={17}/><span>{item.label}</span>{item.live&&<i className="profile-menu-live" aria-label="Идут загрузки"/>}{item.chevron&&<ChevronRight size={15}/>}</button>)}</nav>
   {(state.user||guest)&&<button type="button" className="profile-menu-exit" onClick={go(onLogout)}><LogOut size={16}/>Выйти</button>}
  </motion.section>}</AnimatePresence>,document.body)}</>;

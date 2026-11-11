@@ -1,5 +1,6 @@
 import {deviceStore} from './device-storage.js';
 import {rememberedDeviceId,saveRememberedDeviceId} from './privacy.js';
+import {accountEpoch} from './account-session.js';
 const encode=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
 const text=new TextEncoder();
 async function request(server,path,body,token){
@@ -12,13 +13,15 @@ async function proof(record){
   return {id:record.id,nonce:challenge.nonce,signature:encode(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},record.privateKey,text.encode(message)))};
 }
 export async function rememberGoogleSession(server,token,user){
+  const epoch=accountEpoch();
   let record=await deviceStore('get','auth');
+  if(record&&(record.epoch||'')!==epoch)record=null;
   const profile=Object.fromEntries(['sub','email','email_verified','name','given_name','picture'].map(k=>[k,user[k]]).filter(([,v])=>v!==undefined));
   if(record?.sub===user.sub&&record.server===server){
-    record={...record,user:profile};
+    record={...record,user:profile,epoch};
     await deviceStore('put','auth',record);
     if(record.pendingURL&&record.pendingUntil>Date.now())return finishConsent(record);
-    try{await request(server,'/devices/restore',await proof(record));saveRememberedDeviceId(record.id);return record;}catch(error){
+    try{await request(server,'/devices/restore',await proof(record));if(accountEpoch()!==epoch)throw new DOMException('Вход завершён на устройстве.','AbortError');saveRememberedDeviceId(record.id);return record;}catch(error){
       if(error.status!==401)throw error;
       const repaired=await request(server,'/devices/reconnect',{id:record.id},token);
       record={...record,pendingURL:repaired.url,pendingUntil:Date.now()+540000};
@@ -29,7 +32,8 @@ export async function rememberGoogleSession(server,token,user){
   // A record lost with cleared site storage is replaced on the server, not left behind.
   const previous=record?.server===server?record.id:rememberedDeviceId();
   const registered=await request(server,'/devices/register',{public_key:await crypto.subtle.exportKey('jwk',keys.publicKey),...(previous?{replaces:previous}:{})},token);
-  record={id:registered.id,privateKey:keys.privateKey,server,sub:user.sub,user:profile,...(registered.url?{pendingURL:registered.url,pendingUntil:Date.now()+540000}:{})};
+  if(accountEpoch()!==epoch)throw new DOMException('Вход завершён на устройстве.','AbortError');
+  record={id:registered.id,privateKey:keys.privateKey,server,sub:user.sub,user:profile,epoch,...(registered.url?{pendingURL:registered.url,pendingUntil:Date.now()+540000}:{})};
   await deviceStore('put','auth',record);saveRememberedDeviceId(record.id);
   return record.pendingURL?finishConsent(record):record;
 }
@@ -40,22 +44,24 @@ async function finishConsent(record){
     if(!popup)throw Error('Нажми «Запомнить это устройство» в профиле ещё раз и разреши окно Google.');
     await new Promise((resolve,reject)=>{let finished=false;const finish=error=>{if(finished)return;finished=true;clearInterval(timer);clearTimeout(timeout);window.removeEventListener('message',message);error?reject(error):resolve();};const message=event=>{if(event.origin===server&&event.source===popup&&event.data?.type==='mediavault-server-connected')finish();};window.addEventListener('message',message);const timer=setInterval(()=>{if(popup.closed)finish();},1000),timeout=setTimeout(()=>{popup.close();finish(Error('Запоминание устройства не завершено. Повтори из профиля.'));},150000);});
     await request(server,'/devices/restore',await proof(record));
+    if((record.epoch||'')!==accountEpoch())throw new DOMException('Вход завершён на устройстве.','AbortError');
     delete record.pendingURL;delete record.pendingUntil;await deviceStore('put','auth',record);return record;
 }
 export async function restoreGoogleSession(){
  const record=await deviceStore('get','auth');if(!record)return null;
+ if((record.epoch||'')!==accountEpoch())return null;
  const result=await request(record.server,'/devices/restore',await proof(record));
  const current=await deviceStore('get','auth');
- if(current?.id!==record.id)throw new DOMException('Вход завершён на устройстве.','AbortError');
+ if(current?.id!==record.id||(record.epoch||'')!==accountEpoch())throw new DOMException('Вход завершён на устройстве.','AbortError');
  if(result.user?.sub===record.sub)await deviceStore('put','auth',{...current,user:result.user});
  saveRememberedDeviceId(record.id);return result;
 }
 export async function rememberedAccount(){
  const record=await deviceStore('get','auth');
- return record?.user?.sub===record?.sub?record.user:null;
+ return record?.user?.sub===record?.sub&&(record.epoch||'')===accountEpoch()?record.user:null;
 }
-export async function hasRememberedSession(){return !!(await deviceStore('get','auth').catch(()=>null));}
+export async function hasRememberedSession(){const record=await deviceStore('get','auth').catch(()=>null);return !!record&&(record.epoch||'')===accountEpoch();}
 export async function forgetGoogleSession(){
   const record=await deviceStore('get','auth');
-  try{if(record)await request(record.server,'/devices/remove',await proof(record));}finally{saveRememberedDeviceId('');await deviceStore('delete','auth');}
+  try{if(record)await request(record.server,'/devices/remove',await proof(record));}finally{if(!record||rememberedDeviceId()===record.id)saveRememberedDeviceId('');if(record)await deviceStore('deleteIf','auth',{id:record.id});}
 }
