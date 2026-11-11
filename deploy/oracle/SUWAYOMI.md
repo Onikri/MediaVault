@@ -6,6 +6,49 @@ Upstream: https://github.com/Suwayomi/Suwayomi-Server (MPL-2.0; Android compatib
 
 ## Operation
 
+### Publisher-scoped Japanese egress
+
+`sudo python3 deploy/oracle/enable-suwayomi-japan.py` installs a private SOCKS5
+router and a separate OpenVPN network namespace. Suwayomi's native SOCKS setting
+points at `suwayomi-jp-router:1080`. GOST routes only Comic Ryu, Young Champion,
+Manga Zegra, Big Comics and their Comici domains through the Japanese gateway;
+all other destinations remain direct. Neither service publishes a host port.
+The VM's default route, importer, Drive credentials and Alloha are unchanged.
+
+The free upstream is [VPN Gate](https://www.vpngate.net/en/about_overview.aspx),
+not an unverified open SOCKS list. The gateway fetches its public feed, considers
+only Japanese endpoints, rebuilds an allowlisted configuration, verifies the
+server certificate/hostname and HTTPS normally, checks the exit country and
+publisher search JSON, and tries another endpoint after a failure. It retains
+the last working public profile privately under
+`/opt/mediavault-suwayomi/japan-egress/.codex-local/state/`. GOST 3.3.3 comes from
+the [official release](https://github.com/go-gost/gost/releases/tag/v3.3.3), with
+an ARM64 archive SHA256 pinned in the Dockerfile. The unprivileged SOCKS worker
+has an owner-based firewall rule prohibiting public egress outside `tun0`,
+including during reconnection. Readiness/liveness does not grant access to paid
+or login-only chapters. Free volunteer relays can disappear and provide no SLA.
+
+Installation backs up the existing Compose/config, checks active imports,
+preserves the private configuration fingerprints and recreates only the source
+service and these two gateways. A failure restores the previous settings and
+image references. Private backups/logs live inside the gateway's `.codex-local`.
+
+Live Oracle verification on 2026-11-11: direct publisher searches returned403;
+the Japanese route returned200 JSON for all four. Actual **Suwayomi** searches
+returned24 titles each for `の`; separate chapter and JPEG retrieval passed:
+
+| Source | Indexed chapters in tested title | Pages in tested free chapter | First JPEG |
+| --- | ---: | ---: | ---: |
+| Big Comics | 68 | 21 | 812963 bytes |
+| Comic Ryu | 66 | 15 | 1099056 bytes |
+| Manga Zegra | 3 | 11 | 472180 bytes |
+| Young Champion | 4 | 5 | 292120 bytes |
+
+A nonmatching HTTPS destination through the same router reported the original
+Oracle exit, confirming domain routing. The two new containers used about49MiB
+combined at idle. These are real network/reader checks, separate from the
+Python configuration tests; no ML inference is involved.
+
 After the existing importer has been updated to backend v14, the maintainer runs `python3 deploy/oracle/install-suwayomi.py` on the VM. It discovers the current Compose project, preserves existing overlays, adds `suwayomi.yaml`, checks the service, and recreates only the importer to enable its private adapter. It leaves Oracle shape/resources, Caddy routes, Drive/OAuth configuration, library encryption and existing ML workers intact. A failed readiness check leaves the importer unchanged; a failed importer check restores the previous Compose configuration. Logs and rollback information are private under `/opt/mediavault-suwayomi`.
 
 No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit2304MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. The official image launcher enables bundled ARM64 KCEF and Xvfb, which LibGroup uses even when reading browser storage for a public request. Challenge-solving services remain disabled. Actual account/subscription requirements remain distinct from a broken runtime.
