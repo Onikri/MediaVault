@@ -11,7 +11,8 @@ Upstream: https://github.com/Suwayomi/Suwayomi-Server (MPL-2.0; Android compatib
 `sudo python3 deploy/oracle/enable-suwayomi-japan.py` installs a private SOCKS5
 router and a separate OpenVPN network namespace. Suwayomi's native SOCKS setting
 points at `suwayomi-jp-router:1080`. GOST routes only Comic Ryu, Young Champion,
-Manga Zegra, Big Comics and their Comici domains through the Japanese gateway;
+Manga Zegra, Big Comics, the other configured Comici publishers and the listed
+country-limited Japanese catalogues through the Japanese gateway;
 all other destinations remain direct. Neither service publishes a host port.
 The VM's default route, importer, Drive credentials and Alloha are unchanged.
 
@@ -48,6 +49,23 @@ A nonmatching HTTPS destination through the same router reported the original
 Oracle exit, confirming domain routing. The two new containers used about49MiB
 combined at idle. These are real network/reader checks, separate from the
 Python configuration tests; no ML inference is involved.
+
+The installer also publishes `/data/manga-source-routes.json`, containing only
+the verified route revision, public publisher domains and fixed private HTTP
+diagnostic proxy. Discovery v4 notices a changed revision and resets only those
+sources' stale search/reader failure quarantines and failed completed snapshots.
+Public title metadata and private libraries remain intact. The ordinary search
+then retries without requiring the owner to bypass a24-hour circuit breaker.
+Origin diagnostics use the same Japanese route, avoiding false regional errors
+from an unrelated direct Oracle probe. Native source requests use SOCKS1080;
+diagnostic HTTP CONNECT uses8080; neither port is public.
+
+Language-aware aliases now prefer the native title and then the Latin title
+(`バガボンド`, `Vagabond`), rather than the Russian display name as second query.
+The query cache includes the actual aliases and route revision. Rejection of one
+search term may try the next alias and cannot quarantine the entire source.
+An empty search response is distinct from an unavailable source or readable
+chapters; recovery of a publisher does not imply it carries every manga.
 
 After the existing importer has been updated to backend v14, the maintainer runs `python3 deploy/oracle/install-suwayomi.py` on the VM. It discovers the current Compose project, preserves existing overlays, adds `suwayomi.yaml`, checks the service, and recreates only the importer to enable its private adapter. It leaves Oracle shape/resources, Caddy routes, Drive/OAuth configuration, library encryption and existing ML workers intact. A failed readiness check leaves the importer unchanged; a failed importer check restores the previous Compose configuration. Logs and rollback information are private under `/opt/mediavault-suwayomi`.
 

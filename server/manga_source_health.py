@@ -33,6 +33,13 @@ def blocked(identity,known=None):
     row=(states() if known is None else known).get(str(identity),{})
     return row.get('status') in FAILED
 
+def reset_failures(identities):
+    """A verified routing change invalidates old failures, never working entries."""
+    db=connection()
+    try:
+        with db:db.executemany("DELETE FROM health WHERE id=? AND status IN ('unavailable','restricted')",[(str(identity),) for identity in identities])
+    finally:db.close()
+
 def report():
     rows=list(states().values())
     return {'sources':sorted(rows,key=lambda r:(r['language'],r['name'].casefold(),r['id'])),

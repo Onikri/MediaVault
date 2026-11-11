@@ -38,7 +38,7 @@ def bridge_error(status, text, image=False):
     origin = re.search(r'\bhttp(?:\s+error)?[:\s]+([45]\d{2})\b', text)
     if status >= 500 and origin:
         status = int(origin[1])
-    code={401:'login',403:'restricted',404:'missing',408:'timeout',429:'rate-limit',504:'timeout'}.get(status,'upstream')
+    code={400:'bad-request',401:'login',403:'restricted',404:'missing',408:'timeout',429:'rate-limit',504:'timeout'}.get(status,'upstream')
     return BridgeError(code,f'Ошибка источника (HTTP {status}). Не удалось получить '+('страницу главы.' if image else 'данные читалки.'))
 
 # Geo walls that answer the VM with 403 (Comici/CloudFront publishers say
@@ -56,12 +56,14 @@ def origin_block(base_url,fetch=None,clock=time.monotonic):
     """
     try:url=public_url(str(base_url or '').rstrip('/')+'/',allow_api=False)
     except SourceError:return None
-    host=urlsplit(url).hostname;now=clock()
-    with _lock:hit=_origins.get(host)
+    from manga_network_routes import configuration,routed
+    routes=configuration();host=urlsplit(url).hostname;now=clock();cache_key=(host,routes.get('revision','direct'))
+    with _lock:hit=_origins.get(cache_key)
     if hit and hit[0]>now:return hit[1]
     result=None;response=None
     try:
-        get=fetch or (lambda u:requests.get(u,timeout=(3,6),allow_redirects=False,stream=True,
+        options={'proxies':{'http':routes['httpProxy'],'https':routes['httpProxy']}} if routed(url,routes) else {}
+        get=fetch or (lambda u:requests.get(u,timeout=(3,6),allow_redirects=False,stream=True,**options,
             headers={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36','Accept-Language':'ja,en;q=0.8'}))
         response=get(url);raw=b''
         for block in response.iter_content(4096):
@@ -75,7 +77,7 @@ def origin_block(base_url,fetch=None,clock=time.monotonic):
     except requests.RequestException:result=None
     finally:
         if response is not None:response.close()
-    with _lock:_origins[host]=(now+ORIGIN_TTL,result)
+    with _lock:_origins[cache_key]=(now+ORIGIN_TTL,result)
     return result
 
 def configured():return bool(os.getenv('SUWAYOMI_URL') and os.getenv('SUWAYOMI_AUTH_FILE') and os.getenv('PUBLIC_URL','').startswith('https://'))
@@ -121,7 +123,10 @@ class Client:
                     raw+=block[:4096-len(raw)]
                     if len(raw)>=4096:break
                 text=raw.decode('utf-8',errors='replace').casefold()
-                raise bridge_error(response.status_code,text,image)
+                error=bridge_error(response.status_code,text,image)
+                if error.code=='bad-request' and re.fullmatch(r'/source/\d+/search',path):
+                    error=BridgeError('query','Источник не принял поисковый запрос (HTTP 400).')
+                raise error
             chunks=[];size=0;limit=30*1024*1024 if image else 8*1024*1024
             for block in response.iter_content(65536):
                 size+=len(block)

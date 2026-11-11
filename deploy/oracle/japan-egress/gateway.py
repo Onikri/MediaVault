@@ -17,7 +17,20 @@ import urllib.request
 
 STATE = Path(os.environ.get('JP_STATE', '/state'))
 FEED = 'https://www.vpngate.net/api/iphone/'
-HOSTS = ('comic-ryu.jp', 'youngchampion.jp', 'manga-zegra.com', 'bigcomics.jp', 'comici.jp')
+HOSTS = (
+    'comic-ryu.jp', 'youngchampion.jp', 'manga-zegra.com', 'bigcomics.jp', 'comici.jp',
+    # The other installed ComiciViewer publishers share the same regional wall.
+    'asacomi.jp', 'bibibi-comic.com', 'studio.booklista.co.jp', 'championcross.jp',
+    'comicpash.jp', 'comicride.jp', 'comic-room-base.com', 'comirela.com', 'g-comi.jp',
+    'hayacomic.jp', 'heros-web.com', 'hanayume.com', 'comic.j-nbooks.jp', 'kimicomi.com',
+    'kansai.mag-garden.co.jp', 'mangaspa.nikkan-spa.jp', 'comics.manga-bang.com',
+    'mangabu.jp', 'mangalt.jp', 'namicomic.jp', 'piacomic.jp', 'rimacomiplus.jp',
+    'takecomic.jp', 'younganimal.com',
+    # Country-limited public catalogues. Account/purchase requirements remain.
+    'cmoa.jp', 'novema.jp', 'booklive.jp', 'bookwalker.jp', 'music-book.jp',
+    'sokuyomi.jp', 'manga.fod.fujitv.co.jp', 'manga.line.me', 'book.dmm.com',
+    'book.dmm.co.jp', 'yomonga.com',
+)
 STOP = False
 
 
@@ -93,7 +106,9 @@ def routing_config():
     # Hop whitelist: only these publishers/CDNs use Japan. Other sources are direct.
     return {
         'services': [{'name': 'suwayomi', 'addr': ':1080',
-                      'handler': {'type': 'socks5', 'chain': 'japan'}, 'listener': {'type': 'tcp'}}],
+                      'handler': {'type': 'socks5', 'chain': 'japan'}, 'listener': {'type': 'tcp'}},
+                     {'name': 'origin-diagnostics', 'addr': ':8080',
+                      'handler': {'type': 'http', 'chain': 'japan'}, 'listener': {'type': 'tcp'}}],
         'chains': [{'name': 'japan', 'hops': [{'name': 'japan-only', 'bypass': 'publishers',
                     'nodes': [{'name': 'vpn', 'addr': 'suwayomi-jp-vpn:1081',
                                'connector': {'type': 'socks5'}, 'dialer': {'type': 'tcp'}}]}]}],

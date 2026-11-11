@@ -67,6 +67,11 @@ def settings(text):
     return text
 
 
+def route_manifest():
+    revision = hashlib.sha256(json.dumps(gateway.routing_config(), sort_keys=True).encode()).hexdigest()
+    return {'revision': revision, 'hosts': list(gateway.HOSTS), 'httpProxy': 'http://suwayomi-jp-router:8080'}
+
+
 def main():
     if os.geteuid() != 0:
         raise RuntimeError('Run with sudo on the existing VM')
@@ -86,6 +91,10 @@ def main():
             raise RuntimeError('Expected one ' + name)
         return rows[0]
     importer, source = one('importer'), one('suwayomi')
+    def proxy_addresses(container):
+        return sorted((name, info.get('IPAddress')) for name, info in container.get('NetworkSettings', {}).get('Networks', {}).items())
+    routers = [c for c in containers if c['Config'].get('Labels', {}).get('com.docker.compose.service') == 'suwayomi-jp-router']
+    old_proxy_addresses = proxy_addresses(routers[0]) if len(routers) == 1 else []
     labels = source['Config']['Labels']
     work = Path(labels['com.docker.compose.project.working_dir'])
     files = labels['com.docker.compose.project.config_files'].split(',')
@@ -138,7 +147,9 @@ def main():
             raise RuntimeError('Japanese gateway failed readiness; source configuration preserved')
         current = config.read_text()
         desired = settings(current)
-        if current != desired:
+        router_id = get([*base, 'ps', '-q', 'suwayomi-jp-router'])
+        router = json.loads(get(['docker', 'inspect', router_id]))[0]
+        if current != desired or old_proxy_addresses != proxy_addresses(router):
             config.write_text(desired)
             run([*base, 'up', '-d', '--no-deps', '--force-recreate', 'suwayomi'])
         probe = "from suwayomi_bridge import Client;c=Client();v=c.get('/source/list',timeout=5);c.close();assert v;print(len(v))"
@@ -152,6 +163,12 @@ def main():
             raise RuntimeError('Suwayomi failed readiness')
         if {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in private} != before:
             raise RuntimeError('Private configuration changed unexpectedly')
+        # Only a verified route invalidates the affected source quarantines.
+        temporary = data / '.manga-source-routes.json.tmp'
+        temporary.write_text(json.dumps(route_manifest()))
+        temporary.chmod(0o600)
+        os.chown(temporary, 1000, 1000)
+        temporary.replace(data / 'manga-source-routes.json')
     except Exception:
         if not had_gateway:
             run([*base, 'rm', '--stop', '--force', 'suwayomi-jp-vpn', 'suwayomi-jp-router'])

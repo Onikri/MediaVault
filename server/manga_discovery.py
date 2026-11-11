@@ -10,7 +10,7 @@ from source_parser import SourceAccessError,SourceError,SourceTemporaryError,pub
 import suwayomi_bridge as bridge
 
 LANGUAGES={'all',*bridge.LANGUAGES}
-DISCOVERY_VERSION=3
+DISCOVERY_VERSION=4
 # A source that failed its search twice in a row (challenge, login wall,
 # timeout, DNS, HTTP 5xx) is left out of ordinary searches for a growing
 # pause. It stays installed and listed with the reason; «Повторить поиск»
@@ -20,7 +20,12 @@ SEARCH_BACKOFF=(3600,6*3600,24*3600)
 NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'SlashLib':2,'MangaDex':0,'Senkognito':None}
 def language_queries(values,language):
     pattern={'ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[language]
-    return sorted(dict.fromkeys(values),key=lambda v:not bool(re.search(pattern,v,re.I)))[:2]
+    # Native title first; Latin title/romanization is the useful second query
+    # on Japanese/Korean catalogues, not the first Russian display-name alias.
+    def rank(value):
+        if re.search(pattern,value,re.I):return 0
+        return 1 if re.search(r'[a-z]',value,re.I) else 2
+    return sorted(dict.fromkeys(values),key=rank)[:2]
 def public_aliases(row):
     values=[row.get('title'),*(row.get('aliases') or [])]
     text=str(row.get('description') or '')[:20000]
@@ -151,8 +156,13 @@ def search_source(source,query):
     try:
         from title_identity import match_title
         found={};selected=source.get('_title') or source.get('_alias_title')
+        responded=False;query_error=None
         for term in source.get('_queries',[query]):
-            data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=12)
+            try:data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=12)
+            except bridge.BridgeError as error:
+                if error.code!='query':raise
+                query_error=error;continue
+            responded=True
             rows=data.get('mangaList',[])
             if not isinstance(rows,list):raise ValueError('Invalid source result')
             for row in rows[:40]:
@@ -166,6 +176,7 @@ def search_source(source,query):
                         if languages is not None and source['lang'] not in languages:continue
                     found[value['id']]=value
             if found:break
+        if not responded and query_error:raise query_error
         return list(found.values())
     except SourceError as error:
         # A failing extension must not make its still-readable public HTML
@@ -223,6 +234,7 @@ class Discovery:
               CREATE INDEX IF NOT EXISTS titles_language_name ON titles(language,title_norm);
               CREATE TABLE IF NOT EXISTS reachability(source_id TEXT PRIMARY KEY,name TEXT NOT NULL,language TEXT NOT NULL,
                 failures INTEGER NOT NULL,code TEXT NOT NULL,message TEXT NOT NULL,last_ok REAL NOT NULL,last_fail REAL NOT NULL,skip_until REAL NOT NULL);
+              CREATE TABLE IF NOT EXISTS network_state(key TEXT PRIMARY KEY,value TEXT NOT NULL);
             ''')
             if self.db.execute('PRAGMA user_version').fetchone()[0]<1:
                 stale=[];sources=set()
@@ -279,6 +291,11 @@ class Discovery:
         installed={str(s['id']) for s in active}
         if source_ids and any(v not in installed for v in source_ids):raise ValueError('Выбранный источник не установлен. Обнови каталог источников.')
         selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())
+        with self.condition,self.db:self._sync_network(active)
+        from manga_network_routes import configuration,routed
+        routes=configuration()
+        for source in selected:
+            if routed(source.get('baseUrl'),routes):source['_routeRevision']=routes['revision']
         from manga_source_health import states,blocked
         health=states()
         if not refresh and not source_ids:selected=[s for s in selected if not blocked(s['id'],health)]
@@ -293,7 +310,7 @@ class Discovery:
             for source in selected:
                 source['_queries']=language_queries(aliases(title),source['lang'])
                 source['_title']=clean_title
-        signature=hashlib.sha256(json.dumps([DISCOVERY_VERSION,key,language,[str(s['id']) for s in selected],title and aliases(title)],ensure_ascii=False).encode()).hexdigest()
+        signature=hashlib.sha256(json.dumps([DISCOVERY_VERSION,key,language,[str(s['id']) for s in selected],title and aliases(title),routes.get('revision','direct')],ensure_ascii=False).encode()).hexdigest()
         now=self.clock()
         with self.condition,self.db:
             self._prune(now)
@@ -311,7 +328,7 @@ class Discovery:
                 pause=paused.get(sid) if not hit else None
                 self.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',(identity,sid,json.dumps(source,ensure_ascii=False),'done' if hit else 'skipped' if pause else 'queued',json.dumps([{**v,'stale':True} for v in seed] if pause else seed,ensure_ascii=False),int(bool(hit))))
                 if pause:
-                    until=time.strftime('%H:%M',time.gmtime(pause['skip_until']))
+                    until=time.strftime('%d.%m %H:%M',time.gmtime(pause['skip_until']))
                     self.db.execute('INSERT OR REPLACE INTO work_diagnostics VALUES(?,?,?)',(identity,sid,json.dumps({'code':'paused','reason':pause['code'],'failures':pause['failures'],'retryAt':pause['skip_until'],
                         'message':f"Пропущен: {pause['failures']} отказа подряд ({pause['message'].rstrip('.')}). Снова спросим после {until} UTC или сразу по кнопке «Повторить».",'elapsedMs':0},ensure_ascii=False)))
             if selected and self.db.execute("SELECT count(*) FROM work WHERE job=? AND state='queued'",(identity,)).fetchone()[0]==0:self.db.execute("UPDATE jobs SET state='done' WHERE id=?",(identity,))
@@ -321,7 +338,24 @@ class Discovery:
     @staticmethod
     def _cache_key(key,source):
         versioned=f'native-v{DISCOVERY_VERSION}:{key}'
+        if source.get('_queries'):versioned+='|aliases:'+hashlib.sha256(json.dumps(source['_queries'],ensure_ascii=False).encode()).hexdigest()
+        if source.get('_routeRevision'):versioned+='|route:'+source['_routeRevision']
         return versioned if not source.get('_title') else versioned+'|title:'+hashlib.sha256(json.dumps(source['_title'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+
+    def _sync_network(self,sources):
+        from manga_network_routes import configuration,routed
+        routes=configuration();revision=routes.get('revision','direct')
+        previous=self.db.execute("SELECT value FROM network_state WHERE key='routes'").fetchone()
+        if previous and json.loads(previous[0]).get('revision','direct')==revision:return
+        old=json.loads(previous[0]) if previous else {}
+        identities=[str(s['id']) for s in sources if routed(s.get('baseUrl'),routes) or routed(s.get('baseUrl'),old)]
+        if identities:
+            from manga_source_health import reset_failures
+            reset_failures(identities)
+            self.db.executemany('DELETE FROM reachability WHERE source_id=?',[(sid,) for sid in identities])
+            self.db.executemany('DELETE FROM query_cache WHERE source_id=?',[(sid,) for sid in identities])
+            self.db.executemany("UPDATE jobs SET state='interrupted' WHERE state='done' AND id IN (SELECT job FROM work WHERE source_id=? AND state IN ('skipped','unavailable'))",[(sid,) for sid in identities])
+        self.db.execute("INSERT OR REPLACE INTO network_state VALUES('routes',?)",(json.dumps(routes),))
 
     def _indexed(self,key,sid):
         # Parameterized escaped LIKE supports raw Japanese/Korean substring
@@ -438,6 +472,8 @@ class Discovery:
                 self.condition.notify_all()
 
     def _reachability(self,source,sid,ok,details,now):
+        # A rejected search term says nothing about the source's availability.
+        if not ok and details.get('code')=='query':return
         old=self.db.execute('SELECT failures,last_ok FROM reachability WHERE source_id=?',(sid,)).fetchone()
         failures=0 if ok else (old['failures'] if old else 0)+1
         pause=SEARCH_BACKOFF[min(failures-2,len(SEARCH_BACKOFF)-1)] if failures>=2 else 0
