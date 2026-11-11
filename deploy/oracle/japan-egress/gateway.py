@@ -31,7 +31,7 @@ HOSTS = (
     'sokuyomi.jp', 'manga.fod.fujitv.co.jp', 'manga.line.me', 'book.dmm.com',
     'book.dmm.co.jp', 'yomonga.com', 'honto.jp',
     # These public sources returned200 from Japan and403 from Oracle in live checks.
-    'mangafire.to', 'soraraw.com',
+    'mangafire.to', 'soraraw.com', 'mfcdn1.xyz', 'mangarawgo.site',
 )
 STOP = False
 

@@ -67,6 +67,24 @@ search term may try the next alias and cannot quarantine the entire source.
 An empty search response is distinct from an unavailable source or readable
 chapters; recovery of a publisher does not imply it carries every manga.
 
+Live follow-up on2026-11-12 reproduced the owner's stale24-hour pauses despite
+the working gateway. After expanding publisher routes,37 of the49 previously
+failing sources answered native searches. Further same-URL checks showed Honto,
+MangaFire and SoraRaw also need Japan. Their chapter hosts `mfcdn1.xyz` and
+`mangarawgo.site` must follow the same route: routing only their catalogue made
+search succeed while page retrieval still failed.
+
+The exact reported title `バガボンド` / `Vagabond` was then checked through
+Suwayomi, including actual image bytes: SoraRaw listed37 entries, its first
+entry exposed247 pages and returned a180430-byte WebP; two MangaFire editions
+matched Inoue/Yoshikawa, with157/322 chapters, and the first tested image was
+a568364-byte JPEG. This is real source/image delivery, not just a200home page.
+Raw UwU's separate empty-search schema omits `pagi.button`; its extension throws
+`MissingFieldException`. MediaVault rechecks only that same public JSON endpoint
+and accepts its exact empty result, without hiding HTML blocks or parse failures
+on nonempty results. Remaining interactive challenges and the independently
+failing C'moA search/Yomonga/HDoujin are not certified repaired by this change.
+
 After the existing importer has been updated to backend v14, the maintainer runs `python3 deploy/oracle/install-suwayomi.py` on the VM. It discovers the current Compose project, preserves existing overlays, adds `suwayomi.yaml`, checks the service, and recreates only the importer to enable its private adapter. It leaves Oracle shape/resources, Caddy routes, Drive/OAuth configuration, library encryption and existing ML workers intact. A failed readiness check leaves the importer unchanged; a failed importer check restores the previous Compose configuration. Logs and rollback information are private under `/opt/mediavault-suwayomi`.
 
 No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit2304MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. The official image launcher enables bundled ARM64 KCEF and Xvfb, which LibGroup uses even when reading browser storage for a public request. Challenge-solving services remain disabled. Actual account/subscription requirements remain distinct from a broken runtime.
