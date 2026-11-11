@@ -85,6 +85,27 @@ and accepts its exact empty result, without hiding HTML blocks or parse failures
 on nonempty results. Remaining interactive challenges and the independently
 failing C'moA search/Yomonga/HDoujin are not certified repaired by this change.
 
+The remaining eight were checked individually: MyReadingManga, Kagane,
+OniSaga, Hachiraw and Kumaraw returned verification/challenge responses from
+both Oracle and Japan; C'moA opened its home page from Japan but its public
+search endpoint returned503 for both the reported title and a known query;
+Yomonga returned403 from both routes. HDoujin's actual Suwayomi log identified
+`NoSuchMethodException: android.webkit.WebView.getFactory()` with its current
+1.6.3 extension and no advertised update, a compatibility issue rather than an
+IP failure. These sources retain their failure descriptions. The restored
+MangaFire/SoraRaw paths provide the tested Japanese edition of the reported
+title; the remaining sites are not silently certified working.
+
+An isolated real-network discovery run seeded with the production failure
+records recovered ten Japanese title candidates, including both MangaFire
+editions and SoraRaw. All six checked publisher/source tasks completed without
+their old pauses. The full179-source search was cancelled after those checks
+(171 completed); this was not a claim that all179 sites were validated. The
+Raw UwU search-only old pause was separately cleared after its public empty
+response was verified by the deployed adapter. Three verified public title
+metadata records were warmed in the production search index; no library files
+or decrypted pages were imported.
+
 After the existing importer has been updated to backend v14, the maintainer runs `python3 deploy/oracle/install-suwayomi.py` on the VM. It discovers the current Compose project, preserves existing overlays, adds `suwayomi.yaml`, checks the service, and recreates only the importer to enable its private adapter. It leaves Oracle shape/resources, Caddy routes, Drive/OAuth configuration, library encryption and existing ML workers intact. A failed readiness check leaves the importer unchanged; a failed importer check restores the previous Compose configuration. Logs and rollback information are private under `/opt/mediavault-suwayomi`.
 
 No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit2304MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. The official image launcher enables bundled ARM64 KCEF and Xvfb, which LibGroup uses even when reading browser storage for a public request. Challenge-solving services remain disabled. Actual account/subscription requirements remain distinct from a broken runtime.
