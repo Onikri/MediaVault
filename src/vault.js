@@ -98,7 +98,7 @@ function createController(get,patch){
     // signing key and any still-valid token; retry without a Google popup.
     patch({deviceError:'Временный сбой подключения. Вход будет восстановлен автоматически.'});
     clearTimeout(tokenTimer);const expected=epoch;
-    tokenTimer=setTimeout(()=>{if(expected!==epoch||!mounted||!privacyPreferences().remember)return;if(!get().user&&!get().busy)restoreLogin();else renewSession().catch(error=>renewalFailed(error,expectedToken));},15000);
+    tokenTimer=setTimeout(()=>{if(expected!==epoch||!mounted||!privacyPreferences().remember)return;if(!get().busy&&(!get().user||!get().token||get().libraryDiscovery==='error'))restoreLogin();else renewSession().catch(error=>renewalFailed(error,expectedToken));},15000);
   }
   function scheduleExpiry(){
     clearTimeout(tokenTimer);
@@ -645,7 +645,7 @@ function createController(get,patch){
     patch({workerReady:false});
     if(workerSession())syncWorker().catch(error);
   }
-  function onFocus(){if(get().busy||document.visibilityState==='hidden')return;if(privacyPreferences().remember){if(!reconnectRequired&&(!get().token||Date.now()+120000>=get().tokenExpiresAt)){if(!get().user&&!get().busy)restoreLogin();else renewSession().catch(cause=>renewalFailed(cause));}}else if(get().token&&!tokenAlive())expireDrive();}
+  function onFocus(){if(get().busy||document.visibilityState==='hidden')return;if(privacyPreferences().remember){if(!reconnectRequired&&(!get().token||Date.now()+120000>=get().tokenExpiresAt)){if(!get().busy&&(!get().user||!get().token||get().libraryDiscovery==='error'))restoreLogin();else renewSession().catch(cause=>renewalFailed(cause));}}else if(get().token&&!tokenAlive())expireDrive();}
   function mount(){
     mounted=true;
     navigator.serviceWorker?.addEventListener("message",onMessage);
