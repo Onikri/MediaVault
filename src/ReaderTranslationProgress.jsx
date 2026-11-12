@@ -1,4 +1,5 @@
 import {useEffect,useState} from 'react';
+import {LoaderCircle} from 'lucide-react';
 import {translationProgressDetails} from './translation-progress.js';
 import ReaderRequestDiagnostics from './ReaderRequestDiagnostics.jsx';
 export default function ReaderTranslationProgress({progress,fallback,onRetry,onRerender,allowRefresh=false,showDiagnostics=false}){
@@ -8,7 +9,7 @@ export default function ReaderTranslationProgress({progress,fallback,onRetry,onR
  const message=showDiagnostics?progress?.message||fallback:progress?.phase==='error'?progress.message:progress?.running?({cleaning:'Восстанавливаем фон…',rendering:'Готовим русскую страницу…',translating:'Переводим страницу…'}[progress.phase]||'Переводим страницу…'):progress?.untranslated?'Осталось реплик без перевода: '+progress.untranslated:progress?.renderIncomplete?'Часть перевода показана с белой подложкой':null;
  if(!message&&!showDiagnostics)return null;
  return <div className={'reader-live-progress'+(progress?.phase==='error'?' reader-live-progress-error':'')} aria-label="Состояние перевода">
-  <span role="status" aria-live="polite">{message}</span>
+  {!showDiagnostics&&progress?.running?<LoaderCircle className="reader-translation-spinner" size={13} aria-hidden="true"/>:null}<span role="status" aria-live="polite">{message}</span>
   {showDiagnostics&&details.length>0&&<small>{details.join(' · ')}</small>}
   {progress?.running&&progress.totalRegions>0&&<progress aria-label="Обработанные области текста" max={progress.totalRegions} value={Math.min(progress.totalRegions,progress.completedRegions||0)}/>}
   {!progress?.running&&(progress?.phase==='error'||progress?.untranslated>0)&&<button onClick={onRetry}>{progress?.failureStage==='render'?'Повторить очистку':'Повторить перевод'}</button>}
