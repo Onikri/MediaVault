@@ -1,0 +1,84 @@
+{
+  "label": "first-page-priority",
+  "kind": "real-google-and-canvas-synthetic-pages",
+  "pages": 6,
+  "seconds": 15.931,
+  "firstPageSeconds": 7.637,
+  "saved": {
+    "0": {
+      "bytes": 117142,
+      "seconds": 7.637
+    },
+    "3": {
+      "bytes": 117142,
+      "seconds": 11.559
+    },
+    "4": {
+      "bytes": 117142,
+      "seconds": 12.081
+    },
+    "2": {
+      "bytes": 117142,
+      "seconds": 12.484
+    },
+    "5": {
+      "bytes": 117142,
+      "seconds": 12.808
+    },
+    "1": {
+      "bytes": 117142,
+      "seconds": 15.712
+    }
+  },
+  "gatewayCalls": [
+    {
+      "startSeconds": 2.286,
+      "seconds": 4.142,
+      "status": 200,
+      "inputTokens": 2941,
+      "priority": "interactive",
+      "requestBytes": 72785
+    },
+    {
+      "startSeconds": 8.272,
+      "seconds": 2.699,
+      "status": 200,
+      "inputTokens": 3006,
+      "priority": "background",
+      "requestBytes": 74171
+    },
+    {
+      "startSeconds": 8.427,
+      "seconds": 2.702,
+      "status": 200,
+      "inputTokens": 3006,
+      "priority": "background",
+      "requestBytes": 74267
+    },
+    {
+      "startSeconds": 8.125,
+      "seconds": 3.214,
+      "status": 200,
+      "inputTokens": 3006,
+      "priority": "background",
+      "requestBytes": 74455
+    },
+    {
+      "startSeconds": 8.566,
+      "seconds": 3.788,
+      "status": 200,
+      "inputTokens": 3006,
+      "priority": "background",
+      "requestBytes": 74495
+    },
+    {
+      "startSeconds": 7.931,
+      "seconds": 7.373,
+      "status": 200,
+      "inputTokens": 3006,
+      "priority": "background",
+      "requestBytes": 74303
+    }
+  ],
+  "peakGatewayRequests": 5
+}
