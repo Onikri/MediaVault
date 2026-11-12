@@ -8,7 +8,6 @@ import {translationCacheKey,getTranslation,incompleteRender,putTranslation} from
 import {drainBlockChapter} from './manga-block-chapter.js';
 import {ChapterPreparation,drainOrderedChapter,sharedRequestPacer} from './reader-chapter-pipeline.js';
 import {reviewEmptyTranslations,unresolvedRegions} from './manga-empty-review.js';
-import {bubbleFallback} from './manga-bubble-fallback.js';
 
 // Bump when rendered page output changes (fonts, layout) so stale cached renders are skipped.
 export const RENDER_CACHE_VERSION='render-v12';
@@ -142,40 +141,15 @@ export class DirectChapter{
    }
   }
  }
- // Save dialog hook: pages that still have blank bubbles get one more Google
- // review (unless the chapter already ran it) and then the optional fallback
- // translator from manga-bubble-fallback.js. Returns the indices that changed.
+ // Save dialog hook: pages that still have blank bubbles get one more
+ // recoverChapter() pass. Returns the indices that changed.
  async recoverUnresolved(indices,{signal,onStatus}={}){
   const wanted=new Set(indices),changed=new Set(),before=new Map([...this.incomplete].filter(([i])=>wanted.has(i)).map(([i,r])=>[i,unresolvedRegions(r.page).length]));
   if(!before.size)return [];
   const stop=AbortSignal.any([this.controller.signal,...(signal?[signal]:[])]);
-  // One extra Google review per page; the chapter pipeline's own retry counts too.
-  this.reviewedAgain||=new Set();if(this.recoveryStarted!=='done'&&[...before.keys()].some(i=>!this.reviewedAgain.has(i))){for(const i of before.keys())this.reviewedAgain.add(i);onStatus?.({index:[...before.keys()][0],label:'Повторно проверяем пропущенные реплики в Google'});await this.recoverChapter().catch(()=>{});stop.throwIfAborted();}
-  const provider=bubbleFallback();
-  if(provider){
-   const pending=[...before.keys()].filter(i=>this.incomplete.has(i)).sort((a,b)=>a-b);
-   for(let offset=0;offset<pending.length;offset+=4){
-    const packet=pending.slice(offset,offset+4),pages=[],sources=[];
-    for(const index of packet){
-     const record=this.incomplete.get(index),blob=await waitFor(this.entries[index].async('blob'),AbortSignal.any([stop,AbortSignal.timeout(30000)]));
-     const page=structuredClone({...record.page,diagnostics:undefined});page.unresolved=unresolvedRegions(page).map(r=>r.uid);
-     pages.push(page);sources.push({page:index+1,width:page.width,height:page.height,blob});
-    }
-    onStatus?.({index:packet[0],label:'Запасной переводчик · '+packet.map(i=>'стр. '+(i+1)).join(', ')});
-    let answer;try{answer=await provider({pages,sources,language:this.config.language,direction:this.direction,signal:stop,onStatus:value=>onStatus?.({index:packet[0],...value})});}catch(error){stop.throwIfAborted();continue;}
-    for(const page of Array.isArray(answer)?answer:pages){
-     const index=page.page-1,record=this.incomplete.get(index);if(!record)continue;
-     const allowed=new Set(unresolvedRegions(record.page).map(r=>r.uid)),filled=new Map((page.regions||[]).filter(r=>allowed.has(r.uid)&&r.ru_translation?.trim()).map(r=>[r.uid,r]));
-     if(!filled.size)continue;
-     const merged={...record.page,regions:record.page.regions.map(r=>filled.has(r.uid)?{...r,ru_translation:filled.get(r.uid).ru_translation.trim(),empty_reason:undefined,...(filled.get(r.uid).fallback?{fallback:filled.get(r.uid).fallback}:{})}:r)};
-     const left=unresolvedRegions(merged);merged.detectionReport={...merged.detectionReport,translated:merged.regions.filter(r=>r.ru_translation?.trim()).length,unresolved:left.map(r=>r.uid),fallback:[...filled.keys()]};
-     this.recovered.set(index,merged);const job=this.jobs.get(index);if(job?.state==='done')job.promise=Promise.resolve(merged);
-     if(this.config.cache&&record.cacheId){const {diagnostics,...safe}=merged;await this.writeCache(record.cacheId,this.scope,{kind:'manga-json',page:safe});}
-     if(!left.length){this.partialPages.delete(index);this.incomplete.delete(index);this.pageStates.set(index,{...this.pageStates.get(index),state:'done'});}else this.incomplete.set(index,{...record,page:merged});
-     this.config.onRecovered?.(index);this.notify(index,{phase:left.length?'partial':'ready',message:left.length?'Осталось реплик без перевода: '+left.length:'Пропущенные реплики переведены запасной моделью'});
-    }
-   }
-  }
+  // One extra pass per page (Google review, then the VM fallback model inside
+  // recoverChapter); the chapter pipeline's own retry counts too.
+  this.reviewedAgain||=new Set();if([...before.keys()].some(i=>!this.reviewedAgain.has(i))){for(const i of before.keys())this.reviewedAgain.add(i);onStatus?.({index:[...before.keys()][0],label:'Повторно проверяем пропущенные реплики в Google'});await this.recoverChapter().catch(()=>{});stop.throwIfAborted();}
   for(const [index,count] of before){const record=this.incomplete.get(index);if(!record||unresolvedRegions(record.page).length!==count||this.recovered.has(index))changed.add(index);}
   return [...changed];
  }
