@@ -26,4 +26,14 @@ export async function cachedChapterPages({scope,chapter,url,total}){
  pages.sort((a,b)=>a.page-b.page);
  return {pages,total:expected,complete:!!expected&&pages.length===expected&&pages.every((p,i)=>p.page===i)};
 }
+// Readiness scan for the save dialog. JSON rows carry ":chapter=…:page=N",
+// rendered rows add ":render-v…". Only the newest JSON row per page is
+// decrypted, to tell complete pages from pages with blank bubbles.
+export async function chapterCacheSummary({scope,chapter}){
+ const db=await database(),rows=await request(db.transaction('pages').objectStore('pages').getAll()),marker=':chapter='+encodeURIComponent(chapter)+':page=',newest=new Map(),rendered=new Set(),translated=new Set(),partial=new Set();
+ for(const row of rows){if(row.scope!==scope||typeof row.id!=='string')continue;const at=row.id.indexOf(marker);if(at<0)continue;const page=Number(row.id.slice(at+marker.length).match(/^\d+/)?.[0]);if(!Number.isInteger(page))continue;if(row.id.includes(':render-v')){rendered.add(page);continue;}if(!newest.has(page)||newest.get(page).time<row.time)newest.set(page,row);}
+ await Promise.all([...newest].map(async([page,row])=>{const value=await getTranslation(row.id,scope);if(value?.kind!=='manga-json'||!value.page)return;(value.page.regions||[]).some(r=>!r.ru_translation?.trim()&&r.empty_reason!=='non_text')?partial.add(page):translated.add(page);}));
+ for(const page of rendered)if(!partial.has(page))translated.add(page);
+ return {translated,partial,rendered};
+}
 export async function clearTranslations(scope){const db=await database(),rows=await request(db.transaction('pages').objectStore('pages').getAll()),tx=db.transaction(['pages','keys'],'readwrite');for(const row of rows)if(row.scope===scope)tx.objectStore('pages').delete(row.id);tx.objectStore('keys').delete(scope);await done(tx);}
