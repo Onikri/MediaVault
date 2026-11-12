@@ -35,6 +35,8 @@ import {UPSCALERS,upscalerById,autoUpscaler,migrateUpscaler} from './upscaler-ca
 import {SourceBadges} from './source-badges.jsx';
 import {readSubtitleTrack,subtitleFileName,subtitleMime} from './subtitle-export.js';
 import {saveBlob} from './use-player-actions.js';
+import {chapterSpans,chapterIndexAt,normalizeChapters,parseChapterFile,toMatroskaXml,toWebVttChapters,chapterSubtitlePick} from './video-chapters.js';
+import {ChevronRight} from 'lucide-react';
 import {useColorGrade,readCustomPresets,writeCustomPresets} from './color-grade.js';
 import './player-shell.css';
 
@@ -55,8 +57,11 @@ const COLOR_PRESETS=[['Оригинал',1,1,1,0,0],['Сочнее',1.18,1.06,1.
 const sameColor=(colors,p)=>(colors.saturation??1)===p[1]&&(colors.contrast??1)===p[2]&&(colors.brightness??1)===p[3]&&(colors.temperature??0)===p[4]&&(colors.tint??0)===p[5];
 
 // The one loud element: a map of the episode (opening, ending) filled with the scene colour.
-function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type,segments,feedback,onSeek,hoverSeek,setHoverSeek,seekTimer}){
+function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type,segments,chapters=[],feedback,onSeek,hoverSeek,setHoverSeek,seekTimer}){
   const [hover,setHover]=useState(null);
+  // Scenes cut the track into pieces; the piece under the pointer lifts and glides to the next one.
+  const scenes=seekable&&chapters.length>1?chapterSpans(chapters,duration):[];
+  const sceneAt=point=>scenes.find(s=>point>=s.start&&point<s.end);
   const progress=seekable?Math.min(100,time/duration*100):0;
   const loaded=Math.max(progress,seekable?buffered/duration*100:0);
   function seekAtPointer(event){
@@ -67,24 +72,30 @@ function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type
   function move(event){
     if(!seekable)return;
     const r=event.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(event.clientX-r.left)/r.width)),point=fraction*duration;
-    setHover({time:point,left:fraction*100,label:segments.find(s=>point>=s.start&&point<s.end)?.label});
+    const scene=sceneAt(point);
+    setHover({time:point,left:fraction*100,label:segments.find(s=>point>=s.start&&point<s.end)?.label,scene:scene&&{title:scene.title,left:scene.start/duration*100,width:(scene.end-scene.start)/duration*100}});
     clearTimeout(seekTimer.current);
     if(!source||navigator.connection?.saveData)return;
     const value={time:point,left:Math.max(12,Math.min(88,fraction*100))};
     seekTimer.current=setTimeout(()=>setHoverSeek(value),200);
   }
   function leave(){clearTimeout(seekTimer.current);setHover(null);setHoverSeek(null);}
-  const bubble=feedback?.type==='seek'?{left:progress,time,delta:feedback.delta}:hover;
+  const bubble=feedback?.type==='seek'?{left:progress,time,delta:feedback.delta,scene:sceneAt(time)&&{title:sceneAt(time).title}}:hover;
   return <div className={'mvx-timeline'+(hover?' is-hovered':'')} onPointerMove={move} onPointerLeave={leave} onPointerCancel={leave}>
     {hoverSeek&&<TimelinePreview source={source} type={type} point={hoverSeek.time} left={hoverSeek.left}/>}
-    {bubble&&<output className="mvx-timeline-bubble" style={{left:Math.max(4,Math.min(96,bubble.left))+'%'}}>
+    {bubble&&(bubble.scene?<output className="mvx-timeline-bubble has-scene" style={{left:Math.max(8,Math.min(92,bubble.left))+'%'}}>
+      <strong>{bubble.scene.title}</strong>
+      <small>{bubble.label&&<span>{bubble.label}</span>}{clock(bubble.time)}{Number.isFinite(bubble.delta)&&' · '+(bubble.delta>=0?'+':'−')+Math.abs(Math.round(bubble.delta))+' сек.'}</small>
+    </output>:<output className="mvx-timeline-bubble" style={{left:Math.max(4,Math.min(96,bubble.left))+'%'}}>
       {bubble.label&&<span>{bubble.label}</span>}{clock(bubble.time)}
       {Number.isFinite(bubble.delta)&&<small>{bubble.delta>=0?'+':'−'}{Math.abs(Math.round(bubble.delta))} сек.</small>}
-    </output>}
+    </output>)}
     <div className="mvx-track" aria-hidden="true">
       <i className="mvx-track-loaded" style={{width:loaded+'%'}}/>
       {seekable&&segments.map(s=><i key={s.label} className="mvx-track-segment" title={s.label+', '+clock(s.start)+'–'+clock(s.end)} style={{left:s.start/duration*100+'%',width:(s.end-s.start)/duration*100+'%'}}><b>{s.label}</b></i>)}
       <i className="mvx-track-played" style={{width:progress+'%'}}/>
+      {hover?.scene&&<i className="mvx-track-scene" style={{left:hover.scene.left+'%',width:hover.scene.width+'%'}}/>}
+      {scenes.slice(1).map(s=><i key={s.start} className="mvx-track-cut" style={{left:s.start/duration*100+'%'}}/>)}
     </div>
     <i className="mvx-thumb" style={{left:progress+'%'}} aria-hidden="true"/>
     <input ref={timeline} aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1} step="0.1"
@@ -94,6 +105,16 @@ function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type
       onPointerUp={event=>{if(event.currentTarget.hasPointerCapture(event.pointerId)){seekAtPointer(event);event.currentTarget.releasePointerCapture(event.pointerId);}}}
       onChange={event=>onSeek(Number(event.target.value))}/>
   </div>;
+}
+
+// Scenes of this video in the settings sheet: where each starts, and how far into the current one we are.
+function ChapterList({chapters,duration,time,onSeek,close}){
+  const spans=chapterSpans(chapters,duration),now=chapterIndexAt(spans,time);
+  return <ol className="mvx-chapters">{spans.map((c,i)=><li key={c.start}>
+    <button type="button" aria-current={i===now?'true':undefined} onClick={()=>{onSeek(c.start);close?.();}}
+      style={i===now?{'--within':Math.max(0,Math.min(100,(time-c.start)/Math.max(1,c.end-c.start)*100))+'%'}:undefined}>
+      <time>{clock(c.start)}</time><span>{c.title}</span>
+    </button></li>)}</ol>;
 }
 
 // Dub switch kept in the control bar: the most frequent anime-specific choice.
@@ -183,6 +204,38 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     if(track){captionPick.current=false;setSubtitle(track.id);}
   },[availableTracks,onlineControls?.externalCaptions]);
   useEffect(()=>setSubtitleError(''),[source]);
+  // Chapters: a file the viewer loaded wins over the scenes the server marked up.
+  const chapterFeed=onlineControls?.chapters,chapterInput=useRef(null);
+  const [fileChapters,setFileChapters]=useState(null),[chapterError,setChapterError]=useState('');
+  useEffect(()=>{setFileChapters(null);setChapterError('');},[item.id]);
+  const chaptersShown=prefs.chapters!==false;
+  const chapterList=normalizeChapters(fileChapters||chapterFeed?.chapters||[],duration>0?duration:Infinity);
+  const visibleChapters=chaptersShown&&chapterList.length>1?chapterList:[];
+  const chapterNow=visibleChapters.length?chapterIndexAt(visibleChapters,time):-1;
+  async function loadChapters(event){
+    const file=event.target.files?.[0];event.target.value='';if(!file)return;setChapterError('');
+    try{if(file.size>2*1024*1024)throw Error('Файл глав должен быть меньше 2 МБ.');setFileChapters(parseChapterFile(await file.text(),duration||undefined));changePrefs({chapters:true});}
+    catch(e){setChapterError(e.message);}
+  }
+  function saveChapters(kind){
+    const name=[cleanTitle(library.title),episode?.label,'главы'].filter(Boolean).join(' · ').replace(/[\\/:*?"<>|]+/g,' ');
+    const text=kind==='mkv'?toMatroskaXml(chapterList,duration,item.id):toWebVttChapters(chapterList,duration);
+    saveBlob(new Blob([text],{type:kind==='mkv'?'application/xml;charset=utf-8':'text/vtt;charset=utf-8'}),name+(kind==='mkv'?'.xml':'.vtt'));
+  }
+  // Subtitles of this very stream (Alloha, HLS, another version's file) are the
+  // best-aligned source for scenes: once the video has played a little, the
+  // player hands one track to the server. It does this once per video.
+  const chapterSent=useRef('');
+  useEffect(()=>{
+    if(!chapterFeed?.submit||!chaptersShown||fileChapters||!playing||time<8||chapterSent.current===source)return;
+    if(chapterFeed.state==='working'||chapterFeed.state==='loading'||chapterFeed.state==='ready'&&chapterFeed.rank>=3)return;
+    const options=[...streaming.subtitles.map(t=>({value:'hls:'+t.index,label:t.name})),...availableTracks.map(t=>({value:t.id,label:t.name}))];
+    const pick=chapterSubtitlePick(options);if(!pick)return;
+    chapterSent.current=source;
+    readSubtitleTrack(pick.value,{video:videoRef.current,hlsUrl:streaming.subtitleUrl})
+      .then(({text})=>chapterFeed.submit({text:text.slice(0,2900000),label:pick.label,origin:'player'}))
+      .catch(()=>{});
+  },[playing,time>=8,source,chapterFeed?.state,streaming.subtitles.length,availableTracks.length,chaptersShown,!!fileChapters]);
   const [downloadOpen,setDownloadOpen]=useState(false),downloadButton=useRef(null),roomButton=useRef(null);
   const title=cleanTitle(library.title);
   const defaultName=[title,episode?.label].filter(Boolean).join(' · ')||'MediaVault';
@@ -294,6 +347,22 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
         <button type="button" className="mvx-link" onClick={()=>subtitleInput.current?.click()}><Subtitles size={16}/>Загрузить файл SRT или VTT</button>
         <Slider label="Размер" ariaLabel="Размер субтитров" min={16} max={40} step={2} value={prefs.subSize} format={v=>v+' px'} onChange={v=>changePrefs({subSize:v})}/>
         <Slider label="Отступ снизу" ariaLabel="Отступ субтитров" min={3} max={22} step={1} value={prefs.subOffset} format={v=>v+'%'} onChange={v=>changePrefs({subOffset:v})}/>
+      </>},
+      {id:'chapters',label:'Главы',value:!chaptersShown?'Скрыты':chapterList.length>1?chapterList.length+' '+plural(chapterList.length,'сцена','сцены','сцен'):['loading','working','busy'].includes(chapterFeed?.state)?'Готовим':'Нет',content:close=><>
+        {chaptersShown&&chapterList.length>1&&<ChapterList chapters={chapterList} duration={duration} time={time} onSeek={seek} close={close}/>}
+        <Switch label="Показывать главы" hint="Сцены на шкале и название текущей рядом со временем" checked={chaptersShown} onChange={v=>changePrefs({chapters:v})}/>
+        <Note role="status">{fileChapters?'Главы из файла.'
+          :chapterFeed?.state==='ready'?'Размечено по субтитрам'+(chapterFeed.source?': '+chapterFeed.source:'')+'.'
+          :['loading','working','busy'].includes(chapterFeed?.state)?'Размечаем сцены по субтитрам. Обычно это несколько секунд.'
+          :chapterFeed?.state==='none'?(chapterFeed.reason||'Подходящих субтитров не нашлось')+'. Главы появятся, когда у видео будут субтитры, или загрузи файл глав.'
+          :'Глав пока нет. Можно загрузить файл глав.'}</Note>
+        {chapterError&&<p className="mvx-help" role="alert">{chapterError}</p>}
+        {chapterList.length>1&&<div className="mvx-button-row">
+          <button type="button" onClick={()=>saveChapters('mkv')}><Download size={15}/>Matroska XML</button>
+          <button type="button" onClick={()=>saveChapters('vtt')}><Download size={15}/>WebVTT</button>
+        </div>}
+        <button type="button" className="mvx-link" onClick={()=>chapterInput.current?.click()}>Загрузить файл глав: Matroska, WebVTT, OGM</button>
+        {fileChapters&&<button type="button" className="mvx-link" onClick={()=>setFileChapters(null)}>Вернуть главы по субтитрам</button>}
       </>}
     ]},
     {id:'auto',items:[
@@ -446,7 +515,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       {gpuActive&&<span className="mvx-gpu-tag"><Sparkles size={12}/>{engineName}{engine==='mobile'||engine==='lanczos'||String(engine).startsWith('fsr')?'':' ×2'}{neuralStats&&<span>{neuralStats.fps} кадр/с</span>}</span>}
       {busy&&<div className="mvx-loading" role="status"><span className="mvx-spinner"/>Готовим видео</div>}
       <div className="mvx-console" onPointerEnter={revealControls}>
-        <Timeline timeline={timeline} duration={duration} time={previewTime} buffered={buffered} seekable={seekable} disabled={!!roomControl&&!roomControl.canControl} source={source} type={item.onlineType} segments={segments} feedback={gestures.feedback} onSeek={seek} hoverSeek={hoverSeek} setHoverSeek={setHoverSeek} seekTimer={seekTimer}/>
+        <Timeline timeline={timeline} duration={duration} time={previewTime} buffered={buffered} seekable={seekable} disabled={!!roomControl&&!roomControl.canControl} source={source} type={item.onlineType} segments={segments} chapters={visibleChapters} feedback={gestures.feedback} onSeek={seek} hoverSeek={hoverSeek} setHoverSeek={setHoverSeek} seekTimer={seekTimer}/>
         <div className="mvx-controls">
           <div className="mvx-group-left">
             <button type="button" className="mvx-play" aria-label={playing?'Пауза':'Воспроизвести'} onClick={toggle} disabled={!source}>{playing?<Pause size={22} fill="currentColor" strokeWidth={0}/>:<Play size={22} fill="currentColor" strokeWidth={0}/>}</button>
@@ -456,6 +525,9 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
               <input type="range" min="0" max="1" step=".05" value={effectiveVolume} aria-label="Громкость" style={{'--fill':effectiveVolume*100+'%'}} onChange={event=>{setMuted(false);changePrefs({volume:Number(event.target.value)});}}/>
             </div>
             <span className="mvx-time"><span>{clock(time)}</span><span>{clock(duration)}</span></span>
+            {chapterNow>=0&&<button type="button" className="mvx-chapter" aria-label={'Сцена: '+visibleChapters[chapterNow].title+'. Все главы'} title="Все главы" onClick={()=>openSettings('chapters')}>
+              <span key={visibleChapters[chapterNow].start}>{visibleChapters[chapterNow].title}</span><ChevronRight size={14} aria-hidden="true"/>
+            </button>}
           </div>
           <div className="mvx-group-right">
             {dub&&<DubMenu {...dub} onPick={dub.pick}/>}
@@ -470,6 +542,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
     </div>
     <PlayerExtensionSlot name="footer" extensions={extensions} onError={onError}/>
     <input ref={subtitleInput} type="file" accept=".srt,.vtt,text/vtt" hidden onChange={attachSubtitle}/>
+    <input ref={chapterInput} type="file" accept=".xml,.vtt,.txt,.ffmetadata,text/xml,application/xml,text/vtt,text/plain" hidden onChange={loadChapters}/>
     <input ref={lutInput} type="file" accept=".cube" hidden onChange={loadLut}/>
     <AnimatePresence>{musicOpen&&<PlayerPopover anchor={musicButton} label="Музыка серии" className="mvx-menu" onClose={()=>setMusicOpen(false)}>
       <header className="mvx-menu-head"><h2>Музыка серии</h2>{episodeMusic.tracks.length>0&&<small>{episodeMusic.tracks.length} {plural(episodeMusic.tracks.length,'песня','песни','песен')}</small>}</header>

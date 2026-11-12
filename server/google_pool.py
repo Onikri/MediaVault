@@ -8,7 +8,41 @@ from typing import Literal
 MODELS=('gemini-3.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
 # Models added after key slots were saved are allowed on every slot. (Owner rule: no non-Lite Flash.)
 LATER_MODELS=()
-SETTING='reader:google-keys';_store=lambda:None
+SETTING='reader:google-keys';_store=lambda:None;_limits_state=None
+API_ROOT='https://generativelanguage.googleapis.com/v1beta/models/'
+
+class GoogleCallError(Exception):
+    def __init__(self,status,message):
+        super().__init__(message);self.status=status
+
+async def server_generate(model,request,*,max_wait=120):
+    """A server-side request (video chapters) through the same quota ledger as the gateway.
+
+    Keys rotate by the ledger; 429 or 5xx moves the request to a key of another project, as the gateway does.
+    """
+    if _limits_state is None:raise GoogleCallError(503,'Хранилище сервера не готово.')
+    rows=[r for r in saved() if model in r.get('models',MODELS) or model in LATER_MODELS]
+    if not rows:raise GoogleCallError(422,'Нет серверного ключа Google для '+model+'.')
+    from google_gateway_limits import estimate,project as key_project,GatewayLimited
+    tokens=estimate(request);spare=list(rows)
+    while True:
+        try:row,call=await _limits_state().acquire(spare,model,tokens=tokens,max_wait=max_wait)
+        except GatewayLimited as error:raise GoogleCallError(429,'Ключи ждут квоту Google '+str(error.seconds)+' с') from None
+        response=None;status=0;usage=None
+        try:
+            async with httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':row['key']}) as client:
+                response=await client.post(API_ROOT+model+':generateContent',json=request)
+            status=response.status_code
+            if status==200:
+                try:data=response.json()
+                except ValueError:status=502;data=None
+                if data is not None:
+                    usage=data.get('usageMetadata',{});return data
+        except httpx.HTTPError:status=502
+        finally:_limits_state().finish(row,model,call,status,usage,response)
+        spare=[r for r in spare if key_project(r)!=key_project(row)]
+        if (status==429 or status>=500) and spare:continue
+        raise GoogleCallError(status,'Google · HTTP '+str(status))
 
 def saved():
     store=_store()
@@ -54,6 +88,8 @@ def install(app,owner,get_store,translator=None):
             if not directory:raise HTTPException(503,'Хранилище сервера не готово.')
             limits=GoogleGatewayLimits(Path(directory)/'google-gateway.sqlite')
         return limits
+    global _limits_state
+    _limits_state=state
     def status_rows():
         rows=saved();result=safe_status(rows)
         for slot,row in zip(result['slots'],rows):slot['runtime']=state().snapshot(row)
