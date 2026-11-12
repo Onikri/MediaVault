@@ -1,5 +1,7 @@
 import {BLOCK_LIMITS,blockPackets,linkPageBlocks,packBlockSheets,unpackBlockTranslations} from './manga-blocks.js';
 import {directKey,restoreDirectKeys} from './manga-direct-key.js';
+import {callGoogleSplitting,refusalLedger} from './manga-refusal.js';
+import {unresolvedRegions} from './manga-empty-review.js';
 
 // Measured budgets determine how many source pages share a sheet.
 export async function drainBlockChapter(c){
@@ -10,7 +12,7 @@ export async function drainBlockChapter(c){
   try{
    // First-page cache hits need no neighbour work. If it is missing, rebuild
    // any linked neighbours together so cached halves cannot split a sentence.
-   const firstHit=await c.cached(first);if(firstHit){c.finish(first,firstHit);continue;}
+   const firstHit=await c.cached(first);if(firstHit){c.settle(first,firstHit);continue;}
    const previous=c.config.webtoon&&first.index>0&&!c.jobs.has(first.index-1)?first.index-1:first.index;
    for(let n=previous;n<c.entries.length;n++){
     if(c.config.skipPages?.has(n))break;
@@ -40,20 +42,20 @@ export async function drainBlockChapter(c){
    if(sheets.length){
     const available=c.serverSlots.length?c.serverSlots.map(slot=>'oracle-slot:'+slot):c.getKey===directKey?await restoreDirectKeys(c.keyScope):[c.getKey(c.keyScope)];key=available.find(k=>!c.keyBusy.has(k));if(!key)throw Error('Добавь ключ Google в настройках перевода.');c.keyBusy.add(key);
     const packed=await c.canvasTask({operation:'blocks-pack',sheets,pages:prepared});c.controller.signal.throwIfAborted();
-    const answers=[];
+    const answers=[],ledger=refusalLedger();
     for(const current of blockPackets(packed)){
      for(const job of active){job.keySlot=c.serverSlots.length?c.serverSlots[available.indexOf(key)]+1:available.indexOf(key)+1;job.serverKey=!!c.serverSlots.length;c.notify(job.index,{phase:'translating',message:'Блоки · '+current.length+' лист(а), '+prepared.length+' исходных страниц',model:c.config.directModel,totalRegions:job.prepared.regions.length,completedRegions:0});}
-     const result=await c.callGoogle(current,{key,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:'compat',allowMissing:true,context:[...c.context].filter(([i])=>i<first.index).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{
+     const result=await callGoogleSplitting(c,current,{key,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:'compat',allowMissing:true,context:[...c.context].filter(([i])=>i<first.index).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{
       diagnostics={...value,blocks:{sourcePages:prepared.map(p=>p.page),sheets:current.map(s=>({id:s.id,width:s.width,height:s.height,placements:s.placements.map(p=>({id:p.group.id,box:p.box,parts:p.group.parts.map(part=>({page:part.page,bbox:part.bbox}))}))})),joined:groups.filter(g=>g.parts.length>1).map(g=>g.id)},transport:{viaOracle:!!c.config.directViaOracle,keySlot:active[0]?.keySlot,serverKey:!!c.serverSlots.length}};
       for(const job of active)c.notify(job.index,{phase:'translating',message:'Лист блоков · '+value.stage,diagnostics});
-     }});answers.push(...result.pages);usage.push(result.usage);
+     }},{sources:prepared,ledger});answers.push(...result.pages);usage.push(result.usage);
     }
     pages=unpackBlockTranslations(answers,sheets,prepared);
    }
    c.controller.signal.throwIfAborted();
    for(const job of active){const page=pages.find(p=>p.page===job.index+1);if(!page)throw Error('Не получена страница пакета блоков.');page.usage=usage;page.engine='Блоки → Google → очистка на устройстве';page.diagnostics=diagnostics;
-    page.detectionReport={found:page.detected.regions.length,translated:page.regions.filter(r=>r.ru_translation?.trim()).length,rejected:page.regions.filter(r=>!r.ru_translation?.trim()).map(r=>r.uid),missed:'unknown'};
-    if(c.config.cache){const{diagnostics,...safe}=page;await c.writeCache(job.cacheId,c.scope,{kind:'manga-json',page:safe});}c.finish(job,page);
+    page.detectionReport={found:page.detected.regions.length,translated:page.regions.filter(r=>r.ru_translation?.trim()).length,rejected:page.regions.filter(r=>!r.ru_translation?.trim()).map(r=>r.uid),unresolved:unresolvedRegions(page).map(r=>r.uid),refused:page.regions.filter(r=>r.refused).map(r=>r.uid),missed:'unknown'};
+    if(c.config.cache){const{diagnostics,...safe}=page;await c.writeCache(job.cacheId,c.scope,{kind:'manga-json',page:safe});}c.settle(job,page);
    }
   }catch(error){if(!group.length&&first.state==='queued')c.fail(first,error);for(const job of group)if(job.state==='running')c.fail(job,error);}
   finally{if(key)c.keyBusy.delete(key);}

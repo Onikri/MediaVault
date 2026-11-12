@@ -62,6 +62,23 @@ globalThis.mangaTranslate=pipeline;
 // Private diagnostics/benchmarks use the exact production detection runner.
 globalThis.mangaDetect=async(bytes,config)=>{const source=URL.createObjectURL(new Blob([bytes]));try{const{detectManga}=await import('./detection.js');return await detectManga(source,config);}finally{URL.revokeObjectURL(source);}};
 globalThis.mangaPpOcr=async(bytes,boxes)=>{const source=URL.createObjectURL(new Blob([bytes]));try{return await(await import('./ppocrv6.js')).recognizePpManga(source,boxes);}finally{URL.revokeObjectURL(source);}};
+// Bubbles Google refuses to translate arrive as already-detected crops. Read
+// them with the production OCR selection and script gate of this pipeline;
+// the Python worker translates the recognised text (MediaVault integration).
+globalThis.mangaFallbackOcr=async(crops,language)=>{
+ if(!Array.isArray(crops)||crops.length>40||!['Japanese','Korean','English'].includes(language))throw Error('Некорректный запрос запасного OCR.');
+ const engine=resolveMangaOcr(language,'auto'),{textRecognise}=await import('./upstream/lib/ocr/main.ts'),rows=[];
+ for(const crop of crops){
+  const blob=new Blob([Uint8Array.from(atob(crop.image),c=>c.charCodeAt(0))]),source=URL.createObjectURL(blob),started=performance.now();
+  try{
+   const bitmap=await createImageBitmap(blob),box={x1:0,y1:0,x2:bitmap.width,y2:bitmap.height};bitmap.close();
+   if(box.x2*box.y2>4_000_000)throw Error('Вырезка реплики слишком велика.');
+   const ocr=await textRecognise(source,[box],language,.55,4,48,{enabled:true},engine),r=ocr.results[0]||{};
+   rows.push({id:crop.id,text:r.gateSkip||r.failed?'':String(r.text||'').trim(),gate:r.gateSkip||null,failed:!!r.failed,confidence:Number.isFinite(r.confidence)?r.confidence:null,ms:Math.round(performance.now()-started)});
+  }finally{URL.revokeObjectURL(source);}
+ }
+ return {engine,rows};
+};
 const queuedPipeline=serializePipeline(pipeline);
 addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==parent||event.data?.type!=='mv-lmt-connect'||event.ports.length!==1)return;

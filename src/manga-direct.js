@@ -7,7 +7,9 @@ import {compareDirectInputs} from './manga-direct-comparison.js';
 import {translationCacheKey,getTranslation,incompleteRender,putTranslation} from './translation-cache.js';
 import {drainBlockChapter} from './manga-block-chapter.js';
 import {ChapterPreparation,drainOrderedChapter,sharedRequestPacer} from './reader-chapter-pipeline.js';
-import {reviewEmptyTranslations,unresolvedRegions} from './manga-empty-review.js';
+import {needsEmptyReview,reviewEmptyTranslations,unresolvedRegions} from './manga-empty-review.js';
+import {callGoogleSplitting,refusalLedger} from './manga-refusal.js';
+import {translateFallback,wantsFallback} from './manga-fallback.js';
 
 // Bump when rendered page output changes (fonts, layout) so stale cached renders are skipped.
 export const RENDER_CACHE_VERSION='render-v12';
@@ -27,7 +29,7 @@ export class DirectChapter{
   this.prepare=prepare||((blob,index,status,inputMode=config.directInput)=>{const type=inputMode==='blocks'?'annotated':inputMode;return type!=='vision'&&DIRECT_DETECTORS.some(v=>v.id===config.directDetector&&v.model)?translateLmt(blob,{...config,directInput:type,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({channel:'prepare',operation:'direct-prepare',blob,index,direction,inputMode:type},status);});
   this.renderPage=renderPage||this.renderCanvas.bind(this);this.controller=new AbortController();this.jobs=new Map();this.listeners=new Map();this.progress=new Map();this.context=new Map();this.active=0;this.keyBusy=new Set();this.worker=null;this.renders=new Map();this.serial=0;this.bypass=new Set();
   this.translatedPages=new Set();this.partialPages=new Set();this.pageStates=new Map();this.priorityPages=new Set();this.focusWindow=[];this.priorityEpoch=0;this.focusIndex=0;this.pacer=pacer||sharedRequestPacer;this.preparation=new ChapterPreparation(this);
-  this.incomplete=new Map();this.recovered=new Map();
+  this.incomplete=new Map();this.recovered=new Map();this.fallbacks=new Map();this.fallbackPages=new Map();
  }
  notify(index,value){this.lastActivity=performance.now();const old=this.progress.get(index)||{};value=value.phase==='cleaning'&&(old.phase==='error'||old.phase==='translating'&&this.jobs.get(index)?.state==='running')?{...old,backgroundCleanup:value}:{...old,...value};this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
  request(index,blob,background=false){
@@ -68,7 +70,7 @@ export class DirectChapter{
    const block=Math.floor(first.index/this.batchSize());let group=pending.filter(j=>Math.floor(j.index/this.batchSize())===block).sort((a,b)=>a.index-b.index);
    for(const job of group){job.state='running';job.queueMs=Math.round(performance.now()-job.started);}
    try{
-    await Promise.all(group.map(async job=>{try{const hit=await this.cached(job);if(hit)this.finish(job,hit);}catch(error){this.fail(job,error);job.state='failed';}}));group=group.filter(j=>j.state==='running');if(!group.length)continue;
+    await Promise.all(group.map(async job=>{try{const hit=await this.cached(job);if(hit)this.settle(job,hit);}catch(error){this.fail(job,error);job.state='failed';}}));group=group.filter(j=>j.state==='running');if(!group.length)continue;
     const available=this.serverSlots.length?this.serverSlots.map(slot=>'oracle-slot:'+slot):this.getKey===directKey?await restoreDirectKeys(this.keyScope):[this.getKey(this.keyScope)];const key=available.find(k=>!this.keyBusy.has(k));if(key){this.keyBusy.add(key);first.keyLease=key;}if(!key)throw Error('Введи ключ Google AI Studio в настройках перевода.');for(const job of group){job.keySlot=this.serverSlots.length?this.serverSlots[available.indexOf(key)]+1:available.indexOf(key)+1;job.serverKey=this.serverSlots.length>0;}
     const prepare=async job=>{
      this.notify(job.index,{phase:'detecting',message:this.config.directInput==='vision'?'Чистая страница · координаты и текст определит Google':DIRECT_DETECTORS.find(v=>v.id===this.config.directDetector)?.label||'Подготовка страницы'});
@@ -90,8 +92,11 @@ export class DirectChapter{
       const local={batchPages:nonempty.map(p=>p.page),sourceBytes:group.reduce((sum,j)=>sum+(j.blob?.size||0),0),queueMs:first.queueMs,sourceReadMs:first.sourceReadMs,fingerprintAndCacheMs:first.cacheMs,clientPreparationMs:first.prepareMs,...first.prepared?.prepareTimings};
       first.diagnostics={...value,local,transport:{viaOracle:!!this.config.directViaOracle,keySlot:first.keySlot,serverKey:first.serverKey}};for(const job of group)this.notify(job.index,{phase:'translating',message:names[value.stage]||'Google · обработка',model:this.config.directModel,completedRegions:value.metrics?.completedRegions||0,totalRegions:job.prepared?.regions.length,diagnostics:first.diagnostics});
      }};const packs=[];let pack=[],count=0,bytes=0;for(const page of nonempty){const size=page.image?.length||0;if(pack.length&&(count+page.regions.length>100||bytes+size>18*1024*1024)){packs.push(pack);pack=[];count=0;bytes=0;}pack.push(page);count+=page.regions.length;bytes+=size;}if(pack.length)packs.push(pack);
-     const answer={pages:[],usage:[]};for(const pack of packs){const result=await this.callGoogle(pack,{...options,allowMissing:true});answer.pages.push(...result.pages);answer.usage.push(result.usage);answer.diagnostics=result.diagnostics;}
-     diagnostics=first.diagnostics||answer.diagnostics;cloudMs=Math.round(performance.now()-start);translated=answer.pages;usage=answer.usage.length===1?answer.usage[0]:answer.usage;
+     const sources=nonempty.map(p=>({...p,blob:group.find(j=>j.index+1===p.page)?.blob})),ledger=refusalLedger();
+     const answer={pages:[],usage:[]};for(const pack of packs){const result=await callGoogleSplitting(this,pack,{...options,allowMissing:true},{sources,ledger});answer.pages.push(...result.pages);answer.usage.push(result.usage);answer.diagnostics=result.diagnostics;}
+     translated=answer.pages;if(ledger.refusals)for(const page of translated)page.refusal={requests:ledger.requests,refusals:ledger.refusals,reasons:ledger.reasons};
+     if(translated.some(needsEmptyReview)){for(const job of group)this.notify(job.index,{phase:'translating',message:'Проверяем пропущенные реплики · увеличенные вырезки'});translated=await reviewEmptyTranslations(this,translated,sources,options);}
+     diagnostics=first.diagnostics||answer.diagnostics;cloudMs=Math.round(performance.now()-start);usage=answer.usage.length===1?answer.usage[0]:answer.usage;
     }
     this.controller.signal.throwIfAborted();
     if(nonempty.some(source=>!translated.some(p=>p.page===source.page)))throw Error('Google пропустил страницу пакета. Оригинал сохранён.');
@@ -99,14 +104,33 @@ export class DirectChapter{
      const source=prepared.find(p=>p.page===job.index+1),page=translated.find(p=>p.page===job.index+1)||{page:source.page,width:source.width,height:source.height,regions:[],timings:{detectionMs:source.detectionMs,ocrMs:0}};
      page.detected={width:source.width,height:source.height,regions:source.regions.map(r=>({id:r.id,bbox:r.bbox}))};
      page.timings={...page.timings,translationMs:cloudMs};page.usage=usage;page.engine=this.config.directViaOracle?'Google через Oracle → Canvas Worker':'Google → Canvas Worker';page.diagnostics=diagnostics;
+     page.detectionReport={...page.detectionReport,found:source.regions.length,translated:page.regions.filter(r=>r.ru_translation?.trim()).length,unresolved:unresolvedRegions(page).map(r=>r.uid),refused:page.regions.filter(r=>r.refused).map(r=>r.uid),review:page.emptyReview,missed:'unknown'};
      this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);
      if(this.config.cache){const {diagnostics,...cachedPage}=page;await this.writeCache(job.cacheId,this.scope,{kind:'manga-json',page:cachedPage});}
-     this.finish(job,page);
+     this.settle(job,page);
     }
    }catch(error){for(const job of group)if(job.state!=='done')this.fail(job,error);}finally{if(first.keyLease)this.keyBusy.delete(first.keyLease);}
   }}finally{this.active--;if([...this.jobs.values()].some(j=>j.state==='queued')&&!this.controller.signal.aborted)queueMicrotask(()=>this.drain());}
  }
- finish(job,page){this.lastActivity=performance.now();this.translatedPages.add(job.index);if(unresolvedRegions(page).length){this.partialPages.add(job.index);this.incomplete.set(job.index,{page,cacheId:job.cacheId});}else{this.partialPages.delete(job.index);this.incomplete.delete(job.index);}this.pageStates.set(job.index,{page:job.index+1,state:this.partialPages.has(job.index)?'partial':'done',keySlot:job.keySlot,serverKey:job.serverKey});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.bypass.delete(job.index);this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);job.state='done';job.blob=null;if(job.prepared)job.prepared={...job.prepared,image:undefined,blob:undefined};job.resolve(page);for(const old of [...this.jobs.values()].filter(j=>j.state==='done').slice(0,-12)){this.jobs.delete(old.index);this.progress.delete(old.index);}}
+ // Every translated or cached page passes here. Bubbles Google refused (or
+ // left blank after its review) go to the VM fallback model first; the Google
+ // key lease is already released, so other packets keep translating.
+ settle(job,page){
+  if(!wantsFallback(page,this.config)){this.finish(job,page);return Promise.resolve(page);}
+  const index=job.index,signal=this.controller.signal,count=unresolvedRegions(page).length;
+  this.notify(index,{phase:'translating',message:(page.regions.some(r=>r.refused)?'Google отказался переводить':'Google оставил без перевода')+' '+count+' реплик · переводит запасная модель на ВМ'});
+  const task=(async()=>{
+   const blob=job.blob||await waitFor(this.entries[index].async('blob'),AbortSignal.any([signal,AbortSignal.timeout(30000)]));
+   let result;
+   try{result=await translateFallback(page,blob,{service:this.service?.(),language:this.config.language,signal,onStatus:message=>this.notify(index,{phase:'translating',message})});}
+   catch(error){signal.throwIfAborted();result={...page,fallback:{error:error.message},detectionReport:{...page.detectionReport,fallbackError:error.message}};}
+   if(this.config.cache&&job.cacheId&&(result.fallback?.translated?.length||result.fallback?.nonText?.length)){const {diagnostics,...safe}=result;await this.writeCache(job.cacheId,this.scope,{kind:'manga-json',page:safe});}
+   return result;
+  })();
+  this.fallbacks.set(index,task);
+  return task.then(result=>{if(job.state!=='done')this.finish(job,result);return result;},error=>{if(!signal.aborted&&job.state!=='done')this.fail(job,error,{retryable:true});}).finally(()=>{if(this.fallbacks.get(index)===task)this.fallbacks.delete(index);});
+ }
+ finish(job,page){this.lastActivity=performance.now();this.translatedPages.add(job.index);if(page.fallback?.translated?.length)this.fallbackPages.set(job.index,page.fallback.translated.length);else this.fallbackPages.delete(job.index);if(unresolvedRegions(page).length){this.partialPages.add(job.index);this.incomplete.set(job.index,{page,cacheId:job.cacheId});}else{this.partialPages.delete(job.index);this.incomplete.delete(job.index);}this.pageStates.set(job.index,{page:job.index+1,state:this.partialPages.has(job.index)?'partial':'done',keySlot:job.keySlot,serverKey:job.serverKey,fallback:page.fallback?.translated?.length||0});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.bypass.delete(job.index);this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);job.state='done';job.blob=null;if(job.prepared)job.prepared={...job.prepared,image:undefined,blob:undefined};job.resolve(page);for(const old of [...this.jobs.values()].filter(j=>j.state==='done').slice(0,-12)){this.jobs.delete(old.index);this.progress.delete(old.index);}}
  async recoverChapter(){
   const pending=[...this.incomplete].sort(([a],[b])=>a-b);
   if(!pending.length)return;
@@ -124,11 +148,17 @@ export class DirectChapter{
    }
    if(!pages.length)continue;
    await reviewEmptyTranslations(this,pages,sources,{key:keys[(Math.floor(offset/4)+1)%keys.length],model:this.config.directModel,language:this.config.language,direction:this.direction,signal,timeoutMs:this.config.directTimeoutMs},{retry:true});
-   for(const page of pages){
-    const index=page.page-1,record=this.incomplete.get(index);
+   for(let n=0;n<pages.length;n++){
+    let page=pages[n];const index=page.page-1,record=this.incomplete.get(index);
     if(!record)continue;
+    if(wantsFallback(page,this.config)){
+     const blob=sources.find(s=>s.page===page.page)?.blob;
+     try{if(blob)page=pages[n]=await translateFallback(page,blob,{service:this.service?.(),language:this.config.language,signal,onStatus:message=>this.notify(index,{phase:'translating',message})});}
+     catch(error){signal.throwIfAborted();page=pages[n]={...page,fallback:{error:error.message},detectionReport:{...page.detectionReport,fallbackError:error.message}};}
+     if(page.fallback?.translated?.length)this.fallbackPages.set(index,page.fallback.translated.length);
+    }
     const unresolved=unresolvedRegions(page),changed=unresolved.length!==unresolvedRegions(record.page).length;
-    page.detectionReport={...page.detectionReport,translated:page.regions.filter(r=>r.ru_translation?.trim()).length,unresolved:unresolved.map(r=>r.uid),review:page.emptyReview};
+    page.detectionReport={...page.detectionReport,translated:page.regions.filter(r=>r.ru_translation?.trim()).length,unresolved:unresolved.map(r=>r.uid),review:page.emptyReview,refused:page.regions.filter(r=>r.refused).map(r=>r.uid),fallback:page.regions.filter(r=>r.fallback?.status==='translated').map(r=>r.uid)};
     if(changed){
      this.recovered.set(index,page);
      const job=this.jobs.get(index);if(job?.state==='done')job.promise=Promise.resolve(page);
@@ -175,7 +205,7 @@ export class DirectChapter{
    signal?.throwIfAborted();
    const painting=this.renderPage(blob,page,font,value=>this.notify(index,{...value,completedRegions:value.cleanedRegions||0,totalRegions:page.regions.filter(r=>r.ru_translation?.trim()).length,diagnostics:page.diagnostics}),{...config,preparedClean}).then(result=>{if(signal?.aborted){result.renderedBitmap?.close();throw signal.reason;}return result;});
    let result;try{result=await waitFor(painting,signal);}catch(error){error.stage='render';throw error;}signal?.throwIfAborted();
-   result.detected=page.detected;result.detectionReport=page.detectionReport;result.unresolvedRegions=unresolvedRegions(page).map(r=>r.uid);
+   result.detected=page.detected;result.detectionReport=page.detectionReport;result.unresolvedRegions=unresolvedRegions(page).map(r=>r.uid);if(page.fallback)result.fallback=page.fallback;
    if(this.config.cache&&result.cacheImage&&!result.unresolvedRegions.length){const {renderedBitmap,cacheImage,diagnostics,debug,...save}=result;await this.writeCache(renderCacheId,this.scope,{...save,renderedImage:cacheImage,renderedMime:'image/webp'},{chapter:this.config.contextKey,url:this.config.contextURL,index,total:this.entries.length});}delete result.cacheImage;
    result.timings={...result.timings,directTotalMs:Math.round(performance.now()-(fromMemory?renderStarted:job.started))};
    if(page.diagnostics)result.diagnostics={...page.diagnostics,stage:'ready',cleanup:result.inpaint,typesetting:result.typesetting,local:{...page.diagnostics.local,inpaintMs:result.timings.inpaintMs,typesetMs:result.timings.typesetMs,renderMs:result.timings.renderMs,totalMs:result.timings.directTotalMs}};
@@ -195,7 +225,7 @@ export class DirectChapter{
  prefetch(index){const count=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1);if(!this.jobs.has(index-1))return;for(let n=index;n<Math.min(this.entries.length,index+count*this.batchSize());n++)if(!this.jobs.has(n))this.request(n,null,true);}
  focus(index,force=false){const jump=force||Math.abs(index-this.focusIndex)>1;this.focusIndex=index;if(!jump)return;const start=this.entries.length-index<this.batchSize()?this.packetRange(index).start:index;this.focusWindow=Array.from({length:Math.min(4,this.entries.length-start)},(_,n)=>start+n);this.priorityPages=new Set(this.focusWindow.filter(n=>n<this.entries.length&&!this.translatedPages.has(n)));this.priorityEpoch++;this.priorityBarrier=true;this.priorityKey=null;this.drain();}
  pendingJobs(){const priorityBusy=this.priorityKey&&this.keyBusy.has(this.priorityKey);return [...this.jobs.values()].filter(j=>j.state==='queued').sort((a,b)=>{const pa=this.priorityPages.has(a.index),pb=this.priorityPages.has(b.index);return pa!==pb?(pa?(priorityBusy?1:-1):(priorityBusy?-1:1)):a.index-b.index;});}
- snapshot(){return {credentialMode:this.config.engine==='vm'?'server':'personal',focusPage:this.focusIndex+1,priorityPages:[...this.priorityPages].map(n=>n+1),active:this.active,queued:[...this.jobs.values()].filter(j=>j.state==='queued').length,buffer:9,inFlightPages:this.activePages||0,preparation:{downloaded:this.preparation.downloaded,detected:this.preparation.done,cleaned:this.preparation.cleanDone.size,cleanFailed:this.preparation.cleanFailed.size,cleanup:this.preparation.cleanProgress,translated:this.translatedPages.size-this.partialPages.size,partial:this.partialPages.size,total:this.entries.length},jobs:Array.from({length:this.entries.length},(_,i)=>{const job=this.jobs.get(i);return job?{page:i+1,state:job.state==='done'&&this.partialPages.has(i)?'partial':job.state,keySlot:job.keySlot,serverKey:job.serverKey}:this.pageStates.get(i)||{page:i+1,state:'queued'};})};}
+ snapshot(){return {credentialMode:this.config.engine==='vm'?'server':'personal',focusPage:this.focusIndex+1,priorityPages:[...this.priorityPages].map(n=>n+1),active:this.active,queued:[...this.jobs.values()].filter(j=>j.state==='queued').length,buffer:9,inFlightPages:this.activePages||0,preparation:{downloaded:this.preparation.downloaded,detected:this.preparation.done,cleaned:this.preparation.cleanDone.size,cleanFailed:this.preparation.cleanFailed.size,cleanup:this.preparation.cleanProgress,translated:this.translatedPages.size-this.partialPages.size,partial:this.partialPages.size,total:this.entries.length,fallback:{pending:this.fallbacks.size,pages:this.fallbackPages.size,regions:[...this.fallbackPages.values()].reduce((a,b)=>a+b,0)}},jobs:Array.from({length:this.entries.length},(_,i)=>{const job=this.jobs.get(i);return job?{page:i+1,state:job.state==='done'&&this.partialPages.has(i)?'partial':this.fallbacks.has(i)?'fallback':job.state,keySlot:job.keySlot,serverKey:job.serverKey,fallback:this.fallbackPages.get(i)||0}:this.pageStates.get(i)||{page:i+1,state:'queued'};})};}
 
  renderCanvas(blob,page,font,status,options={}){
   return this.canvasTask({blob,page,font,captureDebug:options.captureDebug===true,mode:options.inpaint||this.config.inpaint||'hybrid',cache:this.config.cache,preparedClean:options.preparedClean,allowDownloads:options.allowDownloads??this.config.allowDownloads},status);

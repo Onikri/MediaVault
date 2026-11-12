@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from PIL import Image
 from lmt_runtime import LmtRuntime
+from lmt_fallback import FallbackBody, translate_refused
 
 VERSION = 5
 MAX_IMAGE = 10 * 1024 * 1024
@@ -80,6 +81,9 @@ class Processor:
         root=Path(directory)
         self.runtime=LmtRuntime(os.getenv('LMT_ASSETS_DIR','/assets'),root/'lmt-browser')
         self.cache=EncryptedCache(root/'results');self.jobs={};self.queue=asyncio.Queue(maxsize=4);self.worker=None
+        # Refusal fallback always uses Hy-MT2; it never switches the LMT profile.
+        from lmt_translate import SegmentTranslator
+        self.fallback_translator=SegmentTranslator('hymt2');self.fallback_waiting=0
     def status(self):
         s=self.runtime.status()
         return {**s,'version':VERSION,'modelLabel':'Hy-MT2 1.8B Q8 · LaMa Manga',
@@ -195,6 +199,19 @@ async def submit(body:Body,subject=Depends(owner)):
 async def poll(job_id:str,subject=Depends(owner)):
     j=app.state.processor.get(job_id,subject)
     return {'state':j['state'],'status':j['status'],**({'result':j['result']} if j['state']=='done' else {})}
+@app.post('/reader/lmt/fallback')
+async def fallback(body:FallbackBody,subject=Depends(owner)):
+    # Bubbles Google still refused after splitting: production OCR + Hy-MT2.
+    p=app.state.processor
+    if not p.runtime.status()['ready']:raise HTTPException(503,'Запасная модель ещё не настроена на ВМ.')
+    if p.fallback_waiting>=8:raise HTTPException(429,'Запасной перевод занят. Повтори через несколько секунд.',headers={'Retry-After':'5'})
+    p.fallback_waiting+=1
+    try:return await asyncio.wait_for(translate_refused(p.runtime,p.fallback_translator,body),240)
+    except asyncio.TimeoutError:raise HTTPException(504,'Запасной перевод не уложился в 4 минуты.',headers={'Retry-After':'10'}) from None
+    except ValueError as error:raise HTTPException(422,str(error)[:300]) from None
+    except HTTPException:raise
+    except Exception:raise HTTPException(502,'Запасной OCR на ВМ не завершился. Повтори позже.',headers={'Retry-After':'10'}) from None
+    finally:p.fallback_waiting-=1
 @app.post('/reader/lmt/jobs/{job_id}/cancel')
 async def cancel(job_id:str,subject=Depends(owner)):
     p=app.state.processor;p.cancel(p.get(job_id,subject));return {'state':'cancelled'}

@@ -20,6 +20,8 @@ class LmtRuntime:
         self.progress = lambda _: None
         self.allow_downloads = False
         self.native = None
+        # One Chromium page: full LMT jobs and refusal-fallback OCR take turns.
+        self.lock = asyncio.Lock()
         from lmt_translate import SegmentTranslator
         self.translator = SegmentTranslator()
 
@@ -110,6 +112,25 @@ class LmtRuntime:
         await self.page.wait_for_function('typeof window.mangaTranslate === "function"')
 
     async def run(self, data, config, progress):
+        async with self.lock:
+            return await self._run(data, config, progress)
+
+    async def recognize(self, crops, language):
+        """Production OCR for bubble crops Google refused (no detection/inpaint)."""
+        async with self.lock:
+            # Operator-controlled OCR weights may download from Hugging Face once.
+            self.allow_downloads = True
+            try:
+                await self._start(needs_llm=False)
+                return await self.page.evaluate('({crops,language}) => window.mangaFallbackOcr(crops,language)',
+                                                {'crops': crops, 'language': language})
+            except BaseException:
+                await self.reset_page()
+                raise
+            finally:
+                self.allow_downloads = False
+
+    async def _run(self, data, config, progress):
         self.progress = progress
         self.allow_downloads = config.get('allowDownloads', False)
         self.translator.profile = config.get('translator', 'hymt2')

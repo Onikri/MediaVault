@@ -34,7 +34,24 @@ export function directRequest(pages,{model=DIRECT_MODELS[0],direction='rtl',cont
  if(count>100)throw Error('Запрос превышает лимит 100 текстовых областей. Раздели пакет.');
  return {contents:[{role:'user',parts}],generationConfig:{...(!model.startsWith('gemini-3.')?{temperature:0}:{}),maxOutputTokens:Math.min(8192,Math.max(input==='vision'?8192:native?1024:2048,count*(native?100:180))),...(!model.startsWith('gemma-')?{responseMimeType:'application/json'}:{}),thinkingConfig:{...googleModel(model).thinking}}};
 }
+// Google answers HTTP 200 without a candidate when the prompt is blocked
+// (promptFeedback.blockReason, e.g. PROHIBITED_CONTENT for adult or violent
+// pages) and stops a candidate with a safety finishReason. Both are refusals,
+// not broken JSON: the caller splits the request and gives the remainder to
+// the non-Google fallback model.
+const REFUSAL_REASONS=new Set(['SAFETY','PROHIBITED_CONTENT','BLOCKLIST','SPII','RECITATION','IMAGE_SAFETY','IMAGE_PROHIBITED_CONTENT','IMAGE_RECITATION','IMAGE_OTHER','OTHER']);
+export function googleRefusal(response){
+ const block=response?.promptFeedback?.blockReason,candidate=response?.candidates?.[0],text=(candidate?.content?.parts||[]).some(p=>!p.thought&&String(p.text||'').trim());
+ if(block&&block!=='BLOCK_REASON_UNSPECIFIED'&&!text)return {blockReason:String(block)};
+ if(candidate?.finishReason&&REFUSAL_REASONS.has(candidate.finishReason))return {finishReason:candidate.finishReason};
+ return null;
+}
+export class GoogleRefusal extends Error{
+ constructor(refusal){super('Google отказался переводить · '+(refusal.blockReason||refusal.finishReason));this.name='GoogleRefusal';this.refusal=refusal;}
+}
+export const isGoogleRefusal=error=>!!error?.refusal;
 export function validateDirectResponse(response,pages,{allowMissing=false}={}){
+ const refusal=googleRefusal(response);if(refusal)throw new GoogleRefusal(refusal);
  const candidate=response.candidates?.[0];
  if(candidate?.finishReason&&candidate.finishReason!=='STOP')throw Error(candidate.finishReason==='MAX_TOKENS'?'Ответ обрезан. Оригинал сохранён; повтори с одной страницей.':'Google не вернул полный перевод. Оригинал сохранён.');
  const text=(candidate?.content?.parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('').trim().replace(/^```(?:json)?\s*|\s*```$/g,'');
@@ -90,7 +107,7 @@ export async function callDirectGoogle(pages,{key,model=DIRECT_MODELS[0],directi
   return {pages:translated,usage:data.usageMetadata,diagnostics:diagnostic};
  }catch(error){
   const message=redactGoogle(error.message||'Ошибка Google',key);
-  diagnostic={...diagnostic,stage:'error',errorType:error.name||'Error',error:message,metrics:{...diagnostic.metrics,googleTotalMs:Math.round(performance.now()-start)}};publish();
-  const clean=Error(message);clean.name=error.name||'Error';clean.diagnostics=diagnostic;throw clean;
+  diagnostic={...diagnostic,stage:error.refusal?'refused':'error',errorType:error.name||'Error',error:message,...(error.refusal?{refusal:error.refusal}:{}),metrics:{...diagnostic.metrics,googleTotalMs:Math.round(performance.now()-start)}};publish();
+  const clean=Error(message);clean.name=error.name||'Error';clean.diagnostics=diagnostic;if(error.refusal)clean.refusal=error.refusal;throw clean;
  }
 }

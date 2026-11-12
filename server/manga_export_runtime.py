@@ -38,11 +38,15 @@ async def _translate_pages(job, pages, options, skip, save, progress, budget):
     slots = []
     def google(path, body):
         budget.check()
-        if path not in {'/reader/google/keys', '/reader/google/generate'}:
+        if path not in {'/reader/google/keys', '/reader/google/generate', '/reader/lmt/fallback'}:
             raise SourceError('Неподдерживаемый запрос переводчика.')
+        # Bubbles Google refused go to the private LMT worker (OCR + Hy-MT2) on
+        # the same Docker network, with the export owner's session.
+        base = os.environ.get('LMT_INTERNAL_URL', 'http://lmt:7861') if path == '/reader/lmt/fallback' else 'http://127.0.0.1:7860'
         response = requests.request('GET' if path.endswith('/keys') else 'POST',
-                                   'http://127.0.0.1:7860' + path, headers=headers,
-                                   json=body if not path.endswith('/keys') else None, timeout=(4, 150))
+                                   base.rstrip('/') + path, headers=headers,
+                                   json=body if not path.endswith('/keys') else None,
+                                   timeout=(4, 250 if path == '/reader/lmt/fallback' else 150))
         data = response.json()
         if response.status_code != 200:
             if response.status_code in {429, 502, 503, 504}:
