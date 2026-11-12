@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const {revealReader}=require('./reader-controls.cjs');
 // Title-page playback lives in the retained-media layer above the page, which currently covers the
 // title page's own close button (regression since 96f932e); close it from the background-player dock.
-async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else if(await page.locator('.title-playback').count()){await page.getByRole('button',{name:'Плеер в фоне'}).click();await page.locator('.retained-dock-panel').getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}
+async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.locator('.immersive-reader').last().getByRole('button',{name:/^Закрыть (?:просмотр|читалку)$/}).click();}else if(await page.locator('.title-playback').count()){await page.getByRole('button',{name:'Плеер в фоне'}).click();await page.locator('.retained-dock-panel').getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}
 // Status and error toasts are collected in the navbar notification centre.
 async function expectNotice(page,text){await page.getByRole('button',{name:/^Уведомления/}).click();const center=page.getByRole('dialog',{name:'Уведомления'});await center.getByText(text,{exact:true}).first().waitFor();await page.keyboard.press('Escape');await center.waitFor({state:'hidden'});}
 const fs = require('node:fs/promises');
