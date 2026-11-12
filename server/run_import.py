@@ -363,6 +363,25 @@ def download_chapter(url, temporary, http,progress=lambda _:None,quality='best')
 
 
 def download_text(url, temporary, http):
+    # Ranobe and public-domain book chapters come through the same adapters as
+    # the online reader (RanobeHub, Zenko, Gutenberg, Wikisource…); any other
+    # page falls back to its main article text.
+    try:
+        from ranobe_sources import chapter
+        data = chapter(url)
+    except SourceError as error:
+        if 'другой книге' in str(error) or 'пуста' in str(error):
+            raise
+        data = None
+    except Exception:
+        data = None
+    if data and data.get("paragraphs"):
+        lines = [str(p.get("text", "") if isinstance(p, dict) else p).strip() for p in data["paragraphs"]]
+        title = str(data.get("title") or "").strip()
+        path = Path(temporary) / "chapter.txt"
+        body = "\n\n".join(line for line in lines if line)
+        path.write_text((title + "\n\n" + body) if title else body, encoding="utf-8")
+        return path
     from bs4 import BeautifulSoup
     text, _, _ = http.document(url)
     soup = BeautifulSoup(text, "html.parser")

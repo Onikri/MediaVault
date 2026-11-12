@@ -79,10 +79,9 @@ export function ChapterSaveDock({userId}){
    {job.state==='done'?<Check size={17}/>:job.state==='error'?<TriangleAlert size={16}/>:<Download size={14}/>}
    {running.length>1&&<b className="chapter-save-count">{running.length}</b>}
   </motion.button>}</AnimatePresence>
-  <Dialog.Root open={open} onOpenChange={value=>{if(!value)chapterSaves.collapse();}}>
+  <Dialog.Root open={open} onOpenChange={value=>{if(!value)chapterSaves.collapse();}} modal={false}>
    <Dialog.Portal>
-    <Dialog.Overlay className="reader-save-backdrop is-docked"/>
-    <Dialog.Content className="reader-save-sheet is-docked" style={anchor?{'--dock-top':anchor.top+'px','--dock-right':anchor.right+'px'}:undefined} aria-describedby={undefined} onOpenAutoFocus={e=>{e.preventDefault();e.currentTarget.focus({preventScroll:true});}} onCloseAutoFocus={e=>{e.preventDefault();trigger.current?.focus({preventScroll:true});}}>
+    <Dialog.Content onInteractOutside={e=>{if(trigger.current?.contains(e.target))e.preventDefault();}} className="reader-save-sheet is-docked" style={anchor?{'--dock-top':anchor.top+'px','--dock-right':anchor.right+'px'}:undefined} aria-describedby={undefined} onOpenAutoFocus={e=>{e.preventDefault();e.currentTarget.focus({preventScroll:true});}} onCloseAutoFocus={e=>{e.preventDefault();trigger.current?.focus({preventScroll:true});}}>
      {job&&<motion.div className="reader-save-body" layout={!reduce} transition={saveSpring}>
       <motion.header layout="position" className="reader-save-head">
        <div><Dialog.Title>{job.state==='done'?'Глава сохранена':job.state==='running'?'Сохраняем главу':'Сохранение главы'}</Dialog.Title><p>{job.title} · {pagesWord(job.total)}</p></div>

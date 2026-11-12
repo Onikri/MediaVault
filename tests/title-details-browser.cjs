@@ -23,12 +23,15 @@ const root=path.resolve(__dirname,'..'),dir=path.join(root,'.codex-local/test-ou
   await p.route('**/*',r=>new URL(r.request().url()).hostname==='127.0.0.1'?r.continue():r.abort());
   const url='http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html';await p.goto(url);
   await p.getByLabel('Альтернативные названия',{exact:true}).filter({hasText:'Ёцуба и!'}).waitFor();
-  const facts=p.locator('.title-hero-facts');await facts.locator('div').filter({hasText:'Последняя глава в источнике'}).filter({hasText:'2.5'}).waitFor();assert.equal(await facts.locator('div').filter({hasText:'Главы в каталоге'}).locator('dd').innerText(),'120');
-  assert.equal(await facts.locator('div').filter({hasText:'Главы в источнике'}).locator('dd').innerText(),'2 · Русский');
+  // The passport states the catalogue total and what the verified source published.
+  const passport=p.locator('.title-passport');await passport.locator('.passport-facts div').filter({hasText:'Последняя глава в источнике'}).filter({hasText:'2.5'}).waitFor();
+  assert.match(await passport.locator('.passport-figures').innerText(),/120\s*глав,\s*16\s*томов/);
+  assert.match(await passport.locator('.passport-note').first().innerText(),/Переведено 2 из 120 · MangaLib/);
   assert.ok(await p.evaluate(()=>window.requests.some(b=>b.title.aliases.includes('Ёцуба и!'))));
   assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:path.join(dir,'title-'+width+'.png'),fullPage:true});
-  await p.goto(url+'?late');await p.waitForFunction(()=>window.requests.length>0&&window.inspections.length>0);await p.waitForFunction(()=>document.querySelector('.title-source-picker')?.textContent.includes('Источник относится к другому произведению.'));assert.equal(await p.locator('.title-source-option').count(),0);
-  await p.getByRole('button',{name:'Обновить названия'}).click();await p.locator('.title-source-option').filter({hasText:'MangaLib'}).waitFor();await p.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Читать сейчас',exact:true}).isEnabled(),true);
+  await p.goto(url+'?late');await p.waitForFunction(()=>window.requests.length>0&&window.inspections.length>0);await p.waitForFunction(()=>document.querySelector('.reader-stage')?.textContent.includes('Источник относится к другому произведению.'));assert.equal(await p.locator('.reader-source-pick').count(),0);
+  await p.getByRole('button',{name:'Обновить названия'}).click();await p.locator('.reader-source-pick').filter({hasText:'MangaLib'}).waitFor();const read=p.getByRole('button',{name:/^Читать главу/});await read.waitFor();assert.equal(await read.isEnabled(),true);
+  assert.equal(await p.locator('.chapter-index li').count(),2);
   assert.ok(await p.evaluate(()=>window.inspections.at(-1).title.aliases.includes('Ёцуба и!')));assert.deepEqual(errors,[]);await p.close();console.log('PASS catalogue aliases/counts, verified chapter feedback, late Russian source discovery '+width+'px');
  }
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

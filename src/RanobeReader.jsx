@@ -14,7 +14,7 @@ import './ranobe.css';
 // 'attached' (full screen), 'popup' (mini window) or 'hidden' (in the tray,
 // the voice keeps reading). onMinimize hides it without closing; onStop is
 // called when the tray closes it.
-export default function RanobeReader({book,item,start,service,userId,onClose,onMinimize,onStop}){
+export default function RanobeReader({book,item,start,service,userId,onClose,onMinimize,onStop,embed=false}){
  const root=useRef(null),body=useRef(null),restored=useRef(false),follow=useRef(true),scrollPause=useRef(0);
  const [prefs,setPrefs]=useState(()=>bookPreferences(userId)),[settings,setSettings]=useState(false);
  const [index,setIndex]=useState(start?.index||0),[chapter,setChapter]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
@@ -78,7 +78,8 @@ export default function RanobeReader({book,item,start,service,userId,onClose,onM
  const byParagraph=script?segmentsByParagraph(script.segments):null;
  // The margin mark of the paragraph being read takes the speaker's colour.
  const speakerColor=speakingSegment!=null&&script?script.colors?.[script.segments.find(x=>x.id===speakingSegment)?.speaker]:undefined;
- const away=mode!=='attached';
+ // Embedded on the title page it stays in the stage; full screen is one button away.
+ const away=embed||mode!=='attached';
  return <ReaderShell readerRef={root} title={book.title} subtitle={'Глава '+entry?.number+(entry?.title?' · '+entry.title:'')} onClose={onClose} onMinimize={onMinimize} theme={prefs.theme}
   layout="rail" dock={narration} inline={away} embedded={away} navigationLabels={{previous:'Предыдущая глава',next:'Следующая глава'}}
   className={'book-reader ranobe-reader text-reader'+(mode==='popup'?' is-mini':'')} paged={false} settings={options} settingsOpen={settings} onSettingsOpenChange={setSettings} contents={contents}
