@@ -8,6 +8,7 @@ import {translationCacheKey,getTranslation,incompleteRender,putTranslation} from
 import {drainBlockChapter} from './manga-block-chapter.js';
 import {ChapterPreparation,drainOrderedChapter,sharedRequestPacer} from './reader-chapter-pipeline.js';
 import {reviewEmptyTranslations,unresolvedRegions} from './manga-empty-review.js';
+import {bubbleFallback} from './manga-bubble-fallback.js';
 
 // Bump when rendered page output changes (fonts, layout) so stale cached renders are skipped.
 export const RENDER_CACHE_VERSION='render-v12';
@@ -29,7 +30,7 @@ export class DirectChapter{
   this.translatedPages=new Set();this.partialPages=new Set();this.pageStates=new Map();this.priorityPages=new Set();this.focusWindow=[];this.priorityEpoch=0;this.focusIndex=0;this.pacer=pacer||sharedRequestPacer;this.preparation=new ChapterPreparation(this);
   this.incomplete=new Map();this.recovered=new Map();
  }
- notify(index,value){const old=this.progress.get(index)||{};value=value.phase==='cleaning'&&(old.phase==='error'||old.phase==='translating'&&this.jobs.get(index)?.state==='running')?{...old,backgroundCleanup:value}:{...old,...value};this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
+ notify(index,value){this.lastActivity=performance.now();const old=this.progress.get(index)||{};value=value.phase==='cleaning'&&(old.phase==='error'||old.phase==='translating'&&this.jobs.get(index)?.state==='running')?{...old,backgroundCleanup:value}:{...old,...value};this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
  request(index,blob,background=false){
   this.controller.signal.throwIfAborted();let job=this.jobs.get(index);
   if(job){if(!background)job.background=false;return job;}
@@ -106,7 +107,7 @@ export class DirectChapter{
    }catch(error){for(const job of group)if(job.state!=='done')this.fail(job,error);}finally{if(first.keyLease)this.keyBusy.delete(first.keyLease);}
   }}finally{this.active--;if([...this.jobs.values()].some(j=>j.state==='queued')&&!this.controller.signal.aborted)queueMicrotask(()=>this.drain());}
  }
- finish(job,page){this.translatedPages.add(job.index);if(unresolvedRegions(page).length){this.partialPages.add(job.index);this.incomplete.set(job.index,{page,cacheId:job.cacheId});}else{this.partialPages.delete(job.index);this.incomplete.delete(job.index);}this.pageStates.set(job.index,{page:job.index+1,state:this.partialPages.has(job.index)?'partial':'done',keySlot:job.keySlot,serverKey:job.serverKey});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.bypass.delete(job.index);this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);job.state='done';job.blob=null;if(job.prepared)job.prepared={...job.prepared,image:undefined,blob:undefined};job.resolve(page);for(const old of [...this.jobs.values()].filter(j=>j.state==='done').slice(0,-12)){this.jobs.delete(old.index);this.progress.delete(old.index);}}
+ finish(job,page){this.lastActivity=performance.now();this.translatedPages.add(job.index);if(unresolvedRegions(page).length){this.partialPages.add(job.index);this.incomplete.set(job.index,{page,cacheId:job.cacheId});}else{this.partialPages.delete(job.index);this.incomplete.delete(job.index);}this.pageStates.set(job.index,{page:job.index+1,state:this.partialPages.has(job.index)?'partial':'done',keySlot:job.keySlot,serverKey:job.serverKey});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.bypass.delete(job.index);this.context.set(job.index,page.regions.map(r=>r.ru_translation).filter(Boolean).join(' '));while(this.context.size>6)this.context.delete(this.context.keys().next().value);job.state='done';job.blob=null;if(job.prepared)job.prepared={...job.prepared,image:undefined,blob:undefined};job.resolve(page);for(const old of [...this.jobs.values()].filter(j=>j.state==='done').slice(0,-12)){this.jobs.delete(old.index);this.progress.delete(old.index);}}
  async recoverChapter(){
   const pending=[...this.incomplete].sort(([a],[b])=>a-b);
   if(!pending.length)return;
@@ -141,7 +142,45 @@ export class DirectChapter{
    }
   }
  }
- fail(job,error,{retryable=false}={}){this.pageStates.set(job.index,{page:job.index+1,state:'failed',retryable});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.jobs.delete(job.index);const raw=job.diagnostics||error.diagnostics,diagnostics=raw?{...raw,local:{...raw.local,totalMs:Math.round(performance.now()-job.started)}}:undefined;job.reject(error);this.notify(job.index,{phase:'error',message:error.message,diagnostics});}
+ // Save dialog hook: pages that still have blank bubbles get one more Google
+ // review (unless the chapter already ran it) and then the optional fallback
+ // translator from manga-bubble-fallback.js. Returns the indices that changed.
+ async recoverUnresolved(indices,{signal,onStatus}={}){
+  const wanted=new Set(indices),changed=new Set(),before=new Map([...this.incomplete].filter(([i])=>wanted.has(i)).map(([i,r])=>[i,unresolvedRegions(r.page).length]));
+  if(!before.size)return [];
+  const stop=AbortSignal.any([this.controller.signal,...(signal?[signal]:[])]);
+  // One extra Google review per page; the chapter pipeline's own retry counts too.
+  this.reviewedAgain||=new Set();if(this.recoveryStarted!=='done'&&[...before.keys()].some(i=>!this.reviewedAgain.has(i))){for(const i of before.keys())this.reviewedAgain.add(i);onStatus?.({index:[...before.keys()][0],label:'Повторно проверяем пропущенные реплики в Google'});await this.recoverChapter().catch(()=>{});stop.throwIfAborted();}
+  const provider=bubbleFallback();
+  if(provider){
+   const pending=[...before.keys()].filter(i=>this.incomplete.has(i)).sort((a,b)=>a-b);
+   for(let offset=0;offset<pending.length;offset+=4){
+    const packet=pending.slice(offset,offset+4),pages=[],sources=[];
+    for(const index of packet){
+     const record=this.incomplete.get(index),blob=await waitFor(this.entries[index].async('blob'),AbortSignal.any([stop,AbortSignal.timeout(30000)]));
+     const page=structuredClone({...record.page,diagnostics:undefined});page.unresolved=unresolvedRegions(page).map(r=>r.uid);
+     pages.push(page);sources.push({page:index+1,width:page.width,height:page.height,blob});
+    }
+    onStatus?.({index:packet[0],label:'Запасной переводчик · '+packet.map(i=>'стр. '+(i+1)).join(', ')});
+    let answer;try{answer=await provider({pages,sources,language:this.config.language,direction:this.direction,signal:stop,onStatus:value=>onStatus?.({index:packet[0],...value})});}catch(error){stop.throwIfAborted();continue;}
+    for(const page of Array.isArray(answer)?answer:pages){
+     const index=page.page-1,record=this.incomplete.get(index);if(!record)continue;
+     const allowed=new Set(unresolvedRegions(record.page).map(r=>r.uid)),filled=new Map((page.regions||[]).filter(r=>allowed.has(r.uid)&&r.ru_translation?.trim()).map(r=>[r.uid,r]));
+     if(!filled.size)continue;
+     const merged={...record.page,regions:record.page.regions.map(r=>filled.has(r.uid)?{...r,ru_translation:filled.get(r.uid).ru_translation.trim(),empty_reason:undefined,...(filled.get(r.uid).fallback?{fallback:filled.get(r.uid).fallback}:{})}:r)};
+     const left=unresolvedRegions(merged);merged.detectionReport={...merged.detectionReport,translated:merged.regions.filter(r=>r.ru_translation?.trim()).length,unresolved:left.map(r=>r.uid),fallback:[...filled.keys()]};
+     this.recovered.set(index,merged);const job=this.jobs.get(index);if(job?.state==='done')job.promise=Promise.resolve(merged);
+     if(this.config.cache&&record.cacheId){const {diagnostics,...safe}=merged;await this.writeCache(record.cacheId,this.scope,{kind:'manga-json',page:safe});}
+     if(!left.length){this.partialPages.delete(index);this.incomplete.delete(index);this.pageStates.set(index,{...this.pageStates.get(index),state:'done'});}else this.incomplete.set(index,{...record,page:merged});
+     this.config.onRecovered?.(index);this.notify(index,{phase:left.length?'partial':'ready',message:left.length?'Осталось реплик без перевода: '+left.length:'Пропущенные реплики переведены запасной моделью'});
+    }
+   }
+  }
+  for(const [index,count] of before){const record=this.incomplete.get(index);if(!record||unresolvedRegions(record.page).length!==count||this.recovered.has(index))changed.add(index);}
+  return [...changed];
+ }
+ chapterState(){const failed=[...this.pageStates.values()].filter(p=>p.state==='failed').length;return {total:this.entries.length,translated:this.translatedPages.size-this.partialPages.size,partial:this.partialPages.size,failed,partialPages:[...this.partialPages].map(i=>i+1).sort((a,b)=>a-b)};}
+ fail(job,error,{retryable=false}={}){this.lastActivity=performance.now();this.pageStates.set(job.index,{page:job.index+1,state:'failed',retryable});this.priorityPages.delete(job.index);if(!this.priorityPages.size)this.priorityKey=null;this.jobs.delete(job.index);const raw=job.diagnostics||error.diagnostics,diagnostics=raw?{...raw,local:{...raw.local,totalMs:Math.round(performance.now()-job.started)}}:undefined;job.reject(error);this.notify(job.index,{phase:'error',message:error.message,diagnostics});}
  async render(blob,index,font,status,config={},signal,background=false){
   const renderStarted=performance.now(),fromMemory=this.jobs.get(index)?.state==='done';
   signal?.throwIfAborted();const listeners=this.listeners.get(index)||new Set();if(status)listeners.add(status);this.listeners.set(index,listeners);

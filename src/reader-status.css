@@ -1,0 +1,7 @@
+.reader-status-dock{position:absolute;z-index:11;left:50%;bottom:max(14px,env(safe-area-inset-bottom));translate:-50% 0;width:max-content;max-width:min(460px,calc(100% - 24px));padding:7px 14px;border-radius:99px;background:color-mix(in srgb,var(--color-canvas,#0c0c0f) 90%,transparent);color:var(--color-petal,#f0e8e5);box-shadow:0 8px 30px #0005;backdrop-filter:blur(18px);font-size:11px;line-height:1.45;transition:bottom .3s cubic-bezier(.22,1,.36,1)}
+.immersive-reader[data-chrome=true]:not(.reader-vertical-tools) .reader-status-dock{bottom:calc(max(18px,env(safe-area-inset-bottom)) + 58px)}
+.reader-status-dock .reader-live-progress{display:flex;align-items:center;gap:10px;padding:0;flex-wrap:wrap;justify-content:center}
+.reader-status-dock .reader-live-progress>progress{flex-basis:100%;max-width:none;height:2px}
+.reader-status-dock .reader-live-progress>button{padding:0;border:0;background:none;color:var(--color-blossom-light,#ff6655);font:inherit;font-size:11px;cursor:pointer}
+.reader-status-dock.is-wide{width:min(560px,calc(100% - 24px));border-radius:18px;max-height:42dvh;overflow:auto;text-align:left}
+.reader-status-dock.is-wide .reader-live-progress{display:grid;justify-content:stretch}

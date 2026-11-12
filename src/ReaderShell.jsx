@@ -1,19 +1,21 @@
 import ReaderPageTrack from './ReaderPageTrack.jsx';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ArrowLeft,ChevronLeft,ChevronRight,Settings2,Maximize,Minimize,Minimize2,List,Grid2X2,X} from 'lucide-react';
 import './reader-shell.css';
 import './reader-morph.css';
 import './reader-rail.css';
+import './reader-status.css';
 
 // Chrome overlays the reading surface. Opening a panel never resizes a page.
 // layout="rail" (text readers): one fixed column of controls on the right,
 // always visible — nothing appears on hover, so nothing moves under the
 // pointer. dock (the narration player) sits at the bottom of the rail;
 // onMinimize hides the reader to the tray while its voice keeps reading.
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='horizontal',navigationDirection='reading',chapterControl,gesturesEnabled=true,layout='overlay',dock=null,onMinimize,navigationLabels}){
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='horizontal',navigationDirection='reading',chapterControl,gesturesEnabled=true,layout='overlay',dock=null,onMinimize,navigationLabels,pagePreview,statusWide=false}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({});
- const rail=layout==='rail';
+ const rail=layout==='rail',reduce=useReducedMotion();
  const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[hint,setHint]=useState(true),[fullscreenError,setFullscreenError]=useState('');
  methods.current={onClose,onMinimize,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel,rail};
  const navigation=navigationDirection==='reading'?direction:navigationDirection==='left'?'rtl':'ltr';methods.current.direction=navigation;
@@ -83,11 +85,13 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
   <div className="reader-chrome reader-bottom reader-bottom-float mv-viewer-tools" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
    <div className="reader-navigation">
     <button className="reader-control" aria-label="Назад" disabled={!canPrevious} onClick={onPrevious}><ChevronLeft size={22}/></button>
-    {onPage&&progress?.total>1?<ReaderPageTrack progress={progress} onPage={onPage} orientation={progressOrientation} chapter={title}/>:<span className="reader-page-count" aria-live="polite">{progress?.label||`${progress?.current||0} / ${progress?.total||0}`}</span>}
+    {onPage&&progress?.total>1?<ReaderPageTrack progress={progress} onPage={onPage} orientation={progressOrientation} chapter={title} preview={pagePreview}/>:<span className="reader-page-count" aria-live="polite">{progress?.label||`${progress?.current||0} / ${progress?.total||0}`}</span>}
     <button className="reader-control" aria-label="Вперёд" disabled={!canNext} onClick={onNext}><ChevronRight size={22}/></button>
    </div>
-   {status&&<div className="reader-quiet-status">{status}</div>}{fullscreenError&&<small role="status">{fullscreenError}</small>}
+   {fullscreenError&&<small role="status">{fullscreenError}</small>}
   </div>
+  {/* Page status lives in its own floating chip, never inside the page track. */}
+  <AnimatePresence>{status&&<motion.div key="status" className={'reader-status-dock'+(statusWide?' is-wide':'')} layout={!reduce} initial={{opacity:0,y:10,scale:.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:8,scale:.97,transition:{duration:.16}}} transition={reduce?{duration:0}:{type:'spring',stiffness:420,damping:34}}>{status}</motion.div>}</AnimatePresence>
   </>}
   {!rail&&hint&&!visible&&!activePanel&&<div className="reader-gesture-hint" aria-hidden="true">Касание центра — меню{paged?' · По краям — листать':''}</div>}
   {debug}
