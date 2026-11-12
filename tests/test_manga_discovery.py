@@ -20,6 +20,28 @@ def wait_done(manager,owner,identity):
     raise AssertionError('Discovery job did not finish')
 
 class NativeSourceFallbackTests(unittest.TestCase):
+    def test_source_search_keeps_punctuation_variants_without_accepting_unrelated_hits(self):
+        source={'id':'2','name':'Fixture','lang':'en','baseUrl':'https://source.example'}
+        rows=[{'id':1,'title':'Moon-Road','url':'/moon-road'},{'id':2,'title':'Moon Lake','url':'/moon-lake'}]
+        with patch.object(discovery.bridge,'Client') as client,patch.dict(os.environ,ENV):
+            client.return_value.get.return_value={'mangaList':rows}
+            values=discovery.search_source(source,'Moon Road')
+        self.assertEqual([r['title'] for r in values],['Moon-Road'])
+    def test_verified_english_title_retains_russian_lib_result_for_frontend(self):
+        selected={'kind':'manga','title':'Moon Road','year':2020}
+        source={'id':'1','name':'MangaLib','lang':'ru','_title':selected}
+        native={'title':'Лунная дорога','kind':'manga','identityTitles':['Лунная дорога','lunnaya doroga'],'aliases':['Лунная дорога','Moon Road'],'year':2020,'language':'ru','url':'https://mangalib.me/ru/71--moon-road'}
+        with patch('manga_catalog_adapters.lib_search',return_value=[native]):
+            rows=discovery.search_source(source,'Moon Road')
+        self.assertEqual(len(rows),1);self.assertIn('Moon Road',rows[0]['identityTitles'])
+        with patch('manga_catalog_adapters.lib_search',return_value=[{**native,'year':1990}]):
+            self.assertEqual(discovery.search_source(source,'Moon Road'),[])
+        with patch('manga_catalog_adapters.lib_search',return_value=[{**native,'year':None}]):
+            self.assertEqual(discovery.search_source({**source,'_title':{**selected,'year':None}},'Moon Road'),[])
+    def test_language_query_budget_keeps_alternate_spellings_and_deduplicates_punctuation(self):
+        names=['Moon Road','Лунная дорога','ЛУННАЯ-ДОРОГА','Лунный путь','Дорога Луны','余分な名前']
+        terms=discovery.language_queries(names,'ru')
+        self.assertEqual(terms,['Лунная дорога','Лунный путь','Дорога Луны','Moon Road'])
     def test_mangadex_edge_failure_falls_back_to_the_installed_source(self):
         source={'id':'2','name':'MangaDex','lang':'ru','baseUrl':'https://mangadex.org'}
         with patch.dict(os.environ,ENV),patch.object(discovery,'native_search_source',side_effect=SourceError('edge challenge')),patch.object(discovery.bridge,'Client') as client:
@@ -104,6 +126,69 @@ class MangaDiscoveryTests(unittest.TestCase):
     self.sources.stop();self.env.stop();self.directory.cleanup()
  def manager(self,**options):
     manager=discovery.Discovery(self.directory.name,**options);self.managers.append(manager);return manager
+ def test_english_alias_from_a_multilingual_catalog_reaches_russian_sources(self):
+    sources=[{'id':'1','name':'MangaDex','lang':'en'},{'id':'2','name':'Russian Catalogue','lang':'ru'}];seen=[]
+    def fetch(source,query):
+        seen.append((source['id'],source.get('_queries',[query])))
+        if source['id']=='1':return [{'id':'english','sourceId':'1','kind':'manga','title':'Лунная дорога','aliases':['Moon Road','Лунная дорога'],'language':'en','year':2020}]
+        return [{'id':'russian','sourceId':'2','kind':'manga','title':'Лунная дорога','aliases':['Лунная дорога'],'language':'ru'}] if 'Лунная дорога' in source.get('_queries',[]) else []
+    with patch.object(discovery,'installed_sources',return_value=sources):
+        manager=self.manager(fetch=fetch,workers=1);result=wait_done(manager,'A',manager.start('A','Moon Road')['id'])
+    self.assertEqual({r['id'] for r in result['results']},{'english','russian'})
+    self.assertTrue(any(sid=='2' and terms[0]=='Лунная дорога' for sid,terms in seen))
+ def test_selected_title_learns_verified_aliases_without_losing_identity(self):
+    sources=[{'id':'1','name':'MangaDex','lang':'en'},{'id':'2','name':'Russian Catalogue','lang':'ru'}];seen=[]
+    selected={'kind':'manga','title':'Moon Road','year':2020,'ids':{'mal':'71'}}
+    def fetch(source,query):
+        seen.append(source)
+        if source['id']=='1':return [{'id':'english','sourceId':'1','kind':'manga','title':'Moon Road','aliases':['Moon Road','Лунная дорога'],'language':'en','year':2020}]
+        return [{'id':'russian','sourceId':'2','kind':'manga','title':'Лунная дорога','language':'ru'}] if 'Лунная дорога' in source.get('_queries',[]) else []
+    with patch.object(discovery,'installed_sources',return_value=sources):
+        manager=self.manager(fetch=fetch,workers=1);result=wait_done(manager,'A',manager.start('A','Moon Road',title=selected)['id'])
+    self.assertEqual({r['id'] for r in result['results']},{'english','russian'})
+    russian=next(s for s in seen if s['id']=='2' and 'Лунная дорога' in s.get('_queries',[]))
+    self.assertEqual(russian['_title']['ids'],{'mal':'71'});self.assertEqual(russian['_title']['year'],2020)
+    self.assertEqual(russian['_title']['title'],'Moon Road')
+ def test_cached_multilingual_hit_still_expands_a_different_language_search(self):
+    sources=[{'id':'1','name':'MangaDex','lang':'en'},{'id':'2','name':'Russian Catalogue','lang':'ru'}];seen=[]
+    def fetch(source,query):
+        seen.append(source['id'])
+        if source['id']=='1':return [{'id':'english','sourceId':'1','kind':'manga','title':'Moon Road','aliases':['Moon Road','Лунная дорога'],'language':'en'}]
+        return [{'id':'russian','sourceId':'2','kind':'manga','title':'Лунная дорога','language':'ru'}] if 'Лунная дорога' in source.get('_queries',[]) else []
+    with patch.object(discovery,'installed_sources',return_value=sources):
+        manager=self.manager(fetch=fetch,workers=1);wait_done(manager,'A',manager.start('A','Moon Road','en')['id'])
+        seen.clear();result=wait_done(manager,'A',manager.start('A','Moon Road','all')['id'])
+    self.assertEqual({r['id'] for r in result['results']},{'english','russian'});self.assertNotIn('1',seen)
+ def test_conflicting_year_does_not_supply_aliases_to_selected_title(self):
+    selected={'kind':'manga','title':'Moon Road','year':2020}
+    source={'id':'1','name':'English Catalogue','lang':'en'};other={'id':'2','name':'Russian Catalogue','lang':'ru'}
+    with patch.object(discovery,'installed_sources',return_value=[source,other]):
+        manager=self.manager(start_workers=False);job=manager.start('A','Moon Road',title=selected)
+        with manager.condition,manager.db:
+            manager._expand_aliases(job['id'],'Moon Road',[{'kind':'manga','title':'Moon Road','aliases':['Moon Road','Чужая история'],'year':1990}])
+        work=manager.db.execute('SELECT source FROM work WHERE job=? AND source_id=?',(job['id'],'2')).fetchone()
+    self.assertNotIn('Чужая история',json.loads(work[0]).get('_queries',[]))
+ def test_running_source_finishes_old_query_then_retries_new_alias(self):
+    sources=[{'id':'1','name':'English Catalogue','lang':'en'},{'id':'2','name':'Russian Catalogue','lang':'ru'}]
+    russian_started=threading.Event();aliases_added=threading.Event();seen=[]
+    def fetch(source,query):
+        terms=source.get('_queries',[query]);seen.append((source['id'],terms))
+        if source['id']=='1':
+            self.assertTrue(russian_started.wait(3))
+            return [{'id':'english','sourceId':'1','kind':'manga','title':'Moon Road','aliases':['Moon Road','Лунная дорога'],'language':'en'}]
+        if 'Лунная дорога' not in terms:
+            russian_started.set();self.assertTrue(aliases_added.wait(3));return []
+        return [{'id':'russian','sourceId':'2','kind':'manga','title':'Лунная дорога','language':'ru'}]
+    with patch.object(discovery,'installed_sources',return_value=sources):
+        manager=self.manager(fetch=fetch,workers=2)
+        expand=manager._expand_aliases
+        def notify(*args):
+            expand(*args)
+            if any(value.get('id')=='english' for value in args[2]):aliases_added.set()
+        manager._expand_aliases=notify
+        result=wait_done(manager,'A',manager.start('A','Moon Road',title={'kind':'manga','title':'Moon Road'})['id'])
+    self.assertEqual({r['id'] for r in result['results']},{'english','russian'})
+    self.assertEqual(sum(sid=='2' for sid,terms in seen),2)
  def test_discovery_reports_browser_checks_and_ignores_unsupported_languages(self):
     sources=[{'id':str(i),'name':'Fixture '+str(i),'lang':'ru'} for i in range(1,4)]
     def fetch(source,_):
@@ -123,7 +208,7 @@ class MangaDiscoveryTests(unittest.TestCase):
         return [{'id':'native-dex','sourceId':'2','kind':'manga','title':'Moby Dick','aliases':['Moby Dick','Белый Кит'],'language':'en'}] if 'Moby Dick' in source.get('_queries',[]) else []
     with patch.object(discovery,'installed_sources',return_value=sources):
         manager=self.manager(fetch=fetch,workers=1);job=manager.start('A','Белый кит');result=wait_done(manager,'A',job['id'])
-    self.assertEqual({r['id'] for r in result['results']},{'native-lib','native-dex'});self.assertIn(('2',['Moby Dick','Белый Кит']),seen)
+    self.assertEqual({r['id'] for r in result['results']},{'native-lib','native-dex'});self.assertIn(('2',['Moby Dick']),seen)
     self.assertTrue(manager._indexed('moby dick','1'))
 
  def test_global_queue_reaches_every_source_with_four_shared_workers_and_partial_results(self):

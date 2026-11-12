@@ -713,6 +713,11 @@ def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
     if body.title:
         if len(json.dumps(body.title).encode())>50000:raise HTTPException(422,'Слишком большое описание манги.')
         candidate={'title':value['title'],'aliases':list(dict.fromkeys([*title_aliases(value['title']),*(value.get('identityTitles') or value.get('aliases') or [])])),'kind':'manga','year':value.get('year'),'ids':value.get('ids') or {}}
+        # Discovery permits an upstream English alias when the publication
+        # year also agrees. Opening that verified source must apply the same
+        # identity rule; missing/conflicting years retain canonical-only names.
+        if body.title.get('year') and value.get('year') and str(body.title['year'])[:4]==str(value['year'])[:4]:
+            candidate['aliases']=list(dict.fromkeys([*candidate['aliases'],*(value.get('aliases') or [])]))
         if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
     if body.verifyPages:
         from manga_readability import verify

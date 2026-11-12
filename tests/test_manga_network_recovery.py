@@ -32,7 +32,7 @@ class NetworkRecoveryTests(unittest.TestCase):
         values = ['Бродяга', 'Vagabond', 'バガボンド', 'Bagabondo', '배가본드']
         self.assertEqual(discovery.language_queries(values, 'ja'), ['バガボンド', 'Vagabond'])
         self.assertEqual(discovery.language_queries(values, 'ko'), ['배가본드', 'Vagabond'])
-        self.assertEqual(discovery.language_queries(values, 'ru'), ['Бродяга', 'Vagabond'])
+        self.assertEqual(discovery.language_queries(values, 'ru'), ['Бродяга', 'Vagabond', 'Bagabondo'])
 
     def test_route_revision_recovers_old_pause_and_snapshots_only_for_affected_source(self):
         route = {}
