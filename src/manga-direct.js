@@ -1,6 +1,7 @@
 import {acquireRenderer,releaseRenderer} from './reader-worker-pool.js';
 import {translateLmt} from './lmt-client.js';
 import {callDirectGoogle} from './manga-direct-api.js';
+import {transientGoogleError} from './google-transient.js';
 import {directKey,restoreDirectKey,directKeys,restoreDirectKeys,keySlotScope} from './manga-direct-key.js';
 import {DIRECT_DETECTORS} from './manga-direct-profiles.js';
 import {compareDirectInputs} from './manga-direct-comparison.js';
@@ -219,7 +220,20 @@ export class DirectChapter{
   const slot=this.serverSlots.find(slot=>options.key==='oracle-slot:'+slot);
   if(this.serverSlots.length&&!oracle)throw Error('Для серверных ключей нужен Oracle.');
   if(!options.paced)await this.pacer.reserve(options.key,options.signal||this.controller.signal);
-  return this.google(pages,{...options,...(oracle?{gemmaProfile:'compat',transport:async({json,signal})=>{const data=await oracle.request('/reader/google/generate',{method:'POST',body:{...(slot===undefined?{key:options.key}:{slot}),model:options.model,request:JSON.parse(json)},signal});return {status:200,text:JSON.stringify(data)};}}:{})});
+  const send=(key,target)=>this.google(pages,{...options,key,...(oracle?{gemmaProfile:'compat',transport:async({json,signal})=>{const data=await oracle.request('/reader/google/generate',{method:'POST',body:{...target,model:options.model,request:JSON.parse(json)},signal});return {status:200,text:JSON.stringify(data)};}}:{})});
+  try{return await send(options.key,slot===undefined?{key:options.key}:{slot});}
+  catch(error){
+   if(!transientGoogleError(error)||(options.signal||this.controller.signal).aborted)throw error;
+   // A pinned server slot never moves on 429/5xx: send the request once more to
+   // the whole pool, where the gateway picks a key with free quota. Personal
+   // keys move to another of the user's keys the same way.
+   if(slot!==undefined)return send(options.key,{});
+   const keys=this.getKey===directKey?directKeys(this.keyScope).filter(k=>k&&k!==options.key):[];
+   const other=keys.find(k=>!this.keyBusy.has(k))||keys[0];
+   if(!other)throw error;
+   await this.pacer.reserve(other,options.signal||this.controller.signal);
+   return send(other,{key:other});
+  }
  }
  async compare(blob,index,{signal,onProgress}={}){const key=this.getKey(this.keyScope)||(this.getKey===directKey?await restoreDirectKey(this.keyScope):'');return compareDirectInputs({blob,index,prepare:this.prepare,google:(pages,options)=>this.callGoogle(pages,options),key,config:this.config,direction:this.direction,signal:signal||this.controller.signal,onProgress});}
  prefetch(index){const count=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1);if(!this.jobs.has(index-1))return;for(let n=index;n<Math.min(this.entries.length,index+count*this.batchSize());n++)if(!this.jobs.has(n))this.request(n,null,true);}

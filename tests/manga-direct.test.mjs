@@ -25,6 +25,10 @@ test('online reader uses an Oracle credential slot without receiving the server 
  const sent=[];const {c}=chapter({entries:[{async:async()=>new Blob(['last page'])}],config:translationConfig({engine:'vm',directViaOracle:true,directBatchPages:2}),serverSlots:[0],getKey:()=>'',google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent.push({path,body:options.body});return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
  try{await c.render(new Blob(['page']),0,'auto',null,{},new AbortController().signal);assert.equal(sent[0].path,'/reader/google/generate');assert.equal(sent[0].body.slot,0);assert.equal(sent[0].body.key,undefined);assert.equal(sent[0].body.model,'gemini-3.5-flash-lite');}finally{c.close();}
 });
+test('an overloaded Oracle slot moves the same request to the whole key pool once',async()=>{
+ const sent=[];const {c}=chapter({entries:[{async:async()=>new Blob(['last page'])}],config:translationConfig({engine:'vm',directViaOracle:true,directBatchPages:2}),serverSlots:[2],getKey:()=>'',google:callDirectGoogle,service:()=>({request:async(path,options)=>{sent.push(options.body);if(sent.length===1)throw Error('Google · HTTP 503 · повтор через 6 с');return reply([{id:'P1_B1',ru:'Привет!'}]);}})});
+ try{const page=await c.render(new Blob(['page']),0,'auto',null,{},new AbortController().signal);assert.equal(sent.length,2);assert.equal(sent[0].slot,2);assert.equal(sent[1].slot,undefined);assert.equal(sent[1].key,undefined);assert.ok(page);}finally{c.close();}
+});
 test('direct mode is a separate compact cache variant without personal secrets',()=>{
  const c=translationConfig({engine:'direct',apiKey:'private-fixture'});assert.equal(c.engine,'direct');assert.equal(c.directModel,'gemini-3.5-flash-lite');assert.equal(c.inpaint,'hybrid');assert.equal(c.font,'auto');
  const variant=resultConfig(c);assert.equal(variant.direction,'rtl');assert.ok(!JSON.stringify(variant).includes('private-fixture'));assert.notDeepEqual(variant,resultConfig({...c,engine:'vm'}));assert.notDeepEqual(variant,resultConfig({...c,directModel:'gemma-4-31b-it'}));

@@ -47,7 +47,7 @@ test('saves every page, retries a failure, never waits forever and reports gaps'
   recover:async(indices)=>{assert.deepEqual(indices,[2]);recovered=true;return [2];},
   state:()=>({translated:5,partial:1})
  };
- const result=await saveReaderChapter({total:6,format:'cbz',name:'Манга: том 1 / глава 2',source,stallMs:40,tick:5,onProgress:value=>events.push(value)});
+ const result=await saveReaderChapter({total:6,format:'cbz',name:'Манга: том 1 / глава 2',source,stallMs:40,tick:5,maxWaitMs:30,wait:async()=>{},onProgress:value=>events.push(value)});
  assert.equal(result.filename,'Манга том 1 глава 2.cbz');
  const archive=await read(result.blob);
  assert.deepEqual(Object.keys(archive.files),['001.webp','002.webp','003.webp','004.png','005.webp','006.webp']);
@@ -79,4 +79,32 @@ test('Russian wording helpers',()=>{
  assert.equal(pagesWord(1),'1 страница');assert.equal(pagesWord(3),'3 страницы');assert.equal(pagesWord(12),'12 страниц');assert.equal(pagesWord(21),'21 страница');
  assert.equal(formatDuration(42000),'около 40 с');assert.equal(formatDuration(130000),'около 2 мин 10 с');assert.equal(formatDuration(8*60000),'около 8 мин');
  assert.equal(activityLabel({cacheHit:true}),'Берём готовую страницу из кэша');assert.equal(activityLabel({phase:'translating'}),'Переводим в Google');
+});
+
+test('overloaded Google is waited out and retried until every page is translated',async()=>{
+ const attempts=new Map(),waits=[],events=[];
+ const source={blob:async i=>new Blob([png('p'+i)]),retry:()=>{},render:async index=>{
+  const n=(attempts.get(index)||0)+1;attempts.set(index,n);
+  if(index%2===0&&n<=3)throw Error('Google · HTTP 503 · повтор через 6 с');
+  return {renderedImage:webp('ru '+(index+1))};
+ }};
+ const result=await saveReaderChapter({total:5,format:'cbz',source,wait:async ms=>{waits.push(ms);},onProgress:value=>events.push(value)});
+ assert.deepEqual(result.problems,[]);assert.equal(result.counts.original,0);
+ assert.deepEqual([...attempts.values()],[4,1,4,1,4]);
+ assert.ok(events.some(e=>e.phase==='wait'&&e.wait.pages===3&&e.wait.seconds===6),'waits for Retry-After before the next round');
+ const archive=await read(result.blob);assert.equal(await text(archive,'005.webp'),'ru 5');
+});
+
+test('a rejected key stops the save instead of writing originals',async()=>{
+ await assert.rejects(saveReaderChapter({total:3,format:'cbz',source:{blob:async()=>new Blob([png('p')]),render:async()=>{throw Error('Google отклонил ключ · HTTP 401');}}}),{name:'SaveBlocked',message:/Проверь ключи/});
+});
+
+test('relay source moves to a private translator when the reader goes away',async()=>{
+ const {relaySource}=await import('../src/reader-chapter-save.js');
+ let alive=true,released=0,closed=0;const calls=[];
+ const live={render:async index=>{calls.push('live:'+index);if(!alive)throw Error('Читалка закрыта');return {renderedImage:webp('live')};},lastActivity:()=>1};
+ const relay=relaySource({blob:async()=>null,live,alive:()=>alive,release:()=>released++,fallback:async()=>({render:async index=>{calls.push('own:'+index);return {renderedImage:webp('own')};},close:()=>closed++})});
+ await relay.render(0);alive=false;await relay.render(1);await relay.render(2);
+ assert.deepEqual(calls,['live:0','own:1','own:2']);
+ assert.equal(relay.switched,true);relay.close();relay.close();assert.equal(released,1);assert.equal(closed,1);
 });

@@ -44,6 +44,30 @@
 .reader-save-ring{position:absolute;inset:0;margin:auto;width:27px;height:27px;transform:rotate(-90deg);pointer-events:none}
 .reader-save-ring circle{fill:none;stroke-width:2.2;stroke:color-mix(in srgb,var(--color-petal,#f0e8e5) 16%,transparent)}
 .reader-save-ring circle+circle{stroke:var(--color-blossom,#ee3c35);stroke-linecap:round;transition:stroke-dasharray .45s var(--ease-expressive,ease)}
+/* Closing collapses the sheet up into its button (reader toolbar or navbar). */
+.reader-save-sheet[data-state=closed]{animation:reader-save-collapse .24s cubic-bezier(.4,0,.6,1) forwards;transform-origin:85% 0}
+.reader-save-backdrop[data-state=closed]{animation:reader-save-fade .2s ease reverse forwards}
+/* Navbar sheet: grows out of the save button under the header. */
+.reader-save-backdrop.is-docked{background:#0003;backdrop-filter:none}
+.reader-save-sheet.is-docked{top:var(--dock-top,72px);left:auto;right:var(--dock-right,16px);transform:none;transform-origin:calc(100% - 19px) -10px;max-height:calc(100dvh - var(--dock-top,72px) - 16px);animation-name:reader-save-dock-open;animation-duration:.36s}
+.reader-save-sheet.is-docked[data-state=closed]{animation:reader-save-dock-close .22s cubic-bezier(.4,0,.6,1) forwards}
+.chapter-save-others{margin-top:16px;display:grid;gap:4px}
+.chapter-save-others>p{margin:0 0 4px;font-size:11.5px;color:var(--color-quiet,#8f8b91)}
+.chapter-save-others button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:9px 12px;border:0;border-radius:13px;background:var(--color-canvas-soft,#131316);color:var(--color-petal);font:inherit;font-size:12px;text-align:left;cursor:pointer;transition:background .18s}
+.chapter-save-others button:hover{background:var(--color-surface-raised,#24242b)}
+.chapter-save-others span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chapter-save-others em{flex:none;font-style:normal;color:var(--color-on-muted,#b9b4bd);font-variant-numeric:tabular-nums}
+.chapter-save-dock{color:var(--color-petal)}
+.chapter-save-dock.is-running{background:color-mix(in srgb,var(--color-blossom,#ee3c35) 16%,var(--color-canvas-soft))}
+.chapter-save-dock.is-done{background:color-mix(in srgb,var(--color-petal,#f0e8e5) 14%,var(--color-canvas-soft));animation:chapter-save-done .7s var(--ease-expressive,ease)}
+.chapter-save-dock.is-error{background:color-mix(in srgb,var(--color-blossom,#ee3c35) 30%,var(--color-canvas-soft))}
+.chapter-save-dock .reader-save-ring{width:30px;height:30px}
+.chapter-save-count{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--color-blossom,#ee3c35);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center}
+.chapter-save-dock:focus-visible{outline:2px solid var(--color-blossom,#ee3c35);outline-offset:2px}
+@keyframes reader-save-collapse{from{opacity:1;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(.6)}}
+@keyframes reader-save-dock-open{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+@keyframes reader-save-dock-close{from{opacity:1;transform:none}to{opacity:0;transform:scale(.25)}}
+@keyframes reader-save-sink{from{opacity:1;transform:none}to{opacity:0;transform:translateY(40px)}}
+@keyframes chapter-save-done{0%{transform:scale(1)}35%{transform:scale(1.14)}100%{transform:scale(1)}}
 @keyframes reader-save-open{from{opacity:0;transform:translate(-50%,-48%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 @keyframes reader-save-rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 @keyframes reader-save-fade{from{opacity:0}to{opacity:1}}
@@ -53,5 +77,9 @@
  .reader-save-count strong{font-size:36px}
  .reader-save-actions{flex-wrap:wrap}.reader-save-hint{flex-basis:100%;order:2;text-align:center;margin:2px 0 0}
  .reader-save-actions>button{flex:1}
+ .reader-save-sheet[data-state=closed]{animation-name:reader-save-sink}
+ .reader-save-sheet.is-docked{top:auto;right:8px;left:8px;transform-origin:50% 100%;max-height:88dvh;animation-name:reader-save-rise}
+ .reader-save-sheet.is-docked[data-state=closed]{animation-name:reader-save-sink}
+ html[data-blossom] .blossom-navbar .chapter-save-dock .reader-save-ring{width:26px;height:26px}
 }
-@media(prefers-reduced-motion:reduce){.reader-save-sheet,.reader-save-backdrop{animation:none}.reader-save-ring circle+circle{transition:none}}
+@media(prefers-reduced-motion:reduce){.reader-save-sheet,.reader-save-backdrop,.reader-save-sheet[data-state=closed],.reader-save-backdrop[data-state=closed],.chapter-save-dock{animation:none!important}.reader-save-ring circle+circle{transition:none}}

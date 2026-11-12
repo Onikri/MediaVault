@@ -32,7 +32,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    assert.equal(file.name,'Тестовая манга · Глава 3 · RU.'+format.toLowerCase());assert.equal(file.entries,5);assert.equal(file.head.slice(0,format==='PDF'?5:2),format==='PDF'?'%PDF-':'PK');
    if(format==='PDF'){await page.getByRole('button',{name:'Готово',exact:true}).click();await page.getByRole('button',{name:'Скачать главу с переводом'}).click();}
   }
-  await page.getByText('1 страница сохранена с пропусками перевода').waitFor();
+  await page.getByText('1 страница сохранена не полностью').waitFor();
   assert.match(await page.locator('.reader-save-problems li').innerText(),/Стр\. 4[\s\S]*1 реплика без перевода/);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   await page.screenshot({path:path.join(DIR,'manga-export-'+width+'.png')});
