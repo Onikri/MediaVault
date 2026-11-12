@@ -4,7 +4,7 @@ RPM is a local admission budget, not a claim about the project's Google balance.
 Only Google-reported quota dimensions and retry delays are provider facts.
 """
 import asyncio,hashlib,json,math,random,sqlite3,time
-from contextlib import closing
+from contextlib import closing,contextmanager
 from datetime import datetime,timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -115,7 +115,7 @@ class GatewayLimited(Exception):
 
 class GoogleGatewayLimits:
     def __init__(self,path,clock=time.time):
-        self.path=str(path);self.clock=clock;self.lock=asyncio.Lock();self.busy={};self.changed=asyncio.Event();self.cursor=0
+        self.path=str(path);self.clock=clock;self.lock=asyncio.Lock();self.busy={};self.changed=asyncio.Event();self.cursor=0;self.interactive_sessions=0
         Path(path).parent.mkdir(parents=True,exist_ok=True)
         with closing(sqlite3.connect(self.path)) as db,db:
             db.executescript('''CREATE TABLE IF NOT EXISTS calls(id INTEGER PRIMARY KEY,credential TEXT,project TEXT,model TEXT,at REAL,status INTEGER,input_tokens INTEGER,output_tokens INTEGER);
@@ -153,7 +153,13 @@ class GoogleGatewayLimits:
         if today>=budget['rpd']:waits.append(day_end-now)
         return max(0,*waits)
 
-    async def acquire(self,rows,model,preferred=None,on_wait=lambda seconds:None,disconnected=None,max_wait=90,tokens=0):
+    @contextmanager
+    def interactive(self):
+        self.interactive_sessions+=1;self.changed.set()
+        try:yield
+        finally:self.interactive_sessions-=1;self.changed.set()
+
+    async def acquire(self,rows,model,preferred=None,on_wait=lambda seconds:None,disconnected=None,max_wait=90,tokens=0,background=False):
         start=time.monotonic();per_key=1 if preferred is not None else PER_KEY
         while True:
             if disconnected and await disconnected():raise asyncio.CancelledError()
@@ -165,7 +171,8 @@ class GoogleGatewayLimits:
                 for row in ordered:
                     delay=self.delay(row,model,tokens);waits.append(delay)
                     credential=identity(row['key'])
-                    if delay>0 or self.busy.get(credential,0)>=per_key or sum(self.busy.values())>=MAX_FLIGHT:continue
+                    capacity=MAX_FLIGHT-2 if background and self.interactive_sessions else MAX_FLIGHT
+                    if delay>0 or self.busy.get(credential,0)>=per_key or sum(self.busy.values())>=capacity:continue
                     self.busy[credential]=self.busy.get(credential,0)+1;self.cursor=(rows.index(row)+1)%len(rows)
                     with closing(sqlite3.connect(self.path)) as db,db:
                         db.execute('DELETE FROM calls WHERE at<?',(self.clock()-86400*2,))

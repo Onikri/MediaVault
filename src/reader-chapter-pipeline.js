@@ -23,9 +23,9 @@ export function labelPackets(pages,limit=100){
  while(remaining){let budget=limit;out.push(pages.map((p,i)=>{const regions=p.regions.slice(counts[i],counts[i]+budget);counts[i]+=regions.length;budget-=regions.length;remaining-=regions.length;return {...p,regions};}));}return out;
 }
 export class ChapterPreparation{
- constructor(chapter){this.c=chapter;this.tasks=chapter.entries.map(()=>deferred());this.sources=chapter.entries.map(()=>deferred());this.cleaned=chapter.entries.map(()=>deferred());this.held=new Map();this.getting=new Map();this.memory=new Map();this.scanPending=new Set(chapter.entries.map((_,i)=>i));this.cleanPending=new Set(this.scanPending);this.nextSource=0;this.done=0;this.downloaded=0;this.cleanDone=new Set();this.cleanFailed=new Set();this.started=false;}
+ constructor(chapter){this.c=chapter;this.tasks=chapter.entries.map(()=>deferred());this.sources=chapter.entries.map(()=>deferred());this.cleaned=chapter.entries.map(()=>deferred());this.held=new Map();this.getting=new Map();this.memory=new Map();this.scanPending=new Set(chapter.entries.map((_,i)=>i));this.cleanPending=new Set(this.scanPending);this.sourcePending=new Set(this.scanPending);this.done=0;this.downloaded=0;this.cleanDone=new Set();this.cleanFailed=new Set();this.started=false;}
  start(){if(this.started)return;this.started=true;for(let n=0;n<(this.c.config.saveData?1:4);n++)this.load();for(let n=0;n<(this.c.config.saveData?1:2);n++)this.scan();this.cleanLoop();}
- async load(){const c=this.c;while(!c.controller.signal.aborted){const index=this.nextSource++;if(index>=this.sources.length)return;try{const blob=c.jobs.get(index)?.blob||await c.entries[index].async('blob');c.controller.signal.throwIfAborted();this.sources[index].resolve({blob});this.downloaded++;}catch(error){this.sources[index].reject(error);}}}
+ async load(){const c=this.c;while(!c.controller.signal.aborted&&this.sourcePending.size){const index=this.take(this.sourcePending);try{const blob=c.jobs.get(index)?.blob||await c.entries[index].async('blob');c.controller.signal.throwIfAborted();this.sources[index].resolve({blob});this.downloaded++;}catch(error){this.sources[index].reject(error);}}}
  take(pending){const focus=this.c.focusWindow||[],index=focus.find(i=>pending.has(i))??pending.values().next().value;pending.delete(index);return index;}
  async scan(){const c=this.c;while(!c.controller.signal.aborted&&this.scanPending.size){const index=this.take(this.scanPending);
   try{
@@ -75,6 +75,7 @@ export async function drainOrderedChapter(c){
  try{
   c.preparation.start();
   while(!c.controller.signal.aborted){
+   const startupWait=c.waitForStartup();if(startupWait)await startupWait;if(c.controller.signal.aborted)break;
    if(c.priorityBarrier){if(inFlight.size){await Promise.allSettled([...inFlight]);continue;}c.priorityBarrier=false;}
    if(inFlight.size>=parallel||(c.activePages||0)+c.batchSize()>pageBuffer&&inFlight.size){await Promise.race(inFlight);continue;}
    const pending=c.pendingJobs();
@@ -97,10 +98,10 @@ export async function drainOrderedChapter(c){
    }
    const first=pending[0],group=[],sources=[],epoch=c.priorityEpoch,priority=c.priorityPages.has(first.index);let key;
    try{
-    const blocks=c.config.directInput==='blocks',max=blocks?pageBuffer-(c.activePages||0):c.packetRange(first.index).count;let pixels=0,regions=0;
+    const startup=c.isStartup(first.index),blocks=c.config.directInput==='blocks',max=startup&&!c.config.webtoon?1:blocks?pageBuffer-(c.activePages||0):c.packetRange(first.index).count;let pixels=0,regions=0;
     if(!blocks&&(c.activePages||0)+max>pageBuffer&&inFlight.size){await Promise.race(inFlight);continue;}
     for(const job of pending){
-     if(c.priorityPages.has(job.index)!==priority||group.length>=max||group.length&&job.index!==group.at(-1).index+1)break;
+     if(!startup&&c.priorityPages.has(job.index)!==priority||group.length>=max||group.length&&job.index!==group.at(-1).index+1)break;
      const source=await c.preparation.get(job.index);
      if(blocks&&sources.length&&(pixels+source.width*source.height>BLOCK_LIMITS.pixels||regions+source.regions.length>100))break;
      job.state='running';c.pageStates.set(job.index,{page:job.index+1,state:'running'});group.push(job);sources.push(source);job.prepared=source;job.blob=source.blob;pixels+=source.width*source.height;regions+=source.regions.length;
@@ -121,7 +122,7 @@ export async function drainOrderedChapter(c){
     await c.pacer.reserve(key,c.controller.signal);
     if(epoch!==c.priorityEpoch){c.keyBusy.delete(key);key=null;for(const job of group)job.state='queued';continue;}
     const local=sources.filter(p=>active.some(j=>j.index+1===p.page));
-    if(!blocks&&local.length===1&&c.entries.length>1){const neighbour=local[0].page<c.entries.length?local[0].page:local[0].page-2;try{local.push(await c.preparation.get(neighbour));local.sort((a,b)=>a.page-b.page);}catch{}}
+    if(!startup&&!blocks&&local.length===1&&c.entries.length>1){const neighbour=local[0].page<c.entries.length?local[0].page:local[0].page-2;try{local.push(await c.preparation.get(neighbour));local.sort((a,b)=>a.page-b.page);}catch{}}
     c.activePages=(c.activePages||0)+active.length;const leasedKey=key;
     const task=translatePacket(c,active,local,leasedKey,hits.every(Boolean)?hits:null).then(completed=>{c.keyBusy.delete(leasedKey);for(const[job,page]of completed){const settled=c.settle(job,page);if(job.retryAfterChapter)settled.then(()=>c.config.onRecovered?.(job.index));}}).catch(error=>{c.keyBusy.delete(leasedKey);for(const job of active)if(job.state!=='done')c.fail(job,error,{retryable:true});}).finally(()=>{c.keyBusy.delete(leasedKey);c.activePages-=active.length;inFlight.delete(task);c.active=inFlight.size;});
     inFlight.add(task);c.active=inFlight.size;key=null;
@@ -135,7 +136,7 @@ async function translatePacket(c,jobs,sources,key,cachedPages){
  let translated=cachedPages||[],diagnostics,usage,options,refusal;
  if(send.length){
   for(const job of jobs)c.notify(job.index,{phase:'translating',message:blocks?'Блоки · '+sources.length+' исходных страниц на '+send.length+' листах':'Перевод по порядку · страницы '+sources.map(p=>p.page).join(', '),totalRegions:job.prepared.regions.length});
-  options={key,paced:true,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:c.config.gemmaProfile||'compat',context:[...c.context].filter(([i])=>i<jobs[0].index).sort((a,b)=>a[0]-b[0]).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{if(value.gateway?.personal===false&&Number.isInteger(value.gateway.slot))for(const job of jobs)job.keySlot=value.gateway.slot+1;diagnostics={...value,local:{batchPages:sources.map(p=>p.page),buffer:9},transport:{viaOracle:!!c.config.directViaOracle,keySlot:jobs[0].keySlot,serverKey:jobs[0].serverKey}};for(const job of jobs)c.notify(job.index,{phase:'translating',message:({prepared:'Запрос подготовлен',sending:'Отправляем пакет в Google',uploading:'Отправляем изображения в Google',waiting:'Пакет отправлен · ждём Google',headers:'Google начал отвечать',receiving:'Получаем ответ Google',streaming:'Google присылает перевод',complete:'JSON проверен'}[value.stage]||'Пакет · '+value.stage),diagnostics});}};
+  options={key,paced:true,interactive:jobs.some(j=>c.isStartup(j.index)),model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:c.config.gemmaProfile||'compat',context:[...c.context].filter(([i])=>i<jobs[0].index).sort((a,b)=>a[0]-b[0]).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{if(value.gateway?.personal===false&&Number.isInteger(value.gateway.slot))for(const job of jobs)job.keySlot=value.gateway.slot+1;diagnostics={...value,local:{batchPages:sources.map(p=>p.page),buffer:9},transport:{viaOracle:!!c.config.directViaOracle,keySlot:jobs[0].keySlot,serverKey:jobs[0].serverKey}};for(const job of jobs)c.notify(job.index,{phase:'translating',message:({prepared:'Запрос подготовлен',sending:'Отправляем пакет в Google',uploading:'Отправляем изображения в Google',waiting:'Пакет отправлен · ждём Google',headers:'Google начал отвечать',receiving:'Получаем ответ Google',streaming:'Google присылает перевод',complete:'JSON проверен'}[value.stage]||'Пакет · '+value.stage),diagnostics});}};
   if(!cachedPages){
   // A refused packet is split and retried on Google; bubbles it still refuses
   // come back marked `refused` for the fallback model (manga-refusal.js).

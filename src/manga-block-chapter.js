@@ -8,6 +8,7 @@ export async function drainBlockChapter(c){
  if(c.blockDispatching||c.controller.signal.aborted)return;c.blockDispatching=true;
  const flights=c.blockFlights||(c.blockFlights=new Set()),parallel=Math.min(6,Math.max(1,c.serverSlots.length||(c.getKey===directKey?6:1)));
  try{while(!c.controller.signal.aborted){
+  const startupWait=c.waitForStartup();if(startupWait)await startupWait;if(c.controller.signal.aborted)break;
   if(flights.size>=parallel){await Promise.race(flights);continue;}
   const waiting=[...c.jobs.values()].filter(j=>j.state==='queued'),first=waiting.find(j=>!j.background)||waiting[0];if(!first){if(flights.size){await Promise.allSettled([...flights]);continue;}break;}
   const group=[],prepared=[];let key,sourcePixels=0,sourceBytes=0;const started=performance.now();
@@ -15,7 +16,7 @@ export async function drainBlockChapter(c){
    // First-page cache hits need no neighbour work. If it is missing, rebuild
    // any linked neighbours together so cached halves cannot split a sentence.
    const firstHit=await c.cached(first);if(firstHit){c.settle(first,firstHit);continue;}
-   const previous=c.config.webtoon&&first.index>0&&!c.jobs.has(first.index-1)?first.index-1:first.index;
+   const previous=c.config.webtoon&&first.index>0&&!c.config.skipPages?.has(first.index-1)&&!c.jobs.has(first.index-1)?first.index-1:first.index;
    for(let n=previous;n<c.entries.length;n++){
     if(c.config.skipPages?.has(n))break;
     let job=c.jobs.get(n);if(job&&job.state!=='queued'){if(n>=first.index)break;continue;}
@@ -35,7 +36,7 @@ export async function drainBlockChapter(c){
      prepared.push({...page,blob:job.blob});sourcePixels=nextPixels;sourceBytes=nextBytes;
      const sheets=packBlockSheets(linkPageBlocks(prepared,{direction:c.direction,webtoon:c.config.webtoon}));
      const nextEdge=c.config.webtoon&&n<c.entries.length-1&&page.regions.some(r=>page.height-r.bbox[3]<=Math.max(16,page.width*.025));
-     if(n>=first.index&&!nextEdge&&(sheets.length>=2||performance.now()-started>1800||c.config.saveData))break;
+     if(n>=first.index&&!nextEdge&&(c.isStartup(first.index)||sheets.length>=2||performance.now()-started>1800||c.config.saveData))break;
     }catch(error){c.fail(job,error);job.state='failed';break;}
    }
    let active=group.filter(j=>j.state==='running');if(!active.length)continue;
@@ -61,7 +62,7 @@ async function translateBlockPacket(c,active,prepared,key){
     const answers=[],ledger=refusalLedger();
     for(const current of blockPackets(packed)){
      for(const job of active)c.notify(job.index,{phase:'translating',message:'Блоки · '+current.length+' лист(а), '+prepared.length+' исходных страниц',model:c.config.directModel,totalRegions:job.prepared.regions.length,completedRegions:0});
-     const result=await callGoogleSplitting(c,current,{key,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:'compat',allowMissing:true,context:[...c.context].filter(([i])=>i<active[0].index).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{
+     const result=await callGoogleSplitting(c,current,{key,interactive:active.some(j=>c.isStartup(j.index)),model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:'compat',allowMissing:true,context:[...c.context].filter(([i])=>i<active[0].index).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{
       diagnostics={...value,blocks:{sourcePages:prepared.map(p=>p.page),sheets:current.map(s=>({id:s.id,width:s.width,height:s.height,placements:s.placements.map(p=>({id:p.group.id,box:p.box,parts:p.group.parts.map(part=>({page:part.page,bbox:part.bbox}))}))})),joined:groups.filter(g=>g.parts.length>1).map(g=>g.id)},transport:{viaOracle:!!c.config.directViaOracle,keySlot:active[0]?.keySlot,serverKey:!!c.serverSlots.length}};
       for(const job of active)c.notify(job.index,{phase:'translating',message:'Лист блоков · '+value.stage,diagnostics});
      }},{sources:prepared,ledger});answers.push(...result.pages);usage.push(result.usage);

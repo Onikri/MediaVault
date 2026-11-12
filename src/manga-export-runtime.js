@@ -6,8 +6,8 @@ import {stopLmt} from './lmt-client.js';
 window.translateExportChapter=async({count,options,slots,skip=[]})=>{
  const controller=new AbortController(),ignored=new Set(skip);
  const entries=Array.from({length:count},(_,index)=>({async:async()=>new Blob([fromBase64(await window.exportSourcePage(index))])}));
- const config=translationConfig({...options,directTimeoutMs:120000,engine:'vm',directViaOracle:true,chapterPipeline:false,cache:false,allowDownloads:true,skipPages:ignored});
- const service={session:{googleGatewayVersion:4},request:(path,request)=>window.exportGoogleRequest(path,request.body||{})};
+ const config=translationConfig({...options,firstPagePriority:true,directTimeoutMs:120000,engine:'vm',directViaOracle:true,chapterPipeline:false,cache:false,allowDownloads:true,skipPages:ignored});
+ const service={session:{googleGatewayVersion:5},request:(path,request)=>window.exportGoogleRequest(path,request.body||{})};
  const chapter=new DirectChapter({entries,scope:'vm-export',keyScope:'vm-export',config,direction:options.direction,serverSlots:slots,service:()=>service});
  try{
   const pending=entries.map((_,index)=>index).filter(index=>!ignored.has(index)),failures=new Map();
@@ -35,7 +35,9 @@ window.translateExportChapter=async({count,options,slots,skip=[]})=>{
     await Promise.all(packet.map((index,i)=>loaded[i].status==='fulfilled'?save(index,loaded[i].value).catch(error=>failures.set(index,error)):failures.set(index,loaded[i].reason)));
    }
   };
-  await run(pending);
+  // Source reads, detection and rendering of later pages cannot hold up page 1.
+  await run(pending.slice(0,1));
+  await run(pending.slice(1));
   // Keep already verified pages and retry only missing work.
   if(failures.size){
    await run([...failures].filter(([,error])=>!error?.needsReview).map(([index])=>index).sort((a,b)=>a-b));

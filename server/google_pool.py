@@ -5,6 +5,7 @@ import httpx
 from fastapi import Depends,HTTPException,Request
 from pydantic import BaseModel,Field,SecretStr,ConfigDict
 from typing import Literal
+from google_interactive import FirstPageTimeout
 MODELS=('gemini-3.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
 # Models added after key slots were saved are allowed on every slot. (Owner rule: no non-Lite Flash.)
 LATER_MODELS=()
@@ -73,6 +74,7 @@ class Generate(BaseModel):
     # Personal mode: explicitly join the owner's pool. Server slots: treat the
     # requested slot as a preference and fail over inside this one gateway call.
     pool:bool=False
+    priority:Literal['normal','interactive','background']='normal'
 
 def install(app,owner,get_store,translator=None):
     global _store
@@ -155,23 +157,31 @@ def install(app,owner,get_store,translator=None):
         from google_gateway_limits import estimate
         tokens=estimate(request,model)
         try:
-            while True:
-                lease=await state().acquire(spare or rows,model,preferred=body.slot,tokens=tokens,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),disconnected=connection.is_disconnected)
-                row,call=lease
-                network.update(activity,'translating',slot=row.get('slot'))
-                if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
-                # Exactly the same request body as personal mode. No countTokens
-                # round trip: the TPM budget uses the size estimate of the body.
-                async with httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':row['key']}) as client:
-                    response=await client.post('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',json=request)
+            if body.priority=='interactive' and body.pool:
+                from google_interactive import generate_first_page
+                row,response=await generate_first_page(rows,model,request,state(),preferred=body.slot,tokens=tokens,
+                    disconnected=connection.is_disconnected,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),
+                    on_start=lambda row:network.update(activity,'translating',slot=row.get('slot')))
                 status_code=response.status_code
-                # 429 (quota) or 5xx (overloaded) moves to another key once.
-                if (status_code==429 or status_code>=500) and spare:
-                    state().finish(row,model,call,status_code,None,response);lease=None
-                    spare=[r for r in spare if key_identity(r['key'])!=key_identity(row['key']) and key_project(r)!=key_project(row)]
-                    if spare:
-                        network.update(activity,'quota');continue
-                break
+                network.update(activity,'translating',slot=row.get('slot'))
+            else:
+                while True:
+                    lease=await state().acquire(spare or rows,model,preferred=body.slot,tokens=tokens,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),disconnected=connection.is_disconnected,background=body.priority=='background')
+                    row,call=lease
+                    network.update(activity,'translating',slot=row.get('slot'))
+                    if await connection.is_disconnected():raise HTTPException(499,'Запрос отменён до перевода.')
+                    # Exactly the same request body as personal mode. No countTokens
+                    # round trip: the TPM budget uses the size estimate of the body.
+                    async with httpx.AsyncClient(timeout=120,follow_redirects=False,headers={'x-goog-api-key':row['key']}) as client:
+                        response=await client.post('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',json=request)
+                    status_code=response.status_code
+                    # 429 (quota) or 5xx (overloaded) moves to another key once.
+                    if (status_code==429 or status_code>=500) and spare:
+                        state().finish(row,model,call,status_code,None,response);lease=None
+                        spare=[r for r in spare if key_identity(r['key'])!=key_identity(row['key']) and key_project(r)!=key_project(row)]
+                        if spare:
+                            network.update(activity,'quota');continue
+                    break
             if status_code!=200:
                 from google_gateway_limits import provider_limit
                 delay,_=provider_limit(response,time.time())
@@ -185,6 +195,9 @@ def install(app,owner,get_store,translator=None):
         except GatewayLimited as error:
             network.update(activity,'error',429,retry_after=error.seconds)
             raise HTTPException(429,'Все доступные ключи ожидают квоту Google · повтор через '+str(error.seconds)+' с',headers={'Retry-After':str(error.seconds)}) from None
+        except FirstPageTimeout:
+            status_code=504;network.update(activity,'error',status_code)
+            raise HTTPException(504,'Google не успел перевести первую страницу. Готовый перевод сохранён; повтори страницу.') from None
         except HTTPException as error:
             status_code=error.status_code;network.update(activity,'error',status_code);raise
         except httpx.HTTPError:

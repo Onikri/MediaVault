@@ -38,7 +38,7 @@ def main():
             response=original(method,url,**kw)
             try:usage=response.json().get('usageMetadata',{})
             except ValueError:usage={}
-            calls.append({'startSeconds':round(t-started,3),'seconds':round(time.monotonic()-t,3),'status':response.status_code,'inputTokens':usage.get('promptTokenCount'),'requestBytes':len(json.dumps(kw.get('json',{})))})
+            calls.append({'startSeconds':round(t-started,3),'seconds':round(time.monotonic()-t,3),'status':response.status_code,'inputTokens':usage.get('promptTokenCount'),'priority':kw.get('json',{}).get('priority','normal'),'requestBytes':len(json.dumps(kw.get('json',{})))})
             return response
         finally:
             with lock:flight-=1
@@ -53,7 +53,7 @@ def main():
     result={'label':args.label,'kind':'real-google-and-canvas-synthetic-pages','pages':args.pages}
     try:runtime.translate_pages(SimpleNamespace(owner=row[0]),pages,options,[],save,lambda value:None,Budget())
     except Exception as error:result['error']=type(error).__name__+': '+str(error)[:180]
-    result.update(seconds=round(time.monotonic()-started,3),saved=saved,gatewayCalls=calls,peakGatewayRequests=peak)
+    result.update(seconds=round(time.monotonic()-started,3),firstPageSeconds=saved.get(0,{}).get('seconds'),saved=saved,gatewayCalls=calls,peakGatewayRequests=peak)
     print(json.dumps(result,ensure_ascii=False),flush=True)
 
 if __name__=='__main__':main()

@@ -1,6 +1,6 @@
 import {googleModel} from './google-models.js';
 import {restoreDirectKeys} from './manga-direct-key.js';
-import {sharedRequestPacer} from './reader-chapter-pipeline.js';
+import {sharedRequestPacer,gatewayRequestPacer} from './reader-chapter-pipeline.js';
 export const READER_LANGUAGES={en:'English',ja:'Japanese',ko:'Korean',zh:'Chinese (Simplified)'};
 const proportions={type:'OBJECT',properties:Object.fromEntries(['en','ja','ko','zh','other'].map(key=>[key,{type:'NUMBER'}]))};
 export const readerLanguageSchema={type:'OBJECT',properties:{dialogue:proportions,sfx:proportions,hasDialogue:{type:'BOOLEAN'}},required:['dialogue','sfx','hasDialogue']};
@@ -16,21 +16,27 @@ export async function readerProbeImage(blob,{signal}={}){
   const scale=Math.min(1,1280/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);signal?.throwIfAborted();return canvas.toDataURL('image/jpeg',.78).split(',')[1];
  }finally{bitmap.close();}
 }
-export async function probeReaderLanguage({entries,page=0,config,keyScope,serverSlots=[],service,signal,encode=readerProbeImage,send,pacer=sharedRequestPacer}){
+export async function probeReaderLanguage({entries,page=0,config,keyScope,serverSlots=[],service,signal,encode=readerProbeImage,send,pacer}){
  const started=performance.now(),model=googleModel(config.directModel);if(!model)throw Error('Выбери поддерживаемую модель Google.');
  const keys=config.engine==='direct'?await restoreDirectKeys(keyScope):[],key=keys[0],slot=config.engine==='vm'?serverSlots[0]:undefined;
  if(!key&&slot===undefined)return{skipped:true,language:config.language,message:'Автоопределение пропущено: нет доступного ключа. Готовый кэш можно читать.'};
  const indices=[Math.max(0,Math.min(entries.length-1,page)),Math.max(0,Math.min(entries.length-1,page+1))].filter((v,i,a)=>v>=0&&a.indexOf(v)===i);
  if(!indices.length)throw Error('Глава ещё загружается.');
- const images=await Promise.all(indices.map(async index=>{const blob=await entries[index].async('blob');signal?.throwIfAborted();return{inlineData:{mimeType:'image/jpeg',data:await encode(blob,{signal})}};}));
+ const pending=indices.map(async index=>{const blob=await entries[index].async('blob');signal?.throwIfAborted();return{index,part:{inlineData:{mimeType:'image/jpeg',data:await encode(blob,{signal})}}};});
+ // A slow neighbouring page must not hold the visible page behind a probe.
+ // Reuse it when already available; shared source reads need not be cancelled.
+ pending.forEach(p=>p.catch(()=>{}));
+ const samples=[await pending[0]];
+ if(pending[1]){let timer;try{const next=await Promise.race([pending[1].catch(()=>null),new Promise(resolve=>timer=setTimeout(()=>resolve(null),350))]);if(next)samples.push(next);}finally{clearTimeout(timer);}}
+ const images=samples.map(v=>v.part),viaOracle=config.directViaOracle!==false||config.engine==='vm';
  const request={contents:[{role:'user',parts:[{text:readerLanguagePrompt},...images]}],generationConfig:{temperature:0,maxOutputTokens:512,responseMimeType:'application/json',...(!model.id.startsWith('gemma-')?{responseSchema:readerLanguageSchema}:{}),...(model.thinking?{thinkingConfig:model.thinking}:{})}};
- await pacer.reserve(key||'oracle-slot:'+slot,signal);signal?.throwIfAborted();const prepMs=Math.round(performance.now()-started),apiStart=performance.now();let data;
+ await (pacer||(viaOracle?gatewayRequestPacer:sharedRequestPacer)).reserve(key||'oracle-slot:'+slot,signal);signal?.throwIfAborted();const prepMs=Math.round(performance.now()-started),apiStart=performance.now();let data;
  if(send)data=await send({request,key,slot,model:model.id,signal});
  else if(config.directViaOracle!==false||config.engine==='vm'){
   if(!service||service.status!=='connected')throw Error('Подключи Oracle для проверки языка и ключа.');
-  data=await service.request('/reader/google/generate',{method:'POST',body:{...(key?{key}:{slot}),model:model.id,request},signal});
+  data=await service.request('/reader/google/generate',{method:'POST',body:{...(key?{key}:{slot}),...(Number(service.session?.googleGatewayVersion)>=5?{priority:'interactive',...(!key?{pool:true}:{})}:{}),model:model.id,request},signal});
  }else{
   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model.id+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(request),signal});if(!response.ok){const error=Error('Google · HTTP '+response.status);error.status=response.status;throw error;}data=await response.json();
  }
- signal?.throwIfAborted();return{...parseReaderLanguage(data,config.language),model:model.id,keyVerified:true,slot:slot===undefined?0:slot,credentialMode:key?'personal':'server',samplePages:indices.map(n=>n+1),prepMs,apiMs:Math.round(performance.now()-apiStart),totalMs:Math.round(performance.now()-started)};
+ signal?.throwIfAborted();return{...parseReaderLanguage(data,config.language),model:model.id,keyVerified:true,slot:slot===undefined?0:slot,credentialMode:key?'personal':'server',samplePages:samples.map(v=>v.index+1),prepMs,apiMs:Math.round(performance.now()-apiStart),totalMs:Math.round(performance.now()-started)};
 }

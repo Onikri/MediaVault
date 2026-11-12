@@ -116,11 +116,11 @@ export default function MangaReader({item,catalog,userId,libraryId,onClose,onSel
  useLayoutEffect(()=>{queueRef.current?.close();vmRef.current?.close();vmRef.current=null;directRef.current?.close();directRef.current=null;
   if(!prefs.translate)return;
   if(lmt.engine==='direct'){
-   if(entries.length)directRef.current=new DirectChapter({entries,scope,keyScope:String(userId||'anonymous'),config:{...translationConfig(lmt),onRecovered,saveData,webtoon:readerProfile==='webtoon',direction:prefs.direction,contextKey:item.id,contextURL:item.sourceURL},service:()=>serviceRef.current,direction:prefs.direction});
+   if(entries.length)directRef.current=new DirectChapter({entries,scope,keyScope:String(userId||'anonymous'),config:{...translationConfig(lmt),firstPagePriority:true,onRecovered,saveData,webtoon:readerProfile==='webtoon',direction:prefs.direction,contextKey:item.id,contextURL:item.sourceURL},service:()=>serviceRef.current,direction:prefs.direction});
    return()=>{directRef.current?.close();directRef.current=null;stopLmt();};
   }
   if(lmt.engine==='vm'){
-   if(entries.length&&serverSlots?.length)directRef.current=new DirectChapter({entries,scope,keyScope:String(userId||'anonymous'),config:{...translationConfig(lmt),onRecovered,saveData,webtoon:readerProfile==='webtoon',direction:prefs.direction,directViaOracle:true,contextKey:item.id,contextURL:item.sourceURL},serverSlots,service:()=>serviceRef.current,direction:prefs.direction});
+   if(entries.length&&serverSlots?.length)directRef.current=new DirectChapter({entries,scope,keyScope:String(userId||'anonymous'),config:{...translationConfig(lmt),firstPagePriority:true,onRecovered,saveData,webtoon:readerProfile==='webtoon',direction:prefs.direction,directViaOracle:true,contextKey:item.id,contextURL:item.sourceURL},serverSlots,service:()=>serviceRef.current,direction:prefs.direction});
    if(serverSlots!==null&&!directRef.current&&lmt.directInput!=='blocks'&&entries.length&&lmt.vmPolicy&&!item.onlinePages?.length&&item.chunks?.length)vmRef.current=new VmChapter({model:lmt.directModel,item,names:entries.map(e=>e.name),direction:prefs.direction,scope,service:()=>serviceRef.current,cache:lmt.cache,policy:lmt.vmPolicy,canStart:()=>backendRef.current?.vm?.configured===true});
    return()=>{vmRef.current?.close();vmRef.current=null;directRef.current?.close();directRef.current=null;};
   }
@@ -188,7 +188,7 @@ export default function MangaReader({item,catalog,userId,libraryId,onClose,onSel
  const saveRef=useRef(null);saveRef.current={entries,prefs,item,scope,userId,saveData,readerProfile,onRecovered};
  const exportChapterOptions=useCallback(()=>{
   const {entries,prefs,item,scope,userId,saveData,readerProfile,onRecovered}=saveRef.current,value=lmtRef.current,keyScope=String(userId||'anonymous');
-  const config={...translationConfig(value),onRecovered,saveData,webtoon:readerProfile==='webtoon',direction:prefs.direction,contextKey:item.id,contextURL:item.sourceURL};
+  const config={...translationConfig(value),firstPagePriority:true,onRecovered,saveData,webtoon:readerProfile==='webtoon',direction:prefs.direction,contextKey:item.id,contextURL:item.sourceURL};
   const base={entries,scope,keyScope,service:()=>serviceRef.current,direction:prefs.direction};
   if(value.engine==='vm'&&serverSlotsRef.current?.length)return {...base,config:{...config,directViaOracle:true},serverSlots:serverSlotsRef.current};
   if(value.engine==='direct')return {...base,config};

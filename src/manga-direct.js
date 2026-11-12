@@ -34,7 +34,9 @@ export class DirectChapter{
  }
  notify(index,value){this.lastActivity=performance.now();const old=this.progress.get(index)||{};value=value.phase==='cleaning'&&(old.phase==='error'||old.phase==='translating'&&this.jobs.get(index)?.state==='running')?{...old,backgroundCleanup:value}:{...old,...value};this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
  request(index,blob,background=false){
-  this.controller.signal.throwIfAborted();let job=this.jobs.get(index);
+  this.controller.signal.throwIfAborted();
+  if(!background&&this.config.firstPagePriority&&this.startupIndex===undefined){this.startupIndex=index;this.startupGate=new Promise(resolve=>this.releaseStartup=resolve);this.focusWindow=[index,...this.focusWindow.filter(i=>i!==index)];this.priorityPages.add(index);}
+  let job=this.jobs.get(index);
   if(job){if(!background)job.background=false;return job;}
   job={index,blob,background,state:'queued',started:performance.now()};
   job.promise=new Promise((resolve,reject)=>Object.assign(job,{resolve,reject}));job.promise.catch(()=>{});
@@ -67,8 +69,9 @@ export class DirectChapter{
   if(this.config.directInput==='blocks')return drainBlockChapter(this);
   const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1);if(this.active>=Math.min(6,capacity)||this.controller.signal.aborted)return;this.active++;
   try{while(!this.controller.signal.aborted){
+   const startupWait=this.waitForStartup();if(startupWait)await startupWait;if(this.controller.signal.aborted)break;
    const pending=[...this.jobs.values()].filter(j=>j.state==='queued'),first=pending.find(j=>!j.background)||pending[0];if(!first)break;
-   const block=Math.floor(first.index/this.batchSize());let group=pending.filter(j=>Math.floor(j.index/this.batchSize())===block).sort((a,b)=>a.index-b.index);
+   const offset=this.startupIndex===0?1:0,block=Math.floor((first.index-offset)/this.batchSize());let group=this.isStartup(first.index)&&!this.config.webtoon?[first]:pending.filter(j=>Math.floor((j.index-offset)/this.batchSize())===block).sort((a,b)=>a.index-b.index);
    for(const job of group){job.state='running';job.queueMs=Math.round(performance.now()-job.started);}
    try{
     await Promise.all(group.map(async job=>{try{const hit=await this.cached(job);if(hit)this.settle(job,hit);}catch(error){this.fail(job,error);job.state='failed';}}));group=group.filter(j=>j.state==='running');if(!group.length)continue;
@@ -88,7 +91,7 @@ export class DirectChapter{
      const regions=nonempty.reduce((n,p)=>n+p.regions.length,0);
      if(regions>300)throw Error('Слишком много реплик для пакета. Уменьши область поиска текста.');
      for(const job of group)this.notify(job.index,{phase:'translating',message:'Напрямую в Google · '+nonempty.length+' стр., минимальные размышления',model:this.config.directModel,totalRegions:prepared.find(p=>p.page===job.index+1)?.regions.length,completedRegions:0,attempt:1});
-     const start=performance.now();const options={key,model:this.config.directModel,language:this.config.language,direction:this.direction,gemmaProfile:this.config.gemmaProfile||'native',context:[...this.context].filter(([i])=>i<group[0].index).sort((a,b)=>a[0]-b[0]).map(([,text])=>text).join('\n').slice(-1200),signal:this.controller.signal,timeoutMs:this.config.directTimeoutMs,onDiagnostic:value=>{
+     const start=performance.now();const options={key,interactive:group.some(j=>this.isStartup(j.index)),model:this.config.directModel,language:this.config.language,direction:this.direction,gemmaProfile:this.config.gemmaProfile||'native',context:[...this.context].filter(([i])=>i<group[0].index).sort((a,b)=>a[0]-b[0]).map(([,text])=>text).join('\n').slice(-1200),signal:this.controller.signal,timeoutMs:this.config.directTimeoutMs,onDiagnostic:value=>{
       const names={prepared:'Запрос подготовлен',sending:'Отправляем в Google · соединение и CORS',uploading:'Отправляем изображение в Google',waiting:'Изображение отправлено · ждём Google',headers:'Google начал отвечать',streaming:'Gemma присылает перевод · поток активен',receiving:'Получаем ответ Google',received:'Ответ получен · проверяем JSON',complete:'JSON проверен',error:'Ошибка Google'};
       const local={batchPages:nonempty.map(p=>p.page),sourceBytes:group.reduce((sum,j)=>sum+(j.blob?.size||0),0),queueMs:first.queueMs,sourceReadMs:first.sourceReadMs,fingerprintAndCacheMs:first.cacheMs,clientPreparationMs:first.prepareMs,...first.prepared?.prepareTimings};
       first.diagnostics={...value,local,transport:{viaOracle:!!this.config.directViaOracle,keySlot:first.keySlot,serverKey:first.serverKey}};for(const job of group)this.notify(job.index,{phase:'translating',message:names[value.stage]||'Google · обработка',model:this.config.directModel,completedRegions:value.metrics?.completedRegions||0,totalRegions:job.prepared?.regions.length,diagnostics:first.diagnostics});
@@ -191,7 +194,7 @@ export class DirectChapter{
   signal?.throwIfAborted();const listeners=this.listeners.get(index)||new Set();if(status)listeners.add(status);this.listeners.set(index,listeners);
   const last=this.progress.get(index);if(last)status?.(last);
   try{
-   const job=this.request(index,blob,background);
+   const job=this.request(index,blob,background&&!(this.config.firstPagePriority&&this.startupIndex===undefined&&index===0));
    const renderCacheId=(await this.jsonCacheId(blob,index))+':'+RENDER_CACHE_VERSION+':'+(config.inpaint||this.config.inpaint)+':'+font;
    if(this.config.cache&&!this.bypass.has(index)&&!this.recovered.has(index)){const cached=await this.readCache(renderCacheId,this.scope);if(cached?.renderedImage&&!incompleteRender(cached)&&!config.captureDebug)return {...cached,cacheHit:true,timings:{...cached.timings,directTotalMs:Math.round(performance.now()-renderStarted)}};}
    const stored=await waitFor(job.promise,signal),page=fromMemory?{...stored,cacheHit:true,diagnostics:undefined}:stored;signal?.throwIfAborted();
@@ -211,17 +214,22 @@ export class DirectChapter{
    result.timings={...result.timings,directTotalMs:Math.round(performance.now()-(fromMemory?renderStarted:job.started))};
    if(page.diagnostics)result.diagnostics={...page.diagnostics,stage:'ready',cleanup:result.inpaint,typesetting:result.typesetting,local:{...page.diagnostics.local,inpaintMs:result.timings.inpaintMs,typesetMs:result.timings.typesetMs,renderMs:result.timings.renderMs,totalMs:result.timings.directTotalMs}};
    return result;
-  }finally{if(status)listeners.delete(status);if(!listeners.size)this.listeners.delete(index);}
+  }finally{if(index===this.startupIndex)this.startupReady();if(status)listeners.delete(status);if(!listeners.size)this.listeners.delete(index);}
  }
+ isStartup(index){return index===this.startupIndex&&!this.startupDelivered;}
+ startupReady(){this.startupDelivered=true;this.releaseStartup?.();}
+ waitForStartup(){return this.startupGate&&!this.startupDelivered&&this.jobs.get(this.startupIndex)?.state!=='queued'?this.startupGate:null;}
  invalidate(index){if(this.jobs.get(index)?.state==='running')return;const{count,start}=this.packetRange(index);for(let n=start;n<Math.min(this.entries.length,start+count);n++){if(this.jobs.get(n)?.state==='running')continue;this.jobs.delete(n);this.recovered.delete(n);this.incomplete.delete(n);this.progress.delete(n);this.bypass.add(n);}}
  async callGoogle(pages,options){
   const oracle=this.config.directViaOracle&&this.service?.();
   if(this.config.directViaOracle&&this.google===callDirectGoogle&&!oracle)throw Error('Для перевода личным ключом подключи Oracle в профиле.');
   const slot=this.serverSlots.find(slot=>options.key==='oracle-slot:'+slot);
   const serverScheduling=Number(oracle?.session?.googleGatewayVersion)>=4;
+  const firstRequest=Number(oracle?.session?.googleGatewayVersion)>=5&&options.interactive&&!this.interactiveSent;
+  if(firstRequest)this.interactiveSent=true;
   if(this.serverSlots.length&&!oracle)throw Error('Для серверных ключей нужен Oracle.');
   if(!options.paced)await this.pacer.reserve(options.key,options.signal||this.controller.signal);
-  const send=(key,target)=>this.google(pages,{...options,key,...(oracle?{gemmaProfile:'compat',transport:async({json,signal})=>{const data=await oracle.request('/reader/google/generate',{method:'POST',body:{...target,model:options.model,request:JSON.parse(json)},signal});return {status:200,text:JSON.stringify(data)};}}:{})});
+  const send=(key,target)=>this.google(pages,{...options,key,...(oracle?{gemmaProfile:'compat',transport:async({json,signal})=>{const data=await oracle.request('/reader/google/generate',{method:'POST',body:{...target,...(Number(oracle.session?.googleGatewayVersion)>=5?{priority:firstRequest?'interactive':'background'}:{}),model:options.model,request:JSON.parse(json)},signal});return {status:200,text:JSON.stringify(data)};}}:{})});
   try{return await send(options.key,slot===undefined?{key:options.key}:{slot,...(serverScheduling?{pool:true}:{})});}
   catch(error){
    if(!transientGoogleError(error)||(options.signal||this.controller.signal).aborted)throw error;
@@ -256,5 +264,5 @@ export class DirectChapter{
   }
   const id=++this.serial;return new Promise((resolve,reject)=>{this.renders.set(id,{resolve,reject,status,channel});this[channel].postMessage({id,...message});});
  }
- close(){this.controller.abort(cancelled());this.preparation.close(this.controller.signal.reason);for(const channel of ['worker','prepareWorker','cleanWorker']){releaseRenderer(this[channel],[...this.renders.values()].some(j=>j.channel===channel),channel);this[channel]=null;}for(const job of [...this.jobs.values(),...this.renders.values()])job.reject(this.controller.signal.reason);this.jobs.clear();this.renders.clear();this.listeners.clear();this.progress.clear();this.context.clear();}
+ close(){this.controller.abort(cancelled());this.startupReady();this.preparation.close(this.controller.signal.reason);for(const channel of ['worker','prepareWorker','cleanWorker']){releaseRenderer(this[channel],[...this.renders.values()].some(j=>j.channel===channel),channel);this[channel]=null;}for(const job of [...this.jobs.values(),...this.renders.values()])job.reject(this.controller.signal.reason);this.jobs.clear();this.renders.clear();this.listeners.clear();this.progress.clear();this.context.clear();}
 }

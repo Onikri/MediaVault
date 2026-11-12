@@ -135,7 +135,8 @@ export async function saveReaderChapter({total,translate=true,format='cbz',name=
   await Promise.all(Array.from({length:Math.max(1,Math.min(concurrency,indices.length))},worker));
  }
  emit();
- await pool(Array.from({length:total},(_,i)=>i));
+ if(translate){await pool([0]);await pool(Array.from({length:total-1},(_,i)=>i+1));}
+ else await pool(Array.from({length:total},(_,i)=>i));
  if(translate){
   // Overload, quota and network errors pass: wait, then send every unfinished
   // page again (the translator moves each request to a key with free quota).
