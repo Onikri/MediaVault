@@ -208,7 +208,7 @@ class MangaDiscoveryTests(unittest.TestCase):
         return [{'id':'native-dex','sourceId':'2','kind':'manga','title':'Moby Dick','aliases':['Moby Dick','Белый Кит'],'language':'en'}] if 'Moby Dick' in source.get('_queries',[]) else []
     with patch.object(discovery,'installed_sources',return_value=sources):
         manager=self.manager(fetch=fetch,workers=1);job=manager.start('A','Белый кит');result=wait_done(manager,'A',job['id'])
-    self.assertEqual({r['id'] for r in result['results']},{'native-lib','native-dex'});self.assertTrue(any(sid=='2' and terms[:2]==['Moby Dick','Белый Кит'] for sid,terms in seen))
+    self.assertEqual({r['id'] for r in result['results']},{'native-lib','native-dex'});self.assertIn(('2',['Moby Dick']),seen)
     self.assertTrue(manager._indexed('moby dick','1'))
 
  def test_global_queue_reaches_every_source_with_four_shared_workers_and_partial_results(self):
