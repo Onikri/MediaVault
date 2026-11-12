@@ -38,3 +38,14 @@ class MangaInspectionTests(unittest.TestCase):
   self.assertEqual(client.post('/manga/summary',json={'url':'https://manga.example/title'}).status_code,401)
   with patch('manga_sources.inspect',return_value={'title':'Other manga','episodes':[],'seasons':[]}):
    with self.assertRaisesRegex(Exception,'другому произведению'):api.manga_summary(api.MangaInspection(url='https://manga.example/title',title={'kind':'manga','title':'Selected manga'}),subject='owner')
+ def test_english_alias_and_matching_year_open_the_same_russian_source(self):
+  import api
+  title={'kind':'manga','title':'Moon Road','year':2020}
+  value={'title':'Лунная дорога','identityTitles':['Лунная дорога'],'aliases':['Лунная дорога','Moon Road'],'year':2020,'episodes':[],'seasons':[]}
+  with patch('manga_sources.inspect',return_value=value):
+   result=api.manga_inspect(api.MangaInspection(url='https://manga.example/title',title=title),subject='owner')
+  self.assertEqual(result['title'],'Лунная дорога')
+  for selected,upstream in [(title,{**value,'year':1990}),({**title,'year':None},{**value,'year':None}),({**title,'ids':{'mal':'1'}},{**value,'ids':{'mal':'2'}})]:
+   cache._cache.clear()
+   with patch('manga_sources.inspect',return_value=upstream),self.assertRaisesRegex(Exception,'другому произведению'):
+    api.manga_inspect(api.MangaInspection(url='https://manga.example/title',title=selected),subject='owner')
