@@ -13,6 +13,7 @@ import gzip
 import hashlib
 import html
 import json
+import math
 import os
 import re
 import secrets
@@ -23,10 +24,13 @@ from xml.sax.saxutils import escape as xml_escape
 
 PRIMARY = 'gemini-3.1-flash-lite'
 FALLBACK = 'gemini-3.5-flash-lite'
-VERSION = 1
+VERSION = 2
 WINDOW = 25 * 60
 SINGLE_LIMIT = 40 * 60
 MIN_GAP = 30
+# Navigation, not a transcript: about one chapter per 4–5 minutes. A one-hour
+# episode came back as 30 two-minute scenes (three windows of ~10 each).
+SCENE = 270
 RETRY_NONE = {'no-subtitles': 3 * 86400, 'invalid-subtitles': 3 * 86400, 'model-error': 3600}
 RANK = {'player': 3, 'local': 3, 'collaps': 2, 'opensubtitles': 1}
 
@@ -203,6 +207,9 @@ def user_text(meta, cues, start, end, duration, whole):
     if meta.get('description'):
         lines.append('Описание: ' + meta['description'][:900])
     lines.append(f'Длительность видео: {clock(duration)}')
+    target = scene_target(end - start)
+    lines.append(f'Нужно около {target} глав (от {max(1, target - 2)} до {target + 2}): примерно одна на 4–5 минут. '
+                 'Короткие соседние эпизоды одной линии объединяй в одну сцену.')
     if not whole:
         lines.append(f'Это фрагмент видео с {clock(start)} до {clock(end)}. Размечай только его: первая глава начинается в {clock(start)}, '
                      f'последняя заканчивается в {clock(end)}. Время пиши от начала всего видео, как в субтитрах.')
@@ -286,16 +293,28 @@ async def piece(call, meta, cues, lo, hi, duration, whole, usage, depth=0):
         return left + right
 
 
+def scene_target(length):
+    return max(2, round(length / SCENE))
+
+
 def normalize(rows, duration):
     rows = sorted((max(0, int(s)), t) for s, t in rows if s < duration - 5)
+    gap = max(MIN_GAP, min(90, duration / 45))
     kept = []
     for start, title in rows:
-        if kept and start - kept[-1][0] < MIN_GAP:
+        if kept and start - kept[-1][0] < gap:
             continue
         kept.append([start, title])
     if not kept:
         return [[0, 'Видео целиком']]
     kept[0][0] = 0
+    # Too dense for a seek bar: the shortest scene joins the one before it
+    # (the earlier title names the merged span) until the count fits.
+    limit = max(4, math.ceil(duration / SCENE * 1.3))
+    while len(kept) > limit:
+        spans = [(kept[i + 1][0] if i + 1 < len(kept) else duration) - kept[i][0] for i in range(len(kept))]
+        shortest = min(range(1, len(kept)), key=lambda i: spans[i] + spans[i - 1] * .25)
+        del kept[shortest]
     return kept
 
 
@@ -556,9 +575,17 @@ class Store:
 
     def read(self, key):
         try:
-            return json.loads(self.path(key).read_text('utf-8'))
+            record = json.loads(self.path(key).read_text('utf-8'))
         except (OSError, ValueError):
             return None
+        if record.get('v', 1) < VERSION and not record.get('none') and record.get('c'):
+            # Version 1 had no density limit: thin the stored chapters once, without a model call.
+            record = {**record, 'v': VERSION, 'c': normalize(record['c'], record['d'])}
+            try:
+                self.write(key, record)
+            except OSError:
+                pass
+        return record
 
     def write(self, key, value):
         path = self.path(key)
@@ -570,6 +597,9 @@ class Store:
 
 def public(key, record, job=None):
     if job:
+        # A redo (player subtitles) keeps showing the markup it replaces.
+        if record and not record.get('none'):
+            return {**public(key, record), 'state': 'working', 'step': job['step']}
         return {'key': key, 'state': 'working', 'step': job['step']}
     if not record:
         return {'key': key, 'state': 'missing'}

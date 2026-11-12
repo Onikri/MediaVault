@@ -134,44 +134,56 @@ export function chapterSubtitlePick(options){
 
 const memory=new Map();
 // One request per episode; the server answers from its record when one exists.
+// A new answer for the same title: chapters already on the seek bar stay
+// while the server redoes them, polls, or a request fails; only an empty
+// final "none" (or another title) replaces them.
+export function chapterUpdate(old,next){
+ return old?.key===next.key&&!next.chapters.length&&next.state!=='none'&&old.chapters?.length?{...next,chapters:old.chapters,rank:old.rank,source:old.source}:next;
+}
+
 export function useVideoChapters({service,enabled=true,request}){
  const key=request?[request.work,request.season||0,request.episode||0].join('|'):'';
- const [value,setValue]=useState(()=>memory.get(key)||{state:key?'loading':'off',chapters:[]});
+ const [value,setValue]=useState(()=>memory.get(key)||{state:key?'loading':'off',chapters:[],key});
  const live=useRef(request);live.current=request;
+ const api=useRef(service);api.current=service;
  const sent=useRef(new Set());
+ const usable=!!(enabled&&key&&service?.request);
+ // Shown chapters belong to the key: a re-render of the service, a short
+ // sign-in refresh or a redo on the server never blanks the seek bar.
+ const keep=next=>setValue(old=>chapterUpdate(old,next));
  useEffect(()=>{
-  if(!enabled||!key||!service?.request){setValue({state:'off',chapters:[]});return;}
-  setValue(memory.get(key)||{state:'loading',chapters:[]});
+  if(!usable){setValue(old=>old.key===key&&old.chapters.length?old:{state:'off',chapters:[],key});return;}
+  setValue(old=>memory.get(key)||(old.key===key&&old.chapters.length?old:{state:'loading',chapters:[],key}));
   let closed=false,timer=0,rounds=0;
   const ask=async(body)=>{
    try{
-    const data=await service.request('/video-chapters/prepare',{method:'POST',body});
+    const data=await api.current.request('/video-chapters/prepare',{method:'POST',body});
     if(closed)return;
-    const next={state:data.state,chapters:normalizeChapters(data.chapters||[]),source:data.source||'',reason:data.reason||'',key:data.key,rank:data.rank||0};
+    const next={state:data.state,chapters:normalizeChapters(data.chapters||[]),source:data.source||'',reason:data.reason||'',key,rank:data.rank||0};
     if(data.state==='ready'||data.state==='none')memory.set(key,next);
-    setValue(next);
+    keep(next);
     if((data.state==='working'||data.state==='busy')&&rounds++<60)timer=setTimeout(()=>ask(live.current),Math.min(8000,2000+rounds*400));
-   }catch{if(!closed)setValue({state:'error',chapters:[]});}
+   }catch{if(!closed)keep({state:'error',chapters:[],key});}
   };
   ask(live.current);
   return()=>{closed=true;clearTimeout(timer);};
- },[key,enabled,service]);
+ },[key,usable]);
  // The player found subtitles of its own (Alloha, HLS, a local file): better
  // aligned with this very video than a library file, so the server may redo it.
  const submit=useCallback(async(subtitle)=>{
-  if(!enabled||!key||!service?.request||!subtitle?.text||sent.current.has(key))return;
+  const svc=api.current;
+  if(!enabled||!key||!svc?.request||!subtitle?.text||sent.current.has(key))return;
   if(memory.get(key)?.state==='ready'&&memory.get(key).rank>=3)return;
   sent.current.add(key);
+  const read=data=>({state:data.state,chapters:normalizeChapters(data.chapters||[]),source:data.source||'',key,rank:data.rank||0});
   try{
-   const data=await service.request('/video-chapters/prepare',{method:'POST',body:{...live.current,subtitle}});
-   let next={state:data.state,chapters:normalizeChapters(data.chapters||[]),source:data.source||'',key:data.key,rank:data.rank||0};
+   let next=read(await svc.request('/video-chapters/prepare',{method:'POST',body:{...live.current,subtitle}}));
    for(let i=0;next.state==='working'&&i<40;i++){
     await new Promise(r=>setTimeout(r,2500));
-    const poll=await service.request('/video-chapters/prepare',{method:'POST',body:live.current});
-    next={state:poll.state,chapters:normalizeChapters(poll.chapters||[]),source:poll.source||'',key:poll.key,rank:poll.rank||0};
+    next=read(await svc.request('/video-chapters/prepare',{method:'POST',body:live.current}));
    }
    if(next.state==='ready'){memory.set(key,next);setValue(next);}
   }catch{/* chapters stay as they were */}
- },[key,enabled,service]);
- return {...value,submit};
+ },[key,enabled]);
+ return {...(value.key===key?value:memory.get(key)||{state:key?'loading':'off',chapters:[],key}),submit};
 }

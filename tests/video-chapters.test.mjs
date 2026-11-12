@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DOMParser} from '@xmldom/xmldom';
-import {parseChapterFile,normalizeChapters,chapterIndexAt,chapterSpans,toMatroskaXml,toWebVttChapters,collapsEmbeds,chapterSubtitlePick,chapterSeconds} from '../src/video-chapters.js';
+import {parseChapterFile,normalizeChapters,chapterIndexAt,chapterSpans,toMatroskaXml,toWebVttChapters,collapsEmbeds,chapterSubtitlePick,chapterSeconds,chapterUpdate} from '../src/video-chapters.js';
 
 globalThis.DOMParser??=class{parseFromString(text,type){return new DOMParser({onError:()=>{}}).parseFromString(text,type);}};
 
@@ -52,4 +52,14 @@ test('Collaps embeds of the title are sent with the episode, and forced tracks a
  assert.deepEqual(collapsEmbeds(voices,0,0),['https://api.namy.ws/embed/kp/2040161']);
  assert.equal(chapterSubtitlePick([{value:'off',label:'Выключены'},{value:'hls:0',label:'Рус. форсированные'},{value:'hls:1',label:'English'},{value:'hls:2',label:'Русские полные'}]).value,'hls:2');
  assert.equal(chapterSubtitlePick([{value:'hls:0',label:'Signs'}]),null);
+});
+
+test('chapters on the seek bar survive a redo, a busy poll and a failed request of the same title',()=>{
+ const shown={state:'ready',chapters:sample,key:'w|1|2',rank:2,source:'Collaps'};
+ assert.deepEqual(chapterUpdate(shown,{state:'working',chapters:[],key:'w|1|2',rank:0}).chapters,sample);
+ assert.equal(chapterUpdate(shown,{state:'error',chapters:[],key:'w|1|2'}).rank,2);
+ const redone=[{start:0,title:'Новое'},{start:600,title:'Сцена'}];
+ assert.deepEqual(chapterUpdate(shown,{state:'ready',chapters:redone,key:'w|1|2',rank:3}).chapters,redone);
+ assert.deepEqual(chapterUpdate(shown,{state:'loading',chapters:[],key:'w|1|3'}).chapters,[]);
+ assert.deepEqual(chapterUpdate(shown,{state:'none',chapters:[],key:'w|1|2'}).chapters,[]);
 });

@@ -55,6 +55,15 @@ class Parsing(unittest.TestCase):
         self.assertTrue(all(a < b for a, b in parts))
 
 
+    def test_chapters_stay_navigation_sized(self):
+        thirty = [[i * 119, f'Сцена {i}'] for i in range(30)]
+        kept = vc.normalize(thirty, 3572)
+        self.assertLessEqual(len(kept), 18)
+        self.assertTrue(all(b[0] - a[0] >= 79 for a, b in zip(kept, kept[1:])))
+        self.assertEqual(13, vc.scene_target(3572))
+        self.assertIn('около 6 глав', vc.user_text({'title': 'X'}, [], 0, 1500, 1500, True))
+
+
 class Model(unittest.TestCase):
     def test_answer_times_are_strings_inside_the_window(self):
         self.assertEqual([[0, 'Пролог'], [83, 'Долги Дэндзи']], vc.read_answer(json.dumps({'chapters': [
@@ -242,6 +251,23 @@ class Service(unittest.TestCase):
         self.assertEqual(['collaps'], fake.asked)
         path = vc.Store(self.temp.name).path(done['key'])
         self.assertLess(path.stat().st_size, 400)
+
+    def test_redo_keeps_showing_the_markup_it_replaces(self):
+        record = {'v': vc.VERSION, 'd': 1500, 'c': [[0, 'Старое'], [600, 'Погоня']], 's': 'Collaps', 'q': 2}
+        state = vc.public('k', record, {'step': 'Размечаем сцены'})
+        self.assertEqual('working', state['state'])
+        self.assertEqual([{'start': 0, 'title': 'Старое'}, {'start': 600, 'title': 'Погоня'}], state['chapters'])
+        self.assertNotIn('chapters', vc.public('k', None, {'step': 'В очереди'}))
+
+    def test_a_dense_version_one_record_is_thinned_once_without_the_model(self):
+        store = vc.Store(self.temp.name)
+        key = vc.record_key('bird', 1, 2)
+        store.write(key, {'v': 1, 'd': 3572, 'c': [[i * 119, f'Сцена {i}'] for i in range(30)], 's': 'Alloha', 'q': 3})
+        record = store.read(key)
+        self.assertEqual(vc.VERSION, record['v'])
+        self.assertLessEqual(len(record['c']), 18)
+        self.assertEqual(0, record['c'][0][0])
+        self.assertEqual(record, json.loads(store.path(key).read_text('utf-8')))
 
     def test_player_subtitles_upgrade_a_library_record_once(self):
         store = vc.Store(self.temp.name)
