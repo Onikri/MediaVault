@@ -106,6 +106,20 @@ response was verified by the deployed adapter. Three verified public title
 metadata records were warmed in the production search index; no library files
 or decrypted pages were imported.
 
+The title UI's follow-up page-check queue must use the selected language and
+provider IDs, not every candidate retained from earlier searches. On a filter
+change it aborts checks for hidden candidates, releases their two browser slots
+and retains completed checks for reuse. A selected reader excluded by the new
+filter is cleared before selecting another; late replies cannot restore it.
+The full chapter-list allowance is restored for aborted, unfinished requests.
+Real React/retained-portal regressions at360/1440px reproduce the original stall
+with two slow hidden readers and verify language/provider switching, image
+verification and cache reuse. API replies in those tests are explicit fixtures.
+Separately, the deployed `manga_summary(..., verifyPages=True)` handler checked
+actual Vagabond pages on2026-11-12: MangaFire returned322 chapters/readable=true
+in7.97s; SoraRaw returned37 entries/readable=true in5.68s. Those handler checks
+do not claim validation of the owner's browser credentials or all179 sources.
+
 After the existing importer has been updated to backend v14, the maintainer runs `python3 deploy/oracle/install-suwayomi.py` on the VM. It discovers the current Compose project, preserves existing overlays, adds `suwayomi.yaml`, checks the service, and recreates only the importer to enable its private adapter. It leaves Oracle shape/resources, Caddy routes, Drive/OAuth configuration, library encryption and existing ML workers intact. A failed readiness check leaves the importer unchanged; a failed importer check restores the previous Compose configuration. Logs and rollback information are private under `/opt/mediavault-suwayomi`.
 
 No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit2304MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. The official image launcher enables bundled ARM64 KCEF and Xvfb, which LibGroup uses even when reading browser storage for a public request. Challenge-solving services remain disabled. Actual account/subscription requirements remain distinct from a broken runtime.

@@ -1,6 +1,6 @@
 // Contract regression: provider replies are fixtures, not real source availability.
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{chromium}=require('playwright');
-const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let browser,vite;
+const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-output/title-sources'),BASE='/.codex-local/test-output/title-sources/';let browser,vite;
 // Since 0019d18 the picker quarantines sources whose check failed: they leave the button list and
 // sit in the «Недоступные источники · N» disclosure with «Повторить проверку». «All 82 sources are
 // still offered» therefore means visible buttons plus quarantined rows.
@@ -8,7 +8,7 @@ const offered=async p=>(await p.locator('.title-source-option').count())+(await 
 const quarantined=(p,name)=>p.locator('.title-source-picker .title-source-tools>div').filter({hasText:name});
 (async()=>{
  await fs.mkdir(DIR,{recursive:true});
- await fs.writeFile(path.join(DIR,'title-sources.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/test-output/title-sources.jsx"></script>');
+ await fs.writeFile(path.join(DIR,'title-sources.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="'+BASE+'title-sources.jsx"></script>');
  await fs.writeFile(path.join(DIR,'title-sources.jsx'),`
  import React from'react';import{createRoot}from'react-dom/client';import MangaImport from'/src/MangaImport.jsx';import'/src/styles.css';import'/src/world-library.css';import'/src/title-page.css';
  window.started=[];window.summaryActive=0;window.summaryPeak=0;
@@ -24,9 +24,9 @@ const quarantined=(p,name)=>p.locator('.title-source-picker .title-source-tools>
  if(p==='/manga/inspect'){const n=Number(o.body.url.split('/').at(-1));await sleep(n===2?100:10);if(n===0||n===2)throw Error('HTTP 500 source failed');return{title:title.title,url:o.body.url,language:n%2?'en':'ru',episodes:[{url:o.body.url+'/chapter/1',number:1,season:1,title:'Chapter for '+n,language:n%2?'en':'ru'}],seasons:[{number:1,name:'Том 1'}],translations:[]};}
  return{};}};return <main style={{maxWidth:1000,margin:'auto',padding:16}}><button onClick={()=>setStatus(status==='connected'?'error':'connected')}>Toggle connection</button><MangaImport compact destination="online" item={{...title,sources}} state={{user:{sub:'fixture'}}} service={service}/></main>;}
  createRoot(document.getElementById('root')).render(<Demo/>);`);
- const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
+ const{createServer}=await import('vite');vite=await createServer({root:ROOT,cacheDir:'.codex-local/cache/vite-title-sources',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of[360,1440]){
-  const p=await browser.newPage({viewport:{width,height:1000}}),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/title-sources.html');
+  const p=await browser.newPage({viewport:{width,height:1000}}),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto('http://127.0.0.1:'+vite.httpServer.address().port+BASE+'title-sources.html');
   await p.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();assert.equal(await offered(p),82);
   await quarantined(p,'Source 00').filter({hasText:'HTTP 500 source failed'}).waitFor({state:'attached'});assert.equal(await p.locator('.title-source-option').filter({hasText:'Source 00'}).count(),0,'A source whose check failed leaves the reading list');
   await p.getByText(/Поиск завершён: 770/).waitFor();assert.equal(await offered(p),82,'Empty final poll preserves attached and previously found sources');

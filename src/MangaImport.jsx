@@ -30,8 +30,8 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  const [sourceIds,setSourceIds]=useState([]);
  const searchTitle=item?Object.fromEntries(['id','kind','title','titles','aliases','ids','year'].map(k=>[k,item[k]])):null;
  const globalSearch=useGlobalManga(item?.title||'','manga',language,sourceIds,service,false,revision,searchTitle);
- const sourceInfo=useMangaSourceInfo(sources,searchTitle,service,revision,{enabled:!online&&placement!=='hidden',priority:url});
  const visibleSources=sources.filter(s=>(language==='all'||s.language===language)&&(!sourceIds.length||sourceIds.includes(s.sourceId||s.provider?.split(':')[1])));
+ const sourceInfo=useMangaSourceInfo(visibleSources,searchTitle,service,revision,{enabled:!online&&placement!=='hidden',priority:url});
  const usableSources=visibleSources.filter(s=>Number(service.session?.serverVersion)<47||sourceInfo[s.url]?.readable===true);
  const displayInfo={...sourceInfo,...(inspection?{[url]:{inspection,state:inspection.readable===false?'error':inspection.readable===true?'ready':'verifying',readable:inspection.readable,chapterCount:new Set(inspection.episodes.map(e=>(e.season||1)+':'+e.number)).size,volumeCount:inspection.seasons?.length||1}}:{})};
  const attempted=useRef(new Set()),manualSource=useRef(false);
@@ -45,6 +45,10 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
   service.request('/manga/search',{method:'POST',body:{title:searchTitle,...(languageAware?{language}:{}),...(rawAware?{format}:{})},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(45000)])}).then(data=>{if(!abort.signal.aborted){setSources(old=>[...new Map([...old,...matchingMangaSources(item,data.results||[])].map(s=>[s.url,s])).values()]);setProviders(data.providers||[]);setBridgeWindow(data.bridgeSearch||null);}}).catch(cause=>{if(!abort.signal.aborted)setError(cause.message);}).finally(()=>{if(!abort.signal.aborted)setSearching(false);});return()=>abort.abort();
  },[item?.id,service.status,supported,languageAware,rawAware,language,format,revision,JSON.stringify(sourceIds)]);
  useEffect(()=>{const rows=matchingMangaSources(item,[...(item?.sources||[]),...(globalSearch.results||[])],{attached:!!item?.sources?.length});if(rows.length)setSources(old=>[...new Map([...old,...rows].map(s=>[s.url,s])).values()]);},[item?.id,globalSearch.results,item?.sources]);
+ useEffect(()=>{
+  if(!url||!sources.some(s=>s.url===url)||visibleSources.some(s=>s.url===url))return;
+  generation.current++;attempted.current.clear();manualSource.current=false;setOnline(false);setBusy('');setInspection(null);setUrl('');setError('');
+ },[language,JSON.stringify(sourceIds)]);
  useEffect(()=>{if(!item||service.status!=='connected'||manualSource.current||inspection&&inspection.readable!==false||busy)return;const next=visibleSources.find(s=>!attempted.current.has(s.url)&&(Number(service.session?.serverVersion)<47||sourceInfo[s.url]?.readable===true||sourceInfo[s.url]?.state!=='error'&&sourceInfo[s.url]?.inspection?.episodes?.length));if(next){attempted.current.add(next.url);inspect(next.url,true);}},[item?.id,visibleSources.map(s=>s.url).join('\n'),service.status,inspection,busy,revision,Object.entries(sourceInfo).map(([key,v])=>key+':'+v.state+':'+v.readable+':'+!!v.inspection).join('|')]);
  async function moreSources(){
   if(!bridgeWindow?.hasMore||moreSearching)return;const version=generation.current,requestSignal=searchAbort.current?.signal;setMoreSearching(true);setError('');
