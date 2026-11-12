@@ -20,14 +20,23 @@ const EMPTY=[];
 // Order: favourite sites; then sources whose published chapters come closest
 // to the work's total (the most complete translation); unknown counts last.
 // Without a known total the source with more chapters goes first.
-export function rankSources(sources,{favorites=[],expected=0,count=()=>null}={}){
+function scorer({favorites=[],expected=0,count=()=>null}){
  const total=Number(expected)||0;
- const score=source=>{
+ return source=>{
   const n=Number(count(source));
   const known=Number.isFinite(n)&&n>0;
   const distance=!known?Infinity:total?Math.abs(total-n)/total:1/(1+n);
   return [favorites.includes(siteOf(source))?0:1,known?0:1,distance];
  };
+}
+// True only when a is strictly better than b (a favourite, or a more complete
+// translation); equal sources never displace the one already open.
+export function betterSource(a,b,options={}){
+ const score=scorer(options),x=score(a),y=score(b);
+ return x[0]<y[0]||x[0]===y[0]&&(x[1]<y[1]||x[1]===y[1]&&x[2]<y[2]-1e-9);
+}
+export function rankSources(sources,options={}){
+ const score=scorer(options);
  return sources.map((source,index)=>({source,index,key:score(source)}))
   .sort((a,b)=>a.key[0]-b.key[0]||a.key[1]-b.key[1]||a.key[2]-b.key[2]||a.index-b.index)
   .map(row=>row.source);

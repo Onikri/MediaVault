@@ -93,7 +93,7 @@ export default function RanobeSources({item,service,state,expected=0}){
  const entries=opened?.episodes||[],current=open?entries[open.index]?.url:resume>=0?entries[resume]?.url:'';
  const reading=!!open&&!!(opened||held?.data?.book);
  const start=index=>setOpen({index,paragraph:index===resume&&progress?progress.paragraph||0:0});
- return <section className="reader-stage ranobe-stage ranobe-sources" aria-label={isBook?'Книга онлайн':'Ранобэ онлайн'}>
+ return <section className="reader-stage ranobe-stage ranobe-sources" data-reading={reading||undefined} aria-label={isBook?'Книга онлайн':'Ранобэ онлайн'}>
   <aside className="reader-stage-filters" aria-label="Фильтры чтения">
    <FilterGroup legend={isBook?'Язык текста':'Язык перевода'} value={language} options={languages} onChange={setReadingLanguage}/>
    <SourceList sources={shown} value={source?.url} favorites={favorites} expected={Number(expected)||0} loading={search.loading} pending={search.loading?0:pending}
@@ -112,7 +112,7 @@ export default function RanobeSources({item,service,state,expected=0}){
    :<div className="watch-idle mv-player mvx mvx-idle reader-idle" style={item.cover?{'--watch-poster':`url("${String(item.cover).replace(/["\\]/g,'')}")`}:undefined}>
     <div className="mvx-idle-poster" aria-hidden="true"/>
     <div className="mvx-overview mvx-idle-overview">
-     <h2 translate="no">{opened?.title||item.title}</h2>
+     <strong className="reader-idle-title" translate="no">{opened?.title||item.title}</strong>
      <p className="mvx-meta" role="status">{busy?<><span className="mvx-spinner"/><span>{isBook?'Готовим книгу и оглавление':'Загружаем главы'}</span></>
       :opened?<><span>{entries.length} {isBook?'разделов':'глав'}</span><span>{opened.providerName}</span><span>{providerLanguage(opened.language)}</span></>
       :search.loading||pending?<><span className="mvx-spinner"/><span>{isBook?'Ищем полный текст в библиотеках':'Ищем переводы и сравниваем источники'}</span></>

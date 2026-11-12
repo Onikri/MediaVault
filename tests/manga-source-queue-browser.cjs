@@ -20,14 +20,14 @@ let browser,vite;
    catch(e){if(o.signal?.aborted)window.aborted.push(n);throw e;}finally{window.active--;}
   }return{};
  }};
- function Demo(){const[shown,setShown]=React.useState(true);return <RetainedMediaProvider><main style={{maxWidth:900,margin:'auto',padding:16}}><button onClick={()=>setShown(v=>!v)}>Toggle title</button>{shown&&<RetainedMediaSlot id="manga-test" kind="reader" label="Бродяга"><MangaImport compact destination="online" item={{...title,sources}} state={{user:{sub:'fixture'}}} service={service}/></RetainedMediaSlot>}</main></RetainedMediaProvider>;}createRoot(document.getElementById('root')).render(<Demo/>);`);
+ function Demo(){const[shown,setShown]=React.useState(true);return <RetainedMediaProvider><main style={{maxWidth:900,margin:'auto',padding:16}}><button onClick={()=>setShown(v=>!v)}>Toggle title</button>{shown&&<RetainedMediaSlot id="manga-test" kind="reader" label="Бродяга"><MangaImport compact destination="online" initialLanguage={byProvider?'all':''} item={{...title,sources}} state={{user:{sub:'fixture'}}} service={service}/></RetainedMediaSlot>}</main></RetainedMediaProvider>;}createRoot(document.getElementById('root')).render(<Demo/>);`);
  const{createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-source-queue',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,strictPort:false}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
  for(const width of [360,1440])for(const filter of ['language','provider']){
   const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html?'+filter);
   await page.waitForFunction(()=>window.calls.filter(c=>c.path==='/manga/inspect').length===2);
-  if(filter==='language')await page.getByLabel('Язык источника манги',{exact:true}).selectOption('ja');
+  if(filter==='language')await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Японский',exact:true}).click();
   else{
    await page.locator('#worldSourceQuery').fill('Reader 4');
    await page.getByRole('checkbox',{name:/Reader 4/}).check();
@@ -46,14 +46,14 @@ let browser,vite;
   }
   const calls=await page.evaluate(()=>window.calls.length);
   await page.evaluate(()=>{window.releaseRussian=true;});
-  await page.getByLabel('Язык источника манги',{exact:true}).selectOption('all');
+  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Все языки',exact:true}).click();
   await page.waitForFunction(()=>window.calls.length>0&&window.active===0&&document.querySelectorAll('.title-source-option').length===5,{},{timeout:5000});
-  await page.getByLabel('Язык источника манги',{exact:true}).selectOption('ja');
+  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Японский',exact:true}).click();
   assert.equal(await page.locator('.title-source-option').count(),3);
   assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.n>=2).length),await page.evaluate(end=>window.calls.slice(0,end).filter(c=>c.n>=2).length,calls),'Completed Japanese results survive filter changes');
-  await page.getByLabel('Язык источника манги',{exact:true}).selectOption('ru');
+  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Русский',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.title-source-option[aria-pressed="true"]')?.textContent.includes('Reader 0'));
-  await page.getByLabel('Язык источника манги',{exact:true}).selectOption('ja');
+  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Японский',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.title-source-option[aria-pressed="true"]')?.textContent.includes('Reader 2'));
   await page.getByRole('button',{name:'Toggle title',exact:true}).click();
   assert.equal(await page.locator('.retained-media-host').count(),0,'Inactive title checks unmount with their retained host');

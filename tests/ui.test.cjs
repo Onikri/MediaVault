@@ -91,7 +91,7 @@ async function run(){
     await page.locator('#catalogSearch').press('Enter');
     // The paused player repeats the title in its own overview, so read the page hero.
     await page.locator('.title-hero').getByRole('heading',{name:'Naruto',exact:true}).waitFor();
-    await page.getByRole('button',{name:'Сохранить на Google Диск',exact:true}).click();assert.equal(await page.locator('#importVideoBtn').isDisabled(),true,'Locked users cannot start a Drive import');
+    await page.locator('.export-trigger').click();await page.locator('.export-sheet').getByRole('radio',{name:'В Google Диск',exact:true}).click();assert.equal(await page.locator('#importVideoBtn').isDisabled(),true,'Locked users cannot start a Drive import');await page.getByRole('button',{name:'Закрыть окно сохранения',exact:true}).click();
     await noOverflow('Catalogue title detail');
     await page.getByRole('button',{name:'К результатам поиска'}).click();
     await noOverflow('Server import');

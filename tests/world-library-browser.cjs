@@ -38,11 +38,13 @@ const expectText=(locator,text)=>locator.filter({hasText:text}).waitFor();
   await page.getByRole('button',{name:'Убрать источник Source B',exact:true}).click();
   await page.getByRole('button',{name:'Выбрать Новый тайтл только в источнике',exact:true}).click();
   await page.getByRole('heading',{name:'Новый тайтл только в источнике',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();assert.equal(await page.locator('.title-save-menu').getAttribute('open'),null,'Saving is a secondary disclosure');
+  await page.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();assert.equal(await page.locator('.export-sheet').count(),0,'Saving is a secondary window opened from the showcase');assert.equal(await page.locator('.export-trigger').count(),1);
   assert.equal(await page.getByRole('button',{name:'Проверить следующие источники',exact:true}).count(),0);
-  await page.getByText('Сохранить в коллекцию или на устройство',{exact:true}).click();await page.getByRole('button',{name:'На устройство',exact:true}).click();await page.locator('#importMangaBtn').filter({hasText:'Сохранить на устройство'}).waitFor();
-  await page.getByRole('button',{name:'В Google Диск',exact:true}).click();await page.getByRole('button',{name:'Добавить 2 главы в коллекцию',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Онлайн',exact:true}).click();await page.getByText('Сохранить в коллекцию или на устройство',{exact:true}).click();
+  // Saving opens a non-modal window from the showcase; the page stays usable behind it.
+  await page.locator('.export-trigger').click();const sheet=page.locator('.export-sheet');await sheet.waitFor();
+  await sheet.locator('#importMangaBtn').filter({hasText:'Сохранить на устройство'}).waitFor();
+  await sheet.getByRole('radio',{name:'В Google Диск',exact:true}).click();await sheet.getByRole('button',{name:'Добавить 2 главы в коллекцию',exact:true}).waitFor();
+  await sheet.getByRole('button',{name:'Закрыть окно сохранения',exact:true}).click();await sheet.waitFor({state:'detached'});
   await page.getByRole('button',{name:'Читать сейчас',exact:true}).click();await page.locator('.reader-embedded .reader-page-image img').first().waitFor();
   await page.waitForFunction(()=>document.querySelector('.reader-embedded .reader-page-image img')?.naturalWidth>0);
   assert.equal(await page.getByRole('dialog',{name:'Онлайн без сохранения',exact:true}).count(),0);assert.equal(await page.locator('.online-title-materials .online-viewer-inline').count(),1,'Reader stays inside title materials');
