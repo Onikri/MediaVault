@@ -18,7 +18,8 @@ import TitleSourcePicker from './TitleSourcePicker.jsx';
 import SourceFilter from './SourceFilter.jsx';
 import useMangaSourceInfo from './use-manga-source-info.js';
 import {matchingMangaSources} from './manga-source-identity.js';
-export default function MangaImport({state,service,item,onSubmitted,onOpenLibrary,manual,onKindChange,destination='drive',compact=false}){
+import {mangaPublication} from './title-details.js';
+export default function MangaImport({state,service,item,onSubmitted,onOpenLibrary,manual,onKindChange,destination='drive',compact=false,onPublication}){
  const localAbort=useRef(null);
  const [exportSettings,setExportSettings]=useState(()=>({...defaultMangaExport,...exportTranslation(readLmt(state.user?.sub))}));
  useEffect(()=>()=>localAbort.current?.abort(),[]);
@@ -29,12 +30,17 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  const placement=useRetainedMedia(online,{label:collection||item?.title||'Манга',kind:'reader'},()=>setOnline(false));
  const [sourceIds,setSourceIds]=useState([]);
  const searchTitle=item?Object.fromEntries(['id','kind','title','titles','aliases','ids','year'].map(k=>[k,item[k]])):null;
+ const identityKey=JSON.stringify(searchTitle);
+ useEffect(()=>{onPublication?.(mangaPublication(inspection));},[onPublication,inspection]);
  const globalSearch=useGlobalManga(item?.title||'','manga',language,sourceIds,service,false,revision,searchTitle);
  const visibleSources=sources.filter(s=>(language==='all'||s.language===language)&&(!sourceIds.length||sourceIds.includes(s.sourceId||s.provider?.split(':')[1])));
  const sourceInfo=useMangaSourceInfo(visibleSources,searchTitle,service,revision,{enabled:!online&&placement!=='hidden',priority:url});
  const usableSources=visibleSources.filter(s=>Number(service.session?.serverVersion)<47||sourceInfo[s.url]?.readable===true);
  const displayInfo={...sourceInfo,...(inspection?{[url]:{inspection,state:inspection.readable===false?'error':inspection.readable===true?'ready':'verifying',readable:inspection.readable,chapterCount:new Set(inspection.episodes.map(e=>(e.season||1)+':'+e.number)).size,volumeCount:inspection.seasons?.length||1}}:{})};
  const attempted=useRef(new Set()),manualSource=useRef(false);
+ // A dossier may supply its Russian name after the first source request. Only
+ // failed/absent inspections are retried; a reader already playing stays put.
+ useEffect(()=>{attempted.current.clear();if(!inspection||inspection.readable===false){setInspection(null);setError('');}},[identityKey]);
  const generation=useRef(0),ready=canImport(state,service),supported=Number(service.session?.serverVersion||0)>=8,languageAware=Number(service.session?.serverVersion||0)>=10,rawAware=Number(service.session?.serverVersion||0)>=12;
  const names=[item?.titles?.en,item?.titles?.en_jp,item?.title,...item?.aliases||[]].filter(v=>typeof v==='string');const englishName=names.find(v=>/[a-z]/i.test(v)&&!/[а-яё]/i.test(v))||item?.title||'';
  const englishSearch='https://mangapill.com/search?'+new URLSearchParams({q:englishName});
@@ -43,8 +49,8 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
   if(!item||service.status!=='connected'||!supported||sourceIds.length)return;
   const abort=new AbortController();searchAbort.current=abort;setSearching(true);
   service.request('/manga/search',{method:'POST',body:{title:searchTitle,...(languageAware?{language}:{}),...(rawAware?{format}:{})},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(45000)])}).then(data=>{if(!abort.signal.aborted){setSources(old=>[...new Map([...old,...matchingMangaSources(item,data.results||[])].map(s=>[s.url,s])).values()]);setProviders(data.providers||[]);setBridgeWindow(data.bridgeSearch||null);}}).catch(cause=>{if(!abort.signal.aborted)setError(cause.message);}).finally(()=>{if(!abort.signal.aborted)setSearching(false);});return()=>abort.abort();
- },[item?.id,service.status,supported,languageAware,rawAware,language,format,revision,JSON.stringify(sourceIds)]);
- useEffect(()=>{const rows=matchingMangaSources(item,[...(item?.sources||[]),...(globalSearch.results||[])],{attached:!!item?.sources?.length});if(rows.length)setSources(old=>[...new Map([...old,...rows].map(s=>[s.url,s])).values()]);},[item?.id,globalSearch.results,item?.sources]);
+ },[identityKey,service.status,supported,languageAware,rawAware,language,format,revision,JSON.stringify(sourceIds)]);
+ useEffect(()=>{const rows=matchingMangaSources(item,[...(item?.sources||[]),...(globalSearch.results||[])],{attached:!!item?.sources?.length});if(rows.length)setSources(old=>[...new Map([...old,...rows].map(s=>[s.url,s])).values()]);},[identityKey,globalSearch.results,item?.sources]);
  useEffect(()=>{
   if(!url||!sources.some(s=>s.url===url)||visibleSources.some(s=>s.url===url))return;
   generation.current++;attempted.current.clear();manualSource.current=false;setOnline(false);setBusy('');setInspection(null);setUrl('');setError('');

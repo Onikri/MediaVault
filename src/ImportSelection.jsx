@@ -13,7 +13,7 @@ import {selectedVideoEntries} from './import-selection-model.js';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import OnlineWatch from './OnlineWatch.jsx';
 
-export default function ImportSelection({state,service,item,manual=false,onSubmitted,onOpenLibrary,destination='drive',compact=false,profile,onSeasonBrowse}){
+export default function ImportSelection({state,service,item,manual=false,onSubmitted,onOpenLibrary,destination='drive',compact=false,profile,onSeasonBrowse,onMangaPublication}){
   const localAbort=useRef(null);
  useEffect(()=>()=>localAbort.current?.abort(),[]);
  const [online,setOnline]=useState(false),[playingEntry,setPlayingEntry]=useState(null),[localProgress,setLocalProgress]=useState(''),[episodeCount,setEpisodeCount]=useState(24);
@@ -91,7 +91,7 @@ export default function ImportSelection({state,service,item,manual=false,onSubmi
     }
     setBusy('submit');try{await service.submit(job);onSubmitted();}catch(cause){setError(cause.message);}finally{setBusy('');}
   }
-  if(kind==='manga'){const node=<MangaImport compact={compact} destination={destination} state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary}/>;return compact&&destination==='online'?<RetainedMediaSlot userId={state.user?.sub} id={'manga:'+state.user?.sub+':'+(item?.id||'manual')} label={item?.title||'Манга'} kind="reader">{node}</RetainedMediaSlot>:node;}
+  if(kind==='manga'){const node=<MangaImport compact={compact} destination={destination} state={state} service={service} item={item} manual={manual} onKindChange={setManualKind} onSubmitted={onSubmitted} onOpenLibrary={onOpenLibrary} onPublication={onMangaPublication}/>;return compact&&destination==='online'?<RetainedMediaSlot userId={state.user?.sub} id={'manga:'+state.user?.sub+':'+(item?.id||'manual')} label={item?.title||'Манга'} kind="reader">{node}</RetainedMediaSlot>:node;}
   const player=online&&<OnlineViewer sourceUrl={url} inline={compact} onEntryChange={e=>{setPlayingEntry(e);setOne(String(e.number));}} quality={quality} kind="video" entries={(compact?published:onlineEntries).map(e=>({...e,season:Number(e.season||season)}))} initial={playingEntry||onlineEntries[0]} title={collection} service={service} userId={state.user?.sub} dub={variant?.name||inspection?.dubs?.find(d=>d.url===dub)?.name||''} metadata={item} onClose={()=>setOnline(false)}/>;
   if(compact&&destination==='online'&&(kind==='anime'||['tv','movie'].includes(kind)&&!url&&(discovery.loading||discovery.data?.voices?.length)))return <RetainedMediaSlot userId={state.user?.sub} id={'watch:'+state.user?.sub+':'+(item?.ids?.mal||item?.id)} label={item?.title||'Видео'}><OnlineWatch item={item} profile={profile||item} discovery={discovery} service={service} userId={state.user?.sub} onSeasonBrowse={onSeasonBrowse}/></RetainedMediaSlot>;
   if(compact&&destination==='online')return <div className="title-playback-controls video-playback-controls">

@@ -1,11 +1,12 @@
 import {useEffect,useMemo,useState} from 'react';
+import {profileCatalogFields} from './title-details.js';
 import {fetchCatalog} from './catalog.js';
 import useSourceDiscovery from './use-source-discovery.js';
 import {useContentLanguage,preferredVoiceLanguage} from './content-language.js';
 import {orderedVoices,variantsFor,readWatch,voicesForCatalogue} from './watch-session.js';
 import {catalogueSeasonHint} from './franchise-seasons.js';
 
-export function profileForSeason(item){return {title:item?.title,sourceId:item?.ids?.mal,source:'shikimori',cover:item?.cover,description:item?.description,year:item?.year,format:item?.format,status:item?.status,genres:item?.genres||[],themes:item?.tags||[],characters:[],staff:[],related:[],screenshots:[],releases:item?.releases||[]};}
+export function profileForSeason(item){return {...profileCatalogFields(item),title:item?.title,sourceId:item?.ids?.mal,source:'shikimori',cover:item?.cover,description:item?.description,year:item?.year,format:item?.format,status:item?.status,genres:item?.genres||[],themes:item?.tags||[],characters:[],staff:[],related:[],screenshots:[],releases:item?.releases||[]};}
 const studio=value=>String(value||'').toLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
 export async function inspectSeasonSource(service,candidate,number,signal){
  async function load(season,url){let data,continuation,previous=-1,stalled=0;

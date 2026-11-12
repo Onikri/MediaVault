@@ -1,4 +1,5 @@
-import {useEffect,useMemo,useState,useRef,lazy,Suspense} from 'react';
+import {useEffect,useMemo,useState,useRef,useCallback,lazy,Suspense} from 'react';
+import {mergeTitleIdentity,preserveCatalogFacts} from './title-details.js';
 import {profileForSeason} from './use-season-source.js';
 import {fetchCatalog,mergeCatalog,normalized} from './catalog.js';
 import {loadTitleProfile,translate} from './title-metadata.js';
@@ -30,12 +31,15 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   if(value.ids?.mal)tasks.push(loadTitleProfile(value.ids.mal,value.kind,{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setProfile(data);}}).then(data=>{if(!abort.signal.aborted)setProfile(data);}));
   Promise.allSettled(tasks).then(()=>{if(!abort.signal.aborted)setLoading(false);});return()=>abort.abort();
  },[value.id,service.server,destination]);
+ const [sourcePublication,setSourcePublication]=useState(null);
+ const receivePublication=useCallback(value=>setSourcePublication({id:item.id,value}),[item.id]);
+ const searchItem=useMemo(()=>mergeTitleIdentity(item,profile||{}),[item,profile]);
  const baseDisplayProfile=useMemo(()=>({
   title:item.title,cover:item.cover,description:item.description,year:item.year,format:item.format?translate(item.format):null,status:item.status?translate(item.status):null,
   sourceId:item.ids?.mal||'',source:item.ids?.mal?'shikimori':item.provider,sourceURL:item.sourceUrl||item.sourceURL,
   releases:item.releases||[],episodeImages:item.episodeImages||{},rating:item.age!=null?item.age+'+':'',genres:(item.genres||[]).map(localLabel),themes:(item.tags||[]).map(localLabel),characters:[],staff:[],related:[],screenshots:[],
-  ...(profile||{})
- }),[item,profile]);
+  ...(profile||{}),...preserveCatalogFacts(item,profile||{}),aliases:searchItem.aliases,sourcePublication:sourcePublication?.id===item.id?sourcePublication.value:null
+ }),[item,profile,searchItem,sourcePublication]);
  const sceneItem=viewSeason?.item||item,sceneId=String(sceneItem.ids?.mal||''),basisId=String(item.ids?.mal||'');
  useEffect(()=>{if(!sceneId||sceneId===basisId||seasonProfiles[sceneId])return;const abort=new AbortController();loadTitleProfile(sceneId,'anime',{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}}).then(data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}).catch(()=>{});return()=>abort.abort();},[sceneId,basisId,service.server]);
  const displayProfile=useMemo(()=>sceneId&&sceneId!==basisId?{...profileForSeason(sceneItem),...(seasonProfiles[sceneId]||{})}:baseDisplayProfile,[sceneItem,sceneId,basisId,seasonProfiles,baseDisplayProfile]);
@@ -44,7 +48,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  function destinationAction(value){setTarget(value);requestAnimationFrame(()=>document.getElementById('titleMaterials')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'}));}
  const heroActions=!['ranobe','book'].includes(item.kind)&&<div className="title-save-actions" role="group" aria-label="Открыть или сохранить"><button title="Сохранить на Google Диск" aria-label="Сохранить на Google Диск" aria-pressed={target==='drive'} onClick={()=>destinationAction(target==='drive'?'online':'drive')}><CloudDownload size={18}/></button><button title="Сохранить на устройство" aria-label="Сохранить на устройство" aria-pressed={target==='local'} onClick={()=>destinationAction(target==='local'?'online':'local')}><Download size={18}/></button></div>;
  const materials=<><div className="section-heading watch-materials-heading"><h2>{['manga','ranobe','book'].includes(item.kind)?'Читать':'Смотреть'}</h2></div>
-  {item.kind==='manga'&&<details className='title-save-menu' onToggle={e=>{if(!e.currentTarget.open)setTarget('online');}}><summary>Сохранить в коллекцию или на устройство</summary><div className='world-destinations' role='group' aria-label='Открыть или сохранить'>{[['online','Онлайн'],['drive','В Google Диск'],['local','На устройство']].map(([id,label])=><button key={id} aria-pressed={target===id} onClick={()=>setTarget(id)}>{label}</button>)}</div></details>}{['ranobe','book'].includes(item.kind)?<RanobeSources item={item} service={service} state={state}/>:<ImportSelection compact key={item.id} destination={target} onOpenLibrary={onOpenLibrary} item={item} profile={baseDisplayProfile} onSeasonBrowse={setViewSeason} state={state} service={service} onSubmitted={onSubmitted}/>}
+  {item.kind==='manga'&&<details className='title-save-menu' onToggle={e=>{if(!e.currentTarget.open)setTarget('online');}}><summary>Сохранить в коллекцию или на устройство</summary><div className='world-destinations' role='group' aria-label='Открыть или сохранить'>{[['online','Онлайн'],['drive','В Google Диск'],['local','На устройство']].map(([id,label])=><button key={id} aria-pressed={target===id} onClick={()=>setTarget(id)}>{label}</button>)}</div></details>}{['ranobe','book'].includes(item.kind)?<RanobeSources item={searchItem} service={service} state={state}/>:<ImportSelection compact key={item.id} destination={target} onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} onMangaPublication={receivePublication} onSeasonBrowse={setViewSeason} state={state} service={service} onSubmitted={onSubmitted}/>}
  </>;
  return <><TitlePage onLocalFile={()=>localInput.current?.click()} title={title} state={state} actions={remoteArtwork} onBack={onBack} onRelated={onRelated} online onOnlinePlay={()=>destinationAction('online')} heroActions={heroActions} onlineProfile={displayProfile} onlineBusy={loading} materials={materials} onlineFacts={facts} server={service.server} backLabel="К результатам поиска"/><input ref={localInput} type="file" accept=".cbz,.zip" hidden onChange={e=>{const file=e.target.files?.[0];if(file)setLocalFile({id:'local:'+file.name+':'+file.lastModified,name:file.name,category:'manga',size:file.size,file});e.target.value='';}}/>{localFile&&<Suspense fallback={<p role="status">Открываем файл…</p>}><LocalMediaViewer item={localFile} catalog={{items:[localFile]}} libraryId="local" userId={state.user?.sub} readWhole={()=>Promise.resolve(localFile.file)} onClose={()=>setLocalFile(null)} readerService={service}/></Suspense>}</>;
 }

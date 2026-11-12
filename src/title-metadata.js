@@ -1,5 +1,6 @@
 // Public, free metadata only. Video extraction does not use these APIs.
 import {creditsFromRoles} from './credits.js';
+import {profileCatalogFields} from './title-details.js';
 import {crossMediaFromLinks,highResolutionArtwork} from './cross-media.js';
 const ORIGIN='https://shikimori.io';
 const pending=new Map();
@@ -32,11 +33,11 @@ export function imageURL(value){
   if(!value||typeof value!=='string'||/(?:\/|_)(?:404|missing|no[_-]?image)(?:[.\/_-]|$)/i.test(value))return '';
   try{const url=new URL(value,ORIGIN);return url.protocol==='https:'&&!url.username&&!url.password?url.href:'';}catch{return '';}
 }
-export const translated={'finished airing':'Завершён','currently airing':'Выходит','not yet aired':'Анонсирован',finished:'Завершён',publishing:'Выходит',tv:'Аниме',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',webtoon:'Вебтун',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
+export const translated={releasing:'Выходит',current:'Выходит','not_yet_released':'Анонсирован',upcoming:'Анонсирован',unreleased:'Анонсирован',cancelled:'Отменён',hiatus:'Приостановлен','finished airing':'Завершён','currently airing':'Выходит','not yet aired':'Анонсирован',finished:'Завершён',publishing:'Выходит',tv:'Аниме',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',webtoon:'Вебтун',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
 export const translate=(value,fallback='Не указано')=>translated[String(value||'').toLowerCase()]||(hasRussian(value)?String(value):fallback);
 export function importedProfile(value){
   if(!value||!Object.keys(value).length)return null;
-  return {version:4,partial:true,language:'ru',title:russianText(value.titles?.ru)||russianText(value.title),sourceId:value.ids?.mal||'',
+  return {...profileCatalogFields(value),version:4,partial:true,language:'ru',title:russianText(value.titles?.ru)||russianText(value.title),sourceId:value.ids?.mal||'',
     description:russianText(value.description),cover:imageURL(value.cover),background:imageURL(value.background),
     genres:(value.genres||[]).filter(hasRussian),themes:(value.tags||[]).filter(hasRussian),format:translate(value.format),status:translate(value.status),
     year:value.year,startDate:value.startDate,endDate:value.endDate,episodes:value.episodes,chapters:value.chapters,volumes:value.volumes,rating:value.age?value.age+'+':'',characters:[],related:[],screenshots:[]};

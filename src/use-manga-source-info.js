@@ -4,6 +4,7 @@ import {useEffect,useRef,useState} from 'react';
 export default function useMangaSourceInfo(sources,title,service,revision,{enabled=true,priority=''}={}){
  const [info,setInfo]=useState({}),cache=useRef({}),run=useRef(null),pump=useRef(()=>{}),live=useRef();live.current={sources,title,service,enabled,priority};
  const urls=sources.map(s=>s.url).join('\n');
+ const identityKey=JSON.stringify(title);
  useEffect(()=>{
   cache.current={};setInfo({});const current={active:0,cancelled:false,controllers:new Map(),metadata:0};run.current=current;
   const emit=()=>{if(!current.cancelled)setInfo({...cache.current});};
@@ -30,7 +31,7 @@ export default function useMangaSourceInfo(sources,title,service,revision,{enabl
    }
   };
   pump.current();return()=>{current.cancelled=true;for(const controller of current.controllers.values())controller.abort();};
- },[title?.id,service.server,revision]);
+ },[identityKey,service.server,revision]);
  // A language/provider switch must release slots held by now-hidden readers.
  // Keep completed results cached so switching back needs no repeat image probe.
  useEffect(()=>{const wanted=new Set(sources.map(s=>s.url));for(const [url,controller]of run.current?.controllers||[])if(!enabled||!wanted.has(url))controller.abort();if(enabled)pump.current();},[urls,enabled,priority,service.session?.serverVersion]);
