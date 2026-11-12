@@ -57,9 +57,40 @@ GAP=1.0        # seconds between two admissions for one project and model
 PER_KEY=2      # requests in flight on one key; a pinned (manga) slot keeps one
 MAX_FLIGHT=6   # requests in flight through the whole gateway
 
-def estimate(request):
-    """Input tokens of a request body before sending (Cyrillic JSON is about 3.8 characters per token)."""
-    return int(len(json.dumps(request,ensure_ascii=False))/3.5)+1
+def estimate(request,model=''):
+    """Local admission estimate, not countTokens. Image bytes are not text tokens.
+
+    Gemini 3's default/high image budget is 1120 tokens (2240 ultra-high).
+    Earlier models use 258-token tiles. Actual usage replaces this reservation
+    on completion; Google Retry-After/learned project limits remain authoritative.
+    """
+    images=0
+    resolution=request.get('generationConfig',{}).get('mediaResolution','')
+    def compact(value):
+        nonlocal images
+        if isinstance(value,list):return [compact(v) for v in value]
+        if not isinstance(value,dict):return value
+        result={}
+        for key,item in value.items():
+            if key in {'inlineData','fileData'} and isinstance(item,dict) and str(item.get('mimeType','')).startswith('image/'):
+                level=value.get('mediaResolution',resolution)
+                if isinstance(level,dict):level=level.get('level','')
+                if model.startswith(('gemini-3.','gemini-4.')):
+                    images+=next((n for label,n in [('ULTRA_HIGH',2240),('HIGH',1120),('MEDIUM',560),('LOW',280)] if str(level).upper().endswith(label)),1120)
+                else:
+                    # Read dimensions only, never decompress the pixel array.
+                    try:
+                        import base64,io
+                        from PIL import Image
+                        with Image.open(io.BytesIO(base64.b64decode(item.get('data',''),validate=True))) as image:w,h=image.size
+                        unit=max(256,min(768,math.floor(min(w,h)/1.5)))
+                        images+=258 if max(w,h)<=384 else 258*math.ceil(w/unit)*math.ceil(h/unit)
+                    except (ValueError,OSError,Image.DecompressionBombError):images+=16384
+                result[key]={'mimeType':item.get('mimeType')}
+            else:result[key]=compact(item)
+        return result
+    text=compact(request)
+    return math.ceil((len(json.dumps(text,ensure_ascii=False))/3.5+images)*1.1)+1
 
 def pacific_day(now):
     try:

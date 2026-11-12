@@ -58,6 +58,10 @@ async def _translate_pages(job, pages, options, skip, save, progress, budget):
             raise SourceError(str(data.get('detail') or 'Google не завершил перевод.')[:350])
         return data
     async def google_request(path, body):
+        # The v4 pool-aware renderer delegates project cooldown/failover to the
+        # gateway. Do not add a second sleep/slot-rotation loop around that call.
+        if path.endswith('/generate') and body.get('pool'):
+            return await asyncio.to_thread(google, path, body)
         for attempt in range(3):
             try:
                 return await asyncio.to_thread(google, path, body)

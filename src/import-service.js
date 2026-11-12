@@ -65,7 +65,7 @@ export function createImportClient(server,googleToken,fetcher=fetch,guestSession
       if(!token)throw Error('Сначала войди через Google.');
       const response=await fetcher(server+'/auth/session',{method:'POST',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+token}});
       const data=await response.json();if(!response.ok)throw Error(data.detail||'Сервер не подтвердил вход.');
-      session={...data,serverVersion:health.version};return session;
+      session={...data,serverVersion:health.version,googleGatewayVersion:health.googleGatewayVersion||0};return session;
     })();
     try{return await signing;}finally{signing=null;}
   }

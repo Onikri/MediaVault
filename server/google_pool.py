@@ -24,7 +24,7 @@ async def server_generate(model,request,*,max_wait=120):
     rows=[r for r in saved() if model in r.get('models',MODELS) or model in LATER_MODELS]
     if not rows:raise GoogleCallError(422,'Нет серверного ключа Google для '+model+'.')
     from google_gateway_limits import estimate,project as key_project,GatewayLimited
-    tokens=estimate(request);spare=list(rows)
+    tokens=estimate(request,model);spare=list(rows)
     while True:
         try:row,call=await _limits_state().acquire(spare,model,tokens=tokens,max_wait=max_wait)
         except GatewayLimited as error:raise GoogleCallError(429,'Ключи ждут квоту Google '+str(error.seconds)+' с') from None
@@ -70,8 +70,8 @@ class Generate(BaseModel):
     slot:int|None=Field(default=None,ge=0,le=5)
     model:str
     request:dict
-    # Narration: a personal key joins the owner's server keys instead of
-    # replacing them (one more worker for the chapter passes).
+    # Personal mode: explicitly join the owner's pool. Server slots: treat the
+    # requested slot as a preference and fail over inside this one gateway call.
     pool:bool=False
 
 def install(app,owner,get_store,translator=None):
@@ -148,13 +148,12 @@ def install(app,owner,get_store,translator=None):
             rows=[r for r in rows if body.model in r.get('models',MODELS) or body.model in LATER_MODELS]
         if not rows:raise HTTPException(422,'Добавь серверный ключ Google для выбранной модели.')
         model=body.model;activity=network.begin(subject,body.slot,model,personal=personal);lease=None;response=None;status_code=0;usage=None
-        # Without a pinned slot (narration), a 429 moves the request to a key of
-        # another project: the spent project gets its cooldown and is skipped.
-        # A pinned slot (the manga queue spreads pages over keys) never moves.
+        # Pool-aware manga clients delegate retries here, so another project can
+        # proceed immediately while the failed project keeps its own cooldown.
         from google_gateway_limits import identity as key_identity,project as key_project
-        spare=[] if body.slot is not None or (personal and not body.pool) else list(rows)
+        spare=[] if (body.slot is not None and not body.pool) or (personal and not body.pool) else list(rows)
         from google_gateway_limits import estimate
-        tokens=estimate(request)
+        tokens=estimate(request,model)
         try:
             while True:
                 lease=await state().acquire(spare or rows,model,preferred=body.slot,tokens=tokens,on_wait=lambda seconds:network.update(activity,'quota',retry_after=seconds),disconnected=connection.is_disconnected)

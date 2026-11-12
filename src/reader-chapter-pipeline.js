@@ -12,6 +12,9 @@ export class RequestPacer{
  async reserveOne(key,signal){signal?.throwIfAborted();const history=this.starts.get(key)||[],now=this.now();while(history.length&&now-history[0]>=60000)history.shift();const ms=Math.max(0,history.length?history.at(-1)+4000-now:0,history.length>=15?history[0]+60000-now:0);if(ms)await this.wait(ms,signal);signal?.throwIfAborted();history.push(this.now());this.starts.set(key,history);}
 }
 export const sharedRequestPacer=new RequestPacer();
+// Oracle already admits calls against durable project/model RPM, TPM and RPD.
+// Adding the device's fixed four-second gap on top only leaves free keys idle.
+export const gatewayRequestPacer={reserve:async(key,signal)=>{signal?.throwIfAborted();}};
 // Dense pages still travel together. Partition label IDs, never silently turn
 // a two-page packet into independent one-image calls.
 export function labelPackets(pages,limit=100){

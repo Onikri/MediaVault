@@ -82,7 +82,50 @@ class GatewayLimitsTests(unittest.IsolatedAsyncioTestCase):
   delay,_=provider_limit(httpx.Response(503,headers={'Retry-After':'Thu, 01 Jan 1970 00:17:00 GMT'}),1000);self.assertEqual(delay,20)
   delay,_=provider_limit(httpx.Response(403,json={'error':{'message':'private'}}),1000);self.assertEqual(delay,900)
 
+ async def test_image_payload_does_not_spend_text_tpm_or_block_the_next_packet_after_503(self):
+  import base64,io
+  from PIL import Image
+  output=io.BytesIO();Image.new('RGB',(900,1300),'white').save(output,format='PNG',compress_level=0)
+  image={'inlineData':{'mimeType':'image/png','data':base64.b64encode(output.getvalue()).decode()}}
+  request={'contents':[{'parts':[{'text':'Translate all labels into Russian.'},image,image]}]}
+  tokens=estimate(request,self.model)
+  self.assertGreater(len(json.dumps(request)),2_000_000)
+  self.assertLess(tokens,4000,'Base64 transport bytes are not text tokens')
+  self.assertGreater(tokens,2240,'Include both image budgets and prompt overhead')
+  rows=[{**r,'project':'shared'} for r in self.rows]
+  row,call=await self.state.acquire(rows,self.model,tokens=tokens)
+  self.state.finish(row,self.model,call,503,response=httpx.Response(503))
+  self.now[0]+=GAP
+  other,other_call=await self.state.acquire(rows,self.model,tokens=tokens,max_wait=0)
+  self.assertNotEqual(row['slot'],other['slot'])
+  self.state.finish(other,self.model,other_call,200,{'promptTokenCount':2500})
+
+ async def test_image_resolution_and_legacy_tiles_are_counted_without_changing_request(self):
+  import base64,io,copy
+  from PIL import Image
+  output=io.BytesIO();Image.new('RGB',(384,384)).save(output,format='PNG')
+  request={'contents':[{'parts':[{'text':'Translate.'},{'inlineData':{'mimeType':'image/png','data':base64.b64encode(output.getvalue()).decode()}}]}]}
+  original=copy.deepcopy(request);high=estimate(request,self.model)
+  self.assertEqual(request,original)
+  self.assertLess(estimate(request,'gemini-2.5-flash-lite'),high)
+  request['generationConfig']={'mediaResolution':'MEDIA_RESOLUTION_LOW'}
+  self.assertLess(estimate(request,self.model),high)
+  request['generationConfig']['mediaResolution']='MEDIA_RESOLUTION_ULTRA_HIGH'
+  self.assertGreater(estimate(request,self.model),high)
+
 class GatewayApiParallelTests(unittest.IsolatedAsyncioTestCase):
+ async def test_pool_aware_preferred_manga_slot_fails_over_in_one_call_without_changing_payload(self):
+  temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup);store=TaskStore(temp.name);self.addCleanup(store.database.close)
+  store.setting(google_pool.SETTING,{'slots':profiles()});previous=google_pool._store;self.addCleanup(setattr,google_pool,'_store',previous)
+  app=FastAPI();google_pool.install(app,lambda:'owner',lambda:store);real=httpx.AsyncClient;seen=[];body={'contents':[{'parts':[{'text':'translate fixture'}]}]}
+  async def provider(request):
+   seen.append(request.headers['x-goog-api-key']);self.assertEqual(json.loads(request.content),body)
+   return httpx.Response(503 if len(seen)==1 else 200,json={'candidates':[]})
+  async with real(transport=httpx.ASGITransport(app=app),base_url='http://fixture') as client:
+   with patch('google_pool.httpx.AsyncClient',lambda **kw:real(transport=httpx.MockTransport(provider),**kw)):
+    result=await asyncio.wait_for(client.post('/reader/google/generate',json={'slot':0,'pool':True,'model':google_pool.MODELS[0],'request':body}),3)
+  self.assertEqual(result.status_code,200);self.assertEqual(len(set(seen)),2);self.assertEqual(seen[0],profiles()[0]['key']);self.assertNotEqual(result.json()['mediavaultGateway']['slot'],0)
+
  async def test_six_configured_keys_can_translate_concurrently(self):
   temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
   store=TaskStore(temp.name);self.addCleanup(store.database.close)

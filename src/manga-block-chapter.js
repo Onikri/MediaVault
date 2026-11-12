@@ -5,10 +5,12 @@ import {unresolvedRegions} from './manga-empty-review.js';
 
 // Measured budgets determine how many source pages share a sheet.
 export async function drainBlockChapter(c){
- if(c.active||c.controller.signal.aborted)return;c.active++;
+ if(c.blockDispatching||c.controller.signal.aborted)return;c.blockDispatching=true;
+ const flights=c.blockFlights||(c.blockFlights=new Set()),parallel=Math.min(6,Math.max(1,c.serverSlots.length||(c.getKey===directKey?6:1)));
  try{while(!c.controller.signal.aborted){
-  const waiting=[...c.jobs.values()].filter(j=>j.state==='queued'),first=waiting.find(j=>!j.background)||waiting[0];if(!first)break;
-  const group=[],prepared=[];let key,diagnostics,sourcePixels=0,sourceBytes=0;const started=performance.now();
+  if(flights.size>=parallel){await Promise.race(flights);continue;}
+  const waiting=[...c.jobs.values()].filter(j=>j.state==='queued'),first=waiting.find(j=>!j.background)||waiting[0];if(!first){if(flights.size){await Promise.allSettled([...flights]);continue;}break;}
+  const group=[],prepared=[];let key,sourcePixels=0,sourceBytes=0;const started=performance.now();
   try{
    // First-page cache hits need no neighbour work. If it is missing, rebuild
    // any linked neighbours together so cached halves cannot split a sentence.
@@ -20,7 +22,7 @@ export async function drainBlockChapter(c){
     job=job||c.request(n,null,true);job.state='running';job.queueMs=Math.round(performance.now()-job.started);group.push(job);
     try{
      if(n>first.index&&!c.config.webtoon)job.sourceTimeoutMs=Math.ceil(Math.max(100,1800-(performance.now()-started)));
-     await c.cached(job);
+     if(job!==first)await c.cached(job);
      c.notify(n,{phase:'detecting',message:'Блоки · быстрый алгоритмический поиск без весов'});
      const page=job.prepared||await c.prepare(job.blob,n,message=>c.notify(n,{phase:'detecting',message}));job.prepared=page;
      c.notify(n,{phase:'detecting',message:'Блоки · '+page.regions.length+' областей',detected:{width:page.width,height:page.height,regions:page.regions.map(r=>({id:r.id,bbox:r.bbox}))}});
@@ -37,15 +39,29 @@ export async function drainBlockChapter(c){
     }catch(error){c.fail(job,error);job.state='failed';break;}
    }
    let active=group.filter(j=>j.state==='running');if(!active.length)continue;
+   if(!prepared.some(p=>p.regions.length)){await translateBlockPacket(c,active,prepared,null);continue;}
+   const available=c.serverSlots.length?c.serverSlots.map(slot=>'oracle-slot:'+slot):c.getKey===directKey?await restoreDirectKeys(c.keyScope):[c.getKey(c.keyScope)];
+   while(!key){key=available.find(k=>k&&!c.keyBusy.has(k));if(!key){if(!flights.size)throw Error('Добавь ключ Google в настройках перевода.');await Promise.race(flights);}}
+   c.keyBusy.add(key);const leased=key;
+   for(const job of active){job.keySlot=c.serverSlots.length?c.serverSlots[available.indexOf(key)]+1:c.personalSlot(key)+1;job.serverKey=!!c.serverSlots.length;}
+   const task=translateBlockPacket(c,active,prepared,leased).catch(error=>{for(const job of active)if(job.state!=='done')c.fail(job,error);}).finally(()=>{c.keyBusy.delete(leased);flights.delete(task);c.active=flights.size;});
+   flights.add(task);c.active=flights.size;key=null;
+  }catch(error){if(!group.length&&first.state==='queued')c.fail(first,error);for(const job of group)if(job.state==='running')c.fail(job,error);}
+  finally{if(key)c.keyBusy.delete(key);}
+ }}finally{c.blockDispatching=false;if([...c.jobs.values()].some(j=>j.state==='queued')&&!c.controller.signal.aborted)queueMicrotask(()=>c.drain());}
+}
+// Preparation continues while earlier packets await Google. Each independent
+// packet owns one credential until completion; source/seam/size limits stay local.
+async function translateBlockPacket(c,active,prepared,key){
+   let diagnostics;
    const groups=linkPageBlocks(prepared,{direction:c.direction,webtoon:c.config.webtoon}),sheets=packBlockSheets(groups);
    let pages=prepared.map(p=>({page:p.page,width:p.width,height:p.height,regions:[],detected:{width:p.width,height:p.height,regions:[]},timings:{detectionMs:p.detectionMs,ocrMs:0}})),usage=[];
    if(sheets.length){
-    const available=c.serverSlots.length?c.serverSlots.map(slot=>'oracle-slot:'+slot):c.getKey===directKey?await restoreDirectKeys(c.keyScope):[c.getKey(c.keyScope)];key=available.find(k=>!c.keyBusy.has(k));if(!key)throw Error('Добавь ключ Google в настройках перевода.');c.keyBusy.add(key);
     const packed=await c.canvasTask({operation:'blocks-pack',sheets,pages:prepared});c.controller.signal.throwIfAborted();
     const answers=[],ledger=refusalLedger();
     for(const current of blockPackets(packed)){
-     for(const job of active){job.keySlot=c.serverSlots.length?c.serverSlots[available.indexOf(key)]+1:available.indexOf(key)+1;job.serverKey=!!c.serverSlots.length;c.notify(job.index,{phase:'translating',message:'Блоки · '+current.length+' лист(а), '+prepared.length+' исходных страниц',model:c.config.directModel,totalRegions:job.prepared.regions.length,completedRegions:0});}
-     const result=await callGoogleSplitting(c,current,{key,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:'compat',allowMissing:true,context:[...c.context].filter(([i])=>i<first.index).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{
+     for(const job of active)c.notify(job.index,{phase:'translating',message:'Блоки · '+current.length+' лист(а), '+prepared.length+' исходных страниц',model:c.config.directModel,totalRegions:job.prepared.regions.length,completedRegions:0});
+     const result=await callGoogleSplitting(c,current,{key,model:c.config.directModel,language:c.config.language,direction:c.direction,gemmaProfile:'compat',allowMissing:true,context:[...c.context].filter(([i])=>i<active[0].index).map(([,s])=>s).join('\n').slice(-1200),signal:c.controller.signal,timeoutMs:c.config.directTimeoutMs,onDiagnostic:value=>{
       diagnostics={...value,blocks:{sourcePages:prepared.map(p=>p.page),sheets:current.map(s=>({id:s.id,width:s.width,height:s.height,placements:s.placements.map(p=>({id:p.group.id,box:p.box,parts:p.group.parts.map(part=>({page:part.page,bbox:part.bbox}))}))})),joined:groups.filter(g=>g.parts.length>1).map(g=>g.id)},transport:{viaOracle:!!c.config.directViaOracle,keySlot:active[0]?.keySlot,serverKey:!!c.serverSlots.length}};
       for(const job of active)c.notify(job.index,{phase:'translating',message:'Лист блоков · '+value.stage,diagnostics});
      }},{sources:prepared,ledger});answers.push(...result.pages);usage.push(result.usage);
@@ -57,7 +73,4 @@ export async function drainBlockChapter(c){
     page.detectionReport={found:page.detected.regions.length,translated:page.regions.filter(r=>r.ru_translation?.trim()).length,rejected:page.regions.filter(r=>!r.ru_translation?.trim()).map(r=>r.uid),unresolved:unresolvedRegions(page).map(r=>r.uid),refused:page.regions.filter(r=>r.refused).map(r=>r.uid),missed:'unknown'};
     if(c.config.cache){const{diagnostics,...safe}=page;await c.writeCache(job.cacheId,c.scope,{kind:'manga-json',page:safe});}c.settle(job,page);
    }
-  }catch(error){if(!group.length&&first.state==='queued')c.fail(first,error);for(const job of group)if(job.state==='running')c.fail(job,error);}
-  finally{if(key)c.keyBusy.delete(key);}
- }}finally{c.active--;if([...c.jobs.values()].some(j=>j.state==='queued')&&!c.controller.signal.aborted)queueMicrotask(()=>c.drain());}
 }

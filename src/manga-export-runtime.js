@@ -7,7 +7,7 @@ window.translateExportChapter=async({count,options,slots,skip=[]})=>{
  const controller=new AbortController(),ignored=new Set(skip);
  const entries=Array.from({length:count},(_,index)=>({async:async()=>new Blob([fromBase64(await window.exportSourcePage(index))])}));
  const config=translationConfig({...options,directTimeoutMs:120000,engine:'vm',directViaOracle:true,chapterPipeline:false,cache:false,allowDownloads:true,skipPages:ignored});
- const service={request:(path,request)=>window.exportGoogleRequest(path,request.body||{})};
+ const service={session:{googleGatewayVersion:4},request:(path,request)=>window.exportGoogleRequest(path,request.body||{})};
  const chapter=new DirectChapter({entries,scope:'vm-export',keyScope:'vm-export',config,direction:options.direction,serverSlots:slots,service:()=>service});
  try{
   const pending=entries.map((_,index)=>index).filter(index=>!ignored.has(index)),failures=new Map();

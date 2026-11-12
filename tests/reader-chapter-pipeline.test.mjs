@@ -2,8 +2,18 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {DirectChapter,RENDER_CACHE_VERSION} from '../src/manga-direct.js';
 import {translationConfig} from '../src/manga-translation.js';
 import {RequestPacer,labelPackets} from '../src/reader-chapter-pipeline.js';
+import {gatewayRequestPacer,sharedRequestPacer} from '../src/reader-chapter-pipeline.js';
 import {cachedChapterEntries,encodeCleanPage,decodeCleanPage} from '../src/reader-chapter-cache.js';
 const tick=()=>new Promise(r=>setTimeout(r,0));
+
+test('Google gateway owns pacing for reading and export; direct Google keeps device pacing',async()=>{
+ const gateway=new DirectChapter({entries:[],config:translationConfig({directViaOracle:true})});
+ const device=new DirectChapter({entries:[],config:translationConfig({directViaOracle:false})});
+ try{assert.equal(gateway.pacer,gatewayRequestPacer);assert.equal(device.pacer,sharedRequestPacer);
+  const controller=new AbortController();controller.abort(Error('closed'));
+  await assert.rejects(gateway.pacer.reserve('oracle-slot:0',controller.signal),/closed/);
+ }finally{gateway.close();device.close();}
+});
 
 test('chapter downloads/detects ahead independently, sends ordered pairs on rotating keys, and cleans before API completion',async()=>{
  let firstReady,cloudReady;const first=new Promise(r=>firstReady=r),cloud=new Promise(r=>cloudReady=r),downloads=[],detected=[],cleaned=[],sent=[],resolved=[];

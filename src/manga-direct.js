@@ -7,7 +7,7 @@ import {DIRECT_DETECTORS} from './manga-direct-profiles.js';
 import {compareDirectInputs} from './manga-direct-comparison.js';
 import {translationCacheKey,getTranslation,incompleteRender,putTranslation} from './translation-cache.js';
 import {drainBlockChapter} from './manga-block-chapter.js';
-import {ChapterPreparation,drainOrderedChapter,sharedRequestPacer} from './reader-chapter-pipeline.js';
+import {ChapterPreparation,drainOrderedChapter,sharedRequestPacer,gatewayRequestPacer} from './reader-chapter-pipeline.js';
 import {needsEmptyReview,reviewEmptyTranslations,unresolvedRegions} from './manga-empty-review.js';
 import {callGoogleSplitting,refusalLedger} from './manga-refusal.js';
 import {translateFallback,wantsFallback} from './manga-fallback.js';
@@ -29,7 +29,7 @@ export class DirectChapter{
   Object.assign(this,{entries,scope,keyScope,config,direction,google,cacheKey,readCache,writeCache,getKey,service,serverSlots});
   this.prepare=prepare||((blob,index,status,inputMode=config.directInput)=>{const type=inputMode==='blocks'?'annotated':inputMode;return type!=='vision'&&DIRECT_DETECTORS.some(v=>v.id===config.directDetector&&v.model)?translateLmt(blob,{...config,directInput:type,allowDownloads:true,mode:'gemma',operation:'gemma-prepare',fastDirect:true,pageIndex:index,direction},this.controller.signal,status):this.canvasTask({channel:'prepare',operation:'direct-prepare',blob,index,direction,inputMode:type},status);});
   this.renderPage=renderPage||this.renderCanvas.bind(this);this.controller=new AbortController();this.jobs=new Map();this.listeners=new Map();this.progress=new Map();this.context=new Map();this.active=0;this.keyBusy=new Set();this.worker=null;this.renders=new Map();this.serial=0;this.bypass=new Set();
-  this.translatedPages=new Set();this.partialPages=new Set();this.pageStates=new Map();this.priorityPages=new Set();this.focusWindow=[];this.priorityEpoch=0;this.focusIndex=0;this.pacer=pacer||sharedRequestPacer;this.preparation=new ChapterPreparation(this);
+  this.translatedPages=new Set();this.partialPages=new Set();this.pageStates=new Map();this.priorityPages=new Set();this.focusWindow=[];this.priorityEpoch=0;this.focusIndex=0;this.pacer=pacer||(config.directViaOracle?gatewayRequestPacer:sharedRequestPacer);this.preparation=new ChapterPreparation(this);
   this.incomplete=new Map();this.recovered=new Map();this.fallbacks=new Map();this.fallbackPages=new Map();
  }
  notify(index,value){this.lastActivity=performance.now();const old=this.progress.get(index)||{};value=value.phase==='cleaning'&&(old.phase==='error'||old.phase==='translating'&&this.jobs.get(index)?.state==='running')?{...old,backgroundCleanup:value}:{...old,...value};this.progress.set(index,value);for(const fn of this.listeners.get(index)||[])fn(value);}
@@ -218,12 +218,14 @@ export class DirectChapter{
   const oracle=this.config.directViaOracle&&this.service?.();
   if(this.config.directViaOracle&&this.google===callDirectGoogle&&!oracle)throw Error('Для перевода личным ключом подключи Oracle в профиле.');
   const slot=this.serverSlots.find(slot=>options.key==='oracle-slot:'+slot);
+  const serverScheduling=Number(oracle?.session?.googleGatewayVersion)>=4;
   if(this.serverSlots.length&&!oracle)throw Error('Для серверных ключей нужен Oracle.');
   if(!options.paced)await this.pacer.reserve(options.key,options.signal||this.controller.signal);
   const send=(key,target)=>this.google(pages,{...options,key,...(oracle?{gemmaProfile:'compat',transport:async({json,signal})=>{const data=await oracle.request('/reader/google/generate',{method:'POST',body:{...target,model:options.model,request:JSON.parse(json)},signal});return {status:200,text:JSON.stringify(data)};}}:{})});
-  try{return await send(options.key,slot===undefined?{key:options.key}:{slot});}
+  try{return await send(options.key,slot===undefined?{key:options.key}:{slot,...(serverScheduling?{pool:true}:{})});}
   catch(error){
    if(!transientGoogleError(error)||(options.signal||this.controller.signal).aborted)throw error;
+   if(slot!==undefined&&serverScheduling)throw error; // the server already tried eligible projects
    // A pinned server slot never moves on 429/5xx: send the request once more to
    // the whole pool, where the gateway picks a key with free quota. Personal
    // keys move to another of the user's keys the same way.
