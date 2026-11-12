@@ -492,8 +492,8 @@ async function main() {
   await owner.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
   await owner.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
   await owner.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
-  await owner.getByRole('button',{name:'Оценка 8',exact:true}).click();
-  await owner.getByText('8 из 10',{exact:true}).waitFor();
+  await owner.getByRole('radio',{name:'Оценка 8',exact:true}).click();
+  await owner.getByRole('radio',{name:'Оценка 8',exact:true,checked:true}).waitFor();
   const snapshotProfile=(await decryptCatalog(files.get(catalogId))).titleProfiles;
   assert.ok(Object.values(snapshotProfile).some(value=>value.userRatings?.[OWNER]===8&&value.characters[0].description.includes('Хокагэ')),'Russian character details and own rating are stored in the encrypted catalog');
   assert.equal(await owner.getByRole('combobox',{name:'Сезон или том'}).locator('option').count(),2,'Seasons appear inside the title');
