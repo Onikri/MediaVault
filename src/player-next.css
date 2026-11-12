@@ -528,8 +528,10 @@
 .mvx-chapters [aria-current=true] time{color:var(--mvx-tint)}
 .mvx-chapters [aria-current=true]:after{content:'';position:absolute;left:74px;right:12px;bottom:4px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--mvx-tint) var(--within,0%),#ffffff1f var(--within,0%))}
 @media(max-width:650px){
-  /* Phones: the bar has no room; the scene title takes the free line above the track. */
-  .mvx .mvx-controls .mvx-chapter{position:absolute;top:4px;left:6px;max-width:calc(100% - 12px);height:28px;margin:0;padding:0 4px 0 6px;font-size:12px;color:#ffffffd9}
+  /* Phones: the scene title takes whatever room the bar leaves between the time and the buttons. */
+  .mvx-controls:has(.mvx-chapter) .mvx-group-left{flex:1 1 auto}
+  .mvx-controls:has(.mvx-chapter) .mvx-group-right{flex:none}
+  .mvx .mvx-controls .mvx-chapter{flex:0 1 auto;max-width:none;height:30px;margin-left:2px;padding:0 2px 0 6px;font-size:12px}
   .mvx-timeline-bubble.has-scene{max-width:86%}
   .mvx-sheet .mvx-chapters button{padding:11px 10px 12px}
 }
