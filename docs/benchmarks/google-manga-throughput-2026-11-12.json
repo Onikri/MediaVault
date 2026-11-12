@@ -1,0 +1,215 @@
+{
+  "method": "Real Google gateway and Canvas, synthetic pages; gateway calls are not upstream Google call counts",
+  "runs": [
+    {
+      "label": "before",
+      "kind": "real-google-and-canvas-synthetic-pages",
+      "pages": 6,
+      "seconds": 172.605,
+      "saved": {
+        "0": {
+          "bytes": 118326,
+          "seconds": 41.222
+        },
+        "1": {
+          "bytes": 118326,
+          "seconds": 93.208
+        },
+        "2": {
+          "bytes": 118326,
+          "seconds": 105.334
+        },
+        "3": {
+          "bytes": 118326,
+          "seconds": 109.701
+        },
+        "4": {
+          "bytes": 118326,
+          "seconds": 128.399
+        },
+        "5": {
+          "bytes": 118336,
+          "seconds": 172.362
+        }
+      },
+      "gatewayCalls": [
+        {
+          "startSeconds": 2.897,
+          "seconds": 8.085,
+          "status": 503,
+          "inputTokens": null,
+          "requestBytes": 72744
+        },
+        {
+          "startSeconds": 16.984,
+          "seconds": 8.639,
+          "status": 503,
+          "inputTokens": null,
+          "requestBytes": 72744
+        },
+        {
+          "startSeconds": 31.625,
+          "seconds": 8.474,
+          "status": 200,
+          "inputTokens": 2941,
+          "requestBytes": 72744
+        },
+        {
+          "startSeconds": 41.231,
+          "seconds": 10.163,
+          "status": 503,
+          "inputTokens": null,
+          "requestBytes": 74257
+        },
+        {
+          "startSeconds": 57.395,
+          "seconds": 8.576,
+          "status": 503,
+          "inputTokens": null,
+          "requestBytes": 74257
+        },
+        {
+          "startSeconds": 71.973,
+          "seconds": 20.47,
+          "status": 200,
+          "inputTokens": 3006,
+          "requestBytes": 74257
+        },
+        {
+          "startSeconds": 93.218,
+          "seconds": 11.524,
+          "status": 200,
+          "inputTokens": 3062,
+          "requestBytes": 75418
+        },
+        {
+          "startSeconds": 105.344,
+          "seconds": 3.671,
+          "status": 200,
+          "inputTokens": 3118,
+          "requestBytes": 76143
+        },
+        {
+          "startSeconds": 109.693,
+          "seconds": 9.398,
+          "status": 503,
+          "inputTokens": null,
+          "requestBytes": 77248
+        },
+        {
+          "startSeconds": 125.092,
+          "seconds": 2.422,
+          "status": 200,
+          "inputTokens": 3174,
+          "requestBytes": 77248
+        },
+        {
+          "startSeconds": 128.409,
+          "seconds": 10.938,
+          "status": 503,
+          "inputTokens": null,
+          "requestBytes": 78485
+        },
+        {
+          "startSeconds": 145.349,
+          "seconds": 8.712,
+          "status": 503,
+          "inputTokens": null,
+          "requestBytes": 78485
+        },
+        {
+          "startSeconds": 160.063,
+          "seconds": 9.499,
+          "status": 503,
+          "inputTokens": null,
+          "requestBytes": 78485
+        },
+        {
+          "startSeconds": 169.846,
+          "seconds": 1.982,
+          "status": 200,
+          "inputTokens": 3230,
+          "requestBytes": 78485
+        }
+      ],
+      "peakGatewayRequests": 1
+    },
+    {
+      "label": "after",
+      "kind": "real-google-and-canvas-synthetic-pages",
+      "pages": 6,
+      "seconds": 61.205,
+      "saved": {
+        "4": {
+          "bytes": 117142,
+          "seconds": 22.2
+        },
+        "1": {
+          "bytes": 117107,
+          "seconds": 38.906
+        },
+        "2": {
+          "bytes": 118326,
+          "seconds": 41.892
+        },
+        "0": {
+          "bytes": 116719,
+          "seconds": 47.799
+        },
+        "3": {
+          "bytes": 116719,
+          "seconds": 51.021
+        },
+        "5": {
+          "bytes": 117142,
+          "seconds": 60.969
+        }
+      },
+      "gatewayCalls": [
+        {
+          "startSeconds": 4.68,
+          "seconds": 16.146,
+          "status": 200,
+          "inputTokens": 2941,
+          "requestBytes": 73166
+        },
+        {
+          "startSeconds": 4.058,
+          "seconds": 34.154,
+          "status": 200,
+          "inputTokens": 2941,
+          "requestBytes": 73202
+        },
+        {
+          "startSeconds": 4.26,
+          "seconds": 37.093,
+          "status": 200,
+          "inputTokens": 2941,
+          "requestBytes": 73354
+        },
+        {
+          "startSeconds": 3.79,
+          "seconds": 43.572,
+          "status": 200,
+          "inputTokens": 2941,
+          "requestBytes": 72758
+        },
+        {
+          "startSeconds": 4.473,
+          "seconds": 46.159,
+          "status": 200,
+          "inputTokens": 2941,
+          "requestBytes": 73070
+        },
+        {
+          "startSeconds": 4.839,
+          "seconds": 55.728,
+          "status": 200,
+          "inputTokens": 2941,
+          "requestBytes": 73394
+        }
+      ],
+      "peakGatewayRequests": 6
+    }
+  ]
+}
