@@ -504,3 +504,34 @@
 .mvx-ost .mvx-song-row{padding-right:48px}
 .mvx-ost-play{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:50%;background:rgb(255 255 255 / .08);color:#fff;cursor:pointer}
 .mvx-ost-play:hover{background:rgb(255 255 255 / .16)}
+
+/* Scenes (chapters from subtitles or a chapter file). The track breaks into
+   pieces at each scene start; the piece under the pointer lifts and glides to
+   the next one, and the bubble names it. The current scene sits after the time. */
+.mvx-track-cut{z-index:3;width:3px!important;margin-left:-1.5px;background:#000000c4;border-radius:0!important}
+.mvx-track-scene{z-index:2;top:-2px!important;bottom:-2px!important;border-radius:3px!important;background:#ffffff33;transition:left .18s var(--mvx-ease),width .18s var(--mvx-ease);animation:mvx-scene-in .2s var(--mvx-ease)}
+@keyframes mvx-scene-in{from{opacity:0;transform:scaleY(.3)}}
+.mvx-timeline-bubble.has-scene{flex-direction:column;align-items:center;gap:1px;padding:6px 12px 5px;max-width:min(320px,72%);text-align:center}
+.mvx-timeline-bubble.has-scene strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:#fff}
+.mvx-timeline-bubble.has-scene small{display:flex;gap:6px;font-size:11px;color:#ffffffa6}
+.mvx-timeline-bubble.has-scene small span{color:var(--mvx-tint)}
+.mvx .mvx-controls .mvx-chapter{display:flex;align-items:center;gap:2px;min-width:0;max-width:min(32vw,360px);height:32px;min-height:0;margin-left:4px;padding:0 6px 0 10px;border-radius:999px;font-size:13px;font-weight:500;color:#ffffffc4}
+.mvx .mvx-controls .mvx-chapter span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;animation:mvx-chapter-in .38s var(--mvx-ease)}
+.mvx .mvx-controls .mvx-chapter svg{flex:none;opacity:.55;transition:transform .2s var(--mvx-ease),opacity .2s}
+.mvx .mvx-controls .mvx-chapter:hover svg{opacity:1;transform:translateX(2px)}
+@keyframes mvx-chapter-in{from{opacity:0;transform:translateY(6px);filter:blur(3px)}}
+.mvx-chapters{list-style:none;margin:0;padding:0 0 4px;display:grid;gap:1px;max-height:min(46vh,380px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.mvx-sheet .mvx-chapters button{position:relative;display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;align-items:baseline;width:100%;padding:9px 10px 10px;border-radius:11px;text-align:left;font-size:14px;line-height:1.35;color:#ffffffc2}
+.mvx-sheet .mvx-chapters button:hover{background:var(--mvx-raised);color:#fff}
+.mvx-chapters time{font-size:12px;font-variant-numeric:tabular-nums;color:var(--mvx-muted);text-align:right}
+.mvx-sheet .mvx-chapters [aria-current=true]{background:var(--mvx-raised);color:#fff;font-weight:500}
+.mvx-chapters [aria-current=true] time{color:var(--mvx-tint)}
+.mvx-chapters [aria-current=true]:after{content:'';position:absolute;left:74px;right:12px;bottom:4px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--mvx-tint) var(--within,0%),#ffffff1f var(--within,0%))}
+@media(max-width:650px){
+  /* Phones: the scene title takes whatever room the bar leaves between the time and the buttons. */
+  .mvx-controls:has(.mvx-chapter) .mvx-group-left{flex:1 1 auto}
+  .mvx-controls:has(.mvx-chapter) .mvx-group-right{flex:none}
+  .mvx .mvx-controls .mvx-chapter{flex:0 1 auto;max-width:none;height:30px;margin-left:2px;padding:0 2px 0 6px;font-size:12px}
+  .mvx-timeline-bubble.has-scene{max-width:86%}
+  .mvx-sheet .mvx-chapters button{padding:11px 10px 12px}
+}

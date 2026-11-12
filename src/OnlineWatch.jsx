@@ -24,6 +24,8 @@ import EpisodeMotionPreview from './EpisodeMotionPreview.jsx';
 import {voiceEpisodeCount} from './anime-navigation.js';
 import useVisibleCards from './use-visible-cards.js';
 import useWatchQualities from './use-watch-qualities.js';
+import {useVideoChapters,collapsEmbeds} from './video-chapters.js';
+const signedOutForChapters=service=>['disconnected','unconfigured'].includes(service.status)&&!service.session;
 import {bestQualityRow,qualityHeights} from './watch-quality.js';
 import {voiceSwitchState} from './voice-switch.js';
 
@@ -283,7 +285,16 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const signedOut=['disconnected','unconfigured'].includes(service.status)&&!service.session,locked=guestLocked(service.session,item);
  const idleCurrent=browsingCatalog?foreign.row?.entries[0]:viewVariant?current:null,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
  const warmCurrent=usePlaybackWarmup({entry:idleCurrent,sourceUrl:idleVariant?.sourceUrl,quality,service,enabled:!playing&&!idleBusy&&!isAllohaVariant(idleVariant),anchor:sourceButton});
- const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:voice?.id,
+ // Scenes of the episode the page is about to play, prepared while the viewer
+ // is still on the title page: the server finds subtitles and marks them up once.
+ const film=/movie|фильм/i.test(String(item.format||item.kind||''))&&viewEntries.length<=1;
+ const chapterNames=[...new Set([item.title,profile?.title,...Object.values(item.titles||{}),...(item.aliases||[]),...(item.synonyms||[])].filter(v=>typeof v==='string'&&v.trim()).map(v=>v.trim()))].slice(0,8);
+ const chapters=useVideoChapters({service,enabled:!locked&&!signedOutForChapters(service),request:voices.length?{
+  work:String(identity).replace(/[^\w:.\-]/g,'').slice(0,120)||'title',season:film?0:Number(season)||0,episode:film?0:Number(current?.number||episode)||0,
+  title:profile?.title||item.title||'',names:chapterNames,kind:String(item.kind||item.format||'').slice(0,60),year:Number(item.year)||undefined,
+  description:String(profile?.description||item.description||'').replace(/<[^>]+>/g,'').slice(0,1200),episodeTitle:current?.title&&!/^\d+$/.test(current.title)?String(current.title).slice(0,300):'',
+  collaps:collapsEmbeds(voices,film?0:season,film?0:Number(current?.number||episode))}:null});
+ const controls={chapters,configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:voice?.id,
   // A voice picked in the player is a real voice change: its own balancer and
   // stream (or its audio track inside the playing Collaps stream).
   onVoice:id=>{if(id&&id!==voice?.id)changeVoice(id);},
