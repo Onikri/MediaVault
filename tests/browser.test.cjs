@@ -121,6 +121,9 @@ async function signIn(page) {
   await page.waitForFunction(()=>document.querySelector('#loginBtn').disabled);
   await page.locator('#setupPanel').waitFor({state:'visible'});
   await page.waitForFunction(()=>document.querySelector('#setupPanel')?.getAttribute('aria-busy')==='false');
+  // Drive connects before async account caching and library discovery finish.
+  // Wait for an actionable result, rather than the transient idle panel.
+  await page.waitForFunction(()=>{const b=document.querySelector('#setupPanel #createBtn, #setupPanel #unlockBtn');return b&&!b.disabled;});
   assert.equal(await page.locator('#driveBtn').isVisible(),false,'Drive connects with login; no extra connection click is required');
   assert.equal(await page.locator('#libraryId').count(),0,'Normal setup never asks the user for a Drive ID');
 }
