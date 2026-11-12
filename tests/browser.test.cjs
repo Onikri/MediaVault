@@ -114,7 +114,10 @@ async function installProvider(context, identity,options={}) {
 
 async function signIn(page) {
   await page.locator('#profileBtn').click();await page.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
-  await page.locator('#loginBtn').click();
+  // A remembered account is restored on reload; its login button correctly
+  // stays disabled. Click only when a new login is actually required.
+  await page.waitForFunction(()=>{const b=document.querySelector('#loginBtn');return b&&(!b.disabled||b.textContent.includes('Вход выполнен'));});
+  if(await page.locator('#loginBtn').isEnabled())await page.locator('#loginBtn').click();
   await page.waitForFunction(()=>document.querySelector('#loginBtn').disabled);
   await page.locator('#setupPanel').waitFor({state:'visible'});
   await page.waitForFunction(()=>document.querySelector('#setupPanel')?.getAttribute('aria-busy')==='false');
