@@ -24,7 +24,7 @@ import {Row,Switch,Choices,Segmented,Slider,Note,Group} from './player-sheet-con
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 import {contiguousBufferEnd} from './watch-quality.js';
-import {useEffect,useImperativeHandle,useRef,useState,useSyncExternalStore} from 'react';
+import {useEffect,useImperativeHandle,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {isShortEpisodeClip} from './watch-session.js';
 import usePlayerController from './player-controller.js';
 import {clock,keyFor,readResume,openerKey} from './player-runtime.js';
@@ -209,6 +209,24 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
   }
   function bridgeDone(){if(!bridge&&!resumeAfterSwitch.current)return;setBridge('');if(resumeAfterSwitch.current){resumeAfterSwitch.current=false;videoRef.current?.play().catch(()=>{});}}
   useEffect(()=>{if(!bridge)return;const v=videoRef.current,safety=setTimeout(bridgeDone,8000);const ready=setTimeout(()=>{if(v&&v.readyState>=3&&!v.seeking)bridgeDone();},60);return()=>{clearTimeout(safety);clearTimeout(ready);};},[source,bridge]);
+  // An online voice switch hands the same episode to another stream. Before
+  // hls.js detaches the old one, its last frame becomes the bridge, so the
+  // picture holds until the new voice can play from the same second.
+  const bridgedSource=useRef(source);
+  useLayoutEffect(()=>{
+    const previous=bridgedSource.current;bridgedSource.current=source;
+    if(!previous||previous===source||!onlineControls?.continuing)return;
+    const video=videoRef.current;
+    try{if(video?.videoWidth&&video.readyState>=2){const c=document.createElement('canvas');c.width=video.videoWidth;c.height=video.videoHeight;c.getContext('2d').drawImage(video,0,0);setBridge(c.toDataURL('image/jpeg',.85));}}catch{}
+  },[source]);
+  // Another dub inside the playing stream (Collaps): only the audio track changes.
+  const audioName=onlineControls?.audioName||'';
+  useEffect(()=>{
+    if(!audioName||!streaming.audio.length)return;
+    const index=streaming.audio.findIndex(track=>track.name===audioName);
+    if(index>=0&&index!==streaming.audioTrack())switchAudio(index);
+  },[audioName,streaming.audio]);
+  const voiceSwitch=onlineControls?.voiceSwitch?.phase?onlineControls.voiceSwitch:null;
   function openSettings(page='watch'){setSettingsTab(page);setMusicOpen(false);setDownloadOpen(false);openPanel('settings');}
 
   // ---- Values for the settings sheet ----
@@ -367,7 +385,12 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
         <PauseFrameEffects mode={prefs.depthMode||'cinematic'} characterContext={characterContext} characterService={characterService} userId={userId} key={item.id} videoRef={videoRef} source={source} paused={!playing} enabled={prefs.depthShadow} modelAllowed={prefs.depthModelAllowed} strength={prefs.shadowStrength} breathPeriod={prefs.breathPeriod} breathAmplitude={prefs.breathAmplitude} autoRecognize={prefs.characterAuto} visible={panel==='watch'&&!musicOpen}/>
         {subtitleText&&<div className="mvx-captions" style={{fontSize:prefs.subSize+'px',bottom:(hiddenControls?prefs.subOffset:Math.max(22,prefs.subOffset))+'%'}} aria-live="off">{subtitleText}</div>}
       </div>
-      {health.visible&&<div className="mvx-status" role="status">{health.phase==='blocked'?<button type="button" className="mvx-pill-light" onClick={health.retry}><Play size={15} fill="currentColor"/>Нажми, чтобы воспроизвести</button>:health.phase==='failed'?<><span>Поток задерживается</span><button type="button" className="mvx-pill-light" onClick={onlineControls?.retryStream||health.retry}>Повторить</button></>:<><span className="mvx-spinner"/>{health.phase==='loading'?'Запускаем видео':'Подгружаем видео'}</>}<button type="button" className="mvx-status-dismiss" aria-label="Скрыть статус воспроизведения" onClick={health.dismiss}><X size={14}/></button></div>}
+      {voiceSwitch?(voiceSwitch.phase==='failed'
+        ?<div className="mvx-status is-switch-failed" role="alert"><span>Не удалось включить «{voiceSwitch.name}»{voiceSwitch.message?'. '+voiceSwitch.message:''}</span>
+          {voiceSwitch.retry&&<button type="button" className="mvx-pill-light" onClick={voiceSwitch.retry}>Повторить</button>}
+          {voiceSwitch.revert&&voiceSwitch.previous&&<button type="button" className="mvx-pill-light" onClick={voiceSwitch.revert}>Вернуть «{voiceSwitch.previous}»</button>}</div>
+        :<div className="mvx-status is-switching" role="status"><span className="mvx-spinner"/><span>Загружаем озвучку «{voiceSwitch.name}»</span></div>)
+      :health.visible&&<div className="mvx-status" role="status">{health.phase==='blocked'?<button type="button" className="mvx-pill-light" onClick={health.retry}><Play size={15} fill="currentColor"/>Нажми, чтобы воспроизвести</button>:health.phase==='failed'?<><span>Поток задерживается</span><button type="button" className="mvx-pill-light" onClick={onlineControls?.retryStream||health.retry}>Повторить</button></>:<><span className="mvx-spinner"/>{health.phase==='loading'?'Запускаем видео':'Подгружаем видео'}</>}<button type="button" className="mvx-status-dismiss" aria-label="Скрыть статус воспроизведения" onClick={health.dismiss}><X size={14}/></button></div>}
 
       <AnimatePresence>{gestures.feedback&&gestures.feedback.type!=='seek'&&<motion.output className="mvx-hud" style={{x:'-50%',y:'-50%'}} initial={{opacity:0,scale:.92}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:.96}} aria-live="off">
         {gestures.feedback.type==='brightness'?<><Sun size={22}/><strong>{Math.round(gestures.feedback.value*100)}%</strong><i style={{'--level':gestures.feedback.value/1.5}}/></>:gestures.feedback.type==='volume'?<><VolumeGlyph value={effectiveVolume}/><strong>{Math.round(effectiveVolume*100)}%</strong><i style={{'--level':effectiveVolume}}/></>:<>{gestures.feedback.type==='episodes'?<ChevronsUp size={22}/>:<ChevronsDown size={22}/>}<strong>{gestures.feedback.type==='episodes'?'Серии':'Настройки'}</strong></>}

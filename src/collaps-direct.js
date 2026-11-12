@@ -46,10 +46,17 @@ export function collapsStream(text,{season=null,episode=null}={}){
 // The embed appends its page token to the stream address, as its own player does.
 export function pageToken(text){return /var\s+lok\s*=\s*1\s*,\s*\w+\s*=\s*"(\w{4,64})"/.exec(text)?.[1]||'';}
 
+// Unique audio rendition names in manifest order: the order Collaps numbers its dubs.
+export function audioNames(manifest){
+ const names=[];
+ for(const line of String(manifest||'').split(/\r?\n/))if(line.startsWith('#EXT-X-MEDIA')&&line.includes('TYPE=AUDIO')){const name=/NAME="([^"]*)"/.exec(line)?.[1];if(name!=null&&!names.includes(name))names.push(name);}
+ return names;
+}
+
 // One HLS carries every dub: the chosen one becomes the default audio.
 export function preferAudio(manifest,index){
  if(index==null||!manifest.includes('#EXT-X-MEDIA'))return manifest;
- const names=[];for(const line of manifest.split(/\r?\n/))if(line.startsWith('#EXT-X-MEDIA')&&line.includes('TYPE=AUDIO')){const n=/NAME="([^"]*)"/.exec(line)?.[1];if(n!=null&&!names.includes(n))names.push(n);}
+ const names=audioNames(manifest);
  if(!(index>=0&&index<names.length))return manifest;
  return manifest.split(/\r?\n/).map(line=>{
   if(!(line.startsWith('#EXT-X-MEDIA')&&line.includes('TYPE=AUDIO')))return line;
@@ -97,7 +104,7 @@ export async function prepareCollaps(value,{quality='best',signal,fetcher=fetch}
  const playlist=directMaster(preferAudio(raw,selection.audio),base,maxHeight);
  const qualities=[...new Set([...raw.matchAll(/RESOLUTION=\d+x(\d+)/g)].map(m=>Number(m[1])))].sort((a,b)=>b-a);
  const url=URL.createObjectURL(new Blob([playlist],{type:'application/vnd.apple.mpegurl'}));
- return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,subtitles:[],sourceIntervals:[]};
+ return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,audioNames:audioNames(raw),subtitles:[],sourceIntervals:[]};
 }
 
 // Shared by the viewer, the separate audio track and episode previews.

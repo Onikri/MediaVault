@@ -46,6 +46,7 @@ test('the browser opens the embed and the stream itself, with the page token',as
   return new Response('',{status:410});};
  const data=await prepareCollaps('https://api.nextembed.ws/embed/movie/180?mv_audio=0',{fetcher});
  assert.equal(data.direct,true);assert.equal(data.type,'hls');assert.deepEqual(data.qualities,[720,360]);
+ assert.deepEqual(data.audioNames,['rus0','ukr1'],'the dubs inside the stream, in the order Collaps numbers them');
  assert.match(data.url,/^blob:/);assert.deepEqual(asked.map(a=>a[1]),['omit','omit']);
  URL.revokeObjectURL(data.url);
  await assert.rejects(prepareCollaps('https://api.nextembed.ws/embed/movie/181',{fetcher}),/HTTP 410/);

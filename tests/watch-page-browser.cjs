@@ -100,8 +100,14 @@ for(const [id,name] of [['c','Crunchyroll.Subtitles'],['d','Студия суб�
   assert.equal(await row('Источник').count(),1,'Source settings are flattened into one row of the player sheet');
   await closeSheet();
   const before=await video.evaluate(v=>({source:v.currentSrc,time:v.currentTime}));
-  // The dub switch sits in the control bar; another studio arrives as separate audio.
-  await page.getByRole('button',{name:/^Озвучка: /}).click();await page.getByRole('radiogroup',{name:'Озвучка',exact:true}).getByRole('radio',{name:/^Команда Б/}).click();await page.waitForFunction(()=>document.querySelector('.mv-external-audio')?.readyState>=2);
+  // The dub switch sits in the control bar. In the "best video" mode the video
+  // already comes from Команда Б: picking it drops the separate audio, picking
+  // Команда А brings it back beside the same video. (Without that mode a picked
+  // voice replaces the video source: tests/voice-switch-browser.cjs.)
+  const pickDub=async name=>{await page.getByRole('button',{name:/^Озвучка: /}).click();await page.getByRole('radiogroup',{name:'Озвучка',exact:true}).getByRole('radio',{name:new RegExp('^'+name)}).click();};
+  await pickDub('Команда Б');await page.waitForFunction(()=>!document.querySelector('.mv-external-audio'));
+  assert.equal(await video.evaluate(v=>v.currentSrc),before.source,'The best video stays when its own voice is picked');
+  await pickDub('Команда А');await page.waitForFunction(()=>document.querySelector('.mv-external-audio')?.readyState>=2);
   assert.equal(await video.evaluate(v=>v.currentSrc),before.source,'Audio switch must preserve video source');
   assert.ok(await video.evaluate(v=>v.currentTime)>=before.time);
   await video.evaluate(v=>{v.currentTime=12;});await page.waitForFunction(()=>{const v=document.querySelector('.mv-player-stage>video'),a=document.querySelector('.mv-external-audio');return Math.abs(v.currentTime-a.currentTime)<.6;});
@@ -123,7 +129,10 @@ for(const [id,name] of [['c','Crunchyroll.Subtitles'],['d','Студия суб�
   await closePlayer();await page.getByRole('button',{name:'Открыть страницу заново'}).click();
   await page.getByRole('button',{name:'Смотреть серию 2'}).waitFor();await openSources();assert.equal(await rowValue('Озвучка'),'Команда А');
   await closeSheet();await page.getByRole('button',{name:'Смотреть серию 2'}).click();await page.waitForFunction(()=>{const v=document.querySelector('.mv-player-stage>video');return v?.readyState>=2&&v.currentTime>=13;});
-  await page.waitForFunction(()=>!!document.querySelector('.mv-external-audio'));
+  // The remembered voice plays as its own video until another voice's better
+  // quality is known again; no separate audio survives from before the remount.
+  assert.equal(await page.locator('.mv-external-audio').count(),0);
+  assert.match(requests.filter(b=>String(b.clientId||'').endsWith(':viewer')).at(-1).url,/^https:\/\/source\.example\/a(?:-hd)?\/2$/);
   // While a video plays, the episode grid lives in the player's episode panel.
   await showEpisodes(page);assert.equal(await page.locator('.watch-episode-grid .title-episode-card').nth(1).locator('img').evaluate(n=>n.src.startsWith('data:image/')),true,'Preview survives page remount');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);

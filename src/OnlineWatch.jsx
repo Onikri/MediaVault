@@ -25,6 +25,7 @@ import {voiceEpisodeCount} from './anime-navigation.js';
 import useVisibleCards from './use-visible-cards.js';
 import useWatchQualities from './use-watch-qualities.js';
 import {bestQualityRow,qualityHeights} from './watch-quality.js';
+import {voiceSwitchState} from './voice-switch.js';
 
 const noEntries=Object.freeze([]);
 export default function OnlineWatch({item:basisItem,profile:basisProfile=basisItem,discovery:basisDiscovery,service,userId,onSeasonBrowse}){
@@ -49,7 +50,9 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const [voiceId,setVoiceId]=useState(saved.current.voiceId||''),[episode,setEpisode]=useState(sceneJump.current?.episode||saved.current.episode||1),[season,setSeason]=useState(initialSeason);
  const voices=useMemo(()=>titleSeason?titleVoices:voicesForCatalogue(titleVoices,discovery.data?.sources,season),[titleVoices,discovery.data?.sources,titleSeason,season]);
  const [browseSeason,setBrowseSeason]=useState(initialSeason),[browseData,setBrowseData]=useState(null),[browseBusy,setBrowseBusy]=useState(false),[browseError,setBrowseError]=useState(''),[browseAttempt,setBrowseAttempt]=useState(0);
- const [audioId,setAudioId]=useState(saved.current.audioId||''),[subtitleId,setSubtitleId]=useState(saved.current.subtitleId||'');
+ const [subtitleId,setSubtitleId]=useState(saved.current.subtitleId||'');
+ // The voice whose stream the player has actually loaded (reported by OnlineViewer).
+ const [loadedVoiceId,setLoadedVoiceId]=useState('');
  const [entries,setEntries]=useState([]),[seasons,setSeasons]=useState([]),[variant,setVariant]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[playing,setPlaying]=useState(false),[count,setCount]=useState(24);
  useRetainedMedia(playing,{label:item.title+' · '+season+' сезон · '+episode+' серия',kind:'video'},()=>setPlaying(false));
  const [hovering,setHovering]=useState(false),[sourceSettings,setSourceSettings]=useState(false),sourceButton=useRef(null);
@@ -153,7 +156,12 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  if(playing&&candidate&&(frozen.current?.key!==selectionKey||!frozen.current?.value))frozen.current={key:selectionKey,value:candidate};
  const selectedVideo=playing?frozen.current?.value:preferred;
  const viewVariant=selectedVideo?.variant||(!playing?base?.variant:null),viewEntries=selectedVideo?.entries||base?.entries||entries,videoVoiceId=selectedVideo?.voiceId||voice?.id;
- const effectiveAudioId=audioId||(videoVoiceId!==voice?.id?voice?.id:'');
+ // Separate audio exists only in the "best video from every voice" mode: the
+ // video comes from the best version and the chosen voice plays beside it.
+ // Otherwise a picked voice replaces the video source itself.
+ const effectiveAudioId=bestVideo&&videoVoiceId!==voice?.id?voice?.id:'';
+ useEffect(()=>{if(!playing)setLoadedVoiceId('');},[playing]);
+ const voiceSwitch=voiceSwitchState({playing,bestVideo,voiceId:voice?.id,loadedVoiceId,busy,error});
  // Independent audio/captions get their own lease; changing them never
  // replaces the video source or its HLS quality selection.
  useEffect(()=>{setAudio(null);setCaptions([]);setTrackError('');if(!playing||!effectiveAudioId&&!subtitleId)return;
@@ -214,7 +222,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
 
  const spoken=voices.filter(v=>v.kind!=='subtitles');
  burnedCaptions.current=group=>{changeVoice(group.id);setCaptionNotice('Субтитры «'+group.name+'» вшиты в видео этой версии: включили её.');};
- function changeVoice(id,nextQuality=quality){setCaptionNotice('');manualVoice.current=true;failed.current.clear();setVoiceId(id);setAudioId('');setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
+ function changeVoice(id,nextQuality=quality){setCaptionNotice('');manualVoice.current=true;failed.current.clear();setVoiceId(id);setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
  function fallback(){
   if(!viewVariant)return false;
   failed.current.add(viewVariant.id);
@@ -245,9 +253,9 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   saved.current=saveWatch(userId,nextIdentity,{...readWatch(userId,nextIdentity),voiceId:value.voice.id,episode:Number(number),season:nextSeason,audioId:'',subtitleId:''});
   failed.current.clear();cache.current.set(nextIdentity+':'+value.variant.id+':'+nextSeason,value);
   frozen.current={key:[nextIdentity,value.voice.id,nextSeason,Number(number),quality,bestVideo,attempt,applyRevision].join(':'),value};
-  setSourceContext(context);setVoiceId(value.voice.id);setAudioId('');setSubtitleId('');setSeason(nextSeason);setBrowseSeason(nextSeason);setEntries(value.entries);setSeasons(value.seasons);setVariant(value.variant);setEpisode(Number(number));setPlaying(true);setScanScope('');setSourceSettings(false);setError('');
+  setSourceContext(context);setVoiceId(value.voice.id);setSubtitleId('');setSeason(nextSeason);setBrowseSeason(nextSeason);setEntries(value.entries);setSeasons(value.seasons);setVariant(value.variant);setEpisode(Number(number));setPlaying(true);setScanScope('');setSourceSettings(false);setError('');
  }
- function prepared(data){if(!viewVariant)return;const row={identity,variant:viewVariant,entries:viewEntries,voiceId:videoVoiceId,episode,season,qualities:(data.qualities||[]).map(Number).sort((a,b)=>b-a)};setPreparedRows(old=>[...old.filter(r=>r.variant.id!==row.variant.id||r.episode!==episode||r.season!==season),row].slice(-100));}
+ function prepared(data){if(!viewVariant)return;setLoadedVoiceId(videoVoiceId);const row={identity,variant:viewVariant,entries:viewEntries,voiceId:videoVoiceId,episode,season,qualities:(data.qualities||[]).map(Number).sort((a,b)=>b-a)};setPreparedRows(old=>[...old.filter(r=>r.variant.id!==row.variant.id||r.episode!==episode||r.season!==season),row].slice(-100));}
  const configuration=<div className="watch-player-configuration">  <div className="watch-selection"><label>Озвучка<select aria-label="Озвучка для просмотра" value={voice?.id||''} onChange={e=>changeVoice(e.target.value)} disabled={!voices.length}><option value="" disabled>{discovery.loading?'Ищем озвучки…':'Выбери озвучку'}</option>{offeredVoices.map(v=><option key={v.id} value={v.id}>{v.name}{qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]?' · до '+qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]+'p':''}{voiceEpisodeCount(v,season)?' · '+voiceEpisodeCount(v,season)+' сер.':''}{v.kind==='subtitles'?' · субтитры':''}{saved.current.usage?.[v.id]?' · твой выбор':''}</option>)}</select></label>
    <label>Качество<select aria-label="Качество просмотра" value={quality} onChange={e=>changeQuality(e.target.value)}><option value="best">Лучшее · авто</option>{heights.map(q=><option key={q} value={String(q)}>{q}p{!bestVideo&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(q))?' · другая озвучка':''}</option>)}{quality!=='best'&&!heights.includes(Number(quality))&&<option value={quality}>{quality}p · проверяем</option>}</select></label>
   </div>
@@ -275,8 +283,12 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const signedOut=['disconnected','unconfigured'].includes(service.status)&&!service.session,locked=guestLocked(service.session,item);
  const idleCurrent=browsingCatalog?foreign.row?.entries[0]:viewVariant?current:null,idleVariant=browsingCatalog?foreign.row?.variant:viewVariant,idleBusy=browsingCatalog?foreignBusy:busy||discovery.loading&&!voices.length;
  const warmCurrent=usePlaybackWarmup({entry:idleCurrent,sourceUrl:idleVariant?.sourceUrl,quality,service,enabled:!playing&&!idleBusy&&!isAllohaVariant(idleVariant),anchor:sourceButton});
- const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:audioId||voice?.id,
-  onVoice:id=>{const value=id===voice?.id?'':id;setAudioId(value);persist({audioId:value});},
+ const controls={configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:voice?.id,
+  // A voice picked in the player is a real voice change: its own balancer and
+  // stream (or its audio track inside the playing Collaps stream).
+  onVoice:id=>{if(id&&id!==voice?.id)changeVoice(id);},
+  voiceSwitch:voiceSwitch&&{...voiceSwitch,name:voice?.name||'',previous:voices.find(v=>v.id===loadedVoiceId)?.name||'',
+   retry:()=>{failed.current.clear();setError('');setAttempt(n=>n+1);},revert:loadedVoiceId?()=>changeVoice(loadedVoiceId):null},
   captionVoices:voices.filter(v=>v.kind==='subtitles').map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),subtitleId,
   onCaptionVoice:id=>{setCaptionNotice('');setSubtitleId(id);persist({subtitleId:id});},audio,externalCaptions:captions,trackBusy,trackError,captionNotice};
  return <div className="online-watch">
@@ -309,7 +321,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
     {sourceSettings&&<PlayerSettings anchor={sourceButton} initialPage={sourceOpen} sections={sourceSections} footer={<p className="mvx-help" role="status">{qualityScan.busy&&scanScope?'Проверяем качества: '+qualityScan.done+' из '+qualityScan.total:heights.length?'Доступно до '+heights[0]+'p.':'Качества появятся после запуска.'}{bestVideo&&videoVoiceId!==voice?.id?' Видео берётся из версии '+(voices.find(v=>v.id===videoVoiceId)?.name||'другой озвучки')+'.':''}</p>} onClose={()=>setSourceSettings(false)}/>}
    </div>}</PlaybackReveal>
   {!playing&&episodeBrowser}
-  {!browsingCatalog&&error&&<div className="inline-error" role="alert">{error}<button className="text-link" onClick={()=>{failed.current.clear();setAttempt(n=>n+1);}}>Повторить</button>{alternativeActions}</div>}
+  {!browsingCatalog&&error&&!voiceSwitch&&<div className="inline-error" role="alert">{error}<button className="text-link" onClick={()=>{failed.current.clear();setAttempt(n=>n+1);}}>Повторить</button>{alternativeActions}</div>}
   {!browsingCatalog&&!locked&&discovery.error&&<p className="fine">{discovery.error}<button className="text-link" onClick={discovery.retry}>Повторить поиск</button></p>}
   {!!saved.current.usage&&<p className="watch-personal-note">«Твой выбор» — история просмотров на этом устройстве.</p>}
  </div>;

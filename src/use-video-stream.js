@@ -22,7 +22,7 @@ export default function useVideoStream(ref,source,type,onError,{preview=false,au
   return()=>{closed=true;instance?.destroy();if(engine.current===instance)engine.current=null;};
  },[ref,source,hls,preview,audioOnly,sessionRecovery,alloha]);
  useEffect(()=>{const instance=engine.current;if(!instance?.levels?.length)return;const index=quality==='best'?-1:instance.levels.findIndex(l=>Number.parseInt(l.attrs?.NAME||l.name||l.height)===Number(quality));instance.nextLevel=index;setLevelState(index);},[quality]);
- return {hls,levels,level,setLevel:n=>{if(engine.current){engine.current.nextLevel=n;setLevelState(n);}},audio,setAudio:n=>{if(engine.current)engine.current.audioTrack=n;},subtitles,subtitleUrl:n=>engine.current?.subtitleTracks?.[n]?.url||'',setSubtitle:n=>{const e=engine.current;if(!e)return;
+ return {hls,levels,level,setLevel:n=>{if(engine.current){engine.current.nextLevel=n;setLevelState(n);}},audio,setAudio:n=>{if(engine.current)engine.current.audioTrack=n;},audioTrack:()=>engine.current?.audioTrack??-1,subtitles,subtitleUrl:n=>engine.current?.subtitleTracks?.[n]?.url||'',setSubtitle:n=>{const e=engine.current;if(!e)return;
   // Every switch makes hls.js disable all labelled text tracks, the page's own
   // <track> files included: touch it only when its subtitles really change.
   if(e.subtitleDisplay)e.subtitleDisplay=false;if(e.subtitleTrack!==n)e.subtitleTrack=n;}};
