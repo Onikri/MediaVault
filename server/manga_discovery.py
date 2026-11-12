@@ -10,7 +10,7 @@ from source_parser import SourceAccessError,SourceError,SourceTemporaryError,pub
 import suwayomi_bridge as bridge
 
 LANGUAGES={'all',*bridge.LANGUAGES}
-DISCOVERY_VERSION=4
+DISCOVERY_VERSION=5
 # A source that failed its search twice in a row (challenge, login wall,
 # timeout, DNS, HTTP 5xx) is left out of ordinary searches for a growing
 # pause. It stays installed and listed with the reason; «Повторить поиск»
@@ -25,7 +25,11 @@ def language_queries(values,language):
     def rank(value):
         if re.search(pattern,value,re.I):return 0
         return 1 if re.search(r'[a-z]',value,re.I) else 2
-    return sorted(dict.fromkeys(values),key=rank)[:2]
+    from title_identity import normalized
+    unique={}
+    for value in values:
+        if isinstance(value,str) and value.strip():unique.setdefault(normalized(value),value.strip())
+    return sorted(unique.values(),key=rank)[:4]
 def public_aliases(row):
     values=[row.get('title'),*(row.get('aliases') or [])]
     text=str(row.get('description') or '')[:20000]
@@ -38,6 +42,11 @@ def public_aliases(row):
 
 def normalize(value):
     return ' '.join(unicodedata.normalize('NFKC',value).casefold().split())
+
+def query_matches(query,names):
+    from title_identity import normalized
+    term=normalized(query)
+    return bool(term) and any(term in normalized(name) for name in names)
 
 def installed_sources():
     from manga_hentaichan import SOURCE
@@ -92,13 +101,18 @@ def native_search_source(source,query):
                 rows=lib_search(term,http,NATIVE_SOURCES[source['name']],details=True)
             for row in rows:
                 candidate={**row,'aliases':row.get('identityTitles') or row.get('aliases') or [row['title']]}
-                if source['name']=='Senkognito' and not selected and not any(normalized(term) in normalized(name) for name in candidate['aliases']):continue
+                if source['name']=='Senkognito' and not selected and not query_matches(term,candidate['aliases']):continue
                 matched=not selected or match_title(selected,candidate)[0]
                 # A matching publication year permits the documented English alias,
                 # while unrelated fan works with a franchise alias remain rejected.
                 if selected and not matched and selected.get('year') and selected['year']==row.get('year'):matched=match_title(selected,row)[0]
                 if not matched:continue
-                if selected:row={**row,'aliases':list(dict.fromkeys([*row.get('aliases',[]),selected['title']]))}
+                if selected:
+                    row={**row,'aliases':list(dict.fromkeys([*row.get('aliases',[]),selected['title']]))}
+                    # The selected name is admitted only after the canonical
+                    # title/year checks above, so the frontend can retain the
+                    # exact match even when its original name is English.
+                    if row.get('identityTitles'):row['identityTitles']=list(dict.fromkeys([*row['identityTitles'],selected['title']]))
                 found[row['url']]=row
             if found:break
         if not found and source['name']=='MangaDex' and not selected and re.search(r'[а-яё]',query,re.I):
@@ -139,7 +153,7 @@ def search_source(source,query):
                 for row in search(term,http):
                     selected=source.get('_title') or source.get('_alias_title')
                     if selected and not match_title(selected,row)[0]:continue
-                    if source['name'] in {'HentaiChan','HenChan'} and not selected and not any(normalize(term) in normalize(v) for v in row['aliases']):continue
+                    if source['name'] in {'HentaiChan','HenChan'} and not selected and not query_matches(term,row['aliases']):continue
                     if source['name']=='HenChan':
                         row={**row,'id':'henchan:'+row['id'].split(':')[-1],'sourceId':str(source['id']),'providerName':'HenChan'}
                     found[row['id']]=row
@@ -173,7 +187,7 @@ def search_source(source,query):
                     if selected:
                         if not match_title(selected,value)[0]:continue
                         value['aliases']=list(dict.fromkeys([*value['aliases'],selected['title']]))
-                    elif not any(normalize(term) in normalize(v) for v in value['aliases']):continue
+                    elif not query_matches(term,value['aliases']):continue
                     if source.get('name')=='Manga Ball':
                         languages=bridge.mangaball_languages(client,row['id'])
                         if languages is not None and source['lang'] not in languages:continue
@@ -201,7 +215,7 @@ def search_source(source,query):
                 if site_for(final)!=site:raise SourceError('Источник перенаправил поиск на другой сайт.')
                 for value in parse_search(text,final,site):
                     if selected and not match_title(selected,value)[0]:continue
-                    if not selected and not any(normalize(term) in normalize(v) for v in value.get('aliases',[value['title']])):continue
+                    if not selected and not query_matches(term,value.get('aliases',[value['title']])):continue
                     rows.append({**value,'id':'suwayomi:'+str(source['id'])+':native:'+hashlib.sha256(value['url'].encode()).hexdigest()[:20],'sourceId':str(source['id']),'sourceUrl':value['url'],'sourceURL':value['url'],'sourceOnly':True,'ids':{},'genres':[],'tags':[]})
                 if rows:break
             return rows
@@ -323,17 +337,22 @@ class Discovery:
             if self.db.execute("SELECT count(*) FROM jobs WHERE state='running'").fetchone()[0]>=self.max_jobs or self.db.execute("SELECT count(*) FROM jobs WHERE state='running' AND owner=?",(owner,)).fetchone()[0]>=self.per_owner:raise SearchLimit('Поиск уже выполняется. Дождись результата или останови предыдущий.')
             identity=secrets.token_urlsafe(24)
             self.db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',(identity,owner,signature,query,language,'running' if selected else 'done',now,now,now+86400,now))
+            seeded=[]
             for source in selected:
                 sid=str(source['id']);cache_key=self._cache_key(key,source);hit=None if refresh else self.db.execute('SELECT results FROM query_cache WHERE query=? AND source_id=? AND expires>?',(cache_key,sid,now)).fetchone()
                 # A stale metadata index is useful immediately, but is not counted
                 # as a fresh provider response and never suppresses its refresh.
                 seed=self._indexed(key,sid) if not hit else json.loads(hit['results'])
+                if hit:seeded.extend(seed)
                 pause=paused.get(sid) if not hit else None
                 self.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',(identity,sid,json.dumps(source,ensure_ascii=False),'done' if hit else 'skipped' if pause else 'queued',json.dumps([{**v,'stale':True} for v in seed] if pause else seed,ensure_ascii=False),int(bool(hit))))
                 if pause:
                     until=time.strftime('%d.%m %H:%M',time.gmtime(pause['skip_until']))
                     self.db.execute('INSERT OR REPLACE INTO work_diagnostics VALUES(?,?,?)',(identity,sid,json.dumps({'code':'paused','reason':pause['code'],'failures':pause['failures'],'retryAt':pause['skip_until'],
                         'message':f"Пропущен: {pause['failures']} отказа подряд ({pause['message'].rstrip('.')}). Снова спросим после {until} UTC или сразу по кнопке «Повторить».",'elapsedMs':0},ensure_ascii=False)))
+            # A fresh cached multilingual hit must expand the current job too:
+            # no worker will revisit it just to discover its translated names.
+            if seeded:self._expand_aliases(identity,query,seeded)
             if selected and self.db.execute("SELECT count(*) FROM work WHERE job=? AND state='queued'",(identity,)).fetchone()[0]==0:self.db.execute("UPDATE jobs SET state='done' WHERE id=?",(identity,))
             self.condition.notify_all()
             return self._snapshot(owner,identity)
@@ -405,20 +424,37 @@ class Discovery:
         return row
 
     def _expand_aliases(self,job,query,values):
-        from title_identity import aliases,normalized
+        from title_identity import aliases,normalized,match_title
+        work_rows=self.db.execute('SELECT source_id,source,state,results FROM work WHERE job=?',(job,)).fetchall()
+        selected=next((s['_title'] for w in work_rows if (s:=json.loads(w['source'])).get('_title')),None)
         for value in values:
-            canonical=value.get('identityTitles') or [value.get('title','')]
-            if normalized(query) not in {normalized(v) for v in canonical}:continue
-            names=aliases(value)
+            canonical=value.get('identityTitles') or aliases(value)
+            candidate={**value,'aliases':canonical,'titles':{},'originalTitle':None,'original_title':None}
+            if selected:
+                matched=match_title(selected,candidate)[0]
+                if not matched and selected.get('year') and selected['year']==value.get('year'):matched=match_title(selected,value)[0]
+                if not matched:continue
+                identity={**selected,'aliases':aliases({**selected,'aliases':[*aliases(selected),*aliases(value)]})}
+            else:
+                if normalized(query) not in {normalized(v) for v in canonical}:continue
+                identity={k:value.get(k) for k in ('title','kind','aliases','year','ids','format')}
+            names=aliases(identity)
             if not any(normalized(v)!=normalized(query) for v in names):continue
-            identity={k:value.get(k) for k in ('title','kind','aliases','year','ids','format')}
-            for work in self.db.execute('SELECT source_id,source,state FROM work WHERE job=?',(job,)).fetchall():
+            for work in work_rows:
                 source=json.loads(work['source'])
-                if source.get('_title') or source.get('_alias_title'):continue
+                # A query alias cannot repair a transport failure; do not
+                # repeatedly retry restricted sources during the same search.
+                if work['state'] not in {'queued','running','done'}:continue
+                previous=source.get('_title') or source.get('_alias_title')
+                if previous and not match_title(previous,identity)[0]:continue
+                expected={**(previous or identity),'aliases':aliases({**identity,'aliases':[*aliases(previous or {}),*names]})}
                 terms=language_queries(names,source['lang'])
                 if terms==source.get('_queries',[query]):continue
-                source['_queries']=terms;source['_alias_title']=identity
-                self.db.execute('UPDATE work SET source=?,state=? WHERE job=? AND source_id=?',(json.dumps(source,ensure_ascii=False),'running' if work['state']=='running' else 'queued',job,work['source_id']))
+                # Keep successful cached sources done; expand only neighbours
+                # that have not already returned this exact work.
+                if work['state']=='done' and any(match_title(expected,v)[0] for v in json.loads(work['results'])):continue
+                source['_queries']=terms;source['_title' if source.get('_title') else '_alias_title']=expected
+                self.db.execute('UPDATE work SET source=?,state=?,cached=0 WHERE job=? AND source_id=?',(json.dumps(source,ensure_ascii=False),'running' if work['state']=='running' else 'queued',job,work['source_id']))
             break
 
     def _worker(self):
@@ -459,7 +495,7 @@ class Discovery:
                 changed=latest and latest['source']!=row['source']
                 if changed:
                     from title_identity import match_title
-                    expected=json.loads(latest['source']).get('_alias_title')
+                    latest_source=json.loads(latest['source']);expected=latest_source.get('_title') or latest_source.get('_alias_title')
                     if expected and not any(match_title(expected,v)[0] for v in values):state='queued'
                 encoded=json.dumps(values,ensure_ascii=False)
                 if state in {'done','unavailable'}:self._reachability(json.loads(row['source']),row['source_id'],state=='done',details,now)
