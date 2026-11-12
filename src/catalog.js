@@ -122,7 +122,8 @@ export function normalizeCatalog(provider,data,kind='anime'){
       return record(provider,a.id,a.type==='Series'?'tv':'movie',{titles:{ru:a.title.russian,en:a.title.original||undefined},title:a.title.russian,aliases:[a.title.russian,a.title.original],
         description:a.synopsis||a.description||'',cover:poster,background:safeImage(a.gallery?.coverUrl||'').replace(/\/orig$/,'/1920x'),year:a.year||yearOf(a.releaseDate),startDate:a.releaseDate||null,
         format:a.type==='Series'?'Сериал':'Фильм',genres:(a.genres||[]).map(g=>String(g.name||'').replace(/^./,c=>c.toLocaleUpperCase('ru'))).filter(Boolean),
-        tags:(a.countries||[]).map(c=>c.name).filter(Boolean),score:Number(rating.kinopoisk?.value)||Number(rating.imdb?.value)||null,
+        tags:(a.countries||[]).map(c=>c.name).filter(Boolean),countries:(a.countries||[]).map(c=>c.name).filter(Boolean),score:Number(rating.kinopoisk?.value)||Number(rating.imdb?.value)||null,
+        scores:[['kinopoisk','Кинопоиск','255 102 0','https://www.kinopoisk.ru/'+(a.type==='Series'?'series':'film')+'/'+a.id+'/'],['imdb','IMDb','245 197 24','']].filter(([key])=>Number(rating[key]?.value)>0).map(([key,name,rgb,url])=>({key,name,rgb,url,value:Number(rating[key].value),votes:Number(rating[key].count)||null})),duration:/^(\d+):(\d+)/.test(a.duration||'')?Number(a.duration.split(':')[0])*60+Number(a.duration.split(':')[1]):null,
         age:/age(\d+)/.test(a.restriction?.age||'')?Number(a.restriction.age.match(/age(\d+)/)[1]):null,ageLabel:/age(\d+)/.test(a.restriction?.age||'')?a.restriction.age.match(/age(\d+)/)[1]+'+':'',
         ids:{kinopoisk:String(a.id)},links:[{provider,url:'https://www.kinopoisk.ru/'+(a.type==='Series'?'series':'film')+'/'+a.id+'/'}]});
     });
@@ -142,7 +143,8 @@ export function mergeCatalog(values){
     current.genres=unique([...current.genres,...item.genres]);current.tags=unique([...current.tags,...item.tags]);current.links=[...current.links,...item.links];current.ids={...current.ids,...item.ids};
     current.releases=[...current.releases,...item.releases].filter((e,i,a)=>a.findIndex(x=>x.date===e.date&&x.episode===e.episode)===i);
     if(item.titles.ru){current.titles={...current.titles,...item.titles};current.title=item.titles.ru;current.description=item.description||current.description;}
-    for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','startDate','endDate','score','trailer','background','episodesAired'])if(current[key]==null||current[key]==='')current[key]=item[key];
+    for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','startDate','endDate','score','trailer','background','episodesAired','duration','authors'])if(current[key]==null||current[key]==='')current[key]=item[key];
+    for(const key of ['scores','countries'])if(!current[key]?.length&&item[key]?.length)current[key]=item[key];
   }
   return result;
 }

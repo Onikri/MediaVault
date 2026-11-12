@@ -1,0 +1,141 @@
+/* Below the showcase: the stage (player or reader) spans the page, the
+   dossier (characters, stills, credits, relations) follows in two columns.
+   Separation is tone and spacing only, per the site's no-outline rule. */
+html[data-blossom] .title-page>.title-stage{margin:clamp(22px,3vw,40px) 0 0;padding:0;background:transparent;scroll-margin-top:110px;min-width:0}
+html[data-blossom] .title-page>.title-stage>.watch-materials-heading{margin:0 0 18px}
+html[data-blossom] .title-page>.title-stage .online-watch{max-width:1320px}
+.title-hero-copy>.hero-character-links{order:6}
+.hero-character-links{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:14px 0 0;font-size:12px}
+.hero-character-links>span{color:var(--color-quiet)}
+.hero-character-links>button{padding:0;border:0;background:none;color:var(--color-petal);font:inherit;cursor:pointer;text-decoration:none;background-image:linear-gradient(currentColor,currentColor);background-size:0 1px;background-position:0 100%;background-repeat:no-repeat;transition:background-size .2s}
+.hero-character-links>button:hover,.hero-character-links>button:focus-visible{background-size:100% 1px;outline:none}
+
+/* Reader stage: filters · reader · chapters. */
+.reader-stage{--stage-top:calc(var(--header-height,72px) + 18px);display:grid;grid-template-columns:minmax(200px,230px) minmax(0,1fr) minmax(250px,300px);grid-template-areas:'filters main index';gap:clamp(16px,1.6vw,26px);align-items:start;min-width:0}
+.reader-stage-filters{grid-area:filters;position:sticky;top:var(--stage-top);display:grid;gap:22px;max-height:calc(100dvh - var(--stage-top) - 16px);overflow:auto;overscroll-behavior:contain;scrollbar-width:none;padding:2px 2px 16px;min-width:0}
+.reader-stage-filters::-webkit-scrollbar{display:none}
+.reader-stage-main{grid-area:main;display:grid;gap:18px;min-width:0}
+.reader-stage>.chapter-index{grid-area:index}
+.reader-stage .title-playback-reveal{border-radius:24px;overflow:hidden}
+.reader-stage .reader-idle{position:relative;width:100%;aspect-ratio:16/9;min-height:360px;border-radius:24px;overflow:hidden}
+.reader-stage .reader-idle .reader-idle-title{display:block;margin:0;font:700 clamp(24px,3.4vw,46px)/1.04 var(--font-display,inherit);letter-spacing:-.045em;color:#fff;text-wrap:balance;text-shadow:0 2px 24px #0006}
+.reader-stage .reader-idle .mvx-primary svg{flex:none}
+.reader-idle-loading{display:grid;place-items:center;min-height:420px;border-radius:24px;background:var(--color-canvas-soft);color:var(--color-on-muted);font-size:13px}
+.reader-stage .retained-media-slot.is-reader{min-height:clamp(440px,75dvh,950px)}
+.reader-stage .world-chapters{margin:0}
+.reader-stage .inline-error{margin:0}
+
+/* Filter column: shop-style groups; the chosen row is lifted by tone. */
+.reader-filter-group{display:grid;gap:8px;margin:0;padding:0;border:0;min-width:0}
+.reader-filter-group legend{padding:0;margin:0 0 8px;font-size:12px;font-weight:650;color:var(--color-petal)}
+.reader-filter-group legend small{font-weight:500;color:var(--color-quiet)}
+.reader-filter-group [role=radiogroup]{display:grid;gap:2px}
+.reader-filter-group [role=radio]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:34px;padding:7px 11px;border:0;border-radius:11px;background:transparent;color:var(--color-on-muted);font:inherit;font-size:13px;text-align:left;cursor:pointer;transition:background .15s,color .15s}
+.reader-filter-group [role=radio]:hover{background:var(--color-canvas-soft);color:var(--color-petal)}
+.reader-filter-group [role=radio][aria-checked=true]{background:var(--color-surface);color:var(--color-petal);font-weight:600}
+.reader-filter-group [role=radio]:focus-visible{outline:2px solid var(--color-blossom);outline-offset:-2px}
+.reader-filter-group [role=radio] small{font-size:11px;color:var(--color-quiet)}
+.reader-filter-note{margin:0;font-size:12px;line-height:1.5;color:var(--color-quiet)}
+.reader-filter-note .loading-ring{margin-right:7px;vertical-align:-2px}
+.reader-stage-filters>.text-link{justify-self:start;font-size:12px}
+.reader-stage-filters .world-source-filter{margin:0}
+.reader-stage-filters .title-source-tools,.reader-stage-filters .ranobe-file{font-size:12px}
+
+.reader-source-list ul{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.reader-source-list li{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:center;border-radius:12px;transition:background .15s}
+.reader-source-list li:hover{background:var(--color-canvas-soft)}
+.reader-source-list li[data-selected]{background:var(--color-surface)}
+.reader-source-pick{position:relative;display:grid;gap:3px;min-width:0;padding:9px 4px 11px 11px;border:0;background:none;color:var(--color-petal);font:inherit;text-align:left;cursor:pointer;overflow:hidden;border-radius:12px}
+.reader-source-pick:focus-visible{outline:2px solid var(--color-blossom);outline-offset:-2px}
+.reader-source-pick strong{font-size:13px;font-weight:620;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reader-source-pick small{font-size:11px;color:var(--color-quiet);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* How complete the translation is against the work's total chapters. */
+.reader-source-fill{position:absolute;left:11px;right:4px;bottom:5px;height:2px;border-radius:2px;background:color-mix(in srgb,var(--color-petal) 9%,transparent);overflow:hidden}
+.reader-source-fill::after{content:'';position:absolute;inset:0;transform-origin:left;transform:scaleX(var(--fill));background:rgb(var(--title-rgb,238 60 53)/.85)}
+.reader-source-favorite{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:none;color:var(--color-quiet);cursor:pointer;opacity:.55;transition:opacity .15s,color .15s}
+.reader-source-list li:hover .reader-source-favorite,.reader-source-favorite:focus-visible,.reader-source-favorite[aria-pressed=true]{opacity:1}
+.reader-source-favorite[aria-pressed=true]{color:var(--color-blossom)}
+.reader-source-favorite:focus-visible{outline:2px solid var(--color-blossom);outline-offset:0}
+@media(hover:none){.reader-source-favorite{opacity:1}}
+
+/* Chapter index: the right column, its own scroll. */
+.chapter-index{position:sticky;top:var(--stage-top,90px);display:flex;flex-direction:column;gap:10px;max-height:calc(100dvh - var(--stage-top,90px) - 16px);min-height:0;padding:14px 8px 8px 14px;box-sizing:border-box;border-radius:22px;background:var(--color-canvas-soft);min-width:0}
+.chapter-index>header{display:grid;gap:3px;padding-right:6px}
+.chapter-index h3{margin:0;font:700 15px var(--font-display,inherit);letter-spacing:-.02em}
+.chapter-index>header p{margin:0;font-size:11.5px;color:var(--color-quiet)}
+.chapter-index-search{height:34px;margin-right:6px;padding:0 11px;border:0;border-radius:10px;background:var(--color-surface);color:var(--color-petal);font:inherit;font-size:12px}
+.chapter-index-search:focus-visible{outline:2px solid var(--color-blossom);outline-offset:0}
+.chapter-index-list{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--color-surface-raised) transparent}
+.chapter-index-list ol{display:grid;gap:1px;margin:0;padding:0;list-style:none}
+.chapter-index-list li>button{display:grid;grid-template-columns:3.2em minmax(0,1fr);align-items:baseline;gap:8px;width:100%;padding:7px 8px;border:0;border-radius:9px;background:none;color:var(--color-on-muted);font:inherit;font-size:12.5px;text-align:left;cursor:pointer}
+.chapter-index-list li>button:hover{background:var(--color-surface);color:var(--color-petal)}
+.chapter-index-list li>button[aria-current=true]{background:rgb(var(--title-rgb,238 60 53)/.16);color:var(--color-petal)}
+.chapter-index-list li>button[data-read]:not([aria-current]){color:var(--color-quiet)}
+.chapter-index-list li>button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:-2px}
+.chapter-index-number{font-variant-numeric:tabular-nums;color:var(--color-quiet);font-size:11.5px}
+.chapter-index-title{display:grid;gap:2px;min-width:0}
+.chapter-index-title,.chapter-index-title>small{overflow:hidden;text-overflow:ellipsis}
+.chapter-index-title>small{font-size:10.5px;color:var(--color-quiet);white-space:nowrap}
+.chapter-index-volume{display:grid;gap:2px;margin-bottom:4px}
+.chapter-index-volume-head{display:grid;grid-template-columns:minmax(0,1fr) auto 16px;align-items:center;gap:8px;width:100%;padding:8px;border:0;border-radius:10px;background:none;color:var(--color-petal);font:inherit;text-align:left;cursor:pointer}
+.chapter-index-volume-head:hover{background:var(--color-surface)}
+.chapter-index-volume-head strong{font-size:12.5px;font-weight:650}
+.chapter-index-volume-head span{font-size:11px;color:var(--color-quiet)}
+.chapter-index-volume-head svg{color:var(--color-quiet);transition:transform .2s}
+.chapter-index-volume[data-open] .chapter-index-volume-head svg{transform:rotate(180deg)}
+.chapter-index-volume-head:focus-visible{outline:2px solid var(--color-blossom);outline-offset:-2px}
+.chapter-index-more{display:block;width:100%;padding:8px;border:0;border-radius:9px;background:none;color:var(--color-on-muted);font:inherit;font-size:12px;cursor:pointer}
+.chapter-index-more:hover{background:var(--color-surface);color:var(--color-petal)}
+.chapter-index-empty{margin:4px 6px 10px 0;font-size:12px;line-height:1.5;color:var(--color-quiet)}
+
+@media(max-width:1180px){
+ .reader-stage{grid-template-columns:minmax(190px,215px) minmax(0,1fr);grid-template-areas:'filters main' 'filters index'}
+ .chapter-index{position:static;max-height:520px}
+}
+@media(max-width:760px){
+ .reader-stage{grid-template-columns:minmax(0,1fr);grid-template-areas:'main' 'filters' 'index';gap:18px}
+ .reader-stage .world-chapters .title-episode-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+ .reader-stage-filters{position:static;max-height:none;overflow:visible}
+ .reader-filter-group [role=radiogroup]{display:flex;flex-wrap:wrap;gap:4px}
+ .reader-filter-group [role=radio]{width:auto;min-height:32px;border-radius:99px;background:var(--color-canvas-soft)}
+ .reader-stage .reader-idle{aspect-ratio:4/5;min-height:0}
+ .chapter-index{max-height:420px}
+}
+@media(prefers-reduced-motion:reduce){.reader-filter-group [role=radio],.reader-source-list li,.chapter-index-volume-head svg,.hero-character-links>button{transition:none}}
+.reader-stage-filters .world-source-filter>label{display:grid;gap:3px;margin:0 0 8px;font-size:12px;font-weight:650;color:var(--color-petal)}
+.reader-stage-filters .world-source-filter>label small{font-weight:500;color:var(--color-quiet)}
+/* A reader embedded in the stage keeps to its slot (online.css is not loaded
+   on every title page). Full screen stays one button away in the reader. */
+.retained-media-host .reader-embedded,.reader-stage .reader-embedded{position:relative!important;inset:auto!important;z-index:1!important;height:clamp(440px,75dvh,950px)!important;min-height:0!important;border-radius:24px}
+.retained-media-host .reader-embedded:fullscreen,.reader-stage .reader-embedded:fullscreen{height:100dvh!important;border-radius:0}
+/* The source picker inside the filter column: one row per source, heart at the end. */
+.reader-stage-filters .title-source-picker{display:grid;gap:8px;margin:0;padding:0;background:none}
+.reader-stage-filters .title-source-picker .section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0}
+.reader-stage-filters .title-source-picker h4{margin:0;font-size:12px;font-weight:650;color:var(--color-petal)}
+.reader-stage-filters .title-source-picker .section-heading .fine{font-size:11px;color:var(--color-quiet)}
+.reader-stage-filters .title-source-picker .input-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.reader-stage-filters .title-source-picker .field-input{height:34px;min-height:34px;border:0;border-radius:10px;background:var(--color-canvas-soft);font-size:12px;padding:0 11px}
+.reader-stage-filters .title-source-options{display:grid;gap:2px}
+.title-source-row{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:center;border-radius:12px;transition:background .15s}
+.title-source-row:hover{background:var(--color-canvas-soft)}
+.title-source-row[data-selected]{background:var(--color-surface)}
+.reader-stage-filters .title-source-option{position:relative;display:grid;gap:3px;width:100%;min-width:0;padding:9px 4px 12px 11px;border:0;border-radius:12px;background:none!important;color:var(--color-petal);font:inherit;text-align:left;cursor:pointer;box-shadow:none}
+.reader-stage-filters .title-source-option:focus-visible{outline:2px solid var(--color-blossom);outline-offset:-2px}
+.reader-stage-filters .title-source-option>span:first-child{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
+.reader-stage-filters .title-source-option strong{font-size:13px;font-weight:620;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reader-stage-filters .title-source-option small,.reader-stage-filters .title-source-counts{font-size:11px;color:var(--color-quiet);text-align:left}
+.reader-stage-filters .title-source-counts{display:grid;gap:2px}
+.reader-stage-filters .title-source-picker details{font-size:12px}
+@media(prefers-reduced-motion:reduce){.title-source-row{transition:none}}
+/* Side columns stay under the reader's own panels (voices, contents, settings). */
+.reader-stage>.reader-stage-filters,.reader-stage>.chapter-index{z-index:0}
+.reader-stage>.reader-stage-main{position:relative;z-index:2}
+/* While a chapter is open the reader takes the filter column's place; the
+   chapter index stays on the right for navigation. Closing the reader brings
+   the filters back. */
+.reader-stage[data-reading]{grid-template-columns:minmax(0,1fr) minmax(250px,300px);grid-template-areas:'main index'}
+.reader-stage[data-reading]>.reader-stage-filters{display:none}
+@media(max-width:1180px){.reader-stage[data-reading]{grid-template-columns:minmax(0,1fr);grid-template-areas:'main' 'index'}}
+/* Panels of an embedded reader (voices, book card, consent) fit inside it. */
+.reader-embedded .reader-rail{contain:layout}
+.reader-embedded .reader-rail-dock :is(.narration-cast,.narration-book,.narration-consent){position:absolute!important;max-height:calc(100% - var(--rail-gap,8px) * 2)!important}

@@ -18,7 +18,8 @@ let browser,vite;
  await page.getByRole('button',{name:/Начать читать/}).click({timeout:120000});
  await page.locator('.ranobe-prose p').first().waitFor();
  // Layout: one rail on the right; the player is in it; no subtitles.
- const box=await page.locator('.reader-rail').boundingBox();assert.ok(box.x>1280-90,'rail on the right edge: '+box.x);
+ // The reader is embedded in the title page's stage: its rail sits on the reader's right edge.
+ const box=await page.locator('.reader-rail').boundingBox(),reader=await page.locator('.ranobe-reader').boundingBox();assert.ok(box.x>reader.x+reader.width-90,'rail on the reader right edge: '+box.x);
  await page.waitForSelector('.ranobe-prose .role-name i',{timeout:60000});
  await page.getByRole('button',{name:'Слушать главу'}).click();
  await page.waitForSelector('.ranobe-prose p.is-speaking',{timeout:30000});

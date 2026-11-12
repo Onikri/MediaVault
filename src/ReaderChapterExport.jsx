@@ -32,14 +32,15 @@ export default function ReaderChapterExport({title,userId,chapterLabel,fileName,
   chapterSaves.start({id:title,userId,title:fileName,chapterLabel,fileName,total,translate:choice.translate,format:choice.format,pages:choice.translate?ready?.pages:null,createSource});
  }
  const live=running||finished;
- return <Dialog.Root open={open} onOpenChange={setOpen}>
+ // Not modal: like the player and the reader mini-apps, the page and the
+ // reader keep answering while the window is open; Escape or × close it.
+ return <Dialog.Root open={open} onOpenChange={setOpen} modal={false}>
   <Dialog.Trigger className="reader-control reader-save-trigger" aria-label={running?'Сохранение главы · '+(job.progress?.done||0)+' из '+total:finished?'Глава сохранена':'Скачать главу с переводом'} data-running={running||undefined}>
    {running?<ProgressRing fraction={ringFraction(job)}/>:null}
    <Download size={running?14:19}/>
   </Dialog.Trigger>
   <Dialog.Portal container={container||undefined}>
-   <Dialog.Overlay className="reader-save-backdrop"/>
-   <Dialog.Content className="reader-save-sheet" aria-describedby={undefined} onOpenAutoFocus={e=>{e.preventDefault();e.currentTarget.focus({preventScroll:true});}}>
+   <Dialog.Content className="reader-save-sheet" aria-describedby={undefined} onInteractOutside={e=>e.preventDefault()} onOpenAutoFocus={e=>{e.preventDefault();e.currentTarget.focus({preventScroll:true});}}>
     <motion.div className="reader-save-body" layout={!reduce} transition={saveSpring}>
      <motion.header layout="position" className="reader-save-head">
       <div><Dialog.Title>{finished?'Глава сохранена':running?'Сохраняем главу':'Сохранить главу'}</Dialog.Title><p>{chapterLabel}</p></div>
