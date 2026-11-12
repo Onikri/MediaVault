@@ -32,7 +32,9 @@ def language_queries(values,language):
     # Japanese/Korean sources retain their native + Latin two-query budget.
     # Russian/English catalogues need room for multiple translated spellings.
     limit=4 if language in {'ru','uk','en','all'} else 2
-    return sorted(unique.values(),key=rank)[:limit]
+    ordered=sorted(unique.values(),key=rank)
+    if language in {'ru','uk','en'} and any(rank(v)<2 for v in ordered):ordered=[v for v in ordered if rank(v)<2]
+    return ordered[:limit]
 def public_aliases(row):
     values=[row.get('title'),*(row.get('aliases') or [])]
     text=str(row.get('description') or '')[:20000]
