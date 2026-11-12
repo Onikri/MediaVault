@@ -29,7 +29,10 @@ def language_queries(values,language):
     unique={}
     for value in values:
         if isinstance(value,str) and value.strip():unique.setdefault(normalized(value),value.strip())
-    return sorted(unique.values(),key=rank)[:4]
+    # Japanese/Korean sources retain their native + Latin two-query budget.
+    # Russian/English catalogues need room for multiple translated spellings.
+    limit=4 if language in {'ru','uk','en','all'} else 2
+    return sorted(unique.values(),key=rank)[:limit]
 def public_aliases(row):
     values=[row.get('title'),*(row.get('aliases') or [])]
     text=str(row.get('description') or '')[:20000]
