@@ -1,16 +1,27 @@
-import React,{useState} from 'react';
+import React,{useEffect,useState} from 'react';
 import {variantsFor} from './watch-session.js';
-export default function VoicePicker({discovery,onChoose,selected}){
-  const [groupId,setGroupId]=useState('');
-  const voices=(discovery.data?.voices||[]).filter(v=>v.language!=='en'||v.kind==='original'),group=voices.find(g=>g.id===groupId);
-  return <section className="voice-picker" aria-label="Переводы со всех источников">
-    <h4>Озвучка и субтитры</h4>
-    {discovery.loading&&<p role="status"><span className="loading-ring"/>Проверяем точный тайтл и собираем переводы…</p>}
-    {discovery.error&&<p role="alert">{discovery.error}<button type="button" className="text-link" onClick={discovery.retry}>Повторить поиск</button></p>}
-    {!discovery.loading&&discovery.data&&!voices.length&&<p className="fine">Подтверждённых переводов для этого тайтла и сезона пока нет. Другие произведения не подставляются.</p>}
-    {discovery.data?.complete===false&&<p className="fine">Часть источников не удалось проверить полностью. Найденные варианты сохранены; полный список пока не подтверждён. <button type="button" className="text-link" onClick={discovery.retry}>Продолжить проверку</button></p>}
-    {!!voices.length&&<><label className="input-label" htmlFor="voiceGroup">Перевод · {voices.length} вариантов</label><select id="voiceGroup" className="field-input" value={groupId} onChange={e=>{setGroupId(e.target.value);const group=voices.find(v=>v.id===e.target.value);onChoose(variantsFor(group,1)[0]||null);}}><option value="">Выбери студию или субтитры</option>{voices.map(voice=><option key={voice.id} value={voice.id}>{voice.name} · {voice.kind==='subtitles'?'субтитры':'озвучка'} · {voice.variants.length} источн.</option>)}</select></>}
-    {group&&<details className="voice-source-details"><summary>Другой источник · {selected?.providerName||group.variants[0]?.providerName}</summary><label className="input-label" htmlFor="voiceSource">Доступный плеер</label><select id="voiceSource" className="field-input" value={selected?.id||''} onChange={e=>onChoose(group.variants.find(v=>v.id===e.target.value)||null)}><option value="">Выбери вариант</option>{group.variants.map(v=><option key={v.id} value={v.id}>{v.player} · {v.providerName} · {v.sourceTitle}{v.episodes.length?' · '+v.episodes.length+' сер.':''}</option>)}</select><p className="fine">Названия студий объединены; каждый плеер сохраняет свой список серий. Наличие перевода у конкретной серии перепроверяется перед просмотром.</p></details>}
-    {discovery.data?.providers&&<details className="provider-diagnostics"><summary>Проверено источников: {discovery.data.providers.length}</summary>{discovery.data.providers.map(p=><p key={p.provider}><b>{p.name}</b> — {p.status==='ok'?'найдены варианты':p.status==='no_match'?'точного совпадения нет':p.message||'недоступен'}</p>)}</details>}
-  </section>;
+import {counted} from './title-context.js';
+
+// Studios and subtitle tracks from every source. A studio is one row; the
+// players (Kodik, Alloha, Collaps…) that carry it are chips under it, named
+// the way the player names them, so the saved file's origin is visible.
+export default function VoicePicker({discovery,onChoose,selected,initialVoice=''}){
+ const voices=(discovery.data?.voices||[]).filter(v=>v.language!=='en'||v.kind==='original');
+ const [groupId,setGroupId]=useState('');
+ const group=voices.find(g=>g.id===groupId);
+ // The voice already chosen in the player is preselected once it is found.
+ useEffect(()=>{if(groupId||!initialVoice)return;const match=voices.find(v=>v.id===initialVoice||v.name===initialVoice);if(match)choose(match);},[initialVoice,voices.length]);
+ function choose(value){setGroupId(value.id);onChoose(variantsFor(value,1)[0]||null);}
+ return <section className="voice-picker export-field" aria-label="Перевод для сохранения">
+  <span>Озвучка или субтитры{voices.length?' · '+voices.length:''}</span>
+  {discovery.loading&&!voices.length&&<p className="export-hint" role="status"><span className="loading-ring"/>Собираем переводы со всех источников…</p>}
+  {discovery.error&&<p className="inline-error" role="alert">{discovery.error} <button type="button" className="text-link" onClick={discovery.retry}>Повторить поиск</button></p>}
+  {!discovery.loading&&discovery.data&&!voices.length&&<p className="export-hint">Подтверждённых переводов для этого тайтла и сезона пока нет. Другие произведения не подставляются.</p>}
+  {!!voices.length&&<div className="export-choice-list" role="group" aria-label="Выбрать перевод">{voices.map(voice=><button type="button" key={voice.id} className="export-choice" aria-pressed={voice.id===groupId} onClick={()=>choose(voice)}>
+   <strong>{voice.name}</strong><small>{voice.kind==='subtitles'?'Субтитры':voice.kind==='original'?'Оригинальная дорожка':'Озвучка'}{voice.language&&voice.language!=='ru'?' · '+voice.language.toUpperCase():''}</small>
+   <em>{counted(voice.variants.length,['плеер','плеера','плееров'])}</em>
+  </button>)}</div>}
+  {group&&group.variants.length>0&&<div className="export-field"><span>Плеер</span><div className="export-players" role="group" aria-label="Плеер для сохранения">{group.variants.map(v=><button type="button" key={v.id} aria-pressed={selected?.id===v.id} title={v.sourceTitle} onClick={()=>onChoose(v)}>{v.player||v.providerName}{v.player&&v.providerName&&v.player!==v.providerName?' · '+v.providerName:''}{v.episodes?.length?' · '+v.episodes.length+' сер.':''}</button>)}</div></div>}
+  {discovery.data?.complete===false&&<p className="export-hint">Часть источников ещё не проверена. <button type="button" className="text-link" onClick={discovery.retry}>Продолжить проверку</button></p>}
+ </section>;
 }

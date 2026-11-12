@@ -41,11 +41,12 @@ createRoot(document.getElementById('root')).render(React.createElement('main',{s
       return json([]);
     });
     await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/voice-harness.html');
-    assert.equal(await page.locator('#serverCollection').count(),0,'Online page does not show import naming fields');assert.equal(await page.getByRole('button',{name:'Сохранить на Google Диск',exact:true}).count(),1);
-    await page.getByRole('button',{name:'Сохранить на Google Диск',exact:true}).click();
-    await page.locator('#voiceGroup option').nth(40).waitFor({state:'attached'});assert.equal(await page.locator('#voiceGroup option').count(),41);
-    await page.locator('#voiceGroup').selectOption('studio-39');await page.locator('#voiceSource option').nth(14).waitFor({state:'attached'});assert.equal(await page.locator('#voiceSource option').count(),15);
-    await page.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();await page.locator('.voice-source-details summary').click();await page.locator('#voiceSource').selectOption('variant-39-13');
+    assert.equal(await page.locator('#serverCollection').count(),0,'Online page does not show import naming fields');assert.equal(await page.locator('.export-trigger').count(),1);
+    // The save window lists every studio once and, under the chosen one, the players that carry it.
+    await page.locator('.export-trigger').click();const sheet=page.locator('.export-sheet');await sheet.getByRole('radio',{name:'В Google Диск',exact:true}).click();
+    await sheet.locator('.export-choice').nth(39).waitFor();assert.equal(await sheet.locator('.export-choice').count(),40);
+    await sheet.locator('.export-choice').filter({has:page.getByText('Studio 39',{exact:true})}).click();await sheet.locator('.export-players button').nth(13).waitFor();assert.equal(await sheet.locator('.export-players button').count(),14);
+    await page.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();await sheet.locator('.export-players button').filter({hasText:'Источник 13'}).click();
     await page.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
     await page.locator('#serverQuality option[value="4320"]').waitFor({state:'attached'});assert.equal(await page.locator('#serverQuality option').count(),10);
     assert.equal(await page.locator('#serverQuality').inputValue(),'best');

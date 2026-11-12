@@ -1,4 +1,4 @@
-import ShareTitleButton from './ShareTitleButton.jsx';
+import {publishTitleShare} from './title-context.js';
 import {useRetainedMedia} from './RetainedMedia.jsx';
 import usePlaybackWarmup from './use-playback-warmup.js';
 import useSeasonSource from './use-season-source.js';
@@ -302,10 +302,11 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
    retry:()=>{failed.current.clear();setError('');setAttempt(n=>n+1);},revert:loadedVoiceId?()=>changeVoice(loadedVoiceId):null},
   captionVoices:voices.filter(v=>v.kind==='subtitles').map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),subtitleId,
   onCaptionVoice:id=>{setCaptionNotice('');setSubtitleId(id);persist({subtitleId:id});},audio,externalCaptions:captions,trackBusy,trackError,captionNotice};
+  // The hero's share button offers the voice and episodes chosen here.
+  const shareKey=[viewVariant?.id,voice?.id,current?.url,viewEntries.length,quality].join('|');
+  useEffect(()=>{if(!viewEntries.length){publishTitleShare(null);return;}publishTitleShare({service,title:{...item,cover:profile?.cover||item.cover,description:profile?.description||item.description},kind:'video',entries:viewEntries,initial:current,referer:(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant?.sourceUrl,dub:voice?.name,language:voice?.language||'ru',quality,userId,voiceId:voice?.id||'',voiceName:voice?.name||''});},[shareKey]);
+  useEffect(()=>()=>publishTitleShare(null),[]);
  return <div className="online-watch">
-  <ShareTitleButton service={service} title={{...item,cover:profile?.cover||item.cover,description:profile?.description||item.description}}
-   kind="video" entries={viewEntries} initial={current} referer={(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant?.sourceUrl}
-   dub={voice?.name} language={voice?.language||'ru'} quality={quality} userId={userId}/>
   <OnlineEpisodePreviews minimumDuration={minimumEpisodeDuration(displayProfile)} entries={previewTargets} active={!playing&&!busy&&!browseBusy&&!foreignBusy&&!hovering} service={service} sourceUrl={previewVariant?.sourceUrl} sourceId={displayVariant?.id} identity={displayIdentity} season={displaySeason} userId={userId} onPreview={(number,image)=>preview(number,image,displaySeason,displayVariant?.id,displayIdentity)}/>
   <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} errorActions={alternativeActions} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
    :<div className="watch-idle mv-player mvx mvx-idle watch-player-idle" style={profile.cover?{'--watch-poster':`url("${profile.cover.replace(/["\\]/g,'')}")`}:undefined}>

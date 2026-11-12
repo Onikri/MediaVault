@@ -1,0 +1,65 @@
+/* The save window: a floating panel like the mini-apps (player, readers),
+   not a modal. Tone separates its parts; no outlines. */
+.export-sheet{
+ position:fixed;z-index:95;right:18px;top:calc(var(--header-height,72px) + 14px);
+ width:min(460px,calc(100vw - 24px));max-height:calc(100dvh - var(--header-height,72px) - 32px);
+ display:flex;flex-direction:column;box-sizing:border-box;padding:16px 16px 0;
+ border-radius:24px;background:color-mix(in srgb,var(--color-canvas-soft) 96%,transparent);
+ backdrop-filter:blur(26px) saturate(1.3);-webkit-backdrop-filter:blur(26px) saturate(1.3);
+ color:var(--color-petal);box-shadow:0 22px 60px rgb(0 0 0/.42);outline:none;transform-origin:right top;
+}
+.export-sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:2px 2px 14px}
+.export-sheet-head h2{margin:0;font:750 19px/1.2 var(--font-display,inherit);letter-spacing:-.035em}
+.export-sheet-head p{margin:5px 0 0;font-size:12px;line-height:1.45;color:var(--color-on-muted)}
+.export-sheet-close{flex:none;display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:50%;background:var(--color-surface);color:var(--color-petal);cursor:pointer}
+.export-sheet-close:hover{background:var(--color-surface-raised)}
+.export-sheet-close:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
+.export-sheet-destination{margin:0 0 4px}
+.export-sheet-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 2px 16px;scrollbar-width:thin;scrollbar-color:var(--color-surface-raised) transparent}
+@media(max-width:600px){.export-sheet{right:10px;left:10px;width:auto;top:auto;bottom:calc(var(--dock-h,0px) + 10px);max-height:82dvh;transform-origin:center bottom}}
+
+/* Forms inside the window: one column, compact fields, quiet hints. */
+.export-sheet .export-form{display:grid;gap:14px;margin:0;padding:0;background:transparent;box-shadow:none}
+.export-sheet .export-form>*{margin:0}
+.export-sheet .export-field{display:grid;gap:7px;min-width:0}
+.export-sheet .export-field>span,.export-sheet .export-field>label,.export-sheet .input-label,.export-sheet .episode-selection-legend{font-size:11.5px;font-weight:600;color:var(--color-on-muted);margin:0;letter-spacing:0;text-transform:none}
+.export-sheet .export-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.export-sheet .field-input,.export-sheet select.field-input{height:40px;min-height:40px;border:0;border-radius:12px;background:var(--color-surface);color:var(--color-petal);font-size:13px;padding:0 12px;box-shadow:none}
+.export-sheet .field-input:focus-visible{outline:2px solid var(--color-blossom);outline-offset:0}
+.export-sheet .fine,.export-sheet .export-hint{font-size:11.5px;line-height:1.5;color:var(--color-quiet);margin:0}
+.export-sheet .chip-row{display:flex;gap:2px;padding:3px;border-radius:14px;background:var(--color-canvas)}
+.export-sheet .chip-row .chip{flex:1;height:32px;border:0;border-radius:11px;background:transparent;color:var(--color-quiet);font-size:12px;box-shadow:none}
+.export-sheet .chip-row .chip.chip-active{background:var(--color-surface-raised);color:var(--color-petal)}
+.export-sheet .import-submit,.export-sheet .export-submit{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:46px;border:0;border-radius:14px;font-weight:700}
+.export-sheet .import-submit>svg:last-child{display:none}
+.export-sheet details>summary{font-size:12px;color:var(--color-on-muted);cursor:pointer}
+.export-sheet .provider-diagnostics,.export-sheet .source-calendar{font-size:11.5px}
+.export-sheet .inline-error{margin:0}
+.export-sheet .world-local-progress{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--color-surface);font-size:12px;margin:0}
+/* The page-level step rail, headings and duplicate “watch now” don't belong in the window. */
+.export-sheet .import-form-heading,.export-sheet .import-step-rail,.export-sheet .online-launch,.export-sheet .manga-import>.section-heading{display:none}
+
+/* Choice cards: a translation (studio + player) or a source, one per row. */
+.export-choice-list{display:grid;gap:4px;max-height:260px;overflow:auto;scrollbar-width:thin;padding:2px;margin:0;border-radius:14px;background:var(--color-canvas)}
+.export-choice{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 12px;width:100%;padding:10px 12px;border:0;border-radius:11px;background:transparent;color:var(--color-petal);font:inherit;text-align:left;cursor:pointer}
+.export-choice:hover{background:var(--color-surface)}
+.export-choice[aria-pressed=true]{background:var(--color-surface-raised)}
+.export-choice:focus-visible{outline:2px solid var(--color-blossom);outline-offset:-2px}
+.export-choice strong{font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.export-choice small{grid-column:1;font-size:11px;color:var(--color-quiet);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.export-choice>em{grid-row:1/3;grid-column:2;font-style:normal;font-size:11px;color:var(--color-on-muted)}
+.export-choice[aria-pressed=true]>em{color:var(--color-petal)}
+.export-players{display:flex;flex-wrap:wrap;gap:6px}
+.export-players>button{border:0;border-radius:99px;padding:7px 12px;background:var(--color-surface);color:var(--color-on-muted);font:inherit;font-size:12px;cursor:pointer}
+.export-players>button[aria-pressed=true]{background:var(--color-petal);color:var(--color-canvas)}
+.export-players>button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
+.export-progress{display:grid;gap:8px;padding:12px;border-radius:14px;background:var(--color-surface);font-size:12px}
+.export-progress-bar{height:6px;border-radius:99px;background:var(--color-canvas);overflow:hidden}
+.export-progress-bar>i{display:block;height:100%;border-radius:inherit;background:var(--color-blossom);transition:width .3s}
+.export-progress>div{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.export-source{display:flex;align-items:center;gap:10px;margin:0;padding:10px 12px;border-radius:12px;background:var(--color-surface);font-size:12px}
+.export-source>svg{flex:none;color:var(--color-quiet)}
+.export-source>span{display:grid;gap:2px;min-width:0}
+.export-source strong{font-size:13px;font-weight:650}
+.export-source small{font-size:11px;color:var(--color-quiet)}
+.export-sheet .export-row>:only-child{grid-column:1/-1}
