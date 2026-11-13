@@ -13,6 +13,20 @@ test('metadata providers merge the same MAL title and preserve multilingual alia
   assert.equal(matchesFilters(result[0],{year:'2002',genre:'экшен'}),true);
   assert.equal(matchesFilters(result[0],{year:'2003'}),false);
 });
+test('partial saved titles merge with enriched catalogue rows in either order without mutation',()=>{
+  const partial={id:'saved',provider:'shikimori',kind:'anime',title:'Наруто',ids:{mal:'20'},year:2002};
+  const [full]=normalizeCatalog('anilist',{data:{Page:{media:[{id:1735,idMal:20,type:'ANIME',title:{english:'Naruto',native:'ナルト'},startDate:{year:2002},genres:['Action']}]}}});
+  const snapshot=JSON.stringify([partial,full]);
+  for(const rows of [[partial,full],[full,partial]]){
+    const merged=mergeCatalog(rows);assert.equal(merged.length,1);
+    assert.deepEqual(new Set(merged[0].providers),new Set(['shikimori','anilist']));
+    assert.ok(merged[0].aliases.includes('Наруто'));assert.ok(merged[0].aliases.includes('Naruto'));
+    assert.deepEqual(merged[0].ids,{...full.ids,...partial.ids});assert.deepEqual(merged[0].genres,['Action']);
+    assert.ok(Array.isArray(merged[0].links));assert.ok(Array.isArray(merged[0].releases));
+  }
+  assert.equal(JSON.stringify([partial,full]),snapshot);
+});
+
 test('Kitsu data produces real covers, genres and plain descriptions; dangerous image protocols are rejected',()=>{
   const [item]=normalizeCatalog('kitsu',{data:[{type:'manga',id:'1',attributes:{canonicalTitle:'物語',titles:{en:'Story',ja_jp:'物語'},synopsis:'<b>A story</b><script>bad()</script>',posterImage:{large:'javascript:bad()'},startDate:'2020-01-01',ageRating:'R18',chapterCount:12},relationships:{genres:{data:[{type:'genres',id:'2'}]}}}],included:[{type:'genres',id:'2',attributes:{name:'Fantasy'}}]},'manga');
   assert.equal(item.cover,'');assert.ok(!item.description.includes('<'));assert.deepEqual(item.genres,['Fantasy']);assert.equal(item.age,18);assert.equal(item.chapters,12);

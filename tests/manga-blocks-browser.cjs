@@ -25,9 +25,12 @@ createRoot(document.getElementById('root')).render(<MangaReader item={item} cata
   await page.route('https://fixture.example/**',r=>r.fulfill({json:{ready:true,configured:true,policy:'fixture-policy'},headers:{'access-control-allow-origin':'*'}}));
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/blocks.html'+(webtoon?'?webtoon=1'+(seam?'&seam=1':''):''));await require('./reader-controls.cjs').startTranslation(page);
   await page.waitForFunction(()=>document.querySelector('[data-page="0"] canvas.reader-translated-overlay')?.dataset.ready==='true',null,{timeout:45000});
-  const sent=await page.evaluate(()=>window.sent);assert.equal(sent.length,1);const parts=sent[0].request.contents[0].parts;
-  assert.equal(parts.filter(p=>p.inlineData).length,1,'six original pages share one sheet image');
-  const mapping=JSON.parse(parts.find(p=>p.text?.startsWith('{')).text);assert.equal(mapping.regions.length,seam?1:6);assert.ok(mapping.regions.every(r=>/^P[1-6]_B1$/.test(r.id)));if(seam){await page.waitForFunction(()=>window.renderedRecords.length>=2);const layouts=await page.evaluate(()=>window.renderedRecords.map(r=>r.layouts[0]));assert.ok(layouts.every(Boolean));assert.equal(layouts[0].fontSize,layouts[1].fontSize,'joined paragraph uses the same layout across the seam');}assert.ok(mapping.originalWidth>=600);
+  // Manga shows the first page immediately, then packs the remaining pages.
+  // Webtoons keep adjacent page edges together, including split text blocks.
+  await page.waitForFunction(expected=>new Set(window.sent.flatMap(s=>s.request.contents[0].parts.filter(p=>p.text?.startsWith('{')).flatMap(p=>JSON.parse(p.text).regions.map(r=>r.id)))).size===expected,seam?1:6,{timeout:45000});
+  const sent=await page.evaluate(()=>window.sent);assert.equal(sent.length,webtoon?1:2);
+  const mappings=sent.map(s=>{const parts=s.request.contents[0].parts;assert.equal(parts.filter(p=>p.inlineData).length,1,'each packet uses one readable block sheet');return JSON.parse(parts.find(p=>p.text?.startsWith('{')).text);});
+  const regions=mappings.flatMap(m=>m.regions);assert.equal(regions.length,seam?1:6);assert.ok(regions.every(r=>/^P[1-6]_B1$/.test(r.id)));if(!webtoon)assert.deepEqual(mappings.map(m=>m.regions.length),[1,5],'background pages remain batched after the interactive first page');if(seam){await page.waitForFunction(()=>window.renderedRecords.length>=2);const layouts=await page.evaluate(()=>window.renderedRecords.map(r=>r.layouts[0]));assert.ok(layouts.every(Boolean));assert.equal(layouts[0].fontSize,layouts[1].fontSize,'joined paragraph uses the same layout across the seam');}assert.ok(mappings.every(m=>m.originalWidth>=600));
   const image=await page.locator('[data-page="0"] .reader-image-stack>img').first().boundingBox();assert.ok(image.width<=Math.min(width,600)+1,'intrinsic width never enlarges source');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   // Observer movement during repaint must keep the source URL stable.
   const source=await page.locator('[data-page="0"] .reader-image-stack>img').first().getAttribute('src');
