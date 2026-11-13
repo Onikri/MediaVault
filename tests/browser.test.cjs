@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const {revealReader}=require('./reader-controls.cjs');
 // Title-page playback lives in the retained-media layer above the page, which currently covers the
 // title page's own close button (regression since 96f932e); close it from the background-player dock.
-async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else if(await page.locator('.title-playback').count()){await page.getByRole('button',{name:'Плеер в фоне'}).click();await page.locator('.retained-dock-panel').getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}
+async function closeViewer(page){if(await page.locator('.immersive-reader').count()){await revealReader(page);await page.locator('.immersive-reader').last().getByRole('button',{name:/^Закрыть (?:просмотр|читалку)$/}).click();}else if(await page.locator('.title-playback').count()){await page.getByRole('button',{name:'Плеер в фоне'}).click();await page.locator('.retained-dock-panel').getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}else await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();}
 // Status and error toasts are collected in the navbar notification centre.
 async function expectNotice(page,text){await page.getByRole('button',{name:/^Уведомления/}).click();const center=page.getByRole('dialog',{name:'Уведомления'});await center.getByText(text,{exact:true}).first().waitFor();await page.keyboard.press('Escape');await center.waitFor({state:'hidden'});}
 const fs = require('node:fs/promises');
@@ -114,10 +114,16 @@ async function installProvider(context, identity,options={}) {
 
 async function signIn(page) {
   await page.locator('#profileBtn').click();await page.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
-  await page.locator('#loginBtn').click();
+  // A remembered account is restored on reload; its login button correctly
+  // stays disabled. Click only when a new login is actually required.
+  await page.waitForFunction(()=>{const b=document.querySelector('#loginBtn');return b&&(!b.disabled||b.textContent.includes('Вход выполнен'));});
+  if(await page.locator('#loginBtn').isEnabled())await page.locator('#loginBtn').click();
   await page.waitForFunction(()=>document.querySelector('#loginBtn').disabled);
   await page.locator('#setupPanel').waitFor({state:'visible'});
   await page.waitForFunction(()=>document.querySelector('#setupPanel')?.getAttribute('aria-busy')==='false');
+  // Drive connects before async account caching and library discovery finish.
+  // Wait for an actionable result, rather than the transient idle panel.
+  await page.waitForFunction(()=>{const b=document.querySelector('#setupPanel #createBtn, #setupPanel #unlockBtn, #setupPanel #findLibrariesBtn');return b&&!b.disabled;});
   assert.equal(await page.locator('#driveBtn').isVisible(),false,'Drive connects with login; no extra connection click is required');
   assert.equal(await page.locator('#libraryId').count(),0,'Normal setup never asks the user for a Drive ID');
 }
@@ -681,7 +687,7 @@ async function main() {
   for(const [name,selector] of [['Маленькие плитки','.library-layout-compact'],['Список','.library-layout-list'],['Таблица','.library-table'],['Плитки','.library-layout-grid']]){await cachedPage.getByRole('button',{name,exact:true}).click();await cachedPage.locator(selector).waitFor();}
   await cachedPage.getByRole('button',{name:'Раздел Аниме',exact:true}).click();await cachedPage.locator('.title-card').click();await cachedPage.locator('.title-related button').click();await cachedPage.locator('.title-hero').waitFor();
   await cachedPage.locator('.online-title-page .title-hero').waitFor();
-  assert.equal(await cachedPage.locator('.online-title-page .title-hero h1').innerText(),'Наруто');assert.ok((await cachedPage.locator('.online-title-page .title-hero .eyebrow').innerText()).toLocaleLowerCase('ru').includes('манга'),'Related manga opens the exact title rather than starting an ambiguous name search');
+  assert.equal(await cachedPage.locator('.online-title-page .title-hero h1').innerText(),'Наруто');assert.equal(await cachedPage.locator('.online-title-page').getAttribute('data-kind'),'manga','Related manga opens the exact title rather than starting an ambiguous name search');
   const sharedItem=organized.items.find(item=>item.collectionId===animeTitle.id&&item.category==='video');
   const sharedPage=await cachedContext.newPage();
   await sharedPage.goto(base+'?library='+catalogId+'#'+new URLSearchParams({episode:sharedItem.id,t:'1'}));await signIn(sharedPage);await sharedPage.locator('#passphrase').fill(PHRASE);await sharedPage.locator('#unlockBtn').click();

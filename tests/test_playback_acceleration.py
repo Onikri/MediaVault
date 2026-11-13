@@ -53,7 +53,10 @@ class AccelerationTests(unittest.TestCase):
    if site.id=='slow':slow.wait(3)
    return {'status':'ok','results':[{'title':selected['title'],'kind':'anime','year':2024,'url':'https://catalog.example/'+site.id,'provider':site.id}]}
   def inspect(url,**kwargs):return {'url':url,'title':selected['title'],'year':2024,'dubs':[choice('Studio '+url.split('/')[-1],'https://kodikplayer.com/serial/1/h/720p')],'complete':True}
-  with patch.object(source_discovery,'SITES',sites),patch.object(source_discovery,'search_site',side_effect=search),patch.object(source_discovery,'inspect_source',side_effect=inspect),patch.object(source_index,'save'):
+  # These integrations were added after this test: leaving them live turns a
+  # deterministic concurrency check into an external-network timing test.
+  empty={'status':'empty','sources':[],'complete':True}
+  with patch.object(source_discovery,'SITES',sites),patch.object(source_discovery,'search_site',side_effect=search),patch.object(source_discovery,'inspect_source',side_effect=inspect),patch.object(source_index,'save'),patch('kodik_api.discover',return_value=empty),patch('kinobox_source.discover',return_value=empty):
    try:
     first=source_discovery.discover(selected,refresh=True);self.assertTrue(first['pending']);self.assertEqual(len(first['voices']),1)
     slow.set()

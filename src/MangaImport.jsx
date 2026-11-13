@@ -22,7 +22,7 @@ import {kinds} from './ImportParts.jsx';
 import TitleSourcePicker from './TitleSourcePicker.jsx';
 import SourceFilter from './SourceFilter.jsx';
 import useMangaSourceInfo from './use-manga-source-info.js';
-import {matchingMangaSources} from './manga-source-identity.js';
+import {matchingMangaSources,mangaInspectionTitle} from './manga-source-identity.js';
 import {mangaPublication} from './title-details.js';
 export default function MangaImport({state,service,item,onSubmitted,onOpenLibrary,manual,onKindChange,destination='drive',compact=false,sheet=false,preferredSource='',expected=0,onPublication,initialLanguage=''}){
  const localAbort=useRef(null);
@@ -90,9 +90,10 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  }},[url,sourceInfo[url]?.readable,sourceInfo[url]?.state]);
  async function inspect(value,automatic=false,targetChapter=null){
   if(!value)return;if(!automatic){manualSource.current=true;setOnline(false);}const version=++generation.current;setUrl(value);setBusy('inspect');setInspection(null);setError('');
+  const inspectionTitle=mangaInspectionTitle(searchTitle,sources.find(s=>s.url===value));
   try{
    const cached=automatic||targetChapter?sourceInfo[value]:null;
-   const data=cached?.inspection||await service.request('/manga/inspect',{method:'POST',body:{url:value,...(item?{title:searchTitle}:{}),verifyPages:false,refresh:!automatic}});
+   const data=cached?.inspection||await service.request('/manga/inspect',{method:'POST',body:{url:value,...(item?{title:inspectionTitle}:{}),verifyPages:false,refresh:!automatic}});
    if(version!==generation.current)return;
    if(!['ru','uk','en','ja','ko'].includes(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
    if(!data.episodes?.length)throw Error('У этого тайтла нет открытых глав на языке «'+mangaLanguageName(data.language)+'».');
@@ -103,7 +104,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
     }
     return;
    }
-   const result=await service.request('/manga/summary',{method:'POST',body:{url:value,...(item?{title:searchTitle}:{}),verifyPages:Number(service.session?.serverVersion)>=47,refresh:!automatic}});
+   const result=await service.request('/manga/summary',{method:'POST',body:{url:value,...(item?{title:inspectionTitle}:{}),verifyPages:Number(service.session?.serverVersion)>=47,refresh:!automatic}});
    if(version!==generation.current)return;setInspection(old=>old?{...old,...result}:old);
    if(result.readable===false)setError(result.readabilityError||'Источник не отдал страницу.');
   }catch(cause){if(version===generation.current){setError(cause.message);setInspection(old=>old?{...old,readable:false,readabilityError:cause.message}:old);}}finally{if(version===generation.current)setBusy('');}

@@ -107,33 +107,13 @@ jobs:
           mkdir -p test-output
           set +e
           {
-            npm run test:browser &&
-            npm run test:blossom &&
-            npm run test:design &&
-            npm run test:watch &&
-            npm run test:ui &&
-            npm run test:vm &&
-            npm run test:direct &&
-            npm run test:blocks &&
-            npm run test:cleaning &&
-            npm run test:migan &&
-            npm run test:voices &&
-            npm run test:manga &&
-            npm run test:reader &&
-            npm run test:music &&
-            npm run test:online &&
-            npm run test:translation &&
-            npm run test:gpu &&
-            npm run test:lmt &&
-            npm run test:gemma &&
-            npm run test:trusted &&
-            npm run test:rooms &&
-            npm run test:library-layout &&
-            npm run test:cards &&
-            npm run test:suwayomi &&
-            npm run test:world &&
-            npm run test:music-nav &&
-            npm run test:downloads
+            failures=0
+            for suite in browser blossom design watch ui vm direct blocks cleaning migan voices manga reader music online translation gpu lmt gemma trusted rooms library-layout cards suwayomi world music-nav downloads; do
+              npm run "test:$suite"
+              code=$?
+              if [ "$code" -ne 0 ]; then failures=$((failures + 1)); fi
+            done
+            test "$failures" -eq 0
           } 2>&1 | tee test-output/browser-ci.log
           result=${PIPESTATUS[0]}
           {

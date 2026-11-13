@@ -43,6 +43,9 @@ module.exports=async function({browser,base,installProvider,OWNER,PHRASE,catalog
   await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));
   await page.waitForFunction(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('mediavault-trusted-device-v1',1);q.onsuccess=()=>r(q.result);});try{return await new Promise(r=>{const q=db.transaction('records').objectStore('records').getAll();q.onsuccess=()=>r(q.result.some(v=>v?.libraryId&&v?.data));});}finally{db.close();}});
   const cookie=await page.evaluate(()=>document.cookie);assert.ok(cookie.includes('mv_preferences='));assert.ok(!cookie.includes(OWNER)&&!cookie.includes(PHRASE)&&!cookie.includes('access_token'));
+  // Exercise signed server restoration, not the newer valid-access-token cache.
+  // Keep the registered non-exportable key and encrypted library intact.
+  await page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const q=indexedDB.open('mediavault-trusted-device-v1',1);q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});try{await new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite'),q=tx.objectStore('records').openCursor();q.onsuccess=()=>{const cursor=q.result;if(cursor){if(String(cursor.key).startsWith('account-access:'))cursor.delete();cursor.continue();}};tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}finally{db.close();}});
   await page.reload();
   try{await page.waitForFunction(()=>document.querySelector('#count')?.textContent.includes('10'));}
   catch(error){console.error('Remembered fixture restore diagnostics:',{restores,deviceCount:devices.size,body:(await page.locator('body').innerText()).slice(-6000)});throw error;}
