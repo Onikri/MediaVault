@@ -2952,7 +2952,8 @@
       "aliases": [
         "Romance",
         "Романтика",
-        "романтика"
+        "романтика",
+        "Romantic"
       ]
     },
     {
@@ -4274,6 +4275,146 @@
       "aliases": [
         "x-ray",
         "X-Ray"
+      ]
+    },
+    {
+      "key": "18",
+      "label": "18+",
+      "aliases": [
+        "18+"
+      ]
+    },
+    {
+      "key": "adaptation",
+      "label": "Adaptation",
+      "aliases": [
+        "Adaptation"
+      ]
+    },
+    {
+      "key": "defloration",
+      "label": "defloration ♀",
+      "aliases": [
+        "defloration ♀"
+      ]
+    },
+    {
+      "key": "demon girl",
+      "label": "demon girl ♀",
+      "aliases": [
+        "demon girl ♀"
+      ]
+    },
+    {
+      "key": "doujinshi",
+      "label": "Doujinshi",
+      "aliases": [
+        "Doujinshi"
+      ]
+    },
+    {
+      "key": "femdom",
+      "label": "femdom ♀",
+      "aliases": [
+        "femdom ♀"
+      ]
+    },
+    {
+      "key": "gyaru",
+      "label": "Gyaru",
+      "aliases": [
+        "Gyaru"
+      ]
+    },
+    {
+      "key": "mesugaki",
+      "label": "mesugaki ♀",
+      "aliases": [
+        "mesugaki ♀"
+      ]
+    },
+    {
+      "key": "monsters",
+      "label": "Monsters",
+      "aliases": [
+        "Monsters"
+      ]
+    },
+    {
+      "key": "multi work series",
+      "label": "multi-work series ◊",
+      "aliases": [
+        "multi-work series ◊"
+      ]
+    },
+    {
+      "key": "official colored",
+      "label": "Official Colored",
+      "aliases": [
+        "Official Colored"
+      ]
+    },
+    {
+      "key": "oneshot",
+      "label": "Oneshot",
+      "aliases": [
+        "Oneshot"
+      ]
+    },
+    {
+      "key": "self published",
+      "label": "Self-Published",
+      "aliases": [
+        "Self-Published"
+      ]
+    },
+    {
+      "key": "sexual violence",
+      "label": "Sexual Violence",
+      "aliases": [
+        "Sexual Violence"
+      ]
+    },
+    {
+      "key": "sole female",
+      "label": "sole female ♀",
+      "aliases": [
+        "sole female ♀"
+      ]
+    },
+    {
+      "key": "sole male",
+      "label": "sole male ♂",
+      "aliases": [
+        "sole male ♂"
+      ]
+    },
+    {
+      "key": "tail",
+      "label": "tail ♀",
+      "aliases": [
+        "tail ♀"
+      ]
+    },
+    {
+      "key": "uncensored",
+      "label": "uncensored ◊",
+      "aliases": [
+        "uncensored ◊"
+      ]
+    },
+    {
+      "key": "web comic",
+      "label": "Web Comic",
+      "aliases": [
+        "Web Comic"
+      ]
+    },
+    {
+      "key": "манхва",
+      "label": "Манхва",
+      "aliases": [
+        "Манхва"
       ]
     }
   ]
