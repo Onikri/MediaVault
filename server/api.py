@@ -595,6 +595,43 @@ def manga_discovery_call(action,*args):
     except SearchMissing as error:raise HTTPException(404,str(error)) from None
     except ValueError as error:raise HTTPException(422,str(error)) from None
 
+@app.get('/manga/catalog')
+def manga_catalog(q:str='',tag:str='',provider:str='',format:str='',offset:int=0,limit:int=30,subject=Depends(owner)):
+    from manga_discovery import manager
+    from manga_catalog_index import browse
+    store=manager()
+    with store.lock:
+        return browse(store.db,q=q,tag=tag,provider=provider,format=format,offset=offset,limit=limit)
+
+@app.get('/manga/catalog/tags')
+def manga_catalog_tags(provider:str='',sourceId:str='',limit:int=100,subject=Depends(owner)):
+    from manga_discovery import manager
+    from manga_catalog_index import tags
+    store=manager()
+    with store.lock:
+        return tags(store.db,provider=provider,source_id=sourceId,limit=limit)
+
+@app.get('/manga/catalog/stats')
+def manga_catalog_stats(subject=Depends(owner)):
+    from manga_discovery import manager
+    from manga_catalog_index import stats
+    store=manager()
+    with store.lock:
+        return stats(store.db)
+
+@app.get('/manga/catalog/{catalog_id}')
+def manga_catalog_title(catalog_id:str,subject=Depends(owner)):
+    from manga_discovery import manager
+    from manga_catalog_index import title
+    if not re.fullmatch(r'[a-f0-9]{32}',catalog_id):
+        raise HTTPException(422,'Неверный идентификатор записи каталога.')
+    store=manager()
+    with store.lock:
+        result=title(store.db,catalog_id)
+    if result is None:
+        raise HTTPException(404,'Произведение не найдено в индексе.')
+    return result
+
 @app.get('/manga/source-coverage')
 def manga_source_coverage(subject=Depends(owner)):
     from manga_source_coverage import report
@@ -724,6 +761,18 @@ def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
         if body.title.get('year') and value.get('year') and str(body.title['year'])[:4]==str(value['year'])[:4]:
             candidate['aliases']=list(dict.fromkeys([*candidate['aliases'],*(value.get('aliases') or [])]))
         if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
+    if not value.get('pages'):
+        # A successful title inspection enriches the persistent catalogue.
+        # Indexing failure must never break a working reader.
+        try:
+            from manga_discovery import manager as manga_catalog_manager
+            from manga_catalog_index import upsert as catalog_upsert
+            catalog=manga_catalog_manager()
+            with catalog.lock,catalog.db:
+                catalog_upsert(catalog.db,[value])
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('Could not index manga source metadata')
     if body.verifyPages:
         from manga_readability import verify
         value={**value,**verify(value,body.refresh)}
