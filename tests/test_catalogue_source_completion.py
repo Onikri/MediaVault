@@ -53,6 +53,11 @@ class CompletionTests(unittest.TestCase):
   import content_sources
   class Session:pass
   content_sources._robots.clear()
+  with patch('content_sources.checked_get',return_value=(b'User-agent: *\nDisallow: /private/', 'https://fixture.example/robots.txt')) as get:
+   self.assertTrue(content_sources.permitted(Session(),'https://fixture.example/manga/1',{'fixture.example'}))
+   self.assertFalse(content_sources.permitted(Session(),'https://fixture.example/private/1',{'fixture.example'}))
+   self.assertEqual(get.call_count,1)
+  content_sources._robots.clear()
 
  def test_overlapping_listing_pages_count_unique_titles_and_refresh_resets_cycle(self):
   with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,{'DATA_DIR':d,'MEDIA_VAULT_DISABLE_WORKER':'1'}):
@@ -66,10 +71,5 @@ class CompletionTests(unittest.TestCase):
    self.assertEqual(db.execute('SELECT priority FROM catalogue_jobs').fetchone()[0],10)
    now[0]+=21601;worker.run_once();status=worker.status()['sources'][0]
    self.assertEqual(status['indexed'],2);self.assertEqual(status['pages'],1);db.close()
-  with patch('content_sources.checked_get',return_value=(b'User-agent: *\nDisallow: /private/', 'https://fixture.example/robots.txt')) as get:
-   self.assertTrue(content_sources.permitted(Session(),'https://fixture.example/manga/1',{'fixture.example'}))
-   self.assertFalse(content_sources.permitted(Session(),'https://fixture.example/private/1',{'fixture.example'}))
-   self.assertEqual(get.call_count,1)
-  content_sources._robots.clear()
 
 if __name__=='__main__':unittest.main()
