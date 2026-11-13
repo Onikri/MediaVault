@@ -56,8 +56,9 @@ def query_matches(query,names):
 def installed_sources():
     from manga_hentaichan import SOURCE
     from manga_hentaichan_cc import SOURCE as CHAN_CC
+    from manga_hmanga import SOURCE as HMANGA
     from manga_hitomi import SOURCES as HITOMI
-    return [*bridge.sources(),dict(SOURCE),dict(CHAN_CC),*(dict(s) for s in HITOMI)]
+    return [*bridge.sources(),dict(SOURCE),dict(CHAN_CC),dict(HMANGA),*(dict(s) for s in HITOMI)]
 
 def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
@@ -139,11 +140,13 @@ def native_search_source(source,query):
              'sourceOnly':True,'ids':{},'genres':[],'tags':[]} for row in found.values()][:40]
 
 def search_source(source,query):
-    if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi'}:
+    if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'}:
         from title_identity import match_title
         from source_parser import PublicHttp
         from functools import partial
-        if source['name'] in {'HentaiChan','HenChan'}:
+        if source['name']=='HManga':
+            from manga_hmanga import search
+        elif source['name'] in {'HentaiChan','HenChan'}:
             from manga_hentaichan import search
             if source['name']=='HenChan':search=partial(search,root='https://xxl.hentaichan.live')
         elif source['name']=='HentaiChan.cc':
@@ -158,7 +161,7 @@ def search_source(source,query):
                 for row in search(term,http):
                     selected=source.get('_title') or source.get('_alias_title')
                     if selected and not match_title(selected,row)[0]:continue
-                    if source['name'] in {'HentaiChan','HenChan'} and not selected and not query_matches(term,row['aliases']):continue
+                    if source['name'] in {'HentaiChan','HenChan','HManga'} and not selected and not query_matches(term,row['aliases']):continue
                     if source['name']=='HenChan':
                         row={**row,'id':'henchan:'+row['id'].split(':')[-1],'sourceId':str(source['id']),'providerName':'HenChan'}
                     found[row['id']]=row
