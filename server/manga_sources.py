@@ -11,6 +11,7 @@ import time
 from urllib.parse import urlencode,urljoin,urlsplit
 from bs4 import BeautifulSoup
 from source_parser import PublicHttp,SourceError,public_url
+from manga_source_tags import from_html
 from title_identity import aliases,match_title
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class MangaSite:
 
 SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan',('x17.h-chan.me','xxl.hentaichan.live')),
        MangaSite('hentaichan-cc','HentaiChan.cc','https://hentaichan.cc','hentaichan-cc'),
+       MangaSite('hmanga','HManga','https://hmanga.me','madara',('hmanga.su',)),
        MangaSite('hitomi','Hitomi','https://hitomi.la','hitomi',languages=('en','ja','ru','ko')),
        MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('mangapoisk.io','eropoisk.com')),
        MangaSite('mangahub','MangaHub','https://mangahub.ru','hub'),
@@ -94,7 +96,7 @@ def parse_search(text,base,site):
             names=[clean((heading or anchor).get_text(' ',strip=True))]
             if other:names.extend(title_aliases(other.get_text(' ',strip=True)))
             image=card.select_one('img');year=re.search(r'\b(19\d\d|20\d\d)\b',card.get_text(' ',strip=True))
-            results.append({'provider':site.id,'providerName':site.name,'title':names[0],'aliases':names,'url':safe_link(anchor.get('href'),base),'kind':'manga','language':'en','year':int(year[1]) if year else None,'cover':safe_link(image.get('data-src') or image.get('src'),base) if image else ''})
+            results.append({'provider':site.id,'providerName':site.name,'title':names[0],'aliases':names,'url':safe_link(anchor.get('href'),base),'kind':'manga','language':'en','year':int(year[1]) if year else None,'cover':safe_link(image.get('data-src') or image.get('src'),base) if image else '',**from_html(str(card))})
         return results
     selectors={'katana':('#book_list .item','h3.title a','h3.title a'),'poisk':('article.card,.manga-card','.card-title,h2.entry-title','a.card-about,a[href*="/manga/"]'),
                'hub':('.item-grid','a.fw-medium','a.fw-medium'),
@@ -109,7 +111,7 @@ def parse_search(text,base,site):
         if not names or not url or site_for(url)!=site:continue
         image=card.select_one('img');year=re.search(r'(?:Год[:\s]*)(19\d\d|20\d\d)',card.get_text(' ',strip=True))
         results.append({'provider':site.id,'providerName':site.name,'title':names[0],'aliases':names,'url':url,'kind':'manga','language':'en' if site.family=='katana' else 'ru',
-                        'year':int(year[1]) if year else None,'cover':safe_link(image.get('data-src') or image.get('src'),base) if image else ''})
+                        'year':int(year[1]) if year else None,'cover':safe_link(image.get('data-src') or image.get('src'),base) if image else '',**from_html(str(card))})
     return list({v['url']:v for v in results}.values())
 def search_url(site,query):
     if site.family=='katana':return site.root+'/?'+urlencode({'search':query,'search_by':'book_name'})
@@ -141,6 +143,9 @@ def search_title(title,language='auto',format='all'):
                     candidates=search(query,http)
                 elif site.family=='hentaichan-cc':
                     from manga_hentaichan_cc import search
+                    candidates=search(query,http)
+                elif site.family=='madara':
+                    from manga_hmanga import search
                     candidates=search(query,http)
                 elif site.family=='hitomi':
                     from manga_hitomi import search
@@ -254,6 +259,9 @@ def inspect(url,http=None):
         if initial and initial.family=='hentaichan-cc':
             from manga_hentaichan_cc import inspect as inspect_chan_cc
             return inspect_chan_cc(url,http)
+        if initial and initial.family=='madara':
+            from manga_hmanga import inspect as inspect_hmanga
+            return inspect_hmanga(url,http)
         if initial and initial.family=='hitomi':
             from manga_hitomi import inspect as inspect_hitomi
             return inspect_hitomi(url,http)
@@ -311,6 +319,6 @@ def inspect(url,http=None):
         chapters=sorted({c['url']:c for c in chapters}.values(),key=lambda c:(c['season'],c['number'],c['translator']))
         return {'provider':site.id,'providerName':site.name,'title':title,'url':final,'kind':'manga','language':language,'episodes':chapters,'pages':pages,
                 'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({c['season'] for c in chapters})],'dubs':[],'releases':[],
-                'truncated':truncated,'available':bool(chapters),'translations':sorted({c['translator'] for c in chapters if c['translator']})}
+                'truncated':truncated,'available':bool(chapters),'translations':sorted({c['translator'] for c in chapters if c['translator']}),**from_html(soup)}
     finally:
         if own:http.close()

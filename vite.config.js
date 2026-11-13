@@ -62,6 +62,8 @@ export default defineConfig({
     closeBundle() {
       const output = resolve(projectRoot, 'dist');
       mkdirSync(output, {recursive: true});
+      // Only the vetted static tag export is copied; publicDir stays disabled.
+      cpSync(resolve(projectRoot,'public/data'),resolve(output,'data'),{recursive:true});
       cpSync(resolve(projectRoot,'reader-fonts'),resolve(output,'reader-fonts'),{recursive:true});
       for (const file of runtimeFiles) {
         copyFileSync(resolve(projectRoot, file), resolve(output, file));

@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 import hashlib,json,os,re,secrets,sqlite3,threading,time,unicodedata
 from source_parser import SourceAccessError,SourceError,SourceTemporaryError,public_url
+from manga_source_tags import from_api
 import suwayomi_bridge as bridge
 
 LANGUAGES={'all',*bridge.LANGUAGES}
@@ -56,8 +57,9 @@ def query_matches(query,names):
 def installed_sources():
     from manga_hentaichan import SOURCE
     from manga_hentaichan_cc import SOURCE as CHAN_CC
+    from manga_hmanga import SOURCE as HMANGA
     from manga_hitomi import SOURCES as HITOMI
-    return [*bridge.sources(),dict(SOURCE),dict(CHAN_CC),*(dict(s) for s in HITOMI)]
+    return [*bridge.sources(),dict(SOURCE),dict(CHAN_CC),dict(HMANGA),*(dict(s) for s in HITOMI)]
 
 def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
@@ -85,7 +87,7 @@ def result_row(source,row):
     return {'id':f'suwayomi:{sid}:{identity}','kind':'manga','title':title.strip()[:500],'aliases':public_aliases(row),
             'provider':'suwayomi:'+sid,'providerName':source['name'],'sourceId':sid,'sourceUrl':canonical,
             'url':bridge.reference(identity),'sourceURL':bridge.reference(identity),'sourceOnly':True,
-            'language':language,'cover':cover,'format':'manhwa' if language=='ko' else 'manga','ids':{},'genres':[],'tags':[],
+            'language':language,'cover':cover,'format':'manhwa' if language=='ko' else 'manga','ids':{},**from_api(row),
             'adult':bool(source.get('isNsfw'))}
 
 def native_search_source(source,query):
@@ -136,14 +138,16 @@ def native_search_source(source,query):
     sid=str(source['id'])
     return [{**row,'id':'suwayomi:'+sid+':native:'+hashlib.sha256(row['url'].encode()).hexdigest()[:20],
              'providerName':source['name'],'sourceId':sid,'sourceUrl':row['url'],'sourceURL':row['url'],
-             'sourceOnly':True,'ids':{},'genres':[],'tags':[]} for row in found.values()][:40]
+             'sourceOnly':True,'ids':{}} for row in found.values()][:40]
 
 def search_source(source,query):
-    if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi'}:
+    if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'}:
         from title_identity import match_title
         from source_parser import PublicHttp
         from functools import partial
-        if source['name'] in {'HentaiChan','HenChan'}:
+        if source['name']=='HManga':
+            from manga_hmanga import search
+        elif source['name'] in {'HentaiChan','HenChan'}:
             from manga_hentaichan import search
             if source['name']=='HenChan':search=partial(search,root='https://xxl.hentaichan.live')
         elif source['name']=='HentaiChan.cc':
@@ -158,7 +162,7 @@ def search_source(source,query):
                 for row in search(term,http):
                     selected=source.get('_title') or source.get('_alias_title')
                     if selected and not match_title(selected,row)[0]:continue
-                    if source['name'] in {'HentaiChan','HenChan'} and not selected and not query_matches(term,row['aliases']):continue
+                    if source['name'] in {'HentaiChan','HenChan','HManga'} and not selected and not query_matches(term,row['aliases']):continue
                     if source['name']=='HenChan':
                         row={**row,'id':'henchan:'+row['id'].split(':')[-1],'sourceId':str(source['id']),'providerName':'HenChan'}
                     found[row['id']]=row
@@ -221,7 +225,7 @@ def search_source(source,query):
                 for value in parse_search(text,final,site):
                     if selected and not match_title(selected,value)[0]:continue
                     if not selected and not query_matches(term,value.get('aliases',[value['title']])):continue
-                    rows.append({**value,'id':'suwayomi:'+str(source['id'])+':native:'+hashlib.sha256(value['url'].encode()).hexdigest()[:20],'sourceId':str(source['id']),'sourceUrl':value['url'],'sourceURL':value['url'],'sourceOnly':True,'ids':{},'genres':[],'tags':[]})
+                    rows.append({**value,'id':'suwayomi:'+str(source['id'])+':native:'+hashlib.sha256(value['url'].encode()).hexdigest()[:20],'sourceId':str(source['id']),'sourceUrl':value['url'],'sourceURL':value['url'],'sourceOnly':True,'ids':{}})
                 if rows:break
             return rows
         finally:http.close()
@@ -258,6 +262,8 @@ class Discovery:
                 failures INTEGER NOT NULL,code TEXT NOT NULL,message TEXT NOT NULL,last_ok REAL NOT NULL,last_fail REAL NOT NULL,skip_until REAL NOT NULL);
               CREATE TABLE IF NOT EXISTS network_state(key TEXT PRIMARY KEY,value TEXT NOT NULL);
             ''')
+            from manga_catalog_index import initialize as initialize_catalog
+            initialize_catalog(self.db)
             if self.db.execute('PRAGMA user_version').fetchone()[0]<1:
                 stale=[];sources=set()
                 for row in self.db.execute('SELECT id,source_id,metadata FROM titles'):
@@ -511,6 +517,11 @@ class Discovery:
                 if state=='done':
                     self.db.execute('INSERT OR REPLACE INTO query_cache VALUES(?,?,?,?)',(self._cache_key(normalize(row['query']),json.loads(row['source'])),row['source_id'],encoded,now+self.cache_ttl))
                     for value in values:self.db.execute('INSERT OR REPLACE INTO titles VALUES(?,?,?,?,?,?)',(value['id'],row['source_id'],value['language'],normalize(' '.join(public_aliases(value))),json.dumps(value,ensure_ascii=False),now))
+                    from manga_catalog_index import upsert as catalog_upsert
+                    try:catalog_upsert(self.db,values,source_id=row['source_id'],timestamp=now)
+                    except Exception:
+                        import logging
+                        logging.getLogger(__name__).exception('Manga catalogue indexing failed')
                 remaining=self.db.execute("SELECT count(*) FROM work WHERE job=? AND state IN ('queued','running')",(row['job'],)).fetchone()[0]
                 self.db.execute('UPDATE jobs SET updated=?,state=? WHERE id=?',(now,'running' if remaining else 'done',row['job']))
                 self.condition.notify_all()

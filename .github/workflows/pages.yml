@@ -6,13 +6,18 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Publish current main after full validation
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
   # Keep an explicit audit running when another release is pushed.
-  group: mediavault-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'latest' }}
+  group: mediavault-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && !inputs.deploy && github.run_id || 'latest' }}
   cancel-in-progress: true
 
 jobs:
@@ -96,6 +101,29 @@ jobs:
         run: |
           npm run test:notebook
 
+      - name: Source catalogue browser contracts
+        if: env.PUBLISH_NOW != 'true'
+        timeout-minutes: 5
+        env:
+          MEDIA_VAULT_SKIP_BUILD: '1'
+        run: |
+          CHROMIUM_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROMIUM_PATH"
+          export CHROMIUM_PATH
+          npm run test:world
+          npm run test:suwayomi
+
+      - name: Library playback and gesture browser contract
+        if: env.PUBLISH_NOW != 'true'
+        timeout-minutes: 5
+        env:
+          MEDIA_VAULT_SKIP_BUILD: '1'
+        run: |
+          CHROMIUM_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROMIUM_PATH"
+          export CHROMIUM_PATH
+          npm run test:browser
+
       - name: Direct translation browser contract
         if: env.PUBLISH_NOW != 'true'
         timeout-minutes: 4
@@ -108,7 +136,7 @@ jobs:
           npm run test:direct
 
       - name: Responsive UI and browser integration
-        if: env.PUBLISH_NOW != 'true'
+        if: ${{ !cancelled() && env.PUBLISH_NOW != 'true' }}
         timeout-minutes: 25
         env:
           MEDIA_VAULT_SKIP_BUILD: '1'
@@ -120,7 +148,7 @@ jobs:
           set +e
           {
             failures=0
-            for suite in browser blossom design watch ui vm blocks cleaning migan voices manga reader music online translation gpu lmt gemma trusted rooms library-layout cards suwayomi world music-nav downloads; do
+            for suite in blossom design watch ui vm blocks cleaning migan voices manga reader music online translation gpu lmt gemma trusted rooms library-layout cards music-nav downloads; do
               npm run "test:$suite"
               code=$?
               if [ "$code" -ne 0 ]; then failures=$((failures + 1)); fi
@@ -168,21 +196,31 @@ jobs:
           path: dist
 
   deploy:
-    # A manual audit may finish after main moved; it must never deploy its snapshot.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Audits never publish; an explicit publication shares main's concurrency group.
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.deploy)
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Check release is still current
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          echo "publish=$([ "$head" = "$GITHUB_SHA" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
       - name: Configure Pages
+        if: steps.current.outputs.publish == 'true'
         uses: actions/configure-pages@v5
 
       - name: Deploy
+        if: steps.current.outputs.publish == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
         with:

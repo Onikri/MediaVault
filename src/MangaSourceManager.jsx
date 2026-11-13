@@ -1,12 +1,14 @@
 import {useEffect,useRef,useState} from 'react';
 import {BookOpen,Plus,Check,Search} from 'lucide-react';
 import {uiLocale} from './i18n/index.js';
+import MangaStaticTags from './MangaStaticTags.jsx';
 
 export default function MangaSourceManager({service,onInstalled}){
  const [adultOnly,setAdultOnly]=useState(false),[open,setOpen]=useState(false),[status,setStatus]=useState(null),[language,setLanguage]=useState('ru'),[query,setQuery]=useState(''),[rows,setRows]=useState([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(''),[error,setError]=useState(''),[revision,setRevision]=useState(0),[pack,setPack]=useState(null);
- const [health,setHealth]=useState(null),[healthShown,setHealthShown]=useState(30);
+ const [health,setHealth]=useState(null),[healthShown,setHealthShown]=useState(30),[coverage,setCoverage]=useState(null),[catalogStats,setCatalogStats]=useState(null),[catalogTags,setCatalogTags]=useState(null);
  const notified=useRef(''),packs=Number(service.session?.serverVersion)>=15;
  useEffect(()=>{setHealthShown(30);},[language,query]);
+ useEffect(()=>{if(!open)return;const abort=new AbortController();service.request('/manga/source-coverage',{signal:abort.signal}).then(value=>{if(!abort.signal.aborted)setCoverage(value);}).catch(()=>{});Promise.all([service.request('/manga/catalog/stats',{signal:abort.signal}),service.request('/manga/catalog/tags?limit=30',{signal:abort.signal})]).then(([stats,facets])=>{if(!abort.signal.aborted){setCatalogStats(stats);setCatalogTags(facets);}}).catch(()=>{});return()=>abort.abort();},[open,revision,service.server]);
  useEffect(()=>{if(!open||Number(service.session?.serverVersion)<47)return;const abort=new AbortController();service.request('/discovery/manga/health',{signal:abort.signal}).then(setHealth).catch(()=>{});return()=>abort.abort();},[open,revision,service.server]);
  useEffect(()=>{if(!open)return;const abort=new AbortController();setLoading(true);setError('');
   const timer=setTimeout(()=>Promise.all([service.request('/manga/bridge/status',{signal:abort.signal}),service.request('/manga/bridge/extensions?'+new URLSearchParams({language,q:query}),{signal:abort.signal})]).then(([state,catalog])=>{if(!abort.signal.aborted){setStatus(state);setRows(catalog.extensions||[]);}}).catch(e=>{if(!abort.signal.aborted)setError(e.message);}).finally(()=>{if(!abort.signal.aborted)setLoading(false);}),180);
@@ -27,7 +29,16 @@ export default function MangaSourceManager({service,onInstalled}){
  return <details className="manga-source-manager" onToggle={e=>setOpen(e.currentTarget.open)}>
   <summary><BookOpen size={16}/>Больше источников <span>Suwayomi</span></summary>
   {open&&<div className="manga-source-manager-body">
+   <MangaStaticTags/>
    <p className="fine">{status?.ready?`${status.availableExtensions} расширений в каталоге · подключено источников: ${status.sources?.length||0}`:status?.message||'Подключи нужные читалки — они появятся в общем поиске переводов.'}</p>
+   {coverage&&<details className="manga-source-coverage"><summary>Твои 18 сайтов · нативных {coverage.nativeRegistered} · расширений {coverage.extensionInstalled}</summary>
+    <p className="fine">Этот список отражает интеграцию, а не доступность каждой главы. Перед чтением MediaVault проверяет реальную страницу.</p>
+    {catalogStats&&<p className="fine">Постоянный индекс: {catalogStats.totalTitles} тайтлов · с тегами {catalogStats.titlesWithTags}. Источники без извлечённых тегов сохраняются отдельно.</p>}
+    {catalogTags?.tags?.length>0&&<details><summary>Теги и жанры каталога · {catalogTags.tags.length} самых частых</summary>
+      <div className="manga-extension-list">{catalogTags.tags.map(tag=><div key={tag.type+':'+tag.key}><span><strong>{tag.original}</strong><small>{tag.type==='genres'?'Жанр':'Тег'} · {tag.works} тайтлов · {tag.key}</small></span></div>)}</div>
+    </details>}
+    <div className="manga-extension-list">{coverage.sources.map(row=><div key={row.domain}><span><strong>{row.name}</strong><small>{row.domain} · {{native_registered:'Нативный адаптер',partial_mirror:'Только подтверждённое зеркало',extension_installed:'Suwayomi подключён',extension_not_installed:'Требуется расширение Suwayomi',unverified:'Адаптер не подтверждён',closed:'Сайт закрыт',not_registered:'Адаптер отсутствует'}[row.status]||row.status}</small></span></div>)}</div>
+   </details>}
    {packs&&<div className="manga-language-pack">
     <button type="button" className="btn btn-secondary btn-small" disabled={!status?.ready||!!busy||running} onClick={()=>installPack(['ru','en','ja','ko'])}>Подключить все RU · EN · JA · KO</button>
     {language!=='all'&&<button type="button" className="text-link" disabled={!status?.ready||!!busy||running} onClick={()=>installPack([language])}>Все расширения {language.toUpperCase()}</button>}

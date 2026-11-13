@@ -1,6 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeCatalog,mergeCatalog,matchesFilters,providerUrl,safeImage,alternateSpelling,rankCatalog,fetchCatalog,catalogProviders} from '../src/catalog.js';
+import {mangaCatalogParams,mangaFacetOptions,mangaTagKey,mangaFormatLabel} from '../src/manga-catalog.js';
+import {tagLabels} from '../src/taxonomy.js';
+import {readFileSync} from 'node:fs';
+
+test('source catalogue passes combined filters and preserves source ID precision',()=>{
+ const params=mangaCatalogParams({query:' Garden World ',filters:{genre:'Драма',tag:'Time Travel',year:'2024',format:'Манхва',age:'adult'},language:'en',sourceIds:['990000000000000003','1'],page:3});
+ assert.equal(params.get('q'),'Garden World');assert.equal(params.get('sourceIds'),'1,990000000000000003');assert.equal(params.get('offset'),'60');
+ assert.equal(params.get('genre'),'Драма');assert.equal(params.get('tag'),'Time Travel');assert.equal(params.get('language'),'en');
+ assert.equal(mangaFormatLabel('manhwa'),'Манхва');
+});
+
+test('frontend and backend share tag aliases, case and format filters',()=>{
+ const aliases=JSON.parse(readFileSync(new URL('../server/manga_tag_aliases.json',import.meta.url)));
+ assert.deepEqual(aliases,tagLabels);
+ assert.equal(mangaTagKey('TIME TRAVEL'),mangaTagKey(tagLabels['Time Travel']));
+ const row={genres:['DRAMA'],tags:['TIME TRAVEL'],format:'manhwa',year:2024,age:18};
+ assert.equal(matchesFilters(row,{genre:'Драма',tag:tagLabels['Time Travel'],format:'Манхва',year:'2024',age:'adult'}),true);
+ assert.equal(matchesFilters(row,{tag:'Horror'}),false);
+});
+
+test('taxonomy facets retain provider labels and scope static terms by selected sources',()=>{
+ const snapshot={sources:[{name:'Source A',domain:'a.example'},{name:'Source B',domain:'b.example'}],tags:[
+  {category:'genre',label:'Drama',sources:['a.example']},{category:'tag',label:'Time Travel',sources:['b.example']}]};
+ const live=[{type:'genres',original:'Драма',originalLabels:['Drama','Драма'],works:4}];
+ const facets=mangaFacetOptions(snapshot,live,{sourceIds:['1'],sources:{'1':{name:'Source A'}}});
+ assert.equal(facets.length,1);assert.equal(facets[0].label,'Драма');assert.equal(facets[0].works,4);
+ assert.deepEqual(new Set(facets[0].originalLabels),new Set(['Drama','Драма']));
+ assert.equal(mangaFacetOptions(snapshot,[],{sourceIds:['2'],sources:{'2':{name:'Source B'}}}).length,1);
+});
 
 test('metadata providers merge the same MAL title and preserve multilingual aliases and real dates',()=>{
   const shiki=normalizeCatalog('shikimori',[{id:20,russian:'Наруто',name:'Naruto',kind:'tv',aired_on:'2002-10-03',episodes:220,rating:'pg_13',image:{original:'/system/animes/original/20.jpg'},url:'/animes/20',genres:[{name:'Action',russian:'Экшен'}]}]);

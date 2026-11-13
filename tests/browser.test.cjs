@@ -550,19 +550,23 @@ async function main() {
   const touchSession=await ownerContext.newCDPSession(owner);
   await touchSession.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
   const swipe=async(zone,dx,dy)=>{
+    const surface=cinema.locator('.mv-player-touch-surface');
+    await surface.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
+    await settledBox(surface);
     const {x,y}=await cinema.locator('.mv-player-touch-surface').evaluate((el,zone)=>{
       // Panels opened by earlier gestures can scroll the page, leaving the video under the
       // phone dock, so re-centre it and search only its visible part before every gesture.
-      el.scrollIntoView({block:'center',behavior:'instant'});
       const rect=el.getBoundingClientRect(),x=rect.x+rect.width*zone,top=Math.max(rect.y,0),bottom=Math.min(rect.bottom,innerHeight);
       for(const fraction of [.3,.4,.5,.6]){const y=top+Math.min((bottom-top)*fraction,200);if(document.elementFromPoint(x,y)===el)return {x,y};}
       const cover=document.elementFromPoint(x,top+(bottom-top)/2);
       throw Error('No unobstructed video point for the touch gesture; covered by '+(cover?cover.tagName+'.'+[...cover.classList].join('.'):'nothing')+', video '+Math.round(rect.y)+'..'+Math.round(rect.bottom)+' of '+innerHeight);
     },zone);
     await touchSession.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+    await owner.evaluate(()=>new Promise(requestAnimationFrame));
     const original=await cinema.locator('video').evaluate(v=>v.currentTime);
     for(let i=1;i<=6;i++){
       await touchSession.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx*i/6,y:y+dy*i/6}]});
+      await owner.evaluate(()=>new Promise(requestAnimationFrame));
       if(dx&&i===3){
         assert.equal(await cinema.locator('.mvx-timeline-bubble').count(),1,'Scrubbing previews its destination on the timeline');
         assert.equal(await cinema.locator('video').evaluate(v=>v.currentTime),original,'Touch seek waits for release');

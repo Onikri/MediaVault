@@ -335,7 +335,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 71, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 72, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -607,6 +607,118 @@ def manga_discovery_call(action,*args):
     except SearchMissing as error:raise HTTPException(404,str(error)) from None
     except ValueError as error:raise HTTPException(422,str(error)) from None
 
+def manga_catalog_filters(language,year,age,source_ids):
+    if language not in {'all','ru','uk','en','ja','ko'} or age not in {'','adult','under18'}:
+        raise HTTPException(422,'Выбери язык и возрастную категорию каталога.')
+    if year and (not str(year).isdigit() or not 1800<=int(year)<=2200):
+        raise HTTPException(422,'Укажи корректный год выпуска.')
+    sources=list(dict.fromkeys(v for v in source_ids.split(',') if v))
+    if len(sources)>1000 or any(not re.fullmatch(r'[1-9][0-9]{0,19}',v) for v in sources):
+        raise HTTPException(422,'Выбери источники из каталога.')
+    return {'language':language,'year':year,'age':age,'source_ids':sources}
+
+
+@app.get('/manga/catalog')
+def manga_catalog(q:str='',tag:str='',genre:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,subject=Depends(viewer)):
+    from manga_discovery import manager
+    from manga_catalog_index import browse
+    store=manager()
+    with store.lock:
+        return browse(store.db,q=q,tag=tag,genre=genre,provider=provider,format=format,offset=offset,limit=limit,**manga_catalog_filters(language,year,age,sourceIds))
+
+@app.get('/manga/catalog/tags')
+def manga_catalog_tags(provider:str='',sourceId:str='',sourceIds:str='',language:str='all',q:str='',limit:int=500,subject=Depends(viewer)):
+    from manga_discovery import manager
+    from manga_catalog_index import tags
+    store=manager()
+    with store.lock:
+        return tags(store.db,provider=provider,source_id=sourceId,limit=limit,q=q,**manga_catalog_filters(language,'','',sourceIds))
+
+@app.get('/manga/catalog/stats')
+def manga_catalog_stats(subject=Depends(viewer)):
+    from manga_discovery import manager
+    from manga_catalog_index import stats
+    store=manager()
+    with store.lock:
+        return stats(store.db)
+
+class MangaCatalogBackfill(StrictBody):
+    offset:int=Field(default=0,ge=0,le=50000)
+    limit:int=Field(default=250,ge=1,le=500)
+
+@app.post('/manga/catalog/backfill')
+def manga_catalog_backfill(body:MangaCatalogBackfill,subject=Depends(owner)):
+    from manga_discovery import manager
+    from manga_catalog_index import backfill
+    store=manager()
+    with store.lock,store.db:
+        return backfill(store.db,offset=body.offset,limit=body.limit)
+
+class MangaCatalogEnrich(StrictBody):
+    ids:list[str]=Field(default_factory=list,max_length=3)
+    refresh:bool=False
+
+_catalog_enrich_slots=threading.BoundedSemaphore(2)
+
+@app.post('/manga/catalog/enrich')
+def manga_catalog_enrich(body:MangaCatalogEnrich,subject=Depends(viewer)):
+    # Explicit bounded metadata check; no image bytes, bulk crawler or new
+    # playback endpoint. A failure never changes the existing reader.
+    from manga_discovery import manager
+    from manga_catalog_index import title,missing_tags,upsert
+    from manga_catalog_metadata import enrich
+    store=manager()
+    with store.lock:
+        if body.ids:
+            if any(not re.fullmatch(r'[a-f0-9]{32}',key) for key in body.ids):
+                raise HTTPException(422,'Выбери известные записи каталога.')
+            targets=body.ids
+        else:
+            targets=[key for key,_ in missing_tags(store.db,limit=2)]
+    result=[]
+    for key in targets:
+        with store.lock:row=title(store.db,key)
+        if not row:
+            result.append({'id':key,'status':'missing'})
+            continue
+        if row.get('metadataChecked') and not body.refresh:
+            result.append({'id':key,'status':'cached'});continue
+        if not _catalog_enrich_slots.acquire(blocking=False):
+            result.append({'id':key,'status':'busy'});continue
+        try:
+            detail=enrich(row)
+            with store.lock,store.db:
+                count=upsert(store.db,[detail])
+            result.append({'id':key,'status':'indexed' if count else 'skipped',
+                           'tags':len(detail.get('tags') or []),
+                           'genres':len(detail.get('genres') or [])})
+        except SourceError as error:
+            result.append({'id':key,'status':'unavailable','reason':str(error)[:240]})
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('Manga catalogue enrichment failed')
+            result.append({'id':key,'status':'failed'})
+        finally:_catalog_enrich_slots.release()
+    return {'items':result}
+
+@app.get('/manga/catalog/{catalog_id}')
+def manga_catalog_title(catalog_id:str,subject=Depends(viewer)):
+    from manga_discovery import manager
+    from manga_catalog_index import title
+    if not re.fullmatch(r'[a-f0-9]{32}',catalog_id):
+        raise HTTPException(422,'Неверный идентификатор записи каталога.')
+    store=manager()
+    with store.lock:
+        result=title(store.db,catalog_id)
+    if result is None:
+        raise HTTPException(404,'Произведение не найдено в индексе.')
+    return result
+
+@app.get('/manga/source-coverage')
+def manga_source_coverage(subject=Depends(owner)):
+    from manga_source_coverage import report
+    return report()
+
 @app.get('/discovery/manga/sources')
 def discovery_manga_sources(language:str='all',q:str='',subject=Depends(viewer)):
     from manga_discovery import source_list
@@ -731,6 +843,19 @@ def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
         if body.title.get('year') and value.get('year') and str(body.title['year'])[:4]==str(value['year'])[:4]:
             candidate['aliases']=list(dict.fromkeys([*candidate['aliases'],*(value.get('aliases') or [])]))
         if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
+    if not value.get('pages'):
+        # A successful title inspection enriches the persistent catalogue.
+        # Indexing failure must never break a working reader.
+        try:
+            from manga_discovery import manager as manga_catalog_manager
+            from manga_catalog_index import upsert as catalog_upsert
+            catalog=manga_catalog_manager()
+            if not value.get('pages'):
+                with catalog.lock,catalog.db:
+                    catalog_upsert(catalog.db,[value])
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('Could not index manga source metadata')
     if body.verifyPages:
         from manga_readability import verify
         value={**value,**verify(value,body.refresh)}

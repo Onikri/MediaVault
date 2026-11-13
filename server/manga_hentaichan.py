@@ -11,6 +11,7 @@ import re
 from urllib.parse import urljoin,urlsplit,urlencode
 from bs4 import BeautifulSoup
 from source_parser import SourceError,public_url
+from manga_source_tags import from_html
 
 HOSTS={'hentaichan.live','xxl.hentaichan.live','x17.h-chan.me'}
 ROOT='https://x17.h-chan.me'
@@ -56,7 +57,7 @@ def parse_search(text,base):
         result[url]={'id':'hentaichan:'+slug.split('-')[0],'provider':'hentaichan','providerName':'HentaiChan',
                      'sourceId':SOURCE['id'],'sourceOnly':True,'sourceUrl':url,'sourceURL':url,'url':url,
                      'title':title,'aliases':title_aliases(title),'kind':'manga','format':'manga','language':'ru',
-                     'adult':True,'age':18,'cover':cover,'ids':{},'genres':[],'tags':[]}
+                     'adult':True,'age':18,'cover':cover,'ids':{},**from_html(str(card))}
     return list(result.values())
 
 
@@ -154,6 +155,6 @@ def inspect(url,http):
         try:cover_url=public_url(urljoin(final,cover.get('src') or ''),resolve_dns=False)
         except SourceError:pass
     return {'provider':'hentaichan','providerName':'HentaiChan','title':title,'url':final,'kind':'manga','language':'ru',
-            'adult':True,'age':18,'cover':cover_url,'episodes':chapters,'pages':pages,'available':bool(chapters),
+            'adult':True,'age':18,'cover':cover_url,**from_html(soup),'episodes':chapters,'pages':pages,'available':bool(chapters),
             'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({c['season'] for c in chapters})],
             'translations':sorted({c['translator'] for c in chapters if c['translator']}),'dubs':[],'releases':[],'truncated':truncated}

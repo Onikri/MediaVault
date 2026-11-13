@@ -1,0 +1,6753 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-13T07:43:47Z",
+  "scope": "public_taxonomy_only",
+  "coverageGuaranteed": false,
+  "sources": [
+    {
+      "domain": "hentailib.me",
+      "name": "HentaiLib",
+      "integration": "native",
+      "status": "complete",
+      "tagsFound": 269,
+      "reason": "explicit_public_taxonomy",
+      "note": "LibGroup API; source images are verified per title."
+    },
+    {
+      "domain": "hentaichan.live",
+      "name": "HentaiChan",
+      "integration": "native",
+      "status": "stale",
+      "tagsFound": 194,
+      "reason": "public_catalogue_unavailable",
+      "note": "Native public HTML parser and reader."
+    },
+    {
+      "domain": "h-chan.me",
+      "name": "H-Chan",
+      "integration": "mirror",
+      "status": "unavailable",
+      "tagsFound": 0,
+      "reason": "robots_or_network",
+      "note": "Only confirmed x17.h-chan.me mirror is allowed; root domain is not assumed equivalent."
+    },
+    {
+      "domain": "manga-chan.me",
+      "name": "MangaChan",
+      "integration": "native",
+      "status": "stale",
+      "tagsFound": 88,
+      "reason": "public_catalogue_unavailable",
+      "note": "Native HTML adapter uses im.manga-chan.me and known mirror host."
+    },
+    {
+      "domain": "henchan.pro",
+      "name": "HenChan",
+      "integration": "extension",
+      "status": "unavailable",
+      "tagsFound": 0,
+      "reason": "no_public_tags_found",
+      "note": "Suwayomi adapter when installed; source domain must be confirmed."
+    },
+    {
+      "domain": "hentaichan.cc",
+      "name": "HentaiChan.cc",
+      "integration": "native",
+      "status": "partial",
+      "tagsFound": 5,
+      "reason": "one_public_catalogue_page",
+      "note": "Native public search and reader."
+    },
+    {
+      "domain": "y.hentaichan.live",
+      "name": "Y-HentaiChan",
+      "integration": "unverified",
+      "status": "stale",
+      "tagsFound": 194,
+      "reason": "public_catalogue_unavailable",
+      "note": "Distinct subdomain; not an approved HentaiChan reader mirror."
+    },
+    {
+      "domain": "yaoi-chan.me",
+      "name": "YaoiChan",
+      "integration": "extension",
+      "status": "partial",
+      "tagsFound": 85,
+      "reason": "one_public_catalogue_page",
+      "note": "Only if an exact installed Suwayomi source exists."
+    },
+    {
+      "domain": "hmanga.su",
+      "name": "HManga",
+      "integration": "native",
+      "status": "unavailable",
+      "tagsFound": 0,
+      "reason": "no_public_tags_found",
+      "note": "Native public HTML adapter on current hmanga.me; live reader check still required."
+    },
+    {
+      "domain": "hentaros.com",
+      "name": "Hentaros",
+      "integration": "extension",
+      "status": "partial",
+      "tagsFound": 1,
+      "reason": "one_public_catalogue_page",
+      "note": "Extension only if installed; no verified native parser."
+    },
+    {
+      "domain": "online.hentaimoody.com",
+      "name": "HentaiMoody",
+      "integration": "extension",
+      "status": "unavailable",
+      "tagsFound": 0,
+      "reason": "no_public_tags_found",
+      "note": "Extension only if installed; no verified native parser."
+    },
+    {
+      "domain": "nude-moon.org",
+      "name": "Nude-Moon",
+      "integration": "extension",
+      "status": "unavailable",
+      "tagsFound": 0,
+      "reason": "robots_or_network",
+      "note": "External reader extension exists; installation and live availability vary."
+    },
+    {
+      "domain": "20.allhen.online",
+      "name": "AllHentai",
+      "integration": "extension",
+      "status": "unavailable",
+      "tagsFound": 0,
+      "reason": "robots_or_network",
+      "note": "Grouple-family Suwayomi source; no session/cookie bypass."
+    },
+    {
+      "domain": "mangalib.org",
+      "name": "MangaLib",
+      "integration": "native",
+      "status": "complete",
+      "tagsFound": 196,
+      "reason": "explicit_public_taxonomy",
+      "note": "LibGroup API uses canonical mangalib.me, with mangalib.org as known mirror."
+    },
+    {
+      "domain": "v2.shlib.life",
+      "name": "SlashLIB",
+      "integration": "native",
+      "status": "complete",
+      "tagsFound": 206,
+      "reason": "explicit_public_taxonomy",
+      "note": "LibGroup API for SlashLIB."
+    },
+    {
+      "domain": "remanga.org",
+      "name": "ReManga",
+      "integration": "extension",
+      "status": "unavailable",
+      "tagsFound": 0,
+      "reason": "robots_or_network",
+      "note": "Suwayomi source only if installed; no undocumented reader API."
+    },
+    {
+      "domain": "хентай.онлайн",
+      "name": "Хентай.онлайн",
+      "integration": "unverified",
+      "status": "unavailable",
+      "tagsFound": 0,
+      "reason": "not_configured",
+      "note": "IDN host not verified; do not auto-route arbitrary aliases."
+    },
+    {
+      "domain": "newmanga.org",
+      "name": "NewManga",
+      "integration": "closed",
+      "status": "closed",
+      "tagsFound": 0,
+      "reason": "site_closed",
+      "note": "Website publicly announces permanent closure."
+    }
+  ],
+  "tags": [
+    {
+      "key": "18 плюс",
+      "category": "genre",
+      "label": "18_плюс",
+      "originalLabels": [
+        "18_плюс"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "арт",
+      "category": "genre",
+      "label": "Арт",
+      "originalLabels": [
+        "арт",
+        "Арт"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "безумие",
+      "category": "genre",
+      "label": "Безумие",
+      "originalLabels": [
+        "Безумие"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "боевые искусства",
+      "category": "genre",
+      "label": "Боевые искусства",
+      "originalLabels": [
+        "Боевые искусства"
+      ],
+      "sources": [
+        "hentailib.me",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "в цвете",
+      "category": "genre",
+      "label": "в_цвете",
+      "originalLabels": [
+        "в_цвете"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "вампиры",
+      "category": "genre",
+      "label": "Вампиры",
+      "originalLabels": [
+        "Вампиры"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "веб",
+      "category": "genre",
+      "label": "веб",
+      "originalLabels": [
+        "веб"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "военное",
+      "category": "genre",
+      "label": "Военное",
+      "originalLabels": [
+        "Военное"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гарем",
+      "category": "genre",
+      "label": "Гарем",
+      "originalLabels": [
+        "Гарем"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гендерная интрига",
+      "category": "genre",
+      "label": "Гендерная интрига",
+      "originalLabels": [
+        "Гендерная интрига",
+        "гендерная_интрига"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "героическое фэнтези",
+      "category": "genre",
+      "label": "Героическое фэнтези",
+      "originalLabels": [
+        "Героическое фэнтези"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "групповой секс",
+      "category": "genre",
+      "label": "групповой_секс",
+      "originalLabels": [
+        "групповой_секс"
+      ],
+      "sources": [
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "демоны",
+      "category": "genre",
+      "label": "Демоны",
+      "originalLabels": [
+        "Демоны"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "детектив",
+      "category": "genre",
+      "label": "Детектив",
+      "originalLabels": [
+        "детектив",
+        "Детектив"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "дзесэй",
+      "category": "genre",
+      "label": "Дзёсэй",
+      "originalLabels": [
+        "дзёсэй",
+        "Дзёсэй"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "додзинси",
+      "category": "genre",
+      "label": "додзинси",
+      "originalLabels": [
+        "додзинси"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "домсабверс",
+      "category": "genre",
+      "label": "Домсабверс",
+      "originalLabels": [
+        "Домсабверс"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "драма",
+      "category": "genre",
+      "label": "Драма",
+      "originalLabels": [
+        "драма",
+        "Драма"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "енкома",
+      "category": "genre",
+      "label": "ёнкома",
+      "originalLabels": [
+        "ёнкома"
+      ],
+      "sources": [
+        "manga-chan.me"
+      ]
+    },
+    {
+      "key": "животные",
+      "category": "genre",
+      "label": "животные",
+      "originalLabels": [
+        "животные"
+      ],
+      "sources": [
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "игра",
+      "category": "genre",
+      "label": "Игра",
+      "originalLabels": [
+        "Игра"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "инцест",
+      "category": "genre",
+      "label": "инцест",
+      "originalLabels": [
+        "инцест"
+      ],
+      "sources": [
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "исекай",
+      "category": "genre",
+      "label": "Исекай",
+      "originalLabels": [
+        "Исекай"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "история",
+      "category": "genre",
+      "label": "История",
+      "originalLabels": [
+        "история",
+        "История"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "киберпанк",
+      "category": "genre",
+      "label": "Киберпанк",
+      "originalLabels": [
+        "Киберпанк"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "кодомо",
+      "category": "genre",
+      "label": "Кодомо",
+      "originalLabels": [
+        "Кодомо"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "комедия",
+      "category": "genre",
+      "label": "Комедия",
+      "originalLabels": [
+        "комедия",
+        "Комедия"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "космос",
+      "category": "genre",
+      "label": "Космос",
+      "originalLabels": [
+        "Космос"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "магия",
+      "category": "genre",
+      "label": "Магия",
+      "originalLabels": [
+        "Магия"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "махо седзе",
+      "category": "genre",
+      "label": "Махо-сёдзё",
+      "originalLabels": [
+        "Махо-сёдзё"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "машины",
+      "category": "genre",
+      "label": "Машины",
+      "originalLabels": [
+        "Машины"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "меха",
+      "category": "genre",
+      "label": "Меха",
+      "originalLabels": [
+        "Меха"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "мистика",
+      "category": "genre",
+      "label": "Мистика",
+      "originalLabels": [
+        "Мистика",
+        "мистика"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "музыка",
+      "category": "genre",
+      "label": "Музыка",
+      "originalLabels": [
+        "Музыка"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "научная фантастика",
+      "category": "genre",
+      "label": "Научная фантастика",
+      "originalLabels": [
+        "Научная фантастика",
+        "научная_фантастика"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "омегаверс",
+      "category": "genre",
+      "label": "Омегаверс",
+      "originalLabels": [
+        "Омегаверс"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "пародия",
+      "category": "genre",
+      "label": "Пародия",
+      "originalLabels": [
+        "Пародия"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "повседневность",
+      "category": "genre",
+      "label": "Повседневность",
+      "originalLabels": [
+        "повседневность",
+        "Повседневность"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "полиция",
+      "category": "genre",
+      "label": "Полиция",
+      "originalLabels": [
+        "Полиция"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "постапокалиптика",
+      "category": "genre",
+      "label": "Постапокалиптика",
+      "originalLabels": [
+        "Постапокалиптика"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "приключения",
+      "category": "genre",
+      "label": "Приключения",
+      "originalLabels": [
+        "приключения",
+        "Приключения"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "психология",
+      "category": "genre",
+      "label": "Психология",
+      "originalLabels": [
+        "психология",
+        "Психология"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "романтика",
+      "category": "genre",
+      "label": "Романтика",
+      "originalLabels": [
+        "Романтика",
+        "романтика"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "самурайский боевик",
+      "category": "genre",
+      "label": "Самурайский боевик",
+      "originalLabels": [
+        "Самурайский боевик"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "сборник",
+      "category": "genre",
+      "label": "сборник",
+      "originalLabels": [
+        "сборник"
+      ],
+      "sources": [
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сверхъестественное",
+      "category": "genre",
+      "label": "Сверхъестественное",
+      "originalLabels": [
+        "сверхъестественное",
+        "Сверхъестественное"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "седзе",
+      "category": "genre",
+      "label": "Сёдзё",
+      "originalLabels": [
+        "сёдзё",
+        "Сёдзё"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "седзе ай",
+      "category": "genre",
+      "label": "Сёдзё-ай",
+      "originalLabels": [
+        "сёдзё-ай",
+        "Сёдзё-ай"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "сенэн",
+      "category": "genre",
+      "label": "Сёнэн",
+      "originalLabels": [
+        "сёнэн",
+        "Сёнэн"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "сенэн ай",
+      "category": "genre",
+      "label": "Сёнэн-ай",
+      "originalLabels": [
+        "Сёнэн-ай",
+        "сёнэн-ай"
+      ],
+      "sources": [
+        "hentailib.me",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сетакон",
+      "category": "genre",
+      "label": "сетакон",
+      "originalLabels": [
+        "сетакон"
+      ],
+      "sources": [
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "спорт",
+      "category": "genre",
+      "label": "Спорт",
+      "originalLabels": [
+        "Спорт",
+        "спорт"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "супер сила",
+      "category": "genre",
+      "label": "Супер сила",
+      "originalLabels": [
+        "Супер сила"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "сэйнэн",
+      "category": "genre",
+      "label": "Сэйнэн",
+      "originalLabels": [
+        "Сэйнэн",
+        "сэйнэн"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "трагедия",
+      "category": "genre",
+      "label": "Трагедия",
+      "originalLabels": [
+        "трагедия",
+        "Трагедия"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "триллер",
+      "category": "genre",
+      "label": "Триллер",
+      "originalLabels": [
+        "триллер",
+        "Триллер"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "ужасы",
+      "category": "genre",
+      "label": "Ужасы",
+      "originalLabels": [
+        "ужасы",
+        "Ужасы"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "фантастика",
+      "category": "genre",
+      "label": "Фантастика",
+      "originalLabels": [
+        "фантастика",
+        "Фантастика"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "фэнтези",
+      "category": "genre",
+      "label": "Фэнтези",
+      "originalLabels": [
+        "Фэнтези",
+        "фэнтези"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "хантерверс",
+      "category": "genre",
+      "label": "Хантерверс",
+      "originalLabels": [
+        "Хантерверс"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "школа",
+      "category": "genre",
+      "label": "Школа",
+      "originalLabels": [
+        "Школа",
+        "школа"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "экшен",
+      "category": "genre",
+      "label": "Боевик",
+      "originalLabels": [
+        "боевик",
+        "Боевик"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "эротика",
+      "category": "genre",
+      "label": "Эротика",
+      "originalLabels": [
+        "эротика",
+        "Эротика"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "этти",
+      "category": "genre",
+      "label": "Этти",
+      "originalLabels": [
+        "Этти"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "юри",
+      "category": "genre",
+      "label": "Юри",
+      "originalLabels": [
+        "юри",
+        "Юри"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "яой",
+      "category": "genre",
+      "label": "Яой",
+      "originalLabels": [
+        "яой",
+        "Яой"
+      ],
+      "sources": [
+        "hentailib.me",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "18 плюс",
+      "category": "tag",
+      "label": "18 плюс",
+      "originalLabels": [
+        "18 плюс"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "3dcg",
+      "category": "tag",
+      "label": "3DCG",
+      "originalLabels": [
+        "3DCG"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "ahegao",
+      "category": "tag",
+      "label": "ahegao",
+      "originalLabels": [
+        "ahegao"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "bdsm",
+      "category": "tag",
+      "label": "bdsm",
+      "originalLabels": [
+        "bdsm"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "corruption",
+      "category": "tag",
+      "label": "corruption",
+      "originalLabels": [
+        "corruption"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "dilf",
+      "category": "tag",
+      "label": "DILF",
+      "originalLabels": [
+        "DILF"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "foot fetish",
+      "category": "tag",
+      "label": "foot fetish",
+      "originalLabels": [
+        "foot fetish"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "footfuck",
+      "category": "tag",
+      "label": "Footfuck",
+      "originalLabels": [
+        "footfuck",
+        "Footfuck"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "footjob",
+      "category": "tag",
+      "label": "Footjob",
+      "originalLabels": [
+        "Footjob"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "fpp вид от первого лица",
+      "category": "tag",
+      "label": "FPP (Вид от первого лица)",
+      "originalLabels": [
+        "FPP (Вид от первого лица)"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "gender bender",
+      "category": "tag",
+      "label": "gender bender",
+      "originalLabels": [
+        "gender bender"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "handjob",
+      "category": "tag",
+      "label": "Handjob",
+      "originalLabels": [
+        "Handjob"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "koikatsu",
+      "category": "tag",
+      "label": "Koikatsu",
+      "originalLabels": [
+        "Koikatsu"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "live",
+      "category": "tag",
+      "label": "live",
+      "originalLabels": [
+        "live"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "lolcon",
+      "category": "tag",
+      "label": "lolcon",
+      "originalLabels": [
+        "lolcon"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "megane",
+      "category": "tag",
+      "label": "megane",
+      "originalLabels": [
+        "megane"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "mind break",
+      "category": "tag",
+      "label": "mind break",
+      "originalLabels": [
+        "mind break"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "monstergirl",
+      "category": "tag",
+      "label": "monstergirl",
+      "originalLabels": [
+        "monstergirl"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "netorare",
+      "category": "tag",
+      "label": "netorare",
+      "originalLabels": [
+        "netorare"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "netorase",
+      "category": "tag",
+      "label": "netorase",
+      "originalLabels": [
+        "netorase"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "netori",
+      "category": "tag",
+      "label": "netori",
+      "originalLabels": [
+        "netori"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "nipple penetration",
+      "category": "tag",
+      "label": "nipple penetration",
+      "originalLabels": [
+        "nipple penetration"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "oyakodon",
+      "category": "tag",
+      "label": "oyakodon",
+      "originalLabels": [
+        "oyakodon"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "paizuri titsfuck",
+      "category": "tag",
+      "label": "paizuri (titsfuck)",
+      "originalLabels": [
+        "paizuri (titsfuck)"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "rpg",
+      "category": "tag",
+      "label": "rpg",
+      "originalLabels": [
+        "rpg"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "scat",
+      "category": "tag",
+      "label": "Scat",
+      "originalLabels": [
+        "scat",
+        "Scat"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "selfcest",
+      "category": "tag",
+      "label": "Selfcest",
+      "originalLabels": [
+        "Selfcest"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "shemale",
+      "category": "tag",
+      "label": "Shemale",
+      "originalLabels": [
+        "Shemale",
+        "shemale"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "shimaidon",
+      "category": "tag",
+      "label": "shimaidon",
+      "originalLabels": [
+        "shimaidon"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "shooter",
+      "category": "tag",
+      "label": "shooter",
+      "originalLabels": [
+        "shooter"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "simulation",
+      "category": "tag",
+      "label": "simulation",
+      "originalLabels": [
+        "simulation"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "skinsuit",
+      "category": "tag",
+      "label": "skinsuit",
+      "originalLabels": [
+        "skinsuit"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "tomboy",
+      "category": "tag",
+      "label": "Tomboy",
+      "originalLabels": [
+        "Tomboy",
+        "tomboy"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "tomgirl",
+      "category": "tag",
+      "label": "tomgirl",
+      "originalLabels": [
+        "tomgirl"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "unbirth",
+      "category": "tag",
+      "label": "Unbirth",
+      "originalLabels": [
+        "Unbirth"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "vore",
+      "category": "tag",
+      "label": "Vore",
+      "originalLabels": [
+        "Vore"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "x ray",
+      "category": "tag",
+      "label": "X-Ray",
+      "originalLabels": [
+        "x-ray",
+        "X-Ray"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "азартные игры",
+      "category": "tag",
+      "label": "Азартные игры",
+      "originalLabels": [
+        "Азартные игры"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "алкоголь",
+      "category": "tag",
+      "label": "Алкоголь",
+      "originalLabels": [
+        "Алкоголь",
+        "алкоголь"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "алхимия",
+      "category": "tag",
+      "label": "Алхимия",
+      "originalLabels": [
+        "Алхимия"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "амнезия потеря памяти",
+      "category": "tag",
+      "label": "Амнезия / Потеря памяти",
+      "originalLabels": [
+        "Амнезия / Потеря памяти"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "ампутация",
+      "category": "tag",
+      "label": "Ампутация",
+      "originalLabels": [
+        "Ампутация"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "анал",
+      "category": "tag",
+      "label": "Анал",
+      "originalLabels": [
+        "Анал",
+        "анал"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "ангелы",
+      "category": "tag",
+      "label": "Ангелы",
+      "originalLabels": [
+        "Ангелы"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "андроид",
+      "category": "tag",
+      "label": "Андроид",
+      "originalLabels": [
+        "Андроид",
+        "андроид"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "анилингус",
+      "category": "tag",
+      "label": "Анилингус",
+      "originalLabels": [
+        "Анилингус",
+        "анилингус"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "анимация",
+      "category": "tag",
+      "label": "анимация",
+      "originalLabels": [
+        "анимация"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "анимация gif",
+      "category": "tag",
+      "label": "Анимация (GIF)",
+      "originalLabels": [
+        "Анимация (GIF)"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "антигерой",
+      "category": "tag",
+      "label": "Антигерой",
+      "originalLabels": [
+        "Антигерой"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "антиутопия",
+      "category": "tag",
+      "label": "Антиутопия",
+      "originalLabels": [
+        "Антиутопия"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "апокалипсис",
+      "category": "tag",
+      "label": "Апокалипсис",
+      "originalLabels": [
+        "Апокалипсис"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "аристократия",
+      "category": "tag",
+      "label": "Аристократия",
+      "originalLabels": [
+        "Аристократия"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "аркада",
+      "category": "tag",
+      "label": "аркада",
+      "originalLabels": [
+        "аркада"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "армия",
+      "category": "tag",
+      "label": "Армия",
+      "originalLabels": [
+        "Армия"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "арт",
+      "category": "tag",
+      "label": "Арт",
+      "originalLabels": [
+        "арт",
+        "Арт"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "артбук",
+      "category": "tag",
+      "label": "Артбук",
+      "originalLabels": [
+        "Артбук"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "артефакты",
+      "category": "tag",
+      "label": "Артефакты",
+      "originalLabels": [
+        "Артефакты"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "ахэгао",
+      "category": "tag",
+      "label": "Ахэгао",
+      "originalLabels": [
+        "Ахэгао"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "бабушка",
+      "category": "tag",
+      "label": "бабушка",
+      "originalLabels": [
+        "бабушка"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "бакуню",
+      "category": "tag",
+      "label": "Бакуню",
+      "originalLabels": [
+        "Бакуню"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "бара",
+      "category": "tag",
+      "label": "Бара",
+      "originalLabels": [
+        "Бара",
+        "бара"
+      ],
+      "sources": [
+        "hentailib.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "бдсм",
+      "category": "tag",
+      "label": "БДСМ",
+      "originalLabels": [
+        "БДСМ"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "без проникновения",
+      "category": "tag",
+      "label": "Без проникновения",
+      "originalLabels": [
+        "без проникновения",
+        "Без проникновения"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "без текста",
+      "category": "tag",
+      "label": "Без текста",
+      "originalLabels": [
+        "без текста",
+        "Без текста"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "без трусиков",
+      "category": "tag",
+      "label": "Без трусиков",
+      "originalLabels": [
+        "без трусиков",
+        "Без трусиков"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "без цензуры",
+      "category": "tag",
+      "label": "Без цензуры",
+      "originalLabels": [
+        "без цензуры",
+        "Без цензуры"
+      ],
+      "sources": [
+        "hentaichan.cc",
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "безответная любовь",
+      "category": "tag",
+      "label": "Безответная любовь",
+      "originalLabels": [
+        "Безответная любовь"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "беременность",
+      "category": "tag",
+      "label": "Беременность",
+      "originalLabels": [
+        "Беременность",
+        "беременность"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "бикини",
+      "category": "tag",
+      "label": "Бикини",
+      "originalLabels": [
+        "Бикини",
+        "бикини"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "близнецы",
+      "category": "tag",
+      "label": "Близнецы",
+      "originalLabels": [
+        "Близнецы",
+        "близнецы"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "боги",
+      "category": "tag",
+      "label": "Боги",
+      "originalLabels": [
+        "Боги"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "боди арт",
+      "category": "tag",
+      "label": "боди-арт",
+      "originalLabels": [
+        "боди-арт"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "боевые искусства",
+      "category": "tag",
+      "label": "Боевые искусства",
+      "originalLabels": [
+        "боевые искусства",
+        "Боевые искусства"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "mangalib.org",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "бои на мечах",
+      "category": "tag",
+      "label": "Бои на мечах",
+      "originalLabels": [
+        "Бои на мечах"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "больница",
+      "category": "tag",
+      "label": "Больница",
+      "originalLabels": [
+        "Больница",
+        "больница"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "большая грудь",
+      "category": "tag",
+      "label": "Большая грудь",
+      "originalLabels": [
+        "большая грудь",
+        "Большая грудь"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "большая попка",
+      "category": "tag",
+      "label": "Большая попка",
+      "originalLabels": [
+        "Большая попка"
+      ],
+      "sources": [
+        "hentaichan.cc",
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "большие попки",
+      "category": "tag",
+      "label": "большие попки",
+      "originalLabels": [
+        "большие попки"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "бондаж",
+      "category": "tag",
+      "label": "бондаж",
+      "originalLabels": [
+        "бондаж"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "борьба",
+      "category": "tag",
+      "label": "Борьба",
+      "originalLabels": [
+        "Борьба"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "борьба за власть",
+      "category": "tag",
+      "label": "Борьба за власть",
+      "originalLabels": [
+        "Борьба за власть"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "брат и сестра",
+      "category": "tag",
+      "label": "Брат и сестра",
+      "originalLabels": [
+        "Брат и сестра"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "будущее",
+      "category": "tag",
+      "label": "Будущее",
+      "originalLabels": [
+        "Будущее"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "буккаке",
+      "category": "tag",
+      "label": "буккаке",
+      "originalLabels": [
+        "буккаке"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "буккакэ",
+      "category": "tag",
+      "label": "Буккакэ",
+      "originalLabels": [
+        "Буккакэ"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "в бассейне",
+      "category": "tag",
+      "label": "В бассейне",
+      "originalLabels": [
+        "В бассейне"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "в ванной",
+      "category": "tag",
+      "label": "В ванной",
+      "originalLabels": [
+        "В ванной",
+        "в ванной"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "в государственном учреждении",
+      "category": "tag",
+      "label": "В государственном учреждении",
+      "originalLabels": [
+        "В государственном учреждении"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "в общественном месте",
+      "category": "tag",
+      "label": "В общественном месте",
+      "originalLabels": [
+        "в общественном месте",
+        "В общественном месте"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "в очках",
+      "category": "tag",
+      "label": "В очках",
+      "originalLabels": [
+        "В очках"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "в первый раз",
+      "category": "tag",
+      "label": "В первый раз",
+      "originalLabels": [
+        "В первый раз",
+        "в первый раз"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "в транспорте",
+      "category": "tag",
+      "label": "В транспорте",
+      "originalLabels": [
+        "В транспорте"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "в туалете",
+      "category": "tag",
+      "label": "в туалете",
+      "originalLabels": [
+        "в туалете"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "в цвете",
+      "category": "tag",
+      "label": "в цвете",
+      "originalLabels": [
+        "в цвете"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "в школе",
+      "category": "tag",
+      "label": "в школе",
+      "originalLabels": [
+        "в школе"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "вампиры",
+      "category": "tag",
+      "label": "Вампиры",
+      "originalLabels": [
+        "Вампиры",
+        "вампиры"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "веб",
+      "category": "tag",
+      "label": "веб",
+      "originalLabels": [
+        "веб"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "вебкам",
+      "category": "tag",
+      "label": "вебкам",
+      "originalLabels": [
+        "вебкам"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "ведьма",
+      "category": "tag",
+      "label": "Ведьма",
+      "originalLabels": [
+        "Ведьма"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "вестерн",
+      "category": "tag",
+      "label": "Вестерн",
+      "originalLabels": [
+        "Вестерн"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "вибратор",
+      "category": "tag",
+      "label": "Вибратор",
+      "originalLabels": [
+        "Вибратор",
+        "вибратор"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "видеоигры",
+      "category": "tag",
+      "label": "Видеоигры",
+      "originalLabels": [
+        "Видеоигры"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "визуальная новелла",
+      "category": "tag",
+      "label": "визуальная новелла",
+      "originalLabels": [
+        "визуальная новелла"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "викторианская эпоха",
+      "category": "tag",
+      "label": "Викторианская эпоха",
+      "originalLabels": [
+        "Викторианская эпоха"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "виртуальная реальность",
+      "category": "tag",
+      "label": "Виртуальная реальность",
+      "originalLabels": [
+        "Виртуальная реальность"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "владыка демонов",
+      "category": "tag",
+      "label": "Владыка демонов",
+      "originalLabels": [
+        "Владыка демонов"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "внучка",
+      "category": "tag",
+      "label": "внучка",
+      "originalLabels": [
+        "внучка"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "военные",
+      "category": "tag",
+      "label": "Военные",
+      "originalLabels": [
+        "Военные"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "война",
+      "category": "tag",
+      "label": "Война",
+      "originalLabels": [
+        "Война"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "волосатые женщины",
+      "category": "tag",
+      "label": "волосатые женщины",
+      "originalLabels": [
+        "волосатые женщины"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "волшебники маги",
+      "category": "tag",
+      "label": "Волшебники / маги",
+      "originalLabels": [
+        "Волшебники / маги"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "волшебные существа",
+      "category": "tag",
+      "label": "Волшебные существа",
+      "originalLabels": [
+        "Волшебные существа"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "воспоминания из другого мира",
+      "category": "tag",
+      "label": "Воспоминания из другого мира",
+      "originalLabels": [
+        "Воспоминания из другого мира"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "все",
+      "category": "tag",
+      "label": "Все",
+      "originalLabels": [
+        "Все"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "втроем",
+      "category": "tag",
+      "label": "Втроём",
+      "originalLabels": [
+        "Втроём"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "выживание",
+      "category": "tag",
+      "label": "Выживание",
+      "originalLabels": [
+        "Выживание"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "газлайтинг",
+      "category": "tag",
+      "label": "Газлайтинг",
+      "originalLabels": [
+        "Газлайтинг"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гайдверс",
+      "category": "tag",
+      "label": "Гайдверс",
+      "originalLabels": [
+        "Гайдверс"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гарем",
+      "category": "tag",
+      "label": "гарем",
+      "originalLabels": [
+        "гарем"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "гаремник",
+      "category": "tag",
+      "label": "гаремник",
+      "originalLabels": [
+        "гаремник"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "гг девушка",
+      "category": "tag",
+      "label": "гг девушка",
+      "originalLabels": [
+        "гг девушка"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "гг женщина",
+      "category": "tag",
+      "label": "ГГ женщина",
+      "originalLabels": [
+        "ГГ женщина"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гг имба",
+      "category": "tag",
+      "label": "ГГ имба",
+      "originalLabels": [
+        "ГГ имба"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гг мужчина",
+      "category": "tag",
+      "label": "ГГ мужчина",
+      "originalLabels": [
+        "ГГ мужчина"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гг мэри сью",
+      "category": "tag",
+      "label": "ГГ - Мэри Сью",
+      "originalLabels": [
+        "ГГ - Мэри Сью"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гг не ояш",
+      "category": "tag",
+      "label": "ГГ не ояш",
+      "originalLabels": [
+        "ГГ не ояш"
+      ],
+      "sources": [
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "гг не человек",
+      "category": "tag",
+      "label": "ГГ не человек",
+      "originalLabels": [
+        "ГГ не человек"
+      ],
+      "sources": [
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "гг парень",
+      "category": "tag",
+      "label": "гг парень",
+      "originalLabels": [
+        "гг парень"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "геймеры",
+      "category": "tag",
+      "label": "Геймеры",
+      "originalLabels": [
+        "Геймеры"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гендерная интрига",
+      "category": "tag",
+      "label": "гендерная интрига",
+      "originalLabels": [
+        "гендерная интрига"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "героическое фэнтези",
+      "category": "tag",
+      "label": "героическое фэнтези",
+      "originalLabels": [
+        "героическое фэнтези"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "гильдии",
+      "category": "tag",
+      "label": "Гильдии",
+      "originalLabels": [
+        "Гильдии"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гиперсексуальность",
+      "category": "tag",
+      "label": "Гиперсексуальность",
+      "originalLabels": [
+        "Гиперсексуальность"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "гипноз",
+      "category": "tag",
+      "label": "Гипноз",
+      "originalLabels": [
+        "Гипноз",
+        "гипноз"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "глубокий минет",
+      "category": "tag",
+      "label": "Глубокий минет",
+      "originalLabels": [
+        "Глубокий минет",
+        "глубокий минет"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "глупый гг",
+      "category": "tag",
+      "label": "Глупый ГГ",
+      "originalLabels": [
+        "Глупый ГГ"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гоблины",
+      "category": "tag",
+      "label": "Гоблины",
+      "originalLabels": [
+        "Гоблины"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "горничные",
+      "category": "tag",
+      "label": "Горничные",
+      "originalLabels": [
+        "Горничные"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "горячий источник",
+      "category": "tag",
+      "label": "Горячий источник",
+      "originalLabels": [
+        "Горячий источник",
+        "горячий источник"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "градостроение",
+      "category": "tag",
+      "label": "Градостроение",
+      "originalLabels": [
+        "Градостроение"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "групповой секс",
+      "category": "tag",
+      "label": "Групповой секс",
+      "originalLabels": [
+        "Групповой секс",
+        "групповой секс"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "гуро",
+      "category": "tag",
+      "label": "Гуро",
+      "originalLabels": [
+        "Гуро"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гяру",
+      "category": "tag",
+      "label": "Гяру",
+      "originalLabels": [
+        "Гяру"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "гяру и гангуро",
+      "category": "tag",
+      "label": "Гяру и Гангуро",
+      "originalLabels": [
+        "Гяру и Гангуро",
+        "гяру и гангуро"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "двойное проникновение",
+      "category": "tag",
+      "label": "двойное проникновение",
+      "originalLabels": [
+        "двойное проникновение"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "девочки волшебницы",
+      "category": "tag",
+      "label": "Девочки-волшебницы",
+      "originalLabels": [
+        "девочки волшебницы",
+        "Девочки-волшебницы"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "девушка туалет",
+      "category": "tag",
+      "label": "Девушка-туалет",
+      "originalLabels": [
+        "девушка туалет",
+        "Девушка-туалет"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "демоны",
+      "category": "tag",
+      "label": "Демоны",
+      "originalLabels": [
+        "Демоны",
+        "демоны"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "детектив",
+      "category": "tag",
+      "label": "детектив",
+      "originalLabels": [
+        "детектив"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "дзесэй",
+      "category": "tag",
+      "label": "дзёсэй",
+      "originalLabels": [
+        "дзёсэй"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "дилдо",
+      "category": "tag",
+      "label": "Дилдо",
+      "originalLabels": [
+        "Дилдо",
+        "дилдо"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "додзинси",
+      "category": "tag",
+      "label": "додзинси",
+      "originalLabels": [
+        "додзинси"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "домохозяйка",
+      "category": "tag",
+      "label": "Домохозяйка",
+      "originalLabels": [
+        "Домохозяйка"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "дочь",
+      "category": "tag",
+      "label": "дочь",
+      "originalLabels": [
+        "дочь"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "драконы",
+      "category": "tag",
+      "label": "Драконы",
+      "originalLabels": [
+        "Драконы"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "драма",
+      "category": "tag",
+      "label": "драма",
+      "originalLabels": [
+        "драма"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "древний китай",
+      "category": "tag",
+      "label": "Древний Китай",
+      "originalLabels": [
+        "Древний Китай"
+      ],
+      "sources": [
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "дружба",
+      "category": "tag",
+      "label": "Дружба",
+      "originalLabels": [
+        "Дружба"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "друзья детства",
+      "category": "tag",
+      "label": "Друзья детства",
+      "originalLabels": [
+        "Друзья детства"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "дыра в стене",
+      "category": "tag",
+      "label": "Дыра в стене",
+      "originalLabels": [
+        "дыра в стене",
+        "Дыра в стене"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "енкома",
+      "category": "tag",
+      "label": "ёнкома",
+      "originalLabels": [
+        "ёнкома"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "жанры",
+      "category": "tag",
+      "label": "Жанры",
+      "originalLabels": [
+        "Жанры"
+      ],
+      "sources": [
+        "hentaros.com"
+      ]
+    },
+    {
+      "key": "жестокий мир",
+      "category": "tag",
+      "label": "Жестокий мир",
+      "originalLabels": [
+        "Жестокий мир"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "жестокость",
+      "category": "tag",
+      "label": "Жестокость",
+      "originalLabels": [
+        "жестокость",
+        "Жестокость"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "живая одежда",
+      "category": "tag",
+      "label": "Живая одежда",
+      "originalLabels": [
+        "Живая одежда"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "животные компаньоны",
+      "category": "tag",
+      "label": "Животные компаньоны",
+      "originalLabels": [
+        "Животные компаньоны"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "за деньги",
+      "category": "tag",
+      "label": "за деньги",
+      "originalLabels": [
+        "за деньги"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "завоевание мира",
+      "category": "tag",
+      "label": "Завоевание мира",
+      "originalLabels": [
+        "Завоевание мира"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "запугивание",
+      "category": "tag",
+      "label": "Запугивание",
+      "originalLabels": [
+        "Запугивание"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "зверолюди",
+      "category": "tag",
+      "label": "Зверолюди",
+      "originalLabels": [
+        "Зверолюди"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "здоровые отношения",
+      "category": "tag",
+      "label": "Здоровые отношения",
+      "originalLabels": [
+        "Здоровые отношения"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "злые духи",
+      "category": "tag",
+      "label": "Злые духи",
+      "originalLabels": [
+        "Злые духи"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "золотой дождь",
+      "category": "tag",
+      "label": "Золотой дождь",
+      "originalLabels": [
+        "Золотой дождь"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "зомби",
+      "category": "tag",
+      "label": "Зомби",
+      "originalLabels": [
+        "зомби",
+        "Зомби"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "зоофилия",
+      "category": "tag",
+      "label": "Зоофилия",
+      "originalLabels": [
+        "Зоофилия"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "зрелые женщины",
+      "category": "tag",
+      "label": "Зрелые женщины",
+      "originalLabels": [
+        "зрелые женщины",
+        "Зрелые женщины"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "игра",
+      "category": "tag",
+      "label": "игра",
+      "originalLabels": [
+        "игра"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "игра на выживание",
+      "category": "tag",
+      "label": "Игра на выживание",
+      "originalLabels": [
+        "Игра на выживание"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "игровые элементы",
+      "category": "tag",
+      "label": "Игровые элементы",
+      "originalLabels": [
+        "Игровые элементы"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "избиение",
+      "category": "tag",
+      "label": "Избиение",
+      "originalLabels": [
+        "Избиение"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "изгнание",
+      "category": "tag",
+      "label": "Изгнание",
+      "originalLabels": [
+        "Изгнание"
+      ],
+      "sources": [
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "измена",
+      "category": "tag",
+      "label": "Измена",
+      "originalLabels": [
+        "измена",
+        "Измена"
+      ],
+      "sources": [
+        "hentaichan.cc",
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "изнасилование",
+      "category": "tag",
+      "label": "Изнасилование",
+      "originalLabels": [
+        "Изнасилование",
+        "изнасилование"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "империи",
+      "category": "tag",
+      "label": "Империи",
+      "originalLabels": [
+        "Империи"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "инопланетяне",
+      "category": "tag",
+      "label": "Инопланетяне",
+      "originalLabels": [
+        "Инопланетяне",
+        "инопланетяне"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "инсеки",
+      "category": "tag",
+      "label": "Инсеки",
+      "originalLabels": [
+        "Инсеки"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "инцест",
+      "category": "tag",
+      "label": "Инцест",
+      "originalLabels": [
+        "Инцест",
+        "инцест"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "manga-chan.me",
+        "v2.shlib.life",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "иррумация",
+      "category": "tag",
+      "label": "Иррумация",
+      "originalLabels": [
+        "Иррумация"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "искусство",
+      "category": "tag",
+      "label": "искусство",
+      "originalLabels": [
+        "искусство"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "исполнение желаний",
+      "category": "tag",
+      "label": "Исполнение желаний",
+      "originalLabels": [
+        "Исполнение желаний",
+        "исполнение желаний"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "исторические",
+      "category": "tag",
+      "label": "Исторические",
+      "originalLabels": [
+        "Исторические"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "история",
+      "category": "tag",
+      "label": "история",
+      "originalLabels": [
+        "история"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "камера",
+      "category": "tag",
+      "label": "Камера",
+      "originalLabels": [
+        "камера",
+        "Камера"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "квест",
+      "category": "tag",
+      "label": "квест",
+      "originalLabels": [
+        "квест"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "квесты",
+      "category": "tag",
+      "label": "Квесты",
+      "originalLabels": [
+        "Квесты"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "кейкверс",
+      "category": "tag",
+      "label": "Кейкверс",
+      "originalLabels": [
+        "Кейкверс"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "кемпинг",
+      "category": "tag",
+      "label": "Кемпинг",
+      "originalLabels": [
+        "Кемпинг"
+      ],
+      "sources": [
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "киберпанк",
+      "category": "tag",
+      "label": "киберпанк",
+      "originalLabels": [
+        "киберпанк"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "кимоно",
+      "category": "tag",
+      "label": "кимоно",
+      "originalLabels": [
+        "кимоно"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "кляп",
+      "category": "tag",
+      "label": "Кляп",
+      "originalLabels": [
+        "Кляп"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "кодомо",
+      "category": "tag",
+      "label": "кодомо",
+      "originalLabels": [
+        "кодомо"
+      ],
+      "sources": [
+        "manga-chan.me"
+      ]
+    },
+    {
+      "key": "колготки",
+      "category": "tag",
+      "label": "Колготки",
+      "originalLabels": [
+        "колготки",
+        "Колготки"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "комедия",
+      "category": "tag",
+      "label": "комедия",
+      "originalLabels": [
+        "комедия"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "комиксы",
+      "category": "tag",
+      "label": "комиксы",
+      "originalLabels": [
+        "комиксы"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "космос",
+      "category": "tag",
+      "label": "Космос",
+      "originalLabels": [
+        "Космос"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "косплей",
+      "category": "tag",
+      "label": "Косплей",
+      "originalLabels": [
+        "Косплей",
+        "косплей"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "кремпай",
+      "category": "tag",
+      "label": "Кремпай",
+      "originalLabels": [
+        "кремпай",
+        "Кремпай"
+      ],
+      "sources": [
+        "hentaichan.cc",
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "кримпай",
+      "category": "tag",
+      "label": "Кримпай",
+      "originalLabels": [
+        "Кримпай"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "кудере",
+      "category": "tag",
+      "label": "кудере",
+      "originalLabels": [
+        "кудере"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "кузина",
+      "category": "tag",
+      "label": "кузина",
+      "originalLabels": [
+        "кузина"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "кулинария",
+      "category": "tag",
+      "label": "Кулинария",
+      "originalLabels": [
+        "Кулинария"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "культивирование",
+      "category": "tag",
+      "label": "Культивирование",
+      "originalLabels": [
+        "Культивирование"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "куннилингус",
+      "category": "tag",
+      "label": "Куннилингус",
+      "originalLabels": [
+        "куннилингус",
+        "Куннилингус"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "купальники",
+      "category": "tag",
+      "label": "Купальники",
+      "originalLabels": [
+        "Купальники",
+        "купальники"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "лактация",
+      "category": "tag",
+      "label": "Лактация",
+      "originalLabels": [
+        "Лактация"
+      ],
+      "sources": [
+        "hentailib.me",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "латекс и кожа",
+      "category": "tag",
+      "label": "Латекс и кожа",
+      "originalLabels": [
+        "Латекс и кожа",
+        "латекс и кожа"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "лгбт",
+      "category": "tag",
+      "label": "ЛГБТ",
+      "originalLabels": [
+        "ЛГБТ"
+      ],
+      "sources": [
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "легендарное оружие",
+      "category": "tag",
+      "label": "Легендарное оружие",
+      "originalLabels": [
+        "Легендарное оружие"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "литрпг",
+      "category": "tag",
+      "label": "литРПГ",
+      "originalLabels": [
+        "литРПГ"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "магическая академия",
+      "category": "tag",
+      "label": "Магическая академия",
+      "originalLabels": [
+        "Магическая академия"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "магия",
+      "category": "tag",
+      "label": "Магия",
+      "originalLabels": [
+        "Магия",
+        "магия"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "маленькая грудь",
+      "category": "tag",
+      "label": "Маленькая грудь",
+      "originalLabels": [
+        "маленькая грудь",
+        "Маленькая грудь"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "манипуляция памятью",
+      "category": "tag",
+      "label": "Манипуляция памятью",
+      "originalLabels": [
+        "Манипуляция памятью"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "мастурбация",
+      "category": "tag",
+      "label": "Мастурбация",
+      "originalLabels": [
+        "мастурбация",
+        "Мастурбация"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "матриархат",
+      "category": "tag",
+      "label": "Матриархат",
+      "originalLabels": [
+        "Матриархат"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "мать",
+      "category": "tag",
+      "label": "мать",
+      "originalLabels": [
+        "мать"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "мафия",
+      "category": "tag",
+      "label": "Мафия",
+      "originalLabels": [
+        "Мафия"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "махо седзе",
+      "category": "tag",
+      "label": "махо-сёдзё",
+      "originalLabels": [
+        "махо-сёдзё"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "медицина",
+      "category": "tag",
+      "label": "Медицина",
+      "originalLabels": [
+        "Медицина"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "медсестра",
+      "category": "tag",
+      "label": "Медсестра",
+      "originalLabels": [
+        "Медсестра"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "межвидовые отношения",
+      "category": "tag",
+      "label": "Межвидовые отношения",
+      "originalLabels": [
+        "Межвидовые отношения"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "мейдочки",
+      "category": "tag",
+      "label": "мейдочки",
+      "originalLabels": [
+        "мейдочки"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "мерзкий дядька",
+      "category": "tag",
+      "label": "Мерзкий дядька",
+      "originalLabels": [
+        "Мерзкий дядька",
+        "мерзкий дядька"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "месть",
+      "category": "tag",
+      "label": "Месть",
+      "originalLabels": [
+        "Месть"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "меха",
+      "category": "tag",
+      "label": "меха",
+      "originalLabels": [
+        "меха"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "милф",
+      "category": "tag",
+      "label": "Милф",
+      "originalLabels": [
+        "Милф"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "минет",
+      "category": "tag",
+      "label": "минет",
+      "originalLabels": [
+        "минет"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "мистика",
+      "category": "tag",
+      "label": "мистика",
+      "originalLabels": [
+        "мистика"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "много девушек",
+      "category": "tag",
+      "label": "Много девушек",
+      "originalLabels": [
+        "Много девушек",
+        "много девушек"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "много парней",
+      "category": "tag",
+      "label": "Много парней",
+      "originalLabels": [
+        "Много парней"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "много спермы",
+      "category": "tag",
+      "label": "Много спермы",
+      "originalLabels": [
+        "Много спермы"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "молоко",
+      "category": "tag",
+      "label": "Молоко",
+      "originalLabels": [
+        "Молоко",
+        "молоко"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "монашка",
+      "category": "tag",
+      "label": "Монашка",
+      "originalLabels": [
+        "Монашка"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "монашки",
+      "category": "tag",
+      "label": "монашки",
+      "originalLabels": [
+        "монашки"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "монстродевушки",
+      "category": "tag",
+      "label": "Монстродевушки",
+      "originalLabels": [
+        "Монстродевушки"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "монстры",
+      "category": "tag",
+      "label": "Монстры",
+      "originalLabels": [
+        "Монстры",
+        "монстры"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "мочеиспускание",
+      "category": "tag",
+      "label": "Мочеиспускание",
+      "originalLabels": [
+        "Мочеиспускание",
+        "мочеиспускание"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "мужская беременность",
+      "category": "tag",
+      "label": "Мужская беременность",
+      "originalLabels": [
+        "мужская беременность",
+        "Мужская беременность"
+      ],
+      "sources": [
+        "hentailib.me",
+        "v2.shlib.life",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "мужская озвучка",
+      "category": "tag",
+      "label": "мужская озвучка",
+      "originalLabels": [
+        "мужская озвучка"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "мужчина крепкого телосложения",
+      "category": "tag",
+      "label": "мужчина крепкого телосложения",
+      "originalLabels": [
+        "мужчина крепкого телосложения"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "музыка",
+      "category": "tag",
+      "label": "музыка",
+      "originalLabels": [
+        "музыка"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "мурим",
+      "category": "tag",
+      "label": "Мурим",
+      "originalLabels": [
+        "Мурим"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "мускулистые женщины",
+      "category": "tag",
+      "label": "мускулистые женщины",
+      "originalLabels": [
+        "мускулистые женщины"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "на природе",
+      "category": "tag",
+      "label": "На природе",
+      "originalLabels": [
+        "на природе",
+        "На природе"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "наблюдение",
+      "category": "tag",
+      "label": "Наблюдение",
+      "originalLabels": [
+        "Наблюдение",
+        "наблюдение"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "навыки способности",
+      "category": "tag",
+      "label": "Навыки / способности",
+      "originalLabels": [
+        "Навыки / способности"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "наемники",
+      "category": "tag",
+      "label": "Наёмники",
+      "originalLabels": [
+        "Наёмники"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "накачанный пассив",
+      "category": "tag",
+      "label": "Накачанный пассив",
+      "originalLabels": [
+        "Накачанный пассив"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "насекомые",
+      "category": "tag",
+      "label": "Насекомые",
+      "originalLabels": [
+        "Насекомые"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "насилие жестокость",
+      "category": "tag",
+      "label": "Насилие / жестокость",
+      "originalLabels": [
+        "Насилие / жестокость"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "научная фантастика",
+      "category": "tag",
+      "label": "научная фантастика",
+      "originalLabels": [
+        "научная фантастика"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "не слеш",
+      "category": "tag",
+      "label": "Не слеш",
+      "originalLabels": [
+        "Не слеш"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "не хентай",
+      "category": "tag",
+      "label": "Не хентай",
+      "originalLabels": [
+        "Не хентай"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "небритая киска",
+      "category": "tag",
+      "label": "Небритая киска",
+      "originalLabels": [
+        "Небритая киска"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "небритые подмышки",
+      "category": "tag",
+      "label": "Небритые подмышки",
+      "originalLabels": [
+        "Небритые подмышки"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "недопонимание",
+      "category": "tag",
+      "label": "Недопонимание",
+      "originalLabels": [
+        "Недопонимание"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "нежить",
+      "category": "tag",
+      "label": "Нежить",
+      "originalLabels": [
+        "Нежить"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "нездоровые отношения",
+      "category": "tag",
+      "label": "Нездоровые отношения",
+      "originalLabels": [
+        "Нездоровые отношения"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "непрямой инцест",
+      "category": "tag",
+      "label": "непрямой инцест",
+      "originalLabels": [
+        "непрямой инцест"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "нетораре",
+      "category": "tag",
+      "label": "Нетораре",
+      "originalLabels": [
+        "Нетораре"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "ниндзя",
+      "category": "tag",
+      "label": "Ниндзя",
+      "originalLabels": [
+        "Ниндзя"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "новелла",
+      "category": "tag",
+      "label": "новелла",
+      "originalLabels": [
+        "новелла"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "ножницы",
+      "category": "tag",
+      "label": "Ножницы",
+      "originalLabels": [
+        "Ножницы"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "нэтори",
+      "category": "tag",
+      "label": "Нэтори",
+      "originalLabels": [
+        "Нэтори"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "обмен партнерами",
+      "category": "tag",
+      "label": "обмен партнерами",
+      "originalLabels": [
+        "обмен партнерами"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "обмен телами",
+      "category": "tag",
+      "label": "Обмен телами",
+      "originalLabels": [
+        "обмен телами",
+        "Обмен телами"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "обратный гарем",
+      "category": "tag",
+      "label": "Обратный Гарем",
+      "originalLabels": [
+        "Обратный Гарем"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "обратный исекай",
+      "category": "tag",
+      "label": "Обратный исекай",
+      "originalLabels": [
+        "Обратный исекай"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "обретенная семья",
+      "category": "tag",
+      "label": "Обретённая семья",
+      "originalLabels": [
+        "Обретённая семья"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "обычный секс",
+      "category": "tag",
+      "label": "Обычный секс",
+      "originalLabels": [
+        "обычный секс",
+        "Обычный секс"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "огнестрельное оружие",
+      "category": "tag",
+      "label": "Огнестрельное оружие",
+      "originalLabels": [
+        "Огнестрельное оружие"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "огромная грудь",
+      "category": "tag",
+      "label": "Огромная грудь",
+      "originalLabels": [
+        "Огромная грудь",
+        "огромная грудь"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "огромный член",
+      "category": "tag",
+      "label": "Огромный член",
+      "originalLabels": [
+        "огромный член",
+        "Огромный член"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "одержимость",
+      "category": "tag",
+      "label": "Одержимость",
+      "originalLabels": [
+        "Одержимость"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "омегаверс",
+      "category": "tag",
+      "label": "омегаверс",
+      "originalLabels": [
+        "омегаверс"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "омегавсерс",
+      "category": "tag",
+      "label": "Омегавсерс",
+      "originalLabels": [
+        "Омегавсерс"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "омораси",
+      "category": "tag",
+      "label": "Омораси",
+      "originalLabels": [
+        "Омораси"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "оплодотворение",
+      "category": "tag",
+      "label": "оплодотворение",
+      "originalLabels": [
+        "оплодотворение"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "оральный секс",
+      "category": "tag",
+      "label": "Оральный секс",
+      "originalLabels": [
+        "Оральный секс"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "орки",
+      "category": "tag",
+      "label": "Орки",
+      "originalLabels": [
+        "Орки"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "остановка времени",
+      "category": "tag",
+      "label": "Остановка времени",
+      "originalLabels": [
+        "остановка времени",
+        "Остановка времени"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "от ненависти до любви",
+      "category": "tag",
+      "label": "От ненависти до любви",
+      "originalLabels": [
+        "От ненависти до любви"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "офисные работники",
+      "category": "tag",
+      "label": "Офисные Работники",
+      "originalLabels": [
+        "Офисные Работники"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "оякодон",
+      "category": "tag",
+      "label": "Оякодон",
+      "originalLabels": [
+        "Оякодон"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "пайзури",
+      "category": "tag",
+      "label": "Пайзури",
+      "originalLabels": [
+        "Пайзури"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "парень пассив",
+      "category": "tag",
+      "label": "Парень пассив",
+      "originalLabels": [
+        "Парень пассив",
+        "парень пассив"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "пародия",
+      "category": "tag",
+      "label": "Пародия",
+      "originalLabels": [
+        "Пародия"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "переодевание",
+      "category": "tag",
+      "label": "Переодевание",
+      "originalLabels": [
+        "Переодевание",
+        "переодевание"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "песочница",
+      "category": "tag",
+      "label": "песочница",
+      "originalLabels": [
+        "песочница"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "пираты",
+      "category": "tag",
+      "label": "Пираты",
+      "originalLabels": [
+        "Пираты"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "пирсинг",
+      "category": "tag",
+      "label": "Пирсинг",
+      "originalLabels": [
+        "Пирсинг"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "племянница",
+      "category": "tag",
+      "label": "племянница",
+      "originalLabels": [
+        "племянница"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "пляж",
+      "category": "tag",
+      "label": "Пляж",
+      "originalLabels": [
+        "Пляж",
+        "пляж"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "повседневность",
+      "category": "tag",
+      "label": "повседневность",
+      "originalLabels": [
+        "повседневность"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "подвязки",
+      "category": "tag",
+      "label": "Подвязки",
+      "originalLabels": [
+        "Подвязки"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "подглядывание",
+      "category": "tag",
+      "label": "Подглядывание",
+      "originalLabels": [
+        "Подглядывание",
+        "подглядывание"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "подземелья",
+      "category": "tag",
+      "label": "Подземелья",
+      "originalLabels": [
+        "Подземелья"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "подчинение",
+      "category": "tag",
+      "label": "Подчинение",
+      "originalLabels": [
+        "Подчинение",
+        "подчинение"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "пожилой протагонист",
+      "category": "tag",
+      "label": "Пожилой протагонист",
+      "originalLabels": [
+        "Пожилой протагонист"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "полиамория",
+      "category": "tag",
+      "label": "Полиамория",
+      "originalLabels": [
+        "Полиамория"
+      ],
+      "sources": [
+        "hentailib.me",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "политика",
+      "category": "tag",
+      "label": "Политика",
+      "originalLabels": [
+        "Политика"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "полиция",
+      "category": "tag",
+      "label": "Полиция",
+      "originalLabels": [
+        "Полиция"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "полностью cgi",
+      "category": "tag",
+      "label": "Полностью CGI",
+      "originalLabels": [
+        "Полностью CGI"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "постапокалиптика",
+      "category": "tag",
+      "label": "постапокалиптика",
+      "originalLabels": [
+        "постапокалиптика"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "похищение",
+      "category": "tag",
+      "label": "Похищение",
+      "originalLabels": [
+        "похищение",
+        "Похищение"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "превозмогание",
+      "category": "tag",
+      "label": "Превозмогание",
+      "originalLabels": [
+        "Превозмогание"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "презерватив",
+      "category": "tag",
+      "label": "презерватив",
+      "originalLabels": [
+        "презерватив"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "преступники криминал",
+      "category": "tag",
+      "label": "Преступники / Криминал",
+      "originalLabels": [
+        "Преступники / Криминал"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "призраки духи",
+      "category": "tag",
+      "label": "Призраки / Духи",
+      "originalLabels": [
+        "Призраки / Духи"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "приключения",
+      "category": "tag",
+      "label": "приключения",
+      "originalLabels": [
+        "приключения"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "принуждение",
+      "category": "tag",
+      "label": "Принуждение",
+      "originalLabels": [
+        "Принуждение",
+        "принуждение"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "приручение существ",
+      "category": "tag",
+      "label": "Приручение существ",
+      "originalLabels": [
+        "Приручение существ"
+      ],
+      "sources": [
+        "mangalib.org"
+      ]
+    },
+    {
+      "key": "прозрачная одежда",
+      "category": "tag",
+      "label": "Прозрачная одежда",
+      "originalLabels": [
+        "Прозрачная одежда",
+        "прозрачная одежда"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "проникновение в матку",
+      "category": "tag",
+      "label": "проникновение в матку",
+      "originalLabels": [
+        "проникновение в матку"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "проникновение в соски",
+      "category": "tag",
+      "label": "Проникновение в соски",
+      "originalLabels": [
+        "Проникновение в соски"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "проституция",
+      "category": "tag",
+      "label": "Проституция",
+      "originalLabels": [
+        "Проституция"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "прыжки между мирами",
+      "category": "tag",
+      "label": "Прыжки между мирами",
+      "originalLabels": [
+        "Прыжки между мирами"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "психические отклонения",
+      "category": "tag",
+      "label": "Психические отклонения",
+      "originalLabels": [
+        "психические отклонения",
+        "Психические отклонения"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "психический слом",
+      "category": "tag",
+      "label": "Психический слом",
+      "originalLabels": [
+        "Психический слом"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "психология",
+      "category": "tag",
+      "label": "психология",
+      "originalLabels": [
+        "психология"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "публично",
+      "category": "tag",
+      "label": "публично",
+      "originalLabels": [
+        "публично"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "публичный секс",
+      "category": "tag",
+      "label": "Публичный секс",
+      "originalLabels": [
+        "Публичный секс"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "путешествие",
+      "category": "tag",
+      "label": "Путешествие",
+      "originalLabels": [
+        "Путешествие"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "путешествие во времени",
+      "category": "tag",
+      "label": "Путешествие во времени",
+      "originalLabels": [
+        "Путешествие во времени"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "пытки",
+      "category": "tag",
+      "label": "Пытки",
+      "originalLabels": [
+        "Пытки"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "пьяные",
+      "category": "tag",
+      "label": "Пьяные",
+      "originalLabels": [
+        "Пьяные"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "рабы",
+      "category": "tag",
+      "label": "Рабы",
+      "originalLabels": [
+        "Рабы"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "рабыни",
+      "category": "tag",
+      "label": "рабыни",
+      "originalLabels": [
+        "рабыни"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "разница в возрасте",
+      "category": "tag",
+      "label": "Разница в возрасте",
+      "originalLabels": [
+        "Разница в возрасте"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "разумные расы",
+      "category": "tag",
+      "label": "Разумные расы",
+      "originalLabels": [
+        "Разумные расы"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "ранги силы",
+      "category": "tag",
+      "label": "Ранги силы",
+      "originalLabels": [
+        "Ранги силы"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "регрессия",
+      "category": "tag",
+      "label": "Регрессия",
+      "originalLabels": [
+        "Регрессия"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "реинкарнация",
+      "category": "tag",
+      "label": "Реинкарнация",
+      "originalLabels": [
+        "Реинкарнация"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "роботы",
+      "category": "tag",
+      "label": "Роботы",
+      "originalLabels": [
+        "Роботы"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "родительство",
+      "category": "tag",
+      "label": "Родительство",
+      "originalLabels": [
+        "Родительство"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "романтика",
+      "category": "tag",
+      "label": "романтика",
+      "originalLabels": [
+        "романтика"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "русалки",
+      "category": "tag",
+      "label": "Русалки",
+      "originalLabels": [
+        "Русалки"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "рыцари",
+      "category": "tag",
+      "label": "Рыцари",
+      "originalLabels": [
+        "Рыцари"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "с сюжетом",
+      "category": "tag",
+      "label": "С Сюжетом",
+      "originalLabels": [
+        "С Сюжетом"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "сuminside",
+      "category": "tag",
+      "label": "Сuminside",
+      "originalLabels": [
+        "Сuminside"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "самураи",
+      "category": "tag",
+      "label": "Самураи",
+      "originalLabels": [
+        "Самураи"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "самурайский боевик",
+      "category": "tag",
+      "label": "самурайский боевик",
+      "originalLabels": [
+        "самурайский боевик"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сборник",
+      "category": "tag",
+      "label": "сборник",
+      "originalLabels": [
+        "сборник"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сверхъестественное",
+      "category": "tag",
+      "label": "сверхъестественное",
+      "originalLabels": [
+        "сверхъестественное"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сгенерировано ии",
+      "category": "tag",
+      "label": "Сгенерировано ИИ",
+      "originalLabels": [
+        "Сгенерировано ИИ"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "седзе",
+      "category": "tag",
+      "label": "сёдзё",
+      "originalLabels": [
+        "сёдзё"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "седзе ай",
+      "category": "tag",
+      "label": "сёдзё-ай",
+      "originalLabels": [
+        "сёдзё-ай"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "секс игрушки",
+      "category": "tag",
+      "label": "Секс-игрушки",
+      "originalLabels": [
+        "секс игрушки",
+        "Секс-игрушки"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "сексуально возбужденная",
+      "category": "tag",
+      "label": "Сексуально возбуждённая",
+      "originalLabels": [
+        "Сексуально возбуждённая"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "сенэн",
+      "category": "tag",
+      "label": "сёнэн",
+      "originalLabels": [
+        "сёнэн"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сенэн ай",
+      "category": "tag",
+      "label": "сёнэн-ай",
+      "originalLabels": [
+        "сёнэн-ай"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сестра",
+      "category": "tag",
+      "label": "сестра",
+      "originalLabels": [
+        "сестра"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "сетакон",
+      "category": "tag",
+      "label": "Сетакон",
+      "originalLabels": [
+        "сетакон",
+        "Сетакон"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сибари",
+      "category": "tag",
+      "label": "Сибари",
+      "originalLabels": [
+        "Сибари"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "сирота",
+      "category": "tag",
+      "label": "Сирота",
+      "originalLabels": [
+        "Сирота"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "система",
+      "category": "tag",
+      "label": "Система",
+      "originalLabels": [
+        "Система"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "сказка",
+      "category": "tag",
+      "label": "сказка",
+      "originalLabels": [
+        "сказка"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "скрытие личности",
+      "category": "tag",
+      "label": "Скрытие личности",
+      "originalLabels": [
+        "Скрытие личности"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "скрытный секс",
+      "category": "tag",
+      "label": "скрытный секс",
+      "originalLabels": [
+        "скрытный секс"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "слоуберн",
+      "category": "tag",
+      "label": "Слоубёрн",
+      "originalLabels": [
+        "Слоубёрн"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "современность",
+      "category": "tag",
+      "label": "Современность",
+      "originalLabels": [
+        "Современность"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "спасение мира",
+      "category": "tag",
+      "label": "Спасение мира",
+      "originalLabels": [
+        "Спасение мира"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "спорт",
+      "category": "tag",
+      "label": "спорт",
+      "originalLabels": [
+        "спорт"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "спортивная форма",
+      "category": "tag",
+      "label": "Спортивная форма",
+      "originalLabels": [
+        "Спортивная форма",
+        "спортивная форма"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "спортивное тело",
+      "category": "tag",
+      "label": "Спортивное тело",
+      "originalLabels": [
+        "Спортивное тело"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "спящие",
+      "category": "tag",
+      "label": "Спящие",
+      "originalLabels": [
+        "Спящие",
+        "спящие"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "средневековье",
+      "category": "tag",
+      "label": "Средневековье",
+      "originalLabels": [
+        "Средневековье"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "стимпанк",
+      "category": "tag",
+      "label": "Стимпанк",
+      "originalLabels": [
+        "Стимпанк"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "стимуляция пальцами",
+      "category": "tag",
+      "label": "Стимуляция пальцами",
+      "originalLabels": [
+        "Стимуляция пальцами"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "страпон",
+      "category": "tag",
+      "label": "Страпон",
+      "originalLabels": [
+        "Страпон",
+        "страпон"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "стримы",
+      "category": "tag",
+      "label": "Стримы",
+      "originalLabels": [
+        "Стримы"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "суккуб",
+      "category": "tag",
+      "label": "Суккуб",
+      "originalLabels": [
+        "Суккуб"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "суккубы",
+      "category": "tag",
+      "label": "суккубы",
+      "originalLabels": [
+        "суккубы"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "супергерои",
+      "category": "tag",
+      "label": "Супергерои",
+      "originalLabels": [
+        "Супергерои",
+        "супергерои"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "сэйнэн",
+      "category": "tag",
+      "label": "сэйнэн",
+      "originalLabels": [
+        "сэйнэн"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "танцы",
+      "category": "tag",
+      "label": "танцы",
+      "originalLabels": [
+        "танцы"
+      ],
+      "sources": [
+        "manga-chan.me"
+      ]
+    },
+    {
+      "key": "татуировки",
+      "category": "tag",
+      "label": "Татуировки",
+      "originalLabels": [
+        "Татуировки"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "телесный ужас",
+      "category": "tag",
+      "label": "Body Horror",
+      "originalLabels": [
+        "Body Horror"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "темнокожие",
+      "category": "tag",
+      "label": "Темнокожие",
+      "originalLabels": [
+        "темнокожие",
+        "Темнокожие"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "тентакли",
+      "category": "tag",
+      "label": "Тентакли",
+      "originalLabels": [
+        "тентакли",
+        "Тентакли"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "тетя",
+      "category": "tag",
+      "label": "тётя",
+      "originalLabels": [
+        "тётя"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "толстушки",
+      "category": "tag",
+      "label": "Толстушки",
+      "originalLabels": [
+        "Толстушки",
+        "толстушки"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "трагедия",
+      "category": "tag",
+      "label": "трагедия",
+      "originalLabels": [
+        "трагедия"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "традиционные игры",
+      "category": "tag",
+      "label": "Традиционные игры",
+      "originalLabels": [
+        "Традиционные игры"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "трап",
+      "category": "tag",
+      "label": "Трап",
+      "originalLabels": [
+        "Трап",
+        "трап"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "трехмерная графика",
+      "category": "tag",
+      "label": "3D",
+      "originalLabels": [
+        "3D"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "триллер",
+      "category": "tag",
+      "label": "триллер",
+      "originalLabels": [
+        "триллер"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "трисомия",
+      "category": "tag",
+      "label": "Трисомия",
+      "originalLabels": [
+        "Трисомия"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "тэги",
+      "category": "tag",
+      "label": "Тэги",
+      "originalLabels": [
+        "Тэги"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "увеличение груди",
+      "category": "tag",
+      "label": "Увеличение груди",
+      "originalLabels": [
+        "Увеличение груди"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "ужасы",
+      "category": "tag",
+      "label": "Ужасы",
+      "originalLabels": [
+        "ужасы",
+        "Ужасы"
+      ],
+      "sources": [
+        "hentailib.me",
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "умеренная жестокость",
+      "category": "tag",
+      "label": "умеренная жестокость",
+      "originalLabels": [
+        "умеренная жестокость"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "умный гг",
+      "category": "tag",
+      "label": "Умный ГГ",
+      "originalLabels": [
+        "Умный ГГ"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "универсалы",
+      "category": "tag",
+      "label": "Универсалы",
+      "originalLabels": [
+        "Универсалы"
+      ],
+      "sources": [
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "униформа",
+      "category": "tag",
+      "label": "Униформа",
+      "originalLabels": [
+        "Униформа"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "учитель",
+      "category": "tag",
+      "label": "Учитель",
+      "originalLabels": [
+        "Учитель"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "учитель и ученик",
+      "category": "tag",
+      "label": "учитель и ученик",
+      "originalLabels": [
+        "учитель и ученик"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "ушастые",
+      "category": "tag",
+      "label": "Ушастые",
+      "originalLabels": [
+        "ушастые",
+        "Ушастые"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "фантазии",
+      "category": "tag",
+      "label": "Фантазии",
+      "originalLabels": [
+        "Фантазии",
+        "фантазии"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "фантастика",
+      "category": "tag",
+      "label": "фантастика",
+      "originalLabels": [
+        "фантастика"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "фембой",
+      "category": "tag",
+      "label": "Фембой",
+      "originalLabels": [
+        "Фембой"
+      ],
+      "sources": [
+        "hentaichan.cc"
+      ]
+    },
+    {
+      "key": "фемдом",
+      "category": "tag",
+      "label": "Фемдом",
+      "originalLabels": [
+        "Фемдом",
+        "фемдом"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "фестиваль",
+      "category": "tag",
+      "label": "Фестиваль",
+      "originalLabels": [
+        "фестиваль",
+        "Фестиваль"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "фетиш",
+      "category": "tag",
+      "label": "Фетиш",
+      "originalLabels": [
+        "фетиш",
+        "Фетиш"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "фиктивные отношения",
+      "category": "tag",
+      "label": "Фиктивные отношения",
+      "originalLabels": [
+        "Фиктивные отношения"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "философия",
+      "category": "tag",
+      "label": "Философия",
+      "originalLabels": [
+        "Философия"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "фистинг",
+      "category": "tag",
+      "label": "Фистинг",
+      "originalLabels": [
+        "фистинг",
+        "Фистинг"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "фурри",
+      "category": "tag",
+      "label": "Фурри",
+      "originalLabels": [
+        "Фурри",
+        "фурри"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "футанари",
+      "category": "tag",
+      "label": "Футанари",
+      "originalLabels": [
+        "Футанари",
+        "футанари"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "футанари имеет парня",
+      "category": "tag",
+      "label": "Футанари имеет парня",
+      "originalLabels": [
+        "Футанари имеет парня",
+        "футанари имеет парня"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "фэнтези",
+      "category": "tag",
+      "label": "фэнтези",
+      "originalLabels": [
+        "фэнтези"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "фэнтези мир",
+      "category": "tag",
+      "label": "Фэнтези мир",
+      "originalLabels": [
+        "Фэнтези мир"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "хикикомори",
+      "category": "tag",
+      "label": "Хикикомори",
+      "originalLabels": [
+        "Хикикомори"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "холодное оружие",
+      "category": "tag",
+      "label": "Холодное оружие",
+      "originalLabels": [
+        "Холодное оружие"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "хоррор",
+      "category": "tag",
+      "label": "хоррор",
+      "originalLabels": [
+        "хоррор"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "цельный купальник",
+      "category": "tag",
+      "label": "Цельный купальник",
+      "originalLabels": [
+        "Цельный купальник"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "цундере",
+      "category": "tag",
+      "label": "цундере",
+      "originalLabels": [
+        "цундере"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "цундэрэ",
+      "category": "tag",
+      "label": "Цундэрэ",
+      "originalLabels": [
+        "Цундэрэ"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "частично сгенерировано ии",
+      "category": "tag",
+      "label": "Частично сгенерировано ИИ",
+      "originalLabels": [
+        "Частично сгенерировано ИИ"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "чикан",
+      "category": "tag",
+      "label": "Чикан",
+      "originalLabels": [
+        "чикан",
+        "Чикан"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "чирлидеры",
+      "category": "tag",
+      "label": "чирлидеры",
+      "originalLabels": [
+        "чирлидеры"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "чулки",
+      "category": "tag",
+      "label": "Чулки",
+      "originalLabels": [
+        "Чулки",
+        "чулки"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "шантаж",
+      "category": "tag",
+      "label": "Шантаж",
+      "originalLabels": [
+        "Шантаж"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "шимайдон",
+      "category": "tag",
+      "label": "Шимайдон",
+      "originalLabels": [
+        "Шимайдон"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "школа",
+      "category": "tag",
+      "label": "школа",
+      "originalLabels": [
+        "школа"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "школьная форма",
+      "category": "tag",
+      "label": "школьная форма",
+      "originalLabels": [
+        "школьная форма"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "школьники",
+      "category": "tag",
+      "label": "школьники",
+      "originalLabels": [
+        "школьники"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "школьницы",
+      "category": "tag",
+      "label": "школьницы",
+      "originalLabels": [
+        "школьницы"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "школьный купальник",
+      "category": "tag",
+      "label": "школьный купальник",
+      "originalLabels": [
+        "школьный купальник"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "шлюха",
+      "category": "tag",
+      "label": "Шлюха",
+      "originalLabels": [
+        "Шлюха"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "шоу бизнес",
+      "category": "tag",
+      "label": "Шоу-бизнес",
+      "originalLabels": [
+        "Шоу-бизнес"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "щекотка",
+      "category": "tag",
+      "label": "щекотка",
+      "originalLabels": [
+        "щекотка"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "эксгибиционизм",
+      "category": "tag",
+      "label": "Эксгибиционизм",
+      "originalLabels": [
+        "эксгибиционизм",
+        "Эксгибиционизм"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "эксперименты над людьми",
+      "category": "tag",
+      "label": "Эксперименты над людьми",
+      "originalLabels": [
+        "Эксперименты над людьми"
+      ],
+      "sources": [
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "экшен",
+      "category": "tag",
+      "label": "action",
+      "originalLabels": [
+        "action",
+        "боевик"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "эльфы",
+      "category": "tag",
+      "label": "Эльфы",
+      "originalLabels": [
+        "эльфы",
+        "Эльфы"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "эмоциональное насилие",
+      "category": "tag",
+      "label": "Эмоциональное насилие",
+      "originalLabels": [
+        "Эмоциональное насилие"
+      ],
+      "sources": [
+        "hentailib.me",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "эротика",
+      "category": "tag",
+      "label": "эротика",
+      "originalLabels": [
+        "эротика"
+      ],
+      "sources": [
+        "manga-chan.me",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "эччи",
+      "category": "tag",
+      "label": "эччи",
+      "originalLabels": [
+        "эччи"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "юмор",
+      "category": "tag",
+      "label": "юмор",
+      "originalLabels": [
+        "юмор"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "юные",
+      "category": "tag",
+      "label": "Юные",
+      "originalLabels": [
+        "Юные"
+      ],
+      "sources": [
+        "hentailib.me"
+      ]
+    },
+    {
+      "key": "юри",
+      "category": "tag",
+      "label": "юри",
+      "originalLabels": [
+        "юри"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "manga-chan.me",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "якудза",
+      "category": "tag",
+      "label": "Якудза",
+      "originalLabels": [
+        "Якудза"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "яндере",
+      "category": "tag",
+      "label": "Яндере",
+      "originalLabels": [
+        "Яндере",
+        "яндере"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "hentailib.me",
+        "mangalib.org",
+        "v2.shlib.life",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "яой",
+      "category": "tag",
+      "label": "яой",
+      "originalLabels": [
+        "яой"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live",
+        "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "япония",
+      "category": "tag",
+      "label": "Япония",
+      "originalLabels": [
+        "Япония"
+      ],
+      "sources": [
+        "mangalib.org",
+        "v2.shlib.life"
+      ]
+    }
+  ]
+}
