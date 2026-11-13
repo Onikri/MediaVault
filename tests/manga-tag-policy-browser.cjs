@@ -4,7 +4,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
 (async()=>{
  await fs.mkdir(DIR,{recursive:true});await fs.writeFile(path.join(DIR,'index.html'),'<meta name="viewport" content="width=device-width"><div id="root"></div><script type="module" src="./harness.jsx"></script>');
  await fs.writeFile(path.join(DIR,'harness.jsx'),`
- import React from'react';import{createRoot}from'react-dom/client';import CatalogBrowser from'/src/CatalogBrowser.jsx';import policy from'/tests/fixtures/manga-tag-policy.json';import{setMangaPolicy}from'/src/manga-tag-policy.js';import'/src/styles.css';
+ import React from'react';import{createRoot}from'react-dom/client';import CatalogBrowser from'/src/CatalogBrowser.jsx';import policy from'/tests/fixtures/manga-tag-policy.json';import{setMangaPolicy,compileMangaPolicy}from'/src/manga-tag-policy.js';import'/src/styles.css';
  setMangaPolicy(policy,'fixture-initial');
  window.rules=policy;window.generation=0;
  const row={id:'fixture:1',catalogId:'a'.repeat(32),provider:'fixture',sourceId:'1',kind:'manga',title:'Garden World',url:'https://fixture.example/title/garden',sourceUrl:'https://fixture.example/title/garden',aliases:['Garden World'],genres:['Drama'],tags:['Fantasy'],language:'en',metadataChecked:true};
@@ -12,6 +12,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
   if(p.startsWith('/manga/tag-policy'))return{revision:String(window.generation),policy:window.rules};
   if(p.startsWith('/manga/catalog/tags'))return{tags:[{key:'драма',original:'Drama',type:'genres',works:1},{key:'фэнтези',original:'Fantasy',type:'tags',works:1}]};
   if(p.startsWith('/manga/catalog?'))return{items:[row],total:1,offset:0};
+  if(p==='/manga/catalog/'+row.catalogId){const active=compileMangaPolicy(window.rules);return{...row,genres:active.project(['Drama','Ecology']),tags:active.project(['Fantasy'])};}
   if(p.startsWith('/discovery/manga/sources'))return{sources:[{id:'1',name:'Fixture',language:'en'}]};
   if(p==='/discovery/manga/search')return{id:'fixture',state:'done',results:[row]};
   if(p.startsWith('/discovery/manga/search/'))return{state:'done',results:[row]};
@@ -33,11 +34,13 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  await page.locator('.title-genre-list').getByText('Драма',{exact:true}).waitFor();
  await page.evaluate(()=>{window.rules={...window.rules,tags:window.rules.tags.filter(t=>!['драма','фэнтези'].includes(t.key))};window.generation++;window.dispatchEvent(new Event('focus'));});
  await page.locator('.title-genre-list').getByText('Драма',{exact:true}).waitFor({state:'detached'});
+ await page.evaluate(()=>{window.rules={...window.rules,tags:[...window.rules.tags,{key:'экология',label:'Экология',aliases:['Ecology']}]};window.generation++;window.dispatchEvent(new Event('focus'));});
+ await page.locator('.title-genre-list').getByText('Экология',{exact:true}).waitFor();
  await page.getByRole('button',{name:'К результатам поиска',exact:true}).click();
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).waitFor();
  await page.getByLabel('Жанр').waitFor();
  assert.equal(await page.getByLabel('Жанр').locator('option').filter({hasText:/^Драма$/}).count(),0);
  assert.equal(await page.locator('#catalogTags option[value="Фэнтези"]').count(),0);
  assert.deepEqual(errors,[]);
- console.log('PASS runtime deletion reaches open title, catalogue cards and filter options despite stale metadata responses');
+ console.log('PASS runtime deletion and addition reach an open title, catalogue cards and filter options despite stale metadata responses');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

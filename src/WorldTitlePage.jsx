@@ -14,6 +14,8 @@ import {filmSupplement} from './film-supplement.js';
 import {bookSupplement} from './book-supplement.js';
 import {useTitleShare,useTitleStats} from './title-context.js';
 import {onlineTitleLocation} from './title-route.js';
+import useMangaPolicy from './use-manga-policy.js';
+import {sameMangaTitle} from './manga-source-identity.js';
 
 // Online titles use the collection's presentation, without its Drive writes.
 const LocalMediaViewer=lazy(()=>import('./MediaViewer.jsx'));
@@ -27,6 +29,18 @@ const languageNames={ru:'Русский',en:'Английский',ja:'Япон�
 export default function WorldTitlePage({value,service,state,onBack,onSubmitted,onOpenLibrary,destination='online',onRelated}){
  const localInput=useRef(null),[localFile,setLocalFile]=useState(null);
  const [item,setItem]=useState(value),[profile,setProfile]=useState(null),[supplement,setSupplement]=useState(null),[loading,setLoading]=useState(false),[saveOpen,setSaveOpen]=useState(false),[saveTo,setSaveTo]=useState('local'),[viewSeason,setViewSeason]=useState(null),[seasonProfiles,setSeasonProfiles]=useState({});
+ const tagPolicyVersion=useMangaPolicy(service,value.kind==='manga');
+ const [indexedFacts,setIndexedFacts]=useState(null);
+ const factIds=[...new Set([value.catalogId,...(value.sources||[]).map(source=>source.catalogId)].filter(id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)))].slice(0,3).join(',');
+ useEffect(()=>{
+  setIndexedFacts(null);if(value.kind!=='manga'||!factIds)return;
+  const abort=new AbortController();
+  Promise.allSettled(factIds.split(',').map(id=>service.request('/manga/catalog/'+id,{signal:abort.signal}).then(row=>row.catalogId===id&&sameMangaTitle(value,row)?row:null))).then(results=>{
+   if(abort.signal.aborted)return;
+   const rows=results.filter(result=>result.status==='fulfilled'&&result.value).map(result=>result.value);
+   setIndexedFacts({id:value.id,genres:[...new Set(rows.flatMap(row=>row.genres||[]))],themes:[...new Set(rows.flatMap(row=>row.tags||[]))]});
+  });return()=>abort.abort();
+ },[value.id,factIds,tagPolicyVersion,service.server]);
  useEffect(()=>{
   const abort=new AbortController();setItem(value);setProfile(null);setSupplement(null);setViewSeason(null);setSeasonProfiles({});setSaveOpen(false);setLoading(true);
   const tasks=[];
@@ -58,7 +72,9 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   episodes:item.episodes||null,episodesAired:item.episodesAired||null,chapters:item.chapters||null,volumes:item.volumes||null,duration:item.duration||null,startDate:item.startDate||'',endDate:item.endDate||'',scores:item.scores||[],countries:item.countries||[],authors:item.authors||[],background:item.background||'',
   releases:item.releases||[],episodeImages:item.episodeImages||{},rating:item.age!=null?item.age+'+':'',genres:item.kind==='manga'?item.genres||[]:(item.genres||[]).map(localLabel),themes:item.kind==='manga'?item.tags||[]:(item.tags||[]).map(localLabel),characters:[],staff:[],related:[],screenshots:[],
 
- };return withSupplement({...base,...(profile||{}),...preserveCatalogFacts(item,profile||{}),aliases:searchItem.aliases,sourcePublication:sourcePublication?.id===item.id?sourcePublication.value:null},supplement);},[item,profile,supplement,searchItem,sourcePublication]);
+ };const result=withSupplement({...base,...(profile||{}),...preserveCatalogFacts(item,profile||{}),aliases:searchItem.aliases,sourcePublication:sourcePublication?.id===item.id?sourcePublication.value:null},supplement);
+ if(item.kind==='manga'&&indexedFacts?.id===item.id)for(const field of ['genres','themes'])result[field]=[...new Set([...(result[field]||[]),...indexedFacts[field]])];
+ return result;},[item,profile,supplement,searchItem,sourcePublication,indexedFacts]);
  const sceneItem=viewSeason?.item||item,sceneId=String(sceneItem.ids?.mal||''),basisId=String(item.ids?.mal||'');
  useEffect(()=>{if(!sceneId||sceneId===basisId||seasonProfiles[sceneId])return;const abort=new AbortController();loadTitleProfile(sceneId,'anime',{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}}).then(data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}).catch(()=>{});return()=>abort.abort();},[sceneId,basisId,service.server]);
  const displayProfile=useMemo(()=>sceneId&&sceneId!==basisId?{...profileForSeason(sceneItem),...(seasonProfiles[sceneId]||{})}:baseDisplayProfile,[sceneItem,sceneId,basisId,seasonProfiles,baseDisplayProfile]);
