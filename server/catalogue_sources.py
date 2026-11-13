@@ -48,7 +48,12 @@ def base_sources(installed):
     jobs.append({'type':'books','kind':'book','domain':'openlibrary.org','name':'Книги · Open Library'})
     return jobs
 
-def headers(spec):return {'Site-id':str(spec['site']),'Referer':spec['referer'],'Accept':'application/json','User-Agent':'MediaVault-Catalogue/1.0'}
+def headers(spec):
+    result={'Site-id':str(spec['site']),'Referer':spec['referer'],'Accept':'application/json','User-Agent':'MediaVault-Catalogue/1.0'}
+    if spec['type']=='lib-detail':
+        from catalogue_lib_auth import token
+        if value:=token(spec['site']):result['Authorization']='Bearer '+value
+    return result
 
 def next_html(raw,url,hosts,page):
     soup=BeautifulSoup(raw,'html.parser')

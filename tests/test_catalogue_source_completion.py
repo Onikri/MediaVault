@@ -72,4 +72,27 @@ class CompletionTests(unittest.TestCase):
    now[0]+=21601;worker.run_once();status=worker.status()['sources'][0]
    self.assertEqual(status['indexed'],2);self.assertEqual(status['pages'],1);db.close()
 
+ def test_existing_private_lib_session_is_reused_only_for_detail_requests(self):
+  import catalogue_lib_auth as auth
+  from catalogue_sources import headers
+  secret='fixture-session-credential';calls=[]
+  class Client:
+   def get(self,path,**kw):
+    calls.append(path);return [{'props':{'key':'bearer_token','currentValue':secret if auth.SOURCES[4] in path else ''}}]
+   def close(self):pass
+  auth._cache.clear()
+  with patch.object(auth,'configured',return_value=True),patch.object(auth,'Client',Client):
+   self.assertEqual(auth.token(2),secret);self.assertEqual(auth.token(2),secret);self.assertEqual(len(calls),2)
+   spec={'type':'lib-detail','site':2,'referer':'https://v2.shlib.life/'}
+   self.assertEqual(headers(spec)['Authorization'],'Bearer '+secret)
+   self.assertNotIn('Authorization',headers({**spec,'type':'lib'}));self.assertNotIn(secret,json.dumps(spec))
+  auth._cache.clear()
+
+ def test_missing_private_lib_session_preserves_anonymous_metadata_access(self):
+  import catalogue_lib_auth as auth
+  auth._cache.clear()
+  with patch.object(auth,'configured',return_value=True),patch.object(auth,'Client',side_effect=RuntimeError('unavailable')):
+   self.assertEqual(auth.token(4),'')
+  auth._cache.clear()
+
 if __name__=='__main__':unittest.main()
