@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {Search,Tags} from 'lucide-react';
 
 /** Public build-time vocabulary, independent of MediaVault server login. */
-const tagsUrl = new URL('data/manga-tags.json', window.location.origin + import.meta.env.BASE_URL).toString();
+// Lazy import keeps the large taxonomy in a separate Vite chunk.
 const statuses = {
   complete:'Полный публичный справочник',
   partial:'Частичный список',
@@ -19,17 +19,14 @@ export default function MangaStaticTags(){
   const [domain,setDomain]=useState('all');
   const [limit,setLimit]=useState(60);
   useEffect(()=>{
-    const abort=new AbortController();
-    fetch(tagsUrl,{signal:abort.signal}).then(response=>{
-      if(!response.ok)throw Error('HTTP '+response.status);
-      return response.json();
-    }).then(value=>{
-      if(abort.signal.aborted)return;
+    let mounted=true;
+    import('../public/data/manga-tags.json').then(({default:value})=>{
+      if(!mounted)return;
       if(value.schemaVersion!==1||!Array.isArray(value.tags)||!Array.isArray(value.sources))
         throw Error('Недопустимый формат справочника тегов.');
       setSnapshot(value);
-    }).catch(e=>{if(!abort.signal.aborted)setError(e.message);});
-    return ()=>abort.abort();
+    }).catch(e=>{if(mounted)setError(e.message);});
+    return ()=>{mounted=false;};
   },[]);
   const rows=useMemo(()=>{
     if(!snapshot)return [];
