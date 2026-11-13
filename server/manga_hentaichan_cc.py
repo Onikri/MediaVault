@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
 from source_parser import PublicHttp, SourceError, public_url
+from manga_source_tags import from_api, from_html
 
 ROOT = 'https://hentaichan.cc'
 SOURCE = {'id': '990000000000000002', 'name': 'HentaiChan.cc', 'lang': 'ru',
@@ -49,7 +50,7 @@ def search(query, http):
             found.append({'id': 'hentaichan-cc:' + slug, 'provider': 'hentaichan-cc', 'providerName': SOURCE['name'],
                           'sourceId': SOURCE['id'], 'url': url, 'sourceURL': url, 'sourceUrl': url,
                           'title': title.strip()[:500], 'aliases': [title.strip()[:500]], 'cover': cdn_image(row.get('src')),
-                          'kind': 'manga', 'format': 'manga', 'language': 'ru', 'sourceOnly': True, 'adult': True, 'age': 18})
+                          'kind': 'manga', 'format': 'manga', 'language': 'ru', 'sourceOnly': True, 'adult': True, 'age': 18, **from_api(row)})
         return found
     raise SourceError('HentaiChan.cc изменил формат ответа поиска.')
 
@@ -95,6 +96,6 @@ def inspect(url, http: PublicHttp):
         chapters.sort(key=lambda entry: entry['number'])
     return {'provider': 'hentaichan-cc', 'providerName': SOURCE['name'], 'url': canonical,
             'title': name, 'cover': cover, 'kind': 'manga', 'format': 'manga', 'language': 'ru',
-            'adult': True, 'age': 18, 'episodes': chapters, 'pages': pages,
+            'adult': True, 'age': 18, **from_html(soup), 'episodes': chapters, 'pages': pages,
             'seasons': [{'number': 1, 'name': 'Том 1'}] if chapters else [], 'dubs': [],
             'releases': [], 'translations': [], 'available': bool(chapters)}
