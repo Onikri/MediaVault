@@ -1,11 +1,11 @@
 """Public search and reader for hentaichan.cc's Next.js and TanStack pages."""
 import json
 import re
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,urljoin,parse_qs
 
 from bs4 import BeautifulSoup
 from source_parser import PublicHttp, SourceError, public_url
-from manga_source_tags import from_api, from_html
+from manga_source_tags import from_api, from_html,unique
 
 ROOT = 'https://hentaichan.cc'
 SOURCE = {'id': '990000000000000002', 'name': 'HentaiChan.cc', 'lang': 'ru',
@@ -22,6 +22,56 @@ def cdn_image(value):
     except SourceError:
         pass
     return ''
+
+
+def catalogue_metadata(soup):
+    """Explicit work tags; recommendations, global filters and counters aren't facts."""
+    tags=unique(a.get_text(' ',strip=True) for a in soup.select('a[href^="/catalog/tags/"]'))
+    description=soup.select_one('meta[property="og:description"],meta[name="description"]')
+    cover=soup.select_one('meta[property="og:image"]')
+    return {'tags':tags,'genres':[],'sourceMetadataVersion':1,
+            'description':str(description.get('content',''))[:12000] if description else '',
+            'cover':cdn_image(cover.get('content')) if cover else ''}
+
+
+def flight_text(soup):
+    chunks=[]
+    for script in soup.select('script:not([src])'):
+        text=script.get_text().strip()
+        if not text.startswith('self.__next_f.push('):continue
+        try:part=json.JSONDecoder().raw_decode(text[len('self.__next_f.push('):])[0]
+        except ValueError:continue
+        if isinstance(part,list) and len(part)>1 and isinstance(part[1],str):chunks.append(part[1])
+    return ''.join(chunks)
+
+
+def catalogue_page(raw,url,page):
+    """The public /catalog listing, its real next link and declared total."""
+    soup=BeautifulSoup(raw,'html.parser');rows={};path=urlsplit(url).path
+    for anchor in soup.select('a[href^="/manga/"]'):
+        target=urljoin(ROOT,anchor['href']);match=PATH.fullmatch(urlsplit(target).path)
+        if not match or match[1]!='manga' or urlsplit(target).hostname!='hentaichan.cc':continue
+        title=anchor.select_one('p');image=anchor.select_one('img')
+        name=title.get_text(' ',strip=True) if title else image.get('alt','') if image else ''
+        if not name:continue
+        cover=image.get('src','') if image else ''
+        if cover.startswith('/_next/image?'):cover=parse_qs(urlsplit(cover).query).get('url',[''])[0]
+        rows[target]={'id':'hentaichan-cc:'+match[2],'provider':'hentaichan-cc','providerName':SOURCE['name'],
+                      'sourceId':SOURCE['id'],'title':name[:500],'aliases':[name[:500]],'kind':'manga','format':'manga',
+                      'language':'ru','url':target,'sourceUrl':target,'cover':cdn_image(cover),'adult':True,'age':18,'tags':[],'genres':[]}
+    flight=flight_text(soup)
+    counts={key:int(value) for key,value in re.findall(r'"(currentPage|totalPosts|limit)"\s*:\s*(\d+)',flight)}
+    if counts.get('currentPage',page)!=page:raise SourceError('Каталог HentaiChan.cc вернул другую страницу')
+    next_url=None
+    for anchor in soup.select('a[href]'):
+        target=urljoin(url,anchor['href']);parts=urlsplit(target)
+        if parts.scheme!='https' or parts.hostname!='hentaichan.cc' or parts.path!=path:continue
+        if parse_qs(parts.query).get('page')==[str(page+1)]:next_url=target;break
+    total=counts.get('totalPosts');limit=counts.get('limit')
+    if total is None or not limit:raise SourceError('Каталог HentaiChan.cc не предоставил итоговое число записей')
+    if page*limit<total and not next_url:raise SourceError('Не найдена следующая страница каталога HentaiChan.cc')
+    if not rows and total:raise SourceError('Каталог HentaiChan.cc не предоставил карточки')
+    return {'rows':list(rows.values()),'next':{'page':page+1,'url':next_url} if next_url else None,'total':total,'state':'done'}
 
 
 def entries(query, http):
@@ -148,6 +198,6 @@ def inspect(url, http: PublicHttp):
         chapters.sort(key=lambda entry: entry['number'])
     return {'provider': 'hentaichan-cc', 'providerName': SOURCE['name'], 'url': canonical,
             'title': name, 'cover': cover, 'kind': 'manga', 'format': 'manga', 'language': 'ru',
-            'adult': True, 'age': 18, **from_html(soup), 'episodes': chapters, 'pages': pages,
+            'adult': True, 'age': 18, **catalogue_metadata(soup), 'episodes': chapters, 'pages': pages,
             'seasons': [{'number': 1, 'name': 'Том 1'}] if chapters else [], 'dubs': [],
             'releases': [], 'translations': [], 'available': bool(chapters)}

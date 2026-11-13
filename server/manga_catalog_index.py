@@ -98,7 +98,7 @@ def upsert(conn, rows, source_id='', timestamp=None):
         fields = ('id','ids','titles','title', 'provider', 'providerName', 'sourceId', 'sourceUrl', 'url',
                   'language', 'format', 'cover', 'year', 'description', 'readingMode',
                   'adult', 'age', 'aliases', 'tags', 'genres', 'identityTitles',
-                  'authors', 'artists', 'status', 'truncated')
+                  'authors', 'artists', 'status', 'truncated','sourceMetadataVersion')
         data = dict(previous)
         for key in fields:
             value = row.get(key)
