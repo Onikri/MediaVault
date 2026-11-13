@@ -57,6 +57,16 @@ class HentaiChanTests(unittest.TestCase):
           BASE+'/related/21221-tiny-evil-glava-1.html':''.join(f'<div class="related_info"><h2><a href="/manga/{n}-tiny-evil-glava-{c}.html">Tiny Evil - глава {c}</a></h2></div>' for n,c in [(21221,1),(23061,2)])})
         value=inspect(BASE+'/manga/21221-tiny-evil-glava-1.html',http)
         self.assertEqual(value['title'],'Tiny Evil');self.assertEqual([e['number'] for e in value['episodes']],[1,2])
+    def test_series_continuations_from_the_same_author(self):
+        card=lambda n,label,writer,team='':f'<div class="content_row"><h2><a href="{BASE}/manga/{n}.html">{label}</a></h2><a href="/mangaka/1/">{writer}</a><a href="/translation/2/">{team}</a></div>'
+        first=BASE+'/manga/21221-tiny-evil-glava-1.html'
+        http=Http({first:'<a href="/mangaka/">по... авторам</a><a class="title_top_a">Tiny Evil - глава 1</a><a href="/mangaka/1/">MUK</a>',
+          BASE+'/related/21221-tiny-evil-glava-1.html':''.join(f'<div class="related_info"><h2><a href="/manga/{n}-tiny-evil-glava-{c}.html">Tiny Evil - глава {c}</a></h2></div>' for n,c in [(21221,1),(23061,2)]),
+          BASE+'/?do=search&subaction=search&story=Tiny+Evil&search_start=1':card('44710-tiny-evil-3','Tiny Evil 3','MUK','Не требуется')+card('44711-tiny-evil-4','Tiny Evil 4','Other')+card('44712-tiny-evil-6','Tiny Evil 6','MUK')+card('23061-tiny-evil-glava-2','Tiny Evil - глава 2','MUK')})
+        value=inspect(first,http)
+        self.assertEqual([e['number'] for e in value['episodes']],[1,2,3],'another author and a gap stop the continuation')
+        self.assertEqual(value['episodes'][2]['url'],BASE+'/online/44710-tiny-evil-3.html?page=1')
+        self.assertEqual(value['episodes'][2]['translator'],'')
     def test_series_pagination_preserves_chapter_and_translator(self):
         http=Http({MANGA:'<a class="title_top_a">История</a><img id="cover" src="/covers/one.jpg">',
           RELATED:'''<h1>Все главы</h1><div class="related_info"><h2><a href="/manga/124-chapter.html">Том 2 Глава 3.5</a></h2><span class="translation"><a>Team A</a></span></div><a href="?offset=10">Next</a>''',
