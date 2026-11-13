@@ -22,6 +22,17 @@ ITEM=re.compile(r'^/(manga|online|related)/([1-9]\d{0,11}-[^/?]{1,250})\.html$')
 def clean(value):return re.sub(r'\s+',' ',str(value or '')).strip()[:500]
 
 
+# HentaiChan often publishes every chapter of a series as its own catalogue
+# entry ("Tiny Evil - глава 3"). The series name is the title without that
+# explicit chapter marker; a bare trailing number stays, since it may be a sequel.
+CHAPTER_SUFFIX=re.compile(r'\s*(?:[-–—:,.]\s*)?\(?\s*(?:(?:том|volume|vol\.)\s*\d{1,3}\s*[.,]?\s*)?(?:глава|часть|chapter|ch\.|part)\s*\d{1,4}(?:[.,]\d{1,3})?\s*\)?\s*$',re.I)
+
+
+def series_title(title):
+    base=clean(CHAPTER_SUFFIX.sub('',clean(title)))
+    return base if len(base)>1 and base!=clean(title) else None
+
+
 def link(value,base):
     target=public_url(urljoin(base,value),resolve_dns=False)
     if urlsplit(target).hostname not in HOSTS or not ITEM.fullmatch(urlsplit(target).path):
@@ -53,12 +64,21 @@ def parse_search(text,base):
             try:cover=public_url(urljoin(base,image.get('data-src') or image.get('src') or ''),resolve_dns=False)
             except SourceError:pass
         from manga_sources import title_aliases
-        slug=ITEM.fullmatch(urlsplit(url).path)[2]
+        slug=ITEM.fullmatch(urlsplit(url).path)[2];series=series_title(title)
+        names=title_aliases(title) if not series else list(dict.fromkeys([*title_aliases(series),*title_aliases(title)]))
         result[url]={'id':'hentaichan:'+slug.split('-')[0],'provider':'hentaichan','providerName':'HentaiChan',
                      'sourceId':SOURCE['id'],'sourceOnly':True,'sourceUrl':url,'sourceURL':url,'url':url,
-                     'title':title,'aliases':title_aliases(title),'kind':'manga','format':'manga','language':'ru',
-                     'adult':True,'age':18,'cover':cover,'ids':{},**from_html(str(card))}
-    return list(result.values())
+                     'title':series or title,'aliases':names,'kind':'manga','format':'manga','language':'ru',
+                     'adult':True,'age':18,'cover':cover,'ids':{},**from_html(str(card)),
+                     '_chapter':number(title) if series else None}
+    # One result per series: its reader page lists the sibling chapters, so the
+    # earliest chapter entry opens the whole series.
+    grouped={}
+    for value in result.values():
+        key=value['title'].casefold();chapter=value.pop('_chapter')
+        rank=(chapter is None,chapter if chapter is not None else 0)
+        if key not in grouped or rank<grouped[key][0]:grouped[key]=(rank,value)
+    return [value for _,value in grouped.values()]
 
 
 def search(query,http,root=ROOT):
@@ -146,6 +166,8 @@ def inspect(url,http):
                 candidate=urljoin(related,a['href']);p=urlsplit(candidate)
                 if p.hostname in HOSTS and p.path==urlsplit(related).path and re.fullmatch(r'offset=\d{1,5}',p.query) and candidate not in seen and candidate not in pending:pending.append(candidate)
         truncated=bool(pending)
+        # A chapter entry that lists its siblings names the series, not itself.
+        if len(chapters)>1 and series_title(title):title=series_title(title)
         if not chapters:
             current['number']=current['number'] if current['number'] is not None else 1
             chapters=[current]
