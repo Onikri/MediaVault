@@ -64,14 +64,15 @@ def labels(values):
 
 def card(row):
     directory = row.get('dir')
-    if not isinstance(directory, str) or not directory.strip() or not row.get('main_name'):
+    titles=names(row)
+    if not isinstance(directory, str) or not directory.strip() or not titles:
         return None
     url = title_url(directory)
     cover = (row.get('cover') or {}) if isinstance(row.get('cover'), dict) else {}
     adult = bool(row.get('is_erotic') or row.get('is_yaoi'))
     return {'id': 'remanga:' + str(row.get('id') or directory), 'provider': 'remanga', 'providerName': 'ReManga',
             'sourceId': SOURCE['id'], 'sourceOnly': True, 'url': url, 'sourceUrl': url, 'sourceURL': url,
-            'title': clean(row['main_name']), 'aliases': names(row), 'kind': 'manga', 'format': kind(row),
+            'title': titles[0], 'aliases': titles, 'kind': 'manga', 'format': kind(row),
             'language': 'ru', 'year': row.get('issue_year') if isinstance(row.get('issue_year'), int) else None,
             'cover': media(cover.get('mid') or cover.get('high') or cover.get('low')), 'ids': {},
             'adult': adult, **({'age': 18} if adult else {}),

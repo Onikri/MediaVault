@@ -122,4 +122,10 @@ class CompletionTests(unittest.TestCase):
    worker.run_once();status=worker.status()['sources'][0]
    self.assertEqual(status['storedTitles'],1);self.assertEqual(status['pendingDetails'],1);self.assertEqual(status['status'],'enriching');db.close()
 
+ def test_remanga_uses_the_published_alternative_name_when_primary_name_is_empty(self):
+  from manga_remanga import catalogue_page
+  payload={'results':[{'id':12,'dir':'garden','main_name':'','secondary_name':'Garden','genres':[{'name':'Ecology'}]}],'next':'/api/v2/search/catalog/?page=2&count=30'}
+  with patch('manga_remanga.api',return_value=payload):d=catalogue_page(1,None)
+  self.assertEqual(d['rows'][0]['title'],'Garden');self.assertEqual(d['rows'][0]['genres'],['Ecology']);self.assertEqual(d['next'],{'page':2})
+
 if __name__=='__main__':unittest.main()
