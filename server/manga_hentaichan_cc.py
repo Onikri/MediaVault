@@ -27,8 +27,18 @@ def cdn_image(value):
 
 def catalogue_metadata(soup):
     """Explicit work tags; recommendations, global filters and counters aren't facts."""
-    complete=flight_tags(flight_text(soup))
+    flight=flight_text(soup);complete=flight_tags(flight)
     tags=complete if complete is not None else unique(a.get_text(' ',strip=True) for a in soup.select('a[href^="/catalog/tags/"]'))
+    # The source omits WorkTags entirely for genuinely untagged works. Require
+    # the complete canonical work/Book document, not a login or challenge page.
+    if complete is None and not tags and flight and soup.select_one('h1'):
+        canonical=soup.select_one('link[rel="canonical"]');url=canonical.get('href','') if canonical else '';parts=urlsplit(url);match=PATH.fullmatch(parts.path)
+        if parts.scheme=='https' and parts.hostname=='hentaichan.cc' and match and match[1]=='manga':
+            for node in soup.select('script[type="application/ld+json"]'):
+                try:record=json.loads(node.get_text())
+                except ValueError:continue
+                if isinstance(record,dict) and record.get('@type')=='Book' and str(record.get('url','')).rstrip('/')==url.rstrip('/') and record.get('name'):
+                    complete=[];break
     description=soup.select_one('meta[property="og:description"],meta[name="description"]')
     cover=soup.select_one('meta[property="og:image"]')
     return {'tags':tags,'genres':[],'sourceMetadataVersion':2 if complete is not None else 1,
