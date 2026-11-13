@@ -169,17 +169,21 @@ class Indexer:
         with self.store.lock,self.store.db:
             rows=[]
             pending_details={domain:count for domain,count in self.store.db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind LIKE '%-detail' GROUP BY json_extract(spec,'$.domain')")}
+            pending_catalogues={domain:count for domain,count in self.store.db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind IN ('html','lib','bridge','remanga') AND json_extract(spec,'$.term') IS NOT NULL AND state IN ('queued','retry','running') GROUP BY json_extract(spec,'$.domain')")}
+            stored=dict(self.store.db.execute('SELECT provider,COUNT(*) FROM catalog_titles GROUP BY provider'))
+            from catalogue_sources import source_provider
             for spec,state,pages,records,error,due,expected in self.store.db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books') ORDER BY id"):
                 spec=json.loads(spec)
                 if '-detail' in spec['type'] or spec['type'].endswith('-vocabulary') or spec.get('term'):continue
                 details=pending_details.get(spec['domain'],0)
-                rows.append({'domain':spec['domain'],'name':spec['name'],'status':'enriching' if state=='done' and details else state,'pages':pages,'indexed':records,'expected':expected,'pendingDetails':details,'error':error,'retryAt':due if state=='retry' else None})
+                catalogues=pending_catalogues.get(spec['domain'],0)
+                rows.append({'domain':spec['domain'],'name':spec['name'],'status':'enriching' if state in {'done','partial'} and (details or catalogues) else state,'pages':pages,'indexed':records,'storedTitles':stored.get(source_provider(spec),0),'expected':expected,'pendingDetails':details,'pendingCatalogues':catalogues,'error':error,'retryAt':due if state=='retry' else None})
                 if spec['type']=='mirror':rows[-1]['mirrorOf']=spec['primary']
             by_domain={r['domain']:r for r in rows}
             for row in rows:
                 if row.get('mirrorOf') in by_domain:
                     primary=by_domain[row['mirrorOf']]
-                    for field in ('status','pages','indexed','expected','pendingDetails','retryAt'):row[field]=primary[field]
+                    for field in ('status','pages','indexed','storedTitles','expected','pendingDetails','pendingCatalogues','retryAt'):row[field]=primary[field]
             manga=self.store.db.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]
             from content_catalog import initialize
             initialize(self.store.db)

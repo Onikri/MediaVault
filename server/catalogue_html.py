@@ -29,11 +29,13 @@ def facts(scope):
 def catalogue(raw, url, spec, page):
     soup = BeautifulSoup(raw, 'html.parser'); domain = spec['domain']; hosts = set(spec['hosts'])
     if domain=='hentaros.com' and urlsplit(url).path.rstrip('/')=='/tag':
-        vocabulary=[];catalogues=[]
+        vocabulary=[];catalogues=[];seen=set()
         for a in soup.select('a.card[href]'):
             target=valid_url(a.get('href'),url,hosts,r'/tag/[^/?#]{1,300}/?')
             label=a.select_one('.t')
             if not target or label is None:raise SourceError('Источник изменил каталог тегов')
+            if target in seen:continue
+            seen.add(target)
             term={'label':label.get_text(' ',strip=True),'category':'tag','url':target}
             vocabulary.append(term);catalogues.append({**spec,'url':target,'term':term})
         if not vocabulary:raise SourceError('Источник не предоставил каталог тегов')
@@ -56,7 +58,8 @@ def catalogue(raw, url, spec, page):
             from content_catalog import safe_url
             cover = safe_url(urljoin(url, value))
         source = spec.get('source') or {}
-        provider = 'suwayomi:' + str(source['id']) if source.get('id') else {'hentaichan.live':'hentaichan','h-chan.me':'hentaichan','manga-chan.me':'mangachan'}.get(domain, domain)
+        from catalogue_sources import source_provider
+        provider = source_provider(spec)
         tags = facts(node) if chan else {'tags': [], 'genres': unique([s for n in node.select('.manga-card__meta') for s in n.stripped_strings])}
         row = {'kind':'manga','title':title[:500],'aliases':[title[:500]],'provider':provider,'providerName':spec['name'].split(' · ')[0],
                'url':target,'sourceUrl':target,'sourceOnly':True,'language':'ru','cover':cover,**tags}

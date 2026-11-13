@@ -99,7 +99,9 @@ class CompletionTests(unittest.TestCase):
 
  def test_published_tag_directory_seeds_each_source_listing_and_preserves_full_details(self):
   spec={'type':'html','domain':'hentaros.com','name':'HentaRos','hosts':['hentaros.com'],'url':'https://hentaros.com/tag'}
-  d=catalogue('<a class="card" href="/tag/ecology"><span class="t">Ecology</span></a>',spec['url'],spec,1)
+  card='<a class="card" href="/tag/ecology"><span class="t">Ecology</span></a>'
+  d=catalogue(card+card,spec['url'],spec,1)
+  self.assertEqual(len(d['catalogues']),1)
   self.assertEqual(d['catalogues'][0]['term']['label'],'Ecology');self.assertEqual(d['catalogues'][0]['url'],'https://hentaros.com/tag/ecology')
   self.assertEqual(d['state'],'partial')
   detail='<div class="post-head"><h1>Garden</h1></div><a class="chip" href="/tag/ecology">Ecology</a><a class="chip" href="/artist/smith">Smith</a>'
@@ -109,5 +111,15 @@ class CompletionTests(unittest.TestCase):
   base={'type':'html-detail','domain':'fixture.example','url':'https://fixture.example/garden'}
   self.assertEqual(identity({**base,'term':{'label':'Ecology'}}),identity({**base,'term':{'label':'Botany'}}))
   self.assertNotEqual(identity({**base,'type':'html','term':{'label':'Ecology'}}),identity({**base,'type':'html','term':{'label':'Botany'}}))
+
+ def test_tag_crawl_status_reports_stored_cards_even_without_a_base_title_listing(self):
+  with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,{'DATA_DIR':d,'MEDIA_VAULT_DISABLE_WORKER':'1'}):
+   db=sqlite3.connect(':memory:',check_same_thread=False);initialize(db);db.commit();store=SimpleNamespace(db=db,lock=threading.RLock())
+   row={'kind':'manga','provider':'fixture.example','title':'Garden','sourceUrl':'https://fixture.example/garden'}
+   detail={'type':'html-detail','domain':'fixture.example','url':row['sourceUrl'],'row':row}
+   worker=Indexer(store,lambda s,c:{'rows':[row],'next':None,'state':'partial','details':[detail]},lambda:1000,interval=0)
+   with db:worker.enqueue({'type':'html','domain':'fixture.example','name':'Fixture','url':'https://fixture.example/catalog'})
+   worker.run_once();status=worker.status()['sources'][0]
+   self.assertEqual(status['storedTitles'],1);self.assertEqual(status['pendingDetails'],1);self.assertEqual(status['status'],'enriching');db.close()
 
 if __name__=='__main__':unittest.main()

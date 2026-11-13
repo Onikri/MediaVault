@@ -8,6 +8,11 @@ from content_sources import checked_get,permitted,html_terms,lib_terms,lib_title
 from manga_source_tags import from_api,from_html,unique
 from source_parser import SourceError
 
+def source_provider(spec):
+    if spec.get('source',{}).get('id'):return 'suwayomi:'+str(spec['source']['id'])
+    if spec.get('site') in {1,2,4}:return {1:'mangalib',2:'slashlib',4:'hentailib'}[spec['site']]
+    return {'hentaichan.cc':'hentaichan-cc','hentaichan.live':'hentaichan','h-chan.me':'hentaichan','manga-chan.me':'mangachan','hmanga.su':'hmanga','remanga.org':'remanga'}.get(spec['domain'],spec['domain'])
+
 def base_sources(installed):
     from manga_source_coverage import SOURCES
     from manga_tag_policy import alias_domains
