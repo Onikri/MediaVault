@@ -209,11 +209,11 @@ def title(conn, identity):
 
 def tags(conn, *, provider='', source_id='', limit=100):
     where,params = _conditions(provider=provider,source_id=source_id)
-    rows=conn.execute('''SELECT g.category,g.tag_key,MIN(g.original),COUNT(DISTINCT g.title_id),GROUP_CONCAT(DISTINCT g.original)
+    rows=conn.execute('''SELECT g.category,g.tag_key,MIN(g.original),COUNT(DISTINCT g.title_id),json_group_array(DISTINCT g.original)
                          FROM catalog_tags g JOIN catalog_titles t ON t.id=g.title_id'''+where+
                       ''' GROUP BY g.category,g.tag_key ORDER BY COUNT(DISTINCT g.title_id) DESC,g.tag_key LIMIT ?''',
                       [*params,min(500,max(1,int(limit)))]).fetchall()
-    return {'tags':[{'type':kind,'key':key,'original':original,'originalLabels':originals.split(',') if originals else [],'works':count}
+    return {'tags':[{'type':kind,'key':key,'original':original,'originalLabels':json.loads(originals) if originals else [],'works':count}
                     for kind,key,original,count,originals in rows]}
 
 def stats(conn):
