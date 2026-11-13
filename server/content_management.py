@@ -16,7 +16,7 @@ _pending_all=False
 def directory():return Path(os.getenv('DATA_DIR','/data'))
 
 def public_policy():
-    data=current().public()
+    with _update_lock:data=current().public()
     return {'revision':hashlib.sha256(canonical_json(data)).hexdigest(),'policy':data,'scope':'all'}
 
 def save(store,data,expected):
@@ -127,7 +127,9 @@ class CatalogueFacts(BaseModel):
 def install(app,owner,viewer,manager):
     @app.get('/admin/content')
     def read_content(subject=Depends(owner)):
-        return {'revision':current().revision,'policy':current().data,'job':scan_status(),'scope':'all','storage':'private-oracle'}
+        with _update_lock:
+            policy=current()
+            return {'revision':policy.revision,'policy':policy.data,'job':scan_status(),'scope':'all','storage':'private-oracle'}
 
     @app.put('/admin/content/policy')
     def write_content(body:PolicyUpdate,subject=Depends(owner)):

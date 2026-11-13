@@ -33,9 +33,16 @@ def ingest(db,rows):
         data['ids']={k:str(v)[:100] for k,v in (data.get('ids') or {}).items() if k in {'mal','anilist','kitsu','imdb','wikidata','fantlab','kinopoisk','openlibrary'}} if isinstance(data.get('ids'),dict) else {}
         if not isinstance(data.get('titles'),dict):data['titles']={}
         data['titles']={k:v[:500] for k,v in data['titles'].items() if k in {'ru','uk','en','native','romaji'} and isinstance(v,str)}
+        key=hashlib.sha256((data['kind']+'\0'+provider+'\0'+identity).encode()).hexdigest()[:32]
+        previous=db.execute('SELECT raw FROM content_titles WHERE id=?',(key,)).fetchone()
+        if previous:
+            old=json.loads(previous[0])
+            for field in ('tags','genres','aliases'):data[field]=list(dict.fromkeys([*data[field],*old.get(field,[])]))[:120]
+            for field in ('sourceUrl','sourceURL','url','cover','description'):
+                if not data.get(field):data[field]=old.get(field,'')
+            for field in ('ids','titles'):data[field]={**old.get(field,{}),**data[field]}
         raw=json.dumps(data,ensure_ascii=False,separators=(',',':'))
         if len(raw.encode())>24000:continue
-        key=hashlib.sha256((data['kind']+'\0'+provider+'\0'+identity).encode()).hexdigest()[:32]
         search=normalize(' '.join([title,*data['aliases'],*data['titles'].values()]))[:5000]
         db.execute('INSERT OR REPLACE INTO content_titles VALUES(?,?,?,?,?)',(key,data['kind'],search,raw,int(time.time())))
         count+=1

@@ -63,6 +63,14 @@ class ContentTests(ContentFixture,unittest.TestCase):
   for value in (bad,{**BASE,'shell':'echo test'}):
    with self.assertRaises(HTTPException) as result:save(self.store,value,current().revision)
    self.assertEqual(result.exception.status_code,422)
+ def test_partial_provider_answers_preserve_raw_genres_for_later_alias_matching(self):
+  self.seed()
+  content_catalog.ingest(self.db,[{'id':'fixture:movie','provider':'fixture','kind':'movie','title':'Garden World','genres':[],'tags':[]}]);self.db.commit()
+  self.assertEqual(content_catalog.browse(self.db,kind='movie',genre='Journey')['total'],1)
+  data={**BASE,'tags':[{'key':'ecology','label':'Экология','aliases':['Ecology'],'category':'genre'}]}
+  save(self.store,data,current().revision)
+  row=content_catalog.browse(self.db,kind='movie',genre='Ecology')['items'][0]
+  self.assertEqual(row['sourceUrl'],'https://fixture.example/movie')
  def test_source_taxonomy_extracts_exact_links_and_membership_without_images(self):
   terms=html_terms(b'<a rel="tag" href="/tags/ecology/">Ecology</a><a rel="tag" href="https://evil.example/a">Other</a>','https://hmanga.me/',{'hmanga.me'})
   self.assertEqual(len(terms),1);self.assertEqual(terms[0]['url'],'https://hmanga.me/tags/ecology/')
