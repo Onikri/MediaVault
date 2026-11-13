@@ -66,7 +66,7 @@ def initialize(conn):
       CREATE TABLE IF NOT EXISTS catalog_tags(
         title_id TEXT NOT NULL,category TEXT NOT NULL,tag_key TEXT NOT NULL,
         original TEXT NOT NULL,
-        PRIMARY KEY(title_id,category,tag_key));
+        PRIMARY KEY(title_id,category,tag_key,original));
       CREATE INDEX IF NOT EXISTS catalog_tags_key ON catalog_tags(tag_key,title_id);
     ''')
 
@@ -91,7 +91,7 @@ def upsert(conn, rows, source_id='', timestamp=None):
         fields = ('title', 'provider', 'providerName', 'sourceId', 'sourceUrl',
                   'language', 'format', 'cover', 'year', 'description', 'readingMode',
                   'adult', 'age', 'aliases', 'tags', 'genres', 'identityTitles',
-                  'authors', 'artists', 'status')
+                  'authors', 'artists', 'status', 'truncated')
         data = dict(previous)
         for key in fields:
             value = row.get(key)
@@ -206,12 +206,12 @@ def title(conn, identity):
 
 def tags(conn, *, provider='', source_id='', limit=100):
     where,params = _conditions(provider=provider,source_id=source_id)
-    rows=conn.execute('''SELECT g.category,g.tag_key,MIN(g.original),COUNT(DISTINCT g.title_id)
+    rows=conn.execute('''SELECT g.category,g.tag_key,MIN(g.original),COUNT(DISTINCT g.title_id),GROUP_CONCAT(DISTINCT g.original)
                          FROM catalog_tags g JOIN catalog_titles t ON t.id=g.title_id'''+where+
                       ''' GROUP BY g.category,g.tag_key ORDER BY COUNT(DISTINCT g.title_id) DESC,g.tag_key LIMIT ?''',
                       [*params,min(500,max(1,int(limit)))]).fetchall()
-    return {'tags':[{'type':kind,'key':key,'original':original,'works':count}
-                    for kind,key,original,count in rows]}
+    return {'tags':[{'type':kind,'key':key,'original':original,'originalLabels':originals.split(',') if originals else [],'works':count}
+                    for kind,key,original,count,originals in rows]}
 
 def stats(conn):
     total = conn.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]
