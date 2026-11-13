@@ -130,12 +130,14 @@ class CrawlerRouteTests(unittest.TestCase):
         manga={'id':5,'title':'Отмеченная история','url':'/api/v1/manga/5','thumbnailUrl':'','sourceId':'42'}
         client=Client(FILTERS,{'/source/42/quick-search':{'mangaList':[manga],'hasNextPage':False}})
         def fetch(spec,cursor):
-            with patch('suwayomi_bridge.Client',return_value=client),patch.dict(os.environ,{'PUBLIC_URL':'https://vault.example'}):
+            # result_row links through the bridge, which needs a configured Suwayomi.
+            with patch('suwayomi_bridge.Client',return_value=client),patch.dict(os.environ,{'PUBLIC_URL':'https://vault.example','SUWAYOMI_URL':'http://suwayomi:4567','SUWAYOMI_AUTH_FILE':'/nonexistent/auth.json'}):
                 return catalogue_sources.fetch(spec,cursor)
         worker=Indexer(self.store,fetch,lambda:1000,interval=0)
         spec={'type':'bridge','domain':'fixture.example','name':'Fixture · ru','source':source}
         with self.store.lock,self.db:worker.enqueue({**spec,'type':'bridge-vocabulary'},30)
         self.assertTrue(worker.run_once())
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM catalogue_jobs WHERE state='retry'").fetchone()[0],0)
         targets={label:json.loads(target) for _,label,target in self.db.execute('SELECT source,label,target FROM catalogue_tag_targets')}
         self.assertEqual(set(targets),{'Драма','Магия'})
         self.assertEqual(targets['Драма']['type'],'bridge');self.assertEqual(targets['Драма']['term']['sourceId'],{'position':1,'child':0,'kind':'TriState'})
@@ -144,6 +146,7 @@ class CrawlerRouteTests(unittest.TestCase):
         self.assertEqual(job[1],80)
         self.db.execute("DELETE FROM catalogue_jobs WHERE kind!='bridge'");self.db.commit()
         self.assertTrue(worker.run_once())
+        self.assertEqual(self.db.execute("SELECT error FROM catalogue_jobs WHERE state='retry'").fetchall(),[],'the filtered page was fetched')
         found=browse(self.db,genre='Драма')['items']
         self.assertEqual([r['title'] for r in found],['Отмеченная история'],'a filtered listing labels its titles')
         detail=json.loads(self.db.execute("SELECT spec FROM catalogue_jobs WHERE kind='bridge-detail'").fetchone()[0])
