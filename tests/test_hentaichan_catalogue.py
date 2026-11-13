@@ -43,6 +43,11 @@ class ParserTests(unittest.TestCase):
   metadata=catalogue_metadata(soup)
   self.assertEqual(set(metadata['tags']),{'Кимоно','Экология'});self.assertEqual(metadata['sourceMetadataVersion'],2)
   self.assertEqual(flight_tags('1:'+json.dumps({'tags':[]})),[]);self.assertIsNone(flight_tags('1:'+json.dumps({'tags':[], 'maxViews':1})))
+ def test_verified_untagged_work_is_complete_but_login_markup_is_not(self):
+  url='https://hentaichan.cc/manga/garden'
+  raw='<h1>Garden</h1><link rel="canonical" href="'+url+'"><script>self.__next_f.push([1,"0:[]"])</script><script type="application/ld+json">'+json.dumps({'@type':'Book','url':url,'name':'Garden'})+'</script>'
+  self.assertEqual(catalogue_metadata(BeautifulSoup(raw,'html.parser'))['sourceMetadataVersion'],2)
+  self.assertEqual(catalogue_metadata(BeautifulSoup(raw.replace(url,'https://hentaichan.cc/auth/login'),'html.parser'))['sourceMetadataVersion'],1)
 
 class IndexTests(unittest.TestCase):
  def setUp(self):
