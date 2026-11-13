@@ -113,7 +113,7 @@ jobs:
           npm run test:direct
 
       - name: Responsive UI and browser integration
-        if: env.PUBLISH_NOW != 'true'
+        if: ${{ !cancelled() && env.PUBLISH_NOW != 'true' }}
         timeout-minutes: 25
         env:
           MEDIA_VAULT_SKIP_BUILD: '1'
