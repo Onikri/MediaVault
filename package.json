@@ -19,7 +19,7 @@
     "test:title-sections": "node tests/title-showcase-browser.cjs && node tests/title-sections-browser.cjs",
     "test:ui": "node tests/ui.test.cjs",
     "preview": "vite preview --host 0.0.0.0",
-    "test:server": "python -m unittest discover -s tests -p 'test_*.py'",
+    "test:server": "python scripts/test-server.py",
     "test:notebook": "python scripts/build-notebook.py --check",
     "test:voices": "node tests/voice-ui.cjs",
     "test:manga": "node tests/chapter-thumbnails-browser.cjs && node tests/manga-browser.cjs && npm run test:fonts",

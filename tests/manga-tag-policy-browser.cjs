@@ -4,7 +4,8 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
 (async()=>{
  await fs.mkdir(DIR,{recursive:true});await fs.writeFile(path.join(DIR,'index.html'),'<meta name="viewport" content="width=device-width"><div id="root"></div><script type="module" src="./harness.jsx"></script>');
  await fs.writeFile(path.join(DIR,'harness.jsx'),`
- import React from'react';import{createRoot}from'react-dom/client';import CatalogBrowser from'/src/CatalogBrowser.jsx';import policy from'/server/manga-tag-policy.json';import'/src/styles.css';
+ import React from'react';import{createRoot}from'react-dom/client';import CatalogBrowser from'/src/CatalogBrowser.jsx';import policy from'/tests/fixtures/manga-tag-policy.json';import{setMangaPolicy}from'/src/manga-tag-policy.js';import'/src/styles.css';
+ setMangaPolicy(policy,'fixture-initial');
  window.rules=policy;window.generation=0;
  const row={id:'fixture:1',catalogId:'a'.repeat(32),provider:'fixture',sourceId:'1',kind:'manga',title:'Garden World',url:'https://fixture.example/title/garden',sourceUrl:'https://fixture.example/title/garden',aliases:['Garden World'],genres:['Drama'],tags:['Fantasy'],language:'en',metadataChecked:true};
  const service={server:location.origin,status:'connected',session:{serverVersion:73},request:async(p,o={})=>{

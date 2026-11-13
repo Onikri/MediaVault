@@ -56,7 +56,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   title:item.title,cover:item.cover,description:item.description,year:item.year,format:item.format?translate(item.format):null,status:item.status?translate(item.status):null,
   sourceId:item.ids?.mal||'',source:item.ids?.mal?'shikimori':item.provider,sourceURL:item.sourceUrl||item.sourceURL||item.links?.find(l=>l.provider===item.provider)?.url||item.links?.[0]?.url,
   episodes:item.episodes||null,episodesAired:item.episodesAired||null,chapters:item.chapters||null,volumes:item.volumes||null,duration:item.duration||null,startDate:item.startDate||'',endDate:item.endDate||'',scores:item.scores||[],countries:item.countries||[],authors:item.authors||[],background:item.background||'',
-  releases:item.releases||[],episodeImages:item.episodeImages||{},rating:item.age!=null?item.age+'+':'',genres:(item.genres||[]).map(localLabel),themes:(item.tags||[]).map(localLabel),characters:[],staff:[],related:[],screenshots:[],
+  releases:item.releases||[],episodeImages:item.episodeImages||{},rating:item.age!=null?item.age+'+':'',genres:item.kind==='manga'?item.genres||[]:(item.genres||[]).map(localLabel),themes:item.kind==='manga'?item.tags||[]:(item.tags||[]).map(localLabel),characters:[],staff:[],related:[],screenshots:[],
 
  };return withSupplement({...base,...(profile||{}),...preserveCatalogFacts(item,profile||{}),aliases:searchItem.aliases,sourcePublication:sourcePublication?.id===item.id?sourcePublication.value:null},supplement);},[item,profile,supplement,searchItem,sourcePublication]);
  const sceneItem=viewSeason?.item||item,sceneId=String(sceneItem.ids?.mal||''),basisId=String(item.ids?.mal||'');

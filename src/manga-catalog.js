@@ -1,6 +1,4 @@
-import {normalized} from './catalog.js';
-import {localLabel} from './taxonomy.js';
-import {mangaPolicy} from './manga-tag-policy.js';
+import {mangaPolicy,normalizeTag as normalized} from './manga-tag-policy.js';
 
 export const mangaTagKey=value=>mangaPolicy().key(value);
 export const mangaFormatLabel=value=>({manga:'Манга',manhwa:'Манхва',manhua:'Маньхуа',webtoon:'Вебтун'}[String(value).toLowerCase()]||value);

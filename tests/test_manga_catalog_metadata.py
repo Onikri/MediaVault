@@ -41,8 +41,13 @@ class MetadataTests(unittest.TestCase):
 class CatalogHttpTests(unittest.TestCase):
     def setUp(self):
         import api
+        import tempfile,os,shutil
         from fastapi.testclient import TestClient
         self.api=api
+        self.policy_directory=tempfile.TemporaryDirectory()
+        policy_file=Path(self.policy_directory.name)/'manga-tag-policy.json'
+        shutil.copyfile(Path(__file__).parent/'fixtures/manga-tag-policy.json',policy_file)
+        self.policy_env=patch.dict(os.environ,{'MANGA_TAG_POLICY_FILE':str(policy_file),'DATA_DIR':self.policy_directory.name});self.policy_env.start()
         self.db=sqlite3.connect(':memory:',check_same_thread=False);initialize(self.db)
         row=MetadataTests().row();row['genres']=['Drama'];row['year']=2024
         upsert(self.db,[row]);self.key=browse(self.db)['items'][0]['catalogId']
@@ -54,6 +59,7 @@ class CatalogHttpTests(unittest.TestCase):
     def tearDown(self):
         self.client.close();self.api.app.dependency_overrides=self.before
         self.mock.stop();self.db.close()
+        self.policy_env.stop();self.policy_directory.cleanup()
 
     def test_viewer_can_filter_browse_and_read_facets_but_not_backfill(self):
         response=self.client.get('/manga/catalog',params={'genre':'драма','language':'en','year':'2024','sourceIds':'1'})
@@ -81,7 +87,9 @@ class CatalogHttpTests(unittest.TestCase):
         digest=current().revision
         self.assertTrue(self.client.get('/manga/tag-policy',params={'revision':digest}).json()['unchanged'])
         self.assertEqual(self.client.post('/ops/manga-tags/update',json={'commit':'a'*40,'policy':current().data}).status_code,401)
-        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}):
+        prior_policy=current().data
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory,'MANGA_TAG_POLICY_FILE':str(Path(directory)/'manga-tag-policy.json')}):
+            Path(directory,'manga-tag-policy.json').write_bytes(canonical_json(prior_policy))
             key=b'fixture-key-for-scoped-tag-deployment';Path(directory,'manga-tags-deploy.key').write_bytes(key)
             data={**current().data,'excludedTerms':[*current().data['excludedTerms'],'Drama']}
             body={'commit':'a'*40,'policy':data};stamp=str(int(time.time()))

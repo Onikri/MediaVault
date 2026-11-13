@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+import os
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +14,11 @@ spec.loader.exec_module(snapshot)
 
 
 class SnapshotTests(unittest.TestCase):
+    def setUp(self):
+        self.policy_env=patch.dict(os.environ,{'MANGA_TAG_POLICY_FILE':str(ROOT/'tests/fixtures/manga-tag-policy.json')});self.policy_env.start()
+
+    def tearDown(self):self.policy_env.stop()
+
     def test_exact_requested_sources(self):
         self.assertEqual(len(snapshot.SOURCES),18)
         self.assertEqual(len({row[0] for row in snapshot.SOURCES}),18)
