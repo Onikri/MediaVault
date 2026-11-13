@@ -19,6 +19,20 @@ class SnapshotTests(unittest.TestCase):
 
     def tearDown(self):self.policy_env.stop()
 
+    def test_source_alias_is_catalogued_only_for_its_registered_domain(self):
+        import tempfile
+        from manga_tag_policy import current
+        data=json.loads(json.dumps(current().data))
+        domain=snapshot.SOURCES[0][0]
+        next(row for row in data['tags'] if row['key']=='фэнтези')['sourceAliases']={domain:['Special label']}
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'policy.json';path.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
+            with patch.dict(os.environ,{'MANGA_TAG_POLICY_FILE':str(path)}),patch.object(snapshot,'source_tags',return_value=([('tag','Special label')],'partial','fixture')):
+                result=snapshot.build(object(),pause=0)
+        self.assertEqual(len(result['tags']),1)
+        self.assertEqual(result['tags'][0]['key'],'фэнтези')
+        self.assertEqual(result['tags'][0]['sources'],[domain])
+
     def test_exact_requested_sources(self):
         self.assertEqual(len(snapshot.SOURCES),18)
         self.assertEqual(len({row[0] for row in snapshot.SOURCES}),18)

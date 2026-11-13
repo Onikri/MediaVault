@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {compileMangaPolicy,setMangaPolicy,mangaPolicyFacts,mangaPolicyProfile,subscribeMangaPolicy} from '../src/manga-tag-policy.js';
 import {blossomRecord} from '../src/blossom/media-adapter.js';
+import {mangaFacetOptions} from '../src/manga-catalog.js';
 const bundled=JSON.parse(readFileSync(new URL('../server/manga-tag-policy.json',import.meta.url)));
 const base={schemaVersion:1,excludedTerms:[],excludedPrefixes:[],tags:[
  {key:'fantasy',label:'Фэнтези',aliases:['Fantasy','幻想','판타지']},
@@ -24,6 +25,8 @@ test('exclusions hide every alias; source-specific aliases stay scoped',()=>{
  for(const value of ['Fantasy','幻想','판타지','Фэнтези'])assert.equal(policy.key(value),'');
  const scoped=compileMangaPolicy({...base,tags:[{...base.tags[0],sourceAliases:{'one.example':['Special label']}},base.tags[1]]});
  assert.equal(scoped.key('Special label','one.example'),'fantasy');assert.equal(scoped.key('Special label','two.example'),'');
+ setMangaPolicy(scoped.data);
+ assert.equal(mangaFacetOptions(null,[{key:'fantasy',original:'Special label',type:'tags'}])[0].label,'Фэнтези');
 });
 test('ambiguous aliases are rejected before replacing active rules',()=>{
  assert.throws(()=>setMangaPolicy({...base,tags:[base.tags[0],{...base.tags[1],aliases:['Fantasy']}]}),/алиас/);

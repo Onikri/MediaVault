@@ -259,7 +259,7 @@ def build(session, old=None, *, now=None, pause=0.6):
         for category, name in values[:MAX_TAGS_PER_SOURCE]:
             if category not in {'tag','genre'} or not (label := clean(name)):
                 continue
-            key = tag_key(label)
+            key = current().key(label,domain)
             if not key:continue
             token = (category, key)
             entry = collected.setdefault(token, {'key': key, 'category': category,

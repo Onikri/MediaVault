@@ -65,6 +65,10 @@ class PolicyTests(unittest.TestCase):
         policy=Policy(data)
         self.assertEqual(policy.key('Special label','one.example'),'fantasy')
         self.assertEqual(policy.key('Special label','two.example'),'')
+        self.put(data)
+        upsert(self.db,[{'title':'Garden World','provider':'fixture','sourceUrl':'https://one.example/garden','tags':['Special label']}])
+        self.assertEqual(browse(self.db,tag='Фэнтези')['total'],1)
+        self.assertEqual(tags(self.db)['tags'][0]['key'],'fantasy')
 
     def test_invalid_or_superseded_config_does_not_mutate_index(self):
         self.seed();old=current().revision
