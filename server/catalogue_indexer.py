@@ -12,7 +12,7 @@ def identity(spec):
 
 class Indexer:
     def __init__(self,store,fetch=None,clock=time.time,interval=1.1):
-        self.store=store;self.clock=clock;self.fetch=fetch or __import__('catalogue_sources').fetch;self.stop=threading.Event();self.threads=[];self.rate={};self.rate_lock=threading.Lock();self.interval=interval
+        self.store=store;self.clock=clock;self.fetch=fetch or __import__('catalogue_sources').fetch;self.stop=threading.Event();self.threads=[];self.rate={};self.rate_lock=threading.Lock();self.interval=interval;self.turn=0
         with store.lock,store.db:
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_jobs(id TEXT PRIMARY KEY,spec TEXT NOT NULL,cursor TEXT NOT NULL,state TEXT NOT NULL,priority INTEGER NOT NULL,due REAL NOT NULL,pages INTEGER NOT NULL DEFAULT 0,records INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT \'\',updated REAL NOT NULL,lease TEXT NOT NULL DEFAULT \'\')')
             store.db.execute('CREATE INDEX IF NOT EXISTS catalogue_jobs_due ON catalogue_jobs(state,due,priority)')
@@ -21,6 +21,7 @@ class Indexer:
                 store.db.execute("ALTER TABLE catalogue_jobs ADD COLUMN kind TEXT NOT NULL DEFAULT ''")
                 store.db.execute("UPDATE catalogue_jobs SET kind=json_extract(spec,'$.type')")
             store.db.execute('CREATE INDEX IF NOT EXISTS catalogue_jobs_kind ON catalogue_jobs(kind,state)')
+            if 'expected' not in columns:store.db.execute('ALTER TABLE catalogue_jobs ADD COLUMN expected INTEGER')
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_page_fingerprints(job TEXT NOT NULL,digest TEXT NOT NULL,PRIMARY KEY(job,digest))')
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_tag_targets(source TEXT NOT NULL,label TEXT NOT NULL,target TEXT NOT NULL,PRIMARY KEY(source,label,target))')
             store.db.execute("UPDATE catalogue_jobs SET state='queued',lease='' WHERE state='running'")
@@ -33,6 +34,12 @@ class Indexer:
     def seed(self,installed):
         from catalogue_sources import base_sources
         with self.store.lock,self.store.db:
+            # The old HentaiChan feed was the home page, not its full catalogue.
+            # Retire only that listing; retained cards and detail jobs stay intact.
+            for key,raw in self.store.db.execute("SELECT id,spec FROM catalogue_jobs WHERE kind='html'").fetchall():
+                old=json.loads(raw)
+                if old.get('domain')=='hentaichan.cc' and not old.get('term') and old.get('url','').rstrip('/')=='https://hentaichan.cc':
+                    self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(key,));self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(key,))
             for spec in base_sources(installed):
                 self.enqueue(spec)
                 if spec['type']=='lib':self.enqueue({**spec,'type':'lib-vocabulary'},30)
@@ -47,7 +54,9 @@ class Indexer:
     def claim(self):
         now=self.clock()
         with self.store.lock,self.store.db:
-            cursor=self.store.db.execute("SELECT id,spec,cursor,pages,records,attempts,state FROM catalogue_jobs WHERE state IN ('queued','retry','done','partial') AND due<=? ORDER BY CASE WHEN priority>=50 THEN 0 ELSE 1 END,due,id LIMIT 1",(now,));row=cursor.fetchone()
+            self.turn+=1
+            order='due,priority,id' if self.turn%4==0 else 'priority DESC,due,id'
+            cursor=self.store.db.execute("SELECT id,spec,cursor,pages,records,attempts,state FROM catalogue_jobs WHERE state IN ('queued','retry','done','partial') AND due<=? ORDER BY "+order+" LIMIT 1",(now,));row=cursor.fetchone()
             if not row:return None
             job=dict(zip([c[0] for c in cursor.description],row));job['spec']=json.loads(job['spec']);job['cursor']=json.loads(job['cursor'])
             if job['state'] in {'done','partial'}:
@@ -82,8 +91,9 @@ class Indexer:
                 other=[r for r in rows if r not in manga]
                 count=upsert(self.store.db,manga)+ingest(self.store.db,other)
                 for detail in result.get('details') or []:
-                    row=detail['row'];known=self.store.db.execute('SELECT inspected FROM catalog_titles WHERE provider=? AND source_url=?',(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone()
-                    if not known or known[0]<self.clock()-7*86400 or not self.store.db.execute("SELECT 1 FROM catalog_titles WHERE provider=? AND source_url=? AND json_extract(metadata,'$.description') IS NOT NULL AND json_extract(metadata,'$.description')!=''",(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone():self.enqueue(detail,15)
+                    row=detail['row'];known=self.store.db.execute("SELECT inspected,json_extract(metadata,'$.sourceMetadataVersion'),json_extract(metadata,'$.description') FROM catalog_titles WHERE provider=? AND source_url=?",(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone()
+                    missing=(known[1] or 0)<1 if known and spec['domain']=='hentaichan.cc' else not known or not known[2]
+                    if not known or known[0]<self.clock()-7*86400 or missing:self.enqueue(detail,int(spec.get('detailPriority',15)))
                 from content_vocabulary import add,bump
                 vocabulary_added=0
                 if spec['type'] in {'anilist','books'}:
@@ -102,7 +112,7 @@ class Indexer:
                 if vocabulary_added:bump(self.store.db)
                 next_cursor=result.get('next');state='queued' if next_cursor else result.get('state') or ('partial' if spec['type']=='html' else 'done')
                 due=self.clock()+(2 if next_cursor else 86400 if '-detail' in spec['type'] else 21600)
-                self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,attempts=0,error=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('reason',''),self.clock(),job['id']))
+                self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),attempts=0,error=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),result.get('reason',''),self.clock(),job['id']))
                 if '-detail' in spec['type'] and not next_cursor:
                     self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(job['id'],));self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
         except Exception as error:
@@ -125,10 +135,12 @@ class Indexer:
     def status(self):
         with self.store.lock,self.store.db:
             rows=[]
-            for spec,state,pages,records,error,due in self.store.db.execute("SELECT spec,state,pages,records,error,due FROM catalogue_jobs WHERE kind IN ('lib','bridge','html','unsupported','anilist','kinobox','books') ORDER BY id"):
+            pending_details={domain:count for domain,count in self.store.db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind LIKE '%-detail' GROUP BY json_extract(spec,'$.domain')")}
+            for spec,state,pages,records,error,due,expected in self.store.db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','html','unsupported','anilist','kinobox','books') ORDER BY id"):
                 spec=json.loads(spec)
                 if '-detail' in spec['type'] or spec['type']=='lib-vocabulary' or spec.get('term'):continue
-                rows.append({'domain':spec['domain'],'name':spec['name'],'status':state,'pages':pages,'indexed':records,'error':error,'retryAt':due if state=='retry' else None})
+                details=pending_details.get(spec['domain'],0)
+                rows.append({'domain':spec['domain'],'name':spec['name'],'status':'enriching' if state=='done' and details else state,'pages':pages,'indexed':records,'expected':expected,'pendingDetails':details,'error':error,'retryAt':due if state=='retry' else None})
             manga=self.store.db.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]
             from content_catalog import initialize
             initialize(self.store.db)

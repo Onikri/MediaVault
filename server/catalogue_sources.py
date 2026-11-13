@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import httpx,requests
 from content_source_routes import LIB,HTML
 from content_sources import checked_get,permitted,html_terms,lib_terms,lib_titles,lib_metadata
-from manga_source_tags import from_api,from_html
+from manga_source_tags import from_api,from_html,unique
 from source_parser import SourceError
 
 def base_sources(installed):
@@ -122,6 +122,9 @@ def fetch(spec,cursor):
         from manga_sources import guard
         guard(soup)
         if kind=='html-detail':
+            if spec['domain']=='hentaichan.cc':
+                from manga_hentaichan_cc import catalogue_metadata
+                return {'rows':[{**spec['row'],**catalogue_metadata(soup),'metadataInspected':True}],'next':None}
             metadata={}
             description=soup.select_one('meta[property="og:description"],meta[name="description"]')
             summary=soup.select_one('.description-summary,.summary__content,[itemprop="description"],.manga-description')
@@ -134,6 +137,13 @@ def fetch(spec,cursor):
                 if value:metadata['cover']=value
             for node in soup.select('nav,aside,footer,.sidebar,.tagcloud,.tag-cloud,.related,.recommendations'):node.decompose()
             return {'rows':[{**spec['row'],**metadata,**from_html(soup),'metadataInspected':True}],'next':None}
+        if spec['domain']=='hentaichan.cc':
+            from manga_hentaichan_cc import catalogue_page
+            result=catalogue_page(raw,final,page)
+            for row in result['rows']:
+                if spec.get('term'):row['tags']=unique([*row.get('tags',[]),spec['term']['label']])
+                details.append({**spec,'type':'html-detail','url':row['url'],'row':row})
+            return {**result,'details':details}
         rows=html_rows(raw,final)
         if not rows:raise SourceError('Не удалось прочитать карточки каталога')
         if spec.get('term'):

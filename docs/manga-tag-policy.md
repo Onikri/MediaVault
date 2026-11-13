@@ -62,6 +62,14 @@ headers. Robots and upstream availability are respected. No images are fetched.
 The UI shows source availability, actual pages processed and cached counts.
 HTTP/2 support requires the `httpx[http2]` dependency, and Lib list requests omit
 unsupported detail-only fields. Tags use `tags[]`, genres use `genres[]`.
+HentaiChan.cc starts at `/catalog`, follows its actual same-path next-page
+links, and checks the declared page number and total. The former home-page
+listing is retired without dropping cached cards. Its `/catalog/tags/` links
+provide the work's tags even without semantic CSS classes. Legacy cards are
+enriched again once for this parser version. Listing completion is shown
+separately from pending detail enrichment, and totals remain visible in the
+owner's source status. Priority rescans reserve regular queue turns so other
+sources can continue progressing.
 The initial full catalogue is not instantaneous; successful feeds continue to
 their upstream last page and are periodically refreshed. Optional manual-only
 mode retains the previous bounded discovery behavior.

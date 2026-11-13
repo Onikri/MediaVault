@@ -4,7 +4,7 @@ HTML = {
     'h-chan.me': ('https://manga.h-chan.me/', {'manga.h-chan.me'}),
     'manga-chan.me': ('https://manga-chan.me/catalog', {'manga-chan.me', 'im.manga-chan.me'}),
     'henchan.pro': ('https://henchan.pro/', {'henchan.pro'}),
-    'hentaichan.cc': ('https://hentaichan.cc/', {'hentaichan.cc'}),
+    'hentaichan.cc': ('https://hentaichan.cc/catalog', {'hentaichan.cc'}),
     'y.hentaichan.live': ('https://y.hentaichan.live/', {'y.hentaichan.live'}),
     'yaoi-chan.me': ('https://v18.yaoi-chan.me/catalog', {'v18.yaoi-chan.me'}),
     'hmanga.su': ('https://hmanga.me/', {'hmanga.me'}),
