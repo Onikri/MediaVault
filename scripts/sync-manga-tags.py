@@ -151,7 +151,7 @@ def parse_html_taxonomy(data, page_url, permitted_hosts):
     return list(collected.values())
 
 
-def parse_lib_taxonomy(raw):
+def parse_lib_taxonomy(raw, site_id=None):
     data = json.loads(raw)
     payload = data.get('data', data) if isinstance(data, dict) else None
     if not isinstance(payload, dict):
@@ -165,6 +165,8 @@ def parse_lib_taxonomy(raw):
             continue
         discovered_field = True
         for row in rows[:MAX_TAGS_PER_SOURCE]:
+            if isinstance(row, dict) and site_id is not None and isinstance(row.get('site_ids'), list) and site_id not in row['site_ids']:
+                continue
             if isinstance(row, str):
                 names = [row]
             elif isinstance(row, dict):
@@ -196,7 +198,7 @@ def source_tags(session, domain):
                                         'Accept': 'application/json', 'User-Agent': UA})
             try:
                 raw, _ = checked_get(lib_session, url, permitted)
-                values, explicit = parse_lib_taxonomy(raw)
+                values, explicit = parse_lib_taxonomy(raw, site_id=site_id)
             except (requests.RequestException, ValueError, json.JSONDecodeError):
                 return [], 'unavailable', 'public_api_unavailable'
         return values, ('complete' if explicit else 'unavailable'), (
