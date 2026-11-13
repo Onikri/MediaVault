@@ -71,6 +71,13 @@ class ContinuousTests(unittest.TestCase):
   self.assertEqual(result['total'],8);self.assertEqual(len(result['items']),2);self.assertEqual(result['offset'],4)
 
 class Http2Contracts(unittest.TestCase):
+ def test_lib_catalogue_keeps_cover_and_detail_summary_without_fetching_images(self):
+  from content_sources import lib_titles,lib_metadata
+  payload={'slug_url':'1--garden','rus_name':'Сад','eng_name':'Garden','cover':{'default':'https://covers.example/garden.jpg'},'summary':'<p>A peaceful garden.</p>'}
+  row=lib_titles({'data':[payload]},1,'','tag')[0]
+  self.assertEqual(row['cover'],'https://covers.example/garden.jpg');self.assertEqual(row['description'],'A peaceful garden.')
+  self.assertIn('Garden',row['aliases']);self.assertEqual(lib_metadata({'summary':'<p>Updated.</p>'})['description'],'Updated.')
+  self.assertEqual(lib_metadata({'summary':{'type':'doc','content':[{'type':'paragraph','content':[{'type':'text','text':'A garden.'}]}]}})['description'],'A garden.')
  def test_book_catalogue_has_a_stable_sort_and_advances_offset(self):
   from catalogue_sources import fetch
   with patch('metadata_catalog.get_json',return_value={'numFound':100,'docs':[{'key':'/works/OL1W','title':'Garden','subject':['Ecology']}]}) as get:
