@@ -24,6 +24,7 @@ class Indexer:
             store.db.execute("CREATE INDEX IF NOT EXISTS catalogue_jobs_domain_due ON catalogue_jobs(kind,json_extract(spec,'$.domain'),state,due,id)")
             if 'expected' not in columns:store.db.execute('ALTER TABLE catalogue_jobs ADD COLUMN expected INTEGER')
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_page_fingerprints(job TEXT NOT NULL,digest TEXT NOT NULL,PRIMARY KEY(job,digest))')
+            store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_page_items(job TEXT NOT NULL,url TEXT NOT NULL,PRIMARY KEY(job,url))')
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_tag_targets(source TEXT NOT NULL,label TEXT NOT NULL,target TEXT NOT NULL,PRIMARY KEY(source,label,target))')
             store.db.execute("UPDATE catalogue_jobs SET state='queued',lease='' WHERE state='running'")
 
@@ -82,6 +83,7 @@ class Indexer:
             self.inflight[host]=self.inflight.get(host,0)+1
             if job['state'] in {'done','partial'}:
                 job['cursor']={'page':1};self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
+                self.store.db.execute('DELETE FROM catalogue_page_items WHERE job=?',(job['id'],))
                 self.store.db.execute('UPDATE catalogue_jobs SET pages=0,records=0,expected=NULL WHERE id=?',(job['id'],))
             job['lease']=os.urandom(12).hex()
             self.store.db.execute("UPDATE catalogue_jobs SET state='running',lease=?,updated=? WHERE id=?",(job['lease'],now,job['id']))
@@ -101,6 +103,7 @@ class Indexer:
             if self.stop.wait(max(0,next_time-time.monotonic())):return False
             result=self.fetch(spec,job['cursor']);rows=result.get('rows') or []
             if not rows and result.get('next'):raise RuntimeError('empty-page')
+            if not rows and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html'}:raise RuntimeError('empty-page')
             digest=hashlib.sha256(canonical_json(sorted(str(r.get('sourceUrl') or r.get('url') or r.get('id')) for r in rows))).hexdigest()
             with self.store.lock,self.store.db:
                 active=self.store.db.execute('SELECT lease FROM catalogue_jobs WHERE id=?',(job['id'],)).fetchone()
@@ -134,8 +137,12 @@ class Indexer:
                     self.store.db.execute('INSERT OR IGNORE INTO catalogue_tag_targets VALUES(?,?,?)',(spec['domain'],term['label'],canonical_json(target).decode()))
                 if vocabulary_added:bump(self.store.db)
                 next_cursor=result.get('next');state='queued' if next_cursor else result.get('state') or ('partial' if spec['type']=='html' else 'done')
+                if rows and '-detail' not in spec['type']:
+                    before=self.store.db.total_changes
+                    self.store.db.executemany('INSERT OR IGNORE INTO catalogue_page_items VALUES(?,?)',[(job['id'],str(r.get('sourceUrl') or r.get('url') or r.get('id'))) for r in rows])
+                    count=self.store.db.total_changes-before
                 due=self.clock()+(2 if next_cursor else 86400 if '-detail' in spec['type'] else 21600)
-                self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),attempts=0,error=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),result.get('reason',''),self.clock(),job['id']))
+                self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),priority=CASE WHEN ? THEN priority ELSE MIN(priority,10) END,attempts=0,error=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),bool(next_cursor),result.get('reason',''),self.clock(),job['id']))
                 if '-detail' in spec['type'] and not next_cursor:
                     self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(job['id'],));self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
         except Exception as error:

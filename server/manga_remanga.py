@@ -95,7 +95,11 @@ def catalogue_page(page, http, genre=None, category=None):
     if category:
         params['categories'] = category
     data = api('/api/v2/search/catalog/', http, **params)
+    if not isinstance(data.get('results'),list) or 'next' not in data:
+        raise SourceError('ReManga не предоставил пагинацию каталога.')
     rows = [value for row in data.get('results') or [] if isinstance(row, dict) and (value := card(row))]
+    if len(rows)!=len(data['results']) or not rows and (page==1 or data.get('next')):
+        raise SourceError('ReManga вернул неполную страницу каталога.')
     return {'rows': rows, 'next': {'page': page + 1} if data.get('next') and rows else None}
 
 

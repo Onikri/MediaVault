@@ -53,6 +53,19 @@ class CompletionTests(unittest.TestCase):
   import content_sources
   class Session:pass
   content_sources._robots.clear()
+
+ def test_overlapping_listing_pages_count_unique_titles_and_refresh_resets_cycle(self):
+  with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,{'DATA_DIR':d,'MEDIA_VAULT_DISABLE_WORKER':'1'}):
+   db=sqlite3.connect(':memory:',check_same_thread=False);initialize(db);db.commit();store=SimpleNamespace(db=db,lock=threading.RLock());now=[1000]
+   def row(i):return {'kind':'manga','provider':'fixture','title':'Garden '+str(i),'sourceUrl':'https://fixture.example/manga/'+str(i)}
+   def fetch_page(s,c):return {'rows':[row(1),row(c['page']+1)],'next':{'page':2} if c['page']==1 else None}
+   worker=Indexer(store,fetch_page,lambda:now[0],interval=0)
+   with db:worker.enqueue({'type':'lib','domain':'fixture.example','site':1,'name':'Fixture'},80)
+   worker.run_once();now[0]+=3;worker.run_once();status=worker.status()['sources'][0]
+   self.assertEqual(status['indexed'],3);self.assertEqual(status['pages'],2)
+   self.assertEqual(db.execute('SELECT priority FROM catalogue_jobs').fetchone()[0],10)
+   now[0]+=21601;worker.run_once();status=worker.status()['sources'][0]
+   self.assertEqual(status['indexed'],2);self.assertEqual(status['pages'],1);db.close()
   with patch('content_sources.checked_get',return_value=(b'User-agent: *\nDisallow: /private/', 'https://fixture.example/robots.txt')) as get:
    self.assertTrue(content_sources.permitted(Session(),'https://fixture.example/manga/1',{'fixture.example'}))
    self.assertFalse(content_sources.permitted(Session(),'https://fixture.example/private/1',{'fixture.example'}))
