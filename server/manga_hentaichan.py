@@ -25,15 +25,16 @@ ITEM=re.compile(r'^/(manga|online|related)/([1-9]\d{0,11}-[^/?]{1,250})\.html$')
 def clean(value):return re.sub(r'\s+',' ',str(value or '')).strip()[:500]
 
 
-# HentaiChan often publishes every chapter of a series as its own catalogue
-# entry ("Tiny Evil - глава 3"). The series name is the title without that
-# explicit chapter marker; a bare trailing number stays, since it may be a sequel.
-CHAPTER_SUFFIX=re.compile(r'\s*(?:[-–—:,.]\s*)?\(?\s*(?:(?:том|volume|vol\.)\s*\d{1,3}\s*[.,]?\s*)?(?:глава|часть|chapter|ch\.|part)\s*\d{1,4}(?:[.,]\d{1,3})?\s*\)?\s*$',re.I)
+# HentaiChan sites often publish every chapter of a series as its own catalogue
+# entry ("Tiny Evil - глава 3", "Kono Mama Naka de... Part 2: subtitle"). The
+# series name is the text before that explicit chapter marker; a bare trailing
+# number stays, since it may be a sequel.
+CHAPTER_MARK=re.compile(r'\s*(?:[-–—:,.]\s*)?\(?\s*(?:(?:том|volume|vol\.)\s*\d{1,3}\s*[.,]?\s*)?(?:глава|часть|chapter|ch\.|part)\s*\d{1,4}(?:[.,]\d{1,3})?(?!\d).*$',re.I|re.S)
 
 
 def series_title(title):
-    base=clean(CHAPTER_SUFFIX.sub('',clean(title)))
-    return base if len(base)>1 and base!=clean(title) else None
+    value=clean(title);base=clean(CHAPTER_MARK.sub('',value,count=1)).rstrip(' .…-–—:,')
+    return base if len(base)>1 and base!=value else None
 
 
 def link(value,base):
@@ -68,7 +69,8 @@ def parse_search(text,base):
             except SourceError:pass
         from manga_sources import title_aliases
         slug=ITEM.fullmatch(urlsplit(url).path)[2];series=series_title(title)
-        names=title_aliases(title) if not series else list(dict.fromkeys([*title_aliases(series),*title_aliases(title)]))
+        # The chapter label is not a name of the work: it would become a search term.
+        names=title_aliases(series or title)
         result[url]={'id':'hentaichan:'+slug.split('-')[0],'provider':'hentaichan','providerName':'HentaiChan',
                      'sourceId':SOURCE['id'],'sourceOnly':True,'sourceUrl':url,'sourceURL':url,'url':url,
                      'title':series or title,'aliases':names,'kind':'manga','format':'manga','language':'ru',
@@ -96,7 +98,7 @@ def search(query,http,root=ROOT):
 
 
 def number(label):
-    patterns=[r'(?:глава|часть|chapter|ch\.)\s*([0-9]+(?:[.,][0-9]{1,3})?)',
+    patterns=[r'(?:глава|часть|chapter|ch\.|part)\s*([0-9]+(?:[.,][0-9]{1,3})?)',
               r'([0-9]+(?:[.,][0-9]{1,3})?)\s*(?:глава|часть|chapter)']
     from manga_sources import chapter_number
     for pattern in patterns:

@@ -27,6 +27,11 @@ def language_queries(values,language):
         if re.search(pattern,value,re.I):return 0
         return 1 if re.search(r'[a-z]',value,re.I) else 2
     from title_identity import normalized
+    from manga_hentaichan import series_title
+    # "Series - глава 1" learned from a per-chapter catalogue entry only costs
+    # a slow extra request when the series name itself is already a query.
+    names={normalized(v) for v in values if isinstance(v,str)}
+    values=[v for v in values if not (isinstance(v,str) and (base:=series_title(v)) and normalized(base) in names)]
     unique={}
     for value in values:
         if isinstance(value,str) and value.strip():unique.setdefault(normalized(value),value.strip())
