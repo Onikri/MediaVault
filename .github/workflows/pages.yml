@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: mediavault-${{ github.ref }}
+  # Keep an explicit audit running when another release is pushed.
+  group: mediavault-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'latest' }}
   cancel-in-progress: true
 
 jobs:
@@ -156,7 +157,8 @@ jobs:
           path: dist
 
   deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # A manual audit may finish after main moved; it must never deploy its snapshot.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     permissions:
