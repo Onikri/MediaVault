@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {BookOpen,Plus,Check,Search} from 'lucide-react';
 import {uiLocale} from './i18n/index.js';
+import MangaStaticTags from './MangaStaticTags.jsx';
 
 export default function MangaSourceManager({service,onInstalled}){
  const [adultOnly,setAdultOnly]=useState(false),[open,setOpen]=useState(false),[status,setStatus]=useState(null),[language,setLanguage]=useState('ru'),[query,setQuery]=useState(''),[rows,setRows]=useState([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(''),[error,setError]=useState(''),[revision,setRevision]=useState(0),[pack,setPack]=useState(null);
@@ -28,6 +29,7 @@ export default function MangaSourceManager({service,onInstalled}){
  return <details className="manga-source-manager" onToggle={e=>setOpen(e.currentTarget.open)}>
   <summary><BookOpen size={16}/>Больше источников <span>Suwayomi</span></summary>
   {open&&<div className="manga-source-manager-body">
+   <MangaStaticTags/>
    <p className="fine">{status?.ready?`${status.availableExtensions} расширений в каталоге · подключено источников: ${status.sources?.length||0}`:status?.message||'Подключи нужные читалки — они появятся в общем поиске переводов.'}</p>
    {coverage&&<details className="manga-source-coverage"><summary>Твои 18 сайтов · нативных {coverage.nativeRegistered} · расширений {coverage.extensionInstalled}</summary>
     <p className="fine">Этот список отражает интеграцию, а не доступность каждой главы. Перед чтением MediaVault проверяет реальную страницу.</p>
