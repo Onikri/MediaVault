@@ -518,7 +518,10 @@ class Discovery:
                     self.db.execute('INSERT OR REPLACE INTO query_cache VALUES(?,?,?,?)',(self._cache_key(normalize(row['query']),json.loads(row['source'])),row['source_id'],encoded,now+self.cache_ttl))
                     for value in values:self.db.execute('INSERT OR REPLACE INTO titles VALUES(?,?,?,?,?,?)',(value['id'],row['source_id'],value['language'],normalize(' '.join(public_aliases(value))),json.dumps(value,ensure_ascii=False),now))
                     from manga_catalog_index import upsert as catalog_upsert
-                    catalog_upsert(self.db,values,source_id=row['source_id'],timestamp=now)
+                    try:catalog_upsert(self.db,values,source_id=row['source_id'],timestamp=now)
+                    except Exception:
+                        import logging
+                        logging.getLogger(__name__).exception('Manga catalogue indexing failed')
                 remaining=self.db.execute("SELECT count(*) FROM work WHERE job=? AND state IN ('queued','running')",(row['job'],)).fetchone()[0]
                 self.db.execute('UPDATE jobs SET updated=?,state=? WHERE id=?',(now,'running' if remaining else 'done',row['job']))
                 self.condition.notify_all()
