@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT / 'server'))
 from manga_source_coverage import SOURCES
 from manga_source_tags import clean_label
 from manga_catalog_index import tag_key
+from manga_tag_policy import current
 
 OUTPUT = ROOT / 'public' / 'data' / 'manga-tags.json'
 UA = 'MediaVault-Taxonomy/1.0 (+https://github.com/Onikri/MediaVault)'
@@ -56,12 +57,6 @@ LIB = {'mangalib.org': (1, 'https://mangalib.me/'),
        'hentailib.me': (4, 'https://hentailib.me/'),
        'v2.shlib.life': (2, 'https://v2.shlib.life/')}
 
-# Taxonomy terms categorizing sexual content depicting minors are never
-# published into the static public autocomplete index.
-MINOR_SEXUAL = re.compile(
-    r'(?:\b(?:lolicon|shotacon|loli|shota|underage|child[ -]?porn|preteen)\b'
-    r'|(?:детское\s*порно|малолет(?:к|ние)|несовершеннолетн))', re.I
-)
 TAXONOMY_PATH = re.compile(
     r'/(?:tags?|genres?|categories?)(?:/|$)|[?&](?:tag|genre|category)=', re.I
 )
@@ -75,7 +70,7 @@ TAGS_SELECTOR = ','.join((
 
 def clean(value):
     label = clean_label(value)
-    if not label or len(label) > MAX_LABEL_LENGTH or MINOR_SEXUAL.search(label):
+    if not label or len(label) > MAX_LABEL_LENGTH:
         return ''
     return label
 
@@ -264,7 +259,8 @@ def build(session, old=None, *, now=None, pause=0.6):
         for category, name in values[:MAX_TAGS_PER_SOURCE]:
             if category not in {'tag','genre'} or not (label := clean(name)):
                 continue
-            key = tag_key(label)
+            key = current().key(label,domain)
+            if not key:continue
             token = (category, key)
             entry = collected.setdefault(token, {'key': key, 'category': category,
                                                   'label': label, 'originalLabels': set(),
@@ -278,7 +274,7 @@ def build(session, old=None, *, now=None, pause=0.6):
                        'status': state, 'tagsFound': actual, 'reason': reason, 'note': note})
         if pause:
             time.sleep(pause)
-    result = [{'key': v['key'], 'category': v['category'], 'label': min(v['originalLabels'], key=lambda x:(len(x), x)),
+    result = [{'key': v['key'], 'category': v['category'], 'label': current().rules[v['key']]['label'],
                'originalLabels': sorted(v['originalLabels'], key=str.casefold),
                'sources': sorted(v['sources'])}
               for v in collected.values()]
@@ -299,9 +295,8 @@ def main(argv=None):
             snapshot = build(_Offline(), old, pause=0)
         else:
             snapshot = build(session, old)
-    # Repeated, identical no-op runs should not create commits.
-    if not snapshot['tags'] and old.get('tags') and not args.no_network:
-        raise RuntimeError('No tags could be generated; refusing to erase the prior manifest')
+    # An empty projection is valid after removing the previously observed tags.
+    # Network failures already retain matching labels with an explicit stale state.
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f"Sources: {len(snapshot['sources'])}; indexed tag keys: {len(snapshot['tags'])}")

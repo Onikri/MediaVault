@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+import os
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +14,38 @@ spec.loader.exec_module(snapshot)
 
 
 class SnapshotTests(unittest.TestCase):
+    def setUp(self):
+        self.policy_env=patch.dict(os.environ,{'MANGA_TAG_POLICY_FILE':str(ROOT/'tests/fixtures/manga-tag-policy.json')});self.policy_env.start()
+
+    def tearDown(self):self.policy_env.stop()
+
+    def test_source_alias_is_catalogued_only_for_its_registered_domain(self):
+        import tempfile
+        from manga_tag_policy import current
+        data=json.loads(json.dumps(current().data))
+        domain=snapshot.SOURCES[0][0]
+        next(row for row in data['tags'] if row['key']=='фэнтези')['sourceAliases']={domain:['Special label']}
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'policy.json';path.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
+            with patch.dict(os.environ,{'MANGA_TAG_POLICY_FILE':str(path)}),patch.object(snapshot,'source_tags',return_value=([('tag','Special label')],'partial','fixture')):
+                result=snapshot.build(object(),pause=0)
+        self.assertEqual(len(result['tags']),1)
+        self.assertEqual(result['tags'][0]['key'],'фэнтези')
+        self.assertEqual(result['tags'][0]['sources'],[domain])
+
+    def test_removing_all_observed_tags_can_publish_an_empty_projection(self):
+        import tempfile,io
+        from contextlib import redirect_stdout
+        from manga_tag_policy import current
+        policy={**current().data,'tags':[{'key':'ecology','label':'Экология','aliases':['Ecology']}]}
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'policy.json';path.write_text(json.dumps(policy),encoding='utf-8')
+            output=Path(folder)/'snapshot.json'
+            output.write_text(json.dumps({'schemaVersion':1,'sources':[], 'tags':[{'key':'фэнтези','label':'Фэнтези','category':'tag','sources':[snapshot.SOURCES[0][0]],'originalLabels':['Fantasy']}]}),encoding='utf-8')
+            with patch.dict(os.environ,{'MANGA_TAG_POLICY_FILE':str(path)}),patch.object(snapshot,'source_tags',return_value=([('tag','Fantasy')],'partial','fixture')),patch.object(snapshot.time,'sleep'),redirect_stdout(io.StringIO()):
+                self.assertEqual(snapshot.main(['--output',str(output)]),0)
+            self.assertEqual(json.loads(output.read_text(encoding='utf-8'))['tags'],[])
+
     def test_exact_requested_sources(self):
         self.assertEqual(len(snapshot.SOURCES),18)
         self.assertEqual(len({row[0] for row in snapshot.SOURCES}),18)

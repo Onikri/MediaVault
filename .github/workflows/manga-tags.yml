@@ -14,6 +14,8 @@ on:
       - server/manga_source_coverage.py
       - server/manga_source_tags.py
       - server/manga_catalog_index.py
+      - server/manga-tag-policy.json
+      - server/manga_tag_policy.py
       - tests/test_manga_tag_snapshot.py
 
 permissions:

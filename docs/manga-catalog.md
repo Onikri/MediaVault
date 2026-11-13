@@ -6,8 +6,10 @@ the source's reader URL separately from its canonical title URL. Numeric source
 IDs stay strings throughout the client and server.
 
 Title aliases, source/language, format, known year/age, genre and all selected
-tags participate in the indexed query. English/Russian tag aliases share
-`server/manga_tag_aliases.json` with `src/taxonomy.js`; a test checks parity.
+tags participate in the indexed query. Canonical manga labels, multilingual
+aliases and exclusions share `server/manga-tag-policy.json` with the browser.
+Its signed deployment rebuilds the index from retained source facts; see
+`manga-tag-policy.md` for adding, renaming or removing a tag on GitHub.
 The static vocabulary and live facets retain provider labels and provenance.
 
 Missing facts are enriched on demand from title metadata, with two requests

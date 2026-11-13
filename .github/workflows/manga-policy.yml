@@ -1,0 +1,47 @@
+name: Validate and apply manga tag rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - server/manga-tag-policy.json
+      - server/manga_tag_policy.py
+      - server/manga_tag_deploy.py
+      - scripts/deploy-manga-tags.py
+      - .github/workflows/manga-policy.yml
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manga-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python -m pip install --disable-pip-version-check beautifulsoup4 requests
+      - name: Validate shared configuration
+        run: python scripts/deploy-manga-tags.py --validate
+      - name: Verify indexing, deletion, restoration and deployment authentication
+        run: python -m unittest discover -s tests -p test_manga_tag_policy.py
+      - name: Verify browser policy semantics
+        run: node --test tests/manga-tag-policy.test.mjs
+      - name: Apply committed rules to Oracle
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          MANGA_ORACLE_URL: ${{ vars.MANGA_ORACLE_URL }}
+          MANGA_TAG_DEPLOY_KEY: ${{ secrets.MANGA_TAG_DEPLOY_KEY }}
+        run: python scripts/deploy-manga-tags.py

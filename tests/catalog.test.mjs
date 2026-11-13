@@ -1,9 +1,14 @@
-import test from 'node:test';
+import test,{beforeEach,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeCatalog,mergeCatalog,matchesFilters,providerUrl,safeImage,alternateSpelling,rankCatalog,fetchCatalog,catalogProviders} from '../src/catalog.js';
 import {mangaCatalogParams,mangaFacetOptions,mangaTagKey,mangaFormatLabel} from '../src/manga-catalog.js';
 import {tagLabels} from '../src/taxonomy.js';
 import {readFileSync} from 'node:fs';
+import {setMangaPolicy,compileMangaPolicy} from '../src/manga-tag-policy.js';
+const defaultPolicy=JSON.parse(readFileSync(new URL('../server/manga-tag-policy.json',import.meta.url)));
+const fixturePolicy=JSON.parse(readFileSync(new URL('./fixtures/manga-tag-policy.json',import.meta.url)));
+beforeEach(()=>setMangaPolicy(fixturePolicy));
+afterEach(()=>setMangaPolicy(defaultPolicy));
 
 test('source catalogue passes combined filters and preserves source ID precision',()=>{
  const params=mangaCatalogParams({query:' Garden World ',filters:{genre:'Драма',tag:'Time Travel',year:'2024',format:'Манхва',age:'adult'},language:'en',sourceIds:['990000000000000003','1'],page:3});
@@ -13,8 +18,8 @@ test('source catalogue passes combined filters and preserves source ID precision
 });
 
 test('frontend and backend share tag aliases, case and format filters',()=>{
- const aliases=JSON.parse(readFileSync(new URL('../server/manga_tag_aliases.json',import.meta.url)));
- assert.deepEqual(aliases,tagLabels);
+ const policy=JSON.parse(readFileSync(new URL('../server/manga-tag-policy.json',import.meta.url)));
+ assert.equal(compileMangaPolicy(policy).rules.size,policy.tags.length);
  assert.equal(mangaTagKey('TIME TRAVEL'),mangaTagKey(tagLabels['Time Travel']));
  const row={genres:['DRAMA'],tags:['TIME TRAVEL'],format:'manhwa',year:2024,age:18};
  assert.equal(matchesFilters(row,{genre:'Драма',tag:tagLabels['Time Travel'],format:'Манхва',year:'2024',age:'adult'}),true);

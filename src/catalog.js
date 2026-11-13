@@ -1,4 +1,5 @@
 import {localLabel,queryLabel} from './taxonomy.js';
+import {mangaPolicy} from './manga-tag-policy.js';
 import {russianText,translate,imageURL} from './title-metadata.js';
 import {contentLanguage} from './content-language.js';
 import {uiLanguage} from './i18n/index.js';
@@ -157,8 +158,9 @@ export function mergeCatalog(values){
 
 export function matchesFilters(item,filters){
   if(filters.year&&String(item.year)!==String(filters.year))return false;
-  if(filters.genre&&!item.genres.some(g=>normalized(genreLabels[g]||localLabel(g)).includes(normalized(localLabel(filters.genre)))))return false;
-  if(filters.tag&&!String(filters.tag).split(',').map(s=>s.trim()).filter(Boolean).every(tag=>(item.tags||[]).concat(item.genres||[]).some(t=>normalized(localLabel(t)).includes(normalized(localLabel(tag)))||normalized(t).includes(normalized(tag)))))return false;
+  const manga=item.kind==='manga',match=(left,right)=>manga?(mangaPolicy().key(right)?mangaPolicy().key(left)===mangaPolicy().key(right):normalized(left).includes(normalized(right))):normalized(localLabel(left)).includes(normalized(localLabel(right)))||normalized(left).includes(normalized(right));
+  if(filters.genre&&!item.genres.some(g=>manga?match(g,filters.genre):normalized(genreLabels[g]||localLabel(g)).includes(normalized(localLabel(filters.genre)))))return false;
+  if(filters.tag&&!String(filters.tag).split(',').map(s=>s.trim()).filter(Boolean).every(tag=>(item.tags||[]).concat(item.genres||[]).some(t=>match(t,tag))))return false;
   const formatKey=value=>({манга:'manga',манхва:'manhwa',маньхуа:'manhua',вебтун:'webtoon'}[normalized(value)]||normalized(value));
   if(filters.format&&formatKey(item.format)!==formatKey(filters.format))return false;
   if(filters.age==='under18'&&(item.age==null||item.age>=18))return false;

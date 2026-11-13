@@ -2,6 +2,8 @@
 import sqlite3
 import sys
 import unittest
+import os
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1] / 'server'))
@@ -11,11 +13,13 @@ from manga_source_tags import from_api, from_html
 
 class CatalogIndexTests(unittest.TestCase):
     def setUp(self):
+        self.policy_env=patch.dict(os.environ,{'MANGA_TAG_POLICY_FILE':str(Path(__file__).parent/'fixtures/manga-tag-policy.json')});self.policy_env.start()
         self.db=sqlite3.connect(':memory:')
         initialize(self.db)
 
     def tearDown(self):
         self.db.close()
+        self.policy_env.stop()
 
     @staticmethod
     def work(provider='hmanga',title_name='Садовый мир',slug='garden-world'):

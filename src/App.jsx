@@ -1,4 +1,5 @@
 import GoogleKeySettings from './GoogleKeyFields.jsx';
+import useMangaPolicy from './use-manga-policy.js';
 import SharedTitlePage from './SharedTitlePage.jsx';
 import {RetainedMediaProvider,VideoDock,useRetainedWorkspace} from './RetainedMedia.jsx';
 import {ChapterSaveDock} from './ChapterSaveView.jsx';
@@ -124,6 +125,7 @@ function EmptyState({icon='library',title,text,button,onClick}){
 function MediaVaultApp(){
   const {state,actions}=useVault();
   const importService=useImportService(state,actions);
+  useMangaPolicy(importService);
   const retained=useRetainedWorkspace();useEffect(()=>retained?.scope(state.user?.sub),[retained,state.user?.sub]);
   const [importTab,setImportTab]=useState('catalog');
   const guestSession=useGuestSession(),guest=!state.user?guestSession:null;

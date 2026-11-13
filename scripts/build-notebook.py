@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = ['server/source_parser.py', 'server/media_download.py', 'server/run_import.py',
          'server/vault_drive.py', 'server/player_catalog.py', 'server/player_compat.py', 'server/browser_player.py', 'server/public_page_data.py', 'server/requirements.txt','server/title_extras.py',
          'server/manga_sources.py','server/manga_novelcool.py','server/novelcool_client.py','server/manga_raw_adapters.py','server/manga_webtoons.py','server/manga_catalog_adapters.py','server/manga_download.py','server/title_identity.py','server/suwayomi_bridge.py',
-         'server/manga_hmanga.py','server/manga_source_tags.py','server/manga_source_coverage.py','server/manga_catalog_index.py','server/manga_tag_aliases.json','server/manga_catalog_metadata.py']
+         'server/manga_hmanga.py','server/manga_source_tags.py','server/manga_source_coverage.py','server/manga_catalog_index.py','server/manga_tag_policy.py','server/manga_tag_deploy.py','server/manga_catalog_metadata.py']
+CONFIG_FILES = ['server/manga-tag-policy.json']
 # GitHub serves repository LF bytes even when a Windows checkout uses CRLF.
 HASHES = {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for name in FILES}
 
@@ -58,6 +59,7 @@ from pathlib import Path
 import hashlib, json, shutil, subprocess, sys, urllib.request
 
 SOURCE_HASHES = ''' + repr(HASHES) + '''
+CONFIG_FILES = ''' + repr(CONFIG_FILES) + '''
 BASE = "https://raw.githubusercontent.com/Onikri/MediaVault/main/"
 RUNTIME = Path("/content/mediavault-server")
 RUNTIME.mkdir(parents=True, exist_ok=True)
@@ -72,6 +74,14 @@ if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
     subprocess.run(["apt-get", "-qq", "update"], check=True)
     subprocess.run(["apt-get", "-qq", "install", "-y", "ffmpeg"], check=True)
 sys.path.insert(0, str(RUNTIME))
+from manga_tag_policy import Policy
+for relative in CONFIG_FILES:
+    with urllib.request.urlopen(BASE + relative, timeout=45) as response:
+        data = response.read(1_000_001)
+    if len(data) > 1_000_000:
+        raise RuntimeError("Слишком большой файл правил тегов.")
+    Policy(json.loads(data))  # Mutable data only; executable sources remain hash-checked.
+    (RUNTIME / Path(relative).name).write_bytes(data)
 from run_import import validate_job, run_job
 from vault_drive import GoogleDriveAdapter, VaultDrive, VaultError
 from source_parser import SourceError

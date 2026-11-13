@@ -1,6 +1,8 @@
 import {useEffect,useMemo,useState} from 'react';
 import {Search,Tags} from 'lucide-react';
 import {loadMangaTaxonomy} from './manga-catalog.js';
+import {mangaFacetOptions} from './manga-catalog.js';
+import useMangaPolicy from './use-manga-policy.js';
 
 /** Public build-time vocabulary, independent of MediaVault server login. */
 // Lazy import keeps the large taxonomy in a separate Vite chunk.
@@ -13,7 +15,8 @@ const statuses = {
   closed:'Сайт закрыт',
 };
 
-export default function MangaStaticTags(){
+export default function MangaStaticTags({service}){
+  const policyVersion=useMangaPolicy(service);
   const [snapshot,setSnapshot]=useState(null);
   const [error,setError]=useState('');
   const [filter,setFilter]=useState('');
@@ -32,14 +35,14 @@ export default function MangaStaticTags(){
   const rows=useMemo(()=>{
     if(!snapshot)return [];
     const search=filter.toLocaleLowerCase('ru').trim();
-    return snapshot.tags.filter(tag=>(domain==='all'||tag.sources.includes(domain)) &&
+    return mangaFacetOptions(snapshot).map(tag=>({...tag,category:tag.type})).filter(tag=>(domain==='all'||tag.sources.includes(domain)) &&
       (!search||[tag.label,tag.key,...(tag.originalLabels||[])].some(value=>value.toLocaleLowerCase('ru').includes(search))));
-  },[snapshot,domain,filter]);
+  },[snapshot,domain,filter,policyVersion]);
   if(error)return <p className="fine" role="status">Статический справочник тегов пока недоступен: {error}</p>;
   if(!snapshot)return <p className="fine" role="status">Загружаем теги из статического каталога…</p>;
   const active=snapshot.sources.filter(s=>['complete','partial','stale'].includes(s.status)).length;
   return <details className="manga-static-taxonomy">
-    <summary><Tags size={15}/> Справочник тегов · {snapshot.tags.length} · {active}/{snapshot.sources.length} источников</summary>
+    <summary><Tags size={15}/> Справочник тегов · {mangaFacetOptions(snapshot).length} · {active}/{snapshot.sources.length} источников</summary>
     <div className="manga-source-manager-body">
       <p className="fine">Теги встроены в статический сайт и доступны без backend. Это данные публичных справочников, не гарантия охвата каждой манги.</p>
       <div className="manga-source-filters">
