@@ -24,7 +24,7 @@ export function mangaFacetOptions(snapshot,live=[],{sourceIds=[],sources={}}={})
   const type=['genre','genres'].includes(row.category||row.type)?'genre':'tag';
   const original=row.original||row.label||row.key;if(typeof original!=='string'||!original.trim())continue;
   const key=mangaTagKey(row.key)||mangaTagKey(original);if(!key)continue;
-  const label=mangaPolicy().rules.get(key).label,id=type+':'+key;
+  const label=mangaPolicy().label(key,original),id=type+':'+key;
   const prior=groups.get(id)||{key,label,type,originalLabels:[],works:0,sources:[]};
   prior.originalLabels=[...new Set([...prior.originalLabels,original,...row.originalLabels||[]])];
   prior.sources=[...new Set([...prior.sources,...row.sources||[]])];

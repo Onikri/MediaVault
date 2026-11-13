@@ -89,7 +89,8 @@ def lib_titles(payload,site_id,label,category):
         slug=row.get('slug_url');title=row.get('rus_name') or row.get('eng_name') or row.get('name')
         if not isinstance(slug,str) or not __import__('re').fullmatch(r'[\w-]{1,250}',slug) or not isinstance(title,str):continue
         field='genres' if category=='genre' else 'tags';facts=from_api(row);facts[field]=list(dict.fromkeys([*facts[field],label]))
-        rows.append({'kind':'manga','provider':provider,'providerName':name,'title':title,'aliases':[title],
+        format={'Манга':'manga','Манхва':'manhwa','Маньхуа':'manhua','Manga':'manga','Manhwa':'manhwa','Manhua':'manhua'}.get((row.get('type') or {}).get('label'),'manga')
+        rows.append({'kind':'manga','format':format,'provider':provider,'providerName':name,'title':title,'aliases':[title],
                      'url':root+'/ru/'+slug,'sourceUrl':root+'/ru/'+slug,'language':'ru',**lib_identity(row),**facts})
     return rows
 
@@ -117,9 +118,7 @@ def scan(store,keys=None):
                         matches=matching_terms(terms,domain,keys)
                         result['matched']=len(matches)
                         for term in matches[:4]:
-                            # Keiyoushi LibGroup's GenreList uses genres[] for both
-                            # explicit source genres and tags.
-                            params=[('site_id[]',site_id),('genres[]',term['sourceId']),('page',1),('fields[]','genres'),('fields[]','tags')]
+                            params=[('site_id[]',site_id),('genres[]' if term['category']=='genre' else 'tags[]',term['sourceId']),('page',1)]
                             data,_=checked_get(client,root+'/api/manga?'+urlencode(params),hosts,headers)
                             rows=lib_titles(json.loads(data),site_id,term['label'],term['category'])
                             with store.lock,store.db:result['indexed']+=upsert(store.db,rows)

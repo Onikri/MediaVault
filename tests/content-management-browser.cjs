@@ -9,6 +9,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
   const page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://**',r=>r.fulfill({json:{}}));await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/content-management/index.html');
   await page.getByRole('heading',{name:'Управление контентом',exact:true}).waitFor();
+  await page.getByLabel('Все найденные теги, кроме исключений').check();
   await page.getByLabel('Добавить названия из облака тегов').fill('Ecology\nМир океана');
   await page.getByRole('button',{name:'Добавить в справочник',exact:true}).click();
   await page.locator('.content-rule-list').getByRole('button',{name:/Ecology/}).click();
@@ -17,7 +18,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
   await page.getByRole('button',{name:'Удалить Hidden phrase',exact:true}).click();
   await page.getByRole('button',{name:'Сохранить и переиндексировать',exact:true}).click();
   await page.getByRole('status').filter({hasText:/Сохранено на Oracle/}).waitFor();
-  const saved=await page.evaluate(()=>window.__savedContent);assert.deepEqual(saved.excludedTerms,[]);assert.equal(saved.tags.find(row=>row.key==='ecology').label,'Экология');
+  const saved=await page.evaluate(()=>window.__savedContent);assert.equal(saved.includeDiscovered,true);assert.deepEqual(saved.excludedTerms,[]);assert.equal(saved.tags.find(row=>row.key==='ecology').label,'Экология');
   await page.getByRole('tab',{name:'Теги и жанры',exact:true}).click();
   await page.locator('.content-rule-list').getByRole('button',{name:/Путешествие/}).click();
   await page.getByRole('button',{name:'Удалить тег из каталога',exact:true}).click();

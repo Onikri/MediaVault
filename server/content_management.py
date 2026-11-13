@@ -15,11 +15,36 @@ _pending_all=False
 
 def directory():return Path(os.getenv('DATA_DIR','/data'))
 
-def public_policy():
-    with _update_lock:data=current().public()
-    return {'revision':hashlib.sha256(canonical_json(data)).hexdigest(),'policy':data,'scope':'all'}
+def public_policy(store=None):
+    with _update_lock:
+        if store is not None:
+            from content_vocabulary import public
+            return public(store)
+        data=current().public()
+        data.pop('includeDiscovered',None);data.pop('hiddenTags',None)
+        return {'revision':hashlib.sha256(canonical_json(data)).hexdigest(),'policy':data,'scope':'all'}
+
+def with_policy(result,revision,store):
+    value=public_policy(store)
+    return {**result,**({'tagPolicy':value} if value['revision']!=revision else {})}
+
+def prioritize(store,subject,tag='',genre=''):
+    if not current().include_discovered or not isinstance(subject,str) or subject.startswith(('guest:','share:')) or not (tag or genre):return
+    from catalogue_indexer import ensure
+    service=ensure(store)
+    if service:service.prioritize([*str(tag or '').split(','),genre])
 
 def save(store,data,expected):
+    data=json.loads(json.dumps(data))
+    # Deleting an explicitly configured rule in automatic mode must not let
+    # its original spellings silently reappear as newly discovered tags.
+    previous=current()
+    if data.get('includeDiscovered'):
+        remaining={row.get('key') for row in data.get('tags',[]) if isinstance(row,dict)}
+        hidden=list(data.get('hiddenTags',[]))
+        for key,row in previous.rules.items():
+            if key not in remaining:hidden.extend([key,row['label'],*row['aliases'],*(v for values in row.get('sourceAliases',{}).values() for v in values)])
+        data['hiddenTags']=list(dict.fromkeys(hidden))
     try:policy=Policy(data)
     except (ValueError,TypeError,KeyError):raise HTTPException(422,'Проверь названия, синонимы и повторяющиеся соответствия тегов.') from None
     with _update_lock,store.lock:
@@ -30,7 +55,15 @@ def save(store,data,expected):
         try:
             from manga_catalog_index import reindex
             with store.db:
-                count=reindex(store.db,policy)+content_catalog.reindex(store.db,policy)
+                if previous.include_discovered and policy.include_discovered and previous.data['tags']==policy.data['tags']:
+                    # Visibility changes need no corpus rewrite: source facts and
+                    # canonical lookup keys remain indexed independently.
+                    content_catalog.initialize(store.db)
+                    count=store.db.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]+store.db.execute('SELECT COUNT(*) FROM content_titles').fetchone()[0]
+                    store.db.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('revision',?)",(policy.revision,))
+                    store.db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('policy',?)",(policy.revision,))
+                    content_catalog.invalidate(store.db)
+                else:count=reindex(store.db,policy)+content_catalog.reindex(store.db,policy)
                 atomic_write(path,canonical_json(policy.data)+b'\n')
                 store.db.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('commit','private-owner')")
         except BaseException:
@@ -41,31 +74,30 @@ def save(store,data,expected):
         return {'revision':policy.revision,'unchanged':False,'reindexedTitles':count,'changedKeys':changed}
 
 def inventory(store,q='',limit=80):
+    from content_vocabulary import initialize
     policy=current();terms={}
-    def add(label,source,category,kind,identity):
-        token=normalize(label)
-        if not token:return
-        item=terms.setdefault(token,{'label':label,'sources':set(),'kinds':set(),'works':set(),'category':category})
-        if source:item['sources'].add(source)
-        item['kinds'].add(kind)
-        if identity:item['works'].add(kind+':'+identity)
-    with store.lock:
-        for identity,source,category,label in store.db.execute('SELECT f.title_id,t.source_url,f.category,f.original FROM catalog_tag_facts f JOIN catalog_titles t ON t.id=f.title_id'):
-            add(label,urlsplit(source).hostname or '',category,'manga',identity)
-        for identity,kind,source,category,label in content_catalog.facts(store.db):add(label,source,category,kind,identity)
-    try:cache=json.loads((directory()/'content-source-vocabulary.json').read_text())
-    except (OSError,ValueError):cache={}
-    for source in cache.get('sources',[]):
-        for row in source.get('terms',[]):add(row['label'],source['domain'],'genres' if row.get('category')=='genre' else 'tags','manga','')
-    query=normalize(q);results=[]
-    for token,row in terms.items():
-        score=1 if not query or query in token else difflib.SequenceMatcher(None,query,token).ratio()
-        if query and query not in token and score<.55:continue
-        keys={policy.key(row['label'],source) for source in row['sources'] or ['']}-{''}
-        results.append({'label':row['label'],'sources':sorted(row['sources']),'kinds':sorted(row['kinds']),
-                        'works':len(row['works']),'category':row['category'],'keys':sorted(keys),'score':round(score,3)})
-    results.sort(key=lambda row:(-row['score'],-row['works'],row['label']))
-    return {'items':results[:limit],'total':len(results)}
+    with store.lock,store.db:
+        content_catalog.initialize(store.db);initialize(store.db)
+        for label,source,category,kind in store.db.execute('SELECT label,source,category,kind FROM catalog_vocabulary'):
+            token=normalize(label)
+            item=terms.setdefault(token,{'label':label,'labels':set(),'sources':set(),'kinds':set(),'category':category})
+            item['labels'].add(label)
+            if source:item['sources'].add(source)
+            item['kinds'].add(kind)
+        query=normalize(q);results=[]
+        for token,row in terms.items():
+            score=1 if not query or query in token else difflib.SequenceMatcher(None,query,token).ratio()
+            if query and query not in token and score<.55:continue
+            keys={policy.key(row['label'],source) for source in row['sources'] or ['']}-{''}
+            results.append({'label':row['label'],'sources':sorted(row['sources']),'kinds':sorted(row['kinds']),
+                'category':row['category'],'keys':sorted(keys),'score':round(score,3),'labels':row['labels']})
+        results.sort(key=lambda row:(-row['score'],row['label']))
+        total=len(results);results=results[:limit]
+        for row in results:
+            labels=list(row.pop('labels'));marks=','.join('?' for _ in labels)
+            row['works']=store.db.execute('SELECT COUNT(DISTINCT title_id) FROM catalog_tag_facts WHERE original IN ('+marks+')',labels).fetchone()[0]+store.db.execute('SELECT COUNT(DISTINCT title_id) FROM content_tag_facts WHERE original IN ('+marks+')',labels).fetchone()[0]
+    return {'items':results,'total':total}
+
 
 def scan_status():
     try:
@@ -119,6 +151,9 @@ def recover(manager):
             keys=None if status.get('keys') is None or pending.get('all') else sorted(set(status.get('keys',[])+pending.get('keys',[])))
             start_scan(manager(),keys)
     except (OSError,ValueError):pass
+    if current().include_discovered:
+        from catalogue_indexer import ensure
+        ensure(manager())
 
 class PolicyUpdate(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -132,15 +167,24 @@ class CatalogueFacts(BaseModel):
 def install(app,owner,viewer,manager):
     @app.get('/admin/content')
     def read_content(subject=Depends(owner)):
+        if current().include_discovered:
+            from catalogue_indexer import ensure
+            service=ensure(manager())
+        else:service=None
         with _update_lock:
             policy=current()
-            return {'revision':policy.revision,'policy':policy.data,'job':scan_status(),'scope':'all','storage':'private-oracle'}
+            return {'revision':policy.revision,'policy':policy.data,'job':service.status() if service else scan_status(),'scope':'all','storage':'private-oracle'}
 
     @app.put('/admin/content/policy')
     def write_content(body:PolicyUpdate,subject=Depends(owner)):
         store=manager();result=save(store,body.policy,body.revision)
         keys=result.pop('changedKeys',[])
-        if keys:result['job']=start_scan(store,keys)
+        if current().include_discovered:
+            from catalogue_indexer import ensure
+            service=ensure(store)
+            if service:
+                service.prioritize([current().label(key) for key in keys]);result['job']=service.status()
+        elif keys:result['job']=start_scan(store,keys)
         return {**result,'policy':current().data,'scope':'all'}
 
     @app.get('/admin/content/vocabulary')
@@ -149,11 +193,30 @@ def install(app,owner,viewer,manager):
 
     @app.post('/admin/content/refresh')
     def refresh_content(subject=Depends(owner)):
+        if current().include_discovered:
+            from catalogue_indexer import ensure
+            service=ensure(manager())
+            if service:
+                from suwayomi_bridge import sources
+                service.seed(sources())
+                with service.store.lock,service.store.db:service.store.db.execute("UPDATE catalogue_jobs SET state='queued',due=0 WHERE state IN ('done','partial','retry','unsupported') AND spec NOT LIKE '%-detail%'")
+                return service.status()
         prior=scan_status()
         return start_scan(manager(),prior.get('keys') if prior.get('state') in {'failed','interrupted'} else None)
 
     @app.get('/admin/content/job')
-    def read_job(subject=Depends(owner)):return scan_status()
+    def read_job(subject=Depends(owner)):
+        if current().include_discovered:
+            from catalogue_indexer import ensure
+            service=ensure(manager())
+            if service:return service.status()
+        return scan_status()
+
+    @app.get('/catalog/status')
+    def public_status(subject=Depends(viewer)):
+        from catalogue_indexer import ensure
+        service=ensure(manager())
+        return service.status() if service else {'state':'disabled','indexed':0,'sources':[]}
 
     @app.post('/catalog/content/facts')
     def record_facts(body:CatalogueFacts,subject=Depends(owner)):
@@ -161,6 +224,8 @@ def install(app,owner,viewer,manager):
         with store.lock,store.db:return {'indexed':content_catalog.ingest(store.db,body.items)}
 
     @app.get('/catalog/content')
-    def content(q:str='',kind:str='anime',tag:str='',genre:str='',subject=Depends(viewer)):
+    def content(q:str='',kind:str='anime',tag:str='',genre:str='',offset:int=0,limit:int=60,tagPolicyRevision:str='',subject=Depends(viewer)):
         store=manager()
-        with store.lock:return content_catalog.browse(store.db,kind=kind,q=q[:160],tag=tag[:120],genre=genre[:120])
+        with store.lock:result=content_catalog.browse(store.db,kind=kind,q=q[:160],tag=tag[:120],genre=genre[:120],offset=offset,limit=limit)
+        prioritize(store,subject,tag,genre)
+        return with_policy(result,tagPolicyRevision,store)

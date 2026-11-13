@@ -35,14 +35,19 @@ def alias_domains(domain):
 
 class Policy:
     def __init__(self,data):
-        if not isinstance(data,dict) or set(data)!={'schemaVersion','tags','excludedTerms','excludedPrefixes'} or data['schemaVersion']!=1:
+        required={'schemaVersion','tags','excludedTerms','excludedPrefixes'}
+        if not isinstance(data,dict) or not required<=set(data) or set(data)-required-{'includeDiscovered','hiddenTags'} or data['schemaVersion']!=1:
             raise ValueError('Invalid manga tag policy schema')
+        if not isinstance(data.get('includeDiscovered',False),bool):raise ValueError('Invalid automatic vocabulary setting')
+        hidden=data.get('hiddenTags',[])
+        if not isinstance(hidden,list) or len(hidden)>20000 or any(not isinstance(v,str) or not normalize(v) or len(v)>120 for v in hidden):raise ValueError('Invalid hidden tag list')
+        self.include_discovered=data.get('includeDiscovered',False)
         if len(canonical_json(data))>MAX_BYTES:raise ValueError('Tag policy too large')
         for field in ('excludedTerms','excludedPrefixes'):
             if not isinstance(data[field],list) or len(data[field])>256 or any(not isinstance(v,str) or not normalize(v) or len(v)>120 for v in data[field]):
                 raise ValueError('Invalid tag exclusion list')
         if not isinstance(data['tags'],list) or len(data['tags'])>5000:raise ValueError('Invalid tag list')
-        self.data=json.loads(json.dumps(data));self.rules={};self.aliases={};self.scoped={};self.expanded={}
+        self.data=json.loads(json.dumps(data));self.rules={};self.aliases={};self.scoped={};self.expanded={};self._keys={};self._identities={}
         self.terms=[normalize(v) for v in data['excludedTerms']]
         self.prefixes=[normalize(v) for v in data['excludedPrefixes']]
         self.hidden=set()
@@ -74,6 +79,7 @@ class Policy:
                         token=(actual,normalize(alias))
                         if token in self.scoped and self.scoped[token]!=key:raise ValueError('Ambiguous source alias')
                         self.scoped[token]=key
+        self.hidden.update(self.aliases.get(normalize(v),normalize(v)) for v in hidden)
         self.revision=hashlib.sha256(canonical_json(self.data)).hexdigest()
 
     def clean(self,value):
@@ -86,15 +92,30 @@ class Policy:
         return text
 
     def key(self,value,source=''):
-        if not self.clean(value):return ''
-        key=self.scoped.get((source,normalize(value))) or self.aliases.get(normalize(value),'')
-        return key if key not in self.hidden else ''
+        if not isinstance(value,str):return ''
+        token=(value,source)
+        if token in self._keys:return self._keys[token]
+        norm=normalize(value);key=self.identity(value,source)
+        result=key if self.clean(value) and norm not in self.hidden and key not in self.hidden and (self.include_discovered or key in self.rules) else ''
+        if len(self._keys)>100000:self._keys.clear()
+        self._keys[token]=result;return result
+
+    def identity(self,value,source=''):
+        token=(value,source)
+        if token not in self._identities:
+            norm=normalize(value)
+            if len(self._identities)>100000:self._identities.clear()
+            self._identities[token]=self.scoped.get((source,norm)) or self.aliases.get(norm) or norm
+        return self._identities[token]
+
+    def label(self,key,fallback=''):
+        return self.rules.get(key,{}).get('label') or fallback or key
 
     def project(self,values,source=''):
         found={}
         for value in values if isinstance(values,(list,tuple)) else []:
             key=self.key(value,source)
-            if key:found[key]=self.rules[key]['label']
+            if key:found[key]=self.label(key,value)
         return list(found.values())[:120]
 
     def facts(self,row,source=''):
@@ -104,8 +125,9 @@ class Policy:
             for value in values if isinstance(values,(list,tuple)) else []:
                 key=self.key(value,source)
                 if not key:continue
-                rule=self.rules[key];target={'tag':'tags','genre':'genres'}.get(rule.get('category'),field)
-                if rule['label'] not in result[target]:result[target].append(rule['label'])
+                rule=self.rules.get(key,{});target={'tag':'tags','genre':'genres'}.get(rule.get('category'),field)
+                label=self.label(key,value)
+                if label not in result[target]:result[target].append(label)
         return {field:values[:120] for field,values in result.items()}
 
     def public(self):

@@ -3,6 +3,7 @@ import bundled from '../server/manga-tag-policy.json' with {type:'json'};
 export const normalizeTag=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export function compileMangaPolicy(data){
  if(data?.schemaVersion!==1||!Array.isArray(data.tags)||!Array.isArray(data.excludedTerms)||!Array.isArray(data.excludedPrefixes))throw Error('Неверный формат правил тегов.');
+ if(data.includeDiscovered!=null&&typeof data.includeDiscovered!=='boolean'||data.hiddenTags!=null&&!Array.isArray(data.hiddenTags))throw Error('Неверный режим справочника.');
  const rules=new Map(),aliases=new Map(),scoped=new Map(),hidden=new Set();
  const terms=data.excludedTerms.map(normalizeTag),prefixes=data.excludedPrefixes.map(normalizeTag);
  const clean=value=>typeof value==='string'&&value.trim().length>=1&&value.length<=120&&!terms.some(t=>(' '+normalizeTag(value)+' ').includes(' '+t+' '))&&!normalizeTag(value).split(' ').some(w=>prefixes.some(p=>w.startsWith(p)));
@@ -14,10 +15,12 @@ export function compileMangaPolicy(data){
   for(const value of [row.key,row.label,...row.aliases]){const alias=normalizeTag(value);if(!valid(value)||aliases.has(alias)&&aliases.get(alias)!==row.key)throw Error('Неоднозначный алиас тега.');aliases.set(alias,row.key);if(!clean(value))hidden.add(row.key);}
   for(const [domain,values] of Object.entries(row.sourceAliases||{}))for(const value of values){const alias=domain+':'+normalizeTag(value);if(!valid(value)||scoped.has(alias)&&scoped.get(alias)!==row.key)throw Error('Неоднозначный алиас источника.');scoped.set(alias,row.key);if(!clean(value))hidden.add(row.key);}
  }
- const key=(value,source='')=>{const id=clean(value)?scoped.get(source+':'+normalizeTag(value))||aliases.get(normalizeTag(value))||'':'';return hidden.has(id)?'':id;};
- const project=(values,source='')=>[...new Set((Array.isArray(values)?values:[]).map(v=>key(v,source)).filter(Boolean))].map(k=>rules.get(k).label);
- const facts=(row,source='')=>{const result={genres:[],tags:[]};for(const field of ['genres','tags'])for(const value of Array.isArray(row?.[field])?row[field]:[]){const id=key(value,source);if(!id)continue;const rule=rules.get(id),target=({genre:'genres',tag:'tags'})[rule.category]||field;if(!result[target].includes(rule.label))result[target].push(rule.label);}return result;};
- return {data,rules,key,project,facts};
+ for(const value of data.hiddenTags||[])hidden.add(aliases.get(normalizeTag(value))||normalizeTag(value));
+ const key=(value,source='')=>{const norm=normalizeTag(value),id=clean(value)&&!hidden.has(norm)?scoped.get(source+':'+norm)||aliases.get(norm)||(data.includeDiscovered?norm:''):'';return hidden.has(id)?'':id;};
+ const label=(id,fallback='')=>rules.get(id)?.label||fallback||id;
+ const project=(values,source='')=>{const found=new Map();for(const value of Array.isArray(values)?values:[]){const id=key(value,source);if(id)found.set(id,label(id,value));}return [...found.values()];};
+ const facts=(row,source='')=>{const result={genres:[],tags:[]};for(const field of ['genres','tags'])for(const value of Array.isArray(row?.[field])?row[field]:[]){const id=key(value,source);if(!id)continue;const rule=rules.get(id)||{},target=({genre:'genres',tag:'tags'})[rule.category]||field,name=label(id,value);if(!result[target].includes(name))result[target].push(name);}return result;};
+ return {data,rules,key,label,project,facts};
 }
 let active=compileMangaPolicy(bundled),version=0,scope='manga';
 const listeners=new Set();
@@ -25,10 +28,12 @@ export const mangaPolicy=()=>active;
 export const policyVersion=()=>version;
 export const subscribeMangaPolicy=listener=>{listeners.add(listener);return()=>listeners.delete(listener);};
 let revision='';
+export const contentPolicyRevision=()=>revision;
 export function setMangaPolicy(data,digest='',nextScope='manga'){
  if(digest&&digest===revision&&nextScope===scope)return;
  const next=compileMangaPolicy(data);active=next;revision=digest;scope=nextScope;version++;for(const listener of listeners)listener();
 }
+export function acceptContentPolicy(value){const next=value?.tagPolicy;if(next?.policy)setMangaPolicy(next.policy,next.revision,next.scope||'all');return value;}
 export function mangaPolicyFacts(row){
  let source='';try{source=new URL(row.sourceUrl||row.url||'').hostname;}catch{}
  return {...row,...active.facts(row,source)};
