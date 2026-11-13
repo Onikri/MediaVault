@@ -81,6 +81,17 @@ class CatalogIndexTests(unittest.TestCase):
         self.assertEqual(stats(self.db)['totalTitles'],1)
         self.assertEqual(browse(self.db,q='%" OR 1=1 --')['total'],0)
 
+    def test_libgroup_tags_from_title_details(self):
+        from unittest.mock import patch
+        from manga_catalog_adapters import inspect_catalog
+        detail={'data':{'rus_name':'Garden World','genres':[{'name':'Фэнтези'}],
+                        'tags':[{'name':'Romance'}]}}
+        chapters={'data':[{'number':'1','volume':'1','branches':[{}]}]}
+        with patch('manga_catalog_adapters.get',side_effect=[detail,chapters]):
+            item=inspect_catalog('https://hentailib.me/ru/garden-world',None)
+        self.assertEqual(item['genres'],['Фэнтези'])
+        self.assertEqual(item['tags'],['Romance'])
+
     def test_taxonomy_from_structured_and_html_metadata(self):
         self.assertEqual(from_api({'genres':[{'name':'Фэнтези'}],
                                    'tags':[{'name':{'ru':'Романтика','en':'Romance'}}]}),
