@@ -71,6 +71,12 @@ class ContinuousTests(unittest.TestCase):
   self.assertEqual(result['total'],8);self.assertEqual(len(result['items']),2);self.assertEqual(result['offset'],4)
 
 class Http2Contracts(unittest.TestCase):
+ def test_book_catalogue_has_a_stable_sort_and_advances_offset(self):
+  from catalogue_sources import fetch
+  with patch('metadata_catalog.get_json',return_value={'numFound':100,'docs':[{'key':'/works/OL1W','title':'Garden','subject':['Ecology']}]}) as get:
+   result=fetch({'type':'books','kind':'book'},{'page':2})
+  self.assertEqual(get.call_args.kwargs['params']['sort'],'key');self.assertEqual(get.call_args.kwargs['params']['offset'],40)
+  self.assertEqual(result['next'],{'page':3})
  def test_required_http2_transport_can_be_created_without_network(self):
   import httpx
   with httpx.Client(http2=True):pass

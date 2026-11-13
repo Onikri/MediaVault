@@ -146,7 +146,7 @@ def fetch(spec,cursor):
         data=get_json('https://fbphdplay.top/api/popular',params={'page':page,'type':'series' if spec['kind']=='tv' else 'films'});rows=movie_rows(data,spec['kind'])
         return {'rows':rows,'next':{'page':page+1} if rows else None}
     if kind=='books':
-        params={'limit':40,'offset':(page-1)*40,'fields':'key,title,subject,first_publish_year,cover_i'}
+        params={'limit':40,'offset':(page-1)*40,'sort':'key','fields':'key,title,subject,first_publish_year,cover_i'}
         params.update({'subject':spec['term']['label']} if spec.get('term') else {'q':'*:*'})
         data=get_json('https://openlibrary.org/search.json',params=params);rows=[]
         for item in data.get('docs',[]):

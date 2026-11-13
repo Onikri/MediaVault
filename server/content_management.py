@@ -214,6 +214,7 @@ def install(app,owner,viewer,manager):
 
     @app.get('/catalog/status')
     def public_status(subject=Depends(viewer)):
+        if not current().include_discovered:return {'state':'disabled','indexed':0,'sources':[]}
         from catalogue_indexer import ensure
         service=ensure(manager())
         return service.status() if service else {'state':'disabled','indexed':0,'sources':[]}
