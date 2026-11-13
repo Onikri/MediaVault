@@ -7,8 +7,8 @@ COPY src/ src/
 COPY lmt/ lmt/
 COPY reader-fonts/ reader-fonts/
 COPY scripts/build-lmt.mjs scripts/
-COPY vite.config.js index.html manga-export.html config.js spotify-callback.html translation-demo.html sw.js crypto.js drive.js selftest.html icon.svg manifest.webmanifest ./
-RUN npm run build && test -s dist/manga-export.html && test -s dist/lmt/index.html
+COPY vite.config.js index.html manga-export.html narration-export.html config.js spotify-callback.html translation-demo.html sw.js crypto.js drive.js selftest.html icon.svg manifest.webmanifest ./
+RUN npm run build && test -s dist/manga-export.html && test -s dist/narration-export.html && test -s dist/lmt/index.html
 
 FROM python:3.12-slim-bookworm
 ENV CHROMIUM_PATH=/usr/bin/chromium PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data

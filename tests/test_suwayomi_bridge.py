@@ -8,6 +8,16 @@ from source_parser import SourceError
 
 ENV={'PUBLIC_URL':'https://media.example','SUWAYOMI_URL':'http://suwayomi:4567','SUWAYOMI_AUTH_FILE':'/private/auth'}
 class BridgeTests(unittest.TestCase):
+    def test_inspection_retains_explicit_alternative_titles_used_by_source_search(self):
+        class Fake:
+            def close(self):pass
+            def get(self,path,*a,**kw):
+                if path=='/manga/8':return {'title':'Лунная дорога','realUrl':'https://source.example/road','description':'**Альтернативные названия**:\n- Moon Road\n- 달의 길\n\nОписание','source':{'id':'2','name':'Fixture','lang':'ru','baseUrl':'https://source.example'}}
+                if path=='/manga/8/chapters':return [{'index':1,'chapterNumber':1,'name':'Глава 1'}]
+                raise AssertionError(path)
+        with patch.object(bridge,'Client',Fake):
+            result=bridge.inspect(bridge.reference(8))
+        self.assertEqual(result['aliases'],['Лунная дорога','Moon Road','달의 길'])
     def setUp(self):self.env=patch.dict(os.environ,ENV);self.env.start();bridge._cache.clear()
     def tearDown(self):self.env.stop();bridge._cache.clear()
     def test_native_html_reader_recovers_same_saved_title_and_chapter(self):

@@ -33,7 +33,7 @@ def validate_job(value):
     # Reject accidental pasted credentials rather than saving or forwarding them.
     allowed = {"version", "library_id", "sources", "collection", "episodes", "quality", "resume", "season"}
     if value["version"] >= 2:
-        allowed |= {"section", "metadata", "entries", "dub", "provider", "translation", "alloha_mode"}
+        allowed |= {"section", "metadata", "entries", "dub", "provider", "translation", "alloha_mode", "output", "voice", "render"}
     if set(value) - allowed:
         raise SourceError("В задании есть лишние поля. Скопируй новое задание с сайта.")
     library = value.get("library_id", "")
@@ -92,10 +92,62 @@ def validate_job(value):
     if translation:
         if translation.get('kind') not in ({'manga'} if section=='manga' else {'voice','subtitles'}) or any(not isinstance(v,str) or len(v)>180 for v in translation.values()):
             raise SourceError('Некорректные параметры перевода.')
+    output = value.get("output", "text")
+    voice = value.get("voice") or None
+    if section in {"ranobe", "book"}:
+        if output not in {"text", "audio", "both"}:
+            raise SourceError("Выбери текст, аудиокнигу или оба варианта.")
+        voice = narration_direction(voice) if output != "text" else None
+    elif "output" in value or "voice" in value:
+        raise SourceError("Аудиокнига доступна только для ранобэ и книг.")
+    render = value.get("render") or None
+    if render is not None:
+        if section != "manga":
+            raise SourceError("Перевод страниц доступен только для манги.")
+        from manga_export import Translation
+        try:
+            render = Translation.model_validate(render).model_dump()
+        except Exception:
+            raise SourceError("Некорректные настройки перевода манги.") from None
     return {"version":value['version'],"library_id": library, "sources": sources, "collection": collection,
             "quality": quality, "selected": selected, "chapters":chapters,"season": int(season), "section": section,
             "metadata": metadata, "entries": prepared, "translation":translation, "dub": str(value.get("dub", ""))[:120],
-            "alloha_mode": alloha_mode}
+            "alloha_mode": alloha_mode, "output": output, "voice": voice, "render": render}
+
+
+ROLE_MODELS = {"gemini-3.5-flash-lite", "gemma-4-26b-a4b-it", "gemma-4-31b-it"}
+BIBLE_MODELS = {"gemini-3.5-flash-lite", "gemma-4-31b-it"}
+
+
+def narration_direction(value):
+    """What the owner's reader knows about the book's voices (src/tts/chapter-script.js
+    bookDirection): narrator choice, pace, role models, the listener's voice choices
+    and the title bible. The VM director voices the book the same way."""
+    from gemini_voice import VOICES
+    if not isinstance(value, dict) or set(value) - {"prefs", "saved", "cast", "bible", "language"}:
+        raise SourceError("Не хватает настроек озвучки. Открой окно сохранения заново.")
+    if len(json.dumps(value, ensure_ascii=False).encode()) > 160000:
+        raise SourceError("Настройки озвучки книги слишком большие.")
+    prefs = value.get("prefs") or {}
+    if not isinstance(prefs, dict) or set(prefs) - {"geminiNarrator", "narrator", "pace", "roles", "rolesModel", "bibleModel"}:
+        raise SourceError("Некорректные настройки озвучки.")
+    narrator = prefs.get("geminiNarrator", "auto")
+    pace = prefs.get("pace", 1)
+    if (narrator not in VOICES | {"auto", "m", "f"} or isinstance(pace, bool) or not isinstance(pace, (int, float)) or not .5 <= pace <= 2
+            or prefs.get("rolesModel", "gemini-3.5-flash-lite") not in ROLE_MODELS or prefs.get("bibleModel", "gemini-3.5-flash-lite") not in BIBLE_MODELS
+            or not isinstance(prefs.get("roles", True), bool) or not isinstance(prefs.get("narrator", "auto"), str) or len(prefs.get("narrator", "auto")) > 40):
+        raise SourceError("Некорректные настройки озвучки.")
+    for key in ("saved", "cast"):
+        if not isinstance(value.get(key) or {}, dict):
+            raise SourceError("Некорректный каст голосов.")
+    if value.get("bible") is not None and not isinstance(value["bible"], dict):
+        raise SourceError("Некорректная карточка книги для озвучки.")
+    language = value.get("language", "ru")
+    if language not in {"ru", "uk"}:
+        raise SourceError("Аудиокнига озвучивается на русском или украинском.")
+    return {"prefs": {"geminiNarrator": narrator, "narrator": prefs.get("narrator", "auto"), "pace": pace, "roles": prefs.get("roles", True),
+                      "rolesModel": prefs.get("rolesModel", "gemini-3.5-flash-lite"), "bibleModel": prefs.get("bibleModel", "gemini-3.5-flash-lite")},
+            "saved": value.get("saved") or {}, "cast": value.get("cast") or {}, "bible": value.get("bible"), "language": language}
 
 
 def source_identity(url):
@@ -191,7 +243,7 @@ def video_import_source(job, entry, http):
     return url, parent
 
 
-def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None, alloha_downloader=None, alloha_cache=None, alloha_streamer=None, staged_source=None):
+def run_job(value, vault, *, resolver=None, downloader=download_episode, log=print, progress=None, cancelled=None, temporary_dir=None, start_index=0, max_files=None, on_saved=None, alloha_downloader=None, alloha_cache=None, alloha_streamer=None, staged_source=None, audiobook=None, manga_translator=None):
     job = validate_job(value)
     if getattr(vault, "library_id", None) != job["library_id"]:
         raise SourceError("Открытая библиотека не совпадает с заданием.")
@@ -219,10 +271,22 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
             # Old queued jobs keep their exact fingerprints and recovery behavior.
             # New jobs may intentionally import another quality of the same dub.
             if job['version']>=3:identity+=':quality='+job['quality']
+            if job.get('render'):identity+=':render='+__import__('hashlib').sha256(json.dumps(job['render'],sort_keys=True).encode()).hexdigest()
             label = f"Серия {number}" if number is not None else f"Видео {index}"
             emit({"current": index, "total": len(plans), "episode": number, "title": collection,
                   "phase": "preparing", "operation": "Проверяем, есть ли этот файл в Drive", **result})
             category = "manga" if job["section"] == "manga" else "book" if job["section"] in {"ranobe", "book"} else "video"
+            if category == "book" and job.get("output", "text") != "text":
+                outcome = save_book_chapter(job, entry, vault, identity=identity, collection=collection, number=number, season=season,
+                                            label=f"[{index}/{len(plans)}] {label}", http=resolver.http,
+                                            emit=lambda event, index=index, number=number, collection=collection: emit({"current": index, "total": len(plans), "episode": number, "title": collection, **event}),
+                                            log=log, cancelled=cancelled, temporary_dir=temporary_dir, audiobook=audiobook, on_saved=on_saved)
+                result[outcome] += 1
+                if outcome == "saved":
+                    emit({**result, "phase": "episode_done"})
+                if cancelled and cancelled():
+                    break
+                continue
             # Check before contacting the player, because its signed links expire.
             if vault.completed(identity, collection=collection, episode=number, category=category):
                 result["skipped"] += 1
@@ -251,7 +315,14 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                             if text:
                                 log(f"  {label}: {text}.")
                             last_phase[0] = phase
-                    if category == "manga":
+                    if category == "manga" and job.get("render"):
+                        # The VM translates the chapter with the reader's own renderer; it is then encrypted like any chapter.
+                        if not manga_translator:
+                            raise SourceError("Перевод манги в Google Диск выполняет только сервер импорта.")
+                        path = manga_translator(entry, temporary, resolver.http, render=job["render"], quality=job["quality"],
+                                                collection=collection, progress=report, cancelled=cancelled)
+                        page = type("Chapter", (), {"title": entry["title"]})()
+                    elif category == "manga":
                         path = download_chapter(entry["url"], temporary, resolver.http,progress=report,quality=job["quality"])
                         page = type("Chapter", (), {"title": entry["title"]})()
                     elif category == "book":
@@ -321,12 +392,7 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
                 number_label=str(number).zfill(3) if isinstance(number,int) else str(number)
                 name = (f"{collection} — {noun} {number_label}.{extension}" if number is not None
                         else (page.title or entry["title"] or collection)[:220] + "." + extension)
-                options = {"metadata": job["metadata"], "dub": job["dub"]} if job["metadata"] or job["dub"] else {}
-                if job.get('translation'):options['translation']=job['translation']
-                from title_extras import russian
-                episode_title=russian(entry.get('title'))
-                if episode_title and not re.fullmatch(r'(?:Серия|Эпизод)\s*\d+',episode_title,re.I):options['episode_title']=episode_title
-                if russian(entry.get('description')):options['episode_description']=russian(entry['description'])
+                options = file_options(job, entry)
                 if category == 'video' and streaming is None:
                     height=video_height(path)
                     if height:options['quality']=height
@@ -357,15 +423,147 @@ def run_job(value, vault, *, resolver=None, downloader=download_episode, log=pri
             resolver.http.close()
 
 
+def file_options(job, entry):
+    """Library fields shared by every file of an import: title card, dub, episode text."""
+    options = {"metadata": job["metadata"], "dub": job["dub"]} if job["metadata"] or job["dub"] else {}
+    if job.get('translation'):options['translation']=job['translation']
+    from title_extras import russian
+    episode_title=russian(entry.get('title'))
+    if episode_title and not re.fullmatch(r'(?:Серия|Эпизод)\s*\d+',episode_title,re.I):options['episode_title']=episode_title
+    if russian(entry.get('description')):options['episode_description']=russian(entry['description'])
+    return options
+
+
+def save_book_chapter(job, entry, vault, *, identity, collection, number, season, label, http, emit, log, cancelled, temporary_dir, audiobook, on_saved=None):
+    """Text and/or audiobook of one ranobe/book chapter. Each output has its own
+    fingerprint: a chapter whose text is already in Drive gets only its audio."""
+    import hashlib
+    from ranobe_audiobook import PhraseCache, encode_opus, script_rows, synthesize
+    direction = job.get("voice") or {}
+    # Another narrator, pace, role model or voice choice is another audiobook;
+    # the bible and the cast grow while a book is voiced and do not count.
+    voicing = {key: direction.get(key) for key in ("prefs", "saved", "language")}
+    audio_identity = identity + ":audio=" + hashlib.sha256(json.dumps(voicing, sort_keys=True).encode()).hexdigest()
+    outputs = {"text": ["text"], "audio": ["audio"], "both": ["text", "audio"]}[job["output"]]
+    emit({"phase": "preparing", "operation": "Проверяем, есть ли эта глава в Drive"})
+    wanted = [kind for kind in outputs if not vault.completed(identity if kind == "text" else audio_identity,
+                                                                collection=collection, episode=number, category="book")]
+    if not wanted:
+        log(f"{label}: уже в Drive, пропускаю.")
+        return "skipped"
+    if "audio" in wanted and not audiobook:
+        raise SourceError("Аудиокнигу в Google Диск собирает только сервер импорта.")
+
+    def report(event):
+        if cancelled and cancelled():
+            raise SourceError("Импорт отменён владельцем.")
+        event = dict(event)
+        if "total" in event:
+            event["bytesTotal"] = event.pop("total")
+        if "loaded" in event:
+            event["bytesLoaded"] = event.pop("loaded")
+        event.setdefault("operation", "")
+        emit(event)
+
+    number_label = str(number).zfill(3) if isinstance(number, int) else str(number)
+    base = f"{collection} — глава {number_label}" if number is not None else (entry["title"] or collection)[:220]
+    part = f"Том {season}"
+    with tempfile.TemporaryDirectory(prefix="mediavault-chapter-", dir=temporary_dir) as temporary:
+        try:
+            emit({"phase": "downloading", "operation": "Загружаем текст главы"})
+            text = chapter_text(entry["url"], http)
+        except SourceError as error:
+            emit({"sourceError": re.sub(r'https?://\S+', '[ссылка]', str(error))[:400]})
+            log(f"  {label}: {error}")
+            return "failed"
+        if "text" in wanted:
+            path = Path(temporary) / "chapter.txt"
+            path.write_bytes(text["file"].encode("utf-8"))
+            options = file_options(job, entry)
+            options.update(name=base + ".txt", category="book", collection=collection, episode=number, source_identity=identity,
+                           mime="text/plain", progress=report, section=job["section"], part=part, season=season)
+            saved = vault.upload_file(path, **options)
+            if on_saved:
+                on_saved(saved)
+        if "audio" in wanted:
+            metadata = job["metadata"]
+            meta = {"title": str(metadata.get("title") or collection)[:300], "aliases": metadata.get("aliases") or [], "authors": metadata.get("authors") or [],
+                    "description": re.sub(r"<[^>]+>", "", str(metadata.get("description") or ""))[:1200], "year": metadata.get("year"),
+                    "kind": metadata.get("kind") or job["section"], "language": direction.get("language", "ru")}
+            try:
+                emit({"phase": "directing", "operation": "Режиссёр размечает роли и голоса главы"})
+                rows = script_rows(audiobook["script"](text["paragraphs"], book_key=job["sources"][0], chapter_key=entry["url"],
+                                                       meta=meta, direction=direction, cancelled=cancelled))
+            except SourceError as error:
+                emit({"sourceError": str(error)[:400]})
+                log(f"  {label}: {error}")
+                return "failed"
+            if not rows:
+                emit({"sourceError": "В главе нет текста для озвучки."})
+                return "failed"
+            directory = audiobook.get("cache_dir")
+            cache = PhraseCache(directory) if directory else None
+            try:
+                pcm, phrases = synthesize(rows, language=direction.get("language", "ru"),
+                                          keys=audiobook["keys"](), scope=job["library_id"], cache=cache, progress=report,
+                                          cancelled=cancelled or (lambda: False),
+                                          **({"speak_phrase": audiobook["speak"]} if audiobook.get("speak") else {}))
+            except SourceError as error:
+                emit({"sourceError": str(error)[:400]})
+                log(f"  {label}: {error}")
+                return "failed"
+            emit({"phase": "assembling", "operation": "Собираем файл аудиокниги"})
+            authors = ", ".join(str(value) for value in (job["metadata"].get("authors") or []) if value)[:300]
+            path = (audiobook.get("encode") or encode_opus)(pcm, Path(temporary) / "chapter.opus", tags={
+                "title": entry.get("title") or text["title"] or base, "album": collection, "artist": authors, "genre": "Audiobook",
+                "track": str(number) if number is not None else "", "comment": "Синтезированная озвучка MediaVault: Gemini 2.5 Flash Native Audio"})
+            options = file_options(job, entry)
+            options.update(name=base + ".opus", category="book", collection=collection, episode=number, source_identity=audio_identity,
+                           mime="audio/ogg", progress=report, section=job["section"], part=part, season=season)
+            saved = vault.upload_file(path, **options)
+            if cache:
+                cache.forget(phrases)
+            if on_saved:
+                on_saved(saved)
+    log(f"  {label}: сохранено ({' и '.join({'text': 'текст', 'audio': 'аудио'}[kind] for kind in wanted)}).")
+    return "saved"
+
+
+def translate_chapter(owner, entry, temporary, http, *, render, quality, collection, progress, cancelled=None):
+    """One manga chapter translated on the VM (manga_export.produce, the reader's renderer) as a CBZ."""
+    from types import SimpleNamespace
+    from manga_export import Options, produce
+
+    class Budget:
+        maximum = 2 * 1024**3
+        def check(self):
+            if cancelled and cancelled():
+                raise SourceError("Импорт отменён владельцем.")
+    options = Options.model_validate({"mode": "translate", "format": "cbz", "name": (collection or "Манга")[:180],
+                                      "chapters": [{"url": entry["url"], "number": float(entry["number"]), "volume": int(entry.get("season") or 1),
+                                                    "title": str(entry.get("title") or "")[:200]}],
+                                      "translation": render}).model_dump()
+    task = SimpleNamespace(owner=owner, directory=Path(temporary), quality=quality, manga=options)
+    return produce(task, http, Budget(), progress)
+
+
 def download_chapter(url, temporary, http,progress=lambda _:None,quality='best'):
     from manga_download import download_chapter as download
     return download(url,temporary,http,progress=progress,quality=quality)
 
 
 def download_text(url, temporary, http):
-    # Ranobe and public-domain book chapters come through the same adapters as
-    # the online reader (RanobeHub, Zenko, Gutenberg, Wikisource…); any other
-    # page falls back to its main article text.
+    path = Path(temporary) / "chapter.txt"
+    path.write_bytes(chapter_text(url, http)["file"].encode("utf-8"))
+    return path
+
+
+def chapter_text(url, http):
+    """{title, paragraphs, file} of one chapter.
+
+    Ranobe and public-domain book chapters come through the same adapters as
+    the online reader (RanobeHub, Zenko, Gutenberg, Wikisource…); any other
+    page falls back to its main article text."""
     try:
         from ranobe_sources import chapter
         data = chapter(url)
@@ -378,10 +576,9 @@ def download_text(url, temporary, http):
     if data and data.get("paragraphs"):
         lines = [str(p.get("text", "") if isinstance(p, dict) else p).strip() for p in data["paragraphs"]]
         title = str(data.get("title") or "").strip()
-        path = Path(temporary) / "chapter.txt"
-        body = "\n\n".join(line for line in lines if line)
-        path.write_text((title + "\n\n" + body) if title else body, encoding="utf-8")
-        return path
+        paragraphs = [line for line in lines if line]
+        body = "\n\n".join(paragraphs)
+        return {"title": title, "paragraphs": paragraphs, "file": (title + "\n\n" + body) if title else body}
     from bs4 import BeautifulSoup
     text, _, _ = http.document(url)
     soup = BeautifulSoup(text, "html.parser")
@@ -390,6 +587,5 @@ def download_text(url, temporary, http):
         raise SourceError("Публичный текст главы не найден.")
     for tag in article.select("script, style, nav, form"):
         tag.decompose()
-    path = Path(temporary) / "chapter.txt"
-    path.write_text(article.get_text("\n", strip=True), encoding="utf-8")
-    return path
+    text = article.get_text("\n", strip=True)
+    return {"title": "", "paragraphs": [line.strip() for line in text.split("\n") if line.strip()], "file": text}

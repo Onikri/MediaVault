@@ -137,7 +137,10 @@ class TaskStore:
 
     def next(self):
         with self.lock, self.database:
-            queued=self.database.execute("SELECT id,data FROM tasks WHERE status='queued' ORDER BY updated,created").fetchall()
+            queued=self.database.execute("SELECT id,data,progress FROM tasks WHERE status='queued' ORDER BY updated,created").fetchall()
+            # A task waiting for voice quota (resumeAt) stays queued until then.
+            now=time.time()
+            queued=[r for r in queued if float(self.open(r[2],r[0]).get('resumeAt') or 0)<=now]
             # Interactive imports should not wait behind background decoration.
             row=next((r for r in queued if self.open(r[1],r[0]).get('kind')!='enrich'),queued[0] if queued else None)
             if row:

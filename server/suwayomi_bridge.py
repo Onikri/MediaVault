@@ -302,9 +302,10 @@ def inspect(value):
             pages=[reference(manga,chapter,i) for i in range(count)]
             episodes=[e for e in episodes if e['url']==value]
         episodes.sort(key=lambda e:(e['season'],e['number'],e['translator']))
+        from manga_discovery import public_aliases
         try:canonical=public_url(data.get('realUrl') or urljoin(source.get('baseUrl',''),data.get('url','')),resolve_dns=False)
         except SourceError:canonical=''
-        return {'sourceId':str(source['id']),'sourceUrl':canonical,**from_api(data),'provider':'suwayomi:'+str(source['id']),'providerName':source['name'],'title':data['title'],'aliases':[data['title']],'url':value,'kind':'manga','language':lang,'episodes':episodes,'pages':pages,'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({e['season'] for e in episodes})],'translations':sorted({e['translator'] for e in episodes if e['translator']}),'cover':'','description':data.get('description') or '','dubs':[],'releases':[],'truncated':len(chapters)>1500,**({'format':'manhwa','readingMode':'scroll'} if lang=='ko' else {})}
+        return {'sourceId':str(source['id']),'sourceUrl':canonical,**from_api(data),'provider':'suwayomi:'+str(source['id']),'providerName':source['name'],'title':data['title'],'aliases':public_aliases(data),'url':value,'kind':'manga','language':lang,'episodes':episodes,'pages':pages,'seasons':[{'number':n,'name':'Том '+str(n)} for n in sorted({e['season'] for e in episodes})],'translations':sorted({e['translator'] for e in episodes if e['translator']}),'cover':'','description':data.get('description') or '','dubs':[],'releases':[],'truncated':len(chapters)>1500,**({'format':'manhwa','readingMode':'scroll'} if lang=='ko' else {})}
     finally:client.close()
 
 def native_reader_url(client,data,source,manga,chapter=None):

@@ -22,7 +22,7 @@ import {kinds} from './ImportParts.jsx';
 import TitleSourcePicker from './TitleSourcePicker.jsx';
 import SourceFilter from './SourceFilter.jsx';
 import useMangaSourceInfo from './use-manga-source-info.js';
-import {matchingMangaSources} from './manga-source-identity.js';
+import {matchingMangaSources,mangaInspectionTitle} from './manga-source-identity.js';
 import {mangaPublication} from './title-details.js';
 export default function MangaImport({state,service,item,onSubmitted,onOpenLibrary,manual,onKindChange,destination='drive',compact=false,sheet=false,preferredSource='',expected=0,onPublication,initialLanguage=''}){
  const localAbort=useRef(null);
@@ -90,9 +90,10 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  }},[url,sourceInfo[url]?.readable,sourceInfo[url]?.state]);
  async function inspect(value,automatic=false,targetChapter=null){
   if(!value)return;if(!automatic){manualSource.current=true;setOnline(false);}const version=++generation.current;setUrl(value);setBusy('inspect');setInspection(null);setError('');
+  const inspectionTitle=mangaInspectionTitle(searchTitle,sources.find(s=>s.url===value));
   try{
    const cached=automatic||targetChapter?sourceInfo[value]:null;
-   const data=cached?.inspection||await service.request('/manga/inspect',{method:'POST',body:{url:value,...(item?{title:searchTitle}:{}),verifyPages:false,refresh:!automatic}});
+   const data=cached?.inspection||await service.request('/manga/inspect',{method:'POST',body:{url:value,...(item?{title:inspectionTitle}:{}),verifyPages:false,refresh:!automatic}});
    if(version!==generation.current)return;
    if(!['ru','uk','en','ja','ko'].includes(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
    if(!data.episodes?.length)throw Error('У этого тайтла нет открытых глав на языке «'+mangaLanguageName(data.language)+'».');
@@ -103,7 +104,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
     }
     return;
    }
-   const result=await service.request('/manga/summary',{method:'POST',body:{url:value,...(item?{title:searchTitle}:{}),verifyPages:Number(service.session?.serverVersion)>=47,refresh:!automatic}});
+   const result=await service.request('/manga/summary',{method:'POST',body:{url:value,...(item?{title:inspectionTitle}:{}),verifyPages:Number(service.session?.serverVersion)>=47,refresh:!automatic}});
    if(version!==generation.current)return;setInspection(old=>old?{...old,...result}:old);
    if(result.readable===false)setError(result.readabilityError||'Источник не отдал страницу.');
   }catch(cause){if(version===generation.current){setError(cause.message);setInspection(old=>old?{...old,readable:false,readabilityError:cause.message}:old);}}finally{if(version===generation.current)setBusy('');}
@@ -111,8 +112,13 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  function startReader(){if(!sourceReady){setError(inspection?.readabilityError||'Главы получены. Проверяем загрузку страницы…');return;}setOnline(true);}
 
  const selection=mode==='range'?first+'-'+last:mode==='list'?list:'all';let chosen=[],selectionError='';try{chosen=selectChapters(inspection?.episodes||[],{volume,team,selection,language:inspection?.language||'ru'});if(mode==='single')chosen=chosen.filter(e=>e.url===one);}catch(cause){selectionError=cause.message;}
+ // The VM translates Drive chapters too (server 71+, renderer assets installed).
+ const driveTranslation=destination==='drive'&&sheet&&service.session?.mangaDriveTranslation===true;
+ const driveTranslate=driveTranslation&&exportSettings.mode==='translate';
  async function submit(event){event.preventDefault();setError('');if(!sourceReady){setError(inspection?.readabilityError||'Проверяем доступность страниц.');return;}if(destination==='online'){if(chosen.length&&!selectionError)startReader();return;}if(destination==='local'){if(!chosen.length||selectionError){setError(selectionError||'Выбери главы.');return;}setBusy('local');const controller=new AbortController();localAbort.current=controller;try{await exportLocally({signal:controller.signal,entries:chosen,kind:'manga',quality,service,manga:exportSettings,cacheContext:{name:collection,userId:state.user?.sub},onProgress:setLocalProgress});setLocalProgress('Файлы переданы браузеру для сохранения.');}catch(e){setError(e.message);}finally{setBusy('');}return;}if(!ready||!supported||!inspection)return;if(selectionError){setError(selectionError);return;}if(!chosen.length){setError('Выбранные главы не опубликованы в этом переводе.');return;}if(chosen.length>1000){setError('Выбери до 1000 глав за один импорт.');return;}
-  const job={version:3,library_id:state.libraryId,sources:[inspection.url||url],collection:collection.trim(),season:volume==='all'?1:Number(volume),episodes:'all',quality,resume:true,section:'manga',metadata:{...mangaMetadata(item),format:inspection.format||item?.format||'manga',readingMode:inspection.readingMode,sourceLanguage:inspection.language,...(!item?{title:collection.trim(),cover:inspection.cover}: {})},dub:team,translation:{name:team||(inspection.language==='ru'?'Перевод':'Оригинал · '+inspection.language.toUpperCase()),kind:'manga',language:inspection.language},provider:inspection.provider,entries:chosen.map(e=>({number:e.number,url:e.url,title:e.title||'Глава '+e.number,season:Number(e.season||1)}))};
+  const job={version:3,library_id:state.libraryId,sources:[inspection.url||url],collection:collection.trim(),season:volume==='all'?1:Number(volume),episodes:'all',quality,resume:true,section:'manga',metadata:{...mangaMetadata(item),format:inspection.format||item?.format||'manga',readingMode:inspection.readingMode,sourceLanguage:inspection.language,...(!item?{title:collection.trim(),cover:inspection.cover}: {})},dub:team,translation:{name:team||(inspection.language==='ru'?'Перевод':'Оригинал · '+inspection.language.toUpperCase()),kind:'manga',language:inspection.language},
+   // A translated chapter is its own «translation» of the title next to the original.
+   ...(driveTranslate?{quality:'best',render:exportTranslation(exportSettings),dub:('Перевод MediaVault'+(team?' · '+team:'')).slice(0,120),translation:{name:'Перевод MediaVault',kind:'manga',language:'ru'}}:{}),provider:inspection.provider,entries:chosen.map(e=>({number:e.number,url:e.url,title:e.title||'Глава '+e.number,season:Number(e.season||1)}))};
   setBusy('submit');try{await service.submit(job);onSubmitted?.();}catch(cause){setError(cause.message);}finally{setBusy('');}
  }
  const readerEntries=inspection&&compact?selectChapters(inspection.episodes,{volume,team,language:inspection.language}):chosen;
@@ -202,10 +208,11 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
     {mode==='list'&&<input className="field-input" aria-label="Список глав" placeholder="0, 1-20, 25.5" value={list} onChange={e=>setList(e.target.value)}/>}
     <p className="fine">{selectionError||'К добавлению: '+chosen.length+' глав. Дробные главы и экстра сохраняются отдельно.'}</p>
    </div>}</>}
-  {sheet&&inspection&&(destination==='drive'?<p className="export-hint">В Google Диск сервер сохраняет исходные страницы глав. Главы с переводом сохраняются на устройство.</p>
-   :<div className="export-field"><span>Что сохранить</span><UiSegmented className="is-wide" label="Что сохранить" value={exportSettings.mode==='original'?'original':'translate'} options={translateChoice} disabled={!!busy} onChange={mode=>setExportSettings(v=>({...v,mode}))}/></div>)}
+  {sheet&&inspection&&(destination==='drive'&&!driveTranslation?<p className="export-hint">В Google Диск сервер сохраняет исходные страницы глав. Для перевода в Google Диск обнови сервер MediaVault.</p>
+   :destination!=='online'&&<div className="export-field"><span>Что сохранить</span><UiSegmented className="is-wide" label="Что сохранить" value={exportSettings.mode==='original'?'original':'translate'} options={translateChoice} disabled={!!busy} onChange={mode=>setExportSettings(v=>({...v,mode}))}/></div>)}
   {destination==='local'&&inspection&&<MangaExportSettings hideMode={sheet} value={exportSettings} onChange={setExportSettings} disabled={!!busy}/>}
-  {destination!=='online'&&inspection&&(destination!=='local'||exportSettings.mode==='original')&&<label className="form-field input-label">{destination==='local'?'Изображения в файле':'Изображения в Drive'}<select aria-label="Качество страниц манги" className="field-input" value={quality} onChange={e=>setQuality(e.target.value)}><option value="best">Оригинал · без изменений</option><option value="1920">Сбалансированно · до 1920 px</option><option value="1280">Экономия трафика · до 1280 px</option></select><small className="fine">{destination==='local'?'Сжатие выполняет сервер перед сохранением файла.':'Сжатие выполняет сервер до шифрования.'} Исходные размеры при уменьшении не восстановить.</small></label>}
+  {driveTranslate&&inspection&&<><MangaExportSettings translationOnly value={exportSettings} onChange={setExportSettings} disabled={!!busy}/><p className="export-hint">Сервер переводит главы на ВМ теми же моделями, что и читалка, затем шифрует и записывает их в Google Диск отдельным переводом рядом с оригиналом, даже если компьютер выключен.</p></>}
+  {destination!=='online'&&inspection&&(destination==='drive'?!driveTranslate:exportSettings.mode==='original')&&<label className="form-field input-label">{destination==='local'?'Изображения в файле':'Изображения в Drive'}<select aria-label="Качество страниц манги" className="field-input" value={quality} onChange={e=>setQuality(e.target.value)}><option value="best">Оригинал · без изменений</option><option value="1920">Сбалансированно · до 1920 px</option><option value="1280">Экономия трафика · до 1280 px</option></select><small className="fine">{destination==='local'?'Сжатие выполняет сервер перед сохранением файла.':'Сжатие выполняет сервер до шифрования.'} Исходные размеры при уменьшении не восстановить.</small></label>}
   {destination!=='online'&&Number(service.session?.serverVersion)>=11&&chosen.length>0&&<button type="button" className="btn btn-secondary online-launch" disabled={!!busy||service.status!=='connected'} onClick={startReader}><BookOpen size={17}/>Читать сейчас · без импорта</button>}
   {destination==='drive'&&<ImportReadiness state={state} service={service} onOpenLibrary={onOpenLibrary}/>}{localProgress&&<p className="world-local-progress" role="status">{localProgress}{busy==='local'&&<button type="button" className="text-link" onClick={()=>localAbort.current?.abort(new DOMException('Скачивание остановлено','AbortError'))}>Остановить</button>}</p>}{error&&<p className="inline-error" role="alert">{error}</p>}
   <button className="btn btn-primary import-submit" id="importMangaBtn" type="submit" disabled={(destination==='drive'?!ready||!!state.busy:service.status!=='connected')||!supported||!!busy||!chosen.length||!!selectionError}><BookOpen size={17}/>{busy==='submit'?'Отправляем…':destination==='online'?'Читать сейчас':destination==='local'?(busy==='local'?'Подготавливаем файлы…':'Сохранить на устройство'):chosen.length?'Добавить '+chosen.length+' '+(chosen.length%100>=11&&chosen.length%100<=14?'глав':chosen.length%10===1?'главу':chosen.length%10>=2&&chosen.length%10<=4?'главы':'глав')+' в коллекцию':'Импортировать главы'}<ArrowRight size={16}/></button>

@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: mediavault-${{ github.ref }}
+  # Keep an explicit audit running when another release is pushed.
+  group: mediavault-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'latest' }}
   cancel-in-progress: true
 
 jobs:
@@ -95,6 +96,17 @@ jobs:
         run: |
           npm run test:notebook
 
+      - name: Direct translation browser contract
+        if: env.PUBLISH_NOW != 'true'
+        timeout-minutes: 4
+        env:
+          MEDIA_VAULT_SKIP_BUILD: '1'
+        run: |
+          CHROMIUM_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROMIUM_PATH"
+          export CHROMIUM_PATH
+          npm run test:direct
+
       - name: Responsive UI and browser integration
         if: env.PUBLISH_NOW != 'true'
         timeout-minutes: 25
@@ -107,33 +119,13 @@ jobs:
           mkdir -p test-output
           set +e
           {
-            npm run test:browser &&
-            npm run test:blossom &&
-            npm run test:design &&
-            npm run test:watch &&
-            npm run test:ui &&
-            npm run test:vm &&
-            npm run test:direct &&
-            npm run test:blocks &&
-            npm run test:cleaning &&
-            npm run test:migan &&
-            npm run test:voices &&
-            npm run test:manga &&
-            npm run test:reader &&
-            npm run test:music &&
-            npm run test:online &&
-            npm run test:translation &&
-            npm run test:gpu &&
-            npm run test:lmt &&
-            npm run test:gemma &&
-            npm run test:trusted &&
-            npm run test:rooms &&
-            npm run test:library-layout &&
-            npm run test:cards &&
-            npm run test:suwayomi &&
-            npm run test:world &&
-            npm run test:music-nav &&
-            npm run test:downloads
+            failures=0
+            for suite in browser blossom design watch ui vm blocks cleaning migan voices manga reader music online translation gpu lmt gemma trusted rooms library-layout cards suwayomi world music-nav downloads; do
+              npm run "test:$suite"
+              code=$?
+              if [ "$code" -ne 0 ]; then failures=$((failures + 1)); fi
+            done
+            test "$failures" -eq 0
           } 2>&1 | tee test-output/browser-ci.log
           result=${PIPESTATUS[0]}
           {
@@ -176,7 +168,8 @@ jobs:
           path: dist
 
   deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # A manual audit may finish after main moved; it must never deploy its snapshot.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     permissions:

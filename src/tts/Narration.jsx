@@ -13,10 +13,8 @@ import {roleColors,emotionLabel} from './RoleText.jsx';
 import {geminiCast,geminiNarrator,geminiRows,geminiClip,wholeClip,GEMINI_VOICES,geminiVoiceLabel,savedGeminiCast,saveGeminiCast,voiceNote,NARRATOR_NOTE,describeVoice,styleFor} from './gemini-voice.js';
 import './narration.css';
 
-const PREFS='mediavault_tts_prefs_v2';
-const DEFAULTS={engine:'gemini',geminiNarrator:'auto',pace:1,narrator:'auto',roles:true,rolesModel:ROLE_MODEL,bibleModel:'gemini-3.5-flash-lite'};
-// Only models offered in the panel are kept (non-Lite Flash is never used).
-function readPrefs(){try{const value={...DEFAULTS,...JSON.parse(localStorage.getItem(PREFS)||'{}')};if(!BIBLE_MODELS.some(([id])=>id===value.bibleModel))value.bibleModel=DEFAULTS.bibleModel;if(!ROLE_MODELS.some(([id])=>id===value.rolesModel))value.rolesModel=DEFAULTS.rolesModel;return value;}catch{return {...DEFAULTS};}}
+// Preferences are shared with the save window's audiobook (chapter-script.js).
+import {PREFS,readPrefs} from './chapter-script.js';
 const mb=bytes=>Math.round(bytes/1048576);
 const voiceName=v=>(v[0]==='F'?'Женский ':'Мужской ')+v.slice(1);
 const TIMBRE_LABELS={neutral:'обычный',warm:'тёплый',bright:'звонкий',dark:'низкий, глухой',breathy:'с придыханием',rough:'хрипловатый',nasal:'носовой',soft:'мягкий'};

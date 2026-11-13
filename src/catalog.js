@@ -133,8 +133,14 @@ export function normalizeCatalog(provider,data,kind='anime'){
 }
 
 export function mergeCatalog(values){
-  const result=[];
-  for(const item of values){
+  const result=[],list=value=>Array.isArray(value)?value:[];
+  for(const value of values){
+    // Saved/deep-linked titles can be partial while catalogue enrichment loads.
+    // Give both sides the same collection shape before merging either order.
+    const item={...value,providers:unique([...list(value.providers),value.provider]),
+      aliases:unique([...list(value.aliases),value.title,...Object.values(value.titles||{})]),
+      genres:list(value.genres),tags:list(value.tags),links:list(value.links),releases:list(value.releases),
+      ids:value.ids||{},titles:value.titles||{}};
     const current=result.find(other=>other.kind===item.kind&&(
       Object.keys(item.ids||{}).some(key=>item.ids[key]&&item.ids[key]===other.ids?.[key])||
       ((!item.ids?.mal||!other.ids?.mal||item.ids.mal===other.ids.mal)&&(!item.year||!other.year||item.year===other.year)&&item.aliases.some(alias=>normalized(alias).length>3&&other.aliases.some(x=>normalized(x)===normalized(alias))))));
