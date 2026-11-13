@@ -595,6 +595,11 @@ def manga_discovery_call(action,*args):
     except SearchMissing as error:raise HTTPException(404,str(error)) from None
     except ValueError as error:raise HTTPException(422,str(error)) from None
 
+@app.get('/manga/source-coverage')
+def manga_source_coverage(subject=Depends(owner)):
+    from manga_source_coverage import report
+    return report()
+
 @app.get('/discovery/manga/sources')
 def discovery_manga_sources(language:str='all',q:str='',subject=Depends(viewer)):
     from manga_discovery import source_list
