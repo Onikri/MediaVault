@@ -27,7 +27,8 @@ let browser,vite;
   const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html?'+filter);
   await page.waitForFunction(()=>window.calls.filter(c=>c.path==='/manga/inspect').length===2);
-  if(filter==='language')await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Японский',exact:true}).click();
+  await page.locator('.desk-source-plaque').click();await page.locator('.desk-source-menu').waitFor();
+  if(filter==='language')await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'JA',exact:true}).click();
   else{
    await page.locator('#worldSourceQuery').fill('Reader 4');
    await page.getByRole('checkbox',{name:/Reader 4/}).check();
@@ -37,7 +38,7 @@ let browser,vite;
   assert.deepEqual((await page.evaluate(()=>window.aborted)).sort(),[0,1],'Hidden-language requests release both verification slots');
   await page.waitForFunction(()=>window.active===0,{},{timeout:5000});
   assert.equal(await page.locator('.title-source-option').count(),filter==='language'?3:1,'Selected candidates appear without waiting for hidden sources');
-  await page.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();
+  await page.getByRole('button',{name:/^Читать главу/}).waitFor();
   assert.equal(await page.locator('.title-source-option[aria-pressed="true"]').count(),1);
   if(filter==='provider'){
    assert.ok((await page.locator('.title-source-option[aria-pressed="true"]').innerText()).includes('Reader 4'));
@@ -46,14 +47,14 @@ let browser,vite;
   }
   const calls=await page.evaluate(()=>window.calls.length);
   await page.evaluate(()=>{window.releaseRussian=true;});
-  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Все языки',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Все',exact:true}).click();
   await page.waitForFunction(()=>window.calls.length>0&&window.active===0&&document.querySelectorAll('.title-source-option').length===5,{},{timeout:5000});
-  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Японский',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'JA',exact:true}).click();
   assert.equal(await page.locator('.title-source-option').count(),3);
   assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.n>=2).length),await page.evaluate(end=>window.calls.slice(0,end).filter(c=>c.n>=2).length,calls),'Completed Japanese results survive filter changes');
-  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Русский',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'RU',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.title-source-option[aria-pressed="true"]')?.textContent.includes('Reader 0'));
-  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'Японский',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Язык глав'}).getByRole('radio',{name:'JA',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.title-source-option[aria-pressed="true"]')?.textContent.includes('Reader 2'));
   await page.getByRole('button',{name:'Toggle title',exact:true}).click();
   assert.equal(await page.locator('.retained-media-host').count(),0,'Inactive title checks unmount with their retained host');
