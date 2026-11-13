@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 import hashlib,json,os,re,secrets,sqlite3,threading,time,unicodedata
 from source_parser import SourceAccessError,SourceError,SourceTemporaryError,public_url
+from manga_source_tags import from_api
 import suwayomi_bridge as bridge
 
 LANGUAGES={'all',*bridge.LANGUAGES}
@@ -86,7 +87,7 @@ def result_row(source,row):
     return {'id':f'suwayomi:{sid}:{identity}','kind':'manga','title':title.strip()[:500],'aliases':public_aliases(row),
             'provider':'suwayomi:'+sid,'providerName':source['name'],'sourceId':sid,'sourceUrl':canonical,
             'url':bridge.reference(identity),'sourceURL':bridge.reference(identity),'sourceOnly':True,
-            'language':language,'cover':cover,'format':'manhwa' if language=='ko' else 'manga','ids':{},'genres':[],'tags':[],
+            'language':language,'cover':cover,'format':'manhwa' if language=='ko' else 'manga','ids':{},**from_api(row),
             'adult':bool(source.get('isNsfw'))}
 
 def native_search_source(source,query):
@@ -137,7 +138,7 @@ def native_search_source(source,query):
     sid=str(source['id'])
     return [{**row,'id':'suwayomi:'+sid+':native:'+hashlib.sha256(row['url'].encode()).hexdigest()[:20],
              'providerName':source['name'],'sourceId':sid,'sourceUrl':row['url'],'sourceURL':row['url'],
-             'sourceOnly':True,'ids':{},'genres':[],'tags':[]} for row in found.values()][:40]
+             'sourceOnly':True,'ids':{}} for row in found.values()][:40]
 
 def search_source(source,query):
     if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'}:
@@ -224,7 +225,7 @@ def search_source(source,query):
                 for value in parse_search(text,final,site):
                     if selected and not match_title(selected,value)[0]:continue
                     if not selected and not query_matches(term,value.get('aliases',[value['title']])):continue
-                    rows.append({**value,'id':'suwayomi:'+str(source['id'])+':native:'+hashlib.sha256(value['url'].encode()).hexdigest()[:20],'sourceId':str(source['id']),'sourceUrl':value['url'],'sourceURL':value['url'],'sourceOnly':True,'ids':{},'genres':[],'tags':[]})
+                    rows.append({**value,'id':'suwayomi:'+str(source['id'])+':native:'+hashlib.sha256(value['url'].encode()).hexdigest()[:20],'sourceId':str(source['id']),'sourceUrl':value['url'],'sourceURL':value['url'],'sourceOnly':True,'ids':{}})
                 if rows:break
             return rows
         finally:http.close()
