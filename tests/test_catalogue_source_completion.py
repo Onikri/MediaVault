@@ -137,4 +137,10 @@ class CompletionTests(unittest.TestCase):
   with patch('catalogue_lib_auth.token',return_value=''),patch('catalogue_sources.checked_get',return_value=(json.dumps({'data':{'id':2,'slug_url':'2-pending','rus_name':'Botany','tags':[{'name':'Ecology'}]}}).encode(),'https://api.cdnrulib.link/api/manga/2-pending')):enriched=fetch(detail,{'page':1})
   self.assertEqual(enriched['rows'][0]['title'],'Botany');self.assertEqual(enriched['rows'][0]['tags'],['Ecology'])
 
+ def test_lib_published_long_slugs_are_not_dropped_from_the_catalogue(self):
+  from content_sources import lib_titles
+  slug='123--'+'garden-'*70
+  rows=lib_titles({'data':[{'slug_url':slug,'rus_name':'Garden'}]},1,'','tag')
+  self.assertEqual(len(rows),1);self.assertTrue(rows[0]['sourceUrl'].endswith(slug))
+
 if __name__=='__main__':unittest.main()
