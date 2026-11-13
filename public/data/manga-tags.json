@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-13T11:25:22Z",
+  "generatedAt": "2026-11-13T19:31:42Z",
   "scope": "public_taxonomy_only",
   "coverageGuaranteed": false,
   "sources": [
@@ -17,9 +17,9 @@
       "domain": "hentaichan.live",
       "name": "HentaiChan",
       "integration": "native",
-      "status": "stale",
-      "tagsFound": 288,
-      "reason": "public_catalogue_unavailable",
+      "status": "partial",
+      "tagsFound": 190,
+      "reason": "one_public_catalogue_page",
       "note": "Native public HTML parser and reader."
     },
     {
@@ -35,9 +35,9 @@
       "domain": "manga-chan.me",
       "name": "MangaChan",
       "integration": "native",
-      "status": "stale",
-      "tagsFound": 121,
-      "reason": "public_catalogue_unavailable",
+      "status": "partial",
+      "tagsFound": 87,
+      "reason": "one_public_catalogue_page",
       "note": "Native HTML adapter uses im.manga-chan.me and known mirror host."
     },
     {
@@ -53,18 +53,18 @@
       "domain": "hentaichan.cc",
       "name": "HentaiChan.cc",
       "integration": "native",
-      "status": "partial",
-      "tagsFound": 5,
-      "reason": "one_public_catalogue_page",
+      "status": "stale",
+      "tagsFound": 8,
+      "reason": "no_public_tags_found",
       "note": "Native public search and reader."
     },
     {
       "domain": "y.hentaichan.live",
       "name": "Y-HentaiChan",
       "integration": "unverified",
-      "status": "stale",
-      "tagsFound": 288,
-      "reason": "public_catalogue_unavailable",
+      "status": "partial",
+      "tagsFound": 190,
+      "reason": "one_public_catalogue_page",
       "note": "Distinct subdomain; not an approved HentaiChan reader mirror."
     },
     {
@@ -73,7 +73,7 @@
       "integration": "extension",
       "status": "stale",
       "tagsFound": 113,
-      "reason": "robots_or_network",
+      "reason": "public_catalogue_unavailable",
       "note": "Only if an exact installed Suwayomi source exists."
     },
     {
@@ -82,7 +82,7 @@
       "integration": "native",
       "status": "unavailable",
       "tagsFound": 0,
-      "reason": "no_public_tags_found",
+      "reason": "public_catalogue_unavailable",
       "note": "Native public HTML adapter on current hmanga.me; live reader check still required."
     },
     {
@@ -142,11 +142,11 @@
     {
       "domain": "remanga.org",
       "name": "ReManga",
-      "integration": "extension",
+      "integration": "native",
       "status": "unavailable",
       "tagsFound": 0,
       "reason": "robots_or_network",
-      "note": "Suwayomi source only if installed; no undocumented reader API."
+      "note": "Public api.remanga.org JSON: search, branches and free chapters; paid chapters skipped."
     },
     {
       "domain": "хентай.онлайн",
@@ -185,8 +185,8 @@
       "category": "genre",
       "label": "Арт",
       "originalLabels": [
-        "Арт",
-        "арт"
+        "арт",
+        "Арт"
       ],
       "sources": [
         "hentailib.me",
@@ -341,8 +341,8 @@
       "category": "genre",
       "label": "Детектив",
       "originalLabels": [
-        "Детектив",
-        "детектив"
+        "детектив",
+        "Детектив"
       ],
       "sources": [
         "hentailib.me",
@@ -356,8 +356,8 @@
       "category": "genre",
       "label": "Дзёсэй",
       "originalLabels": [
-        "дзёсэй",
-        "Дзёсэй"
+        "Дзёсэй",
+        "дзёсэй"
       ],
       "sources": [
         "hentailib.me",
@@ -510,8 +510,8 @@
       "category": "genre",
       "label": "Комедия",
       "originalLabels": [
-        "комедия",
-        "Комедия"
+        "Комедия",
+        "комедия"
       ],
       "sources": [
         "hentailib.me",
@@ -660,8 +660,8 @@
       "category": "genre",
       "label": "Повседневность",
       "originalLabels": [
-        "Повседневность",
-        "повседневность"
+        "повседневность",
+        "Повседневность"
       ],
       "sources": [
         "hentailib.me",
@@ -773,8 +773,8 @@
       "category": "genre",
       "label": "Сверхъестественное",
       "originalLabels": [
-        "Сверхъестественное",
-        "сверхъестественное"
+        "сверхъестественное",
+        "Сверхъестественное"
       ],
       "sources": [
         "hentailib.me",
@@ -788,8 +788,8 @@
       "category": "genre",
       "label": "Сёдзё",
       "originalLabels": [
-        "сёдзё",
-        "Сёдзё"
+        "Сёдзё",
+        "сёдзё"
       ],
       "sources": [
         "hentailib.me",
@@ -803,8 +803,8 @@
       "category": "genre",
       "label": "Сёдзё-ай",
       "originalLabels": [
-        "Сёдзё-ай",
-        "сёдзё-ай"
+        "сёдзё-ай",
+        "Сёдзё-ай"
       ],
       "sources": [
         "hentailib.me",
@@ -817,8 +817,8 @@
       "category": "genre",
       "label": "Сёнэн",
       "originalLabels": [
-        "сёнэн",
-        "Сёнэн"
+        "Сёнэн",
+        "сёнэн"
       ],
       "sources": [
         "hentailib.me",
@@ -885,8 +885,8 @@
       "category": "genre",
       "label": "Сэйнэн",
       "originalLabels": [
-        "сэйнэн",
-        "Сэйнэн"
+        "Сэйнэн",
+        "сэйнэн"
       ],
       "sources": [
         "hentailib.me",
@@ -915,8 +915,8 @@
       "category": "genre",
       "label": "Триллер",
       "originalLabels": [
-        "Триллер",
-        "триллер"
+        "триллер",
+        "Триллер"
       ],
       "sources": [
         "hentailib.me",
@@ -931,8 +931,8 @@
       "category": "genre",
       "label": "Ужасы",
       "originalLabels": [
-        "Ужасы",
-        "ужасы"
+        "ужасы",
+        "Ужасы"
       ],
       "sources": [
         "hentailib.me",
@@ -962,8 +962,8 @@
       "category": "genre",
       "label": "Фэнтези",
       "originalLabels": [
-        "Фэнтези",
-        "фэнтези"
+        "фэнтези",
+        "Фэнтези"
       ],
       "sources": [
         "hentailib.me",
@@ -988,8 +988,8 @@
       "category": "genre",
       "label": "Школа",
       "originalLabels": [
-        "Школа",
-        "школа"
+        "школа",
+        "Школа"
       ],
       "sources": [
         "hentailib.me",
@@ -1061,8 +1061,8 @@
       "category": "genre",
       "label": "Яой",
       "originalLabels": [
-        "яой",
-        "Яой"
+        "Яой",
+        "яой"
       ],
       "sources": [
         "hentailib.me",
@@ -1374,8 +1374,8 @@
       "category": "tag",
       "label": "Scat",
       "originalLabels": [
-        "scat",
-        "Scat"
+        "Scat",
+        "scat"
       ],
       "sources": [
         "hentaichan.live",
@@ -1399,8 +1399,8 @@
       "category": "tag",
       "label": "Shemale",
       "originalLabels": [
-        "shemale",
-        "Shemale"
+        "Shemale",
+        "shemale"
       ],
       "sources": [
         "hentaichan.live",
@@ -1461,8 +1461,8 @@
       "category": "tag",
       "label": "Tomboy",
       "originalLabels": [
-        "Tomboy",
-        "tomboy"
+        "tomboy",
+        "Tomboy"
       ],
       "sources": [
         "hentaichan.live",
@@ -1535,8 +1535,8 @@
       "category": "tag",
       "label": "Алкоголь",
       "originalLabels": [
-        "алкоголь",
-        "Алкоголь"
+        "Алкоголь",
+        "алкоголь"
       ],
       "sources": [
         "hentaichan.live",
@@ -1624,8 +1624,8 @@
       "category": "tag",
       "label": "Анилингус",
       "originalLabels": [
-        "Анилингус",
-        "анилингус"
+        "анилингус",
+        "Анилингус"
       ],
       "sources": [
         "hentaichan.live",
@@ -1735,8 +1735,8 @@
       "category": "tag",
       "label": "Арт",
       "originalLabels": [
-        "Арт",
-        "арт"
+        "арт",
+        "Арт"
       ],
       "sources": [
         "hentaichan.live",
@@ -1874,8 +1874,8 @@
       "category": "tag",
       "label": "Без цензуры",
       "originalLabels": [
-        "без цензуры",
-        "Без цензуры"
+        "Без цензуры",
+        "без цензуры"
       ],
       "sources": [
         "hentaichan.cc",
@@ -1930,8 +1930,8 @@
       "category": "tag",
       "label": "Близнецы",
       "originalLabels": [
-        "близнецы",
-        "Близнецы"
+        "Близнецы",
+        "близнецы"
       ],
       "sources": [
         "hentaichan.live",
@@ -1968,8 +1968,8 @@
       "category": "tag",
       "label": "Боевые искусства",
       "originalLabels": [
-        "Боевые искусства",
-        "боевые искусства"
+        "боевые искусства",
+        "Боевые искусства"
       ],
       "sources": [
         "manga-chan.me",
@@ -1994,8 +1994,8 @@
       "category": "tag",
       "label": "Больница",
       "originalLabels": [
-        "больница",
-        "Больница"
+        "Больница",
+        "больница"
       ],
       "sources": [
         "hentaichan.live",
@@ -2008,8 +2008,8 @@
       "category": "tag",
       "label": "Большая грудь",
       "originalLabels": [
-        "Большая грудь",
-        "большая грудь"
+        "большая грудь",
+        "Большая грудь"
       ],
       "sources": [
         "hentaichan.live",
@@ -2140,8 +2140,8 @@
       "category": "tag",
       "label": "В ванной",
       "originalLabels": [
-        "В ванной",
-        "в ванной"
+        "в ванной",
+        "В ванной"
       ],
       "sources": [
         "hentaichan.live",
@@ -2317,8 +2317,8 @@
       "category": "tag",
       "label": "Вибратор",
       "originalLabels": [
-        "Вибратор",
-        "вибратор"
+        "вибратор",
+        "Вибратор"
       ],
       "sources": [
         "hentaichan.live",
@@ -2729,8 +2729,8 @@
       "category": "tag",
       "label": "Глубокий минет",
       "originalLabels": [
-        "глубокий минет",
-        "Глубокий минет"
+        "Глубокий минет",
+        "глубокий минет"
       ],
       "sources": [
         "hentaichan.live",
@@ -2807,8 +2807,8 @@
       "category": "tag",
       "label": "групповой_секс",
       "originalLabels": [
-        "групповой секс",
-        "Групповой секс"
+        "Групповой секс",
+        "групповой секс"
       ],
       "sources": [
         "hentaichan.live",
@@ -2901,8 +2901,8 @@
       "category": "tag",
       "label": "Демоны",
       "originalLabels": [
-        "демоны",
-        "Демоны"
+        "Демоны",
+        "демоны"
       ],
       "sources": [
         "hentaichan.live",
@@ -3101,8 +3101,8 @@
       "category": "tag",
       "label": "Жестокость",
       "originalLabels": [
-        "Жестокость",
-        "жестокость"
+        "жестокость",
+        "Жестокость"
       ],
       "sources": [
         "hentaichan.live",
@@ -3322,8 +3322,8 @@
       "category": "tag",
       "label": "Измена",
       "originalLabels": [
-        "измена",
-        "Измена"
+        "Измена",
+        "измена"
       ],
       "sources": [
         "hentaichan.cc",
@@ -3365,8 +3365,8 @@
       "category": "tag",
       "label": "Инопланетяне",
       "originalLabels": [
-        "Инопланетяне",
-        "инопланетяне"
+        "инопланетяне",
+        "Инопланетяне"
       ],
       "sources": [
         "hentaichan.live",
@@ -3430,8 +3430,8 @@
       "category": "tag",
       "label": "Исполнение желаний",
       "originalLabels": [
-        "исполнение желаний",
-        "Исполнение желаний"
+        "Исполнение желаний",
+        "исполнение желаний"
       ],
       "sources": [
         "hentaichan.live",
@@ -3468,8 +3468,8 @@
       "category": "tag",
       "label": "Камера",
       "originalLabels": [
-        "камера",
-        "Камера"
+        "Камера",
+        "камера"
       ],
       "sources": [
         "hentaichan.live",
@@ -3625,8 +3625,8 @@
       "category": "tag",
       "label": "Косплей",
       "originalLabels": [
-        "Косплей",
-        "косплей"
+        "косплей",
+        "Косплей"
       ],
       "sources": [
         "hentaichan.live",
@@ -3726,8 +3726,8 @@
       "category": "tag",
       "label": "Купальники",
       "originalLabels": [
-        "купальники",
-        "Купальники"
+        "Купальники",
+        "купальники"
       ],
       "sources": [
         "hentaichan.live",
@@ -3813,8 +3813,8 @@
       "category": "tag",
       "label": "Магия",
       "originalLabels": [
-        "Магия",
-        "магия"
+        "магия",
+        "Магия"
       ],
       "sources": [
         "hentaichan.live",
@@ -4036,8 +4036,8 @@
       "category": "tag",
       "label": "Много девушек",
       "originalLabels": [
-        "много девушек",
-        "Много девушек"
+        "Много девушек",
+        "много девушек"
       ],
       "sources": [
         "hentaichan.live",
@@ -4072,8 +4072,8 @@
       "category": "tag",
       "label": "Молоко",
       "originalLabels": [
-        "молоко",
-        "Молоко"
+        "Молоко",
+        "молоко"
       ],
       "sources": [
         "hentaichan.live",
@@ -4227,8 +4227,8 @@
       "category": "tag",
       "label": "На природе",
       "originalLabels": [
-        "На природе",
-        "на природе"
+        "на природе",
+        "На природе"
       ],
       "sources": [
         "hentaichan.live",
@@ -4241,8 +4241,8 @@
       "category": "tag",
       "label": "Наблюдение",
       "originalLabels": [
-        "Наблюдение",
-        "наблюдение"
+        "наблюдение",
+        "Наблюдение"
       ],
       "sources": [
         "hentaichan.live",
@@ -4540,8 +4540,8 @@
       "category": "tag",
       "label": "Обычный секс",
       "originalLabels": [
-        "обычный секс",
-        "Обычный секс"
+        "Обычный секс",
+        "обычный секс"
       ],
       "sources": [
         "hentaichan.live",
@@ -4566,8 +4566,8 @@
       "category": "tag",
       "label": "Огромная грудь",
       "originalLabels": [
-        "огромная грудь",
-        "Огромная грудь"
+        "Огромная грудь",
+        "огромная грудь"
       ],
       "sources": [
         "hentaichan.live",
@@ -4736,8 +4736,8 @@
       "category": "tag",
       "label": "Парень пассив",
       "originalLabels": [
-        "парень пассив",
-        "Парень пассив"
+        "Парень пассив",
+        "парень пассив"
       ],
       "sources": [
         "hentaichan.live",
@@ -4762,8 +4762,8 @@
       "category": "tag",
       "label": "Переодевание",
       "originalLabels": [
-        "Переодевание",
-        "переодевание"
+        "переодевание",
+        "Переодевание"
       ],
       "sources": [
         "hentaichan.live",
@@ -4824,8 +4824,8 @@
       "category": "tag",
       "label": "Пляж",
       "originalLabels": [
-        "пляж",
-        "Пляж"
+        "Пляж",
+        "пляж"
       ],
       "sources": [
         "hentaichan.live",
@@ -4887,8 +4887,8 @@
       "category": "tag",
       "label": "Подчинение",
       "originalLabels": [
-        "Подчинение",
-        "подчинение"
+        "подчинение",
+        "Подчинение"
       ],
       "sources": [
         "hentaichan.live",
@@ -4974,8 +4974,8 @@
       "category": "tag",
       "label": "Похищение",
       "originalLabels": [
-        "похищение",
-        "Похищение"
+        "Похищение",
+        "похищение"
       ],
       "sources": [
         "hentaichan.live",
@@ -5073,8 +5073,8 @@
       "category": "tag",
       "label": "Прозрачная одежда",
       "originalLabels": [
-        "Прозрачная одежда",
-        "прозрачная одежда"
+        "прозрачная одежда",
+        "Прозрачная одежда"
       ],
       "sources": [
         "hentaichan.live",
@@ -5558,8 +5558,8 @@
       "category": "tag",
       "label": "сетакон",
       "originalLabels": [
-        "сетакон",
-        "Сетакон"
+        "Сетакон",
+        "сетакон"
       ],
       "sources": [
         "hentaichan.live",
@@ -5692,8 +5692,8 @@
       "category": "tag",
       "label": "Спортивная форма",
       "originalLabels": [
-        "Спортивная форма",
-        "спортивная форма"
+        "спортивная форма",
+        "Спортивная форма"
       ],
       "sources": [
         "hentaichan.live",
@@ -5769,8 +5769,8 @@
       "category": "tag",
       "label": "Страпон",
       "originalLabels": [
-        "страпон",
-        "Страпон"
+        "Страпон",
+        "страпон"
       ],
       "sources": [
         "hentaichan.live",
@@ -5882,8 +5882,8 @@
       "category": "tag",
       "label": "Темнокожие",
       "originalLabels": [
-        "Темнокожие",
-        "темнокожие"
+        "темнокожие",
+        "Темнокожие"
       ],
       "sources": [
         "hentaichan.live",
@@ -6036,8 +6036,8 @@
       "category": "tag",
       "label": "Ужасы",
       "originalLabels": [
-        "Ужасы",
-        "ужасы"
+        "ужасы",
+        "Ужасы"
       ],
       "sources": [
         "hentailib.me",
@@ -6202,8 +6202,8 @@
       "category": "tag",
       "label": "Фетиш",
       "originalLabels": [
-        "Фетиш",
-        "фетиш"
+        "фетиш",
+        "Фетиш"
       ],
       "sources": [
         "hentaichan.live",
@@ -6242,8 +6242,8 @@
       "category": "tag",
       "label": "Фистинг",
       "originalLabels": [
-        "Фистинг",
-        "фистинг"
+        "фистинг",
+        "Фистинг"
       ],
       "sources": [
         "hentaichan.live",
@@ -6272,8 +6272,8 @@
       "category": "tag",
       "label": "Футанари",
       "originalLabels": [
-        "Футанари",
-        "футанари"
+        "футанари",
+        "Футанари"
       ],
       "sources": [
         "hentaichan.live",
@@ -6410,8 +6410,8 @@
       "category": "tag",
       "label": "Чикан",
       "originalLabels": [
-        "Чикан",
-        "чикан"
+        "чикан",
+        "Чикан"
       ],
       "sources": [
         "hentaichan.live",
@@ -6611,8 +6611,8 @@
       "category": "tag",
       "label": "Эльфы",
       "originalLabels": [
-        "эльфы",
-        "Эльфы"
+        "Эльфы",
+        "эльфы"
       ],
       "sources": [
         "hentaichan.live",
@@ -6713,8 +6713,8 @@
       "category": "tag",
       "label": "Яндере",
       "originalLabels": [
-        "Яндере",
-        "яндере"
+        "яндере",
+        "Яндере"
       ],
       "sources": [
         "hentaichan.live",
