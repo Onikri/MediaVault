@@ -9,9 +9,10 @@ import json
 import re
 import time
 import unicodedata
+from pathlib import Path
 from urllib.parse import urlsplit
 
-from manga_source_tags import unique
+from manga_source_tags import unique, clean_label
 
 FORMAT = {'manga', 'manhwa', 'manhua', 'webtoon'}
 SYNONYMS = {
@@ -25,7 +26,11 @@ SYNONYMS = {
 }
 
 def normalize(value):
-    return ' '.join(unicodedata.normalize('NFKC', str(value or '')).casefold().split()).strip()
+    value=unicodedata.normalize('NFKC', str(value or '')).casefold().replace('ё','е')
+    return ' '.join(''.join(char if char.isalnum() else ' ' for char in value).split())
+
+SYNONYMS.update({normalize(key):normalize(value) for key,value in json.loads(Path(__file__).with_name('manga_tag_aliases.json').read_text(encoding='utf-8')).items()})
+
 
 def tag_key(value):
     name = normalize(value)
@@ -35,8 +40,8 @@ def _text(value, limit=500):
     return ' '.join(str(value or '').split())[:limit]
 
 def _aliases(row):
-    values = [row.get('title'), *(row.get('aliases') if isinstance(row.get('aliases'), list) else [])]
-    return unique(v for v in values if isinstance(v, str))
+    values = [row.get('title'), *list((row.get('titles') or {}).values()), *(row.get('aliases') if isinstance(row.get('aliases'), list) else [])]
+    return list(dict.fromkeys(_text(v,500) for v in values if isinstance(v,str) and v.strip()))[:60]
 
 def _url(row):
     # Source URL outranks a Suwayomi local bridge reference.
@@ -54,6 +59,7 @@ def _url(row):
     return value
 
 def initialize(conn):
+    conn.create_function('catalog_normalize',1,normalize,deterministic=True)
     conn.executescript('''
       CREATE TABLE IF NOT EXISTS catalog_titles(
         id TEXT PRIMARY KEY,provider TEXT NOT NULL,source_id TEXT NOT NULL,
@@ -90,8 +96,8 @@ def upsert(conn, rows, source_id='', timestamp=None):
                            (identity,)).fetchone()
         # The discovery worker may supply a partial metadata-only row.
         previous = json.loads(old[0]) if old else {}
-        inspected = isinstance(row.get('episodes'), list)
-        fields = ('title', 'provider', 'providerName', 'sourceId', 'sourceUrl',
+        inspected = isinstance(row.get('episodes'), list) or row.get('metadataInspected') is True
+        fields = ('id','ids','titles','title', 'provider', 'providerName', 'sourceId', 'sourceUrl', 'url',
                   'language', 'format', 'cover', 'year', 'description', 'readingMode',
                   'adult', 'age', 'aliases', 'tags', 'genres', 'identityTitles',
                   'authors', 'artists', 'status', 'truncated')
@@ -105,7 +111,7 @@ def upsert(conn, rows, source_id='', timestamp=None):
         data['title'] = title
         data['provider'] = provider
         data['sourceUrl'] = url
-        data['aliases'] = list(dict.fromkeys([*_aliases(previous), *_aliases(row)]))[:60]
+        data['aliases'] = list(dict.fromkeys([*_aliases(row), *_aliases(previous)]))[:60]
         raw = {}
         for category in ('tags', 'genres'):
             input_values = row.get(category)
@@ -113,21 +119,18 @@ def upsert(conn, rows, source_id='', timestamp=None):
             prior = unique(previous.get(category) or [])
             data[category] = list(dict.fromkeys([*prior, *fresh]))[:120]
             raw[category] = fresh
-        chapters = row.get('episodes') if inspected else None
+        chapters = row.get('episodes') if isinstance(row.get('episodes'),list) else None
         chapter_count = len({(v.get('season'), str(v.get('number')))
-                             for v in chapters if isinstance(v, dict)}) if inspected else None
+                             for v in chapters if isinstance(v, dict)}) if chapters is not None else None
         chapter_count = chapter_count if chapter_count is not None else (old[4] if old else None)
         data['chapterCount'] = chapter_count
         data['tagStatus'] = ('present' if data['tags'] or data['genres'] else
                              'not_provided_in_detail' if inspected else
                              old[3] if old else 'not_requested')
         data['indexedAt'] = now
-        clean_metadata = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
-        if len(clean_metadata.encode('utf-8')) > 32000:
-            # Never let an abnormally large upstream payload poison the index.
-            continue
+        data['metadataChecked']=inspected or previous.get('metadataChecked',False)
         search = normalize(' '.join([title, *_aliases(data)]))[:5000]
-        lang = _text(data.get('language') or 'ru', 8)
+        lang = _text(data.get('language') or 'und', 8)
         kind = _text(data.get('format') or '', 20)
         if kind not in FORMAT:
             kind = ''
@@ -135,6 +138,13 @@ def upsert(conn, rows, source_id='', timestamp=None):
         year = data.get('year')
         year = int(year) if isinstance(year, int) and not isinstance(year, bool) and 1800 <= year <= 2200 else None
         sid = _text(row.get('sourceId') or source_id or (previous.get('sourceId') or provider), 100)
+        data['sourceId']=sid
+        data['url']=data.get('url') or url
+        data['kind']='manga'
+        clean_metadata = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+        if len(clean_metadata.encode('utf-8')) > 32000:
+            # Never let an abnormally large upstream payload poison the index.
+            continue
         conn.execute('''INSERT INTO catalog_titles(
              id,provider,source_id,source_url,title,search_text,language,format,
              adult,year,chapter_count,tag_state,metadata,first_seen,updated,inspected)
@@ -162,37 +172,54 @@ def upsert(conn, rows, source_id='', timestamp=None):
         count += 1
     return count
 
-def _conditions(q='', tag='', provider='', format='', source_id=''):
+def _conditions(q='', tag='', provider='', format='', source_id='', *, genre='', language='all', year='', age='', source_ids=()):
     sql = []
     args = []
     if q:
-        needle = normalize(q)[:160].replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-        sql.append("t.search_text LIKE ? ESCAPE '\\'")
-        args.append('%'+needle+'%')
-    if tag:
-        sql.append('EXISTS(SELECT 1 FROM catalog_tags x WHERE x.title_id=t.id AND x.tag_key=?)')
-        args.append(tag_key(tag))
+        for word in normalize(q)[:160].split()[:12]:
+            sql.append("t.search_text LIKE ? ESCAPE '\\'")
+            args.append('%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%')
+    for category,values in ((None,tag),('genres',genre)):
+        for value in (values if isinstance(values,(list,tuple)) else str(values or '').split(','))[:12]:
+            if not str(value).strip():continue
+            sql.append('EXISTS(SELECT 1 FROM catalog_tags x WHERE x.title_id=t.id AND x.tag_key=?'+(' AND x.category=?' if category else '')+')')
+            args.append(tag_key(value) if clean_label(value) else '')
+            if category:args.append(category)
     if provider:
         sql.append('t.provider=?')
         args.append(provider)
     if source_id:
         sql.append('t.source_id=?')
         args.append(source_id)
+    if source_ids:
+        sql.append('t.source_id IN ('+','.join('?' for _ in source_ids)+')')
+        args.extend(source_ids)
     if format:
         sql.append('t.format=?')
-        args.append(format)
+        args.append({'манга':'manga','манхва':'manhwa','маньхуа':'manhua','вебтун':'webtoon'}.get(normalize(format),format))
+    if language and language!='all':
+        sql.append('t.language=?');args.append(language)
+    if year:
+        sql.append('t.year=?');args.append(str(year))
+    if age=='adult':sql.append('(t.adult=1 OR CAST(json_extract(t.metadata,\'$.age\') AS INTEGER)>=18)')
+    elif age=='under18':sql.append('(t.adult=0 OR CAST(json_extract(t.metadata,\'$.age\') AS INTEGER)<18)')
     return (' WHERE '+' AND '.join(sql) if sql else ''), args
 
-def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30, offset=0):
+def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30, offset=0, **filters):
     limit = min(100,max(1,int(limit)))
     offset = min(100000,max(0,int(offset)))
-    where,args = _conditions(q,tag,provider,format,source_id)
+    where,args = _conditions(q,tag,provider,format,source_id,**filters)
     total = conn.execute('SELECT COUNT(*) FROM catalog_titles t'+where,args).fetchone()[0]
+    rank=''
+    ranking=[]
+    if normalize(q):
+        rank="CASE WHEN catalog_normalize(t.title)=? THEN 0 WHEN EXISTS(SELECT 1 FROM json_each(t.metadata,'$.aliases') a WHERE catalog_normalize(a.value)=?) THEN 1 WHEN catalog_normalize(t.title) LIKE ? ESCAPE '\\' THEN 2 ELSE 3 END,"
+        term=normalize(q);ranking=[term,term,term+'%']
     values = conn.execute('SELECT id,metadata,chapter_count,tag_state,updated FROM catalog_titles t'+where+
-                          ' ORDER BY updated DESC,id LIMIT ? OFFSET ?', [*args,limit,offset]).fetchall()
+                          ' ORDER BY '+rank+'updated DESC,id LIMIT ? OFFSET ?', [*args,*ranking,limit,offset]).fetchall()
     result=[]
     for identity,metadata,chapters,status,updated in values:
-        row=json.loads(metadata)
+        row=_public_metadata(json.loads(metadata))
         row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated})
         result.append(row)
     return {'total':total,'limit':limit,'offset':offset,'items':result}
@@ -201,20 +228,31 @@ def title(conn, identity):
     row = conn.execute('SELECT metadata,chapter_count,tag_state FROM catalog_titles WHERE id=?',(identity,)).fetchone()
     if not row:
         return None
-    result = json.loads(row[0])
+    result = _public_metadata(json.loads(row[0]))
     result['catalogId'] = identity
     result['chapterCount'] = row[1]
     result['tagStatus'] = row[2]
     return result
 
-def tags(conn, *, provider='', source_id='', limit=100):
-    where,params = _conditions(provider=provider,source_id=source_id)
+def _public_metadata(row):
+    # Older index entries may predate the reader URL and taxonomy normalization.
+    row={**row,'kind':'manga','url':row.get('url') or row.get('sourceUrl','')}
+    for category in ('tags','genres'):row[category]=unique(row.get(category) or [])
+    return row
+
+
+def tags(conn, *, provider='', source_id='', limit=100, q='', **filters):
+    where,params = _conditions(provider=provider,source_id=source_id,**filters)
+    if q:
+        needle='%'+normalize(q).replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
+        where+=(' AND ' if where else ' WHERE ')+"(g.tag_key LIKE ? ESCAPE '\\' OR catalog_normalize(g.original) LIKE ? ESCAPE '\\')"
+        params.extend([needle,needle])
     rows=conn.execute('''SELECT g.category,g.tag_key,MIN(g.original),COUNT(DISTINCT g.title_id),json_group_array(DISTINCT g.original)
                          FROM catalog_tags g JOIN catalog_titles t ON t.id=g.title_id'''+where+
                       ''' GROUP BY g.category,g.tag_key ORDER BY COUNT(DISTINCT g.title_id) DESC,g.tag_key LIMIT ?''',
                       [*params,min(500,max(1,int(limit)))]).fetchall()
     return {'tags':[{'type':kind,'key':key,'original':original,'originalLabels':json.loads(originals) if originals else [],'works':count}
-                    for kind,key,original,count,originals in rows]}
+                    for kind,key,original,count,originals in rows if clean_label(original)]}
 
 def stats(conn):
     total = conn.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]
@@ -247,5 +285,5 @@ def missing_tags(conn, limit=3):
     """Metadata-only titles eligible for an explicit on-demand enrich request."""
     limit = min(3,max(1,int(limit)))
     return [(row[0],row[1]) for row in conn.execute(
-        "SELECT id,source_url FROM catalog_titles WHERE tag_state!='present' AND inspected=0 "
+        "SELECT id,source_url FROM catalog_titles WHERE inspected=0 "
         "ORDER BY updated DESC LIMIT ?",(limit,))]

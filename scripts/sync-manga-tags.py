@@ -18,6 +18,7 @@ from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
 
 import requests
+import httpx
 from bs4 import BeautifulSoup
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -94,8 +95,13 @@ def checked_get(session, url, hosts, *, limit=MAX_HTML_BYTES):
     for _ in range(3):
         if host(current) not in hosts:
             raise ValueError('unexpected redirect host')
-        with session.get(current, headers={'User-Agent': UA}, timeout=TIMEOUT,
-                         allow_redirects=False, stream=True) as response:
+        h2 = isinstance(session, httpx.Client)
+        response = (session.send(session.build_request('GET', current), stream=True, follow_redirects=False)
+                    if h2 else session.get(current, headers={'User-Agent': UA}, timeout=TIMEOUT,
+                                           allow_redirects=False, stream=True))
+        try:
+            if h2 and response.http_version != 'HTTP/2':
+                raise ValueError('HTTP/2 required by taxonomy gateway')
             if response.status_code in (301, 302, 303, 307, 308):
                 location = response.headers.get('Location')
                 if not location:
@@ -104,11 +110,13 @@ def checked_get(session, url, hosts, *, limit=MAX_HTML_BYTES):
                 continue
             response.raise_for_status()
             chunks = bytearray()
-            for part in response.iter_content(chunk_size=64 * 1024):
+            for part in (response.iter_bytes(64 * 1024) if h2 else response.iter_content(chunk_size=64 * 1024)):
                 chunks.extend(part)
                 if len(chunks) > limit:
                     raise ValueError('response too large')
             return bytes(chunks), current
+        finally:
+            response.close()
     raise ValueError('too many redirects')
 
 
@@ -120,10 +128,10 @@ def allowed_by_robots(session, url, hosts):
         parser = RobotFileParser()
         parser.parse(raw.decode('utf-8', errors='replace').splitlines())
         return parser.can_fetch(UA, url)
-    except requests.HTTPError as error:
+    except (requests.HTTPError, httpx.HTTPStatusError) as error:
         # A 404 robots file means the server has no published robots rules.
         return getattr(error.response, 'status_code', None) == 404
-    except (requests.RequestException, ValueError):
+    except (requests.RequestException, httpx.HTTPError, ValueError):
         # A temporary failure should not turn into aggressive crawling.
         return False
 
@@ -191,15 +199,15 @@ def source_tags(session, domain):
         site_id, referer = LIB[domain]
         url = 'https://api.cdnlibs.org/api/constants?fields%5B%5D=genres&fields%5B%5D=tags'
         permitted = {'api.cdnlibs.org'}
-        if not allowed_by_robots(session, url, permitted):
-            return [], 'unavailable', 'robots_or_network'
-        with requests.Session() as lib_session:
-            lib_session.headers.update({'Site-Id': str(site_id), 'Referer': referer,
-                                        'Accept': 'application/json', 'User-Agent': UA})
+        with httpx.Client(http2=True, timeout=httpx.Timeout(10, connect=4),
+                          headers={'Site-Id': str(site_id), 'Referer': referer,
+                                   'Accept': 'application/json', 'User-Agent': UA}) as lib_session:
+            if not allowed_by_robots(lib_session, url, permitted):
+                return [], 'unavailable', 'robots_or_network'
             try:
                 raw, _ = checked_get(lib_session, url, permitted)
                 values, explicit = parse_lib_taxonomy(raw, site_id=site_id)
-            except (requests.RequestException, ValueError, json.JSONDecodeError):
+            except (requests.RequestException, httpx.HTTPError, ValueError):
                 return [], 'unavailable', 'public_api_unavailable'
         return values, ('complete' if explicit else 'unavailable'), (
             'explicit_public_taxonomy' if explicit else 'taxonomy_not_provided')

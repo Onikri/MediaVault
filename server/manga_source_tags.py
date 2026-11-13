@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 MAX_LABELS = 120
 MAX_LENGTH = 120
 _TAG_LINK = re.compile(r'/(?:tags?|genres?|categories?)/|[?&](?:tag|genre|category)=', re.I)
+_MINOR_SEXUAL = re.compile(r'\b(?:lolicon|shotacon|loli|shota|underage|preteen|child[ -]?porn|лоли(?:кон)?|шота(?:кон)?|детское\s*порно|малолет\w*|несовершеннолетн\w*)\b',re.I)
 
 
 def clean_label(value):
@@ -18,6 +19,7 @@ def clean_label(value):
         return ''
     value = unicodedata.normalize('NFKC', value)
     value = ' '.join(value.split()).strip(' ,;|')
+    if _MINOR_SEXUAL.search(value):return ''
     return value[:MAX_LENGTH] if 1 < len(value) <= MAX_LENGTH else ''
 
 
@@ -43,6 +45,7 @@ def labels(value):
         if isinstance(item, str):
             result.append(item)
         elif isinstance(item, dict):
+            item=item.get('attributes') if isinstance(item.get('attributes'),dict) else item
             raw = item.get('name') or item.get('label') or item.get('title')
             if isinstance(raw, str):
                 result.append(raw)
@@ -58,9 +61,16 @@ def from_api(payload):
     if not isinstance(payload, dict):
         return {'tags': [], 'genres': []}
     fields = payload.get('attributes') if isinstance(payload.get('attributes'), dict) else payload
-    tags = labels(fields.get('tags'))
+    entries=fields.get('tags') or []
+    grouped={'tags':[],'genres':[]}
+    if isinstance(entries,list):
+        for entry in entries:
+            raw=entry.get('attributes',entry) if isinstance(entry,dict) else entry
+            grouped['genres' if isinstance(raw,dict) and raw.get('group')=='genre' else 'tags'].append(raw)
+    else:grouped['tags']=entries
+    tags = labels(grouped['tags'])
     genres = labels(fields.get('genres') if fields.get('genres') is not None else fields.get('genre'))
-    return {'tags': tags, 'genres': genres}
+    return {'tags': tags, 'genres': unique([*genres,*labels(grouped['genres'])])}
 
 
 def from_html(source):

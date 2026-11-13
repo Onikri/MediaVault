@@ -169,7 +169,7 @@
   ],
   "tags": [
     {
-      "key": "18_плюс",
+      "key": "18 плюс",
       "category": "genre",
       "label": "18_плюс",
       "originalLabels": [
@@ -191,7 +191,7 @@
       ]
     },
     {
-      "key": "в_цвете",
+      "key": "в цвете",
       "category": "genre",
       "label": "в_цвете",
       "originalLabels": [
@@ -213,7 +213,7 @@
       ]
     },
     {
-      "key": "гендерная_интрига",
+      "key": "гендерная интрига",
       "category": "genre",
       "label": "гендерная_интрига",
       "originalLabels": [
@@ -235,7 +235,7 @@
       ]
     },
     {
-      "key": "дзёсэй",
+      "key": "дзесэй",
       "category": "genre",
       "label": "дзёсэй",
       "originalLabels": [
@@ -262,6 +262,17 @@
       "label": "драма",
       "originalLabels": [
         "драма"
+      ],
+      "sources": [
+        "manga-chan.me"
+      ]
+    },
+    {
+      "key": "енкома",
+      "category": "genre",
+      "label": "ёнкома",
+      "originalLabels": [
+        "ёнкома"
       ],
       "sources": [
         "manga-chan.me"
@@ -356,18 +367,7 @@
       ]
     },
     {
-      "key": "сэйнэн",
-      "category": "genre",
-      "label": "сэйнэн",
-      "originalLabels": [
-        "сэйнэн"
-      ],
-      "sources": [
-        "manga-chan.me"
-      ]
-    },
-    {
-      "key": "сёдзё",
+      "key": "седзе",
       "category": "genre",
       "label": "сёдзё",
       "originalLabels": [
@@ -378,7 +378,7 @@
       ]
     },
     {
-      "key": "сёдзё-ай",
+      "key": "седзе ай",
       "category": "genre",
       "label": "сёдзё-ай",
       "originalLabels": [
@@ -389,11 +389,22 @@
       ]
     },
     {
-      "key": "сёнэн",
+      "key": "сенэн",
       "category": "genre",
       "label": "сёнэн",
       "originalLabels": [
         "сёнэн"
+      ],
+      "sources": [
+        "manga-chan.me"
+      ]
+    },
+    {
+      "key": "сэйнэн",
+      "category": "genre",
+      "label": "сэйнэн",
+      "originalLabels": [
+        "сэйнэн"
       ],
       "sources": [
         "manga-chan.me"
@@ -499,17 +510,6 @@
       ]
     },
     {
-      "key": "ёнкома",
-      "category": "genre",
-      "label": "ёнкома",
-      "originalLabels": [
-        "ёнкома"
-      ],
-      "sources": [
-        "manga-chan.me"
-      ]
-    },
-    {
       "key": "18 плюс",
       "category": "tag",
       "label": "18 плюс",
@@ -518,18 +518,6 @@
       ],
       "sources": [
         "manga-chan.me"
-      ]
-    },
-    {
-      "key": "3d",
-      "category": "tag",
-      "label": "3D",
-      "originalLabels": [
-        "3D"
-      ],
-      "sources": [
-        "hentaichan.live",
-        "y.hentaichan.live"
       ]
     },
     {
@@ -738,7 +726,7 @@
       ]
     },
     {
-      "key": "paizuri (titsfuck)",
+      "key": "paizuri titsfuck",
       "category": "tag",
       "label": "paizuri (titsfuck)",
       "originalLabels": [
@@ -858,7 +846,7 @@
       ]
     },
     {
-      "key": "x-ray",
+      "key": "x ray",
       "category": "tag",
       "label": "x-ray",
       "originalLabels": [
@@ -1007,8 +995,8 @@
       "category": "tag",
       "label": "Без цензуры",
       "originalLabels": [
-        "без цензуры",
-        "Без цензуры"
+        "Без цензуры",
+        "без цензуры"
       ],
       "sources": [
         "hentaichan.cc",
@@ -1053,7 +1041,7 @@
       ]
     },
     {
-      "key": "боди-арт",
+      "key": "боди арт",
       "category": "tag",
       "label": "боди-арт",
       "originalLabels": [
@@ -1422,18 +1410,6 @@
       ]
     },
     {
-      "key": "грудастая лоли",
-      "category": "tag",
-      "label": "грудастая лоли",
-      "originalLabels": [
-        "грудастая лоли"
-      ],
-      "sources": [
-        "hentaichan.live",
-        "y.hentaichan.live"
-      ]
-    },
-    {
       "key": "групповой секс",
       "category": "tag",
       "label": "групповой секс",
@@ -1517,7 +1493,7 @@
       ]
     },
     {
-      "key": "дзёсэй",
+      "key": "дзесэй",
       "category": "tag",
       "label": "дзёсэй",
       "originalLabels": [
@@ -1585,6 +1561,17 @@
       "sources": [
         "hentaichan.live",
         "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "енкома",
+      "category": "tag",
+      "label": "ёнкома",
+      "originalLabels": [
+        "ёнкома"
+      ],
+      "sources": [
+        "manga-chan.me"
       ]
     },
     {
@@ -1662,8 +1649,8 @@
       "category": "tag",
       "label": "Измена",
       "originalLabels": [
-        "измена",
-        "Измена"
+        "Измена",
+        "измена"
       ],
       "sources": [
         "hentaichan.cc",
@@ -1933,17 +1920,6 @@
       ]
     },
     {
-      "key": "лоликон",
-      "category": "tag",
-      "label": "Лоликон",
-      "originalLabels": [
-        "Лоликон"
-      ],
-      "sources": [
-        "hentaichan.cc"
-      ]
-    },
-    {
       "key": "магия",
       "category": "tag",
       "label": "магия",
@@ -1992,7 +1968,7 @@
       ]
     },
     {
-      "key": "махо-сёдзё",
+      "key": "махо седзе",
       "category": "tag",
       "label": "махо-сёдзё",
       "originalLabels": [
@@ -2594,6 +2570,28 @@
       ]
     },
     {
+      "key": "седзе",
+      "category": "tag",
+      "label": "сёдзё",
+      "originalLabels": [
+        "сёдзё"
+      ],
+      "sources": [
+        "manga-chan.me"
+      ]
+    },
+    {
+      "key": "седзе ай",
+      "category": "tag",
+      "label": "сёдзё-ай",
+      "originalLabels": [
+        "сёдзё-ай"
+      ],
+      "sources": [
+        "manga-chan.me"
+      ]
+    },
+    {
       "key": "секс игрушки",
       "category": "tag",
       "label": "секс игрушки",
@@ -2603,6 +2601,28 @@
       "sources": [
         "hentaichan.live",
         "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "сенэн",
+      "category": "tag",
+      "label": "сёнэн",
+      "originalLabels": [
+        "сёнэн"
+      ],
+      "sources": [
+        "manga-chan.me"
+      ]
+    },
+    {
+      "key": "сенэн ай",
+      "category": "tag",
+      "label": "сёнэн-ай",
+      "originalLabels": [
+        "сёнэн-ай"
+      ],
+      "sources": [
+        "manga-chan.me"
       ]
     },
     {
@@ -2736,50 +2756,6 @@
       ]
     },
     {
-      "key": "сёдзё",
-      "category": "tag",
-      "label": "сёдзё",
-      "originalLabels": [
-        "сёдзё"
-      ],
-      "sources": [
-        "manga-chan.me"
-      ]
-    },
-    {
-      "key": "сёдзё-ай",
-      "category": "tag",
-      "label": "сёдзё-ай",
-      "originalLabels": [
-        "сёдзё-ай"
-      ],
-      "sources": [
-        "manga-chan.me"
-      ]
-    },
-    {
-      "key": "сёнэн",
-      "category": "tag",
-      "label": "сёнэн",
-      "originalLabels": [
-        "сёнэн"
-      ],
-      "sources": [
-        "manga-chan.me"
-      ]
-    },
-    {
-      "key": "сёнэн-ай",
-      "category": "tag",
-      "label": "сёнэн-ай",
-      "originalLabels": [
-        "сёнэн-ай"
-      ],
-      "sources": [
-        "manga-chan.me"
-      ]
-    },
-    {
       "key": "танцы",
       "category": "tag",
       "label": "танцы",
@@ -2808,6 +2784,18 @@
       "label": "тентакли",
       "originalLabels": [
         "тентакли"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
+      "key": "тетя",
+      "category": "tag",
+      "label": "тётя",
+      "originalLabels": [
+        "тётя"
       ],
       "sources": [
         "hentaichan.live",
@@ -2850,6 +2838,18 @@
       ]
     },
     {
+      "key": "трехмерная графика",
+      "category": "tag",
+      "label": "3D",
+      "originalLabels": [
+        "3D"
+      ],
+      "sources": [
+        "hentaichan.live",
+        "y.hentaichan.live"
+      ]
+    },
+    {
       "key": "триллер",
       "category": "tag",
       "label": "триллер",
@@ -2870,18 +2870,6 @@
       "sources": [
         "hentaichan.live",
         "manga-chan.me",
-        "y.hentaichan.live"
-      ]
-    },
-    {
-      "key": "тётя",
-      "category": "tag",
-      "label": "тётя",
-      "originalLabels": [
-        "тётя"
-      ],
-      "sources": [
-        "hentaichan.live",
         "y.hentaichan.live"
       ]
     },
@@ -3305,17 +3293,6 @@
       "sources": [
         "hentaichan.live",
         "y.hentaichan.live"
-      ]
-    },
-    {
-      "key": "ёнкома",
-      "category": "tag",
-      "label": "ёнкома",
-      "originalLabels": [
-        "ёнкома"
-      ],
-      "sources": [
-        "manga-chan.me"
       ]
     }
   ]

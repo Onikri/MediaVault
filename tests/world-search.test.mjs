@@ -1,5 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+
+test('unfiltered catalogue context attaches known sources without leaking unrelated cards',()=>{
+ const metadata={id:'meta:1',provider:'kitsu',kind:'manga',title:'Garden World',genres:[],tags:[],aliases:['Garden World'],ids:{},year:2024};
+ const row={...metadata,id:'src:1',provider:'suwayomi:1',sourceId:'1',url:'https://media.example/__manga/suwayomi/m/42'};
+ const unrelated={...row,id:'src:2',title:'Other World',aliases:['Other World'],url:'https://media.example/__manga/suwayomi/m/43'};
+ const values=worldResults([metadata],[],'Garden World',['1'],[row,unrelated]);
+ assert.equal(values.length,1);assert.equal(values[0].title,'Garden World');assert.equal(values[0].sources[0].url,row.url);
+ assert.equal(worldResults([metadata],[],'Garden World',['2'],[row]).length,0);
+});
 import {worldResults,sourceTitle} from '../src/world-search.js';
 import {matchingMangaSources,sameMangaTitle,mangaInspectionTitle} from '../src/manga-source-identity.js';
 

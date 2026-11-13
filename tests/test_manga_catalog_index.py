@@ -100,6 +100,38 @@ class CatalogIndexTests(unittest.TestCase):
         self.assertEqual(from_html(html)['tags'],['Fantasy'])
         self.assertEqual(from_html('<a href="/manga/anything/">Not a tag</a>')['tags'],[])
 
+    def test_combined_filters_require_each_fact_and_keep_reader_reference(self):
+        row={**self.work(),'year':2024,'url':'https://media.example/__manga/suwayomi/m/42'}
+        upsert(self.db,[row])
+        filters=dict(q='garden world',tag='FANTASY,romance',genre='DRAMA',format='Манхва',language='ru',
+                     source_ids=[row['sourceId']],year='2024',age='adult')
+        result=browse(self.db,**filters)
+        self.assertEqual(result['total'],1)
+        self.assertEqual(result['items'][0]['url'],row['url'])
+        self.assertEqual(result['items'][0]['sourceUrl'],row['sourceUrl'])
+        for key,value in [('tag','fantasy,horror'),('genre','fantasy'),('language','en'),('year','2023'),
+                          ('source_ids',['1']),('age','under18')]:
+            self.assertEqual(browse(self.db,**{**filters,key:value})['total'],0,key)
+
+    def test_exact_title_and_alias_rank_ahead_of_newer_partial_names(self):
+        upsert(self.db,[{**self.work(slug='exact'),'aliases':['Garden World']}],timestamp=1)
+        upsert(self.db,[{**self.work(title_name='Garden World: Another Story',slug='sequel'),'aliases':[]}],timestamp=2)
+        self.assertEqual(browse(self.db,q='Garden World')['items'][0]['title'],'Садовый мир')
+        self.assertEqual(browse(self.db,q='Садовый мир')['items'][0]['title'],'Садовый мир')
+
+    def test_facet_query_filters_before_limit_and_metadata_check_is_cached(self):
+        upsert(self.db,[{**self.work(),'tags':['Comedy','Time Travel'],'metadataInspected':True}])
+        facet=tags(self.db,q='TRAVEL',limit=1)['tags']
+        self.assertEqual(len(facet),1)
+        self.assertEqual(facet[0]['original'],'Time Travel')
+        self.assertTrue(browse(self.db)['items'][0]['metadataChecked'])
+        self.assertIsNone(browse(self.db)['items'][0]['chapterCount'])
+
+    def test_mangadex_genres_are_not_flattened_into_tags(self):
+        facts=from_api({'tags':[{'attributes':{'name':{'en':'Drama'},'group':'genre'}},
+                               {'attributes':{'name':{'en':'Time Travel'},'group':'theme'}}]})
+        self.assertEqual(facts,{'genres':['Drama'],'tags':['Time Travel']})
+
 
 if __name__=='__main__':
     unittest.main()

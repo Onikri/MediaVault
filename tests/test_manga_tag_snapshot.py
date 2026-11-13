@@ -53,6 +53,30 @@ class SnapshotTests(unittest.TestCase):
         self.assertIsNone(snapshot.host('https://user:password@manga-chan.me/'))
         self.assertEqual(snapshot.host('https://manga-chan.me/catalog'),'manga-chan.me')
 
+    def test_h2_transport_preserves_headers_and_rejects_protocol_downgrade(self):
+        import httpx
+        seen=[]
+        def respond(request):
+            seen.append(dict(request.headers))
+            return httpx.Response(200,content=b'{"data":{}}',extensions={'http_version':b'HTTP/2'})
+        with httpx.Client(transport=httpx.MockTransport(respond),headers={
+                'Site-id':'4','Referer':'https://hentailib.me/','Accept':'application/json'}) as client:
+            raw,_=snapshot.checked_get(client,'https://api.cdnlibs.org/api/constants',{'api.cdnlibs.org'})
+        self.assertEqual(raw,b'{"data":{}}')
+        self.assertEqual(seen[0]['site-id'],'4')
+        self.assertEqual(seen[0]['referer'],'https://hentailib.me/')
+        with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(200,content=b'{}'))) as client:
+            with self.assertRaisesRegex(ValueError,'HTTP/2'):
+                snapshot.checked_get(client,'https://api.cdnlibs.org/api/constants',{'api.cdnlibs.org'})
+
+    def test_transport_bounds_response_and_trusts_only_registered_hosts(self):
+        import httpx
+        with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(200,content=b'12345',extensions={'http_version':b'HTTP/2'}))) as client:
+            with self.assertRaisesRegex(ValueError,'too large'):
+                snapshot.checked_get(client,'https://api.cdnlibs.org/',{'api.cdnlibs.org'},limit=4)
+            with self.assertRaisesRegex(ValueError,'redirect host'):
+                snapshot.checked_get(client,'https://unregistered.example/',{'api.cdnlibs.org'})
+
     def test_build_preserves_source_provenance_and_staleness(self):
         original = [('tag','Фэнтези'),('genre','Romance')]
         with patch.object(snapshot, 'source_tags', return_value=(original,'partial','one_public_catalogue_page')):

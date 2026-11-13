@@ -61,7 +61,7 @@ def dex_search(query,language,http):
         for lang in languages:
             if lang not in a.get('availableTranslatedLanguages',[]):continue
             name=a.get('title',{}).get(lang if lang in {'ru','uk'} else 'ru') or next((v[lang] for v in a.get('altTitles',[]) if lang in {'ru','uk'} and v.get(lang)),None) or a.get('title',{}).get('ru') or next((v['ru'] for v in a.get('altTitles',[]) if v.get('ru')),aliases[0])
-            out.append({'provider':'mangadex','providerName':'MangaDex · '+lang.upper(),'title':name,'aliases':aliases,'kind':'manga','format':'manhwa' if a.get('originalLanguage')=='ko' else 'manhua' if a.get('originalLanguage') in {'zh','zh-hk'} else 'manga','readingMode':'scroll' if any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in a.get('tags',[])) else 'pages','language':lang,'year':a.get('year'),'adult':a.get('contentRating') in {'erotica','pornographic'},'age':18 if a.get('contentRating') in {'erotica','pornographic'} else None,'url':'https://mangadex.org/title/'+row['id']+'?lang='+lang,'tags':labels([v.get('attributes',{}) for v in a.get('tags',[]) if isinstance(v,dict)]),'genres':[],'cover':'https://uploads.mangadex.org/covers/'+row['id']+'/'+cover+'.256.jpg' if cover else ''})
+            out.append({'provider':'mangadex','providerName':'MangaDex · '+lang.upper(),'title':name,'aliases':aliases,'kind':'manga','format':'manhwa' if a.get('originalLanguage')=='ko' else 'manhua' if a.get('originalLanguage') in {'zh','zh-hk'} else 'manga','readingMode':'scroll' if any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in a.get('tags',[])) else 'pages','language':lang,'year':a.get('year'),'adult':a.get('contentRating') in {'erotica','pornographic'},'age':18 if a.get('contentRating') in {'erotica','pornographic'} else None,'url':'https://mangadex.org/title/'+row['id']+'?lang='+lang,**from_api(a),'cover':'https://uploads.mangadex.org/covers/'+row['id']+'/'+cover+'.256.jpg' if cover else ''})
     return out
 
 def dex_available(url,http):
@@ -115,7 +115,7 @@ def inspect_catalog(url,http):
                 offset+=len(rows)
             truncated=offset<total
         attributes=detail.get('attributes',{});format='manhwa' if attributes.get('originalLanguage')=='ko' else 'manhua' if attributes.get('originalLanguage') in {'zh','zh-hk'} else 'manga'
-        return {**result('mangadex','MangaDex',title,url,language,chapters,pages,truncated),'format':format,'readingMode':'scroll' if format=='manhwa' or any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in attributes.get('tags',[])) else 'pages','aliases':names(attributes),'tags':labels([v.get('attributes',{}) for v in attributes.get('tags',[]) if isinstance(v,dict)]),'genres':[]}
+        return {**result('mangadex','MangaDex',title,url,language,chapters,pages,truncated),'format':format,'readingMode':'scroll' if format=='manhwa' or any(v.get('attributes',{}).get('name',{}).get('en')=='Long Strip' for v in attributes.get('tags',[])) else 'pages','aliases':names(attributes),**from_api(attributes)}
     config=next(((sid,*row) for sid,row in LIB_SITES.items() if p.hostname==urlsplit(row[2]).hostname or p.hostname==row[0]+'.org' or sid==2 and p.hostname=='slashlib.me'),None)
     if config is None:raise SourceError('Неизвестный каталог читалки.')
     site_id,provider,provider_name,root=config;http=lib_context(http,site_id)

@@ -1,9 +1,9 @@
 import {useEffect,useRef,useState} from 'react';
 import Icon from './Icons.jsx';
-export default function SourceFilter({service,language='all',value,onChange,label='Источники'}){
+export default function SourceFilter({service,language='all',value,onChange,onOptions,label='Источники'}){
  const [adultOnly,setAdultOnly]=useState(false),[query,setQuery]=useState(''),[options,setOptions]=useState([]),[error,setError]=useState(''),[open,setOpen]=useState(false),[labels,setLabels]=useState({}),root=useRef(null);
  useEffect(()=>{const abort=new AbortController();if(service.status!=='connected'||Number(service.session?.serverVersion)<16)return;
-  const timer=setTimeout(()=>service.request('/discovery/manga/sources?'+new URLSearchParams({language,q:query}),{signal:abort.signal}).then(data=>{if(!abort.signal.aborted){setOptions(data.sources||[]);setLabels(old=>({...old,...Object.fromEntries((data.sources||[]).map(s=>[s.id,s.name]))}));setError('');}}).catch(e=>{if(!abort.signal.aborted)setError(e.message);}),query?180:0);
+  const timer=setTimeout(()=>service.request('/discovery/manga/sources?'+new URLSearchParams({language,q:query}),{signal:abort.signal}).then(data=>{if(!abort.signal.aborted){setOptions(data.sources||[]);onOptions?.(data.sources||[]);setLabels(old=>({...old,...Object.fromEntries((data.sources||[]).map(s=>[s.id,s.name]))}));setError('');}}).catch(e=>{if(!abort.signal.aborted)setError(e.message);}),query?180:0);
   return()=>{clearTimeout(timer);abort.abort();};
  },[query,language,service.server,service.status,service.session?.serverVersion]);
  useEffect(()=>{const close=e=>{if(!root.current?.contains(e.target))setOpen(false);};document.addEventListener('pointerdown',close);return()=>document.removeEventListener('pointerdown',close);},[]);

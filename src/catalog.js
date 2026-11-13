@@ -157,9 +157,10 @@ export function mergeCatalog(values){
 
 export function matchesFilters(item,filters){
   if(filters.year&&String(item.year)!==String(filters.year))return false;
-  if(filters.genre&&!item.genres.some(g=>normalized(genreLabels[g]||g).includes(normalized(filters.genre))))return false;
-  if(filters.tag&&!String(filters.tag).split(',').map(s=>s.trim()).filter(Boolean).every(tag=>(item.tags||[]).concat(item.genres||[]).some(t=>normalized(localLabel(t)).includes(normalized(tag))||normalized(t).includes(normalized(tag)))))return false;
-  if(filters.format&&normalized(item.format)!==normalized(filters.format))return false;
+  if(filters.genre&&!item.genres.some(g=>normalized(genreLabels[g]||localLabel(g)).includes(normalized(localLabel(filters.genre)))))return false;
+  if(filters.tag&&!String(filters.tag).split(',').map(s=>s.trim()).filter(Boolean).every(tag=>(item.tags||[]).concat(item.genres||[]).some(t=>normalized(localLabel(t)).includes(normalized(localLabel(tag)))||normalized(t).includes(normalized(tag)))))return false;
+  const formatKey=value=>({манга:'manga',манхва:'manhwa',маньхуа:'manhua',вебтун:'webtoon'}[normalized(value)]||normalized(value));
+  if(filters.format&&formatKey(item.format)!==formatKey(filters.format))return false;
   if(filters.age==='under18'&&(item.age==null||item.age>=18))return false;
   if(filters.age==='adult'&&(item.age==null||item.age<18))return false;
   return true;
