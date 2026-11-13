@@ -39,6 +39,24 @@ class HentaiChanTests(unittest.TestCase):
         self.assertEqual(len(rows),1);self.assertEqual(rows[0]['sourceId'],SOURCE['id'])
         self.assertTrue(rows[0]['adult']);self.assertIn('Neutral story',rows[0]['aliases'])
         self.assertEqual(site_for(MANGA).family,'hentaichan')
+    def test_chapter_entries_collapse_into_the_selected_series(self):
+        html=''.join(f'<div class="content_row"><h2><a href="{BASE}/manga/{n}-tiny-evil-glava-{c}.html">Tiny Evil - глава {c}</a></h2></div>' for n,c in [(29072,4),(24056,3),(21221,1),(23061,2)])
+        html+=f'<div class="content_row"><h2><a href="{BASE}/manga/44710-tiny-evil-5.html">Tiny Evil 5</a></h2></div>'
+        html+=f'<div class="content_row"><h2><a href="{BASE}/manga/39674-chans.html">Mujaki na Tanpenshuu (Tiny Evil Chans!)</a></h2></div>'
+        rows=parse_search(html,BASE)
+        series=[r for r in rows if r['title']=='Tiny Evil']
+        self.assertEqual(len(series),1,'one result per series, not per chapter')
+        self.assertEqual(series[0]['url'],BASE+'/manga/21221-tiny-evil-glava-1.html','the first chapter opens the series')
+        self.assertIn('Tiny Evil - глава 1',series[0]['aliases'])
+        self.assertIn('Tiny Evil 5',[r['title'] for r in rows],'a bare number may be a sequel and stays separate')
+        selected={'kind':'manga','title':'Крошечное зло','titles':{'ru':'Крошечное зло','en':'Tiny Evil','native':'Tiny Evil'},'aliases':['Крошечное зло','Tiny Evil'],'ids':{'mal':'110373'},'year':2015}
+        with patch('manga_hentaichan.search',return_value=rows):
+            found=manga_discovery.search_source({**SOURCE,'_title':selected,'_queries':['Крошечное зло','Tiny Evil']},'Крошечное зло')
+        self.assertEqual([r['url'] for r in found],[BASE+'/manga/21221-tiny-evil-glava-1.html'])
+        http=Http({BASE+'/manga/21221-tiny-evil-glava-1.html':'<a class="title_top_a">Tiny Evil - глава 1</a>',
+          BASE+'/related/21221-tiny-evil-glava-1.html':''.join(f'<div class="related_info"><h2><a href="/manga/{n}-tiny-evil-glava-{c}.html">Tiny Evil - глава {c}</a></h2></div>' for n,c in [(21221,1),(23061,2)])})
+        value=inspect(BASE+'/manga/21221-tiny-evil-glava-1.html',http)
+        self.assertEqual(value['title'],'Tiny Evil');self.assertEqual([e['number'] for e in value['episodes']],[1,2])
     def test_series_pagination_preserves_chapter_and_translator(self):
         http=Http({MANGA:'<a class="title_top_a">История</a><img id="cover" src="/covers/one.jpg">',
           RELATED:'''<h1>Все главы</h1><div class="related_info"><h2><a href="/manga/124-chapter.html">Том 2 Глава 3.5</a></h2><span class="translation"><a>Team A</a></span></div><a href="?offset=10">Next</a>''',
