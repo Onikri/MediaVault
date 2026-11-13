@@ -43,7 +43,10 @@ def _url(row):
     value = row.get('sourceUrl') or row.get('sourceURL') or row.get('url') or ''
     if not isinstance(value, str):
         return ''
-    p = urlsplit(value)
+    try:
+        p = urlsplit(value)
+    except ValueError:
+        return ''
     if p.scheme != 'https' or not p.hostname or p.username or p.password or len(value) > 2048:
         return ''
     if p.hostname in {'localhost', '127.0.0.1'} or p.hostname.endswith('.local'):
