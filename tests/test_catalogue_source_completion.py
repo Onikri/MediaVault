@@ -128,4 +128,13 @@ class CompletionTests(unittest.TestCase):
   with patch('manga_remanga.api',return_value=payload):d=catalogue_page(1,None)
   self.assertEqual(d['rows'][0]['title'],'Garden');self.assertEqual(d['rows'][0]['genres'],['Ecology']);self.assertEqual(d['next'],{'page':2})
 
+ def test_lib_unnamed_stub_is_retained_as_a_detail_job_without_stalling_the_page(self):
+  spec={'type':'lib','domain':'mangalib.org','site':1,'referer':'https://mangalib.me/'}
+  payload={'data':[{'id':1,'slug_url':'1-garden','rus_name':' ','eng_name':'Garden'},{'id':2,'slug_url':'2-pending','rus_name':'','eng_name':'','name':''}],'meta':{'has_next_page':True}}
+  with patch('catalogue_sources.checked_get',return_value=(json.dumps(payload).encode(),'https://api.cdnrulib.link/api/manga')):d=fetch(spec,{'page':1})
+  self.assertEqual([r['title'] for r in d['rows']],['Garden']);self.assertEqual(len(d['details']),2);self.assertEqual(d['next']['page'],2)
+  detail=d['details'][1]
+  with patch('catalogue_lib_auth.token',return_value=''),patch('catalogue_sources.checked_get',return_value=(json.dumps({'data':{'id':2,'slug_url':'2-pending','rus_name':'Botany','tags':[{'name':'Ecology'}]}}).encode(),'https://api.cdnrulib.link/api/manga/2-pending')):enriched=fetch(detail,{'page':1})
+  self.assertEqual(enriched['rows'][0]['title'],'Botany');self.assertEqual(enriched['rows'][0]['tags'],['Ecology'])
+
 if __name__=='__main__':unittest.main()

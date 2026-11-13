@@ -106,7 +106,9 @@ def fetch(spec,cursor):
                 raw,_=checked_get(client,root+'/api/manga/'+spec['slug']+'?fields[]=genres&fields[]=tags&fields[]=summary&fields[]=otherNames',hosts)
                 data=json.loads(raw).get('data') or {}
                 if not data.get('id') and not data.get('slug_url'):raise SourceError('Источник не предоставил метаданные карточки')
-                row={**spec['row'],**lib_metadata(data),**from_api(data),'metadataInspected':True}
+                metadata=lib_metadata(data);row={**spec['row'],**metadata,**from_api(data),'metadataInspected':True}
+                if metadata.get('aliases'):row['title']=metadata['aliases'][0]
+                if not row.get('title','').strip():raise SourceError('Источник пока не опубликовал название этой записи')
                 return {'rows':[row],'next':None}
             params=[('site_id[]',spec['site']),('page',page)]
             if cursor.get('seed'):params.append(('seed',cursor['seed']))
@@ -119,7 +121,9 @@ def fetch(spec,cursor):
                 details.append({**spec,'type':'lib-detail','slug':slug,'row':row})
             meta=data.get('meta') or {};more=meta.get('has_next_page')
             if more is None:more=bool(data.get('links',{}).get('next')) if 'links' in data else bool(rows)
-            return {'rows':rows,'next':{'page':page+1,'seed':meta.get('seed') or cursor.get('seed')} if more else None,'details':details}
+            # An incomplete listing stub must remain queued for its own detail
+            # fetch, without stopping every subsequent catalogue page.
+            return {'rows':[r for r in rows if r.get('title','').strip()],'next':{'page':page+1,'seed':meta.get('seed') or cursor.get('seed')} if more else None,'details':details}
     if kind in {'remanga','remanga-vocabulary'}:
         from source_parser import PublicHttp
         import manga_remanga

@@ -115,7 +115,7 @@ def lib_titles(payload,site_id,label,category):
     from manga_catalog_adapters import LIB_SITES,lib_identity
     provider,name,root=LIB_SITES[site_id];rows=[]
     for row in payload.get('data',[])[:60]:
-        slug=row.get('slug_url');title=row.get('rus_name') or row.get('eng_name') or row.get('name')
+        slug=row.get('slug_url');title=next((' '.join(v.split()) for v in (row.get('rus_name'),row.get('eng_name'),row.get('name')) if isinstance(v,str) and v.strip()),'')
         if not isinstance(slug,str) or not __import__('re').fullmatch(r'[\w-]{1,250}',slug) or not isinstance(title,str):continue
         field='genres' if category=='genre' else 'tags';facts=from_api(row);facts[field]=list(dict.fromkeys([*facts[field],label]))
         format={'Манга':'manga','Манхва':'manhwa','Маньхуа':'manhua','Manga':'manga','Manhwa':'manhwa','Manhua':'manhua'}.get((row.get('type') or {}).get('label'),'manga')
