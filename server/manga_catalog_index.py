@@ -15,7 +15,7 @@ from manga_source_tags import unique
 
 FORMAT = {'manga', 'manhwa', 'manhua', 'webtoon'}
 SYNONYMS = {
-    'fantasy': 'фэнтези', 'фантастика': 'фэнтези',
+    'fantasy': 'фэнтези',
     'romance': 'романтика', 'romantic': 'романтика',
     'comedy': 'комедия', 'drama': 'драма',
     'action': 'экшен', 'боевик': 'экшен',
@@ -222,3 +222,27 @@ def stats(conn):
     return {'totalTitles':total,'titlesWithTags':tagged,
             'perProvider':[{'provider':p,'titles':n,'withTags':t or 0} for p,n,t in rows],
             'note':'Only discovered titles are indexed; full upstream catalogue coverage is not implied.'}
+
+
+def backfill(conn, *, offset=0, limit=250):
+    """Copy bounded existing discovery cache rows into the permanent index."""
+    offset = min(50000, max(0, int(offset)))
+    limit = min(500, max(1, int(limit)))
+    rows = conn.execute('SELECT source_id,metadata FROM titles ORDER BY updated DESC LIMIT ? OFFSET ?',
+                        (limit,offset)).fetchall()
+    imported = 0
+    for source_id, metadata in rows:
+        try:
+            value = json.loads(metadata)
+            imported += upsert(conn,[value],source_id=source_id)
+        except (ValueError,TypeError,KeyError):
+            continue
+    return {'scanned':len(rows),'imported':imported,
+            'nextOffset':offset+len(rows) if len(rows)==limit else None}
+
+def missing_tags(conn, limit=3):
+    """Metadata-only titles eligible for an explicit on-demand enrich request."""
+    limit = min(3,max(1,int(limit)))
+    return [(row[0],row[1]) for row in conn.execute(
+        "SELECT id,source_url FROM catalog_titles WHERE tag_state!='present' AND inspected=0 "
+        "ORDER BY updated DESC LIMIT ?",(limit,))]
