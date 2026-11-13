@@ -31,7 +31,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  const [item,setItem]=useState(value),[profile,setProfile]=useState(null),[supplement,setSupplement]=useState(null),[loading,setLoading]=useState(false),[saveOpen,setSaveOpen]=useState(false),[saveTo,setSaveTo]=useState('local'),[viewSeason,setViewSeason]=useState(null),[seasonProfiles,setSeasonProfiles]=useState({});
  const tagPolicyVersion=useMangaPolicy(service,value.kind==='manga');
  const [indexedFacts,setIndexedFacts]=useState(null);
- const factIds=[...new Set([value.catalogId,...(value.sources||[]).map(source=>source.catalogId)].filter(id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)))].slice(0,3).join(',');
+ const factIds=[...new Set([value.catalogId,...(value.sources||[]).map(source=>source.catalogId)].filter(id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)))].slice(0,100).join(',');
  useEffect(()=>{
   setIndexedFacts(null);if(value.kind!=='manga'||!factIds)return;
   const abort=new AbortController();

@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+test('metadata cards retain indexed source identities for runtime tag refresh',()=>{
+ const metadata={id:'metadata:1',kind:'manga',provider:'kitsu',title:'Garden World',aliases:['Garden World'],ids:{},genres:[],tags:[]};
+ const source={...metadata,id:'source:1',provider:'fixture',sourceId:'1',catalogId:'a'.repeat(32),url:'https://fixture.example/garden'};
+ const card=worldResults([metadata],[source],'Garden World')[0];
+ assert.equal(card.id,metadata.id);assert.equal(card.sources[0].catalogId,source.catalogId);
+});
+
 test('source adult classification remains usable by library age filtering without inventing a child rating',()=>{
  const marked=sourceTitle({provider:'fixture',title:'Fixture',kind:'manga',url:'https://example.org/fixture',adult:true});
  assert.equal(marked.age,18);
