@@ -26,7 +26,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  await page.route(url=>url.pathname==='/manga/tag-policy',async r=>r.fulfill({json:await page.evaluate(()=>({revision:String(window.generation),policy:window.rules}))}));
  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/tag-policy/index.html');
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).waitFor();
- assert.equal(await page.getByLabel('Жанр',{exact:true}).locator('option').filter({hasText:/^Драма$/}).count(),1);
+ await page.getByLabel('Жанр').locator('option').filter({hasText:/^Драма$/}).waitFor({state:'attached'});
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).click();
  await page.getByRole('heading',{name:'Garden World',exact:true}).waitFor();
  await page.locator('.title-genre-list').getByText('Драма',{exact:true}).waitFor();
@@ -34,7 +34,8 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  await page.locator('.title-genre-list').getByText('Драма',{exact:true}).waitFor({state:'detached'});
  await page.getByRole('button',{name:'К результатам поиска',exact:true}).click();
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).waitFor();
- assert.equal(await page.getByLabel('Жанр',{exact:true}).locator('option').filter({hasText:/^Драма$/}).count(),0);
+ await page.getByLabel('Жанр').waitFor();
+ assert.equal(await page.getByLabel('Жанр').locator('option').filter({hasText:/^Драма$/}).count(),0);
  assert.equal(await page.locator('#catalogTags option[value="Фэнтези"]').count(),0);
  assert.deepEqual(errors,[]);
  console.log('PASS runtime deletion reaches open title, catalogue cards and filter options despite stale metadata responses');
