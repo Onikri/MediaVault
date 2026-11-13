@@ -33,6 +33,19 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(result['tags'][0]['key'],'фэнтези')
         self.assertEqual(result['tags'][0]['sources'],[domain])
 
+    def test_removing_all_observed_tags_can_publish_an_empty_projection(self):
+        import tempfile,io
+        from contextlib import redirect_stdout
+        from manga_tag_policy import current
+        policy={**current().data,'tags':[{'key':'ecology','label':'Экология','aliases':['Ecology']}]}
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'policy.json';path.write_text(json.dumps(policy),encoding='utf-8')
+            output=Path(folder)/'snapshot.json'
+            output.write_text(json.dumps({'schemaVersion':1,'sources':[], 'tags':[{'key':'фэнтези','label':'Фэнтези','category':'tag','sources':[snapshot.SOURCES[0][0]],'originalLabels':['Fantasy']}]}),encoding='utf-8')
+            with patch.dict(os.environ,{'MANGA_TAG_POLICY_FILE':str(path)}),patch.object(snapshot,'source_tags',return_value=([('tag','Fantasy')],'partial','fixture')),patch.object(snapshot.time,'sleep'),redirect_stdout(io.StringIO()):
+                self.assertEqual(snapshot.main(['--output',str(output)]),0)
+            self.assertEqual(json.loads(output.read_text(encoding='utf-8'))['tags'],[])
+
     def test_exact_requested_sources(self):
         self.assertEqual(len(snapshot.SOURCES),18)
         self.assertEqual(len({row[0] for row in snapshot.SOURCES}),18)

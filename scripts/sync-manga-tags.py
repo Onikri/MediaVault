@@ -295,9 +295,8 @@ def main(argv=None):
             snapshot = build(_Offline(), old, pause=0)
         else:
             snapshot = build(session, old)
-    # Repeated, identical no-op runs should not create commits.
-    if not snapshot['tags'] and old.get('tags') and current().rules and not args.no_network:
-        raise RuntimeError('No tags could be generated; refusing to erase the prior manifest')
+    # An empty projection is valid after removing the previously observed tags.
+    # Network failures already retain matching labels with an explicit stale state.
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f"Sources: {len(snapshot['sources'])}; indexed tag keys: {len(snapshot['tags'])}")
