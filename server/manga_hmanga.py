@@ -192,10 +192,12 @@ def inspect(url, http):
             raise SourceError('HManga не предоставил открытый список глав.')
     type_field = _field(soup, ('type', 'тип'))
     name_field = _field(soup, ('alternative', 'альтернатив'))
-    tags_field = _field(soup, ('tag(s)', 'тег'))
+    tags_field = _field(soup, ('tag', 'тег'))
+    genres_field = _field(soup, ('genre', 'жанр'))
     kind_text = clean(type_field.get_text(' ', strip=True)).casefold() if type_field else ''
     format_name = 'manhwa' if 'manhwa' in kind_text else 'manhua' if 'manhua' in kind_text else 'manga'
-    tags = [clean(a.get_text(' ', strip=True)) for a in tags_field.select('a')][:60] if tags_field else []
+    tags = [clean(a.get_text(' ', strip=True)) for a in tags_field.select('a')][:120] if tags_field else []
+    genres = [clean(a.get_text(' ', strip=True)) for a in genres_field.select('a')][:120] if genres_field else []
     alternative = [clean(x) for x in re.split(r',\s*', name_field.get_text(' ', strip=True))][:30] if name_field else []
     cover_tag = soup.select_one('.summary_image img,meta[property="og:image"]')
     cover = ''
@@ -209,7 +211,7 @@ def inspect(url, http):
             'aliases': list(dict.fromkeys([*aliases(title), *(v for v in alternative if v)])),
             'url': final, 'kind': 'manga', 'language': 'ru', 'format': format_name,
             'readingMode': 'scroll' if format_name in {'manhwa', 'manhua'} else 'pages',
-            'adult': True, 'age': 18, 'cover': cover, 'tags': list(dict.fromkeys(tags)),
+            'adult': True, 'age': 18, 'cover': cover, 'tags': list(dict.fromkeys(tags)), 'genres': list(dict.fromkeys(genres)),
             'episodes': chapters, 'pages': pages, 'available': bool(chapters),
             'seasons': [{'number': 1, 'name': 'Том 1'}], 'translations': [],
             'dubs': [], 'releases': [],
