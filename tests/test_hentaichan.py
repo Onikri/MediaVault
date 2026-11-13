@@ -47,7 +47,8 @@ class HentaiChanTests(unittest.TestCase):
         series=[r for r in rows if r['title']=='Tiny Evil']
         self.assertEqual(len(series),1,'one result per series, not per chapter')
         self.assertEqual(series[0]['url'],BASE+'/manga/21221-tiny-evil-glava-1.html','the first chapter opens the series')
-        self.assertIn('Tiny Evil - глава 1',series[0]['aliases'])
+        self.assertEqual(series[0]['aliases'],['Tiny Evil'],'a chapter label never becomes a search alias')
+        self.assertEqual(manga_discovery.language_queries(['Tiny Evil','Tiny Evil - глава 1','Крошечное зло'],'ru'),['Крошечное зло','Tiny Evil'])
         self.assertIn('Tiny Evil 5',[r['title'] for r in rows],'a bare number may be a sequel and stays separate')
         selected={'kind':'manga','title':'Крошечное зло','titles':{'ru':'Крошечное зло','en':'Tiny Evil','native':'Tiny Evil'},'aliases':['Крошечное зло','Tiny Evil'],'ids':{'mal':'110373'},'year':2015}
         with patch('manga_hentaichan.search',return_value=rows):
@@ -57,6 +58,19 @@ class HentaiChanTests(unittest.TestCase):
           BASE+'/related/21221-tiny-evil-glava-1.html':''.join(f'<div class="related_info"><h2><a href="/manga/{n}-tiny-evil-glava-{c}.html">Tiny Evil - глава {c}</a></h2></div>' for n,c in [(21221,1),(23061,2)])})
         value=inspect(BASE+'/manga/21221-tiny-evil-glava-1.html',http)
         self.assertEqual(value['title'],'Tiny Evil');self.assertEqual([e['number'] for e in value['episodes']],[1,2])
+    def test_chan_cc_split_series_is_one_work_with_all_parts(self):
+        import json
+        import manga_hentaichan_cc as cc
+        rows=[{'name':'Сестрички - часть 2','slug':'sisters-chast-2'},{'name':'Сестрички - часть 1','slug':'sisters-chast-1'},{'name':'Сестрички Часть 4 Финал','slug':'sisters-chast-4-final'},{'name':'Другие сестрички','slug':'other'}]
+        class Chan:
+            def document(self,url,**kw):
+                if kw.get('action')=='hentaichan-search':return '0:{}\n1:'+json.dumps({'data':rows},ensure_ascii=False),url,{}
+                return '<h1>Сестрички - часть 2</h1><a href="/read/sisters-chast-2">Читать</a>',url,{}
+        found=cc.search('Сестрички',Chan())
+        self.assertEqual([(r['title'],r['url']) for r in found],[('Сестрички',cc.ROOT+'/manga/sisters-chast-1'),('Другие сестрички',cc.ROOT+'/manga/other')])
+        value=cc.inspect(cc.ROOT+'/manga/sisters-chast-2',Chan())
+        self.assertEqual(value['title'],'Сестрички')
+        self.assertEqual([(e['number'],e['url']) for e in value['episodes']],[(1,cc.ROOT+'/read/sisters-chast-1'),(2,cc.ROOT+'/read/sisters-chast-2'),(4,cc.ROOT+'/read/sisters-chast-4-final')])
     def test_series_continuations_from_the_same_author(self):
         card=lambda n,label,writer,team='':f'<div class="content_row"><h2><a href="{BASE}/manga/{n}.html">{label}</a></h2><a href="/mangaka/1/">{writer}</a><a href="/translation/2/">{team}</a></div>'
         first=BASE+'/manga/21221-tiny-evil-glava-1.html'

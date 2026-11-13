@@ -24,7 +24,8 @@ def cdn_image(value):
     return ''
 
 
-def search(query, http):
+def entries(query, http):
+    """Raw (title, slug, row) triples from the public search box."""
     text, final, _ = http.document(ROOT + '/', method='POST', data=query, action='hentaichan-search')
     if final != ROOT + '/':
         raise SourceError('HentaiChan.cc перенаправил поиск.')
@@ -46,13 +47,49 @@ def search(query, http):
             title, slug = row.get('name'), row.get('slug')
             if not isinstance(title, str) or not title.strip() or not isinstance(slug, str) or not re.fullmatch(r'[\w-]{1,240}', slug):
                 continue
-            url = ROOT + '/manga/' + slug
-            found.append({'id': 'hentaichan-cc:' + slug, 'provider': 'hentaichan-cc', 'providerName': SOURCE['name'],
-                          'sourceId': SOURCE['id'], 'url': url, 'sourceURL': url, 'sourceUrl': url,
-                          'title': title.strip()[:500], 'aliases': [title.strip()[:500]], 'cover': cdn_image(row.get('src')),
-                          'kind': 'manga', 'format': 'manga', 'language': 'ru', 'sourceOnly': True, 'adult': True, 'age': 18, **from_api(row)})
+            found.append((title.strip()[:500], slug, row))
         return found
     raise SourceError('HentaiChan.cc изменил формат ответа поиска.')
+
+
+def search(query, http):
+    from manga_hentaichan import number, series_title
+    grouped = {}
+    for title, slug, row in entries(query, http):
+        # A series split into per-chapter entries is one work; its earliest
+        # entry represents it and the reader collects the sibling parts.
+        series = series_title(title)
+        name = series or title
+        part = number(title) if series else None
+        url = ROOT + '/manga/' + slug
+        value = {'id': 'hentaichan-cc:' + slug, 'provider': 'hentaichan-cc', 'providerName': SOURCE['name'],
+                 'sourceId': SOURCE['id'], 'url': url, 'sourceURL': url, 'sourceUrl': url,
+                 'title': name, 'aliases': [name], 'cover': cdn_image(row.get('src')),
+                 'kind': 'manga', 'format': 'manga', 'language': 'ru', 'sourceOnly': True, 'adult': True, 'age': 18, **from_api(row)}
+        rank = (part is None, part if part is not None else 0)
+        key = name.casefold()
+        if key not in grouped or rank < grouped[key][0]:
+            grouped[key] = (rank, value)
+    return [value for _, value in grouped.values()]
+
+
+def siblings(series, http):
+    """Every per-chapter entry of a split series, as reader chapters."""
+    from manga_hentaichan import number, series_title
+    try:
+        found = entries(series, http)
+    except SourceError:
+        return []
+    result = []
+    for title, slug, _ in found:
+        if (series_title(title) or '').casefold() != series.casefold():
+            continue
+        part = number(title)
+        if part is None:
+            continue
+        result.append({'number': part, 'season': 1, 'url': ROOT + '/read/' + slug, 'title': title,
+                       'language': 'ru', 'translator': ''})
+    return result
 
 
 def chapter(url, slug, index):
@@ -93,6 +130,21 @@ def inspect(url, http: PublicHttp):
             if match and match[2] not in seen:
                 seen.add(match[2])
                 chapters.append(chapter(ROOT + '/read/' + match[2], match[2], len(chapters) + 1))
+        from manga_hentaichan import series_title
+        series = series_title(name)
+        if series and len(chapters) <= 1:
+            # A per-chapter entry shows only its own part; its siblings are
+            # separate catalogue entries found by the series name.
+            from manga_hentaichan import number
+            parts = siblings(series, http)
+            if parts:
+                own = number(name)
+                for entry in chapters:
+                    entry['number'] = own if own is not None else entry['number']
+                known = {entry['url'] for entry in parts}
+                chapters = parts + [entry for entry in chapters if entry['url'] not in known]
+                name = series
+        chapters = list({entry['url']: entry for entry in chapters}.values())
         chapters.sort(key=lambda entry: entry['number'])
     return {'provider': 'hentaichan-cc', 'providerName': SOURCE['name'], 'url': canonical,
             'title': name, 'cover': cover, 'kind': 'manga', 'format': 'manga', 'language': 'ru',
