@@ -38,11 +38,14 @@ class Indexer:
             # Retire only that listing; retained cards and detail jobs stay intact.
             for key,raw in self.store.db.execute("SELECT id,spec FROM catalogue_jobs WHERE kind='html'").fetchall():
                 old=json.loads(raw)
-                if old.get('domain')=='hentaichan.cc' and not old.get('term') and old.get('url','').rstrip('/')=='https://hentaichan.cc':
+                # ReManga's HTML front is CAPTCHA-gated; its JSON catalogue replaces it.
+                if old.get('domain')=='hentaichan.cc' and not old.get('term') and old.get('url','').rstrip('/')=='https://hentaichan.cc' or old.get('domain')=='remanga.org':
                     self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(key,));self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(key,))
             for spec in base_sources(installed):
                 self.enqueue(spec)
-                if spec['type']=='lib':self.enqueue({**spec,'type':'lib-vocabulary'},30)
+                # Each source's own genre/tag list becomes owner vocabulary and
+                # a filtered catalogue route for that label.
+                if spec['type'] in {'lib','bridge','remanga'}:self.enqueue({**spec,'type':spec['type']+'-vocabulary'},30)
 
     def prioritize(self,values):
         policy=current();keys={policy.key(value) for value in values if isinstance(value,str)}-{''}
@@ -105,7 +108,7 @@ class Indexer:
                 for term in result.get('vocabulary') or []:
                     field='genres' if term.get('category')=='genre' else 'tags'
                     vocabulary_added+=add(self.store.db,term['label'],spec['domain'],field,'manga')
-                    if spec['type']=='lib-vocabulary':target={**spec,'type':'lib','term':term}
+                    if spec['type'] in {'lib-vocabulary','bridge-vocabulary','remanga-vocabulary'}:target={**spec,'type':spec['type'].removesuffix('-vocabulary'),'term':term}
                     elif term.get('url'):target={**spec,'type':'html','url':term['url'],'term':term}
                     else:continue
                     self.store.db.execute('INSERT OR IGNORE INTO catalogue_tag_targets VALUES(?,?,?)',(spec['domain'],term['label'],canonical_json(target).decode()))
@@ -136,9 +139,9 @@ class Indexer:
         with self.store.lock,self.store.db:
             rows=[]
             pending_details={domain:count for domain,count in self.store.db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind LIKE '%-detail' GROUP BY json_extract(spec,'$.domain')")}
-            for spec,state,pages,records,error,due,expected in self.store.db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','html','unsupported','anilist','kinobox','books') ORDER BY id"):
+            for spec,state,pages,records,error,due,expected in self.store.db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','unsupported','anilist','kinobox','books') ORDER BY id"):
                 spec=json.loads(spec)
-                if '-detail' in spec['type'] or spec['type']=='lib-vocabulary' or spec.get('term'):continue
+                if '-detail' in spec['type'] or spec['type'].endswith('-vocabulary') or spec.get('term'):continue
                 details=pending_details.get(spec['domain'],0)
                 rows.append({'domain':spec['domain'],'name':spec['name'],'status':'enriching' if state=='done' and details else state,'pages':pages,'indexed':records,'expected':expected,'pendingDetails':details,'error':error,'retryAt':due if state=='retry' else None})
             manga=self.store.db.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]

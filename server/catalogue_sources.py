@@ -16,6 +16,9 @@ def base_sources(installed):
         if integration=='closed':jobs.append({'type':'unsupported','domain':domain,'name':name,'reason':'Сайт закрыт'});continue
         if domain in LIB:
             site,referer=LIB[domain];jobs.append({'type':'lib','domain':domain,'name':name,'site':site,'referer':referer});continue
+        if domain=='remanga.org':
+            # The HTML front is CAPTCHA-gated; the public JSON catalogue is not.
+            jobs.append({'type':'remanga','domain':domain,'name':name});continue
         hosts=set(alias_domains(domain));matches=[s for s in installed if urlsplit(s.get('baseUrl','')).hostname in hosts]
         if not matches:
             matches=[s for s in installed if s.get('name','').casefold()==name.casefold() or (name=='AllHentai' and s.get('name')=='AllHentai')]
@@ -94,22 +97,39 @@ def fetch(spec,cursor):
             meta=data.get('meta') or {};more=meta.get('has_next_page')
             if more is None:more=bool(data.get('links',{}).get('next')) if 'links' in data else bool(rows)
             return {'rows':rows,'next':{'page':page+1,'seed':meta.get('seed') or cursor.get('seed')} if more else None,'details':details}
-    if kind in {'bridge','bridge-detail'}:
-        from suwayomi_bridge import Client
+    if kind in {'remanga','remanga-vocabulary'}:
+        from source_parser import PublicHttp
+        import manga_remanga
+        http=PublicHttp(timeout=(3,15))
+        try:
+            if kind=='remanga-vocabulary':return {'rows':[],'next':None,'vocabulary':manga_remanga.vocabulary(http)}
+            term=spec.get('term') or {};identity=term.get('sourceId')
+            result=manga_remanga.catalogue_page(page,http,genre=identity if term.get('category')=='genre' else None,category=identity if term and term.get('category')!='genre' else None)
+            return result
+        finally:http.close()
+    if kind in {'bridge','bridge-detail','bridge-vocabulary'}:
+        from suwayomi_bridge import Client,filter_vocabulary,filtered_page
         from manga_discovery import result_row
         client=Client()
         try:
+            if kind=='bridge-vocabulary':return {'rows':[],'next':None,'vocabulary':filter_vocabulary(client,spec['source']['id'])}
             if kind=='bridge-detail':
                 data=client.get('/manga/'+str(spec['manga']),{'onlineFetch':'true'},timeout=25)
                 if not data.get('title'):raise SourceError('Адаптер не предоставил метаданные карточки')
-                return {'rows':[{**spec['row'],'description':str(data.get('description') or '')[:12000],**from_api(data),'metadataInspected':True}],'next':None}
-            source=spec['source'];data=client.get('/source/'+str(source['id'])+'/popular/'+str(page),timeout=25)
+                found=from_api(data);row=spec['row']
+                # Keep a label learned from the extension's own filter listing.
+                for field in ('tags','genres'):found[field]=unique([*(found.get(field) or []),*(row.get(field) or [])])
+                return {'rows':[{**row,'description':str(data.get('description') or '')[:12000],**found,'metadataInspected':True}],'next':None}
+            source=spec['source'];term=spec.get('term')
+            data=filtered_page(client,source['id'],term,page) if term else client.get('/source/'+str(source['id'])+'/popular/'+str(page),timeout=25)
             if not isinstance(data.get('mangaList'),list) or not isinstance(data.get('hasNextPage'),bool):raise SourceError('Адаптер не предоставил пагинацию каталога')
-            rows=[]
+            rows=[];field='genres' if term and term.get('category')=='genre' else 'tags'
             for raw in data['mangaList']:
                 row=result_row(source,raw)
                 if not row:continue
-                rows.append(row);details.append({**spec,'type':'bridge-detail','manga':raw['id'],'row':row})
+                # A title listed under the extension's own filter carries that label.
+                if term:row[field]=unique([*(row.get(field) or []),term['label']])
+                rows.append(row);details.append({**{k:v for k,v in spec.items() if k!='term'},'type':'bridge-detail','manga':raw['id'],'row':row})
             return {'rows':rows,'next':{'page':page+1} if data['hasNextPage'] else None,'details':details}
         finally:client.close()
     if kind in {'html','html-detail'}:

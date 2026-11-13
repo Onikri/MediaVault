@@ -3,6 +3,7 @@ Protocol: Suwayomi Server v2.4 REST v1 (MPL-2.0 upstream, no vendored code).
 """
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from functools import partial
 from pathlib import Path
 from urllib.parse import urlsplit,urljoin,parse_qs
 import json,os,re,threading,time,sqlite3
@@ -111,12 +112,16 @@ class Client:
         self.session=requests.Session();self.session.trust_env=False # fixed private Docker endpoint only
         self.session.auth=(auth['username'],auth['password'])
     def close(self):self.session.close()
-    def get(self,path,params=None,timeout=12,image=False):
+    def get(self,path,params=None,timeout=12,image=False,body=None):
         # Paths are constructed only by this module, never taken from external URLs.
         if not re.fullmatch(r'/[a-zA-Z0-9_./-]+',path) or '..' in path:raise SourceError('Некорректный запрос к каталогу.')
+        # The only write-shaped call is the stateless filtered search; it never
+        # changes the source's shared filter or preference state.
+        if body is not None and not re.fullmatch(r'/source/\d{1,20}/quick-search',path):raise SourceError('Некорректный запрос к каталогу.')
         response=None
         try:
-            response=self.session.get(self.root+'/api/v1'+path,params=params,timeout=(3,timeout),allow_redirects=False,stream=True)
+            request=self.session.get if body is None else partial(self.session.post,json=body)
+            response=request(self.root+'/api/v1'+path,params=params,timeout=(3,timeout),allow_redirects=False,stream=True)
             if path.startswith(('/extension/install/','/extension/update/')) and response.status_code in {200,201,204}:return {'installed':True}
             if response.status_code!=200:
                 # Classify bounded upstream text; never expose its HTML, stack,
@@ -127,7 +132,7 @@ class Client:
                     if len(raw)>=4096:break
                 text=raw.decode('utf-8',errors='replace').casefold()
                 error=bridge_error(response.status_code,text,image)
-                if error.code=='bad-request' and re.fullmatch(r'/source/\d+/search',path):
+                if error.code=='bad-request' and re.fullmatch(r'/source/\d+/(?:search|quick-search)',path):
                     error=BridgeError('query','Источник не принял поисковый запрос (HTTP 400).')
                 raise error
             chunks=[];size=0;limit=30*1024*1024 if image else 8*1024*1024
@@ -443,3 +448,31 @@ def search(title,language='all',format='all',offset=0,limit=8):
     return {'results':[v for row in attempted for v in row['results']],
             'providers':[{k:v for k,v in row.items() if k not in {'results','attempted'}} for row in attempted],
             'window':{'offset':offset,'checked':len(attempted),'nextOffset':next_offset,'totalSources':total,'hasMore':next_offset<total}}
+
+# Filter groups that carry a work's subject. Status, year, rating and sort
+# controls are not tags and are never offered to the owner's vocabulary.
+TAXONOMY_GROUP=re.compile(r'жанр|тэг|тег|категор|тематик|genre|tag|categor|theme|demographic',re.I)
+GENRE_GROUP=re.compile(r'жанр|genre',re.I)
+
+def filter_vocabulary(client,source_id):
+    """The extension's own genre/tag options with their stateless filter path."""
+    data=client.get('/source/'+str(source_id)+'/filters',{'reset':'true'},timeout=25)
+    if not isinstance(data,list):raise BridgeError('format','Каталог источников вернул данные в неизвестном формате.')
+    terms=[]
+    for position,item in enumerate(data[:60]):
+        node=item.get('filter') if isinstance(item,dict) else None
+        if not isinstance(node,dict) or item.get('type')!='Group' or not TAXONOMY_GROUP.search(str(node.get('name') or '')):continue
+        category='genre' if GENRE_GROUP.search(str(node.get('name'))) else 'tag'
+        for child,option in enumerate((node.get('state') or [])[:600]):
+            kind=option.get('type') if isinstance(option,dict) else None;label=str(((option or {}).get('filter') or {}).get('name') or '').strip()
+            if kind not in {'CheckBox','TriState'} or not label or len(label)>120:continue
+            terms.append({'label':label,'category':category,'sourceId':{'position':position,'child':child,'kind':kind}})
+    return terms
+
+def filtered_page(client,source_id,term,page):
+    """One page of an extension's catalogue narrowed to a single genre/tag."""
+    path=term.get('sourceId') if isinstance(term,dict) else None
+    if not isinstance(path,dict) or path.get('kind') not in {'CheckBox','TriState'} or not all(isinstance(path.get(k),int) and 0<=path[k]<=600 for k in ('position','child')):
+        raise SourceError('Некорректный фильтр источника.')
+    change={'position':path['child'],'state':'true' if path['kind']=='CheckBox' else '1'}
+    return client.get('/source/'+str(source_id)+'/quick-search',{'pageNum':page},timeout=30,body={'searchTerm':'','filter':[{'position':path['position'],'state':json.dumps(change)}]})

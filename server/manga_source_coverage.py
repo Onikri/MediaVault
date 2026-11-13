@@ -23,7 +23,7 @@ SOURCES = (
     ('20.allhen.online', 'AllHentai', 'extension', None, ('allhentai',), 'Grouple-family Suwayomi source; no session/cookie bypass.'),
     ('mangalib.org', 'MangaLib', 'native', 'mangalib', (), 'LibGroup API uses canonical mangalib.me, with mangalib.org as known mirror.'),
     ('v2.shlib.life', 'SlashLIB', 'native', 'slashlib', (), 'LibGroup API for SlashLIB.'),
-    ('remanga.org', 'ReManga', 'extension', None, ('remanga', 'реманга'), 'Suwayomi source only if installed; no undocumented reader API.'),
+    ('remanga.org', 'ReManga', 'native', 'remanga', (), 'Public api.remanga.org JSON: search, branches and free chapters; paid chapters skipped.'),
     ('хентай.онлайн', 'Хентай.онлайн', 'unverified', None, (), 'IDN host not verified; do not auto-route arbitrary aliases.'),
     ('newmanga.org', 'NewManga', 'closed', None, (), 'Website publicly announces permanent closure.'),
 )

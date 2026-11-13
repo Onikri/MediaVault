@@ -18,6 +18,7 @@ DISCOVERY_VERSION=5
 # (refresh) or choosing it explicitly asks it at once. One failure never
 # removes a source: an empty answer or a single outage is not evidence.
 SEARCH_BACKOFF=(3600,6*3600,24*3600)
+TRANSIENT={'upstream','timeout','network'};TRANSIENT_BACKOFF=(600,1800,3600)
 NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'SlashLib':2,'MangaDex':0,'Senkognito':None}
 def language_queries(values,language):
     pattern={'ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[language]
@@ -64,7 +65,8 @@ def installed_sources():
     from manga_hentaichan_cc import SOURCE as CHAN_CC
     from manga_hmanga import SOURCE as HMANGA
     from manga_hitomi import SOURCES as HITOMI
-    return [*bridge.sources(),dict(SOURCE),dict(CHAN_CC),dict(HMANGA),*(dict(s) for s in HITOMI)]
+    from manga_remanga import SOURCE as REMANGA
+    return [*bridge.sources(),dict(SOURCE),dict(CHAN_CC),dict(HMANGA),dict(REMANGA),*(dict(s) for s in HITOMI)]
 
 def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
@@ -145,8 +147,28 @@ def native_search_source(source,query):
              'providerName':source['name'],'sourceId':sid,'sourceUrl':row['url'],'sourceURL':row['url'],
              'sourceOnly':True,'ids':{}} for row in found.values()][:40]
 
+def indexed_search(source,query):
+    """Titles of this extension source already in the persistent catalogue."""
+    from manga_catalog_index import browse
+    from title_identity import match_title
+    selected=source.get('_title') or source.get('_alias_title');found={}
+    try:
+        discovery=manager()
+        with discovery.lock:
+            for term in source.get('_queries',[query]):
+                for row in browse(discovery.db,q=term,source_id=str(source['id']),limit=20)['items']:
+                    if not row.get('url') or not row.get('title'):continue
+                    row={**row,'aliases':row.get('aliases') or [row['title']],'sourceOnly':True,'sourceId':str(source['id']),'providerName':source.get('name',''),'indexed':True}
+                    if selected and not match_title(selected,row)[0]:continue
+                    if not selected and not query_matches(term,row['aliases']):continue
+                    found[row['url']]=row
+                if found:break
+    except Exception:
+        return []
+    return list(found.values())[:40]
+
 def search_source(source,query):
-    if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'}:
+    if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'} or str(source.get('id'))=='990000000000000020':
         from title_identity import match_title
         from source_parser import PublicHttp
         from functools import partial
@@ -157,6 +179,8 @@ def search_source(source,query):
             if source['name']=='HenChan':search=partial(search,root='https://xxl.hentaichan.live')
         elif source['name']=='HentaiChan.cc':
             from manga_hentaichan_cc import search
+        elif str(source.get('id'))=='990000000000000020':
+            from manga_remanga import search
         else:
             from manga_hitomi import search as hitomi_search
             search=partial(hitomi_search,language=source['lang'])
@@ -167,7 +191,7 @@ def search_source(source,query):
                 for row in search(term,http):
                     selected=source.get('_title') or source.get('_alias_title')
                     if selected and not match_title(selected,row)[0]:continue
-                    if source['name'] in {'HentaiChan','HenChan','HManga'} and not selected and not query_matches(term,row['aliases']):continue
+                    if source['name'] in {'HentaiChan','HenChan','HManga','ReManga'} and not selected and not query_matches(term,row['aliases']):continue
                     if source['name']=='HenChan':
                         row={**row,'id':'henchan:'+row['id'].split(':')[-1],'sourceId':str(source['id']),'providerName':'HenChan'}
                     found[row['id']]=row
@@ -216,6 +240,10 @@ def search_source(source,query):
         from source_parser import PublicHttp
         site=site_for(source.get('baseUrl',''))
         if not site or site.family not in {'pill','katana','poisk','hub','chan','buff'}:
+            # Some extensions read a catalogue anonymously but search only for
+            # signed-in users (Nude-Moon). Their crawled catalogue still answers.
+            indexed=indexed_search(source,query)
+            if indexed:return indexed
             # Suwayomi reports the origin's 403/404 as a bare HTTP 500.
             if isinstance(error,bridge.BridgeError) and error.code=='upstream' and 'http 500' in str(error).casefold():
                 raise bridge.origin_block(source.get('baseUrl')) or error
@@ -539,6 +567,9 @@ class Discovery:
         pause=SEARCH_BACKOFF[min(failures-2,len(SEARCH_BACKOFF)-1)] if failures>=2 else 0
         # A regional wall is the origin's own statement, not a flaky outage.
         if not ok and details.get('code')=='region':pause=SEARCH_BACKOFF[-1]
+        # A 5xx or a timeout is usually a short outage of a small site; do not
+        # hide a recovered catalogue for a day (MangaChan, YaoiChan).
+        elif not ok and details.get('code') in TRANSIENT and failures>=2:pause=TRANSIENT_BACKOFF[min(failures-2,len(TRANSIENT_BACKOFF)-1)]
         self.db.execute('INSERT OR REPLACE INTO reachability VALUES(?,?,?,?,?,?,?,?,?)',(sid,str(source.get('name',''))[:120],str(source.get('lang',''))[:8],failures,
             '' if ok else str(details.get('code','source'))[:40],'' if ok else str(details.get('message',''))[:300],now if ok else (old['last_ok'] if old else 0),0 if ok else now,now+pause if pause else 0))
 

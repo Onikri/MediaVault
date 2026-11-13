@@ -26,6 +26,7 @@ class MangaSite:
 
 SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan',('x17.h-chan.me','xxl.hentaichan.live')),
        MangaSite('hentaichan-cc','HentaiChan.cc','https://hentaichan.cc','hentaichan-cc'),
+       MangaSite('remanga','ReManga','https://remanga.org','remanga',('api.remanga.org',)),
        MangaSite('hmanga','HManga','https://hmanga.me','madara',('hmanga.su',)),
        MangaSite('hitomi','Hitomi','https://hitomi.la','hitomi',languages=('en','ja','ru','ko')),
        MangaSite('mangapoisk','MangaPoisk','https://mangapoisk.me','poisk',('mangapoisk.io','eropoisk.com')),
@@ -144,6 +145,9 @@ def search_title(title,language='auto',format='all'):
                 elif site.family=='hentaichan-cc':
                     from manga_hentaichan_cc import search
                     candidates=search(query,http)
+                elif site.family=='remanga':
+                    from manga_remanga import search
+                    candidates=search(query,http)
                 elif site.family=='madara':
                     from manga_hmanga import search
                     candidates=search(query,http)
@@ -259,6 +263,9 @@ def inspect(url,http=None):
         if initial and initial.family=='hentaichan-cc':
             from manga_hentaichan_cc import inspect as inspect_chan_cc
             return inspect_chan_cc(url,http)
+        if initial and initial.family=='remanga':
+            from manga_remanga import inspect as inspect_remanga
+            return inspect_remanga(url,http)
         if initial and initial.family=='madara':
             from manga_hmanga import inspect as inspect_hmanga
             return inspect_hmanga(url,http)

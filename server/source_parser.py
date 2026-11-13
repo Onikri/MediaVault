@@ -124,6 +124,8 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         # Hikka: Ukrainian catalogue of anime, manga and novels (public search and details).
         or host == "api.hikka.io" and bool(re.fullmatch(r"/(?:novel|anime|manga)(?:/[a-z0-9-]{1,120})?|/integrations/mal/(?:anime|manga|novel)/\d{1,9}", url.path))
         or host == "api.zenko.online" and bool(re.fullmatch(r"/(?:titles(?:/\d{1,9}(?:/chapters)?)?|chapters/\d{1,9})", url.path))
+        # ReManga's public catalogue, translator branches, free chapter pages and covers.
+        or host == "api.remanga.org" and bool(re.fullmatch(r"/api/v2/search/(?:catalog/)?|/api/forms/titles/|/api/v2/titles/(?:chapters/(?:[1-9]\d{0,11}/)?|[^/]{1,300}/)|/media/[\w./-]{1,300}", url.path))
     )
     if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
         raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
