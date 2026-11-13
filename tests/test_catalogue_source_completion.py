@@ -16,7 +16,7 @@ class CompletionTests(unittest.TestCase):
  def card(self):return '<div class="content_row"><h2><a class="title_link" href="/manga/1-garden.html">Garden</a></h2><div class="genre"><a href="/tags/ecology">Ecology</a><span hidden><a href="/tags/botany">Botany</a></span></div><img src="https://covers.example/garden.jpg"></div>'
  def test_collapsed_work_tags_survive_and_offset_navigation_is_followed(self):
   result=catalogue(self.card()+'<div id="page"><a href="?offset=20">Next</a><a href="?offset=120">Last</a></div><aside class="sidetag"><a href="/tags/foreign">Foreign</a></aside>',self.spec()['url'],self.spec(),1)
-  self.assertEqual(result['rows'][0]['tags'],['Ecology','Botany']);self.assertEqual(result['rows'][0]['provider'],'suwayomi:7')
+  self.assertEqual(result['rows'][0]['genres'],['Ecology','Botany']);self.assertEqual(result['rows'][0]['provider'],'suwayomi:7')
   self.assertEqual(result['next'],{'page':2,'url':'https://im.manga-chan.me/catalog?offset=20'})
   self.assertEqual(result['rows'][0]['cover'],'https://covers.example/garden.jpg')
  def test_missing_offset_and_parked_empty_pages_are_not_complete(self):

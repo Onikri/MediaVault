@@ -21,8 +21,9 @@ def valid_url(value, base, hosts, pattern):
 
 def facts(scope):
     # Work-local containers only; .sidetag (singular) is a global tag cloud.
-    links = scope.select('.genre a[href*="/tags/"],.tags a[href*="/tags/"],.sidetags ul a[href*="/tags/"]')
-    return {'tags': unique(a.get_text(' ', strip=True) for a in links), 'genres': []}
+    genres = scope.select('.genre a[href*="/tags/"]')
+    tags = scope.select('.tags a[href*="/tags/"],.sidetags ul a[href*="/tags/"]')
+    return {'tags': unique(a.get_text(' ', strip=True) for a in tags), 'genres': unique(a.get_text(' ', strip=True) for a in genres)}
 
 
 def catalogue(raw, url, spec, page):
