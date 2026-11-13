@@ -31,16 +31,18 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  const [item,setItem]=useState(value),[profile,setProfile]=useState(null),[supplement,setSupplement]=useState(null),[loading,setLoading]=useState(false),[saveOpen,setSaveOpen]=useState(false),[saveTo,setSaveTo]=useState('local'),[viewSeason,setViewSeason]=useState(null),[seasonProfiles,setSeasonProfiles]=useState({});
  const tagPolicyVersion=useMangaPolicy(service,value.kind==='manga');
  const [indexedFacts,setIndexedFacts]=useState(null);
- const factIds=[...new Set([value.catalogId,...(value.sources||[]).map(source=>source.catalogId)].filter(id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)))].slice(0,100).join(',');
+ const factIds=[...new Set([value.catalogId,...(value.catalogIds||[]),...(value.sources||[]).map(source=>source.catalogId)].filter(id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)))].slice(0,100).join(',');
+ const factUrls=[...new Set([value.sourceUrl,value.sourceURL,value.url].filter(url=>typeof url==='string'&&url.startsWith('https://')))].join('\n');
  useEffect(()=>{
-  setIndexedFacts(null);if(value.kind!=='manga'||!factIds)return;
+  setIndexedFacts(null);if(value.kind!=='manga'||!factIds&&!factUrls)return;
   const abort=new AbortController();
-  Promise.allSettled(factIds.split(',').map(id=>service.request('/manga/catalog/'+id,{signal:abort.signal}).then(row=>row.catalogId===id&&sameMangaTitle(value,row)?row:null))).then(results=>{
+  const pending=factIds?factIds.split(',').map(id=>service.request('/manga/catalog/'+id,{signal:abort.signal}).then(row=>row.catalogId===id&&sameMangaTitle(value,row)?[row]:[])):[service.request('/manga/catalog?'+new URLSearchParams({q:value.title,limit:'100'}),{signal:abort.signal}).then(result=>(result.items||[]).filter(row=>factUrls.split('\n').some(url=>url===row.url||url===row.sourceUrl)&&sameMangaTitle(value,row)))];
+  Promise.allSettled(pending).then(results=>{
    if(abort.signal.aborted)return;
-   const rows=results.filter(result=>result.status==='fulfilled'&&result.value).map(result=>result.value);
+   const rows=results.filter(result=>result.status==='fulfilled').flatMap(result=>result.value);
    setIndexedFacts({id:value.id,genres:[...new Set(rows.flatMap(row=>row.genres||[]))],themes:[...new Set(rows.flatMap(row=>row.tags||[]))]});
   });return()=>abort.abort();
- },[value.id,factIds,tagPolicyVersion,service.server]);
+ },[value.id,factIds,factUrls,tagPolicyVersion,service.server]);
  useEffect(()=>{
   const abort=new AbortController();setItem(value);setProfile(null);setSupplement(null);setViewSeason(null);setSeasonProfiles({});setSaveOpen(false);setLoading(true);
   const tasks=[];

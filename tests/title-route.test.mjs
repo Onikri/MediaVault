@@ -16,5 +16,8 @@ test('online title address restores exact identity without a catalogue search or
   assert.doesNotThrow(()=>mergeCatalog([saved,{...shared,title:'Атака титанов',titles:{ru:'Атака титанов'}}]));
   assert.equal(readOnlineTitle('#library',storage),null);
   assert.equal(readOnlineTitle('#watch=invalid:shikimori:16498',storage),null);
+  onlineTitleLocation({id:'fixture:1',provider:'fixture',providerId:'1',kind:'manga',title:'Garden World',catalogId:'a'.repeat(32),sources:[{catalogId:'b'.repeat(32),url:'https://private.invalid/stream'},{catalogId:'not-an-index-id'}]});
+  const manga=readOnlineTitle();assert.deepEqual(manga.catalogIds,['a'.repeat(32),'b'.repeat(32)]);
+  assert.equal(manga.sources,undefined,'Only public index identities survive routing, never source/stream payloads');
  }finally{Object.assign(globalThis,previous);}
 });
