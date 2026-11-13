@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
-from manga_hentaichan_cc import catalogue_page,catalogue_metadata
+from manga_hentaichan_cc import catalogue_page,catalogue_metadata,flight_tags
 from bs4 import BeautifulSoup
 from catalogue_indexer import Indexer,identity
 from manga_catalog_index import initialize,upsert,browse
@@ -36,6 +36,13 @@ class ParserTests(unittest.TestCase):
  def test_explicit_card_tags_work_without_semantic_css_classes_and_deduplicate(self):
   soup=BeautifulSoup('<a href="/catalog/tags/kimono">Кимоно</a><a href="/catalog/tags/kimono">Кимоно</a><a href="/catalog/tags/ecology">Экология</a><a href="/author/someone">Имя автора</a><meta name="description" content="A garden.">','html.parser')
   r=catalogue_metadata(soup);self.assertEqual(r['tags'],['Кимоно','Экология']);self.assertEqual(r['description'],'A garden.')
+ def test_all_tags_are_read_from_work_props_including_tags_hidden_from_the_dom(self):
+  data=['$',{'tags':[{'id':1,'name':'Экология','slug':'ecology'},{'id':2,'name':'Кимоно','slug':'kimono'}]}, {'tags':[{'id':3,'name':'Not a work tag','slug':'global'}],'maxViews':99}]
+  flight='a:'+json.dumps(data,ensure_ascii=False)
+  soup=BeautifulSoup('<a href="/catalog/tags/ecology">Экология</a><script>self.__next_f.push('+json.dumps([1,flight])+')</script>','html.parser')
+  metadata=catalogue_metadata(soup)
+  self.assertEqual(set(metadata['tags']),{'Кимоно','Экология'});self.assertEqual(metadata['sourceMetadataVersion'],2)
+  self.assertEqual(flight_tags('1:'+json.dumps({'tags':[]})),[]);self.assertIsNone(flight_tags('1:'+json.dumps({'tags':[], 'maxViews':1})))
 
 class IndexTests(unittest.TestCase):
  def setUp(self):
@@ -55,8 +62,8 @@ class IndexTests(unittest.TestCase):
  def test_full_listing_is_not_complete_until_detail_tags_are_enriched_and_unhidden(self):
   spec={'type':'html','domain':'hentaichan.cc','name':'HentaiChan.cc','url':'https://hentaichan.cc/catalog','hosts':['hentaichan.cc']}
   row=catalogue_page(listing(1,1),spec['url'],1)['rows'][0]
-  upsert(self.db,[{**row,'description':'Legacy cached summary','metadataInspected':True}]);self.db.commit()
-  def fetch(s,c):return {'rows':[{**row,'tags':['Кимоно','Экология'],'sourceMetadataVersion':1,'metadataInspected':True}],'next':None} if s['type']=='html-detail' else {'rows':[row],'next':None,'state':'done','total':1,'details':[{**spec,'type':'html-detail','url':row['url'],'row':row}]}
+  upsert(self.db,[{**row,'description':'Legacy cached summary','sourceMetadataVersion':1,'metadataInspected':True}]);self.db.commit()
+  def fetch(s,c):return {'rows':[{**row,'tags':['Кимоно','Экология'],'sourceMetadataVersion':2,'metadataInspected':True}],'next':None} if s['type']=='html-detail' else {'rows':[row],'next':None,'state':'done','total':1,'details':[{**spec,'type':'html-detail','url':row['url'],'row':row}]}
   worker=Indexer(self.store,fetch,lambda:self.now,interval=0)
   with self.db:worker.enqueue(spec)
   worker.run_once();status=worker.status()['sources'][0]

@@ -124,7 +124,9 @@ def fetch(spec,cursor):
         if kind=='html-detail':
             if spec['domain']=='hentaichan.cc':
                 from manga_hentaichan_cc import catalogue_metadata
-                return {'rows':[{**spec['row'],**catalogue_metadata(soup),'metadataInspected':True}],'next':None}
+                metadata=catalogue_metadata(soup)
+                if metadata['sourceMetadataVersion']<2:raise SourceError('Не получен полный список тегов карточки HentaiChan.cc')
+                return {'rows':[{**spec['row'],**metadata,'metadataInspected':True}],'next':None}
             metadata={}
             description=soup.select_one('meta[property="og:description"],meta[name="description"]')
             summary=soup.select_one('.description-summary,.summary__content,[itemprop="description"],.manga-description')

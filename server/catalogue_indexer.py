@@ -92,7 +92,7 @@ class Indexer:
                 count=upsert(self.store.db,manga)+ingest(self.store.db,other)
                 for detail in result.get('details') or []:
                     row=detail['row'];known=self.store.db.execute("SELECT inspected,json_extract(metadata,'$.sourceMetadataVersion'),json_extract(metadata,'$.description') FROM catalog_titles WHERE provider=? AND source_url=?",(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone()
-                    missing=(known[1] or 0)<1 if known and spec['domain']=='hentaichan.cc' else not known or not known[2]
+                    missing=(known[1] or 0)<2 if known and spec['domain']=='hentaichan.cc' else not known or not known[2]
                     if not known or known[0]<self.clock()-7*86400 or missing:self.enqueue(detail,int(spec.get('detailPriority',15)))
                 from content_vocabulary import add,bump
                 vocabulary_added=0

@@ -27,10 +27,11 @@ def cdn_image(value):
 
 def catalogue_metadata(soup):
     """Explicit work tags; recommendations, global filters and counters aren't facts."""
-    tags=unique(a.get_text(' ',strip=True) for a in soup.select('a[href^="/catalog/tags/"]'))
+    complete=flight_tags(flight_text(soup))
+    tags=complete if complete is not None else unique(a.get_text(' ',strip=True) for a in soup.select('a[href^="/catalog/tags/"]'))
     description=soup.select_one('meta[property="og:description"],meta[name="description"]')
     cover=soup.select_one('meta[property="og:image"]')
-    return {'tags':tags,'genres':[],'sourceMetadataVersion':1,
+    return {'tags':tags,'genres':[],'sourceMetadataVersion':2 if complete is not None else 1,
             'description':str(description.get('content',''))[:12000] if description else '',
             'cover':cdn_image(cover.get('content')) if cover else ''}
 
@@ -44,6 +45,30 @@ def flight_text(soup):
         except ValueError:continue
         if isinstance(part,list) and len(part)>1 and isinstance(part[1],str):chunks.append(part[1])
     return ''.join(chunks)
+
+
+def flight_tags(text):
+    """WorkTags props contain every tag; the DOM renders only five of them.
+
+    A filter dictionary also has `tags` but carries other fields. Never attach
+    its global vocabulary to a work, and never execute the source scripts.
+    """
+    found=[];present=False
+    for line in text.splitlines():
+        prefix,_,payload=line.partition(':')
+        if not re.fullmatch(r'[0-9a-f]+',prefix):continue
+        try:stack=[json.loads(payload)]
+        except ValueError:continue
+        while stack:
+            value=stack.pop()
+            if isinstance(value,dict):
+                tags=value.get('tags')
+                if set(value)=={'tags'} and isinstance(tags,list) and all(isinstance(t,dict) and isinstance(t.get('name'),str) and isinstance(t.get('slug'),str) and isinstance(t.get('id'),int) for t in tags):
+                    if len({t['name'].strip().casefold() for t in tags})>120:raise SourceError('Полный список тегов карточки превышает лимит индекса; частичный результат не сохранён')
+                    present=True;found.extend(t['name'] for t in tags)
+                stack.extend(value.values())
+            elif isinstance(value,list):stack.extend(value)
+    return unique(found) if present else None
 
 
 def catalogue_page(raw,url,page):
