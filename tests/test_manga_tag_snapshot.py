@@ -28,6 +28,10 @@ class SnapshotTests(unittest.TestCase):
         empty, complete=snapshot.parse_lib_taxonomy(b'{"data":{"other":[]}}')
         self.assertEqual(empty,[])
         self.assertFalse(complete)
+        by_site={'data':{'genres':[{'name':'For MangaLib','site_ids':[1]},{'name':'For HentaiLib','site_ids':[4]}]}}
+        scoped, complete=snapshot.parse_lib_taxonomy(json.dumps(by_site).encode(),site_id=4)
+        self.assertTrue(complete)
+        self.assertEqual(scoped,[('genre','For HentaiLib')])
 
     def test_html_tags_require_taxonomy_links(self):
         html = b'''<main><a href="/manga/sample">Not tag</a>
