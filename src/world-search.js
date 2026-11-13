@@ -2,7 +2,7 @@ import {mergeCatalog,rankCatalog} from './catalog.js';
 import {sameMangaTitle} from './manga-source-identity.js';
 
 export function sourceTitle(row){
- return {...row,id:row.id||row.provider+':'+row.url,providerId:row.id,providers:[row.providerName||'Suwayomi'],
+ return {...row,age:row.age??(row.adult===true?18:null),id:row.id||row.provider+':'+row.url,providerId:row.id,providers:[row.providerName||'Suwayomi'],
   titles:row.titles||{},aliases:[...new Set([row.title,...row.aliases||[]])],genres:row.genres||[],tags:row.tags||[],links:row.links||[],ids:row.ids||{},releases:row.releases||[],
   sourceOnly:true,sources:[{url:row.url,provider:row.provider,providerName:row.providerName,language:row.language,title:row.title,aliases:row.aliases||[],identityTitles:row.identityTitles,kind:row.kind,year:row.year,ids:row.ids||{},sourceId:row.sourceId}],description:row.description||'',cover:row.cover||''};
 }

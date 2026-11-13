@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+test('source adult classification remains usable by library age filtering without inventing a child rating',()=>{
+ const marked=sourceTitle({provider:'fixture',title:'Fixture',kind:'manga',url:'https://example.org/fixture',adult:true});
+ assert.equal(marked.age,18);
+ assert.equal(sourceTitle({...marked,age:null,adult:false}).age,null);
+ assert.equal(sourceTitle({...marked,age:16}).age,16);
+});
+
 test('unfiltered catalogue context attaches known sources without leaking unrelated cards',()=>{
  const metadata={id:'meta:1',provider:'kitsu',kind:'manga',title:'Garden World',genres:[],tags:[],aliases:['Garden World'],ids:{},year:2024};
  const row={...metadata,id:'src:1',provider:'suwayomi:1',sourceId:'1',url:'https://media.example/__manga/suwayomi/m/42'};

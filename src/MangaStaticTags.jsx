@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {Search,Tags} from 'lucide-react';
+import {loadMangaTaxonomy} from './manga-catalog.js';
 
 /** Public build-time vocabulary, independent of MediaVault server login. */
 // Lazy import keeps the large taxonomy in a separate Vite chunk.
@@ -20,7 +21,7 @@ export default function MangaStaticTags(){
   const [limit,setLimit]=useState(60);
   useEffect(()=>{
     let mounted=true;
-    import('../public/data/manga-tags.json').then(({default:value})=>{
+    loadMangaTaxonomy().then(value=>{
       if(!mounted)return;
       if(value.schemaVersion!==1||!Array.isArray(value.tags)||!Array.isArray(value.sources))
         throw Error('Недопустимый формат справочника тегов.');

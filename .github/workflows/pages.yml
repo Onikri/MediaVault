@@ -101,6 +101,17 @@ jobs:
         run: |
           npm run test:notebook
 
+      - name: Source catalogue browser contracts
+        if: env.PUBLISH_NOW != 'true'
+        timeout-minutes: 5
+        env:
+          MEDIA_VAULT_SKIP_BUILD: '1'
+        run: |
+          CHROMIUM_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROMIUM_PATH"
+          export CHROMIUM_PATH
+          npm run test:world
+
       - name: Direct translation browser contract
         if: env.PUBLISH_NOW != 'true'
         timeout-minutes: 4
@@ -125,7 +136,7 @@ jobs:
           set +e
           {
             failures=0
-            for suite in browser blossom design watch ui vm blocks cleaning migan voices manga reader music online translation gpu lmt gemma trusted rooms library-layout cards suwayomi world music-nav downloads; do
+            for suite in browser blossom design watch ui vm blocks cleaning migan voices manga reader music online translation gpu lmt gemma trusted rooms library-layout cards suwayomi music-nav downloads; do
               npm run "test:$suite"
               code=$?
               if [ "$code" -ne 0 ]; then failures=$((failures + 1)); fi
