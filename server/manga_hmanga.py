@@ -78,7 +78,7 @@ def parse_search(text, base=ROOT):
             'sourceId': SOURCE['id'], 'sourceOnly': True,
             'url': url, 'sourceURL': url, 'sourceUrl': url,
             'title': title, 'aliases': aliases(title), 'kind': 'manga',
-            'language': 'ru', 'format': 'manga', 'adult': True,
+            'language': 'ru', 'format': '', 'adult': True,
             'age': 18, 'cover': cover, 'ids': {}, 'genres': [], 'tags': []}
         if len(found) >= 40:
             break
