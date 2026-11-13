@@ -153,7 +153,7 @@ def fetch(spec,cursor):
             from content_sources import UA
             session.headers['User-Agent']=UA
             if not permitted(session,url,hosts):raise SourceError('Источник не разрешил получение каталога')
-            raw,final=checked_get(session,url,hosts)
+            raw,final=checked_get(session,url,hosts,timeout=30)
         soup=BeautifulSoup(raw,'html.parser')
         from manga_sources import guard
         guard(soup)

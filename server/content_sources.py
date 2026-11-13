@@ -21,11 +21,11 @@ def matching_terms(terms,domain,keys):
         if key and (keys is None or key in keys):found.setdefault(key,term)
     return list(found.values())
 
-def checked_get(session,url,hosts,headers=None):
+def checked_get(session,url,hosts,headers=None,timeout=10):
     for _ in range(4):
         p=urlsplit(url)
         if p.scheme!='https' or p.hostname not in hosts or p.username or p.password:raise ValueError('unapproved taxonomy host')
-        response=session.send(session.build_request('GET',url,headers=headers or {},timeout=10),stream=True,follow_redirects=False) if isinstance(session,httpx.Client) else session.get(url,headers=headers or {},timeout=(4,10),allow_redirects=False,stream=True)
+        response=session.send(session.build_request('GET',url,headers=headers or {},timeout=timeout),stream=True,follow_redirects=False) if isinstance(session,httpx.Client) else session.get(url,headers=headers or {},timeout=(4,timeout),allow_redirects=False,stream=True)
         try:
             if isinstance(response,httpx.Response) and response.http_version!='HTTP/2':raise ValueError('HTTP/2 required')
             if response.status_code in {301,302,303,307,308}:
