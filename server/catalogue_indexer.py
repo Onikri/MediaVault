@@ -7,7 +7,7 @@ _service=None;_service_lock=threading.Lock()
 
 def identity(spec):
     key={k:spec.get(k) for k in ('type','domain','site','kind','slug','manga','url')}
-    key['source']=(spec.get('source') or {}).get('id');key['term']=spec.get('term')
+    key['source']=(spec.get('source') or {}).get('id');key['term']=None if spec.get('type','').endswith('-detail') else spec.get('term')
     return hashlib.sha256(canonical_json(key)).hexdigest()[:32]
 
 class Indexer:
@@ -119,7 +119,7 @@ class Indexer:
                 for child in result.get('catalogues') or []:self.enqueue(child,70)
                 for detail in result.get('details') or []:
                     row=detail['row'];known=self.store.db.execute("SELECT inspected,json_extract(metadata,'$.sourceMetadataVersion'),json_extract(metadata,'$.description') FROM catalog_titles WHERE provider=? AND source_url=?",(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone()
-                    missing=(known[1] or 0)<2 if known and spec['domain']=='hentaichan.cc' else not known or not known[2]
+                    missing=(known[1] or 0)<2 if known and spec['domain']=='hentaichan.cc' else not known or not known[0]
                     if not known or known[0]<self.clock()-7*86400 or missing:self.enqueue(detail,int(spec.get('detailPriority',15)))
                 from content_vocabulary import add,bump
                 vocabulary_added=0

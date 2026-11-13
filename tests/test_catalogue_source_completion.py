@@ -104,4 +104,10 @@ class CompletionTests(unittest.TestCase):
   self.assertEqual(d['state'],'partial')
   detail='<div class="post-head"><h1>Garden</h1></div><a class="chip" href="/tag/ecology">Ecology</a><a class="chip" href="/artist/smith">Smith</a>'
   self.assertEqual(metadata(BeautifulSoup(detail,'html.parser'),spec['domain'])['tags'],['Ecology'])
+ def test_detail_identity_deduplicates_a_work_seen_under_many_source_tags(self):
+  from catalogue_indexer import identity
+  base={'type':'html-detail','domain':'fixture.example','url':'https://fixture.example/garden'}
+  self.assertEqual(identity({**base,'term':{'label':'Ecology'}}),identity({**base,'term':{'label':'Botany'}}))
+  self.assertNotEqual(identity({**base,'type':'html','term':{'label':'Ecology'}}),identity({**base,'type':'html','term':{'label':'Botany'}}))
+
 if __name__=='__main__':unittest.main()
