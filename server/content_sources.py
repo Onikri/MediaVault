@@ -13,6 +13,13 @@ from manga_tag_deploy import atomic_write
 UA='MediaVault-Content/1.0 (+https://github.com/Onikri/MediaVault)'
 SELECTOR='a[rel="tag"],.tags a[href],.genres a[href],.tag-list a[href],.genre-list a[href],a[href*="/tag/"],a[href*="/tags/"],a[href*="/genre/"],a[href*="/genres/"],a[href*="/category/"],a[href*="tag="]'
 
+def matching_terms(terms,domain,keys):
+    found={}
+    for term in terms:
+        key=current().key(term['label'],domain)
+        if key and (keys is None or key in keys):found.setdefault(key,term)
+    return list(found.values())
+
 def checked_get(session,url,hosts,headers=None):
     for _ in range(4):
         p=urlsplit(url)
@@ -107,7 +114,7 @@ def scan(store,keys=None):
                         url=root+'/api/constants?fields[]=genres&fields[]=tags'
                         if not permitted(client,url,hosts,headers):raise ValueError('robots_or_network')
                         raw,_=checked_get(client,url,hosts,headers);terms=lib_terms(raw,site_id)
-                        matches=[t for t in terms if (key:=current().key(t['label'],domain)) and (keys is None or key in keys)]
+                        matches=matching_terms(terms,domain,keys)
                         result['matched']=len(matches)
                         for term in matches[:4]:
                             # Keiyoushi LibGroup's GenreList uses genres[] for both
@@ -121,7 +128,7 @@ def scan(store,keys=None):
                     url,hosts=HTML[domain]
                     if not permitted(session,url,hosts):raise ValueError('robots_or_network')
                     raw,final=checked_get(session,url,hosts);terms=html_terms(raw,final,hosts)
-                    matches=[t for t in terms if (key:=current().key(t['label'],domain)) and (keys is None or key in keys)]
+                    matches=matching_terms(terms,domain,keys)
                     result['matched']=len(matches)
                     for term in matches[:4]:
                         if not permitted(session,term['url'],hosts):continue

@@ -50,7 +50,11 @@ def scan(store,keys=None):
                     catalogue=get_json('https://graphql.anilist.co',body={'query':'{GenreCollection MediaTagCollection{name}}'}).get('data',{})
                     source_rules=[('genre',name) for name in catalogue.get('GenreCollection',[])]+[('tag',row['name']) for row in catalogue.get('MediaTagCollection',[]) if isinstance(row.get('name'),str)]
                 selected_keys={rule['key'] for rule in selected}
-                matches=[(field,name) for field,name in source_rules if current().key(name,'anilist.co') in selected_keys]
+                grouped={}
+                for field,name in source_rules:
+                    key=current().key(name,'anilist.co')
+                    if key in selected_keys:grouped.setdefault(key,(field,name))
+                matches=list(grouped.values())
                 for field,name in matches[:3]:
                     payload=metadata('anilist',kind=kind,**{field:name})
                     rows.extend(anilist_rows(payload,kind))

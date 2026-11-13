@@ -104,6 +104,14 @@ class ContentTests(ContentFixture,unittest.TestCase):
   with patch('content_management.start_scan') as start:recover(lambda:self.store)
   start.assert_called_once_with(self.store,['ecology','journey'])
   self.assertEqual(current().data,BASE)
+ def test_bulk_new_rules_queue_every_key_instead_of_dropping_after_first_batch(self):
+  import content_management as management
+  with patch.object(management,'_worker_lock',threading.Lock()),patch.object(management,'_pending',set()),patch.object(management,'_pending_all',False),patch('content_management.threading.Thread') as thread:
+   status=management.start_scan(self.store,['journey','ecology','ocean','garden','city'])
+   self.assertEqual(status['keys'],['journey','ecology','ocean']);self.assertEqual(status['remainingKeys'],2)
+   pending=json.loads(Path(self.temp.name,'content-pending-keys.json').read_text())
+   self.assertEqual(pending['keys'],['city','garden']);thread.return_value.start.assert_called_once()
+  self.assertEqual(current().data,BASE)
 
 class ContentHttpTests(ContentFixture,unittest.TestCase):
  def setUp(self):

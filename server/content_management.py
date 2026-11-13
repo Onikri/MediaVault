@@ -82,7 +82,12 @@ def start_scan(store,keys=None):
             else:_pending.update(keys)
             atomic_write(directory()/'content-pending-keys.json',canonical_json({'all':_pending_all,'keys':sorted(_pending)}))
         return {**scan_status(),'pendingChanges':True}
-    status={'state':'queued','startedAt':int(time.time()),'completed':0,'total':24,'indexed':0,'sources':[],'keys':keys}
+    with _queue_lock:
+        if keys is not None:
+            keys=list(dict.fromkeys(keys));_pending.update(keys[3:]);keys=keys[:3]
+        atomic_write(directory()/'content-pending-keys.json',canonical_json({'all':_pending_all,'keys':sorted(_pending)}))
+        remaining=len(_pending)
+    status={'state':'queued','startedAt':int(time.time()),'completed':0,'total':24,'indexed':0,'sources':[],'keys':keys,'remainingKeys':remaining}
     atomic_write(directory()/'content-index-job.json',canonical_json(status))
     def run():
         global _pending_all
