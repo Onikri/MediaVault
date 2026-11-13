@@ -6,8 +6,10 @@ strict public URLs and image-list parsing without executing JavaScript.
 Upstream: 92d80387f6a24fd48c6be0097bbd2d1450353751.
 """
 import ast
+import copy
 import json
 import re
+import time
 from urllib.parse import urljoin,urlsplit,urlencode
 from bs4 import BeautifulSoup
 from source_parser import SourceError,public_url
@@ -16,6 +18,7 @@ from manga_source_tags import from_html
 HOSTS={'hentaichan.live','xxl.hentaichan.live','x17.h-chan.me'}
 ROOT='https://x17.h-chan.me'
 SOURCE={'id':'990000000000000001','name':'HentaiChan','lang':'ru','baseUrl':ROOT,'isNsfw':True}
+_CONTINUED={}
 ITEM=re.compile(r'^/(manga|online|related)/([1-9]\d{0,11}-[^/?]{1,250})\.html$')
 
 
@@ -152,6 +155,10 @@ def continuations(series,writer,chapters,base,http):
     """
     known={c['number'] for c in chapters if c['number'] is not None}
     if not writer or not known:return []
+    # The site's search is slow; keep a successful answer so a later timeout
+    # does not drop chapters a reader has already seen.
+    key=(urlsplit(base).hostname,series.casefold(),writer,int(max(known)));saved=_CONTINUED.get(key)
+    if saved and saved[0]>time.monotonic():return copy.deepcopy(saved[1])
     params=urlencode({'do':'search','subaction':'search','story':series,'search_start':1})
     try:text,final,soup=document(f'https://{urlsplit(base).hostname}/?'+params,http)
     except SourceError:return []
@@ -168,6 +175,8 @@ def continuations(series,writer,chapters,base,http):
         entry=chapter(url,label,translator(card));entry['number']=int(match[1]);found[entry['number']]=entry
     result=[];following=int(max(known))+1
     while following in found:result.append(found[following]);following+=1
+    if len(_CONTINUED)>=256:_CONTINUED.pop(next(iter(_CONTINUED)))
+    _CONTINUED[key]=(time.monotonic()+86400,copy.deepcopy(result))
     return result
 
 
