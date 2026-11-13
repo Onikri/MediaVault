@@ -11,7 +11,8 @@ ROOT = 'https://hentaichan.cc'
 SOURCE = {'id': '990000000000000002', 'name': 'HentaiChan.cc', 'lang': 'ru',
           'baseUrl': ROOT, 'isNsfw': True}
 CDN = 'cdn.hentaichan.cc'
-PATH = re.compile(r'/(manga|read)/([\w-]{1,240})/?')
+SLUG = r'[\w-]{1,1024}'
+PATH = re.compile(r'/(manga|read)/('+SLUG+r')/?')
 
 
 def cdn_image(value):
@@ -95,7 +96,7 @@ def entries(query, http):
             if not isinstance(row, dict):
                 continue
             title, slug = row.get('name'), row.get('slug')
-            if not isinstance(title, str) or not title.strip() or not isinstance(slug, str) or not re.fullmatch(r'[\w-]{1,240}', slug):
+            if not isinstance(title, str) or not title.strip() or not isinstance(slug, str) or not re.fullmatch(SLUG, slug):
                 continue
             found.append((title.strip()[:500], slug, row))
         return found
