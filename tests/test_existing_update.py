@@ -17,7 +17,7 @@ REVISION='a'*40
 
 
 class ExistingUpdateTests(unittest.TestCase):
-    def exercise(self,root,*,active=False,health_failure=False,resume_active=False):
+    def exercise(self,root,*,active=False,health_failure=False,resume_active=False,image_revision=None):
         work=root/'legacy/media-vault/deploy/oracle';data=work/'data';data.mkdir(parents=True)
         for name,value in [('.env','private-fixture'),('compose.yaml','services: {}'),('release-v51.yaml','services: {}'),('Caddyfile','fixture')]:
             (work/name).write_text(value)
@@ -50,7 +50,11 @@ class ExistingUpdateTests(unittest.TestCase):
                     if health_failure:raise subprocess.CalledProcessError(1,args)
                     return json.dumps({'application':'MediaVault','version':7,'voiceDiscovery':True,'sourceQualities':True,'oauthConfigured':True})
             raise AssertionError(args)
-        def run(args,**kwargs):calls.append(args)
+        def run(args,**kwargs):
+            calls.append(args)
+            if args[:3]==['docker','image','inspect']:
+                return subprocess.CompletedProcess(args,0 if image_revision else 1,stdout=image_revision or '',stderr='')
+            return subprocess.CompletedProcess(args,0)
         code=SCRIPT.read_text().split("python3 - \"$@\" <<'PY'\n",1)[1].rsplit('\nPY',1)[0]
         # Relocate only host deployment directories into this isolated fixture.
         code=code.replace("'/opt/mediavault-releases'",repr(str(root/'releases'))).replace("'/opt/mediavault-backups'",repr(str(root/'backups'))).replace("'/var/tmp/mediavault-update-'",repr(str(root/'update-')))
@@ -93,6 +97,20 @@ class ExistingUpdateTests(unittest.TestCase):
             *_,calls,error=self.exercise(Path(directory),active=True)
             self.assertIsInstance(error,SystemExit)
             self.assertFalse(any('build' in c or 'stop' in c or 'up' in c for c in calls))
+
+    def test_exact_release_image_is_reused_without_rebuilding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            *_,calls,error=self.exercise(Path(directory),image_revision=REVISION)
+            self.assertIsNone(error)
+            self.assertTrue(any(c[:3]==['docker','image','inspect'] for c in calls))
+            self.assertFalse(any(c[:2]==['docker','build'] for c in calls))
+            self.assertTrue(any(c[:2]==['docker','run'] for c in calls),'The reused image is still checked before deployment')
+
+    def test_an_image_from_another_revision_is_not_reused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            *_,calls,error=self.exercise(Path(directory),image_revision='b'*40)
+            self.assertIsNone(error)
+            self.assertTrue(any(c[:2]==['docker','build'] for c in calls))
 
     def test_failed_health_restores_original_compose_without_new_override(self):
         with tempfile.TemporaryDirectory() as directory:
