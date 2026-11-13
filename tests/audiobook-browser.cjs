@@ -59,11 +59,15 @@ let browser,vite;
  assert.deepEqual(errors,[]);
  console.log('Audiobook (Gemini): OK ('+total+' phrases, '+stored+' reused, '+seconds.toFixed(2)+' s Opus; MOCKED tone instead of Gemini audio).');
 
+ // Neural inference is an explicit integration run, separate from the always-on
+ // mocked provider contract above. No private benchmark path exists on CI.
+ if(!process.env.TTS_MODEL_DIR&&!process.argv.includes('--real-tts')){console.log('SKIP real Supertonic inference: run npm run test:audiobook-ml with cached weights or set TTS_MODEL_DIR. The Gemini provider contract above uses a mocked tone.');return;}
+ const MODELS=process.env.TTS_MODEL_DIR||path.join(ROOT,'.codex-local/benchmark/tts-2026-11-08/models');
+ assert.ok(fs.existsSync(path.join(MODELS,'fp32/onnx/duration_predictor.onnx')),'Real Supertonic inference requested: provide the model pack with TTS_MODEL_DIR.');
  // Supertonic: real on-device inference; phrases carry pitch and EQ and are
  // rendered offline, then resampled from 44.1 kHz for Opus.
  const fresh=await browser.newContext({viewport:{width:1100,height:850},serviceWorkers:'block',acceptDownloads:true});fresh.setDefaultTimeout(30000);
  const local=await fresh.newPage();// The real Supertonic weights, served from disk like tests/ranobe-reader-browser.cjs.
- const MODELS=process.env.TTS_MODEL_DIR||path.resolve(ROOT,'../../benchmark/tts-2026-11-08/models');
  await local.route('https://huggingface.co/**',route=>{const address=new URL(route.request().url()).pathname,file=decodeURIComponent(address.split('/resolve/')[1].split('/').slice(1).join('/'));route.fulfill({status:200,body:fs.readFileSync(path.join(MODELS,address.startsWith('/Supertone/')?'fp32':'q4',file)),headers:{'Access-Control-Allow-Origin':'*'}});});local.on('pageerror',e=>errors.push(e.message));
  await local.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/ranobe.html',{waitUntil:'domcontentloaded',timeout:180000});
  await local.getByRole('button',{name:/Начать читать/}).click({timeout:120000});

@@ -46,7 +46,8 @@
     "test:blossom": "node tests/blossom-browser.cjs && node tests/title-capsule-browser.cjs && node tests/title-showcase-browser.cjs",
     "test:i18n": "node scripts/i18n-extract.mjs --check && node tests/i18n-browser.cjs",
     "test:tts": "node tests/tts-browser.cjs",
-    "test:downloads": "node tests/player-subtitles-browser.cjs && node tests/audiobook-browser.cjs"
+    "test:downloads": "node tests/player-subtitles-browser.cjs && node tests/audiobook-browser.cjs",
+    "test:audiobook-ml": "node tests/audiobook-browser.cjs --real-tts"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.86",
