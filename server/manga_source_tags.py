@@ -59,7 +59,7 @@ def from_api(payload):
         return {'tags': [], 'genres': []}
     fields = payload.get('attributes') if isinstance(payload.get('attributes'), dict) else payload
     tags = labels(fields.get('tags'))
-    genres = labels(fields.get('genres'))
+    genres = labels(fields.get('genres') if fields.get('genres') is not None else fields.get('genre'))
     return {'tags': tags, 'genres': genres}
 
 
