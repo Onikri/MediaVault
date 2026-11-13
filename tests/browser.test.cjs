@@ -392,7 +392,9 @@ async function main() {
   const directory=path.join(temp,'Private folder');
   await fs.mkdir(directory);
   await fs.writeFile(path.join(directory,'directory-note.txt'),'Encrypted directory picker test');
-  await owner.locator('#foldersInput').setInputFiles(directory);
+  // Exercise the directory FileList contract, including webkitRelativePath.
+  // Chromium's native folder enumeration is outside these mocked-provider tests.
+  await owner.locator('#foldersInput').evaluate((input,file)=>{const transfer=new DataTransfer(),entry=new File([file.text],file.name,{type:'text/plain'});Object.defineProperty(entry,'webkitRelativePath',{value:file.relativePath});transfer.items.add(entry);input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));},{name:'directory-note.txt',text:await fs.readFile(path.join(directory,'directory-note.txt'),'utf8'),relativePath:'Private folder/directory-note.txt'});
   await owner.waitForFunction(()=>document.querySelectorAll('.media-card').length===4);
   const folderCatalog=await decryptCatalog(files.get(catalogId));
   const folderItem=folderCatalog.items.find(item=>item.name==='directory-note.txt');
