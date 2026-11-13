@@ -15,7 +15,7 @@ let vite,browser,last;
    const anime=Array.from({length:8},(_,i)=>({mal_id:20+i,id:20+i,title:'Test '+i,name:'Test '+i,russian:'Тайтл '+i,kind:'tv',type:'TV',episodes:12,year:2024,score:8,genres:[],images:{jpg:{large_image_url:'https://art.fixture/p.svg'}},image:{original:'https://art.fixture/p.svg'}}));
    let data={data:[]};if(u.pathname.includes('/shikimori')||u.hostname.startsWith('shikimori'))data=anime;else if(u.pathname.includes('/jikan')||u.hostname==='api.jikan.moe'||u.hostname==='api.tenrai.org')data={data:anime};else if(u.hostname==='graphql.anilist.co')data={data:{Page:{media:[]}}};return r.fulfill({json:data});
   });
-  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html#library');await page.locator('.external-sidebar .catalog-grid .anime-card-shell').first().waitFor();await page.evaluate(()=>document.fonts.ready);
+  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html#library');await page.locator('.online-library .catalog-grid .anime-card-shell').first().waitFor();await page.evaluate(()=>document.fonts.ready);
   const main=await page.locator('.library-workspace-main').boundingBox(),content=await page.locator('.blossom-catalog-content').boundingBox(),cards=page.locator('.catalog-grid .anime-card-shell');
   assert.ok(content.width>=main.width-4,'Catalogue uses its whole main column: '+JSON.stringify({main,content}));
   if(width>=1000){const a=await cards.nth(0).boundingBox(),b=await cards.nth(1).boundingBox();assert.ok(Math.abs(a.y-b.y)<2&&b.x>a.x+a.width,'Cards form a row, rather than a narrow nested sidebar');}
