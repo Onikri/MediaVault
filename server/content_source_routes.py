@@ -18,4 +18,3 @@ HTML = {
 LIB = {'mangalib.org': (1, 'https://mangalib.me/'),
        'hentailib.me': (4, 'https://hentailib.me/'),
        'v2.shlib.life': (2, 'https://v2.shlib.life/')}
-

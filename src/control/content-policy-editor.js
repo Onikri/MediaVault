@@ -16,4 +16,3 @@ export function updateContentRule(policy,key,changes){
  const next={...policy,tags:policy.tags.map(row=>row.key===key?{...row,...changes}:row)};
  compileMangaPolicy(next);return next;
 }
-
