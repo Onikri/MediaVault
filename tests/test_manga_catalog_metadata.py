@@ -74,5 +74,25 @@ class CatalogHttpTests(unittest.TestCase):
         self.assertEqual(self.client.post('/manga/catalog/enrich',json={'ids':['https://example.org']}).status_code,422)
         self.assertEqual(self.client.post('/manga/catalog/enrich',json={'ids':[self.key]*4}).status_code,422)
 
+    def test_public_policy_and_signed_update_are_independent_of_owner_session(self):
+        import tempfile,os,time,hmac,hashlib
+        from manga_tag_policy import current,Policy,canonical_json
+        self.assertEqual(self.client.get('/manga/tag-policy').status_code,200)
+        digest=current().revision
+        self.assertTrue(self.client.get('/manga/tag-policy',params={'revision':digest}).json()['unchanged'])
+        self.assertEqual(self.client.post('/ops/manga-tags/update',json={'commit':'a'*40,'policy':current().data}).status_code,401)
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'DATA_DIR':directory}):
+            key=b'fixture-key-for-scoped-tag-deployment';Path(directory,'manga-tags-deploy.key').write_bytes(key)
+            data={**current().data,'excludedTerms':[*current().data['excludedTerms'],'Drama']}
+            body={'commit':'a'*40,'policy':data};stamp=str(int(time.time()))
+            signature=hmac.new(key,stamp.encode()+b'.'+canonical_json(body),hashlib.sha256).hexdigest()
+            headers={'X-MediaVault-Timestamp':stamp,'X-MediaVault-Signature':signature}
+            with patch('manga_tag_deploy.committed_policy',return_value=Policy(data)):
+                result=self.client.post('/ops/manga-tags/update',json=body,headers=headers)
+            self.assertEqual(result.status_code,200,result.text)
+            self.assertTrue(result.json()['applied'])
+            self.assertEqual(self.client.get('/manga/catalog?genre=Drama').json()['total'],0)
+            self.assertEqual(self.client.get('/manga/tag-policy').json()['revision'],Policy(data).revision)
+
 
 if __name__=='__main__':unittest.main()

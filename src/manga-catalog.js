@@ -1,7 +1,8 @@
 import {normalized} from './catalog.js';
 import {localLabel} from './taxonomy.js';
+import {mangaPolicy} from './manga-tag-policy.js';
 
-export const mangaTagKey=value=>normalized(localLabel(value));
+export const mangaTagKey=value=>mangaPolicy().key(value);
 export const mangaFormatLabel=value=>({manga:'Манга',manhwa:'Манхва',manhua:'Маньхуа',webtoon:'Вебтун'}[String(value).toLowerCase()]||value);
 let vocabulary;
 export function loadMangaTaxonomy(){
@@ -24,7 +25,8 @@ export function mangaFacetOptions(snapshot,live=[],{sourceIds=[],sources={}}={})
  for(const row of entries){
   const type=['genre','genres'].includes(row.category||row.type)?'genre':'tag';
   const original=row.original||row.label||row.key;if(typeof original!=='string'||!original.trim())continue;
-  const label=localLabel(original),key=mangaTagKey(label),id=type+':'+key;
+  const key=mangaTagKey(original);if(!key)continue;
+  const label=mangaPolicy().rules.get(key).label,id=type+':'+key;
   const prior=groups.get(id)||{key,label,type,originalLabels:[],works:0,sources:[]};
   prior.originalLabels=[...new Set([...prior.originalLabels,original,...row.originalLabels||[]])];
   prior.sources=[...new Set([...prior.sources,...row.sources||[]])];

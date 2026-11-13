@@ -335,7 +335,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 72, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 73, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -602,10 +602,16 @@ class MangaGlobalSearch(StrictBody):
 
 def manga_discovery_call(action,*args):
     from manga_discovery import SearchLimit,SearchMissing
-    try:return action(*args)
+    try:
+        value=action(*args)
+        return manga_public_results(value)
     except SearchLimit as error:raise HTTPException(429,str(error)) from None
     except SearchMissing as error:raise HTTPException(404,str(error)) from None
     except ValueError as error:raise HTTPException(422,str(error)) from None
+
+def manga_public_results(value):
+    from manga_tag_policy import project_row
+    return {**value,'results':[project_row(row) for row in value['results']]} if isinstance(value,dict) and isinstance(value.get('results'),list) else value
 
 def manga_catalog_filters(language,year,age,source_ids):
     if language not in {'all','ru','uk','en','ja','ko'} or age not in {'','adult','under18'}:
@@ -616,6 +622,29 @@ def manga_catalog_filters(language,year,age,source_ids):
     if len(sources)>1000 or any(not re.fullmatch(r'[1-9][0-9]{0,19}',v) for v in sources):
         raise HTTPException(422,'Выбери источники из каталога.')
     return {'language':language,'year':year,'age':age,'source_ids':sources}
+
+
+@app.get('/manga/tag-policy')
+def manga_tag_policy(revision:str=''):
+    from manga_tag_policy import current
+    policy=current()
+    return {'revision':policy.revision,**({'unchanged':True} if revision==policy.revision else {'policy':policy.data})}
+
+
+class MangaTagDeployment(StrictBody):
+    commit:str=Field(min_length=40,max_length=40)
+    policy:dict
+
+
+@app.post('/ops/manga-tags/update')
+def manga_tag_deployment(body:MangaTagDeployment,x_mediavault_timestamp:str=Header(default=''),x_mediavault_signature:str=Header(default='')):
+    from manga_tag_deploy import authenticate,apply,DeployError
+    from manga_discovery import manager
+    value=body.model_dump()
+    try:
+        authenticate(value,x_mediavault_timestamp,x_mediavault_signature)
+        return apply(value,manager())
+    except DeployError as error:raise HTTPException(error.status,str(error)) from None
 
 
 @app.get('/manga/catalog')
@@ -750,7 +779,7 @@ def manga_search(body:MangaDiscovery,subject=Depends(viewer)):
         bridge=pool.submit(bridge_search,body.title,body.language,body.format,body.bridgeOffset,body.bridgeLimit)
         result=native.result();extra=bridge.result()
     known={v['url'] for v in result['results']}
-    return {**result,'results':[*result['results'],*[v for v in extra['results'] if (v.get('sourceUrl') or v['url']) not in known]],'providers':[*result['providers'],*extra['providers']],'bridgeSearch':extra.get('window')}
+    return manga_public_results({**result,'results':[*result['results'],*[v for v in extra['results'] if (v.get('sourceUrl') or v['url']) not in known]],'providers':[*result['providers'],*extra['providers']],'bridgeSearch':extra.get('window')})
 
 
 @app.get('/manga/bridge/status')
@@ -789,7 +818,7 @@ def manga_bridge_pack_status(subject=Depends(owner)):
 def manga_bridge_search(body:MangaDiscovery,subject=Depends(viewer)):
     from suwayomi_bridge import search
     guest_may_open(subject,{**body.title,'kind':body.title.get('kind') or 'manga'})
-    return search(body.title,body.language,body.format,body.bridgeOffset,body.bridgeLimit)
+    return manga_public_results(search(body.title,body.language,body.format,body.bridgeOffset,body.bridgeLimit))
 
 class MangaInspection(StrictBody):
     url:str=Field(max_length=8192)
@@ -867,7 +896,8 @@ def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
             from manga_source_health import record
             for source in sources():
                 if source.get('name')==value['providerName'] and source.get('lang')==value.get('language'):record(source['id'],source['name'],source['lang'],'working','image')
-    return value
+    from manga_tag_policy import project_row
+    return project_row(value)
 
 @app.post('/manga/summary')
 def manga_summary(body:MangaInspection,subject=Depends(viewer)):

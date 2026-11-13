@@ -23,7 +23,7 @@ RUN useradd --uid 1000 --create-home vault && mkdir -p /data /app/.codex-local/l
 COPY --from=node:22.22.0-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 COPY --chown=vault:vault --chmod=0644 server/*.py ./
 COPY --chown=vault:vault --chmod=0644 server/gemma-system.md ./
-COPY --chown=vault:vault --chmod=0644 server/manga_tag_aliases.json ./
+COPY --chown=vault:vault --chmod=0644 server/manga-tag-policy.json ./
 COPY --from=export-assets /build/dist /app/export-assets
 USER vault
 EXPOSE 7860

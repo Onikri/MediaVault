@@ -5,13 +5,13 @@ tags from artwork or a title. Empty means 'not provided', not 'no tags'.
 """
 import re
 import unicodedata
+from manga_tag_policy import current
 
 from bs4 import BeautifulSoup
 
 MAX_LABELS = 120
 MAX_LENGTH = 120
 _TAG_LINK = re.compile(r'/(?:tags?|genres?|categories?)/|[?&](?:tag|genre|category)=', re.I)
-_MINOR_SEXUAL = re.compile(r'\b(?:lolicon|shotacon|loli|shota|underage|preteen|child[ -]?porn|лоли(?:кон)?|шота(?:кон)?|детское\s*порно|малолет\w*|несовершеннолетн\w*)\b',re.I)
 
 
 def clean_label(value):
@@ -19,8 +19,8 @@ def clean_label(value):
         return ''
     value = unicodedata.normalize('NFKC', value)
     value = ' '.join(value.split()).strip(' ,;|')
-    if _MINOR_SEXUAL.search(value):return ''
-    return value[:MAX_LENGTH] if 1 < len(value) <= MAX_LENGTH else ''
+    if not current().clean(value):return ''
+    return value[:MAX_LENGTH] if 1 <= len(value) <= MAX_LENGTH else ''
 
 
 def unique(values):

@@ -13,28 +13,13 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from manga_source_tags import unique, clean_label
+from manga_tag_policy import current, normalize, project_row
 
 FORMAT = {'manga', 'manhwa', 'manhua', 'webtoon'}
-SYNONYMS = {
-    'fantasy': 'фэнтези',
-    'romance': 'романтика', 'romantic': 'романтика',
-    'comedy': 'комедия', 'drama': 'драма',
-    'action': 'экшен', 'боевик': 'экшен',
-    'adventure': 'приключения',
-    'horror': 'ужасы', 'mystery': 'детектив',
-    'slice of life': 'повседневность',
-}
-
-def normalize(value):
-    value=unicodedata.normalize('NFKC', str(value or '')).casefold().replace('ё','е')
-    return ' '.join(''.join(char if char.isalnum() else ' ' for char in value).split())
-
-SYNONYMS.update({normalize(key):normalize(value) for key,value in json.loads(Path(__file__).with_name('manga_tag_aliases.json').read_text(encoding='utf-8')).items()})
-
 
 def tag_key(value):
-    name = normalize(value)
-    return SYNONYMS.get(name, name)
+    return current().key(value)
+
 
 def _text(value, limit=500):
     return ' '.join(str(value or '').split())[:limit]
@@ -60,6 +45,7 @@ def _url(row):
 
 def initialize(conn):
     conn.create_function('catalog_normalize',1,normalize,deterministic=True)
+    conn.create_function('catalog_tag_label',1,lambda key:current().rules.get(key,{}).get('label',''))
     conn.executescript('''
       CREATE TABLE IF NOT EXISTS catalog_titles(
         id TEXT PRIMARY KEY,provider TEXT NOT NULL,source_id TEXT NOT NULL,
@@ -77,7 +63,14 @@ def initialize(conn):
         original TEXT NOT NULL,
         PRIMARY KEY(title_id,category,tag_key,original));
       CREATE INDEX IF NOT EXISTS catalog_tags_key ON catalog_tags(tag_key,title_id);
+      CREATE TABLE IF NOT EXISTS catalog_tag_facts(
+        title_id TEXT NOT NULL,category TEXT NOT NULL,original TEXT NOT NULL,
+        PRIMARY KEY(title_id,category,original));
+      CREATE TABLE IF NOT EXISTS catalog_policy_state(name TEXT PRIMARY KEY,value TEXT NOT NULL);
     ''')
+    revision=conn.execute("SELECT value FROM catalog_policy_state WHERE name='revision'").fetchone()
+    if not revision or revision[0]!=current().revision:
+        with conn:reindex(conn)
 
 def upsert(conn, rows, source_id='', timestamp=None):
     """Idempotent; weak search results never erase enriched source tags."""
@@ -141,10 +134,16 @@ def upsert(conn, rows, source_id='', timestamp=None):
         data['sourceId']=sid
         data['url']=data.get('url') or url
         data['kind']='manga'
+        facts={category:raw[category] for category in ('tags','genres')}
+        data=project_row(data)
+        data['tagStatus']='present' if data['tags'] or data['genres'] else 'not_provided_in_detail' if data['metadataChecked'] else 'not_requested'
         clean_metadata = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
         if len(clean_metadata.encode('utf-8')) > 32000:
             # Never let an abnormally large upstream payload poison the index.
             continue
+        for category in ('tags','genres'):
+            for label in facts[category]:
+                conn.execute('INSERT OR IGNORE INTO catalog_tag_facts VALUES(?,?,?)',(identity,category,label))
         conn.execute('''INSERT INTO catalog_titles(
              id,provider,source_id,source_url,title,search_text,language,format,
              adult,year,chapter_count,tag_state,metadata,first_seen,updated,inspected)
@@ -159,9 +158,11 @@ def upsert(conn, rows, source_id='', timestamp=None):
              (identity,provider,sid,url,title,search,lang,kind,adult,year,chapter_count,
               data['tagStatus'],clean_metadata,old[1] if old else now,now,
               now if inspected else old[2] if old else 0))
+        conn.execute('DELETE FROM catalog_tags WHERE title_id=?',(identity,))
+        policy=current();source=urlsplit(url).hostname or ''
         for category in ('tags','genres'):
-            for label in data[category]:
-                key = tag_key(label)
+            for (label,) in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category)).fetchall():
+                key = policy.key(label,source)
                 if not key:
                     continue
                 # Keep each original provider name; aliases for the same key can
@@ -238,15 +239,40 @@ def _public_metadata(row):
     # Older index entries may predate the reader URL and taxonomy normalization.
     row={**row,'kind':'manga','url':row.get('url') or row.get('sourceUrl','')}
     for category in ('tags','genres'):row[category]=unique(row.get(category) or [])
-    return row
+    return project_row(row)
+
+
+def reindex(conn,policy=None):
+    """Rebuild the projection from retained source facts, including removals."""
+    policy=policy or current()
+    rows=conn.execute('SELECT id,metadata FROM catalog_titles').fetchall()
+    conn.execute('DELETE FROM catalog_tags')
+    for identity,raw in rows:
+        row=json.loads(raw)
+        for category in ('tags','genres'):
+            if not conn.execute('SELECT 1 FROM catalog_tag_facts WHERE title_id=? AND category=? LIMIT 1',(identity,category)).fetchone():
+                for label in unique(row.get(category) or []):
+                    conn.execute('INSERT OR IGNORE INTO catalog_tag_facts VALUES(?,?,?)',(identity,category,label))
+        source=urlsplit(row.get('sourceUrl') or row.get('url') or '').hostname or ''
+        for category in ('tags','genres'):
+            facts=[v[0] for v in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category))]
+            row[category]=policy.project(facts,source)
+            for label in facts:
+                key=policy.key(label,source)
+                if key:conn.execute('INSERT INTO catalog_tags VALUES(?,?,?,?)',(identity,category,key,label))
+        state='present' if row['tags'] or row['genres'] else 'not_provided_in_detail' if row.get('metadataChecked') else 'not_requested'
+        row['tagStatus']=state
+        conn.execute('UPDATE catalog_titles SET metadata=?,tag_state=? WHERE id=?',(json.dumps(row,ensure_ascii=False),state,identity))
+    conn.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('revision',?)",(policy.revision,))
+    return len(rows)
 
 
 def tags(conn, *, provider='', source_id='', limit=100, q='', **filters):
     where,params = _conditions(provider=provider,source_id=source_id,**filters)
     if q:
         needle='%'+normalize(q).replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
-        where+=(' AND ' if where else ' WHERE ')+"(g.tag_key LIKE ? ESCAPE '\\' OR catalog_normalize(g.original) LIKE ? ESCAPE '\\')"
-        params.extend([needle,needle])
+        where+=(' AND ' if where else ' WHERE ')+"(g.tag_key LIKE ? ESCAPE '\\' OR catalog_normalize(g.original) LIKE ? ESCAPE '\\' OR catalog_normalize(catalog_tag_label(g.tag_key)) LIKE ? ESCAPE '\\')"
+        params.extend([needle,needle,needle])
     rows=conn.execute('''SELECT g.category,g.tag_key,MIN(g.original),COUNT(DISTINCT g.title_id),json_group_array(DISTINCT g.original)
                          FROM catalog_tags g JOIN catalog_titles t ON t.id=g.title_id'''+where+
                       ''' GROUP BY g.category,g.tag_key ORDER BY COUNT(DISTINCT g.title_id) DESC,g.tag_key LIMIT ?''',

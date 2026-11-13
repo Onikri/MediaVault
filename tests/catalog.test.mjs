@@ -13,8 +13,8 @@ test('source catalogue passes combined filters and preserves source ID precision
 });
 
 test('frontend and backend share tag aliases, case and format filters',()=>{
- const aliases=JSON.parse(readFileSync(new URL('../server/manga_tag_aliases.json',import.meta.url)));
- assert.deepEqual(aliases,tagLabels);
+ const policy=JSON.parse(readFileSync(new URL('../server/manga-tag-policy.json',import.meta.url)));
+ for(const row of policy.tags)for(const alias of row.aliases)if(alias!==row.label)assert.equal(tagLabels[alias],row.label);
  assert.equal(mangaTagKey('TIME TRAVEL'),mangaTagKey(tagLabels['Time Travel']));
  const row={genres:['DRAMA'],tags:['TIME TRAVEL'],format:'manhwa',year:2024,age:18};
  assert.equal(matchesFilters(row,{genre:'Драма',tag:tagLabels['Time Travel'],format:'Манхва',year:'2024',age:'adult'}),true);

@@ -29,7 +29,7 @@ export default function MangaSourceManager({service,onInstalled}){
  return <details className="manga-source-manager" onToggle={e=>setOpen(e.currentTarget.open)}>
   <summary><BookOpen size={16}/>Больше источников <span>Suwayomi</span></summary>
   {open&&<div className="manga-source-manager-body">
-   <MangaStaticTags/>
+   <MangaStaticTags service={service}/>
    <p className="fine">{status?.ready?`${status.availableExtensions} расширений в каталоге · подключено источников: ${status.sources?.length||0}`:status?.message||'Подключи нужные читалки — они появятся в общем поиске переводов.'}</p>
    {coverage&&<details className="manga-source-coverage"><summary>Твои 18 сайтов · нативных {coverage.nativeRegistered} · расширений {coverage.extensionInstalled}</summary>
     <p className="fine">Этот список отражает интеграцию, а не доступность каждой главы. Перед чтением MediaVault проверяет реальную страницу.</p>
