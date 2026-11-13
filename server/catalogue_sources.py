@@ -4,7 +4,7 @@ from urllib.parse import urlsplit,urljoin,urlencode
 from bs4 import BeautifulSoup
 import httpx,requests
 from content_source_routes import LIB,HTML
-from content_sources import checked_get,permitted,html_terms,lib_terms,lib_titles
+from content_sources import checked_get,permitted,html_terms,lib_terms,lib_titles,lib_metadata
 from manga_source_tags import from_api,from_html
 from source_parser import SourceError
 
@@ -77,10 +77,10 @@ def fetch(spec,cursor):
                 raw,_=checked_get(client,root+'/api/constants?fields[]=genres&fields[]=tags',hosts)
                 return {'rows':[],'next':None,'vocabulary':lib_terms(raw,spec['site'])}
             if kind=='lib-detail':
-                raw,_=checked_get(client,root+'/api/manga/'+spec['slug']+'?fields[]=genres&fields[]=tags',hosts)
+                raw,_=checked_get(client,root+'/api/manga/'+spec['slug']+'?fields[]=genres&fields[]=tags&fields[]=summary&fields[]=otherNames',hosts)
                 data=json.loads(raw).get('data') or {}
                 if not data.get('id') and not data.get('slug_url'):raise SourceError('Источник не предоставил метаданные карточки')
-                row={**spec['row'],**from_api(data),'metadataInspected':True}
+                row={**spec['row'],**lib_metadata(data),**from_api(data),'metadataInspected':True}
                 return {'rows':[row],'next':None}
             params=[('site_id[]',spec['site']),('page',page)]
             if cursor.get('seed'):params.append(('seed',cursor['seed']))
@@ -102,7 +102,7 @@ def fetch(spec,cursor):
             if kind=='bridge-detail':
                 data=client.get('/manga/'+str(spec['manga']),{'onlineFetch':'true'},timeout=25)
                 if not data.get('title'):raise SourceError('Адаптер не предоставил метаданные карточки')
-                return {'rows':[{**spec['row'],**from_api(data),'metadataInspected':True}],'next':None}
+                return {'rows':[{**spec['row'],'description':str(data.get('description') or '')[:12000],**from_api(data),'metadataInspected':True}],'next':None}
             source=spec['source'];data=client.get('/source/'+str(source['id'])+'/popular/'+str(page),timeout=25)
             if not isinstance(data.get('mangaList'),list) or not isinstance(data.get('hasNextPage'),bool):raise SourceError('Адаптер не предоставил пагинацию каталога')
             rows=[]
@@ -122,8 +122,18 @@ def fetch(spec,cursor):
         from manga_sources import guard
         guard(soup)
         if kind=='html-detail':
+            metadata={}
+            description=soup.select_one('meta[property="og:description"],meta[name="description"]')
+            summary=soup.select_one('.description-summary,.summary__content,[itemprop="description"],.manga-description')
+            text=summary.get_text(' ',strip=True) if summary else description.get('content','') if description else ''
+            if text:metadata['description']=str(text)[:12000]
+            cover=soup.select_one('meta[property="og:image"]')
+            if cover:
+                from content_catalog import safe_url
+                value=safe_url(urljoin(final,cover.get('content','')))
+                if value:metadata['cover']=value
             for node in soup.select('nav,aside,footer,.sidebar,.tagcloud,.tag-cloud,.related,.recommendations'):node.decompose()
-            return {'rows':[{**spec['row'],**from_html(soup),'metadataInspected':True}],'next':None}
+            return {'rows':[{**spec['row'],**metadata,**from_html(soup),'metadataInspected':True}],'next':None}
         rows=html_rows(raw,final)
         if not rows:raise SourceError('Не удалось прочитать карточки каталога')
         if spec.get('term'):

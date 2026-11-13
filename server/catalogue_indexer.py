@@ -83,7 +83,7 @@ class Indexer:
                 count=upsert(self.store.db,manga)+ingest(self.store.db,other)
                 for detail in result.get('details') or []:
                     row=detail['row'];known=self.store.db.execute('SELECT inspected FROM catalog_titles WHERE provider=? AND source_url=?',(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone()
-                    if not known or known[0]<self.clock()-7*86400:self.enqueue(detail,15)
+                    if not known or known[0]<self.clock()-7*86400 or not self.store.db.execute("SELECT 1 FROM catalog_titles WHERE provider=? AND source_url=? AND json_extract(metadata,'$.description') IS NOT NULL AND json_extract(metadata,'$.description')!=''",(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone():self.enqueue(detail,15)
                 from content_vocabulary import add,bump
                 vocabulary_added=0
                 if spec['type'] in {'anilist','books'}:
