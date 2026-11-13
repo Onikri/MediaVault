@@ -8,7 +8,7 @@ HTML = {
     'y.hentaichan.live': ('https://y.hentaichan.live/', {'y.hentaichan.live'}),
     'yaoi-chan.me': ('https://v18.yaoi-chan.me/catalog', {'v18.yaoi-chan.me'}),
     'hmanga.su': ('https://hmanga.me/', {'hmanga.me'}),
-    'hentaros.com': ('https://hentaros.com/', {'hentaros.com'}),
+    'hentaros.com': ('https://hentaros.com/tag', {'hentaros.com'}),
     'online.hentaimoody.com': ('https://online.hentaimoody.com/', {'online.hentaimoody.com'}),
     'nude-moon.org': ('https://nude-moon.org/', {'nude-moon.org'}),
     '20.allhen.online': ('https://20.allhen.online/', {'20.allhen.online'}),

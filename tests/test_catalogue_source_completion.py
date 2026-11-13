@@ -32,6 +32,8 @@ class CompletionTests(unittest.TestCase):
   raw='<article class="manga-card"><a class="manga-card__link" href="/12-garden.html"><span class="manga-card__title">Garden</span><span class="manga-card__meta">Ecology<span>Botany</span></span></a></article><div class="pagination"><a href="/page/2/">2</a></div>'
   d=catalogue(raw,'https://online.hentaimoody.com/',spec,1);self.assertEqual(d['rows'][0]['genres'],['Ecology','Botany']);self.assertEqual(d['next']['page'],2)
   with self.assertRaises(SourceError):metadata(BeautifulSoup('<h1>Garden</h1><div class="system-message">Login</div>','html.parser'),spec['domain'])
+  public='<div class="title-hero__body"><h1>Garden</h1></div><div class="title-hero__genres"><a href="/genre/ecology">Ecology</a><span hidden><a href="/genre/botany">Botany</a></span></div><div class="system-message">Reader requires login</div>'
+  self.assertEqual(metadata(BeautifulSoup(public,'html.parser'),spec['domain'])['genres'],['Ecology','Botany'])
  def test_all_requested_sources_are_accounted_for_even_a_shared_extension(self):
   jobs=base_sources([{'id':'7','name':'MangaChan','lang':'ru','baseUrl':'https://im.manga-chan.me'},{'id':'8','name':'HenChan','lang':'ru','baseUrl':'https://xxl.hentaichan.live'}])
   from manga_source_coverage import SOURCES
@@ -95,4 +97,11 @@ class CompletionTests(unittest.TestCase):
    self.assertEqual(auth.token(4),'')
   auth._cache.clear()
 
+ def test_published_tag_directory_seeds_each_source_listing_and_preserves_full_details(self):
+  spec={'type':'html','domain':'hentaros.com','name':'HentaRos','hosts':['hentaros.com'],'url':'https://hentaros.com/tag'}
+  d=catalogue('<a class="card" href="/tag/ecology"><span class="t">Ecology</span></a>',spec['url'],spec,1)
+  self.assertEqual(d['catalogues'][0]['term']['label'],'Ecology');self.assertEqual(d['catalogues'][0]['url'],'https://hentaros.com/tag/ecology')
+  self.assertEqual(d['state'],'partial')
+  detail='<div class="post-head"><h1>Garden</h1></div><a class="chip" href="/tag/ecology">Ecology</a><a class="chip" href="/artist/smith">Smith</a>'
+  self.assertEqual(metadata(BeautifulSoup(detail,'html.parser'),spec['domain'])['tags'],['Ecology'])
 if __name__=='__main__':unittest.main()

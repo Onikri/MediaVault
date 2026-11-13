@@ -156,13 +156,15 @@ def fetch(spec,cursor):
         url=cursor.get('url') or spec['url'];hosts=set(spec['hosts'])
         with requests.Session() as session:
             from content_sources import UA
-            session.headers['User-Agent']=UA
+            session.headers.update({'User-Agent':UA,'Referer':'https://'+urlsplit(url).hostname+'/','Accept':'text/html'})
             if not permitted(session,url,hosts):raise SourceError('Источник не разрешил получение каталога')
             raw,final=checked_get(session,url,hosts,timeout=30)
         soup=BeautifulSoup(raw,'html.parser')
         from manga_sources import guard
         guard(soup)
         if kind=='html-detail':
+            if urlsplit(final).path.rstrip('/')!=urlsplit(url).path.rstrip('/'):
+                raise SourceError('Источник перенаправил карточку на другое произведение')
             if spec['domain']=='hentaichan.cc':
                 from manga_hentaichan_cc import catalogue_metadata
                 metadata=catalogue_metadata(soup)
@@ -193,8 +195,12 @@ def fetch(spec,cursor):
         from catalogue_html import SPECIAL,catalogue
         if spec['domain'] in SPECIAL:
             result=catalogue(raw,final,spec,page)
-            for row in result['rows']:details.append({**spec,'type':'html-detail','url':row['url'],'row':row})
-            return {**result,'details':details,'vocabulary':html_terms(raw,final,hosts)}
+            for row in result['rows']:
+                if spec.get('term'):
+                    field='genres' if spec['term'].get('category')=='genre' else 'tags'
+                    row[field]=unique([*row.get(field,[]),spec['term']['label']])
+                details.append({**spec,'type':'html-detail','url':row['url'],'row':row})
+            return {**result,'details':details,'vocabulary':result.get('vocabulary',html_terms(raw,final,hosts))}
         rows=html_rows(raw,final)
         if not rows:raise SourceError('Не удалось прочитать карточки каталога')
         if spec.get('term'):

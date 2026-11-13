@@ -103,7 +103,7 @@ class Indexer:
             if self.stop.wait(max(0,next_time-time.monotonic())):return False
             result=self.fetch(spec,job['cursor']);rows=result.get('rows') or []
             if not rows and result.get('next'):raise RuntimeError('empty-page')
-            if not rows and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html'}:raise RuntimeError('empty-page')
+            if not rows and not result.get('catalogues') and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html'}:raise RuntimeError('empty-page')
             digest=hashlib.sha256(canonical_json(sorted(str(r.get('sourceUrl') or r.get('url') or r.get('id')) for r in rows))).hexdigest()
             with self.store.lock,self.store.db:
                 active=self.store.db.execute('SELECT lease FROM catalogue_jobs WHERE id=?',(job['id'],)).fetchone()
@@ -116,6 +116,7 @@ class Indexer:
                 other=[r for r in rows if r not in manga]
                 count=upsert(self.store.db,manga)+ingest(self.store.db,other)
                 if count!=len(rows):raise RuntimeError('incomplete-write')
+                for child in result.get('catalogues') or []:self.enqueue(child,70)
                 for detail in result.get('details') or []:
                     row=detail['row'];known=self.store.db.execute("SELECT inspected,json_extract(metadata,'$.sourceMetadataVersion'),json_extract(metadata,'$.description') FROM catalog_titles WHERE provider=? AND source_url=?",(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone()
                     missing=(known[1] or 0)<2 if known and spec['domain']=='hentaichan.cc' else not known or not known[2]
