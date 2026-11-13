@@ -130,6 +130,47 @@ def parse_pages(text,base):
     return result
 
 
+def author(node):
+    # The site menu links the author index ("по... авторам"); a real author has an id.
+    for found in node.select('a[href*="/mangaka/"]'):
+        name=clean(found.get_text(' ',strip=True)).casefold()
+        if name and re.search(r'/mangaka/\d+',found.get('href','')):return name
+    return ''
+
+
+def translator(node):
+    found=node.select_one('.translation a,a[href*="/translation/"]')
+    value=clean(found.get_text(' ',strip=True)) if found else ''
+    return '' if re.fullmatch(r'не\s+требуется|perevodchik',value,re.I) else value
+
+
+def continuations(series,writer,chapters,base,http):
+    """Later parts published as "<series> 5" are missing from the related list.
+
+    Only the same author's entries that directly continue the known chapter
+    numbers are accepted; a failed lookup keeps the chapters already found.
+    """
+    known={c['number'] for c in chapters if c['number'] is not None}
+    if not writer or not known:return []
+    params=urlencode({'do':'search','subaction':'search','story':series,'search_start':1})
+    try:text,final,soup=document(f'https://{urlsplit(base).hostname}/?'+params,http)
+    except SourceError:return []
+    pattern=re.compile(re.escape(series)+r'\s*(?:[-–—:,.]\s*)?(?:(?:глава|часть|chapter|part)\s*)?(\d{1,3})',re.I)
+    found={}
+    for card in soup.select('.content_row')[:50]:
+        a=card.select_one('a.title_link,h2 a[href]')
+        label=clean(a.get_text(' ',strip=True)) if a else ''
+        match=pattern.fullmatch(label)
+        if not match or author(card)!=writer or int(match[1]) in known:continue
+        try:url=link(a.get('href',''),final)
+        except SourceError:continue
+        if ITEM.fullmatch(urlsplit(url).path)[1]!='manga':continue
+        entry=chapter(url,label,translator(card));entry['number']=int(match[1]);found[entry['number']]=entry
+    result=[];following=int(max(known))+1
+    while following in found:result.append(found[following]);following+=1
+    return result
+
+
 def inspect(url,http):
     url=link(url,url);part=ITEM.fullmatch(urlsplit(url).path)
     slug=part[2]
@@ -167,7 +208,9 @@ def inspect(url,http):
                 if p.hostname in HOSTS and p.path==urlsplit(related).path and re.fullmatch(r'offset=\d{1,5}',p.query) and candidate not in seen and candidate not in pending:pending.append(candidate)
         truncated=bool(pending)
         # A chapter entry that lists its siblings names the series, not itself.
-        if len(chapters)>1 and series_title(title):title=series_title(title)
+        if len(chapters)>1 and series_title(title):
+            title=series_title(title)
+            chapters.extend(continuations(title,author(soup),chapters,final,http))
         if not chapters:
             current['number']=current['number'] if current['number'] is not None else 1
             chapters=[current]
