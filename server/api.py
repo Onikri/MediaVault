@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import base64
 from contextlib import asynccontextmanager
+import functools
 import hashlib
 import hmac
 import json
@@ -28,7 +29,8 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 import requests
 
 from metadata_catalog import metadata
-from run_import import run_job, validate_job
+from run_import import run_job, translate_chapter, validate_job
+from ranobe_audiobook import Paused as AudiobookPaused, VoiceError as AudiobookVoiceError
 from site_adapters import inspect_source, search_sources, voice_availability
 from source_parser import SourceError,public_url
 from task_store import TaskStore
@@ -208,13 +210,15 @@ def worker():
                                  alloha_downloader=app.state.alloha_importer.download,
                                  alloha_streamer=app.state.alloha_importer.stream,
                                  alloha_cache=store.directory / ".codex-local" / "alloha-import" / task_id,
-                                 staged_source=lambda identity,directory,owner=task['owner']:__import__('local_exports').manager().take(owner,identity,directory))
+                                 staged_source=lambda identity,directory,owner=task['owner']:__import__('local_exports').manager().take(owner,identity,directory),
+                                 audiobook={'keys':lambda:[row['key'] for row in google_pool.saved()],'cache_dir':store.directory,'script':functools.partial(__import__('narration_runtime').chapter_script,task['owner'])},
+                                 manga_translator=functools.partial(translate_chapter,task['owner']))
             if stopping.is_set():continue
             result={**result,**{key:base_counts[key]+result[key] for key in base_counts}}
             if cancelled():
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
             elif result.get('remaining'):
-                store.update(task_id,status='queued',progress={**result,'phase':'queued','operation':'Ожидает следующего прохода','recover_needed':False,'message':'Следующий файл оформления — после других заданий.' if data.get('kind')=='enrich' else 'Следующая серия — после одного файла из других заданий.'})
+                store.update(task_id,status='queued',progress={**result,'phase':'queued','operation':'Ожидает следующего прохода','recover_needed':False,'voicePauses':0,'resumeAt':0,'message':'Следующий файл оформления — после других заданий.' if data.get('kind')=='enrich' else 'Следующая серия — после одного файла из других заданий.'})
                 wakeup.set()
             elif result["failed"]:
                 reason=store.get(task_id)["progress"].get("sourceError")
@@ -226,11 +230,19 @@ def worker():
             if stopping.is_set():continue
             if store.get(task_id)["status"] == "cancelling":
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
+            elif isinstance(error,AudiobookPaused):
+                # Voice quota is per minute and per day: the task waits in the queue
+                # (longer after each pause) instead of failing; voiced phrases are cached.
+                pauses=int(task['progress'].get('voicePauses',0))+1
+                seconds=min(3600,max(error.seconds,error.seconds*2**min(5,pauses-1)))
+                resume=time.time()+seconds
+                store.update(task_id,status='queued',progress={'phase':'waiting','voicePauses':pauses,'resumeAt':resume,
+                    'operation':'Ждём квоту озвучки Google','message':'Квота озвучки Google исчерпана. Продолжим сами в '+time.strftime('%H:%M',time.gmtime(resume))+' UTC; готовые главы и фразы сохранены.'})
             elif import_auth_error(error):
                 if credential is not None:drive_grants.rejected(store,task["owner"],getattr(credential,'refresh_token',None))
                 store.update(task_id, status="waiting_auth", progress={"message": "Серверу нужно повторное разрешение Google. Завершённые серии сохранены."})
             else:
-                message = drive_error_message(error) or (str(error) if isinstance(error, (SourceError, VaultError)) else "Импорт остановился. Завершённые файлы в Drive сохранены; задание можно продолжить.")
+                message = drive_error_message(error) or (str(error) if isinstance(error, (SourceError, VaultError, AudiobookVoiceError)) else "Импорт остановился. Завершённые файлы в Drive сохранены; задание можно продолжить.")
                 store.update(task_id, status="failed", progress={"phase": "failed", "message": message[:500]})
         finally:
             if vault:
@@ -323,7 +335,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 70, "ranobeDriveText":True,"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 71, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 

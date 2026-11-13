@@ -35,7 +35,7 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'es2022',
     rollupOptions: {
-      input: {main:resolve(projectRoot,'index.html'),mangaExport:resolve(projectRoot,'manga-export.html')},
+      input: {main:resolve(projectRoot,'index.html'),mangaExport:resolve(projectRoot,'manga-export.html'),narrationExport:resolve(projectRoot,'narration-export.html')},
       onwarn(warning, warn) {
         if(warning.code==='MODULE_LEVEL_DIRECTIVE'&&warning.message.includes('use client'))return;
         warn(warning);

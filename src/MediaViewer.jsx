@@ -38,7 +38,7 @@ function LegacyMediaViewer({item,catalog,libraryId,userId,onSelectItem,onClose,r
   const methods=useRef({readWhole,prepareStream,onError});
   methods.current={readWhole,prepareStream,onError};
   const extension=item.name.toLowerCase().split('.').pop();
-  const isMedia=item.category==='video'||item.category==='audio';
+  const isMedia=item.category==='video'||item.category==='audio'||isAudiobook(item);
   const chapters=item.category==='manga'?(catalog?.items||[]).filter(value=>value.category==='manga'&&value.collectionId===item.collectionId&&(!item.dub||value.dub===item.dub)).sort((a,b)=>(Number(a.season)||1)-(Number(b.season)||1)||(Number(a.episode)||0)-(Number(b.episode)||0)):[];
   const chapterIndex=chapters.findIndex(value=>value.id===item.id);
   useEffect(()=>{if(item.category!=='manga'||!pageCount)return;const handler=event=>{if(event.defaultPrevented||event.target.closest?.('input,textarea,select,[contenteditable=true]')||inline&&!panelRef.current?.contains(document.activeElement))return;if(!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();setPage(value=>Math.max(0,Math.min(pageCount-1,value+(event.key==='ArrowRight'?1:-1))));};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[item.category,pageCount,inline]);
@@ -173,11 +173,14 @@ function LegacyMediaViewer({item,catalog,libraryId,userId,onSelectItem,onClose,r
   </section>;
 }
 
+// Audiobook chapters the import server saves next to the text (.opus in Ранобэ/Книги) play as audio.
+export const isAudiobook=item=>item?.category==='book'&&(/^audio\//.test(item.mime||'')||/\.(opus|ogg|m4a|mp3)$/i.test(item.name||''));
+
 function MediaContent(props){
  const [item,setItem]=useState(props.item);
  useEffect(()=>setItem(props.item),[props.item.id]);
  useRetainedMedia(true,{label:item.name,kind:item.category==='manga'?'reader':'video'},props.onClose);
  const current={...props,item,onSelectItem:value=>{setItem(value);props.onSelectItem?.(value);}};
- return item.category==='manga'?<MangaReader {...current}/>:item.category==='book'?<BookReader {...current}/>:<LegacyMediaViewer {...current}/>;
+ return item.category==='manga'?<MangaReader {...current}/>:item.category==='book'&&!isAudiobook(item)?<BookReader {...current}/>:<LegacyMediaViewer {...current}/>;
 }
 export default function MediaViewer(props){const content=<MediaContent {...props}/>,node=props.reveal?<PlaybackReveal>{content}</PlaybackReveal>:content;return props.inline&&['video','manga'].includes(props.item.category)?<RetainedMediaSlot userId={props.userId} id={'drive:'+props.libraryId+':'+props.item.category+':'+(props.item.collectionId||props.item.id)} label={props.item.name} kind={props.item.category==='manga'?'reader':'video'} resumeItemId={props.item.id} restore={props.onSelectItem?()=>props.onSelectItem(props.item):undefined}>{node}</RetainedMediaSlot>:node;}
