@@ -262,6 +262,8 @@ class Discovery:
                 failures INTEGER NOT NULL,code TEXT NOT NULL,message TEXT NOT NULL,last_ok REAL NOT NULL,last_fail REAL NOT NULL,skip_until REAL NOT NULL);
               CREATE TABLE IF NOT EXISTS network_state(key TEXT PRIMARY KEY,value TEXT NOT NULL);
             ''')
+            from manga_catalog_index import initialize as initialize_catalog
+            initialize_catalog(self.db)
             if self.db.execute('PRAGMA user_version').fetchone()[0]<1:
                 stale=[];sources=set()
                 for row in self.db.execute('SELECT id,source_id,metadata FROM titles'):
@@ -515,6 +517,8 @@ class Discovery:
                 if state=='done':
                     self.db.execute('INSERT OR REPLACE INTO query_cache VALUES(?,?,?,?)',(self._cache_key(normalize(row['query']),json.loads(row['source'])),row['source_id'],encoded,now+self.cache_ttl))
                     for value in values:self.db.execute('INSERT OR REPLACE INTO titles VALUES(?,?,?,?,?,?)',(value['id'],row['source_id'],value['language'],normalize(' '.join(public_aliases(value))),json.dumps(value,ensure_ascii=False),now))
+                    from manga_catalog_index import upsert as catalog_upsert
+                    catalog_upsert(self.db,values,source_id=row['source_id'],timestamp=now)
                 remaining=self.db.execute("SELECT count(*) FROM work WHERE job=? AND state IN ('queued','running')",(row['job'],)).fetchone()[0]
                 self.db.execute('UPDATE jobs SET updated=?,state=? WHERE id=?',(now,'running' if remaining else 'done',row['job']))
                 self.condition.notify_all()
