@@ -169,7 +169,7 @@ def upsert(conn, rows, source_id='', timestamp=None):
                 # be recovered from the JSON metadata.
                 conn.execute('''INSERT OR IGNORE INTO catalog_tags(
                    title_id,category,tag_key,original) VALUES(?,?,?,?)''',
-                   (identity,category,key,label))
+                   (identity,{'tag':'tags','genre':'genres'}.get(policy.rules[key].get('category'),category),key,label))
         count += 1
     return count
 
@@ -254,12 +254,14 @@ def reindex(conn,policy=None):
                 for label in unique(row.get(category) or []):
                     conn.execute('INSERT OR IGNORE INTO catalog_tag_facts VALUES(?,?,?)',(identity,category,label))
         source=urlsplit(row.get('sourceUrl') or row.get('url') or '').hostname or ''
+        raw_facts={}
         for category in ('tags','genres'):
             facts=[v[0] for v in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category))]
-            row[category]=policy.project(facts,source)
+            raw_facts[category]=facts
             for label in facts:
                 key=policy.key(label,source)
-                if key:conn.execute('INSERT INTO catalog_tags VALUES(?,?,?,?)',(identity,category,key,label))
+                if key:conn.execute('INSERT OR IGNORE INTO catalog_tags VALUES(?,?,?,?)',(identity,{'tag':'tags','genre':'genres'}.get(policy.rules[key].get('category'),category),key,label))
+        row.update(policy.facts(raw_facts,source))
         state='present' if row['tags'] or row['genres'] else 'not_provided_in_detail' if row.get('metadataChecked') else 'not_requested'
         row['tagStatus']=state
         conn.execute('UPDATE catalog_titles SET metadata=?,tag_state=? WHERE id=?',(json.dumps(row,ensure_ascii=False),state,identity))

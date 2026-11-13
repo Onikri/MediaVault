@@ -5,7 +5,6 @@ tags from artwork or a title. Empty means 'not provided', not 'no tags'.
 """
 import re
 import unicodedata
-from manga_tag_policy import current
 
 from bs4 import BeautifulSoup
 
@@ -19,7 +18,8 @@ def clean_label(value):
         return ''
     value = unicodedata.normalize('NFKC', value)
     value = ' '.join(value.split()).strip(' ,;|')
-    if not current().clean(value):return ''
+    # Keep structurally valid source facts even when their public projection is
+    # hidden. The owner can restore or remap them later without another scrape.
     return value[:MAX_LENGTH] if 1 <= len(value) <= MAX_LENGTH else ''
 
 

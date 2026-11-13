@@ -17,7 +17,7 @@ import WatchOrder from './WatchOrder.jsx';
 import {readProgress,progressClock} from './playback-progress.js';
 import TitleBackdrop from './TitleBackdrop.jsx';
 import TitleShowcase from './TitleShowcase.jsx';
-import {mangaPolicyProfile} from './manga-tag-policy.js';
+import {mangaPolicyProfile,globalContentPolicy} from './manga-tag-policy.js';
 import useMangaPolicy from './use-manga-policy.js';
 import {jikan,youtubeTrailer} from './media-metadata.js';
 import {jikanProfile,fillProfile} from './title-supplement.js';
@@ -77,7 +77,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   const [part,setPart]=useState(''),[ratingBusy,setRatingBusy]=useState(false);
   const characterAbort=useRef(null),abort=useRef(null),saveInProgress=useRef(false),live=useRef(state);live.current=state;
   const characterService=useMemo(()=>{let address='';try{address=validateServer(server||window.MEDIA_VAULT_CONFIG?.importServerUrl||localStorage.getItem('mediavault_import_server')||'');}catch{}return {...createImportClient(address,()=>live.current.token),server:address};},[server,state.user?.sub]);
-  useMangaPolicy(characterService,title.category==='manga');
+  useMangaPolicy(characterService);
   const currentProfile=useRef(profile);currentProfile.current=profile;
   const supplementIdentity=String((online?onlineProfile?.sourceId:saved?.sourceId||title.profile?.sourceId)||title.metadataId||'');
   useEffect(()=>{
@@ -172,7 +172,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   }
   const ukrainian=useUkrainianTitle(server||state?.server,title.section||title.profile?.kind,title.metadataId||title.profile?.sourceId||title.profile?.ids?.mal);
   const baseProfile=ukrainian?{...(profile||{}),title:ukrainian.title,description:ukrainian.description||profile?.description}:(profile||{});
-  const p=title.category==='manga'?mangaPolicyProfile(baseProfile):baseProfile,name=p.title&&p.title!=='Название уточняется'?p.title:title.name,parts=titleParts(title),currentPart=parts.find(value=>value.name===part)||parts[0];
+  const p=title.category==='manga'||globalContentPolicy()?mangaPolicyProfile(baseProfile):baseProfile,name=p.title&&p.title!=='Название уточняется'?p.title:title.name,parts=titleParts(title),currentPart=parts.find(value=>value.name===part)||parts[0];
   const video=selected&&title.items.some(item=>item.id===selected.id)?selected:null;
   const voices=[...new Set(title.items.filter(i=>i.category==='video').map(i=>voiceLabel(i)))];
   const facts=[['Тип',p.format||SECTION_LABELS[title.section]||'Произведение'],['Тема',p.themes?.join(', ')],['Статус',p.status],['Выпуск',day(p.startDate)+(p.endDate?' — '+day(p.endDate):'')],['Первоисточник',p.origin],...publicationFacts(p,title.section),['Длительность',p.duration?p.duration+' мин.':null],['Рейтинг',p.ratingCode],['Возраст',p.rating],['Озвучка',voices.join(', ')],['Режиссёры',p.directors?.join(', ')],['Студия',p.studios?.join(', ')]];

@@ -20,7 +20,8 @@ import {useVoices} from './use-voices.js';
 import useGlobalManga from './use-global-manga.js';
 import useMangaCatalog from './use-manga-catalog.js';
 import {mangaFacetOptions,mangaFormatLabel} from './manga-catalog.js';
-import {mangaPolicyFacts,mangaPolicy} from './manga-tag-policy.js';
+import {contentPolicyFacts,mangaPolicy,globalContentPolicy} from './manga-tag-policy.js';
+import useContentCatalog from './use-content-catalog.js';
 import useMangaPolicy from './use-manga-policy.js';
 import MangaSearchDiagnostics from './MangaSearchDiagnostics.jsx';
 import useSourceTitles from './use-source-titles.js';
@@ -52,11 +53,13 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const {items:metadataItems,statuses,loading:metadataLoading,retry}=useCatalog(query,kind,filters.year,service.server,page,composing,filters);
   const sourceTitles=useSourceTitles(query,kind,service,composing);
   const globalManga=useGlobalManga(query,kind,sourceLanguage,sourceIds,service,composing||!!selected,sourceRevision);
-  const tagPolicyVersion=useMangaPolicy(service,kind==='manga');
-  useEffect(()=>{if(kind!=='manga')return;setFilters(old=>{const genre=old.genre&&!mangaPolicy().key(old.genre)?'':old.genre,tag=String(old.tag||'').split(',').filter(value=>mangaPolicy().key(value.trim())).join(',');return genre===old.genre&&tag===old.tag?old:{...old,genre,tag};});},[tagPolicyVersion,kind]);
+  const tagPolicyVersion=useMangaPolicy(service);
+  const globalTags=globalContentPolicy();
+  useEffect(()=>{if(kind!=='manga'&&!globalTags)return;setFilters(old=>{const genre=old.genre&&!mangaPolicy().key(old.genre)?'':old.genre,tag=String(old.tag||'').split(',').filter(value=>mangaPolicy().key(value.trim())).join(',');return genre===old.genre&&tag===old.tag?old:{...old,genre,tag};});},[tagPolicyVersion,kind,globalTags]);
+  const contentIndex=useContentCatalog({service,state,kind,query,filters,rows:metadataItems,revision:tagPolicyVersion});
   const indexed=useMangaCatalog({query,kind,filters,language:sourceLanguage,sourceIds,service,page,paused:!!selected,composing,revision:[sourceRevision,globalManga.results?.length||0,globalManga.state,tagPolicyVersion].join(':')});
   const catalogueRows=indexed.ready?indexed.results:globalManga.results||noTitles;
-  const items=useMemo(()=>{const rows=worldResults(metadataItems,[...catalogueRows,...sourceTitles.results],query,kind==='manga'?sourceIds:[],indexed.candidates);return kind==='manga'?rows.map(mangaPolicyFacts):rows;},[metadataItems,catalogueRows,sourceTitles.results,query,sourceIds,kind,indexed.candidates,tagPolicyVersion]);
+  const items=useMemo(()=>worldResults([...metadataItems,...contentIndex.items],[...catalogueRows,...sourceTitles.results],query,kind==='manga'?sourceIds:[],indexed.candidates).map(contentPolicyFacts),[metadataItems,contentIndex.items,catalogueRows,sourceTitles.results,query,sourceIds,kind,indexed.candidates,tagPolicyVersion]);
   const pagingLoading=metadataLoading||sourceTitles.loading||indexed.loading;
   const loading=pagingLoading||globalManga.state==='running'||indexed.enriching;
   useEffect(()=>onItems?.(items),[items]);
@@ -64,8 +67,8 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const voices=useVoices(kind==='anime'?items:noTitles,voice,service);
   const visible=useMemo(()=>items.filter(item=>(!favoritesOnly||bookmarks.has(item))&&matchesFilters(item,filters)&&item.kind===kind&&(!voice||(voices.results[item.id]?.dubs||[]).some(d=>d.toLocaleLowerCase().includes(voice.toLocaleLowerCase())))),[items,filters,kind,voice,voices.results,favoritesOnly,bookmarks]);
   const sourceFacets=useMemo(()=>kind==='manga'?mangaFacetOptions(indexed.taxonomy,indexed.facets,{sourceIds,sources:knownSources}):[],[kind,indexed.taxonomy,indexed.facets,sourceIds,knownSources,tagPolicyVersion]);
-  const genres=[...new Set([...(kind==='manga'?[]:[filters.genre,...Object.values(genreLabels)]),...sourceFacets.filter(t=>t.type==='genre').map(t=>t.label),...items.flatMap(item=>kind==='manga'?item.genres:item.genres.map(localLabel))].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
-  const tagOptions=[...new Set([...(kind==='manga'?[]:Object.values(tagLabels)),...sourceFacets.map(t=>t.label),...items.flatMap(item=>kind==='manga'?item.tags:item.tags.map(localLabel))])].sort((a,b)=>a.localeCompare(b,'ru'));
+  const genres=[...new Set([...(kind==='manga'||globalTags?[]:[filters.genre,...Object.values(genreLabels)]),...(globalTags?[...mangaPolicy().rules.values()].filter(row=>row.category==='genre').map(row=>row.label):[]),...sourceFacets.filter(t=>t.type==='genre').map(t=>t.label),...items.flatMap(item=>kind==='manga'||globalTags?item.genres:item.genres.map(localLabel))].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+  const tagOptions=[...new Set([...(globalTags?[...mangaPolicy().rules.values()].map(row=>row.label):kind==='manga'?[]:Object.values(tagLabels)),...sourceFacets.map(t=>t.label),...items.flatMap(item=>kind==='manga'||globalTags?item.tags:item.tags.map(localLabel))])].sort((a,b)=>a.localeCompare(b,'ru'));
   const formats=[...new Set([...items.map(item=>item.format),...(kind==='manga'?['manga','manhwa','manhua','webtoon']:[])].filter(Boolean).map(f=>kind==='manga'?mangaFormatLabel(f):f))];
   const suggestions=visible.slice(0,7),filter=(key,value)=>{setFilters(old=>({...old,[key]:value}));setPage(1);};
   function choose(item){setSelected(item);onlineTitleLocation(item);}

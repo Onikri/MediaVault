@@ -20,6 +20,18 @@ def normalize(value):
 def canonical_json(value):
     return json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
 
+def alias_domains(domain):
+    from content_source_routes import HTML,LIB
+    from urllib.parse import urlsplit
+    result={domain}
+    for canonical,(_,hosts) in HTML.items():
+        group={canonical,*hosts}
+        if domain in group:result.update(group)
+    for canonical,(_,referer) in LIB.items():
+        group={canonical,urlsplit(referer).hostname}
+        if domain in group:result.update(group)
+    return sorted(result)
+
 
 class Policy:
     def __init__(self,data):
@@ -30,14 +42,15 @@ class Policy:
             if not isinstance(data[field],list) or len(data[field])>256 or any(not isinstance(v,str) or not normalize(v) or len(v)>120 for v in data[field]):
                 raise ValueError('Invalid tag exclusion list')
         if not isinstance(data['tags'],list) or len(data['tags'])>5000:raise ValueError('Invalid tag list')
-        self.data=json.loads(json.dumps(data));self.rules={};self.aliases={};self.scoped={}
+        self.data=json.loads(json.dumps(data));self.rules={};self.aliases={};self.scoped={};self.expanded={}
         self.terms=[normalize(v) for v in data['excludedTerms']]
         self.prefixes=[normalize(v) for v in data['excludedPrefixes']]
         self.hidden=set()
         valid=lambda value:isinstance(value,str) and 1<=len(value.strip())<=120
         for row in data['tags']:
-            if not isinstance(row,dict) or set(row)-{'key','label','aliases','sourceAliases'} or not {'key','label','aliases'}<=set(row):
+            if not isinstance(row,dict) or set(row)-{'key','label','aliases','sourceAliases','category'} or not {'key','label','aliases'}<=set(row):
                 raise ValueError('Invalid tag entry')
+            if row.get('category') not in (None,'tag','genre'):raise ValueError('Invalid tag category')
             key=normalize(row['key'])
             if not key or row['key']!=key or key in self.rules or not valid(row['label']):raise ValueError('Invalid or duplicate tag key/label')
             aliases=row['aliases']
@@ -54,10 +67,13 @@ class Policy:
                 if not isinstance(domain,str) or not domain or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789.-' for c in domain):raise ValueError('Invalid source alias domain')
                 if not isinstance(values,list) or len(values)>120 or any(not valid(v) for v in values):raise ValueError('Invalid source alias values')
                 if any(not self.clean(v) for v in values):self.hidden.add(key)
-                for alias in values:
-                    token=(domain,normalize(alias))
-                    if token in self.scoped and self.scoped[token]!=key:raise ValueError('Ambiguous source alias')
-                    self.scoped[token]=key
+                for actual in alias_domains(domain):
+                    expanded=self.expanded.setdefault(key,{}).setdefault(actual,[])
+                    expanded.extend(value for value in values if value not in expanded)
+                    for alias in values:
+                        token=(actual,normalize(alias))
+                        if token in self.scoped and self.scoped[token]!=key:raise ValueError('Ambiguous source alias')
+                        self.scoped[token]=key
         self.revision=hashlib.sha256(canonical_json(self.data)).hexdigest()
 
     def clean(self,value):
@@ -80,6 +96,23 @@ class Policy:
             key=self.key(value,source)
             if key:found[key]=self.rules[key]['label']
         return list(found.values())[:120]
+
+    def facts(self,row,source=''):
+        result={'tags':[],'genres':[]}
+        for field in result:
+            values=row.get(field) or []
+            for value in values if isinstance(values,(list,tuple)) else []:
+                key=self.key(value,source)
+                if not key:continue
+                rule=self.rules[key];target={'tag':'tags','genre':'genres'}.get(rule.get('category'),field)
+                if rule['label'] not in result[target]:result[target].append(rule['label'])
+        return {field:values[:120] for field,values in result.items()}
+
+    def public(self):
+        # The public catalogue needs only visible matching rules. Moderation
+        # exclusions and hidden entries are exclusively owner data.
+        return {'schemaVersion':1,'tags':[{**row,**({'sourceAliases':self.expanded[key]} if key in self.expanded else {})} for key,row in self.rules.items() if key not in self.hidden],
+                'excludedTerms':[],'excludedPrefixes':[]}
 
 
 def policy_path():
@@ -104,4 +137,4 @@ def project_row(row,policy=None):
     from urllib.parse import urlsplit
     policy=policy or current()
     source=urlsplit(row.get('sourceUrl') or row.get('url') or '').hostname or ''
-    return {**row,**{category:policy.project(row.get(category) or [],source) for category in ('tags','genres')}}
+    return {**row,**policy.facts(row,source)}

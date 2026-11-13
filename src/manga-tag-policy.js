@@ -9,26 +9,30 @@ export function compileMangaPolicy(data){
  for(const row of data.tags){
   const valid=value=>typeof value==='string'&&value.trim().length>=1&&value.length<=120;
   if(!row.key||normalizeTag(row.key)!==row.key||rules.has(row.key)||!valid(row.label)||!Array.isArray(row.aliases))throw Error('Неверная запись тега.');
+  if(row.category!=null&&!['tag','genre'].includes(row.category))throw Error('Выбери категорию: тег или жанр.');
   rules.set(row.key,row);
   for(const value of [row.key,row.label,...row.aliases]){const alias=normalizeTag(value);if(!valid(value)||aliases.has(alias)&&aliases.get(alias)!==row.key)throw Error('Неоднозначный алиас тега.');aliases.set(alias,row.key);if(!clean(value))hidden.add(row.key);}
   for(const [domain,values] of Object.entries(row.sourceAliases||{}))for(const value of values){const alias=domain+':'+normalizeTag(value);if(!valid(value)||scoped.has(alias)&&scoped.get(alias)!==row.key)throw Error('Неоднозначный алиас источника.');scoped.set(alias,row.key);if(!clean(value))hidden.add(row.key);}
  }
  const key=(value,source='')=>{const id=clean(value)?scoped.get(source+':'+normalizeTag(value))||aliases.get(normalizeTag(value))||'':'';return hidden.has(id)?'':id;};
  const project=(values,source='')=>[...new Set((Array.isArray(values)?values:[]).map(v=>key(v,source)).filter(Boolean))].map(k=>rules.get(k).label);
- return {data,rules,key,project};
+ const facts=(row,source='')=>{const result={genres:[],tags:[]};for(const field of ['genres','tags'])for(const value of Array.isArray(row?.[field])?row[field]:[]){const id=key(value,source);if(!id)continue;const rule=rules.get(id),target=({genre:'genres',tag:'tags'})[rule.category]||field;if(!result[target].includes(rule.label))result[target].push(rule.label);}return result;};
+ return {data,rules,key,project,facts};
 }
-let active=compileMangaPolicy(bundled),version=0;
+let active=compileMangaPolicy(bundled),version=0,scope='manga';
 const listeners=new Set();
 export const mangaPolicy=()=>active;
 export const policyVersion=()=>version;
 export const subscribeMangaPolicy=listener=>{listeners.add(listener);return()=>listeners.delete(listener);};
 let revision='';
-export function setMangaPolicy(data,digest=''){
- if(digest&&digest===revision)return;
- const next=compileMangaPolicy(data);active=next;revision=digest;version++;for(const listener of listeners)listener();
+export function setMangaPolicy(data,digest='',nextScope='manga'){
+ if(digest&&digest===revision&&nextScope===scope)return;
+ const next=compileMangaPolicy(data);active=next;revision=digest;scope=nextScope;version++;for(const listener of listeners)listener();
 }
 export function mangaPolicyFacts(row){
  let source='';try{source=new URL(row.sourceUrl||row.url||'').hostname;}catch{}
- return {...row,genres:active.project(row.genres,source),tags:active.project(row.tags,source)};
+ return {...row,...active.facts(row,source)};
 }
-export function mangaPolicyProfile(profile){return {...profile,genres:active.project(profile?.genres),themes:active.project(profile?.themes)};}
+export function mangaPolicyProfile(profile){const facts=active.facts({genres:profile?.genres,tags:profile?.themes});return {...profile,genres:facts.genres,themes:facts.tags};}
+export const globalContentPolicy=()=>scope==='all';
+export const contentPolicyFacts=row=>row.kind==='manga'||globalContentPolicy()?mangaPolicyFacts(row):row;

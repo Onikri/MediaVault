@@ -8,6 +8,7 @@ import GuestsPanel from './GuestsPanel.jsx';
 import TasksPanel from './TasksPanel.jsx';
 import RulesPanel from './RulesPanel.jsx';
 import SystemPanel from './SystemPanel.jsx';
+import ContentPanel from './ContentPanel.jsx';
 import './control-center.css';
 
 // The owner's control center and everyone's settings share one shell:
@@ -19,6 +20,7 @@ const GROUPS=[
   ['guests','Гости',UsersRound,'Профили по приглашению, их доступ и активность'],
   ['tasks','Задачи',ListChecks,'Импорт и оформление библиотеки на ВМ'],
   ['rules','Правила',SlidersHorizontal,'Ограничения комнат и права новых гостей'],
+  ['content','Управление контентом',ListChecks,'Общие теги, жанры и соответствия на источниках'],
  ]],
  ['data','Данные',[
   ['storage','Хранилище',HardDrive,'Место, нагрузка сервера, коллекция и Google Диск'],
@@ -30,7 +32,7 @@ const GROUPS=[
   ['privacy','Устройство',ShieldCheck,'Что этот браузер помнит и кому доверяет'],
  ]],
 ];
-const ADMIN=new Set(['overview','rooms','guests','tasks','rules']),LIVE=new Set(['overview','rooms','guests']);
+const ADMIN=new Set(['overview','rooms','guests','tasks','rules','content']),LIVE=new Set(['overview','rooms','guests']);
 
 function Counter({value,tone}){
  const reduce=useReducedMotion();
@@ -68,6 +70,7 @@ export default function ControlCenter({state,guest,service,initialTab,onLogout,p
   guests:<GuestsPanel data={data} service={service}/>,
   tasks:<TasksPanel service={service}/>,
   rules:<RulesPanel service={service} onSaved={data.refresh}/>,
+  content:<ContentPanel service={service}/>,
  }[current]:current==='storage'&&admin?<><SystemPanel service={service}/>{panels.storage}</>:panels[current];
  return <section className="cc" aria-label="Пульт и настройки">
   <aside className="cc-rail">

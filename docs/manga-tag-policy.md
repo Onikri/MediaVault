@@ -1,57 +1,54 @@
-# Editing manga tags on GitHub
+# Private global content management
 
-Edit **`server/manga-tag-policy.json`** on `main` and commit. This is the single
-editable definition for all manga source adapters, source vocabulary collection,
-Oracle indexing, title profiles, catalogue cards and filter options.
+Open **Profile → Control center → Управление контентом** as the site owner.
+The same private policy governs movies, TV series, anime, manga/manhwa/manhua,
+ranobe and books. Repository JSON is an installation default, not the live
+administration surface. GitHub commits never replace the owner's runtime rules.
 
-Each `tags` entry has a stable `key`, a display `label`, and `aliases` containing
-the actual source labels in any language. Matching normalizes case, punctuation,
-Unicode width and ё/е; it does not guess unrelated words. For example:
+The graphical editor supports bulk pasting source labels (one per line), adding
+or deleting any rule, changing its display name and category, multilingual
+aliases, source-specific aliases, and editable word/phrase/prefix exclusions.
+All choices are editable. There is no second hidden tag exclusion list.
+Saving validates aliases and atomically reindexes retained source facts. A stale
+editor receives HTTP 409 without overwriting another saved revision. Discarding
+unsaved changes leaves Oracle unchanged.
 
-```json
-{"key":"экология","label":"Экология","aliases":["Ecology","Экология"]}
-```
+Rules stay in `/data/manga-tag-policy.json` on Oracle (the filename is retained
+for compatibility). The file is private, mode 0600. Administrative endpoints
+require the existing Google-verified owner session. Guest, share and viewer
+roles cannot read the policy, save rules, refresh sources, or contribute shared
+index facts. The former signed GitHub update endpoint returns HTTP 410. The
+workflow only validates bundled defaults. No Workers account or execution of
+uploaded scripts is involved.
 
-Keep `key` unchanged to rename the display label. An optional `sourceAliases`
-object maps source domains to additional source-specific labels. Those aliases
-do not apply to other sites. The ordinary aliases apply uniformly to all 18
-registered sources and the other manga adapters.
+Public clients receive only visible matching rules and a digest of that public
+projection; hidden entries and exclusion terms are omitted. The private
+configuration is never sent to GitHub, browser persistence or public logs.
+Public catalogue labels are necessarily visible as part of the catalogue.
+Clients refresh rules on focus and every minute, including already open titles
+and cached catalogue cards. Tag/genre categorization applies across media kinds.
 
-Delete the entry to remove the tag from both genres/tags, index facets, cards and
-filter controls. `excludedTerms` and `excludedPrefixes` provide shared exclusions:
-an exclusion matching any alias hides that canonical tag across its languages.
-These lists contain plain terms, not executable regex or code.
+Source labels are retained independently of the current projection. Adding a
+previously unknown alias or restoring a tag immediately matches existing facts.
+Owner catalogue browsing also contributes bounded normalized metadata for all
+media kinds. Source facts never include account cookies, streams or reader bytes.
 
-The **Validate and apply manga tag rules** workflow checks the JSON, alias
-ambiguity, indexing, deletion/restoration and deployment authentication. A failed
-validation preserves the active version. A successful main commit sends a signed,
-scoped request to Oracle. Oracle verifies the current committed configuration,
-transactionally rebuilds its tag projection, and publishes the new revision.
-There is no VM restart or account-session transfer for a rule edit. Concurrent
-outdated updates are rejected. The browser refreshes the policy on focus and
-every minute; already cached metadata is projected through the current rules.
+New/changed rules queue bounded public metadata discovery. AniList's actual
+genre/tag vocabulary is consulted for anime, manga and ranobe; book subject
+search uses Open Library; movie/TV catalogue batches use Kinobox. The 18 manga
+domains use public LibGroup constants/genre filters or exact tag-cloud links on
+approved hosts. Known approved mirrors share source-specific aliases. Requests
+are bounded and sequential; the LibGroup gateway uses HTTP/2 with site/referrer
+headers. Robots and upstream availability are respected. No images are fetched.
+The UI shows matches, source availability and first-batch limits. It does not
+claim that closed/unavailable sites were indexed or that a bounded batch covers
+an entire source. Ordinary discovery continues adding source-provided metadata.
 
-Source-provided facts are retained privately so additions and restored aliases
-can match already collected metadata without a new scrape. This does not invent
-tags, fetch missing pages, or perform an exhaustive catalogue crawl. Titles/facts
-not collected yet are added by normal discovery and title inspection. Sources
-that do not supply the tag remain untagged; unavailable sources retain their
-availability status. The static vocabulary is a generated view and should not be
-edited manually.
+Exact normalized spelling and declared aliases match automatically. Similar
+spellings are suggestions in the private vocabulary search; the owner chooses
+semantic merges, rather than an algorithm silently changing site policy.
 
-The one-time server installation provisions `MANGA_TAG_DEPLOY_KEY` as a repository
-secret and `/data/manga-tags-deploy.key` on Oracle. The key authorizes only this
-configuration endpoint. The public Oracle origin is the `MANGA_ORACLE_URL`
-repository variable. No account cookies, SSH private keys, or model credentials
-are committed or sent in the policy. Initial code upgrades still use the normal
-server release procedure; the automatic deployment here is scoped to tag rules.
-
-Validation uses neutral multilingual tag fixtures across the 18 source domains;
-it makes no upstream image requests and performs no ML inference.
-
-The first live automatic update was verified on 2026-11-13: the main-branch
-workflow applied 582 rules and rebuilt 2,352 indexed titles without restarting
-the backend container. The public policy revision matched the committed JSON.
-The source-vocabulary workflow also validated its generated snapshot across all
-18 registered sources. Full Linux CI passed before publication, including the
-open-title deletion/addition browser contract (440 Node and 898 Python tests).
+Validation uses neutral fixtures, private API authorization/conflict/rollback
+tests, all-media deletion/restoration/category tests and a responsive graphical
+editor contract. These checks do not access adult reader pages or perform ML
+inference.

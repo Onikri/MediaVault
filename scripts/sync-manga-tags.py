@@ -27,6 +27,7 @@ from manga_source_coverage import SOURCES
 from manga_source_tags import clean_label
 from manga_catalog_index import tag_key
 from manga_tag_policy import current
+from content_source_routes import HTML,LIB
 
 OUTPUT = ROOT / 'public' / 'data' / 'manga-tags.json'
 UA = 'MediaVault-Taxonomy/1.0 (+https://github.com/Onikri/MediaVault)'
@@ -38,24 +39,6 @@ MAX_TOTAL_TAGS = 15000
 
 # Site catalogue routes; these are not invented API endpoints. A host is
 # allowed to redirect only to itself or one explicitly permitted mirror.
-HTML = {
-    'hentaichan.live': ('https://x17.h-chan.me/', {'x17.h-chan.me', 'xxl.hentaichan.live'}),
-    'h-chan.me': ('https://manga.h-chan.me/', {'manga.h-chan.me'}),
-    'manga-chan.me': ('https://manga-chan.me/catalog', {'manga-chan.me', 'im.manga-chan.me'}),
-    'henchan.pro': ('https://henchan.pro/', {'henchan.pro'}),
-    'hentaichan.cc': ('https://hentaichan.cc/', {'hentaichan.cc'}),
-    'y.hentaichan.live': ('https://y.hentaichan.live/', {'y.hentaichan.live'}),
-    'yaoi-chan.me': ('https://v18.yaoi-chan.me/catalog', {'v18.yaoi-chan.me'}),
-    'hmanga.su': ('https://hmanga.me/', {'hmanga.me'}),
-    'hentaros.com': ('https://hentaros.com/', {'hentaros.com'}),
-    'online.hentaimoody.com': ('https://online.hentaimoody.com/', {'online.hentaimoody.com'}),
-    'nude-moon.org': ('https://nude-moon.org/', {'nude-moon.org'}),
-    '20.allhen.online': ('https://20.allhen.online/', {'20.allhen.online'}),
-    'remanga.org': ('https://remanga.org/', {'remanga.org'}),
-}
-LIB = {'mangalib.org': (1, 'https://mangalib.me/'),
-       'hentailib.me': (4, 'https://hentailib.me/'),
-       'v2.shlib.life': (2, 'https://v2.shlib.life/')}
 
 TAXONOMY_PATH = re.compile(
     r'/(?:tags?|genres?|categories?)(?:/|$)|[?&](?:tag|genre|category)=', re.I
@@ -70,7 +53,7 @@ TAGS_SELECTOR = ','.join((
 
 def clean(value):
     label = clean_label(value)
-    if not label or len(label) > MAX_LABEL_LENGTH:
+    if not label or not current().clean(label) or len(label) > MAX_LABEL_LENGTH:
         return ''
     return label
 
