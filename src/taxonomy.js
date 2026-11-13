@@ -1,3 +1,4 @@
+import {mangaPolicy,globalContentPolicy} from './manga-tag-policy.js';
 export const tagLabels={
   Action:'Экшен',Adventure:'Приключения',Comedy:'Комедия',Drama:'Драма',Fantasy:'Фэнтези',Horror:'Ужасы',Mystery:'Детектив',Romance:'Романтика','Sci-Fi':'Фантастика','Science Fiction':'Фантастика','Slice of Life':'Повседневность',Sports:'Спорт',Supernatural:'Сверхъестественное',Suspense:'Триллер',Thriller:'Триллер',Mecha:'Меха',Music:'Музыка',Psychological:'Психологическое',Historical:'Историческое',School:'Школа',
   'Coming of Age':'Взросление',Shounen:'Сёнен',Shoujo:'Сёдзё',Seinen:'Сэйнэн',Josei:'Дзёсэй','Male Protagonist':'Главный герой — мужчина','Female Protagonist':'Главная героиня','Female Ensemble Cast':'Женский актёрский состав','Ensemble Cast':'Несколько главных героев','Primarily Teen Cast':'Герои-подростки','Primarily Adult Cast':'Взрослые герои','Primarily Female Cast':'Преимущественно женские персонажи','Primarily Male Cast':'Преимущественно мужские персонажи','Primarily Child Cast':'Герои-дети',
@@ -6,5 +7,5 @@ export const tagLabels={
 const labelKey=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const caseLabels=new Map(Object.entries(tagLabels).flatMap(([key,label])=>[[labelKey(key),label],[labelKey(label),label]]));
 export const localLabel=value=>tagLabels[value]||caseLabels.get(labelKey(value))||value;
-export const queryLabel=value=>Object.entries(tagLabels).find(([,ru])=>ru.toLocaleLowerCase()===String(value).toLocaleLowerCase())?.[0]||value;
+export const queryLabel=value=>{if(globalContentPolicy()){const policy=mangaPolicy(),rule=policy.rules.get(policy.key(value));if(rule)return rule.aliases.find(alias=>/^[\x20-\x7e]+$/.test(alias)&&/[a-z]/i.test(alias))||rule.label;}return Object.entries(tagLabels).find(([,ru])=>ru.toLocaleLowerCase()===String(value).toLocaleLowerCase())?.[0]||value;};
 export const russianLabels=values=>[...new Set((values||[]).map(localLabel).filter(v=>/[а-яё]/i.test(v)))];

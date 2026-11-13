@@ -110,6 +110,7 @@ jobs:
           CHROMIUM_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           test -n "$CHROMIUM_PATH"
           export CHROMIUM_PATH
+          node tests/content-management-browser.cjs
           npm run test:world
           npm run test:suwayomi
 
@@ -186,6 +187,7 @@ jobs:
             .codex-local/test-output/blossom/*.png
             .codex-local/test-output/watch/*.png
             .codex-local/test-output/navigation/*.png
+            .codex-local/test-output/content-management/*.png
           include-hidden-files: true
           if-no-files-found: ignore
 

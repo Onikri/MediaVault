@@ -12,7 +12,7 @@ export default function useMangaPolicy(service,enabled=true){
    const update=async()=>{
     if(connection.busy||document.hidden)return;connection.busy=true;
     try{const value=await connection.service.request('/manga/tag-policy?'+new URLSearchParams({revision:connection.revision}),{auth:false,signal:connection.abort.signal});
-     if(!connection.abort.signal.aborted&&value?.policy){setMangaPolicy(value.policy,value.revision);connection.revision=value.revision;}
+     if(!connection.abort.signal.aborted&&value?.policy){setMangaPolicy(value.policy,value.revision,value.scope||'manga');connection.revision=value.revision;}
     }catch{}finally{connection.busy=false;}
    };
    connection.update=update;connection.timer=setInterval(update,60000);addEventListener('focus',update);update();

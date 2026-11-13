@@ -1,4 +1,4 @@
-name: Validate and apply manga tag rules
+name: Validate bundled catalogue tag defaults
 
 on:
   push:
@@ -39,9 +39,5 @@ jobs:
         run: python -m unittest discover -s tests -p test_manga_tag_policy.py
       - name: Verify browser policy semantics
         run: node --test tests/manga-tag-policy.test.mjs
-      - name: Apply committed rules to Oracle
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        env:
-          MANGA_ORACLE_URL: ${{ vars.MANGA_ORACLE_URL }}
-          MANGA_TAG_DEPLOY_KEY: ${{ secrets.MANGA_TAG_DEPLOY_KEY }}
-        run: python scripts/deploy-manga-tags.py
+      # Runtime rules belong exclusively to the owner on Oracle. Repository
+      # defaults are validated here and never deployed over private settings.

@@ -16,6 +16,7 @@ import {useTitleShare,useTitleStats} from './title-context.js';
 import {onlineTitleLocation} from './title-route.js';
 import useMangaPolicy from './use-manga-policy.js';
 import {sameMangaTitle} from './manga-source-identity.js';
+import {globalContentPolicy} from './manga-tag-policy.js';
 
 // Online titles use the collection's presentation, without its Drive writes.
 const LocalMediaViewer=lazy(()=>import('./MediaViewer.jsx'));
@@ -29,7 +30,7 @@ const languageNames={ru:'Русский',en:'Английский',ja:'Япон�
 export default function WorldTitlePage({value,service,state,onBack,onSubmitted,onOpenLibrary,destination='online',onRelated}){
  const localInput=useRef(null),[localFile,setLocalFile]=useState(null);
  const [item,setItem]=useState(value),[profile,setProfile]=useState(null),[supplement,setSupplement]=useState(null),[loading,setLoading]=useState(false),[saveOpen,setSaveOpen]=useState(false),[saveTo,setSaveTo]=useState('local'),[viewSeason,setViewSeason]=useState(null),[seasonProfiles,setSeasonProfiles]=useState({});
- const tagPolicyVersion=useMangaPolicy(service,value.kind==='manga');
+ const tagPolicyVersion=useMangaPolicy(service);
  const [indexedFacts,setIndexedFacts]=useState(null);
  const factIds=[...new Set([value.catalogId,...(value.catalogIds||[]),...(value.sources||[]).map(source=>source.catalogId)].filter(id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)))].slice(0,100).join(',');
  const factUrls=[...new Set([value.sourceUrl,value.sourceURL,value.url].filter(url=>typeof url==='string'&&url.startsWith('https://')))].join('\n');
@@ -43,6 +44,15 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
    setIndexedFacts({id:value.id,genres:[...new Set(rows.flatMap(row=>row.genres||[]))],themes:[...new Set(rows.flatMap(row=>row.tags||[]))]});
   });return()=>abort.abort();
  },[value.id,factIds,factUrls,tagPolicyVersion,service.server]);
+ useEffect(()=>{
+  if(value.kind==='manga'||!globalContentPolicy()||Number(service.session?.serverVersion)<74)return;
+  const abort=new AbortController();
+  service.request('/catalog/content?'+new URLSearchParams({q:value.title,kind:value.kind}),{signal:abort.signal}).then(result=>{
+   if(abort.signal.aborted)return;
+   const rows=(result.items||[]).filter(row=>row.id===value.id||(value.sources||[]).some(source=>source.id===row.id)||Object.entries(value.ids||{}).some(([key,id])=>id&&String(row.ids?.[key])===String(id)));
+   setIndexedFacts({id:value.id,genres:[...new Set(rows.flatMap(row=>row.genres||[]))],themes:[...new Set(rows.flatMap(row=>row.tags||[]))]});
+  }).catch(()=>{});return()=>abort.abort();
+ },[value.id,tagPolicyVersion,service.server]);
  useEffect(()=>{
   const abort=new AbortController();setItem(value);setProfile(null);setSupplement(null);setViewSeason(null);setSeasonProfiles({});setSaveOpen(false);setLoading(true);
   const tasks=[];
@@ -72,11 +82,11 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   title:item.title,cover:item.cover,description:item.description,year:item.year,format:item.format?translate(item.format):null,status:item.status?translate(item.status):null,
   sourceId:item.ids?.mal||'',source:item.ids?.mal?'shikimori':item.provider,sourceURL:item.sourceUrl||item.sourceURL||item.links?.find(l=>l.provider===item.provider)?.url||item.links?.[0]?.url,
   episodes:item.episodes||null,episodesAired:item.episodesAired||null,chapters:item.chapters||null,volumes:item.volumes||null,duration:item.duration||null,startDate:item.startDate||'',endDate:item.endDate||'',scores:item.scores||[],countries:item.countries||[],authors:item.authors||[],background:item.background||'',
-  releases:item.releases||[],episodeImages:item.episodeImages||{},rating:item.age!=null?item.age+'+':'',genres:item.kind==='manga'?item.genres||[]:(item.genres||[]).map(localLabel),themes:item.kind==='manga'?item.tags||[]:(item.tags||[]).map(localLabel),characters:[],staff:[],related:[],screenshots:[],
+  releases:item.releases||[],episodeImages:item.episodeImages||{},rating:item.age!=null?item.age+'+':'',genres:item.kind==='manga'||globalContentPolicy()?item.genres||[]:(item.genres||[]).map(localLabel),themes:item.kind==='manga'||globalContentPolicy()?item.tags||[]:(item.tags||[]).map(localLabel),characters:[],staff:[],related:[],screenshots:[],
 
  };const result=withSupplement({...base,...(profile||{}),...preserveCatalogFacts(item,profile||{}),aliases:searchItem.aliases,sourcePublication:sourcePublication?.id===item.id?sourcePublication.value:null},supplement);
- if(item.kind==='manga'&&indexedFacts?.id===item.id)for(const field of ['genres','themes'])result[field]=[...new Set([...(result[field]||[]),...indexedFacts[field]])];
- return result;},[item,profile,supplement,searchItem,sourcePublication,indexedFacts]);
+ if(indexedFacts?.id===item.id)for(const field of ['genres','themes'])result[field]=[...new Set([...(result[field]||[]),...indexedFacts[field]])];
+ return result;},[item,profile,supplement,searchItem,sourcePublication,indexedFacts,tagPolicyVersion]);
  const sceneItem=viewSeason?.item||item,sceneId=String(sceneItem.ids?.mal||''),basisId=String(item.ids?.mal||'');
  useEffect(()=>{if(!sceneId||sceneId===basisId||seasonProfiles[sceneId])return;const abort=new AbortController();loadTitleProfile(sceneId,'anime',{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}}).then(data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}).catch(()=>{});return()=>abort.abort();},[sceneId,basisId,service.server]);
  const displayProfile=useMemo(()=>sceneId&&sceneId!==basisId?{...profileForSeason(sceneItem),...(seasonProfiles[sceneId]||{})}:baseDisplayProfile,[sceneItem,sceneId,basisId,seasonProfiles,baseDisplayProfile]);
