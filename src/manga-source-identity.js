@@ -16,3 +16,13 @@ export function matchingMangaSources(item,rows,{attached=false}={}){
  if(!item)return [];
  return [...new Map(rows.filter(row=>row.url&&(attached&&!row.title||sameMangaTitle(item,row))).map(row=>[row.url,{...row,title:row.title||item.title}])).values()].sort((a,b)=>Number(b.provider==='mangalib')-Number(a.provider==='mangalib'));
 }
+
+// A matched source may publish a localized heading absent from the metadata
+// catalogue. Carry its verified names into inspection without changing the
+// selected work's year, IDs or title.
+export function mangaInspectionTitle(title,source){
+ if(!title||!source||!sameMangaTitle(title,source))return title;
+ const names=[title.title,title.originalTitle,...Object.values(title.titles||{}),...title.aliases||[],
+  source.title,...Object.values(source.titles||{}),...source.aliases||[],...source.identityTitles||[]];
+ return {...title,aliases:[...new Set(names.filter(v=>typeof v==='string'&&v.trim()).map(v=>v.trim()))].slice(0,40)};
+}

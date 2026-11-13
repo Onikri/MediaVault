@@ -1,7 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {worldResults,sourceTitle} from '../src/world-search.js';
-import {matchingMangaSources,sameMangaTitle} from '../src/manga-source-identity.js';
+import {matchingMangaSources,sameMangaTitle,mangaInspectionTitle} from '../src/manga-source-identity.js';
+
+test('inspection carries the matched source spelling without changing the chosen work',()=>{
+ const title={kind:'manga',title:'Moon Road',year:2020,ids:{mal:'71'},aliases:['Moon Road']};
+ const source={kind:'manga',title:'Лунная дорога',aliases:['Moon Road'],year:2020,url:'https://source.example/moon-road'};
+ const identity=mangaInspectionTitle(title,source);
+ assert.ok(identity.aliases.includes('Лунная дорога'));assert.equal(identity.title,'Moon Road');assert.equal(identity.year,2020);assert.deepEqual(identity.ids,{mal:'71'});assert.deepEqual(title.aliases,['Moon Road']);
+ assert.equal(mangaInspectionTitle(title,{...source,year:1990}),title);
+ assert.equal(mangaInspectionTitle(title,{...source,ids:{mal:'99'}}),title);
+ assert.equal(mangaInspectionTitle(title,{...source,title:'Other',aliases:[]}),title);
+});
 
 test('real MangaLib franchise alias does not merge Sakura and Charasuke into Naruto',()=>{
  const original={id:'lib:195',provider:'mangalib',providerName:'MangaLib',sourceId:'1',kind:'manga',title:'Наруто',aliases:['Наруто','Naruto'],identityTitles:['Наруто','Naruto'],year:1999,url:'https://mangalib.me/ru/195--naruto'};
