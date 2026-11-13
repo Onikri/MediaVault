@@ -476,3 +476,42 @@ def filtered_page(client,source_id,term,page):
         raise SourceError('Некорректный фильтр источника.')
     change={'position':path['child'],'state':'true' if path['kind']=='CheckBox' else '1'}
     return client.get('/source/'+str(source_id)+'/quick-search',{'pageNum':page},timeout=30,body={'searchTerm':'','filter':[{'position':path['position'],'state':json.dumps(change)}]})
+
+# Extensions whose built-in domain no longer serves the catalogue. Suwayomi
+# keeps the choice in its own data volume, which a reset or reinstall loses, so
+# the server re-applies it on every start. Values are fixed here, never user input.
+DOMAIN_OVERRIDES={('Nude-Moon','ru'):'https://g.nude-moon.fun'}
+
+def apply_domain_overrides(client=None,installed=None):
+    """Set each listed extension's "overrideBaseUrl" preference; returns changes."""
+    own=client is None;client=client or Client();changed=[]
+    try:
+        for source in installed if installed is not None else client.get('/source/list',timeout=20):
+            target=DOMAIN_OVERRIDES.get((source.get('name'),source.get('lang')))
+            if not target or not re.fullmatch(r'\d{1,20}',str(source.get('id'))):continue
+            preferences=client.get('/source/'+str(source['id'])+'/preferences',timeout=20)
+            for position,item in enumerate(preferences if isinstance(preferences,list) else []):
+                props=item.get('props') if isinstance(item,dict) else None
+                if not isinstance(props,dict) or props.get('key')!='overrideBaseUrl':continue
+                if props.get('currentValue')!=target:
+                    response=client.session.post(client.root+'/api/v1/source/'+str(source['id'])+'/preferences',json={'position':position,'value':target},timeout=(3,20),allow_redirects=False)
+                    if response.status_code!=200:raise BridgeError('upstream','Каталог источников не принял домен расширения.')
+                    changed.append((source.get('name'),target))
+                break
+        return changed
+    finally:
+        if own:client.close()
+
+def keep_domain_overrides(stop,attempts=20,wait=30):
+    """Startup task: Suwayomi may start after the importer, so retry briefly."""
+    if not configured():return
+    for _ in range(attempts):
+        try:
+            changed=apply_domain_overrides()
+            if changed:
+                import logging
+                logging.getLogger(__name__).info('Suwayomi domain overrides applied: %s',changed)
+                with _lock:_cache.clear()
+            return
+        except (SourceError,requests.RequestException,ValueError):
+            if stop.wait(wait):return

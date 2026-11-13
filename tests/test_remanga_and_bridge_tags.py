@@ -170,4 +170,23 @@ class CrawlerRouteTests(unittest.TestCase):
         self.assertEqual([r['title'] for r in rows],['Отмеченная история'])
 
 
+class DomainOverrideTests(unittest.TestCase):
+    def test_moved_extension_domain_is_restored_and_others_untouched(self):
+        posts=[]
+        class Response:status_code=200
+        class Session:
+            def post(self,url,json=None,**kw):posts.append((url,json));return Response()
+        class Prefs:
+            root='http://suwayomi:4567';session=Session()
+            def __init__(self,value):self.value=value
+            def get(self,path,params=None,timeout=12):
+                return [{'type':'ListPreference','props':{'key':'other'}},{'type':'EditTextPreference','props':{'key':'overrideBaseUrl','currentValue':self.value}}]
+        installed=[{'id':'6384784374922886076','name':'Nude-Moon','lang':'ru'},{'id':'7','name':'MangaChan','lang':'ru'}]
+        self.assertEqual(suwayomi_bridge.apply_domain_overrides(Prefs('https://nude-moon.org'),installed),[('Nude-Moon','https://g.nude-moon.fun')])
+        self.assertEqual(posts,[('http://suwayomi:4567/api/v1/source/6384784374922886076/preferences',{'position':1,'value':'https://g.nude-moon.fun'})])
+        posts.clear()
+        self.assertEqual(suwayomi_bridge.apply_domain_overrides(Prefs('https://g.nude-moon.fun'),installed),[])
+        self.assertEqual(posts,[],'an already correct domain is not rewritten')
+
+
 if __name__=='__main__':unittest.main()

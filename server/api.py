@@ -265,6 +265,8 @@ async def lifespan(application):
         catalog_stop = threading.Event()
         catalog_thread = threading.Thread(target=index_catalog, args=(catalog_stop,), daemon=True, name='hentaichan-catalog')
         catalog_thread.start()
+        from suwayomi_bridge import keep_domain_overrides
+        threading.Thread(target=keep_domain_overrides,args=(catalog_stop,),daemon=True,name='suwayomi-domains').start()
         for thread in threads:thread.start()
     else:
         catalog_stop = None
