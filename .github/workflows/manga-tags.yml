@@ -74,7 +74,26 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/data/manga-tags.json
           git commit -m "chore: refresh public manga taxonomy snapshot [skip ci]"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # The branch may advance while the HTTP collection is running.
+          # Rebase on the latest head; never force-push or erase user commits.
+          pushed=false
+          for attempt in 1 2 3; do
+            git fetch origin "$GITHUB_REF_NAME"
+            if ! git rebase "origin/$GITHUB_REF_NAME"; then
+              git rebase --abort || true
+              echo "::error::Cannot safely rebase the generated taxonomy; branch changed with conflicting data."
+              exit 1
+            fi
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              pushed=true
+              break
+            fi
+            sleep 3
+          done
+          if [[ "$pushed" != "true" ]]; then
+            echo "::error::Unable to push taxonomy after safe retries."
+            exit 1
+          fi
           echo "updated=true" >> "$GITHUB_OUTPUT"
           echo "Manga tags updated on ${GITHUB_REF_NAME}." >> "$GITHUB_STEP_SUMMARY"
       - name: Rebuild public frontend with the new static file
