@@ -22,7 +22,19 @@ def base_sources(installed):
         hosts=set(alias_domains(domain));matches=[s for s in installed if urlsplit(s.get('baseUrl','')).hostname in hosts]
         if not matches:
             matches=[s for s in installed if s.get('name','').casefold()==name.casefold() or (name=='AllHentai' and s.get('name')=='AllHentai')]
-        if matches:
+        # These extensions discard collapsed catalogue tags, and some return an
+        # empty popular list even while the public catalogue is available.
+        if domain in {'hentaichan.live','manga-chan.me','yaoi-chan.me'}:
+            url,allowed=HTML[domain]
+            jobs.append({'type':'html','domain':domain,'name':name,'url':url,'hosts':sorted(allowed),
+                         **({'source':matches[0]} if matches else {})})
+        elif domain=='h-chan.me':
+            jobs.append({'type':'mirror','domain':domain,'name':name,'primary':'hentaichan.live'})
+        elif domain=='henchan.pro':
+            # This requested address currently serves a parked domain, not the
+            # HenChan extension's different .live catalogue. Audit it separately.
+            url,allowed=HTML[domain];jobs.append({'type':'html','domain':domain,'name':name,'url':url,'hosts':sorted(allowed)})
+        elif matches:
             for source in matches:
                 sid=str(source['id'])
                 if sid in seen:continue
@@ -73,6 +85,7 @@ def html_rows(raw,url):
 def fetch(spec,cursor):
     page=int(cursor.get('page',1));kind=spec['type'];details=[];vocabulary=[]
     if kind=='unsupported':return {'rows':[],'next':None,'state':'unsupported','reason':spec['reason']}
+    if kind=='mirror':return {'rows':[],'next':None,'state':'done','reason':'Зеркало '+spec['primary']}
     if kind in {'lib','lib-detail','lib-vocabulary'}:
         with httpx.Client(http2=True,timeout=15,headers=headers(spec)) as client:
             root='https://api.cdnrulib.link';hosts={'api.cdnrulib.link'}
@@ -119,10 +132,12 @@ def fetch(spec,cursor):
                 found=from_api(data);row=spec['row']
                 # Keep a label learned from the extension's own filter listing.
                 for field in ('tags','genres'):found[field]=unique([*(found.get(field) or []),*(row.get(field) or [])])
-                return {'rows':[{**row,'description':str(data.get('description') or '')[:12000],**found,'metadataInspected':True}],'next':None}
+                updated=__import__('manga_discovery').result_row(spec['source'],data)
+                return {'rows':[{**row,**(updated or {}),'description':str(data.get('description') or '')[:12000],**found,'metadataInspected':True}],'next':None}
             source=spec['source'];term=spec.get('term')
             data=filtered_page(client,source['id'],term,page) if term else client.get('/source/'+str(source['id'])+'/popular/'+str(page),timeout=25)
             if not isinstance(data.get('mangaList'),list) or not isinstance(data.get('hasNextPage'),bool):raise SourceError('Адаптер не предоставил пагинацию каталога')
+            if page==1 and not data['mangaList'] and not spec.get('term'):raise SourceError('Адаптер вернул пустую первую страницу каталога')
             rows=[];field='genres' if term and term.get('category')=='genre' else 'tags'
             for raw in data['mangaList']:
                 row=result_row(source,raw)
@@ -135,7 +150,8 @@ def fetch(spec,cursor):
     if kind in {'html','html-detail'}:
         url=cursor.get('url') or spec['url'];hosts=set(spec['hosts'])
         with requests.Session() as session:
-            session.headers['User-Agent']='MediaVault-Catalogue/1.0'
+            from content_sources import UA
+            session.headers['User-Agent']=UA
             if not permitted(session,url,hosts):raise SourceError('Источник не разрешил получение каталога')
             raw,final=checked_get(session,url,hosts)
         soup=BeautifulSoup(raw,'html.parser')
@@ -147,7 +163,8 @@ def fetch(spec,cursor):
                 metadata=catalogue_metadata(soup)
                 if metadata['sourceMetadataVersion']<2:raise SourceError('Не получен полный список тегов карточки HentaiChan.cc')
                 return {'rows':[{**spec['row'],**metadata,'metadataInspected':True}],'next':None}
-            metadata={}
+            from catalogue_html import SPECIAL,metadata as source_metadata
+            metadata=source_metadata(soup,spec['domain']) if spec['domain'] in SPECIAL else {}
             description=soup.select_one('meta[property="og:description"],meta[name="description"]')
             summary=soup.select_one('.description-summary,.summary__content,[itemprop="description"],.manga-description')
             text=summary.get_text(' ',strip=True) if summary else description.get('content','') if description else ''
@@ -158,7 +175,9 @@ def fetch(spec,cursor):
                 value=safe_url(urljoin(final,cover.get('content','')))
                 if value:metadata['cover']=value
             for node in soup.select('nav,aside,footer,.sidebar,.tagcloud,.tag-cloud,.related,.recommendations'):node.decompose()
-            return {'rows':[{**spec['row'],**metadata,**from_html(soup),'metadataInspected':True}],'next':None}
+            generic=from_html(soup)
+            for field in ('tags','genres'):generic[field]=unique([*generic[field],*(metadata.get(field) or [])])
+            return {'rows':[{**spec['row'],**metadata,**generic,'metadataInspected':True}],'next':None}
         if spec['domain']=='hentaichan.cc':
             from manga_hentaichan_cc import catalogue_page
             result=catalogue_page(raw,final,page)
@@ -166,6 +185,11 @@ def fetch(spec,cursor):
                 if spec.get('term'):row['tags']=unique([*row.get('tags',[]),spec['term']['label']])
                 details.append({**spec,'type':'html-detail','url':row['url'],'row':row})
             return {**result,'details':details}
+        from catalogue_html import SPECIAL,catalogue
+        if spec['domain'] in SPECIAL:
+            result=catalogue(raw,final,spec,page)
+            for row in result['rows']:details.append({**spec,'type':'html-detail','url':row['url'],'row':row})
+            return {**result,'details':details,'vocabulary':html_terms(raw,final,hosts)}
         rows=html_rows(raw,final)
         if not rows:raise SourceError('Не удалось прочитать карточки каталога')
         if spec.get('term'):

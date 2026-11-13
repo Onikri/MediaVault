@@ -1,5 +1,5 @@
 """Owner-triggered bounded public taxonomy/metadata refresh. No reader bytes."""
-import json,time
+import json,time,threading
 from urllib.parse import urljoin,urlsplit,urlencode
 from urllib.robotparser import RobotFileParser
 import requests,httpx
@@ -12,6 +12,7 @@ from manga_tag_deploy import atomic_write
 
 UA='MediaVault-Content/1.0 (+https://github.com/Onikri/MediaVault)'
 SELECTOR='a[rel="tag"],.tags a[href],.genres a[href],.tag-list a[href],.genre-list a[href],a[href*="/tag/"],a[href*="/tags/"],a[href*="/genre/"],a[href*="/genres/"],a[href*="/category/"],a[href*="tag="]'
+_robots={};_robots_lock=threading.Lock()
 
 def matching_terms(terms,domain,keys):
     found={}
@@ -40,11 +41,18 @@ def checked_get(session,url,hosts,headers=None):
 
 def permitted(session,url,hosts,headers=None):
     p=urlsplit(url)
+    key=(p.scheme+'://'+p.netloc,tuple(sorted(hosts)));now=time.monotonic()
+    with _robots_lock:hit=_robots.get(key)
+    if hit and hit[0]>now:return hit[1].can_fetch(UA,url) if hit[1] else hit[2]
     try:
         raw,_=checked_get(session,p.scheme+'://'+p.netloc+'/robots.txt',hosts,headers)
-        robots=RobotFileParser();robots.parse(raw.decode(errors='replace').splitlines());return robots.can_fetch(UA,url)
-    except (requests.HTTPError,httpx.HTTPStatusError) as error:return error.response.status_code==404
-    except Exception:return False
+        robots=RobotFileParser();robots.parse(raw.decode(errors='replace').splitlines());allowed=robots.can_fetch(UA,url);ttl=3600
+    except (requests.HTTPError,httpx.HTTPStatusError) as error:robots=None;allowed=error.response.status_code==404;ttl=3600 if allowed else 60
+    except Exception:robots=None;allowed=False;ttl=60
+    with _robots_lock:
+        if len(_robots)>128:_robots.clear()
+        _robots[key]=(now+ttl,robots,allowed)
+    return allowed
 
 def html_terms(raw,url,hosts):
     found={}

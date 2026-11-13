@@ -1,8 +1,8 @@
 """Fixed public taxonomy routes shared by CLI and private server indexing."""
 HTML = {
-    'hentaichan.live': ('https://x17.h-chan.me/', {'x17.h-chan.me', 'xxl.hentaichan.live'}),
-    'h-chan.me': ('https://manga.h-chan.me/', {'manga.h-chan.me'}),
-    'manga-chan.me': ('https://manga-chan.me/catalog', {'manga-chan.me', 'im.manga-chan.me'}),
+    'hentaichan.live': ('https://x17.h-chan.me/manga/newest?offset=0', {'x17.h-chan.me', 'xxl.hentaichan.live'}),
+    'h-chan.me': ('https://x17.h-chan.me/manga/newest?offset=0', {'manga.h-chan.me', 'x17.h-chan.me'}),
+    'manga-chan.me': ('https://im.manga-chan.me/catalog', {'manga-chan.me', 'im.manga-chan.me'}),
     'henchan.pro': ('https://henchan.pro/', {'henchan.pro'}),
     'hentaichan.cc': ('https://hentaichan.cc/catalog', {'hentaichan.cc'}),
     'y.hentaichan.live': ('https://y.hentaichan.live/', {'y.hentaichan.live'}),

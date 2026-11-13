@@ -1,0 +1,62 @@
+"""Neutral source metadata fixtures; no manga artwork or ML inference."""
+import json,os,sys,tempfile,threading,sqlite3,unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
+from catalogue_html import catalogue,metadata
+from catalogue_sources import base_sources,fetch
+from catalogue_indexer import Indexer
+from manga_catalog_index import initialize
+from source_parser import SourceError
+from bs4 import BeautifulSoup
+
+class CompletionTests(unittest.TestCase):
+ def spec(self):return {'type':'html','domain':'manga-chan.me','name':'MangaChan','url':'https://im.manga-chan.me/catalog','hosts':['im.manga-chan.me'],'source':{'id':'7'}}
+ def card(self):return '<div class="content_row"><h2><a class="title_link" href="/manga/1-garden.html">Garden</a></h2><div class="genre"><a href="/tags/ecology">Ecology</a><span hidden><a href="/tags/botany">Botany</a></span></div><img src="https://covers.example/garden.jpg"></div>'
+ def test_collapsed_work_tags_survive_and_offset_navigation_is_followed(self):
+  result=catalogue(self.card()+'<div id="page"><a href="?offset=20">Next</a><a href="?offset=120">Last</a></div><aside class="sidetag"><a href="/tags/foreign">Foreign</a></aside>',self.spec()['url'],self.spec(),1)
+  self.assertEqual(result['rows'][0]['tags'],['Ecology','Botany']);self.assertEqual(result['rows'][0]['provider'],'suwayomi:7')
+  self.assertEqual(result['next'],{'page':2,'url':'https://im.manga-chan.me/catalog?offset=20'})
+  self.assertEqual(result['rows'][0]['cover'],'https://covers.example/garden.jpg')
+ def test_missing_offset_and_parked_empty_pages_are_not_complete(self):
+  with self.assertRaises(SourceError):catalogue(self.card(),self.spec()['url'],self.spec(),2)
+  with self.assertRaises(SourceError):catalogue('<h1>Domain for sale</h1>',self.spec()['url'],self.spec(),1)
+  with self.assertRaises(SourceError):catalogue(self.card()+'<a href="?offset=40">Next</a>',self.spec()['url'],self.spec(),1)
+ def test_detail_scopes_full_work_tags_and_rejects_a_login_page(self):
+  raw='<div id="info_wrap"></div><div class="sidetags"><ul><li><a href="/tags/ecology">Ecology</a></li></ul></div><aside class="sidetag"><a href="/tags/foreign">Foreign</a></aside>'
+  self.assertEqual(metadata(BeautifulSoup(raw,'html.parser'),'manga-chan.me')['tags'],['Ecology'])
+  with self.assertRaises(SourceError):metadata(BeautifulSoup('<h1>Log in</h1>','html.parser'),'manga-chan.me')
+ def test_moody_new_cards_and_real_next_link(self):
+  spec={'type':'html','domain':'online.hentaimoody.com','name':'HentaiMoody','hosts':['online.hentaimoody.com']}
+  raw='<article class="manga-card"><a class="manga-card__link" href="/12-garden.html"><span class="manga-card__title">Garden</span><span class="manga-card__meta">Ecology<span>Botany</span></span></a></article><div class="pagination"><a href="/page/2/">2</a></div>'
+  d=catalogue(raw,'https://online.hentaimoody.com/',spec,1);self.assertEqual(d['rows'][0]['genres'],['Ecology','Botany']);self.assertEqual(d['next']['page'],2)
+  with self.assertRaises(SourceError):metadata(BeautifulSoup('<h1>Garden</h1><div class="system-message">Login</div>','html.parser'),spec['domain'])
+ def test_all_requested_sources_are_accounted_for_even_a_shared_extension(self):
+  jobs=base_sources([{'id':'7','name':'MangaChan','lang':'ru','baseUrl':'https://im.manga-chan.me'},{'id':'8','name':'HenChan','lang':'ru','baseUrl':'https://xxl.hentaichan.live'}])
+  from manga_source_coverage import SOURCES
+  domains={j['domain'] for j in jobs};self.assertTrue({s[0] for s in SOURCES}<=domains)
+  by={j['domain']:j for j in jobs};self.assertEqual(by['manga-chan.me']['type'],'html');self.assertEqual(by['h-chan.me']['type'],'mirror');self.assertEqual(by['henchan.pro']['type'],'html')
+ def test_empty_extension_popular_page_cannot_claim_success(self):
+  class Client:
+   def get(self,*a,**k):return {'mangaList':[],'hasNextPage':False}
+   def close(self):pass
+  with patch('suwayomi_bridge.Client',Client),self.assertRaises(SourceError):fetch({'type':'bridge','domain':'fixture.example','source':{'id':'7'}},{'page':1})
+ def test_slow_host_cannot_starve_a_different_source_and_base_pages_get_a_turn(self):
+  with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,{'DATA_DIR':d,'MEDIA_VAULT_DISABLE_WORKER':'1'}):
+   db=sqlite3.connect(':memory:',check_same_thread=False);initialize(db);db.commit();store=SimpleNamespace(db=db,lock=threading.RLock());worker=Indexer(store,clock=lambda:1000,interval=0)
+   with db:
+    for i in range(120):worker.enqueue({'type':'lib-detail','domain':'mangalib.org','site':1,'slug':str(i)},100)
+    worker.enqueue({'type':'bridge','domain':'fixture.example','name':'Fixture','source':{'id':'9'}},1)
+   worker.inflight['api.cdnrulib.link']=2;job=worker.claim();self.assertEqual(job['spec']['domain'],'fixture.example');db.close()
+ def test_robots_cache_is_path_specific_and_does_not_refetch_for_every_detail(self):
+  import content_sources
+  class Session:pass
+  content_sources._robots.clear()
+  with patch('content_sources.checked_get',return_value=(b'User-agent: *\nDisallow: /private/', 'https://fixture.example/robots.txt')) as get:
+   self.assertTrue(content_sources.permitted(Session(),'https://fixture.example/manga/1',{'fixture.example'}))
+   self.assertFalse(content_sources.permitted(Session(),'https://fixture.example/private/1',{'fixture.example'}))
+   self.assertEqual(get.call_count,1)
+  content_sources._robots.clear()
+
+if __name__=='__main__':unittest.main()
