@@ -48,3 +48,10 @@ server release procedure; the automatic deployment here is scoped to tag rules.
 
 Validation uses neutral multilingual tag fixtures across the 18 source domains;
 it makes no upstream image requests and performs no ML inference.
+
+The first live automatic update was verified on 2026-11-13: the main-branch
+workflow applied 582 rules and rebuilt 2,352 indexed titles without restarting
+the backend container. The public policy revision matched the committed JSON.
+The source-vocabulary workflow also validated its generated snapshot across all
+18 registered sources. Full Linux CI passed before publication, including the
+open-title deletion/addition browser contract (440 Node and 898 Python tests).
