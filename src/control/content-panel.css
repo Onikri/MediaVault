@@ -2,3 +2,5 @@
 @media(max-width:1000px){.content-add{grid-template-columns:minmax(0,1fr) 140px}.content-add>button{grid-column:1/-1;justify-self:start}.content-workspace{gap:16px;grid-template-columns:minmax(180px,.7fr) minmax(0,1fr)}.content-rule-editor{padding:18px}}
 @media(max-width:640px){.content-workspace,.content-add{grid-template-columns:minmax(0,1fr)}.content-rule-editor{position:static;max-height:none;grid-row:1}.content-rule-list{max-height:420px;overflow:auto}.content-tabs button{padding:10px;font-size:12px}.content-source-state{grid-template-columns:minmax(0,1fr)}.content-panel .cc-savebar{flex-wrap:wrap}.content-panel .cc-savebar .btn{white-space:normal;min-height:42px}}
 @media(prefers-reduced-motion:reduce){.content-panel *{transition:none!important}}
+
+.content-panel .content-auto{display:flex;align-items:center;gap:10px;font-size:14px}.content-panel .content-auto input{width:18px;min-height:18px;height:18px;accent-color:var(--color-blossom)}

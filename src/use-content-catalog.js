@@ -1,7 +1,8 @@
 import {useEffect,useState} from 'react';
+import {acceptContentPolicy,contentPolicyRevision} from './manga-tag-policy.js';
 const sent=new Map();
 const empty=Object.freeze([]);
-export default function useContentCatalog({service,state,kind,query,filters,rows,revision}){
+export default function useContentCatalog({service,state,kind,query,filters,rows,revision,page=1}){
  const [result,setResult]=useState({items:empty});
  const enabled=!!service?.server&&Number(service.session?.serverVersion)>=74;
  useEffect(()=>{
@@ -14,9 +15,9 @@ export default function useContentCatalog({service,state,kind,query,filters,rows
  useEffect(()=>{
   if(!enabled){setResult({items:empty});return;}
   const abort=new AbortController();let busy=false;
-  const read=async()=>{if(busy||document.hidden)return;busy=true;try{const value=await service.request('/catalog/content?'+new URLSearchParams({q:query,kind,tag:filters.tag||'',genre:filters.genre||''}),{signal:abort.signal});if(!abort.signal.aborted)setResult({items:value.items||empty,query,kind,server:service.server});}catch{}finally{busy=false;}};
+  const read=async()=>{if(busy||document.hidden)return;busy=true;try{const value=await service.request('/catalog/content?'+new URLSearchParams({q:query,kind,tag:filters.tag||'',genre:filters.genre||'',tagPolicyRevision:contentPolicyRevision(),limit:'30',offset:String((page-1)*30)}),{signal:abort.signal});if(!abort.signal.aborted){acceptContentPolicy(value);setResult({items:value.items||empty,query,kind,server:service.server,page,hasMore:Number(value.offset||0)+(value.items||[]).length<Number(value.total||0)});}}catch{}finally{busy=false;}};
   const timer=setTimeout(read,150),poll=setInterval(read,15000);addEventListener('focus',read);
   return()=>{clearTimeout(timer);clearInterval(poll);removeEventListener('focus',read);abort.abort();};
- },[enabled,kind,query,filters.tag,filters.genre,revision,service.server]);
- return result.query===query&&result.kind===kind&&result.server===service.server?result:{items:empty};
+ },[enabled,kind,query,filters.tag,filters.genre,revision,service.server,page]);
+ return result.query===query&&result.kind===kind&&result.server===service.server&&result.page===page?result:{items:empty};
 }

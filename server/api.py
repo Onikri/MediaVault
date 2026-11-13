@@ -336,7 +336,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 74, "contentManagement":True, "globalTagPolicy":True, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 75, "continuousCatalogue":True, "contentManagement":True, "globalTagPolicy":True, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -628,7 +628,7 @@ def manga_catalog_filters(language,year,age,source_ids):
 @app.get('/manga/tag-policy')
 def manga_tag_policy(revision:str=''):
     from content_management import public_policy
-    value=public_policy()
+    value=public_policy(__import__('manga_discovery').manager())
     return {'revision':value['revision'],'scope':'all',**({'unchanged':True} if revision==value['revision'] else {'policy':value['policy']})}
 
 
@@ -654,12 +654,14 @@ content_management.install(app,content_owner,viewer,lambda:__import__('manga_dis
 
 
 @app.get('/manga/catalog')
-def manga_catalog(q:str='',tag:str='',genre:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,subject=Depends(viewer)):
+def manga_catalog(q:str='',tag:str='',genre:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,tagPolicyRevision:str='',subject=Depends(viewer)):
     from manga_discovery import manager
     from manga_catalog_index import browse
     store=manager()
     with store.lock:
-        return browse(store.db,q=q,tag=tag,genre=genre,provider=provider,format=format,offset=offset,limit=limit,**manga_catalog_filters(language,year,age,sourceIds))
+        result=browse(store.db,q=q,tag=tag,genre=genre,provider=provider,format=format,offset=offset,limit=limit,**manga_catalog_filters(language,year,age,sourceIds))
+    content_management.prioritize(store,subject,tag,genre)
+    return content_management.with_policy(result,tagPolicyRevision,store)
 
 @app.get('/manga/catalog/tags')
 def manga_catalog_tags(provider:str='',sourceId:str='',sourceIds:str='',language:str='all',q:str='',limit:int=500,subject=Depends(viewer)):

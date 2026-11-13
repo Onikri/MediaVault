@@ -257,7 +257,7 @@ def build(session, old=None, *, now=None, pause=0.6):
                        'status': state, 'tagsFound': actual, 'reason': reason, 'note': note})
         if pause:
             time.sleep(pause)
-    result = [{'key': v['key'], 'category': v['category'], 'label': current().rules[v['key']]['label'],
+    result = [{'key': v['key'], 'category': v['category'], 'label': current().label(v['key'],v['key']),
                'originalLabels': sorted(v['originalLabels'], key=str.casefold),
                'sources': sorted(v['sources'])}
               for v in collected.values()]
