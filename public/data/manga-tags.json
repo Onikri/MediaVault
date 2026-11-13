@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": null,
+  "scope": "public_taxonomy_only",
+  "coverageGuaranteed": false,
+  "sources": [
+    {
+      "domain": "hentailib.me",
+      "name": "HentaiLib",
+      "integration": "native",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "hentaichan.live",
+      "name": "HentaiChan",
+      "integration": "native",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "h-chan.me",
+      "name": "H-Chan",
+      "integration": "mirror",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "manga-chan.me",
+      "name": "MangaChan",
+      "integration": "native",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "henchan.pro",
+      "name": "HenChan",
+      "integration": "extension",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "hentaichan.cc",
+      "name": "HentaiChan.cc",
+      "integration": "native",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "y.hentaichan.live",
+      "name": "Y-HentaiChan",
+      "integration": "unverified",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "yaoi-chan.me",
+      "name": "YaoiChan",
+      "integration": "extension",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "hmanga.su",
+      "name": "HManga",
+      "integration": "native",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "hentaros.com",
+      "name": "Hentaros",
+      "integration": "extension",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "online.hentaimoody.com",
+      "name": "HentaiMoody",
+      "integration": "extension",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "nude-moon.org",
+      "name": "Nude-Moon",
+      "integration": "extension",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "20.allhen.online",
+      "name": "AllHentai",
+      "integration": "extension",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "mangalib.org",
+      "name": "MangaLib",
+      "integration": "native",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "v2.shlib.life",
+      "name": "SlashLIB",
+      "integration": "native",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "remanga.org",
+      "name": "ReManga",
+      "integration": "extension",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "хентай.онлайн",
+      "name": "Хентай.онлайн",
+      "integration": "unverified",
+      "status": "pending",
+      "tagsFound": 0,
+      "reason": "not_yet_collected",
+      "note": ""
+    },
+    {
+      "domain": "newmanga.org",
+      "name": "NewManga",
+      "integration": "closed",
+      "status": "closed",
+      "tagsFound": 0,
+      "reason": "site_closed",
+      "note": ""
+    }
+  ],
+  "tags": []
+}
