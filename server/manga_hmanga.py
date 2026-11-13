@@ -204,7 +204,7 @@ def inspect(url, http):
             cover = public_url(urljoin(final, cover_tag.get('data-src') or cover_tag.get('content') or cover_tag.get('src') or ''), resolve_dns=False)
         except SourceError:
             pass
-    full_list = bool(soup.select_one('.listing-chapters_wrap,.main.version-chap,.wp-manga-chapter'))
+    full_list = bool(soup.select_one('.listing-chapters_wrap a[href],.main.version-chap a[href],.wp-manga-chapter a[href]'))
     return {'provider': 'hmanga', 'providerName': SOURCE['name'], 'title': title,
             'aliases': list(dict.fromkeys([*aliases(title), *(v for v in alternative if v)])),
             'url': final, 'kind': 'manga', 'language': 'ru', 'format': format_name,
