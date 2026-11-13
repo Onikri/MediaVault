@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ChevronDown} from 'lucide-react';
 import {useTitleNavigation,jumpTitleSection} from './title-navigation-store.js';
+import {useSectionBrand} from './section-brand-store.js';
 import {GLASS_ENTER,GLASS_HIDDEN,GLASS_VISIBLE} from './glass-motion.js';
 import './title-capsule.css';
 export function TitleSectionCapsule({sections,active,navbar=false,width,disabled=false}){
@@ -16,7 +17,24 @@ export function TitleSectionCapsule({sections,active,navbar=false,width,disabled
  return <><button ref={anchor} disabled={disabled} type="button" className={(navbar?'brand logo ':'')+'title-section-capsule'} style={{width}} title={label} aria-label="Разделы тайтла" aria-haspopup="menu" aria-expanded={open} onClick={()=>setOpen(v=>!v)}><motion.span ref={text} key={active} initial={reduce?false:{opacity:0,y:7}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-7}} transition={{duration:reduce?0:.12}}>{label}</motion.span><ChevronDown size={13} style={{transform:open?'rotate(180deg)':undefined}}/></button>{createPortal(<AnimatePresence>{open&&<motion.div ref={menu} className="title-section-menu" role="menu" aria-label="Навигация по тайтлу" style={{...box,position:'fixed'}} initial={reduce?false:GLASS_HIDDEN} animate={GLASS_VISIBLE} exit={GLASS_HIDDEN} transition={reduce?{duration:0}:GLASS_ENTER}>{sections.map(s=><button type="button" role="menuitem" key={s.id} aria-current={active===s.id?'location':undefined} onClick={()=>{jumpTitleSection(s.id);setOpen(false);anchor.current?.focus({preventScroll:true});}}>{s.label}</button>)}</motion.div>}</AnimatePresence>,document.body)}</>;
 }
 export function NavbarTitleBrand({fallback}){
- const state=useTitleNavigation(),[width,setWidth]=useState(144);
- useLayoutEffect(()=>{if(state?.merged)return;const node=document.querySelector('.header-brand-area .brand.logo');if(!node)return;const update=()=>setWidth(node.getBoundingClientRect().width);update();const observer=new ResizeObserver(update);observer.observe(node);return()=>observer.disconnect();},[!!state?.merged]);
- return state?.merged?<TitleSectionCapsule navbar sections={state.sections} active={state.active} width={width}/>:fallback;
+ const state=useTitleNavigation(),section=useSectionBrand(),[width,setWidth]=useState(144),reduce=useReducedMotion();
+ useLayoutEffect(()=>{if(state?.merged||section)return;const node=document.querySelector('.header-brand-area .brand.logo');if(!node)return;const update=()=>setWidth(node.getBoundingClientRect().width);update();const observer=new ResizeObserver(update);observer.observe(node);return()=>observer.disconnect();},[!!state?.merged,!!section]);
+ if(state?.merged)return <TitleSectionCapsule navbar sections={state.sections} active={state.active} width={width}/>;
+ // Scrolled past the library sections: the logo slides away and the current section takes its place.
+ const slide=reduce?{initial:false,animate:{opacity:1},exit:{opacity:0}}:{initial:{opacity:0,y:'70%',filter:'blur(4px)'},animate:{opacity:1,y:'0%',filter:'blur(0px)'},exit:{opacity:0,y:'-70%',filter:'blur(4px)'}};
+ return <span className="navbar-brand-morph" style={{minWidth:width}}><AnimatePresence mode="popLayout" initial={false}>
+  {section?<motion.span key={'section:'+section.active} className="navbar-brand-slot" {...slide} transition={reduce?{duration:.12}:{type:'spring',stiffness:420,damping:34}}><SectionBrandCapsule section={section} width={width}/></motion.span>
+  :<motion.span key="brand" className="navbar-brand-slot" {...slide} transition={reduce?{duration:.12}:{type:'spring',stiffness:420,damping:34}}>{fallback}</motion.span>}
+ </AnimatePresence></span>;
+}
+
+function SectionBrandCapsule({section,width}){
+ const [open,setOpen]=useState(false),[box,setBox]=useState({left:12,top:80}),anchor=useRef(null),menu=useRef(null),reduce=useReducedMotion();
+ const label=section.sections.find(([id])=>id===section.active)?.[1]||'Разделы';
+ useLayoutEffect(()=>{if(!open)return;const update=()=>{const r=anchor.current?.getBoundingClientRect();if(r)setBox({left:Math.max(12,Math.min(r.left,innerWidth-232)),top:r.bottom+10});};update();addEventListener('resize',update);addEventListener('scroll',update,{passive:true});return()=>{removeEventListener('resize',update);removeEventListener('scroll',update);};},[open]);
+ useEffect(()=>{if(!open)return;const close=e=>{if(!menu.current?.contains(e.target)&&!anchor.current?.contains(e.target))setOpen(false);};const key=e=>{if(e.key==='Escape'){e.preventDefault();setOpen(false);anchor.current?.focus();}};document.addEventListener('pointerdown',close);document.addEventListener('keydown',key);menu.current?.querySelector('[aria-current=page]')?.focus({preventScroll:true});return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',key);};},[open]);
+ return <><button ref={anchor} type="button" className="brand logo title-section-capsule section-brand-capsule" style={{width}} aria-label={'Раздел: '+label+'. Сменить раздел'} aria-haspopup="menu" aria-expanded={open} onClick={()=>setOpen(v=>!v)}><span>{label}</span><ChevronDown size={13} style={{transform:open?'rotate(180deg)':undefined}}/></button>
+  {createPortal(<AnimatePresence>{open&&<motion.div ref={menu} className="title-section-menu section-brand-menu" role="menu" aria-label="Разделы" style={{...box,position:'fixed',width:220}} initial={reduce?false:GLASS_HIDDEN} animate={GLASS_VISIBLE} exit={GLASS_HIDDEN} transition={reduce?{duration:0}:GLASS_ENTER}>
+   {section.sections.map(([id,text])=><button type="button" role="menuitem" key={id} aria-current={id===section.active?'page':undefined} onClick={()=>{setOpen(false);section.onPick(id);scrollTo({top:0,behavior:reduce?'instant':'smooth'});}}>{text}</button>)}
+  </motion.div>}</AnimatePresence>,document.body)}</>;
 }

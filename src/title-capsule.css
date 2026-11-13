@@ -22,3 +22,10 @@ html[data-blossom] .title-tabbar>button[aria-current]{color:var(--color-petal);b
 html[data-blossom] .title-tabbar>button[aria-current]>svg{opacity:1;color:var(--title-accent,var(--color-blossom))}
 html[data-blossom] .title-tab-indicator{position:absolute;inset:0;border-radius:999px;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
 @media(max-width:900px){html[data-blossom] .title-tabbar>button{padding:0 13px;font-size:12.5px;height:38px;min-height:38px}html[data-blossom] .title-tabbar>button>svg{display:none}}
+
+/* Navbar brand ↔ library section: both share one slot so the links beside it never jump. */
+.navbar-brand-morph{position:relative;display:inline-grid;align-items:center;justify-items:start;min-height:38px;overflow:visible}
+.navbar-brand-slot{display:inline-flex;align-items:center;grid-area:1/1}
+html[data-blossom] .blossom-navbar .section-brand-capsule.brand.logo{justify-content:space-between;gap:8px;padding:0 12px 0 14px;background:color-mix(in srgb,var(--color-blossom) 16%,var(--color-canvas));font:700 13px/1 var(--font-ui,system-ui)}
+html[data-blossom] .blossom-navbar .section-brand-capsule.brand.logo>span{overflow:hidden;text-overflow:ellipsis;color:var(--color-petal);-webkit-text-fill-color:var(--color-petal);background:none;font:700 13px/1 var(--font-ui,system-ui)}
+html[data-blossom] .blossom-navbar .section-brand-capsule.brand.logo>svg{color:var(--color-blossom-light)}

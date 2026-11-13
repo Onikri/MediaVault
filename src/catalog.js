@@ -197,6 +197,11 @@ export function providerUrl(provider,{query='',kind='anime',page=1,identity,year
 }
 
 const aniFields='id idMal title{romaji english native} synonyms description coverImage{large} bannerImage trailer{id site thumbnail} averageScore format status genres tags{name} isAdult episodes chapters volumes seasonYear startDate{year month day} endDate{year month day} siteUrl nextAiringEpisode{episode airingAt} airingSchedule(perPage:50,notYetAired:true){nodes{episode airingAt}}';
+// How many pages a provider can list for this request (16 titles per page), when it says so.
+export function catalogPages(provider,data){
+  const count=provider==='kitsu'?Math.ceil(Number(data?.meta?.count)/16):provider==='anilist'?Number(data?.data?.Page?.pageInfo?.lastPage):0;
+  return Number.isFinite(count)&&count>0?Math.min(count,100000):null;
+}
 export async function fetchCatalog(provider,options,fetcher=fetch){
   options.signal?.throwIfAborted();
   const url=providerUrl(provider,options),abort=new AbortController(),signal=options.signal;
@@ -204,18 +209,20 @@ export async function fetchCatalog(provider,options,fetcher=fetch){
   const timeout=setTimeout(stop,16000);
   try{
     const init={signal:abort.signal};
-    if(provider==='anilist'&&!options.server){init.method='POST';init.headers={'Content-Type':'application/json'};init.body=JSON.stringify(options.identity?{query:`query($id:Int){Media(id:$id){${aniFields}}}`,variables:{id:Number(options.identity)}}:{query:`query($search:String,$type:MediaType,$page:Int){Page(page:$page,perPage:16){media(type:$type,sort:POPULARITY_DESC${options.kind==='ranobe'?',format_in:[NOVEL]':options.kind==='manga'?',format_not_in:[NOVEL]':''}${options.query?',search:$search':''}){${aniFields}}}}`,variables:{search:options.query||null,type:['manga','ranobe'].includes(options.kind)?'MANGA':'ANIME',page:options.page||1}});}
+    if(provider==='anilist'&&!options.server){init.method='POST';init.headers={'Content-Type':'application/json'};init.body=JSON.stringify(options.identity?{query:`query($id:Int){Media(id:$id){${aniFields}}}`,variables:{id:Number(options.identity)}}:{query:`query($search:String,$type:MediaType,$page:Int){Page(page:$page,perPage:16){pageInfo{lastPage} media(type:$type,sort:POPULARITY_DESC${options.kind==='ranobe'?',format_in:[NOVEL]':options.kind==='manga'?',format_not_in:[NOVEL]':''}${options.query?',search:$search':''}){${aniFields}}}}`,variables:{search:options.query||null,type:['manga','ranobe'].includes(options.kind)?'MANGA':'ANIME',page:options.page||1}});}
     const response=await fetcher(url,init);
     if(!response.ok)throw Error(response.status===429?'Слишком частые запросы':'Каталог временно недоступен');
     const data=await response.json();if(data.errors)throw Error('Каталог не ответил на запрос');
     if(provider==='openlibrary'&&data&&typeof data==='object'){data.mvLanguage=bookLanguage();data.mvStories=!options.query&&!options.genre;}
     let items=normalizeCatalog(provider,data,options.kind);
+    const pages=catalogPages(provider,data);
     if(provider==='openlibrary'&&!options.identity&&data?.mvLanguage==='ru')items=await russianBookTitles(items,options.signal,fetcher);
     const alternate=!options.identity&&!options.spellingFallback&&['kitsu','anilist','jikan'].includes(provider)&&alternateSpelling(options.query);
     if(!items.length&&alternate){
       clearTimeout(timeout);options.signal?.throwIfAborted();
       return (await fetchCatalog(provider,{...options,query:alternate,spellingFallback:true},fetcher)).map(item=>({...item,searchSpelling:alternate}));
     }
+    if(pages)Object.defineProperty(items,'pages',{value:pages,enumerable:false});
     return items;
   }catch(error){
     signal?.throwIfAborted();

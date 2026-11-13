@@ -15,23 +15,24 @@ export function useCatalog(query,kind,year,server,page=1,composing=false,filters
     if(cached&&cached.expires>Date.now()){
       setSnapshot({key,...cached,loading:false});return;
     }
-    const states=Object.fromEntries(names.map(name=>[name,'loading'])),results={};
+    const states=Object.fromEntries(names.map(name=>[name,'loading'])),results={},pages={};
     const items=()=>rankCatalog(mergeCatalog(names.flatMap(name=>results[name]||[])),text);
-    setSnapshot({key,items:[],statuses:{...states},loading:names.length>0});
+    const total=()=>Math.max(0,...Object.values(pages))||null;
+    setSnapshot({key,items:[],statuses:{...states},pages:null,loading:names.length>0});
     const timer=setTimeout(()=>{
       Promise.allSettled(names.map(async provider=>{
         try{
           const found=await fetchCatalog(provider,{query:text,kind,year,genre:filters.genre,tag:filters.tag,server,page,signal:abort.signal});
           if(abort.signal.aborted)return;
-          results[provider]=found;states[provider]='ok';
+          results[provider]=found;states[provider]='ok';if(found.pages)pages[provider]=found.pages;
         }catch(error){
           if(abort.signal.aborted)return;
           states[provider]='unavailable';
         }
-        if(!abort.signal.aborted)setSnapshot({key,items:items(),statuses:{...states},loading:Object.values(states).includes('loading')});
+        if(!abort.signal.aborted)setSnapshot({key,items:items(),statuses:{...states},pages:total(),loading:Object.values(states).includes('loading')});
       })).then(()=>{
         if(abort.signal.aborted)return;
-        const complete={items:items(),statuses:{...states}};
+        const complete={items:items(),statuses:{...states},pages:total()};
         setSnapshot({key,...complete,loading:false});
         // Do not make temporary provider outages persist for three minutes.
         if(names.length&&names.every(name=>states[name]==='ok')){
@@ -44,6 +45,6 @@ export function useCatalog(query,kind,year,server,page=1,composing=false,filters
   },[key]);
   // Clear old choices in the same render as input/type/page changes, before
   // effects run. IME composition never dispatches intermediate search terms.
-  const current=snapshot?.key===key?snapshot:{items:emptyItems,statuses:emptyStatuses,loading:!composing};
+  const current=snapshot?.key===key?snapshot:{items:emptyItems,statuses:emptyStatuses,pages:null,loading:!composing};
   return {...current,retry};
 }

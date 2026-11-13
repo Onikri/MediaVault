@@ -56,7 +56,7 @@ export default function CatalogSearch({query,onQuery,suggestions,loading,showFil
         aria-controls={expanded?'catalogPredictions':undefined} aria-activedescendant={expanded&&activeIndex>=0?'prediction-'+activeIndex:undefined}/>
       {loading&&<span className="loading-ring" aria-label="Поиск"/>}
       {query&&<button className="icon-button" aria-label="Очистить поиск по каталогам" onClick={()=>{onQuery('');setActive(null);input.current?.focus();}}><Icon name="close" size={17}/></button>}
-      <button className={'icon-button filter-toggle'+(showFilters?' is-active':'')} onClick={()=>{setOpen(false);onToggleFilters();}} aria-label="Фильтры каталога" aria-expanded={showFilters}><Icon name="filter" size={19}/></button>
+      {onToggleFilters&&<button className={'icon-button filter-toggle'+(showFilters?' is-active':'')} onClick={()=>{setOpen(false);onToggleFilters();}} aria-label="Фильтры каталога" aria-expanded={showFilters}><Icon name="filter" size={19}/></button>}
     </div>
     {expanded&&<div id="catalogPredictions" className={'catalog-predictions'+(placement.above?' is-above':'')} style={{maxHeight:placement.height}} role="listbox" aria-label="Подсказки названий" aria-busy={loading}>
       {suggestions.map((item,index)=><button id={'prediction-'+index} key={item.id} tabIndex={-1} className={active===item.id?'prediction-active':''}

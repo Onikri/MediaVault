@@ -103,6 +103,17 @@ function YearPanel({value,onChange,years}){
  </>;
 }
 
+function SourcePanel({options,value,onChange,error,disabled}){
+ const [find,setFind]=useState(''),[adult,setAdult]=useState(false),needle=find.trim().toLocaleLowerCase();
+ const shown=options.filter(s=>(!adult||s.adult)&&String(s.name||'').toLocaleLowerCase().includes(needle));
+ const meta=s=>[s.language==='all'?'мультиязычный':String(s.language||'').toUpperCase(),s.adult?'18+':''].filter(Boolean).join(' · ');
+ if(disabled)return <p className="fdock-empty">Подключи сервер, чтобы выбрать источники.</p>;
+ return <>
+  <div className="fdock-source-tools"><Finder value={find} onChange={setFind} placeholder="Найти источник"/><button type="button" className="fdock-chip-toggle" aria-pressed={adult} onClick={()=>setAdult(v=>!v)}>18+</button></div>
+  {shown.length?<Options multiple label="Источники" options={shown.map(s=>[s.id,<>{s.name} <small className="fdock-option-meta">{meta(s)}</small></>])} selected={id=>value.includes(id)} onPick={id=>onChange(value.includes(id)?value.filter(v=>v!==id):[...value,id])}/>:<p className="fdock-empty">{error||(options.length?'Таких источников нет.':'Список источников загружается.')}</p>}
+ </>;
+}
+
 function VoicePanel({value,onChange,options,disabled}){
  const needle=value.trim().toLocaleLowerCase(),shown=options.filter(option=>option.toLocaleLowerCase().includes(needle)&&!same(option,value)).slice(0,40);
  return <>
@@ -137,7 +148,7 @@ export function SortMenu({value,options,onChange,label='Сортировка'}){
  </>;
 }
 
-export default function CatalogFilterDock({search,kind,filters,onFilter,onReset,fields=['genre','year','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceNote,language,morphId='filters'}){
+export default function CatalogFilterDock({search,kind,filters,onFilter,onReset,fields=['genre','year','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceTitle='Озвучка',voiceNote,language,sources,morphId='filters'}){
  const [panel,setPanel]=useState(null),anchors=useRef({}),sentinel=useRef(null),[stuck,setStuck]=useState(false),reduced=useReducedMotion(),[open,setOpen]=useFiltersOpen(),toggle=useRef(null),fold=useRef(null);
  const chosenTags=splitTags(filters.tag);
  useEffect(()=>{const node=sentinel.current;if(!node)return;const observer=new IntersectionObserver(([entry])=>setStuck(!entry.isIntersecting&&entry.boundingClientRect.top<0),{rootMargin:'-96px 0px 0px 0px'});observer.observe(node);return()=>observer.disconnect();},[]);
@@ -152,12 +163,13 @@ export default function CatalogFilterDock({search,kind,filters,onFilter,onReset,
   use('tag')&&{key:'tag',label:'Теги',value:chosenTags.length?chosenTags[0]+(chosenTags.length>1?' +'+(chosenTags.length-1):''):'',clear:()=>onFilter('tag','')},
   use('format')&&{key:'format',label:'Формат',value:filters.format,clear:()=>onFilter('format','')},
   use('age')&&{key:'age',label:'Возраст',value:filters.age?age:'',clear:()=>onFilter('age','')},
-  use('voice')&&(kind==='anime'||voiceExact)&&{key:'voice',label:'Озвучка',value:voice,clear:()=>onVoice('')},
+  use('voice')&&(kind==='anime'||voiceExact)&&{key:'voice',label:voiceTitle,value:voice,clear:()=>onVoice('')},
+  sources&&{key:'sources',label:'Источники',value:sources.value.length?(sources.options.find(s=>s.id===sources.value[0])?.name||sources.value[0])+(sources.value.length>1?' +'+(sources.value.length-1):''):'',clear:()=>sources.onChange([])},
   use('language')&&language&&{key:'language',label:language.label,value:language.options.find(([id])=>id===language.value)?.[1],quiet:language.value===language.options[0][0]},
  ].filter(Boolean);
  const active=items.filter(item=>item.clear&&item.value).length+Math.max(0,chosenTags.length-1);
  const current=items.find(item=>item.key===panel);
- const note=panel==='tag'?(chosenTags.length>1?'Показываем тайтлы, у которых есть все выбранные теги.':'Можно выбрать до 12 тегов. Подойдут тайтлы, где есть все сразу.'):panel==='voice'?voiceNote:panel==='genre'&&kind==='manga'?'Жанры ищутся прямо в каталогах источников.':panel==='language'?language?.note:'';
+ const note=panel==='tag'?(chosenTags.length>1?'Показываем тайтлы, у которых есть все выбранные теги.':'Можно выбрать до 12 тегов. Подойдут тайтлы, где есть все сразу.'):panel==='voice'?voiceNote:panel==='genre'&&kind==='manga'?'Жанры ищутся прямо в каталогах источников.':panel==='language'?language?.note:panel==='sources'?(sources?.value.length?'Ищем только в выбранных источниках.':'Ничего не выбрано: ищем во всех подключённых.'):'';
  const morph=reduced?{duration:0}:MORPH,fade=reduced?{}:{initial:{opacity:0},animate:{opacity:1,transition:{delay:.12,duration:.2}}};
  return <>
   <span ref={sentinel} className="fdock-sentinel" aria-hidden="true"/>
@@ -189,13 +201,14 @@ export default function CatalogFilterDock({search,kind,filters,onFilter,onReset,
   </LayoutGroup>
   </div>
   <AnimatePresence>{current&&<Panel key={current.key} anchor={anchors.current[current.key]} label={current.label} onClose={shut}
-   footer={note||current.key==='tag'?<>{note&&<p>{note}</p>}{current.key==='tag'&&<button type="button" className="fdock-done" onClick={()=>shut(true)}>Готово{chosenTags.length?' · '+chosenTags.length+' '+plural(chosenTags.length,['тег','тега','тегов']):''}</button>}</>:null}>
+   footer={note||current.key==='tag'?<>{note&&<p>{note}</p>}{current.key==='tag'&&<button type="button" className="fdock-done" onClick={()=>shut(true)}>Готово{chosenTags.length?' · '+chosenTags.length+' '+plural(chosenTags.length,['тег','тега','тегов']):''}</button>}{current.key==='sources'&&<button type="button" className="fdock-done" onClick={()=>shut(true)}>Готово{sources.value.length?' · '+sources.value.length:''}</button>}</>:null}>
    {current.key==='genre'&&<ChoicePanel label="Жанры" findLabel="Найти жанр" options={genres} value={filters.genre} onPick={value=>{onFilter('genre',same(value,filters.genre||'')?'':value);shut(true);}}/>}
    {current.key==='year'&&<YearPanel years={years} value={filters.year} onChange={value=>{onFilter('year',value);if(years)shut(true);}}/>}
    {current.key==='tag'&&<TagPanel value={filters.tag} options={tags} onChange={value=>onFilter('tag',value)}/>}
    {current.key==='format'&&<ChoicePanel label="Форматы" findLabel="Найти формат" options={formats} value={filters.format} onPick={value=>{onFilter('format',same(value,filters.format||'')?'':value);shut(true);}}/>}
    {current.key==='age'&&<Options label="Возраст" options={AGES} selected={id=>id===(filters.age||'')} onPick={id=>{onFilter('age',id);shut(true);}}/>}
-   {current.key==='voice'&&(voiceExact?<ChoicePanel label="Студии озвучки" findLabel="Найти озвучку" options={voiceOptions} value={voice} onPick={value=>{onVoice(same(value,voice||'')?'':value);shut(true);}}/>:<VoicePanel value={voice} onChange={onVoice} options={voiceOptions} disabled={voiceDisabled}/>)}
+   {current.key==='voice'&&(voiceExact?<ChoicePanel label={voiceTitle} findLabel={voiceTitle==='Перевод'?'Найти перевод':'Найти озвучку'} options={voiceOptions} value={voice} onPick={value=>{onVoice(same(value,voice||'')?'':value);shut(true);}}/>:<VoicePanel value={voice} onChange={onVoice} options={voiceOptions} disabled={voiceDisabled}/>)}
+   {current.key==='sources'&&<SourcePanel {...sources}/>}
    {current.key==='language'&&<Options label={language.label} options={language.options} selected={id=>id===language.value} onPick={id=>{language.onChange(id);shut(true);}}/>}
   </Panel>}</AnimatePresence>
  </>;

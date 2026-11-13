@@ -1,5 +1,15 @@
 import {useEffect,useRef,useState} from 'react';
 import Icon from './Icons.jsx';
+// Connected manga sources for a language; the catalogue filter row lists them in its own panel.
+export function useSourceOptions(service,language='all',onOptions){
+ const [state,setState]=useState({sources:[],error:''}),report=useRef(onOptions);report.current=onOptions;
+ useEffect(()=>{const abort=new AbortController();if(service.status!=='connected'||Number(service.session?.serverVersion)<16)return;
+  service.request('/discovery/manga/sources?'+new URLSearchParams({language,q:''}),{signal:abort.signal}).then(data=>{if(abort.signal.aborted)return;const sources=data.sources||[];setState({sources,error:''});report.current?.(sources);}).catch(e=>{if(!abort.signal.aborted)setState(old=>({...old,error:e.message}));});
+  return()=>abort.abort();
+ },[language,service.server,service.status,service.session?.serverVersion]);
+ return state;
+}
+
 export default function SourceFilter({service,language='all',value,onChange,onOptions,label='Источники'}){
  const [adultOnly,setAdultOnly]=useState(false),[query,setQuery]=useState(''),[options,setOptions]=useState([]),[error,setError]=useState(''),[open,setOpen]=useState(false),[labels,setLabels]=useState({}),root=useRef(null);
  useEffect(()=>{const abort=new AbortController();if(service.status!=='connected'||Number(service.session?.serverVersion)<16)return;

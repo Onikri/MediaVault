@@ -105,3 +105,34 @@ html[data-blossom] .fdock-count{display:inline-grid;place-items:center;min-width
 html[data-blossom] .blossom-catalog-body.is-docked{display:block;min-width:0}
 .fdock-panel.is-compact .fdock-options{flex-direction:column;align-items:stretch}
 .fdock-panel.is-compact .fdock-options>button{justify-content:space-between;height:40px;padding:0 14px}
+
+/* Pages: numbers around the current page, the first and the last, and a jump field. */
+html[data-blossom] .catalog-pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 10px;margin:34px 0 10px}
+html[data-blossom] .pager-pages{display:flex;align-items:center;gap:2px;margin:0;padding:4px;list-style:none;border-radius:999px;background:var(--color-canvas-soft)}
+html[data-blossom] .pager-pages button{position:relative;isolation:isolate;display:grid;place-items:center;min-width:40px;height:40px;min-height:0;margin:0;padding:0 10px;border:0;border-radius:999px;background:none;box-shadow:none;color:var(--color-on-muted);font:600 13.5px/1 var(--font-ui);font-variant-numeric:tabular-nums;cursor:pointer;transition:color .2s}
+html[data-blossom] .pager-pages button:hover{color:var(--color-petal)}
+html[data-blossom] .pager-pages button.is-current{color:#fff}
+html[data-blossom] .pager-pages button:focus-visible,html[data-blossom] .pager-step:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
+html[data-blossom] .pager-current{position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--color-blossom)}
+html[data-blossom] .pager-gap{min-width:22px;text-align:center;color:var(--color-quiet);font-weight:700;letter-spacing:.1em}
+html[data-blossom] .pager-step{display:inline-flex;align-items:center;gap:6px;height:48px;min-height:0;margin:0;padding:0 18px;border:0;border-radius:999px;background:var(--color-canvas-soft);box-shadow:none;color:var(--color-petal);font:600 13px/1 var(--font-ui);cursor:pointer;transition:background-color .2s,opacity .2s}
+html[data-blossom] .pager-step:hover:not(:disabled){background:var(--color-surface-raised)}
+html[data-blossom] .pager-step:disabled{opacity:.35;cursor:default}
+html[data-blossom] .pager-jump{display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 6px 0 16px;border-radius:999px;background:var(--color-canvas-soft);color:var(--color-quiet);font:600 12.5px/1 var(--font-ui);font-variant-numeric:tabular-nums}
+html[data-blossom] .pager-jump input{width:64px;height:36px;margin:0;padding:0 10px;border:0;border-radius:999px;background:var(--color-surface-raised);color:var(--color-petal);font:600 13px/1 var(--font-ui);text-align:center;-moz-appearance:textfield}
+html[data-blossom] .pager-jump input::-webkit-inner-spin-button,html[data-blossom] .pager-jump input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+html[data-blossom] .pager-jump input:focus-visible{outline:2px solid var(--color-blossom);outline-offset:1px}
+html[data-blossom] .pager-jump>span:last-child{padding-right:10px}
+@media(max-width:640px){
+ html[data-blossom] .catalog-pager{gap:8px}
+ html[data-blossom] .pager-pages{order:-1;flex-basis:100%;justify-content:center;background:none}
+ html[data-blossom] .pager-pages button{min-width:36px;height:36px;padding:0 7px}
+ html[data-blossom] .pager-step{height:42px;padding:0 14px}
+ html[data-blossom] .pager-jump{height:42px}
+}
+.fdock-source-tools{display:flex;gap:8px}
+.fdock-source-tools>.fdock-find{flex:1;min-width:0}
+.fdock-chip-toggle{flex:none;height:44px;min-height:0;margin:0;padding:0 14px;border:0;border-radius:14px;background:var(--color-canvas-soft);color:var(--color-on-muted);font:700 13px/1 var(--font-ui);cursor:pointer;transition:background-color .2s,color .2s}
+.fdock-chip-toggle[aria-pressed=true]{background:var(--color-blossom);color:#fff}
+.fdock-chip-toggle:focus-visible{outline:2px solid var(--color-blossom);outline-offset:1px}
+.fdock-option-meta{margin-left:2px;font-size:10.5px;font-weight:600;opacity:.65}

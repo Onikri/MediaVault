@@ -31,11 +31,15 @@ const expectText=(locator,text)=>locator.filter({hasText:text}).waitFor();
   await page.getByLabel('Глобальный поиск по каталогам').fill('Новый');
   await page.getByRole('button',{name:'Выбрать Новый тайтл только в источнике',exact:true}).waitFor();
   assert.ok((await page.evaluate(()=>window.searchBodies)).every(b=>!Object.hasOwn(b,'sourceIds')),'All-source request omits optional subset');
-  await page.getByLabel('Источники Все подключённые').fill('Source');
-  await page.getByRole('checkbox',{name:'Source A RU'}).check();await page.getByRole('checkbox',{name:'Source B JA'}).check();await page.getByRole('button',{name:'Готово',exact:true}).click();
+  // Narrow screens start with the filter row folded into its button.
+  await page.getByLabel('Глобальный поиск по каталогам').press('Escape');
+  const fold=page.getByRole('button',{name:/^Фильтры/});if(await fold.count())await fold.click();
+  await page.getByRole('toolbar',{name:'Фильтры каталога'}).getByRole('button',{name:/^Источники/}).click();
+  const sourcePanel=page.getByRole('dialog',{name:'Источники'});await sourcePanel.getByLabel('Найти источник').fill('Source');
+  await sourcePanel.getByRole('option',{name:/^Source A/}).click();await sourcePanel.getByRole('option',{name:/^Source B/}).click();await sourcePanel.getByRole('button',{name:/^Готово/}).click();
   await page.waitForFunction(()=>window.searchBodies.some(b=>b.sourceIds?.length===2));
   await page.getByRole('button',{name:'Выбрать Новый тайтл только в источнике',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Убрать источник Source B',exact:true}).click();
+  await page.getByRole('toolbar',{name:'Фильтры каталога'}).getByRole('button',{name:/^Источники/}).click();await page.getByRole('dialog',{name:'Источники'}).getByRole('option',{name:/^Source B/}).click();await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Выбрать Новый тайтл только в источнике',exact:true}).click();
   await page.getByRole('heading',{name:'Новый тайтл только в источнике',exact:true}).waitFor();
   await page.getByRole('button',{name:/^Читать главу/}).waitFor();assert.equal(await page.locator('.export-sheet').count(),0,'Saving is a secondary window opened from the showcase');assert.equal(await page.locator('.export-trigger').count(),1);
