@@ -28,3 +28,9 @@
 .reader-view-settings .reader-hint svg{flex:none;margin-top:3px}
 @media(max-width:520px){.reader-view-row{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;gap:8px}.reader-view-row .mv-segmented{display:flex;width:100%}}
 @media(prefers-reduced-motion:reduce){.reader-view-toggle>input,.reader-view-toggle>input::after{transition:none}}
+.reader-view-row>span{display:grid;gap:2px}
+.reader-view-row>span>small{font-size:10.5px;color:var(--color-quiet,#8f8b91)}
+.reader-panel .reader-zones-button,.reader-zones-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:40px;padding:0 14px;border:0;border-radius:12px;background:var(--color-canvas,#0c0c0f);color:var(--color-petal,#f0e8e5);font:inherit;font-size:12.5px;cursor:pointer;transition:background .18s}
+.reader-zones-button:hover{background:var(--color-surface-raised,#24242b)}
+.reader-zones-button:focus-visible{outline:2px solid var(--reader-accent,#ee3c35);outline-offset:2px}
+.reader-translation-settings>.reader-view-toggle{margin-top:18px!important}

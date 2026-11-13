@@ -1,14 +1,15 @@
-import ChapterIndex from './ChapterIndex.jsx';
 import PlaybackReveal from './PlaybackReveal.jsx';
 import UiSegmented from './UiSegmented.jsx';
-import {FilterGroup,defaultReadingLanguage} from './ReaderFilters.jsx';
+import {defaultReadingLanguage} from './ReaderFilters.jsx';
+import MangaDeskPanel,{useDeskStyle,languageCode} from './MangaDeskPanel.jsx';
+import {readReading} from './reading-progress.js';
 import {betterSource,rankSources,useSourceFavorites} from './source-ranking.js';
 import {publishTitleShare,publishTitleStats} from './title-context.js';
 import MangaExportSettings from './MangaExportSettings.jsx';
 import {defaultMangaExport,exportTranslation} from './manga-export-options.js';
 import {readLmt} from './LmtSettings.jsx';
 import {useRetainedMedia} from './RetainedMedia.jsx';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {BookOpen,Globe,Check,ArrowRight,ShieldCheck,RefreshCw} from 'lucide-react';
 import ImportReadiness,{canImport} from './ImportReadiness.jsx';
 import {selectChapters,mangaMetadata,MANGA_LANGUAGES,MANGA_FORMATS,mangaLanguageName} from './manga-import.js';
@@ -28,6 +29,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  const localAbort=useRef(null);
  const [exportSettings,setExportSettings]=useState(()=>({...defaultMangaExport,...exportTranslation(readLmt(state.user?.sub))}));
  useEffect(()=>()=>localAbort.current?.abort(),[]);
+ const deskStyle=useDeskStyle(),[readerProgress,setReaderProgress]=useState(null);
  const [online,setOnline]=useState(false),[localProgress,setLocalProgress]=useState(''),[bridgeWindow,setBridgeWindow]=useState(null),[moreSearching,setMoreSearching]=useState(false);
  const searchAbort=useRef(null);
  const [format,setFormat]=useState('all'),[language,setLanguage]=useState(()=>initialLanguage||(compact&&destination==='online'?defaultReadingLanguage():'all')),[quality,setQuality]=useState('best'),[sources,setSources]=useState([]),[providers,setProviders]=useState([]),[searching,setSearching]=useState(false),[revision,setRevision]=useState(0),[inspection,setInspection]=useState(null),[url,setUrl]=useState(''),[collection,setCollection]=useState(item?.title||''),[volume,setVolume]=useState('all'),[team,setTeam]=useState(''),[mode,setMode]=useState('all'),[one,setOne]=useState(''),[first,setFirst]=useState('0'),[last,setLast]=useState('20'),[list,setList]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState('');
@@ -121,7 +123,11 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
    ...(driveTranslate?{quality:'best',render:exportTranslation(exportSettings),dub:('Перевод MediaVault'+(team?' · '+team:'')).slice(0,120),translation:{name:'Перевод MediaVault',kind:'manga',language:'ru'}}:{}),provider:inspection.provider,entries:chosen.map(e=>({number:e.number,url:e.url,title:e.title||'Глава '+e.number,season:Number(e.season||1)}))};
   setBusy('submit');try{await service.submit(job);onSubmitted?.();}catch(cause){setError(cause.message);}finally{setBusy('');}
  }
- const readerEntries=inspection&&compact?selectChapters(inspection.episodes,{volume,team,language:inspection.language}):chosen;
+ // «All teams» keeps one version of each chapter: the most complete team's, so
+ // reading does not hop between translations mid-volume.
+ const teamSize=new Map();for(const e of inspection?.episodes||[])if(e.translator)teamSize.set(e.translator,(teamSize.get(e.translator)||0)+1);
+ const deskEpisodes=inspection&&compact?[...inspection.episodes].sort((a,b)=>(teamSize.get(a.translator)||0)-(teamSize.get(b.translator)||0)):inspection?.episodes||[];
+ const readerEntries=inspection&&compact?selectChapters(deskEpisodes,{volume,team,language:inspection.language}):chosen;
  const selectedChapter=compact?readerEntries.find(e=>e.url===one)||readerEntries[0]:readerEntries[0];
  const verifiedChapter=mode==='all'&&inspection?.verifiedChapterUrl&&selectedChapter?.url===inspection.episodes?.[0]?.url
   ?readerEntries.find(e=>e.url===inspection.verifiedChapterUrl):null;
@@ -146,43 +152,57 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
   publishTitleStats({kind:'manga',chapters,volumes:inspection.seasons?.length||null,source:inspection.url||url,sourceName:visibleSources.find(s=>s.url===url)?.providerName||inspection.providerName||'',language:inspection.language});
  },[shareKey]);
  useEffect(()=>()=>{if(compact&&destination==='online'){publishTitleShare(null);publishTitleStats(null);}},[]);
- const reader=online&&inspection&&<OnlineViewer inline={compact} onEntryChange={e=>setOne(e.url)} kind="manga" entries={readerEntries} initial={initialChapter} title={collection} service={service} userId={state.user?.sub} language={inspection.language} errorActions={chapterAlternatives} metadata={{...item,format:inspection.format||item?.format,readingMode:inspection.readingMode}} onClose={()=>setOnline(false)}/>;
+ const reader=online&&inspection&&<OnlineViewer inline={compact} onReaderProgress={compact?setReaderProgress:undefined} onEntryChange={e=>setOne(e.url)} kind="manga" entries={readerEntries} initial={initialChapter} title={collection} service={service} userId={state.user?.sub} language={inspection.language} errorActions={chapterAlternatives} metadata={{...item,format:inspection.format||item?.format,readingMode:inspection.readingMode}} onClose={()=>setOnline(false)}/>;
  const requireVerified=Number(service.session?.serverVersion)>=47,stateOf=s=>displayInfo[s.url]||{};
  const failedSource=s=>stateOf(s).state==='error'||stateOf(s).readable===false||stateOf(s).chapterCount===0;
  const shownSources=rankedSources.filter(s=>s.url===url||!failedSource(s)&&(!requireVerified||stateOf(s).readable===true||stateOf(s).inspection?.episodes?.length));
  const pendingSources=rankedSources.filter(s=>!failedSource(s)&&!shownSources.includes(s)).length;
- const chapterEntries=inspection?selectChapters(inspection.episodes,{volume:'all',team,language:inspection.language}):[];
+ const chapterEntries=inspection?selectChapters(deskEpisodes,{volume:'all',team,language:inspection.language}):[];
  const current=chapterEntries.find(e=>e.url===one)||initialChapter;
  const searchingSources=searching||globalSearch.state==='running';
- if(compact&&destination==='online')return <div className="reader-stage manga-stage" data-reading={online||undefined}>
-  <aside className="reader-stage-filters" aria-label="Фильтры чтения">
-   <FilterGroup legend="Язык глав" value={language} options={MANGA_LANGUAGES.map(([id,label])=>[id,label.replace(/ · .*$/,'')])} onChange={value=>{setLanguage(value);setSourceIds([]);}}/>
-   {inspection?.translations?.length>0&&<FilterGroup legend="Переводчик" value={team} options={[['',inspection.language==='ru'?'Все переводчики':'Оригинал'],...inspection.translations.map(v=>[v,v])]} onChange={value=>{setOnline(false);setTeam(value);}}/>}
+ // Teams of the open source, the most complete translation first.
+ const teams=inspection?[...(inspection.translations||[])].filter(Boolean).map(name=>({name,count:new Set(inspection.episodes.filter(e=>e.translator===name&&e.language===inspection.language).map(e=>(e.season||1)+':'+e.number)).size})).filter(t=>t.count>0):[];
+ const readChapters=useMemo(()=>{const done=new Set();if(!compact||destination!=='online')return done;for(const e of chapterEntries){const saved=readReading(state.user?.sub,'online','online:'+e.url);if(saved&&saved.pages>0&&saved.page>=saved.pages-1)done.add(e.url);}return done;},[chapterEntries.length+':'+(chapterEntries[0]?.url||'')+':'+(chapterEntries.at(-1)?.url||''),readerProgress?.url,readerProgress?.page===readerProgress?.total-1,state.user?.sub]);
+ function chooseTeam(value){
+  const same=inspection?selectChapters(inspection.episodes,{volume:'all',team:value,language:inspection.language}).find(e=>Number(e.number)===Number(current?.number)&&Number(e.season||1)===Number(current?.season||1)):null;
+  setTeam(value);if(same)setOne(same.url);else setOnline(false);
+ }
+ if(compact&&destination==='online'){
+  const sourceName=inspection?visibleSources.find(s=>s.url===url)?.providerName||inspection.providerName||'Источник':'';
+  const openChapterEntry=e=>{setMode('single');setOne(e.url);startReader();};
+  const searchNote=globalSearch.progress&&globalSearch.state==='running'?' · '+globalSearch.progress.completed+' из '+globalSearch.progress.total:'';
+  const sourceState=busy==='inspect'?'searching':inspection?(sourceReady?'ready':'verifying'):searchingSources||pendingSources?'searching':'empty';
+  const sourceNote=busy==='inspect'?'Загружаем главы':!inspection?(sourceState==='searching'?'Ищем главы на сайтах'+searchNote:language!=='all'?'На этом языке глав пока нет':'Источник пока не найден'):!sourceReady?'Проверяем, отдаёт ли сайт страницы':inspection.language!=='ru'&&inspection.language!=='uk'?'Оригинал · перевод включается в читалке':'';
+  const sourceMenu=<>
    <TitleSourcePicker requireVerified={requireVerified} key={item?.id||'manual'} sources={rankedSources} value={url} info={displayInfo} loading={searchingSources} favorites={favorites} expected={Number(expected)||0} onChoose={value=>{setOnline(false);inspect(value);}}/>
    {!searchingSources&&!pendingSources&&!shownSources.length&&<p className="reader-filter-note">{language!=='all'?<>На этом языке глав пока нет. <button type="button" className="text-link" onClick={()=>{setLanguage('all');setSourceIds([]);}}>Искать на всех языках</button></>:'Работающий источник для этого тайтла пока не найден.'}</p>}
-   <SourceFilter label="Только эти сайты" service={service} language={language} value={sourceIds} onChange={setSourceIds}/>
-   {globalSearch.progress&&<p className="reader-filter-note" role="status">{globalSearch.state==='running'?'Поиск источников':'Поиск завершён'}: {globalSearch.progress.completed} / {globalSearch.progress.total}{globalSearch.progress.failed?' · не ответили: '+globalSearch.progress.failed:''}. Найденные источники сохранены.</p>}
+   {globalSearch.progress&&<p className="reader-filter-note" role="status">{globalSearch.state==='running'?'Поиск источников':'Поиск завершён'}: {globalSearch.progress.completed} из {globalSearch.progress.total}{globalSearch.progress.failed?' · не ответили: '+globalSearch.progress.failed:''}</p>}
    {globalSearch.error&&<p className="inline-error" role="alert">{globalSearch.error} <button type="button" className="text-link" onClick={()=>setRevision(n=>n+1)}>Повторить поиск источников</button></p>}
+   <SourceFilter label="Только эти сайты" service={service} language={language} value={sourceIds} onChange={setSourceIds}/>
    <MangaSearchDiagnostics providers={globalSearch.providers} key={globalSearch.id}/>
-   <details className="title-source-tools"><summary>Другой источник или своя ссылка</summary><div className="form-actions"><input className="field-input" aria-label="Ссылка на мангу" type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://…"/><button type="button" className="btn btn-secondary" disabled={!url||!!busy} onClick={()=>inspect(url)}>Проверить</button></div><button type="button" className="text-link" onClick={()=>setRevision(n=>n+1)}>Обновить источники</button></details>
-  </aside>
-  <div className="reader-stage-main">
-   {error&&<div className="inline-error" role="alert"><p>{error}</p>{alternateSources.slice(0,3).map(source=><button key={source.url} type="button" className="btn btn-secondary" onClick={()=>inspect(source.url)}>{source.providerName}</button>)}</div>}
-   <PlaybackReveal active={online}>{reader||<div className="watch-idle mv-player mvx mvx-idle reader-idle" style={item?.cover?{'--watch-poster':`url("${String(item.cover).replace(/["\\]/g,'')}")`}:undefined}>
-    <div className="mvx-idle-poster" aria-hidden="true"/>
-    <div className="mvx-overview mvx-idle-overview">
-     <strong className="reader-idle-title">{collection||item?.title}</strong>
-     <p className="mvx-meta" role="status">{busy==='inspect'?<><span className="mvx-spinner"/><span>Загружаем главы</span></>
-      :inspection?<>{current&&<span>Глава {current.number}</span>}<span>{visibleSources.find(s=>s.url===url)?.providerName||inspection.providerName||'Источник'}</span><span>{mangaLanguageName(inspection.language)}{inspection.language!=='ru'?' · перевод в читалке':''}</span></>
-      :searchingSources||pendingSources?<><span className="mvx-spinner"/><span>Ищем главы на сайтах</span></>
-      :<span>Выбери источник слева</span>}</p>
-     {inspection&&<button type="button" className="mvx-primary" disabled={!sourceReady||!chapterEntries.length} onClick={()=>{setMode('single');setOne(current?.url||chapterEntries[0]?.url);startReader();}}><BookOpen size={16}/>{!sourceReady?'Проверяем страницы…':'Читать сейчас'}</button>}
-    </div>
-   </div>}</PlaybackReveal>
-   {inspection&&<ChapterChooser active={sourceReady&&!online} cards entries={chapterEntries} value={one} onChoose={e=>{setMode('single');setOne(e.url);startReader();}} service={service} userId={state.user?.sub}/>}
-  </div>
-  <ChapterIndex entries={chapterEntries} current={one} loading={busy==='inspect'} onOpen={e=>{setMode('single');setOne(e.url);startReader();}}/>
- </div>;
+   <details className="title-source-tools"><summary>Своя ссылка на мангу</summary><div className="form-actions"><input className="field-input" aria-label="Ссылка на мангу" type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://…"/><button type="button" className="btn btn-secondary" disabled={!url||!!busy} onClick={()=>inspect(url)}>Проверить</button></div><button type="button" className="text-link" onClick={()=>setRevision(n=>n+1)}>Обновить источники</button></details>
+  </>;
+  return <div className="manga-desk" data-reading={online||undefined} style={deskStyle}>
+   <div className="manga-desk-reader">
+    {error&&<div className="inline-error" role="alert"><p>{error}</p>{alternateSources.slice(0,3).map(source=><button key={source.url} type="button" className="btn btn-secondary" onClick={()=>inspect(source.url)}>{source.providerName}</button>)}</div>}
+    <PlaybackReveal active={online}>{reader||<div className="watch-idle mv-player mvx mvx-idle reader-idle" style={item?.cover?{'--watch-poster':`url("${String(item.cover).replace(/["\\]/g,'')}")`}:undefined}>
+     <div className="mvx-idle-poster" aria-hidden="true"/>
+     <div className="mvx-overview mvx-idle-overview">
+      <strong className="reader-idle-title">{collection||item?.title}</strong>
+      <p className="mvx-meta" role="status">{busy==='inspect'?<><span className="mvx-spinner"/><span>Загружаем главы</span></>
+       :inspection?<>{current&&<span>Глава {current.number}</span>}<span>{sourceName}</span><span>{languageCode(inspection.language)}{!['ru','uk'].includes(inspection.language)?' · перевод в читалке':''}</span></>
+       :searchingSources||pendingSources?<><span className="mvx-spinner"/><span>Ищем главы на сайтах</span></>
+       :<span>Источник пока не найден</span>}</p>
+      {inspection&&<button type="button" className="mvx-primary" disabled={!sourceReady||!chapterEntries.length} onClick={()=>openChapterEntry(current||chapterEntries[0])}><BookOpen size={16}/>{!sourceReady?'Проверяем страницы…':readerProgress?.url===current?.url&&readerProgress?.page>0?'Продолжить главу '+current.number:'Читать главу '+(current?.number??'')}</button>}
+     </div>
+    </div>}</PlaybackReveal>
+   </div>
+   <MangaDeskPanel source={sourceName} sourceLanguage={inspection?.language} sourceChapters={inspection?new Set(inspection.episodes.map(e=>(e.season||1)+':'+e.number)).size:undefined} sourceState={sourceState} sourceNote={sourceNote} sourceMenu={sourceMenu}
+    language={language} onLanguage={value=>{setLanguage(value);setSourceIds([]);}}
+    teams={teams} team={team} onTeam={chooseTeam} allTeamsLabel={['ru','uk'].includes(inspection?.language)?'Все команды':'Все версии'}
+    entries={chapterEntries} current={current?.url} onOpen={openChapterEntry} progress={readerProgress} read={readChapters} service={service} userId={state.user?.sub} loading={busy==='inspect'||!inspection&&(searchingSources||!!pendingSources)} reading={online}/>
+  </div>;
+ }
  const translateChoice=[['original','Оригинал'],['translate','С переводом']];
  return <>{!sheet&&reader}<form className={(sheet?"export-form ":"")+"import-selection import-compact manga-import export-workspace destination-"+destination} onSubmit={submit}>
   <div className="section-heading"><div><span className="eyebrow">ОТ СТРАНИЦЫ К ИСТОРИИ</span><h3>Манга · Манхва · Вебтуны</h3></div><span className="manga-language">{language==='all'?(rawAware?'RU · EN · JA · KO':'RU · EN'):language.toUpperCase()}</span></div>

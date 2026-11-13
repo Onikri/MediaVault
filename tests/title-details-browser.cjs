@@ -29,9 +29,9 @@ const root=path.resolve(__dirname,'..'),dir=path.join(root,'.codex-local/test-ou
   assert.match(await passport.locator('.passport-note').first().innerText(),/Переведено 2 из 120 · MangaLib/);
   assert.ok(await p.evaluate(()=>window.requests.some(b=>b.title.aliases.includes('Ёцуба и!'))));
   assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await p.evaluate(()=>document.fonts.ready);await p.screenshot({path:path.join(dir,'title-'+width+'.png'),fullPage:true});
-  await p.goto(url+'?late');await p.waitForFunction(()=>window.requests.length>0&&window.inspections.length>0);await p.waitForFunction(()=>document.querySelector('.title-source-picker')?.textContent.includes('Источник относится к другому произведению.'));assert.equal(await p.locator('.title-source-option').count(),0);
-  await p.getByRole('button',{name:'Обновить названия'}).click();await p.locator('.title-source-option').filter({hasText:'MangaLib'}).waitFor();await p.getByRole('button',{name:'Читать сейчас',exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Читать сейчас',exact:true}).isEnabled(),true);
-  assert.equal(await p.locator('.chapter-index li').count(),2);
+  await p.goto(url+'?late');await p.waitForFunction(()=>window.requests.length>0&&window.inspections.length>0);await p.locator('.desk-source-plaque').click();await p.waitForFunction(()=>document.querySelector('.title-source-picker')?.textContent.includes('Источник относится к другому произведению.'));assert.equal(await p.locator('.title-source-option').count(),0);
+  await p.getByRole('button',{name:'Обновить названия'}).click();await p.locator('.title-source-option').filter({hasText:'MangaLib'}).waitFor();await p.getByRole('button',{name:/^Читать главу/}).waitFor();assert.equal(await p.getByRole('button',{name:/^Читать главу/}).isEnabled(),true);
+  assert.equal(await p.locator('.desk-chapters li').count(),2);
   assert.ok(await p.evaluate(()=>window.inspections.at(-1).title.aliases.includes('Ёцуба и!')));assert.deepEqual(errors,[]);await p.close();console.log('PASS catalogue aliases/counts, verified chapter feedback, late Russian source discovery '+width+'px');
  }
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

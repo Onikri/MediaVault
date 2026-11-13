@@ -16,5 +16,6 @@
 @media(max-width:600px){.online-viewer-inline>header{padding:10px}.online-viewer-inline .reader-top .mv-viewer-title{max-width:100px}.online-viewer-inline .reader-top{width:calc(100% - 18px)}}
 
 .online-viewer-inline .reader-embedded{container-type:size}
-.online-viewer-inline .reader-embedded .reader-fit-page .reader-image-stack>img:not(.reader-translated-overlay){max-height:100cqh!important;max-width:100%!important}
+/* A page fits the reader's height; a webtoon strip (data-shape=strip) and the continuous mode keep their width. */
+.online-viewer-inline .reader-embedded .reader-fit-page:not(.reader-mode-scroll) .reader-page:not([data-shape=strip]) .reader-image-stack>img:not(.reader-translated-overlay){max-height:100cqh!important;max-width:100%!important}
 @media(max-width:900px){.online-viewer.online-viewer-inline{scroll-margin-top:150px}}
