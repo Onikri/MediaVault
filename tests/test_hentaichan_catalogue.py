@@ -17,6 +17,13 @@ def listing(page,total=51):
     return '<a href="/manga/garden-'+str(page)+'"><img alt="Garden" src="https://cdn.hentaichan.cc/cover.jpg"><p>Garden '+str(page)+'</p><span>123</span></a>'+script+(f'<a aria-label="Go to next page" href="/catalog?page={page+1}">Next</a>' if page*25<total else '')
 
 class ParserTests(unittest.TestCase):
+ def test_long_source_slugs_remain_available_in_catalogue_and_search(self):
+  import manga_hentaichan_cc as cc
+  slug='garden-'+'a'*250
+  row=catalogue_page(listing(1).replace('/manga/garden-1','/manga/'+slug),'https://hentaichan.cc/catalog',1)['rows'][0]
+  self.assertEqual(row['url'],cc.ROOT+'/manga/'+slug);self.assertIsNotNone(cc.PATH.fullmatch('/read/'+slug))
+  http=SimpleNamespace(document=lambda url,**kw:('1:'+json.dumps({'data':[{'name':'Garden','slug':slug}]}),url,{}))
+  self.assertEqual(cc.search('Garden',http)[0]['url'],row['url'])
  def test_catalogue_walks_actual_links_and_declared_last_page(self):
   r=catalogue_page(listing(1),'https://hentaichan.cc/catalog',1)
   self.assertEqual(r['total'],51);self.assertEqual(r['next'],{'page':2,'url':'https://hentaichan.cc/catalog?page=2'})
