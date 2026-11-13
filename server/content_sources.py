@@ -82,11 +82,23 @@ def html_titles(raw,url,label,category):
     field='genres' if category=='genre' else 'tags'
     return [{**row,field:list(dict.fromkeys([*(row.get(field) or []),label]))} for row in rows[:50]]
 
+def summary_text(value,depth=0,budget=None):
+    if budget is None:budget=[3000]
+    if depth>12 or budget[0]<=0:return ''
+    budget[0]-=1
+    if isinstance(value,str):return BeautifulSoup(value[:50000],'html.parser').get_text(' ',strip=True)[:12000]
+    if isinstance(value,list):return ' '.join(summary_text(v,depth+1,budget) for v in value[:1000])[:12000]
+    if isinstance(value,dict):
+        if isinstance(value.get('text'),str):return value['text'][:12000]
+        return summary_text(value.get('content'),depth+1,budget)
+    return ''
+
+
 def lib_metadata(row):
     cover=row.get('cover') or {}
     summary=row.get('summary') or row.get('description') or ''
     return {'cover':cover.get('default','') if isinstance(cover,dict) else '',
-            'description':BeautifulSoup(summary,'html.parser').get_text(' ',strip=True)[:12000] if isinstance(summary,str) else '',
+            'description':summary_text(summary),
             'aliases':list(dict.fromkeys(v for v in [row.get('rus_name'),row.get('eng_name'),row.get('name'),*(row.get('otherNames') or [])] if isinstance(v,str) and v.strip()))[:60],
             'status':(row.get('status') or {}).get('label','') if isinstance(row.get('status'),dict) else ''}
 
