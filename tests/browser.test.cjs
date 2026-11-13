@@ -320,7 +320,7 @@ async function main() {
   assert.equal(await owner.locator('.media-card').count(),1,'Favorites show only bookmarked material');
   assert.ok((await owner.locator('.media-card').innerText()).includes('private-note.txt'));
   await owner.getByRole('button',{name:'Раздел Всё',exact:true}).click();
-  await owner.getByRole('combobox',{name:'Порядок материалов'}).selectOption('name');
+  await owner.getByRole('button',{name:/^Сортировка/}).click();await owner.getByRole('dialog',{name:'Сортировка'}).getByRole('option',{name:'По названию, А–Я',exact:true}).click();
   assert.deepEqual(await owner.locator('.media-name').allTextContents(),['private-image.png','private-note.txt','private-video.mp4'],'Name sort orders the library');
   await navigateApp(owner,'История');
   assert.equal(await owner.locator('.history-card').count(),3,'History records the three opened files');

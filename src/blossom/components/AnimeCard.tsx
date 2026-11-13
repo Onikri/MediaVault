@@ -1,5 +1,5 @@
 import {CardRating} from './CardRating';
-import {useEffect,useId,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useId,useRef,useState,type ReactNode,type PointerEvent as ReactPointerEvent} from 'react';
 import {Bookmark,Tv,BookOpen,BookText,Music2,Film,Image as Photo} from 'lucide-react';
 import type {Anime} from '../types/anime';
 import {buildTrailerUrl,extractYouTubeId} from '../utils/trailer';
@@ -9,14 +9,17 @@ import {useAnimeSupplement} from '../useAnimeSupplement';
 import {AnimeHoverPreview} from './AnimeHoverPreview';
 import {translate} from '../../title-metadata.js';
 import {localLabel} from '../../taxonomy.js';
+import './card-depth.css';
 
 // AniView archive adapter: data, navigation and favorites belong to MediaVault.
 export interface AnimeCardProps {
  anime:Anime;compact?:boolean;index?:number;onOpen?:()=>void;href?:string;
  onFavorite?:()=>void;favorite?:boolean;artwork?:ReactNode;detail?:ReactNode;extra?:ReactNode;
  className?:string;openLabel?:string;category?:string;titleName?:string;
+ /** Tilt toward the pointer with a parallax cover and soft light (mouse only). */
+ depth?:boolean;
 }
-export function AnimeCard({anime,compact=false,index=0,onOpen,href,onFavorite,favorite=false,artwork,detail,extra,className='',openLabel,category,titleName}:AnimeCardProps){
+export function AnimeCard({anime,compact=false,index=0,onOpen,href,onFavorite,favorite=false,artwork,detail,extra,className='',openLabel,category,titleName,depth=false}:AnimeCardProps){
  const [hovered,setHovered]=useState(false),[mounted,setMounted]=useState(false),[anchor,setAnchor]=useState<DOMRect|null>(null);
  const timer=useRef<ReturnType<typeof setTimeout>|null>(null),root=useRef<HTMLElement>(null);
  const tooltipId=useId();const [nearby,setNearby]=useState(false);
@@ -27,8 +30,17 @@ export function AnimeCard({anime,compact=false,index=0,onOpen,href,onFavorite,fa
  const trailer=buildTrailerUrl(id,{autoplay:true,mute:true,loop:true,controls:false});
  const image=[original,supplement.cover].find(url=>url&&!failedImages.includes(url));
  function enter(){if(timer.current)clearTimeout(timer.current);setAnchor(root.current?.getBoundingClientRect()||null);timer.current=setTimeout(()=>{setHovered(true);if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&!navigator.connection?.saveData)setMounted(true);},300);}
- function leave(){if(timer.current)clearTimeout(timer.current);setHovered(false);setMounted(false);}
- useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current);},[]);
+ const tiltFrame=useRef(0);
+ function tilt(event:ReactPointerEvent<HTMLElement>){
+  if(!depth||event.pointerType!=='mouse')return;
+  const node=root.current;if(!node)return;
+  const rect=node.getBoundingClientRect(),x=Math.min(1,Math.max(0,(event.clientX-rect.left)/rect.width)),y=Math.min(1,Math.max(0,(event.clientY-rect.top)/rect.height));
+  cancelAnimationFrame(tiltFrame.current);
+  tiltFrame.current=requestAnimationFrame(()=>{const set=(name:string,value:string)=>node.style.setProperty(name,value);set('--tilt-x',((.5-y)*8).toFixed(2)+'deg');set('--tilt-y',((x-.5)*10).toFixed(2)+'deg');set('--shift-x',((.5-x)*12).toFixed(1)+'px');set('--shift-y',((.5-y)*12).toFixed(1)+'px');set('--light-x',(x*100).toFixed(1)+'%');set('--light-y',(y*100).toFixed(1)+'%');node.dataset.tilting='';});
+ }
+ function untilt(){cancelAnimationFrame(tiltFrame.current);const node=root.current;if(!node)return;delete node.dataset.tilting;for(const name of ['--tilt-x','--tilt-y','--shift-x','--shift-y'])node.style.removeProperty(name);}
+ function leave(){if(timer.current)clearTimeout(timer.current);setHovered(false);setMounted(false);untilt();}
+ useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current);cancelAnimationFrame(tiltFrame.current);},[]);
  useEffect(()=>{if(!hovered)return;let frame=0;const refresh=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;const rect=root.current?.getBoundingClientRect();if(rect&&rect.bottom>0&&rect.top<innerHeight)setAnchor(rect);else leave();});};addEventListener('scroll',refresh,true);addEventListener('resize',refresh);return()=>{cancelAnimationFrame(frame);removeEventListener('scroll',refresh,true);removeEventListener('resize',refresh);};},[hovered]);
  const [KindIcon,kindLabel]=({anime:[Tv,'Аниме'],manga:[BookOpen,'Манга'],ranobe:[BookText,'Ранобэ'],book:[BookOpen,'Книга'],music:[Music2,'Музыка'],audio:[Music2,'Музыка'],video:[Film,'Видео'],movie:[Film,'Фильм'],tv:[Tv,'Сериал'],image:[Photo,'Фото'],photo:[Photo,'Фото']} as any)[category]||[Film,'Видео'];
  const contents=<><div className="anime-cover" aria-hidden="true">{artwork??(image?<img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailedImages(values=>[...values,image])}/>:<Artwork kind={category||'video'}/>)}</div>
@@ -36,7 +48,7 @@ export function AnimeCard({anime,compact=false,index=0,onOpen,href,onFavorite,fa
   <CardRating score={anime.score}/><div className="card-cover-shade"/>
   {category&&<span className="media-kind-badge" title={kindLabel} aria-label={kindLabel}><KindIcon size={12}/><span className="media-kind-label">{kindLabel}</span></span>}
   <div className="card-caption"><h3 className="media-name" translate="no">{anime.title}</h3><div className="card-caption-details"><span className="media-meta">{detail??subtitle(anime)}</span></div>{extra}</div></>;
- return <article ref={root} className={'anime-card-shell media-card '+(compact?'anime-card-compact ':'')+className} data-category={category} data-title-name={titleName} style={{animationDelay:Math.min(index,12)*32+'ms'}} onMouseEnter={enter} onMouseLeave={leave} onFocus={enter} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))leave();}}>
+ return <article ref={root} className={'anime-card-shell media-card '+(compact?'anime-card-compact ':'')+className} data-category={category} data-title-name={titleName} data-depth={depth?'':undefined} style={{animationDelay:Math.min(index,12)*32+'ms'}} onPointerMove={depth?tilt:undefined} onMouseEnter={enter} onMouseLeave={leave} onFocus={enter} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))leave();}}>
   {href&&!onOpen?<a href={href} className="anime-card media-open" aria-describedby={hovered?tooltipId:undefined} aria-label={openLabel||'Открыть '+anime.title}>{contents}</a>:<button type="button" className="anime-card media-open" onClick={onOpen} aria-describedby={hovered?tooltipId:undefined} aria-label={openLabel||'Открыть '+anime.title}>{contents}</button>}
   {onFavorite&&<button type="button" className={'heart-action bookmark-button '+(favorite?'is-saved':'')} aria-label={favorite?'Убрать из избранного':'В избранное'} aria-pressed={favorite} onClick={onFavorite}><Bookmark size={16} fill={favorite?'currentColor':'none'}/></button>}
   <AnimeHoverPreview id={tooltipId} anime={preview} anchor={anchor} open={hovered} busy={supplement.busy}/>

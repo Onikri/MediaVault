@@ -1,0 +1,25 @@
+/* Card depth: the poster leans toward the pointer, its art drifts the other way
+   and a soft light follows the cursor. Mouse only; reduced motion turns it off. */
+@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+ html[data-blossom] .anime-card-shell[data-depth]{perspective:1100px}
+ html[data-blossom] .anime-card-shell[data-depth]>.anime-card,
+ html[data-blossom] .anime-card-shell[data-depth]>.bookmark-button{transform:rotateX(var(--tilt-x,0deg)) rotateY(var(--tilt-y,0deg));transition:transform .7s var(--ease-expressive),box-shadow .45s var(--ease-expressive)}
+ html[data-blossom] .anime-card-shell[data-depth]>.bookmark-button{transform-origin:calc(50cqw - 9px) calc(66.6cqw - 9px)}
+ html[data-blossom] .anime-card-shell[data-depth][data-tilting]>.anime-card,
+ html[data-blossom] .anime-card-shell[data-depth][data-tilting]>.bookmark-button{transition:transform .14s linear,box-shadow .45s var(--ease-expressive)}
+ html[data-blossom] .anime-card-shell[data-depth]:hover>.anime-card{box-shadow:0 30px 50px -26px rgb(0 0 0 / .95),0 22px 46px -30px color-mix(in srgb,var(--color-blossom) 70%,transparent)}
+ html[data-blossom] .anime-card-shell[data-depth]>.anime-card .anime-cover{transition:transform .7s var(--ease-expressive),opacity .3s}
+ html[data-blossom] .anime-card-shell[data-depth]:not(:has(.anime-card-video)):hover>.anime-card .anime-cover{transform:translate3d(var(--shift-x,0px),var(--shift-y,0px),0) scale(1.1)}
+ html[data-blossom] .anime-card-shell[data-depth][data-tilting]>.anime-card .anime-cover{transition:transform .14s linear,opacity .3s}
+ html[data-blossom] .anime-card-shell[data-depth]>.anime-card::after{content:"";position:absolute;inset:0;z-index:4;border-radius:inherit;pointer-events:none;background:radial-gradient(circle at var(--light-x,50%) var(--light-y,0%),rgb(255 240 236 / .2),rgb(255 240 236 / .05) 30%,transparent 60%);opacity:0;transition:opacity .45s var(--ease-expressive)}
+ html[data-blossom] .anime-card-shell[data-depth]:hover>.anime-card::after{opacity:1}
+ html[data-blossom] .anime-card-shell[data-depth]>.anime-card .card-caption{transition:transform .7s var(--ease-expressive)}
+ html[data-blossom] .anime-card-shell[data-depth]:hover>.anime-card .card-caption{transform:translate3d(calc(var(--shift-x,0px) * -.35),-3px,0)}
+}
+/* Scroll parallax: covers drift slowly against the page as the grid scrolls. */
+@supports (animation-timeline:view()){
+ @media (prefers-reduced-motion:no-preference){
+  html[data-blossom] .catalog-grid:not(.catalog-layout-list) .anime-card-shell[data-depth] .anime-cover img,html[data-blossom] .media-grid.library-layout-grid .anime-card-shell[data-depth] .anime-cover img{animation:card-cover-drift linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
+ }
+}
+@keyframes card-cover-drift{from{transform:translate3d(0,-4.5%,0) scale(1.1)}to{transform:translate3d(0,4.5%,0) scale(1.1)}}
