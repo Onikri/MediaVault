@@ -41,8 +41,8 @@ export default function TitlePassport({kind,profile:p,stats,ratings,extraScores=
   </li>)}</ul>}
   {ratings?.loading&&!scores.length&&<p className="passport-note" role="status">Сверяем оценки платформ…</p>}
   {rows.length>0&&<dl className="passport-facts">{rows.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{factValue(label,value)}</dd></div>)}</dl>}
-  {onRate&&<div className="passport-rate"><p>{ownRating?<>Твоя оценка <b>{ownRating}</b></>:'Твоя оценка'}</p>
-   <div role="radiogroup" aria-label="Оценить произведение">{Array.from({length:10},(_,i)=><button type="button" role="radio" key={i} aria-label={'Оценка '+(i+1)} aria-checked={ownRating===i+1} data-filled={ownRating>i||undefined} disabled={rateDisabled} onClick={()=>onRate(i+1)}/>)}</div>
+  {onRate&&<div className="passport-rate"><p>Твоя оценка{ownRating?<> <b>{ownRating} из 10</b></>:null}</p>
+   <div role="group" aria-label="Оценить произведение">{Array.from({length:10},(_,i)=><button type="button" key={i} aria-label={'Оценка '+(i+1)} aria-pressed={ownRating===i+1} data-filled={ownRating>i||undefined} disabled={rateDisabled} onClick={()=>onRate(i+1)}/>)}</div>
    {rateNote&&<small>{rateNote}</small>}</div>}
  </section>;
 }
