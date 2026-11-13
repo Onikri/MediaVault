@@ -619,6 +619,57 @@ def manga_catalog_stats(subject=Depends(owner)):
     with store.lock:
         return stats(store.db)
 
+class MangaCatalogBackfill(StrictBody):
+    offset:int=Field(default=0,ge=0,le=50000)
+    limit:int=Field(default=250,ge=1,le=500)
+
+@app.post('/manga/catalog/backfill')
+def manga_catalog_backfill(body:MangaCatalogBackfill,subject=Depends(owner)):
+    from manga_discovery import manager
+    from manga_catalog_index import backfill
+    store=manager()
+    with store.lock,store.db:
+        return backfill(store.db,offset=body.offset,limit=body.limit)
+
+class MangaCatalogEnrich(StrictBody):
+    ids:list[str]=Field(default_factory=list,max_length=3)
+
+@app.post('/manga/catalog/enrich')
+def manga_catalog_enrich(body:MangaCatalogEnrich,subject=Depends(owner)):
+    # Explicit bounded metadata check; no image bytes, bulk crawler or new
+    # playback endpoint. A failure never changes the existing reader.
+    from manga_discovery import manager
+    from manga_catalog_index import title,missing_tags,upsert
+    from manga_sources import site_for
+    from manga_inspection import inspect
+    store=manager()
+    with store.lock:
+        if body.ids:
+            if any(not re.fullmatch(r'[a-f0-9]{32}',key) for key in body.ids):
+                raise HTTPException(422,'Выбери известные записи каталога.')
+            targets=[(key,(title(store.db,key) or {}).get('sourceUrl','')) for key in body.ids]
+        else:
+            targets=missing_tags(store.db,limit=2)
+    result=[]
+    for key,url in targets:
+        if not url or not site_for(url) or site_for(url).family=='suwayomi':
+            result.append({'id':key,'status':'unsupported'})
+            continue
+        try:
+            detail=inspect(url)
+            with store.lock,store.db:
+                count=upsert(store.db,[detail])
+            result.append({'id':key,'status':'indexed' if count else 'skipped',
+                           'tags':len(detail.get('tags') or []),
+                           'genres':len(detail.get('genres') or [])})
+        except SourceError as error:
+            result.append({'id':key,'status':'unavailable','reason':str(error)[:240]})
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('Manga catalogue enrichment failed')
+            result.append({'id':key,'status':'failed'})
+    return {'items':result}
+
 @app.get('/manga/catalog/{catalog_id}')
 def manga_catalog_title(catalog_id:str,subject=Depends(owner)):
     from manga_discovery import manager
