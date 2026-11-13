@@ -45,7 +45,8 @@ html[data-blossom] .online-access.is-slim .btn{flex:none;width:auto;height:34px;
 html[data-blossom] .online-library .blossom-catalog-content>.section-heading{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:4px 0 18px}
 html[data-blossom] .online-library .blossom-catalog-content>.section-heading .section-title{font-size:clamp(22px,2vw,28px);letter-spacing:-.035em}
 html[data-blossom] .online-library .section-heading>.catalog-provider-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:0 0 0 4px;padding:0;font-size:11px}
-html[data-blossom] .online-library .section-heading>.catalog-views{margin-left:auto}
+html[data-blossom] .online-library .section-heading>.heading-tools,html[data-blossom] .title-browser-toolbar>.heading-tools{display:flex;align-items:center;gap:8px;margin-left:auto}
+html[data-blossom] .heading-tools>.catalog-views{margin:0}
 html[data-blossom] .app-shell[data-view=library]>.app-main>.page-title-row{margin-top:-28px}
 @media(max-width:1180px){
  html[data-blossom] .library-rail{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
@@ -63,3 +64,41 @@ html[data-blossom] .app-shell[data-view=library]>.app-main>.page-title-row{margi
 }
 html[data-blossom] .online-library .catalog-empty{border:0;border-radius:20px;background:var(--color-surface);padding:44px 20px}
 html[data-blossom] .online-library .catalog-empty>svg{color:var(--color-blossom-light)}
+
+/* Collection: the same head as the library; sections in a rail with counts, filters in the sticky row. */
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.page-title-row{margin:-28px 0 18px}
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.page-title-row .eyebrow{display:none}
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.page-title-row>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.page-title-row .page-title{font-size:clamp(28px,2.6vw,36px);line-height:1.1;letter-spacing:-.04em}
+html[data-blossom] .app-shell[data-view=collection]>.app-main>.page-title-row .page-subtitle{margin:0;font-size:12.5px;color:var(--color-quiet)}
+html[data-blossom] .app-shell[data-view=collection] .admin-bar{margin:0 0 12px;padding:6px}
+html[data-blossom] .collection-workspace.is-railed{display:block;margin-top:0}
+html[data-blossom] .collection-workspace .library-workspace-main{min-width:0}
+html[data-blossom] .collection-rail>button>small{margin-left:2px;font-size:11px;font-weight:600;color:var(--color-quiet);font-variant-numeric:tabular-nums}
+html[data-blossom] .collection-rail>button.is-active>small{color:var(--color-on-muted)}
+html[data-blossom] .collection-workspace .title-browser-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 18px}
+html[data-blossom] .collection-workspace .title-browser-toolbar>.library-count{opacity:1;font-size:11.5px;color:var(--color-quiet)}
+@media(min-width:901px){
+ html[data-blossom] .collection-workspace .media-grid.library-layout-grid{grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:34px 22px}
+ html[data-blossom] .collection-workspace .media-grid.library-layout-compact{grid-template-columns:repeat(auto-fill,minmax(166px,1fr));gap:26px 16px}
+}
+@media(max-width:1180px){
+ html[data-blossom] .collection-rail{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
+}
+@media(max-width:640px){
+ html[data-blossom] .app-shell[data-view=collection]>.app-main>.page-title-row{margin:-22px 0 12px}
+ html[data-blossom] .collection-rail{margin:0 -14px 10px;padding:2px 14px;border-radius:0;background:none}
+ html[data-blossom] .collection-rail>button{flex:none;height:36px;padding:0 12px}
+ html[data-blossom] .collection-workspace .title-browser-toolbar{gap:8px}
+ html[data-blossom] .collection-workspace .title-browser-toolbar>.library-count{order:5;flex-basis:100%}
+ html[data-blossom] .heading-tools .sort-pill{padding:0 10px}
+ html[data-blossom] .heading-tools .sort-pill-value{max-width:120px;overflow:hidden;text-overflow:ellipsis}
+}
+@media(max-width:640px){
+ html[data-blossom] .online-library .section-heading>.heading-tools,html[data-blossom] .collection-workspace .title-browser-toolbar>.heading-tools{flex-basis:100%;justify-content:space-between;margin-left:0}
+}
+html[data-blossom] .heading-tools{min-width:0;max-width:100%}
+html[data-blossom] .heading-tools>.sort-pill{flex:0 1 auto;min-width:0}
+html[data-blossom] .heading-tools>.catalog-views{flex:none}
+html[data-blossom] .sort-pill-value{min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:360px){html[data-blossom] .heading-tools>.sort-pill>svg:first-child{display:none}}

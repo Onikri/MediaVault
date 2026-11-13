@@ -19,7 +19,7 @@
 /* Scroll parallax: covers drift slowly against the page as the grid scrolls. */
 @supports (animation-timeline:view()){
  @media (prefers-reduced-motion:no-preference){
-  html[data-blossom] .catalog-grid:not(.catalog-layout-list) .anime-card-shell[data-depth] .anime-cover img{animation:card-cover-drift linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
+  html[data-blossom] .catalog-grid:not(.catalog-layout-list) .anime-card-shell[data-depth] .anime-cover img,html[data-blossom] .media-grid.library-layout-grid .anime-card-shell[data-depth] .anime-cover img{animation:card-cover-drift linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
  }
 }
 @keyframes card-cover-drift{from{transform:translate3d(0,-4.5%,0) scale(1.1)}to{transform:translate3d(0,4.5%,0) scale(1.1)}}

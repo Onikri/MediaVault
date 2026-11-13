@@ -74,9 +74,9 @@ async function run(){
     assert.equal(await page.locator('#searchInput').inputValue(),'Тестовый поиск');
     // Every layout picks collection sections from the sidebar; the chip row only appears between 1001 and 1099px.
     await page.getByRole('button',{name:'Раздел Манга',exact:true}).click();
-    assert.ok((await page.locator('.library-sidebar .is-active').textContent()).includes('Манга'));
+    assert.ok((await page.locator('.collection-rail .is-active').textContent()).includes('Манга'));
     await page.getByRole('button',{name:'Раздел Избранное',exact:true}).click();
-    assert.ok((await page.locator('.library-sidebar button[aria-label="Раздел Избранное"].is-active').textContent()).includes('Избранное'));
+    assert.ok((await page.locator('.collection-rail button[aria-label="Раздел Избранное"].is-active').textContent()).includes('Избранное'));
     await noOverflow('Library');
     await nav.getByRole('button',{name:'Библиотека',exact:true}).click();
     await page.getByRole('heading',{name:'Библиотека',exact:true,level:1}).waitFor();

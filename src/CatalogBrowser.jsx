@@ -1,5 +1,5 @@
 import CatalogIndexProgress from './CatalogIndexProgress.jsx';
-import CatalogFilterDock,{splitTags} from './CatalogFilterDock.jsx';
+import CatalogFilterDock,{SortMenu,splitTags} from './CatalogFilterDock.jsx';
 import {useCatalogFavorites} from './catalog-favorites.js';
 import {readOnlineTitle,onlineTitleLocation} from './title-route.js';
 import {CONTENT_LANGUAGES,useContentLanguage,setContentLanguage} from './content-language.js';
@@ -34,6 +34,18 @@ import AnimeExplore from './AnimeExplore.jsx';
 import {browseRoute} from './anime-navigation.js';
 const noTitles=Object.freeze([]);
 const SOURCE_LANGUAGES=[['all','Все языки'],['ru','Русский'],['uk','Українська'],['en','Английский'],['ja','Японский, оригинал'],['ko','Корейский, оригинал']];
+const SORTS=[['default','Как в каталогах'],['score','По рейтингу'],['new','Сначала новые'],['old','Сначала старые'],['title','По названию, А–Я'],['length','Больше серий и глав']];
+const SORT_KEY='mediavault_catalog_sort_v1';
+const number=value=>Number.isFinite(Number(value))&&value!==null&&value!==''?Number(value):null;
+// Orders the loaded titles; unknown values go last so a missing year never jumps ahead.
+export function sortTitles(items,order){
+ if(order==='default'||!SORTS.some(([id])=>id===order))return items;
+ const pick={score:item=>number(item.score),new:item=>number(item.year),old:item=>number(item.year),length:item=>number(item.episodes??item.chapters)}[order];
+ const rows=items.map((item,index)=>({item,index}));
+ if(order==='title')return rows.sort((a,b)=>String(a.item.title||'').localeCompare(String(b.item.title||''),'ru')||a.index-b.index).map(row=>row.item);
+ const sign=order==='old'?1:-1;
+ return rows.sort((a,b)=>{const x=pick(a.item),y=pick(b.item);if(x===null||y===null)return (x===null)-(y===null)||a.index-b.index;return (x-y)*sign||a.index-b.index;}).map(row=>row.item);
+}
 const titlesWord=n=>{const t=n%10,h=n%100;return t===1&&h!==11?'тайтл':t>=2&&t<=4&&(h<12||h>14)?'тайтла':'тайтлов';};
 
 export function TitleDetails(props){return <WorldTitlePage {...props}/>;}
@@ -50,6 +62,8 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const [filters,setFilters]=useState(()=>({year:'',genre:'',tag:'',format:'',age:'',...Object.fromEntries(Object.entries(initialFilters||{}).filter(([key,value])=>['year','genre'].includes(key)&&value))})),[voice,setVoice]=useState(''),[showFilters,setShowFilters]=useState(true),[page,setPage]=useState(1),[composing,setComposing]=useState(false);
   useEffect(()=>{if(preset){setSelected(preset);onlineTitleLocation(preset,true);}},[preset]);
   const reduced=useReducedMotion();
+  const [order,setOrder]=useState(()=>{try{const saved=localStorage.getItem(SORT_KEY);return SORTS.some(([id])=>id===saved)?saved:'default';}catch{return 'default';}});
+  const changeOrder=value=>{setOrder(value);try{localStorage.setItem(SORT_KEY,value);}catch{}};
   const [sourceIds,setSourceIds]=useState([]),[sourceLanguage,setSourceLanguage]=useState('all'),[sourceRevision,setSourceRevision]=useState(0),[voiceOptions,setVoiceOptions]=useState([]);
   const [knownSources,setKnownSources]=useState({});
   const receiveSources=useCallback(rows=>setKnownSources(old=>({...old,...Object.fromEntries(rows.map(row=>[row.id,row]))})),[]);
@@ -68,12 +82,13 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   useEffect(()=>onItems?.(items),[items]);
   useEffect(()=>{const abort=new AbortController();if(kind!=='anime'||service.status!=='connected'||Number(service.session?.serverVersion)<16)return;const timer=setTimeout(()=>service.request('/discovery/voices?'+new URLSearchParams({q:voice}),{signal:abort.signal}).then(data=>{if(!abort.signal.aborted)setVoiceOptions(data.voices||[]);}).catch(()=>{}),250);return()=>{clearTimeout(timer);abort.abort();};},[kind,voice,service.status,service.server]);
   const voices=useVoices(kind==='anime'?items:noTitles,voice,service);
-  const visible=useMemo(()=>items.filter(item=>(!favoritesOnly||bookmarks.has(item))&&matchesFilters(item,filters)&&item.kind===kind&&(!voice||(voices.results[item.id]?.dubs||[]).some(d=>d.toLocaleLowerCase().includes(voice.toLocaleLowerCase())))),[items,filters,kind,voice,voices.results,favoritesOnly,bookmarks]);
+  const matched=useMemo(()=>items.filter(item=>(!favoritesOnly||bookmarks.has(item))&&matchesFilters(item,filters)&&item.kind===kind&&(!voice||(voices.results[item.id]?.dubs||[]).some(d=>d.toLocaleLowerCase().includes(voice.toLocaleLowerCase())))),[items,filters,kind,voice,voices.results,favoritesOnly,bookmarks]);
+  const visible=useMemo(()=>sortTitles(matched,order),[matched,order]);
   const sourceFacets=useMemo(()=>kind==='manga'?mangaFacetOptions(indexed.taxonomy,indexed.facets,{sourceIds,sources:knownSources}):[],[kind,indexed.taxonomy,indexed.facets,sourceIds,knownSources,tagPolicyVersion]);
   const genres=[...new Set([...(kind==='manga'||globalTags?[]:[filters.genre,...Object.values(genreLabels)]),...(globalTags?[...mangaPolicy().rules.values()].filter(row=>row.category==='genre'||row.genreHint).map(row=>row.label):[]),...sourceFacets.filter(t=>t.type==='genre').map(t=>t.label),...items.flatMap(item=>kind==='manga'||globalTags?item.genres:item.genres.map(localLabel))].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
   const tagOptions=[...new Set([...(globalTags?[...mangaPolicy().rules.values()].map(row=>row.label):kind==='manga'?[]:Object.values(tagLabels)),...sourceFacets.map(t=>t.label),...items.flatMap(item=>kind==='manga'||globalTags?item.tags:item.tags.map(localLabel))])].sort((a,b)=>a.localeCompare(b,'ru'));
   const formats=[...new Set([...items.map(item=>item.format),...(kind==='manga'?['manga','manhwa','manhua','webtoon']:[])].filter(Boolean).map(f=>kind==='manga'?mangaFormatLabel(f):f))];
-  const suggestions=visible.slice(0,7),filter=(key,value)=>{setFilters(old=>({...old,[key]:value}));setPage(1);};
+  const suggestions=matched.slice(0,7),filter=(key,value)=>{setFilters(old=>({...old,[key]:value}));setPage(1);};
   function choose(item){setSelected(item);onlineTitleLocation(item);}
   useLayoutEffect(()=>{if(!selected)return;scrollTo({top:0,behavior:'instant'});const frame=requestAnimationFrame(()=>scrollTo({top:0,behavior:'instant'}));return()=>cancelAnimationFrame(frame);},[selected?.id]);
   const spelling=visible.find(item=>item.searchSpelling)?.searchSpelling;
@@ -83,7 +98,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   return <><section className="world-catalog-intro"><span className="eyebrow">ОБЩАЯ БИБЛИОТЕКА</span><h2>Найди свою историю</h2><p>Смотри и читай онлайн. Сохраняй любимое в личную коллекцию.</p><CatalogIndexProgress service={service}/></section>
     <div className="catalog-kind-row" aria-label="Тип произведения">{kinds.map(([id,label])=><button key={id} className={'chip'+(kind===id?' chip-active':'')} onClick={()=>{setKind(id);setVoice('');setSourceIds([]);setFilters({year:'',genre:'',tag:'',format:'',age:''});setPage(1);}}>{label}</button>)}</div>
     <div className="blossom-catalog-body is-docked"><div className="blossom-catalog-content">
-    <CatalogFilterDock search={<CatalogSearch query={query} onQuery={value=>{setQuery(value);setPage(1);}} suggestions={suggestions} loading={loading} showFilters={showFilters} onToggleFilters={()=>setShowFilters(value=>!value)} onChoose={choose} onComposing={setComposing}/>} open={showFilters} kind={kind} filters={filters} onFilter={filter} onReset={()=>{setFilters({year:'',genre:'',tag:'',format:'',age:''});setVoice('');setPage(1);}} genres={genres} tags={tagOptions} formats={formats}
+    <CatalogFilterDock search={<CatalogSearch query={query} onQuery={value=>{setQuery(value);setPage(1);}} suggestions={suggestions} loading={loading} showFilters={showFilters} onToggleFilters={()=>setShowFilters(value=>!value)} onChoose={choose} onComposing={setComposing}/>} kind={kind} filters={filters} onFilter={filter} onReset={()=>{setFilters({year:'',genre:'',tag:'',format:'',age:''});setVoice('');setPage(1);}} genres={genres} tags={tagOptions} formats={formats}
      voice={voice} onVoice={setVoice} voiceDisabled={service.status!=='connected'} voiceOptions={[...new Set([...voiceOptions.map(v=>typeof v==='string'?v:v.name),...Object.values(voices.results).flatMap(v=>v.dubs||[])])].filter(Boolean)}
      voiceNote={voice?`Проверяем озвучку найденных карточек, осталось ${voices.pending}.`:'Озвучка проверяется у первых 24 карточек страницы.'}
      language={kind==='manga'?{label:'Язык источника',value:sourceLanguage,options:SOURCE_LANGUAGES,onChange:value=>{setSourceLanguage(value);setSourceIds([]);setPage(1);},note:'Список источников ниже подстроится под этот язык.'}:['anime','movie','tv'].includes(kind)?{label:'Язык озвучки',value:contentLanguageValue,options:CONTENT_LANGUAGES,onChange:setContentLanguage,note:'Сначала покажем озвучки на этом языке.'}:null}/>
@@ -96,7 +111,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
     {kind==='manga'&&<MangaSearchDiagnostics providers={globalManga.providers} key={globalManga.id}/>}
     <p className="catalog-search-hint">Подсказки появляются сразу. Источники дополняют результаты в фоне.</p>
 
-    {spelling&&<p className="fine catalog-spelling">Также ищем по написанию «{spelling}»</p>}<div className="section-heading"><h2 className="section-title">{query?'Результаты поиска':'Тайтлы'}</h2><span className="fine" role="status" aria-live="polite">{loading?'Обновляем карточки…':visible.length?visible.length+' '+titlesWord(visible.length):''}</span><div className="catalog-provider-row" aria-label="Источники метаданных">{Object.entries(statuses).map(([id,status])=><span key={id} className={'catalog-provider provider-'+status} title={status==='unavailable'?'Сейчас недоступен; поиск идёт в остальных каталогах':providers[id]}><i/>{providers[id]}</span>)}{unavailable&&<button className="catalog-retry" disabled={loading} onClick={retry}><Icon name="refresh" size={13}/>Повторить поиск</button>}</div><CatalogViewControls value={layout} onChange={changeLayout}/></div>
+    {spelling&&<p className="fine catalog-spelling">Также ищем по написанию «{spelling}»</p>}<div className="section-heading"><h2 className="section-title">{query?'Результаты поиска':'Тайтлы'}</h2><span className="fine" role="status" aria-live="polite">{loading?'Обновляем карточки…':visible.length?visible.length+' '+titlesWord(visible.length):''}</span><div className="catalog-provider-row" aria-label="Источники метаданных">{Object.entries(statuses).map(([id,status])=><span key={id} className={'catalog-provider provider-'+status} title={status==='unavailable'?'Сейчас недоступен; поиск идёт в остальных каталогах':providers[id]}><i/>{providers[id]}</span>)}{unavailable&&<button className="catalog-retry" disabled={loading} onClick={retry}><Icon name="refresh" size={13}/>Повторить поиск</button>}</div><span className="heading-tools"><SortMenu value={order} options={SORTS} onChange={changeOrder}/><CatalogViewControls value={layout} onChange={changeLayout}/></span></div>
     {visible.length?layout==='table'?<CatalogResultsTable items={visible} onChoose={choose}/>:<AnimeGrid className={'media-grid catalog-grid library-layout-'+layout+' catalog-layout-'+layout}>{visible.map((item,i)=><AnimeCard depth favorite={bookmarks.has(item)} onFavorite={()=>bookmarks.toggle(item)} key={item.id} index={i} anime={blossomRecord({...item,genres:kind==='manga'?item.genres:item.genres.map(g=>genreLabels[g]||g)})} className="title-card catalog-card" titleName={item.title} category={item.kind} onOpen={()=>choose(item)} openLabel={'Выбрать '+item.title} artwork={<Poster item={item}/>} detail={[item.year,item.kind==='book'?(item.authors||[]).slice(0,2).join(', ')||item.format:item.format,item.episodes?item.episodes+' сер.':item.chapters?item.chapters+' гл.':null].filter(Boolean).join(' · ')||item.providerName||providers[item.provider]}/>)}</AnimeGrid>:loading?<SkeletonGrid count={6}/>:<div className="catalog-empty">{loading?<><span className="loading-ring"/><p>Собираем ответы каталогов…</p></>:<><Icon name="search" size={32}/><p>{query?'Пока ничего не нашлось':'Начни вводить название'}</p><small>{Object.values(statuses).some(s=>s==='unavailable')?'Некоторые каталоги недоступны. Попробуй другое написание или повтори поиск позже.':'Можно искать на русском, английском, японском, китайском и корейском. Результат зависит от названий и синонимов в каталогах.'}</small></>}</div>}
     {visible.length>0&&<div className="catalog-pagination"><button className="btn btn-secondary" disabled={page===1} onClick={()=>setPage(p=>p-1)}>Назад</button><span>Страница {page}</span><button className="btn btn-secondary" disabled={!contentIndex.hasMore&&metadataItems.length<16&&(!indexed.ready||!indexed.hasMore)} onClick={()=>setPage(p=>p+1)}>Дальше<Icon name="arrow" size={15}/></button></div>}<p className="catalog-footnote">Каталоги дополняются подключёнными источниками Suwayomi. Отсутствие ответа сайта не подтверждает отсутствие произведения. Годы, жанры и возраст фильтруются только по известным сведениям.</p>
   </div></div></>;

@@ -61,3 +61,20 @@ export function titleParts(title){
   }
   return [...parts].map(([name,items])=>({name,items:items.slice().sort((a,b)=>(a.episode??Infinity)-(b.episode??Infinity)||a.name.localeCompare(b.name,'ru',{numeric:true}))})).sort((a,b)=>a.name.localeCompare(b.name,'ru',{numeric:true}));
 }
+
+export const LIBRARY_SORTS=[['newest','Сначала новые'],['oldest','Сначала старые'],['name','По названию, А–Я'],['name-desc','По названию, Я–А'],['year','По году выпуска'],['score','По рейтингу']];
+const known=value=>value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?Number(value):null;
+// Larger first; titles without the value stay after the rest in their original order.
+const larger=(x,y)=>x===null||y===null?(x===null)-(y===null):y-x;
+export function sortLibrary(list,sort,profileOf=value=>value.profile){
+ const time=value=>new Date(value.addedAt).getTime()||0,name=value=>String(value.name||'');
+ const order={
+  newest:(a,b)=>time(b)-time(a),
+  oldest:(a,b)=>time(a)-time(b),
+  name:(a,b)=>name(a).localeCompare(name(b),'ru'),
+  'name-desc':(a,b)=>name(b).localeCompare(name(a),'ru'),
+  year:(a,b)=>larger(known(profileOf(a)?.year),known(profileOf(b)?.year)),
+  score:(a,b)=>larger(known(profileOf(a)?.score),known(profileOf(b)?.score)),
+ }[sort]||((a,b)=>time(b)-time(a));
+ return list.map((value,index)=>({value,index})).sort((a,b)=>order(a.value,b.value)||a.index-b.index).map(row=>row.value);
+}
