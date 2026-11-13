@@ -8,6 +8,9 @@ import React,{useState} from 'react';import{createRoot}from'react-dom/client';im
 let installed=false,pack=null;window.installs=0;window.moreRequests=[];
 const rows=[{package:'fixture.ru',name:'Manga Source',language:'ru',installed:false},{package:'fixture.ja',name:'Raw Source',language:'ja',installed:false}];
 const service={status:'connected',session:{serverVersion:15,driveConnected:true},request:async(url,options)=>{
+ if(url==='/manga/source-coverage')return{sources:[],nativeRegistered:1,extensionInstalled:0};
+ if(url==='/manga/catalog/stats')return{totalTitles:0,titlesWithTags:0,perProvider:[]};
+ if(url.startsWith('/manga/catalog/tags?'))return{tags:[]};
  if(url==='/manga/search')return{results:[],providers:[],bridgeSearch:{nextOffset:8,totalSources:40,hasMore:true}};
  if(url==='/manga/bridge/search'){window.moreRequests.push(options.body.bridgeOffset);return{results:[{url:'https://media.example/__manga/suwayomi/m/42',provider:'late',providerName:'Source after the first 32',title:'Demo Manga',language:'en'}],providers:[],window:{checked:8,nextOffset:16,totalSources:40,hasMore:true}};}
  if(url.endsWith('/install-pack')){if(options?.method==='POST'){window.packLanguages=options.body.languages;pack={id:'fixture-pack',state:'done',completed:100,total:100,installed:99,failed:[]};}return pack||{state:'idle'};}
