@@ -60,7 +60,12 @@ with log.open('w') as output:
         build+=['-f',str(dockerfile),str(release)]
     else:
         build.append(str(release/'server'))
-    execute(build,stdout=output,stderr=output)
+    # An image already built from this exact commit (an earlier run stopped
+    # at the backup check) is reused: rebuilding it without its cache needs
+    # several GB the disk may not have next to the backup.
+    built=subprocess.run(['docker','image','inspect','--format','{{index .Config.Labels "org.opencontainers.image.revision"}}',image],capture_output=True,text=True)
+    if built.returncode==0 and built.stdout.strip()==revision:print('Reusing the image already built from '+revision[:12]+'.',file=output)
+    else:execute(build,stdout=output,stderr=output)
 expected_version=int(command(['docker','run','--rm','--network','none','--entrypoint','python',image,'-c','import api; print(api.health()["version"])']))
 if expected_version<6:raise SystemExit('The release does not support voice discovery; no replacement made.')
 if expected_version>=51:

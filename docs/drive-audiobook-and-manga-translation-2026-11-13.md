@@ -79,6 +79,27 @@ Mocked contracts (no real model or voice inference):
   the save windows offer only what the server supports and send the expected
   jobs; the device audiobook writes real Opus files (mocked tone instead of speech).
 
-## Real inference
+## Real inference: live check on the VM (2026-11-13, server v71, b9ab9a8)
 
-See the section «Live check on the VM» below; it is recorded after deployment.
+Run inside `oracle-importer-1` with the server key pool, nothing written to
+Drive: `narration_runtime.chapter_script` on a three-paragraph dialogue, then
+`ranobe_audiobook.synthesize` and `encode_opus`.
+
+- Director: Gemini 3.5 Flash Lite studied the book (bible) and tagged the
+  roles in one part, 7.4 s, no failures.
+- Script: six rows in three voices — narrator Charon, Кайто Iapetus,
+  Мирэй Sulafat — with the bible's tone and each hero's character in the style.
+- Voices: Gemini 2.5 Flash Native Audio, 18.1 s of speech in 8.5 s
+  (three phrases at a time), Ogg Opus 48 kbit/s, 107 KB.
+
+Translated manga to Drive was not run live: it calls the same
+`manga_export.produce` / `translate_pages` path as device exports, which the
+owner uses already; the Drive part (fingerprints, encryption, dub) is covered by
+the mocked tests above.
+
+## Deploy note
+
+`deploy/oracle/update-existing.sh` now reuses an image already built from the
+same commit (its `org.opencontainers.image.revision` label). A run that stopped
+at the backup space check no longer needs a second full build: on a 92%-full
+disk the build alone took ~5.7 GB, more than the backup headroom.
