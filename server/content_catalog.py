@@ -51,13 +51,14 @@ def ingest(db,rows):
 def browse(db,*,kind,q='',tag='',genre='',limit=60):
     initialize(db)
     if kind not in KINDS:return {'items':[],'total':0}
-    policy=current();wanted=[(field,policy.key(value)) for field,value in (('tags',tag),('genres',genre)) if value]
+    policy=current();wanted=[('genres',policy.key(genre))] if genre else []
+    wanted += [(None,policy.key(value.strip())) for value in str(tag or '').split(',')[:12] if value.strip()]
     rows=[]
     for identity,search,raw in db.execute('SELECT id,search,raw FROM content_titles WHERE kind=? ORDER BY updated DESC LIMIT 10000',(kind,)):
         if any(word not in search for word in normalize(q).split()[:12]):continue
         row=json.loads(raw);source=urlsplit(row.get('sourceUrl') or row.get('sourceURL') or '').hostname or ''
         facts=policy.facts(row,source)
-        if any(not key or policy.rules[key]['label'] not in facts[field] for field,key in wanted):continue
+        if any(not key or policy.rules[key]['label'] not in (facts[field] if field else facts['tags']+facts['genres']) for field,key in wanted):continue
         rows.append({**row,**facts,'contentCatalogId':identity})
     return {'items':rows[:min(100,max(1,limit))],'total':len(rows)}
 

@@ -71,6 +71,13 @@ class ContentTests(ContentFixture,unittest.TestCase):
   save(self.store,data,current().revision)
   row=content_catalog.browse(self.db,kind='movie',genre='Ecology')['items'][0]
   self.assertEqual(row['sourceUrl'],'https://fixture.example/movie')
+ def test_combined_tag_filters_also_match_canonical_genres_across_media(self):
+  self.seed()
+  data=copy.deepcopy(BASE);data['tags'].append({'key':'ecology','label':'Экология','aliases':['Ecology'],'category':'genre'})
+  save(self.store,data,current().revision)
+  for kind in content_catalog.KINDS:
+   self.assertEqual(content_catalog.browse(self.db,kind=kind,tag='Journey,Ecology')['total'],1)
+   self.assertEqual(content_catalog.browse(self.db,kind=kind,tag='Journey,Missing')['total'],0)
  def test_source_taxonomy_extracts_exact_links_and_membership_without_images(self):
   terms=html_terms(b'<a rel="tag" href="/tags/ecology/">Ecology</a><a rel="tag" href="https://evil.example/a">Other</a>','https://hmanga.me/',{'hmanga.me'})
   self.assertEqual(len(terms),1);self.assertEqual(terms[0]['url'],'https://hmanga.me/tags/ecology/')
