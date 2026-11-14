@@ -157,7 +157,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
       // copy of the page state never overwrites links and stills in Drive.
       const withCharacter=source=>({...source,characters:(source?.characters||[]).map(c=>c.id===value.id?{...c,...merged}:c)});
       const characters=withCharacter(currentProfile.current).characters;setProfile(old=>withCharacter(old));
-      if(!online&&live.current.admin&&live.current.driveWritable&&!saveInProgress.current)actions.saveTitleProfile(title.id,{characters},[],{background:true});
+      if(!online&&live.current.admin&&live.current.driveWritable)actions.saveTitleProfile(title.id,{characters},[],{background:true});
     }catch(cause){if(!controller.signal.aborted)setCharacterError(cause.message||'Каталоги пока не ответили. Сохранённые сведения доступны.');
     }finally{if(!controller.signal.aborted)setCharacterBusy(false);}
   }
@@ -167,7 +167,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   async function rate(value){
     if(online){setLocalRating(value);try{localStorage.setItem(ratingKey,String(value));}catch{}return;}
     setRatingBusy(true);setError('');
-    try{const result=await actions.saveTitleProfile(title.id,{...(profile||{}),userRatings:{...(profile?.userRatings||{}),[state.user.sub]:value}});if(result)setProfile(result);}
+    try{const result=await actions.saveTitleProfile(title.id,{userRatings:{[state.user.sub]:value}});if(result)setProfile(result);}
     catch(cause){setError(cause.message);}finally{setRatingBusy(false);}
   }
   const ukrainian=useUkrainianTitle(server||state?.server,title.section||title.profile?.kind,title.metadataId||title.profile?.sourceId||title.profile?.ids?.mal);

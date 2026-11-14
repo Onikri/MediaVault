@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeProfile,russianText,plainText,imageURL,profileArtwork} from '../src/title-metadata.js';
+import {mergeCharacterDetails} from '../src/title-profile-merge.js';
+
+test('a late dossier save preserves fetched character details but respects changed cast',()=>{
+ const saved=[{id:'17',description:'Недавно загруженное описание',name:'Наруто'},{id:'18',name:'Удалённый персонаж'}];
+ const fresh=mergeCharacterDetails(saved,[{id:17,description:'',name:'Наруто Узумаки'},{id:'19',name:'Новый персонаж'}]);
+ assert.equal(fresh[0].description,saved[0].description);
+ assert.equal(fresh[0].name,'Наруто Узумаки');
+ assert.deepEqual(fresh.map(v=>String(v.id)),['17','19']);
+ assert.equal(mergeCharacterDetails(saved,[{id:'17',description:'Обновлённое описание'}])[0].description,'Обновлённое описание');
+ assert.deepEqual(mergeCharacterDetails(saved,[]),[]);
+});
 
 test('Russian dossier uses Russian descriptions, characters, facts and related media without inserting English prose',()=>{
  const profile=normalizeProfile({id:16498,russian:'Атака титанов',name:'Attack on Titan',kind:'tv',status:'released',source:'manga_source',rating:'r',description:'English synopsis only',aired_on:'2013-04-07',score:'8.55',image:{original:'/cover.jpg'},genres:[{russian:'Экшен',name:'Action'}]}, {

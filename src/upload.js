@@ -1,6 +1,7 @@
 import {CHUNK_SIZE,sealChunk,sealIndex,openIndex,guessCategory,mimeFor} from "../crypto.js";
 import {createFolder,uploadSmall,replaceSmall,readEnvelope,readEnvelopeSnapshot} from "../drive.js";
 import {SECTION_LABELS,SECTION_FORMAT,sectionForCollection,uploadPlacement,sameName} from './library-model.js';
+import {mergeCharacterDetails} from './title-profile-merge.js';
 
 const categories=["video","audio","manga","book","image"];
 function aborted(){return new DOMException("Загрузка отменена","AbortError");}
@@ -270,6 +271,7 @@ export function createUploadService({getSession,onCatalog,onProgress=()=>{},onAu
         const current=await openIndex(snapshot.envelope,context.key),recent=current.titleProfiles?.[titleId]||{};
         assert(context);
         const stored={...recent,...previous,...profile,userRatings:{...(recent.userRatings||{}),...(previous.userRatings||{}),...(profile.userRatings||{})},artwork:{...(recent.artwork||{}),...artwork},artworkFolderId:folderId||'',savedAt:new Date().toISOString()};
+        if(stored.characters)stored.characters=mergeCharacterDetails(recent.characters||previous.characters,stored.characters);
         current.titleProfiles={...(current.titleProfiles||{}),[titleId]:stored};
         try{await commit(current,context,undefined,snapshot.etag);return stored;}
         catch(error){if(error.status!==412||attempt===2)throw error;}

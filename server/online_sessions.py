@@ -286,6 +286,8 @@ def install(app,owner,exports_owner=None):
     async def close(token:str,subject=Depends(owner)):
         service = getattr(app.state, 'alloha_delivery', None)
         if service and token in service.sessions:
+            if service.sessions[token].owner != subject:
+                return {'closed': True}
             await service.close_session(service.sessions[token])
             with lock:sessions.pop(token, None)
             return {'closed': True}
@@ -299,14 +301,25 @@ def install(app,owner,exports_owner=None):
         service = getattr(app.state, 'alloha_delivery', None)
         with lock:
             expire();s=sessions.get(token)
+            # Media requests can keep native delivery active while a phone
+            # throttles its heartbeat timer. Rebuild only that owned bridge,
+            # never a closed/expired delivery session or another user's token.
+            native = service.sessions.get(token) if service else None
+            if not s and native and native.owner == subject and not native.closed and native.expires > service.clock():
+                s = Session(subject, {}, time.monotonic()+service.ttl, alloha=True)
+                s.resources['alloha-playback'] = native.iframe
+                sessions[token] = s
             if not s or s.owner!=subject:raise HTTPException(410,'Онлайн-сеанс завершён. Открой главу снова.')
             if s.alloha:
                 if not service or token not in service.sessions:
                     raise HTTPException(410,'Сессия Alloha завершена.')
                 session=service.sessions[token]
-                if session.closed or session.expires<=service.clock() or getattr(session.source,'socket_closed',False):
+                if session.closed or session.expires<=service.clock():
                     raise HTTPException(410,'Сессия Alloha завершена.')
-                return {'expiresIn': max(0, int(session.expires-service.clock()))}
+                # Heartbeat means the viewer is present, even if paused. Socket
+                # telemetry failure is not proof that HTTP media stopped playing.
+                s.expires=time.monotonic()+service.ttl
+                return {'expiresIn': service.renew(session)}
             s.expires=time.monotonic()+LEASE_SECONDS
         return {'expiresIn':LEASE_SECONDS}
 
