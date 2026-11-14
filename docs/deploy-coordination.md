@@ -50,3 +50,23 @@ rules keep one of us from silently undoing the other.
 - PR #53 validation: 467 Node tests, 1,000 Python tests, production build and
   all CI UI contracts passed; 116 focused Linux contracts also passed in an
   isolated Oracle container. No interactive browser or subagent was used.
+
+## Source-derived genre release — 2026-11-14
+
+- Codex deployed `mediavault-importer:hentai-ad6a9446341b`, main revision
+  `ad6a9446341b09f9b6567da2dec92a99fc4b9785`, derived from the running
+  `library-cafc50f769c9` image under the shared deployment lock.
+- Backup: `/opt/mediavault-backups/hentai-ad6a9446341b-20261114T184604Z`.
+  All 28,014 prior job IDs survived; cursors were retained/advanced, private
+  settings/key/policy/environment were unchanged. Alloha health remained enabled.
+- All 168 server files matched the deployed revision after newline normalization.
+  Live selection found 78,924 Hentai works, including 32,004 from HentaiLib.
+  The intersection with explicit non-hentai works was zero. Positive and vetoed
+  title endpoints and the client filter/profile projection passed. Existing
+  book-cleanup markers remain done; the catalogue queue continues.
+- PR #54: 471 Node tests, 1,008 Python tests, production build and full CI passed.
+  An isolated Oracle container passed 124 focused contracts. A real-index copy
+  verified the derived indexes and their query plans; rollback to the older
+  image was tested with removal of only the new custom-function indexes.
+- No source crawl was restarted. This release classifies existing and incoming
+  catalogue records; it does not assert full coverage of every upstream website.
