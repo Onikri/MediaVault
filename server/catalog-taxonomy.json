@@ -1,0 +1,326 @@
+{
+  "version": 1,
+  "genres": [
+    {
+      "key": "action",
+      "label": "Экшн",
+      "aliases": [
+        "Action",
+        "Боевик",
+        "Экшен"
+      ]
+    },
+    {
+      "key": "adventure",
+      "label": "Приключения",
+      "aliases": [
+        "Adventure"
+      ]
+    },
+    {
+      "key": "comedy",
+      "label": "Комедия",
+      "aliases": [
+        "Comedy",
+        "Юмор",
+        "Humor",
+        "Humour"
+      ]
+    },
+    {
+      "key": "drama",
+      "label": "Драма",
+      "aliases": [
+        "Drama"
+      ]
+    },
+    {
+      "key": "tragedy",
+      "label": "Трагедия",
+      "aliases": [
+        "Tragedy"
+      ]
+    },
+    {
+      "key": "thriller",
+      "label": "Триллер",
+      "aliases": [
+        "Thriller",
+        "Suspense"
+      ]
+    },
+    {
+      "key": "mystery",
+      "label": "Детектив",
+      "aliases": [
+        "Mystery",
+        "Detective"
+      ]
+    },
+    {
+      "key": "horror",
+      "label": "Ужасы",
+      "aliases": [
+        "Horror"
+      ]
+    },
+    {
+      "key": "fantasy",
+      "label": "Фэнтези",
+      "aliases": [
+        "Fantasy",
+        "ファンタジー",
+        "판타지"
+      ]
+    },
+    {
+      "key": "science-fiction",
+      "label": "Фантастика",
+      "aliases": [
+        "Sci-Fi",
+        "Science Fiction",
+        "SF"
+      ]
+    },
+    {
+      "key": "romance",
+      "label": "Романтика",
+      "aliases": [
+        "Romance",
+        "Romantic"
+      ]
+    },
+    {
+      "key": "military",
+      "label": "Военный",
+      "aliases": [
+        "Military",
+        "War",
+        "Война",
+        "Боевые действия"
+      ]
+    },
+    {
+      "key": "martial-arts",
+      "label": "Боевые искусства",
+      "aliases": [
+        "Martial Arts"
+      ]
+    },
+    {
+      "key": "sports",
+      "label": "Спорт",
+      "aliases": [
+        "Sports",
+        "Sport"
+      ]
+    },
+    {
+      "key": "historical",
+      "label": "Исторический",
+      "aliases": [
+        "Historical",
+        "Historical Fiction",
+        "История"
+      ]
+    },
+    {
+      "key": "slice-of-life",
+      "label": "Повседневность",
+      "aliases": [
+        "Slice of Life"
+      ]
+    },
+    {
+      "key": "supernatural",
+      "label": "Сверхъестественное",
+      "aliases": [
+        "Supernatural"
+      ]
+    },
+    {
+      "key": "psychological",
+      "label": "Психологический",
+      "aliases": [
+        "Psychological",
+        "Психология"
+      ]
+    },
+    {
+      "key": "erotica",
+      "label": "Эротика",
+      "aliases": [
+        "Erotica",
+        "Erotic",
+        "Erotic Fiction"
+      ]
+    },
+    {
+      "key": "hentai",
+      "label": "Хентай",
+      "aliases": [
+        "Hentai",
+        "ヘンタイ"
+      ],
+      "kinds": [
+        "anime",
+        "manga",
+        "ranobe"
+      ]
+    },
+    {
+      "key": "mecha",
+      "label": "Меха",
+      "aliases": [
+        "Mecha"
+      ]
+    },
+    {
+      "key": "shooter",
+      "label": "Шутер",
+      "aliases": [
+        "Shooter"
+      ]
+    },
+    {
+      "key": "crime",
+      "label": "Криминал",
+      "aliases": [
+        "Crime"
+      ]
+    },
+    {
+      "key": "western",
+      "label": "Вестерн",
+      "aliases": [
+        "Western"
+      ]
+    },
+    {
+      "key": "musical",
+      "label": "Мюзикл",
+      "aliases": [
+        "Musical"
+      ]
+    },
+    {
+      "key": "documentary",
+      "label": "Документальный",
+      "aliases": [
+        "Documentary"
+      ]
+    },
+    {
+      "key": "biography",
+      "label": "Биография",
+      "aliases": [
+        "Biography",
+        "Autobiography"
+      ],
+      "kinds": [
+        "book",
+        "ranobe"
+      ]
+    },
+    {
+      "key": "nonfiction",
+      "label": "Документальная литература",
+      "aliases": [
+        "Nonfiction",
+        "Non-fiction"
+      ],
+      "kinds": [
+        "book",
+        "ranobe"
+      ]
+    },
+    {
+      "key": "poetry",
+      "label": "Поэзия",
+      "aliases": [
+        "Poetry"
+      ],
+      "kinds": [
+        "book",
+        "ranobe"
+      ]
+    },
+    {
+      "key": "fairy-tale",
+      "label": "Сказка",
+      "aliases": [
+        "Fairy Tales",
+        "Fairy Tale"
+      ],
+      "kinds": [
+        "book",
+        "ranobe"
+      ]
+    },
+    {
+      "key": "satire",
+      "label": "Сатира",
+      "aliases": [
+        "Satire"
+      ],
+      "kinds": [
+        "book",
+        "ranobe"
+      ]
+    },
+    {
+      "key": "literary-fiction",
+      "label": "Литературная проза",
+      "aliases": [
+        "Literary Fiction"
+      ],
+      "kinds": [
+        "book",
+        "ranobe"
+      ]
+    }
+  ],
+  "formats": {
+    "manga": [
+      "Манга",
+      "Манхва",
+      "Маньхуа",
+      "Комикс",
+      "Руманга"
+    ],
+    "anime": [
+      "Аниме-сериал",
+      "Аниме-фильм",
+      "OVA",
+      "ONA",
+      "Спецвыпуск",
+      "Короткометражное"
+    ],
+    "ranobe": [
+      "Ранобэ",
+      "Веб-новелла",
+      "Новелла"
+    ]
+  },
+  "formatAliases": {
+    "anime": {
+      "tv": "Аниме-сериал",
+      "tv_short": "Аниме-сериал",
+      "сериал": "Аниме-сериал",
+      "movie": "Аниме-фильм",
+      "фильм": "Аниме-фильм",
+      "ona": "ONA",
+      "ova": "OVA",
+      "special": "Спецвыпуск",
+      "спешл": "Спецвыпуск",
+      "music": "Короткометражное"
+    },
+    "ranobe": {
+      "novel": "Новелла",
+      "light_novel": "Ранобэ",
+      "light novel": "Ранобэ",
+      "web novel": "Веб-новелла",
+      "web_novel": "Веб-новелла"
+    }
+  }
+}

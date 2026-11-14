@@ -5,9 +5,19 @@ from manga_tag_policy import current,normalize
 
 KINDS=frozenset({'movie','tv','anime','manga','ranobe','book'})
 
+def work_sql(alias='t'):
+    p=alias+'.' if alias else ''
+    expr=p+"kind||':'||CASE "
+    for key in ['mal','imdb','kinopoisk','openlibrary','fantlab']:
+        value="NULLIF(json_extract("+p+"raw,'$.ids."+key+"'),'')"
+        expr+='WHEN '+value+' IS NOT NULL THEN '+repr(key+':')+'||'+value+' '
+    return '('+expr+"ELSE 'id:'||"+p+'id END)'
+
+
 def initialize(db):
     db.execute('CREATE TABLE IF NOT EXISTS content_titles(id TEXT PRIMARY KEY,kind TEXT NOT NULL,search TEXT NOT NULL,raw TEXT NOT NULL,updated INTEGER NOT NULL)')
     db.execute('CREATE INDEX IF NOT EXISTS content_titles_kind ON content_titles(kind,updated)')
+    db.execute('CREATE INDEX IF NOT EXISTS content_work_identity ON content_titles('+work_sql('')+')')
     db.execute('CREATE TABLE IF NOT EXISTS content_catalog_state(name TEXT PRIMARY KEY,value TEXT NOT NULL)')
     db.execute('CREATE TABLE IF NOT EXISTS content_tag_facts(title_id TEXT NOT NULL,kind TEXT NOT NULL,source TEXT NOT NULL,category TEXT NOT NULL,original TEXT NOT NULL,PRIMARY KEY(title_id,category,original))')
     db.execute('CREATE TABLE IF NOT EXISTS content_tags(title_id TEXT NOT NULL,category TEXT NOT NULL,tag_key TEXT NOT NULL,original TEXT NOT NULL,PRIMARY KEY(title_id,category,tag_key,original))')
@@ -43,9 +53,12 @@ def _index(db,identity,row,policy):
         for label in row.get(field) or []:
             db.execute('INSERT OR IGNORE INTO content_tag_facts VALUES(?,?,?,?,?)',(identity,row['kind'],source,field,label))
             added+=add(db,label,source,field,row['kind'])
+            from catalog_taxonomy import classify
+            classified=classify(label,field,row['kind'],policy,source)
+            if not classified:continue
             key=policy.identity(label,source) if policy.include_discovered else policy.key(label,source)
             if key:
-                category={'tag':'tags','genre':'genres'}.get(policy.rules.get(key,{}).get('category'),field)
+                category=classified[0]
                 db.execute('INSERT OR IGNORE INTO content_tags VALUES(?,?,?,?)',(identity,category,key,label))
     return added
 
@@ -90,24 +103,35 @@ def ingest(db,rows):
     if new_facts:invalidate(db)
     return count
 
-def browse(db,*,kind,q='',tag='',genre='',limit=60,offset=0):
+def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='',year='',age='',limit=60,offset=0):
     initialize(db)
     if kind not in KINDS:return {'items':[],'total':0}
-    policy=current();wanted=[('genres',policy.key(genre))] if genre else []
-    wanted += [(None,policy.key(value.strip())) for value in str(tag or '').split(',')[:12] if value.strip()]
-    where=['kind=?'];params=[kind]
+    policy=current();where=['kind=?'];params=[kind]
     for word in normalize(q).split()[:12]:
         where.append("search LIKE ? ESCAPE '\\'");params.append('%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%')
-    for field,key in wanted:
-        if not key:return {'items':[],'total':0,'offset':offset}
-        where.append('EXISTS(SELECT 1 FROM content_tags g WHERE g.title_id=t.id AND g.tag_key=?'+(' AND g.category=?' if field else '')+')');params.append(key)
-        if field:params.append(field)
+    from catalog_taxonomy import clauses
+    extra,values=clauses(db,kind=kind,tag=tag,genre=genre,excludeGenre=excludeGenre,excludeTag=excludeTag)
+    where.extend(extra);params.extend(values)
+    from catalog_taxonomy import format_label
+    db.create_function('catalog_format',2,format_label,deterministic=True)
+    if format:where.append("catalog_format(json_extract(t.raw,'$.format'),t.kind)=?");params.append(format_label(format,kind))
+    if year:where.append("CAST(json_extract(t.raw,'$.year') AS TEXT)=?");params.append(str(year))
+    if age=='adult':where.append("CAST(json_extract(t.raw,'$.age') AS INTEGER)>=18")
+    elif age=='under18':where.append("CAST(json_extract(t.raw,'$.age') AS INTEGER)<18")
     condition=' AND '.join(where);limit=min(100,max(1,limit));offset=max(0,min(10_000_000,offset))
-    total=db.execute('SELECT COUNT(*) FROM content_titles t WHERE '+condition,params).fetchone()[0];rows=[]
-    for identity,raw in db.execute('SELECT id,raw FROM content_titles t WHERE '+condition+' ORDER BY updated DESC,id LIMIT ? OFFSET ?',[*params,limit,offset]):
-        row=json.loads(raw);source=urlsplit(row.get('sourceUrl') or row.get('sourceURL') or '').hostname or ''
-        facts=policy.facts(row,source)
-        rows.append({**row,**facts,'contentCatalogId':identity})
+    work=work_sql();total=db.execute('SELECT COUNT(DISTINCT '+work+') FROM content_titles t WHERE '+condition,params).fetchone()[0]
+    keys=[value[0] for value in db.execute('SELECT '+work+' FROM content_titles t WHERE '+condition+' GROUP BY '+work+' ORDER BY MAX(updated) DESC,'+work+' LIMIT ? OFFSET ?',[*params,limit,offset])]
+    rows=[]
+    for key in keys:
+        records=[(identity,json.loads(raw)) for identity,raw in db.execute('SELECT id,raw FROM content_titles t WHERE '+work+'=? ORDER BY updated DESC,id',(key,))]
+        if not records:continue
+        identity,row=records[0];merged={'genres':[],'tags':[]}
+        for _,record in records:
+            source=urlsplit(record.get('sourceUrl') or record.get('sourceURL') or '').hostname or ''
+            facts=policy.facts(record,source)
+            for field in merged:merged[field]=list(dict.fromkeys([*merged[field],*facts[field]]))[:120]
+        rows.append({**row,**merged,'contentCatalogId':identity,'workKey':key,'providerCount':len(records)})
+
     return {'items':rows,'total':total,'offset':offset,'limit':limit}
 
 def facts(db):

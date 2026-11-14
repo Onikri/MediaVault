@@ -136,3 +136,8 @@ html[data-blossom] .pager-jump>span:last-child{padding-right:10px}
 .fdock-chip-toggle[aria-pressed=true]{background:var(--color-blossom);color:#fff}
 .fdock-chip-toggle:focus-visible{outline:2px solid var(--color-blossom);outline-offset:1px}
 .fdock-option-meta{margin-left:2px;font-size:10.5px;font-weight:600;opacity:.65}
+
+.fdock-signed-note{font-size:11px;color:var(--muted);line-height:1.5;margin:10px 2px}
+.fdock-signed-list{display:grid;gap:3px}.fdock-signed-option{display:grid;grid-template-columns:minmax(0,1fr) 34px 34px;gap:5px;align-items:center;padding:5px 2px}
+.fdock-signed-option>span{font-size:13px;overflow-wrap:anywhere}.fdock-signed-option button{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:var(--color-canvas-soft);color:var(--color-on-muted);transition:transform .2s,background-color .2s}
+.fdock-signed-option button[aria-pressed=true]{background:var(--color-blossom);color:var(--color-petal)}.fdock-signed-option button:active{transform:scale(.94)}

@@ -24,9 +24,9 @@ class ContinuousTests(unittest.TestCase):
   upsert(self.db,[self.row()])
   content_catalog.ingest(self.db,[{**self.row(),'id':'fixture:movie','kind':'movie'}]);self.db.commit()
  def test_unconfigured_source_tags_are_visible_and_exclusions_hide_only_names(self):
-  self.seed();self.assertEqual(browse(self.db,genre='Ecology')['total'],1)
-  self.assertEqual(content_catalog.browse(self.db,kind='movie',genre='Ecology')['total'],1)
-  self.assertEqual(browse(self.db)['total'],1);self.assertEqual(browse(self.db)['items'][0]['tags'],[])
+  self.seed();self.assertEqual(browse(self.db,tag='Ecology')['total'],1)
+  self.assertEqual(content_catalog.browse(self.db,kind='movie',tag='Ecology')['total'],1)
+  self.assertEqual(browse(self.db)['total'],1);self.assertEqual(browse(self.db)['items'][0]['tags'],['Ecology'])
   public=public_policy(self.store)
   self.assertIn('Ecology',[r['label'] for r in public['policy']['tags']]);self.assertNotIn('Hidden word',json.dumps(public))
   self.assertEqual(current().data['tags'],[])
@@ -39,7 +39,7 @@ class ContinuousTests(unittest.TestCase):
   data['hiddenTags']=['Ecology'];save(self.store,data,current().revision)
   self.assertEqual(browse(self.db)['total'],1);self.assertEqual(browse(self.db)['items'][0]['genres'],[])
   self.assertNotIn('ecology',{r['key'] for r in tags(self.db)['tags']})
-  data['hiddenTags']=[];save(self.store,data,current().revision);self.assertEqual(browse(self.db,genre='Ecology')['total'],1)
+  data['hiddenTags']=[];save(self.store,data,current().revision);self.assertEqual(browse(self.db,tag='Ecology')['total'],1)
  def test_deleting_a_custom_rule_cannot_reappear_as_an_automatic_alias(self):
   data=copy.deepcopy(BASE);data['tags']=[{'key':'journey','label':'Путь','aliases':['Journey']}]
   save(self.store,data,current().revision)
@@ -66,8 +66,8 @@ class ContinuousTests(unittest.TestCase):
  def test_generic_catalogue_sql_filter_and_paging_preserve_total(self):
   # A small indexed fixture checks SQL paging/total independently of the result
   # limit; no artificial source corpus or network request is needed.
-  content_catalog.ingest(self.db,[{**self.row(p),'id':str(p),'kind':'book'} for p in range(1,9)]);self.db.commit()
-  result=content_catalog.browse(self.db,kind='book',genre='Ecology',limit=2,offset=4)
+  content_catalog.ingest(self.db,[{**self.row(p),'id':str(p),'kind':'book','genres':['Fantasy']} for p in range(1,9)]);self.db.commit()
+  result=content_catalog.browse(self.db,kind='book',genre='Fantasy',limit=2,offset=4)
   self.assertEqual(result['total'],8);self.assertEqual(len(result['items']),2);self.assertEqual(result['offset'],4)
 
 class Http2Contracts(unittest.TestCase):

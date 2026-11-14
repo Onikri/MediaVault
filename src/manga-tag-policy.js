@@ -1,5 +1,7 @@
+import taxonomy from '../server/catalog-taxonomy.json' with {type:'json'};
 import bundled from '../server/manga-tag-policy.json' with {type:'json'};
 
+const semanticGenres=new Map(taxonomy.genres.flatMap(row=>[row.key,row.label,...row.aliases].map(label=>[String(label).normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim(),row])));
 export const normalizeTag=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export function compileMangaPolicy(data){
  if(data?.schemaVersion!==1||!Array.isArray(data.tags)||!Array.isArray(data.excludedTerms)||!Array.isArray(data.excludedPrefixes))throw Error('Неверный формат правил тегов.');
@@ -15,11 +17,12 @@ export function compileMangaPolicy(data){
   for(const value of [row.key,row.label,...row.aliases]){const alias=normalizeTag(value);if(!valid(value)||aliases.has(alias)&&aliases.get(alias)!==row.key)throw Error('Неоднозначный алиас тега.');aliases.set(alias,row.key);if(!clean(value))hidden.add(row.key);}
   for(const [domain,values] of Object.entries(row.sourceAliases||{}))for(const value of values){const alias=domain+':'+normalizeTag(value);if(!valid(value)||scoped.has(alias)&&scoped.get(alias)!==row.key)throw Error('Неоднозначный алиас источника.');scoped.set(alias,row.key);if(!clean(value))hidden.add(row.key);}
  }
+ for(const genre of taxonomy.genres){const labels=[genre.label,genre.key,...genre.aliases],id=labels.map(value=>aliases.get(normalizeTag(value))).find(Boolean)||normalizeTag(genre.label);if(!rules.has(id)&&!data.includeDiscovered)continue;for(const value of labels)if(!aliases.has(normalizeTag(value)))aliases.set(normalizeTag(value),id);}
  for(const value of data.hiddenTags||[])hidden.add(aliases.get(normalizeTag(value))||normalizeTag(value));
  const key=(value,source='')=>{const norm=normalizeTag(value),id=clean(value)&&!hidden.has(norm)?scoped.get(source+':'+norm)||aliases.get(norm)||(data.includeDiscovered?norm:''):'';return hidden.has(id)?'':id;};
  const label=(id,fallback='')=>rules.get(id)?.label||fallback||id;
  const project=(values,source='')=>{const found=new Map();for(const value of Array.isArray(values)?values:[]){const id=key(value,source);if(id)found.set(id,label(id,value));}return [...found.values()];};
- const facts=(row,source='')=>{const result={genres:[],tags:[]};for(const field of ['genres','tags'])for(const value of Array.isArray(row?.[field])?row[field]:[]){const id=key(value,source);if(!id)continue;const rule=rules.get(id)||{},target=({genre:'genres',tag:'tags'})[rule.category]||field,name=label(id,value);if(!result[target].includes(name))result[target].push(name);}return result;};
+ const facts=(row,source='')=>{const result={genres:[],tags:[]},kind=row?.kind||'manga';for(const field of ['genres','tags'])for(const value of Array.isArray(row?.[field])?row[field]:[]){const id=key(value,source);if(!id||/^\p{N}+$/u.test(value))continue;const rule=rules.get(id)||{},genre=semanticGenres.get(normalizeTag(value))||semanticGenres.get(normalizeTag(rule.key))||semanticGenres.get(normalizeTag(rule.label)),target=({genre:'genres',tag:'tags'})[rule.category]||(genre?'genres':'tags');if(genre?.kinds&&!genre.kinds.includes(kind)||kind==='book'&&(target!=='genres'||!genre&&rule.category!=='genre'))continue;const name=rule.label||(genre&&target==='genres'?genre.label:value);if(!result[target].includes(name))result[target].push(name);}return result;};
  return {data,rules,key,label,project,facts};
 }
 let active=compileMangaPolicy(bundled),version=0,scope='manga';
@@ -38,6 +41,6 @@ export function mangaPolicyFacts(row){
  let source='';try{source=new URL(row.sourceUrl||row.url||'').hostname;}catch{}
  return {...row,...active.facts(row,source)};
 }
-export function mangaPolicyProfile(profile){const facts=active.facts({genres:profile?.genres,tags:profile?.themes});return {...profile,genres:facts.genres,themes:facts.tags};}
+export function mangaPolicyProfile(profile,kind=profile?.kind||'manga'){const facts=active.facts({kind,genres:profile?.genres,tags:profile?.themes});return {...profile,genres:facts.genres,themes:facts.tags};}
 export const globalContentPolicy=()=>scope==='all';
 export const contentPolicyFacts=row=>row.kind==='manga'||globalContentPolicy()?mangaPolicyFacts(row):row;

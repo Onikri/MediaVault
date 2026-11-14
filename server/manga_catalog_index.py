@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from manga_source_tags import unique, clean_label
 from manga_tag_policy import current, normalize, project_row
 
-FORMAT = {'manga', 'manhwa', 'manhua', 'webtoon'}
+FORMAT = {'manga', 'manhwa', 'manhua', 'webtoon','comic','rumanga'}
 
 def tag_key(value):
     return current().key(value)
@@ -189,19 +189,13 @@ def upsert(conn, rows, source_id='', timestamp=None):
     if vocabulary_added:bump(conn)
     return count
 
-def _conditions(q='', tag='', provider='', format='', source_id='', *, genre='', language='all', year='', age='', source_ids=()):
+def _conditions(q='', tag='', provider='', format='', source_id='', *, genre='', excludeGenre='', excludeTag='', readingMode='', language='all', year='', age='', source_ids=()):
     sql = []
     args = []
     if q:
         for word in normalize(q)[:160].split()[:12]:
             sql.append("t.search_text LIKE ? ESCAPE '\\'")
             args.append('%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%')
-    for category,values in ((None,tag),('genres',genre)):
-        for value in (values if isinstance(values,(list,tuple)) else str(values or '').split(','))[:12]:
-            if not str(value).strip():continue
-            sql.append('EXISTS(SELECT 1 FROM catalog_tags x WHERE x.title_id=t.id AND x.tag_key=?'+(' AND x.category=?' if category else '')+')')
-            args.append(tag_key(value) if clean_label(value) else '')
-            if category:args.append(category)
     if provider:
         sql.append('t.provider=?')
         args.append(provider)
@@ -213,7 +207,9 @@ def _conditions(q='', tag='', provider='', format='', source_id='', *, genre='',
         args.extend(source_ids)
     if format:
         sql.append('t.format=?')
-        args.append({'манга':'manga','манхва':'manhwa','маньхуа':'manhua','вебтун':'webtoon'}.get(normalize(format),format))
+        args.append({'манга':'manga','манхва':'manhwa','маньхуа':'manhua','комикс':'comic','руманга':'rumanga','вебтун':'webtoon'}.get(normalize(format),format))
+    if readingMode=='webtoon':sql.append("(t.format='webtoon' OR json_extract(t.metadata,'$.readingMode') IN ('webtoon','vertical','scroll'))")
+    if readingMode=='paged':sql.append("(t.format!='webtoon' AND COALESCE(json_extract(t.metadata,'$.readingMode'),'') NOT IN ('webtoon','vertical','scroll'))")
     if language and language!='all':
         sql.append('t.language=?');args.append(language)
     if year:
@@ -244,41 +240,39 @@ SORTS = {
 def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30, offset=0, sort='', **filters):
     limit = min(100,max(1,int(limit)))
     offset = min(100000,max(0,int(offset)))
-    where,args = _conditions(q,tag,provider,format,source_id,**filters)
-    if not normalize(q):
-        return _browse_works(conn,where,args,sort,limit,offset)
-    total = conn.execute('SELECT COUNT(*) FROM catalog_titles t'+where,args).fetchone()[0]
-    rank=''
-    ranking=[]
-    if normalize(q):
-        rank="CASE WHEN catalog_normalize(t.title)=? THEN 0 WHEN EXISTS(SELECT 1 FROM json_each(t.metadata,'$.aliases') a WHERE catalog_normalize(a.value)=?) THEN 1 WHEN catalog_normalize(t.title) LIKE ? ESCAPE '\\' THEN 2 ELSE 3 END,"
-        term=normalize(q);ranking=[term,term,term+'%']
-    values = conn.execute('SELECT id,metadata,chapter_count,tag_state,updated FROM catalog_titles t'+where+
-                          ' ORDER BY '+rank+(SORTS.get(sort) or ('t.updated DESC,t.id' if rank else SORTS['new']))+' LIMIT ? OFFSET ?', [*args,*ranking,limit,offset]).fetchall()
-    result=[]
-    for identity,metadata,chapters,status,updated in values:
-        row=_public_metadata(json.loads(metadata))
-        row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated})
-        result.append(row)
-    return {'total':total,'limit':limit,'offset':offset,'items':result}
+    facet={k:filters.pop(k,'') for k in ['genre','excludeGenre','excludeTag']}
+    where,args = _conditions(q,'',provider,format,source_id,**filters)
+    from catalog_taxonomy import clauses
+    extra,values=clauses(conn,kind='manga',tag=tag,manga=True,**facet)
+    if extra:where+=(' AND ' if where else ' WHERE ')+' AND '.join(extra);args.extend(values)
+    return _browse_works(conn,where,args,sort,limit,offset,q=q)
 
-def _browse_works(conn,where,args,sort,limit,offset):
+def _browse_works(conn,where,args,sort,limit,offset,q=''):
     # Page over works, then return every matching source row of those works
     # (a few per work) in page order; the client folds them into one card.
     # total stays the number of source rows; workTotal counts works for paging.
     total,works_total = conn.execute('SELECT COUNT(*),COUNT(DISTINCT t.work_key) FROM catalog_titles t'+where,args).fetchone()
-    keys = [k for (k,) in conn.execute('SELECT t.work_key FROM catalog_titles t'+where+' GROUP BY t.work_key ORDER BY '+(WORK_SORTS.get(sort) or WORK_SORTS['new'])+' LIMIT ? OFFSET ?',[*args,limit,offset])]
+    order=WORK_SORTS.get(sort) or WORK_SORTS['new'];ranking=[]
+    if normalize(q):
+        order="MIN(CASE WHEN catalog_normalize(t.title)=? OR EXISTS(SELECT 1 FROM json_each(t.metadata,'$.aliases') a WHERE catalog_normalize(a.value)=?) THEN 0 ELSE 1 END),"+order
+        ranking=[normalize(q),normalize(q)]
+    keys = [k for (k,) in conn.execute('SELECT t.work_key FROM catalog_titles t'+where+' GROUP BY t.work_key ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,*ranking,limit,offset])]
+
     result=[]
     if keys:
         place={k:i for i,k in enumerate(keys)}
         clause=(' AND ' if where else ' WHERE ')+'t.work_key IN ('+','.join('?'*len(keys))+')'
         rows=conn.execute('SELECT t.id,t.metadata,t.chapter_count,t.tag_state,t.updated,t.work_key FROM catalog_titles t'+where+clause+' ORDER BY t.chapter_count IS NULL,t.chapter_count DESC,t.id',[*args,*keys]).fetchall()
+        facts={key:{'genres':[],'tags':[]} for key in keys}
+        for work_key,raw in conn.execute('SELECT work_key,metadata FROM catalog_titles WHERE work_key IN ('+','.join('?' for _ in keys)+')',keys):
+            public=_public_metadata(json.loads(raw))
+            for field in ['genres','tags']:facts[work_key][field]=list(dict.fromkeys([*facts[work_key][field],*public.get(field,[])]))[:120]
         counts={}
         for identity,metadata,chapters,status,updated,key in sorted(rows,key=lambda r:place[r[5]]):
             counts[key]=counts.get(key,0)+1
             if counts[key]>WORK_SOURCES:continue
             row=_public_metadata(json.loads(metadata))
-            row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated,'workKey':key})
+            row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated,'workKey':key,'workFacts':facts[key]})
             result.append(row)
     return {'total':total,'workTotal':works_total,'limit':limit,'offset':offset,'works':len(keys),'items':result}
 

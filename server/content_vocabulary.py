@@ -25,6 +25,8 @@ def bump(db):
     db.execute("INSERT INTO content_catalog_state VALUES('vocabulary','1') ON CONFLICT(name) DO UPDATE SET value=CAST(value AS INTEGER)+1")
 
 def add(db,label,source,category,kind):
+    from catalog_taxonomy import classify
+    if not classify(label,category,kind,current(),source):return 0
     return db.execute('INSERT OR IGNORE INTO catalog_vocabulary VALUES(?,?,?,?)',(label,source,category,kind)).rowcount
 
 def public(store):
@@ -40,14 +42,19 @@ def public(store):
         # terms or an unrestricted fallback on unfiltered remote metadata.
         if policy.include_discovered:
             known={row['key']:dict(row) for row in data['tags']}
-            for label,source,category,_ in store.db.execute('SELECT label,source,category,kind FROM catalog_vocabulary ORDER BY label,source'):
+            from catalog_taxonomy import classify
+            for label,source,category,kind in store.db.execute('SELECT label,source,category,kind FROM catalog_vocabulary ORDER BY label,source'):
+                classified=classify(label,category,kind,policy,source)
+                if not classified:continue
+                category,label=classified
                 key=policy.key(label,source)
                 if not key:continue
                 if key not in known:known[key]={'key':key,'label':label,'aliases':[label]}
                 if key not in policy.rules:
                     row=known[key]
                     if label not in row['aliases']:row['aliases'].append(label)
-                    if category=='genres':row['genreHint']=True
+                    if category=='genres':row['genreHint']=True;row['category']='genre'
+                    else:row.setdefault('category','tag')
             data['tags']=list(known.values())
         # The private switch is implemented by expanding observed, allowed
         # source labels; its private hidden list is never delivered publicly.

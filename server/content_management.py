@@ -32,7 +32,11 @@ def prioritize(store,subject,tag='',genre=''):
     if not current().include_discovered or not isinstance(subject,str) or subject.startswith(('guest:','share:')) or not (tag or genre):return
     from catalogue_indexer import ensure
     service=ensure(store)
-    if service:service.prioritize([*str(tag or '').split(','),genre])
+    if service:
+        def values(raw):
+            try:return json.loads(raw) if str(raw or '').startswith('[') else str(raw or '').split(',')
+            except ValueError:return []
+        service.prioritize([*values(tag),*values(genre)][:64])
 
 def save(store,data,expected):
     data=json.loads(json.dumps(data))
@@ -225,8 +229,8 @@ def install(app,owner,viewer,manager):
         with store.lock,store.db:return {'indexed':content_catalog.ingest(store.db,body.items)}
 
     @app.get('/catalog/content')
-    def content(q:str='',kind:str='anime',tag:str='',genre:str='',offset:int=0,limit:int=60,tagPolicyRevision:str='',subject=Depends(viewer)):
+    def content(q:str='',kind:str='anime',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',format:str='',year:str='',age:str='',offset:int=0,limit:int=60,tagPolicyRevision:str='',subject=Depends(viewer)):
         store=manager()
-        with store.lock:result=content_catalog.browse(store.db,kind=kind,q=q[:160],tag=tag[:120],genre=genre[:120],offset=offset,limit=limit)
+        with store.lock:result=content_catalog.browse(store.db,kind=kind,q=q[:160],tag=tag[:4096],genre=genre[:4096],excludeGenre=excludeGenre[:4096],excludeTag=excludeTag[:4096],format=format[:60],year=year[:4],age=age[:20],offset=offset,limit=limit)
         prioritize(store,subject,tag,genre)
         return with_policy(result,tagPolicyRevision,store)

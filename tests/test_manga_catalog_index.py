@@ -38,10 +38,10 @@ class CatalogIndexTests(unittest.TestCase):
         self.assertEqual(upsert(self.db,[row]),1)
         self.assertEqual(stats(self.db)['totalTitles'],1)
         self.assertEqual(browse(self.db,q='garden')['total'],1)
-        self.assertEqual(browse(self.db,tag='fantasy')['total'],1)
-        self.assertEqual(browse(self.db,tag='фэнтези')['total'],1)
-        self.assertEqual(browse(self.db,tag='романтика',format='manhwa')['total'],1)
-        self.assertEqual(browse(self.db,tag='романтика',format='manga')['total'],0)
+        self.assertEqual(browse(self.db,genre='fantasy')['total'],1)
+        self.assertEqual(browse(self.db,genre='фэнтези')['total'],1)
+        self.assertEqual(browse(self.db,genre='романтика',format='manhwa')['total'],1)
+        self.assertEqual(browse(self.db,genre='романтика',format='manga')['total'],0)
         self.assertEqual(tags(self.db)['tags'][0]['works'],1)
 
     def test_detail_preserved_after_search_without_tags(self):
@@ -56,7 +56,7 @@ class CatalogIndexTests(unittest.TestCase):
         upsert(self.db,[search_result],timestamp=3)
         item=browse(self.db)['items'][0]
         self.assertEqual(item['chapterCount'],2)
-        self.assertIn('Приключения',item['tags'])
+        self.assertIn('Приключения',item['genres'])
         self.assertNotIn('pages',item)
         self.assertNotIn('episodes',item)
         self.assertEqual(item['tagStatus'],'present')
@@ -69,7 +69,7 @@ class CatalogIndexTests(unittest.TestCase):
         upsert(self.db,[left,right])
         self.assertEqual(stats(self.db)['totalTitles'],2)
         self.assertEqual(browse(self.db,provider='hmanga')['total'],1)
-        self.assertEqual(browse(self.db,tag='фэнтези')['total'],2)
+        self.assertEqual(browse(self.db,genre='фэнтези')['total'],2)
         self.assertEqual(tags(self.db,source_id='990000000000000003')['tags'][0]['works'],2)
 
     def test_missing_taxonomy_is_not_invented_and_bad_url_ignored(self):
@@ -107,13 +107,13 @@ class CatalogIndexTests(unittest.TestCase):
     def test_combined_filters_require_each_fact_and_keep_reader_reference(self):
         row={**self.work(),'year':2024,'url':'https://media.example/__manga/suwayomi/m/42'}
         upsert(self.db,[row])
-        filters=dict(q='garden world',tag='FANTASY,romance',genre='DRAMA',format='Манхва',language='ru',
+        filters=dict(q='garden world',genre='FANTASY,romance,DRAMA',format='Манхва',language='ru',
                      source_ids=[row['sourceId']],year='2024',age='adult')
         result=browse(self.db,**filters)
         self.assertEqual(result['total'],1)
         self.assertEqual(result['items'][0]['url'],row['url'])
         self.assertEqual(result['items'][0]['sourceUrl'],row['sourceUrl'])
-        for key,value in [('tag','fantasy,horror'),('genre','fantasy'),('language','en'),('year','2023'),
+        for key,value in [('tag','unknown'),('genre','horror'),('language','en'),('year','2023'),
                           ('source_ids',['1']),('age','under18')]:
             self.assertEqual(browse(self.db,**{**filters,key:value})['total'],0,key)
 

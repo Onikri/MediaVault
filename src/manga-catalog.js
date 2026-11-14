@@ -1,3 +1,4 @@
+import {filterParam} from './catalog-taxonomy.js';
 import {mangaPolicy,normalizeTag as normalized} from './manga-tag-policy.js';
 
 export const mangaTagKey=value=>mangaPolicy().key(value);
@@ -11,8 +12,8 @@ export function loadMangaTaxonomy(){
 }
 
 export function mangaCatalogParams({query='',filters={},language='all',sourceIds=[],page=1,limit=30,sort=''}={}){
- const values={q:query.trim(),tag:filters.tag,genre:filters.genre,year:filters.year,format:filters.format,age:filters.age,language,sourceIds:[...sourceIds].sort().join(','),offset:(Math.max(1,page)-1)*limit,limit,sort};
- return new URLSearchParams(Object.entries(values).filter(([,v])=>v!==undefined&&v!==null&&v!==''));
+ const values={q:query.trim(),tag:filters.tag,genre:filters.genre,excludeGenre:filters.excludeGenre,excludeTag:filters.excludeTag,readingMode:filters.readingMode,year:filters.year,format:filters.format,age:filters.age,language,sourceIds:[...sourceIds].sort().join(','),offset:(Math.max(1,page)-1)*limit,limit,sort};
+ return new URLSearchParams(Object.entries(values).filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([key,value])=>[key,filterParam(value)]));
 }
 
 export function mangaFacetOptions(snapshot,live=[],{sourceIds=[],sources={}}={}){
