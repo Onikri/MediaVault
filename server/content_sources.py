@@ -1,5 +1,5 @@
 """Owner-triggered bounded public taxonomy/metadata refresh. No reader bytes."""
-import json,time
+import json,time,threading
 from urllib.parse import urljoin,urlsplit,urlencode
 from urllib.robotparser import RobotFileParser
 import requests,httpx
@@ -12,6 +12,7 @@ from manga_tag_deploy import atomic_write
 
 UA='MediaVault-Content/1.0 (+https://github.com/Onikri/MediaVault)'
 SELECTOR='a[rel="tag"],.tags a[href],.genres a[href],.tag-list a[href],.genre-list a[href],a[href*="/tag/"],a[href*="/tags/"],a[href*="/genre/"],a[href*="/genres/"],a[href*="/category/"],a[href*="tag="]'
+_robots={};_robots_lock=threading.Lock()
 
 def matching_terms(terms,domain,keys):
     found={}
@@ -20,11 +21,11 @@ def matching_terms(terms,domain,keys):
         if key and (keys is None or key in keys):found.setdefault(key,term)
     return list(found.values())
 
-def checked_get(session,url,hosts,headers=None):
+def checked_get(session,url,hosts,headers=None,timeout=10):
     for _ in range(4):
         p=urlsplit(url)
         if p.scheme!='https' or p.hostname not in hosts or p.username or p.password:raise ValueError('unapproved taxonomy host')
-        response=session.send(session.build_request('GET',url,headers=headers or {},timeout=10),stream=True,follow_redirects=False) if isinstance(session,httpx.Client) else session.get(url,headers=headers or {},timeout=(4,10),allow_redirects=False,stream=True)
+        response=session.send(session.build_request('GET',url,headers=headers or {},timeout=timeout),stream=True,follow_redirects=False) if isinstance(session,httpx.Client) else session.get(url,headers=headers or {},timeout=(4,timeout),allow_redirects=False,stream=True)
         try:
             if isinstance(response,httpx.Response) and response.http_version!='HTTP/2':raise ValueError('HTTP/2 required')
             if response.status_code in {301,302,303,307,308}:
@@ -40,11 +41,18 @@ def checked_get(session,url,hosts,headers=None):
 
 def permitted(session,url,hosts,headers=None):
     p=urlsplit(url)
+    key=(p.scheme+'://'+p.netloc,tuple(sorted(hosts)));now=time.monotonic()
+    with _robots_lock:hit=_robots.get(key)
+    if hit and hit[0]>now:return hit[1].can_fetch(UA,url) if hit[1] else hit[2]
     try:
         raw,_=checked_get(session,p.scheme+'://'+p.netloc+'/robots.txt',hosts,headers)
-        robots=RobotFileParser();robots.parse(raw.decode(errors='replace').splitlines());return robots.can_fetch(UA,url)
-    except (requests.HTTPError,httpx.HTTPStatusError) as error:return error.response.status_code==404
-    except Exception:return False
+        robots=RobotFileParser();robots.parse(raw.decode(errors='replace').splitlines());allowed=robots.can_fetch(UA,url);ttl=3600
+    except (requests.HTTPError,httpx.HTTPStatusError) as error:robots=None;allowed=error.response.status_code==404;ttl=3600 if allowed else 60
+    except Exception:robots=None;allowed=False;ttl=60
+    with _robots_lock:
+        if len(_robots)>128:_robots.clear()
+        _robots[key]=(now+ttl,robots,allowed)
+    return allowed
 
 def html_terms(raw,url,hosts):
     found={}
@@ -107,8 +115,8 @@ def lib_titles(payload,site_id,label,category):
     from manga_catalog_adapters import LIB_SITES,lib_identity
     provider,name,root=LIB_SITES[site_id];rows=[]
     for row in payload.get('data',[])[:60]:
-        slug=row.get('slug_url');title=row.get('rus_name') or row.get('eng_name') or row.get('name')
-        if not isinstance(slug,str) or not __import__('re').fullmatch(r'[\w-]{1,250}',slug) or not isinstance(title,str):continue
+        slug=row.get('slug_url');title=next((' '.join(v.split()) for v in (row.get('rus_name'),row.get('eng_name'),row.get('name')) if isinstance(v,str) and v.strip()),'')
+        if not isinstance(slug,str) or not __import__('re').fullmatch(r'[\w-]{1,1024}',slug) or not isinstance(title,str):continue
         field='genres' if category=='genre' else 'tags';facts=from_api(row);facts[field]=list(dict.fromkeys([*facts[field],label]))
         format={'Манга':'manga','Манхва':'manhwa','Маньхуа':'manhua','Manga':'manga','Manhwa':'manhwa','Manhua':'manhua'}.get((row.get('type') or {}).get('label'),'manga')
         rows.append({'kind':'manga','format':format,'provider':provider,'providerName':name,'title':title,'aliases':[title],
