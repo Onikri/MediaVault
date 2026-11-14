@@ -1,6 +1,6 @@
 // CI contract with neutral controls; no source/account requests or ML inference.
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{chromium}=require('playwright');
-const root=process.cwd(),dir=path.join(root,'.codex-local/test-output/catalog-morph');let browser,vite;
+const root=process.cwd(),dir=path.join(root,'.codex-local/test-output/catalog-morph');let browser,vite,lastPage;
 (async()=>{
  await fs.mkdir(dir,{recursive:true});
  await fs.writeFile(path.join(dir,'index.html'),'<meta name="viewport" content="width=device-width"><div id="root"></div><script type="module" src="./fixture.jsx"></script>');
@@ -20,7 +20,7 @@ const root=process.cwd(),dir=path.join(root,'.codex-local/test-output/catalog-mo
  const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-catalog-morph',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
  for(const width of [320,390,768,1440]){
-  const page=await browser.newPage({viewport:{width,height:960},reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const page=lastPage=await browser.newPage({viewport:{width,height:960},reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://**/*',route=>route.fulfill({status:204}));
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/catalog-morph/index.html');
   const query=page.getByRole('textbox',{name:'Поиск в каталоге'});await query.fill('Garden');
@@ -31,7 +31,7 @@ const root=process.cwd(),dir=path.join(root,'.codex-local/test-output/catalog-mo
   assert.equal(await page.locator('.catalog-toolbar').count(),1,'Only one toolbar is mounted');
   assert.equal(await page.locator('.catalog-nav-slot .catalog-toolbar').count(),1);
   assert.equal(await query.inputValue(),'Garden');
-  await page.getByRole('button',{name:'Раздел: Манга. Сменить раздел'}).waitFor();
+  await page.getByRole('button',{name:'Раздел: Манга. Сменить раздел'}).waitFor({timeout:8000}).catch(async error=>{console.error(await page.evaluate(()=>({scroll:scrollY,brand:document.querySelector('.header-brand-area')?.textContent,display:document.querySelector('.header-brand-area')&&getComputedStyle(document.querySelector('.header-brand-area')).display,width:document.querySelector('.navbar-brand-morph')?.getBoundingClientRect().width})));throw error;});
   await page.keyboard.press('Control+k');assert.equal(await query.evaluate(e=>document.activeElement===e),true);assert.equal(await page.evaluate(()=>!!window.globalSearchOpened),false);
   await query.evaluate(e=>e.blur());
   if(!(await page.getByRole('toolbar',{name:'Фильтры каталога'}).isVisible()))await page.getByRole('button',{name:/^Фильтры/}).click();
@@ -45,4 +45,4 @@ const root=process.cwd(),dir=path.join(root,'.codex-local/test-output/catalog-mo
   assert.equal(await query.inputValue(),'Garden');assert.equal(await page.locator('.catalog-toolbar').count(),1);assert.deepEqual(errors,[]);
   await page.close();console.log('PASS signed filters, one dock, section brand, focus and reverse scroll '+width);
  }
-})().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});
+})().catch(async e=>{console.error(e);await lastPage?.screenshot({path:path.join(dir,'failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

@@ -39,9 +39,13 @@ def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False)
     result=[];params=[]
     for field,raw,negative in [('genres',genre,False),('tags',tag,False),('genres',excludeGenre,True),('tags',excludeTag,True)]:
         try:values=raw if isinstance(raw,(list,tuple)) else json.loads(raw) if str(raw or '').startswith('[') else str(raw or '').split(',')
-        except (ValueError,TypeError):values=[]
-        if not isinstance(values,(list,tuple)):values=[]
-        values=list(dict.fromkeys(str(v).strip() for v in values if str(v).strip()))[:64]
+        except (ValueError,TypeError):
+            from fastapi import HTTPException
+            raise HTTPException(422,'Неверный список фильтров.') from None
+        if not isinstance(values,(list,tuple)) or len(values)>64 or any(not isinstance(v,str) or len(v)>120 for v in values):
+            from fastapi import HTTPException
+            raise HTTPException(422,'Не больше 64 текстовых значений в группе фильтров.')
+        values=list(dict.fromkeys(v.strip() for v in values if v.strip()))
         if not values:continue
         wanted=sorted({k for v in values for k in keys(v,policy,allow_hidden=negative)})
         if not wanted:

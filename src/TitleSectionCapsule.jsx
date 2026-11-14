@@ -18,7 +18,7 @@ export function TitleSectionCapsule({sections,active,navbar=false,width,disabled
 }
 export function NavbarTitleBrand({fallback}){
  const state=useTitleNavigation(),section=useSectionBrand(),[width,setWidth]=useState(144),reduce=useReducedMotion();
- useLayoutEffect(()=>{if(state?.merged||section)return;const node=document.querySelector('.header-brand-area .brand.logo');if(!node)return;const update=()=>setWidth(node.getBoundingClientRect().width);update();const observer=new ResizeObserver(update);observer.observe(node);return()=>observer.disconnect();},[!!state?.merged,!!section]);
+ useLayoutEffect(()=>{if(state?.merged||section)return;const node=document.querySelector('.header-brand-area .brand.logo');if(!node)return;const update=()=>{const measured=node.getBoundingClientRect().width;if(measured>48)setWidth(measured);};update();const observer=new ResizeObserver(update);observer.observe(node);return()=>observer.disconnect();},[!!state?.merged,!!section]);
  if(state?.merged)return <TitleSectionCapsule navbar sections={state.sections} active={state.active} width={width}/>;
  // Scrolled past the library sections: the logo slides away and the current section takes its place.
  const slide=reduce?{initial:false,animate:{opacity:1},exit:{opacity:0}}:{initial:{opacity:0,y:'70%',filter:'blur(4px)'},animate:{opacity:1,y:'0%',filter:'blur(0px)'},exit:{opacity:0,y:'-70%',filter:'blur(4px)'}};
