@@ -107,7 +107,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const tagOptions=[...new Set([...(globalTags?[...mangaPolicy().rules.values()].map(row=>row.label):kind==='manga'?[]:Object.values(tagLabels)),...sourceFacets.map(t=>t.label),...items.flatMap(item=>kind==='manga'||globalTags?item.tags:item.tags.map(localLabel))])].sort((a,b)=>a.localeCompare(b,'ru'));
   const formats=[...new Set([...items.map(item=>item.format),...(kind==='manga'?['manga','manhwa','manhua','webtoon']:[])].filter(Boolean).map(f=>kind==='manga'?mangaFormatLabel(f):f))];
   const hasMore=browsing?indexSpine?!!indexed.hasMore:metadataPages?page<metadataPages:metadataItems.length>=16:!(!contentIndex.hasMore&&metadataItems.length<16&&(!indexed.ready||!indexed.hasMore));
-  const pageCounts=browsing?[indexSpine?indexed.ready&&indexed.total?Math.ceil(indexed.total/perPage):null:metadataPages].filter(n=>n>0):[metadataPages,contentIndex.pages,kind==='manga'&&indexed.ready&&indexed.total?Math.ceil(indexed.total/30):null].filter(n=>n>0);
+  const pageCounts=browsing?[indexSpine?indexed.ready&&(indexed.workTotal||indexed.total)?Math.ceil((indexed.workTotal||indexed.total)/perPage):null:metadataPages].filter(n=>n>0):[metadataPages,contentIndex.pages,kind==='manga'&&indexed.ready&&indexed.total?Math.ceil(indexed.total/30):null].filter(n=>n>0);
   // Keep the last known page count while the next page loads, so the numbers do not jump.
   const pageScope=JSON.stringify([query.trim(),kind,filters,voice,sourceIds,sourceLanguage,sort,perPage]),knownPages=useRef({scope:'',pages:null});
   if(knownPages.current.scope!==pageScope)knownPages.current={scope:pageScope,pages:null};

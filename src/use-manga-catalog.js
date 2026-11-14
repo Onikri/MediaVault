@@ -28,7 +28,7 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
     if(abort.signal.aborted)return null;
     if(titles.status==='rejected'){setSnapshot({...empty,key,error:titles.reason.message});return null;}
     const data=acceptContentPolicy(titles.value),rows=data.items||[],context=candidates.status==='fulfilled'?candidates.value.items||[]:[];
-    setSnapshot({key,results:rows,candidates:context,facets:facets.status==='fulfilled'?facets.value.tags||[]:[],total:data.total||0,hasMore:Number(data.offset||0)+rows.length<Number(data.total||0),loading:false,enriching,ready:true,error:facets.status==='rejected'?facets.reason.message:''});
+    setSnapshot({key,results:rows,candidates:context,facets:facets.status==='fulfilled'?facets.value.tags||[]:[],total:data.total||0,workTotal:Number(data.workTotal??data.total??0),hasMore:Number(data.offset||0)+Number(data.works??rows.length)<Number(data.workTotal??data.total??0),loading:false,enriching,ready:true,error:facets.status==='rejected'?facets.reason.message:''});
     return context;
    }
    const context=await read();if(!context||!filtered)return;
@@ -48,7 +48,7 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
  useEffect(()=>{
   if(kind!=='manga'||Number(service.session?.serverVersion)<74||paused||composing)return;
   const abort=new AbortController();let busy=false;
-  const refresh=async()=>{if(document.hidden||busy)return;busy=true;try{const [rows,facets]=await Promise.all([live.current.request('/manga/catalog?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:abort.signal}),live.current.request('/manga/catalog/tags?'+facetParams,{signal:abort.signal})]);if(!abort.signal.aborted)setSnapshot(old=>old.key===key?{...old,results:acceptContentPolicy(rows).items||[],facets:facets.tags||[],total:rows.total||0,hasMore:Number(rows.offset||0)+(rows.items||[]).length<Number(rows.total||0),ready:true}:old);}catch{}finally{busy=false;}};
+  const refresh=async()=>{if(document.hidden||busy)return;busy=true;try{const [rows,facets]=await Promise.all([live.current.request('/manga/catalog?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:abort.signal}),live.current.request('/manga/catalog/tags?'+facetParams,{signal:abort.signal})]);if(!abort.signal.aborted)setSnapshot(old=>old.key===key?{...old,results:acceptContentPolicy(rows).items||[],facets:facets.tags||[],total:rows.total||0,workTotal:Number(rows.workTotal??rows.total??0),hasMore:Number(rows.offset||0)+Number(rows.works??(rows.items||[]).length)<Number(rows.workTotal??rows.total??0),ready:true}:old);}catch{}finally{busy=false;}};
   const timer=setInterval(refresh,15000);addEventListener('focus',refresh);return()=>{clearInterval(timer);removeEventListener('focus',refresh);abort.abort();};
  },[key,facetParams,paused,composing,service.session?.serverVersion]);
  return {...(snapshot.key===key?snapshot:empty),taxonomy,taxonomyError,capable,retry:()=>{attempted.current.clear();setRetryGeneration(v=>v+1);}};

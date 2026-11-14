@@ -45,3 +45,11 @@ test('titles get a readable address name and their own tab', ()=>{
  assert.match(kindIcon('manga'),/^data:image\/svg\+xml,/);
  assert.equal(kindIcon('all'),null);
 });
+
+test('source rows of one indexed work fold into one card with every source', async ()=>{
+ const {worldResults}=await import('../src/world-search.js');
+ const row=(site,year,title)=>({id:site+':1',provider:site,providerName:site,url:'https://'+site+'.example/1',title,year,kind:'manga',catalogId:site.padEnd(32,'0'),workKey:'garden'});
+ const items=worldResults([],[row('a',2001,'Garden'),row('b',2004,'GARDEN!'),row('c',null,'Garden')],'',[],[]);
+ assert.equal(items.length,1);
+ assert.deepEqual(items[0].sources.map(s=>s.url).sort(),['https://a.example/1','https://b.example/1','https://c.example/1']);
+});
