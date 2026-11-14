@@ -151,6 +151,10 @@ class DeliverySession:
     cache_complete: bool = False
     cache_started: bool = False
     demands: int = 0
+    aliases: dict = field(default_factory=dict)
+    generation: int = 0
+    refreshes: int = 0
+    refresh_lock: object = field(default_factory=asyncio.Lock)
 
 
 class AllohaDelivery:
@@ -164,6 +168,9 @@ class AllohaDelivery:
         self.archive = None
         self.archive_tasks = set()
         self.restore_locks = {}
+        self.prefetch_interval = max(0, float(os.getenv('ALLOHA_PREFETCH_INTERVAL', '2')))
+        self.prefetch_pacing = asyncio.Lock()
+        self.prefetch_next = 0
         self.factory, self.clock = factory, clock
         self.direct_factory, self.default_mode = direct_factory, default_mode
         self.queue_timeout, self.ttl = queue_timeout, session_ttl
@@ -342,7 +349,7 @@ class AllohaDelivery:
                 return cached
         if session.mode == 'bnsi':
             try:
-                value = await session.source.fetch(url, byte_range, probe=probe)
+                value = await session.source.fetch(session.aliases.get(url, url), byte_range, probe=probe)
             except SourceRefused as error:
                 self.log(session, error.status or 403, url, reason=error.reason)
                 raise
@@ -374,15 +381,33 @@ class AllohaDelivery:
         task = session.transfers.get(key)
         if task is None:
             async def load():
+                if background and session.cache_key:
+                    cached = await cache_io(self.vod.get, session.cache_key, url, byte_range)
+                    if cached:
+                        return cached
+                    # Match the existing Alloha importer cadence. An unlimited
+                    # full-film burst can invalidate an otherwise healthy CDN session.
+                    async with self.prefetch_pacing:
+                        await asyncio.sleep(max(0, self.prefetch_next-time.monotonic()))
+                        self.prefetch_next = time.monotonic()+self.prefetch_interval
                 while background and session.demands:
                     await asyncio.sleep(.01)
                 # BNSI is ordinary HTTP: one background transfer may overlap
                 # one foreground seek. Native WS/browser transports keep their
                 # existing serialized I/O. Neither path adds source bursts.
                 guard = session.prefetch_io if background and session.mode == 'bnsi' and session.cache_key else session.io_lock
-                async with guard:
-                    self.session(session.sid)
-                    return await self.fetch(session, url, kind=kind, byte_range=byte_range)
+                generation = session.generation
+                try:
+                    async with guard:
+                        self.session(session.sid)
+                        return await self.fetch(session, url, kind=kind, byte_range=byte_range)
+                except (SourceRefused, SourceInvalid) as error:
+                    if not session.cache_key or session.mode != 'bnsi' or getattr(error, 'status', None) not in {401, 403, 404, 410}:
+                        raise
+                    await self.refresh_http(session, generation)
+                    async with guard:
+                        self.session(session.sid)
+                        return await self.fetch(session, url, kind=kind, byte_range=byte_range)
             task = asyncio.create_task(load())
             session.transfers[key] = task
             def finished(done):
@@ -393,6 +418,81 @@ class AllohaDelivery:
                         session.transfers.pop(key, None)
             task.add_done_callback(finished)
         return await asyncio.shield(task)
+
+    async def refresh_http(self, session, generation):
+        """Renew expiring HTTP links without replacing the viewer capability.
+
+        Reuse the importer's strict track/layout/map/key compatibility check.
+        Different cuts, audio, durations or encryption never share old fragments.
+        """
+        from alloha_import import AllohaImportHttp
+        from types import SimpleNamespace
+        async with session.refresh_lock:
+            if session.generation != generation:
+                return
+            if session.refreshes >= 8 or session.cache_complete:
+                raise SourceInvalid('Alloha renewal limit reached')
+            async with session.io_lock, session.prefetch_io:
+                replacement = self.direct_factory(session.iframe, referer=session.referer or None)
+                accepted = False
+                try:
+                    await replacement.open(session.active)
+                    metadata = await replacement.metadata()
+                    row = next((r for r in metadata['sources'] if str(r.get('audioId')) == session.active), None)
+                    quality = session.online_quality
+                    if not row or str(metadata['active_id']) != session.active_id or str(metadata['active']) != session.active or str(row.get('label') or session.active) != session.translations[session.active]['name']:
+                        raise SourceInvalid('Renewed Alloha audio/cut changed')
+                    url = (row.get('quality') or {}).get(quality) or (row.get('quality') or {}).get(quality+'p')
+                    if not isinstance(url, str):
+                        raise SourceInvalid('Renewed Alloha quality changed')
+                    renewed = DeliverySession('renewal', session.iframe, None, replacement, session.expires,
+                                              session.address, mode='bnsi', online_quality=quality)
+                    def plan(native):
+                        value = AllohaImportHttp(SimpleNamespace(service=self), session.iframe, quality, lambda _: None, None, None)
+                        value.session, value.selected = native, quality
+                        return value
+                    old, new = plan(session), plan(renewed)
+                    await old.build(session.translations[session.active]['qualities'][quality], 'root')
+                    await new.build(public_url(url.split(' or ')[0].strip(), resolve_dns=False), 'root')
+                    if old.layout != new.layout or old.resources.keys() != new.resources.keys():
+                        raise SourceInvalid('Renewed Alloha segment layout changed')
+                    for name, (target, interval, kind) in old.resources.items():
+                        if kind not in {'map', 'key'}:
+                            continue
+                        original = await cache_io(self.vod.get, session.cache_key, target, interval)
+                        if original is None:
+                            raise SourceInvalid('Original Alloha initialization missing')
+                        fresh_url, fresh_range, _ = new.resources[name]
+                        fresh = await self.fetch(renewed, fresh_url, byte_range=fresh_range, kind='key' if kind == 'key' else 'media', cache=False)
+                        if hashlib.sha256(original[0]).digest() != hashlib.sha256(fresh[0]).digest():
+                            raise SourceInvalid('Renewed Alloha initialization changed')
+                    aliases = {target: new.resources[name][0] for name, (target, _, _) in old.resources.items()}
+                    first_name = next((n for n, (_, _, kind) in old.resources.items() if kind == 'media'), None)
+                    if first_name:
+                        old_url, interval, _ = old.resources[first_name]
+                        original = await cache_io(self.vod.get, session.cache_key, old_url, interval)
+                        if original is not None:
+                            start = int(interval[6:].split('-')[0]) if interval else 0
+                            length = min(65536, len(original[0]))
+                            sample = await self.fetch(renewed, new.resources[first_name][0],
+                                byte_range=f'bytes={start}-{start+length-1}', probe=True, cache=False)
+                            if sample[0][:length] != original[0][:length]:
+                                raise SourceInvalid('Renewed Alloha video changed')
+                    for track in session.subtitles:
+                        matches = [t for t in metadata.get('subtitles', []) if str(t.get('label') or 'Субтитры')[:160] == track['label'] and str(t.get('lang') or 'und')[:20] == track['lang']]
+                        if len(matches) == 1:
+                            target = session.resource_urls[track['src'].split('?u=', 1)[-1]]
+                            aliases[target] = public_url(matches[0]['src'], resolve_dns=False)
+                    old_source = session.source
+                    session.source, session.aliases = replacement, aliases
+                    session.generation += 1
+                    session.refreshes += 1
+                    accepted = True
+                    await old_source.close()
+                    self.log(session, 200, session.iframe, reason='renewed-compatible-vod')
+                finally:
+                    if not accepted:
+                        await replacement.close()
 
     def lookahead(self, session, url, byte_range):
         if session.cache_key:
@@ -445,7 +545,7 @@ class AllohaDelivery:
 
     async def warm_vod(self, session, root):
         """One sequential downloader; foreground seeks take the next I/O slot."""
-        resources, documents, seen = [], {}, set()
+        resources, documents, seen, planned = [], {}, set(), []
 
         async def visit(url, depth=0, track_kind='media'):
             if depth > 4 or len(seen) > 20000:
@@ -495,15 +595,19 @@ class AllohaDelivery:
                     if pair in wanted:
                         continue
                     wanted.add(pair)
-                    await self.transfer(session, target, kind, interval, background=True)
-                    if await cache_io(self.vod.get, session.cache_key, target, interval) is None:
-                        raise SourceInvalid('VOD cache is full or unavailable')
-                    resources.append(pair)
-                    await asyncio.sleep(.005)  # Yield to playback/seek and other API work.
+                    planned.append((target, interval, kind))
 
         wanted = set()
         try:
             await visit(root)
+            # Freeze every track's VOD document before long background downloads
+            # can outlive a signed child-playlist URL.
+            for target, interval, kind in planned:
+                await self.transfer(session, target, kind, interval, background=True)
+                if await cache_io(self.vod.get, session.cache_key, target, interval) is None:
+                    raise SourceInvalid('VOD cache is full or unavailable')
+                resources.append((target, interval))
+                await asyncio.sleep(0)
             subtitles = []
             for track in session.subtitles:
                 token = track['src'].split('?u=', 1)[-1]

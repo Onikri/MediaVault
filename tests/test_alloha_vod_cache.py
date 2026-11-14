@@ -97,6 +97,7 @@ class VodDeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.profiles = Profiles()
         self.service = AllohaDelivery(self.temp.name, profiles=self.profiles, factory=Source, default_mode='browser')
         self.service.vod.reserve = 0
+        self.service.prefetch_interval = 0
         self.service.external_address = '1.1.1.1'
         self.body = SimpleNamespace(url=IFRAME, quality='720', referer=None, client_id='tab', purpose='playback')
         Source.opened, Source.fail, Source.html = [], False, False
@@ -238,3 +239,34 @@ class VodDeliveryTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result[2], 200)
             finally:
                 release.set(); await task
+
+    async def test_expired_http_links_renew_same_viewer_only_for_compatible_media(self):
+        original_metadata, original_fetch = Source.metadata, Source.fetch
+        async def metadata(source):
+            data = await original_metadata(source)
+            data['active_id'] = 'stable'
+            if getattr(source, 'renewal', False):
+                for row in data['sources']:
+                    row['quality'] = {q: url.replace('cdn.example.com/', 'cdn.example.com/renewed/') for q, url in row['quality'].items()}
+            return data
+        def factory(iframe, referer=None):
+            source = Source(None, iframe, referer=referer); source.renewal = True
+            return source
+        async def fetch(source, url, byte_range='', **kwargs):
+            if url.endswith('second.m4s') and not getattr(source, 'renewal', False):
+                raise SourceRefused('expired fixture', status=403)
+            return await original_fetch(source, url, byte_range)
+        self.service.direct_factory = factory
+        with patch.object(Source, 'metadata', metadata), patch.object(Source, 'fetch', fetch):
+            data = await self.service.prepare_online(self.body, 'owner')
+            session = self.service.session(data['id']); session.mode = 'bnsi'
+            old = session.source
+            await self.service.transfer(session, 'https://cdn.example.com/init.mp4', 'media')
+            await self.service.transfer(session, 'https://cdn.example.com/first.m4s', 'media')
+            result = await self.service.transfer(session, 'https://cdn.example.com/second.m4s', 'media')
+            self.assertEqual(result[2], 200)
+            self.assertEqual(session.generation, 1)
+            self.assertTrue(old.closed)
+            self.assertIs(self.service.session(data['id']), session)
+            self.assertIn('/renewed/', session.aliases['https://cdn.example.com/second.m4s'])
+            self.assertIsNotNone(self.service.vod.get(session.cache_key, 'https://cdn.example.com/second.m4s'))

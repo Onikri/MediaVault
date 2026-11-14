@@ -16,6 +16,11 @@ Only a playback session starts continuous downloading; hover previews don't.
   one concurrent foreground request so an uncached seek needn't wait behind a
   background fragment. Native browser/WS I/O keeps its original serialization.
   In-flight identical requests are joined. No video is transcoded.
+  Background cache misses follow the existing importer's two-second cadence
+  (`ALLOHA_PREFETCH_INTERVAL`); cache hits and foreground seeks aren't delayed.
+  Expiring BNSI links renew under the same viewer capability only after release,
+  dub, quality, segment layout, initialization/key hashes and the first cached
+  media sample match. Renewals are bounded; changed versions never mix.
 * Active viewers pin a shared variant. After the final viewer closes, files remain
   for 1,200 seconds. Capacity pressure never evicts a pinned viewer; when full,
   speculative downloading stops and normal upstream playback remains available.
