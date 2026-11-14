@@ -13,6 +13,14 @@ test('closed leases remove listeners and do not reconnect',()=>{
  const events=new EventTarget();let calls=0,expired=0;const close=keepOnlineLease({request:async()=>calls++},'fixture',()=>expired++,events);close();events.dispatchEvent(new Event('focus'));assert.equal(calls,1);assert.equal(expired,0);
 });
 
+test('browser back-forward cache suspension retains the lease',async()=>{
+ const events=new EventTarget(),calls=[];let expired=0;
+ const close=keepOnlineLease({request:async(path)=>calls.push(path)},'fixture',()=>expired++,events);
+ const hide=new Event('pagehide');Object.defineProperty(hide,'persisted',{value:true});events.dispatchEvent(hide);
+ events.dispatchEvent(new Event('pageshow'));await new Promise(setImmediate);
+ assert.deepEqual(calls,['/online/fixture/heartbeat']);assert.equal(expired,0);close();
+});
+
 test('404 and 410 expire once without parallel reconnects',async()=>{
  for(const status of [404,410]){
   const events=new EventTarget();let expired=0;

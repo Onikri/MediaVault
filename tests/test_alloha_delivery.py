@@ -241,7 +241,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
             sid = r.json()['id'];native = self.service.sessions[sid]
             if reason == 'expired':native.expires = self.service.clock()-1
             else:native.source.socket_closed = True
-            self.assertEqual((await self.client.post('/online/'+sid+'/heartbeat')).status_code, 410)
+            self.assertEqual((await self.client.post('/online/'+sid+'/heartbeat')).status_code, 410 if reason == 'expired' else 200)
             await self.service.close_session(native)
             online_sessions.sessions.pop(sid, None)
 

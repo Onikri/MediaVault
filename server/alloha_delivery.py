@@ -28,6 +28,7 @@ from alloha_browser import NativeSession, SourceInvalid, SourceRefused
 from alloha_bnsi import BnsiSession, MODES
 from alloha_profiles import NativeProfiles, PROFILE_RETRY_INTERVAL
 from source_parser import is_alloha_player, public_url
+from alloha_cache import VodCache, identity as cache_identity
 
 logger = logging.getLogger('mediavault.alloha')
 TTL = 900
@@ -142,9 +143,14 @@ class DeliverySession:
     closed: bool = False
     switch_lock: object = field(default_factory=asyncio.Lock)
     io_lock: object = field(default_factory=asyncio.Lock)
+    prefetch_io: object = field(default_factory=asyncio.Lock)
     next_segments: dict = field(default_factory=dict)
     transfers: dict = field(default_factory=dict)
     prefetches: set = field(default_factory=set)
+    cache_key: str = ''
+    cache_complete: bool = False
+    cache_started: bool = False
+    demands: int = 0
 
 
 class AllohaDelivery:
@@ -153,6 +159,11 @@ class AllohaDelivery:
         root = Path(directory or Path(os.getenv('DATA_DIR') or Path(__file__).resolve().parents[1]) / '.codex-local' / 'alloha-delivery')
         self.profiles = profiles or NativeProfiles(root / 'profiles', clock=clock)
         self.cache = SegmentCache(root / 'segments')
+        self.vod = VodCache(root / 'vod', maximum=int(os.getenv('ALLOHA_VOD_CACHE_BYTES', str(60*1024**3))),
+                            reserve=int(os.getenv('ALLOHA_VOD_FREE_BYTES', str(8*1024**3))))
+        self.archive = None
+        self.archive_tasks = set()
+        self.restore_locks = {}
         self.factory, self.clock = factory, clock
         self.direct_factory, self.default_mode = direct_factory, default_mode
         self.queue_timeout, self.ttl = queue_timeout, session_ttl
@@ -218,6 +229,8 @@ class AllohaDelivery:
         for session in list(self.sessions.values()):
             if session.expires <= self.clock():
                 await self.close_session(session)
+        if self.vod.clock()-self.vod.last_prune >= 30:
+            await cache_io(self.vod.prune)
 
     async def close_session(self, session):
         if session.closed:
@@ -231,6 +244,8 @@ class AllohaDelivery:
             await asyncio.gather(*pending, return_exceptions=True)
         session.transfers.clear()
         session.prefetches.clear()
+        if session.cache_key:
+            await cache_io(self.vod.release, session.cache_key)
         for key, value in list(self.online_clients.items()):
             if value == session.sid:
                 self.online_clients.pop(key, None)
@@ -263,6 +278,8 @@ class AllohaDelivery:
         await asyncio.gather(*(self.close_session(s) for s in list(self.sessions.values())), return_exceptions=True)
         if self.closures:
             await asyncio.gather(*list(self.closures), return_exceptions=True)
+        if self.archive_tasks:
+            await asyncio.gather(*list(self.archive_tasks), return_exceptions=True)
         if self.log_handler:
             self.logger.removeHandler(self.log_handler)
             self.log_handler.close()
@@ -294,6 +311,10 @@ class AllohaDelivery:
             raise HTTPException(404, 'Сессия Alloha истекла.')
         return session
 
+    def renew(self, session):
+        session.expires = self.clock() + self.ttl
+        return self.ttl
+
     def register(self, session, url, kind):
         url = public_url(url, resolve_dns=False)
         if len(session.resources) >= 20000 and url not in session.resources:
@@ -307,9 +328,16 @@ class AllohaDelivery:
 
     async def fetch(self, session, url, *, kind='media', byte_range='', probe=False, cache=True):
         started = self.clock()
+        if session.cache_key and cache and kind != 'manifest' and not probe:
+            cached = await cache_io(self.vod.get, session.cache_key, url, byte_range)
+            if cached:
+                self.log(session, cached[2], url, cached=True, elapsed_ms=round((self.clock()-started)*1000), bytes=len(cached[0]))
+                return cached
         if cache and kind != 'manifest' and not probe:
             cached = await cache_io(self.cache.get, url, byte_range)
             if cached:
+                if session.cache_key:
+                    await cache_io(self.vod.put, session.cache_key, url, byte_range, cached)
                 self.log(session, cached[2], url, cached=True, elapsed_ms=round((self.clock()-started)*1000), bytes=len(cached[0]))
                 return cached
         if session.mode == 'bnsi':
@@ -328,19 +356,31 @@ class AllohaDelivery:
         elif kind == 'subtitle':
             if not raw.lstrip().startswith(b'WEBVTT'):
                 raise SourceInvalid('Source returned invalid subtitles')
+        elif kind == 'key':
+            if len(raw) != 16:
+                raise SourceInvalid('Invalid AES-128 key')
         else:
             media(raw, headers)
         if cache and kind != 'manifest' and not probe:
-            await cache_io(self.cache.put, url, byte_range, value)
+            if session.cache_key:
+                await cache_io(self.vod.put, session.cache_key, url, byte_range, value)
+            else:
+                await cache_io(self.cache.put, url, byte_range, value)
         return value
 
-    async def transfer(self, session, url, kind, byte_range=''):
+    async def transfer(self, session, url, kind, byte_range='', *, background=False):
         """Join an in-flight lookahead instead of fetching the same segment twice."""
         key = (url, byte_range)
         task = session.transfers.get(key)
         if task is None:
             async def load():
-                async with session.io_lock:
+                while background and session.demands:
+                    await asyncio.sleep(.01)
+                # BNSI is ordinary HTTP: one background transfer may overlap
+                # one foreground seek. Native WS/browser transports keep their
+                # existing serialized I/O. Neither path adds source bursts.
+                guard = session.prefetch_io if background and session.mode == 'bnsi' and session.cache_key else session.io_lock
+                async with guard:
                     self.session(session.sid)
                     return await self.fetch(session, url, kind=kind, byte_range=byte_range)
             task = asyncio.create_task(load())
@@ -355,6 +395,8 @@ class AllohaDelivery:
         return await asyncio.shield(task)
 
     def lookahead(self, session, url, byte_range):
+        if session.cache_key:
+            return  # The selected VOD has its own bounded, continuous downloader.
         following = session.next_segments.get(url)
         # One segment per request, at most two queued (video + audio). No chain,
         # whole-film download, parallel source bursts or ranged-file speculation.
@@ -373,11 +415,158 @@ class AllohaDelivery:
     async def playlist(self, session, url):
         cached = session.manifests.get(url)
         if cached and cached[0] > self.clock():
-            return cached[1], cached[2]
+            return self.selected_manifest(session, cached[1], cached[2]), cached[2]
         raw, _, _, final = await self.fetch(session, url, kind='manifest')
         text = raw.decode('utf-8-sig')
-        session.manifests[url] = (self.clock() + 20, text, final)
-        return text, final
+        # Finished VOD playlists don't change. Refetching their expiring signed
+        # URLs during a long pause needlessly destroys otherwise playable media.
+        finished = m3u8.loads(text, uri=final).is_endlist
+        session.manifests[url] = (float('inf') if finished else self.clock() + 20, text, final)
+        return self.selected_manifest(session, text, final), final
+
+    @staticmethod
+    def selected_manifest(session, text, final):
+        if not session.cache_key or not session.online_quality:
+            return text
+        parsed = m3u8.loads(text, uri=final)
+        if not parsed.playlists:
+            return text
+        choices = [p for p in parsed.playlists if not p.stream_info.resolution or p.stream_info.resolution[1] <= int(session.online_quality)]
+        if not choices:
+            raise SourceInvalid('Source has no selected VOD quality')
+        chosen = max(choices, key=lambda p: (p.stream_info.resolution or (0, 0), p.stream_info.bandwidth or 0))
+        parsed.playlists[:] = [chosen]
+        tracks = [p for p in parsed.media if p.type == 'AUDIO' and p.group_id == chosen.stream_info.audio]
+        audio = next((p for p in tracks if p.default == 'YES'), tracks[0] if tracks else None)
+        parsed.media[:] = [p for p in parsed.media if p is audio or
+                           p.type == 'SUBTITLES' and p.group_id == chosen.stream_info.subtitles or
+                           p.type == 'CLOSED-CAPTIONS' and p.group_id == chosen.stream_info.closed_captions]
+        return parsed.dumps()
+
+    async def warm_vod(self, session, root):
+        """One sequential downloader; foreground seeks take the next I/O slot."""
+        resources, documents, seen = [], {}, set()
+
+        async def visit(url, depth=0, track_kind='media'):
+            if depth > 4 or len(seen) > 20000:
+                raise SourceInvalid('VOD cache exceeds playlist limits')
+            if url in seen:
+                return
+            seen.add(url)
+            text, final = await self.playlist(session, url)
+            parsed = m3u8.loads(text, uri=final)
+            if parsed.session_keys:
+                raise SourceInvalid('Unsupported session key')
+            if parsed.playlists:
+                choices = [p for p in parsed.playlists if not p.stream_info.resolution or p.stream_info.resolution[1] <= int(session.online_quality)]
+                chosen = max(choices, key=lambda p: (p.stream_info.resolution or (0, 0), p.stream_info.bandwidth or 0))
+                parsed.playlists[:] = [chosen]
+                tracks = [p for p in parsed.media if p.uri]
+                text = parsed.dumps()
+                documents[url] = [text, final]
+                session.manifests[url] = (float('inf'), text, final)
+                await visit(chosen.absolute_uri, depth+1)
+                for track in tracks:
+                    await visit(track.absolute_uri, depth+1, 'subtitle' if track.type == 'SUBTITLES' else 'media')
+                return
+            if not parsed.is_endlist or not parsed.segments:
+                raise SourceInvalid('Only completed VOD is archived')
+            documents[url] = [text, final]
+            offsets = {}
+            for segment in parsed.segments:
+                if len(resources) > 20000:
+                    raise SourceInvalid('Too many cached resources')
+                items = []
+                if segment.key and segment.key.method != 'NONE':
+                    if segment.key.method != 'AES-128' or segment.key.keyformat not in {None, 'identity'}:
+                        raise SourceInvalid('Unsupported encrypted media')
+                    items.append((segment.key.absolute_uri, '', 'key'))
+                if segment.init_section:
+                    items.append((urljoin(final, segment.init_section.uri), segment.init_section.byterange or '', 'media'))
+                items.append((segment.absolute_uri, segment.byterange or '',
+                              'subtitle' if track_kind == 'subtitle' and urlsplit(segment.absolute_uri).path.endswith(('.vtt', '.webvtt')) else 'media'))
+                for target, interval, kind in items:
+                    if interval:
+                        length, _, offset = interval.partition('@')
+                        begin = int(offset) if offset else offsets.get(target, 0)
+                        offsets[target] = begin+int(length)
+                        interval = f'bytes={begin}-{offsets[target]-1}'
+                    pair = (target, interval)
+                    if pair in wanted:
+                        continue
+                    wanted.add(pair)
+                    await self.transfer(session, target, kind, interval, background=True)
+                    if await cache_io(self.vod.get, session.cache_key, target, interval) is None:
+                        raise SourceInvalid('VOD cache is full or unavailable')
+                    resources.append(pair)
+                    await asyncio.sleep(.005)  # Yield to playback/seek and other API work.
+
+        wanted = set()
+        try:
+            await visit(root)
+            subtitles = []
+            for track in session.subtitles:
+                token = track['src'].split('?u=', 1)[-1]
+                url = session.resource_urls[token]
+                await self.transfer(session, url, 'subtitle', background=True)
+                resources.append((url, ''))
+                subtitles.append({'label': track['label'], 'lang': track['lang'], 'url': url})
+            record = {'resources': resources, 'manifests': documents, 'root': root,
+                      'quality': session.online_quality, 'active': session.active,
+                      'active_id': session.active_id, 'translations': session.translations,
+                      'skip': session.skip, 'mode': session.mode, 'subtitles': subtitles}
+            session.cache_complete = await cache_io(self.vod.complete, session.cache_key, record)
+            if session.cache_complete and self.archive:
+                await cache_io(self.vod.pin, session.cache_key)
+                async def save():
+                    try:
+                        await asyncio.to_thread(self.archive.save, session.owner, session.cache_key)
+                    except Exception as error:
+                        self.log(session, 503, session.iframe, reason='archive-'+type(error).__name__)
+                    finally:
+                        await cache_io(self.vod.release, session.cache_key)
+                task = asyncio.create_task(save())
+                self.archive_tasks.add(task)
+                task.add_done_callback(self.archive_tasks.discard)
+        except (HTTPException, SourceRefused, SourceInvalid, OSError, ValueError) as error:
+            # A speculative failure must never close the foreground player.
+            self.log(session, 503, session.iframe, reason='prefetch-'+type(error).__name__)
+
+    async def cached_online(self, key, body, subject):
+        # Pin before a potentially slow Drive restore so the reaper can't evict it.
+        await cache_io(self.vod.pin, key)
+        try:
+            record = await cache_io(self.vod.load, key)
+            if record is None and self.archive:
+                try:
+                    await asyncio.wait_for(cache_io(self.archive.restore, subject, key), 180)
+                    record = await cache_io(self.vod.load, key)
+                except Exception as error:
+                    logger.info('Alloha archive restore unavailable (%s)', type(error).__name__)
+            if record is None:
+                return None
+            await self.start()
+            await asyncio.wait_for(self.slots.acquire(), self.queue_timeout)
+            class CachedSource:
+                async def close(self): pass
+                async def fetch(self, *args, **kwargs):
+                    raise SourceInvalid('Cached resource is missing or damaged')
+                async def update_playback(self, state): pass
+            session = DeliverySession(secrets.token_urlsafe(32), body.url, None, CachedSource(),
+                self.clock()+self.ttl, self.external_address, referer=getattr(body, 'referer', None) or '',
+                owner=subject, mode=record['mode'], active=record['active'], active_id=record['active_id'],
+                translations=record['translations'], online_quality=record['quality'], skip=record['skip'],
+                cache_key=key, cache_complete=True, cache_started=True)
+            session.published_qualities = [int(record['quality'])]
+            session.manifests = {url: (float('inf'), *data) for url, data in record['manifests'].items()}
+            session.subtitles = [{'label': t['label'], 'lang': t['lang'],
+                                  'src': self.register(session, t['url'], 'subtitle')}
+                                 for t in record.get('subtitles', [])]
+            self.sessions[session.sid] = session
+            await cache_io(self.vod.pin, key)
+            return session
+        finally:
+            await cache_io(self.vod.release, key)
 
     async def ready(self, session, url, quality, depth=0):
         if depth > 4:
@@ -570,13 +759,27 @@ class AllohaDelivery:
         """Compatibility with the site's existing player, only for Alloha."""
         key = (subject, body.client_id) if body.client_id else None
         previous = self.online_clients.get(key)
-        if previous in self.sessions:
-            await self.close_session(self.sessions[previous])
         started = self.clock()
-        data = await self.resolve(body.url, online_quality=body.quality, referer=getattr(body, 'referer', None),
-                                  mode=getattr(body, 'alloha_mode', None))
-        session = self.session(data['sid'])
+        cache_key = cache_identity(subject, body.url, body.quality, getattr(body, 'referer', None))
+        gate = self.restore_locks.setdefault(cache_key, asyncio.Lock())
+        async with gate:
+            session = await self.cached_online(cache_key, body, subject) if getattr(body, 'purpose', 'playback') == 'playback' else None
+        if not gate.locked() and not getattr(gate, '_waiters', None):
+            self.restore_locks.pop(cache_key, None)
+        # Replace the same viewer only after preparation succeeds. A failed
+        # refresh must leave its old buffered player and lease intact.
+        if session is None:
+            if previous in self.sessions and self.slots.locked():
+                raise HTTPException(503, 'Подключение занято. Текущий поток сохранён.')
+            data = await self.resolve(body.url, online_quality=body.quality, referer=getattr(body, 'referer', None),
+                                      mode=getattr(body, 'alloha_mode', None))
+            session = self.session(data['sid'])
+            if getattr(body, 'purpose', 'playback') == 'playback':
+                session.cache_key = cache_key
+                await cache_io(self.vod.pin, cache_key)
         session.owner = subject
+        if previous in self.sessions and previous != session.sid:
+            await self.close_session(self.sessions[previous])
         if key:
             self.online_clients[key] = session.sid
         qualities = session.translations[session.active]['qualities']
@@ -585,7 +788,8 @@ class AllohaDelivery:
         return {'id': session.sid, 'kind': 'video', 'type': 'hls',
                 'url': f'/online/{session.sid}/alloha-playback',
                 'expiresIn': self.ttl, 'qualities': session.published_qualities,
-                'allohaMode': session.mode, 'sessionRecovery': True, 'playbackTelemetry': session.mode == 'browser',
+                'allohaMode': session.mode, 'sessionRecovery': True, 'playbackTelemetry': session.mode == 'browser' and not session.cache_complete,
+                'serverCached': session.cache_complete,
                 'subtitles': [{'id': str(i), 'name': t['label'], 'language': t['lang'], 'url': t['src']}
                               for i, t in enumerate(session.subtitles)],
                 'sourceIntervals': [{'start': a, 'end': b, 'type': 'op' if i == 0 else 'ed', 'source': 'Alloha'}
@@ -596,6 +800,7 @@ class AllohaDelivery:
         session = self.session(sid)
         if session.owner != subject:
             raise HTTPException(404, 'Сессия Alloha недоступна.')
+        self.renew(session)
         try:
             await session.source.update_playback({**state, 'quality': session.online_quality})
         except SourceRefused as error:
@@ -615,7 +820,8 @@ class AllohaDelivery:
         for line in text.splitlines():
             stripped = line.strip()
             if stripped.startswith('#'):
-                kind = 'manifest' if stripped.startswith(('#EXT-X-MEDIA:', '#EXT-X-I-FRAME-STREAM-INF:', '#EXT-X-RENDITION-REPORT:')) else 'media'
+                kind = ('manifest' if stripped.startswith(('#EXT-X-MEDIA:', '#EXT-X-I-FRAME-STREAM-INF:', '#EXT-X-RENDITION-REPORT:'))
+                        else 'key' if stripped.startswith('#EXT-X-KEY:') else 'media')
                 line = re.sub(r'URI="([^"\r\n]+)"', lambda m: 'URI="' + self.register(session, urljoin(base, m[1]), kind) + '"', line)
                 next_manifest = stripped.startswith('#EXT-X-STREAM-INF:') or next_manifest
             elif stripped:
@@ -626,6 +832,7 @@ class AllohaDelivery:
 
     async def play(self, sid, audio, quality):
         session = self.session(sid)
+        self.renew(session)
         value = session.translations.get(audio)
         if not value or not re.fullmatch(r'[1-9]\d{0,3}', quality) or int(quality) > 8640:
             raise HTTPException(404, 'Озвучка или качество отсутствуют в сессии.')
@@ -642,6 +849,11 @@ class AllohaDelivery:
         try:
             text, final = await self.playlist(session, value['qualities'][selected])
             content = self.rewrite(session, text, final)
+            if session.cache_key and not session.cache_started:
+                session.cache_started = True
+                task = asyncio.create_task(self.warm_vod(session, value['qualities'][selected]))
+                session.prefetches.add(task)
+                task.add_done_callback(session.prefetches.discard)
             headers = {'Cache-Control': 'no-store', 'X-Alloha-Quality': selected}
             if selected != quality:
                 headers['X-Alloha-Degradation'] = 'quality-unavailable'
@@ -656,6 +868,7 @@ class AllohaDelivery:
 
     async def resource(self, sid, resource, byte_range=''):
         session = self.session(sid)
+        self.renew(session)
         url = session.resource_urls.get(resource)
         kind = session.resources.get(url)
         if not kind:
@@ -667,7 +880,11 @@ class AllohaDelivery:
                 text, final = await self.playlist(session, url)
                 return Response(self.rewrite(session, text, final), media_type='application/vnd.apple.mpegurl', headers={'Cache-Control': 'no-store'})
             started = self.clock()
-            raw, headers, status, _ = await self.transfer(session, url, kind, byte_range)
+            session.demands += 1
+            try:
+                raw, headers, status, _ = await self.transfer(session, url, kind, byte_range)
+            finally:
+                session.demands -= 1
             self.lookahead(session, url, byte_range)
             outgoing = {'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff'}
             outgoing['Server-Timing'] = 'alloha;dur=' + str(round((self.clock()-started)*1000))
