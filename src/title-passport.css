@@ -39,17 +39,22 @@ html[data-blossom] .title-showcase .title-passport .passport-facts dd,.passport-
 .title-facts.title-passport dl.passport-facts>div{min-width:0}
 .title-facts.title-passport .passport-facts dt,.title-facts.title-passport .passport-facts dd{min-width:0;max-width:none}
 
-.passport-rate{display:grid;gap:8px}
-.passport-rate p{margin:0;font-size:12px;color:var(--color-on-muted)}
-.passport-rate p b{color:var(--color-petal);font:780 14px var(--font-display,inherit)}
-.passport-rate [role=group]{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;max-width:260px}
-.passport-rate button{height:16px;padding:0;border:0;border-radius:5px;background:color-mix(in srgb,var(--color-petal) 13%,transparent);cursor:pointer;transition:background .15s,transform .15s}
-.passport-rate button[data-filled]{background:color-mix(in srgb,var(--passport-tint) 72%,var(--color-petal))}
-.passport-rate [role=group]:hover button{background:color-mix(in srgb,var(--color-petal) 13%,transparent)}
-.passport-rate [role=group]:hover button:has(~button:hover),.passport-rate [role=group] button:hover{background:color-mix(in srgb,var(--passport-tint) 55%,var(--color-petal))}
-.passport-rate button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
+.passport-rate{display:grid;gap:10px;margin-top:4px}
+.passport-rate-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.passport-rate-head>span{font-size:12px;color:var(--color-on-muted)}
+.passport-rate-head output{display:flex;align-items:baseline;gap:8px;min-height:28px}
+.passport-rate-head output b{font:800 26px/1 var(--font-display,inherit);color:var(--color-petal);font-variant-numeric:tabular-nums}
+.passport-rate-head output b span{font-size:13px;font-weight:600;color:var(--color-on-muted);letter-spacing:0}
+.passport-rate-head output small{font-size:12px;color:color-mix(in srgb,var(--passport-tint) 60%,var(--color-petal))}
+.passport-rate [role=group]{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;padding:3px;border-radius:14px;background:color-mix(in srgb,var(--color-petal) 7%,transparent)}
+.passport-rate button{height:30px;min-width:0;padding:0;border:0;border-radius:10px;background:transparent;color:var(--color-on-muted);font:650 12px/1 var(--font-ui,inherit);font-variant-numeric:tabular-nums;cursor:pointer;transition:background .2s ease calc(var(--step)*18ms),color .2s ease calc(var(--step)*18ms),transform .15s}
+.passport-rate button[data-filled]{background:color-mix(in srgb,var(--passport-tint) calc(38% + var(--step)*5%),transparent);color:var(--color-petal)}
+.passport-rate.is-previewing button[data-filled]{background:color-mix(in srgb,var(--passport-tint) calc(26% + var(--step)*4%),transparent)}
+.passport-rate button[aria-pressed=true]{background:var(--passport-tint);color:#fff}
+.passport-rate button:active:not(:disabled){transform:scale(.92)}
+.passport-rate button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:1px}
 .passport-rate button:disabled{cursor:default;opacity:.5}
-.passport-rate small{font-size:10.5px;color:var(--color-quiet)}
+.passport-rate-note{font-size:10.5px;color:var(--color-quiet)}
 @media(prefers-reduced-motion:reduce){.passport-rate button,.passport-facts dd a{transition:none}}
 /* Older mobile rules lay the facts table out in columns; the passport keeps one. */
 html[data-blossom] .title-showcase .title-passport dl.passport-facts{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:0!important}

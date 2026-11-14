@@ -1,6 +1,6 @@
 /* Local per-device streaming proxy. OAuth tokens and CryptoKeys stay in worker RAM. */
 const STORAGE_CACHE="mediavault-ciphertext-v1";
-const SHELL_CACHE="mediavault-app-v4";
+const SHELL_CACHE="mediavault-app-v5";
 const CHUNK_SIZE=4*1024*1024;
 const CHUNK_LIMIT=160;
 // A worker may control several tabs with different libraries or accounts.
@@ -81,8 +81,40 @@ self.addEventListener("fetch",event=>{
     try{id=decodeURIComponent(url.pathname.slice(prefix.length));}
     catch{event.respondWith(new Response("Некорректный адрес",{status:400}));return;}
     event.respondWith(serveRange(event.request,id,event.clientId,promise=>{try{event.waitUntil?.(promise);}catch{promise.catch(()=>{});}}));
+    return;
   }
+  const shell=offlineShell(event.request,url);
+  if(shell)event.respondWith(shell);
 });
+// Offline start: the page itself is network-first with the last good copy as a
+// fallback; built assets (hashed names) and the few runtime files are kept
+// once fetched. Only this site's own static files, never API or media.
+const SHELL_FILES=/\/(?:assets\/[^/]+|config\.js|crypto\.js|drive\.js|icon\.svg|manifest\.webmanifest)$/;
+function offlineShell(request,url){
+  if(request.method!=="GET"||url.origin!==self.location.origin)return null;
+  const scope=new URL(self.registration.scope).pathname;
+  if(!url.pathname.startsWith(scope))return null;
+  if(request.mode==="navigate")return (async()=>{
+    const cache=await caches.open(SHELL_CACHE).catch(()=>null);
+    try{
+      const response=await fetch(request);
+      if(response.ok&&cache)cache.put(scope,response.clone()).catch(()=>{});
+      return response;
+    }catch(error){
+      const saved=cache&&await cache.match(scope);
+      if(saved)return saved;
+      throw error;
+    }
+  })();
+  if(!SHELL_FILES.test(url.pathname))return null;
+  return (async()=>{
+    const cache=await caches.open(SHELL_CACHE).catch(()=>null);
+    const saved=cache&&await cache.match(request);
+    const fresh=fetch(request).then(response=>{if(response.ok&&cache)cache.put(request,response.clone()).catch(()=>{});return response;});
+    if(saved){fresh.catch(()=>{});return /\/assets\//.test(url.pathname)?saved:fresh.catch(()=>saved);}
+    return fresh;
+  })();
+}
 async function downloadEncrypted(session,fileId,signal,clientId,background){
   let cache=null;
   try{cache=await caches.open(STORAGE_CACHE);}catch{}

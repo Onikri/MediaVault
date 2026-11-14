@@ -7,15 +7,16 @@ import {useRetainedWorkspace} from './RetainedMedia.jsx';
 import {Poster} from './ImportParts.jsx';
 import './history-page.css';
 import {uiLocale} from './i18n/index.js';
+import {titleOpens,scopedKey} from './history-scope.js';
 
-// One history for everything opened on this device: library titles (online),
+// One history per profile for everything opened on this device: library titles (online),
 // player sessions (online and collection) and collection files.
 const TITLES='mv_public_titles_v1',HIDDEN='mv_history_hidden_v1';
 const listeners=new Set(),emit=()=>listeners.forEach(fn=>fn());
 function readJSON(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback;}catch{return fallback;}}
-function hidden(){return readJSON(HIDDEN,{});}
-function hide(keys){const value=hidden(),now=Date.now();for(const key of keys)value[key]=now;try{localStorage.setItem(HIDDEN,JSON.stringify(Object.fromEntries(Object.entries(value).slice(-400))));}catch{}emit();}
-function useHistoryRevision(){return useSyncExternalStore(fn=>{listeners.add(fn);addEventListener('storage',fn);return()=>{listeners.delete(fn);removeEventListener('storage',fn);};},()=>localStorage.getItem(HIDDEN)||'',()=>'');}
+function hidden(user){return readJSON(scopedKey(HIDDEN,user),{});}
+function hide(keys,user){const value=hidden(user),now=Date.now();for(const key of keys)value[key]=now;try{localStorage.setItem(scopedKey(HIDDEN,user),JSON.stringify(Object.fromEntries(Object.entries(value).slice(-400))));}catch{}emit();}
+function useHistoryRevision(){return useSyncExternalStore(fn=>{listeners.add(fn);addEventListener('storage',fn);return()=>{listeners.delete(fn);removeEventListener('storage',fn);};},()=>localStorage.getItem(scopedKey(HIDDEN))||'',()=>'');}
 const kindLabel={anime:'Аниме',manga:'Манга',ranobe:'Ранобэ',book:'Книга',movie:'Фильм',tv:'Сериал',music:'Музыка'};
 const dayLabel=at=>{const d=new Date(at),today=new Date();today.setHours(0,0,0,0);const diff=Math.round((today-new Date(d.getFullYear(),d.getMonth(),d.getDate()))/86400000);return diff===0?'Сегодня':diff===1?'Вчера':d.toLocaleDateString(uiLocale(),{day:'numeric',month:'long',...(d.getFullYear()!==today.getFullYear()?{year:'numeric'}:{})});};
 const timeLabel=at=>new Date(at).toLocaleTimeString(uiLocale(),{hour:'2-digit',minute:'2-digit'});
@@ -25,9 +26,9 @@ export default function HistoryTimeline({recent,onOpen,renderCover,userId,librar
  const store=useRetainedWorkspace(),reduce=useReducedMotion(),revision=useHistoryRevision(),[filter,setFilter]=useState('all');
  const viewing=useSyncExternalStore(store?store.subscribe:()=>()=>{},()=>store?store.getSnapshot().history:[],()=>[]);
  const entries=useMemo(()=>{
-  const muted=hidden(),titles=readJSON(TITLES,{}),rows=new Map();
+  const muted=hidden(userId),titles=readJSON(TITLES,{}),opens=titleOpens(userId),rows=new Map();
   const put=row=>{if((muted[row.key]||0)>=row.at)return;const old=rows.get(row.key);if(!old||old.at<row.at)rows.set(row.key,{...old,...row,cover:row.cover||old?.cover});};
-  for(const [key,value] of Object.entries(titles))if(value?.openedAt)put({key:'title:'+key,source:'library',kind:value.kind,title:value.title||'Без названия',cover:value.cover,mal:value.ids?.mal||(value.provider==='shikimori'?value.providerId:''),meta:[kindLabel[value.kind],value.year].filter(Boolean).join(' · '),at:value.openedAt,open:()=>{location.hash='watch='+key;}});
+  for(const [key,openedAt] of Object.entries(opens)){const value=titles[key];if(value)put({key:'title:'+key,source:'library',kind:value.kind,title:value.title||'Без названия',cover:value.cover,mal:value.ids?.mal||(value.provider==='shikimori'?value.providerId:''),meta:[kindLabel[value.kind],value.year].filter(Boolean).join(' · '),at:openedAt,open:()=>{location.hash='watch='+key;}});}
   for(const value of viewing||[]){
    if(value.resumeItemId&&recent.some(r=>r.item.id===value.resumeItemId))continue;
    const key=watchKey(value.route),title=key?titles[key]:null;
@@ -41,8 +42,8 @@ export default function HistoryTimeline({recent,onOpen,renderCover,userId,librar
  },[viewing,recent,revision,userId,libraryId]);
  const shown=entries.filter(row=>filter==='all'||row.source===filter);
  const groups=[];for(const row of shown){const label=dayLabel(row.at);const last=groups.at(-1);if(last?.label===label)last.rows.push(row);else groups.push({label,rows:[row]});}
- function forget(row){hide([row.key]);if(row.viewId)store?.forget?.(row.viewId);if(row.itemId)onForgetCollection?.(row.itemId);}
- function clearAll(){if(!confirm('Очистить всю историю на этом устройстве? Прогресс серий и страниц сохранится.'))return;hide(entries.map(row=>row.key));store?.forgetAll?.();onClearCollection?.();}
+ function forget(row){hide([row.key],userId);if(row.viewId)store?.forget?.(row.viewId);if(row.itemId)onForgetCollection?.(row.itemId);}
+ function clearAll(){if(!confirm('Очистить свою историю на этом устройстве? Прогресс серий и страниц сохранится.'))return;hide(entries.map(row=>row.key),userId);store?.forgetAll?.();onClearCollection?.();}
  const counts={all:entries.length,library:entries.filter(r=>r.source==='library').length,collection:entries.filter(r=>r.source==='collection').length};
  if(!entries.length)return empty;
  return <div className="history-page">

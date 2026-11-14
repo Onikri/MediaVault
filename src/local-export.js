@@ -1,3 +1,4 @@
+import {deliverFile} from './device-library.js';
 import {mangaExportJobs} from './manga-export-client.js';
 export async function exportLocally({entries,kind,referer,quality='best',service,onProgress=()=>{},signal,manga,cacheContext,name}){
  if(!entries.length)throw Error('Выбери опубликованную главу или серию.');
@@ -26,7 +27,7 @@ export async function exportLocally({entries,kind,referer,quality='best',service
    }
    if(job.state!=='done'||!job.downloadUrl)throw Error(job.error||'Не удалось подготовить файл.');
    const url=new URL(job.downloadUrl,service.server);if(url.origin!==new URL(service.server).origin||!url.pathname.startsWith('/online/exports/file/'))throw Error('Сервер вернул некорректную ссылку сохранения.');
-   const anchor=document.createElement('a');anchor.href=url.href;anchor.download=job.filename||'';anchor.rel='noreferrer';document.body.append(anchor);anchor.click();anchor.remove();downloads.push({url:url.href,name:job.filename});
+   await deliverFile(url.href,job.filename||'',{title:job.title||''});downloads.push({url:url.href,name:job.filename});
   }catch(error){if(job?.id&&['staging','queued','running'].includes(job.state))await service.request('/online/exports/'+job.id,{method:'DELETE'}).catch(()=>{});throw error;}
  }
  return downloads;

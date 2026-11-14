@@ -1,3 +1,4 @@
+import {deliverFile} from './device-library.js';
 // Saves the open chapter on this device from the reader's own translation
 // chain: rendered-page cache → cached Google JSON + local typesetting → new
 // Google requests only for pages that were never translated. Nothing is sent
@@ -209,8 +210,4 @@ export function relaySource({blob,live,alive,fallback,release}){
  };
 }
 
-export function downloadBlob(blob,filename){
- const url=URL.createObjectURL(blob),anchor=document.createElement('a');
- anchor.href=url;anchor.download=filename;anchor.rel='noopener';document.body.append(anchor);anchor.click();anchor.remove();
- setTimeout(()=>URL.revokeObjectURL(url),120000);
-}
+export function downloadBlob(blob,filename,title=''){return deliverFile(blob,filename,{title});}
