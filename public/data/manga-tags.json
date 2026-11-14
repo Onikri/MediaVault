@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-14T17:18:01Z",
+  "generatedAt": "2026-11-14T18:44:30Z",
   "scope": "public_taxonomy_only",
   "coverageGuaranteed": false,
   "sources": [
@@ -17,18 +17,18 @@
       "domain": "hentaichan.live",
       "name": "HentaiChan",
       "integration": "native",
-      "status": "stale",
-      "tagsFound": 288,
-      "reason": "public_catalogue_unavailable",
+      "status": "partial",
+      "tagsFound": 259,
+      "reason": "one_public_catalogue_page",
       "note": "Native public HTML parser and reader."
     },
     {
       "domain": "h-chan.me",
       "name": "H-Chan",
       "integration": "mirror",
-      "status": "unavailable",
-      "tagsFound": 0,
-      "reason": "public_catalogue_unavailable",
+      "status": "partial",
+      "tagsFound": 259,
+      "reason": "one_public_catalogue_page",
       "note": "Only confirmed x17.h-chan.me mirror is allowed; root domain is not assumed equivalent."
     },
     {
@@ -62,9 +62,9 @@
       "domain": "y.hentaichan.live",
       "name": "Y-HentaiChan",
       "integration": "unverified",
-      "status": "stale",
-      "tagsFound": 288,
-      "reason": "public_catalogue_unavailable",
+      "status": "partial",
+      "tagsFound": 190,
+      "reason": "one_public_catalogue_page",
       "note": "Distinct subdomain; not an approved HentaiChan reader mirror."
     },
     {
@@ -181,6 +181,138 @@
       ]
     },
     {
+      "key": "3dcg",
+      "category": "genre",
+      "label": "3DCG",
+      "originalLabels": [
+        "3DCG"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "ahegao",
+      "category": "genre",
+      "label": "ahegao",
+      "originalLabels": [
+        "ahegao"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "corruption",
+      "category": "genre",
+      "label": "corruption",
+      "originalLabels": [
+        "corruption"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "gender bender",
+      "category": "genre",
+      "label": "gender bender",
+      "originalLabels": [
+        "gender_bender"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "mind break",
+      "category": "genre",
+      "label": "mind break",
+      "originalLabels": [
+        "mind_break"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "monstergirl",
+      "category": "genre",
+      "label": "monstergirl",
+      "originalLabels": [
+        "monstergirl"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "netorare",
+      "category": "genre",
+      "label": "netorare",
+      "originalLabels": [
+        "netorare"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "shemale",
+      "category": "genre",
+      "label": "Shemale",
+      "originalLabels": [
+        "shemale"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "skinsuit",
+      "category": "genre",
+      "label": "skinsuit",
+      "originalLabels": [
+        "skinsuit"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "x ray",
+      "category": "genre",
+      "label": "X-Ray",
+      "originalLabels": [
+        "x-ray"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "анал",
+      "category": "genre",
+      "label": "Анал",
+      "originalLabels": [
+        "анал"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "арт",
       "category": "genre",
       "label": "Арт",
@@ -193,6 +325,18 @@
         "manga-chan.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "без цензуры",
+      "category": "genre",
+      "label": "Без цензуры",
+      "originalLabels": [
+        "без_цензуры"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -209,6 +353,18 @@
       ]
     },
     {
+      "key": "беременность",
+      "category": "genre",
+      "label": "Беременность",
+      "originalLabels": [
+        "беременность"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "боевые искусства",
       "category": "genre",
       "label": "Боевые искусства",
@@ -221,6 +377,66 @@
       ]
     },
     {
+      "key": "большая грудь",
+      "category": "genre",
+      "label": "Большая грудь",
+      "originalLabels": [
+        "большая_грудь"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "большие попки",
+      "category": "genre",
+      "label": "большие попки",
+      "originalLabels": [
+        "большие_попки"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "в общественном месте",
+      "category": "genre",
+      "label": "В общественном месте",
+      "originalLabels": [
+        "в_общественном_месте"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "в первый раз",
+      "category": "genre",
+      "label": "В первый раз",
+      "originalLabels": [
+        "в_первый_раз"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "в туалете",
+      "category": "genre",
+      "label": "в туалете",
+      "originalLabels": [
+        "в_туалете"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "в цвете",
       "category": "genre",
       "label": "в_цвете",
@@ -228,8 +444,22 @@
         "в_цвете"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "manga-chan.me",
         "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "в школе",
+      "category": "genre",
+      "label": "в школе",
+      "originalLabels": [
+        "в_школе"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -284,6 +514,42 @@
       ]
     },
     {
+      "key": "гаремник",
+      "category": "genre",
+      "label": "гаремник",
+      "originalLabels": [
+        "гаремник"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "гг девушка",
+      "category": "genre",
+      "label": "гг девушка",
+      "originalLabels": [
+        "гг_девушка"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "гг парень",
+      "category": "genre",
+      "label": "гг парень",
+      "originalLabels": [
+        "гг_парень"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "гендерная интрига",
       "category": "genre",
       "label": "Гендерная интрига",
@@ -313,6 +579,18 @@
       ]
     },
     {
+      "key": "глубокий минет",
+      "category": "genre",
+      "label": "Глубокий минет",
+      "originalLabels": [
+        "глубокий_минет"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "групповой секс",
       "category": "genre",
       "label": "групповой_секс",
@@ -328,9 +606,12 @@
       "category": "genre",
       "label": "Демоны",
       "originalLabels": [
+        "демоны",
         "Демоны"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
         "v2.shlib.life"
@@ -341,8 +622,8 @@
       "category": "genre",
       "label": "Детектив",
       "originalLabels": [
-        "детектив",
-        "Детектив"
+        "Детектив",
+        "детектив"
       ],
       "sources": [
         "hentailib.me",
@@ -394,10 +675,12 @@
       "category": "genre",
       "label": "Драма",
       "originalLabels": [
-        "драма",
-        "Драма"
+        "Драма",
+        "драма"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
         "mangalib.org",
@@ -414,6 +697,18 @@
       ],
       "sources": [
         "manga-chan.me"
+      ]
+    },
+    {
+      "key": "жестокость",
+      "category": "genre",
+      "label": "Жестокость",
+      "originalLabels": [
+        "жестокость"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -438,6 +733,30 @@
         "hentailib.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "изнасилование",
+      "category": "genre",
+      "label": "Изнасилование",
+      "originalLabels": [
+        "изнасилование"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "инопланетяне",
+      "category": "genre",
+      "label": "Инопланетяне",
+      "originalLabels": [
+        "инопланетяне"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -469,8 +788,8 @@
       "category": "genre",
       "label": "История",
       "originalLabels": [
-        "История",
-        "история"
+        "история",
+        "История"
       ],
       "sources": [
         "hentailib.me",
@@ -490,6 +809,18 @@
         "hentailib.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "кимоно",
+      "category": "genre",
+      "label": "кимоно",
+      "originalLabels": [
+        "кимоно"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -522,6 +853,18 @@
       ]
     },
     {
+      "key": "комиксы",
+      "category": "genre",
+      "label": "комиксы",
+      "originalLabels": [
+        "комиксы"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "космос",
       "category": "genre",
       "label": "Космос",
@@ -535,6 +878,42 @@
       ]
     },
     {
+      "key": "кремпай",
+      "category": "genre",
+      "label": "Кремпай",
+      "originalLabels": [
+        "кремпай"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "куннилингус",
+      "category": "genre",
+      "label": "Куннилингус",
+      "originalLabels": [
+        "куннилингус"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "купальники",
+      "category": "genre",
+      "label": "Купальники",
+      "originalLabels": [
+        "купальники"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "магия",
       "category": "genre",
       "label": "Магия",
@@ -545,6 +924,30 @@
         "hentailib.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "маленькая грудь",
+      "category": "genre",
+      "label": "Маленькая грудь",
+      "originalLabels": [
+        "маленькая_грудь"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "мастурбация",
+      "category": "genre",
+      "label": "Мастурбация",
+      "originalLabels": [
+        "мастурбация"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -587,6 +990,18 @@
       ]
     },
     {
+      "key": "минет",
+      "category": "genre",
+      "label": "минет",
+      "originalLabels": [
+        "минет"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "мистика",
       "category": "genre",
       "label": "Мистика",
@@ -602,6 +1017,30 @@
       ]
     },
     {
+      "key": "монстры",
+      "category": "genre",
+      "label": "Монстры",
+      "originalLabels": [
+        "монстры"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "мужчина крепкого телосложения",
+      "category": "genre",
+      "label": "мужчина крепкого телосложения",
+      "originalLabels": [
+        "мужчина_крепкого_телосложения"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "музыка",
       "category": "genre",
       "label": "Музыка",
@@ -612,6 +1051,18 @@
         "hentailib.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "на природе",
+      "category": "genre",
+      "label": "На природе",
+      "originalLabels": [
+        "на_природе"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -630,6 +1081,42 @@
       ]
     },
     {
+      "key": "обычный секс",
+      "category": "genre",
+      "label": "Обычный секс",
+      "originalLabels": [
+        "обычный_секс"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "огромная грудь",
+      "category": "genre",
+      "label": "Огромная грудь",
+      "originalLabels": [
+        "огромная_грудь"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "огромный член",
+      "category": "genre",
+      "label": "Огромный член",
+      "originalLabels": [
+        "огромный_член"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "омегаверс",
       "category": "genre",
       "label": "Омегаверс",
@@ -640,6 +1127,18 @@
         "hentailib.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "оплодотворение",
+      "category": "genre",
+      "label": "оплодотворение",
+      "originalLabels": [
+        "оплодотворение"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -656,6 +1155,18 @@
       ]
     },
     {
+      "key": "пляж",
+      "category": "genre",
+      "label": "Пляж",
+      "originalLabels": [
+        "пляж"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "повседневность",
       "category": "genre",
       "label": "Повседневность",
@@ -669,6 +1180,30 @@
         "mangalib.org",
         "v2.shlib.life",
         "yaoi-chan.me"
+      ]
+    },
+    {
+      "key": "подглядывание",
+      "category": "genre",
+      "label": "Подглядывание",
+      "originalLabels": [
+        "подглядывание"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "подчинение",
+      "category": "genre",
+      "label": "Подчинение",
+      "originalLabels": [
+        "подчинение"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -713,12 +1248,24 @@
       ]
     },
     {
+      "key": "принуждение",
+      "category": "genre",
+      "label": "Принуждение",
+      "originalLabels": [
+        "принуждение"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "психология",
       "category": "genre",
       "label": "Психология",
       "originalLabels": [
-        "психология",
-        "Психология"
+        "Психология",
+        "психология"
       ],
       "sources": [
         "hentailib.me",
@@ -729,14 +1276,28 @@
       ]
     },
     {
+      "key": "рабыни",
+      "category": "genre",
+      "label": "рабыни",
+      "originalLabels": [
+        "рабыни"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "романтика",
       "category": "genre",
       "label": "Романтика",
       "originalLabels": [
-        "романтика",
-        "Романтика"
+        "Романтика",
+        "романтика"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
         "mangalib.org",
@@ -773,10 +1334,12 @@
       "category": "genre",
       "label": "Сверхъестественное",
       "originalLabels": [
-        "сверхъестественное",
-        "Сверхъестественное"
+        "Сверхъестественное",
+        "сверхъестественное"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
         "mangalib.org",
@@ -813,6 +1376,18 @@
       ]
     },
     {
+      "key": "секс игрушки",
+      "category": "genre",
+      "label": "Секс-игрушки",
+      "originalLabels": [
+        "секс_игрушки"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "сенэн",
       "category": "genre",
       "label": "Сёнэн",
@@ -832,8 +1407,8 @@
       "category": "genre",
       "label": "Сёнэн-ай",
       "originalLabels": [
-        "Сёнэн-ай",
-        "сёнэн-ай"
+        "сёнэн-ай",
+        "Сёнэн-ай"
       ],
       "sources": [
         "hentailib.me",
@@ -868,6 +1443,18 @@
       ]
     },
     {
+      "key": "страпон",
+      "category": "genre",
+      "label": "Страпон",
+      "originalLabels": [
+        "страпон"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "супер сила",
       "category": "genre",
       "label": "Супер сила",
@@ -878,6 +1465,18 @@
         "hentailib.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "супергерои",
+      "category": "genre",
+      "label": "Супергерои",
+      "originalLabels": [
+        "супергерои"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -896,6 +1495,42 @@
       ]
     },
     {
+      "key": "темнокожие",
+      "category": "genre",
+      "label": "Темнокожие",
+      "originalLabels": [
+        "темнокожие"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "тентакли",
+      "category": "genre",
+      "label": "Тентакли",
+      "originalLabels": [
+        "тентакли"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "толстушки",
+      "category": "genre",
+      "label": "Толстушки",
+      "originalLabels": [
+        "толстушки"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "трагедия",
       "category": "genre",
       "label": "Трагедия",
@@ -911,12 +1546,24 @@
       ]
     },
     {
+      "key": "трап",
+      "category": "genre",
+      "label": "Трап",
+      "originalLabels": [
+        "трап"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "триллер",
       "category": "genre",
       "label": "Триллер",
       "originalLabels": [
-        "Триллер",
-        "триллер"
+        "триллер",
+        "Триллер"
       ],
       "sources": [
         "hentailib.me",
@@ -951,10 +1598,24 @@
         "фантастика"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "футанари",
+      "category": "genre",
+      "label": "Футанари",
+      "originalLabels": [
+        "футанари"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -966,6 +1627,8 @@
         "Фэнтези"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
         "mangalib.org",
@@ -981,6 +1644,18 @@
       ],
       "sources": [
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "хоррор",
+      "category": "genre",
+      "label": "хоррор",
+      "originalLabels": [
+        "хоррор"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -1000,18 +1675,57 @@
       ]
     },
     {
+      "key": "школьники",
+      "category": "genre",
+      "label": "школьники",
+      "originalLabels": [
+        "школьники"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "школьницы",
+      "category": "genre",
+      "label": "школьницы",
+      "originalLabels": [
+        "школьницы"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "экшен",
       "category": "genre",
       "label": "Экшен",
       "originalLabels": [
-        "Боевик",
-        "боевик"
+        "action",
+        "боевик",
+        "Боевик"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
         "mangalib.org",
         "v2.shlib.life"
+      ]
+    },
+    {
+      "key": "эльфы",
+      "category": "genre",
+      "label": "Эльфы",
+      "originalLabels": [
+        "эльфы"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
       ]
     },
     {
@@ -1043,14 +1757,40 @@
       ]
     },
     {
+      "key": "эччи",
+      "category": "genre",
+      "label": "эччи",
+      "originalLabels": [
+        "эччи"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
+      "key": "юмор",
+      "category": "genre",
+      "label": "юмор",
+      "originalLabels": [
+        "юмор"
+      ],
+      "sources": [
+        "h-chan.me",
+        "hentaichan.live"
+      ]
+    },
+    {
       "key": "юри",
       "category": "genre",
       "label": "Юри",
       "originalLabels": [
-        "юри",
-        "Юри"
+        "Юри",
+        "юри"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
         "v2.shlib.life"
@@ -1065,6 +1805,8 @@
         "Яой"
       ],
       "sources": [
+        "h-chan.me",
+        "hentaichan.live",
         "hentailib.me",
         "v2.shlib.life",
         "yaoi-chan.me"
@@ -1090,6 +1832,7 @@
         "3DCG"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1102,6 +1845,7 @@
         "ahegao"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1114,6 +1858,7 @@
         "bdsm"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -1128,6 +1873,7 @@
         "corruption"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1151,6 +1897,7 @@
         "foot fetish"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1164,6 +1911,7 @@
         "footfuck"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1199,6 +1947,7 @@
         "gender bender"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1233,6 +1982,7 @@
         "live"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1245,6 +1995,7 @@
         "lolcon"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1257,6 +2008,7 @@
         "megane"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1269,6 +2021,7 @@
         "mind break"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1281,6 +2034,7 @@
         "monstergirl"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1293,6 +2047,7 @@
         "netorare"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1305,6 +2060,7 @@
         "netorase"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1317,6 +2073,7 @@
         "netori"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1329,6 +2086,7 @@
         "nipple penetration"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1341,6 +2099,7 @@
         "oyakodon"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1353,6 +2112,7 @@
         "paizuri (titsfuck)"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1365,6 +2125,7 @@
         "rpg"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1378,6 +2139,7 @@
         "Scat"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1399,10 +2161,11 @@
       "category": "tag",
       "label": "Shemale",
       "originalLabels": [
-        "Shemale",
-        "shemale"
+        "shemale",
+        "Shemale"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1416,6 +2179,7 @@
         "shimaidon"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1428,6 +2192,7 @@
         "shooter"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1440,6 +2205,7 @@
         "simulation"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1452,6 +2218,7 @@
         "skinsuit"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1461,10 +2228,11 @@
       "category": "tag",
       "label": "Tomboy",
       "originalLabels": [
-        "Tomboy",
-        "tomboy"
+        "tomboy",
+        "Tomboy"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1478,6 +2246,7 @@
         "tomgirl"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1509,10 +2278,11 @@
       "category": "tag",
       "label": "X-Ray",
       "originalLabels": [
-        "X-Ray",
-        "x-ray"
+        "x-ray",
+        "X-Ray"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1535,10 +2305,11 @@
       "category": "tag",
       "label": "Алкоголь",
       "originalLabels": [
-        "Алкоголь",
-        "алкоголь"
+        "алкоголь",
+        "Алкоголь"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1588,6 +2359,7 @@
         "Анал"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1610,10 +2382,11 @@
       "category": "tag",
       "label": "Андроид",
       "originalLabels": [
-        "Андроид",
-        "андроид"
+        "андроид",
+        "Андроид"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1624,10 +2397,11 @@
       "category": "tag",
       "label": "Анилингус",
       "originalLabels": [
-        "Анилингус",
-        "анилингус"
+        "анилингус",
+        "Анилингус"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1641,6 +2415,7 @@
         "анимация"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1714,6 +2489,7 @@
         "аркада"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1739,6 +2515,7 @@
         "Арт"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
@@ -1788,6 +2565,7 @@
         "бабушка"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1836,6 +2614,7 @@
         "без проникновения"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1846,10 +2625,11 @@
       "category": "tag",
       "label": "Без текста",
       "originalLabels": [
-        "Без текста",
-        "без текста"
+        "без текста",
+        "Без текста"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1864,6 +2644,7 @@
         "без трусиков"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1874,10 +2655,11 @@
       "category": "tag",
       "label": "Без цензуры",
       "originalLabels": [
-        "без цензуры",
-        "Без цензуры"
+        "Без цензуры",
+        "без цензуры"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.cc",
         "hentaichan.live",
         "hentailib.me",
@@ -1902,10 +2684,11 @@
       "category": "tag",
       "label": "Беременность",
       "originalLabels": [
-        "Беременность",
-        "беременность"
+        "беременность",
+        "Беременность"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1920,6 +2703,7 @@
         "Бикини"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1930,10 +2714,11 @@
       "category": "tag",
       "label": "Близнецы",
       "originalLabels": [
-        "Близнецы",
-        "близнецы"
+        "близнецы",
+        "Близнецы"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -1959,6 +2744,7 @@
         "боди-арт"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -1968,8 +2754,8 @@
       "category": "tag",
       "label": "Боевые искусства",
       "originalLabels": [
-        "Боевые искусства",
-        "боевые искусства"
+        "боевые искусства",
+        "Боевые искусства"
       ],
       "sources": [
         "manga-chan.me",
@@ -1994,10 +2780,11 @@
       "category": "tag",
       "label": "Больница",
       "originalLabels": [
-        "больница",
-        "Больница"
+        "Больница",
+        "больница"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2012,6 +2799,7 @@
         "большая грудь"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "v2.shlib.life",
@@ -2038,6 +2826,7 @@
         "большие попки"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2050,6 +2839,7 @@
         "бондаж"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2109,6 +2899,7 @@
         "буккаке"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2140,10 +2931,11 @@
       "category": "tag",
       "label": "В ванной",
       "originalLabels": [
-        "В ванной",
-        "в ванной"
+        "в ванной",
+        "В ванной"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2169,6 +2961,7 @@
         "В общественном месте"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2190,10 +2983,11 @@
       "category": "tag",
       "label": "В первый раз",
       "originalLabels": [
-        "в первый раз",
-        "В первый раз"
+        "В первый раз",
+        "в первый раз"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2218,6 +3012,7 @@
         "в туалете"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2230,6 +3025,7 @@
         "в цвете"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2242,6 +3038,7 @@
         "в школе"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2255,6 +3052,7 @@
         "вампиры"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
@@ -2270,6 +3068,7 @@
         "веб"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -2284,6 +3083,7 @@
         "вебкам"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2321,6 +3121,7 @@
         "Вибратор"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2346,6 +3147,7 @@
         "визуальная новелла"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2395,6 +3197,7 @@
         "внучка"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2432,6 +3235,7 @@
         "волосатые женщины"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2480,7 +3284,6 @@
         "Все"
       ],
       "sources": [
-        "hentaichan.live",
         "y.hentaichan.live"
       ]
     },
@@ -2552,6 +3355,7 @@
         "гаремник"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2564,6 +3368,7 @@
         "гг девушка"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2647,6 +3452,7 @@
         "гг парень"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2719,6 +3525,7 @@
         "гипноз"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2733,6 +3540,7 @@
         "Глубокий минет"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2780,10 +3588,11 @@
       "category": "tag",
       "label": "Горячий источник",
       "originalLabels": [
-        "горячий источник",
-        "Горячий источник"
+        "Горячий источник",
+        "горячий источник"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2807,10 +3616,11 @@
       "category": "tag",
       "label": "групповой_секс",
       "originalLabels": [
-        "групповой секс",
-        "Групповой секс"
+        "Групповой секс",
+        "групповой секс"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live",
@@ -2847,10 +3657,11 @@
       "category": "tag",
       "label": "Гяру и Гангуро",
       "originalLabels": [
-        "гяру и гангуро",
-        "Гяру и Гангуро"
+        "Гяру и Гангуро",
+        "гяру и гангуро"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2864,6 +3675,7 @@
         "двойное проникновение"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -2877,6 +3689,7 @@
         "Девочки-волшебницы"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2891,6 +3704,7 @@
         "Девушка-туалет"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2905,6 +3719,7 @@
         "Демоны"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
@@ -2941,10 +3756,11 @@
       "category": "tag",
       "label": "Дилдо",
       "originalLabels": [
-        "Дилдо",
-        "дилдо"
+        "дилдо",
+        "Дилдо"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -2981,6 +3797,7 @@
         "дочь"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3005,6 +3822,7 @@
         "драма"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -3052,10 +3870,11 @@
       "category": "tag",
       "label": "Дыра в стене",
       "originalLabels": [
-        "Дыра в стене",
-        "дыра в стене"
+        "дыра в стене",
+        "Дыра в стене"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3105,6 +3924,7 @@
         "жестокость"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3141,6 +3961,7 @@
         "за деньги"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3227,6 +4048,7 @@
         "зомби"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
@@ -3250,10 +4072,11 @@
       "category": "tag",
       "label": "Зрелые женщины",
       "originalLabels": [
-        "Зрелые женщины",
-        "зрелые женщины"
+        "зрелые женщины",
+        "Зрелые женщины"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3322,10 +4145,11 @@
       "category": "tag",
       "label": "Измена",
       "originalLabels": [
-        "измена",
-        "Измена"
+        "Измена",
+        "измена"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.cc",
         "hentaichan.live",
         "hentailib.me",
@@ -3339,10 +4163,11 @@
       "category": "tag",
       "label": "Изнасилование",
       "originalLabels": [
-        "Изнасилование",
-        "изнасилование"
+        "изнасилование",
+        "Изнасилование"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3369,6 +4194,7 @@
         "инопланетяне"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3390,10 +4216,11 @@
       "category": "tag",
       "label": "инцест",
       "originalLabels": [
-        "инцест",
-        "Инцест"
+        "Инцест",
+        "инцест"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
@@ -3434,6 +4261,7 @@
         "исполнение желаний"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3472,6 +4300,7 @@
         "Камера"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
@@ -3486,6 +4315,7 @@
         "квест"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3544,6 +4374,7 @@
         "кимоно"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3579,6 +4410,7 @@
         "колготки"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3604,6 +4436,7 @@
         "комиксы"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3625,10 +4458,11 @@
       "category": "tag",
       "label": "Косплей",
       "originalLabels": [
-        "косплей",
-        "Косплей"
+        "Косплей",
+        "косплей"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3643,6 +4477,7 @@
         "кремпай"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.cc",
         "hentaichan.live",
         "y.hentaichan.live"
@@ -3667,6 +4502,7 @@
         "кудере"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3679,6 +4515,7 @@
         "кузина"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3712,10 +4549,11 @@
       "category": "tag",
       "label": "Куннилингус",
       "originalLabels": [
-        "Куннилингус",
-        "куннилингус"
+        "куннилингус",
+        "Куннилингус"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3730,6 +4568,7 @@
         "Купальники"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3756,6 +4595,7 @@
         "латекс и кожа"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3813,10 +4653,11 @@
       "category": "tag",
       "label": "Магия",
       "originalLabels": [
-        "Магия",
-        "магия"
+        "магия",
+        "Магия"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
@@ -3829,10 +4670,11 @@
       "category": "tag",
       "label": "Маленькая грудь",
       "originalLabels": [
-        "Маленькая грудь",
-        "маленькая грудь"
+        "маленькая грудь",
+        "Маленькая грудь"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3858,6 +4700,7 @@
         "мастурбация"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -3883,6 +4726,7 @@
         "мать"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3953,6 +4797,7 @@
         "мейдочки"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -3966,6 +4811,7 @@
         "Мерзкий дядька"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4015,6 +4861,7 @@
         "минет"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4036,10 +4883,11 @@
       "category": "tag",
       "label": "Много девушек",
       "originalLabels": [
-        "много девушек",
-        "Много девушек"
+        "Много девушек",
+        "много девушек"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4076,6 +4924,7 @@
         "молоко"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4100,6 +4949,7 @@
         "монашки"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4122,10 +4972,11 @@
       "category": "tag",
       "label": "Монстры",
       "originalLabels": [
-        "Монстры",
-        "монстры"
+        "монстры",
+        "Монстры"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
@@ -4142,6 +4993,7 @@
         "мочеиспускание"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4152,8 +5004,8 @@
       "category": "tag",
       "label": "Мужская беременность",
       "originalLabels": [
-        "Мужская беременность",
-        "мужская беременность"
+        "мужская беременность",
+        "Мужская беременность"
       ],
       "sources": [
         "hentailib.me",
@@ -4169,6 +5021,7 @@
         "мужская озвучка"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4181,6 +5034,7 @@
         "мужчина крепкого телосложения"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4218,6 +5072,7 @@
         "мускулистые женщины"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4231,6 +5086,7 @@
         "На природе"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4241,10 +5097,11 @@
       "category": "tag",
       "label": "Наблюдение",
       "originalLabels": [
-        "наблюдение",
-        "Наблюдение"
+        "Наблюдение",
+        "наблюдение"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4409,6 +5266,7 @@
         "непрямой инцест"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4444,6 +5302,7 @@
         "новелла"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4478,6 +5337,7 @@
         "обмен партнерами"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4491,6 +5351,7 @@
         "Обмен телами"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
@@ -4540,10 +5401,11 @@
       "category": "tag",
       "label": "Обычный секс",
       "originalLabels": [
-        "Обычный секс",
-        "обычный секс"
+        "обычный секс",
+        "Обычный секс"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4566,10 +5428,11 @@
       "category": "tag",
       "label": "Огромная грудь",
       "originalLabels": [
-        "огромная грудь",
-        "Огромная грудь"
+        "Огромная грудь",
+        "огромная грудь"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4580,10 +5443,11 @@
       "category": "tag",
       "label": "Огромный член",
       "originalLabels": [
-        "огромный член",
-        "Огромный член"
+        "Огромный член",
+        "огромный член"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4644,6 +5508,7 @@
         "оплодотворение"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4675,10 +5540,11 @@
       "category": "tag",
       "label": "Остановка времени",
       "originalLabels": [
-        "Остановка времени",
-        "остановка времени"
+        "остановка времени",
+        "Остановка времени"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4736,10 +5602,11 @@
       "category": "tag",
       "label": "Парень пассив",
       "originalLabels": [
-        "Парень пассив",
-        "парень пассив"
+        "парень пассив",
+        "Парень пассив"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4762,10 +5629,11 @@
       "category": "tag",
       "label": "Переодевание",
       "originalLabels": [
-        "Переодевание",
-        "переодевание"
+        "переодевание",
+        "Переодевание"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live",
@@ -4780,6 +5648,7 @@
         "песочница"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4815,6 +5684,7 @@
         "племянница"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -4824,10 +5694,11 @@
       "category": "tag",
       "label": "Пляж",
       "originalLabels": [
-        "пляж",
-        "Пляж"
+        "Пляж",
+        "пляж"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4861,10 +5732,11 @@
       "category": "tag",
       "label": "Подглядывание",
       "originalLabels": [
-        "подглядывание",
-        "Подглядывание"
+        "Подглядывание",
+        "подглядывание"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4891,6 +5763,7 @@
         "подчинение"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -4974,10 +5847,11 @@
       "category": "tag",
       "label": "Похищение",
       "originalLabels": [
-        "похищение",
-        "Похищение"
+        "Похищение",
+        "похищение"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5002,6 +5876,7 @@
         "презерватив"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -5047,10 +5922,11 @@
       "category": "tag",
       "label": "Принуждение",
       "originalLabels": [
-        "Принуждение",
-        "принуждение"
+        "принуждение",
+        "Принуждение"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "v2.shlib.life",
@@ -5073,10 +5949,11 @@
       "category": "tag",
       "label": "Прозрачная одежда",
       "originalLabels": [
-        "Прозрачная одежда",
-        "прозрачная одежда"
+        "прозрачная одежда",
+        "Прозрачная одежда"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5090,6 +5967,7 @@
         "проникновение в матку"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -5137,6 +6015,7 @@
         "Психические отклонения"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "v2.shlib.life",
@@ -5174,6 +6053,7 @@
         "публично"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -5256,6 +6136,7 @@
         "рабыни"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -5354,6 +6235,7 @@
         "романтика"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -5449,6 +6331,7 @@
         "сверхъестественное"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -5501,6 +6384,7 @@
         "Секс-игрушки"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5549,6 +6433,7 @@
         "сестра"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -5558,10 +6443,11 @@
       "category": "tag",
       "label": "сетакон",
       "originalLabels": [
-        "Сетакон",
-        "сетакон"
+        "сетакон",
+        "Сетакон"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live",
@@ -5635,6 +6521,7 @@
         "скрытный секс"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -5696,6 +6583,7 @@
         "Спортивная форма"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5719,10 +6607,11 @@
       "category": "tag",
       "label": "Спящие",
       "originalLabels": [
-        "Спящие",
-        "спящие"
+        "спящие",
+        "Спящие"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5773,6 +6662,7 @@
         "Страпон"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5810,6 +6700,7 @@
         "суккубы"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -5819,10 +6710,11 @@
       "category": "tag",
       "label": "Супергерои",
       "originalLabels": [
-        "супергерои",
-        "Супергерои"
+        "Супергерои",
+        "супергерои"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "mangalib.org",
@@ -5886,6 +6778,7 @@
         "Темнокожие"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5896,10 +6789,11 @@
       "category": "tag",
       "label": "Тентакли",
       "originalLabels": [
-        "тентакли",
-        "Тентакли"
+        "Тентакли",
+        "тентакли"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live",
@@ -5914,6 +6808,7 @@
         "тётя"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -5923,10 +6818,11 @@
       "category": "tag",
       "label": "Толстушки",
       "originalLabels": [
-        "Толстушки",
-        "толстушки"
+        "толстушки",
+        "Толстушки"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5961,10 +6857,11 @@
       "category": "tag",
       "label": "Трап",
       "originalLabels": [
-        "Трап",
-        "трап"
+        "трап",
+        "Трап"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -5978,6 +6875,7 @@
         "3D"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6014,6 +6912,7 @@
         "Тэги"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -6053,6 +6952,7 @@
         "умеренная жестокость"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6112,6 +7012,7 @@
         "учитель и ученик"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6121,10 +7022,11 @@
       "category": "tag",
       "label": "Ушастые",
       "originalLabels": [
-        "Ушастые",
-        "ушастые"
+        "ушастые",
+        "Ушастые"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6135,10 +7037,11 @@
       "category": "tag",
       "label": "Фантазии",
       "originalLabels": [
-        "Фантазии",
-        "фантазии"
+        "фантазии",
+        "Фантазии"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6152,6 +7055,7 @@
         "фантастика"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -6178,6 +7082,7 @@
         "фемдом"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6188,10 +7093,11 @@
       "category": "tag",
       "label": "Фестиваль",
       "originalLabels": [
-        "фестиваль",
-        "Фестиваль"
+        "Фестиваль",
+        "фестиваль"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6206,6 +7112,7 @@
         "фетиш"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "v2.shlib.life",
@@ -6246,6 +7153,7 @@
         "фистинг"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6260,6 +7168,7 @@
         "Фурри"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "manga-chan.me",
@@ -6276,6 +7185,7 @@
         "Футанари"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6290,6 +7200,7 @@
         "футанари имеет парня"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6303,6 +7214,7 @@
         "фэнтези"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -6354,6 +7266,7 @@
         "хоррор"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6377,6 +7290,7 @@
         "цундере"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6410,10 +7324,11 @@
       "category": "tag",
       "label": "Чикан",
       "originalLabels": [
-        "Чикан",
-        "чикан"
+        "чикан",
+        "Чикан"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6427,6 +7342,7 @@
         "чирлидеры"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6440,6 +7356,7 @@
         "Чулки"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6488,6 +7405,7 @@
         "школьная форма"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6500,6 +7418,7 @@
         "школьники"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6512,6 +7431,7 @@
         "школьницы"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6524,6 +7444,7 @@
         "школьный купальник"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6560,6 +7481,7 @@
         "щекотка"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6569,10 +7491,11 @@
       "category": "tag",
       "label": "Эксгибиционизм",
       "originalLabels": [
-        "Эксгибиционизм",
-        "эксгибиционизм"
+        "эксгибиционизм",
+        "Эксгибиционизм"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "y.hentaichan.live"
@@ -6600,6 +7523,7 @@
         "боевик"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -6611,10 +7535,11 @@
       "category": "tag",
       "label": "Эльфы",
       "originalLabels": [
-        "Эльфы",
-        "эльфы"
+        "эльфы",
+        "Эльфы"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
@@ -6654,6 +7579,7 @@
         "эччи"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live"
       ]
@@ -6666,6 +7592,7 @@
         "юмор"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live",
         "yaoi-chan.me"
@@ -6690,6 +7617,7 @@
         "юри"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "manga-chan.me",
         "y.hentaichan.live",
@@ -6717,6 +7645,7 @@
         "Яндере"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "hentailib.me",
         "mangalib.org",
@@ -6732,6 +7661,7 @@
         "яой"
       ],
       "sources": [
+        "h-chan.me",
         "hentaichan.live",
         "y.hentaichan.live",
         "yaoi-chan.me"
