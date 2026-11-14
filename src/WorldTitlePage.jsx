@@ -16,7 +16,8 @@ import {useTitleShare,useTitleStats} from './title-context.js';
 import {onlineTitleLocation} from './title-route.js';
 import useMangaPolicy from './use-manga-policy.js';
 import {sameMangaTitle} from './manga-source-identity.js';
-import {globalContentPolicy} from './manga-tag-policy.js';
+import {globalContentPolicy,contentPolicyFacts} from './manga-tag-policy.js';
+import {taxonomyFacts} from './catalog-taxonomy.js';
 import {useTabIdentity} from './tab-identity.js';
 
 // Online titles use the collection's presentation, without its Drive writes.
@@ -43,7 +44,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   Promise.allSettled(pending).then(results=>{
    if(abort.signal.aborted)return;
    const rows=results.filter(result=>result.status==='fulfilled').flatMap(result=>result.value);
-   setIndexedFacts({id:value.id,genres:[...new Set(rows.flatMap(row=>row.genres||[]))],themes:[...new Set(rows.flatMap(row=>row.tags||[]))]});
+   setIndexedFacts({id:value.id,genres:[...new Set(rows.flatMap(row=>row.genres||[]))],themes:[...new Set(rows.flatMap(row=>row.tags||[]))],hentaiExcluded:rows.some(row=>row.hentaiExcluded||row.workFacts?.hentaiExcluded)});
   });return()=>abort.abort();
  },[value.id,factIds,factUrls,tagPolicyVersion,service.server]);
  useEffect(()=>{
@@ -52,7 +53,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   service.request('/catalog/content?'+new URLSearchParams({q:value.title,kind:value.kind}),{signal:abort.signal}).then(result=>{
    if(abort.signal.aborted)return;
    const rows=(result.items||[]).filter(row=>row.id===value.id||(value.sources||[]).some(source=>source.id===row.id)||Object.entries(value.ids||{}).some(([key,id])=>id&&String(row.ids?.[key])===String(id)));
-   setIndexedFacts({id:value.id,genres:[...new Set(rows.flatMap(row=>row.genres||[]))],themes:[...new Set(rows.flatMap(row=>row.tags||[]))]});
+   setIndexedFacts({id:value.id,genres:[...new Set(rows.flatMap(row=>row.genres||[]))],themes:[...new Set(rows.flatMap(row=>row.tags||[]))],hentaiExcluded:rows.some(row=>row.hentaiExcluded||row.workFacts?.hentaiExcluded)});
   }).catch(()=>{});return()=>abort.abort();
  },[value.id,tagPolicyVersion,service.server]);
  useEffect(()=>{
@@ -88,7 +89,8 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
 
  };const result=withSupplement({...base,...(profile||{}),...preserveCatalogFacts(item,profile||{}),aliases:searchItem.aliases,sourcePublication:sourcePublication?.id===item.id?sourcePublication.value:null},supplement);
  if(indexedFacts?.id===item.id)for(const field of ['genres','themes'])result[field]=[...new Set([...(result[field]||[]),...indexedFacts[field]])];
- return result;},[item,profile,supplement,searchItem,sourcePublication,indexedFacts,tagPolicyVersion]);
+ const classified=taxonomyFacts(contentPolicyFacts({...item,genres:result.genres,tags:result.themes,hentaiExcluded:item.hentaiExcluded||indexedFacts?.id===item.id&&indexedFacts.hentaiExcluded}));
+ return {...result,genres:classified.genres,themes:classified.tags,hentaiExcluded:classified.hentaiExcluded};},[item,profile,supplement,searchItem,sourcePublication,indexedFacts,tagPolicyVersion]);
  const sceneItem=viewSeason?.item||item,sceneId=String(sceneItem.ids?.mal||''),basisId=String(item.ids?.mal||'');
  useEffect(()=>{if(!sceneId||sceneId===basisId||seasonProfiles[sceneId])return;const abort=new AbortController();loadTitleProfile(sceneId,'anime',{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}}).then(data=>{if(!abort.signal.aborted)setSeasonProfiles(old=>({...old,[sceneId]:data}));}).catch(()=>{});return()=>abort.abort();},[sceneId,basisId,service.server]);
  const displayProfile=useMemo(()=>sceneId&&sceneId!==basisId?{...profileForSeason(sceneItem),...(seasonProfiles[sceneId]||{})}:baseDisplayProfile,[sceneItem,sceneId,basisId,seasonProfiles,baseDisplayProfile]);

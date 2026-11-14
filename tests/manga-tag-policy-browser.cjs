@@ -8,6 +8,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  setMangaPolicy(policy,'fixture-initial');
  window.rules=policy;window.generation=0;
  const row={id:'fixture:1',catalogId:'a'.repeat(32),provider:'fixture',sourceId:'1',kind:'manga',title:'Garden World',url:'https://fixture.example/title/garden',sourceUrl:'https://fixture.example/title/garden',aliases:['Garden World'],genres:['Drama'],tags:['Fantasy'],language:'en',metadataChecked:true};
+ window.fixtureRow=row;
  const service={server:location.origin,status:'connected',session:{serverVersion:73},request:async(p,o={})=>{
   if(p.startsWith('/manga/tag-policy'))return{revision:String(window.generation),policy:window.rules};
   if(p.startsWith('/manga/catalog/tags'))return{tags:[{key:'драма',original:'Drama',type:'genres',works:1},{key:'фэнтези',original:'Fantasy',type:'tags',works:1},...(window.generation>=2?[{key:'экология',original:'Ecology',type:'genres',works:1}]:[])]};
@@ -47,6 +48,16 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  await genres.getByRole('button',{name:'Включить Экология',exact:true}).click();await shut();
  await page.getByRole('button',{name:'Убрать фильтр Жанры',exact:true}).waitFor();
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Убрать фильтр Жанры',exact:true}).click();
+ await page.evaluate(()=>{window.rules={...window.rules,tags:[...window.rules.tags,{key:'хентай',label:'Хентай',aliases:['Hentai'],category:'genre'}]};Object.assign(window.fixtureRow,{provider:'hentailib',sourceUrl:'https://hentailib.me/garden',url:'https://hentailib.me/garden',genres:[],tags:[]});window.generation++;window.dispatchEvent(new Event('focus'));});
+ const inferred=await panel('Жанры');await inferred.getByRole('button',{name:'Включить Хентай',exact:true}).click();await shut();
+ await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).click();
+ await page.locator('.title-genre-list').getByText('Хентай',{exact:true}).waitFor();
+ await page.evaluate(()=>{Object.assign(window.fixtureRow,{hentaiExcluded:true,tags:['Не хентай']});window.generation++;window.dispatchEvent(new Event('focus'));});
+ await page.locator('.title-genre-list').getByText('Хентай',{exact:true}).waitFor({state:'detached'});
+ await page.getByRole('button',{name:'К результатам поиска',exact:true}).click();
+ await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).waitFor({state:'detached'});
+ console.log('PASS source-derived genre reaches filter and title; a work veto removes it from the open title and filtered results');
  assert.deepEqual(errors,[]);
  console.log('PASS runtime deletion and addition reach an open title, catalogue cards and filter options despite stale metadata responses');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

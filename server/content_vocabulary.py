@@ -55,6 +55,14 @@ def public(store):
                     if label not in row['aliases']:row['aliases'].append(label)
                     if category=='genres':row['genreHint']=True;row['category']='genre'
                     else:row.setdefault('category','tag')
+            # Source-derived genres must be selectable even before any source
+            # happens to send the same literal label in its tag array.
+            from catalog_taxonomy import origin_sql
+            key=policy.key('Хентай')
+            if key and key not in known:
+                tables={r[0] for r in store.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                has_origin=any(store.db.execute('SELECT 1 FROM '+table+' t WHERE '+origin_sql('t',manga)+'=1 LIMIT 1').fetchone() for table,manga in [('catalog_titles',True),('content_titles',False)] if table in tables)
+                if has_origin:known[key]={'key':key,'label':policy.label(key,'Хентай'),'aliases':['Хентай','Hentai'],'category':'genre'}
             data['tags']=list(known.values())
         # The private switch is implemented by expanding observed, allowed
         # source labels; its private hidden list is never delivered publicly.

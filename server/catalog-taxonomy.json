@@ -336,5 +336,52 @@
       "роман": "Новелла",
       "wn": "Веб-новелла"
     }
+  },
+  "sourceGenres": {
+    "hentai": {
+      "kinds": [
+        "manga",
+        "anime",
+        "ranobe"
+      ],
+      "providers": [
+        "hentailib",
+        "hentaichan",
+        "hentaichan-cc",
+        "hitomi",
+        "hmanga",
+        "hanime"
+      ],
+      "hosts": [
+        "hentailib.me",
+        "hentailib.org",
+        "hentaichan.live",
+        "h-chan.me",
+        "hentaichan.cc",
+        "henchan.pro",
+        "hmanga.su",
+        "hmanga.me",
+        "hentaros.com",
+        "hentaimoody.com",
+        "nude-moon.org",
+        "nude-moon.fun",
+        "allhen.online",
+        "allhentai.ru",
+        "hitomi.la",
+        "hanime.tv",
+        "hanime1.me",
+        "freeanimehentai.net",
+        "hentaifox.com",
+        "rokuhentai.com",
+        "akuma.moe",
+        "3hentai.net"
+      ],
+      "excludeLabels": [
+        "Не хентай",
+        "Not hentai",
+        "Non-hentai",
+        "Nonhentai"
+      ]
+    }
   }
 }

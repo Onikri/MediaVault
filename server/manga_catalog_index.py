@@ -71,6 +71,8 @@ def initialize(conn):
         PRIMARY KEY(title_id,category,original));
       CREATE TABLE IF NOT EXISTS catalog_policy_state(name TEXT PRIMARY KEY,value TEXT NOT NULL);
     ''')
+    from catalog_taxonomy import initialize_origins
+    initialize_origins(conn,manga=True)
     # One work is listed by many source sites under the same title; browse
     # pages over these work keys so the work cannot reappear on another page.
     if 'work_key' not in {r[1] for r in conn.execute('PRAGMA table_info(catalog_titles)')}:
@@ -263,28 +265,41 @@ def _browse_works(conn,where,args,sort,limit,offset,q=''):
         place={k:i for i,k in enumerate(keys)}
         clause=(' AND ' if where else ' WHERE ')+'t.work_key IN ('+','.join('?'*len(keys))+')'
         rows=conn.execute('SELECT t.id,t.metadata,t.chapter_count,t.tag_state,t.updated,t.work_key FROM catalog_titles t'+where+clause+' ORDER BY t.chapter_count IS NULL,t.chapter_count DESC,t.id',[*args,*keys]).fetchall()
-        facts={key:{'genres':[],'tags':[]} for key in keys}
-        for work_key,raw in conn.execute('SELECT work_key,metadata FROM catalog_titles WHERE work_key IN ('+','.join('?' for _ in keys)+')',keys):
-            public=_public_metadata(json.loads(raw))
-            for field in ['genres','tags']:facts[work_key][field]=list(dict.fromkeys([*facts[work_key][field],*public.get(field,[])]))[:120]
+        facts=_work_facts(conn,keys)
         counts={}
         for identity,metadata,chapters,status,updated,key in sorted(rows,key=lambda r:place[r[5]]):
             counts[key]=counts.get(key,0)+1
             if counts[key]>WORK_SOURCES:continue
-            row=_public_metadata(json.loads(metadata))
+            row=_public_metadata({**json.loads(metadata),'hentaiExcluded':facts[key]['hentaiExcluded']})
+            from catalog_taxonomy import is_hentai
+            row['genres']=list(dict.fromkeys([*row['genres'],*[v for v in facts[key]['genres'] if is_hentai(v,current())]]))
+            row['hentaiExcluded']=facts[key]['hentaiExcluded']
             row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated,'workKey':key,'workFacts':facts[key]})
             result.append(row)
     return {'total':total,'workTotal':works_total,'limit':limit,'offset':offset,'works':len(keys),'items':result}
 
 def title(conn, identity):
-    row = conn.execute('SELECT metadata,chapter_count,tag_state FROM catalog_titles WHERE id=?',(identity,)).fetchone()
+    row = conn.execute('SELECT metadata,chapter_count,tag_state,work_key FROM catalog_titles WHERE id=?',(identity,)).fetchone()
     if not row:
         return None
-    result = _public_metadata(json.loads(row[0]))
+    facts=_work_facts(conn,[row[3]])[row[3]]
+    result = {**_public_metadata({**json.loads(row[0]),'hentaiExcluded':facts['hentaiExcluded']}),**facts,'workFacts':facts}
     result['catalogId'] = identity
     result['chapterCount'] = row[1]
     result['tagStatus'] = row[2]
     return result
+
+def _work_facts(conn,keys):
+    from catalog_taxonomy import hentai_excluded
+    marks=','.join('?' for _ in keys)
+    blocked={key for (key,) in conn.execute('SELECT DISTINCT t.work_key FROM catalog_titles t JOIN catalog_tag_facts f ON f.title_id=t.id WHERE t.work_key IN ('+marks+') AND catalog_not_hentai(f.original)=1',keys)}
+    records=[(key,json.loads(raw)) for key,raw in conn.execute('SELECT work_key,metadata FROM catalog_titles WHERE work_key IN ('+marks+')',keys)]
+    blocked.update(key for key,row in records if hentai_excluded(row))
+    facts={key:{'genres':[],'tags':[],'hentaiExcluded':key in blocked} for key in keys}
+    for key,row in records:
+        public=_public_metadata({**row,'hentaiExcluded':key in blocked})
+        for field in ['genres','tags']:facts[key][field]=list(dict.fromkeys([*facts[key][field],*public.get(field,[])]))[:120]
+    return facts
 
 def _public_metadata(row):
     # Older index entries may predate the reader URL and taxonomy normalization.

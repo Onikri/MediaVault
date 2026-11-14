@@ -156,4 +156,5 @@ def project_row(row,policy=None):
     from urllib.parse import urlsplit
     policy=policy or current()
     source=urlsplit(row.get('sourceUrl') or row.get('url') or '').hostname or ''
-    return {**row,**policy.facts(row,source)}
+    from catalog_taxonomy import hentai_excluded
+    return {**row,**policy.facts(row,source),**({'hentaiExcluded':True} if hentai_excluded(row) else {})}
