@@ -62,6 +62,9 @@ function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type
   // Scenes cut the track into pieces; the piece under the pointer lifts and glides to the next one.
   const scenes=seekable&&chapters.length>1?chapterSpans(chapters,duration):[];
   const sceneAt=point=>scenes.find(s=>point>=s.start&&point<s.end);
+  // One set of cuts: opening/ending edges plus scene starts outside them.
+  // A scene cut on (or inside) an opening would draw a second line beside its edge.
+  const near=Math.max(2,duration*.006),cuts=seekable?[...segments.flatMap(s=>[s.start,s.end]).filter(p=>p>near&&p<duration-near),...scenes.slice(1).map(s=>s.start).filter(p=>!segments.some(seg=>p>=seg.start-near&&p<=seg.end+near))].sort((a,b)=>a-b).filter((p,i,list)=>!i||p-list[i-1]>near):[];
   const progress=seekable?Math.min(100,time/duration*100):0;
   const loaded=Math.max(progress,seekable?buffered/duration*100:0);
   function seekAtPointer(event){
@@ -95,7 +98,7 @@ function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type
       {seekable&&segments.map(s=><i key={s.label} className="mvx-track-segment" title={s.label+', '+clock(s.start)+'–'+clock(s.end)} style={{left:s.start/duration*100+'%',width:(s.end-s.start)/duration*100+'%'}}><b>{s.label}</b></i>)}
       <i className="mvx-track-played" style={{width:progress+'%'}}/>
       {hover?.scene&&<i className="mvx-track-scene" style={{left:hover.scene.left+'%',width:hover.scene.width+'%'}}/>}
-      {scenes.slice(1).map(s=><i key={s.start} className="mvx-track-cut" style={{left:s.start/duration*100+'%'}}/>)}
+      {cuts.map(point=><i key={point} className="mvx-track-cut" style={{left:point/duration*100+'%'}}/>)}
     </div>
     <i className="mvx-thumb" style={{left:progress+'%'}} aria-hidden="true"/>
     <input ref={timeline} aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1} step="0.1"

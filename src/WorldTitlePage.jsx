@@ -17,6 +17,7 @@ import {onlineTitleLocation} from './title-route.js';
 import useMangaPolicy from './use-manga-policy.js';
 import {sameMangaTitle} from './manga-source-identity.js';
 import {globalContentPolicy} from './manga-tag-policy.js';
+import {useTabIdentity} from './tab-identity.js';
 
 // Online titles use the collection's presentation, without its Drive writes.
 const LocalMediaViewer=lazy(()=>import('./MediaViewer.jsx'));
@@ -31,6 +32,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  const localInput=useRef(null),[localFile,setLocalFile]=useState(null);
  const [item,setItem]=useState(value),[profile,setProfile]=useState(null),[supplement,setSupplement]=useState(null),[loading,setLoading]=useState(false),[saveOpen,setSaveOpen]=useState(false),[saveTo,setSaveTo]=useState('local'),[viewSeason,setViewSeason]=useState(null),[seasonProfiles,setSeasonProfiles]=useState({});
  const tagPolicyVersion=useMangaPolicy(service);
+ useTabIdentity(item?.title||value.title,item?.kind||value.kind);
  const [indexedFacts,setIndexedFacts]=useState(null);
  const factIds=[...new Set([value.catalogId,...(value.catalogIds||[]),...(value.sources||[]).map(source=>source.catalogId)].filter(id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)))].slice(0,100).join(',');
  const factUrls=[...new Set([value.sourceUrl,value.sourceURL,value.url].filter(url=>typeof url==='string'&&url.startsWith('https://')))].join('\n');

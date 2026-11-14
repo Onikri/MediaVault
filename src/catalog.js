@@ -250,6 +250,51 @@ async function russianBookTitles(items,signal,fetcher){
   }));
   return items;
 }
+// Browsing without a query pages through ONE ordered list (AniList), so page 5
+// never repeats page 1 the way three independently sorted catalogues did.
+// Shikimori only adds Russian names to the titles of that page.
+export const BROWSE_KINDS=['anime','manga','ranobe'];
+export const CATALOG_SORTS=[['popular','По популярности'],['trending','Сейчас обсуждают'],['score','По рейтингу'],['favourites','Чаще в избранном'],['new','Сначала новые'],['old','Сначала старые'],['title','По названию'],['length','Больше серий и глав']];
+const ANILIST_GENRES=new Set(['Action','Adventure','Comedy','Drama','Ecchi','Fantasy','Hentai','Horror','Mahou Shoujo','Mecha','Music','Mystery','Psychological','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Thriller']);
+const ANILIST_FORMATS=new Set(['TV','TV_SHORT','MOVIE','SPECIAL','OVA','ONA','MUSIC','MANGA','NOVEL','ONE_SHOT']);
+export function browseQuery({kind='anime',page=1,perPage=24,sort='popular',year,genre,tag,format}={}){
+  const manga=kind!=='anime',order={popular:'POPULARITY_DESC',trending:'TRENDING_DESC',score:'SCORE_DESC',favourites:'FAVOURITES_DESC',new:'START_DATE_DESC',old:'START_DATE',title:'TITLE_ROMAJI',length:manga?'CHAPTERS_DESC':'EPISODES_DESC'}[sort]||'POPULARITY_DESC';
+  // ID breaks ties, so equal scores keep one place across page requests.
+  const args=['type:$type','sort:[$sort,ID]'],variables={type:manga?'MANGA':'ANIME',sort:order,page:Math.max(1,Number(page)||1),perPage:Math.min(50,Math.max(1,Number(perPage)||24))},defs=['$type:MediaType','$sort:MediaSort','$page:Int','$perPage:Int'];
+  const add=(name,type,value,arg=name)=>{defs.push('$'+name+':'+type);args.push(arg+':$'+name);variables[name]=value;};
+  const pickedFormat=String(format||'').toUpperCase().replace(/\s+/g,'_');
+  if(ANILIST_FORMATS.has(pickedFormat))add('format','[MediaFormat]',[pickedFormat],'format_in');
+  else if(kind==='ranobe')add('format','[MediaFormat]',['NOVEL'],'format_in');
+  else if(kind==='manga')add('notFormat','[MediaFormat]',['NOVEL'],'format_not_in');
+  if(year&&/^\d{4}$/.test(String(year))){if(manga){add('from','FuzzyDateInt',Number(year)*10000,'startDate_greater');add('to','FuzzyDateInt',(Number(year)+1)*10000,'startDate_lesser');}else add('year','Int',Number(year),'seasonYear');}
+  // Dated sorts would otherwise open with undated announcements.
+  else if(sort==='new'||sort==='old')add('dated','FuzzyDateInt',10000000,'startDate_greater');
+  const labels=[genre,...String(tag||'').split(',')].map(v=>String(v||'').trim()).filter(Boolean).map(queryLabel);
+  const genres=labels.filter(v=>ANILIST_GENRES.has(v)),tags=labels.filter(v=>!ANILIST_GENRES.has(v));
+  if(genres.length)add('genres','[String]',genres,'genre_in');
+  if(tags.length)add('tags','[String]',tags,'tag_in');
+  return {query:'query('+defs.join(',')+'){Page(page:$page,perPage:$perPage){pageInfo{lastPage total} media('+args.join(',')+'){'+aniFields+'}}}',variables};
+}
+export async function fetchBrowsePage(options,fetcher=fetch){
+  const {kind='anime',signal}=options;
+  const response=await fetcher('https://graphql.anilist.co',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(browseQuery(options)),signal:AbortSignal.any([signal,AbortSignal.timeout(16000)].filter(Boolean))});
+  if(!response.ok)throw Error(response.status===429?'Слишком частые запросы':'Каталог временно недоступен');
+  const data=await response.json();if(data.errors)throw Error('Каталог не ответил на запрос');
+  const spine=normalizeCatalog('anilist',data,kind),pages=catalogPages('anilist',data);
+  const ids=[...new Set(spine.map(item=>item.ids?.mal).filter(Boolean))];let names=[];
+  if(ids.length){
+    try{
+      const url=new URL('https://shikimori.io/api/'+(kind==='anime'?'animes':kind==='ranobe'?'ranobe':'mangas'));url.searchParams.set('ids',ids.join(','));url.searchParams.set('limit',String(Math.min(50,ids.length)));
+      const reply=await fetcher(url.href,{signal:AbortSignal.any([signal,AbortSignal.timeout(8000)].filter(Boolean))});
+      if(reply.ok)names=normalizeCatalog('shikimori',await reply.json(),kind).filter(item=>ids.includes(item.ids?.mal));
+    }catch(error){signal?.throwIfAborted();}
+  }
+  const items=mergeCatalog([...spine,...names]).slice(0,spine.length);
+  Object.defineProperty(items,'pages',{value:pages,enumerable:false});
+  Object.defineProperty(items,'russian',{value:names.length>0,enumerable:false});
+  return items;
+}
+
 export function catalogProviders(kind,query,server){
   // Kinobox (Kinopoisk) is the Russian film base: popular lists without a
   // query and Russian titles. IMDb/TVmaze/Wikidata add English titles when searching.

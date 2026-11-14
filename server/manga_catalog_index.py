@@ -213,7 +213,17 @@ def _conditions(q='', tag='', provider='', format='', source_id='', *, genre='',
     elif age=='under18':sql.append('(t.adult=0 OR CAST(json_extract(t.metadata,\'$.age\') AS INTEGER)<18)')
     return (' WHERE '+' AND '.join(sql) if sql else ''), args
 
-def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30, offset=0, **filters):
+# Whole-catalogue orders for paging. Every order ends in the id, so a title
+# keeps one place across page requests while the crawler rewrites rows.
+SORTS = {
+    'new': 't.year IS NULL,t.year DESC,t.id',
+    'old': 't.year IS NULL,t.year,t.id',
+    'title': 't.title COLLATE NOCASE,t.id',
+    'length': 't.chapter_count IS NULL,t.chapter_count DESC,t.id',
+    'added': 't.first_seen DESC,t.id',
+}
+
+def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30, offset=0, sort='', **filters):
     limit = min(100,max(1,int(limit)))
     offset = min(100000,max(0,int(offset)))
     where,args = _conditions(q,tag,provider,format,source_id,**filters)
@@ -224,7 +234,7 @@ def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30
         rank="CASE WHEN catalog_normalize(t.title)=? THEN 0 WHEN EXISTS(SELECT 1 FROM json_each(t.metadata,'$.aliases') a WHERE catalog_normalize(a.value)=?) THEN 1 WHEN catalog_normalize(t.title) LIKE ? ESCAPE '\\' THEN 2 ELSE 3 END,"
         term=normalize(q);ranking=[term,term,term+'%']
     values = conn.execute('SELECT id,metadata,chapter_count,tag_state,updated FROM catalog_titles t'+where+
-                          ' ORDER BY '+rank+'updated DESC,id LIMIT ? OFFSET ?', [*args,*ranking,limit,offset]).fetchall()
+                          ' ORDER BY '+rank+(SORTS.get(sort) or ('t.updated DESC,t.id' if rank else SORTS['new']))+' LIMIT ? OFFSET ?', [*args,*ranking,limit,offset]).fetchall()
     result=[]
     for identity,metadata,chapters,status,updated in values:
         row=_public_metadata(json.loads(metadata))

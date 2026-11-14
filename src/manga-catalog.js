@@ -10,8 +10,8 @@ export function loadMangaTaxonomy(){
  }).catch(error=>{vocabulary=null;throw error;});
 }
 
-export function mangaCatalogParams({query='',filters={},language='all',sourceIds=[],page=1,limit=30}={}){
- const values={q:query.trim(),tag:filters.tag,genre:filters.genre,year:filters.year,format:filters.format,age:filters.age,language,sourceIds:[...sourceIds].sort().join(','),offset:(Math.max(1,page)-1)*limit,limit};
+export function mangaCatalogParams({query='',filters={},language='all',sourceIds=[],page=1,limit=30,sort=''}={}){
+ const values={q:query.trim(),tag:filters.tag,genre:filters.genre,year:filters.year,format:filters.format,age:filters.age,language,sourceIds:[...sourceIds].sort().join(','),offset:(Math.max(1,page)-1)*limit,limit,sort};
  return new URLSearchParams(Object.entries(values).filter(([,v])=>v!==undefined&&v!==null&&v!==''));
 }
 

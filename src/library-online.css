@@ -8,6 +8,9 @@ html[data-blossom] .app-shell[data-view=library]>.app-main>.page-title-row .eyeb
 html[data-blossom] .app-shell[data-view=library]>.app-main>.page-title-row .page-title{font-size:clamp(28px,2.6vw,36px);line-height:1.1;letter-spacing:-.04em}
 html[data-blossom] .online-library-workspace.is-railed{display:block;margin-top:0}
 html[data-blossom] .online-library-workspace .blossom-catalog-body.is-docked{display:block;width:100%;min-width:0}
+/* An open title owns the page: the section rail and catalogue tabs would
+   otherwise sit above its showcase, under the navbar. */
+html[data-blossom] .online-library:has(.title-page) .catalog-head,html[data-blossom] .online-library:has(.title-page)>.library-rail,html[data-blossom] .online-library:has(.title-page)>.online-access{display:none}
 html[data-blossom] .online-library .catalog-head{display:flex;align-items:center;gap:8px;margin:0 0 12px}
 html[data-blossom] .library-rail{display:flex;gap:2px;margin:0 0 12px;padding:4px;overflow-x:auto;scrollbar-width:none;border-radius:999px;background:var(--color-canvas-soft)}
 html[data-blossom] .catalog-head>.library-rail{flex:1;min-width:0;margin:0}

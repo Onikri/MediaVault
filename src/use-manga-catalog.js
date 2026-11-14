@@ -3,13 +3,13 @@ import {loadMangaTaxonomy,mangaCatalogParams} from './manga-catalog.js';
 import {acceptContentPolicy,contentPolicyRevision} from './manga-tag-policy.js';
 
 const empty={results:[],candidates:[],facets:[],total:0,hasMore:false,loading:false,enriching:false,ready:false,error:''};
-export default function useMangaCatalog({query,kind,filters,language,sourceIds,service,page,paused=false,revision=0,composing=false}){
+export default function useMangaCatalog({query,kind,filters,language,sourceIds,service,page,sort='',limit=30,paused=false,revision=0,composing=false}){
  const [snapshot,setSnapshot]=useState(empty),[taxonomy,setTaxonomy]=useState(null),[taxonomyError,setTaxonomyError]=useState('');
  const [retryGeneration,setRetryGeneration]=useState(0);
  const attempted=useRef(new Set());
  const live=useRef(service);live.current=service;
  const capable=Number(service.session?.serverVersion)>=72;
- const params=mangaCatalogParams({query,filters,language,sourceIds,page}).toString();
+ const params=mangaCatalogParams({query,filters,language,sourceIds,page,sort,limit}).toString();
  const facetParams=new URLSearchParams({language,sourceIds:[...sourceIds].sort().join(','),limit:'500'}).toString();
  const key=JSON.stringify([params,service.server,kind]);
  useEffect(()=>{if(kind!=='manga')return;let active=true;loadMangaTaxonomy().then(value=>{if(active){setTaxonomy(value);setTaxonomyError('');}}).catch(error=>{if(active)setTaxonomyError(error.message);});return()=>{active=false;};},[kind]);
