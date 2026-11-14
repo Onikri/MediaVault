@@ -125,7 +125,7 @@ html[data-blossom] .title-feature .title-hero-actions{order:6;display:flex;align
 html[data-blossom] .title-feature .title-save-actions{display:flex;gap:7px}
 html[data-blossom] .title-feature .title-save-actions>button{width:41px;height:41px;border:0;border-radius:13px;background:#ffffff12;color:var(--color-petal)}
 html[data-blossom] .title-feature .title-scene-controls{position:absolute;right:25px;bottom:20px;margin:0;border:0;background:#ffffff10;z-index:5;float:none}
-html[data-blossom] .title-page-back{position:absolute;z-index:6;left:18px;top:92px;color:var(--color-petal);font-size:11px}
+
 html[data-blossom] .title-shortcuts{position:sticky;top:82px;z-index:20;display:flex;gap:7px;padding:9px 0;margin:20px 0 10px;background:rgb(var(--canvas-rgb)/.94);backdrop-filter:blur(16px);border:0;border-radius:100px;overflow-x:auto;scrollbar-width:none}
 html[data-blossom] .title-shortcuts>button{padding:9px 15px;border:0;border-radius:100px;font-size:12px;white-space:nowrap;color:var(--color-on-muted)}
 html[data-blossom] .title-shortcuts>[aria-current]{background:var(--color-surface);color:var(--color-petal)}

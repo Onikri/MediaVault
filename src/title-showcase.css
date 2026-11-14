@@ -25,7 +25,6 @@ html[data-blossom] .title-showcase .title-scene-shade{
 html[data-blossom] .title-showcase .title-background-video{inset:-280px -36px;container-type:size}
 
 html[data-blossom] .title-showcase .title-scene-controls{right:24px;bottom:18px}
-html[data-blossom] .title-page .title-page-back{left:20px;top:102px}
 .title-playback-reveal{position:relative;min-width:0;transform-origin:50% 30%}
 .title-playback-mask{position:absolute;pointer-events:none}
 .title-playback-reveal.is-revealed{clip-path:none;transform:none}
@@ -54,7 +53,6 @@ html[data-blossom] .title-showcase .title-facts dd{text-align:right;overflow-wra
  html[data-blossom] .title-showcase .title-hero-copy>.eyebrow{margin-bottom:12px}
  html[data-blossom] .title-showcase .title-hero-copy h1{font-size:32px;line-height:1.1}
  html[data-blossom] .title-showcase .title-hero-description{font-size:13px;-webkit-line-clamp:6}
- html[data-blossom] .title-page .title-page-back{top:88px}
 }
 
 html[data-blossom] .title-showcase .title-background-video video{width:100%;height:100%;object-fit:cover;display:block}
@@ -119,20 +117,15 @@ html[data-blossom] .title-showcase.is-animated .title-showcase-copy-layer>.title
 html[data-blossom] .title-showcase.is-animated .poster-actions>*{animation:mv-showcase-rise .7s cubic-bezier(.22,1,.36,1) .5s both}
 html[data-blossom] .title-showcase-tilt{width:100%}
 
-/* Back to the results: a round glass button over the showcase that opens into
-   a labelled pill on hover or keyboard focus, arriving with the showcase. */
-@keyframes mv-back-in{from{opacity:0;transform:translateX(-12px) scale(.82);filter:blur(5px)}to{opacity:1;transform:none;filter:blur(0)}}
-html[data-blossom] .title-page .title-page-back{display:inline-flex;align-items:center;gap:0;height:44px;min-width:44px;margin:0;padding:0;border:0;border-radius:100px;
- background:color-mix(in srgb,var(--color-petal) 12%,color-mix(in srgb,var(--color-canvas) 58%,transparent));-webkit-backdrop-filter:blur(16px) saturate(1.3);backdrop-filter:blur(16px) saturate(1.3);
- box-shadow:0 10px 28px -14px rgb(0 0 0 / .7);color:var(--color-petal);font:inherit;font-size:13px;font-weight:600;cursor:pointer;
- transition:background .25s ease,box-shadow .25s ease;animation:mv-back-in .6s cubic-bezier(.22,1,.36,1) .04s both}
-html[data-blossom] .title-page .title-page-back-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;transition:transform .3s cubic-bezier(.22,1,.36,1)}
-html[data-blossom] .title-page .title-page-back-label{display:block;max-width:0;overflow:hidden;white-space:nowrap;opacity:0;transform:translateX(-6px);
- transition:max-width .4s cubic-bezier(.22,1,.36,1),opacity .25s ease,transform .35s cubic-bezier(.22,1,.36,1),padding .4s cubic-bezier(.22,1,.36,1)}
-html[data-blossom] .title-page .title-page-back:hover,html[data-blossom] .title-page .title-page-back:focus-visible{background:color-mix(in srgb,var(--color-blossom) 28%,color-mix(in srgb,var(--color-canvas) 50%,transparent));box-shadow:0 14px 34px -14px rgb(0 0 0 / .8)}
-html[data-blossom] .title-page .title-page-back:hover .title-page-back-label,html[data-blossom] .title-page .title-page-back:focus-visible .title-page-back-label{max-width:240px;opacity:1;transform:none;padding-right:18px}
-html[data-blossom] .title-page .title-page-back:hover .title-page-back-icon{transform:translateX(-2px)}
-html[data-blossom] .title-page .title-page-back:active .title-page-back-icon{transform:translateX(-5px)}
-html[data-blossom] .title-page .title-page-back:focus-visible{outline:0;box-shadow:0 0 0 2px var(--color-blossom),0 14px 34px -14px rgb(0 0 0 / .8)}
-@media(hover:none){html[data-blossom] .title-page .title-page-back:hover .title-page-back-label{max-width:0;opacity:0;padding-right:0}}
-@media(prefers-reduced-motion:reduce){html[data-blossom] .title-page .title-page-back{animation:none}html[data-blossom] .title-page .title-page-back-label,html[data-blossom] .title-page .title-page-back-icon{transition:none}}
+/* Back to the results: a small round glass button that opens the copy
+   column, on the same line as the kind and year, so it moves with the text. */
+.title-page .title-page-back{display:inline-grid;place-items:center;width:34px;height:34px;margin:0 14px 0 0;padding:0;border:0;border-radius:50%;vertical-align:middle;
+ background:color-mix(in srgb,var(--color-petal) 12%,color-mix(in srgb,var(--color-canvas) 58%,transparent));-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);
+ color:var(--color-petal);cursor:pointer;letter-spacing:0;transition:background .22s ease,transform .25s cubic-bezier(.22,1,.36,1)}
+.title-page .title-page-back svg{transition:transform .3s cubic-bezier(.22,1,.36,1)}
+.title-page .title-page-back:hover,.title-page .title-page-back:focus-visible{background:color-mix(in srgb,var(--color-blossom) 34%,color-mix(in srgb,var(--color-canvas) 50%,transparent))}
+.title-page .title-page-back:hover svg{transform:translateX(-2px)}
+.title-page .title-page-back:active{transform:scale(.92)}
+.title-page .title-page-back:focus-visible{outline:0;box-shadow:0 0 0 2px var(--color-blossom)}
+@media(max-width:640px){.title-page .title-page-back{width:30px;height:30px;margin-right:10px}}
+@media(prefers-reduced-motion:reduce){.title-page .title-page-back,.title-page .title-page-back svg{transition:none}}
