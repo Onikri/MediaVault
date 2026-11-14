@@ -88,7 +88,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const globalTags=globalContentPolicy();
   useEffect(()=>{setFilters(old=>{const next={...old};for(const field of ['genre','tag'])next[field]=filterValues(old[field]).filter(value=>mangaPolicy().key(value));return JSON.stringify(next)===JSON.stringify(old)?old:next;});},[tagPolicyVersion]);
   const browsing=!query.trim();
-  const indexSpine=browsing&&kind==='manga'&&Number(service.session?.serverVersion)>=72&&service.status==='connected';
+  const indexSpine=browsing&&kind==='manga'&&Number(service.session?.serverVersion)>=72&&!!service.server;
   const sorts=indexSpine?INDEX_SORTS:browsing&&BROWSE_KINDS.includes(kind)?CATALOG_SORTS:SORTS,sort=sorts.some(([id])=>id===order)?order:sorts[0][0];
   const {items:metadataItems,statuses,pages:metadataPages,loading:metadataLoading,retry}=useCatalog(query,kind,filters.year,service.server,page,composing,filters,{sort,perPage,off:indexSpine});
   const contentIndex=useContentCatalog({service,state,kind,query,filters,rows:metadataItems,revision:tagPolicyVersion,page});
