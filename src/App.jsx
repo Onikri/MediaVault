@@ -230,6 +230,8 @@ function MediaVaultApp(){
   async function upload(event){const files=Array.from(event.target.files||[]);event.target.value='';if(files.length&&await actions.refreshCatalog())actions.uploadFiles(files,{collection:uploadCollection,section:uploadSection==='auto'?(category==='all'?undefined:category):uploadSection,part:uploadPart});}
   async function sendInvite(){if(await actions.invite(inviteEmail))setInviteEmail('');}
   function find(){setSearchOpen(true);}
+  // «Посмотреть арты» from a character opens the library's art board.
+  useEffect(()=>{const arts=event=>{const {query='',title=''}=event.detail||{};setCategory('art');setFavoritesOnly(false);setCatalogSearch(old=>({revision:old.revision+1,item:null,query,filters:{title}}));go('library');window.scrollTo({top:0,behavior:'instant'});};addEventListener('mediavault:arts',arts);return()=>removeEventListener('mediavault:arts',arts);});
   function openSearchResult(item,query='',kind='anime',filters=null){if(item?.kind==='music')playMusic({id:'youtube:'+item.youtubeId,youtubeId:item.youtubeId,title:item.title,artists:item.artists||[],source:'youtube'});go('library');setCategory(item?.kind||kind);setCatalogSearch(old=>({revision:old.revision+1,item,query,filters}));setSearchOpen(false);}
   const allTitles=useMemo(()=>buildTitles(state.catalog),[state.catalog]);
   useSectionBrandFor(collectionRail,{enabled:view==='collection'&&!activeTitle,sections:[...filters.map(f=>[f.id,f.label]),['favorites','Избранное']],active:favoritesOnly?'favorites':category,onPick:id=>{if(id==='favorites'){setFavoritesOnly(true);setCategory('all');return;}setCategory(id);setFavoritesOnly(false);}});
