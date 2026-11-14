@@ -20,3 +20,29 @@ class IndexSortTests(unittest.TestCase):
   self.assertEqual(self.titles(sort='length')[0],'Atlas')
 
 if __name__=='__main__':unittest.main()
+
+class WorkPagingTests(unittest.TestCase):
+ def setUp(self):
+  self.db=sqlite3.connect(':memory:');initialize(self.db)
+  # Three sites list "Garden"; two list "Brook"; years and chapters differ by site.
+  rows=[('a','Garden',2001,3),('b','Garden',None,9),('c','GARDEN!',2002,None),('a','Brook',2019,4),('b','Brook',2018,1),('a','Cedar',2010,2),('a','Dune',None,None)]
+  for i,(site,name,year,chapters) in enumerate(rows):
+   upsert(self.db,[{'provider':'site-'+site,'kind':'manga','title':name,'url':f'https://{site}.example/{i}','sourceUrl':f'https://{site}.example/{i}','year':year,'episodes':[{'number':n} for n in range(chapters)] if chapters else None,'language':'en'}])
+  self.db.commit()
+ def test_a_work_is_one_entry_on_one_page_with_all_its_sources(self):
+  for sort in ('new','old','title','length','added'):
+   seen=[]
+   for page in range(4):
+    data=browse(self.db,limit=1,offset=page,sort=sort);keys={row['workKey'] for row in data['items']}
+    self.assertLessEqual(len(keys),1);self.assertEqual(data['workTotal'],4);self.assertEqual(data['total'],7);self.assertEqual(data['works'],len(keys))
+    seen+=list(keys)
+   self.assertEqual(len(seen),len(set(seen)),sort);self.assertEqual(len(seen),4,sort)
+  garden=browse(self.db,limit=4,sort='title')['items']
+  self.assertEqual(sorted(r['url'] for r in garden if r['workKey']=='garden'),['https://a.example/0','https://b.example/1','https://c.example/2'])
+ def test_work_orders_use_the_work_as_a_whole(self):
+  keys=lambda sort:list(dict.fromkeys(r['workKey'] for r in browse(self.db,limit=4,sort=sort)['items']))
+  self.assertEqual(keys('new'),['brook','cedar','garden','dune'])
+  self.assertEqual(keys('length')[0],'garden')
+  self.assertEqual(keys('title'),['brook','cedar','dune','garden'])
+ def test_search_still_lists_each_source(self):
+  self.assertEqual(len(browse(self.db,q='garden')['items']),3)

@@ -69,6 +69,13 @@ def initialize(conn):
         PRIMARY KEY(title_id,category,original));
       CREATE TABLE IF NOT EXISTS catalog_policy_state(name TEXT PRIMARY KEY,value TEXT NOT NULL);
     ''')
+    # One work is listed by many source sites under the same title; browse
+    # pages over these work keys so the work cannot reappear on another page.
+    if 'work_key' not in {r[1] for r in conn.execute('PRAGMA table_info(catalog_titles)')}:
+        conn.execute("ALTER TABLE catalog_titles ADD COLUMN work_key TEXT NOT NULL DEFAULT ''")
+    with conn:conn.execute("UPDATE catalog_titles SET work_key=catalog_normalize(title) WHERE work_key=''")
+    # Covers the per-work aggregates, so a page reads the index, not the rows.
+    conn.execute('CREATE INDEX IF NOT EXISTS catalog_titles_works ON catalog_titles(work_key,year,chapter_count,first_seen)')
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(conn)
     revision=conn.execute("SELECT value FROM catalog_policy_state WHERE name='revision'").fetchone()
@@ -152,18 +159,18 @@ def upsert(conn, rows, source_id='', timestamp=None):
                 vocabulary_added+=add(conn,label,host(url),category,'manga')
         conn.execute('''INSERT INTO catalog_titles(
              id,provider,source_id,source_url,title,search_text,language,format,
-             adult,year,chapter_count,tag_state,metadata,first_seen,updated,inspected)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             adult,year,chapter_count,tag_state,metadata,first_seen,updated,inspected,work_key)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON CONFLICT(id) DO UPDATE SET
              source_id=excluded.source_id,title=excluded.title,
              search_text=excluded.search_text,language=excluded.language,
              format=excluded.format,adult=excluded.adult,year=excluded.year,
              chapter_count=excluded.chapter_count,tag_state=excluded.tag_state,
              metadata=excluded.metadata,updated=excluded.updated,
-             inspected=excluded.inspected''',
+             inspected=excluded.inspected,work_key=excluded.work_key''',
              (identity,provider,sid,url,title,search,lang,kind,adult,year,chapter_count,
               data['tagStatus'],clean_metadata,old[1] if old else now,now,
-              now if inspected else old[2] if old else 0))
+              now if inspected else old[2] if old else 0,normalize(title) or identity))
         conn.execute('DELETE FROM catalog_tags WHERE title_id=?',(identity,))
         policy=current();source=urlsplit(url).hostname or ''
         for category in ('tags','genres'):
@@ -215,6 +222,15 @@ def _conditions(q='', tag='', provider='', format='', source_id='', *, genre='',
 
 # Whole-catalogue orders for paging. Every order ends in the id, so a title
 # keeps one place across page requests while the crawler rewrites rows.
+# The same orders over whole works (all source rows sharing a work key).
+WORK_SORTS = {
+    'new': 'MAX(t.year) IS NULL,MAX(t.year) DESC,t.work_key',
+    'old': 'MAX(t.year) IS NULL,MAX(t.year),t.work_key',
+    'title': 't.work_key',
+    'length': 'MAX(t.chapter_count) IS NULL,MAX(t.chapter_count) DESC,t.work_key',
+    'added': 'MIN(t.first_seen) DESC,t.work_key',
+}
+WORK_SOURCES = 12
 SORTS = {
     'new': 't.year IS NULL,t.year DESC,t.id',
     'old': 't.year IS NULL,t.year,t.id',
@@ -227,6 +243,8 @@ def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30
     limit = min(100,max(1,int(limit)))
     offset = min(100000,max(0,int(offset)))
     where,args = _conditions(q,tag,provider,format,source_id,**filters)
+    if not normalize(q):
+        return _browse_works(conn,where,args,sort,limit,offset)
     total = conn.execute('SELECT COUNT(*) FROM catalog_titles t'+where,args).fetchone()[0]
     rank=''
     ranking=[]
@@ -241,6 +259,26 @@ def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30
         row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated})
         result.append(row)
     return {'total':total,'limit':limit,'offset':offset,'items':result}
+
+def _browse_works(conn,where,args,sort,limit,offset):
+    # Page over works, then return every matching source row of those works
+    # (a few per work) in page order; the client folds them into one card.
+    # total stays the number of source rows; workTotal counts works for paging.
+    total,works_total = conn.execute('SELECT COUNT(*),COUNT(DISTINCT t.work_key) FROM catalog_titles t'+where,args).fetchone()
+    keys = [k for (k,) in conn.execute('SELECT t.work_key FROM catalog_titles t'+where+' GROUP BY t.work_key ORDER BY '+(WORK_SORTS.get(sort) or WORK_SORTS['new'])+' LIMIT ? OFFSET ?',[*args,limit,offset])]
+    result=[]
+    if keys:
+        place={k:i for i,k in enumerate(keys)}
+        clause=(' AND ' if where else ' WHERE ')+'t.work_key IN ('+','.join('?'*len(keys))+')'
+        rows=conn.execute('SELECT t.id,t.metadata,t.chapter_count,t.tag_state,t.updated,t.work_key FROM catalog_titles t'+where+clause+' ORDER BY t.chapter_count IS NULL,t.chapter_count DESC,t.id',[*args,*keys]).fetchall()
+        counts={}
+        for identity,metadata,chapters,status,updated,key in sorted(rows,key=lambda r:place[r[5]]):
+            counts[key]=counts.get(key,0)+1
+            if counts[key]>WORK_SOURCES:continue
+            row=_public_metadata(json.loads(metadata))
+            row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated,'workKey':key})
+            result.append(row)
+    return {'total':total,'workTotal':works_total,'limit':limit,'offset':offset,'works':len(keys),'items':result}
 
 def title(conn, identity):
     row = conn.execute('SELECT metadata,chapter_count,tag_state FROM catalog_titles WHERE id=?',(identity,)).fetchone()
