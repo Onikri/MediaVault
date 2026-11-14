@@ -75,7 +75,7 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const [order,setOrder]=useState(()=>{try{return localStorage.getItem(SORT_KEY)||'popular';}catch{return 'popular';}});
   const changeOrder=value=>{setOrder(value);setPage(1);try{localStorage.setItem(SORT_KEY,value);}catch{}};
   const [columns,setColumns]=useState(()=>typeof innerWidth==='number'?Math.max(2,Math.floor((Math.min(innerWidth,1760)-120)/250)):4),contentRef=useRef(null);
-  useLayoutEffect(()=>{const node=contentRef.current;if(!node||typeof ResizeObserver==='undefined')return;const measure=()=>{const grid=node.querySelector('.catalog-grid');const count=grid?getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length:Math.max(2,Math.floor(node.clientWidth/250));if(count)setColumns(count);};measure();const observer=new ResizeObserver(measure);observer.observe(node);return()=>observer.disconnect();},[layout]);
+  useLayoutEffect(()=>{const node=contentRef.current;if(!node||typeof ResizeObserver==='undefined')return;const measure=()=>{const grid=node.querySelector('.catalog-grid');if(!grid)return;const template=getComputedStyle(grid).gridTemplateColumns;if(!template||template==='none')return;const count=template.split(' ').filter(Boolean).length;if(count)setColumns(count);};measure();const observer=new ResizeObserver(measure);observer.observe(node);return()=>observer.disconnect();},[layout]);
   const perPage=pageSize(columns);
   const [sourceIds,setSourceIds]=useState([]),[sourceLanguage,setSourceLanguage]=useState('all'),[sourceRevision,setSourceRevision]=useState(0),[voiceOptions,setVoiceOptions]=useState([]);
   const [knownSources,setKnownSources]=useState({});
