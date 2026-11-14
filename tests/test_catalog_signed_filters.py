@@ -44,6 +44,11 @@ class SignedFilters(unittest.TestCase):
   self.assertEqual(result['total'],1);self.assertEqual(result['items'][0]['providerCount'],2)
   self.assertEqual(result['items'][0]['tags'],['Robots'])
   self.assertEqual(content_catalog.browse(self.db,kind='anime',excludeTag='Robots')['total'],0)
+ def test_malformed_or_overlarge_filter_lists_do_not_widen_the_query(self):
+  from fastapi import HTTPException
+  for value in ['["Fantasy"',json.dumps(['Fantasy']*65)]:
+   with self.assertRaises(HTTPException) as error:browse(self.db,genre=value)
+   self.assertEqual(error.exception.status_code,422)
  def test_resumable_book_cleanup_preserves_titles_raw_facts_and_crawl_queue(self):
   import threading
   from types import SimpleNamespace

@@ -1,3 +1,4 @@
+import {hasCatalogFilters} from './catalog-taxonomy.js';
 import {useEffect,useRef,useState} from 'react';
 import {loadMangaTaxonomy,mangaCatalogParams} from './manga-catalog.js';
 import {acceptContentPolicy,contentPolicyRevision} from './manga-tag-policy.js';
@@ -28,7 +29,7 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
   const abort=new AbortController();if(kind!=='manga'||!capable||paused||composing){setSnapshot({...empty,key});return()=>abort.abort();}
   setSnapshot(old=>old.key===key?{...old,loading:true,error:''}:{...empty,key,loading:true});
   const timer=setTimeout(async()=>{
-   const filtered=!!(filters.genre||filters.tag||filters.excludeGenre||filters.excludeTag||filters.readingMode||filters.year||filters.format||filters.age);
+   const filtered=hasCatalogFilters(filters);
    const candidateParams=mangaCatalogParams({query,language,sourceIds,page,filters:{}}).toString();
    async function read(enriching=false){
     const [titles,candidates]=await Promise.allSettled([

@@ -4,6 +4,7 @@ const norm=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replac
 const genres=new Map(data.genres.flatMap(row=>[row.key,row.label,...row.aliases].map(alias=>[norm(alias),row])));
 export function filterValues(value){if(Array.isArray(value))return value;try{if(String(value||'').startsWith('['))return JSON.parse(value);}catch{}return String(value||'').split(',').map(v=>v.trim()).filter(Boolean);}
 export const filterParam=value=>Array.isArray(value)?JSON.stringify(value):value||'';
+export const hasCatalogFilters=filters=>['genre','tag','excludeGenre','excludeTag'].some(key=>filterValues(filters[key]).length>0)||['format','readingMode','year','age'].some(key=>!!filters[key]);
 export function classifyLabel(label,field,kind){
  if(!label||/^\p{N}+$/u.test(String(label).trim()))return null;
  const policy=mangaPolicy(),rule=policy.rules.get(policy.key(label)),genre=genres.get(norm(label))||genres.get(norm(rule?.label))||genres.get(norm(rule?.key));

@@ -14,7 +14,8 @@
       "key": "adventure",
       "label": "Приключения",
       "aliases": [
-        "Adventure"
+        "Adventure",
+        "Adventure stories"
       ]
     },
     {
@@ -24,7 +25,8 @@
         "Comedy",
         "Юмор",
         "Humor",
-        "Humour"
+        "Humour",
+        "Humorous stories"
       ]
     },
     {
@@ -54,14 +56,16 @@
       "label": "Детектив",
       "aliases": [
         "Mystery",
-        "Detective"
+        "Detective",
+        "Detective and mystery stories"
       ]
     },
     {
       "key": "horror",
       "label": "Ужасы",
       "aliases": [
-        "Horror"
+        "Horror",
+        "Horror tales"
       ]
     },
     {
@@ -70,7 +74,8 @@
       "aliases": [
         "Fantasy",
         "ファンタジー",
-        "판타지"
+        "판타지",
+        "Fantasy fiction"
       ]
     },
     {
@@ -79,7 +84,8 @@
       "aliases": [
         "Sci-Fi",
         "Science Fiction",
-        "SF"
+        "SF",
+        "Science fiction stories"
       ]
     },
     {
@@ -87,7 +93,8 @@
       "label": "Романтика",
       "aliases": [
         "Romance",
-        "Romantic"
+        "Romantic",
+        "Romance fiction"
       ]
     },
     {
@@ -97,7 +104,8 @@
         "Military",
         "War",
         "Война",
-        "Боевые действия"
+        "Боевые действия",
+        "War stories"
       ]
     },
     {
@@ -152,7 +160,8 @@
       "aliases": [
         "Erotica",
         "Erotic",
-        "Erotic Fiction"
+        "Erotic Fiction",
+        "Erotic stories"
       ]
     },
     {
@@ -313,14 +322,19 @@
       "ova": "OVA",
       "special": "Спецвыпуск",
       "спешл": "Спецвыпуск",
-      "music": "Короткометражное"
+      "music": "Короткометражное",
+      "тв": "Аниме-сериал",
+      "тв-сериал": "Аниме-сериал",
+      "tv series": "Аниме-сериал"
     },
     "ranobe": {
       "novel": "Новелла",
       "light_novel": "Ранобэ",
       "light novel": "Ранобэ",
       "web novel": "Веб-новелла",
-      "web_novel": "Веб-новелла"
+      "web_novel": "Веб-новелла",
+      "роман": "Новелла",
+      "wn": "Веб-новелла"
     }
   }
 }

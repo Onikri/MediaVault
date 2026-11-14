@@ -2,7 +2,7 @@ import test,{beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {setMangaPolicy} from '../src/manga-tag-policy.js';
 import {matchesFilters} from '../src/catalog.js';
-import {taxonomyFacts,formatOptions} from '../src/catalog-taxonomy.js';
+import {taxonomyFacts,formatOptions,hasCatalogFilters} from '../src/catalog-taxonomy.js';
 import {mangaCatalogParams} from '../src/manga-catalog.js';
 beforeEach(()=>setMangaPolicy({schemaVersion:1,tags:[],includeDiscovered:true,hiddenTags:[],excludedTerms:[],excludedPrefixes:[]}));
 test('OR inside each positive group, AND between groups, any exclusion wins',()=>{
@@ -33,3 +33,5 @@ test('all signed groups and separate reading mode travel to Oracle',()=>{
 });
 
 test('a source label containing a comma remains one signed value',()=>{const query=mangaCatalogParams({filters:{tag:['Dragons, ancient'],excludeTag:['Robots']}});assert.deepEqual(JSON.parse(query.get('tag')),['Dragons, ancient']);assert.ok(matchesFilters({kind:'manga',tags:['Dragons, ancient'],genres:[]},{tag:['Dragons, ancient']}));});
+
+test('cleared groups do not start speculative source enrichment',()=>{assert.equal(hasCatalogFilters({genre:[],tag:[],excludeTag:[],excludeGenre:[]}),false);assert.equal(hasCatalogFilters({genre:'[]'}),false);assert.ok(hasCatalogFilters({excludeTag:['Robots']}));assert.equal(mangaCatalogParams({filters:{genre:[],tag:[]}}).has('genre'),false);});
