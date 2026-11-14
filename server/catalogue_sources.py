@@ -137,11 +137,12 @@ def fetch(spec,cursor):
     if kind in {'bridge','bridge-detail','bridge-vocabulary'}:
         from suwayomi_bridge import Client,filter_vocabulary,filtered_page
         from manga_discovery import result_row
+        from manga_solver import source_timeout
         client=Client()
         try:
             if kind=='bridge-vocabulary':return {'rows':[],'next':None,'vocabulary':filter_vocabulary(client,spec['source']['id'])}
             if kind=='bridge-detail':
-                data=client.get('/manga/'+str(spec['manga']),{'onlineFetch':'true'},timeout=25)
+                data=client.get('/manga/'+str(spec['manga']),{'onlineFetch':'true'},timeout=source_timeout(spec['source']['id'],25))
                 if not data.get('title'):raise SourceError('Адаптер не предоставил метаданные карточки')
                 found=from_api(data);row=spec['row']
                 # Keep a label learned from the extension's own filter listing.
@@ -149,7 +150,7 @@ def fetch(spec,cursor):
                 updated=__import__('manga_discovery').result_row(spec['source'],data)
                 return {'rows':[{**row,**(updated or {}),'description':str(data.get('description') or '')[:12000],**found,'metadataInspected':True}],'next':None}
             source=spec['source'];term=spec.get('term')
-            data=filtered_page(client,source['id'],term,page) if term else client.get('/source/'+str(source['id'])+'/popular/'+str(page),timeout=25)
+            data=filtered_page(client,source['id'],term,page) if term else client.get('/source/'+str(source['id'])+'/popular/'+str(page),timeout=source_timeout(source['id'],25))
             if not isinstance(data.get('mangaList'),list) or not isinstance(data.get('hasNextPage'),bool):raise SourceError('Адаптер не предоставил пагинацию каталога')
             if page==1 and not data['mangaList'] and not spec.get('term'):raise SourceError('Адаптер вернул пустую первую страницу каталога')
             rows=[];field='genres' if term and term.get('category')=='genre' else 'tags'

@@ -147,6 +147,25 @@ without a clearance cookie; this is not an image fallback. A successful home
 page alone does not certify search, chapters or image delivery. Timeouts,
 login requirements and outdated source extensions still need separate checks.
 
+The installer also supports `--engine byparr`, using a pinned ARM64-compatible
+Byparr image with the same API, a 2.5-GiB memory ceiling and 1,024 browser threads.
+The initial 256-thread comparison limit was insufficient for its Firefox-based
+runtime. Its cheap readiness probe uses `/docs`; repeatedly calling its browser
+health check with a five-second timeout can leave overlapping browser launches.
+Suwayomi's official Docker example also uses this compatible engine.
+
+After separate real search tests, supply verified IDs with repeatable
+`--source-id ID` options. Only those sources receive a 60-second cold-start
+allowance in asynchronous search, catalogue pagination and tag discovery; all
+other sources retain their existing budgets. `--reader-source-id ID` is a subset
+verified through a chapter and image, whose stale reader failures can be reset.
+The server-side `manga-source-solver.json` stores only these IDs and the budget,
+not cookies, tokens or external proxy URLs. Failed snapshots/backoffs for those
+exact sources are invalidated, retry jobs become due without changing cursors,
+and successful snapshots and all indexed cards remain intact. Deploy the matching
+importer source before configuring this optional allowance. No full crawl reset
+is necessary.
+
 Existing deployments created with the direct Java/headless entrypoint need
 `sudo python3 deploy/oracle/enable-suwayomi-browser.py`. It checks the existing
 private pinned image and bundled browser, refuses active imports, saves private

@@ -10,6 +10,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
+import argparse
+import re
 
 IMAGE = 'ghcr.io/flaresolverr/flaresolverr@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767'
 NAME = 'mediavault-flaresolverr'
@@ -23,22 +25,35 @@ SETTINGS = {
     'flareSolverrSessionTtl': 30,
     'flareSolverrAsResponseFallback': True,
 }
+ENGINES = {
+    'flaresolverr': {'image': IMAGE, 'memory': '1536m', 'pids': '512', 'shm': '256m', 'tmp': '512m', 'health': '/health'},
+    'byparr': {'image': 'ghcr.io/thephaseless/byparr@sha256:c66fa161187b8fa527bfad7eefa2647ea1c553f77df68cbffd6fe83366d1787b',
+               'memory': '2560m', 'pids': '1024', 'shm': '512m', 'tmp': '1g', 'health': '/docs'},
+}
 
 
-def container_args(network, config):
-    return ['docker', 'run', '-d', '--name', NAME, '--network', network,
-            '--network-alias', 'flaresolverr', '--restart', 'unless-stopped',
-            '--memory', '1536m', '--memory-swap', '1536m', '--cpus', '1.0',
-            '--pids-limit', '256', '--shm-size', '256m',
+def engine_settings(engine):
+    return {**SETTINGS, 'flareSolverrUrl': 'http://' + engine + ':8191', 'flareSolverrTimeout': 45 if engine == 'byparr' else 20}
+
+
+def container_args(network, config, engine='flaresolverr'):
+    selected = ENGINES[engine]
+    args = ['docker', 'run', '-d', '--name', 'mediavault-' + engine, '--network', network,
+            '--network-alias', engine, '--restart', 'unless-stopped',
+            '--memory', selected['memory'], '--memory-swap', selected['memory'], '--cpus', '1.0',
+            '--pids-limit', selected['pids'], '--shm-size', selected['shm'],
             '--security-opt', 'no-new-privileges:true', '--cap-drop', 'ALL',
             '--log-opt', 'max-size=5m', '--log-opt', 'max-file=2',
-            '--tmpfs', '/tmp:rw,nosuid,nodev,size=512m,mode=1777',
+            '--tmpfs', '/tmp:rw,nosuid,nodev,size=' + selected['tmp'] + ',mode=1777',
             '-v', str(config) + ':/config', '-e', 'LOG_LEVEL=info',
-            '-e', 'LOG_HTML=false', '-e', 'TZ=Etc/UTC', IMAGE]
+            '-e', 'LOG_HTML=false', '-e', 'TZ=Etc/UTC']
+    if engine == 'byparr':
+        args += ['-e', 'BROWSER_TIMEZONE=Europe/Berlin', '-e', 'BROWSER_LOCALE=en-US']
+    return args + [selected['image']]
 
 
-def validate_solver(container, network):
-    if (container['Config']['Image'] != IMAGE
+def validate_solver(container, network, engine='flaresolverr'):
+    if (container['Config']['Image'] != ENGINES[engine]['image']
             or network not in container['NetworkSettings']['Networks']
             or container['HostConfig'].get('NetworkMode') == 'host'
             or container['HostConfig'].get('PortBindings')
@@ -72,18 +87,29 @@ finally:c.close()
 def main():
     if os.geteuid() != 0:
         raise RuntimeError('Run with sudo on the existing VM')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--engine', choices=ENGINES, default='flaresolverr')
+    parser.add_argument('--source-id', action='append', default=[], help='Source ID verified by a separate real search test')
+    parser.add_argument('--reader-source-id', action='append', default=[], help='Subset also verified through a chapter and image')
+    args = parser.parse_args()
+    if (len(args.source_id) > 128 or any(not re.fullmatch(r'\d{1,20}', s) for s in [*args.source_id, *args.reader_source_id])
+            or not set(args.reader_source_id).issubset(args.source_id)):
+        parser.error('Use verified numeric source IDs; reader IDs must be a subset')
     owner = 'codex-private-source-solver-' + str(os.getpid())
     fd = os.open(LOCK, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'w') as stream:
         json.dump({'owner': owner, 'time': time.time(), 'purpose': 'Enable private solver without restarting the indexer'}, stream)
     try:
-        activate()
+        activate(args.engine, args.source_id, args.reader_source_id)
     finally:
         if json.loads(LOCK.read_text()).get('owner') == owner:
             LOCK.unlink()
 
 
-def activate():
+def activate(engine='flaresolverr', source_ids=(), reader_ids=()):
+    selected = ENGINES[engine]
+    name = 'mediavault-' + engine
+    desired = engine_settings(engine)
     backup = ROOT / 'backups' / time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
     backup.mkdir(parents=True, mode=0o700)
     with (backup / 'operation.log').open('a') as log:
@@ -117,17 +143,18 @@ def activate():
         shutil.copy2(source_root / 'server.conf', backup / 'server.conf')
         created = False
         try:
-            existing = get(['docker', 'ps', '-aq', '--filter', 'name=^' + NAME + '$'])
+            existing = get(['docker', 'ps', '-aq', '--filter', 'name=^' + name + '$'])
             if existing:
-                validate_solver(json.loads(get(['docker', 'inspect', existing]))[0], network)
+                validate_solver(json.loads(get(['docker', 'inspect', existing]))[0], network, engine)
+                run(['docker', 'update', '--pids-limit', selected['pids'], existing], stdout=log)
                 run(['docker', 'start', existing], stdout=log)
             else:
-                run(['docker', 'pull', IMAGE], stdout=log)
-                run(container_args(network, config), stdout=log)
+                run(['docker', 'pull', selected['image']], stdout=log)
+                run(container_args(network, config, engine), stdout=log)
                 created = True
             for _ in range(45):
                 try:
-                    ready = execute("import requests,json;r=requests.get('http://flaresolverr:8191/health',timeout=5);r.raise_for_status();print(json.dumps({'ready':r.status_code==200}))")
+                    ready = execute("import requests,json;r=requests.get(" + repr('http://' + engine + ':8191' + selected['health']) + ",timeout=5);r.raise_for_status();print(json.dumps({'ready':r.status_code==200}))")
                     if ready['ready']:
                         break
                 except (ValueError, subprocess.CalledProcessError):
@@ -135,22 +162,27 @@ def activate():
                 time.sleep(2)
             else:
                 raise RuntimeError('Private solver did not become ready')
-            if execute(runtime_code(SETTINGS)) != SETTINGS or execute(runtime_code()) != SETTINGS:
+            if execute(runtime_code(desired)) != desired or execute(runtime_code()) != desired:
                 raise RuntimeError('Solver settings did not persist')
             # Native Suwayomi settings updates persist immediately; prove it,
             # rather than restarting the service and interrupting source work.
             persisted = (source_root / 'server.conf').read_text()
-            for field, value in SETTINGS.items():
-                import re
+            for field, value in desired.items():
                 line = re.search(r'(?m)^server\.' + field + r'\s*=([^\n]*)', persisted)
                 if not line or json.loads(line[1].split('#', 1)[0].strip()) != value:
                     raise RuntimeError('Solver setting was not written to server.conf')
+            if source_ids:
+                manifest = {'engine': engine, 'requestTimeout': 60, 'sourceIds': sorted(set(source_ids))}
+                code = "import json;from manga_solver import configure;print(json.dumps(configure(" + repr(manifest) + ',' + repr(list(reader_ids)) + ")))"
+                recovered = execute(code)
+            else:
+                recovered = {}
         except Exception:
             execute(runtime_code(original))
             if created:
-                run(['docker', 'rm', '-f', NAME], stdout=log)
+                run(['docker', 'rm', '-f', name], stdout=log)
             raise
-        record = {'enabled': True, 'image': IMAGE, 'privateOnly': True, 'backup': str(backup),
+        record = {'enabled': True, 'engine': engine, 'image': selected['image'], 'privateOnly': True, 'backup': str(backup), 'recovered': recovered,
                   'importerRestarted': False, 'suwayomiRestarted': False,
                   'importerRevision': importer['Config']['Labels'].get('org.opencontainers.image.revision')}
         (ROOT / 'installed.json').write_text(json.dumps(record, indent=2))
