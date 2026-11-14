@@ -91,3 +91,21 @@ rules keep one of us from silently undoing the other.
   New UI contracts cover stable 28-card paging at 1798px, retained indexed cards
   across outages, bounded retries and stale-error clearing. Alloha and Hentai
   source-genre matching remain enabled; the catalogue queue continues.
+
+## First-page catalogue serialization correction — 2026-11-14
+
+- PR #56, site revision `f2d48058660a9eaa01984fc9291a8878650b16e4`, fixes
+  `offset=` on the first manga page. The shared serializer now preserves zero.
+  The earlier live diagnostic supplied parameters manually and the layout
+  fixture accepted empty integers; both paths now check client-generated values.
+- Public Oracle checks reproduced 422 for the old query and 200 with cards for
+  fixed first-page limits 24/28, page two, Naruto search and a genre selection.
+  The published asset `main-CdMU7Qu-.js` matches Pages run 43643471409 and was
+  inspected for the corrected serializer. 472 local Node tests, seven focused
+  Python contracts and the production build passed.
+- No server image, private settings, queue or indexed data changed. The importer
+  remains revision `654cf86742ba14294ee602324a8ac1c3da5f4560`; no restart or
+  deployment lock was needed for this client-only release.
+- PR CI run 43643432662 passed server/queue validation and the source catalogue
+  UI suite, including strict integer query validation. The broader playback/UI
+  audit continues independently of the successful client publication.
