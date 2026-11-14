@@ -8,6 +8,22 @@ from source_parser import SourceError
 
 ENV={'PUBLIC_URL':'https://media.example','SUWAYOMI_URL':'http://suwayomi:4567','SUWAYOMI_AUTH_FILE':'/private/auth'}
 class BridgeTests(unittest.TestCase):
+    def test_unnumbered_comic_issues_remain_readable_at_their_source_indices(self):
+        class Fake:
+            def close(self):pass
+            def get(self,path,*args,**kwargs):
+                if path=='/manga/8':return {'title':'Garden Comics 006','source':{'id':'123','name':'Fixture Comics','lang':'en','baseUrl':'https://fixture.example'}}
+                if path=='/manga/8/chapters':return [{'index':3,'chapterNumber':-1,'name':'Read issue'},{'index':4,'chapterNumber':None,'name':'Supplement'},{'index':5,'chapterNumber':0,'name':'Prologue'},{'index':6,'chapterNumber':12.5,'name':'Extra'}]
+                if path=='/manga/8/chapter/3':return {'pageCount':68}
+                raise AssertionError(path)
+        with patch.object(bridge,'Client',Fake):
+            title=bridge.inspect(bridge.reference(8))
+            issue=bridge.inspect(bridge.reference(8,3))
+        self.assertEqual({e['url'].split('/')[-1]:e['number'] for e in title['episodes']},{'3':3,'4':4,'5':0,'6':12.5})
+        self.assertEqual(next(e['title'] for e in title['episodes'] if e['number']==3),'Read issue')
+        self.assertEqual(len(issue['pages']),68)
+        self.assertTrue(issue['pages'][0].endswith('/m/8/c/3/p/0'))
+
     def test_inspection_retains_explicit_alternative_titles_used_by_source_search(self):
         class Fake:
             def close(self):pass
