@@ -157,6 +157,7 @@ class DeliverySession:
     refreshed_at: float = 0
     refresh_lock: object = field(default_factory=asyncio.Lock)
     promotions: dict = field(default_factory=dict)
+    archive_pending: bool = False
 
 
 class AllohaDelivery:
@@ -169,6 +170,7 @@ class AllohaDelivery:
                             reserve=int(os.getenv('ALLOHA_VOD_FREE_BYTES', str(8*1024**3))))
         self.archive = None
         self.archive_tasks = set()
+        self.restoring = {}
         self.restore_locks = {}
         self.prefetch_interval = max(0, float(os.getenv('ALLOHA_PREFETCH_INTERVAL', '2')))
         self.prefetch_pacing = asyncio.Lock()
@@ -343,7 +345,7 @@ class AllohaDelivery:
             if cached:
                 self.log(session, cached[2], url, cached=True, elapsed_ms=round((self.clock()-started)*1000), bytes=len(cached[0]))
                 return cached
-            if session.cache_complete:
+            if session.cache_complete and not session.archive_pending:
                 raise HTTPException(410, 'Кэш потока повреждён. Обновляем подключение.')
         if cache and kind != 'manifest' and not probe:
             cached = await cache_io(self.cache.get, url, byte_range)
@@ -664,10 +666,17 @@ class AllohaDelivery:
         await cache_io(self.vod.pin, key)
         try:
             record = await cache_io(self.vod.load, key)
+            pending = False
             if record is None and self.archive:
                 try:
-                    await asyncio.wait_for(cache_io(self.archive.restore, subject, key), 180)
-                    record = await cache_io(self.vod.load, key)
+                    info = await cache_io(self.archive.lookup, subject, key)
+                    if info:
+                        record, pending = info['index']['record'], True
+                    else:
+                        # Legacy whole-file archives are uncommon and cannot be
+                        # authenticated progressively. Never hold a new viewer
+                        # beyond its preparation deadline waiting for one.
+                        record = None
                 except Exception as error:
                     logger.info('Alloha archive restore unavailable (%s)', type(error).__name__)
             if record is None:
@@ -675,15 +684,22 @@ class AllohaDelivery:
             await self.start()
             await asyncio.wait_for(self.slots.acquire(), self.queue_timeout)
             class CachedSource:
+                playback_telemetry = False
                 async def close(self): pass
-                async def fetch(self, *args, **kwargs):
+                async def fetch(inner, url, byte_range='', **kwargs):
+                    if pending and self.archive:
+                        try:
+                            return await cache_io(self.archive.fetch, subject, key, url, byte_range)
+                        except Exception:
+                            self.archive.suspend(subject, key)
+                            raise HTTPException(410, 'Архив временно не ответил. Обновляем подключение.') from None
                     raise SourceInvalid('Cached resource is missing or damaged')
                 async def update_playback(self, state): pass
             session = DeliverySession(secrets.token_urlsafe(32), body.url, None, CachedSource(),
                 self.clock()+self.ttl, self.external_address, referer=getattr(body, 'referer', None) or '',
                 owner=subject, mode=record['mode'], active=record['active'], active_id=record['active_id'],
                 translations=record['translations'], online_quality=record['quality'], skip=record['skip'],
-                cache_key=key, cache_complete=True, cache_started=True)
+                cache_key=key, cache_complete=not pending, cache_started=True, archive_pending=pending)
             session.published_qualities = record.get('published_qualities') or [int(record['quality'])]
             session.manifests = {url: (float('inf'), *data) for url, data in record['manifests'].items()}
             session.subtitles = [{'label': t['label'], 'lang': t['lang'],
@@ -691,6 +707,24 @@ class AllohaDelivery:
                                  for t in record.get('subtitles', [])]
             self.sessions[session.sid] = session
             await cache_io(self.vod.pin, key)
+            if pending and key not in self.restoring:
+                await cache_io(self.vod.pin, key)
+                async def restore():
+                    try:
+                        restored = await cache_io(self.archive.restore, subject, key)
+                        if restored:
+                            for current in list(self.sessions.values()):
+                                if current.cache_key == key and current.archive_pending:
+                                    current.cache_complete, current.archive_pending = True, False
+                    except Exception as error:
+                        self.log(session, 503, session.iframe, reason='restore-'+type(error).__name__)
+                    finally:
+                        self.restoring.pop(key, None)
+                        await cache_io(self.vod.release, key)
+                task = asyncio.create_task(restore())
+                self.restoring[key] = task
+                self.archive_tasks.add(task)
+                task.add_done_callback(self.archive_tasks.discard)
             return session
         finally:
             await cache_io(self.vod.release, key)
@@ -916,8 +950,8 @@ class AllohaDelivery:
         return {'id': session.sid, 'kind': 'video', 'type': 'hls',
                 'url': f'/online/{session.sid}/alloha-playback',
                 'expiresIn': self.ttl, 'qualities': session.published_qualities,
-                'allohaMode': session.mode, 'sessionRecovery': True, 'playbackTelemetry': session.mode == 'browser' and not session.cache_complete,
-                'serverCached': session.cache_complete,
+                'allohaMode': session.mode, 'sessionRecovery': True, 'playbackTelemetry': session.mode == 'browser' and not session.cache_complete and not session.archive_pending,
+                'serverCached': session.cache_complete or session.archive_pending,
                 'subtitles': [{'id': str(i), 'name': t['label'], 'language': t['lang'], 'url': t['src']}
                               for i, t in enumerate(session.subtitles)],
                 'sourceIntervals': [{'start': a, 'end': b, 'type': 'op' if i == 0 else 'ed', 'source': 'Alloha'}

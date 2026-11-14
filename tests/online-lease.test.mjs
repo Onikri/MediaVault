@@ -1,6 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {onlineClientId,keepOnlineLease} from '../src/online-lease.js';
+import {allohaMode,setAllohaMode,allohaRequest} from '../src/alloha-connector.js';
+
+test('new devices use the native server P6 session, retaining an explicit direct preference',()=>{
+ const previous=globalThis.localStorage,values=new Map();
+ globalThis.localStorage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
+ try{
+  assert.equal(allohaMode(),'browser');
+  const request=allohaRequest('/online/prepare',{body:{kind:'video',url:'https://alloha.yani.tv/?example=1'}},75);
+  assert.equal(request.body.allohaMode,'browser');
+  setAllohaMode('bnsi');assert.equal(allohaMode(),'bnsi');
+  setAllohaMode('browser');assert.equal(allohaMode(),'browser');
+ }finally{if(previous===undefined)delete globalThis.localStorage;else globalThis.localStorage=previous;}
+});
 test('viewer ID survives reload; preview uses its own slot',()=>{
  const m=new Map(),storage={getItem:k=>m.get(k),setItem:(k,v)=>m.set(k,v)};
  assert.equal(onlineClientId('viewer',storage),onlineClientId('viewer',storage));assert.notEqual(onlineClientId('preview',storage),onlineClientId('viewer',storage));

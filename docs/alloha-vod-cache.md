@@ -2,6 +2,10 @@
 
 The existing BNSI/native acquisition transports and validation stay in place.
 Only a playback session starts continuous downloading; hover previews don't.
+New devices default to the existing server-native P6 session, which keeps its
+source control channel and source-provided headers. An explicitly saved BNSI
+choice remains available. The direct transport can be refused during prolonged
+bulk downloads; this release does not forge or replace source authentication.
 
 * The viewer heartbeat renews both the native delivery and compatibility lease,
   including while paused. An expired bridge can be rebuilt from its still-active
@@ -34,21 +38,24 @@ Only a playback session starts continuous downloading; hover previews don't.
 
 When the owner has already granted offline Drive access, a complete bundle is
 written to `.MediaVault playback cache` as one opaque, encrypted `.mvv` object.
-ZIP_STORED packaging and streaming AES-256-GCM use bounded memory; resumable
-uploads use 16 MiB chunks. One archive operation runs at a time. A cache object
+The index and each fragment have independent AES-256-GCM authentication, so a
+cold viewer needn't wait for an entire movie before verified playback can start.
+Resumable uploads use 16 MiB chunks. One bulk archive operation runs at a time. A cache object
 is indexed only after Drive confirms its byte count and MD5. The private index
 is encrypted in `tasks.sqlite`; neither keys nor signed URLs enter Git.
 
 Repeated opening first checks the local complete bundle, then the private Drive
-index, then the existing upstream resolver. A cold Drive hit downloads once onto
-the VM, verifies SHA-256, GCM, ZIP CRCs and individual fragment hashes, and serves
-all subsequent seeks locally. It doesn't issue a Drive media request per seek.
+index, then the existing upstream resolver. A cold Drive hit starts from its
+private encrypted index immediately and restores the full object in the background.
+Only missing foreground fragments use bounded Drive ranges (at most two); their
+GCM and SHA-256 checks complete before serving. Cached seeks use VM disk only.
+The bulk restore verifies the full object checksum and encrypted index too.
 Archive/restore failures fall back to the existing upstream transport.
 
 The playback archive is separate from the library catalogue and requires the
 server's `service.key` and private settings backup for recovery. It is not a
 new item in “Моя коллекция”. Individual bundles above 16 GiB aren't archived;
-archiving also requires temporary disk space for plaintext ZIP and ciphertext.
+archiving also requires temporary disk space for the encrypted object.
 Drive permissions, quota or insufficient disk space never interrupt playback.
 
 ## Verification

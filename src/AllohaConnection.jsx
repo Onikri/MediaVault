@@ -14,8 +14,8 @@ export default function AllohaConnection({service}){
   <div className="section-heading"><h2><Cable size={19}/> Alloha</h2></div>
   <label className="form-field input-label">Способ подключения
    <UiSelect className="field-input" value={mode} onValueChange={change}>
+    <option value="browser">Серверная сессия P6</option>
     <option value="bnsi">Прямой поток (BNSI)</option>
-    <option value="browser">Браузерный режим</option>
    </UiSelect>
   </label>
   <p className="fine">Настройка действует на этом устройстве для новых сеансов просмотра и заданий сохранения Alloha.</p>

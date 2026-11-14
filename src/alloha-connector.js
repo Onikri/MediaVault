@@ -7,7 +7,7 @@ export function isAllohaUrl(value){
  }catch{return false;}
 }
 export function allohaMode(){
- try{return localStorage.getItem(storageKey)==='browser'?'browser':'bnsi';}catch{return 'bnsi';}
+ try{return localStorage.getItem(storageKey)==='bnsi'?'bnsi':'browser';}catch{return 'browser';}
 }
 export function setAllohaMode(mode){
  localStorage.setItem(storageKey,mode==='browser'?'browser':'bnsi');

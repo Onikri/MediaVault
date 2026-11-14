@@ -12,9 +12,11 @@ from pathlib import Path
 import secrets
 import shutil
 import threading
+import time
 import zipfile
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from vault_drive import GoogleDriveAdapter
 
 CHUNK = 16*1024**2
@@ -25,6 +27,8 @@ class DriveArchive:
     def __init__(self, cache, get_store, credentials):
         self.cache, self.get_store, self.credentials = cache, get_store, credentials
         self.slots = threading.BoundedSemaphore(1)
+        self.range_slots = threading.BoundedSemaphore(2)
+        self.unavailable = {}
 
     def setting(self, owner, key):
         return 'alloha-archive:'+hashlib.sha256(owner.encode()).hexdigest()+':'+key
@@ -104,7 +108,7 @@ class DriveArchive:
         if path.stat().st_size != size:
             raise ValueError('Incomplete Drive archive')
 
-    def save(self, owner, key):
+    def save_legacy(self, owner, key):
         store = self.get_store()
         if not store or owner.startswith(('guest:', 'share:')) or not store.setting('google:'+owner):
             return False
@@ -146,7 +150,7 @@ class DriveArchive:
                 digest.update(raw)
         return digest.hexdigest()
 
-    def restore(self, owner, key):
+    def restore_legacy(self, owner, key):
         store = self.get_store()
         info = store.setting(self.setting(owner, key)) if store else None
         if not info:
@@ -195,3 +199,147 @@ class DriveArchive:
                 plain.unlink(missing_ok=True)
                 sealed.unlink(missing_ok=True)
                 shutil.rmtree(staging)
+
+    def lookup(self, owner, key):
+        if self.unavailable.get((owner, key), 0) > time.monotonic():
+            return None
+        store = self.get_store()
+        info = store.setting(self.setting(owner, key)) if store else None
+        return info if info and info.get('version') == 2 else None
+
+    def suspend(self, owner, key):
+        now = time.monotonic()
+        self.unavailable = {k: v for k, v in self.unavailable.items() if v > now}
+        self.unavailable[(owner, key)] = now+60
+
+    def save(self, owner, key):
+        """Independently authenticated fragments in one resumable Drive object.
+
+        The private encrypted index permits immediate playback without waiting
+        for a multi-gigabyte archive to download or trusting partial GCM data.
+        """
+        store = self.get_store()
+        if not store or owner.startswith(('guest:', 'share:')) or not store.setting('google:'+owner):
+            return False
+        with self.slots:
+            if store.setting(self.setting(owner, key)):
+                return True
+            record = self.cache.load(key)
+            if record is None:
+                return False
+            folder = self.cache.folder(key)
+            entries, offset = [], 0
+            for url, interval in record['resources']:
+                name = self.cache.name(url, interval)
+                meta = json.loads((folder/(name+'.json')).read_text())
+                entries.append({'url': url, 'range': interval, 'name': name, 'meta': meta,
+                                'offset': offset, 'length': meta['size']+28})
+                offset += meta['size']+28
+            if offset > LIMIT or shutil.disk_usage(folder).free < offset+self.cache.reserve:
+                return False
+            index = {'record': record, 'entries': entries}
+            cipher = AESGCM(self.key(owner, key))
+            raw_index = json.dumps(index, separators=(',', ':')).encode()
+            if len(raw_index) > 16*1024**2:
+                return False
+            nonce = os.urandom(12)
+            header = nonce+cipher.encrypt(nonce, raw_index, (key+':index').encode())
+            if offset+10+len(header) > LIMIT:
+                return False
+            index['body'] = 10+len(header)
+            target = folder/(secrets.token_hex(12)+'.sealed.pending')
+            try:
+                with target.open('wb') as output:
+                    os.chmod(target, 0o600)
+                    output.write(b'MVVOD2'+len(header).to_bytes(4, 'big')+header)
+                    for entry in entries:
+                        raw = (folder/entry['name']).read_bytes()
+                        if len(raw) != entry['meta']['size'] or hashlib.sha256(raw).hexdigest() != entry['meta']['sha256']:
+                            raise ValueError('Fragment changed before archiving')
+                        nonce = os.urandom(12)
+                        output.write(nonce+cipher.encrypt(nonce, raw, (key+':'+entry['name']).encode()))
+                file_id = self.upload(owner, key, target)
+                store.setting(self.setting(owner, key), {'file': file_id, 'size': target.stat().st_size,
+                    'sha256': self.digest(target), 'version': 2, 'index': index})
+                return True
+            finally:
+                target.unlink(missing_ok=True)
+
+    def download_range(self, owner, file_id, start, end):
+        drive = GoogleDriveAdapter.from_adc(self.credentials(owner))
+        request = drive.service.files().get_media(fileId=file_id)
+        request.headers['Range'] = f'bytes={start}-{end}'
+        return drive._execute(request)
+
+    def decode_entry(self, owner, key, entry, blob):
+        if len(blob) != entry['length'] or len(blob) > 32*1024**2+28:
+            raise ValueError('Invalid archived fragment size')
+        raw = AESGCM(self.key(owner, key)).decrypt(blob[:12], blob[12:], (key+':'+entry['name']).encode())
+        meta = entry['meta']
+        if len(raw) != meta['size'] or hashlib.sha256(raw).hexdigest() != meta['sha256']:
+            raise ValueError('Invalid archived fragment checksum')
+        return raw, meta['headers'], meta['status'], meta['final']
+
+    def fetch(self, owner, key, url, byte_range=''):
+        """Only cold misses touch Drive; foreground duplicates join in delivery."""
+        info = self.lookup(owner, key)
+        if not info:
+            raise ValueError('Archive is not indexed')
+        with self.range_slots:
+            cached = self.cache.get(key, url, byte_range)
+            if cached:
+                return cached
+            entry = next((e for e in info['index']['entries'] if e['url'] == url and e['range'] == byte_range), None)
+            if entry is None:
+                entry = next((e for e in info['index']['entries'] if e['url'] == url and not e['range']), None)
+            if entry is None:
+                raise ValueError('Resource is not in the archived variant')
+            start = info['index']['body']+entry['offset']
+            blob = self.download_range(owner, info['file'], start, start+entry['length']-1)
+            value = self.decode_entry(owner, key, entry, blob)
+            self.cache.put(key, entry['url'], entry['range'], value)
+            if byte_range == entry['range']:
+                return value
+            value = self.cache.get(key, url, byte_range)
+            if value is None:
+                raise ValueError('Requested archived range is not available')
+            return value
+
+    def restore(self, owner, key):
+        info = self.lookup(owner, key)
+        if not info:
+            if self.unavailable.get((owner, key), 0) > time.monotonic():
+                return False
+            return self.restore_legacy(owner, key)
+        with self.slots:
+            if self.cache.load(key):
+                return True
+            size = int(info['size'])
+            if not 0 < size <= LIMIT or shutil.disk_usage(self.cache.directory).free < 2*size+self.cache.reserve or self.cache.used+size > self.cache.maximum:
+                return False
+            folder = self.cache.folder(key)
+            folder.mkdir(exist_ok=True, mode=0o700)
+            sealed = folder/(secrets.token_hex(12)+'.sealed.pending')
+            try:
+                self.download(owner, info['file'], sealed, size)
+                if self.digest(sealed) != info['sha256']:
+                    raise ValueError('Damaged Drive archive')
+                with sealed.open('rb') as source:
+                    if source.read(6) != b'MVVOD2':
+                        raise ValueError('Invalid playback archive')
+                    length = int.from_bytes(source.read(4), 'big')
+                    if not 28 <= length <= 16*1024**2+28:
+                        raise ValueError('Invalid encrypted archive index')
+                    blob = source.read(length)
+                    index = json.loads(AESGCM(self.key(owner, key)).decrypt(blob[:12], blob[12:], (key+':index').encode()))
+                    expected = {k: v for k, v in info['index'].items() if k != 'body'}
+                    if index != expected or source.tell() != info['index']['body']:
+                        raise ValueError('Archive index mismatch')
+                    for entry in index['entries']:
+                        source.seek(info['index']['body']+entry['offset'])
+                        value = self.decode_entry(owner, key, entry, source.read(entry['length']))
+                        if not self.cache.put(key, entry['url'], entry['range'], value):
+                            return False
+                return self.cache.complete(key, index['record'])
+            finally:
+                sealed.unlink(missing_ok=True)

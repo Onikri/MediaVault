@@ -285,3 +285,46 @@ class VodDeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result[2], 200)
         await background
         self.assertEqual(sum(url == target for url, _ in session.source.requests), 1)
+
+    async def test_cold_drive_archive_starts_before_bulk_restore_finishes(self):
+        import threading
+        first = await self.complete(); key = first.cache_key
+        await self.service.close_session(first)
+        values = {'google:owner': {'configured': True}}
+        class Store:
+            key = b'z'*32
+            def setting(self, name, value=None):
+                if value is not None: values[name] = value
+                return values.get(name)
+        archive = DriveArchive(self.service.vod, Store, lambda owner: None)
+        uploaded = {}
+        def upload(owner, key, path): uploaded['bytes'] = path.read_bytes(); return 'private-file'
+        def download(owner, file_id, path, size): path.write_bytes(uploaded['bytes'])
+        archive.upload, archive.download = upload, download
+        archive.download_range = lambda owner, file_id, start, end: uploaded['bytes'][start:end+1]
+        self.assertTrue(archive.save('owner', key))
+        for path in self.service.vod.folder(key).iterdir():
+            if path.name != 'lease': path.unlink()
+        entered, release = threading.Event(), threading.Event()
+        original = archive.restore
+        def slow_restore(owner, key):
+            entered.set(); release.wait(5); return original(owner, key)
+        archive.restore = slow_restore
+        self.service.archive = archive; Source.fail = True
+        try:
+            data = await asyncio.wait_for(self.service.prepare_online(self.body, 'owner'), .5)
+            self.assertTrue(data['serverCached'])
+            self.assertFalse(data['playbackTelemetry'])
+            self.assertTrue(await asyncio.to_thread(entered.wait, .5))
+            self.assertFalse(release.is_set())
+            session = self.service.session(data['id'])
+            response = await self.service.play(session.sid, session.active, '720')
+            uri = next(line for line in response.body.decode().splitlines() if line.startswith('/hls/'))
+            chunk = await asyncio.wait_for(self.service.resource(session.sid, uri.split('?u=')[1], 'bytes=0-3'), .5)
+            self.assertEqual(chunk.status_code, 206)
+            self.assertEqual(len(chunk.body), 4)
+            self.assertFalse(release.is_set(), 'First playable bytes must not await the whole movie')
+        finally:
+            release.set()
+            await asyncio.gather(*list(self.service.archive_tasks))
+        self.assertTrue(self.service.vod.load(key))
