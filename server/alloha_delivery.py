@@ -156,6 +156,7 @@ class DeliverySession:
     refreshes: int = 0
     refreshed_at: float = 0
     refresh_lock: object = field(default_factory=asyncio.Lock)
+    promotions: dict = field(default_factory=dict)
 
 
 class AllohaDelivery:
@@ -251,6 +252,7 @@ class AllohaDelivery:
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
         session.transfers.clear()
+        session.promotions.clear()
         session.prefetches.clear()
         if session.cache_key:
             await cache_io(self.vod.release, session.cache_key)
@@ -382,7 +384,13 @@ class AllohaDelivery:
         """Join an in-flight lookahead instead of fetching the same segment twice."""
         key = (url, byte_range)
         task = session.transfers.get(key)
+        if task is not None and not background:
+            urgent = session.promotions.get(key)
+            if urgent is not None:
+                urgent.set()
         if task is None:
+            urgent = asyncio.Event()
+            session.promotions[key] = urgent
             async def load():
                 if background and session.cache_key:
                     cached = await cache_io(self.vod.get, session.cache_key, url, byte_range)
@@ -391,14 +399,20 @@ class AllohaDelivery:
                     # Match the existing Alloha importer cadence. An unlimited
                     # full-film burst can invalidate an otherwise healthy CDN session.
                     async with self.prefetch_pacing:
-                        await asyncio.sleep(max(0, self.prefetch_next-time.monotonic()))
-                        self.prefetch_next = time.monotonic()+self.prefetch_interval
-                while background and session.demands:
+                        reserved = max(time.monotonic(), self.prefetch_next)
+                        self.prefetch_next = reserved+self.prefetch_interval
+                    delay = reserved-time.monotonic()
+                    if delay > 0 and not urgent.is_set():
+                        try:
+                            await asyncio.wait_for(urgent.wait(), delay)
+                        except asyncio.TimeoutError:
+                            pass
+                while background and not urgent.is_set() and session.demands:
                     await asyncio.sleep(.01)
                 # BNSI is ordinary HTTP: one background transfer may overlap
                 # one foreground seek. Native WS/browser transports keep their
                 # existing serialized I/O. Neither path adds source bursts.
-                guard = session.prefetch_io if background and session.mode == 'bnsi' and session.cache_key else session.io_lock
+                guard = session.prefetch_io if background and not urgent.is_set() and session.mode == 'bnsi' and session.cache_key else session.io_lock
                 generation = session.generation
                 if session.mode == 'bnsi' and session.cache_key and not session.cache_complete and session.refreshed_at and self.clock()-session.refreshed_at >= 1080:
                     await self.refresh_http(session, generation)
@@ -417,6 +431,7 @@ class AllohaDelivery:
             task = asyncio.create_task(load())
             session.transfers[key] = task
             def finished(done):
+                session.promotions.pop(key, None)
                 # Retain a failed speculative request until demanded: never send
                 # the same refused request again through the same source session.
                 if done.cancelled() or done.exception() is None:

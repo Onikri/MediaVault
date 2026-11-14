@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -270,3 +271,17 @@ class VodDeliveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertIs(self.service.session(data['id']), session)
             self.assertIn('/renewed/', session.aliases['https://cdn.example.com/second.m4s'])
             self.assertIsNotNone(self.service.vod.get(session.cache_key, 'https://cdn.example.com/second.m4s'))
+
+    async def test_foreground_promotes_queued_background_segment_without_pacing_delay(self):
+        data = await self.service.prepare_online(self.body, 'owner')
+        session = self.service.session(data['id']); session.mode = 'bnsi'
+        self.service.prefetch_interval = 10
+        self.service.prefetch_next = time.monotonic()+10
+        target = 'https://cdn.example.com/queued.m4s'
+        background = asyncio.create_task(self.service.transfer(session, target, 'media', background=True))
+        await asyncio.sleep(.01)
+        self.assertFalse(background.done())
+        result = await asyncio.wait_for(self.service.transfer(session, target, 'media'), .5)
+        self.assertEqual(result[2], 200)
+        await background
+        self.assertEqual(sum(url == target for url, _ in session.source.requests), 1)
