@@ -17,11 +17,14 @@ rules keep one of us from silently undoing the other.
 
 ## State on 2026-11-14
 
-- Running `mediavault-importer:p6-43070026350d` = catalogue image from
-  `codex/remaining-source-catalogues` (1564741, manga index grouped by work,
-  fair crawl queue) plus `server/` from `codex/alloha-p6-cache`.
-- Both are now in `main`: Alloha via a54bf5a (Codex), the catalogue branch via
-  Claude's merge. `main` builds the server that is running.
-- Next (Claude Code): cache `/manga/catalog/tags`, which takes about 9 s over
-  the whole index while holding `store.lock` and stalls the manga library.
-  Claude takes the deploy lock first.
+- Running `mediavault-importer:tags-95fddbb59e27`, revision label
+  `95fddbb59e27cc1089e678ed370899ceddc7bc61` (= `main` at deploy time). It is the
+  previous `p6-43070026350d` image plus `server/manga_catalog_index.py` and
+  `server/api.py` from that commit (cached manga tag facets). The Alloha VOD
+  cache settings come from the chained `release-p6-*.yaml` override and are
+  unchanged.
+- Deployed by Claude Code at 12:59 UTC with the lock; backup in
+  `/opt/mediavault-backups/tags-95fddbb59e27-20261114T125821Z`.
+- Set the revision label to the deployed `main` SHA on every build
+  (`--label org.opencontainers.image.revision=<sha>`); a derived image otherwise
+  inherits its base's label.
