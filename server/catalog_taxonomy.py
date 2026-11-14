@@ -35,7 +35,6 @@ def keys(value,policy,allow_hidden=False):
 def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False):
     from manga_tag_policy import current
     policy=current()
-    db.create_function('catalog_category',3,lambda label,field,k:(classify(label,field,k,policy) or ('',''))[0],deterministic=True)
     result=[];params=[]
     for field,raw,negative in [('genres',genre,False),('tags',tag,False),('genres',excludeGenre,True),('tags',excludeTag,True)]:
         try:values=raw if isinstance(raw,(list,tuple)) else json.loads(raw) if str(raw or '').startswith('[') else str(raw or '').split(',')
@@ -47,17 +46,20 @@ def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False)
             raise HTTPException(422,'Не больше 64 текстовых значений в группе фильтров.')
         values=list(dict.fromkeys(v.strip() for v in values if v.strip()))
         if not values:continue
-        wanted=sorted({k for v in values for k in keys(v,policy,allow_hidden=negative)})
+        wanted=sorted({k for v in values for k in keys(v,policy,allow_hidden=negative) if (classify(k,field,kind,policy) or ('',''))[0]==field})
         if not wanted:
             if not negative:result.append('0')
             continue
         if manga:
-            query='SELECT 1 FROM catalog_titles peer JOIN catalog_tags x ON x.title_id=peer.id WHERE peer.work_key=t.work_key'
+            work='t.work_key'
+            query='SELECT peer.work_key FROM catalog_tags x JOIN catalog_titles peer ON peer.id=x.title_id WHERE '
         else:
             from content_catalog import work_sql
-            query='SELECT 1 FROM content_titles peer JOIN content_tags x ON x.title_id=peer.id WHERE '+work_sql('peer')+'='+work_sql('t')
-        query+=' AND x.tag_key IN ('+','.join('?' for _ in wanted)+') AND catalog_category(x.tag_key,x.category,?)=?'
-        result.append(('NOT ' if negative else '')+'EXISTS('+query+')');params.extend([*wanted,kind,field])
+            work=work_sql('t')
+            query='SELECT '+work_sql('peer')+' FROM content_tags x JOIN content_titles peer ON peer.id=x.title_id WHERE '
+        # Resolve each signed set once from the tag index, not once per title.
+        query+='x.tag_key IN ('+','.join('?' for _ in wanted)+')'
+        result.append(work+(' NOT IN (' if negative else ' IN (')+query+')');params.extend(wanted)
     return result,params
 
 def format_label(value,kind):
