@@ -10,9 +10,28 @@ def identity(spec):
     key['source']=(spec.get('source') or {}).get('id');key['term']=None if spec.get('type','').endswith('-detail') else spec.get('term')
     return hashlib.sha256(canonical_json(key)).hexdigest()[:32]
 
+# Every LibGroup site (MangaLib, HentaiLib, SlashLib) is one API host.
+LIB_HOST='api.cdnrulib.link'
+HOST_SQL="CASE WHEN kind LIKE 'lib%' THEN '"+LIB_HOST+"' ELSE COALESCE(json_extract(spec,'$.domain'),'') END"
+CLAIMABLE="state IN ('queued','retry','done','partial') AND due<=?"
+BASE_KINDS=('lib','bridge','remanga','html')
+# Per-host request spacing in seconds; LibGroup tolerates a faster pace and
+# slows down again by itself on 429.
+PACE={LIB_HOST:0.6}
+HOST_SLOTS=2
+# Bridge jobs all run inside the one local Suwayomi process.
+BRIDGE_SLOTS=4
+# Consecutive transport failures that pause a whole host.
+TRIP_AFTER=5
+JOB_ERRORS={'storage','repeated-page','empty-page','incomplete-write'}
+
+def host_of(spec):
+    return LIB_HOST if str(spec.get('type','')).startswith('lib') else spec.get('domain') or ''
+
 class Indexer:
     def __init__(self,store,fetch=None,clock=time.time,interval=1.1):
         self.store=store;self.clock=clock;self.fetch=fetch or __import__('catalogue_sources').fetch;self.stop=threading.Event();self.threads=[];self.rate={};self.rate_lock=threading.Lock();self.interval=interval;self.turn=0;self.inflight={}
+        self.pace={};self.failures={};self.trips={};self.paused={};self.served={};self.bridges=0;self.hosts=set();self.hosts_at=None
         with store.lock,store.db:
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_jobs(id TEXT PRIMARY KEY,spec TEXT NOT NULL,cursor TEXT NOT NULL,state TEXT NOT NULL,priority INTEGER NOT NULL,due REAL NOT NULL,pages INTEGER NOT NULL DEFAULT 0,records INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT \'\',updated REAL NOT NULL,lease TEXT NOT NULL DEFAULT \'\')')
             store.db.execute('CREATE INDEX IF NOT EXISTS catalogue_jobs_due ON catalogue_jobs(state,due,priority)')
@@ -23,6 +42,12 @@ class Indexer:
             store.db.execute('CREATE INDEX IF NOT EXISTS catalogue_jobs_kind ON catalogue_jobs(kind,state)')
             store.db.execute("CREATE INDEX IF NOT EXISTS catalogue_jobs_domain_due ON catalogue_jobs(kind,json_extract(spec,'$.domain'),state,due,id)")
             if 'expected' not in columns:store.db.execute('ALTER TABLE catalogue_jobs ADD COLUMN expected INTEGER')
+            # The request host is stored so a claim reads one indexed row per
+            # host instead of sorting the whole queue through JSON.
+            if 'host' not in columns:store.db.execute("ALTER TABLE catalogue_jobs ADD COLUMN host TEXT NOT NULL DEFAULT ''")
+            store.db.execute("UPDATE catalogue_jobs SET host="+HOST_SQL+" WHERE host=''")
+            store.db.execute('CREATE INDEX IF NOT EXISTS catalogue_jobs_host_priority ON catalogue_jobs(host,priority DESC,due,id)')
+            store.db.execute('CREATE INDEX IF NOT EXISTS catalogue_jobs_host_due ON catalogue_jobs(host,due,priority,id)')
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_page_fingerprints(job TEXT NOT NULL,digest TEXT NOT NULL,PRIMARY KEY(job,digest))')
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_page_items(job TEXT NOT NULL,url TEXT NOT NULL,PRIMARY KEY(job,url))')
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_tag_targets(source TEXT NOT NULL,label TEXT NOT NULL,target TEXT NOT NULL,PRIMARY KEY(source,label,target))')
@@ -30,7 +55,9 @@ class Indexer:
 
     def enqueue(self,spec,priority=10):
         key=identity(spec);now=self.clock()
-        self.store.db.execute("INSERT INTO catalogue_jobs(id,spec,cursor,state,priority,due,updated,kind) VALUES(?,?,?,'queued',?,?,?,?) ON CONFLICT(id) DO UPDATE SET spec=excluded.spec,priority=MAX(catalogue_jobs.priority,excluded.priority)",(key,canonical_json(spec).decode(),'{"page":1}',priority,now,now,spec['type']))
+        host=host_of(spec)
+        self.store.db.execute("INSERT INTO catalogue_jobs(id,spec,cursor,state,priority,due,updated,kind,host) VALUES(?,?,?,'queued',?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET spec=excluded.spec,priority=MAX(catalogue_jobs.priority,excluded.priority),host=excluded.host",(key,canonical_json(spec).decode(),'{"page":1}',priority,now,now,spec['type'],host))
+        self.hosts.add(host)
         return key
 
     def seed(self,installed):
@@ -63,24 +90,47 @@ class Indexer:
             for source,label,target in self.store.db.execute('SELECT source,label,target FROM catalogue_tag_targets').fetchall():
                 if policy.key(label,source) in keys:self.enqueue(json.loads(target),80)
 
+    def open_hosts(self,now):
+        if self.hosts_at is None or time.monotonic()-self.hosts_at>30:
+            self.hosts|={host for (host,) in self.store.db.execute('SELECT DISTINCT host FROM catalogue_jobs')};self.hosts_at=time.monotonic()
+        return [host for host in self.hosts if self.inflight.get(host,0)<HOST_SLOTS and self.paused.get(host,0)<=now]
+
     def claim(self):
         now=self.clock()
         with self.store.lock,self.store.db:
             self.turn+=1
-            order='due,priority,id' if self.turn%4==0 else 'priority DESC,due,id'
+            due_first=self.turn%4==0
+            hosts=self.open_hosts(now)
+            if not hosts:return None
+            # Suwayomi runs every bridge source; keep it to a few requests.
+            bridge='' if self.bridges<BRIDGE_SLOTS else " AND kind NOT LIKE 'bridge%'"
+            columns='id,spec,cursor,pages,records,attempts,state,host,priority,due'
+            row=None
             # Reserve every third turn for a base catalogue page. A large detail
             # queue must not delay discovery of the rest of the source for days.
-            preference="CASE WHEN kind IN ('lib','bridge','remanga','html') AND json_extract(spec,'$.term') IS NULL THEN 0 ELSE 1 END,updated," if self.turn%3==1 else ''
-            busy=[host for host,count in self.inflight.items() if count>=2]
-            exclude=" AND CASE WHEN kind LIKE 'lib%' THEN 'api.cdnrulib.link' ELSE json_extract(spec,'$.domain') END NOT IN ("+','.join('?' for _ in busy)+')' if busy else ''
-            cursor=self.store.db.execute("SELECT id,spec,cursor,pages,records,attempts,state FROM catalogue_jobs WHERE state IN ('queued','retry','done','partial') AND due<=?"+exclude+" ORDER BY "+preference+order+" LIMIT 1",(now,*busy))
-            names=[c[0] for c in cursor.description];row=None
-            for candidate in cursor.fetchall():
-                parsed=json.loads(candidate[1]);host='api.cdnrulib.link' if parsed['type'].startswith('lib') else parsed['domain']
-                if self.inflight.get(host,0)<2:row=candidate;break
-            if not row:return None
-            job=dict(zip(names,row));job['spec']=json.loads(job['spec']);job['cursor']=json.loads(job['cursor']);job['host']=host
-            self.inflight[host]=self.inflight.get(host,0)+1
+            if self.turn%3==1:
+                allowed=set(hosts)
+                for candidate in self.store.db.execute('SELECT '+columns+' FROM catalogue_jobs INDEXED BY catalogue_jobs_kind WHERE kind IN ('+','.join('?'*len(BASE_KINDS))+") AND json_extract(spec,'$.term') IS NULL AND "+CLAIMABLE+bridge+' ORDER BY updated,id',(*BASE_KINDS,now)):
+                    if candidate[7] in allowed:row=candidate;break
+            if not row:
+                # One best job per open host, then the host's priority decides;
+                # equal priorities go to the host served longest ago, so every
+                # source moves at its own pace instead of waiting behind the
+                # oldest queue.
+                # The planner would pick the due index and sort a deep host queue.
+                order,index=('due,priority,id','catalogue_jobs_host_due') if due_first else ('priority DESC,due,id','catalogue_jobs_host_priority')
+                candidates=[]
+                for host in hosts:
+                    found=self.store.db.execute('SELECT '+columns+' FROM catalogue_jobs INDEXED BY '+index+' WHERE host=? AND '+CLAIMABLE+bridge+' ORDER BY '+order+' LIMIT 1',(host,now)).fetchone()
+                    if found:candidates.append(found)
+                if not candidates:return None
+                fair=lambda r:(self.inflight.get(r[7],0),self.served.get(r[7],0))
+                row=min(candidates,key=(lambda r:(fair(r)[0],r[9],r[8],fair(r)[1],r[0])) if due_first else (lambda r:(-r[8],*fair(r),r[9],r[0])))
+            names=columns.split(',')[:7]
+            job=dict(zip(names,row));job['spec']=json.loads(job['spec']);job['cursor']=json.loads(job['cursor']);host=job['host']=row[7]
+            self.inflight[host]=self.inflight.get(host,0)+1;self.served[host]=self.turn
+            job['bridge']=job['spec'].get('type','').startswith('bridge')
+            if job['bridge']:self.bridges+=1
             if job['state'] in {'done','partial'}:
                 job['cursor']={'page':1};self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
                 self.store.db.execute('DELETE FROM catalogue_page_items WHERE job=?',(job['id'],))
@@ -96,10 +146,10 @@ class Indexer:
         try:
             data_dir=Path(os.getenv('DATA_DIR','/data'))
             if data_dir.exists() and shutil.disk_usage(data_dir).free<512*1024*1024:raise RuntimeError('storage')
-            # One request per host per second, even across both workers.
+            # One request per host per pace step, even across all workers.
             host=job['host']
             with self.rate_lock:
-                next_time=max(time.monotonic(),self.rate.get(host,0));self.rate[host]=next_time+self.interval
+                next_time=max(time.monotonic(),self.rate.get(host,0));self.rate[host]=next_time+self.pace.get(host,self.base_pace(host))
             if self.stop.wait(max(0,next_time-time.monotonic())):return False
             result=self.fetch(spec,job['cursor']);rows=result.get('rows') or []
             if not rows and result.get('next'):raise RuntimeError('empty-page')
@@ -146,14 +196,43 @@ class Indexer:
                 self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),priority=CASE WHEN ? THEN priority ELSE MIN(priority,10) END,attempts=0,error=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),bool(next_cursor),result.get('reason',''),self.clock(),job['id']))
                 if '-detail' in spec['type'] and not next_cursor:
                     self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(job['id'],));self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
+            self.answered(host)
         except Exception as error:
             code=getattr(getattr(error,'response',None),'status_code',None)
             reason='Недостаточно свободного места' if str(error)=='storage' else 'Источник повторяет страницу каталога' if str(error)=='repeated-page' else 'Источник вернул пустую промежуточную страницу' if str(error)=='empty-page' else 'Источник временно не отдаёт метаданные'
             wait=30 if code==429 else min(3600,30*2**min(job['attempts'],7))
+            if str(error) not in JOB_ERRORS:self.failed(job['host'],code)
             with self.store.lock,self.store.db:self.store.db.execute("UPDATE catalogue_jobs SET state='retry',due=?,attempts=attempts+1,error=?,updated=?,lease='' WHERE id=? AND lease=?",(self.clock()+wait,reason,self.clock(),job['id'],job['lease']))
         finally:
-            with self.store.lock:self.inflight[job['host']]=max(0,self.inflight.get(job['host'],1)-1)
+            with self.store.lock:
+                self.inflight[job['host']]=max(0,self.inflight.get(job['host'],1)-1)
+                if job['bridge']:self.bridges=max(0,self.bridges-1)
         return True
+
+    def base_pace(self,host):
+        return min(self.interval,PACE.get(host,self.interval))
+
+    def answered(self,host):
+        with self.rate_lock:
+            self.failures[host]=0;self.trips.pop(host,None)
+            # Ease back towards the base pace after a slowdown.
+            if host in self.pace:
+                self.pace[host]=max(self.base_pace(host),self.pace[host]*0.9)
+                if self.pace[host]<=self.base_pace(host):del self.pace[host]
+
+    def failed(self,host,code):
+        with self.rate_lock:
+            if code==429:
+                # Too many requests: halve this host's rate, not the queue's.
+                self.pace[host]=min(30,max(self.pace.get(host,0),self.base_pace(host),0.5)*2);return
+            # A missing title is that title's problem, not the host's.
+            if code in {404,410}:return
+            self.failures[host]=self.failures.get(host,0)+1
+            if self.failures[host]>=TRIP_AFTER:
+                # A failing host rests as a whole so its timeouts stop holding
+                # workers that other sources could use.
+                trips=self.trips.get(host,0);self.trips[host]=trips+1;self.failures[host]=0
+                self.paused[host]=self.clock()+min(3600,900*2**trips)
 
     def start(self):
         if self.threads:return
@@ -162,7 +241,9 @@ class Indexer:
                 try:
                     if not self.run_once():self.stop.wait(2)
                 except Exception:self.stop.wait(5)
-        for i in range(6):
+        # Workers mostly wait on remote hosts; per-host slots and pacing, not
+        # the worker count, bound the load on each source.
+        for i in range(int(os.getenv('MEDIA_VAULT_CATALOGUE_WORKERS','12'))):
             thread=threading.Thread(target=work,daemon=True,name='catalogue-index-'+str(i));self.threads.append(thread);thread.start()
 
     def status(self):
@@ -179,6 +260,7 @@ class Indexer:
                 catalogues=pending_catalogues.get(spec['domain'],0)
                 rows.append({'domain':spec['domain'],'name':spec['name'],'status':'enriching' if state in {'done','partial'} and (details or catalogues) else state,'pages':pages,'indexed':records,'storedTitles':stored.get(source_provider(spec),0),'expected':expected,'pendingDetails':details,'pendingCatalogues':catalogues,'error':error,'retryAt':due if state=='retry' else None})
                 if spec['type']=='mirror':rows[-1]['mirrorOf']=spec['primary']
+                if self.paused.get(host_of(spec),0)>self.clock():rows[-1]['pausedUntil']=self.paused[host_of(spec)]
             by_domain={r['domain']:r for r in rows}
             for row in rows:
                 if row.get('mirrorOf') in by_domain:
