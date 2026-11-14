@@ -23,6 +23,8 @@ def initialize(db):
     db.execute('CREATE TABLE IF NOT EXISTS content_tags(title_id TEXT NOT NULL,category TEXT NOT NULL,tag_key TEXT NOT NULL,original TEXT NOT NULL,PRIMARY KEY(title_id,category,tag_key,original))')
     db.execute('CREATE INDEX IF NOT EXISTS content_tags_key ON content_tags(tag_key,category,title_id)')
     db.execute('CREATE INDEX IF NOT EXISTS content_fact_labels ON content_tag_facts(original,source)')
+    from catalog_taxonomy import initialize_origins
+    initialize_origins(db)
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(db)
     state=db.execute("SELECT value FROM content_catalog_state WHERE name='policy'").fetchone()
@@ -125,15 +127,17 @@ def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='
     for key in keys:
         records=[(identity,json.loads(raw)) for identity,raw in db.execute('SELECT id,raw FROM content_titles t WHERE '+work+'=? ORDER BY updated DESC,id',(key,))]
         if not records:continue
+        from catalog_taxonomy import hentai_excluded
+        excluded=any(hentai_excluded(record) for _,record in records) or bool(db.execute('SELECT 1 FROM content_tag_facts f JOIN content_titles peer ON peer.id=f.title_id WHERE '+work_sql('peer')+'=? AND catalog_not_hentai(f.original)=1 LIMIT 1',(key,)).fetchone())
         identity,row=records[0];merged={'genres':[],'tags':[]}
         for _,record in records:
             source=urlsplit(record.get('sourceUrl') or record.get('sourceURL') or '').hostname or ''
-            facts=policy.facts(record,source)
+            facts=policy.facts({**record,'hentaiExcluded':excluded},source)
             for field in merged:merged[field]=list(dict.fromkeys([*merged[field],*facts[field]]))[:120]
         aliases=list(dict.fromkeys([value for _,record in records for value in [record['title'],*record.get('aliases',[])]]))[:120]
         ids={};titles={}
         for _,record in reversed(records):ids.update(record.get('ids') or {});titles.update(record.get('titles') or {})
-        rows.append({**row,**merged,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records)})
+        rows.append({**row,**merged,'hentaiExcluded':excluded,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records)})
 
     return {'items':rows,'total':total,'offset':offset,'limit':limit}
 

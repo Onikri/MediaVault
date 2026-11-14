@@ -1,5 +1,6 @@
 import data from '../server/catalog-taxonomy.json' with {type:'json'};
 import {mangaPolicy} from './manga-tag-policy.js';
+import {hentaiExcluded,hentaiLabel,sourceGenreProjection} from './source-genres.js';
 const norm=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/[_-]/g,' ').replace(/\s+/g,' ').trim();
 const genres=new Map(data.genres.flatMap(row=>[row.key,row.label,...row.aliases].map(alias=>[norm(alias),row])));
 export function filterValues(value){if(Array.isArray(value))return value;try{if(String(value||'').startsWith('['))return JSON.parse(value);}catch{}return String(value||'').split(',').map(v=>v.trim()).filter(Boolean);}
@@ -16,7 +17,9 @@ export function classifyLabel(label,field,kind){
 export function taxonomyFacts(row){
  const result={genres:[],tags:[]};
  for(const field of ['genres','tags'])for(const label of [...row[field]||[],...row.workFacts?.[field]||[]]){const value=classifyLabel(label,field,row.kind);if(value&&!result[value.category].includes(value.label))result[value.category].push(value.label);}
- return {...row,...result,format:formatLabel(row.format,row.kind)};
+ const policy=mangaPolicy(),id=policy.key('Хентай');
+ const projected=sourceGenreProjection(row,result,{allowed:!!id&&policy.rules.get(id)?.category!=='tag',label:policy.label(id,'Хентай'),isHentai:v=>hentaiLabel(v)||!!id&&policy.key(v)===id});
+ return {...row,...projected,...(hentaiExcluded(row)?{hentaiExcluded:true}:{}),format:formatLabel(row.format,row.kind)};
 }
 export const genreOptions=kind=>data.genres.filter(row=>!row.kinds||row.kinds.includes(kind)).map(row=>row.label);
 export const formatOptions=kind=>data.formats[kind]||[];

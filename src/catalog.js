@@ -149,6 +149,7 @@ export function mergeCatalog(values){
     if(!current){result.push({...item});continue;}
     current.providers=unique([...current.providers,...item.providers]);current.aliases=unique([...current.aliases,...item.aliases]);
     current.genres=unique([...current.genres,...item.genres]);current.tags=unique([...current.tags,...item.tags]);current.links=[...current.links,...item.links];current.ids={...current.ids,...item.ids};
+    current.hentaiExcluded=!!(current.hentaiExcluded||item.hentaiExcluded||item.workFacts?.hentaiExcluded);
     current.releases=[...current.releases,...item.releases].filter((e,i,a)=>a.findIndex(x=>x.date===e.date&&x.episode===e.episode)===i);
     if(item.titles.ru){current.titles={...current.titles,...item.titles};current.title=item.titles.ru;current.description=item.description||current.description;}
     for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','startDate','endDate','score','trailer','background','episodesAired','duration','authors'])if(current[key]==null||current[key]==='')current[key]=item[key];

@@ -1,3 +1,4 @@
+import {hentaiExcluded,hentaiLabel,sourceGenreProjection} from './source-genres.js';
 import taxonomy from '../server/catalog-taxonomy.json' with {type:'json'};
 import bundled from '../server/manga-tag-policy.json' with {type:'json'};
 
@@ -22,7 +23,7 @@ export function compileMangaPolicy(data){
  const key=(value,source='')=>{const norm=normalizeTag(value),id=clean(value)&&!hidden.has(norm)?scoped.get(source+':'+norm)||aliases.get(norm)||(data.includeDiscovered?norm:''):'';return hidden.has(id)?'':id;};
  const label=(id,fallback='')=>rules.get(id)?.label||fallback||id;
  const project=(values,source='')=>{const found=new Map();for(const value of Array.isArray(values)?values:[]){const id=key(value,source);if(id)found.set(id,label(id,value));}return [...found.values()];};
- const facts=(row,source='')=>{const result={genres:[],tags:[]},kind=row?.kind||'manga';for(const field of ['genres','tags'])for(const value of Array.isArray(row?.[field])?row[field]:[]){const id=key(value,source);if(!id||/^\p{N}+$/u.test(value))continue;const rule=rules.get(id)||{},genre=semanticGenres.get(normalizeTag(value))||semanticGenres.get(normalizeTag(rule.key))||semanticGenres.get(normalizeTag(rule.label)),target=({genre:'genres',tag:'tags'})[rule.category]||(genre?'genres':'tags');if(genre?.kinds&&!genre.kinds.includes(kind)||kind==='book'&&(target!=='genres'||!genre&&rule.category!=='genre'))continue;const name=rule.label||(genre&&target==='genres'?genre.label:value);if(!result[target].includes(name))result[target].push(name);}return result;};
+ const facts=(row,source='')=>{const result={genres:[],tags:[]},kind=row?.kind||'manga';for(const field of ['genres','tags'])for(const value of Array.isArray(row?.[field])?row[field]:[]){const id=key(value,source);if(!id||/^\p{N}+$/u.test(value))continue;const rule=rules.get(id)||{},genre=semanticGenres.get(normalizeTag(value))||semanticGenres.get(normalizeTag(rule.key))||semanticGenres.get(normalizeTag(rule.label)),target=({genre:'genres',tag:'tags'})[rule.category]||(genre?'genres':'tags');if(genre?.kinds&&!genre.kinds.includes(kind)||kind==='book'&&(target!=='genres'||!genre&&rule.category!=='genre'))continue;const name=rule.label||(genre&&target==='genres'?genre.label:value);if(!result[target].includes(name))result[target].push(name);}const hentai=key('Хентай',source);return sourceGenreProjection(row,result,{source,allowed:!!hentai&&rules.get(hentai)?.category!=='tag',label:label(hentai,'Хентай'),isHentai:value=>hentaiLabel(value)||!!hentai&&key(value,source)===hentai});};
  return {data,rules,key,label,project,facts};
 }
 let active=compileMangaPolicy(bundled),version=0,scope='manga';
@@ -39,8 +40,8 @@ export function setMangaPolicy(data,digest='',nextScope='manga'){
 export function acceptContentPolicy(value){const next=value?.tagPolicy;if(next?.policy)setMangaPolicy(next.policy,next.revision,next.scope||'all');return value;}
 export function mangaPolicyFacts(row){
  let source='';try{source=new URL(row.sourceUrl||row.url||'').hostname;}catch{}
- return {...row,...active.facts(row,source)};
+ return {...row,...active.facts(row,source),...(hentaiExcluded(row)?{hentaiExcluded:true}:{})};
 }
-export function mangaPolicyProfile(profile,kind=profile?.kind||'manga'){const facts=active.facts({kind,genres:profile?.genres,tags:profile?.themes});return {...profile,genres:facts.genres,themes:facts.tags};}
+export function mangaPolicyProfile(profile,kind=profile?.kind||'manga'){const facts=active.facts({...profile,kind,genres:profile?.genres,tags:profile?.themes});return {...profile,genres:facts.genres,themes:facts.tags};}
 export const globalContentPolicy=()=>scope==='all';
 export const contentPolicyFacts=row=>row.kind==='manga'||globalContentPolicy()?mangaPolicyFacts(row):row;
