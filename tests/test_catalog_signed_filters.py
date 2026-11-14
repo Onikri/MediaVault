@@ -43,6 +43,8 @@ class SignedFilters(unittest.TestCase):
   result=content_catalog.browse(self.db,kind='anime',genre='Fantasy',tag='Robots',limit=1)
   self.assertEqual(result['total'],1);self.assertEqual(result['items'][0]['providerCount'],2)
   self.assertEqual(result['items'][0]['tags'],['Robots'])
+  self.assertEqual(set(result['items'][0]['aliases']),{'Мир','World'})
+  self.assertEqual(content_catalog.browse(self.db,kind='anime',q='World',genre='Fantasy',tag='Robots')['total'],1)
   self.assertEqual(content_catalog.browse(self.db,kind='anime',excludeTag='Robots')['total'],0)
  def test_malformed_or_overlarge_filter_lists_do_not_widen_the_query(self):
   from fastapi import HTTPException

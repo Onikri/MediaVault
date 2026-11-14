@@ -8,7 +8,7 @@ KINDS=frozenset({'movie','tv','anime','manga','ranobe','book'})
 def work_sql(alias='t'):
     p=alias+'.' if alias else ''
     expr=p+"kind||':'||CASE "
-    for key in ['mal','imdb','kinopoisk','openlibrary','fantlab']:
+    for key in ['mal','imdb','kinopoisk','anilist','kitsu','openlibrary','fantlab']:
         value="NULLIF(json_extract("+p+"raw,'$.ids."+key+"'),'')"
         expr+='WHEN '+value+' IS NOT NULL THEN '+repr(key+':')+'||'+value+' '
     return '('+expr+"ELSE 'id:'||"+p+'id END)'
@@ -130,7 +130,10 @@ def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='
             source=urlsplit(record.get('sourceUrl') or record.get('sourceURL') or '').hostname or ''
             facts=policy.facts(record,source)
             for field in merged:merged[field]=list(dict.fromkeys([*merged[field],*facts[field]]))[:120]
-        rows.append({**row,**merged,'contentCatalogId':identity,'workKey':key,'providerCount':len(records)})
+        aliases=list(dict.fromkeys([value for _,record in records for value in [record['title'],*record.get('aliases',[])]]))[:120]
+        ids={};titles={}
+        for _,record in reversed(records):ids.update(record.get('ids') or {});titles.update(record.get('titles') or {})
+        rows.append({**row,**merged,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records)})
 
     return {'items':rows,'total':total,'offset':offset,'limit':limit}
 
