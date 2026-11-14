@@ -60,7 +60,7 @@ class Source:
                              'quality': {q: ORIGIN + audio + '-' + q + '.m3u8' for q in ('1080', '720')}}
                             for audio in ('1', '2')], 'subtitles': [{'label': 'Русский', 'lang': 'ru', 'src': ORIGIN + 'ru.vtt'}]}
 
-    async def fetch(self, url, byte_range):
+    async def fetch(self, url, byte_range, *, probe=False):
         self.requests.append((url, byte_range))
         if self.fail:
             raise SourceRefused('forced source refusal')
