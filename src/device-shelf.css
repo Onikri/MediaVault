@@ -1,0 +1,19 @@
+.device-shelf{display:grid;gap:14px;margin:0 0 24px;padding:18px;border-radius:24px;background:color-mix(in srgb,var(--color-petal) 4%,transparent)}
+.device-shelf-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px}
+.device-shelf-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:color-mix(in srgb,var(--color-blossom) 18%,transparent);color:var(--color-blossom-light,var(--color-blossom))}
+.device-shelf-head h2{margin:0;font-size:18px;color:var(--color-petal)}
+.device-shelf-head p{margin:3px 0 0;font-size:13px;line-height:1.5;color:var(--color-on-muted)}
+.device-shelf-actions{display:flex;align-items:center;gap:12px}
+.device-shelf-actions .btn{border-radius:100px;display:inline-flex;align-items:center;gap:8px}
+.device-shelf-titles{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.device-title{padding:12px 12px 8px;border-radius:16px;background:var(--color-canvas-soft);min-width:0}
+.device-title h3{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 6px;font-size:14px;color:var(--color-petal)}
+.device-title h3 small{font-size:11px;font-weight:500;color:var(--color-on-muted);flex:none}
+.device-title ol{margin:0;padding:0;list-style:none;display:grid;max-height:220px;overflow:auto}
+.device-title button{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:0 6px;border:0;border-radius:10px;background:none;color:var(--color-on-muted);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.device-title button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-title button:hover{background:color-mix(in srgb,var(--color-petal) 7%,transparent);color:var(--color-petal)}
+.device-shelf-player{position:relative;border-radius:18px;overflow:hidden}
+.device-shelf-player>.circle-button{position:absolute;z-index:5;top:10px;right:10px}
+.device-shelf-empty{margin:0;font-size:13px;color:var(--color-on-muted)}
+@media(max-width:640px){.device-shelf{padding:14px}.device-shelf-head{grid-template-columns:auto minmax(0,1fr)}.device-shelf-actions{grid-column:1/-1}}

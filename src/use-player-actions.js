@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
-export function saveBlob(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
+import {deliverFile} from './device-library.js';
+export function saveBlob(blob,name){return deliverFile(blob,name);}
 export default function usePlayerActions({videoRef,canvasRef,item,gpuActive}){
   const [notice,setNotice]=useState(''),[recording,setRecording]=useState(false),[clipSeconds,setClipSeconds]=useState(0);
   const recorder=useRef(null),timer=useRef(null),alive=useRef(true),noticeTimer=useRef(null);

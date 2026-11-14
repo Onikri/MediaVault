@@ -1,3 +1,4 @@
+import {deliverFile} from './device-library.js';
 // Saving a Collaps episode (to the device or to Google Drive) with the usual
 // server remux. Collaps' CDN refuses data-centre addresses (HTTP 410), so the
 // viewer's browser downloads the published HLS segments itself and uploads
@@ -90,7 +91,7 @@ export async function stageCollaps(service,url,{quality='best',name='',signal,on
 export function downloadExport(service,job){
  const url=new URL(job.downloadUrl,service.server);
  if(url.origin!==new URL(service.server).origin||!url.pathname.startsWith('/online/exports/file/'))throw Error('Сервер вернул некорректную ссылку сохранения.');
- const anchor=document.createElement('a');anchor.href=url.href;anchor.download=job.filename||'';anchor.rel='noreferrer';document.body.append(anchor);anchor.click();anchor.remove();
+ deliverFile(url.href,job.filename||'',{title:job.title||''});
  return {url:url.href,name:job.filename};
 }
 

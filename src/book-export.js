@@ -1,3 +1,4 @@
+import {deliverFile} from './device-library.js';
 // A ranobe or book saved as one file: EPUB 3 (chapters, table of contents,
 // cover) or plain text. Chapters come from the same server route the reader
 // uses, three at a time; a chapter that fails is retried, then named in the
@@ -52,6 +53,4 @@ export async function epubFile({title,authors=[],language='ru',source,descriptio
  return zip.generateAsync({type:'blob',mimeType:'application/epub+zip',compression:'DEFLATE'});
 }
 
-export function saveBlob(blob,name){
- const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-}
+export function saveBlob(blob,name,title=''){return deliverFile(blob,name,{title});}
