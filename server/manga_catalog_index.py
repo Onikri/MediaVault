@@ -7,6 +7,7 @@ information are stored, and no full-site crawling is triggered implicitly.
 import hashlib
 import json
 import re
+import threading
 import time
 import unicodedata
 from pathlib import Path
@@ -329,7 +330,22 @@ def reindex(conn,policy=None):
     return count
 
 
+def _visibility(policy):
+    # One policy snapshot per query: current() stats the policy file, and the
+    # facet query asks about every tag row of the index (millions of calls).
+    hosts={}
+    def visible(label,url):
+        host=hosts.get(url)
+        if host is None:
+            host=urlsplit(url or '').hostname or ''
+            if len(hosts)<500000:hosts[url]=host
+        return 1 if policy.key(label,host) else 0
+    return visible
+
 def tags(conn, *, provider='', source_id='', limit=100, q='', **filters):
+    policy=current()
+    conn.create_function('catalog_tag_visible',2,_visibility(policy))
+    conn.create_function('catalog_tag_label',1,policy.label)
     where,params = _conditions(provider=provider,source_id=source_id,**filters)
     where+=(' AND ' if where else ' WHERE ')+'catalog_tag_visible(g.original,t.source_url)=1'
     if q:
@@ -342,6 +358,41 @@ def tags(conn, *, provider='', source_id='', limit=100, q='', **filters):
                       [*params,min(500,max(1,int(limit)))]).fetchall()
     return {'tags':[{'type':kind,'key':key,'original':original,'originalLabels':json.loads(originals) if originals else [],'works':count}
                     for kind,key,original,count,originals in rows if clean_label(original)]}
+
+# Facets read every tag row of the whole index (about 12 s at 200k titles) under
+# the catalogue lock, while they change slowly. Keep each answer for thirty
+# minutes per filter set and tag policy; a stale answer is served at once while
+# one background refresh replaces it, so only a cold start waits.
+TAGS_TTL=1800
+_tag_cache={}
+_tag_guard=threading.Lock()
+_tag_refreshing=set()
+
+def cached_tags(conn, lock, *, ttl=TAGS_TTL, clock=time.monotonic, background=True, **kwargs):
+    key=(current().revision,json.dumps(kwargs,sort_keys=True,default=str))
+    def compute():
+        with lock:
+            value=tags(conn,**kwargs)
+        with _tag_guard:
+            _tag_cache[key]=(clock(),value)
+            while len(_tag_cache)>64:_tag_cache.pop(next(iter(_tag_cache)))
+            _tag_refreshing.discard(key)
+        return value
+    with _tag_guard:
+        hit=_tag_cache.get(key)
+        if hit and clock()-hit[0]<ttl:return hit[1]
+        refresh=hit is not None and key not in _tag_refreshing
+        if refresh:_tag_refreshing.add(key)
+    if hit is not None:
+        if refresh:
+            def run():
+                try:compute()
+                except Exception:
+                    with _tag_guard:_tag_refreshing.discard(key)
+            if background:threading.Thread(target=run,name='manga-tag-facets',daemon=True).start()
+            else:run()
+        return hit[1]
+    return compute()
 
 def stats(conn):
     total = conn.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]

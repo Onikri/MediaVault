@@ -668,10 +668,9 @@ def manga_catalog(q:str='',tag:str='',genre:str='',provider:str='',format:str=''
 @app.get('/manga/catalog/tags')
 def manga_catalog_tags(provider:str='',sourceId:str='',sourceIds:str='',language:str='all',q:str='',limit:int=500,subject=Depends(viewer)):
     from manga_discovery import manager
-    from manga_catalog_index import tags
+    from manga_catalog_index import cached_tags
     store=manager()
-    with store.lock:
-        return tags(store.db,provider=provider,source_id=sourceId,limit=limit,q=q,**manga_catalog_filters(language,'','',sourceIds))
+    return cached_tags(store.db,store.lock,provider=provider,source_id=sourceId,limit=limit,q=q,**manga_catalog_filters(language,'','',sourceIds))
 
 @app.get('/manga/catalog/stats')
 def manga_catalog_stats(subject=Depends(viewer)):
