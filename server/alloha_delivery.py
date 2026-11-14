@@ -154,6 +154,7 @@ class DeliverySession:
     aliases: dict = field(default_factory=dict)
     generation: int = 0
     refreshes: int = 0
+    refreshed_at: float = 0
     refresh_lock: object = field(default_factory=asyncio.Lock)
 
 
@@ -340,6 +341,8 @@ class AllohaDelivery:
             if cached:
                 self.log(session, cached[2], url, cached=True, elapsed_ms=round((self.clock()-started)*1000), bytes=len(cached[0]))
                 return cached
+            if session.cache_complete:
+                raise HTTPException(410, 'Кэш потока повреждён. Обновляем подключение.')
         if cache and kind != 'manifest' and not probe:
             cached = await cache_io(self.cache.get, url, byte_range)
             if cached:
@@ -397,6 +400,9 @@ class AllohaDelivery:
                 # existing serialized I/O. Neither path adds source bursts.
                 guard = session.prefetch_io if background and session.mode == 'bnsi' and session.cache_key else session.io_lock
                 generation = session.generation
+                if session.mode == 'bnsi' and session.cache_key and not session.cache_complete and session.refreshed_at and self.clock()-session.refreshed_at >= 1080:
+                    await self.refresh_http(session, generation)
+                    generation = session.generation
                 try:
                     async with guard:
                         self.session(session.sid)
@@ -487,6 +493,7 @@ class AllohaDelivery:
                     session.source, session.aliases = replacement, aliases
                     session.generation += 1
                     session.refreshes += 1
+                    session.refreshed_at = self.clock()
                     accepted = True
                     await old_source.close()
                     self.log(session, 200, session.iframe, reason='renewed-compatible-vod')
@@ -618,7 +625,8 @@ class AllohaDelivery:
             record = {'resources': resources, 'manifests': documents, 'root': root,
                       'quality': session.online_quality, 'active': session.active,
                       'active_id': session.active_id, 'translations': session.translations,
-                      'skip': session.skip, 'mode': session.mode, 'subtitles': subtitles}
+                      'skip': session.skip, 'mode': session.mode, 'subtitles': subtitles,
+                      'published_qualities': session.published_qualities}
             session.cache_complete = await cache_io(self.vod.complete, session.cache_key, record)
             if session.cache_complete and self.archive:
                 await cache_io(self.vod.pin, session.cache_key)
@@ -661,7 +669,7 @@ class AllohaDelivery:
                 owner=subject, mode=record['mode'], active=record['active'], active_id=record['active_id'],
                 translations=record['translations'], online_quality=record['quality'], skip=record['skip'],
                 cache_key=key, cache_complete=True, cache_started=True)
-            session.published_qualities = [int(record['quality'])]
+            session.published_qualities = record.get('published_qualities') or [int(record['quality'])]
             session.manifests = {url: (float('inf'), *data) for url, data in record['manifests'].items()}
             session.subtitles = [{'label': t['label'], 'lang': t['lang'],
                                   'src': self.register(session, t['url'], 'subtitle')}
@@ -827,6 +835,7 @@ class AllohaDelivery:
             if profile is not None:
                 self.profiles.ready(profile)
             session.expires = self.clock() + self.ttl
+            session.refreshed_at = self.clock()
             self.sessions[session.sid] = session
             return self.contract(session)
         except (SourceRefused, SourceInvalid) as error:

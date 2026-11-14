@@ -102,6 +102,7 @@ class VodCache:
                 meta = json.loads((folder/(name+'.json')).read_text())
                 raw = (folder/name).read_bytes()
                 if len(raw) != meta['size'] or hashlib.sha256(raw).hexdigest() != meta['sha256']:
+                    (folder/'complete.json').unlink(missing_ok=True)
                     return None
                 return raw, meta['headers'], meta['status'], meta['final']
             except (OSError, ValueError, KeyError):
