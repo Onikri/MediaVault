@@ -30,7 +30,7 @@ html[data-blossom] .mobile-dock{display:none}
  /* Content clears the dock; floating panels sit above it. */
  html[data-blossom] .app-shell>.app-main{padding-bottom:var(--dock-clear)!important}
  html[data-blossom] .cookie-notice{bottom:calc(var(--dock-h) + var(--dock-gap) + 10px)!important;right:10px;left:10px;width:auto}
- .retained-media-host[data-mode=popup]{bottom:calc(var(--dock-h) + var(--dock-gap) + 10px)!important;right:10px!important;width:min(380px,calc(100vw - 20px))!important}
+ .retained-media-host[data-mode=popup]{bottom:calc(var(--dock-h) + var(--dock-gap) + 10px)!important;right:10px!important;width:min(380px,calc(100vw - 20px));max-width:calc(100vw - 20px)}
  html[data-blossom] .app-footer{margin-bottom:0}
 }
 
@@ -100,4 +100,11 @@ html[data-blossom] .online-access .btn{border:0;background:var(--color-surface-r
  html[data-blossom] .library-sidebar .library-sidebar-filters{margin-top:0;padding:4px 6px 6px}
  html[data-blossom] .hero-stage.title-feature.title-showcase{padding-top:clamp(220px,30svh,300px)}
  html[data-blossom] .title-showcase .poster-actions{max-width:none}
+}
+
+/* The bottom dock already says where you are, so the phone top bar keeps only
+   the personal actions; a title page puts its way back in the freed corner. */
+@media(max-width:1000px){
+ html[data-blossom] .blossom-navbar .header-brand-area{display:none}
+ html[data-blossom] .blossom-navbar .header-inner,html[data-blossom] .blossom-navbar.is-scrolled .header-inner{justify-content:flex-end}
 }

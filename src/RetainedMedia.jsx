@@ -1,9 +1,11 @@
 import {createContext,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
-import {ArrowUpRight,BookOpen,History,Minimize2,Pause,PictureInPicture2,Play,Video,X} from 'lucide-react';
+import {AppWindow,ArrowUpRight,BookOpen,History,Minimize2,Pause,PictureInPicture2,Play,Video,X} from 'lucide-react';
+import {floatingWindowSupported,openFloatingWindow} from './floating-window.js';
 import {createRetainedMediaStore} from './retained-media-store.js';
 import './retained-media.css';
+const POPUP_WIDTH='mediavault_popup_width';
 const Workspace=createContext(null),Owner=createContext(null);
 export function useRetainedWorkspace(){return useContext(Workspace);}
 export function useRetainedMedia(active,descriptor,onStop){
@@ -43,9 +45,16 @@ function RetainedHost({row,store,popup,active}){
   };
   const schedule=()=>{if(!frame)frame=requestAnimationFrame(update);};update();const resize=new ResizeObserver(schedule);if(row.anchor)resize.observe(row.anchor);if(root.current)resize.observe(root.current);const mutate=new MutationObserver(schedule);if(root.current)mutate.observe(root.current,{subtree:true,attributes:true,attributeFilter:['class']});addEventListener('scroll',schedule,{passive:true});addEventListener('resize',schedule);return()=>{cancelAnimationFrame(frame);resize.disconnect();mutate.disconnect();removeEventListener('scroll',schedule);removeEventListener('resize',schedule);};
  },[row.anchor,mode]);
+ // The mini window keeps the width you drag it to, on this device.
+ const [popupWidth,setPopupWidth]=useState(()=>{try{return Number(localStorage.getItem(POPUP_WIDTH))||0;}catch{return 0;}});
+ function resize(event){event.preventDefault();const node=root.current;if(!node)return;const startX=event.clientX,startY=event.clientY,start=node.getBoundingClientRect().width;let width=start;
+  const move=e=>{const dx=startX-e.clientX,dy=(startY-e.clientY)*16/9;width=Math.round(Math.max(260,Math.min(innerWidth-24,start+Math.max(dx,dy))));node.style.width=width+'px';};
+  const up=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);setPopupWidth(width);try{localStorage.setItem(POPUP_WIDTH,String(width));}catch{}};
+  addEventListener('pointermove',move);addEventListener('pointerup',up);}
  function media(event){const v=event.target;if(!v.matches?.('video.mv-player-media'))return;if(event.type==='timeupdate'&&Math.abs((row.time||0)-v.currentTime)<1)return;const change={playing:!v.paused,time:v.currentTime,duration:Number.isFinite(v.duration)?v.duration:0};if(!row.preview&&v.readyState>=2)try{const canvas=document.createElement('canvas');canvas.width=160;canvas.height=90;canvas.getContext('2d').drawImage(v,0,0,160,90);change.preview=canvas.toDataURL('image/jpeg',.65);}catch{}store.media(row.id,change);}
- return <div ref={root} className="retained-media-host" data-mode={mode} data-session={row.id} style={mode==='attached'?box:undefined} inert={mode==='hidden'} aria-hidden={mode==='hidden'} onPlayCapture={media} onPauseCapture={media} onTimeUpdateCapture={media} onLoadedDataCapture={media}>
- {mode==='popup'&&<div className="retained-popup-heading"><strong>{row.label}</strong><button aria-label="Вернуться к просмотру на странице" onClick={()=>store.return(row.id)}><ArrowUpRight size={16}/></button><button aria-label="Свернуть мини-просмотр" title="Свернуть — продолжит в фоне" onClick={()=>store.popup(row.id)}><Minimize2 size={15}/></button><button className="is-close" aria-label={row.kind==='reader'?'Закрыть читалку':'Закрыть просмотр'} title="Закрыть" onClick={()=>store.close(row.id)}><X size={16}/></button></div>}
+ return <div ref={root} className="retained-media-host" data-mode={mode} data-session={row.id} style={mode==='attached'?box:mode==='popup'&&popupWidth?{width:Math.min(popupWidth,innerWidth-24)}:undefined} inert={mode==='hidden'} aria-hidden={mode==='hidden'} onPlayCapture={media} onPauseCapture={media} onTimeUpdateCapture={media} onLoadedDataCapture={media}>
+ {mode==='popup'&&<span className="retained-popup-resize" aria-hidden="true" title="Потяни, чтобы изменить размер" onPointerDown={resize}/>}
+ {mode==='popup'&&<div className="retained-popup-heading"><strong>{row.label}</strong>{row.kind!=='reader'&&floatingWindowSupported()&&<button aria-label="Окно поверх всех окон" title="Окно поверх всех окон" onClick={()=>openFloatingWindow(root.current,{title:row.label}).catch(()=>{})}><AppWindow size={15}/></button>}<button aria-label="Вернуться к просмотру на странице" onClick={()=>store.return(row.id)}><ArrowUpRight size={16}/></button><button aria-label="Свернуть мини-просмотр" title="Свернуть — продолжит в фоне" onClick={()=>store.popup(row.id)}><Minimize2 size={15}/></button><button className="is-close" aria-label={row.kind==='reader'?'Закрыть читалку':'Закрыть просмотр'} title="Закрыть" onClick={()=>store.close(row.id)}><X size={16}/></button></div>}
  <Owner.Provider value={owner}>{row.node}</Owner.Provider></div>;
 }
 export function VideoDock(){
@@ -70,7 +79,8 @@ function Dock({store}){
    {active.kind!=='reader'&&active.duration>0&&<div className="retained-progress" role="progressbar" aria-label="Прогресс просмотра" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress*100)}><span style={{transform:`scaleX(${progress})`}}/><small>{clock(active.time)}</small><small>{clock(active.duration)}</small></div>}
    <div className="retained-dock-actions">
     <button className="is-primary" onClick={()=>{store.return(active.id);setOpen(false);}}><ArrowUpRight size={16}/>{active.kind==='reader'?'Вернуться к чтению':'Вернуться к просмотру'}</button>
-    <button aria-label="Картинка в картинке" title="Картинка в картинке" onClick={()=>{store.popup(active.id);setOpen(false);}}><PictureInPicture2 size={17}/></button>
+    <button aria-label="Мини-окно на странице" title="Мини-окно на странице" onClick={()=>{store.popup(active.id);setOpen(false);}}><PictureInPicture2 size={17}/></button>
+    {active.kind!=='reader'&&floatingWindowSupported()&&<button aria-label="Окно поверх всех окон" title="Окно поверх всех окон" onClick={()=>{openFloatingWindow(active.host,{title:active.label}).catch(()=>{});setOpen(false);}}><AppWindow size={17}/></button>}
     <button className="is-close" aria-label={active.kind==='reader'?'Закрыть читалку':'Закрыть просмотр'} title="Закрыть" onClick={()=>{store.close(active.id);setOpen(false);}}><X size={17}/></button>
    </div>
   </div>}

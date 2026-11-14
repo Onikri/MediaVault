@@ -41,6 +41,10 @@ function coordinates(){
 function Highlight({text,query}:{text:string,query:string}){const at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;return at<0?<>{text}</>:<>{text.slice(0,at)}<strong>{text.slice(at,at+query.length)}</strong>{text.slice(at+query.length)}</>;}
 export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,onClose:()=>void,onChoose:(item:any)=>void,onBrowse:(query:string,kind:string,filters?:{year:string,genre:string})=>void}){
  const reduce=useReducedMotion(),[geometry,setGeometry]=useState(coordinates),id=useId();
+ // Phones and tablets search from the dock: the sheet grows out of the round
+ // search button at the bottom and folds back into it.
+ const [sheet]=useState(()=>typeof matchMedia==='function'&&matchMedia('(max-width:1000px)').matches),[shown,setShown]=useState(false);
+ useEffect(()=>{if(!sheet)return;const frame=requestAnimationFrame(()=>requestAnimationFrame(()=>setShown(true)));return()=>cancelAnimationFrame(frame);},[sheet]);
  const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[year,setYear]=useState(''),[genre,setGenre]=useState(''),[composing,setComposing]=useState(false),[closing,setClosing]=useState(false);
  const [chips,setChips]=useState<string[]>([]),[marked,setMarked]=useState<string|null>(null),[activeId,setActiveId]=useState<string|null>(null),[rowCursor,setRowCursor]=useState(0),[panelFloor,setPanelFloor]=useState(0);
  const [recents,setRecents]=useState<string[]>(()=>{try{const saved=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(saved)?saved.filter((v):v is string=>typeof v==='string').slice(0,5):[];}catch{return[];}});
@@ -86,10 +90,10 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
   if(event.key==='Backspace'&&event.currentTarget.selectionStart===0&&event.currentTarget.selectionEnd===0&&!query&&chips.length){event.preventDefault();const last=chips.at(-1)!;if(marked===last)removeChip(last);else setMarked(last);return;}
   if(event.key==='ArrowLeft'&&event.currentTarget.selectionStart===0&&!query&&chips.length){event.preventDefault();setMarked(chips.at(-1)!);}
  };
- return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')} style={{position:document.querySelector('.blossom-navbar .header-inner')?'absolute':'fixed',top:geometry.top,left:geometry.left,width:geometry.width}} initial={false}>
+ return createPortal(<motion.div role="dialog" aria-label="Поиск в библиотеке" aria-modal="false" aria-describedby={id+'-help'} className={'blossom-search-dialog morph-search-dialog'+(closing?' is-closing':'')+(sheet?' is-sheet':'')+(sheet&&shown&&!closing?' is-shown':'')} style={sheet?undefined:{position:document.querySelector('.blossom-navbar .header-inner')?'absolute':'fixed',top:geometry.top,left:geometry.left,width:geometry.width}} initial={false}>
   <motion.div className="morph-search-bar" onPointerDown={focusField}
-   initial={reduce?false:{width:geometry.seedWidth,height:38,x:geometry.anchorX}}
-   animate={{width:closing?geometry.seedWidth:geometry.width,height:38,borderRadius:19,x:closing?geometry.anchorX:0}}
+   initial={reduce||sheet?false:{width:geometry.seedWidth,height:38,x:geometry.anchorX}}
+   animate={sheet?{width:'100%',height:46,borderRadius:23,x:0}:{width:closing?geometry.seedWidth:geometry.width,height:38,borderRadius:19,x:closing?geometry.anchorX:0}}
    transition={{duration:reduce?0:.32,ease:[.22,1,.36,1]}} onAnimationComplete={()=>{if(closing&&!finished.current){finished.current=true;onClose();}}}>
    <motion.span className="morph-search-icon" aria-hidden="true" initial={reduce?false:{left:10}} animate={{left:closing?10:16}} transition={{duration:reduce?0:.32,ease:[.22,1,.36,1]}}><Search size={18}/></motion.span>
    <div className="morph-search-chips">
@@ -144,5 +148,5 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
     </motion.div>
    </motion.div>}
   </AnimatePresence>
- </motion.div>,document.querySelector('.blossom-navbar .header-inner')||document.body);
+ </motion.div>,(!sheet&&document.querySelector('.blossom-navbar .header-inner'))||document.body);
 }

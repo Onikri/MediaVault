@@ -335,6 +335,5 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   {!playing&&episodeBrowser}
   {!browsingCatalog&&error&&!voiceSwitch&&<div className="inline-error" role="alert">{error}<button className="text-link" onClick={()=>{failed.current.clear();setAttempt(n=>n+1);}}>Повторить</button>{alternativeActions}</div>}
   {!browsingCatalog&&!locked&&discovery.error&&<p className="fine">{discovery.error}<button className="text-link" onClick={discovery.retry}>Повторить поиск</button></p>}
-  {!!saved.current.usage&&<p className="watch-personal-note">«Твой выбор» — история просмотров на этом устройстве.</p>}
  </div>;
 }

@@ -24,3 +24,23 @@ html[data-blossom] .soundtrack-tracks>.song-row{display:grid;grid-template-colum
 
 .title-summary-more{order:3;font-size:11px;margin:0 0 5px}.title-summary-dialog{max-width:650px;max-height:85svh;overflow:auto}.title-summary-dialog .entity-biography{white-space:pre-line;line-height:1.8}
 .trailer-dialog{position:fixed;z-index:160;left:50%;top:50%;transform:translate(-50%,-50%);outline:none}
+
+/* Stills mosaic: a 2×2 lead frame, then even tiles. */
+.gallery-mosaic{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:auto;gap:8px}
+.gallery-mosaic>button{position:relative;display:block;min-width:0;aspect-ratio:16/9;padding:0;border:0;border-radius:14px;overflow:hidden;background:var(--color-canvas-soft);cursor:zoom-in}
+.gallery-mosaic>button:first-child{grid-column:span 2;grid-row:span 2;aspect-ratio:auto;border-radius:20px}
+.gallery-mosaic>button img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s cubic-bezier(.22,1,.36,1),filter .3s}
+.gallery-mosaic>button:hover img{transform:scale(1.05)}
+.gallery-mosaic>button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
+.gallery-mosaic-more{position:absolute;inset:0;display:grid;place-items:center;background:rgb(0 0 0 / .55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;font:800 22px var(--font-display,inherit)}
+.gallery-mosaic.is-pages>button{aspect-ratio:3/4}
+.gallery-mosaic.is-pages{grid-template-columns:repeat(6,minmax(0,1fr))}
+.gallery-mosaic.is-pages>button:first-child{grid-column:span 2;grid-row:span 2}
+@media(max-width:640px){
+ .gallery-mosaic,.gallery-mosaic.is-pages{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+ .gallery-mosaic>button:first-child{grid-row:auto;aspect-ratio:16/9}
+ .gallery-mosaic.is-pages>button:first-child{aspect-ratio:3/4;grid-column:span 1}
+ .gallery-mosaic>button:nth-child(n+6){display:none}
+ .gallery-mosaic>button:nth-child(5){position:relative}
+}
+@media(prefers-reduced-motion:reduce){.gallery-mosaic>button img{transition:none}}

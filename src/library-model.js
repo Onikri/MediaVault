@@ -1,10 +1,10 @@
 // Reading format (category) and library section are separate: an EPUB may be
 // either a book or a light novel, and a title can also contain its cover image.
 import {importedProfile} from './title-metadata.js';
-export const SECTION_LABELS={anime:'Аниме',manga:'Манга',ranobe:'Ранобэ',book:'Книги',music:'Музыка',video:'Видео',image:'Фото'};
-export const SECTION_FORMAT={anime:'video',manga:'manga',ranobe:'book',book:'book',music:'audio',video:'video',image:'image'};
+export const SECTION_LABELS={anime:'Аниме',manga:'Манга',ranobe:'Ранобэ',book:'Книги',music:'Музыка',movie:'Фильмы',tv:'Сериалы',video:'Видео',image:'Фото'};
+export const SECTION_FORMAT={anime:'video',manga:'manga',ranobe:'book',book:'book',music:'audio',movie:'video',tv:'video',video:'video',image:'image'};
 const DEFAULT_SECTION={video:'video',audio:'music',manga:'manga',book:'book',image:'image'};
-const ALIASES={anime:'anime','аниме':'anime',manga:'manga','манга':'manga',ranobe:'ranobe','ранобэ':'ranobe','ранобе':'ranobe',books:'book','книги':'book',music:'music','музыка':'music',video:'video','видео':'video',images:'image','фото':'image'};
+const ALIASES={anime:'anime','аниме':'anime',movie:'movie',movies:'movie','фильмы':'movie','фильм':'movie',tv:'tv','сериалы':'tv','сериал':'tv',manga:'manga','манга':'manga',ranobe:'ranobe','ранобэ':'ranobe','ранобе':'ranobe',books:'book','книги':'book',music:'music','музыка':'music',video:'video','видео':'video',images:'image','фото':'image'};
 export const normalizedName=value=>String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ');
 export const sameName=(a,b)=>normalizedName(a).toLocaleLowerCase('ru')===normalizedName(b).toLocaleLowerCase('ru');
 export const sectionForItem=item=>SECTION_LABELS[item.section]?item.section:

@@ -1,3 +1,4 @@
+import {useState} from 'react';
 import {ArrowUpRight} from 'lucide-react';
 import {plural} from './title-context.js';
 import {ratingColors} from './PlatformRatings.jsx';
@@ -6,6 +7,8 @@ import './title-passport.css';
 
 import {passportVolume,whole} from './title-passport-model.js';
 export {runtime} from './title-passport-model.js';
+// Shikimori's own words for each step of the ten-point scale.
+const RATE_WORDS=['','Хуже некуда','Ужасно','Очень плохо','Плохо','Более-менее','Нормально','Хорошо','Очень хорошо','Великолепно','Шедевр'];
 const format=value=>new Intl.NumberFormat(uiLocale(),{maximumFractionDigits:1}).format(value);
 const compact=value=>new Intl.NumberFormat(uiLocale(),{notation:'compact',maximumFractionDigits:1}).format(value);
 
@@ -41,8 +44,17 @@ export default function TitlePassport({kind,profile:p,stats,ratings,extraScores=
   </li>)}</ul>}
   {ratings?.loading&&!scores.length&&<p className="passport-note" role="status">Сверяем оценки платформ…</p>}
   {rows.length>0&&<dl className="passport-facts">{rows.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{factValue(label,value)}</dd></div>)}</dl>}
-  {onRate&&<div className="passport-rate"><p>Твоя оценка{ownRating?<> <b>{ownRating} из 10</b></>:null}</p>
-   <div role="group" aria-label="Оценить произведение">{Array.from({length:10},(_,i)=><button type="button" key={i} aria-label={'Оценка '+(i+1)} aria-pressed={ownRating===i+1} data-filled={ownRating>i||undefined} disabled={rateDisabled} onClick={()=>onRate(i+1)}/>)}</div>
-   {rateNote&&<small>{rateNote}</small>}</div>}
+  {onRate&&<OwnRating value={ownRating} onRate={onRate} disabled={rateDisabled}/>}
+  {onRate&&rateNote&&<small className="passport-rate-note">{rateNote}</small>}
  </section>;
+}
+
+// Your score: ten numbered steps that fill up to the pointer, with the score
+// and its word shown large beside the label.
+function OwnRating({value,onRate,disabled}){
+ const [hover,setHover]=useState(0),shown=hover||value;
+ return <div className={'passport-rate'+(hover?' is-previewing':'')}>
+  <div className="passport-rate-head"><span>Твоя оценка</span><output aria-live="polite">{shown?<><b>{shown}</b><small>{RATE_WORDS[shown]}</small></>:<small>Нажми на число</small>}</output></div>
+  <div role="group" aria-label="Оценить произведение" onPointerLeave={()=>setHover(0)}>{Array.from({length:10},(_,i)=><button type="button" key={i} aria-label={'Оценка '+(i+1)+', '+RATE_WORDS[i+1]} aria-pressed={value===i+1} data-filled={shown>i||undefined} style={{'--step':i}} disabled={disabled} onPointerEnter={event=>{if(event.pointerType==='mouse')setHover(i+1);}} onFocus={()=>setHover(i+1)} onBlur={()=>setHover(0)} onClick={()=>onRate(i+1)}>{i+1}</button>)}</div>
+ </div>;
 }

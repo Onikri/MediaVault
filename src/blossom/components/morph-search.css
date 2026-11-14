@@ -137,3 +137,16 @@ html[data-blossom] .morph-search-bar>.morph-search-icon{position:absolute;left:1
 html[data-blossom] .is-closing .morph-search-bar{padding:0}
 html[data-blossom] .morph-search-bar>:not(.morph-search-icon){transition:opacity .12s}
 html[data-blossom] .is-closing .morph-search-bar>:not(.morph-search-icon){opacity:0;pointer-events:none}
+
+/* Dock search: a bottom sheet that opens out of the round search button
+   (centre of the dock) and closes back into it. The field sits at thumb
+   height; suggestions and results stack above it. */
+@media(max-width:1000px){
+ html[data-blossom] .blossom-search-dialog.morph-search-dialog.is-sheet{position:fixed;top:auto;left:10px;right:10px;bottom:var(--dock-gap,10px);width:auto;max-width:none;max-height:none;translate:none;display:flex;flex-direction:column-reverse;gap:8px;background:transparent;box-shadow:none;border-radius:28px;
+  clip-path:circle(26px at 50% calc(100% - 33px));transition:clip-path .48s cubic-bezier(.22,1,.36,1)}
+ html[data-blossom] .blossom-search-dialog.morph-search-dialog.is-sheet.is-shown{clip-path:circle(160% at 50% calc(100% - 33px))}
+ html[data-blossom] .blossom-search-dialog.is-sheet .morph-search-bar{min-height:46px;margin:10px 0;background:var(--color-canvas-soft);box-shadow:0 0 0 1px color-mix(in srgb,var(--color-petal) 8%,transparent);-webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4)}
+ html[data-blossom] .is-sheet .morph-search-bar input{height:46px;font-size:16px}
+ html[data-blossom] .blossom-search-dialog.is-sheet .morph-search-panel{position:relative;inset:auto;margin:0;background:color-mix(in srgb,var(--color-canvas-soft) 97%,transparent);max-height:calc(100dvh - var(--dock-gap,10px) - 90px - env(safe-area-inset-top));overflow:auto}
+}
+@media(max-width:1000px) and (prefers-reduced-motion:reduce){html[data-blossom] .blossom-search-dialog.morph-search-dialog.is-sheet{transition:none}}

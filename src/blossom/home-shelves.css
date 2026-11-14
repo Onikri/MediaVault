@@ -1,0 +1,49 @@
+/* Home below the showcase: shelves of different shapes, so the page reads as
+   "what is airing now" (wide stills with the latest episode) and "what everyone
+   watches" (a ranked ten), not two identical poster strips. */
+.home-shelf{margin:clamp(34px,5vw,64px) 0 0;min-width:0}
+.home-shelf-head{display:flex;align-items:baseline;gap:14px;margin-bottom:16px}
+.home-shelf-head h2{margin:0;font-size:clamp(24px,2.6vw,36px);letter-spacing:-.025em;line-height:1.05;color:var(--color-petal)}
+.home-shelf-head>span{font-size:13px;color:var(--color-on-muted)}
+.home-shelf-head .text-link{margin-left:auto;display:inline-flex;align-items:center;gap:2px;font-size:13px}
+.home-airing-track,.home-top-track{display:grid;grid-auto-flow:column;gap:14px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;padding:4px 2px 10px;margin:0;list-style:none}
+.home-airing-track::-webkit-scrollbar,.home-top-track::-webkit-scrollbar{display:none}
+.home-airing-track{grid-auto-columns:clamp(260px,28vw,420px)}
+.home-airing-card{position:relative;display:grid;gap:10px;padding:0;border:0;background:none;color:inherit;text-align:left;cursor:pointer;scroll-snap-align:start}
+.home-airing-art{position:relative;display:block;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:var(--color-canvas-soft)}
+.home-airing-art img,.home-airing-art .anime-cover img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s cubic-bezier(.22,1,.36,1)}
+.home-airing-art .anime-cover{display:block;height:100%}
+.home-airing-card:hover .home-airing-art img{transform:scale(1.04)}
+.home-airing-copy{display:grid;gap:3px;min-width:0;padding:0 4px}
+.home-airing-copy strong{font-size:15px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-petal)}
+.home-airing-copy small{font-size:12px;color:var(--color-blossom-light,var(--color-blossom));font-weight:650}
+.home-top-track{grid-auto-columns:clamp(200px,18vw,260px);gap:10px;counter-reset:none}
+.home-top-track li{min-width:0;scroll-snap-align:start}
+.home-top-track button{position:relative;display:grid;grid-template-columns:34% minmax(0,1fr);grid-template-rows:auto auto;align-items:end;width:100%;padding:0;border:0;background:none;color:inherit;text-align:left;cursor:pointer}
+.home-top-rank{grid-row:1;grid-column:1;justify-self:end;align-self:end;margin-right:-14px;font:900 clamp(92px,8.4vw,140px)/.76 var(--font-display,inherit);letter-spacing:-.09em;color:color-mix(in srgb,var(--color-petal) 30%,transparent);-webkit-text-stroke:0;z-index:0;transition:color .3s}
+.home-top-track button:hover .home-top-rank{color:color-mix(in srgb,var(--color-blossom) 60%,transparent)}
+.home-top-poster{position:relative;z-index:1;grid-row:1;grid-column:2;display:block;aspect-ratio:2/3;border-radius:14px;overflow:hidden;background:var(--color-canvas-soft);box-shadow:-14px 0 28px -16px rgb(0 0 0/.8)}
+.home-top-poster img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s cubic-bezier(.22,1,.36,1)}
+.home-top-track button:hover .home-top-poster img{transform:scale(1.04)}
+.home-top-copy{grid-row:2;grid-column:2;display:grid;gap:2px;padding:9px 2px 0;min-width:0}
+.home-top-copy strong{font-size:13px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-petal)}
+.home-top-copy small{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--color-on-muted)}
+.home-top-copy small svg{color:#f5b301}
+.home-airing-card:focus-visible,.home-top-track button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:3px;border-radius:18px}
+@media(max-width:640px){
+ .home-airing-track{grid-auto-columns:78vw;gap:10px}
+ .home-top-track{grid-auto-columns:58vw}
+ .home-top-rank{font-size:86px;margin-right:-10px}
+}
+@media(prefers-reduced-motion:reduce){.home-airing-art img,.home-top-poster img,.home-top-rank{transition:none}}
+
+/* Sections: one row of tiles, each with the kind's own icon (the same one the
+   browser tab shows). */
+html[data-blossom] nav.home-sections{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;padding:clamp(34px,5vw,60px) 0 10px}
+html[data-blossom] nav.home-sections>button{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:18px;min-height:112px;padding:14px;border:0;border-radius:20px;background:color-mix(in srgb,var(--color-petal) 5%,transparent);color:var(--color-petal);font:700 15px var(--font-display,inherit);text-align:left;cursor:pointer;transition:background .25s,transform .25s cubic-bezier(.22,1,.36,1)}
+html[data-blossom] nav.home-sections>button img{border-radius:10px;transition:transform .35s cubic-bezier(.22,1,.36,1)}
+html[data-blossom] nav.home-sections>button:hover{background:color-mix(in srgb,var(--color-blossom) 16%,transparent);transform:translateY(-2px)}
+html[data-blossom] nav.home-sections>button:hover img{transform:rotate(-6deg) scale(1.06)}
+html[data-blossom] nav.home-sections>button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
+@media(max-width:640px){html[data-blossom] nav.home-sections{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}html[data-blossom] nav.home-sections>button{min-height:88px;padding:10px;gap:10px;font-size:12px;border-radius:16px}html[data-blossom] nav.home-sections>button img{width:28px;height:28px}}
+@media(prefers-reduced-motion:reduce){html[data-blossom] nav.home-sections>button,html[data-blossom] nav.home-sections>button img{transition:none}}
