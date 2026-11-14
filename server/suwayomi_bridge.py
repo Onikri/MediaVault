@@ -296,6 +296,9 @@ def inspect(value):
         episodes=[]
         for row in chapters[:1500]:
             number=row.get('chapterNumber');index=row.get('index')
+            # Tachiyomi uses -1 for an unnumbered chapter (e.g. an entire comic
+            # issue). Keep its stable source index and supplied name for reading.
+            if number is None or number==-1:number=index
             if not isinstance(number,(int,float)) or not 0<=number<=9999 or not isinstance(index,int) or index<1:continue
             volume=re.search(r'(?:Том|Vol\.?|Volume)\s*(\d+)',row.get('name',''),re.I)
             episodes.append({'number':number,'season':int(volume[1]) if volume else 1,'url':reference(manga,index),'title':row.get('name') or 'Глава '+str(number),'language':lang,'translator':row.get('scanlator') or ''})
