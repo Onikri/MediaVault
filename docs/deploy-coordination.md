@@ -70,3 +70,24 @@ rules keep one of us from silently undoing the other.
   image was tested with removal of only the new custom-function indexes.
 - No source crawl was restarted. This release classifies existing and incoming
   catalogue records; it does not assert full coverage of every upstream website.
+
+## Catalogue and Hanime recovery release — 2026-11-14
+
+- Deployed `mediavault-importer:recovery-654cf86742ba`, main revision
+  `654cf86742ba14294ee602324a8ac1c3da5f4560`, derived from the running
+  `hentai-ad6a9446341b` image under the shared lock. Backup:
+  `/opt/mediavault-backups/recovery-r2-654cf86742ba-20261114T210331Z`.
+- The first attempt rolled back on an overly strict queue-ID assertion. The
+  indexer legitimately deletes completed detail jobs. Verification now permits
+  this only when that exact source row has a persisted inspection timestamp
+  after restart; missing unfinished jobs and cursor resets still fail the check.
+  The second attempt retained unfinished work and verified three completed jobs.
+  Private settings/key/policy/environment and all 168 server sources were checked.
+- Live `/online` checks passed for both Hitou Meguri Kakure Yu - Mao Hen episodes:
+  preparation 200, fragments 206 with video/mp2t and Range, 16-byte AES keys and
+  valid MPEG-TS sync after a 2-KB decrypted probe. No video was rendered or saved.
+  Catalogue browsing, Naruto and White Whale searches returned data successfully.
+- The site build/deploy passed (43640427567), as did full PR #55 CI (43639743001).
+  New UI contracts cover stable 28-card paging at 1798px, retained indexed cards
+  across outages, bounded retries and stale-error clearing. Alloha and Hentai
+  source-genre matching remain enabled; the catalogue queue continues.
