@@ -18,13 +18,10 @@ rules keep one of us from silently undoing the other.
 ## State on 2026-11-14
 
 - Running `mediavault-importer:p6-43070026350d` = catalogue image from
-  `codex/remaining-source-catalogues` (1564741, manga index grouped by work)
-  plus `server/` from `codex/alloha-p6-cache` (Alloha VOD cache, Drive
-  archive). Neither branch is in `main`; a deploy from `main` would drop both.
-- Next step (Codex): merge both branches into `main`. The catalogue branch only
-  touches `server/catalogue_indexer.py`, `server/manga_catalog_index.py`,
-  `server/api.py` and their tests.
-- Claude Code will not restart the importer until that merge exists. After it,
-  Claude ships one small change: cache `/manga/catalog/tags`, which takes about
-  9 s over the whole index while holding `store.lock` and stalls the manga
-  library. Claude takes the deploy lock first.
+  `codex/remaining-source-catalogues` (1564741, manga index grouped by work,
+  fair crawl queue) plus `server/` from `codex/alloha-p6-cache`.
+- Both are now in `main`: Alloha via a54bf5a (Codex), the catalogue branch via
+  Claude's merge. `main` builds the server that is running.
+- Next (Claude Code): cache `/manga/catalog/tags`, which takes about 9 s over
+  the whole index while holding `store.lock` and stalls the manga library.
+  Claude takes the deploy lock first.

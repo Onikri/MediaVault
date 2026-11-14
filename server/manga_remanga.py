@@ -64,14 +64,15 @@ def labels(values):
 
 def card(row):
     directory = row.get('dir')
-    if not isinstance(directory, str) or not directory.strip() or not row.get('main_name'):
+    titles=names(row)
+    if not isinstance(directory, str) or not directory.strip() or not titles:
         return None
     url = title_url(directory)
     cover = (row.get('cover') or {}) if isinstance(row.get('cover'), dict) else {}
     adult = bool(row.get('is_erotic') or row.get('is_yaoi'))
     return {'id': 'remanga:' + str(row.get('id') or directory), 'provider': 'remanga', 'providerName': 'ReManga',
             'sourceId': SOURCE['id'], 'sourceOnly': True, 'url': url, 'sourceUrl': url, 'sourceURL': url,
-            'title': clean(row['main_name']), 'aliases': names(row), 'kind': 'manga', 'format': kind(row),
+            'title': titles[0], 'aliases': titles, 'kind': 'manga', 'format': kind(row),
             'language': 'ru', 'year': row.get('issue_year') if isinstance(row.get('issue_year'), int) else None,
             'cover': media(cover.get('mid') or cover.get('high') or cover.get('low')), 'ids': {},
             'adult': adult, **({'age': 18} if adult else {}),
@@ -95,7 +96,11 @@ def catalogue_page(page, http, genre=None, category=None):
     if category:
         params['categories'] = category
     data = api('/api/v2/search/catalog/', http, **params)
+    if not isinstance(data.get('results'),list) or 'next' not in data:
+        raise SourceError('ReManga не предоставил пагинацию каталога.')
     rows = [value for row in data.get('results') or [] if isinstance(row, dict) and (value := card(row))]
+    if len(rows)!=len(data['results']) or not rows and (page==1 or data.get('next')):
+        raise SourceError('ReManga вернул неполную страницу каталога.')
     return {'rows': rows, 'next': {'page': page + 1} if data.get('next') and rows else None}
 
 
