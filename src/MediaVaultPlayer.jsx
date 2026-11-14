@@ -24,6 +24,7 @@ import {Row,Switch,Choices,Segmented,Slider,Note,Group} from './player-sheet-con
 import {diagnoseVideoFailure} from './playback-diagnostics.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 import {contiguousBufferEnd} from './watch-quality.js';
+import {createTimelineScrub} from './timeline-scrub.js';
 import {useEffect,useImperativeHandle,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {isShortEpisodeClip} from './watch-session.js';
 import usePlayerController from './player-controller.js';
@@ -57,20 +58,28 @@ const COLOR_PRESETS=[['Оригинал',1,1,1,0,0],['Сочнее',1.18,1.06,1.
 const sameColor=(colors,p)=>(colors.saturation??1)===p[1]&&(colors.contrast??1)===p[2]&&(colors.brightness??1)===p[3]&&(colors.temperature??0)===p[4]&&(colors.tint??0)===p[5];
 
 // The one loud element: a map of the episode (opening, ending) filled with the scene colour.
-function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type,segments,chapters=[],feedback,onSeek,hoverSeek,setHoverSeek,seekTimer}){
+function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type,segments,chapters=[],feedback,onSeek,hoverSeek,setHoverSeek,seekTimer,deferSeek=false}){
   const [hover,setHover]=useState(null);
+  const [drag,setDrag]=useState(null),seekRef=useRef(onSeek),scrub=useRef(null);seekRef.current=onSeek;
+  if(!scrub.current)scrub.current=createTimelineScrub(value=>seekRef.current(value));
+  useEffect(()=>{scrub.current.cancel();setDrag(null);},[source,deferSeek]);
+  const displayTime=drag??time;
   // Scenes cut the track into pieces; the piece under the pointer lifts and glides to the next one.
   const scenes=seekable&&chapters.length>1?chapterSpans(chapters,duration):[];
   const sceneAt=point=>scenes.find(s=>point>=s.start&&point<s.end);
   // One set of cuts: opening/ending edges plus scene starts outside them.
   // A scene cut on (or inside) an opening would draw a second line beside its edge.
   const near=Math.max(2,duration*.006),cuts=seekable?[...segments.flatMap(s=>[s.start,s.end]).filter(p=>p>near&&p<duration-near),...scenes.slice(1).map(s=>s.start).filter(p=>!segments.some(seg=>p>=seg.start-near&&p<=seg.end+near))].sort((a,b)=>a-b).filter((p,i,list)=>!i||p-list[i-1]>near):[];
-  const progress=seekable?Math.min(100,time/duration*100):0;
+  const progress=seekable?Math.min(100,displayTime/duration*100):0;
   const loaded=Math.max(progress,seekable?buffered/duration*100:0);
-  function seekAtPointer(event){
+  function seekAtPointer(event,phase='move'){
     const node=event.currentTarget;if(node.disabled||!seekable)return;
     const bounds=node.getBoundingClientRect();event.preventDefault();event.stopPropagation();
-    onSeek(Math.max(0,Math.min(1,(event.clientX-bounds.left)/bounds.width))*duration);
+    const point=Math.max(0,Math.min(1,(event.clientX-bounds.left)/bounds.width))*duration;
+    if(!deferSeek){onSeek(point);return;}
+    if(phase==='begin')setDrag(scrub.current.begin(point));
+    else if(phase==='end'){scrub.current.end(point);setDrag(null);}
+    else if(scrub.current.active)setDrag(scrub.current.move(point));
   }
   function move(event){
     if(!seekable)return;
@@ -83,7 +92,7 @@ function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type
     seekTimer.current=setTimeout(()=>setHoverSeek(value),200);
   }
   function leave(){clearTimeout(seekTimer.current);setHover(null);setHoverSeek(null);}
-  const bubble=feedback?.type==='seek'?{left:progress,time,delta:feedback.delta,scene:sceneAt(time)&&{title:sceneAt(time).title}}:hover;
+  const bubble=drag!=null?{left:progress,time:drag,scene:sceneAt(drag)&&{title:sceneAt(drag).title}}:feedback?.type==='seek'?{left:progress,time,delta:feedback.delta,scene:sceneAt(time)&&{title:sceneAt(time).title}}:hover;
   return <div className={'mvx-timeline'+(hover?' is-hovered':'')} onPointerMove={move} onPointerLeave={leave} onPointerCancel={leave}>
     {hoverSeek&&<TimelinePreview source={source} type={type} point={hoverSeek.time} left={hoverSeek.left}/>}
     {bubble&&(bubble.scene?<output className="mvx-timeline-bubble has-scene" style={{left:Math.max(8,Math.min(92,bubble.left))+'%'}}>
@@ -102,11 +111,12 @@ function Timeline({timeline,duration,time,buffered,seekable,disabled,source,type
     </div>
     <i className="mvx-thumb" style={{left:progress+'%'}} aria-hidden="true"/>
     <input ref={timeline} aria-label="Перемотка видео" type="range" min="0" max={seekable?duration:1} step="0.1"
-      value={Math.min(time,seekable?duration:1)} disabled={!seekable||disabled}
-      onPointerDown={event=>{if(event.button===0&&!event.currentTarget.disabled){event.currentTarget.setPointerCapture(event.pointerId);seekAtPointer(event);}}}
+      value={Math.min(displayTime,seekable?duration:1)} disabled={!seekable||disabled}
+      onPointerDown={event=>{if(event.button===0&&!event.currentTarget.disabled){event.currentTarget.setPointerCapture(event.pointerId);seekAtPointer(event,'begin');}}}
       onPointerMove={event=>{if(event.currentTarget.hasPointerCapture(event.pointerId))seekAtPointer(event);}}
-      onPointerUp={event=>{if(event.currentTarget.hasPointerCapture(event.pointerId)){seekAtPointer(event);event.currentTarget.releasePointerCapture(event.pointerId);}}}
-      onChange={event=>onSeek(Number(event.target.value))}/>
+      onPointerUp={event=>{if(event.currentTarget.hasPointerCapture(event.pointerId)){seekAtPointer(event,'end');event.currentTarget.releasePointerCapture(event.pointerId);}}}
+      onPointerCancel={()=>{scrub.current.cancel();setDrag(null);leave();}}
+      onChange={event=>deferSeek?scrub.current.change(Number(event.target.value)):onSeek(Number(event.target.value))}/>
   </div>;
 }
 
@@ -518,7 +528,7 @@ export default function MediaVaultPlayer({item,source,catalog,libraryId,userId,m
       {gpuActive&&<span className="mvx-gpu-tag"><Sparkles size={12}/>{engineName}{engine==='mobile'||engine==='lanczos'||String(engine).startsWith('fsr')?'':' ×2'}{neuralStats&&<span>{neuralStats.fps} кадр/с</span>}</span>}
       {busy&&<div className="mvx-loading" role="status"><span className="mvx-spinner"/>Готовим видео</div>}
       <div className="mvx-console" onPointerEnter={revealControls}>
-        <Timeline timeline={timeline} duration={duration} time={previewTime} buffered={buffered} seekable={seekable} disabled={!!roomControl&&!roomControl.canControl} source={source} type={item.onlineType} segments={segments} chapters={visibleChapters} feedback={gestures.feedback} onSeek={seek} hoverSeek={hoverSeek} setHoverSeek={setHoverSeek} seekTimer={seekTimer}/>
+        <Timeline deferSeek={!!onlineControls?.alloha} timeline={timeline} duration={duration} time={previewTime} buffered={buffered} seekable={seekable} disabled={!!roomControl&&!roomControl.canControl} source={source} type={item.onlineType} segments={segments} chapters={visibleChapters} feedback={gestures.feedback} onSeek={seek} hoverSeek={hoverSeek} setHoverSeek={setHoverSeek} seekTimer={seekTimer}/>
         <div className="mvx-controls">
           <div className="mvx-group-left">
             <button type="button" className="mvx-play" aria-label={playing?'Пауза':'Воспроизвести'} onClick={toggle} disabled={!source}>{playing?<Pause size={22} fill="currentColor" strokeWidth={0}/>:<Play size={22} fill="currentColor" strokeWidth={0}/>}</button>

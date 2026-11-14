@@ -1,6 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {onlineClientId,keepOnlineLease} from '../src/online-lease.js';
+import {allohaMode,setAllohaMode,allohaRequest} from '../src/alloha-connector.js';
+
+test('new devices use the native server P6 session, retaining an explicit direct preference',()=>{
+ const previous=globalThis.localStorage,values=new Map();
+ globalThis.localStorage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
+ try{
+  assert.equal(allohaMode(),'browser');
+  const request=allohaRequest('/online/prepare',{body:{kind:'video',url:'https://alloha.yani.tv/?example=1'}},75);
+  assert.equal(request.body.allohaMode,'browser');
+  setAllohaMode('bnsi');assert.equal(allohaMode(),'bnsi');
+  setAllohaMode('browser');assert.equal(allohaMode(),'browser');
+ }finally{if(previous===undefined)delete globalThis.localStorage;else globalThis.localStorage=previous;}
+});
 test('viewer ID survives reload; preview uses its own slot',()=>{
  const m=new Map(),storage={getItem:k=>m.get(k),setItem:(k,v)=>m.set(k,v)};
  assert.equal(onlineClientId('viewer',storage),onlineClientId('viewer',storage));assert.notEqual(onlineClientId('preview',storage),onlineClientId('viewer',storage));
@@ -11,6 +24,14 @@ test('pagehide releases once with keepalive; browser restoration reconnects',asy
 });
 test('closed leases remove listeners and do not reconnect',()=>{
  const events=new EventTarget();let calls=0,expired=0;const close=keepOnlineLease({request:async()=>calls++},'fixture',()=>expired++,events);close();events.dispatchEvent(new Event('focus'));assert.equal(calls,1);assert.equal(expired,0);
+});
+
+test('browser back-forward cache suspension retains the lease',async()=>{
+ const events=new EventTarget(),calls=[];let expired=0;
+ const close=keepOnlineLease({request:async(path)=>calls.push(path)},'fixture',()=>expired++,events);
+ const hide=new Event('pagehide');Object.defineProperty(hide,'persisted',{value:true});events.dispatchEvent(hide);
+ events.dispatchEvent(new Event('pageshow'));await new Promise(setImmediate);
+ assert.deepEqual(calls,['/online/fixture/heartbeat']);assert.equal(expired,0);close();
 });
 
 test('404 and 410 expire once without parallel reconnects',async()=>{

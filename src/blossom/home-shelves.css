@@ -2,7 +2,7 @@
    "what is airing now" (wide stills with the latest episode) and "what everyone
    watches" (a ranked ten), not two identical poster strips. */
 .home-shelf{margin:clamp(34px,5vw,64px) 0 0;min-width:0}
-.home-shelf-head{display:flex;align-items:baseline;gap:14px;margin-bottom:16px}
+.home-shelf-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;margin-bottom:16px}
 .home-shelf-head h2{margin:0;font-size:clamp(24px,2.6vw,36px);letter-spacing:-.025em;line-height:1.05;color:var(--color-petal)}
 .home-shelf-head>span{font-size:13px;color:var(--color-on-muted)}
 .home-shelf-head .text-link{margin-left:auto;display:inline-flex;align-items:center;gap:2px;font-size:13px}

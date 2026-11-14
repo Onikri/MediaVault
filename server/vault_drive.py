@@ -177,7 +177,12 @@ class GoogleDriveAdapter:
         from googleapiclient.discovery import build
         from google_auth_httplib2 import AuthorizedHttp
         import httplib2
-        return build('drive','v3',http=AuthorizedHttp(credentials,http=httplib2.Http(timeout=30)),cache_discovery=False)
+        transport = httplib2.Http(timeout=30)
+        # Drive uses 308 without Location for an unfinished resumable upload.
+        # Match googleapiclient.http.build_http rather than following it as a
+        # redirect (small one-chunk uploads otherwise conceal this failure).
+        transport.redirect_codes = transport.redirect_codes - {308}
+        return build('drive','v3',http=AuthorizedHttp(credentials,http=transport),cache_discovery=False)
 
     @classmethod
     def from_adc(cls, credentials=None):
