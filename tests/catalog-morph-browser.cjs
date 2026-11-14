@@ -29,6 +29,7 @@ const root=process.cwd(),dir=path.join(root,'.codex-local/test-output/catalog-mo
   await query.evaluate(e=>e.blur());
   await page.waitForFunction(()=>document.documentElement.dataset.catalogMerged==='true');
   assert.equal(await page.locator('.catalog-toolbar').count(),1,'Only one toolbar is mounted');
+  if(width<=1000)await page.getByRole('navigation',{name:'Навигация',exact:true}).getByRole('button',{name:'Библиотека',exact:true}).waitFor();
   assert.equal(await page.locator('.catalog-nav-slot .catalog-toolbar').count(),1);
   assert.equal(await query.inputValue(),'Garden');
   await page.getByRole('button',{name:'Раздел: Манга. Сменить раздел'}).waitFor({timeout:8000}).catch(async error=>{console.error(await page.evaluate(()=>({scroll:scrollY,brand:document.querySelector('.header-brand-area')?.textContent,display:document.querySelector('.header-brand-area')&&getComputedStyle(document.querySelector('.header-brand-area')).display,width:document.querySelector('.navbar-brand-morph')?.getBoundingClientRect().width})));throw error;});
