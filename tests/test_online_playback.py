@@ -218,3 +218,36 @@ class Readiness(unittest.TestCase):
    online._ready.clear()
    with self.subTest(mime=mime,body=body):
     with self.assertRaises(SourceError):self.check(mime,body)
+
+class HanimeCdnRecovery(unittest.TestCase):
+ def setUp(self):online.sessions.clear();online._ready.clear()
+ def test_new_cdn_encrypted_fragments_are_not_mistaken_for_html(self):
+  from types import SimpleNamespace
+  media='#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="https://ct.htv-services.com/key.bin"\n#EXTINF:6,\nhttps://p00.htv-tsukuyomi.com/segment.html\n#EXT-X-ENDLIST\n'
+  for payload in [b'\x91\x23'*1024,b'<\x91\x82'*600]:
+   response=SimpleNamespace(headers={'Content-Type':'text/html'},iter_content=lambda n:iter([payload]),close=lambda:None)
+   http=SimpleNamespace(_open=lambda *args,**kwargs:(response,args[0]));online._ready.clear()
+   online.playable(media,'https://hanime.tv/hls/1/token',{},http,lambda *args,**kwargs:None)
+ def test_real_html_is_rejected_even_on_the_recognized_cdn(self):
+  from types import SimpleNamespace
+  media='#EXTM3U\n#EXTINF:6,\nhttps://p00.htv-tsukuyomi.com/segment.html\n#EXT-X-ENDLIST\n'
+  for body in [b'<!doctype html><html>challenge</html>',b'<html>error</html>']:
+   response=SimpleNamespace(headers={'Content-Type':'text/html'},iter_content=lambda n:iter([body]),close=lambda:None)
+   with self.assertRaises(SourceError):online.playable(media,'https://hanime.tv/hls/1/token',{},SimpleNamespace(_open=lambda *args,**kwargs:(response,args[0])),None)
+  self.assertFalse(online.disguised_segment('https://p00.htv-tsukuyomi.com.evil.example/segment.html'))
+ def test_proxy_relabels_new_cdn_and_preserves_every_byte_and_range(self):
+  from types import SimpleNamespace
+  token,s=online.create('A',{});resource=s.resource('https://p00.htv-tsukuyomi.com/segment.html')
+  body=[b'\x91'*2048,b'\x73'*1024];response=SimpleNamespace(status_code=206,headers={'Content-Type':'text/html; charset=utf-8','Content-Length':'3072','Content-Range':'bytes 0-3071/9000','Accept-Ranges':'bytes'},iter_content=lambda n:iter(body),close=lambda:None)
+  app=FastAPI();online.install(app,lambda:'A')
+  with patch('online_sessions.PublicHttp._open',return_value=(response,'https://p00.htv-tsukuyomi.com/segment.html')):
+   r=TestClient(app).get('/online/'+token+'/'+resource,headers={'Range':'bytes=0-3071'})
+  self.assertEqual(r.status_code,206);self.assertEqual(r.content,b''.join(body));self.assertEqual(r.headers['content-type'],'video/mp2t');self.assertEqual(r.headers['content-range'],'bytes 0-3071/9000')
+ def test_proxy_rejects_an_actual_html_document_on_known_cdn(self):
+  from types import SimpleNamespace
+  token,s=online.create('A',{});resource=s.resource('https://p00.htv-tsukuyomi.com/segment.html');closed=[]
+  response=SimpleNamespace(status_code=200,headers={'Content-Type':'text/html'},iter_content=lambda n:iter([b'<!doctype html><html>error</html>']),close=lambda:closed.append(True))
+  app=FastAPI();online.install(app,lambda:'A')
+  with patch('online_sessions.PublicHttp._open',return_value=(response,'https://p00.htv-tsukuyomi.com/segment.html')):
+   with self.assertRaises(SourceError):TestClient(app).get('/online/'+token+'/'+resource)
+  self.assertTrue(closed)

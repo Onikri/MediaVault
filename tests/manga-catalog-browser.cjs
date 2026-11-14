@@ -11,14 +11,15 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
   window.calls.push({p,body:o.body});const url=new URL(p,location.origin);
   if(p==='/manga/catalog/enrich'){active++;window.peak=Math.max(active,window.peak);await new Promise(r=>setTimeout(r,30));active--;checked=true;return{items:[{status:'indexed'}]};}
   if(url.pathname.endsWith('/tags'))return{tags:[{original:'Drama',type:'genres',works:2}]};
+  if(window.failReads>0){window.failReads--;throw Object.assign(Error('Fixture catalogue unavailable'),{status:window.failureStatus||503});}
   const q=url.searchParams.get('q');if(q==='Old')await new Promise(r=>setTimeout(r,600));
   const filtered=!!url.searchParams.get('tag'),offset=Number(url.searchParams.get('offset'));
   const rows=Array.from({length:Math.min(30,35-offset)},(_,i)=>({catalogId:String(offset+i).padStart(32,'0'),title:q+' '+(offset+i),metadataChecked:checked}));
   return{items:filtered&&!checked?[]:rows,total:filtered&&!checked?0:35,offset};
  }};
- function Demo(){const[query,setQuery]=React.useState('Garden'),[page,setPage]=React.useState(1),[tag,setTag]=React.useState(''),[version,setVersion]=React.useState(72);
- const data=useMangaCatalog({query,kind:'manga',filters:{tag,genre:'',year:'',format:'',age:''},language:'en',sourceIds:['990000000000000003'],service:{...service,session:{serverVersion:version}},page});
- return <><input aria-label="Query" value={query} onChange={e=>setQuery(e.target.value)}/><button onClick={()=>setPage(v=>v+1)}>Next</button><button onClick={()=>setTag('Time Travel')}>Filter</button><button onClick={()=>setVersion(71)}>Old server</button><pre id="state">{JSON.stringify(data)}</pre></>;}
+ function Demo(){const[query,setQuery]=React.useState('Garden'),[page,setPage]=React.useState(1),[tag,setTag]=React.useState(''),[version,setVersion]=React.useState(72),[paused,setPaused]=React.useState(false);
+ const data=useMangaCatalog({query,kind:'manga',filters:{tag,genre:'',year:'',format:'',age:''},language:'en',sourceIds:['990000000000000003'],service:{...service,session:{serverVersion:version}},page,paused});
+ return <><input aria-label="Query" value={query} onChange={e=>setQuery(e.target.value)}/><button onClick={()=>setPage(v=>v+1)}>Next</button><button onClick={()=>setTag('Time Travel')}>Filter</button><button onClick={()=>setVersion(75)}>Modern server</button><button onClick={()=>setPaused(v=>!v)}>Pause catalogue</button><button onClick={()=>data.retry()}>Retry catalogue</button><button onClick={()=>setVersion(71)}>Old server</button><pre id="state">{JSON.stringify(data)}</pre></>;}
  createRoot(document.getElementById('root')).render(<Demo/>);`);
  const{createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0,hmr:false}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
@@ -42,6 +43,17 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  await page.waitForFunction(()=>JSON.parse(document.querySelector('#state').textContent).results[0]?.title.startsWith('New'));
  // The earlier request intentionally ignores AbortSignal, exercising stale-response protection.
  await page.waitForTimeout(700);assert.ok((await page.evaluate(state)).results.every(r=>r.title.startsWith('New')));
+ await page.evaluate(()=>{window.failReads=1;window.failureStatus=503;});await page.getByLabel('Query').fill('Recover');
+ await page.waitForFunction(()=>JSON.parse(document.querySelector('#state').textContent).retrying);
+ await page.waitForFunction(()=>{const s=JSON.parse(document.querySelector('#state').textContent);return s.ready&&!s.error&&!s.retrying&&s.results[0]?.title.startsWith('Recover');});
+ await page.getByText('Pause catalogue',{exact:true}).click();assert.ok((await page.evaluate(state)).results.length);
+ await page.getByText('Pause catalogue',{exact:true}).click();await page.waitForFunction(()=>!JSON.parse(document.querySelector('#state').textContent).loading);
+ await page.getByText('Modern server',{exact:true}).click();
+ await page.evaluate(()=>{window.failReads=1;window.failureStatus=403;});await page.getByText('Retry catalogue',{exact:true}).click();
+ await page.waitForFunction(()=>!!JSON.parse(document.querySelector('#state').textContent).error);assert.ok((await page.evaluate(state)).results.length,'Keep the loaded page during a transient disconnect');
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await page.waitForFunction(()=>{const s=JSON.parse(document.querySelector('#state').textContent);return s.ready&&!s.error&&!s.loading;});
+ console.log('PASS automatic retry, retained cards across pause/errors, and clearing stale errors after a successful focus refresh');
  await page.getByText('Old server',{exact:true}).click();
  await page.waitForFunction(()=>!JSON.parse(document.querySelector('#state').textContent).capable);
  const count=await page.evaluate(()=>window.calls.length);await page.getByLabel('Query').fill('Unsupported');await page.waitForTimeout(400);

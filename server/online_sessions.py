@@ -125,10 +125,13 @@ def hls_extension_option():
 _ready={};_ready_lock=threading.Lock()
 VIDEO_TYPES=('video/','audio/','application/octet-stream','binary/octet-stream','application/mp4')
 # HanimeTV's CDN labels its AES-128 MPEG-TS segments text/html with a .html name.
-DISGUISED_SEGMENT_HOSTS=('.htv-elidibus.com',)
+DISGUISED_SEGMENT_HOSTS=('.htv-elidibus.com','.htv-tsukuyomi.com')
 def disguised_segment(url):
     host=urlsplit(url).hostname or ''
-    return host.endswith(DISGUISED_SEGMENT_HOSTS) and urlsplit(url).path.endswith('.html')
+    return host.endswith(DISGUISED_SEGMENT_HOSTS) and urlsplit(url).path.lower().endswith('.html')
+
+def html_document(sample):
+    return bool(re.match(rb'\s*(?:<!doctype\s+html\b|<html\b|<head\b|<body\b|<script\b|<!--|<\?xml\b)',sample[:2048],re.I))
 def playable(text,base,headers,http,document,depth=0):
     """Readiness: before granting playback, follow the playlist (≤4 levels)
     to its first fragment and require real media bytes. A CDN that answers a
@@ -152,7 +155,7 @@ def playable(text,base,headers,http,document,depth=0):
         mime=response.headers.get('Content-Type','').split(';')[0].strip().lower()
         sample=next(response.iter_content(2048),b'')
     finally:response.close()
-    if not sample or not disguised_segment(first) and (mime=='text/html' or sample.lstrip()[:1]==b'<' or mime and not mime.startswith(VIDEO_TYPES) and 'mp2t' not in mime):
+    if not sample or html_document(sample) or not disguised_segment(first) and (mime=='text/html' or sample.lstrip()[:1]==b'<' or mime and not mime.startswith(VIDEO_TYPES) and 'mp2t' not in mime):
         raise SourceError('Источник отдаёт страницу вместо видео. Выбери другой плеер или повтори позже.')
     with _ready_lock:
         if len(_ready)>512:_ready.clear()
@@ -443,7 +446,11 @@ def install(app,owner,exports_owner=None):
                     parts.append(block)
                 data=rewrite_manifest(b''.join(parts).decode('utf-8'),final,lambda value:'/online/'+token+'/'+s.resource(value),s.max_height,s.audio_index)
                 return Response(data,media_type='application/vnd.apple.mpegurl',headers=common)
-            if s.kind in {'video','preview'} and disguised_segment(final) and mime=='text/html':mime='video/mp2t'
+            prefix=None;iterator=None
+            if s.kind in {'video','preview'} and disguised_segment(final):
+                iterator=iter(response.iter_content(128*1024));prefix=next(iterator,b'')
+                if not prefix or html_document(prefix):raise SourceError('Источник отдаёт страницу вместо видео. Повтори подключение.')
+                if mime=='text/html':mime='video/mp2t'
             allowed=mime.startswith(('video/','audio/','image/')) or mime in {'application/octet-stream','binary/octet-stream','text/vtt'}
             if not allowed:raise SourceError('Источник вернул неподдерживаемый файл.')
             for name in ('Content-Length','Content-Range','Accept-Ranges'):
@@ -452,7 +459,9 @@ def install(app,owner,exports_owner=None):
             def blocks():
                 try:
                     total=0
-                    for block in active.iter_content(128*1024):
+                    from itertools import chain
+                    chunks=chain([prefix],iterator) if iterator is not None else active.iter_content(128*1024)
+                    for block in chunks:
                         if token not in sessions or s.expires<time.monotonic():break
                         total+=len(block)
                         if total>(256*1024**2 if s.kind in {'music','music-file'} else 12*1024**3):break
