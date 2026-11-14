@@ -122,7 +122,30 @@ do not claim validation of the owner's browser credentials or all179 sources.
 
 After the existing importer has been updated to backend v14, the maintainer runs `python3 deploy/oracle/install-suwayomi.py` on the VM. It discovers the current Compose project, preserves existing overlays, adds `suwayomi.yaml`, checks the service, and recreates only the importer to enable its private adapter. It leaves Oracle shape/resources, Caddy routes, Drive/OAuth configuration, library encryption and existing ML workers intact. A failed readiness check leaves the importer unchanged; a failed importer check restores the previous Compose configuration. Logs and rollback information are private under `/opt/mediavault-suwayomi`.
 
-No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit2304MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. The official image launcher enables bundled ARM64 KCEF and Xvfb, which LibGroup uses even when reading browser storage for a public request. Challenge-solving services remain disabled. Actual account/subscription requirements remain distinct from a broken runtime.
+No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit2304MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. The official image launcher enables bundled ARM64 KCEF and Xvfb, which LibGroup uses even when reading browser storage for a public request. Challenge-solving services are disabled on a fresh installation; the optional private solver below enables them. Actual account/subscription requirements remain distinct from a broken runtime.
+
+### Private FlareSolverr
+
+`sudo python3 deploy/oracle/enable-suwayomi-flaresolverr.py` installs the official
+FlareSolverr v3.5.2 ARM64 image pinned by digest. It joins the existing private
+Docker network at `http://flaresolverr:8191`; no host port or Oracle ingress rule
+is added. `localhost` inside Suwayomi would refer to Suwayomi itself.
+
+The installer takes the shared deploy lock, backs up the source configuration,
+checks solver health from the importer, and updates only six solver settings
+through Suwayomi's authenticated partial-settings API. It verifies both the
+runtime response and persisted `server.conf`; failure restores the previous
+settings. Neither Suwayomi nor the importer is restarted. The existing Japanese
+SOCKS route, source credentials, extension data and catalogue queues are retained.
+Private logs/configuration live in `/opt/mediavault-suwayomi/.codex-local/flaresolverr`.
+
+The solver has a 1.5-GiB memory ceiling, one CPU, bounded logs without HTML,
+no Docker socket or importer data mounts, and no additional capabilities.
+Suwayomi keeps a solver session for 30 minutes with a 20-second solve limit.
+Its native HTML response fallback is enabled for pages that a browser can fetch
+without a clearance cookie; this is not an image fallback. A successful home
+page alone does not certify search, chapters or image delivery. Timeouts,
+login requirements and outdated source extensions still need separate checks.
 
 Existing deployments created with the direct Java/headless entrypoint need
 `sudo python3 deploy/oracle/enable-suwayomi-browser.py`. It checks the existing
