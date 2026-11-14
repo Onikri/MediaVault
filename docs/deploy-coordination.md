@@ -17,14 +17,14 @@ rules keep one of us from silently undoing the other.
 
 ## State on 2026-11-14
 
-- Running `mediavault-importer:tags-95fddbb59e27`, revision label
-  `95fddbb59e27cc1089e678ed370899ceddc7bc61` (= `main` at deploy time). It is the
-  previous `p6-43070026350d` image plus `server/manga_catalog_index.py` and
-  `server/api.py` from that commit (cached manga tag facets). The Alloha VOD
-  cache settings come from the chained `release-p6-*.yaml` override and are
-  unchanged.
-- Deployed by Claude Code at 12:59 UTC with the lock; backup in
-  `/opt/mediavault-backups/tags-95fddbb59e27-20261114T125821Z`.
+- Running `mediavault-importer:facets-734e356457c1`, revision label
+  `734e356457c1f52fedcbf5e34af9e46cad748708` (= `main` at deploy time): the
+  `p6-43070026350d` image plus `server/api.py` and
+  `server/manga_catalog_index.py` from `main` (manga tag facets cached in
+  memory and in `DATA_DIR/manga-tag-facets.json`). The Alloha VOD cache
+  settings come from the chained `release-p6-*.yaml` override, unchanged.
+- Deployed by Claude Code at 13:31 UTC with the lock; backup in
+  `/opt/mediavault-backups/facets-734e356457c1-20261114T133141Z`.
 - Set the revision label to the deployed `main` SHA on every build
   (`--label org.opencontainers.image.revision=<sha>`); a derived image otherwise
   inherits its base's label.
