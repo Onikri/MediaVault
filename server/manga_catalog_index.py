@@ -6,6 +6,7 @@ information are stored, and no full-site crawling is triggered implicitly.
 """
 import hashlib
 import json
+import os
 import re
 import threading
 import time
@@ -360,25 +361,48 @@ def tags(conn, *, provider='', source_id='', limit=100, q='', **filters):
                     for kind,key,original,count,originals in rows if clean_label(original)]}
 
 # Facets read every tag row of the whole index (about 12 s at 200k titles) under
-# the catalogue lock, while they change slowly. Keep each answer for thirty
-# minutes per filter set and tag policy; a stale answer is served at once while
-# one background refresh replaces it, so only a cold start waits.
-TAGS_TTL=1800
+# the catalogue lock, while they change slowly. Each answer (about 80 KB per
+# filter set and tag policy) is kept in memory and in DATA_DIR, so a restart
+# answers at once. An answer older than TAGS_TTL is still served immediately
+# while one background refresh replaces it; only a never-seen key waits.
+TAGS_TTL=6*3600
+TAGS_FILE=Path(os.getenv('DATA_DIR','/data'))/'manga-tag-facets.json'
 _tag_cache={}
 _tag_guard=threading.Lock()
 _tag_refreshing=set()
+_tag_loaded=[False]
 
-def cached_tags(conn, lock, *, ttl=TAGS_TTL, clock=time.monotonic, background=True, **kwargs):
+def _load_tag_cache(path):
+    if _tag_loaded[0]:return
+    _tag_loaded[0]=True
+    try:
+        saved=json.loads(Path(path).read_text(encoding='utf-8'))
+        for row in saved if isinstance(saved,list) else []:
+            if isinstance(row,dict) and isinstance(row.get('value'),dict):
+                _tag_cache[(row['revision'],row['filters'])]=(float(row['at']),row['value'])
+    except (OSError,ValueError,KeyError,TypeError):pass
+
+def _save_tag_cache(path):
+    rows=[{'revision':key[0],'filters':key[1],'at':at,'value':value} for key,(at,value) in _tag_cache.items()]
+    path=Path(path);temporary=path.with_name(path.name+'.tmp')
+    try:
+        temporary.write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8');os.replace(temporary,path)
+    except OSError:pass
+
+def cached_tags(conn, lock, *, ttl=None, clock=time.time, background=True, path=None, **kwargs):
+    ttl=TAGS_TTL if ttl is None else ttl;path=path or TAGS_FILE
     key=(current().revision,json.dumps(kwargs,sort_keys=True,default=str))
     def compute():
         with lock:
             value=tags(conn,**kwargs)
         with _tag_guard:
-            _tag_cache[key]=(clock(),value)
+            _tag_cache.pop(key,None);_tag_cache[key]=(clock(),value)
             while len(_tag_cache)>64:_tag_cache.pop(next(iter(_tag_cache)))
             _tag_refreshing.discard(key)
+            _save_tag_cache(path)
         return value
     with _tag_guard:
+        _load_tag_cache(path)
         hit=_tag_cache.get(key)
         if hit and clock()-hit[0]<ttl:return hit[1]
         refresh=hit is not None and key not in _tag_refreshing
