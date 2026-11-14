@@ -44,6 +44,7 @@ html[data-blossom] .title-showcase .title-passport .passport-facts dd,.passport-
 .passport-rate-head>span{font-size:12px;color:var(--color-on-muted)}
 .passport-rate-head output{display:flex;align-items:baseline;gap:8px;min-height:28px}
 .passport-rate-head output b{font:800 26px/1 var(--font-display,inherit);color:var(--color-petal);font-variant-numeric:tabular-nums}
+.passport-rate-head output b span{font-size:13px;font-weight:600;color:var(--color-on-muted);letter-spacing:0}
 .passport-rate-head output small{font-size:12px;color:color-mix(in srgb,var(--passport-tint) 60%,var(--color-petal))}
 .passport-rate [role=group]{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;padding:3px;border-radius:14px;background:color-mix(in srgb,var(--color-petal) 7%,transparent)}
 .passport-rate button{height:30px;min-width:0;padding:0;border:0;border-radius:10px;background:transparent;color:var(--color-on-muted);font:650 12px/1 var(--font-ui,inherit);font-variant-numeric:tabular-nums;cursor:pointer;transition:background .2s ease calc(var(--step)*18ms),color .2s ease calc(var(--step)*18ms),transform .15s}

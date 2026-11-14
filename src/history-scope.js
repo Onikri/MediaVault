@@ -5,13 +5,18 @@ let scope='guest';
 export const historyScope=()=>scope;
 function read(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback;}catch{return fallback;}}
 export function setHistoryScope(value){
- scope=value?String(value):'guest';
+ const previous=scope;scope=value?String(value):'guest';
  // Opens recorded before profiles had their own history go to the first
  // signed-in profile that opens the site on this device, once.
  if(scope!=='guest'&&!localStorage.getItem(MOVED)){
   const legacy=read(LEGACY,{}),opens=read(OPENS+scope,{});
   for(const [key,value] of Object.entries(legacy))if(value?.openedAt&&!opens[key])opens[key]=value.openedAt;
   try{localStorage.setItem(OPENS+scope,JSON.stringify(opens));localStorage.setItem(MOVED,scope);}catch{}
+ }
+ // What was opened before signing in belongs to the person who signs in.
+ if(previous==='guest'&&scope!=='guest'){
+  const guest=read(OPENS+'guest',{});
+  if(Object.keys(guest).length){const opens={...read(OPENS+scope,{}),...guest};try{localStorage.setItem(OPENS+scope,JSON.stringify(Object.fromEntries(Object.entries(opens).sort((a,b)=>a[1]-b[1]).slice(-60))));localStorage.removeItem(OPENS+'guest');}catch{}}
  }
  dispatchEvent(new Event('mediavault-history-scope'));
 }

@@ -31,7 +31,7 @@ export function leafPath(t){
  const R=.14+.3*t,Ry=R*.75,r=.05,ry=r*.75,k=.45,f=n=>n.toFixed(4);
  return `M${f(R)},0H${f(1-r)}Q1,0 1,${f(ry)}V${f(1-Ry)}C1,${f(1-Ry*k)} ${f(1-R*k)},1 ${f(1-R)},1H${f(r)}Q0,1 0,${f(1-ry)}V${f(Ry)}C0,${f(Ry*k)} ${f(R*k)},0 ${f(R)},0Z`;
 }
-function usePhone(){
+export function usePhone(){
  const [phone,setPhone]=useState(()=>typeof matchMedia==='function'&&matchMedia(PHONE).matches);
  useEffect(()=>{const query=matchMedia(PHONE),sync=()=>setPhone(query.matches);sync();query.addEventListener('change',sync);return()=>query.removeEventListener('change',sync);},[]);
  return phone;
@@ -57,11 +57,11 @@ function PhoneCoverMotion({y,scale,zoom,reduce}){
 }
 // On a phone the way back lives in the top-left corner, outside every
 // transformed layer so it stays fixed while the page scrolls.
-function PhoneBack({label,onBack}){
- return createPortal(<button type="button" className="title-phone-back" aria-label={label} title={label} onClick={onBack}><ArrowLeft size={19} aria-hidden="true"/></button>,document.body);
+function PhoneBack({label,onBack,id}){
+ return createPortal(<button type="button" id={id} className="title-phone-back" aria-label={label} title={label} onClick={onBack}><ArrowLeft size={19} aria-hidden="true"/></button>,document.body);
 }
 
-export default function TitleShowcase({background,children,backLabel,onBack}){
+export default function TitleShowcase({background,children,backLabel,onBack,backId}){
  const root=useRef(null),content=useRef(null),reduce=useReducedMotion();
  useLayoutEffect(()=>{const update=()=>root.current?.style.setProperty('--showcase-content-height',(content.current?.offsetHeight||0)+'px');update();const observer=new ResizeObserver(update);if(content.current)observer.observe(content.current);return()=>observer.disconnect();},[]);
  const {scrollYProgress}=useScroll({target:root,offset:['start start','end start']});
@@ -78,6 +78,6 @@ export default function TitleShowcase({background,children,backLabel,onBack}){
    <div className="title-showcase-copy-layer">{parts[1]}</div>
    {parts[2]&&<motion.div className="title-showcase-info-layer" {...enter(.45,{x:18,y:0})}>{parts[2]}</motion.div>}
   </motion.div>
-  {phone&&onBack&&<PhoneBack label={backLabel} onBack={onBack}/>}
+  {phone&&onBack&&<PhoneBack id={backId} label={backLabel} onBack={onBack}/>}
  </section>;
 }

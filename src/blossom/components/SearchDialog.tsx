@@ -43,7 +43,7 @@ export function SearchDialog({service,onClose,onChoose,onBrowse}:{service:any,on
  const reduce=useReducedMotion(),[geometry,setGeometry]=useState(coordinates),id=useId();
  // Phones and tablets search from the dock: the sheet grows out of the round
  // search button at the bottom and folds back into it.
- const [sheet]=useState(()=>typeof matchMedia==='function'&&matchMedia('(max-width:1000px)').matches),[shown,setShown]=useState(false);
+ const [sheet]=useState(()=>{const dock=document.documentElement.dataset.searchFrom==='dock';delete document.documentElement.dataset.searchFrom;return dock&&typeof matchMedia==='function'&&matchMedia('(max-width:1000px)').matches;}),[shown,setShown]=useState(false);
  useEffect(()=>{if(!sheet)return;const frame=requestAnimationFrame(()=>requestAnimationFrame(()=>setShown(true)));return()=>cancelAnimationFrame(frame);},[sheet]);
  const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[year,setYear]=useState(''),[genre,setGenre]=useState(''),[composing,setComposing]=useState(false),[closing,setClosing]=useState(false);
  const [chips,setChips]=useState<string[]>([]),[marked,setMarked]=useState<string|null>(null),[activeId,setActiveId]=useState<string|null>(null),[rowCursor,setRowCursor]=useState(0),[panelFloor,setPanelFloor]=useState(0);
