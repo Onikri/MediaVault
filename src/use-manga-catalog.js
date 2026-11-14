@@ -26,21 +26,29 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
  },[facetKey,kind,capable,paused]);
  useEffect(()=>{if(kind!=='manga')return;let active=true;loadMangaTaxonomy().then(value=>{if(active){setTaxonomy(value);setTaxonomyError('');}}).catch(error=>{if(active)setTaxonomyError(error.message);});return()=>{active=false;};},[kind]);
  useEffect(()=>{
-  const abort=new AbortController();if(kind!=='manga'||!capable||paused||composing){setSnapshot({...empty,key});return()=>abort.abort();}
+  const abort=new AbortController();if(kind!=='manga'||!capable){setSnapshot({...empty,key});return()=>abort.abort();}
+  if(paused||composing)return()=>abort.abort();
   setSnapshot(old=>old.key===key?{...old,loading:true,error:''}:{...empty,key,loading:true});
   const timer=setTimeout(async()=>{
    const filtered=hasCatalogFilters(filters);
    const candidateParams=mangaCatalogParams({query,language,sourceIds,page,filters:{}}).toString();
+   const pause=delay=>new Promise(resolve=>{const done=()=>{clearTimeout(timer);abort.signal.removeEventListener('abort',done);resolve();};const timer=setTimeout(done,delay);abort.signal.addEventListener('abort',done,{once:true});if(abort.signal.aborted)done();});
    async function read(enriching=false){
+    for(let attempt=0;attempt<4&&!abort.signal.aborted;attempt++){
     const [titles,candidates]=await Promise.allSettled([
-     live.current.request('/manga/catalog?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:abort.signal}),
-     filtered?live.current.request('/manga/catalog?'+candidateParams,{signal:abort.signal}):Promise.resolve({items:[]})
+     live.current.request('/manga/catalog?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(20000)])}),
+     filtered?live.current.request('/manga/catalog?'+candidateParams,{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(20000)])}):Promise.resolve({items:[]})
     ]);
     if(abort.signal.aborted)return null;
-    if(titles.status==='rejected'){setSnapshot({...empty,key,error:titles.reason.message});return null;}
+    if(titles.status==='rejected'){
+     const error=titles.reason,retry=attempt<3&&(error.status>=500||[408,429].includes(error.status)||['TypeError','TimeoutError','NetworkError','AbortError'].includes(error.name));
+     setSnapshot(old=>({...((old.key===key&&old.ready)?old:{...empty,key}),loading:retry&&!old.ready,retrying:retry,error:error.message,errorStatus:error.status||0}));
+     if(retry){await pause([1000,3000,8000][attempt]);continue;}return null;
+    }
     const data=acceptContentPolicy(titles.value),rows=data.items||[],context=candidates.status==='fulfilled'?candidates.value.items||[]:[];
-    setSnapshot({key,results:rows,candidates:context,total:data.total||0,workTotal:Number(data.workTotal??data.total??0),hasMore:Number(data.offset||0)+Number(data.works??rows.length)<Number(data.workTotal??data.total??0),loading:false,enriching,ready:true,error:''});
+    setSnapshot({key,results:rows,candidates:context,total:data.total||0,workTotal:Number(data.workTotal??data.total??0),hasMore:Number(data.offset||0)+Number(data.works??rows.length)<Number(data.workTotal??data.total??0),loading:false,enriching,ready:true,retrying:false,error:'',errorStatus:0});
     return context;
+    }return null;
    }
    const context=await read();if(!context||!filtered)return;
    const pending=context.filter(row=>!row.metadataChecked&&!attempted.current.has(service.server+':'+row.catalogId)).slice(0,12);
@@ -51,11 +59,11 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
      if(attempted.current.size>4000)attempted.current.delete(attempted.current.values().next().value);
      return live.current.request('/manga/catalog/enrich',{method:'POST',body:{ids:[row.catalogId]},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(90000)])});
     }));
-    if(!abort.signal.aborted)await read(i+2<pending.length);
+    if(!abort.signal.aborted&&await read(i+2<pending.length)===null)break;
    }
   },query.trim()?220:0);
   return()=>{clearTimeout(timer);abort.abort();};
- },[key,capable,paused,composing,revision,facetParams,retryGeneration]);
+ },[key,capable,paused,composing,revision,facetParams,retryGeneration,service.status]);
  useEffect(()=>{
   if(kind!=='manga'||Number(service.session?.serverVersion)<74||paused||composing)return;
   const abort=new AbortController();let busy=false;
@@ -63,7 +71,7 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
    // Coming back to the tab also re-reads the facets (a new tag rule may have
    // landed); the timer only refreshes the cards.
    if(event?.type==='focus')live.current.request('/manga/catalog/tags?'+facetParams,{signal:abort.signal}).then(value=>{const next={tags:value.tags||[],at:Date.now()};facetCache.set(facetKey,next);setFacets(next);}).catch(()=>{});
-   const rows=await live.current.request('/manga/catalog?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:abort.signal});if(!abort.signal.aborted)setSnapshot(old=>old.key===key?{...old,results:acceptContentPolicy(rows).items||[],total:rows.total||0,workTotal:Number(rows.workTotal??rows.total??0),hasMore:Number(rows.offset||0)+Number(rows.works??(rows.items||[]).length)<Number(rows.workTotal??rows.total??0),ready:true}:old);}catch{}finally{busy=false;}};
+   const rows=await live.current.request('/manga/catalog?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(20000)])});if(!abort.signal.aborted){const data=acceptContentPolicy(rows);setSnapshot(old=>old.key===key?{...old,results:data.items||[],error:'',errorStatus:0,loading:false,retrying:false,total:rows.total||0,workTotal:Number(rows.workTotal??rows.total??0),hasMore:Number(rows.offset||0)+Number(rows.works??(rows.items||[]).length)<Number(rows.workTotal??rows.total??0),ready:true}:old);}}catch{}finally{busy=false;}};
   const timer=setInterval(()=>refresh(),30000);addEventListener('focus',refresh);return()=>{clearInterval(timer);removeEventListener('focus',refresh);abort.abort();};
  },[key,facetParams,paused,composing,service.session?.serverVersion]);
  const current=snapshot.key===key?snapshot:empty;
