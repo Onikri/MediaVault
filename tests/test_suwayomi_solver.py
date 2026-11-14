@@ -40,3 +40,11 @@ class PrivateSolverTests(unittest.TestCase):
             if field == 'port': value['HostConfig']['PortBindings'] = {'8191/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '8191'}]}
             if field == 'network': value['NetworkSettings']['Networks'] = {'other': {}}
             with self.assertRaises(RuntimeError): runtime.validate_solver(value, 'private')
+
+    def test_compatible_engine_has_pinned_arm_runtime_and_sufficient_browser_threads(self):
+        args = runtime.container_args('private_network', Path('/private/config'), 'byparr')
+        self.assertTrue(args[-1].startswith('ghcr.io/thephaseless/byparr@sha256:'))
+        self.assertEqual(args[args.index('--pids-limit') + 1], '1024')
+        self.assertIn('BROWSER_TIMEZONE=Europe/Berlin', args)
+        self.assertNotIn('-p', args)
+        self.assertEqual(runtime.engine_settings('byparr')['flareSolverrUrl'], 'http://byparr:8191')

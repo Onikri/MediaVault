@@ -456,7 +456,8 @@ GENRE_GROUP=re.compile(r'жанр|genre',re.I)
 
 def filter_vocabulary(client,source_id):
     """The extension's own genre/tag options with their stateless filter path."""
-    data=client.get('/source/'+str(source_id)+'/filters',{'reset':'true'},timeout=25)
+    from manga_solver import source_timeout
+    data=client.get('/source/'+str(source_id)+'/filters',{'reset':'true'},timeout=source_timeout(source_id,25))
     if not isinstance(data,list):raise BridgeError('format','Каталог источников вернул данные в неизвестном формате.')
     terms=[]
     for position,item in enumerate(data[:60]):
@@ -475,7 +476,8 @@ def filtered_page(client,source_id,term,page):
     if not isinstance(path,dict) or path.get('kind') not in {'CheckBox','TriState'} or not all(isinstance(path.get(k),int) and 0<=path[k]<=600 for k in ('position','child')):
         raise SourceError('Некорректный фильтр источника.')
     change={'position':path['child'],'state':'true' if path['kind']=='CheckBox' else '1'}
-    return client.get('/source/'+str(source_id)+'/quick-search',{'pageNum':page},timeout=30,body={'searchTerm':'','filter':[{'position':path['position'],'state':json.dumps(change)}]})
+    from manga_solver import source_timeout
+    return client.get('/source/'+str(source_id)+'/quick-search',{'pageNum':page},timeout=source_timeout(source_id,30),body={'searchTerm':'','filter':[{'position':path['position'],'state':json.dumps(change)}]})
 
 # Extensions whose built-in domain no longer serves the catalogue. Suwayomi
 # keeps the choice in its own data volume, which a reset or reinstall loses, so
