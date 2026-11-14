@@ -10,6 +10,14 @@ const fixturePolicy=JSON.parse(readFileSync(new URL('./fixtures/manga-tag-policy
 beforeEach(()=>setMangaPolicy(fixturePolicy));
 afterEach(()=>setMangaPolicy(defaultPolicy));
 
+test('source catalogue keeps zero offset on the first page for every grid size',()=>{
+ for(const limit of [24,25,28,30])for(const filters of [{},{genre:['Drama'],excludeTag:['Robots']}]){
+  const params=mangaCatalogParams({page:1,limit,sort:'new',filters});
+  assert.equal(params.get('offset'),'0');assert.equal(params.get('limit'),String(limit));
+  assert.equal(mangaCatalogParams({page:2,limit,filters}).get('offset'),String(limit));
+ }
+});
+
 test('source catalogue passes combined filters and preserves source ID precision',()=>{
  const params=mangaCatalogParams({query:' Garden World ',filters:{genre:'Драма',tag:'Time Travel',year:'2024',format:'Манхва',age:'adult'},language:'en',sourceIds:['990000000000000003','1'],page:3});
  assert.equal(params.get('q'),'Garden World');assert.equal(params.get('sourceIds'),'1,990000000000000003');assert.equal(params.get('offset'),'60');
