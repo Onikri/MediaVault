@@ -1,3 +1,4 @@
+import {matchesTaxonomy,formatLabel} from './catalog-taxonomy.js';
 import {localLabel,queryLabel} from './taxonomy.js';
 import {mangaPolicy,globalContentPolicy} from './manga-tag-policy.js';
 import {russianText,translate,imageURL} from './title-metadata.js';
@@ -159,10 +160,10 @@ export function mergeCatalog(values){
 export function matchesFilters(item,filters){
   if(filters.year&&String(item.year)!==String(filters.year))return false;
     const manga=item.kind==='manga'||globalContentPolicy(),match=(left,right)=>manga?(mangaPolicy().key(right)?mangaPolicy().key(left)===mangaPolicy().key(right):!globalContentPolicy()&&normalized(left).includes(normalized(right))):normalized(localLabel(left)).includes(normalized(localLabel(right)))||normalized(left).includes(normalized(right));
-  if(filters.genre&&!item.genres.some(g=>manga?match(g,filters.genre):normalized(genreLabels[g]||localLabel(g)).includes(normalized(localLabel(filters.genre)))))return false;
-  if(filters.tag&&!String(filters.tag).split(',').map(s=>s.trim()).filter(Boolean).every(tag=>(item.tags||[]).concat(item.genres||[]).some(t=>match(t,tag))))return false;
-  const formatKey=value=>({манга:'manga',манхва:'manhwa',маньхуа:'manhua',вебтун:'webtoon'}[normalized(value)]||normalized(value));
-  if(filters.format&&formatKey(item.format)!==formatKey(filters.format))return false;
+  if(!matchesTaxonomy(item,filters))return false;
+  const formatKey=value=>({манга:'manga',манхва:'manhwa',маньхуа:'manhua',комикс:'comic',руманга:'rumanga',вебтун:'webtoon'}[normalized(value)]||normalized(value));
+  if(filters.format&&formatKey(formatLabel(item.format,item.kind))!==formatKey(formatLabel(filters.format,item.kind)))return false;
+  if(filters.readingMode&&((item.format==='webtoon'||['webtoon','vertical','scroll'].includes(item.readingMode))!== (filters.readingMode==='webtoon')))return false;
   if(filters.age==='under18'&&(item.age==null||item.age>=18))return false;
   if(filters.age==='adult'&&(item.age==null||item.age<18))return false;
   return true;

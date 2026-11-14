@@ -12,7 +12,7 @@ afterEach(()=>setMangaPolicy(bundled));
 
 test('all registered sources use the same aliases and deletion removes cards and profiles',()=>{
  setMangaPolicy(base);
- for(let i=0;i<18;i++)assert.deepEqual(mangaPolicyFacts({url:'https://source'+i+'.example/title',tags:[['Fantasy','幻想','판타지'][i%3]],genres:['Drama']}).tags,['Фэнтези']);
+ for(let i=0;i<18;i++)assert.deepEqual(mangaPolicyFacts({url:'https://source'+i+'.example/title',tags:[['Fantasy','幻想','판타지'][i%3]],genres:['Drama']}).genres,['Драма','Фэнтези']);
  let notified=0;const stop=subscribeMangaPolicy(()=>notified++);
  setMangaPolicy({...base,tags:[base.tags[1]]});stop();assert.equal(notified,1);
  assert.deepEqual(mangaPolicyFacts({tags:['Fantasy'],genres:['Drama']}),{tags:[],genres:['Драма']});
@@ -34,13 +34,13 @@ test('ambiguous aliases are rejected before replacing active rules',()=>{
 
 test('automatic vocabulary preserves unknown labels and exact hides are reversible',()=>{
  const data={...base,includeDiscovered:true,hiddenTags:['Ecology']};
- assert.deepEqual(compileMangaPolicy(data).facts({genres:['Ecology','Ocean worlds']}),{genres:['Ocean worlds'],tags:[]});
- assert.deepEqual(compileMangaPolicy({...data,hiddenTags:[]}).facts({genres:['Ecology']}),{genres:['Ecology'],tags:[]});
+ assert.deepEqual(compileMangaPolicy(data).facts({genres:['Ecology','Ocean worlds']}),{genres:[],tags:['Ocean worlds']});
+ assert.deepEqual(compileMangaPolicy({...data,hiddenTags:[]}).facts({genres:['Ecology']}),{genres:[],tags:['Ecology']});
 });
 
 test('cached catalogue response installs expanded vocabulary before projecting rows',()=>{
  setMangaPolicy(base,'old','all');
  const response={items:[{kind:'manga',genres:['Ocean worlds']}],tagPolicy:{revision:'new',scope:'all',policy:{...base,tags:[...base.tags,{key:'ocean worlds',label:'Миры океана',aliases:['Ocean worlds']}]}}};
  assert.equal(acceptContentPolicy(response),response);assert.equal(contentPolicyRevision(),'new');
- assert.deepEqual(mangaPolicyFacts(response.items[0]).genres,['Миры океана']);
+ assert.deepEqual(mangaPolicyFacts(response.items[0]).tags,['Миры океана']);
 });

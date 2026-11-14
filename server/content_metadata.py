@@ -60,7 +60,7 @@ def scan(store,keys=None):
                     rows.extend(anilist_rows(payload,kind))
             elif kind in {'movie','tv'}:rows=movie_rows(metadata('kinobox',kind=kind),kind)
             else:
-                for rule in selected[:3]:
+                for rule in [r for r in selected if r.get('category')=='genre'][:3]:
                     payload=get_json('https://openlibrary.org/search.json',params={'subject':english(rule),'limit':20,'fields':'key,title,subject,first_publish_year,cover_i'})
                     for item in payload.get('docs',[])[:20]:
                         identity=str(item.get('key') or '').removeprefix('/works/')

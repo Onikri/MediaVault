@@ -40,7 +40,7 @@ class ContentTests(ContentFixture,unittest.TestCase):
   self.assertEqual(manga_browse(self.db,genre='Journey')['total'],0)
   for kind in content_catalog.KINDS:
    self.assertEqual(content_catalog.browse(self.db,kind=kind,genre='Journey')['total'],0)
-   self.assertEqual(content_catalog.browse(self.db,kind=kind,tag='Journey')['total'],1)
+   self.assertEqual(content_catalog.browse(self.db,kind=kind,tag='Journey')['total'],0 if kind=='book' else 1)
   policy['tags']=[];save(self.store,policy,current().revision)
   for kind in content_catalog.KINDS:self.assertEqual(content_catalog.browse(self.db,kind=kind,tag='Journey')['total'],0)
   policy['tags']=[{'key':'ecology','label':'Экология','aliases':['Ecology'],'category':'genre'}]
@@ -53,7 +53,7 @@ class ContentTests(ContentFixture,unittest.TestCase):
   with self.assertRaises(HTTPException) as result:save(self.store,policy,'a'*64)
   self.assertEqual(result.exception.status_code,409)
   with patch('content_catalog.reindex',side_effect=RuntimeError('fixture rollback')),self.assertRaises(RuntimeError):save(self.store,policy,current().revision)
-  self.assertEqual(self.path.read_bytes(),before);self.assertEqual(manga_browse(self.db,tag='Journey')['total'],1)
+  self.assertEqual(self.path.read_bytes(),before);self.assertEqual(manga_browse(self.db,genre='Journey')['total'],1)
  def test_inventory_preserves_unmatched_source_facts_and_suggests_without_auto_merging(self):
   self.seed();value=inventory(self.store,'Ecolog')
   self.assertEqual(value['items'][0]['label'],'Ecology');self.assertEqual(value['items'][0]['works'],7)
@@ -71,12 +71,13 @@ class ContentTests(ContentFixture,unittest.TestCase):
   save(self.store,data,current().revision)
   row=content_catalog.browse(self.db,kind='movie',genre='Ecology')['items'][0]
   self.assertEqual(row['sourceUrl'],'https://fixture.example/movie')
- def test_combined_tag_filters_also_match_canonical_genres_across_media(self):
+ def test_genre_and_tag_categories_do_not_cross_match_across_media(self):
   self.seed()
   data=copy.deepcopy(BASE);data['tags'].append({'key':'ecology','label':'Экология','aliases':['Ecology'],'category':'genre'})
   save(self.store,data,current().revision)
   for kind in content_catalog.KINDS:
-   self.assertEqual(content_catalog.browse(self.db,kind=kind,tag='Journey,Ecology')['total'],1)
+   self.assertEqual(content_catalog.browse(self.db,kind=kind,genre='Journey,Ecology')['total'],1)
+   self.assertEqual(content_catalog.browse(self.db,kind=kind,genre='Journey',tag='Ecology')['total'],0)
    self.assertEqual(content_catalog.browse(self.db,kind=kind,tag='Journey,Missing')['total'],0)
  def test_source_taxonomy_extracts_exact_links_and_membership_without_images(self):
   terms=html_terms(b'<a rel="tag" href="/tags/ecology/">Ecology</a><a rel="tag" href="https://evil.example/a">Other</a>','https://hmanga.me/',{'hmanga.me'})

@@ -24,11 +24,11 @@ test('Russian and English collection names with the same exact metadata ID produ
   const catalog={storage:{collections:[{id:'ru',name:'Дандадан',section:'anime',metadata:{ids:{mal:'57334'}}},{id:'en',name:'Dandadan',section:'anime',metadata:{ids:{mal:'57334'}}},{id:'second',name:'Дандадан 2',section:'anime',metadata:{ids:{mal:'60543'}}}]},items:[{id:'1',collectionId:'ru',section:'anime',category:'video',name:'1.mp4'},{id:'2',collectionId:'en',section:'anime',category:'video',name:'2.mp4'},{id:'3',collectionId:'second',section:'anime',category:'video',name:'3.mp4'}]};
   const titles=buildTitles(catalog);assert.equal(titles.length,2);assert.equal(titles[0].items.length,2);assert.equal(titles[1].items.length,1);
 });
-test('tag filtering matches the selected catalogue tags and requires all requested tags',()=>{
+test('tag filtering matches the selected catalogue tags and accepts any requested tag',()=>{
   const item={genres:['Drama'],tags:['School','Time Travel']};
   assert.equal(matchesFilters(item,{tag:'School'}),true);
   assert.equal(matchesFilters(item,{tag:'School, Time Travel'}),true);
-  assert.equal(matchesFilters(item,{tag:'School, Vampires'}),false);
+  assert.equal(matchesFilters(item,{tag:'School, Vampires'}),true);
 });
 test('a browser denying localStorage does not crash progress loading',()=>{
   const descriptor=Object.getOwnPropertyDescriptor(globalThis,'localStorage');

@@ -1,3 +1,5 @@
+import {filterValues} from './catalog-taxonomy.js';
+import MergedCatalogToolbar from './MergedCatalogToolbar.jsx';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,LayoutGroup,animate,motion,useReducedMotion} from 'motion/react';
@@ -7,7 +9,7 @@ import './catalog-filter-dock.css';
 // One sticky row of filters above the catalogue. Each filter opens its own
 // panel (a sheet on phones); several tags narrow results together.
 export const TAG_LIMIT=12;
-export const splitTags=value=>String(value||'').split(',').map(tag=>tag.trim()).filter(Boolean);
+export const splitTags=filterValues;
 const AGES=[['','Любой возраст'],['under18','До 18 лет'],['adult','18+']];
 const SPRING={type:'spring',stiffness:520,damping:38,mass:.8};
 const same=(a,b)=>a.toLocaleLowerCase()===b.toLocaleLowerCase();
@@ -20,7 +22,7 @@ function useNarrow(){
 }
 
 function Panel({anchor,label,onClose,children,footer,compact=false}){
- const ref=useRef(null),narrow=useNarrow(),reduced=useReducedMotion(),[place,setPlace]=useState(null);
+ const ref=useRef(null),phone=useNarrow(),narrow=phone||!!(matchMedia('(max-width:1000px)').matches&&document.documentElement.dataset.catalogMerged),reduced=useReducedMotion(),[place,setPlace]=useState(null);
  useLayoutEffect(()=>{
   if(narrow||!anchor)return;
   let frame=0;
@@ -94,6 +96,24 @@ function TagPanel({value,options,onChange}){
  </>;
 }
 
+function SignedPanel({label,positive,negative,options,onChange}){
+ const [find,setFind]=useState('');
+ const included=splitTags(positive),excluded=splitTags(negative);
+ const choose=(value,sign)=>{
+  const own=sign==='include'?included:excluded,other=sign==='include'?excluded:included;
+  if(!own.includes(value)&&own.length>=64)return;
+  const next=own.includes(value)?own.filter(v=>v!==value):[...own,value];
+  onChange(sign==='include'?next:other.filter(v=>v!==value),sign==='exclude'?next:other.filter(v=>v!==value));
+ };
+ const visible=[...new Set([...included,...excluded,...options])].filter(v=>v.toLocaleLowerCase().includes(find.trim().toLocaleLowerCase())).slice(0,120);
+ return <><Finder value={find} onChange={setFind} placeholder={'Найти: '+label.toLocaleLowerCase()}/>
+  <p className="fdock-signed-note">Любое включение подходит. Любое исключение убирает тайтл. До 64 значений каждого знака.</p>
+  <div className="fdock-signed-list">{visible.map(value=><div key={value} className="fdock-signed-option"><span>{value}</span>
+   <button type="button" aria-label={'Включить '+value} aria-pressed={included.includes(value)} onClick={()=>choose(value,'include')}><Plus size={15}/></button>
+   <button type="button" aria-label={'Исключить '+value} aria-pressed={excluded.includes(value)} onClick={()=>choose(value,'exclude')}><span aria-hidden="true">−</span></button>
+  </div>)}</div>{!visible.length&&<p className="fdock-empty">Подходящих значений нет.</p>}</>;
+}
+
 function YearPanel({value,onChange,years}){
  const now=new Date().getFullYear(),list=years?years.map(String):Array.from({length:12},(_,i)=>String(now-i));
  return <>
@@ -148,20 +168,24 @@ export function SortMenu({value,options,onChange,label='Сортировка'}){
  </>;
 }
 
-export default function CatalogFilterDock({search,kind,filters,onFilter,onReset,fields=['genre','year','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceTitle='Озвучка',voiceNote,language,sources,morphId='filters'}){
+const InlineToolbar=({children})=>children;
+export default function CatalogFilterDock({mergeNavigation=false,search,kind,filters,onFilter,onReset,fields=['genre','year','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceTitle='Озвучка',voiceNote,language,sources,morphId='filters'}){
  const [panel,setPanel]=useState(null),anchors=useRef({}),sentinel=useRef(null),[stuck,setStuck]=useState(false),reduced=useReducedMotion(),[open,setOpen]=useFiltersOpen(),toggle=useRef(null),fold=useRef(null);
+ const ToolbarHost=mergeNavigation?MergedCatalogToolbar:InlineToolbar;
  const chosenTags=splitTags(filters.tag);
- useEffect(()=>{const node=sentinel.current;if(!node)return;const observer=new IntersectionObserver(([entry])=>setStuck(!entry.isIntersecting&&entry.boundingClientRect.top<0),{rootMargin:'-96px 0px 0px 0px'});observer.observe(node);return()=>observer.disconnect();},[]);
+ useEffect(()=>{const merged=event=>{if(event.detail.mobile){setPanel(null);setOpen(false);}};addEventListener('mediavault:catalog-merged',merged);return()=>removeEventListener('mediavault:catalog-merged',merged);},[]);
+ useEffect(()=>{const node=sentinel.current;if(!node)return;const observer=new IntersectionObserver(([entry])=>setStuck(!entry.isIntersecting&&entry.boundingClientRect.top<=(entry.rootBounds?.top??96)),{rootMargin:'-96px 0px 0px 0px'});observer.observe(node);return()=>observer.disconnect();},[]);
  useEffect(()=>setPanel(null),[kind]);
  const close=useRef(null);close.current=refocus=>{const key=panel;setPanel(null);if(refocus&&key)anchors.current[key]?.focus({preventScroll:true});};
  const shut=useCallback(refocus=>close.current(refocus),[]);
  const switchOpen=value=>{setPanel(null);setOpen(value);requestAnimationFrame(()=>(value?fold:toggle).current?.focus({preventScroll:true}));};
  const age=AGES.find(([id])=>id===filters.age)?.[1],use=key=>fields.includes(key);
  const items=[
-  use('genre')&&{key:'genre',label:'Жанр',value:filters.genre,clear:()=>onFilter('genre','')},
+  use('genre')&&{key:'genre',label:mergeNavigation?'Жанры':'Жанр',value:[splitTags(filters.genre).join(', '),splitTags(filters.excludeGenre).length?'− '+splitTags(filters.excludeGenre).join(', '):''].filter(Boolean).join(' · '),clear:()=>{onFilter('genre','');onFilter('excludeGenre','');}},
   use('year')&&{key:'year',label:'Год',value:filters.year,clear:()=>onFilter('year','')},
-  use('tag')&&{key:'tag',label:'Теги',value:chosenTags.length?chosenTags[0]+(chosenTags.length>1?' +'+(chosenTags.length-1):''):'',clear:()=>onFilter('tag','')},
-  use('format')&&{key:'format',label:'Формат',value:filters.format,clear:()=>onFilter('format','')},
+  use('tag')&&kind!=='book'&&{key:'tag',label:'Теги',value:[splitTags(filters.tag).join(', '),splitTags(filters.excludeTag).length?'− '+splitTags(filters.excludeTag).join(', '):''].filter(Boolean).join(' · '),clear:()=>{onFilter('tag','');onFilter('excludeTag','');}},
+  use('format')&&formats.length>0&&{key:'format',label:'Формат',value:filters.format,clear:()=>onFilter('format','')},
+  kind==='manga'&&{key:'readingMode',label:'Подача',value:filters.readingMode==='webtoon'?'Вебтун':filters.readingMode==='paged'?'Страницы':'',clear:()=>onFilter('readingMode','')},
   use('age')&&{key:'age',label:'Возраст',value:filters.age?age:'',clear:()=>onFilter('age','')},
   use('voice')&&(kind==='anime'||voiceExact)&&{key:'voice',label:voiceTitle,value:voice,clear:()=>onVoice('')},
   sources&&{key:'sources',label:'Источники',value:sources.value.length?(sources.options.find(s=>s.id===sources.value[0])?.name||sources.value[0])+(sources.value.length>1?' +'+(sources.value.length-1):''):'',clear:()=>sources.onChange([])},
@@ -169,11 +193,11 @@ export default function CatalogFilterDock({search,kind,filters,onFilter,onReset,
  ].filter(Boolean);
  const active=items.filter(item=>item.clear&&item.value).length+Math.max(0,chosenTags.length-1);
  const current=items.find(item=>item.key===panel);
- const note=panel==='tag'?(chosenTags.length>1?'Показываем тайтлы, у которых есть все выбранные теги.':'Можно выбрать до 12 тегов. Подойдут тайтлы, где есть все сразу.'):panel==='voice'?voiceNote:panel==='genre'&&kind==='manga'?'Жанры ищутся прямо в каталогах источников.':panel==='language'?language?.note:panel==='sources'?(sources?.value.length?'Ищем только в выбранных источниках.':'Ничего не выбрано: ищем во всех подключённых.'):'';
+ const note=panel==='tag'?'Теги объединяются через ИЛИ; с жанрами — через И. Исключения имеют приоритет.':panel==='voice'?voiceNote:panel==='genre'&&kind==='manga'?'Жанры ищутся прямо в каталогах источников.':panel==='language'?language?.note:panel==='sources'?(sources?.value.length?'Ищем только в выбранных источниках.':'Ничего не выбрано: ищем во всех подключённых.'):'';
  const morph=reduced?{duration:0}:MORPH,fade=reduced?{}:{initial:{opacity:0},animate:{opacity:1,transition:{delay:.12,duration:.2}}};
  return <>
   <span ref={sentinel} className="fdock-sentinel" aria-hidden="true"/>
-  <div className={'catalog-toolbar'+(stuck?' is-stuck':'')+(open?' is-open':' is-folded')}>
+  <ToolbarHost stuck={stuck}><div className={'catalog-toolbar'+(stuck?' is-stuck':'')+(open?' is-open':' is-folded')}>
   <LayoutGroup id={morphId}>
   <motion.div layout={!reduced} transition={morph} className="fdock-search" style={{borderRadius:14}}><motion.div layout={!reduced} transition={morph} className="fdock-search-inner">{search}</motion.div></motion.div>
   {open?<motion.div key="dock" layoutId={morphId+'-shell'} transition={morph} style={{borderRadius:16}} className="fdock" role="toolbar" aria-label="Фильтры каталога">
@@ -199,12 +223,15 @@ export default function CatalogFilterDock({search,kind,filters,onFilter,onReset,
    <motion.span layout="position" className="fdock-toggle-face" {...fade}><SlidersHorizontal size={16} aria-hidden="true"/><span className="fdock-toggle-text">Фильтры</span>{active>0&&<span className="fdock-count">{active}</span>}</motion.span>
   </motion.button>}
   </LayoutGroup>
-  </div>
+  </div></ToolbarHost>
   <AnimatePresence>{current&&<Panel key={current.key} anchor={anchors.current[current.key]} label={current.label} onClose={shut}
    footer={note||current.key==='tag'?<>{note&&<p>{note}</p>}{current.key==='tag'&&<button type="button" className="fdock-done" onClick={()=>shut(true)}>Готово{chosenTags.length?' · '+chosenTags.length+' '+plural(chosenTags.length,['тег','тега','тегов']):''}</button>}{current.key==='sources'&&<button type="button" className="fdock-done" onClick={()=>shut(true)}>Готово{sources.value.length?' · '+sources.value.length:''}</button>}</>:null}>
-   {current.key==='genre'&&<ChoicePanel label="Жанры" findLabel="Найти жанр" options={genres} value={filters.genre} onPick={value=>{onFilter('genre',same(value,filters.genre||'')?'':value);shut(true);}}/>}
+   {current.key==='genre'&&mergeNavigation&&<SignedPanel label="Жанры" options={genres} positive={filters.genre} negative={filters.excludeGenre} onChange={(yes,no)=>{onFilter('genre',yes);onFilter('excludeGenre',no);}}/>}
+   {current.key==='genre'&&!mergeNavigation&&<ChoicePanel label="Жанры" findLabel="Найти жанр" options={genres} value={filters.genre} onPick={value=>{onFilter('genre',value);shut(true);}}/>}
+   {current.key==='tag'&&!mergeNavigation&&<TagPanel value={filters.tag} options={tags} onChange={value=>onFilter('tag',value)}/>}
    {current.key==='year'&&<YearPanel years={years} value={filters.year} onChange={value=>{onFilter('year',value);if(years)shut(true);}}/>}
-   {current.key==='tag'&&<TagPanel value={filters.tag} options={tags} onChange={value=>onFilter('tag',value)}/>}
+   {current.key==='tag'&&mergeNavigation&&<SignedPanel label="Теги" options={tags} positive={filters.tag} negative={filters.excludeTag} onChange={(yes,no)=>{onFilter('tag',yes);onFilter('excludeTag',no);}}/>}
+   {current.key==='readingMode'&&<Options label="Подача" options={[["","Любая"],["webtoon","Вебтун"],["paged","Страницы"]]} selected={value=>value===(filters.readingMode||'')} onPick={value=>{onFilter('readingMode',value);shut(true);}}/>}
    {current.key==='format'&&<ChoicePanel label="Форматы" findLabel="Найти формат" options={formats} value={filters.format} onPick={value=>{onFilter('format',same(value,filters.format||'')?'':value);shut(true);}}/>}
    {current.key==='age'&&<Options label="Возраст" options={AGES} selected={id=>id===(filters.age||'')} onPick={id=>{onFilter('age',id);shut(true);}}/>}
    {current.key==='voice'&&(voiceExact?<ChoicePanel label={voiceTitle} findLabel={voiceTitle==='Перевод'?'Найти перевод':'Найти озвучку'} options={voiceOptions} value={voice} onPick={value=>{onVoice(same(value,voice||'')?'':value);shut(true);}}/>:<VoicePanel value={voice} onChange={onVoice} options={voiceOptions} disabled={voiceDisabled}/>)}

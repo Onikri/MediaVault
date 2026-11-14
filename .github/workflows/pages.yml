@@ -188,6 +188,7 @@ jobs:
             .codex-local/test-output/watch/*.png
             .codex-local/test-output/navigation/*.png
             .codex-local/test-output/content-management/*.png
+            .codex-local/test-output/catalog-morph/*.png
           include-hidden-files: true
           if-no-files-found: ignore
 

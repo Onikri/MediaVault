@@ -79,6 +79,11 @@ class Policy:
                         token=(actual,normalize(alias))
                         if token in self.scoped and self.scoped[token]!=key:raise ValueError('Ambiguous source alias')
                         self.scoped[token]=key
+        from catalog_taxonomy import DATA
+        for genre in DATA['genres']:
+            labels=[genre['label'],genre['key'],*genre['aliases']]
+            key=next((self.aliases[normalize(v)] for v in labels if normalize(v) in self.aliases),normalize(genre['label']))
+            for label in labels:self.aliases.setdefault(normalize(label),key)
         self.hidden.update(self.aliases.get(normalize(v),normalize(v)) for v in hidden)
         self.revision=hashlib.sha256(canonical_json(self.data)).hexdigest()
 
@@ -119,16 +124,8 @@ class Policy:
         return list(found.values())[:120]
 
     def facts(self,row,source=''):
-        result={'tags':[],'genres':[]}
-        for field in result:
-            values=row.get(field) or []
-            for value in values if isinstance(values,(list,tuple)) else []:
-                key=self.key(value,source)
-                if not key:continue
-                rule=self.rules.get(key,{});target={'tag':'tags','genre':'genres'}.get(rule.get('category'),field)
-                label=self.label(key,value)
-                if label not in result[target]:result[target].append(label)
-        return {field:values[:120] for field,values in result.items()}
+        from catalog_taxonomy import project
+        return project(self,row,source)
 
     def public(self):
         # The public catalogue needs only visible matching rules. Moderation

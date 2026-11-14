@@ -172,7 +172,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   }
   const ukrainian=useUkrainianTitle(server||state?.server,title.section||title.profile?.kind,title.metadataId||title.profile?.sourceId||title.profile?.ids?.mal);
   const baseProfile=ukrainian?{...(profile||{}),title:ukrainian.title,description:ukrainian.description||profile?.description}:(profile||{});
-  const p=title.category==='manga'||globalContentPolicy()?mangaPolicyProfile(baseProfile):baseProfile,name=p.title&&p.title!=='Название уточняется'?p.title:title.name,parts=titleParts(title),currentPart=parts.find(value=>value.name===part)||parts[0];
+  const p=title.category==='manga'||globalContentPolicy()?mangaPolicyProfile(baseProfile,title.section||title.kind):baseProfile,name=p.title&&p.title!=='Название уточняется'?p.title:title.name,parts=titleParts(title),currentPart=parts.find(value=>value.name===part)||parts[0];
   const video=selected&&title.items.some(item=>item.id===selected.id)?selected:null;
   const voices=[...new Set(title.items.filter(i=>i.category==='video').map(i=>voiceLabel(i)))];
   const facts=[['Тип',p.format||SECTION_LABELS[title.section]||'Произведение'],['Тема',p.themes?.join(', ')],['Статус',p.status],['Выпуск',day(p.startDate)+(p.endDate?' — '+day(p.endDate):'')],['Первоисточник',p.origin],...publicationFacts(p,title.section),['Длительность',p.duration?p.duration+' мин.':null],['Рейтинг',p.ratingCode],['Возраст',p.rating],['Озвучка',voices.join(', ')],['Режиссёры',p.directors?.join(', ')],['Студия',p.studios?.join(', ')]];

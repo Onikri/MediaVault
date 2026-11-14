@@ -11,7 +11,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  const service={server:location.origin,status:'connected',session:{serverVersion:73},request:async(p,o={})=>{
   if(p.startsWith('/manga/tag-policy'))return{revision:String(window.generation),policy:window.rules};
   if(p.startsWith('/manga/catalog/tags'))return{tags:[{key:'драма',original:'Drama',type:'genres',works:1},{key:'фэнтези',original:'Fantasy',type:'tags',works:1},...(window.generation>=2?[{key:'экология',original:'Ecology',type:'genres',works:1}]:[])]};
-  if(p.startsWith('/manga/catalog?'))return{items:[new URL(p,location.origin).searchParams.get('genre')==='Экология'?{...row,genres:['Ecology']}:row],total:1,offset:0};
+  if(p.startsWith('/manga/catalog?'))return{items:[String(new URL(p,location.origin).searchParams.get('genre')).includes('Экология')?{...row,genres:['Ecology']}:row],total:1,offset:0};
   if(p==='/manga/catalog/'+row.catalogId){const active=compileMangaPolicy(window.rules);return{...row,genres:active.project(['Drama','Ecology']),tags:active.project(['Fantasy'])};}
   if(p.startsWith('/discovery/manga/sources'))return{sources:[{id:'1',name:'Fixture',language:'en'}]};
   if(p==='/discovery/manga/search')return{id:'fixture',state:'done',results:[row]};
@@ -30,22 +30,22 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
  const panel=async name=>{await page.getByRole('toolbar',{name:'Фильтры каталога'}).getByRole('button',{name:new RegExp('^'+name)}).click();const dialog=page.getByRole('dialog',{name});await dialog.waitFor();return dialog;};
  const shut=async()=>{await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'detached'});};
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).waitFor();
- await (await panel('Жанр')).getByRole('option',{name:'Драма',exact:true}).waitFor();await shut();
+ await (await panel('Жанры')).getByRole('button',{name:'Включить Драма',exact:true}).waitFor();await shut();
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).click();
  await page.getByRole('heading',{name:'Garden World',exact:true}).waitFor();
  await page.locator('.title-genre-list').getByText('Драма',{exact:true}).waitFor();
  await page.evaluate(()=>{window.rules={...window.rules,tags:window.rules.tags.filter(t=>!['драма','фэнтези'].includes(t.key))};window.generation++;window.dispatchEvent(new Event('focus'));});
  await page.locator('.title-genre-list').getByText('Драма',{exact:true}).waitFor({state:'detached'});
- await page.evaluate(()=>{window.rules={...window.rules,tags:[...window.rules.tags,{key:'экология',label:'Экология',aliases:['Ecology']}]};window.generation++;window.dispatchEvent(new Event('focus'));});
+ await page.evaluate(()=>{window.rules={...window.rules,tags:[...window.rules.tags,{key:'экология',label:'Экология',aliases:['Ecology'],category:'genre'}]};window.generation++;window.dispatchEvent(new Event('focus'));});
  await page.locator('.title-genre-list').getByText('Экология',{exact:true}).waitFor();
  await page.getByRole('button',{name:'К результатам поиска',exact:true}).click();
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).waitFor();
- const tags=await panel('Теги');await tags.getByRole('listbox',{name:'Теги'}).or(tags.locator('.fdock-empty')).first().waitFor();
- assert.equal(await tags.getByRole('option',{name:'Фэнтези',exact:true}).count(),0);await shut();
- const genres=await panel('Жанр');await genres.getByRole('option',{name:'Экология',exact:true}).waitFor();
- assert.equal(await genres.getByRole('option',{name:'Драма',exact:true}).count(),0);
- await genres.getByRole('option',{name:'Экология',exact:true}).click();await page.getByRole('dialog').waitFor({state:'detached'});
- await page.getByRole('button',{name:'Убрать фильтр Жанр',exact:true}).waitFor();
+ const tags=await panel('Теги');await tags.locator('.fdock-signed-list').or(tags.locator('.fdock-empty')).first().waitFor();
+ assert.equal(await tags.getByRole('button',{name:'Включить Фэнтези',exact:true}).count(),0);await shut();
+ const genres=await panel('Жанры');await genres.getByRole('button',{name:'Включить Экология',exact:true}).waitFor();
+ assert.equal(await genres.getByRole('button',{name:'Включить Драма',exact:true}).count(),0);
+ await genres.getByRole('button',{name:'Включить Экология',exact:true}).click();await shut();
+ await page.getByRole('button',{name:'Убрать фильтр Жанры',exact:true}).waitFor();
  await page.getByRole('button',{name:'Выбрать Garden World',exact:true}).waitFor();
  assert.deepEqual(errors,[]);
  console.log('PASS runtime deletion and addition reach an open title, catalogue cards and filter options despite stale metadata responses');

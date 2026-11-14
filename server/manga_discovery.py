@@ -324,6 +324,8 @@ class Discovery:
             self.db.execute("UPDATE jobs SET state='interrupted',updated=? WHERE state='running'",(self.clock(),))
             self.db.execute("UPDATE work SET state='cancelled' WHERE state IN ('queued','running')")
         if start_workers:
+            from catalog_taxonomy import maintain_books
+            cleanup=threading.Thread(target=maintain_books,args=(self,),daemon=True,name='catalog-taxonomy');self.maintenance_thread=cleanup;cleanup.start()
             for i in range(max(1,min(workers,8))):
                 thread=threading.Thread(target=self._worker,daemon=True,name='manga-discovery-'+str(i));self.threads.append(thread);thread.start()
 
@@ -579,9 +581,10 @@ class Discovery:
 
     def close(self):
         with self.condition:self.stopping=True;self.condition.notify_all()
-        for thread in self.threads:thread.join(timeout=6)
+        threads=[*self.threads,*([self.maintenance_thread] if getattr(self,'maintenance_thread',None) else [])]
+        for thread in threads:thread.join(timeout=6)
         with self.lock:
-            if not any(t.is_alive() for t in self.threads):self.db.close()
+            if not any(t.is_alive() for t in threads):self.db.close()
 
 _manager=None;_manager_lock=threading.Lock()
 def manager():
