@@ -656,12 +656,12 @@ content_management.install(app,content_owner,viewer,lambda:__import__('manga_dis
 
 
 @app.get('/manga/catalog')
-def manga_catalog(q:str='',tag:str='',genre:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,tagPolicyRevision:str='',subject=Depends(viewer)):
+def manga_catalog(q:str='',tag:str='',genre:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,sort:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
     from manga_discovery import manager
     from manga_catalog_index import browse
     store=manager()
     with store.lock:
-        result=browse(store.db,q=q,tag=tag,genre=genre,provider=provider,format=format,offset=offset,limit=limit,**manga_catalog_filters(language,year,age,sourceIds))
+        result=browse(store.db,q=q,tag=tag,genre=genre,provider=provider,format=format,offset=offset,limit=limit,sort=sort,**manga_catalog_filters(language,year,age,sourceIds))
     content_management.prioritize(store,subject,tag,genre)
     return content_management.with_policy(result,tagPolicyRevision,store)
 
