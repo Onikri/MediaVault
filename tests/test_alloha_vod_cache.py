@@ -6,6 +6,8 @@ import shutil
 import sys
 import tempfile
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -90,6 +92,24 @@ class DiskCacheTests(unittest.TestCase):
         with self.assertRaises(ValueError): archive.restore('owner', self.key)
         self.assertIsNone(self.cache.load(self.key))
         self.assertFalse(archive.restore('other', self.key))
+
+    def test_full_movie_validation_does_not_lock_out_a_foreground_seek(self):
+        self.cache.put(self.key, 'url', '', self.value)
+        original = self.cache.get
+        entered, release = threading.Event(), threading.Event()
+        def gated(*args):
+            if threading.current_thread().name == 'vod-validator':
+                entered.set(); release.wait(3)
+            return original(*args)
+        self.cache.get = gated
+        worker = threading.Thread(name='vod-validator', target=lambda:self.cache.complete(self.key, {'resources':[['url','']]}))
+        worker.start()
+        try:
+            self.assertTrue(entered.wait(1))
+            with ThreadPoolExecutor(1) as pool:
+                self.assertEqual(pool.submit(original, self.key, 'url').result(timeout=.5), self.value)
+        finally:
+            release.set(); worker.join(3)
 
 
 class VodDeliveryTests(unittest.IsolatedAsyncioTestCase):

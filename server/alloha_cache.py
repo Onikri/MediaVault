@@ -144,9 +144,11 @@ class VodCache:
             return True
 
     def complete(self, key, record):
+        # Validate one fragment at a time; a whole-film hash must not hold the
+        # cache-wide lock and stall a foreground seek for seconds.
+        if not record['resources'] or any(self.get(key, url, interval) is None for url, interval in record['resources']):
+            return False
         with self.lock:
-            if not record['resources'] or any(self.get(key, url, interval) is None for url, interval in record['resources']):
-                return False
             self.atomic(self.folder(key)/'complete.json', json.dumps(record).encode())
             return True
 
