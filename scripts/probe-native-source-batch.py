@@ -26,11 +26,12 @@ def candidates():
     import manga_gigaviewer
     import manga_hentaihand
     import manga_native_sources as native
+    import manga_yii
 
     profiles = dict(native.ADAPTERS)
     for module in (native.manga_madara, native.manga_themesia, native.manga_keyoapp, native.manga_vinetheme,
                    native.manga_mangacatalog, native.manga_iken, native.manga_mangahub, manga_hentaihand,
-                   manga_comici, manga_gigaviewer):
+                   manga_comici, manga_gigaviewer, manga_yii):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in module.SOURCES)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby
@@ -60,8 +61,6 @@ def audit(adapter, check_search, check_chapters):
             http.deadline = time.monotonic() + 12
             found, _ = adapter.catalogue(http, query=sample['title'])
             result['search'] = any(row.get('id') == sample['id'] for row in found)
-            if not result['search']:
-                return {**result, 'status': 'search_mismatch', 'phase': phase}
         if check_chapters:
             phase = 'chapters'
             http.deadline = time.monotonic() + 12
@@ -78,6 +77,8 @@ def audit(adapter, check_search, check_chapters):
                 if not url or not adapter.CHAPTER_PATH.fullmatch(urlsplit(url).path):
                     return {**result, 'status': 'identity_mismatch', 'phase': phase}
             result['chapters'] = True
+        if check_search and not result['search']:
+            return {**result, 'status': 'search_mismatch', 'phase': 'search'}
         return {**result, 'status': 'passed', 'phase': phase}
     except SourceRateLimitError as error:
         return {**result, 'status': 'rate_limited', 'phase': phase, 'retry_after_seconds': error.retry_after}
@@ -113,6 +114,8 @@ def live(args):
     if unknown:
         raise SystemExit('No direct profile for: ' + ', '.join(sorted(unknown)))
     ordered = sorted(profiles.values(), key=lambda row: (row.SOURCE_ID in enabled, row.NAME.casefold(), row.SOURCE_ID))
+    if args.inactive:
+        ordered = [row for row in ordered if row.SOURCE_ID not in enabled]
     if args.source:
         selected = [row for row in ordered if row.SOURCE_ID in args.source]
     else:
@@ -122,7 +125,7 @@ def live(args):
         groups[urlsplit(adapter.ROOT).hostname].append(adapter)
     started = time.monotonic()
     emit({'event': 'started', 'total_profiles': len(profiles), 'selected': len(selected), 'origins': len(groups),
-          'workers': args.workers, 'search': args.search, 'chapters': args.chapters})
+          'workers': args.workers, 'search': args.search, 'chapters': args.chapters, 'inactive_only': args.inactive})
     statuses = Counter()
     operations = Counter()
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
@@ -164,19 +167,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--batch-size', type=int, default=150, choices=range(1, 201), metavar='1-200')
     parser.add_argument('--offset', type=int, default=0)
+    parser.add_argument('--inactive', action='store_true', help='Limit the window to unactivated direct profiles.')
     parser.add_argument('--workers', type=int, default=8, choices=range(1, 13), metavar='1-12')
     parser.add_argument('--source', action='append', default=[], help='Repeat to rerun particular source IDs.')
     parser.add_argument('--search', action='store_true', help='Also look up one returned title by exact ID.')
     parser.add_argument('--chapters', action='store_true', help='Validate one title’s chapter list without downloading images.')
     parser.add_argument('--ssh', metavar='HOST', help='Run temporarily inside the importer through SSH.')
     args = parser.parse_args()
-    if args.offset < 0 or len(args.source) > args.batch_size or args.source and args.offset:
-        parser.error('Supply a nonnegative offset or up to batch-size explicit IDs.')
+    if args.offset < 0 or len(args.source) > args.batch_size or args.source and (args.offset or args.inactive):
+        parser.error('Supply a nonnegative offset with an optional inactive filter, or up to batch-size explicit IDs.')
     if args.ssh:
         if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.@-]*', args.ssh):
             parser.error('Invalid SSH host or alias.')
         remote_args = ['--batch-size', str(args.batch_size), '--offset', str(args.offset), '--workers', str(args.workers)]
         remote_args += [value for source in args.source for value in ('--source', source)]
+        if args.inactive:
+            remote_args.append('--inactive')
         if args.search:
             remote_args.append('--search')
         if args.chapters:

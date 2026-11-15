@@ -352,5 +352,5 @@ SOURCES = (
     Comici('162182610453532778', 'Young Champion', 'https://youngchampion.jp', 'ja', True),
 )
 HOSTS = frozenset(adapter.host for adapter in SOURCES)
-ENABLED = {'6626616605316433619', '6820605856874807465'}
+ENABLED = {'6626616605316433619', '6820605856874807465', '4711824862797870329'}
 ACTIVE_SOURCES = tuple(adapter for adapter in SOURCES if adapter.SOURCE_ID in ENABLED)

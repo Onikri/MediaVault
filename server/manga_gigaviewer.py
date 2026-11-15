@@ -379,7 +379,7 @@ class GigaViewer:
 
 SOURCES = tuple(GigaViewer(*profile) for profile in PROFILES)
 HOSTS = {adapter.host: adapter for adapter in SOURCES}
-ENABLED = {'3399001455113605946', '5161357527629843269'}
+ENABLED = {'3399001455113605946', '5161357527629843269', '5332604811772266259', '3118962894631295374'}
 ACTIVE_SOURCES = tuple(adapter for adapter in SOURCES if adapter.SOURCE_ID in ENABLED)
 
 
