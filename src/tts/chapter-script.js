@@ -5,7 +5,7 @@
 // reader's Narration panel, the save window's device audiobook and the VM's
 // Drive audiobook (narration-export.html in headless Chromium) all call this,
 // so a chapter has the same voices and segmentation wherever it is saved.
-import {heuristicRoles,ROLE_MODEL} from './roles.js';
+import {atomRoles,mergeAtoms,ROLE_MODEL} from './roles.js';
 import {analyseChapter,studyBook,adoptBible,latestBible} from './director.js';
 import {castVoices,savedCast} from './voices.js';
 import {savedBible,applyLexicon} from './bible.js';
@@ -40,7 +40,7 @@ export async function chapterScript({paragraphs,bookKey,chapterKey,meta,service,
  if(prefs.roles&&service&&!bible&&paragraphs.length){
   bible=await studyBook({bookKey,meta,sample:paragraphs.join('\n'),service,userId,model:prefs.bibleModel}).catch(()=>null);
  }
- let segments=heuristicRoles(paragraphs),characters=[],analysis='heuristic',stats=null;
+ let segments=mergeAtoms(atomRoles(paragraphs),paragraphs),characters=[],analysis='heuristic',stats=null;
  if(prefs.roles&&service&&paragraphs.length){
   const value=await analyseChapter({paragraphs,bookKey,chapterKey,bible,meta,service,userId,model:prefs.rolesModel,start:0,onUpdate:null,onBible:next=>{bible=next;}});
   segments=value.segments;characters=value.characters||[];stats=value.stats||null;

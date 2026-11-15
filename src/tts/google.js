@@ -28,7 +28,12 @@ export function forModel(request,model){
  return request;
 }
 
-export async function generate({service,userId,model,request,signal,timeout=120000,pool=false}){
+// slot: a server key slot to try first (the «pro» slots for the director and
+// the arbiter); other slots still answer when it is busy or out of quota.
+export const PRO_SLOTS=[0,1,2];
+let proTurn=0;
+export const nextProSlot=()=>PRO_SLOTS[proTurn++%PRO_SLOTS.length];
+export async function generate({service,userId,model,request,signal,timeout=120000,pool=false,slot=null}){
  if(!service?.request)throw Error('Для разбора текста подключи сервер MediaVault в профиле.');
  request=forModel(request,model);
  const key=await personalKey(userId);
@@ -36,7 +41,7 @@ export async function generate({service,userId,model,request,signal,timeout=1200
  for(;;){
   try{
    return await service.request('/reader/google/generate',{method:'POST',signal:AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(timeout)]),
-    body:{...(key?{key}:{}),...(pool&&key&&Number(service?.session?.serverVersion)>=60?{pool:true}:{}),model,request}});
+    body:{...(key?{key}:{}),...(pool&&key&&Number(service?.session?.serverVersion)>=60?{pool:true}:{}),...(!key&&Number.isInteger(slot)&&Number(service?.session?.serverVersion)>=60?{slot,pool:true}:{}),model,request}});
   }catch(error){
    // Free-tier minute limits: wait the advertised time a couple of times.
    const wait=Number(error?.retryAfter)||(/повтор через (\d+)/.exec(error?.message||'')?.[1]|0);

@@ -94,9 +94,11 @@ test('director: parts go out together, a refused part is halved, new speakers ar
   inFlight++;peak=Math.max(peak,inFlight);await new Promise(r=>setTimeout(r,20));inFlight--;
   const system=body.request.systemInstruction.parts[0].text,user=body.request.contents[0].parts[0].text;calls.push({model:body.model,pool:body.pool,system});
   const wrap=value=>({candidates:[{content:{parts:[{text:JSON.stringify(value)}]}}],usageMetadata:{promptTokenCount:1000,candidatesTokenCount:50}});
+  if(system.includes('редактор аудиокниги'))return wrap({speech:'тире в начале абзаца',author:'— с пробелами после запятой',thoughts:'нет'});
   if(system.includes('ведёшь список'))return wrap({same:['Незнакомка=1'],characters:[{name:'Стражник',aliases:[],gender:'m',age:'adult',importance:'minor',timbre:'rough',voice:'хриплый бас',geminiVoice:'Algenib'}]});
-  const rows=user.split('Сегменты:\n')[1].split('\n').map(l=>/^(\d+) ([NSTQ])/.exec(l)).filter(Boolean);
-  if(user.includes('Запретный')&&rows.length>4)return {promptFeedback:{blockReason:'PROHIBITED_CONTENT'}};
+  const rows=user.split('Сегменты:\n')[1].split('\n').map(l=>/^(\d+) ([NSTQ?])/.exec(l)).filter(Boolean);
+  // Google refuses the same text again when the arbiter asks about it.
+  if(user.includes('Запретный')&&(rows.length>4||system.includes('старший разметчик')))return {promptFeedback:{blockReason:'PROHIBITED_CONTENT'}};
   return wrap({lines:rows.filter(r=>r[2]!=='N').map(r=>r[1]+'|S|'+(Number(r[1])%4===1?'Незнакомка':Number(r[1])%4===3?'Стражник':'1')+'|calm|4'),moods:[],cast:['Незнакомка|f|young|тихий','Стражник|m|adult|хриплый']});
  }};
  const updates=[];let merged=null;

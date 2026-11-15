@@ -2,7 +2,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {Play,Pause,SkipBack,SkipForward,Users,Headphones,X,Volume2,RefreshCw,KeyRound,Download} from 'lucide-react';
 import {TTS_BYTES,ttsConsent,setTtsConsent,PRESET_VOICES} from './model.js';
 import {startNarrationEngine,engineReady,synthesize} from './engine.js';
-import {heuristicRoles,ROLE_MODEL} from './roles.js';
+import {atomRoles,mergeAtoms,ROLE_MODEL} from './roles.js';
 import {analyseChapter,detach,prefetchChapter,studyBook,adoptBible,forgetStudy} from './director.js';
 import {castVoices,narratorCast,savedCast,saveCast,PRESET_TRAITS} from './voices.js';
 import {createNarrator,utterancesOf,playClip,localClip,voiceChain} from './player.js';
@@ -66,7 +66,7 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  // Leaving the chapter does not cancel requests already sent: their answer is
  // stored on the device for the next visit.
  useEffect(()=>{
-  setSegments(heuristicRoles(paragraphs));setCharacters([]);setAnalysis('');setRoleStats(null);
+  setSegments(mergeAtoms(atomRoles(paragraphs),paragraphs));setCharacters([]);setAnalysis('');setRoleStats(null);
   if(!prefs.roles||!service||!paragraphs.length)return;
   let live=true;setAnalysis('running');
   const listener=value=>{if(!live)return;setSegments(value.segments);setCharacters(value.characters||[]);setRoleStats({...value.stats,cached:!!value.cached});if(value.done)setAnalysis(value.stats?.failed?'partial':'model');};
