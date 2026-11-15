@@ -85,9 +85,15 @@ export function letterInk(data,w,h,local,paper,{light,rimmed=false}={}){
  if(!sample.length)sample=parts.filter(p=>p.inside>=.6);
  if(!sample.length)return {ink,glyph:0,stroke:0};
  const stroke=weighted(sample,p=>p.stroke,.5);
+ // A word drawn in one piece (cursive sound effects, outlined letters whose
+ // outlines merge) is dozens of strokes long: it says nothing about the size of
+ // one letter. Taken as a letter size it lets a whole hand or collar through.
+ const joined=p=>size(p)>p.stroke*20,single=sample.filter(p=>!joined(p));
  // Bars and lines say nothing about the size of a letter.
- const squat=sample.filter(p=>p.stroke>=stroke*.6&&Math.max(p.width,p.height)/Math.min(p.width,p.height)<3),bold=squat.length?squat:sample.filter(p=>p.stroke>=stroke*.6);
- const glyph=Math.max(6,Math.min(Math.min(bw,bh),weighted(bold.length?bold:sample,size,.8)));
+ const squat=single.filter(p=>p.stroke>=stroke*.6&&Math.max(p.width,p.height)/Math.min(p.width,p.height)<3),bold=squat.length?squat:single.filter(p=>p.stroke>=stroke*.6);
+ const glyph=Math.max(6,Math.min(Math.min(bw,bh),single.length?weighted(bold.length?bold:single,size,.8):stroke*8));
+ // The joined word itself is lettering: wholly inside the box, open strokes of the text's own weight.
+ const word=p=>joined(p)&&p.inside>=.95&&p.out<=1&&p.area<=bw*bh*.4&&p.area<=p.width*p.height*.4&&p.stroke>=stroke*.75&&p.stroke<=stroke*1.4;
  // Letters that touch (kerned Latin, a joined kana pair) form a run one glyph
  // high (or wide) and several long; a run is a letter too.
  const letter=p=>p.inside>=.6&&p.out<=Math.max(2,glyph*.3)&&p.area<=bw*bh*.4&&(size(p)<=glyph*2.2||Math.min(p.width,p.height)<=glyph*1.3&&size(p)<=glyph*4.5&&p.stroke>=stroke*.7)
@@ -101,7 +107,7 @@ export function letterInk(data,w,h,local,paper,{light,rimmed=false}={}){
   for(const n of p.pixels){core+=lumaAt(n);const x=n%w;for(const d of [-2,-1,1,2])for(const i of [n+d,n+d*w]){if(i<0||i>=total||own.has(i)||(Math.abs(d)<=2&&i===n+d&&((i%w)-x)!==d))continue;sum+=lumaAt(i);count++;}}
   return count>0&&(dark?sum/count-core/p.area>=50:core/p.area-sum/count>=50);
  };
- const least=Math.max(6,(glyph*.18)**2),found=parts.filter(p=>letter(p)&&p.area>=least&&(!rimmed||withRim(p)));
+ const least=Math.max(6,(glyph*.18)**2),found=parts.filter(p=>(letter(p)||word(p))&&p.area>=least&&(!rimmed||withRim(p)));
  // A bar (a long vowel mark, a dash) is a letter only right next to compact
  // letters; alone under or beside the text it is a line of the drawing.
  const long=p=>Math.max(p.width,p.height)/Math.min(p.width,p.height)>=4,compact=found.filter(p=>!long(p));

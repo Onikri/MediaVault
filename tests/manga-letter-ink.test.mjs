@@ -60,3 +60,17 @@ test('dilation by a square is the same as before, in two passes',()=>{
  const out=dilateInk(mask,w,h,2);
  for(let y=0;y<h;y++)for(let x=0;x<w;x++)assert.equal(out[y*w+x],(Math.abs(x-4)<=2&&Math.abs(y-3)<=2)||(x<=2&&y<=2)?1:0,x+','+y);
 });
+
+test('a sound effect drawn as one joined word does not let a dark drawing in the box pass for letters',()=>{
+ // One serpentine stroke of 6 px (a cursive SFX whose letters run together),
+ // a dot beside it, and a dark hand that reaches into the box through a narrow wrist.
+ const W=280,H=240,c=canvas(W,H,230),box=[40,40,190,200];
+ for(const y of [50,80,110,140,170])c.fill(50,y,150,y+6);
+ for(const [i,y] of [50,80,110,140].entries())c.fill(i%2?50:144,y,i%2?56:150,y+36);
+ c.fill(60,186,70,196);
+ c.fill(160,100,186,190,30);c.fill(186,140,188,142,30);c.fill(188,90,260,210,30);
+ const {ink,glyph}=letterInk(c.data,W,H,box,230);
+ assert.ok(glyph<40,'a joined word is not one letter: glyph '+glyph);
+ assert.ok(covered(ink,W,50,50,150,176)>2800,'the joined word is masked');
+ assert.equal(covered(ink,W,160,100,186,190),0,'the hand inside the box stays');
+});
