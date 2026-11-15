@@ -14,13 +14,15 @@ import manga_themesia
 import manga_iken
 import manga_mangacatalog
 import manga_keyoapp
+import manga_vinetheme
 from manga_source_urls import split_reader_url
 from source_parser import PublicHttp, SourceError
 
 
 ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (
     manga_mangashi, *manga_mangahub.SOURCES, *manga_madara.ACTIVE_SOURCES, *manga_themesia.ACTIVE_SOURCES,
-    *manga_iken.SOURCES, *manga_mangacatalog.ACTIVE_SOURCES, *manga_keyoapp.ACTIVE_SOURCES
+    *manga_iken.SOURCES, *manga_mangacatalog.ACTIVE_SOURCES, *manga_keyoapp.ACTIVE_SOURCES,
+    *manga_vinetheme.ACTIVE_SOURCES
 )}
 HOSTS = {
     urlsplit(adapter.ROOT).hostname: adapter
@@ -117,10 +119,13 @@ def catalogue_job(adapter, spec, page):
             # stable upstream filter by exact label without changing its cursor.
             label = term['label'].casefold()
             vocabulary = adapter.vocabulary(http)
-            options = {v['sourceId']: v['label'] for v in vocabulary if v['label'].casefold() == label}
-            if not options and (legacy_label := getattr(adapter, 'legacy_term_label', None)):
+            matching = [v for v in vocabulary if v['label'].casefold() == label]
+            if not matching and (legacy_label := getattr(adapter, 'legacy_term_label', None)):
                 label = legacy_label(label)
-                options = {v['sourceId']: v['label'] for v in vocabulary if v['label'].casefold() == label}
+                matching = [v for v in vocabulary if v['label'].casefold() == label]
+            options = {v['sourceId']: v['label'] for v in matching}
+            if len(options) > 1:
+                options = {v['sourceId']: v['label'] for v in matching if v['category'] == term['category']}
             if len(options) != 1:
                 raise SourceError('Сохранённый фильтр больше не совпадает со справочником источника.')
             tag, name = next(iter(options.items()))
@@ -142,13 +147,16 @@ def catalogue_job(adapter, spec, page):
         http.close()
 
 
-def saved_reader_url(adapter, client, source, canonical, manga, chapter):
+def saved_reader_url(adapter, client, source, canonical, manga, chapter, data=None):
     root = source.get('baseUrl') or adapter.ROOT
     if urlsplit(root).hostname != urlsplit(adapter.ROOT).hostname or not adapter.site_link(root):
         return None
     title = adapter.site_link(canonical, root)
     if resolver := getattr(adapter, 'saved_title_url', None):
         title = resolver(title)
+    if data is not None and not adapter.TITLE_PATH.fullmatch(urlsplit(title).path):
+        if resolver := getattr(adapter, 'resolve_stored_title', None):
+            title = resolver(data)
     title_path = adapter.TITLE_PATH.fullmatch(urlsplit(title).path)
     if not title_path:
         return None
@@ -158,7 +166,7 @@ def saved_reader_url(adapter, client, source, canonical, manga, chapter):
     for row in chapters:
         if row.get('index') == chapter:
             resolve = getattr(adapter, 'saved_chapter', None)
-            target = resolve(row, root) if resolve else adapter.saved_chapter_url(row.get('realUrl') or row.get('url'), title_path[1], root)
+            target = resolve(row, root, title) if resolve else adapter.saved_chapter_url(row.get('realUrl') or row.get('url'), title_path[1], root)
             path = adapter.CHAPTER_PATH.fullmatch(urlsplit(target).path)
             matches = getattr(adapter, 'saved_chapter_matches', None)
             if path and (matches(target, title) if matches else path[1] == title_path[1]):

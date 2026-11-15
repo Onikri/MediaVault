@@ -429,3 +429,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   catalogues in Apache-2.0 Keiyoushi `lib-multisrc/mangacatalog` at the same revision.
 - The Keyoapp family (`server/manga_keyoapp.py`) follows the public HTML and AJAX
   contracts in Apache-2.0 Keiyoushi `lib-multisrc/keyoapp` at the same revision.
+- The VineTheme family (`server/manga_vinetheme.py`) follows the public catalogue
+  and React Flight payloads in Apache-2.0 Keiyoushi `lib-multisrc/vinetheme` and
+  `core/src/main/kotlin/keiyoushi/utils/NextJs.kt`. The installed WitchScans
+  revision is recorded in the native source inventory.

@@ -84,7 +84,7 @@ class Iken:
             return self.ROOT + '/series' + path
         return ''
 
-    def saved_chapter(self, row, root):
+    def saved_chapter(self, row, root, _title):
         stored = row.get('url') or ''
         target = self.site_link(row.get('realUrl') or stored, root)
         reference = urlsplit(stored)

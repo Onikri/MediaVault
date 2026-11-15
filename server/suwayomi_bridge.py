@@ -335,7 +335,7 @@ def native_reader_url(client,data,source,manga,chapter=None):
     parsed=urlsplit(canonical);lang=source.get('lang')
     from manga_native_sources import for_source,saved_reader_url
     if adapter:=for_source(source):
-        return saved_reader_url(adapter,client,source,canonical,manga,chapter)
+        return saved_reader_url(adapter,client,source,canonical,manga,chapter,data=data)
     # Several installed extensions can search but fail at chapter/page retrieval.
     # Use this SAME site's existing native reader adapter, including saved IDs.
     from manga_sources import site_for
