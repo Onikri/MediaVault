@@ -11,7 +11,7 @@ FILES = ['server/catalog_taxonomy.py','server/catalog-taxonomy.json','server/sou
          'server/manga_hmanga.py','server/manga_source_tags.py','server/manga_source_coverage.py','server/manga_catalog_index.py','server/manga_tag_policy.py','server/manga_tag_deploy.py','server/manga_catalog_metadata.py','server/content_catalog.py','server/content_management.py','server/content_sources.py','server/content_metadata.py','server/content_source_routes.py','server/content_vocabulary.py','server/catalogue_sources.py','server/catalogue_html.py','server/catalogue_lib_auth.py','server/catalogue_indexer.py','server/manga_native_sources.py','server/manga_mangashi.py']
 FILES.extend(['server/manga_mangahub.py','server/manga_madara.py','server/manga_madara_profiles.py','server/manga_source_urls.py',
               'server/manga_themesia.py','server/manga_iken.py','server/manga_mangacatalog.py','server/manga_keyoapp.py',
-              'server/manga_vinetheme.py'])
+              'server/manga_vinetheme.py','server/manga_hentaihand.py'])
 CONFIG_FILES = ['server/manga-tag-policy.json']
 # GitHub serves repository LF bytes even when a Windows checkout uses CRLF.
 HASHES = {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for name in FILES}

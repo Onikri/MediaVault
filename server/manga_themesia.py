@@ -258,8 +258,8 @@ SOURCES = (
                  cards='.utao .uta .imgu, .listupd .bs .bsx:not(:has(.novelabel)), .listo .bs .bsx:not(:has(.novelabel))',
                  alternate='.alternative .desktop-titles'),
     MangaThemesia(('427734044452073936', 'Athrea Scans', 'https://athreascans.com', True),
-                 chapters='#chapterlist li:has(.eph-num a[href])', interval=0.5),
+                 chapters='#chapterlist li:has(.eph-num):has(a[href])', interval=0.5),
 )
 
-ENABLED = {'8513894820944573933', '7925933833035450162', '9079184529211162476'}
+ENABLED = {'8513894820944573933', '1931493862544259486', '7925933833035450162', '9079184529211162476'}
 ACTIVE_SOURCES = tuple(adapter for adapter in SOURCES if adapter.SOURCE_ID in ENABLED)

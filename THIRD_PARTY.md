@@ -433,3 +433,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   and React Flight payloads in Apache-2.0 Keiyoushi `lib-multisrc/vinetheme` and
   `core/src/main/kotlin/keiyoushi/utils/NextJs.kt`. The installed WitchScans
   revision is recorded in the native source inventory.
+- The HentaiHand family (`server/manga_hentaihand.py`) follows the public API and
+  language filters in Apache-2.0 Keiyoushi `lib-multisrc/hentaihand`,
+  `src/all/hentaihand` and `src/all/nhentaicom` at revision
+  `6f345a81459739e35d8fc94c05455464e856f771`.

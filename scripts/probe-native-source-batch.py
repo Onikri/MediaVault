@@ -22,18 +22,19 @@ def emit(row):
 
 
 def candidates():
+    import manga_hentaihand
     import manga_native_sources as native
 
     profiles = dict(native.ADAPTERS)
     for module in (native.manga_madara, native.manga_themesia, native.manga_keyoapp, native.manga_vinetheme,
-                   native.manga_mangacatalog, native.manga_iken, native.manga_mangahub):
+                   native.manga_mangacatalog, native.manga_iken, native.manga_mangahub, manga_hentaihand):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in module.SOURCES)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby
     return profiles, native.ADAPTERS
 
 
-def audit(adapter, check_search):
+def audit(adapter, check_search, check_chapters):
     from source_parser import PublicHttp, SourceAccessError, SourceError, SourceRateLimitError, SourceTemporaryError
 
     phase = 'catalogue'
@@ -50,14 +51,30 @@ def audit(adapter, check_search):
                     or not adapter.TITLE_PATH.fullmatch(urlsplit(target).path)):
                 return {**result, 'status': 'identity_mismatch', 'phase': phase}
         result['catalogue'] = True
+        sample = next((row for row in rows if 2 <= len(row['title']) <= 100), rows[0])
         if check_search:
             phase = 'search'
             http.deadline = time.monotonic() + 12
-            sample = next((row for row in rows if 2 <= len(row['title']) <= 100), rows[0])
             found, _ = adapter.catalogue(http, query=sample['title'])
             result['search'] = any(row.get('id') == sample['id'] for row in found)
             if not result['search']:
                 return {**result, 'status': 'search_mismatch', 'phase': phase}
+        if check_chapters:
+            phase = 'chapters'
+            http.deadline = time.monotonic() + 12
+            detail = adapter.inspect(sample['url'], http)
+            episodes = detail.get('episodes', [])
+            result['chapter_count'] = len(episodes)
+            result['chapters_truncated'] = bool(detail.get('truncated'))
+            if detail.get('pages') or str(detail.get('sourceId')) != adapter.SOURCE_ID or detail.get('id') != sample['id']:
+                return {**result, 'status': 'identity_mismatch', 'phase': phase}
+            if not episodes:
+                return {**result, 'status': 'empty', 'phase': phase}
+            for entry in episodes:
+                url = adapter.site_link(entry.get('url'))
+                if not url or not adapter.CHAPTER_PATH.fullmatch(urlsplit(url).path):
+                    return {**result, 'status': 'identity_mismatch', 'phase': phase}
+            result['chapters'] = True
         return {**result, 'status': 'passed', 'phase': phase}
     except SourceRateLimitError as error:
         return {**result, 'status': 'rate_limited', 'phase': phase, 'retry_after_seconds': error.retry_after}
@@ -74,12 +91,12 @@ def audit(adapter, check_search):
         http.close()
 
 
-def probe_origin(adapters, enabled, check_search):
+def probe_origin(adapters, enabled, check_search, check_chapters):
     results = []
     rate_limited = False
     for adapter in adapters:
         started = time.monotonic()
-        result = {'status': 'deferred', 'phase': 'catalogue'} if rate_limited else audit(adapter, check_search)
+        result = {'status': 'deferred', 'phase': 'catalogue'} if rate_limited else audit(adapter, check_search, check_chapters)
         rate_limited |= result['status'] == 'rate_limited'
         results.append({'source_id': adapter.SOURCE_ID, 'name': adapter.NAME,
                         'enabled': adapter.SOURCE_ID in enabled, 'ms': round((time.monotonic()-started)*1000), **result})
@@ -102,17 +119,18 @@ def live(args):
         groups[urlsplit(adapter.ROOT).hostname].append(adapter)
     started = time.monotonic()
     emit({'event': 'started', 'total_profiles': len(profiles), 'selected': len(selected), 'origins': len(groups),
-          'workers': args.workers, 'search': args.search})
+          'workers': args.workers, 'search': args.search, 'chapters': args.chapters})
     statuses = Counter()
-    catalogues = 0
+    operations = Counter()
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        jobs = [pool.submit(probe_origin, group, enabled, args.search) for group in groups.values()]
+        jobs = [pool.submit(probe_origin, group, enabled, args.search, args.chapters) for group in groups.values()]
         for future in as_completed(jobs):
             for result in future.result():
                 statuses[result['status']] += 1
-                catalogues += bool(result.get('catalogue'))
+                operations.update(key for key in ('catalogue', 'search', 'chapters') if result.get(key))
                 emit({'event': 'source', **result})
-    emit({'event': 'summary', 'completed': sum(statuses.values()), 'catalogues_returned': catalogues,
+    emit({'event': 'summary', 'completed': sum(statuses.values()), 'catalogues_returned': operations['catalogue'],
+          'searches_matched': operations['search'], 'chapter_lists_returned': operations['chapters'],
           'statuses': dict(statuses), 'seconds': round(time.monotonic() - started, 2)})
 
 
@@ -146,6 +164,7 @@ def main():
     parser.add_argument('--workers', type=int, default=8, choices=range(1, 13), metavar='1-12')
     parser.add_argument('--source', action='append', default=[], help='Repeat to rerun particular source IDs.')
     parser.add_argument('--search', action='store_true', help='Also look up one returned title by exact ID.')
+    parser.add_argument('--chapters', action='store_true', help='Validate one title’s chapter list without downloading images.')
     parser.add_argument('--ssh', metavar='HOST', help='Run temporarily inside the importer through SSH.')
     args = parser.parse_args()
     if args.offset < 0 or len(args.source) > args.batch_size or args.source and args.offset:
@@ -157,6 +176,8 @@ def main():
         remote_args += [value for source in args.source for value in ('--source', source)]
         if args.search:
             remote_args.append('--search')
+        if args.chapters:
+            remote_args.append('--chapters')
         return over_ssh(args.ssh, remote_args)
     live(args)
     return 0

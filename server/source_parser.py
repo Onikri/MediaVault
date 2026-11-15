@@ -130,7 +130,8 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
     if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
         from manga_iken import public_api as iken_public_api
         from manga_vinetheme import public_api as vine_public_api
-        if not (iken_public_api(host, url.path, url.query) or vine_public_api(host, url.path, url.query)):
+        from manga_hentaihand import public_api as hentaihand_public_api
+        if not any(route(host, url.path, url.query) for route in (iken_public_api, vine_public_api, hentaihand_public_api)):
             raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
     if resolve_dns:
         try:
@@ -238,12 +239,15 @@ class PublicHttp:
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
-        if action in {'vine-json', 'vine-rsc'}:
-            from manga_vinetheme import public_api, rsc_route
-            route = public_api if action == 'vine-json' else rsc_route
+        if action in {'vine-json', 'vine-rsc', 'hentaihand-json'}:
+            if action == 'hentaihand-json':
+                from manga_hentaihand import public_api as route
+            else:
+                from manga_vinetheme import public_api, rsc_route
+                route = public_api if action == 'vine-json' else rsc_route
             origin = urlsplit(url)
             if method != 'GET' or not route(origin.netloc, origin.path, origin.query):
-                raise SourceError('Некорректный публичный маршрут VineTheme.')
+                raise SourceError('Некорректный публичный маршрут источника.')
             outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Sec-Fetch-Site': 'same-origin',
                              'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty'})
             if action == 'vine-rsc':
