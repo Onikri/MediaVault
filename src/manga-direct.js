@@ -1,5 +1,6 @@
 import {acquireRenderer,releaseRenderer} from './reader-worker-pool.js';
 import {privateFontsSettled,sharePrivateFonts} from './private-fonts.js';
+import {staleBuild,STALE_BUILD_MESSAGE} from './build-freshness.js';
 import {translateLmt} from './lmt-client.js';
 import {callDirectGoogle} from './manga-direct-api.js';
 import {transientGoogleError} from './google-transient.js';
@@ -261,7 +262,7 @@ export class DirectChapter{
   if(!this[channel]){
    this[channel]=acquireRenderer(channel);
    this[channel].onmessage=({data})=>{const job=this.renders.get(data.id);if(job){if(data.status){job.status?.(data.status);return;}this.renders.delete(data.id);data.error?job.reject(Error(data.error)):job.resolve(data.result);}};
-   this[channel].onerror=()=>{for(const[id,job]of this.renders)if(job.channel===channel){job.reject(Error('Не удалось обработать страницу. Повтори перевод.'));this.renders.delete(id);}this[channel]?.terminate();this[channel]=null;};
+   this[channel].onerror=()=>{const failed=[...this.renders].filter(([,job])=>job.channel===channel);for(const[id]of failed)this.renders.delete(id);this[channel]?.terminate();this[channel]=null;staleBuild().then(stale=>{for(const[,job]of failed)job.reject(Error(stale?STALE_BUILD_MESSAGE:'Не удалось обработать страницу. Повтори перевод.'));});};
   }
   sharePrivateFonts(this[channel]);
   const id=++this.serial;return new Promise((resolve,reject)=>{this.renders.set(id,{resolve,reject,status,channel});this[channel].postMessage({id,...message});});
