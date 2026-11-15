@@ -29,7 +29,7 @@ def api_url(value):
     p=urlsplit(value)
     if p.hostname in {'mangadex.org','api.mangadex.org'} and p.path.rstrip('/')=='/edge/challenge':
         raise SourceAccessError('MangaDex перенаправил публичный API на браузерную проверку.')
-    allowed=(p.hostname=='api.mangadex.org' and re.fullmatch(rf'/(?:manga(?:/{UUID}(?:/feed)?)?|chapter/{UUID}|at-home/server/{UUID})',p.path)) or (p.hostname=='api.cdnlibs.org' and re.fullmatch(r'/api/(?:manga(?:/[\w-]+(?:/chapters|/chapter)?)?|constants)',p.path))
+    allowed=(p.hostname=='api.mangadex.org' and re.fullmatch(rf'/(?:manga(?:/tag|/{UUID}(?:/feed)?)?|chapter(?:/{UUID})?|list/{UUID}|at-home/server/{UUID})',p.path)) or (p.hostname=='api.cdnlibs.org' and re.fullmatch(r'/api/(?:manga(?:/[\w-]+(?:/chapters|/chapter)?)?|constants)',p.path))
     if not allowed:raise SourceError('Этот адрес не относится к публичной читалке.')
     return public_url(value,allow_api=True)
 def get(url,http):

@@ -105,5 +105,8 @@ python scripts/probe-native-source-batch.py --ssh mediavault-vm --inactive --bat
 | [MultiChan](../server/manga_multichan.py) | 3 | 3 | MangaChan, YaoiChan и HenChan. Списки глав, теги из расширений и ссылки на изображения из данных читалки |
 | [BakkinReaderX](../server/manga_bakkin.py) | 2 | 2 | Индекс `main.php`, тома и старые ссылки с фрагментом. Для Self-hosted нужен адрес сервиса в `BAKKIN_SELF_HOSTED_URL` |
 | [Madara](../server/manga_madara.py) | 9 | 9 | Корейский каталог GoodToon, версии качества Manga District, отдельные жанры и теги Lgbtics, форматы глав и CDN |
+| [MangaDex](../server/manga_mangadex_native.py) | 1 | 62 | Языки API, жанры и теги, поиск по публичным идентификаторам и обновление временного адреса MangaDex@Home |
+| [League of Legends](../server/manga_loluniverse.py) | 1 | 16 | Локализованные серии и ваншоты, порядок выпусков и разворотов |
+| [FoOlSlide](../server/manga_foolslide.py) | 2 | 2 | Формы поиска и чтения, метаданные и сохранённые ссылки Death Toll Scans и Mangatellers |
 
-Эти 31 профиль добавлены в набор следующего пакетного прогона. Подключение источников в рабочем маршруте остаётся отдельной операцией после проверки.
+Эти 111 профилей добавлены в набор следующего пакетного прогона. Подключение источников в рабочем маршруте остаётся отдельной операцией после проверки.

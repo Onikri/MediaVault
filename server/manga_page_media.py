@@ -58,6 +58,10 @@ def page_reference(value):
         if not mangak_cdn(host):
             raise SourceError('Некорректный адрес страницы MangaK.')
         return public_url(value, resolve_dns=False), None, 1, 'mangak-image'
+    if parts.fragment.startswith('mv_dex_page='):
+        from manga_mangadex_native import image_marker
+        image_marker(value)
+        return value, None, 1, 'dex-image'
     if parts.fragment == SETSU_FRAGMENT:
         if host != 'i0.wp.com':
             raise SourceError('Некорректный адрес страницы Setsu Scans.')
@@ -94,6 +98,9 @@ def fetch_page(http, reference, headers):
     target, tiles, alignment, action = reference
     if action == 'setsu-image':
         response, _ = setsu_image(http, target, headers)
+    elif action == 'dex-image':
+        from manga_mangadex_native import open_image
+        response, _ = open_image(http, target, headers)
     else:
         response, _ = open_marked_page(http, target, headers, action)
     try:

@@ -454,3 +454,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
 - The MultiChan and BakkinReaderX adapters (`server/manga_multichan.py`,
   `server/manga_multichan_terms.py`, `server/manga_bakkin.py`) follow the
   Apache-2.0 Keiyoushi layouts and installed extensions at the same revision.
+- The MangaDex, League of Legends and FoOlSlide native adapters
+  (`server/manga_mangadex_native.py`, `server/manga_loluniverse.py`,
+  `server/manga_foolslide.py`) follow the corresponding public Keiyoushi
+  implementations at the same Apache-2.0 revision.
