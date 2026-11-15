@@ -425,3 +425,5 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   and reader protocol in Apache-2.0 Keiyoushi `lib-multisrc/mangathemesia` at the same revision.
 - The Iken family (`server/manga_iken.py`) follows the public catalogue and reader API
   in Apache-2.0 Keiyoushi `lib-multisrc/iken` at the same revision.
+- The MangaCatalog family (`server/manga_mangacatalog.py`) follows the public franchise
+  catalogues in Apache-2.0 Keiyoushi `lib-multisrc/mangacatalog` at the same revision.
