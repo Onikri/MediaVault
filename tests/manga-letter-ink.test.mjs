@@ -42,16 +42,17 @@ test('a patch on flat paper is filled with the paper next to the letters and sta
  assert.ok(patch.masked<=3*18*18,'only the letters and their edge: '+patch.masked);
 });
 
-test('letters with an outline over art are painted in the outline colour; the art is not masked',()=>{
+test('letters with a backing over art are removed with the backing; the drawing around stays',()=>{
  const W=160,H=160,c=canvas(W,H,(x,y)=>(x+y)%4<2?90:170);   // hatching
  for(const y of [50,74,98]){c.fill(69,y-4,91,y+18,255);c.letter(73,y);}   // white backing, then the letter
- const patch=prepareInkPatch(c,[64,42,96,120],{category:'dialogue'});
- assert.equal(patch.declined,undefined);assert.equal(patch.maskKind,'outlined-letters');assert.equal(patch.flat,true);
- assert.ok(patch.background.every(v=>v>=240),'outline colour '+[...patch.background]);
- // Nothing outside the white backing is in the mask.
- const backing=new Uint8Array(patch.width*patch.height);
- for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++){const gx=x+patch.left,gy=y+patch.top;if(gx>=69&&gx<91&&[50,74,98].some(t=>gy>=t-4&&gy<t+18))backing[y*patch.width+x]=1;}
- assert.equal(patch.mask.reduce((n,v,i)=>n+(v&&!backing[i]?1:0),0),0);
+ const patch=prepareInkPatch(c,[64,42,96,120],{category:'dialogue',rescue:true});
+ assert.equal(patch.declined,undefined);assert.ok(['outlined-letters','rimmed-letters'].includes(patch.maskKind),patch.maskKind);assert.equal(patch.flat,false,'the drawing is rebuilt, never filled with the backing colour');
+ assert.ok(patch.wide,'the model gets the letters with their backing');
+ const at=(gx,gy)=>patch.mask[(gy-patch.top)*patch.width+gx-patch.left];
+ let backing=0,total=0;for(const t of [50,74,98])for(let gy=t-4;gy<t+18;gy++)for(let gx=69;gx<91;gx++){total++;backing+=at(gx,gy);}
+ assert.equal(backing,total,'every pixel of the backing is removed');
+ let far=0;for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++){const gx=x+patch.left,gy=y+patch.top;if(patch.mask[y*patch.width+x]&&(gx<60||gx>=100||gy<36||gy>=126))far++;}
+ assert.equal(far,0,'the hatching away from the lettering stays');
 });
 
 test('dilation by a square is the same as before, in two passes',()=>{

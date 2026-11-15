@@ -10,11 +10,22 @@ import {HelpCircle} from 'lucide-react';
 import {resolveMangaOcr} from './ocr-profiles.js';
 import {INDEX_MODELS} from './index-models.js';
 import {HYMT_MODELS} from './hymt-models.js';
-import {MANGA_FONTS} from '../reader-fonts/catalog.js';
+import {MANGA_FONTS,privateFontList} from '../reader-fonts/catalog.js';
+import {privateFontNames} from './private-fonts.js';
 import {translationConfig,migrateTranslationSettings} from './manga-translation.js';
 import {DIRECT_DETECTORS,DIRECT_INPUTS} from './manga-direct-profiles.js';
 export function readLmt(user){try{const v=JSON.parse(localStorage.getItem('mv_lmt_settings:'+user)||'{"engine":"direct","version":10,"inpaint":"fast","directRenderVersion":2}');if(!v||typeof v!=='object')return translationConfig({engine:'direct',inpaint:'fast',directRenderVersion:2});delete v.apiKey;if(v.model?.startsWith('Llama-'))delete v.model;return migrateTranslationSettings(v);}catch{return translationConfig({engine:'direct',inpaint:'fast',directRenderVersion:2});}}
 export function saveLmt(user,value){try{const{apiKey,...safe}=value;localStorage.setItem('mv_lmt_settings:'+user,JSON.stringify(safe));}catch{}}
+// A face for each voice of the lettering; «Авто» keeps the reader's choice.
+const VOICES=[['speech','Реплика'],['thought','Мысли'],['strong','Усиленная'],['shout','Крик'],['angry','Злость'],['weak','Слабый голос'],['script','Рукописное'],['sign','Надписи'],['sfx','Звуки']];
+function VoiceFonts({value,onChange}){
+ const own=[...new Map([...privateFontList(),...privateFontNames().map(name=>({id:'private:'+name.replace(/\.[^.]+$/,''),name:name.replace(/\.[^.]+$/,'')}))].map(f=>[f.id,f])).values()];
+ return <details className="reader-voice-fonts"><summary>Шрифт для каждого голоса</summary>
+  <div className="reader-settings-grid">{VOICES.map(([key,label])=><label key={key}>{label}<UiSelect aria-label={'Шрифт: '+label} value={value[key]||''} onChange={e=>{const next={...value};if(e.target.value)next[key]=e.target.value;else delete next[key];onChange(next);}}>
+   <option value="">Авто</option>{own.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}{MANGA_FONTS.filter(f=>f.id!=='system').map(f=><option key={f.id} value={f.id}>{f.label}</option>)}
+  </UiSelect></label>)}</div>
+ </details>;
+}
 export default function LmtSettings({value,onChange,backendStatus,onClearCache,onConfigureVm,directKeyScope,onDirectKeyChange,service,showDiagnostics=false,languageProbe}){
  const [details,setDetails]=useState(false);
  const v=translationConfig(value),set=patch=>onChange(translationConfig({...v,...patch})),backend=v.engine==='backend',gemma=v.engine==='vm',direct=v.engine==='direct',visual=gemma||direct;
@@ -36,7 +47,7 @@ export default function LmtSettings({value,onChange,backendStatus,onClearCache,o
   <label>Кто распознаёт текст<UiSelect aria-label="OCR LMT" value={v.ocr} onChange={e=>set({ocr:e.target.value})}><option value="auto">Авто · качество для выбранного языка</option><option value="paddle">PaddleOCR · английский / китайский</option><option value="manga-ocr">Manga-OCR · японский, качество (~460 МБ)</option><option value="ppocrv6-manga">PP-OCRv6 Manga 0.2 · японский (~21 МБ)</option><option value="ppocrv5-korean">PP-OCRv5 · корейский (~13 МБ)</option><option value="pororo">Pororo · корейский, для сравнения</option></UiSelect></label>
   </>}
   {!visual&&<label>Кто восстанавливает фон<UiSelect aria-label="Восстановление фона LMT" value={v.inpaint} onChange={e=>set({inpaint:e.target.value})}><option value="quality">LaMa Manga · качественное восстановление (~206 МБ)</option><option value="fast">Быстрый · заливка / Telea</option></UiSelect></label>}
-  <label>Шрифт перевода<UiSelect aria-label="Шрифт перевода манги" value={v.font} onChange={e=>set({font:e.target.value})}>{visual&&<option value="auto">Авто · по стилю оригинала</option>}{MANGA_FONTS.map(f=><option key={f.id} value={f.id}>{f.label}</option>)}</UiSelect></label><label className="reader-checkbox"><UiSwitch checked={v.caps!==false} onChange={e=>set({caps:e.target.checked})}/>Набирать реплики заглавными</label><p className="reader-hint">{visual?'Выбранная модель определяет стиль реплики. Набор подбирает кириллический шрифт, кегль и переносы по форме облачка. Два блока в одном облачке получают раздельные области.':'Автовёрстка подбирает кегль и переносы по размеру области, проверяет границы и центрирует текст. Если реплика не помещается, обработчик сообщает об этом.'}</p>
+  <label>Шрифт перевода<UiSelect aria-label="Шрифт перевода манги" value={v.font} onChange={e=>set({font:e.target.value})}>{visual&&<option value="auto">Авто · по стилю оригинала</option>}{MANGA_FONTS.map(f=><option key={f.id} value={f.id}>{f.label}</option>)}</UiSelect></label><label className="reader-checkbox"><UiSwitch checked={v.caps!==false} onChange={e=>set({caps:e.target.checked})}/>Набирать реплики заглавными</label>{v.font==='auto'&&<VoiceFonts value={v.voiceFonts||{}} onChange={voiceFonts=>set({voiceFonts})}/>}<p className="reader-hint">{visual?'Выбранная модель определяет стиль реплики. Набор подбирает кириллический шрифт, кегль и переносы по форме облачка. Два блока в одном облачке получают раздельные области.':'Автовёрстка подбирает кегль и переносы по размеру области, проверяет границы и центрирует текст. Если реплика не помещается, обработчик сообщает об этом.'}</p>
   {!visual&&<label>Переводить заранее<UiSelect aria-label="Переводить заранее" value={v.prefetch} onChange={e=>set({prefetch:Number(e.target.value)})}>{[0,1,2,4,9].map(n=><option key={n} value={n}>{n?n+' стр. вперёд':'Только текущая страница'}</option>)}</UiSelect></label>}
   <h4 className="reader-settings-category">Модели и кэш</h4><ReaderModelStorage config={v}/>
   <label className="reader-checkbox"><UiSwitch checked={v.cache} onChange={e=>set({cache:e.target.checked})}/>Сохранять готовый перевод на устройстве</label><p className="reader-hint">Зашифрованный кэш для этого профиля и библиотеки: перевод до 1000 записей / 256 МБ; исходники главы и подготовленные фоны — до 1 ГБ. В памяти хранится буфер из девяти страниц. Повторное открытие не запускает модели. Изменение моделей создаёт новый вариант.</p><button type="button" onClick={onClearCache}>Очистить кэш перевода</button>

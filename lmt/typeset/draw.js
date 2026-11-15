@@ -18,5 +18,7 @@ export function drawLayout(ctx,layout,style){
  const placed=lines.map(line=>{let shift=0;for(const [pattern,share,side]of HANG){const hit=line.text.match(pattern);if(hit)shift+=side*share*ctx.measureText(hit[0]).width/2;}return [line.text,cx+shift,line.y+cap/2];});
  if(style.stroke){ctx.strokeStyle=style.stroke;ctx.lineWidth=2*Math.max(1.5,size*(style.strokeRatio||.13));for(const [text,x,y]of placed)ctx.strokeText(text,x,y);}
  ctx.fillStyle=style.fill;for(const [text,x,y]of placed)ctx.fillText(text,x,y);
+ // A light face made heavier by a thin stroke of its own colour.
+ if(style.face?.embolden){ctx.strokeStyle=style.fill;ctx.lineWidth=size*style.face.embolden;for(const [text,x,y]of placed)ctx.strokeText(text,x,y);}
  ctx.restore();
 }

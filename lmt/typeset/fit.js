@@ -7,10 +7,12 @@ export const MAIN_ROLES=new Set(['speech','thought','narration']);
 const COMFORT=.9;
 const quantile=(values,q)=>{const s=[...values].sort((a,b)=>a-b);return s.length?s[Math.min(s.length-1,Math.floor(q*s.length))]:0;};
 export function fitPage(items,{pageWidth,minSize=Math.max(7,pageWidth*.009)}={}){
- const floor=pageWidth*.015,ceiling=pageWidth*.042;
  const work=items.map(item=>{const plain=prepare(item.text,item.measure);return {item,plain,comfort:maxFit(plain,item.region)*COMFORT};});
  const main=work.filter(w=>MAIN_ROLES.has(w.item.role)&&w.comfort>0).map(w=>w.comfort);
  const extent=w=>Math.sqrt(w.item.region.width*w.item.region.height),typical=quantile(work.filter(w=>MAIN_ROLES.has(w.item.role)).map(extent),.5)||1;
+ // The ceiling follows the balloons themselves: on a narrow crop or a webtoon
+ // strip the width of the image says nothing about how large a line may be.
+ const floor=pageWidth*.015,ceiling=Math.max(pageWidth*.042,typical*.16);
  const base=Math.min(ceiling,Math.max(floor,main.length?quantile(main,.4):pageWidth*.024));
  return {base,layouts:work.map(w=>{
   const {item,plain}=w,role=item.role,loud=item.loud>1.6?Math.min(item.loud,2)**.6:1;

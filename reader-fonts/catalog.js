@@ -41,11 +41,17 @@ export async function loadMangaFont(id){
 //   weak     a faint, frightened or muttered line        script  handwriting, notes
 //   narration the author's captions and signs            sfx     sound effects
 //   eerie    thin, uncanny lettering
-const PRIVATE_ROLES=[[/kunkel|anime.?ace|wild.?words|dialog|speech|main/i,'speech'],[/jinkies/i,'strong'],[/smash/i,'shout'],[/beatdown/i,'angry'],
+// Tim Sale is the classic narrow hand lettering of printed manga; Ladronn Bold
+// is the same hand heavier, for a raised voice.
+// FaceFront is the classic hand lettering of printed manga dialogue: regular
+// for lines, bold for a raised voice, italic for thoughts. Faces matched as
+// «extra» are offered only in the settings, for the listener's own choice.
+const PRIVATE_ROLES=[[/face.?front.*bold/i,'strong'],[/face.?front.*italic/i,'thought'],[/face.?front|anime.?ace|wild.?words|dialog|main/i,'speech'],
+ [/tim.?sale|ladronn|meanwhile|kunkel/i,'extra'],[/jinkies/i,'strong'],[/smash/i,'shout'],[/beatdown/i,'angry'],
  [/hictor/i,'weak'],[/hitch|leo.?hand/i,'script'],[/guest/i,'narration'],[/noisy/i,'sfx'],[/diamond/i,'eerie']];
 // A voice without a face of its own borrows the nearest one; older role names are kept.
-const VOICE_CHAIN={speech:['speech'],strong:['strong'],shout:['shout','strong'],angry:['angry','shout','strong'],weak:['weak'],script:['script'],narration:['narration'],
- sfx:['sfx','shout'],eerie:['eerie','sfx'],chatter:['weak','script'],note:['script','narration'],thought:['speech']};
+const VOICE_CHAIN={speech:['speech'],strong:['strong'],shout:['shout','strong'],angry:['angry','shout','strong'],weak:['weak'],script:['script'],narration:['speech'],sign:['narration','speech'],
+ sfx:['sfx','shout'],eerie:['eerie','sfx'],chatter:['weak','script'],note:['script','narration'],thought:['thought']};
 // Faces drawn with capitals only keep the text in capitals.
 const LOWERCASE_VOICES=new Set(['weak','script','eerie']);
 const privateFonts=[];
@@ -58,6 +64,14 @@ try{for(const [path,url]of Object.entries(import.meta.glob('./local/*.{otf,ttf,w
 // fonts: [{name, data: ArrayBuffer | URL string}]
 export function registerPrivateFonts(fonts){for(const font of fonts||[])if(font?.name&&font.data)addPrivate(font.name,font.data);return privateFonts.length;}
 export const privateFontIds=()=>privateFonts.map(f=>f.id);
+// [{id, name}] of every private face, for the per-voice choice in the settings.
+export const privateFontList=()=>privateFonts.map(f=>({id:f.id,name:f.name}));
+// A private face chosen by the listener for a voice.
+export async function loadPrivateById(id,{fallback='system-ui, sans-serif'}={}){
+ const font=privateFonts.find(f=>f.id===id);if(!font)return null;
+ await loadFaces(font.id,font.family,[[font.source,'400']]);
+ return {id:font.id,stack:`"${font.family}", ${fallback}`,weight:400,italic:false,upper:!LOWERCASE_VOICES.has(font.role),voice:font.role};
+}
 // The owner's face for a voice, or null when none was supplied.
 export async function loadPrivateFace(voice,{fallback='system-ui, sans-serif'}={}){
  for(const key of VOICE_CHAIN[voice]||[voice])for(const font of privateFonts.filter(f=>f.role===key)){

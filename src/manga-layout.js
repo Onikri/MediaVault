@@ -6,7 +6,14 @@ export function paperBubble(image,box){
  while((bw+px*2)*(bh+py*2)>700000&&(px>48||py>48)){px=Math.max(48,px*.85);py=Math.max(48,py*.85);}
  const left=Math.max(0,Math.floor(x1-px)),top=Math.max(0,Math.floor(y1-py)),right=Math.min(pw,Math.ceil(x2+px)),bottom=Math.min(ph,Math.ceil(y2+py)),w=right-left,h=bottom-top;
  if(w*h>700000||bw<2||bh<2)return null;
- const seen=new Uint8Array(w*h),queue=new Int32Array(w*h),light=(x,y)=>{const n=((top+y)*pw+left+x)*4;return(data[n]+data[n+1]+data[n+2])/3>222&&Math.max(data[n],data[n+1],data[n+2])-Math.min(data[n],data[n+1],data[n+2])<40;};let best=null;
+ // Paper is light; every dark pixel is a wall, thickened by `gap` pixels so the
+ // paper cannot run out of the balloon between the lines of a burst or through
+ // a small break in the outline.
+ const paperAt=(x,y)=>{const n=((top+y)*pw+left+x)*4;return(data[n]+data[n+1]+data[n+2])/3>222&&Math.max(data[n],data[n+1],data[n+2])-Math.min(data[n],data[n+1],data[n+2])<40;},gap=2,wall=new Uint8Array(w*h),thick=new Uint8Array(w*h);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(!paperAt(x,y))wall[y*w+x]=1;
+ for(let y=0;y<h;y++){let last=-1e9;for(let x=0;x<w;x++){if(wall[y*w+x])last=x;if(x-last<=gap)thick[y*w+x]=1;}last=1e9;for(let x=w-1;x>=0;x--){if(wall[y*w+x])last=x;if(last-x<=gap)thick[y*w+x]=1;}}
+ const across=thick.slice();for(let x=0;x<w;x++){let last=-1e9;for(let y=0;y<h;y++){if(across[y*w+x])last=y;if(y-last<=gap)thick[y*w+x]=1;}last=1e9;for(let y=h-1;y>=0;y--){if(across[y*w+x])last=y;if(last-y<=gap)thick[y*w+x]=1;}}
+ const seen=new Uint8Array(w*h),queue=new Int32Array(w*h),light=(x,y)=>!thick[y*w+x];let best=null;
  for(const fy of [.5,.15,.85])for(const fx of [.5,.15,.85]){const sx=Math.max(0,Math.min(w-1,Math.round(x1+bw*fx)-left)),sy=Math.max(0,Math.min(h-1,Math.round(y1+bh*fy)-top)),seed=sy*w+sx;if(seen[seed]||!light(sx,sy))continue;
   let a=0,z=1,border=false,minX=w,minY=h,maxX=0,maxY=0;const sums=[0,0,0];queue[0]=seed;seen[seed]=1;
   while(a<z){const n=queue[a++],x=n%w,y=(n/w)|0;if(!x||!y||x===w-1||y===h-1)border=true;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);const p=((top+y)*pw+left+x)*4;for(let c=0;c<3;c++)sums[c]+=data[p+c];

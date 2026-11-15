@@ -46,7 +46,7 @@ export class ChapterPreparation{
   })();this.getting.set(index,task);task.finally(()=>this.getting.delete(index)).catch(()=>{});}return this.getting.get(index);
  }
  async cleanLoop(){const c=this.c;while(this.cleanPending.size&&!c.controller.signal.aborted){const index=this.take(this.cleanPending);try{
-  const meta=await this.tasks[index].promise,stage='clean-v11-'+(c.config.inpaint||'fast'),hit=await readChapterBlob(c.scope,meta.key,index,stage);
+  const meta=await this.tasks[index].promise,stage='clean-v13-'+(c.config.inpaint||'fast'),hit=await readChapterBlob(c.scope,meta.key,index,stage);
   if(hit){const summary=await decodeCleanPage(hit);if(summary.regions?.some(r=>!r.painted))this.cleanFailed.add(index);else this.cleanDone.add(index);this.c.notify(index,{phase:'cleaning',message:'Подготовленный фон найден в кэше'});this.cleaned[index].resolve({key:meta.key,stage,fromCache:true});continue;}
   const source=await this.get(index);if(!source.regions.length){this.cleanDone.add(index);this.cleaned[index].resolve(null);continue;}
   const result=await c.canvasTask({channel:'clean',operation:'clean-prepare',blob:source.blob,allowDownloads:c.config.allowDownloads===true,mode:c.config.inpaint||'fast',page:{width:source.width,height:source.height,regions:source.regions.map(r=>({uid:r.id,text_bbox:r.bbox,layout_bbox:r.layout_bbox||r.bbox,text_category:'text'}))}},value=>{this.cleanProgress={page:index+1,message:value.message||'Фон готовится параллельно переводу'};c.notify(index,{...value,phase:'cleaning',message:this.cleanProgress.message});});

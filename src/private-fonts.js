@@ -27,6 +27,8 @@ export function preloadPrivateFonts(service){
 }
 // Rendering waits briefly for a download that has already started, never for one that has not.
 export const privateFontsSettled=()=>pending&&!fonts?Promise.race([pending,new Promise(resolve=>setTimeout(resolve,4000))]):Promise.resolve();
+// Names of the owner's faces received from the server, for the settings.
+export const privateFontNames=()=>(fonts||[]).map(f=>f.name);
 export function sharePrivateFonts(worker){
  if(!worker||!fonts?.length||sent.has(worker))return;
  sent.add(worker);worker.postMessage({operation:'fonts',fonts});

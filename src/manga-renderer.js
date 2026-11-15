@@ -1,6 +1,6 @@
 import {comicLayouts,verticalLettering} from './manga-layout.js';
 import {teleaInpaint} from '../lmt/upstream/lib/inpaint/telea.ts';
-import {loadMangaFont,loadPrivateFace} from '../reader-fonts/catalog.js';
+import {loadMangaFont,loadPrivateFace,loadPrivateById,MANGA_FONTS} from '../reader-fonts/catalog.js';
 import {normalizeText} from '../lmt/typeset/normalize.js';
 import {makeRegion,ellipseRegion,erodeRegion} from '../lmt/typeset/shape.js';
 import {fitPage} from '../lmt/typeset/fit.js';
@@ -8,10 +8,10 @@ import {measurer,drawLayout} from '../lmt/typeset/draw.js';
 import {periodicFill} from '../lmt/upstream/lib/inpaint/tone.ts';
 import {fitComicText,styleFont,comicInkColor} from './manga-typeset.js';
 import {prepareInkPatch,preparePageInk,compositeInkPatch,dilateInk} from './manga-cleaning.js';
-export const READER_RENDER_VERSION=14;
-export const READER_TYPESETTER='shaped-cyrillic-ru-v6';
+export const READER_RENDER_VERSION=15;
+export const READER_TYPESETTER='shaped-cyrillic-ru-v7';
 // The face of ordinary text when the listener leaves the choice to the reader.
-export const MAIN_FONT='comic-relief';
+export const MAIN_FONT='neucha';
 // One main typeface carries speech, thoughts (italic) and shouts; only sound
 // effects, small side chatter and notes on objects get a situational face.
 const SITUATIONAL=new Set(['sfx','chatter','note']);
@@ -22,7 +22,7 @@ const SITUATIONAL=new Set(['sfx','chatter','note']);
 export function voiceOf(region,role,text=''){
  const style=region.font_style||'',value=String(text).trim();
  if(role==='sfx')return 'sfx';
- if(role==='note')return /handwritten/.test(style)?'script':'narration';
+ if(role==='note')return /handwritten/.test(style)?'script':'sign';
  if(role==='chatter')return 'weak';
  if(region.text_category==='system_ui')return 'system';
  if(role==='narration')return 'narration';
@@ -35,9 +35,12 @@ export function voiceOf(region,role,text=''){
  return 'speech';
 }
 // Open faces used when the owner supplied none for a voice: [font, weight].
-const OPEN_FACE={speech:[MAIN_FONT,400],strong:[MAIN_FONT,700],shout:['balsamiq-sans',700],angry:['balsamiq-sans',700],weak:['neucha',400],script:['caveat',400],
- narration:['pt-serif',400],sfx:['ruslan-display',400],eerie:['ruslan-display',400],system:['press-start',400]};
-const CAPS_VOICES=new Set(['speech','strong','shout','angry','narration']);
+// The classic narrow hand-lettered face of printed manga for lines, thoughts
+// and captions; a raised voice is the same face heavier (EMBOLDEN, in em).
+const OPEN_FACE={speech:[MAIN_FONT,400],strong:[MAIN_FONT,400],shout:['balsamiq-sans',700],angry:['balsamiq-sans',700],weak:['pangolin',400],script:['caveat',400],
+ narration:[MAIN_FONT,400],sign:['pt-serif',400],sfx:['ruslan-display',400],eerie:['ruslan-display',400],system:['press-start',400]};
+const EMBOLDEN={speech:.035,narration:.035,strong:.075};
+const CAPS_VOICES=new Set(['speech','strong','shout','angry','narration','sign']);
 const LOUDER={shout:1.9,angry:1.7};
 const ROLE={sfx:'sfx',sign:'note',whisper_aside:'chatter',narration:'narration',thought:'thought',system_ui:'narration'};
 // The role comes from what the text is, never from the style the model guessed
@@ -59,7 +62,7 @@ function letteringShape(region,box){
 }
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
 function maskRuns(patch,pageWidth,mask=patch.mask){const runs=[];for(let y=0;y<patch.height;y++){let x=0;while(x<patch.width){while(x<patch.width&&!mask[y*patch.width+x])x++;const start=x;while(x<patch.width&&mask[y*patch.width+x])x++;if(x>start)runs.push((patch.top+y)*pageWidth+patch.left+start,(patch.top+y)*pageWidth+patch.left+x);}}return runs;}
-export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false,cleanOnly=false,preparedClean,caps=true}){
+export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false,cleanOnly=false,preparedClean,caps=true,voiceFonts={}}){
  const start=performance.now(),bitmap=await createImageBitmap(blob);
  try{
   if(bitmap.width!==page.width||bitmap.height!==page.height||bitmap.width*bitmap.height>24_000_000)throw Error('Размер исходной страницы изменился.');
@@ -79,7 +82,9 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    // One face for lines, thoughts and the author's text (a shout is the same
    // face in bold); the model's style picks a face only for sound effects, side
    // remarks, signs and system windows.
-   const role=roleOf(region),voice=voiceOf(region,role,text),open=OPEN_FACE[voice]||OPEN_FACE.speech;
+   // The listener may pick a face for each voice in the settings.
+   const role=roleOf(region),voice=voiceOf(region,role,text),slot=role==='thought'?'thought':voice,chosen=font==='auto'?voiceFonts?.[slot]||voiceFonts?.[voice]:null;
+   const open=chosen&&MANGA_FONTS.some(f=>f.id===chosen)?[chosen,OPEN_FACE[voice]?.[1]||400]:OPEN_FACE[voice]||OPEN_FACE.speech;
    const idFont=font==='auto'?open[0]:font,weight=font==='auto'?open[1]:region.font_style==='bold_scream'?700:400;let family;
    try{family=idFont==='serif'?'Georgia, serif':idFont==='mono'?'monospace':await loadMangaFont(idFont);}catch{family='system-ui';warnings.push('Шрифт не загрузился: использован системный шрифт.');}
    const flow=region.flow;
@@ -88,8 +93,10 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    if(!flow&&!vertical){
     // Shaped composition; linked webtoon cells and vertical captions keep the cell fitter below.
     // The owner's own typefaces come first: one named for dialogue replaces the main face.
-    const own=font==='auto'?await loadPrivateFace(voice,{fallback:family}).catch(()=>null):null;
-    const face=own?{...own,italic:role==='thought'}:{id:idFont,stack:family,weight,italic:role==='thought',upper:false};
+    const picked=chosen?.startsWith('private:')?await loadPrivateById(chosen,{fallback:family}).catch(()=>null):null;
+    const own=font!=='auto'||chosen&&!picked?null:picked||(role==='thought'?await loadPrivateFace('thought',{fallback:family}).catch(()=>null):null)||await loadPrivateFace(voice,{fallback:family}).catch(()=>null);
+    // A face drawn italic needs no slant of its own.
+    const face=own?{...own,italic:role==='thought'&&own.voice!=='thought'}:{id:idFont,stack:family,weight,italic:role==='thought',upper:false,embolden:font==='auto'?EMBOLDEN[voice]||0:0};
     plans.push({region,box,idFont:face.id,family,weight,role,voice,face,shape:letteringShape(region,box),text:normalizeText(text,{caps:voice==='sfx'||voice==='shout'||caps&&CAPS_VOICES.has(voice)&&(!own||own.upper)})});continue;
    }
    const fit=fitComicText(text,fitBox,(value,size)=>{ctx.font=`${weight} ${size}px ${family}`;return ctx.measureText(value).width;},{oval:!flow&&!!region.bubble_bbox,max:Math.min(96,Math.max(42,Math.round(Math.sqrt((box[2]-box[0])*(box[3]-box[1]))/3)))});
@@ -138,7 +145,10 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    status({phase:'cleaning',message:'Очистка областей · '+(i+1)+' / '+plans.length,cleanedRegions:records.filter(r=>r.painted).length,completedRegions:records.filter(r=>r.painted).length,totalRegions:plans.length});
    // smart: the letter mask of the fast mode; paper is filled at once and only
    // lettering that lies on the drawing goes to the small inpainting model.
-   const smart=mode==='smart',t=performance.now(),patch=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:mode!=='fast'&&!smart,model:mode,...(smart?{rescue:true,contextPad:64}:{})});
+   const smart=mode==='smart',t=performance.now();let patch=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:mode!=='fast'&&!smart,model:mode,...(smart?{rescue:true,contextPad:64}:{})});
+   // Lettering the letter search could not separate is still not left in the
+   // original: the model gets the contrast mask of the glyphs in the box.
+   if(patch.declined&&smart&&lama&&!lamaUnavailable){const glyphs=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:true,model:'migan'});if(!glyphs.declined)patch={...glyphs,wide:glyphs.mask,maskKind:'glyph-contrast'};}
    if(patch.declined){records.push({uid:region.uid,method:'declined',reason:patch.declined});continue;}
    if(cleanupMask)for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++)if(patch.mask[y*patch.width+x])cleanupMask[(patch.top+y)*original.width+patch.left+x]=1;
    const image=new ImageData(patch.data.slice(),patch.width,patch.height);let method,execution,write=patch.mask;
@@ -186,8 +196,11 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   const layouts=[];for(const p of plans)if(p.painted||p.fallback){
    const t=performance.now(),{box,fit}=p,ink=comicInkColor(working,box),dark=!p.fallback&&ink.dark,complex=p.fallback||ink.outline||['sfx','sign','whisper_aside'].includes(p.region.text_category);
    if(p.layout){
-    drawLayout(ctx,p.layout,{face:p.face,angle:0,fill:dark?'#fff':'#151515',stroke:complex?(dark?'#151515':'#fff'):null,strokeRatio:p.fallback?.18:.1});typesetMs+=performance.now()-t;
-    layouts.push({uid:p.region.uid,font:p.idFont,role:p.role,voice:p.voice,fontSize:Math.round(p.layout.size*10)/10,lines:p.layout.lines.length,hyphens:p.layout.hyphens,shrunk:p.layout.shrunk,color:dark?'#fff':'#151515',backgroundLuma:ink.luma,fallback:!!p.fallback,vertical:false,layoutBox:box,fits:true});continue;
+    // A reply outside a balloon of paper is lettered with an outline, as the
+    // original was: on a drawing plain letters cannot be read.
+    const outside=!p.region.bubble_shape&&!p.region.bubble_bbox;
+    drawLayout(ctx,p.layout,{face:p.face,angle:0,fill:dark?'#fff':'#151515',stroke:complex||outside?(dark?'#151515':'#fff'):null,strokeRatio:p.fallback?.18:outside?.15:.1});typesetMs+=performance.now()-t;
+    layouts.push({uid:p.region.uid,font:p.idFont,role:p.role,voice:p.voice,shape:[Math.round(p.shape.width),Math.round(p.shape.height),p.region.bubble_shape?'paper':p.region.bubble_bbox?'detector':'box'],fontSize:Math.round(p.layout.size*10)/10,lines:p.layout.lines.length,hyphens:p.layout.hyphens,shrunk:p.layout.shrunk,color:dark?'#fff':'#151515',backgroundLuma:ink.luma,fallback:!!p.fallback,vertical:false,layoutBox:box,fits:true});continue;
    }
    ctx.save();ctx.beginPath();ctx.rect(box[0]-(p.fallback?3:0),box[1]-(p.fallback?3:0),box[2]-box[0]+(p.fallback?6:0),box[3]-box[1]+(p.fallback?6:0));ctx.clip();ctx.font=`${p.weight} ${fit.fontSize}px ${p.family}`;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=dark?'#fff':'#151515';ctx.lineJoin='round';
    let cx=(box[0]+box[2])/2,cy=p.region.flow?box[1]-p.region.flow.offsetY+(p.region.flow.height-fit.blockH)/2:(box[1]+box[3]-fit.blockH)/2;

@@ -56,9 +56,13 @@ function protectRules(mask,data,w,h,local,bounds){
 //    speed lines or hatching;
 //  - dots and marks smaller than a stroke count only next to a letter
 //    (ellipsis, diacritics), never on their own (screentone).
-export function letterInk(data,w,h,local,paper){
- const total=w*h,dark=paper>=128,tone=new Uint8Array(total),label=new Int32Array(total).fill(-1),queue=new Int32Array(total),ink=new Uint8Array(total);
- const level=dark?Math.min(paper-60,150):Math.max(paper+60,105);
+// light: look for light letters (true) or dark ones (false) instead of the
+// ones opposite to the paper; rimmed: keep only letters drawn with an outline
+// of the opposite tone (white letters with a black edge and the reverse), so
+// highlights and gaps of the drawing are never taken for text.
+export function letterInk(data,w,h,local,paper,{light,rimmed=false}={}){
+ const total=w*h,dark=light===undefined?paper>=128:!light,tone=new Uint8Array(total),label=new Int32Array(total).fill(-1),queue=new Int32Array(total),ink=new Uint8Array(total);
+ const level=light===undefined?(dark?Math.min(paper-60,150):Math.max(paper+60,105)):dark?Math.max(40,Math.min(paper-45,110)):Math.min(235,Math.max(185,paper+40));
  for(let n=0;n<total;n++){const p=n*4,luma=(data[p]+data[p+1]+data[p+2])/3;tone[n]=data[p+3]>127&&(dark?luma<level:luma>level)?1:0;}
  const bw=local[2]-local[0],bh=local[3]-local[1],parts=[];
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
@@ -84,10 +88,20 @@ export function letterInk(data,w,h,local,paper){
  // Bars and lines say nothing about the size of a letter.
  const squat=sample.filter(p=>p.stroke>=stroke*.6&&Math.max(p.width,p.height)/Math.min(p.width,p.height)<3),bold=squat.length?squat:sample.filter(p=>p.stroke>=stroke*.6);
  const glyph=Math.max(6,Math.min(Math.min(bw,bh),weighted(bold.length?bold:sample,size,.8)));
- const letter=p=>p.inside>=.6&&p.out<=Math.max(2,glyph*.3)&&p.area<=bw*bh*.4&&size(p)<=glyph*2.2
+ // Letters that touch (kerned Latin, a joined kana pair) form a run one glyph
+ // high (or wide) and several long; a run is a letter too.
+ const letter=p=>p.inside>=.6&&p.out<=Math.max(2,glyph*.3)&&p.area<=bw*bh*.4&&(size(p)<=glyph*2.2||Math.min(p.width,p.height)<=glyph*1.3&&size(p)<=glyph*4.5&&p.stroke>=stroke*.7)
   &&!(p.stroke<stroke*.5&&size(p)>glyph*.9)
   &&!(Math.max(p.width,p.height)/Math.min(p.width,p.height)>=5&&p.stroke<stroke*.7&&size(p)>glyph*.6);
- const least=Math.max(6,(glyph*.18)**2),found=parts.filter(p=>letter(p)&&p.area>=least);
+ const lumaAt=n=>{const p=n*4;return (data[p]+data[p+1]+data[p+2])/3;};
+ // The edge of a letter drawn with an outline: the pixels one and two steps
+ // around it are far darker (lighter) than the letter itself.
+ const withRim=p=>{
+  const own=new Set(p.pixels);let sum=0,count=0,core=0;
+  for(const n of p.pixels){core+=lumaAt(n);const x=n%w;for(const d of [-2,-1,1,2])for(const i of [n+d,n+d*w]){if(i<0||i>=total||own.has(i)||(Math.abs(d)<=2&&i===n+d&&((i%w)-x)!==d))continue;sum+=lumaAt(i);count++;}}
+  return count>0&&(dark?sum/count-core/p.area>=50:core/p.area-sum/count>=50);
+ };
+ const least=Math.max(6,(glyph*.18)**2),found=parts.filter(p=>letter(p)&&p.area>=least&&(!rimmed||withRim(p)));
  // A bar (a long vowel mark, a dash) is a letter only right next to compact
  // letters; alone under or beside the text it is a line of the drawing.
  const long=p=>Math.max(p.width,p.height)/Math.min(p.width,p.height)>=4,compact=found.filter(p=>!long(p));
@@ -106,10 +120,11 @@ export function letterInk(data,w,h,local,paper){
  // The chain may run two glyphs past the box, one neighbour at a time.
  for(let round=0;round<4;round++)for(const p of parts){
   if(taken.has(p)||p.inside>=.6||p.out>glyph*2.3||size(p)>glyph*1.6||p.area<least||p.stroke<stroke*.6||p.area>bw*bh*.4)continue;
-  if(Math.max(p.width,p.height)/Math.min(p.width,p.height)>=5&&size(p)>glyph*.6)continue;
+  // A bar as heavy as the text (the stroke of «!», a long vowel mark) continues it; a thin one is a line.
+  if(Math.max(p.width,p.height)/Math.min(p.width,p.height)>=5&&size(p)>glyph*.6&&p.stroke<stroke*.85)continue;
   // A solid dot is as thick as it is wide; the perimeter estimate reads it thinner.
   const weight=Math.max(p.stroke,p.area>=p.width*p.height*.7?Math.min(p.width,p.height):0);
-  if(p.area<p.width*p.height*.25||weight<stroke*.75||!inLine(p,main,glyph*.5))continue;
+  if(p.area<p.width*p.height*.25||weight<stroke*.75||!inLine(p,main,glyph*1.1))continue;
   taken.add(p);main.push(p);
  }
  // Dots of an ellipsis and diacritics: as thick as the text's stroke (a
@@ -119,8 +134,15 @@ export function letterInk(data,w,h,local,paper){
  const beside=(p,list,gap)=>list.some(m=>p.x1<=m.x2+gap&&p.x2>=m.x1-gap&&p.y1<=m.y2+gap&&p.y2>=m.y1-gap);
  for(let round=0;round<4;round++){
   let added=0;
-  for(const p of parts)if(dot(p)&&(p.out<=1?beside(p,main,glyph*.6)||beside(p,marks,glyph*.5):inLine(p,main,glyph*.6)||inLine(p,marks,glyph*.5))){taken.add(p);marks.push(p);added++;}
+  for(const p of parts)if(dot(p)&&(p.out<=1?beside(p,main,glyph*.6)||beside(p,marks,glyph*.5):inLine(p,main,glyph*1.1)||inLine(p,marks,glyph*.6))){taken.add(p);marks.push(p);added++;}
   if(!added)break;
+ }
+ // The body of «!» or «?» stands right above its dot: slanted, tapering, often
+ // thinner than the letters, so it is taken by its dot.
+ for(const d of [...marks])for(const p of parts){
+  if(taken.has(p)||p.area<4||size(p)>glyph*1.3||p.y2>d.y1+1||d.y1-p.y2>glyph*.5)continue;
+  if(Math.min(p.x2,d.x2+glyph*.25)<Math.max(p.x1,d.x1-glyph*.25)||p.height<p.width*1.5)continue;
+  taken.add(p);marks.push(p);
  }
  for(const part of [...main,...marks])for(const n of part.pixels)ink[n]=1;
  // A letter touched by a line of the drawing is one component with that line
@@ -161,22 +183,51 @@ export function letterInk(data,w,h,local,paper){
 function outlineWidth(ink,data,w,h,stroke,dark){
  const reach=Math.max(3,Math.min(10,Math.round(stroke*2.5))),means=[];let inner=ink;
  for(let k=1;k<=reach+6;k++){
-  const outer=dilateInk(inner,w,h,1);let sum=0,count=0;
-  for(let n=0;n<outer.length;n++)if(outer[n]&&!inner[n]){const p=n*4;sum+=(data[p]+data[p+1]+data[p+2])/3;count++;}
-  means.push(count?sum/count:means.at(-1)??128);inner=outer;
+  // Medians: a dark object near the text must not pass for the end of an outline.
+  const outer=dilateInk(inner,w,h,1),ring=[];
+  for(let n=0;n<outer.length;n++)if(outer[n]&&!inner[n]){const p=n*4;ring.push((data[p]+data[p+1]+data[p+2])/3);}
+  ring.sort((a,b)=>a-b);means.push(ring.length?ring[ring.length>>1]:means.at(-1)??128);inner=outer;
  }
- const far=means.slice(reach+2).reduce((a,b)=>a+b,0)/Math.max(1,means.length-reach-2),sign=dark?1:-1;
- if(sign*(means[0]-far)<30||(dark?means[0]<205:means[0]>60))return 0;
+ const rest=means.slice(reach+2).sort((a,b)=>a-b),far=rest[rest.length>>1]??means.at(-1),sign=dark?1:-1;
+ // A faint outline on light screentone still shows as a silhouette once the
+ // letters are gone, so a small step in tone already counts.
+ if(sign*(means[0]-far)<14)return 0;
  const half=(means[0]+far)/2;let width=0;
  while(width<reach&&sign*(means[width]-half)>0)width++;
  return width;
 }
+// The outline of letters found in `ink`: pixels around them of the opposite
+// tone (dark around light letters), followed outwards for up to `steps` pixels.
+function growRim(ink,data,w,h,light,steps){
+ const luma=n=>{const p=n*4;return (data[p]+data[p+1]+data[p+2])/3;};
+ let sum=0,count=0;for(let n=0;n<ink.length;n++)if(ink[n]){sum+=luma(n);count++;}
+ if(!count)return ink;
+ const core=sum/count,mask=ink.slice();let front=ink;
+ for(let step=0;step<steps;step++){
+  const next=dilateInk(front,w,h,1);let added=0;
+  for(let n=0;n<next.length;n++)if(next[n]&&!mask[n]){const v=luma(n);if(light?v<core-60:v>core+60){mask[n]=1;added++;}else next[n]=0;}
+  if(!added)break;front=next;
+ }
+ return dilateInk(mask,w,h,1);
+}
+// The backing drawn under the letters: grown from them only into pixels of the
+// backing's own tone (near white around dark letters, near black around light
+// ones), at most `steps` pixels; screentone and hatching stop it.
+function growBacking(ink,data,w,h,lightBacking,steps){
+ const mask=ink.slice();let front=ink;
+ for(let step=0;step<steps;step++){
+  const next=dilateInk(front,w,h,1);let added=0;
+  for(let n=0;n<next.length;n++)if(next[n]&&!mask[n]){const p=n*4,v=(data[p]+data[p+1]+data[p+2])/3;if(lightBacking?v>=200:v<=55){mask[n]=1;added++;}else next[n]=0;}
+  if(!added)break;front=next;
+ }
+ return dilateInk(mask,w,h,1);
+}
 function growInk(ink,data,w,h,paper,flat){
  const mask=dilateInk(ink,w,h,2);
  const dark=paper>=128;let front=mask;
- for(let step=0;step<2;step++){
+ for(let step=0;step<3;step++){
   const next=dilateInk(front,w,h,1);let added=0;
-  for(let n=0;n<next.length;n++)if(next[n]&&!mask[n]){const p=n*4,luma=(data[p]+data[p+1]+data[p+2])/3;if(dark?luma<paper-18:luma>paper+18){mask[n]=1;added++;}else next[n]=0;}
+  for(let n=0;n<next.length;n++)if(next[n]&&!mask[n]){const p=n*4,luma=(data[p]+data[p+1]+data[p+2])/3;if(dark?luma<paper-6:luma>paper+6){mask[n]=1;added++;}else next[n]=0;}
   if(!added)break;front=next;
  }
  return mask;
@@ -214,11 +265,33 @@ export function prepareInkPatch(original,box,{category='dialogue',neural=false,m
  // hand, the balloon's outline and its burst lines, screentone dots) is not
  // erased, so nothing but the lettering is repainted.
  const letters=letterInk(data,w,h,local,paper);
+ // Lettering of the other tone with an outline (white letters edged in black
+ // over hair, screentone or sky; black letters edged in white over a dark
+ // drawing). Both kinds can share one box; each is taken with its own edge.
+ const other=letterInk(data,w,h,local,paper,{light:paper>=128,rimmed:true}),count=ink=>ink.reduce((n,v)=>n+v,0);
+ // The counters of the letters already found (the inside of О, Р, の) are not letters of their own.
+ const closed=fillInkHoles(letters.ink,w,h,Math.max(24,area*.12));for(let n=0;n<other.ink.length;n++)if(closed[n])other.ink[n]=0;
+ // White letters are drawn over grey or dark art, never over white paper.
+ const otherInk=paper<=190&&count(other.ink)>=Math.max(24,count(letters.ink)*.2)?growRim(other.ink,data,w,h,paper>=128,Math.max(2,Math.min(8,Math.round((other.stroke||3)*1.6)))):null;
+ // Light letters on a dark drawing carry a dark edge as well.
+ const ownRim=paper<128&&count(letters.ink)?growRim(letters.ink,data,w,h,true,Math.max(2,Math.min(6,Math.round((letters.stroke||3)*1.2)))):null;
+ // Plain paper carries no outlined lettering: light gaps there are counters and margins.
+ if((otherInk||ownRim)&&!(deviation<12||bubble)){
+  const union=letters.ink.slice();for(const extra of [otherInk,ownRim])if(extra)for(let n=0;n<union.length;n++)if(extra[n])union[n]=1;
+  // A backing around the letters goes with them, faint as it may be.
+  const edge=outlineWidth(letters.ink,data,w,h,letters.stroke,paper>=128);
+  const mask=fillInkHoles(edge?growBacking(union,data,w,h,paper>=128,edge+2):union,w,h,Math.max(24,area*.12)),masked=count(mask),coverage=masked/(w*h);
+  if(coverage>.6)return {declined:'Маска захватывает рисунок: область оставлена в оригинале',coverage};
+  return {left,top,width:w,height:h,data,mask,background,coverage,flat:false,masked,stroke:Math.max(letters.stroke,other.stroke),maskKind:'rimmed-letters',...(rescue?{wide:dilateInk(mask,w,h,1)}:{})};
+ }
  // Letters drawn with an outline over art keep that outline: only the letters
  // themselves are painted, in the outline's own colour. The artist's backing
  // stays as drawn and nothing around it is touched or blurred.
  const smooth=deviation<12||!!bubble,outline=smooth?0:outlineWidth(letters.ink,data,w,h,letters.stroke,paper>=128);
- const mask=fillInkHoles(outline?dilateInk(letters.ink,w,h,Math.min(2,outline)):growInk(letters.ink,data,w,h,paper,smooth),w,h,Math.max(24,area*.12)),masked=mask.reduce((n,v)=>n+v,0),coverage=masked/(w*h);
+ // Lettering with an outline over the drawing is removed together with its
+ // outline and the drawing under both is rebuilt: a backing left behind shows
+ // the old letters as white silhouettes.
+ const mask=fillInkHoles(outline?dilateInk(letters.ink,w,h,outline+1):growInk(letters.ink,data,w,h,paper,smooth),w,h,Math.max(24,area*.12)),masked=mask.reduce((n,v)=>n+v,0),coverage=masked/(w*h);
  if(masked<3)return {declined:'Не выделена безопасная маска букв'};
  // Dense lettering at an image edge loses context on one side. Keep the glyph
  // mask and the 60% Telea guard; retry once with more real surrounding pixels.
@@ -230,23 +303,25 @@ export function prepareInkPatch(original,box,{category='dialogue',neural=false,m
  // Flat paper is filled with the tone of the paper right around the letters
  // (the median of what is left of the box), not the balloon's average: an
  // average is a shade off and leaves a ghost of every letter.
- if(outline){
-  const core=dilateInk(letters.ink,w,h,Math.min(2,outline)),ring=dilateInk(core,w,h,1),tones=[];
-  for(let n=0;n<ring.length;n++)if(ring[n]&&!core[n]){const p=n*4;tones.push([(data[p]+data[p+1]+data[p+2])/3,data[p],data[p+1],data[p+2]]);}
-  // The outline is the lightest part of the ring around dark letters (the darkest around light ones).
-  tones.sort((a,b)=>a[0]-b[0]);const pick=tones[Math.min(tones.length-1,Math.floor(tones.length*(paper>=128?.75:.25)))];
-  if(pick){for(let c=0;c<3;c++)background[c]=pick[c+1];flat=true;}
- }else if(flat&&known){
+ if(outline)flat=false;
+ else if(flat&&known){
   const near=[[],[],[]];
   for(let y=local[1];y<local[3];y++)for(let x=local[0];x<local[2];x++){const n=y*w+x;if(!mask[n])for(let c=0;c<3;c++)near[c].push(data[n*4+c]);}
   for(let c=0;c<3;c++){near[c].sort((a,b)=>a-b);background[c]=near[c][near[c].length>>1];}
  }
+ // Whatever the mask, a hole surrounded by one even tone is filled with that
+ // tone: a model only invents streaks on blank paper.
+ if(!flat){
+  const edge=dilateInk(mask,w,h,2),tones=[[],[],[]];
+  for(let n=0;n<edge.length;n++)if(edge[n]&&!mask[n])for(let c=0;c<3;c++)tones[c].push(data[n*4+c]);
+  if(tones[0].length>=20){
+   const middle=tones.map(t=>{t.sort((a,b)=>a-b);return t[t.length>>1];}),lo=tones[0][Math.floor(tones[0].length*.1)],hi=tones[0][Math.floor(tones[0].length*.9)];
+   if(hi-lo<=14){for(let c=0;c<3;c++)background[c]=middle[c];flat=true;}
+  }
+ }
  const ambiguous=!flat&&(category==='sfx'||category==='sign')&&masked/area>.28;
  if(ambiguous&&!neural&&!rescue)return {declined:'Спецэффект пересекает рисунок: для безопасного удаления выбери нейросетевое восстановление',coverage};
- return {left,top,width:w,height:h,data,mask,background,coverage,flat,masked,stroke:letters.stroke,...(outline?{maskKind:'outlined-letters',
-  // For an inpainting model: the letters together with their outline, so the
-  // drawing under both is rebuilt instead of leaving the backing.
-  ...(rescue?{wide:fillInkHoles(dilateInk(letters.ink,w,h,outline+1),w,h,Math.max(24,area*.12))}:{})}:{})};
+ return {left,top,width:w,height:h,data,mask,background,coverage,flat,masked,stroke:letters.stroke,...(outline?{maskKind:'outlined-letters',...(flat?{}:{wide:mask})}:{})};
 }
 export function compositeInkPatch(target,patch,modified,writeMask=patch.mask){
  for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++)if(writeMask[y*patch.width+x]){
