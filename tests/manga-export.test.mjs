@@ -13,6 +13,11 @@ test('chapter and volume export keep extras in order and apply volume intervals'
 test('only translator settings are sent; credentials and unrelated UI state stay out',()=>{
  assert.deepEqual(exportTranslation({directModel:'gemini-3.5-flash-lite',directBatchPages:3,apiKey:'secret',engine:'direct',cache:true},'Japanese'),{directModel:'gemini-3.5-flash-lite',directBatchPages:3,language:'Japanese'});
 });
+test('the VM gets the reader cleanup, capitals and the face of each voice',()=>{
+ const sent=exportTranslation({inpaint:'smart',caps:false,font:'auto',voiceFonts:{speech:'private:v_CCFaceFront_v1.36',sfx:'neucha','Bad Key':'x',shout:'<script>'}});
+ assert.deepEqual(sent,{inpaint:'smart',font:'auto',caps:false,voiceFonts:{speech:'private:v_CCFaceFront_v1.36',sfx:'neucha'}});
+ assert.equal(exportTranslation({inpaint:'hybrid'}).inpaint,'smart','a mode the VM does not know becomes the reader cleanup, not the old fast one');
+});
 test('a partial Drive chapter stages only missing originals without sending its vault key',async()=>{
  const rendered=new Blob(['rendered']),original=new Blob(['original']);
  const jobs=await mangaExportJobs([{number:0,season:1}],{mode:'translate',format:'cbz',grouping:'chapters',directInput:'vision'},{name:'Drive',cache:{pages:[{page:0,blob:rendered,sourceHash:'a'.repeat(64)}],total:2,complete:false},entries:[{async:async()=>{throw Error('Cached page must not be read again')}},{async:async()=>original}],total:2,vaultKey:'never-forward'});

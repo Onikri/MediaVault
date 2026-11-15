@@ -2,8 +2,19 @@
 import {DirectChapter} from './manga-direct.js';
 import {translationConfig,bytesBase64,fromBase64} from './manga-translation.js';
 import {stopLmt} from './lmt-client.js';
+import {preloadPrivateFonts} from './private-fonts.js';
+
+// The owner's lettering faces, as the reader receives them; an older VM without
+// the font bridge letters with the open fonts.
+const fontService={request:async(path,options={})=>{
+ if(path==='/reader/lmt/fonts')return window.exportFontList?await window.exportFontList():{fonts:[]};
+ const index=Number(path.split('/').pop());
+ if(options.raw)return {arrayBuffer:async()=>fromBase64(await window.exportFont(index))};
+ throw Error('Неподдерживаемый запрос шрифтов.');
+}};
 
 window.translateExportChapter=async({count,options,slots,skip=[]})=>{
+ await preloadPrivateFonts(fontService);
  const controller=new AbortController(),ignored=new Set(skip);
  const entries=Array.from({length:count},(_,index)=>({async:async()=>new Blob([fromBase64(await window.exportSourcePage(index))])}));
  const config=translationConfig({...options,firstPagePriority:true,directTimeoutMs:120000,engine:'vm',directViaOracle:true,chapterPipeline:false,cache:false,allowDownloads:true,skipPages:ignored});

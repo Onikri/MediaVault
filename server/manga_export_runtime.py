@@ -77,6 +77,21 @@ async def _translate_pages(job, pages, options, skip, save, progress, budget):
                 while time.monotonic()<until:
                     budget.check()
                     await asyncio.sleep(min(.2,max(0,until-time.monotonic())))
+    lmt = os.environ.get('LMT_INTERNAL_URL', 'http://lmt:7861').rstrip('/')
+    def private_font_list():
+        # The owner's licensed lettering faces live with the LMT worker, as for the reader.
+        try:
+            response = requests.get(lmt + '/reader/lmt/fonts', headers=headers, timeout=(4, 30))
+            return response.json() if response.status_code == 200 else {'fonts': []}
+        except (requests.RequestException, ValueError):
+            return {'fonts': []}
+    def private_font(index):
+        if type(index) is not int or not 0 <= index < 40:
+            return ''
+        response = requests.get(f'{lmt}/reader/lmt/fonts/{index}', headers=headers, timeout=(4, 60))
+        if response.status_code != 200 or len(response.content) > 4_000_000:
+            raise SourceError('Шрифт владельца не получен с LMT.')
+        return base64.b64encode(response.content).decode()
     keys = await google_request('/reader/google/keys', {})
     slots = [s['slot'] for s in keys.get('slots', []) if s.get('configured') and options['directModel'] in s.get('availableModels', [])]
     if not slots:
@@ -105,6 +120,8 @@ async def _translate_pages(job, pages, options, skip, save, progress, budget):
             await context.route('**/*', route)
             page = await context.new_page()
             await page.expose_function('exportGoogleRequest', google_request)
+            await page.expose_function('exportFontList', lambda: asyncio.to_thread(private_font_list))
+            await page.expose_function('exportFont', lambda index: asyncio.to_thread(private_font, index))
             await page.expose_function('exportSourcePage', lambda index: base64.b64encode(pages[index]).decode() if type(index) is int and 0 <= index < len(pages) else '')
             await page.expose_function('exportRenderedPage', lambda index, image: save(index, base64.b64decode(image, validate=True)))
             await page.expose_function('exportPageProgress', lambda index, value: progress({'phase': 'translating', 'page': index + 1, 'message': str(value.get('message') or 'Перевод и оформление')[:250]}))

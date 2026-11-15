@@ -10,8 +10,8 @@ import zipfile
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from typing import Annotated, Literal
 from source_parser import SourceError
 
 
@@ -32,8 +32,13 @@ class Translation(BaseModel):
     directInput: Literal['vision','annotated','blocks','coordinates'] = 'vision'
     directDetector: Literal['en-fast','rtdetr','ctd','yolo26n-manga','ppocrv6-det'] = 'rtdetr'
     directBatchPages: Literal[2,3] = 2
-    inpaint: Literal['fast','quality','moebius','migan'] = 'fast'
+    # smart: the reader's cleanup (paper fill, MI-GAN over the drawing).
+    inpaint: Literal['smart','fast','quality','moebius','migan'] = 'smart'
     font: Literal['auto','comic-relief','balsamiq-sans','caveat','pangolin','neucha','ruslan-display','marck-script','press-start','pt-serif','system'] = 'auto'
+    caps: bool = True
+    # The face the owner picked for each voice: an open font id or one of their private faces.
+    voiceFonts: dict[Annotated[str, StringConstraints(pattern=r'^[a-z]{1,20}$')],
+                     Annotated[str, StringConstraints(pattern=r'^(?:private:)?[\w .()+-]{1,100}$')]] = Field(default_factory=dict, max_length=12)
 
 
 class CachedPage(BaseModel):
