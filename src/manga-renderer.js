@@ -114,6 +114,9 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   }
   // Conflicting duplicate boxes must not be painted over one another.
   const conflicts=new Set();for(let i=0;i<plans.length;i++)for(let j=i+1;j<plans.length;j++)if(overlap(plans[i].region.text_bbox,plans[j].region.text_bbox)>.85){conflicts.add(i);conflicts.add(j);}
+  // smart: the small model gets at most MODEL_BUDGET ms per page, so a busy page
+  // is never held for minutes; regions after it are cleaned by the fast method.
+  const MODEL_BUDGET=7000,modelStart=()=>performance.now();let modelMs=0;
   let lamaUnavailable=null,modelCalls=0,pageExecution,cleanupMask=captureDebug?new Uint8Array(original.width*original.height):null;
   if(mode==='moebius'&&moebiusStrategy==='page'&&!preparedClean){
    const t=performance.now(),eligible=[];
@@ -148,7 +151,7 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    const smart=mode==='smart',t=performance.now();let patch=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:mode!=='fast'&&!smart,model:mode,...(smart?{rescue:true,contextPad:64}:{})});
    // Lettering the letter search could not separate is still not left in the
    // original: the model gets the contrast mask of the glyphs in the box.
-   if(patch.declined&&smart&&lama&&!lamaUnavailable){const glyphs=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:true,model:'migan'});if(!glyphs.declined)patch={...glyphs,wide:glyphs.mask,maskKind:'glyph-contrast'};}
+   if(patch.declined&&smart&&lama&&!lamaUnavailable&&modelMs<MODEL_BUDGET){const glyphs=prepareInkPatch(original,region.text_bbox,{category:region.text_category,neural:true,model:'migan'});if(!glyphs.declined)patch={...glyphs,wide:glyphs.mask,maskKind:'glyph-contrast'};}
    if(patch.declined){records.push({uid:region.uid,method:'declined',reason:patch.declined});continue;}
    if(cleanupMask)for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++)if(patch.mask[y*patch.width+x])cleanupMask[(patch.top+y)*original.width+patch.left+x]=1;
    const image=new ImageData(patch.data.slice(),patch.width,patch.height);let method,execution,write=patch.mask;
@@ -157,9 +160,9 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
      if(lamaUnavailable)throw Error(lamaUnavailable);if(!lama)throw Error('LaMa недоступна в этом обработчике');
      try{modelCalls++;execution=await lama(image,patch.mask,message=>status({phase:'cleaning',message}));}catch(error){lamaUnavailable=error.message;throw error;}
      method=mode==='moebius'?'moebius':mode==='migan'?'migan':'lama';write=mode==='quality'||mode==='hybrid'?dilateInk(patch.mask,patch.width,patch.height,2):patch.mask;
-    }else if(smart&&patch.wide&&lama&&!lamaUnavailable&&await(async()=>{
+    }else if(smart&&patch.wide&&lama&&!lamaUnavailable&&modelMs<MODEL_BUDGET&&await(async()=>{
      // Outlined lettering over the drawing: the model repaints letters and outline alike.
-     try{modelCalls++;execution=await lama(image,patch.wide,message=>status({phase:'cleaning',message}));method='migan';write=patch.wide;return true;}
+     const began=modelStart();try{modelCalls++;execution=await lama(image,patch.wide,message=>status({phase:'cleaning',message}));method='migan';write=patch.wide;modelMs+=modelStart()-began;return true;}
      catch(error){lamaUnavailable=error.message;image.data.set(patch.data);return false;}
     })()){
     }else if(patch.flat){
@@ -169,7 +172,7 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
      if(patch.coverage>.6)throw Error('Недостаточно фона для Telea');
      // The model repaints a slightly wider band than the letters, so the grey
      // fringe of the old lettering does not survive as a ghost.
-     if(smart&&lama&&!lamaUnavailable)try{const wide=dilateInk(patch.mask,patch.width,patch.height,Math.max(1,Math.min(4,Math.round((patch.stroke||3)*.5))));modelCalls++;execution=await lama(image,wide,message=>status({phase:'cleaning',message}));method='migan';write=wide;}catch(error){lamaUnavailable=error.message;image.data.set(patch.data);write=patch.mask;}
+     if(smart&&lama&&!lamaUnavailable&&modelMs<MODEL_BUDGET)try{const began=modelStart(),wide=dilateInk(patch.mask,patch.width,patch.height,Math.max(1,Math.min(4,Math.round((patch.stroke||3)*.5))));modelCalls++;execution=await lama(image,wide,message=>status({phase:'cleaning',message}));method='migan';write=wide;modelMs+=modelStart()-began;}catch(error){lamaUnavailable=error.message;image.data.set(patch.data);write=patch.mask;}
      if(method!=='migan'){teleaInpaint(image,periodicFill(image,patch.mask).remaining,3);method='telea';}
     }
     compositeInkPatch(working,patch,image.data,write);plan.painted=true;if(cleanOnly){plan.runs=maskRuns(patch,original.width,write);if(write!==patch.mask)plan.inputRuns=maskRuns(patch,original.width,patch.mask);}plan.background=patch.background;methods.add(method);records.push({uid:region.uid,method,execution,painted:true,maskKind:patch.maskKind||'glyphs',coverage:patch.coverage,ms:performance.now()-t});

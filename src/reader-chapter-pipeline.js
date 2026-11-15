@@ -26,7 +26,8 @@ export class ChapterPreparation{
  constructor(chapter){this.c=chapter;this.tasks=chapter.entries.map(()=>deferred());this.sources=chapter.entries.map(()=>deferred());this.cleaned=chapter.entries.map(()=>deferred());this.held=new Map();this.getting=new Map();this.memory=new Map();this.scanPending=new Set(chapter.entries.map((_,i)=>i));this.cleanPending=new Set(this.scanPending);this.sourcePending=new Set(this.scanPending);this.done=0;this.downloaded=0;this.cleanDone=new Set();this.cleanFailed=new Set();this.started=false;}
  start(){if(this.started)return;this.started=true;for(let n=0;n<(this.c.config.saveData?1:4);n++)this.load();for(let n=0;n<(this.c.config.saveData?1:2);n++)this.scan();this.cleanLoop();}
  async load(){const c=this.c;while(!c.controller.signal.aborted&&this.sourcePending.size){const index=this.take(this.sourcePending);try{const blob=c.jobs.get(index)?.blob||await c.entries[index].async('blob');c.controller.signal.throwIfAborted();this.sources[index].resolve({blob});this.downloaded++;}catch(error){this.sources[index].reject(error);}}}
- take(pending){const focus=this.c.focusWindow||[],index=focus.find(i=>pending.has(i))??pending.values().next().value;pending.delete(index);return index;}
+ // The page being read and the next ones first, then the focus window, then the chapter order.
+ take(pending){const at=this.c.focusIndex||0,focus=[at,at+1,at+2,...(this.c.focusWindow||[])],index=focus.find(i=>pending.has(i))??pending.values().next().value;pending.delete(index);return index;}
  async scan(){const c=this.c;while(!c.controller.signal.aborted&&this.scanPending.size){const index=this.take(this.scanPending);
   try{
    const cell=await this.sources[index].promise,blob=cell.blob;delete cell.blob;c.controller.signal.throwIfAborted();

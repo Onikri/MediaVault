@@ -150,27 +150,31 @@ export function letterInk(data,w,h,local,paper,{light,rimmed=false}={}){
  // removes anything up to two pixels wide); what is left is judged again as
  // letters and, when it passes, taken together with its own edge. The line
  // itself stays.
- const index=new Map(parts.map((p,i)=>[p,i]));
+ const index=new Map(parts.map((p,i)=>[p,i])),inCore=new Uint8Array(total),inPiece=new Uint8Array(total);
  for(const p of parts){
-  if(taken.has(p)||p.inside<.2||p.area<least*2||stroke<3)continue;
+  // Only pieces of drawing about the size of a few letters; a whole dark area is not lettering.
+  if(taken.has(p)||p.inside<.2||p.area<least*2||stroke<3||p.area>glyph*glyph*24)continue;
   if(!(p.out>Math.max(2,glyph*.3)||size(p)>glyph*2.2))continue;
   const id=index.get(p),own=n=>n>=0&&n<total&&label[n]===id,core=p.pixels.filter(n=>{const x=n%w;return x>0&&x<w-1&&own(n-1)&&own(n+1)&&own(n-w)&&own(n+w);});
+  for(const n of core)inCore[n]=1;
   const left=new Set(core);
   while(left.size){
-   const seed=left.values().next().value,piece=[seed];left.delete(seed);let x1=w,y1=h,x2=0,y2=0,inside=0,edge=0;
+   const seed=left.values().next().value,piece=[seed];left.delete(seed);inPiece[seed]=1;let x1=w,y1=h,x2=0,y2=0,inside=0,edge=0;
    for(let a=0;a<piece.length;a++){
     const n=piece[a],px=n%w,py=(n/w)|0;x1=Math.min(x1,px);y1=Math.min(y1,py);x2=Math.max(x2,px);y2=Math.max(y2,py);
     if(px>=local[0]&&px<local[2]&&py>=local[1]&&py<local[3])inside++;
     let open=false;
-    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const i=n+dy*w+dx;if(px+dx<0||px+dx>=w)continue;if(left.has(i)){left.delete(i);piece.push(i);}else if(!dx!==!dy&&!core.includes(i)&&!piece.includes(i))open=true;}
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const i=n+dy*w+dx;if(px+dx<0||px+dx>=w)continue;if(left.has(i)){left.delete(i);piece.push(i);inPiece[i]=1;}else if(!dx!==!dy&&!inCore[i]&&!inPiece[i])open=true;}
     if(open)edge++;
    }
+   for(const n of piece)inPiece[n]=0;
    const width=x2-x1+3,height=y2-y1+3,out=Math.max(0,local[0]-x1+1,local[1]-y1+1,x2-local[2]+2,y2-local[3]+2),weight=2*piece.length/Math.max(1,edge)+2;
    // What is left of a line of the drawing is still a line, not a letter.
    if(Math.max(width,height)/Math.min(width,height)>=4)continue;
    if(piece.length<least*.5||inside<piece.length*.6||out>Math.max(2,glyph*.3)||Math.max(width,height)>glyph*2.2||weight<stroke*.6)continue;
    for(const n of piece){ink[n]=1;for(const i of [n-1,n+1,n-w,n+w,n-w-1,n-w+1,n+w-1,n+w+1])if(own(i))ink[i]=1;}
   }
+  for(const n of core)inCore[n]=0;
  }
  return {ink,glyph,stroke};
 }
