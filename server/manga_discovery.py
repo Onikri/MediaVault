@@ -71,11 +71,23 @@ def installed_sources():
     except SourceError:installed=[]
     return merge_source_list([*installed,dict(SOURCE),dict(CHAN_CC),dict(HMANGA),dict(REMANGA),*(dict(s) for s in HITOMI)])
 
+
+def source_matches_language(source, language):
+    lang = source.get('lang')
+    if lang in bridge.LANGUAGES:
+        return language == 'all' or lang == language
+    if lang == language == 'all':
+        from manga_native_sources import for_source
+        adapter = for_source(source)
+        return adapter is not None and adapter.LANGUAGE == 'all'
+    return False
+
+
 def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
     query=normalize(query)[:80]
     rows=[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))}
-          for s in installed_sources() if s.get('lang') in bridge.LANGUAGES and (language=='all' or s['lang']==language)]
+          for s in installed_sources() if source_matches_language(s, language)]
     rows.sort(key=lambda s:(s['language'],s['name'].casefold(),s['id']))
     from manga_source_health import states,blocked
     health=states();usable=[s for s in rows if not blocked(s['id'],health)]
@@ -357,7 +369,7 @@ class Discovery:
         if source_ids is not None and (not isinstance(source_ids,list) or not 1<=len(source_ids)<=1000 or any(not isinstance(v,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',v) for v in source_ids)):raise ValueError('Выбери хотя бы один установленный источник.')
         # Persist only public source identity, never an upstream response's
         # optional preference/authentication fields.
-        active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in installed_sources() if s.get('lang') in bridge.LANGUAGES]
+        active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in installed_sources() if source_matches_language(s, 'all')]
         installed={str(s['id']) for s in active}
         if source_ids and any(v not in installed for v in source_ids):raise ValueError('Выбранный источник не установлен. Обнови каталог источников.')
         selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())

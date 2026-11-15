@@ -59,6 +59,85 @@ PROFILES = (
     (('3386088694317815151', 'Manhwa Comics', 'https://manhwacomics.com', True), {'chapter_mode': 'manga', 'section': 'manhwa', 'date_format': '%d %b %Y'}),
     (('20045885295638720', 'Petrotechsociety', 'https://www.petrotechsociety.org', True), {'date_format': '%d/%m/%Y'}),
     (('2054192099319007885', 'ToonGod', 'https://www.toongod.org', True), {'html': True, 'section': 'webtoons', 'date_format': '%d %b %Y'}),
+    (('1103204227230640533', 'Comics Valley', 'https://comicsvalley.com', True), {
+        'language': 'all', 'section': 'comics-new', 'chapter_mode': 'manga', 'date_format': '%d/%m/%Y',
+    }),
+    (('7008887237419113673', 'Grabber Zone', 'https://grabber.zone', False), {
+        'language': 'all', 'section': 'comics', 'date_format': '%d.%m.%Y',
+        'selectors': {'chapter_name': 'a + a'},
+    }),
+    (('5617855959190673282', 'Manhwa-raw', 'https://manhwa-raw.com', True), {
+        'variant': 'raw', 'language': 'all', 'html': True, 'date_format': '%d/%m/%Y',
+        'selectors': {
+            'status': '.post-content_item:-soup-contains("Status") > .summary-content',
+            'description': '.post-content_item:-soup-contains("Summary") .summary-container',
+            'page_images': '.page-break img.wp-manga-chapter-img',
+        },
+    }),
+    (('626267698662819838', 'Aqua Manga', 'https://aquareader.org', False), {
+        'variant': 'aqua', 'html': True, 'uses_post_id': False,
+        'selectors': {
+            'cards': '.aqua-manga-card', 'card_link': '.aqua-manga-card__title a', 'next': 'a.next',
+            'title': '.aqua-series-info__title', 'cover': '.aqua-series-cover__img',
+            'description': '.aqua-series-synopsis', 'status': '.aqua-series-meta__status',
+            'genres': '.aqua-series-genre-pill', 'authors': '.aqua-series-info__creator-value a',
+            'artists': '.aqua-series-info__creator-value a', 'chapters': '.aqua-ch-item',
+            'chapter_name': '.aqua-ch-item__name', 'chapter_date': '.aqua-ch-item__time',
+        },
+    }),
+    (('7621724834621233483', 'BrainRotComics', 'https://brainrotcomics.com', False), {
+        'chapter_mode': 'manga', 'alt_names': False, 'selectors': {'authors': '', 'artists': ''},
+    }),
+    (('3544369893051520689', 'Cocomic', 'https://cocomic.co', True), {
+        'chapter_mode': 'manga', 'metadata_interval': 2,
+        'selectors': {
+            'title': '.asura-series-title, .post-title h3, .post-title h1',
+            'cover': '.asura-poster-img, .summary_image img',
+            'description': '.asura-synopsis-content, .description-summary .summary__content',
+            'genres': '.asura-genre-tag, .genres-content a', 'status': '.asura-badge-status',
+            'chapters': 'li.wp-manga-chapter:not(.premium)',
+        },
+    }),
+    (('6573506892686767219', 'DragonTea', 'https://dragontea.ink', False), {
+        'section': 'novel', 'chapter_mode': 'manga', 'date_format': '%m/%d/%Y', 'metadata_interval': 1,
+    }),
+    (('3956136651279281107', 'GEDE Comix', 'https://gedecomix.com', True), {
+        'section': 'porncomic', 'chapter_mode': 'manga',
+        'selectors': {'cover': '.summary_image img:not([data-eio])', 'card_cover': 'img:not([data-eio])'},
+    }),
+    (('3694940277826033657', 'Gourmet Scans', 'https://gourmetsupremacy.com', True), {
+        'section': 'project', 'genre_section': 'genre', 'ajax_template': 'wp-manga/content/content-archive',
+    }),
+    (('3112384885023225761', 'Kissmanga.in', 'https://kissmanga.in', True), {
+        'section': 'kissmanga', 'chapter_mode': 'manga',
+    }),
+    (('4480996639887718467', 'Lily Manga', 'https://lilymanga.net', True), {
+        'section': 'gl', 'genre_section': 'gl-genre', 'html': True, 'chapter_mode': 'manga',
+        'date_format': '%d.%m.%Y', 'metadata_interval': 2,
+    }),
+    (('8173282214298911566', 'MangaGG', 'https://mangagg.com', True), {
+        'section': 'comic', 'chapter_mode': 'paged', 'date_format': '%m/%d/%Y',
+    }),
+    (('9030178752551947945', 'Manhua Plus', 'https://manhuaplus.com', False), {
+        'manga_only': False, 'selectors': {'page_images': '.read-container img'},
+    }),
+    (('3663840686576348637', 'ManhwaNex', 'https://manhwanex.com', False), {'chapter_mode': 'manga'}),
+    (('4870917758913494428', 'S2Manga', 'https://s2read.com', True), {}),
+    (('5404499323728358840', 'Toonizy', 'https://toonizy.com', True), {
+        'section': 'webtoon', 'chapter_mode': 'manga', 'date_format': '%b %d, %y',
+        'selectors': {'title': '.post-content h3'},
+    }),
+    (('368848319592333339', 'Top Manhua', 'https://mangatop.org', True), {
+        'section': 'series', 'chapter_mode': 'paged', 'date_format': '%m/%d/%y',
+        'manga_only': False, 'metadata_interval': 0.5,
+    }),
+    (('6750082404202711318', 'WebtoonXYZ', 'https://www.webtoon.xyz', True), {
+        'section': 'read', 'genre_section': 'webtoon-genre', 'date_format': '%d %b %Y',
+        'thumbnail_original': True,
+    }),
+    (('6718273076571980404', 'Yaoihub', 'https://yaoihub.org', True), {
+        'chapter_mode': 'manga', 'metadata_interval': 2,
+    }),
 )
 
 # The MediaVault registry enables a profile after testing its complete
@@ -72,4 +151,9 @@ ENABLED = frozenset({
     '3606721916149050760',  # Mangasushi
     '7638481723868333116',  # ManhuaHot
     '6032516943051342273',  # TritiniaScans
+    '7008887237419113673',  # Grabber Zone
+    '626267698662819838',  # Aqua Manga
+    '9030178752551947945',  # Manhua Plus
+    '3663840686576348637',  # ManhwaNex
+    '2681651342533848540',  # MangaRead.org
 })

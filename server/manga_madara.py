@@ -6,6 +6,9 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import re
+import threading
+import time
+import unicodedata
 from urllib.parse import parse_qs, unquote, urlencode, urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
@@ -14,7 +17,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from manga_madara_profiles import ENABLED, PROFILES
 from manga_source_tags import unique
-from source_parser import PublicHttp, SourceAccessError, SourceError, public_url
+from source_parser import PublicHttp, SourceAccessError, SourceError, SourceTemporaryError, public_url
 
 
 SEGMENT = r'(?!(?:\.|%2[eE]){1,2}(?:/|$))(?:[\w.~+-]|%(?!2[fF]|5[cC]|[01][0-9a-fA-F])[0-9a-fA-F]{2}){1,240}'
@@ -22,8 +25,18 @@ ID = re.compile(r'[1-9]\d{0,11}')
 NUM = r'(\d{1,4}(?:[.,]\d{1,3})?)(?!\d)'
 CHAPTER_NUMBER = re.compile(r'(?:chapter|chap\.?|ch\.?|глава)[\s_\-#:]*' + NUM, re.I)
 VOLUME_NUMBER = re.compile(r'(?:volume|vol\.?|том)[\s_\-#:]*([1-9]\d{0,2})(?!\d)', re.I)
-CARD = '.page-item-detail, .manga__item, .c-tabs-item__content'
 PAGE_WRAP = '.page-break, li.blocks-gallery-item, .reading-content .text-left:not(:has(.blocks-gallery-item))'
+SELECTORS = {
+    'cards': '.page-item-detail, .manga__item, .c-tabs-item__content',
+    'card_link': '.post-title a[href]', 'card_cover': 'img',
+    'next': 'div.nav-previous, a.nextpostslink, #navigation-ajax',
+    'title': '.post-title h3, .post-title h1, #manga-title > h1',
+    'cover': '.summary_image img', 'genres': '.genres-content a', 'tags': '.tags-content a',
+    'authors': '.author-content > a, .manga-authors > a', 'artists': '.artist-content > a',
+    'description': '.description-summary .summary__content, .summary_content .manga-excerpt, .summary_content .post-content_item > h5 + div',
+    'chapters': 'li.wp-manga-chapter', 'chapter_link': 'a[href]', 'chapter_name': '',
+    'chapter_date': '.chapter-release-date', 'page_images': '',
+}
 FORM = '/wp-admin/admin-ajax.php'
 CATALOGUE_FORM = {
     'action': 'madara_load_more', 'template': 'madara-core/content/content-archive',
@@ -128,14 +141,15 @@ def release_date(value, template):
 
 
 class Madara:
-    LANGUAGE = 'en'
-
     def __init__(self, sid, name, root, adult, *, html=False, chapter_mode='page', section='manga',
-                 genre_section='manga-genre', manga_only=True, uses_post_id=True, date_format='%B %d, %Y'):
+                 genre_section='manga-genre', manga_only=True, uses_post_id=True, date_format='%B %d, %Y',
+                 language='en', selectors=None, ajax_template=CATALOGUE_FORM['template'],
+                 metadata_interval=0, thumbnail_original=False, alt_names=True):
         self.SOURCE_ID = sid
         self.NAME = name
         self.ROOT = root
         self.IS_NSFW = adult
+        self.LANGUAGE = language
         self.html = html
         self.chapter_mode = chapter_mode
         self.section = section
@@ -143,6 +157,13 @@ class Madara:
         self.manga_only = manga_only
         self.uses_post_id = uses_post_id
         self.date_format = date_format
+        self.selectors = {**SELECTORS, **(selectors or {})}
+        self.ajax_template = ajax_template
+        self.metadata_interval = metadata_interval
+        self.next_request = 0.0
+        self.pace_lock = threading.Lock()
+        self.thumbnail_original = thumbnail_original
+        self.alt_names = alt_names
         self.host = urlsplit(root).hostname
         self.TITLE_PATH = re.compile(rf'/{section}/({SEGMENT})/?')
         self.CHAPTER_PATH = re.compile(rf'/{section}/({SEGMENT})/({SEGMENT})/?')
@@ -187,6 +208,15 @@ class Madara:
         return values[0] if parsed.path == '/' and set(query) == {'p'} and len(values) == 1 and ID.fullmatch(values[0]) else ''
 
     def soup(self, http, url, *, data=None, referer=None):
+        if self.metadata_interval:
+            with self.pace_lock:
+                now = time.monotonic()
+                scheduled = max(now, self.next_request)
+                if http.deadline is not None and scheduled >= http.deadline:
+                    raise SourceTemporaryError('Madara превысил бюджет ожидания источника.')
+                self.next_request = scheduled + self.metadata_interval
+            if scheduled > now:
+                time.sleep(scheduled - now)
         headers = {'Referer': referer or self.ROOT + '/'}
         options = {'method': 'POST', 'data': data, 'action': 'madara-read'} if data is not None else {}
         raw, final, _ = http.document(url, headers=headers, **options)
@@ -198,7 +228,7 @@ class Madara:
         return document, final
 
     def catalogue_data(self, page, query, sort, tag):
-        data = {**CATALOGUE_FORM, 'page': str(page - 1)}
+        data = {**CATALOGUE_FORM, 'template': self.ajax_template, 'page': str(page - 1)}
         if self.manga_only:
             data.update(MANGA_ONLY)
         if query:
@@ -215,33 +245,51 @@ class Madara:
         if not isinstance(page, int) or not 1 <= page <= 2000 or (tag and not genre_slug(tag)):
             raise SourceError('Некорректные параметры каталога Madara.')
         if self.html:
-            if query and not tag and page > 1 and self.uses_post_id:
+            if query and not tag and page > 1 and not self.html_search_paginates():
                 return [], False
-            path = f'/{self.genre_section}/{tag}/' if tag else '/' if query else f'/{self.section}/'
-            path += f'page/{page}/' if page > 1 else ''
-            params = {'s': query, 'post_type': 'wp-manga'} if query else {'m_orderby': 'latest' if sort == 'updated' else 'views'}
-            expected = self.ROOT + path
-            soup, final = self.soup(http, expected + '?' + urlencode(params))
+            path, params = self.html_request(http, page, query, sort, tag)
+            if not path:
+                return [], False
+            target = self.ROOT + path + ('?' + urlencode(params) if params else '')
+            soup, final = self.soup(http, target)
             if urlsplit(final).path.rstrip('/') != path.rstrip('/'):
                 raise SourceError('Madara перенаправил на другую страницу каталога.')
         else:
             soup, final = self.soup(http, self.ROOT + FORM, data=self.catalogue_data(page, query, sort, tag))
-        cards = soup.select(CARD)
+        rows = self.archive_rows(soup, final)
+        more = (self.html_has_more(soup, query, tag) if self.html else len(rows) == 25)
+        return rows, more
+
+    def html_request(self, http, page, query, sort, tag):
+        path = f'/{self.genre_section}/{tag}/' if tag else '/' if query else f'/{self.section}/'
+        path += f'page/{page}/' if page > 1 else ''
+        params = {'s': query, 'post_type': 'wp-manga'} if query else {'m_orderby': 'latest' if sort == 'updated' else 'views'}
+        return path, params
+
+    def html_has_more(self, soup, query, tag):
+        return (not query or tag or self.html_search_paginates()) and bool(soup.select_one(self.selectors['next']))
+
+    def html_search_paginates(self):
+        return not self.uses_post_id
+
+    def archive_rows(self, soup, final):
         found = {}
-        for card in cards:
-            link = card.select_one('.post-title a[href]')
+        for card in soup.select(self.selectors['cards']):
+            link = card.select_one(self.selectors['card_link'])
             target = self.site_link(link.get('href'), final) if link else ''
             slug = self.TITLE_PATH.fullmatch(urlsplit(target).path)
             title = node_text(link)
             if slug and title:
-                found[slug[1]] = self.row(target, title, image_from(card.select_one('img'), final))
-        if self.html:
-            more = bool(soup.select_one('div.nav-previous, a.nextpostslink, #navigation-ajax'))
-            if query and not tag and self.uses_post_id:
-                more = False
-        else:
-            more = len(found) == 25
-        return list(found.values()), more
+                found[slug[1]] = self.row(target, title, self.thumbnail(card.select_one(self.selectors['card_cover']), final))
+        return list(found.values())
+
+    def thumbnail(self, node, url):
+        image = image_from(node, url)
+        if self.thumbnail_original and image:
+            parsed = urlsplit(image)
+            path = re.sub(r'-\d+x\d+(?=\.[a-zA-Z]+$)', '', parsed.path)
+            return urlunsplit(parsed._replace(path=path))
+        return image
 
     def vocabulary(self, http):
         soup, final = self.soup(http, self.ROOT + f'/{self.section}/')
@@ -270,26 +318,26 @@ class Madara:
         }
 
     def metadata(self, soup, url):
-        title = node_text(soup.select_one('.post-title h3, .post-title h1, #manga-title > h1'))
+        title = node_text(soup.select_one(self.selectors['title']))
         if not title:
             raise SourceError('Madara не предоставил карточку произведения.')
-        result = self.row(url, title, image_from(soup.select_one('.summary_image img'), url))
-        result['genres'] = unique(node_text(node) for node in soup.select('.genres-content a'))
-        result['tags'] = unique(node_text(node) for node in soup.select('.tags-content a'))
-        result['authors'] = unique(node_text(node) for node in soup.select('.author-content > a, .manga-authors > a'))
-        result['artists'] = unique(node_text(node) for node in soup.select('.artist-content > a'))
-        description = soup.select_one('.description-summary .summary__content, .summary_content .manga-excerpt, .summary_content .post-content_item > h5 + div')
+        result = self.row(url, title, self.thumbnail(soup.select_one(self.selectors['cover']), url))
+        for field in ('genres', 'tags', 'authors', 'artists'):
+            result[field] = unique(node_text(node) for node in soup.select(self.selectors[field])) if self.selectors[field] else []
+        description = soup.select_one(self.selectors['description'])
         result['description'] = ('\n\n'.join(node_text(p) for p in description.select('p')) or node_text(description))[:12000] if description else ''
         for item in soup.select('.post-content_item'):
             label = node_text(item.select_one('.summary-heading, h5')).casefold()
             value = node_text(item.select_one('.summary-content'))
-            if label in {'alternative', 'alternative names', 'alt names', 'alternative name', 'other names'}:
+            if self.alt_names and label in {'alternative', 'alternative names', 'alt names', 'alternative name', 'other names'}:
                 aliases = [v.strip() for v in re.split(r'\s*;\s*|\s+[/|]\s+', value) if v.strip()]
                 result['aliases'] = unique([*result['aliases'], *aliases])
             elif label == 'status':
                 result['status'] = value
             elif label == 'type':
                 result['format'] = value.casefold() if value.casefold() in {'manga', 'manhwa', 'manhua', 'webtoon'} else ''
+        if status := self.selectors.get('status'):
+            result['status'] = node_text(soup.select_one(status))
         return result
 
     def title(self, http, value):
@@ -311,17 +359,17 @@ class Madara:
         return self.metadata(soup, final)
 
     def chapter_rows(self, soup, url, slug, found):
-        for node in soup.select('li.wp-manga-chapter'):
-            anchor = node.select_one('a[href]')
+        for node in soup.select(self.selectors['chapters']):
+            anchor = node if node.name == 'a' and node.has_attr('href') else node.select_one(self.selectors['chapter_link'])
             chapter_url = self.site_link(anchor.get('href'), url) if anchor else ''
             path = urlsplit(chapter_url).path
             match = self.CHAPTER_PATH.fullmatch(path)
             if not match or unquote(match[1]) != unquote(slug) or path.rstrip('/') in found:
                 continue
-            label = node_text(anchor)
+            label = node_text(node.select_one(self.selectors['chapter_name'])) if self.selectors['chapter_name'] else node_text(anchor)
             num = CHAPTER_NUMBER.search(label) or CHAPTER_NUMBER.search(unquote(match[2]))
             volume = VOLUME_NUMBER.search(label) or VOLUME_NUMBER.search(unquote(match[2]))
-            date_node = node.select_one('.chapter-release-date')
+            date_node = node.select_one(self.selectors['chapter_date'])
             date_image = date_node.select_one('img[alt]') if date_node else None
             date_link = date_node.select_one('a[title]') if date_node else None
             date = date_image['alt'] if date_image else date_link['title'] if date_link else node_text(date_node)
@@ -334,6 +382,7 @@ class Madara:
 
     def chapters(self, http, soup, url, slug):
         found = {}
+        truncated = False
         if self.chapter_mode == 'page':
             self.chapter_rows(soup, url, slug, found)
         else:
@@ -360,15 +409,13 @@ class Madara:
                     self.chapter_rows(fragment, url, slug, found)
                     if len(found) == previous:
                         break
-                    if len(found) >= 1500:
-                        break
                 else:
-                    raise SourceError('Madara превысил лимит страниц списка глав.')
+                    truncated = True
         rows = list(found.values())
         for position, row in enumerate(rows):
             if row['number'] is None:
                 row['number'] = len(rows) - position
-        return sorted(rows[:1500], key=lambda row: (row['season'], row['number'])), len(rows) >= 1500
+        return sorted(rows, key=lambda row: (row['season'], row['number'])), truncated
 
     def pages(self, http, value, expected):
         soup, final = self.soup(http, value)
@@ -387,7 +434,8 @@ class Madara:
                 raise SourceError('Madara вернул неверный список изображений.')
             pages = [image_url(value, final) for value in sources]
         else:
-            nodes = (wrapper.select_one('img') for wrapper in soup.select(PAGE_WRAP))
+            selector = self.selectors['page_images']
+            nodes = soup.select(selector) if selector else (wrapper.select_one('img') for wrapper in soup.select(PAGE_WRAP))
             # Gallery containers can be nested, while page order is the HTML order.
             images = {id(node): node for node in nodes if node}
             pages = [image_from(node, final) for node in images.values()]
@@ -421,7 +469,51 @@ class Madara:
                 'dubs': [], 'releases': [], 'translations': [], 'available': bool(episodes)}
 
 
-SOURCES = tuple(Madara(*identity, **options) for identity, options in PROFILES)
+class AquaManga(Madara):
+    def html_request(self, http, page, query, sort, tag):
+        path = f'/{self.section}/' + (f'page/{page}/' if page > 1 else '')
+        params = {'m_orderby': 'latest' if sort == 'updated' else 'views'}
+        if query:
+            params['search'] = query
+        if tag:
+            params['genre'] = tag
+        return path, params
+
+    def vocabulary(self, http):
+        soup, final = self.soup(http, self.ROOT + f'/{self.section}/')
+        options = {}
+        for anchor in soup.select('.aqua-genre-pills a.aqua-filter-pill[href]'):
+            url = self.site_link(anchor['href'], final)
+            genre = parse_qs(urlsplit(url).query).get('genre', [''])[0]
+            label = node_text(anchor)
+            if genre_slug(genre) and label:
+                options[genre] = {'label': label, 'sourceId': genre, 'category': 'genre'}
+        return list(options.values())
+
+
+class ManhwaRaw(Madara):
+    def html_request(self, http, page, query, sort, tag):
+        if not query or tag:
+            return super().html_request(http, page, query, sort, tag)
+        normalized = unicodedata.normalize('NFD', query.strip().lower())
+        slug = re.sub(r'[^a-z0-9]+', '-', ''.join(c for c in normalized if not unicodedata.combining(c))).strip('-')
+        if not slug:
+            return '', {}
+        home, _ = self.soup(http, self.ROOT + '/')
+        field = home.select_one('input[name="mbk_token"]')
+        token = field.get('value', '') if field else ''
+        if not re.fullmatch(r'[A-Za-z0-9_-]{4,160}', token):
+            raise SourceError('Manhwa Raw не предоставил публичный параметр поиска.')
+        return f'/search/{token}/{slug}/' + (f'page/{page}/' if page > 1 else ''), {}
+
+    def html_search_paginates(self):
+        return True
+
+
+VARIANTS = {'standard': Madara, 'aqua': AquaManga, 'raw': ManhwaRaw}
+SOURCES = tuple(VARIANTS[options.get('variant', 'standard')](
+    *identity, **{k: v for k, v in options.items() if k != 'variant'}
+) for identity, options in PROFILES)
 ACTIVE_SOURCES = tuple(source for source in SOURCES if source.SOURCE_ID in ENABLED)
 SOURCE_HOSTS = {source.host: source for source in SOURCES}
 

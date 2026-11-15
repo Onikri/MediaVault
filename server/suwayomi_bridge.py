@@ -434,8 +434,9 @@ def native_page_image(target,page):
 
 def search(title,language='all',format='all',offset=0,limit=8):
     from title_identity import aliases,match_title
+    from manga_discovery import source_matches_language
     if not configured():return {'results':[],'providers':[]}
-    try:active=[s for s in sources() if s['lang'] in ({'ru'} if language=='auto' else LANGUAGES if language=='all' else {language})]
+    try:active=[s for s in sources() if source_matches_language(s,'ru' if language=='auto' else language)]
     except SourceError as e:return {'results':[],'providers':[{'provider':'suwayomi','name':'Дополнительные источники','status':'unavailable','message':str(e)}]}
     # A stable, explicit window replaces the old silent first-32-source cut-off.
     # The UI can continue until every installed source in this language is tried.
@@ -449,7 +450,7 @@ def search(title,language='all',format='all',offset=0,limit=8):
         client=None
         try:
             queries=aliases(title)
-            lang=source['lang'];pattern={'ja':r'[\u3040-\u30ff\u3400-\u9fff]','ko':r'[\uac00-\ud7af]','ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]'}[lang]
+            lang=source['lang'];pattern={'ja':r'[\u3040-\u30ff\u3400-\u9fff]','ko':r'[\uac00-\ud7af]','ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','all':r'.'}[lang]
             queries=sorted(queries,key=lambda q:not bool(re.search(pattern,q,re.I)))
             from manga_native_sources import for_source,search as native_search
             if adapter:=for_source(source):

@@ -1,10 +1,11 @@
 import unittest
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlsplit
 from zipfile import ZipFile
 
 from catalogue_sources import base_sources, fetch
-from manga_discovery import search_source
+from manga_discovery import search_source, source_matches_language
 from manga_download import download_chapter
 import manga_madara as madara
 from manga_sources import inspect
@@ -70,6 +71,80 @@ class Http:
 
 
 class MadaraMigration(unittest.TestCase):
+    def test_aqua_keeps_search_genre_and_page_on_the_catalogue_route(self):
+        aqua = madara.SOURCE_HOSTS['aquareader.org']
+        raw = '''
+        <div class="aqua-manga-card">
+          <div class="aqua-manga-card__title"><a href="/manga/example/">Example Story</a></div>
+        </div><a class="next" href="/manga/page/3/">Next</a>
+        '''
+        http = Mock()
+        url = aqua.ROOT + '/manga/page/2/'
+        http.document.return_value = (raw, url, {})
+        rows, more = aqua.catalogue(http, page=2, query='Example Story', tag='sci-fi')
+        request = urlsplit(http.document.call_args.args[0])
+        self.assertEqual(request.path, '/manga/page/2/')
+        self.assertEqual(parse_qs(request.query), {'m_orderby': ['views'], 'search': ['Example Story'], 'genre': ['sci-fi']})
+        self.assertEqual(rows[0]['sourceId'], aqua.SOURCE_ID)
+        self.assertTrue(more)
+
+    def test_aqua_chapter_card_can_be_the_link_itself(self):
+        aqua = madara.SOURCE_HOSTS['aquareader.org']
+        title = aqua.ROOT + '/manga/example/'
+        raw = '''
+        <h1 class="aqua-series-info__title">Example Story</h1>
+        <a class="aqua-ch-item" href="/manga/example/chapter-3/">
+          <span class="aqua-ch-item__name">Chapter 3</span>
+        </a>
+        '''
+        http = Mock()
+        http.document.return_value = (raw, title, {})
+        row, = aqua.inspect(title, http)['episodes']
+        self.assertEqual((row['number'], row['url']), (3, title + 'chapter-3/'))
+
+    def test_single_document_chapter_list_is_not_cut_at_1500(self):
+        adapter = madara.SOURCE_HOSTS['manhuaplus.com']
+        title = adapter.ROOT + '/manga/example/'
+        chapters = ''.join(
+            f'<li class="wp-manga-chapter"><a href="{title}chapter-{n}/">Chapter {n}</a></li>'
+            for n in range(1501, 0, -1)
+        )
+        http = Mock()
+        http.document.return_value = (DETAILS + chapters, title, {})
+        result = adapter.inspect(title, http)
+        self.assertEqual(len(result['episodes']), 1501)
+        self.assertEqual(result['episodes'][0]['number'], 1)
+        self.assertFalse(result['truncated'])
+
+    def test_manhwa_raw_uses_the_public_search_form_and_keeps_page_number(self):
+        raw = madara.SOURCE_HOSTS['manhwa-raw.com']
+        http = Mock()
+        url = raw.ROOT + '/search/public-token/cafe-no-1/page/2/'
+        http.document.side_effect = [
+            ('<input type="hidden" name="mbk_token" value="public-token">', raw.ROOT, {}),
+            (CARDS, url, {}),
+        ]
+        rows, more = raw.catalogue(http, page=2, query='Café No. 1')
+        self.assertEqual([call.args[0] for call in http.document.call_args_list], [raw.ROOT + '/', url])
+        self.assertEqual(rows[0]['language'], 'all')
+        self.assertFalse(more)
+
+    def test_grabber_zone_uses_the_label_link_but_the_original_chapter_href(self):
+        grabber = madara.SOURCE_HOSTS['grabber.zone']
+        root = grabber.ROOT + '/comics/example/'
+        html = DETAILS + '''<li class="wp-manga-chapter">
+          <a href="/comics/example/issue-19/">Read</a><a>Chapter 19.5</a></li>'''
+        http = Mock()
+        http.document.return_value = (html, root, {})
+        row, = grabber.inspect(root, http)['episodes']
+        self.assertEqual((row['number'], row['url'], row['language']), (19.5, root + 'issue-19/', 'all'))
+        source = {'id': grabber.SOURCE_ID, 'lang': 'all'}
+        with patch('manga_native_sources.for_source', return_value=grabber):
+            self.assertTrue(source_matches_language(source, 'all'))
+            self.assertFalse(source_matches_language(source, 'en'))
+        with patch('manga_native_sources.for_source', return_value=None):
+            self.assertFalse(source_matches_language(source, 'all'))
+
     def test_active_profile_search_catalogue_reader_and_cbz_share_identity(self):
         with patch('manga_native_sources.PublicHttp', return_value=Http()), patch('suwayomi_bridge.Client') as bridge:
             hit, = search_source(SOURCE, 'Example Story')
