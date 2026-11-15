@@ -62,6 +62,14 @@ def page_reference(value):
         from manga_mangadex_native import image_marker
         image_marker(value)
         return value, None, 1, 'dex-image'
+    if parts.fragment.startswith('mv_ball_page='):
+        from manga_mangaball_native import parsed_page
+        parsed_page(value)
+        return value, None, 1, 'ball-image'
+    if parts.fragment.startswith('mv_million_page='):
+        from manga_mangamillion import page_marker
+        page_marker(value)
+        return value, None, 1, 'million-image'
     if parts.fragment == SETSU_FRAGMENT:
         if host != 'i0.wp.com':
             raise SourceError('Некорректный адрес страницы Setsu Scans.')
@@ -96,6 +104,22 @@ def decode_page(raw, tiles, alignment=1):
 def fetch_page(http, reference, headers):
     """Both the online reader and CBZ use the exact same page transformation."""
     target, tiles, alignment, action = reference
+    if action == 'ball-image':
+        from manga_mangaball_native import parsed_page
+        from mangaball_reader import reserve_image
+        url, parent, chapter, index = parsed_page(target)
+        try:
+            response, _ = http._open(url, headers=headers)
+            return validated_image(read_image(http, response))
+        except SourceRateLimitError:
+            raise
+        except SourceError:
+            return reserve_image(chapter, index, parent, expected=url, http=http)
+    if action == 'million-image':
+        from manga_mangamillion import decrypt, page_data
+        url, key, iv = page_data(http, target)
+        response, _ = http._open(url, headers=headers)
+        return validated_image(decrypt(read_image(http, response), key, iv))
     if action == 'setsu-image':
         response, _ = setsu_image(http, target, headers)
     elif action == 'dex-image':
@@ -103,6 +127,11 @@ def fetch_page(http, reference, headers):
         response, _ = open_image(http, target, headers)
     else:
         response, _ = open_marked_page(http, target, headers, action)
+    raw = read_image(http, response)
+    return (decode_page(raw, tiles, alignment), 'image/jpeg') if tiles is not None else validated_image(raw)
+
+
+def read_image(http, response):
     try:
         raw = bytearray()
         for block in response.iter_content(65536):
@@ -113,8 +142,10 @@ def fetch_page(http, reference, headers):
         raise SourceError('Источник прервал загрузку страницы.') from None
     finally:
         response.close()
-    if tiles is not None:
-        return decode_page(raw, tiles, alignment), 'image/jpeg'
+    return raw
+
+
+def validated_image(raw):
     from manga_download import image_extension
     extension = image_extension(raw[:32])
     if not extension:

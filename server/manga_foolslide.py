@@ -18,6 +18,17 @@ PAGES = re.compile(r'\bvar\s+pages\s*=\s*(?=\[)')
 TOC = 'div.group div.element, div.list div.element'
 
 
+def public_form(url, form):
+    parts = urlsplit(url)
+    if (parts.scheme != 'https' or parts.netloc not in HOSTS or parts.query or parts.fragment
+            or not isinstance(form, dict)):
+        return False
+    if parts.path == '/search/':
+        return set(form) == {'search'} and isinstance(form['search'], str) and 0 < len(form['search']) <= 160
+    return form == {'adult': 'true'} and bool(
+        TITLE_PATH.fullmatch(parts.path) or CHAPTER_PATH.fullmatch(parts.path))
+
+
 def chapter_date(value):
     value = value.partition(', ')[2] if re.match(r'^[A-Za-z ]+, ', value) else value
     lowered = value.casefold()
@@ -58,7 +69,7 @@ class FoolSlide:
         target = self.site_link(target)
         if not target:
             raise SourceError('Некорректный адрес FoOlSlide.')
-        options = {'method': 'POST', 'data': form} if form else {}
+        options = {'method': 'POST', 'data': form, 'action': 'foolslide-form'} if form else {}
         html, final, _ = http.document(target, headers={'Origin': self.ROOT, 'Referer': self.ROOT + '/'}, **options)
         final = self.site_link(final)
         if not final:
@@ -185,3 +196,5 @@ SOURCES = (
     FoolSlide('4722346859737894698', 'Death Toll Scans', 'https://reader.deathtollscans.net'),
     FoolSlide('3478835885302345699', 'Mangatellers', 'https://reader.mangatellers.gr'),
 )
+
+HOSTS = frozenset(adapter.host for adapter in SOURCES)

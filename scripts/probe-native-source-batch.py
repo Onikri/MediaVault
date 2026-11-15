@@ -30,7 +30,9 @@ def candidates():
     import manga_hentaihand
     import manga_loluniverse
     import manga_mangadventure
+    import manga_mangaball_native
     import manga_mangadex_native
+    import manga_mangamillion
     import manga_mangak
     import manga_masonry
     import manga_multichan
@@ -42,7 +44,7 @@ def candidates():
                    native.manga_mangacatalog, native.manga_iken, native.manga_mangahub, manga_hentaihand,
                    manga_comici, manga_gigaviewer, manga_yii, manga_guya, manga_mangadventure,
                    manga_mangak, manga_masonry, manga_multichan, manga_bakkin, manga_loluniverse,
-                   manga_mangadex_native, manga_foolslide):
+                   manga_mangadex_native, manga_foolslide, manga_mangaball_native, manga_mangamillion):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in module.SOURCES)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby

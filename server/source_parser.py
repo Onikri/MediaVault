@@ -136,8 +136,9 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         from manga_guya import public_api as guya_public_api
         from manga_mangadventure import public_api as adventure_public_api
         from manga_mangak import public_api as mangak_public_api
+        from manga_mangamillion import public_api as million_api
         adapters = (iken_public_api, vine_public_api, hentaihand_public_api, guya_public_api,
-                    adventure_public_api, mangak_public_api)
+                    adventure_public_api, mangak_public_api, million_api)
         if not (any(route(host, url.path, url.query) for route in adapters)
                 or comici_public_route(host, url.path, url.query, 'comici-json')
                 or giga_public_route(host, url.path, url.query, 'giga-json')):
@@ -243,11 +244,26 @@ class PublicHttp:
 
     def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None, action=None):
         url = self.validate(value)
-        if RELAY_ROUTE is not None and method == 'GET' and not byte_range:
+        if RELAY_ROUTE is not None and method == 'GET' and not byte_range and action != 'mangamillion-proto':
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
+        million_register = False
+        if action == 'mangamillion-proto':
+            from manga_mangamillion import TOKEN, public_api
+            target = urlsplit(url)
+            token = (headers or {}).get('Access-Token', '')
+            million_register = target.path == '/api/register' and method == 'POST' and data == b'' and token == ''
+            valid_read = target.path != '/api/register' and method == 'GET' and data is None
+            if not public_api(target.netloc, target.path, target.query) or not (
+                    million_register or valid_read and isinstance(token, str) and TOKEN.fullmatch(token)):
+                raise SourceError('Некорректный маршрут Manga Million.')
+            outgoing.update({'Accept': 'application/x-protobuf, application/octet-stream, */*',
+                             'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+                             'X-Requested-With': 'XMLHttpRequest'})
+            if token:
+                outgoing['Access-Token'] = token
         publisher = action in {'comici-json', 'comici-rsc', 'comici-html', 'comici-image',
                                'giga-json', 'giga-graphql', 'giga-html', 'giga-image'}
         if publisher:
@@ -317,7 +333,14 @@ class PublicHttp:
             if action == 'giga-graphql':
                 from manga_gigaviewer import graphql_form
                 giga_form = origin.path == '/graphql' and graphql_form(host, data)
-            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog or honey_chapters or hikka_search or jaomix_toc or madara_form or giga_form):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            foolslide_form = False
+            if action == 'foolslide-form':
+                from manga_foolslide import public_form
+                foolslide_form = public_form(url, data)
+            if not (player_form or search_form or manga_form or million_register or foolslide_form
+                    or chan_search or senkognito_read or lostfilm_catalog or honey_chapters
+                    or hikka_search or jaomix_toc or madara_form or giga_form):
+                raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if madara_form:outgoing['X-Requested-With']='XMLHttpRequest'
             if chan_search:
                 # The public search box's Next.js action. The caller supplies only the title.
@@ -349,7 +372,7 @@ class PublicHttp:
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
                 response.close()
-                if not location or hop == 5:
+                if action == 'mangamillion-proto' or not location or hop == 5:
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
                 if publisher:

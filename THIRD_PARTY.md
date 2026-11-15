@@ -458,3 +458,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   (`server/manga_mangadex_native.py`, `server/manga_loluniverse.py`,
   `server/manga_foolslide.py`) follow the corresponding public Keiyoushi
   implementations at the same Apache-2.0 revision.
+- The Manga Million and Manga Ball native adapters
+  (`server/manga_mangamillion.py`, `server/manga_million_wire.py`,
+  `server/manga_mangaball_native.py`, `server/manga_ball_million_profiles.py`)
+  follow the public Keiyoushi source implementations at the same Apache-2.0 revision.
