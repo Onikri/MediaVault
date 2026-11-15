@@ -226,6 +226,16 @@ function growBacking(ink,data,w,h,lightBacking,steps){
  }
  return dilateInk(mask,w,h,1);
 }
+// The artist's backing under the letters, kept as drawn: the letters are
+// painted in its colour. Used when the page's model time is spent, instead of
+// a blurred Telea fill over the drawing.
+function keptBacking(ink,backing,data,w,h,darkLetters){
+ const letters=dilateInk(ink,w,h,1),core=dilateInk(ink,w,h,2),tones=[];
+ for(let n=0;n<backing.length;n++)if(backing[n]&&!core[n]){const p=n*4;tones.push([(data[p]+data[p+1]+data[p+2])/3,data[p],data[p+1],data[p+2]]);}
+ if(tones.length<12)return null;
+ tones.sort((a,b)=>a[0]-b[0]);const pick=tones[Math.floor(tones.length*(darkLetters?.7:.3))];
+ return {mask:letters,color:[pick[1],pick[2],pick[3]]};
+}
 function growInk(ink,data,w,h,paper,flat){
  const mask=dilateInk(ink,w,h,2);
  const dark=paper>=128;let front=mask;
@@ -325,7 +335,7 @@ export function prepareInkPatch(original,box,{category='dialogue',neural=false,m
  }
  const ambiguous=!flat&&(category==='sfx'||category==='sign')&&masked/area>.28;
  if(ambiguous&&!neural&&!rescue)return {declined:'Спецэффект пересекает рисунок: для безопасного удаления выбери нейросетевое восстановление',coverage};
- return {left,top,width:w,height:h,data,mask,background,coverage,flat,masked,stroke:letters.stroke,...(outline?{maskKind:'outlined-letters',...(flat?{}:{wide:mask})}:{})};
+ return {left,top,width:w,height:h,data,mask,background,coverage,flat,masked,stroke:letters.stroke,...(outline?{maskKind:'outlined-letters',...(flat?{}:{wide:mask,backing:keptBacking(letters.ink,mask,data,w,h,paper>=128)})}:{})};
 }
 export function compositeInkPatch(target,patch,modified,writeMask=patch.mask){
  for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++)if(writeMask[y*patch.width+x]){

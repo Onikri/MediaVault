@@ -15,6 +15,24 @@ export const MAIN_FONT='neucha';
 // One main typeface carries speech, thoughts (italic) and shouts; only sound
 // effects, small side chatter and notes on objects get a situational face.
 const SITUATIONAL=new Set(['sfx','chatter','note']);
+// The small model sees the hole with plenty of the page around it: with a
+// narrow crop it fills a large hole with flat blocks; with 1.2× the hole's size
+// on each side (160–320 px) it continues hair, screentone and outlines. The
+// result is written back into the region's patch only where the hole is.
+async function inContext(model,page,patch,image,mask,progress){
+ const pw=page.width,ph=page.height;let x1=patch.width,y1=patch.height,x2=-1,y2=-1;
+ for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++)if(mask[y*patch.width+x]){if(x<x1)x1=x;if(x>x2)x2=x;if(y<y1)y1=y;if(y>y2)y2=y;}
+ if(x2<0)return model(image,mask,progress);
+ const pad=Math.min(320,Math.max(160,Math.round(Math.max(x2-x1,y2-y1)*1.2)));
+ const L=Math.max(0,patch.left+x1-pad),T=Math.max(0,patch.top+y1-pad),R=Math.min(pw,patch.left+x2+1+pad),B=Math.min(ph,patch.top+y2+1+pad),W=R-L,H=B-T;
+ const big=new ImageData(W,H),hole=new Uint8Array(W*H);
+ for(let y=0;y<H;y++)big.data.set(page.data.subarray(((T+y)*pw+L)*4,((T+y)*pw+R)*4),y*W*4);
+ // The region's own pixels (with its letters) replace the page's copy.
+ for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++){const gx=patch.left+x-L,gy=patch.top+y-T;if(gx<0||gy<0||gx>=W||gy>=H)continue;const n=gy*W+gx,p=y*patch.width+x;big.data.set(image.data.subarray(p*4,p*4+4),n*4);if(mask[p])hole[n]=1;}
+ const execution=await model(big,hole,progress);
+ for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++){const p=y*patch.width+x;if(!mask[p])continue;const n=(patch.top+y-T)*W+patch.left+x-L;image.data.set(big.data.subarray(n*4,n*4+3),p*4);}
+ return execution;
+}
 // The voice of a line picks its face, as a letterer does: a scream, a furious
 // line, a faint one and a plain one are not set in the same type. The voice
 // comes from what the text is, from the weight the model saw in the source
@@ -114,8 +132,9 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   }
   // Conflicting duplicate boxes must not be painted over one another.
   const conflicts=new Set();for(let i=0;i<plans.length;i++)for(let j=i+1;j<plans.length;j++)if(overlap(plans[i].region.text_bbox,plans[j].region.text_bbox)>.85){conflicts.add(i);conflicts.add(j);}
-  // smart: the small model gets at most MODEL_BUDGET ms per page, so a busy page
-  // is never held for minutes; regions after it are cleaned by the fast method.
+  // smart: the small model gets at most MODEL_BUDGET ms of inference per page
+  // (loading the model is not counted), so a busy page is never held for
+  // minutes; regions after it keep their backing or take the fast method.
   const MODEL_BUDGET=7000,modelStart=()=>performance.now();let modelMs=0;
   let lamaUnavailable=null,modelCalls=0,pageExecution,cleanupMask=captureDebug?new Uint8Array(original.width*original.height):null;
   if(mode==='moebius'&&moebiusStrategy==='page'&&!preparedClean){
@@ -162,7 +181,8 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
      method=mode==='moebius'?'moebius':mode==='migan'?'migan':'lama';write=mode==='quality'||mode==='hybrid'?dilateInk(patch.mask,patch.width,patch.height,2):patch.mask;
     }else if(smart&&patch.wide&&lama&&!lamaUnavailable&&modelMs<MODEL_BUDGET&&await(async()=>{
      // Outlined lettering over the drawing: the model repaints letters and outline alike.
-     const began=modelStart();try{modelCalls++;execution=await lama(image,patch.wide,message=>status({phase:'cleaning',message}));method='migan';write=patch.wide;modelMs+=modelStart()-began;return true;}
+     const began=modelStart();try{modelCalls++;execution=await inContext(lama,working,patch,image,patch.wide,message=>status({phase:'cleaning',message}));method='migan';write=patch.wide;modelMs+=Number.isFinite(execution?.inferenceMs)?execution.inferenceMs:modelStart()-began;
+      return true;}
      catch(error){lamaUnavailable=error.message;image.data.set(patch.data);return false;}
     })()){
     }else if(patch.flat){
@@ -170,10 +190,14 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
     }else{
      // Telea only receives a bounded mask with plenty of known context.
      if(patch.coverage>.6)throw Error('Недостаточно фона для Telea');
+     // Out of model time: lettering on a backing keeps the backing rather than a blurred fill.
+     if(smart&&patch.backing&&(modelMs>=MODEL_BUDGET||lamaUnavailable)){for(let n=0;n<patch.backing.mask.length;n++)if(patch.backing.mask[n])for(let c=0;c<3;c++)image.data[n*4+c]=patch.backing.color[c];method='backing-fill';write=patch.backing.mask;}
+     else{
      // The model repaints a slightly wider band than the letters, so the grey
      // fringe of the old lettering does not survive as a ghost.
-     if(smart&&lama&&!lamaUnavailable&&modelMs<MODEL_BUDGET)try{const began=modelStart(),wide=dilateInk(patch.mask,patch.width,patch.height,Math.max(1,Math.min(4,Math.round((patch.stroke||3)*.5))));modelCalls++;execution=await lama(image,wide,message=>status({phase:'cleaning',message}));method='migan';write=wide;modelMs+=modelStart()-began;}catch(error){lamaUnavailable=error.message;image.data.set(patch.data);write=patch.mask;}
+     if(smart&&lama&&!lamaUnavailable&&modelMs<MODEL_BUDGET)try{const began=modelStart(),wide=dilateInk(patch.mask,patch.width,patch.height,Math.max(1,Math.min(4,Math.round((patch.stroke||3)*.5))));modelCalls++;execution=await inContext(lama,working,patch,image,wide,message=>status({phase:'cleaning',message}));method='migan';write=wide;modelMs+=Number.isFinite(execution?.inferenceMs)?execution.inferenceMs:modelStart()-began;}catch(error){lamaUnavailable=error.message;image.data.set(patch.data);write=patch.mask;}
      if(method!=='migan'){teleaInpaint(image,periodicFill(image,patch.mask).remaining,3);method='telea';}
+     }
     }
     compositeInkPatch(working,patch,image.data,write);plan.painted=true;if(cleanOnly){plan.runs=maskRuns(patch,original.width,write);if(write!==patch.mask)plan.inputRuns=maskRuns(patch,original.width,patch.mask);}plan.background=patch.background;methods.add(method);records.push({uid:region.uid,method,execution,painted:true,maskKind:patch.maskKind||'glyphs',coverage:patch.coverage,ms:performance.now()-t});
    }catch(error){records.push({uid:region.uid,method:'declined',reason:'Не удалось очистить область: '+error.message,ms:performance.now()-t});}
