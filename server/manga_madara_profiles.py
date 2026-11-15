@@ -138,6 +138,40 @@ PROFILES = (
     (('6718273076571980404', 'Yaoihub', 'https://yaoihub.org', True), {
         'chapter_mode': 'manga', 'metadata_interval': 2,
     }),
+    (('7450882931813509619', 'MangaForFree.net', 'https://mangaforfree.net', True), {
+        'chapter_mode': 'admin', 'metadata_interval': 1, 'raw_marker': 'contains',
+    }),
+    (('2115363546279045008', 'MangaForFree.net', 'https://mangaforfree.net', True), {
+        'language': 'ko', 'chapter_mode': 'admin', 'metadata_interval': 1, 'raw_marker': 'contains',
+    }),
+    (('3147518065805706', 'MangaForFree.net', 'https://mangaforfree.net', True), {
+        'language': 'all', 'chapter_mode': 'admin', 'metadata_interval': 1,
+    }),
+    (('6720687475375335817', 'ManhwaClub.net', 'https://manhwaclub.net', True), {
+        'chapter_mode': 'admin', 'raw_marker': 'suffix',
+    }),
+    (('3482736208073357647', 'ManhwaClub.net', 'https://manhwaclub.net', True), {
+        'language': 'ko', 'chapter_mode': 'admin', 'raw_marker': 'suffix',
+    }),
+    (('5395306515630347602', 'SeraphicDeviltry', 'https://seraphic-deviltry.com', True), {
+        'chapter_mode': 'manga', 'date_format': '%m/%d/%Y', 'metadata_interval': 1 / 3,
+    }),
+    (('6626112947749020527', 'SeraphicDeviltry', 'https://spanish.seraphic-deviltry.com', True), {
+        'language': 'es', 'chapter_mode': 'manga', 'date_format': '%m/%d/%Y', 'metadata_interval': 1 / 3,
+    }),
+    (('5727368826344311935', 'Jinmangas', 'https://mangafree.info', True), {'chapter_mode': 'manga'}),
+    (('3386549954655095711', 'Mangafree', 'https://mangafree.info', True), {'chapter_mode': 'manga'}),
+    (('6812667365653325714', 'MangaCrazy', 'https://mangacrazy.net', True), {
+        'language': 'all', 'chapter_mode': 'manga',
+    }),
+    (('6353068724409812158', 'AllPornComics.co', 'https://allporncomics.co', True), {
+        'language': 'all', 'html': True, 'section': 'comic', 'date_format': '%d/%m/%Y',
+        'selectors': {'card_link': 'h3 > a[href]:not([target=_self]):last-of-type'},
+    }),
+    (('1406386535599331231', 'MangaHe', 'https://mangahe.com', True), {'variant': 'mangahe'}),
+    (('4046163527731172053', 'Kmansin09', 'https://kmansin09.top', False), {
+        'language': 'ja', 'html': True, 'chapter_mode': 'manga',
+    }),
 )
 
 # The MediaVault registry enables a profile after testing its complete

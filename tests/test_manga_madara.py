@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
@@ -8,8 +9,10 @@ from catalogue_sources import base_sources, fetch
 from manga_discovery import search_source, source_matches_language
 from manga_download import download_chapter
 import manga_madara as madara
+import manga_native_sources as native
+from manga_source_urls import split_reader_url
 from manga_sources import inspect
-from source_parser import PublicHttp, SourceAccessError, SourceError
+from source_parser import PublicHttp, SourceAccessError, SourceError, playback_headers
 from suwayomi_bridge import native_reader_url
 
 
@@ -71,6 +74,56 @@ class Http:
 
 
 class MadaraMigration(unittest.TestCase):
+    def test_same_host_keeps_language_in_chapters_routes_and_saved_links(self):
+        variants = {source.LANGUAGE: source for source in madara.SOURCES if source.host == 'mangaforfree.net'}
+        english, korean, unfiltered = (variants[language] for language in ('en', 'ko', 'all'))
+        title = english.ROOT + '/manga/example/'
+        first = title + 'chapter-1/'
+        raw = title + 'chapter-1-raw/'
+        listing = '''
+            <li class="wp-manga-chapter"><a href="chapter-1/">Chapter 1</a></li>
+            <li class="wp-manga-chapter"><a href="chapter-1-raw/">Chapter 1</a><span>RAW</span></li>
+        '''
+
+        def document(url, **options):
+            if url == title:
+                return DETAILS, url, {}
+            if url == english.ROOT + '/wp-admin/admin-ajax.php':
+                self.assertEqual(options['headers']['Referer'], title)
+                return listing, url, {}
+            if url == raw:
+                return '<div class="reading-content"><div class="page-break"><img src="/page.jpg"></div></div>', url, {}
+            raise AssertionError(url)
+
+        http = Mock(deadline=None)
+        http.document.side_effect = document
+        adapters = {source.SOURCE_ID: source for source in variants.values()}
+        with patch.dict(native.ADAPTERS, adapters), patch.dict(native.HOSTS, {english.host: unfiltered}), \
+                patch.object(english.origin, 'interval', 0), TemporaryDirectory() as directory, \
+                patch.object(native, 'legacy_links_path', return_value=Path(directory) / 'links.sqlite'):
+            self.assertEqual(english.row(title, 'Example Story', '')['sourceUrl'], title)
+            self.assertIs(native.for_url(title), unfiltered)
+            for adapter, expected in [(english, [first]), (korean, [raw]), (unfiltered, [first, raw])]:
+                result = inspect(adapter.reader_url(title), http)
+                self.assertEqual([split_reader_url(ch['url'])[1] for ch in result['episodes']], expected)
+                self.assertIs(native.for_url(result['url']), adapter)
+            self.assertIsNone(native.for_url(korean.reader_url(TITLE)))
+            self.assertIsNone(native.for_url(korean.reader_url(title) + '&mv_manga_source=' + english.SOURCE_ID))
+            called = http.document.call_count
+            with self.assertRaisesRegex(SourceError, 'языковом варианте'):
+                inspect(korean.reader_url(first), http)
+            self.assertEqual(http.document.call_count, called)
+            chapter = inspect(korean.reader_url(raw), http)
+            self.assertEqual(chapter['pages'], [english.ROOT + '/page.jpg'])
+            bridge = Mock()
+            bridge.get.return_value = [{'index': 8, 'url': '/manga/example/chapter-1-raw/'}]
+            selected = native_reader_url(bridge, {'url': title}, {'id': korean.SOURCE_ID}, 11, 8)
+            self.assertEqual(selected, korean.reader_url(raw))
+            native.record_reader_url(11, 8, korean, selected)
+            self.assertEqual(native.recorded_reader_url(11, 8), selected)
+            signed = raw + '?sign=a%2Fb+b&unused='
+            self.assertEqual(playback_headers({'Referer': korean.reader_url(signed)})['Referer'], signed)
+
     def test_aqua_keeps_search_genre_and_page_on_the_catalogue_route(self):
         aqua = madara.SOURCE_HOSTS['aquareader.org']
         raw = '''

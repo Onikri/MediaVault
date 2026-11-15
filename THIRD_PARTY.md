@@ -421,3 +421,5 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   in Apache-2.0 Keiyoushi `lib-multisrc/mangahub` at the same revision.
 - The Madara family (`server/manga_madara.py`) follows the public WordPress catalogue
   and reader protocol in Apache-2.0 Keiyoushi `lib-multisrc/madara` at the same revision.
+- The MangaThemesia family (`server/manga_themesia.py`) follows the public catalogue
+  and reader protocol in Apache-2.0 Keiyoushi `lib-multisrc/mangathemesia` at the same revision.

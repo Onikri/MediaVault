@@ -10,11 +10,19 @@ from urllib.parse import urljoin, urlsplit
 import manga_mangashi
 import manga_mangahub
 import manga_madara
+import manga_themesia
+from manga_source_urls import split_reader_url
 from source_parser import PublicHttp, SourceError
 
 
-ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (manga_mangashi, *manga_mangahub.SOURCES, *manga_madara.ACTIVE_SOURCES)}
-HOSTS = {urlsplit(adapter.ROOT).hostname: adapter for adapter in ADAPTERS.values()}
+ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (
+    manga_mangashi, *manga_mangahub.SOURCES, *manga_madara.ACTIVE_SOURCES, *manga_themesia.ACTIVE_SOURCES
+)}
+HOSTS = {
+    urlsplit(adapter.ROOT).hostname: adapter
+    for adapter in ADAPTERS.values()
+    if not getattr(adapter, 'scoped_urls', False) or adapter.LANGUAGE == 'all'
+}
 
 
 def merge_source_list(installed):
@@ -32,7 +40,25 @@ def for_source(source):
 
 
 def for_url(url):
-    return HOSTS.get(urlsplit(url).hostname)
+    if not isinstance(url, str):
+        return None
+    try:
+        selected, clean = split_reader_url(url)
+        parsed = urlsplit(clean)
+    except ValueError:
+        return None
+    if selected is None:
+        return HOSTS.get(parsed.hostname)
+    adapter = ADAPTERS.get(selected)
+    if (adapter and getattr(adapter, 'scoped_urls', False)
+            and parsed.scheme == 'https' and parsed.netloc == urlsplit(adapter.ROOT).netloc):
+        return adapter
+    return None
+
+
+def adapter_reader_url(adapter, upstream):
+    encode = getattr(adapter, 'reader_url', None)
+    return encode(upstream) if encode else upstream
 
 
 def search(adapter, source, query):
@@ -108,7 +134,7 @@ def catalogue_job(adapter, spec, page):
 
 def saved_reader_url(adapter, client, source, canonical, manga, chapter):
     root = source.get('baseUrl') or adapter.ROOT
-    if for_url(root) is not adapter:
+    if urlsplit(root).hostname != urlsplit(adapter.ROOT).hostname or not adapter.site_link(root):
         return None
     title = adapter.site_link(canonical, root)
     if resolver := getattr(adapter, 'saved_title_url', None):
@@ -117,14 +143,15 @@ def saved_reader_url(adapter, client, source, canonical, manga, chapter):
     if not title_path:
         return None
     if chapter is None:
-        return title
+        return adapter_reader_url(adapter, title)
     chapters = client.get(f'/manga/{manga}/chapters', {'onlineFetch': 'false'}, timeout=8)
     for row in chapters:
         if row.get('index') == chapter:
             target = adapter.saved_chapter_url(row.get('realUrl') or row.get('url'), title_path[1], root)
             path = adapter.CHAPTER_PATH.fullmatch(urlsplit(target).path)
-            if path and path[1] == title_path[1]:
-                return target
+            matches = getattr(adapter, 'saved_chapter_matches', None)
+            if path and (matches(target, title) if matches else path[1] == title_path[1]):
+                return adapter_reader_url(adapter, target)
             break
     raise SourceError('Не удалось сопоставить сохранённую главу с исходной читалкой.')
 
@@ -144,10 +171,12 @@ def recorded_reader_url(manga, chapter):
         return None
     if row:
         adapter = ADAPTERS.get(row[0])
-        if adapter is not None and adapter is for_url(row[1]):
+        if adapter is not None and (url := adapter.site_link(row[1])):
             pattern = adapter.CHAPTER_PATH if chapter is not None else adapter.TITLE_PATH
-            if pattern.fullmatch(urlsplit(row[1]).path):
-                return adapter.site_link(row[1])
+            if pattern.fullmatch(urlsplit(url).path):
+                target = adapter_reader_url(adapter, url)
+                if for_url(target) is adapter:
+                    return target
     return None
 
 

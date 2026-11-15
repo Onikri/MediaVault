@@ -152,6 +152,12 @@ def playback_headers(headers=None):
         if not isinstance(value, str) or len(value) > 8192 or "\r" in value or "\n" in value:
             raise SourceError("Некорректный заголовок плеера.")
         if name in {"Referer", "Origin"}:
+            if name == "Referer":
+                from manga_source_urls import split_reader_url
+                try:
+                    _, value = split_reader_url(value)
+                except ValueError:
+                    raise SourceError("Некорректная ссылка читалки.") from None
             # Origin is sanitized again on every manifest/segment request.
             # The bare Collaps origin is a header, never a request target.
             collaps_origin = name == "Origin" and value.removesuffix("/") in _COLLAPS_ORIGINS

@@ -2,6 +2,7 @@
 
 import base64
 from calendar import monthrange
+from collections import Counter, OrderedDict
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -17,6 +18,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from manga_madara_profiles import ENABLED, PROFILES
 from manga_source_tags import unique
+from manga_source_urls import reader_url, split_reader_url
 from source_parser import PublicHttp, SourceAccessError, SourceError, SourceTemporaryError, public_url
 
 
@@ -140,11 +142,31 @@ def release_date(value, template):
     return ''
 
 
+class OriginPace:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.interval = 0.0
+        self.next_request = 0.0
+
+    def wait(self, deadline):
+        if not self.interval:
+            return
+        with self.lock:
+            now = time.monotonic()
+            scheduled = max(now, self.next_request)
+            if deadline is not None and scheduled >= deadline:
+                raise SourceTemporaryError('Исчерпан бюджет ожидания запроса к источнику.')
+            self.next_request = scheduled + self.interval
+        if scheduled > now:
+            time.sleep(scheduled - now)
+
+
 class Madara:
     def __init__(self, sid, name, root, adult, *, html=False, chapter_mode='page', section='manga',
                  genre_section='manga-genre', manga_only=True, uses_post_id=True, date_format='%B %d, %Y',
                  language='en', selectors=None, ajax_template=CATALOGUE_FORM['template'],
-                 metadata_interval=0, thumbnail_original=False, alt_names=True):
+                 metadata_interval=0, thumbnail_original=False, alt_names=True,
+                 scoped_urls=False, raw_marker=None, origin=None):
         self.SOURCE_ID = sid
         self.NAME = name
         self.ROOT = root
@@ -159,11 +181,14 @@ class Madara:
         self.date_format = date_format
         self.selectors = {**SELECTORS, **(selectors or {})}
         self.ajax_template = ajax_template
-        self.metadata_interval = metadata_interval
-        self.next_request = 0.0
-        self.pace_lock = threading.Lock()
         self.thumbnail_original = thumbnail_original
         self.alt_names = alt_names
+        self.scoped_urls = scoped_urls
+        self.raw_marker = raw_marker
+        self.origin = origin if origin is not None else OriginPace()
+        self.origin.interval = max(self.origin.interval, metadata_interval)
+        self.chapter_cache = OrderedDict() if raw_marker and language != 'all' else None
+        self.chapter_lock = threading.Lock() if self.chapter_cache is not None else None
         self.host = urlsplit(root).hostname
         self.TITLE_PATH = re.compile(rf'/{section}/({SEGMENT})/?')
         self.CHAPTER_PATH = re.compile(rf'/{section}/({SEGMENT})/({SEGMENT})/?')
@@ -172,13 +197,18 @@ class Madara:
         if not isinstance(value, str) or not value:
             return ''
         try:
-            candidate = urljoin(base or self.ROOT + '/', value)
+            selected, candidate = split_reader_url(urljoin(base or self.ROOT + '/', value))
+            if selected is not None and (not self.scoped_urls or selected != self.SOURCE_ID):
+                return ''
             parsed = urlsplit(candidate)
             if parsed.scheme not in {'http', 'https'} or parsed.netloc != self.host:
                 return ''
             return public_url(urlunsplit(parsed._replace(scheme='https')), resolve_dns=False)
         except (SourceError, ValueError):
             return ''
+
+    def reader_url(self, value):
+        return reader_url(value, self.SOURCE_ID) if self.scoped_urls else value
 
     def saved_chapter_url(self, value, title, root):
         if isinstance(value, str) and re.fullmatch(SEGMENT, value):
@@ -208,15 +238,7 @@ class Madara:
         return values[0] if parsed.path == '/' and set(query) == {'p'} and len(values) == 1 and ID.fullmatch(values[0]) else ''
 
     def soup(self, http, url, *, data=None, referer=None):
-        if self.metadata_interval:
-            with self.pace_lock:
-                now = time.monotonic()
-                scheduled = max(now, self.next_request)
-                if http.deadline is not None and scheduled >= http.deadline:
-                    raise SourceTemporaryError('Madara превысил бюджет ожидания источника.')
-                self.next_request = scheduled + self.metadata_interval
-            if scheduled > now:
-                time.sleep(scheduled - now)
+        self.origin.wait(getattr(http, 'deadline', None))
         headers = {'Referer': referer or self.ROOT + '/'}
         options = {'method': 'POST', 'data': data, 'action': 'madara-read'} if data is not None else {}
         raw, final, _ = http.document(url, headers=headers, **options)
@@ -310,10 +332,11 @@ class Madara:
     def row(self, url, title, cover):
         from manga_sources import title_aliases
         slug = self.TITLE_PATH.fullmatch(urlsplit(url).path)[1]
+        reader = self.reader_url(url)
         return {
             'id': f'suwayomi:{self.SOURCE_ID}:native:{slug}', 'provider': 'suwayomi:' + self.SOURCE_ID,
-            'providerName': self.NAME, 'sourceId': self.SOURCE_ID, 'sourceUrl': url, 'sourceURL': url,
-            'url': url, 'kind': 'manga', 'language': self.LANGUAGE, 'title': title[:500],
+            'providerName': self.NAME, 'sourceId': self.SOURCE_ID, 'sourceUrl': url, 'sourceURL': reader,
+            'url': reader, 'kind': 'manga', 'language': self.LANGUAGE, 'title': title[:500],
             'aliases': title_aliases(title), 'cover': cover, 'sourceOnly': True, 'ids': {},
         }
 
@@ -367,6 +390,10 @@ class Madara:
             if not match or unquote(match[1]) != unquote(slug) or path.rstrip('/') in found:
                 continue
             label = node_text(node.select_one(self.selectors['chapter_name'])) if self.selectors['chapter_name'] else node_text(anchor)
+            if self.chapter_cache is not None:
+                raw = 'raw' in node_text(node).casefold() if self.raw_marker == 'contains' else label.endswith(' raw')
+                if raw != (self.LANGUAGE == 'ko'):
+                    continue
             num = CHAPTER_NUMBER.search(label) or CHAPTER_NUMBER.search(unquote(match[2]))
             volume = VOLUME_NUMBER.search(label) or VOLUME_NUMBER.search(unquote(match[2]))
             date_node = node.select_one(self.selectors['chapter_date'])
@@ -374,7 +401,7 @@ class Madara:
             date_link = date_node.select_one('a[title]') if date_node else None
             date = date_image['alt'] if date_image else date_link['title'] if date_link else node_text(date_node)
             found[path.rstrip('/')] = {
-                'url': chapter_url, 'title': label or unquote(match[2]), 'language': self.LANGUAGE,
+                'url': self.reader_url(chapter_url), 'title': label or unquote(match[2]), 'language': self.LANGUAGE,
                 'number': float(num[1].replace(',', '.')) if num else None,
                 'season': int(volume[1]) if volume else 1, 'translator': '',
                 'publishedAt': release_date(date, self.date_format),
@@ -415,7 +442,26 @@ class Madara:
         for position, row in enumerate(rows):
             if row['number'] is None:
                 row['number'] = len(rows) - position
+        if self.chapter_cache is not None and not truncated:
+            with self.chapter_lock:
+                self.chapter_cache[unquote(slug)] = (time.monotonic() + 180, {
+                    unquote(urlsplit(row['url']).path.rstrip('/')): row for row in rows
+                })
+                self.chapter_cache.move_to_end(unquote(slug))
+                if len(self.chapter_cache) > 32:
+                    self.chapter_cache.popitem(last=False)
         return sorted(rows, key=lambda row: (row['season'], row['number'])), truncated
+
+    def chapter_in_variant(self, http, slug, path):
+        key = unquote(slug)
+        chapter_path = unquote(path.rstrip('/'))
+        with self.chapter_lock:
+            cached = self.chapter_cache.get(key)
+            if cached and cached[0] > time.monotonic():
+                return cached[1].get(chapter_path)
+        soup, title, identity = self.title(http, f'{self.ROOT}/{self.section}/{slug}/')
+        chapters, _ = self.chapters(http, soup, title, identity)
+        return next((row for row in chapters if unquote(urlsplit(row['url']).path.rstrip('/')) == chapter_path), None)
 
     def pages(self, http, value, expected):
         soup, final = self.soup(http, value)
@@ -448,15 +494,18 @@ class Madara:
         path = urlsplit(value).path
         chapter = self.CHAPTER_PATH.fullmatch(path)
         if chapter:
-            pages, final = self.pages(http, value, path)
             slug, chapter_slug = chapter.groups()
+            selected = self.chapter_in_variant(http, slug, path) if self.chapter_cache is not None else None
+            if self.chapter_cache is not None and selected is None:
+                raise SourceError('У источника нет этой главы в выбранном языковом варианте.')
+            pages, final = self.pages(http, value, path)
             number = CHAPTER_NUMBER.search(unquote(chapter_slug))
             volume = VOLUME_NUMBER.search(unquote(chapter_slug))
-            entry = {'url': final, 'title': unquote(chapter_slug), 'language': self.LANGUAGE,
+            entry = {'url': self.reader_url(final), 'title': unquote(chapter_slug), 'language': self.LANGUAGE,
                      'number': float(number[1].replace(',', '.')) if number else 0,
                      'season': int(volume[1]) if volume else 1, 'translator': ''}
             result = self.row(self.ROOT + f'/{self.section}/{slug}/', unquote(slug), '')
-            episodes, truncated = [entry], False
+            episodes, truncated = [{**entry, **(selected or {}), 'url': self.reader_url(final)}], False
         else:
             soup, final, slug = self.title(http, value)
             result = self.metadata(soup, final)
@@ -464,7 +513,7 @@ class Madara:
             if not episodes and soup.select_one('.chapter-locked, .paywall, .purchase-required'):
                 raise SourceAccessError('Список глав требует доступ у источника.')
             pages = []
-        return {**result, 'url': final, 'episodes': episodes, 'pages': pages, 'truncated': truncated,
+        return {**result, 'url': self.reader_url(final), 'episodes': episodes, 'pages': pages, 'truncated': truncated,
                 'seasons': [{'number': n, 'name': f'Том {n}'} for n in sorted({x['season'] for x in episodes})],
                 'dubs': [], 'releases': [], 'translations': [], 'available': bool(episodes)}
 
@@ -510,9 +559,22 @@ class ManhwaRaw(Madara):
         return True
 
 
-VARIANTS = {'standard': Madara, 'aqua': AquaManga, 'raw': ManhwaRaw}
+class MangaHe(Madara):
+    def pages(self, http, value, expected):
+        pages, final = super().pages(http, value, expected)
+        if pages[0].endswith('/1-000001.jpg'):
+            pages = pages[1:]
+        if not pages:
+            raise SourceError('MangaHe вернул только служебное изображение.')
+        return pages, final
+
+
+VARIANTS = {'standard': Madara, 'aqua': AquaManga, 'raw': ManhwaRaw, 'mangahe': MangaHe}
+PROFILE_COUNTS = Counter(urlsplit(identity[2]).hostname for identity, _ in PROFILES)
+ORIGINS = {host: OriginPace() for host in PROFILE_COUNTS}
 SOURCES = tuple(VARIANTS[options.get('variant', 'standard')](
-    *identity, **{k: v for k, v in options.items() if k != 'variant'}
+    *identity, scoped_urls=PROFILE_COUNTS[urlsplit(identity[2]).hostname] > 1,
+    origin=ORIGINS[urlsplit(identity[2]).hostname], **{k: v for k, v in options.items() if k != 'variant'}
 ) for identity, options in PROFILES)
 ACTIVE_SOURCES = tuple(source for source in SOURCES if source.SOURCE_ID in ENABLED)
 SOURCE_HOSTS = {source.host: source for source in SOURCES}
