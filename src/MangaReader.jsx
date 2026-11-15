@@ -29,6 +29,7 @@ import ReaderTranslationProgress from './ReaderTranslationProgress.jsx';
 import {normalizeTranslationProgress} from './translation-progress.js';
 import {spreadPages,turnPage} from './reader-layout.js';
 import ReaderShell from './ReaderShell.jsx';
+import {preloadPrivateFonts} from './private-fonts.js';
 const ReaderPaperBook=lazy(()=>import('./ReaderPaperBook.jsx'));
 import './reader-surface.css';
 // A page taller than 2.2× its width is a webtoon strip: read across its width.
@@ -133,6 +134,7 @@ export default function MangaReader({item,catalog,userId,libraryId,onClose,onSel
  const [serverSlots,setServerSlots]=useState(null),serverSlotsRef=useRef(null);serverSlotsRef.current=serverSlots;
  useEffect(()=>{let closed=false;if(lmt.engine!=='vm'){setServerSlots(null);return;}readerService?.request('/reader/google/keys').then(value=>{if(!closed)setServerSlots((value.slots||[]).map(row=>row.slot));}).catch(()=>{if(!closed)setServerSlots([]);});return()=>{closed=true;};},[item.id,lmt.engine,lmt.directInput,readerService?.server,readerService?.session?.serverVersion,vmGeneration]);
  const queueRef=useRef(null),vmRef=useRef(null),directRef=useRef(null),revision=JSON.stringify(resultConfig(lmt.engine==='vm'&&serverSlots?.length?{...lmt,engine:'direct'}:lmt))+':engine='+lmt.engine+':gemma='+lmt.gemmaProfile+':render='+String(lmt.inpaint)+':prefetch='+String(lmt.directPrefetch===true)+':timeout='+lmt.directTimeoutMs+':'+vmGeneration+':serverSlots='+JSON.stringify(serverSlots);
+ useEffect(()=>{if(readerService?.status==='connected')preloadPrivateFonts(readerService);},[readerService,readerService?.status]);
  useEffect(()=>{let closed=false;if(['lmt','direct'].includes(lmt.engine))return;const server=readerService?.server||window.MEDIA_VAULT_CONFIG?.importServerUrl;if(!server)return;fetch(server+(lmt.engine==='vm'?'/api/v1/manga-translation/status':'/reader/lmt/status'),{signal:AbortSignal.timeout(10000)}).then(async r=>{if(!r.ok)throw Error('Полный LMT ещё не установлен на ВМ. Старый обработчик с метками больше не используется.');return r.json();}).then(v=>{if(!closed){setBackendStatus(lmt.engine==='vm'?{vm:v}:v);if(lmt.engine==='vm'&&v.policy)setLmt(old=>{if(old.vmPolicy===v.policy)return old;const updated={...old,vmPolicy:v.policy};saveLmt(userId,updated);return updated;});if(v.gemma?.promptVersion)setLmt(old=>old.gemmaPromptVersion===v.gemma.promptVersion?old:{...old,gemmaPromptVersion:v.gemma.promptVersion});}}).catch(e=>{if(!closed)setBackendStatus(lmt.engine==='vm'?{vm:{ready:false,message:'Пакетный сервис ещё не установлен на ВМ.'}}:{ready:false,message:e.message});});return()=>{closed=true;};},[readerService?.server,lmt.engine,userId]);
  useLayoutEffect(()=>{queueRef.current?.close();vmRef.current?.close();vmRef.current=null;directRef.current?.close();directRef.current=null;
   if(!prefs.translate)return;

@@ -12,6 +12,6 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
    const result=await window.render({blob,page:{width:500,height:500,regions},font:'serif',mode:'fast'});result.renderedBitmap.close();results.push({kind,unchanged:JSON.stringify(regions)===snapshot,layouts:result.typesetting.layouts});
   }return results;
  });
- for(const row of rows){assert.ok(row.unchanged);assert.equal(row.layouts.length,2,row.kind);const [a,b]=row.layouts.map(r=>r.layoutBox);assert.ok(Math.min(a[2],b[2])<=Math.max(a[0],b[0])||Math.min(a[3],b[3])<=Math.max(a[1],b[1]),row.kind);assert.ok(row.layouts.every(r=>r.fontSize>=20),JSON.stringify(row));}
+ for(const row of rows){assert.ok(row.unchanged);assert.equal(row.layouts.length,2,row.kind);const [a,b]=row.layouts.map(r=>r.layoutBox);assert.ok(Math.min(a[2],b[2])<=Math.max(a[0],b[0])||Math.min(a[3],b[3])<=Math.max(a[1],b[1]),row.kind);/* Captions share the page-wide average size (at most 3.4% of the page width), so a 500 px fixture is lettered at about 16 px instead of filling each cell. */assert.ok(row.layouts.every(r=>r.fontSize>=15&&!r.shrunk),JSON.stringify(row));}
  await fs.writeFile(path.join(out,'contract.json'),JSON.stringify(rows,null,2));console.log('PASS independent lettering cells in horizontal, vertical and diagonal joined bubbles');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

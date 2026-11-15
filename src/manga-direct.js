@@ -1,4 +1,5 @@
 import {acquireRenderer,releaseRenderer} from './reader-worker-pool.js';
+import {privateFontsSettled,sharePrivateFonts} from './private-fonts.js';
 import {translateLmt} from './lmt-client.js';
 import {callDirectGoogle} from './manga-direct-api.js';
 import {transientGoogleError} from './google-transient.js';
@@ -252,7 +253,7 @@ export class DirectChapter{
  snapshot(){return {credentialMode:this.config.engine==='vm'?'server':'personal',focusPage:this.focusIndex+1,priorityPages:[...this.priorityPages].map(n=>n+1),active:this.active,queued:[...this.jobs.values()].filter(j=>j.state==='queued').length,buffer:9,inFlightPages:this.activePages||0,preparation:{downloaded:this.preparation.downloaded,detected:this.preparation.done,cleaned:this.preparation.cleanDone.size,cleanFailed:this.preparation.cleanFailed.size,cleanup:this.preparation.cleanProgress,translated:this.translatedPages.size-this.partialPages.size,partial:this.partialPages.size,total:this.entries.length,fallback:{pending:this.fallbacks.size,pages:this.fallbackPages.size,regions:[...this.fallbackPages.values()].reduce((a,b)=>a+b,0)}},jobs:Array.from({length:this.entries.length},(_,i)=>{const job=this.jobs.get(i);return job?{page:i+1,state:job.state==='done'&&this.partialPages.has(i)?'partial':this.fallbacks.has(i)?'fallback':job.state,keySlot:job.keySlot,serverKey:job.serverKey,fallback:this.fallbackPages.get(i)||0}:this.pageStates.get(i)||{page:i+1,state:'queued'};})};}
 
  renderCanvas(blob,page,font,status,options={}){
-  return this.canvasTask({blob,page,font,captureDebug:options.captureDebug===true,mode:options.inpaint||this.config.inpaint||'hybrid',cache:this.config.cache,preparedClean:options.preparedClean,allowDownloads:options.allowDownloads??this.config.allowDownloads},status);
+  return privateFontsSettled().then(()=>this.canvasTask({blob,page,font,caps:this.config.caps!==false,captureDebug:options.captureDebug===true,mode:options.inpaint||this.config.inpaint||'hybrid',cache:this.config.cache,preparedClean:options.preparedClean,allowDownloads:options.allowDownloads??this.config.allowDownloads},status));
  }
  canvasTask(message,status){
   this.controller.signal.throwIfAborted();
@@ -262,6 +263,7 @@ export class DirectChapter{
    this[channel].onmessage=({data})=>{const job=this.renders.get(data.id);if(job){if(data.status){job.status?.(data.status);return;}this.renders.delete(data.id);data.error?job.reject(Error(data.error)):job.resolve(data.result);}};
    this[channel].onerror=()=>{for(const[id,job]of this.renders)if(job.channel===channel){job.reject(Error('Не удалось обработать страницу. Повтори перевод.'));this.renders.delete(id);}this[channel]?.terminate();this[channel]=null;};
   }
+  sharePrivateFonts(this[channel]);
   const id=++this.serial;return new Promise((resolve,reject)=>{this.renders.set(id,{resolve,reject,status,channel});this[channel].postMessage({id,...message});});
  }
  close(){this.controller.abort(cancelled());this.startupReady();this.preparation.close(this.controller.signal.reason);for(const channel of ['worker','prepareWorker','cleanWorker']){releaseRenderer(this[channel],[...this.renders.values()].some(j=>j.channel===channel),channel);this[channel]=null;}for(const job of [...this.jobs.values(),...this.renders.values()])job.reject(this.controller.signal.reason);this.jobs.clear();this.renders.clear();this.listeners.clear();this.progress.clear();this.context.clear();}
