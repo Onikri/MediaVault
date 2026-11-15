@@ -63,6 +63,9 @@ export function partitionComicLayouts(regions){
 export function comicLayouts(image,regions){
  return partitionComicLayouts(regions.map(source=>{
   const region={...source};if(!Array.isArray(region.text_bbox)||region.text_bbox.length!==4||!region.text_bbox.every(Number.isFinite))return region;
+  // A detector's balloon box says where the balloon is, not what shape it has:
+  // the paper is traced as well, and the lettering is set inside that outline.
+  if(!region.flow&&region.bubble_bbox&&!region.bubble_shape){const traced=paperBubble(image,region.text_bbox);if(traced)region.bubble_shape=traced.shape;}
   if(!region.flow&&!region.bubble_bbox&&(!region.layout_bbox||JSON.stringify(region.layout_bbox)===JSON.stringify(region.text_bbox))){const bubble=paperBubble(image,region.text_bbox);if(bubble){region.bubble_bbox=bubble.box;region.layout_bbox=bubble.box;region.bubble_shape=bubble.shape;}}
   return region;
  }));

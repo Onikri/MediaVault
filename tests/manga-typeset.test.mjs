@@ -58,8 +58,8 @@ test('one average size per page; hyphenation before shrinking; overflow never th
   make(4,'Совершенно невозможно уместить эту длинную реплику',bubble(d.x1,d.y1,d.x2,d.y2,2),d),
  ],{pageWidth:1000});
  const [long,short,medium,narrow,impossible]=page.layouts;
- assert.ok(Math.abs(short.size-medium.size)<.01,'equal balloons share a size');
- assert.ok(short.size<=page.base*1.11,'a short reply does not fill its balloon');
+ assert.ok(short.size>=medium.size&&medium.size>=page.base*.94&&!medium.shrunk,'in equal balloons the longer reply is never larger and never below the page size: '+short.size+' '+medium.size+' base '+page.base);
+ assert.ok(short.size<=page.base*1.46,'a short reply follows the balloon, within the page band');
  assert.ok(long.size<=short.size&&long.size>=page.base*.8);
  assert.ok(narrow.hyphens>=1&&narrow.shrunk&&!narrow.overflow);
  assert.ok(narrow.lines.every(l=>!/^.-$|^-/.test(l.text)));

@@ -81,12 +81,17 @@ export function letterInk(data,w,h,local,paper){
  if(!sample.length)sample=parts.filter(p=>p.inside>=.6);
  if(!sample.length)return {ink,glyph:0,stroke:0};
  const stroke=weighted(sample,p=>p.stroke,.5);
- const bold=sample.filter(p=>p.stroke>=stroke*.6);
+ // Bars and lines say nothing about the size of a letter.
+ const squat=sample.filter(p=>p.stroke>=stroke*.6&&Math.max(p.width,p.height)/Math.min(p.width,p.height)<3),bold=squat.length?squat:sample.filter(p=>p.stroke>=stroke*.6);
  const glyph=Math.max(6,Math.min(Math.min(bw,bh),weighted(bold.length?bold:sample,size,.8)));
  const letter=p=>p.inside>=.6&&p.out<=Math.max(2,glyph*.3)&&p.area<=bw*bh*.4&&size(p)<=glyph*2.2
   &&!(p.stroke<stroke*.5&&size(p)>glyph*.9)
   &&!(Math.max(p.width,p.height)/Math.min(p.width,p.height)>=5&&p.stroke<stroke*.7&&size(p)>glyph*.6);
- const least=Math.max(6,(glyph*.18)**2),main=parts.filter(p=>letter(p)&&p.area>=least);
+ const least=Math.max(6,(glyph*.18)**2),found=parts.filter(p=>letter(p)&&p.area>=least);
+ // A bar (a long vowel mark, a dash) is a letter only right next to compact
+ // letters; alone under or beside the text it is a line of the drawing.
+ const long=p=>Math.max(p.width,p.height)/Math.min(p.width,p.height)>=4,compact=found.filter(p=>!long(p));
+ const main=found.filter(p=>!long(p)||compact.some(m=>p.x1<=m.x2+glyph*.35&&p.x2>=m.x1-glyph*.35&&p.y1<=m.y2+glyph*.35&&p.y2>=m.y1-glyph*.35));
  const reach=glyph*.4,near=p=>main.some(m=>p.x1<=m.x2+reach&&p.x2>=m.x1-reach&&p.y1<=m.y2+reach&&p.y2>=m.y1-reach);
  // A detector's box often clips the last letter or the ellipsis of a column.
  // Text goes on past the box only as more of the same: glyph-sized or smaller,
@@ -98,8 +103,9 @@ export function letterInk(data,w,h,local,paper){
   return across>=p.width*.5&&along>=-gap||along>=p.height*.5&&across>=-gap;
  });
  const taken=new Set(main);
- for(let round=0;round<2;round++)for(const p of parts){
-  if(taken.has(p)||p.inside>=.6||p.out>glyph||size(p)>glyph*1.2||p.area<least||p.stroke<stroke*.6||p.area>bw*bh*.4)continue;
+ // The chain may run two glyphs past the box, one neighbour at a time.
+ for(let round=0;round<4;round++)for(const p of parts){
+  if(taken.has(p)||p.inside>=.6||p.out>glyph*2.3||size(p)>glyph*1.6||p.area<least||p.stroke<stroke*.6||p.area>bw*bh*.4)continue;
   if(Math.max(p.width,p.height)/Math.min(p.width,p.height)>=5&&size(p)>glyph*.6)continue;
   // A solid dot is as thick as it is wide; the perimeter estimate reads it thinner.
   const weight=Math.max(p.stroke,p.area>=p.width*p.height*.7?Math.min(p.width,p.height):0);
@@ -109,7 +115,7 @@ export function letterInk(data,w,h,local,paper){
  // Dots of an ellipsis and diacritics: as thick as the text's stroke (a
  // screentone dot is thinner), compact, and next to a letter or to a mark
  // already taken — an ellipsis is a chain.
- const marks=[],dot=p=>!taken.has(p)&&p.area<least&&p.out<=glyph&&Math.min(p.width,p.height)>=Math.max(2,stroke*.7)&&size(p)<=glyph*.45&&Math.max(p.width,p.height)/Math.min(p.width,p.height)<=3.5;
+ const marks=[],dot=p=>!taken.has(p)&&p.area<least&&p.out<=glyph*2.3&&Math.min(p.width,p.height)>=Math.max(2,stroke*.7)&&size(p)<=glyph*.45&&Math.max(p.width,p.height)/Math.min(p.width,p.height)<=3.5;
  const beside=(p,list,gap)=>list.some(m=>p.x1<=m.x2+gap&&p.x2>=m.x1-gap&&p.y1<=m.y2+gap&&p.y2>=m.y1-gap);
  for(let round=0;round<4;round++){
   let added=0;
@@ -138,6 +144,8 @@ export function letterInk(data,w,h,local,paper){
     if(open)edge++;
    }
    const width=x2-x1+3,height=y2-y1+3,out=Math.max(0,local[0]-x1+1,local[1]-y1+1,x2-local[2]+2,y2-local[3]+2),weight=2*piece.length/Math.max(1,edge)+2;
+   // What is left of a line of the drawing is still a line, not a letter.
+   if(Math.max(width,height)/Math.min(width,height)>=4)continue;
    if(piece.length<least*.5||inside<piece.length*.6||out>Math.max(2,glyph*.3)||Math.max(width,height)>glyph*2.2||weight<stroke*.6)continue;
    for(const n of piece){ink[n]=1;for(const i of [n-1,n+1,n-w,n+w,n-w-1,n-w+1,n+w-1,n+w+1])if(own(i))ink[i]=1;}
   }
@@ -173,7 +181,7 @@ function growInk(ink,data,w,h,paper,flat){
  }
  return mask;
 }
-export function prepareInkPatch(original,box,{category='dialogue',neural=false,model,contextPad}={}){
+export function prepareInkPatch(original,box,{category='dialogue',neural=false,model,contextPad,rescue=false}={}){
  const {width:pw,height:ph}=original;
  if(!Array.isArray(box)||box.length!==4||!box.every(Number.isFinite))return {declined:'Некорректные координаты текста'};
  const [x1,y1,x2,y2]=box.map(Math.round);if(x1<0||y1<0||x2>pw||y2>ph||x2-x1<2||y2-y1<2)return {declined:'Область текста выходит за границы'};
@@ -234,8 +242,11 @@ export function prepareInkPatch(original,box,{category='dialogue',neural=false,m
   for(let c=0;c<3;c++){near[c].sort((a,b)=>a-b);background[c]=near[c][near[c].length>>1];}
  }
  const ambiguous=!flat&&(category==='sfx'||category==='sign')&&masked/area>.28;
- if(ambiguous&&!neural)return {declined:'Спецэффект пересекает рисунок: для безопасного удаления выбери нейросетевое восстановление',coverage};
- return {left,top,width:w,height:h,data,mask,background,coverage,flat,masked,...(outline?{maskKind:'outlined-letters'}:{})};
+ if(ambiguous&&!neural&&!rescue)return {declined:'Спецэффект пересекает рисунок: для безопасного удаления выбери нейросетевое восстановление',coverage};
+ return {left,top,width:w,height:h,data,mask,background,coverage,flat,masked,stroke:letters.stroke,...(outline?{maskKind:'outlined-letters',
+  // For an inpainting model: the letters together with their outline, so the
+  // drawing under both is rebuilt instead of leaving the backing.
+  ...(rescue?{wide:fillInkHoles(dilateInk(letters.ink,w,h,outline+1),w,h,Math.max(24,area*.12))}:{})}:{})};
 }
 export function compositeInkPatch(target,patch,modified,writeMask=patch.mask){
  for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++)if(writeMask[y*patch.width+x]){

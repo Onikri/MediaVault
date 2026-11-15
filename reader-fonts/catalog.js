@@ -35,7 +35,19 @@ export async function loadMangaFont(id){
 // the gitignored reader-fonts/local/, the deployed site receives them from the
 // owner's server after owner authentication (registerPrivateFonts). Each file
 // is assigned to a role by its name.
-const PRIVATE_ROLES=[[/anime.?ace|wild.?words|dialog|speech|main/i,'speech'],[/beatdown|smash|hictor/i,'sfx-loud'],[/noisy|jinkies|hitch/i,'sfx'],[/kunkel/i,'chatter'],[/leo.?hand/i,'note'],[/guest/i,'note'],[/diamond/i,'note']];
+// A voice is how a line sounds; each has its own face, as in printed manga:
+//   speech   ordinary lines (and thoughts, slanted)      strong  a raised voice
+//   shout    a scream                                    angry   a furious line
+//   weak     a faint, frightened or muttered line        script  handwriting, notes
+//   narration the author's captions and signs            sfx     sound effects
+//   eerie    thin, uncanny lettering
+const PRIVATE_ROLES=[[/kunkel|anime.?ace|wild.?words|dialog|speech|main/i,'speech'],[/jinkies/i,'strong'],[/smash/i,'shout'],[/beatdown/i,'angry'],
+ [/hictor/i,'weak'],[/hitch|leo.?hand/i,'script'],[/guest/i,'narration'],[/noisy/i,'sfx'],[/diamond/i,'eerie']];
+// A voice without a face of its own borrows the nearest one; older role names are kept.
+const VOICE_CHAIN={speech:['speech'],strong:['strong'],shout:['shout','strong'],angry:['angry','shout','strong'],weak:['weak'],script:['script'],narration:['narration'],
+ sfx:['sfx','shout'],eerie:['eerie','sfx'],chatter:['weak','script'],note:['script','narration'],thought:['speech']};
+// Faces drawn with capitals only keep the text in capitals.
+const LOWERCASE_VOICES=new Set(['weak','script','eerie']);
 const privateFonts=[];
 function addPrivate(file,source){
  const name=String(file).split('/').pop().replace(/\.[^.]+$/,''),order=PRIVATE_ROLES.findIndex(([pattern])=>pattern.test(name));
@@ -46,18 +58,17 @@ try{for(const [path,url]of Object.entries(import.meta.glob('./local/*.{otf,ttf,w
 // fonts: [{name, data: ArrayBuffer | URL string}]
 export function registerPrivateFonts(fonts){for(const font of fonts||[])if(font?.name&&font.data)addPrivate(font.name,font.data);return privateFonts.length;}
 export const privateFontIds=()=>privateFonts.map(f=>f.id);
-// A private face for sfx / chatter / note, or null when the owner supplied none.
-export async function loadPrivateFace(role,{loud=1,fallback='system-ui, sans-serif'}={}){
- const wanted=role==='sfx'?(loud>=1.2?['sfx-loud','sfx']:['sfx','sfx-loud']):[role];
- for(const key of wanted)for(const font of privateFonts.filter(f=>f.role===key)){
-  try{await loadFaces(font.id,font.family,[[font.source,'400']]);return {id:font.id,stack:`"${font.family}", ${fallback}`,weight:400,italic:false,upper:role==='sfx'};}catch{}
+// The owner's face for a voice, or null when none was supplied.
+export async function loadPrivateFace(voice,{fallback='system-ui, sans-serif'}={}){
+ for(const key of VOICE_CHAIN[voice]||[voice])for(const font of privateFonts.filter(f=>f.role===key)){
+  try{await loadFaces(font.id,font.family,[[font.source,'400']]);return {id:font.id,stack:`"${font.family}", ${fallback}`,weight:400,italic:false,upper:!LOWERCASE_VOICES.has(font.role),voice:font.role};}catch{}
  }
  return null;
 }
 const FALLBACK={narration:main=>main==='pangolin'?'comic-relief':'pangolin',chatter:main=>main==='neucha'?'pangolin':'neucha',note:main=>main==='neucha'?'pangolin':'neucha',sfx:()=>'ruslan-display'};
 // Resolves the face for a typesetting role: {id, stack, weight, italic, upper}.
-export async function loadRoleFace(role,main='comic-relief',{loud=1}={}){
+export async function loadRoleFace(role,main='comic-relief',hint={}){
+ const own=await loadPrivateFace(role,{fallback:await loadMangaFont(main)});if(own)return {...own,italic:role==='thought'};
  if(role==='speech'||role==='thought')return {id:mangaFont(main).id,stack:await loadMangaFont(main),weight:400,italic:role==='thought'};
- const own=await loadPrivateFace(role,{loud,fallback:await loadMangaFont(main)});if(own)return own;
  const id=(FALLBACK[role]||(()=>main))(mangaFont(main).id);return {id,stack:await loadMangaFont(id),weight:400,italic:false,upper:role==='sfx'};
 }
