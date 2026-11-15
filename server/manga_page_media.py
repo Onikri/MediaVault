@@ -70,6 +70,10 @@ def page_reference(value):
         from manga_mangamillion import page_marker
         page_marker(value)
         return value, None, 1, 'million-image'
+    if parts.fragment.startswith('mv_dbm_page='):
+        from manga_dbmultiverse import page_marker
+        page_marker(value)
+        return value, None, 1, 'dbm-image'
     if parts.fragment == SETSU_FRAGMENT:
         if host != 'i0.wp.com':
             raise SourceError('Некорректный адрес страницы Setsu Scans.')
@@ -120,6 +124,13 @@ def fetch_page(http, reference, headers):
         url, key, iv = page_data(http, target)
         response, _ = http._open(url, headers=headers)
         return validated_image(decrypt(read_image(http, response), key, iv))
+    if action == 'dbm-image':
+        from manga_dbmultiverse import compose, page_marker, read_layout
+        profile, referer = page_marker(target)
+        _, url, balloons = read_layout(http, target)
+        response, _ = http._open(url, headers={**headers, 'Referer': referer})
+        raw = read_image(http, response)
+        return (compose(raw, profile.LANGUAGE, balloons), 'image/jpeg') if balloons else validated_image(raw)
     if action == 'setsu-image':
         response, _ = setsu_image(http, target, headers)
     elif action == 'dex-image':

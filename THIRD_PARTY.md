@@ -465,3 +465,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
 - The MangaDot and NamiComi native adapters (`server/manga_mangadot.py`,
   `server/manga_dot_wire.py`, `server/manga_namicomi.py` and related modules)
   follow the public Keiyoushi protocols at the same Apache-2.0 revision.
+- The GlobalComix, Dragon Ball Multiverse, SayManhwa and MangaToon adapters
+  (`server/manga_globalcomix.py`, `server/manga_dbmultiverse.py`,
+  `server/manga_saymanhwa.py`, `server/manga_mangatoon.py`) follow the
+  corresponding Apache-2.0 Keiyoushi public reader protocols at the same revision.

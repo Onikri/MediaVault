@@ -244,7 +244,7 @@ class PublicHttp:
 
     def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None, action=None):
         url = self.validate(value)
-        if RELAY_ROUTE is not None and method == 'GET' and not byte_range and action != 'mangamillion-proto':
+        if RELAY_ROUTE is not None and method == 'GET' and not byte_range and action not in {'mangamillion-proto', 'globalcomix-json'}:
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
@@ -264,6 +264,12 @@ class PublicHttp:
                              'X-Requested-With': 'XMLHttpRequest'})
             if token:
                 outgoing['Access-Token'] = token
+        if action == 'globalcomix-json':
+            from manga_globalcomix import client_header, public_request
+            if method != 'GET' or data is not None or not public_request(url):
+                raise SourceError('Некорректный маршрут GlobalComix.')
+            outgoing.update({'X-GC-Client': client_header(), 'X-GC-Identmode': 'cookie',
+                             'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
         publisher = action in {'comici-json', 'comici-rsc', 'comici-html', 'comici-image',
                                'giga-json', 'giga-graphql', 'giga-html', 'giga-image'}
         if publisher:
@@ -377,7 +383,7 @@ class PublicHttp:
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
                 response.close()
-                if action == 'mangamillion-proto' or not location or hop == 5:
+                if action in {'mangamillion-proto', 'globalcomix-json'} or not location or hop == 5:
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
                 if publisher:

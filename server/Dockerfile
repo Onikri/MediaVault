@@ -14,7 +14,7 @@ RUN npm run build && test -s dist/manga-export.html && test -s dist/narration-ex
 
 FROM python:3.12-slim-bookworm
 ENV CHROMIUM_PATH=/usr/bin/chromium PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates chromium tesseract-ocr tesseract-ocr-eng libgomp1 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates chromium tesseract-ocr tesseract-ocr-eng libgomp1 fonts-noto-core fonts-noto-cjk libraqm0 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY server/requirements.txt server/requirements-service.txt ./
 RUN --mount=type=secret,id=proxy_ca \
