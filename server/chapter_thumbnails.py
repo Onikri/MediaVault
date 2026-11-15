@@ -45,7 +45,7 @@ def first_image(url):
     http=PublicHttp(timeout=(3,10),deadline=time.monotonic()+18)
     response=None
     try:
-        from manga_comici import page_reference, fetch_page
+        from manga_page_media import page_reference, fetch_page
         if reference := page_reference(target):
             return fetch_page(http, reference, {'Referer':info.get('url') or url})[0]
         response,_=http._open(target,headers={'Referer':info.get('url') or url})

@@ -132,8 +132,10 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         from manga_vinetheme import public_api as vine_public_api
         from manga_hentaihand import public_api as hentaihand_public_api
         from manga_comici import public_route as comici_public_route
+        from manga_gigaviewer import public_route as giga_public_route
         if not (any(route(host, url.path, url.query) for route in (iken_public_api, vine_public_api, hentaihand_public_api))
-                or comici_public_route(host, url.path, url.query, 'comici-json')):
+                or comici_public_route(host, url.path, url.query, 'comici-json')
+                or giga_public_route(host, url.path, url.query, 'giga-json')):
             raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
     if resolve_dns:
         try:
@@ -241,23 +243,29 @@ class PublicHttp:
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
-        comici = action in {'comici-json', 'comici-rsc', 'comici-html', 'comici-image'}
-        if comici:
-            from manga_comici import image_route, public_route
+        publisher = action in {'comici-json', 'comici-rsc', 'comici-html', 'comici-image',
+                               'giga-json', 'giga-graphql', 'giga-html', 'giga-image'}
+        if publisher:
+            if action.startswith('comici-'):
+                from manga_comici import image_route, public_route
+            else:
+                from manga_gigaviewer import image_route, public_route
             from manga_network_routes import configuration, routed
             route_config = configuration()
             origin = urlsplit(url)
-            if method != 'GET' or not (image_route(origin.netloc) if action == 'comici-image'
-                                       else public_route(origin.netloc, origin.path, origin.query, action)):
-                raise SourceError('Некорректный публичный маршрут Comici.')
+            publisher_image = action.endswith('-image')
+            expected_method = 'POST' if action == 'giga-graphql' else 'GET'
+            if method != expected_method or not (image_route(origin.netloc) if publisher_image
+                                                  else public_route(origin.netloc, origin.path, origin.query, action)):
+                raise SourceError('Некорректный публичный маршрут издателя.')
             outgoing['Accept-Language'] = 'ja,en;q=0.8'
-        if action in {'vine-json', 'vine-rsc', 'hentaihand-json', 'comici-json', 'comici-rsc'}:
+        if action in {'vine-json', 'vine-rsc', 'hentaihand-json', 'comici-json', 'comici-rsc', 'giga-json', 'giga-graphql'}:
             if action == 'hentaihand-json':
                 from manga_hentaihand import public_api as route
-            elif not comici:
+            elif not publisher:
                 from manga_vinetheme import public_api, rsc_route
                 route = public_api if action == 'vine-json' else rsc_route
-            if not comici:
+            if not publisher:
                 origin = urlsplit(url)
                 if method != 'GET' or not route(origin.netloc, origin.path, origin.query):
                     raise SourceError('Некорректный публичный маршрут источника.')
@@ -300,7 +308,11 @@ class PublicHttp:
             if action=='madara-read':
                 from manga_madara import ajax_form
                 madara_form=ajax_form(url,data,(headers or {}).get('Referer'))
-            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog or honey_chapters or hikka_search or jaomix_toc or madara_form):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
+            giga_form = False
+            if action == 'giga-graphql':
+                from manga_gigaviewer import graphql_form
+                giga_form = origin.path == '/graphql' and graphql_form(host, data)
+            if not (player_form or search_form or manga_form or chan_search or senkognito_read or lostfilm_catalog or honey_chapters or hikka_search or jaomix_toc or madara_form or giga_form):raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if madara_form:outgoing['X-Requested-With']='XMLHttpRequest'
             if chan_search:
                 # The public search box's Next.js action. The caller supplies only the title.
@@ -308,7 +320,7 @@ class PublicHttp:
                                  'Accept': 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8',
                                  'Origin': 'https://hentaichan.cc', 'Referer': 'https://hentaichan.cc/'})
                 data = json.dumps([{'name': data, 'page': 1, 'limit': 24}]).encode()
-            if manga_form or honey_chapters or hikka_search:outgoing['Content-Type']='application/json'
+            if manga_form or honey_chapters or hikka_search or giga_form:outgoing['Content-Type']='application/json'
             if player_form:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
                 outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
@@ -323,7 +335,7 @@ class PublicHttp:
                 if self.deadline:
                     remaining=max(.2,self.deadline-time.monotonic());request_timeout=(min(request_timeout[0],remaining),min(request_timeout[1],remaining))
                 options = {}
-                if comici and routed(url, route_config):
+                if publisher and routed(url, route_config):
                     options['proxies'] = {'https': route_config['httpProxy']}
                 response = self.session.request(method, url, headers=outgoing, data=data,
                                                 timeout=request_timeout, allow_redirects=False, stream=True, **options)
@@ -335,14 +347,14 @@ class PublicHttp:
                 if not location or hop == 5:
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
-                if comici:
+                if publisher:
                     target = urlsplit(next_url)
-                    allowed = (image_route(target.netloc) if action == 'comici-image'
+                    allowed = (image_route(target.netloc) if publisher_image
                                else target.netloc == origin.netloc and target.path.rstrip('/') == origin.path.rstrip('/')
                                and public_route(target.netloc, target.path, target.query, action)
                                and (action == 'comici-rsc' or target.query == origin.query))
                     if not allowed:
-                        raise SourceError('Comici перенаправил запрос на другой маршрут.')
+                        raise SourceError('Издатель перенаправил запрос на другой маршрут.')
                 if action in {'vine-json', 'vine-rsc'}:
                     target = urlsplit(next_url)
                     if (target.netloc != origin.netloc or target.path.rstrip('/') != origin.path.rstrip('/')

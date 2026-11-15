@@ -421,7 +421,7 @@ def native_page_image(target,page):
     if not 0<=page<len(pages):raise SourceError('Страница отсутствует в исходной главе.')
     http=PublicHttp(timeout=(3,20));response=None
     try:
-        from manga_comici import page_reference, fetch_page
+        from manga_page_media import page_reference, fetch_page
         from manga_native_sources import page_headers
         if reference := page_reference(pages[page]):
             return fetch_page(http, reference, page_headers(target))

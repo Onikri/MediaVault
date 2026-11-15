@@ -30,7 +30,7 @@ class Session:
         original=url
         url=public_url(url,resolve_dns=False)
         if self.kind=='manga':
-            from manga_comici import page_reference
+            from manga_page_media import page_reference
             if page_reference(original):url=original
         with self.lock:
             if not synthetic and url in self.reverse:return self.reverse[url]
@@ -421,7 +421,7 @@ def install(app,owner,exports_owner=None):
                 raw,mime=page_image(url)
                 return Response(raw,media_type=mime,headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
             if s.kind=='manga':
-                from manga_comici import page_reference, fetch_page
+                from manga_page_media import page_reference, fetch_page
                 if reference := page_reference(url):
                     raw,mime=fetch_page(http,reference,s.headers)
                     return Response(raw,media_type=mime,headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})

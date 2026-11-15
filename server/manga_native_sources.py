@@ -16,6 +16,7 @@ import manga_mangacatalog
 import manga_keyoapp
 import manga_vinetheme
 import manga_comici
+import manga_gigaviewer
 from manga_source_urls import split_reader_url
 from source_parser import PublicHttp, SourceError
 
@@ -23,7 +24,7 @@ from source_parser import PublicHttp, SourceError
 ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (
     manga_mangashi, *manga_mangahub.SOURCES, *manga_madara.ACTIVE_SOURCES, *manga_themesia.ACTIVE_SOURCES,
     *manga_iken.SOURCES, *manga_mangacatalog.ACTIVE_SOURCES, *manga_keyoapp.ACTIVE_SOURCES,
-    *manga_vinetheme.ACTIVE_SOURCES, *manga_comici.ACTIVE_SOURCES
+    *manga_vinetheme.ACTIVE_SOURCES, *manga_comici.ACTIVE_SOURCES, *manga_gigaviewer.ACTIVE_SOURCES
 )}
 HOSTS = {
     urlsplit(adapter.ROOT).hostname: adapter

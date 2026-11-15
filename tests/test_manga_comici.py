@@ -6,7 +6,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from PIL import Image
 
-from manga_comici import SOURCES, decode_page, page_reference
+from manga_comici import SOURCES
+from manga_page_media import decode_page, page_reference
 from manga_native_sources import saved_reader_url
 from online_sessions import Session
 from source_parser import PublicHttp, SourceAccessError, SourceError, public_url
@@ -71,8 +72,8 @@ class ComiciTests(TestCase):
             image.save(source, 'PNG')
         tiles = list(range(15, -1, -1))
         url = SOURCE.page_url('https://viewer.comicpash.jp/page.jpg?sig=a', tiles)
-        bare, decoded = page_reference(url)
-        self.assertEqual((bare, decoded), ('https://viewer.comicpash.jp/page.jpg?sig=a', tiles))
+        bare, decoded, alignment, action = page_reference(url)
+        self.assertEqual((bare, decoded, alignment, action), ('https://viewer.comicpash.jp/page.jpg?sig=a', tiles, 1, 'comici-image'))
         session = Session('owner', {}, 100, kind='manga')
         self.assertEqual(session.resources[session.resource(url)], url)
         with Image.open(BytesIO(decode_page(source.getvalue(), decoded))) as result:

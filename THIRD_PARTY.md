@@ -440,3 +440,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
 - The Comici Viewer family (`server/manga_comici.py`) follows the public catalogue,
   access metadata and 4 × 4 image tile order in Apache-2.0 Keiyoushi
   `lib-multisrc/comiciviewer` at the same revision.
+- The GigaViewer family (`server/manga_gigaviewer.py`) follows the public
+  catalogue and viewer protocols in Apache-2.0 Keiyoushi `lib-multisrc/gigaviewer`
+  at the same revision. `server/manga_gigaviewer_profiles.py` records the collection
+  IDs and options from the installed publisher extensions at that revision.

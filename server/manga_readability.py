@@ -28,7 +28,7 @@ def verify(value,refresh=False):
         from suwayomi_bridge import parse_reference,page_image
         from manga_download import image_extension
         from manga_native_sources import page_headers
-        from manga_comici import page_reference, fetch_page
+        from manga_page_media import page_reference, fetch_page
         entries = value.get('episodes') or []
         targets = [value['url']] if value.get('pages') else list(dict.fromkeys(
             item['url'] for item in entries if item.get('available') is not False))[:3]
