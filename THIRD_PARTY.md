@@ -451,3 +451,6 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   `server/manga_mangadventure.py`, `server/manga_mangak.py`,
   `server/manga_masonry.py`) follow the corresponding Keiyoushi Apache-2.0
   multisrc entries and installed publisher overrides at the same revision.
+- The MultiChan and BakkinReaderX adapters (`server/manga_multichan.py`,
+  `server/manga_multichan_terms.py`, `server/manga_bakkin.py`) follow the
+  Apache-2.0 Keiyoushi layouts and installed extensions at the same revision.

@@ -166,7 +166,7 @@ class Madara:
                  genre_section='manga-genre', manga_only=True, uses_post_id=True, date_format='%B %d, %Y',
                  language='en', selectors=None, ajax_template=CATALOGUE_FORM['template'],
                  metadata_interval=0, thumbnail_original=False, alt_names=True,
-                 scoped_urls=False, raw_marker=None, origin=None, chapter_volumes=False):
+                 scoped_urls=False, raw_marker=None, origin=None, chapter_volumes=False, quality_paths=False):
         self.SOURCE_ID = sid
         self.NAME = name
         self.ROOT = root
@@ -192,6 +192,8 @@ class Madara:
         self.host = urlsplit(root).hostname
         self.TITLE_PATH = re.compile(rf'/{section}/({SEGMENT})/?')
         chapter_path = rf'(?:tomo-[1-9]\d{{0,2}}/)?{SEGMENT}' if chapter_volumes else SEGMENT
+        if quality_paths:
+            chapter_path += r'(?:/v(?:1-high|2-full)-quality)?'
         self.CHAPTER_PATH = re.compile(rf'/{section}/({SEGMENT})/({chapter_path})/?')
 
     def site_link(self, value, base=None):
@@ -473,22 +475,24 @@ class Madara:
             soup, final = self.soup(http, url)
             if urlsplit(final).path.rstrip('/') != expected.rstrip('/'):
                 raise SourceError('Madara перенаправил список страниц на другую главу.')
+        pages = self.page_images(soup, final)
+        if not pages or len(pages) > 500 or not all(pages):
+            raise SourceError('Madara не предоставил полный список страниц открытой главы.')
+        return pages, final
+
+    def page_images(self, soup, final):
         if protected := soup.select_one('#chapter-protector-data'):
             if soup.select_one('.paywall, .purchase-required, .chapter-locked, form.login'):
                 raise SourceAccessError('Глава требует доступ у источника.')
             sources = public_reader_images(protected)
             if not isinstance(sources, list):
                 raise SourceError('Madara вернул неверный список изображений.')
-            pages = [image_url(value, final) for value in sources]
-        else:
-            selector = self.selectors['page_images']
-            nodes = soup.select(selector) if selector else (wrapper.select_one('img') for wrapper in soup.select(PAGE_WRAP))
-            # Gallery containers can be nested, while page order is the HTML order.
-            images = {id(node): node for node in nodes if node}
-            pages = [image_from(node, final) for node in images.values()]
-        if not pages or len(pages) > 500 or not all(pages):
-            raise SourceError('Madara не предоставил полный список страниц открытой главы.')
-        return pages, final
+            return [image_url(value, final) for value in sources]
+        selector = self.selectors['page_images']
+        nodes = soup.select(selector) if selector else (wrapper.select_one('img') for wrapper in soup.select(PAGE_WRAP))
+        # Gallery containers can be nested, while page order is the HTML order.
+        images = {id(node): node for node in nodes if node}
+        return [image_from(node, final) for node in images.values()]
 
     def inspect(self, value, http):
         value = self.site_link(value)
@@ -570,7 +574,156 @@ class MangaHe(Madara):
         return pages, final
 
 
-VARIANTS = {'standard': Madara, 'aqua': AquaManga, 'raw': ManhwaRaw, 'mangahe': MangaHe}
+class Hentai4Free(Madara):
+    def page_images(self, soup, final):
+        script = soup.select_one('#h4f-r2-data')
+        try:
+            data = json.loads(script.string or '') if script else {}
+        except (ValueError, RecursionError):
+            raise SourceError('Источник вернул некорректный список страниц.') from None
+        images = data.get('images') if isinstance(data, dict) else None
+        if not isinstance(images, list):
+            return []
+        return [image_url(item.get('src'), final) if isinstance(item, dict) else '' for item in images]
+
+
+class MangaDistrict(Madara):
+    def page_images(self, soup, final):
+        return [image_url(node['data-wpfc-original-src'], final) if node.get('data-wpfc-original-src')
+                else image_from(node, final) for node in soup.select(self.selectors['page_images'])]
+
+
+class RubyComics(Madara):
+    def metadata(self, soup, url):
+        row = super().metadata(soup, url)
+        rate = node_text(soup.select_one('#averagerate'))
+        if rate:
+            row['description'] = f'Rating: {rate}\n\n' + row['description']
+        return row
+
+
+class RoseSquadScans(Madara):
+    def soup(self, http, url, **options):
+        soup, final = super().soup(http, url, **options)
+        if urlsplit(final).path == '/wp-login.php':
+            raise SourceAccessError('Rose Squad Scans требует вход у источника.')
+        return soup, final
+
+    def vocabulary(self, http):
+        return []
+
+
+class GoodToon(Madara):
+    def html_request(self, http, page, query, sort, tag):
+        params = {'pg': page} if page > 1 else {}
+        if query:
+            params['q'] = query
+            return '/', params
+        if tag:
+            return f'/{self.genre_section}/{tag}/', params
+        return ('/' if sort == 'updated' else '/recommend/'), params
+
+    def html_search_paginates(self):
+        return True
+
+    def archive_rows(self, soup, final):
+        rows = {}
+        for link in soup.select('a.card[href]'):
+            target = self.site_link(link['href'], final)
+            match = self.TITLE_PATH.fullmatch(urlsplit(target).path)
+            title = node_text(link.select_one('div.subject'))
+            if match and title:
+                cover = link.select_one('div.thumb > img:not(.platform-icon)')
+                rows[match[1]] = self.row(target, title, self.thumbnail(cover, final))
+        return list(rows.values())
+
+    def vocabulary(self, http):
+        soup, _ = self.soup(http, self.ROOT + '/')
+        return [{'label': node_text(button), 'sourceId': button['data-genre'], 'category': 'genre'}
+                for button in soup.select('button.genre[data-genre]')
+                if genre_slug(button['data-genre']) and node_text(button)]
+
+    def metadata(self, soup, url):
+        row = super().metadata(soup, url)
+        genre = node_text(soup.select_one('div.manga-summary-genres'))
+        if genre and not row['genres']:
+            row['genres'] = unique(re.split(r'\s*[,|·]\s*', genre))
+        return row
+
+    def chapter_rows(self, soup, url, slug, found):
+        previous = set(found)
+        super().chapter_rows(soup, url, slug, found)
+        for key in found.keys() - previous:
+            row = found[key]
+            matches = re.findall(r'(\d+(?:\.\d+)?)화', row['title'])
+            if matches:
+                row['number'] = float(matches[-1])
+
+
+class Lgbtics(Madara):
+    def html_request(self, http, page, query, sort, tag):
+        parody = tag.removeprefix('parody:') if tag.startswith('parody:') else ''
+        if parody:
+            params = {'m_orderby': 'latest' if sort == 'updated' else 'views'}
+            path = f'/comic-tag/{parody}/'
+        elif query or tag:
+            path, params = '/', {'s': query, 'post_type': 'wp-manga'}
+            if tag:
+                params['genre[]'] = tag
+        else:
+            return super().html_request(http, page, '', sort, '')
+        if page > 1:
+            path += f'page/{page}/'
+        return path, params
+
+    def catalogue(self, http, page=1, *, query='', sort='popular', tag=''):
+        if isinstance(tag, str) and tag.startswith('parody:'):
+            slug = tag.removeprefix('parody:')
+            if type(page) is not int or not 1 <= page <= 2000 or not genre_slug(slug):
+                raise SourceError('Некорректный фильтр Lgbtics.')
+            path, params = self.html_request(http, page, query, sort, tag)
+            soup, final = self.soup(http, self.ROOT + path + '?' + urlencode(params))
+            if urlsplit(final).path.rstrip('/') != path.rstrip('/'):
+                raise SourceError('Lgbtics перенаправил запрос каталога.')
+            return self.archive_rows(soup, final), self.html_has_more(soup, query, tag)
+        return super().catalogue(http, page, query=query, sort=sort, tag=tag)
+
+    def html_search_paginates(self):
+        return True
+
+    def metadata(self, soup, url):
+        row = super().metadata(soup, url)
+        rate = node_text(soup.select_one('div.post-total-rating span.score'))
+        if re.fullmatch(r'[0-5](?:\.[0-9]{1,2})?', rate):
+            row['description'] = f'Rating: {float(rate):g}/5\n\n' + row['description']
+        return row
+
+    def vocabulary(self, http):
+        result = {}
+        for page, path, category in (('all-genres2', 'comic-genre', 'genre'), ('all-parodies', 'comic-tag', 'tag')):
+            soup, final = self.soup(http, self.ROOT + '/' + page + '/')
+            route = re.compile(rf'/{path}/({SEGMENT})/?')
+            for link in soup.select('a[href]'):
+                target = self.site_link(link['href'], final)
+                match = route.fullmatch(urlsplit(target).path)
+                name = self.legacy_term_label(node_text(link))
+                if match and name:
+                    key = 'parody:' + match[1] if category == 'tag' else match[1]
+                    result[key] = {'label': name, 'sourceId': key, 'category': category}
+        return list(result.values())
+
+
+class SetsuScans(Madara):
+    def page_images(self, soup, final):
+        from manga_page_media import SETSU_FRAGMENT
+
+        return [urlunsplit(parts._replace(fragment=SETSU_FRAGMENT)) if (parts := urlsplit(value)).hostname == 'i0.wp.com'
+                else value for value in super().page_images(soup, final)]
+
+
+VARIANTS = {'standard': Madara, 'aqua': AquaManga, 'raw': ManhwaRaw, 'mangahe': MangaHe,
+            'hentai4free': Hentai4Free, 'district': MangaDistrict, 'ruby': RubyComics,
+            'rosesquad': RoseSquadScans, 'goodtoon': GoodToon, 'lgbtics': Lgbtics, 'setsu': SetsuScans}
 PROFILE_COUNTS = Counter(urlsplit(identity[2]).hostname for identity, _ in PROFILES)
 ORIGINS = {host: OriginPace() for host in PROFILE_COUNTS}
 SOURCES = tuple(VARIANTS[options.get('variant', 'standard')](

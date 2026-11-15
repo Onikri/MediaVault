@@ -4,7 +4,7 @@ from io import BytesIO
 import json
 import re
 import time
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import warnings
 
 from PIL import Image
@@ -17,6 +17,7 @@ TILE_FRAGMENT = 'mv_comici_tiles='
 GIGA_FRAGMENT = 'mv_giga_page'
 MANGAK_FRAGMENT = 'mv_mangak_image'
 MANGAK_IMAGE_FALLBACK = 'rx.rzyn.net'
+SETSU_FRAGMENT = 'mv_setsu_image'
 TILES = frozenset(range(16))
 TRANSPOSE = tuple(index % 4 * 4 + index // 4 for index in range(16))
 
@@ -57,6 +58,10 @@ def page_reference(value):
         if not mangak_cdn(host):
             raise SourceError('Некорректный адрес страницы MangaK.')
         return public_url(value, resolve_dns=False), None, 1, 'mangak-image'
+    if parts.fragment == SETSU_FRAGMENT:
+        if host != 'i0.wp.com':
+            raise SourceError('Некорректный адрес страницы Setsu Scans.')
+        return public_url(value, resolve_dns=False), None, 1, 'setsu-image'
     return None
 
 
@@ -87,18 +92,10 @@ def decode_page(raw, tiles, alignment=1):
 def fetch_page(http, reference, headers):
     """Both the online reader and CBZ use the exact same page transformation."""
     target, tiles, alignment, action = reference
-    try:
-        response, _ = http._open(target, headers=headers, action=action)
-    except SourceRateLimitError:
-        raise
-    except SourceError:
-        if action != 'mangak-image':
-            raise
-        parts = urlsplit(target)
-        if not mangak_cdn(parts.hostname):
-            raise
-        fallback = urlunsplit(parts._replace(netloc=MANGAK_IMAGE_FALLBACK))
-        response, _ = http._open(fallback, headers=headers)
+    if action == 'setsu-image':
+        response, _ = setsu_image(http, target, headers)
+    else:
+        response, _ = open_marked_page(http, target, headers, action)
     try:
         raw = bytearray()
         for block in response.iter_content(65536):
@@ -116,3 +113,37 @@ def fetch_page(http, reference, headers):
     if not extension:
         raise SourceError('Источник не предоставил изображение страницы.')
     return bytes(raw), 'image/' + ('jpeg' if extension == 'jpg' else extension)
+
+
+def open_marked_page(http, target, headers, action):
+    try:
+        return http._open(target, headers=headers, action=action)
+    except SourceRateLimitError:
+        raise
+    except SourceError:
+        if action != 'mangak-image':
+            raise
+        parts = urlsplit(target)
+        if not mangak_cdn(parts.hostname):
+            raise
+        fallback = urlunsplit(parts._replace(netloc=MANGAK_IMAGE_FALLBACK))
+        return http._open(fallback, headers=headers)
+
+
+def setsu_image(http, target, headers):
+    parts = urlsplit(target)
+    try:
+        params = parse_qsl(parts.query, keep_blank_values=True, max_num_fields=30)
+    except ValueError:
+        raise SourceError('Setsu Scans вернул некорректные параметры страницы.') from None
+    ssl = next((value for key, value in params if key == 'ssl'), '')
+    base = [(key, value) for key, value in params if key not in {'fit', 'ssl'}]
+    steps = ('', '0', '2', '3', '4', '5')
+    variants = steps[steps.index(ssl):] if ssl in steps else (ssl,)
+    for index, value in enumerate(variants, 1):
+        query = urlencode([*base, ('ssl', value)] if value else base)
+        try:
+            return http._open(urlunsplit(parts._replace(query=query)), headers=headers)
+        except SourceError as error:
+            if type(error) is not SourceError or 'HTTP 404' not in str(error) or index == len(variants):
+                raise

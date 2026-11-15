@@ -173,6 +173,44 @@ PROFILES = (
     (('4046163527731172053', 'Kmansin09', 'https://kmansin09.top', False), {
         'language': 'ja', 'html': True, 'chapter_mode': 'manga',
     }),
+    (('6625474581258090106', 'Hentai4Free', 'https://hentai4free.net', True), {
+        'variant': 'hentai4free', 'section': 'hentai',
+        'selectors': {'cards': '.page-item-detail', 'chapters': 'section.h4f-oneshot-preview',
+                      'chapter_link': '.h4f-preview-reader-btn[href]', 'chapter_name': '.h4f-preview-title small'},
+    }),
+    (('918523496924275699', 'HentaiXDickgirl', 'https://hentaixdickgirl.com', True), {}),
+    (('4306337471481207984', 'Lgbtics', 'https://lgbtics.com', True), {
+        'variant': 'lgbtics', 'section': 'comic', 'genre_section': 'comic-genre', 'html': True, 'uses_post_id': False,
+    }),
+    (('2964723819258267786', 'Manga District', 'https://mangadistrict.com', True), {
+        'variant': 'district', 'section': 'series', 'genre_section': 'publication-genre', 'html': True,
+        'quality_paths': True,
+        'selectors': {'next': '.wp-pagenavi a.last', 'chapter_date': '.chapter-release-date .timediff',
+                      'page_images': 'div.page-break img:not(noscript img):not(#image-99999)'},
+    }),
+    (('3544957587727489204', 'Manhuanext', 'https://manhuanext.com', False), {
+        'chapter_mode': 'manga', 'selectors': {'chapters': 'li.wp-manga-chapter:not(.premium-block)'},
+    }),
+    (('5475936177780301452', 'Rose Squad Scans', 'https://rosesquadscans.aishiteru.org', True), {
+        'variant': 'rosesquad', 'chapter_mode': 'manga', 'date_format': '%m.%d.%Y', 'metadata_interval': 2,
+    }),
+    (('6792243715659475719', 'Ruby Comics', 'https://rubycomics.net', True), {
+        'variant': 'ruby', 'chapter_mode': 'manga', 'thumbnail_original': True,
+        'selectors': {'description': 'div.description-summary div.limit-html'},
+    }),
+    (('8546397272954539389', 'Setsu Scans', 'https://setsuscans.com', False), {
+        'variant': 'setsu', 'chapter_mode': 'manga', 'metadata_interval': 0.5,
+        'selectors': {'status': 'div.summary-heading:-soup-contains("status", "Status") + div.summary-content'},
+    }),
+    (('2738031143723682744', 'GoodToon', 'https://www.goodtoon010.com', True), {
+        'variant': 'goodtoon', 'language': 'ko', 'html': True, 'uses_post_id': False, 'chapter_mode': 'manga',
+        'date_format': '%y.%m.%d',
+        'selectors': {'title': 'h1.summary-title, div.post-title h3, div.post-title h1, #manga-title > h1',
+                      'authors': 'div.manga-summary-author .author-text, div.manga-summary-author',
+                      'status': 'div.summary-meta-row .meta-value', 'description': 'div.manga-summary-desc',
+                      'cover': 'div.manga-summary-cover img', 'next': 'div.pagination a.page-numbers:-soup-contains-own("다음")',
+                      'page_images': 'div.reading-content img'},
+    }),
 )
 
 # The MediaVault registry enables a profile after testing its complete

@@ -102,5 +102,8 @@ python scripts/probe-native-source-batch.py --ssh mediavault-vm --inactive --bat
 | [MangAdventure](../server/manga_mangadventure.py) | 2 | 2 | Отдельная выдача Arc-Relight по жанрам, номера глав и томов, проверка принадлежности главы тайтлу |
 | [MangaK](../server/manga_mangak.py) | 2 | 2 | MangaK и Toonily.me, метаданные Next.js, чтение через резервный CDN при отказе основного |
 | [Masonry](../server/manga_masonry.py) | 7 | 7 | Отдельные маршруты каталога и тегов, галерея как единая глава, порядок изображений |
+| [MultiChan](../server/manga_multichan.py) | 3 | 3 | MangaChan, YaoiChan и HenChan. Списки глав, теги из расширений и ссылки на изображения из данных читалки |
+| [BakkinReaderX](../server/manga_bakkin.py) | 2 | 2 | Индекс `main.php`, тома и старые ссылки с фрагментом. Для Self-hosted нужен адрес сервиса в `BAKKIN_SELF_HOSTED_URL` |
+| [Madara](../server/manga_madara.py) | 9 | 9 | Корейский каталог GoodToon, версии качества Manga District, отдельные жанры и теги Lgbtics, форматы глав и CDN |
 
-Все 17 профилей доступны для следующего пакетного прогона. Реальное подключение источников в рабочем маршруте остаётся отдельной операцией после проверки.
+Эти 31 профиль добавлены в набор следующего пакетного прогона. Подключение источников в рабочем маршруте остаётся отдельной операцией после проверки.
