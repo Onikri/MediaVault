@@ -158,6 +158,7 @@ PROFILES = (
     }),
     (('6626112947749020527', 'SeraphicDeviltry', 'https://spanish.seraphic-deviltry.com', True), {
         'language': 'es', 'chapter_mode': 'manga', 'date_format': '%m/%d/%Y', 'metadata_interval': 1 / 3,
+        'chapter_volumes': True,
     }),
     (('5727368826344311935', 'Jinmangas', 'https://mangafree.info', True), {'chapter_mode': 'manga'}),
     (('3386549954655095711', 'Mangafree', 'https://mangafree.info', True), {'chapter_mode': 'manga'}),

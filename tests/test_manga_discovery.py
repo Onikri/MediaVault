@@ -239,6 +239,24 @@ class MangaDiscoveryTests(unittest.TestCase):
         by_id={s['id']:s for s in SOURCES}
         self.assertEqual([by_id[r[0]]['lang'] for r in queued[:4]],[language]*4)
         self.assertEqual(len(queued),len(SOURCES))
+ def test_migrated_source_leads_its_language_and_retries_after_old_route_failure(self):
+    sources=[{'id':'1','name':'A source','lang':'en'},{'id':'2','name':'Z source','lang':'en'}]
+    migrated=set()
+    with patch.object(discovery,'installed_sources',return_value=sources), \
+         patch('manga_native_sources.for_source',side_effect=lambda source: str(source['id']) in migrated):
+        manager=self.manager(fetch=fixture,start_workers=False,clock=lambda:1000.)
+        first=manager.start('A','One Piece')
+        manager.cancel('A',first['id'])
+        for source in sources:
+            for _ in range(2):
+                manager._reachability(source,source['id'],False,{'code':'network','message':'timeout'},1000.)
+            manager.db.execute('INSERT INTO query_cache VALUES(?,?,?,?)',
+                               (manager._cache_key('older request',source),source['id'],'[]',1500.))
+        migrated.add('2')
+        current=manager.start('A','One Piece')
+        rows=manager.db.execute('SELECT source_id,state FROM work WHERE job=? ORDER BY rowid',(current['id'],)).fetchall()
+        self.assertEqual([tuple(row) for row in rows],[('2','queued'),('1','skipped')])
+        self.assertEqual([row[0] for row in manager.db.execute('SELECT source_id FROM query_cache')],['1'])
  def test_selected_sources_are_installed_validated_and_raw_query_is_not_exact_title_matched(self):
     calls=[]
     def fetch(source,query):calls.append((source['id'],query));return fixture(source,query)

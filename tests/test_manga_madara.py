@@ -74,6 +74,19 @@ class Http:
 
 
 class MadaraMigration(unittest.TestCase):
+    def test_spanish_madara_chapters_keep_volume_prefix_and_fraction(self):
+        source = madara.SOURCE_HOSTS['spanish.seraphic-deviltry.com']
+        title = source.ROOT + '/manga/example/'
+        chapter = title + 'tomo-2/capitulo-10-5/'
+        http = Mock(deadline=None)
+        http.document.side_effect = [
+            (DETAILS, title, {}),
+            ('<li class="wp-manga-chapter"><a href="' + chapter + '">Capítulo 10,5</a></li>', title + 'ajax/chapters/', {}),
+        ]
+        with patch.object(source.origin, 'interval', 0):
+            episode, = source.inspect(title, http)['episodes']
+        self.assertEqual((episode['url'], episode['season'], episode['number']), (chapter, 2, 10.5))
+
     def test_same_host_keeps_language_in_chapters_routes_and_saved_links(self):
         variants = {source.LANGUAGE: source for source in madara.SOURCES if source.host == 'mangaforfree.net'}
         english, korean, unfiltered = (variants[language] for language in ('en', 'ko', 'all'))

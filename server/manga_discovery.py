@@ -370,6 +370,10 @@ class Discovery:
         # Persist only public source identity, never an upstream response's
         # optional preference/authentication fields.
         active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in installed_sources() if source_matches_language(s, 'all')]
+        from manga_native_sources import for_source
+        for source in active:
+            if for_source(source):
+                source['_nativeAdapter']=True
         installed={str(s['id']) for s in active}
         if source_ids and any(v not in installed for v in source_ids):raise ValueError('Выбранный источник не установлен. Обнови каталог источников.')
         selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())
@@ -384,7 +388,7 @@ class Discovery:
         else:
             for source in selected:source['_retryHealth']=True
         preferred='uk' if re.search(r'[іїєґ]',query,re.I) else 'ru' if re.search(r'[а-яё]',query,re.I) else 'ko' if re.search(r'[가-힣]',query) else 'ja' if re.search(r'[ぁ-ヿ一-鿿]',query) else 'en'
-        selected.sort(key=lambda s:(s['lang']!=preferred,s['lang'],s['name'].casefold(),str(s['id'])))
+        selected.sort(key=lambda s:(s['lang']!=preferred,not s.get('_nativeAdapter'),s['lang'],s['name'].casefold(),str(s['id'])))
         if title:
             # Use the selected title's own aliases in each source's language.
             # Searching a romanized name alone misses Russian, Japanese and Korean editions.
@@ -392,7 +396,8 @@ class Discovery:
             for source in selected:
                 source['_queries']=language_queries(aliases(title),source['lang'])
                 source['_title']=clean_title
-        signature=hashlib.sha256(json.dumps([DISCOVERY_VERSION,key,language,[str(s['id']) for s in selected],title and aliases(title),routes.get('revision','direct')],ensure_ascii=False).encode()).hexdigest()
+        source_paths=[str(s['id'])+('@direct' if s.get('_nativeAdapter') else '') for s in selected]
+        signature=hashlib.sha256(json.dumps([DISCOVERY_VERSION,key,language,source_paths,title and aliases(title),routes.get('revision','direct')],ensure_ascii=False).encode()).hexdigest()
         now=self.clock()
         with self.condition,self.db:
             self._prune(now)
@@ -425,6 +430,7 @@ class Discovery:
     @staticmethod
     def _cache_key(key,source):
         versioned=f'native-v{DISCOVERY_VERSION}:{key}'
+        if source.get('_nativeAdapter'):versioned+='|adapter:direct'
         if source.get('_queries'):versioned+='|aliases:'+hashlib.sha256(json.dumps(source['_queries'],ensure_ascii=False).encode()).hexdigest()
         if source.get('_routeRevision'):versioned+='|route:'+source['_routeRevision']
         return versioned if not source.get('_title') else versioned+'|title:'+hashlib.sha256(json.dumps(source['_title'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
@@ -433,16 +439,22 @@ class Discovery:
         from manga_network_routes import configuration,routed
         routes=configuration();revision=routes.get('revision','direct')
         previous=self.db.execute("SELECT value FROM network_state WHERE key='routes'").fetchone()
-        if previous and json.loads(previous[0]).get('revision','direct')==revision:return
         old=json.loads(previous[0]) if previous else {}
-        identities=[str(s['id']) for s in sources if routed(s.get('baseUrl'),routes) or routed(s.get('baseUrl'),old)]
+        native_ids={str(s['id']) for s in sources if s.get('_nativeAdapter')}
+        old_ids=set(old.get('native_ids', []))
+        route_changed=not previous or old.get('revision','direct')!=revision
+        if not route_changed and native_ids==old_ids:return
+        identities=native_ids^old_ids
+        if route_changed:
+            identities.update(str(s['id']) for s in sources if routed(s.get('baseUrl'),routes) or routed(s.get('baseUrl'),old))
         if identities:
             from manga_source_health import reset_failures
+            identities=sorted(identities)
             reset_failures(identities)
             self.db.executemany('DELETE FROM reachability WHERE source_id=?',[(sid,) for sid in identities])
             self.db.executemany('DELETE FROM query_cache WHERE source_id=?',[(sid,) for sid in identities])
             self.db.executemany("UPDATE jobs SET state='interrupted' WHERE state='done' AND id IN (SELECT job FROM work WHERE source_id=? AND state IN ('skipped','unavailable'))",[(sid,) for sid in identities])
-        self.db.execute("INSERT OR REPLACE INTO network_state VALUES('routes',?)",(json.dumps(routes),))
+        self.db.execute("INSERT OR REPLACE INTO network_state VALUES('routes',?)",(json.dumps({**routes,'native_ids':sorted(native_ids)}),))
 
     def _indexed(self,key,sid):
         # Parameterized escaped LIKE supports raw Japanese/Korean substring

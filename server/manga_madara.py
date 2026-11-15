@@ -25,8 +25,8 @@ from source_parser import PublicHttp, SourceAccessError, SourceError, SourceTemp
 SEGMENT = r'(?!(?:\.|%2[eE]){1,2}(?:/|$))(?:[\w.~+-]|%(?!2[fF]|5[cC]|[01][0-9a-fA-F])[0-9a-fA-F]{2}){1,240}'
 ID = re.compile(r'[1-9]\d{0,11}')
 NUM = r'(\d{1,4}(?:[.,]\d{1,3})?)(?!\d)'
-CHAPTER_NUMBER = re.compile(r'(?:chapter|chap\.?|ch\.?|глава)[\s_\-#:]*' + NUM, re.I)
-VOLUME_NUMBER = re.compile(r'(?:volume|vol\.?|том)[\s_\-#:]*([1-9]\d{0,2})(?!\d)', re.I)
+CHAPTER_NUMBER = re.compile(r'(?:chapter|chap\.?|ch\.?|глава|cap[ií]tulo)[\s_\-#:]*' + NUM, re.I)
+VOLUME_NUMBER = re.compile(r'(?:volume|vol\.?|том|tomo)[\s_\-#:]*([1-9]\d{0,2})(?!\d)', re.I)
 PAGE_WRAP = '.page-break, li.blocks-gallery-item, .reading-content .text-left:not(:has(.blocks-gallery-item))'
 SELECTORS = {
     'cards': '.page-item-detail, .manga__item, .c-tabs-item__content',
@@ -166,7 +166,7 @@ class Madara:
                  genre_section='manga-genre', manga_only=True, uses_post_id=True, date_format='%B %d, %Y',
                  language='en', selectors=None, ajax_template=CATALOGUE_FORM['template'],
                  metadata_interval=0, thumbnail_original=False, alt_names=True,
-                 scoped_urls=False, raw_marker=None, origin=None):
+                 scoped_urls=False, raw_marker=None, origin=None, chapter_volumes=False):
         self.SOURCE_ID = sid
         self.NAME = name
         self.ROOT = root
@@ -191,7 +191,8 @@ class Madara:
         self.chapter_lock = threading.Lock() if self.chapter_cache is not None else None
         self.host = urlsplit(root).hostname
         self.TITLE_PATH = re.compile(rf'/{section}/({SEGMENT})/?')
-        self.CHAPTER_PATH = re.compile(rf'/{section}/({SEGMENT})/({SEGMENT})/?')
+        chapter_path = rf'(?:tomo-[1-9]\d{{0,2}}/)?{SEGMENT}' if chapter_volumes else SEGMENT
+        self.CHAPTER_PATH = re.compile(rf'/{section}/({SEGMENT})/({chapter_path})/?')
 
     def site_link(self, value, base=None):
         if not isinstance(value, str) or not value:
