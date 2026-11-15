@@ -1,0 +1,75 @@
+"""Source identities and Madara overrides from Keiyoushi 6f345a8."""
+
+
+PROFILES = (
+    (('8547397037512613554', 'AllPornComic', 'https://allporncomic.com', True), {'html': True, 'section': 'porncomic', 'uses_post_id': False}),
+    (('7848750588298461115', 'AP Comics', 'https://apcomics.org', True), {'chapter_mode': 'manga'}),
+    (('6576302499429437207', 'Aunt Manhwa', 'https://auntmanhwa.com', True), {}),
+    (('7909401032149692930', 'Borat Scans', 'https://boratscans.com', False), {'chapter_mode': 'manga'}),
+    (('5944672760629857205', 'Bun Manga', 'https://bunmanga.com', False), {}),
+    (('3890119680043332770', 'Cucumber Manga', 'https://cucumbermanga.com', True), {'chapter_mode': 'manga'}),
+    (('7432245132662185058', 'Decadence Scans', 'https://reader.decadencescans.com', True), {'chapter_mode': 'manga'}),
+    (('5861653560535486832', 'Ero18x', 'https://ero18x.com', True), {'html': True, 'chapter_mode': 'manga'}),
+    (('5246625723235112128', 'GakaMangas', 'https://gakamangas.com', False), {'chapter_mode': 'manga', 'manga_only': False}),
+    (('4598626990187882152', 'GalaxyDegenScans', 'https://gdscans.com', True), {'chapter_mode': 'manga'}),
+    (('8561426018751869351', 'Hentai1.io', 'https://hentai1.io', True), {'html': True}),
+    (('7329798563365402763', 'HM2D', 'https://doujindistrict.com', True), {'chapter_mode': 'manga'}),
+    (('3876544289472679486', 'Hunlight Comics', 'https://hunlightcomics.com', True), {'chapter_mode': 'manga'}),
+    (('5815628626283130746', 'KaliScan.org (unoriginal)', 'https://kaliscan.org', True), {'chapter_mode': 'manga'}),
+    (('4307007494151154546', 'KSGroupScans', 'https://ksgroupscans.com', True), {'chapter_mode': 'manga'}),
+    (('8802607595629671202', 'LHTranslation', 'https://lhtranslation.net', False), {'chapter_mode': 'manga'}),
+    (('8622937201319058235', 'LinkManga', 'https://linkmanga.com', True), {}),
+    (('3971812949560196318', 'Lovesjane Scans', 'https://lovesjane.site', False), {'chapter_mode': 'paged'}),
+    (('4446818596127611511', 'Manga18Free', 'https://manga18free.com', True), {'chapter_mode': 'admin'}),
+    (('6802623574377987877', 'Manga 18x', 'https://manga18x.net', True), {'chapter_mode': 'manga'}),
+    (('5229341270935044914', 'Manga Eclipse', 'https://mangaeclipse.com', False), {}),
+    (('1099222169691387069', 'Mangaforfree.com', 'https://mangaforfree.com', True), {'chapter_mode': 'admin'}),
+    (('5502656519292762717', 'MangaManiacs', 'https://mangamaniacs.org', True), {}),
+    (('2031498907928923621', 'MangaOwl.io (unoriginal)', 'https://mangaowl.io', True), {'chapter_mode': 'manga', 'section': 'read-1'}),
+    (('4265503553734005106', 'MangaPark.tv (unoriginal)', 'https://mangapark.tv', True), {'chapter_mode': 'manga'}),
+    (('3606721916149050760', 'Mangasushi', 'https://mangasushi.org', False), {'chapter_mode': 'manga'}),
+    (('7638481723868333116', 'ManhuaHot', 'https://manhuahot.com', False), {}),
+    (('4005973248538140146', 'ManhuaUS', 'https://manhuaus.com', False), {'chapter_mode': 'manga', 'manga_only': False}),
+    (('6077132944162952766', 'Manhua Zonghe', 'https://www.manhuazonghe.com', True), {'section': 'manhua', 'manga_only': False}),
+    (('5795673090229968734', 'Manhwa18.today', 'https://www.manhwa18.today', True), {'chapter_mode': 'manga'}),
+    (('7672439791159944710', 'ManhwaDen', 'https://www.manhwaden.com', True), {'html': True, 'chapter_mode': 'manga', 'manga_only': False}),
+    (('3868891550336834170', 'ManhwaHub.to', 'https://manhwahub.to', True), {'section': 'manhwa', 'genre_section': 'genre'}),
+    (('8935586841672178004', 'ManhwaManhua', 'https://manhwamanhua.com', True), {'chapter_mode': 'manga', 'manga_only': False}),
+    (('3315938131690984352', 'Manhwa Reads', 'https://manhwareads.com', True), {'chapter_mode': 'manga'}),
+    (('3590279382085161370', 'Manhwa Toon', 'https://www.manhwatoon.me', True), {'chapter_mode': 'manga'}),
+    (('5177484976652938680', 'Manhwatop', 'https://manhwatop.com', True), {'chapter_mode': 'manga', 'manga_only': False}),
+    (('2527256034272235453', 'OctopusManga', 'https://octopusmanga.com', True), {'chapter_mode': 'manga'}),
+    (('4403086215261921832', 'Orchisasia', 'https://www.orchisasia.org', True), {'section': 'comic'}),
+    (('3740623306758763677', 'Paritehaber', 'https://www.paritehaber.com', True), {}),
+    (('2311025425739352818', 'Pornhwaz', 'https://www.pornhwaz.com', True), {}),
+    (('5756634909776784131', 'Sleepy Translations', 'https://sleepytranslations.com', False), {'chapter_mode': 'manga'}),
+    (('6421630287504544593', 'TopManhua.net', 'https://topmanhua.net', True), {'chapter_mode': 'manga'}),
+    (('6032516943051342273', 'TritiniaScans', 'https://tritinia.org', False), {'chapter_mode': 'manga'}),
+    (('58992897252080929', 'KokoMangas', 'https://kokomangas.com', True), {'chapter_mode': 'manga'}),
+    (('3062846066388633553', 'WebtoonScan', 'https://webtoonscan.com', True), {}),
+    (('6540843430852844328', 'WuxiaWorld', 'https://wuxiaworld.site', False), {'chapter_mode': 'manga', 'section': 'novel'}),
+    (('4439807782838127935', 'YaoiScan', 'https://yaoiscan.com', True), {}),
+    (('5990114708086767078', 'Zinmanga', 'https://mangazin.org', True), {'manga_only': False}),
+    (('6660493687892371703', 'AllPornComic.io', 'https://allporncomic.io', True), {'chapter_mode': 'manga', 'date_format': '%d/%m/%Y'}),
+    (('4205510315534778593', 'GingeRTooN', 'https://gingertoon.com', True), {'html': True, 'chapter_mode': 'manga', 'date_format': '%m.%d.%Y'}),
+    (('7664311260874726882', 'HentaiXComic', 'https://hentaixcomic.com', True), {'chapter_mode': 'manga', 'date_format': '%b %d, %Y'}),
+    (('1089473637776666044', 'HentaiXYuri', 'https://hentaixyuri.com', True), {'chapter_mode': 'manga', 'date_format': '%b %d, %Y'}),
+    (('2681651342533848540', 'MangaRead.org', 'https://www.mangaread.org', True), {'chapter_mode': 'manga', 'date_format': '%d.%m.%Y'}),
+    (('2676315620251021475', 'Manhwa68', 'https://manhwa68.com', True), {'chapter_mode': 'manga', 'manga_only': False, 'date_format': '%b %d, %Y'}),
+    (('3386088694317815151', 'Manhwa Comics', 'https://manhwacomics.com', True), {'chapter_mode': 'manga', 'section': 'manhwa', 'date_format': '%d %b %Y'}),
+    (('20045885295638720', 'Petrotechsociety', 'https://www.petrotechsociety.org', True), {'date_format': '%d/%m/%Y'}),
+    (('2054192099319007885', 'ToonGod', 'https://www.toongod.org', True), {'html': True, 'section': 'webtoons', 'date_format': '%d %b %Y'}),
+)
+
+# The MediaVault registry enables a profile after testing its complete
+# search-to-CBZ path. The remaining profiles can be tested independently.
+ENABLED = frozenset({
+    '5944672760629857205',  # Bun Manga
+    '5246625723235112128',  # GakaMangas
+    '8802607595629671202',  # LHTranslation
+    '3971812949560196318',  # Lovesjane Scans
+    '5229341270935044914',  # Manga Eclipse
+    '3606721916149050760',  # Mangasushi
+    '7638481723868333116',  # ManhuaHot
+    '6032516943051342273',  # TritiniaScans
+})

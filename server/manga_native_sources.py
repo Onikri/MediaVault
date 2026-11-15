@@ -9,10 +9,11 @@ from urllib.parse import urljoin, urlsplit
 
 import manga_mangashi
 import manga_mangahub
+import manga_madara
 from source_parser import PublicHttp, SourceError
 
 
-ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (manga_mangashi, *manga_mangahub.SOURCES)}
+ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (manga_mangashi, *manga_mangahub.SOURCES, *manga_madara.ACTIVE_SOURCES)}
 HOSTS = {urlsplit(adapter.ROOT).hostname: adapter for adapter in ADAPTERS.values()}
 
 
@@ -79,10 +80,15 @@ def catalogue_job(adapter, spec, page):
             # A queued Suwayomi job used a mutable filter position. Recover the
             # stable upstream filter by exact label without changing its cursor.
             label = term['label'].casefold()
-            options = {v['sourceId'] for v in adapter.vocabulary(http) if v['label'].casefold() == label}
+            vocabulary = adapter.vocabulary(http)
+            options = {v['sourceId']: v['label'] for v in vocabulary if v['label'].casefold() == label}
+            if not options and (legacy_label := getattr(adapter, 'legacy_term_label', None)):
+                label = legacy_label(label)
+                options = {v['sourceId']: v['label'] for v in vocabulary if v['label'].casefold() == label}
             if len(options) != 1:
                 raise SourceError('Сохранённый фильтр больше не совпадает со справочником источника.')
-            tag = options.pop()
+            tag, name = next(iter(options.items()))
+            term = {**term, 'label': name}
         rows, more = adapter.catalogue(http, page=page, tag=tag)
         if page == 1 and not rows and not term:
             raise SourceError('Адаптер вернул пустую первую страницу каталога')
@@ -102,9 +108,13 @@ def catalogue_job(adapter, spec, page):
 
 def saved_reader_url(adapter, client, source, canonical, manga, chapter):
     root = source.get('baseUrl') or adapter.ROOT
+    if for_url(root) is not adapter:
+        return None
     title = adapter.site_link(canonical, root)
+    if resolver := getattr(adapter, 'saved_title_url', None):
+        title = resolver(title)
     title_path = adapter.TITLE_PATH.fullmatch(urlsplit(title).path)
-    if not title_path or for_url(root) is not adapter:
+    if not title_path:
         return None
     if chapter is None:
         return title

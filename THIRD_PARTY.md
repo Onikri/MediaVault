@@ -419,3 +419,5 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   `src/ru/mangashi` at revision `6f345a81459739e35d8fc94c05455464e856f771`.
 - The MangaHub family (`server/manga_mangahub.py`) follows the public reader protocol
   in Apache-2.0 Keiyoushi `lib-multisrc/mangahub` at the same revision.
+- The Madara family (`server/manga_madara.py`) follows the public WordPress catalogue
+  and reader protocol in Apache-2.0 Keiyoushi `lib-multisrc/madara` at the same revision.
