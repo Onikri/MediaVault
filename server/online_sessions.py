@@ -177,9 +177,10 @@ def install(app,owner,exports_owner=None):
         try:
             if body.kind=='manga':
                 from manga_sources import inspect
+                from manga_native_sources import page_headers
                 data=inspect(body.url,http)
                 if not data['pages']:raise SourceError('Выбери конкретную опубликованную главу.')
-                token,s=create(subject,{'Referer':data['url']},'manga',body.client_id,reservation)
+                token,s=create(subject,page_headers(data['url']),'manga',body.client_id,reservation)
                 return {'id':token,'kind':'manga','language':data['language'],'pages':['/online/'+token+'/'+s.resource(url) for url in data['pages'][:1500]],'expiresIn':LEASE_SECONDS}
             started=time.monotonic()
             from media_download import pick_stream

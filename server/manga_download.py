@@ -5,6 +5,7 @@ import subprocess
 import threading
 import zipfile
 from manga_sources import parse_pages,site_for
+from manga_native_sources import page_headers
 from source_parser import SourceError
 
 def image_extension(header):
@@ -27,6 +28,7 @@ def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
         pages=parse_pages(text,final)
     if not pages or len(pages)>500:raise SourceError('В открытой главе не найдены изображения или превышен лимит 500 страниц.')
     output=Path(temporary)/'chapter.cbz';local=threading.local();clients=[];lock=threading.Lock()
+    headers=page_headers(final)
     def download(entry):
         index,url=entry
         if not hasattr(local,'http'):
@@ -40,7 +42,7 @@ def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
             raw=page_image(url)[0]
             if hasattr(local.http,'budget'):local.http.budget.consume(len(raw))
             target.write_bytes(raw)
-        else:local.http.download(url,target,headers={'Referer':final},maximum=30*1024*1024)
+        else:local.http.download(url,target,headers=headers,maximum=30*1024*1024)
         with target.open('rb') as source:extension=image_extension(source.read(32))
         if not extension:raise SourceError('Читалка вернула заглушку вместо изображения страницы.')
         if quality in {'1280','1920'}:

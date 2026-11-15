@@ -128,7 +128,9 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         or host == "api.remanga.org" and bool(re.fullmatch(r"/api/v2/search/(?:catalog/)?|/api/forms/titles/|/api/v2/titles/(?:chapters/(?:[1-9]\d{0,11}/)?|[^/]{1,300}/)|/media/[\w./-]{1,300}", url.path))
     )
     if not allow_api and not playback_api and (host.startswith(("api.", "plapi.")) or re.search(r"/(?:api|graphql)(?:/|$)", url.path, re.I)):
-        raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
+        from manga_iken import public_api as iken_public_api
+        if not iken_public_api(host, url.path, url.query):
+            raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
     if resolve_dns:
         try:
             addresses = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
@@ -146,6 +148,9 @@ def playback_headers(headers=None):
     """Allow only public playback headers; never forward cookies or authorization."""
     result = {"User-Agent": USER_AGENT}
     for key, value in (headers or {}).items():
+        if key.lower() == 'cache-control' and value == 'no-cache':
+            result['Cache-Control'] = value
+            continue
         name = {"referer": "Referer", "origin": "Origin", "user-agent": "User-Agent"}.get(key.lower())
         if not name:
             continue

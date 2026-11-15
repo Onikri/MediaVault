@@ -11,12 +11,14 @@ import manga_mangashi
 import manga_mangahub
 import manga_madara
 import manga_themesia
+import manga_iken
 from manga_source_urls import split_reader_url
 from source_parser import PublicHttp, SourceError
 
 
 ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (
-    manga_mangashi, *manga_mangahub.SOURCES, *manga_madara.ACTIVE_SOURCES, *manga_themesia.ACTIVE_SOURCES
+    manga_mangashi, *manga_mangahub.SOURCES, *manga_madara.ACTIVE_SOURCES, *manga_themesia.ACTIVE_SOURCES,
+    *manga_iken.SOURCES
 )}
 HOSTS = {
     urlsplit(adapter.ROOT).hostname: adapter
@@ -59,6 +61,12 @@ def for_url(url):
 def adapter_reader_url(adapter, upstream):
     encode = getattr(adapter, 'reader_url', None)
     return encode(upstream) if encode else upstream
+
+
+def page_headers(url):
+    adapter = for_url(url)
+    headers = getattr(adapter, 'page_headers', None)
+    return headers(url) if headers else {'Referer': url}
 
 
 def search(adapter, source, query):
@@ -116,7 +124,7 @@ def catalogue_job(adapter, spec, page):
             tag, name = next(iter(options.items()))
             term = {**term, 'label': name}
         rows, more = adapter.catalogue(http, page=page, tag=tag)
-        if page == 1 and not rows and not term:
+        if page == 1 and not rows and not term and not more:
             raise SourceError('Адаптер вернул пустую первую страницу каталога')
         details = []
         for row in rows:
@@ -147,7 +155,8 @@ def saved_reader_url(adapter, client, source, canonical, manga, chapter):
     chapters = client.get(f'/manga/{manga}/chapters', {'onlineFetch': 'false'}, timeout=8)
     for row in chapters:
         if row.get('index') == chapter:
-            target = adapter.saved_chapter_url(row.get('realUrl') or row.get('url'), title_path[1], root)
+            resolve = getattr(adapter, 'saved_chapter', None)
+            target = resolve(row, root) if resolve else adapter.saved_chapter_url(row.get('realUrl') or row.get('url'), title_path[1], root)
             path = adapter.CHAPTER_PATH.fullmatch(urlsplit(target).path)
             matches = getattr(adapter, 'saved_chapter_matches', None)
             if path and (matches(target, title) if matches else path[1] == title_path[1]):

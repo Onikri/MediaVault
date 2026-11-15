@@ -27,6 +27,7 @@ def verify(value,refresh=False):
         from manga_sources import inspect
         from suwayomi_bridge import parse_reference,page_image
         from manga_download import image_extension
+        from manga_native_sources import page_headers
         entries = value.get('episodes') or []
         targets = [value['url']] if value.get('pages') else list(dict.fromkeys(e['url'] for e in entries))[:3]
         result = {'readable': False, 'verifiedPages': 0,
@@ -43,7 +44,7 @@ def verify(value,refresh=False):
                         if parse_reference(pages[0]):
                             raw = page_image(pages[0])[0]
                         else:
-                            response, _ = http._open(pages[0], headers={'Referer': chapter['url']})
+                            response, _ = http._open(pages[0], headers=page_headers(chapter['url']))
                             try:
                                 raw = bytearray()
                                 for block in response.iter_content(65536):

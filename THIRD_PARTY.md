@@ -423,3 +423,5 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   and reader protocol in Apache-2.0 Keiyoushi `lib-multisrc/madara` at the same revision.
 - The MangaThemesia family (`server/manga_themesia.py`) follows the public catalogue
   and reader protocol in Apache-2.0 Keiyoushi `lib-multisrc/mangathemesia` at the same revision.
+- The Iken family (`server/manga_iken.py`) follows the public catalogue and reader API
+  in Apache-2.0 Keiyoushi `lib-multisrc/iken` at the same revision.
