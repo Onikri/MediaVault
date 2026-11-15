@@ -137,8 +137,9 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         from manga_mangadventure import public_api as adventure_public_api
         from manga_mangak import public_api as mangak_public_api
         from manga_mangamillion import public_api as million_api
+        from manga_webcomic_protocols import public_api as webcomics_api
         adapters = (iken_public_api, vine_public_api, hentaihand_public_api, guya_public_api,
-                    adventure_public_api, mangak_public_api, million_api)
+                    adventure_public_api, mangak_public_api, million_api, webcomics_api)
         if not (any(route(host, url.path, url.query) for route in adapters)
                 or comici_public_route(host, url.path, url.query, 'comici-json')
                 or giga_public_route(host, url.path, url.query, 'giga-json')):
@@ -249,6 +250,12 @@ class PublicHttp:
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
+        if action == 'webcomic-json':
+            from manga_webcomic_protocols import public_api
+            target = urlsplit(url)
+            if method != 'GET' or data is not None or not public_api(target.netloc, target.path, target.query):
+                raise SourceError('Некорректный маршрут JSON-каталога.')
+            outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
         million_register = False
         if action == 'mangamillion-proto':
             from manga_mangamillion import TOKEN, public_api
@@ -396,7 +403,7 @@ class PublicHttp:
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
                 response.close()
-                if action in {'mangamillion-proto', 'globalcomix-json'} or not location or hop == 5:
+                if action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json'} or not location or hop == 5:
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
                 if publisher:

@@ -2,6 +2,39 @@
 
 
 PROFILES = (
+    (('7034264791241222160', 'CartoonPorn', 'https://cartoonporn.to', True), {
+        'variant': 'cartoon', 'html': True, 'section': 'porncomic', 'uses_post_id': False,
+        'selectors': {'cards': 'div.item_content, div.item-thumb', 'card_link': 'a[href*="/porncomic/"]',
+                      'next': 'a[href*="/porncomic/page/"]', 'title': 'h1.comic-hero__title',
+                      'cover': '.comic-hero__image-wrap img', 'artists': '.meta-tag--artist',
+                      'genres': '.meta-tag--genre', 'chapters': 'a[href*="/porncomic/"]',
+                      'page_images': 'img.manga-img'},
+    }),
+    (('7947062020376654174', 'Kun Manga Online', 'https://www.kunmanga.online', True), {
+        'variant': 'json_chapters', 'html': True, 'uses_post_id': False, 'metadata_interval': .5,
+        'selectors': {'cards': '.c-tabs-item__content, .page-item-detail',
+                      'card_link': '.post-title a, h3.h4 a', 'next': 'a[aria-label=Next]'},
+    }),
+    (('1987105317893699901', 'Zinmanga.net', 'https://www.zinmanga.net', False), {
+        'variant': 'json_chapters', 'html': True, 'uses_post_id': False, 'manga_only': False, 'metadata_interval': 1,
+    }),
+    (('5190569675461947007', 'Toonily', 'https://toonily.com', True), {
+        'variant': 'toonily', 'html': True, 'section': 'serie', 'genre_section': 'genre',
+        'chapter_mode': 'manga', 'date_format': '%b %d, %y', 'thumbnail_original': True,
+        'selectors': {'description': 'div.content-area div.summary__content'},
+    }),
+    (('6293890187960663957', 'TopManhua.fan', 'https://www.topmanhua.fan', True), {
+        'variant': 'topmanhua_fan', 'html': True, 'section': 'manhua', 'date_format': '%m/%d/%Y',
+        'selectors': {'chapters': 'div.wp-manga-chapter'},
+    }),
+    (('1264036757248780997', 'Zazamanga', 'https://www.zazamanga.com', True), {
+        'variant': 'zaza', 'html': True, 'selectors': {
+            'status': 'div.summary-heading:-soup-contains("Status") + div',
+            'genres': 'div.post-content div.tags a', 'chapters': 'div.wp-manga-chapter',
+            'next': 'ul.pagination > li:last-child:not(.disabled) > a[href]',
+            'description': 'div.summary__content',
+        },
+    }),
     (('8547397037512613554', 'AllPornComic', 'https://allporncomic.com', True), {'html': True, 'section': 'porncomic', 'uses_post_id': False}),
     (('7848750588298461115', 'AP Comics', 'https://apcomics.org', True), {'chapter_mode': 'manga'}),
     (('6576302499429437207', 'Aunt Manhwa', 'https://auntmanhwa.com', True), {}),

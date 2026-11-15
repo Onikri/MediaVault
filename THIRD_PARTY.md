@@ -444,6 +444,11 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   catalogue and viewer protocols in Apache-2.0 Keiyoushi `lib-multisrc/gigaviewer`
   at the same revision. `server/manga_gigaviewer_profiles.py` records the collection
   IDs and options from the installed publisher extensions at that revision.
+- The independent webcomic profiles (`server/manga_webcomic_profiles.py` and
+  `server/manga_webcomic_protocols.py`) follow public HTML and JSON routes
+  documented in the corresponding Apache-2.0 Keiyoushi extensions at the same
+  revision. The installer package, version and upstream folder for each profile
+  are listed in `docs/native-source-inventory.csv`.
 - The Yii family (`server/manga_yii.py`) follows Apache-2.0 Keiyoushi
   `lib-multisrc/yiimanga` and `lib-multisrc/yiimadara` and their installed
   publisher overrides at the same revision.

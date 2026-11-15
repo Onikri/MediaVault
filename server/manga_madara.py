@@ -721,9 +721,157 @@ class SetsuScans(Madara):
                 else value for value in super().page_images(soup, final)]
 
 
+class CartoonPorn(Madara):
+    def html_request(self, http, page, query, sort, tag):
+        if query or tag:
+            return super().html_request(http, page, query, sort, tag)
+        path = '/porncomic/' + (f'page/{page}/' if page > 1 else '')
+        return path, {'m_orderby': 'recent'} if sort == 'updated' else {'m_orderby': 'views', 'm_order': 'desc'}
+
+    def archive_rows(self, soup, url):
+        rows = {}
+        for node in soup.select(self.selectors['cards']):
+            a = node.select_one(self.selectors['card_link'])
+            link = self.site_link(a.get('href'), url) if a else ''
+            name = (a.get('title') or node_text(a)).strip() if a else ''
+            match = self.TITLE_PATH.fullmatch(urlsplit(link).path)
+            if match and name:
+                rows[match[1]] = self.row(link, name, image_from(node.select_one('img'), url))
+        return list(rows.values())
+
+    def catalogue(self, http, page=1, *, query='', sort='popular', tag=''):
+        if query or tag:
+            return super().catalogue(http, page, query=query, sort=sort, tag=tag)
+        if type(page) is not int or not 1 <= page <= 2000:
+            raise SourceError('Некорректная страница каталога CartoonPorn.')
+        path, params = self.html_request(http, page, query, sort, tag)
+        soup, final = self.soup(http, self.ROOT + path + '?' + urlencode(params))
+        more = bool(soup.select_one(f'a[href*="/porncomic/page/{page+1}/"]'))
+        return self.archive_rows(soup, final), more
+
+    def page_images(self, soup, final):
+        return list(dict.fromkeys(url for url in super().page_images(soup, final)
+                                  if '/WP-manga/data/' in urlsplit(url).path))
+
+
+class MadaraJsonChapters(Madara):
+    def page_headers(self, _url):
+        return {'Referer': self.ROOT + '/'}
+
+    def chapters(self, http, soup, url, slug):
+        per_page = 50 if self.host == 'www.kunmanga.online' else 100
+        result, last = {}, 1
+        for page in range(1, 101):
+            self.origin.wait(getattr(http, 'deadline', None))
+            path = f'/api/comics/{slug}/chapters'
+            args = urlencode({'page': page, 'per_page': per_page, 'order': 'desc'})
+            target = self.ROOT + path + '?' + args
+            raw, final, _ = http.document(target, headers={'Referer': url}, action='webcomic-json')
+            if final != target:
+                raise SourceError('Источник перенаправил запрос списка глав.')
+            try:
+                data = json.loads(raw)['data']
+                chapters, last = data['chapters'], int(data['last_page'])
+                if not isinstance(chapters, list) or not all(isinstance(row, dict) for row in chapters):
+                    raise TypeError('invalid chapters')
+            except (KeyError, ValueError, TypeError):
+                raise SourceError('Источник вернул некорректный список глав.') from None
+            for entry in chapters:
+                chapter = entry.get('chapter_slug')
+                if not isinstance(chapter, str) or not re.fullmatch(SEGMENT, chapter):
+                    continue
+                label = entry.get('chapter_name') or chapter
+                number = CHAPTER_NUMBER.search(label) or CHAPTER_NUMBER.search(chapter)
+                stamp = str(entry.get('updated_at') or '')[:10]
+                result.setdefault(chapter, {'url': self.ROOT + f'/{self.section}/{slug}/{chapter}/',
+                                            'title': label, 'language': self.LANGUAGE, 'season': 1,
+                                            'number': float(number[1].replace(',', '.')) if number else None,
+                                            'publishedAt': release_date(stamp, '%Y-%m-%d'), 'translator': ''})
+            if page >= last:
+                break
+        rows = list(result.values())
+        for index, row in enumerate(rows):
+            if row['number'] is None:
+                row['number'] = len(rows) - index
+        return sorted(rows, key=lambda row: row['number']), last > 100
+
+    def page_images(self, soup, final):
+        if self.host != 'www.kunmanga.online' or soup.select_one('#chapter-protector-data'):
+            return super().page_images(soup, final)
+        images = {id(node): node for wrapper in soup.select(PAGE_WRAP) if (node := wrapper.select_one('img'))}
+        return [next((url for attr in ('data-backup', 'src', 'data-src', 'data-lazy-src', 'data-aload')
+                      if (url := image_url(node.get(attr), final))
+                      and not (urlsplit(url).hostname == self.host and urlsplit(url).path.startswith('/thumb/'))), '')
+                for node in images.values()]
+
+
+class Toonily(Madara):
+    def site_link(self, value, base=None):
+        target = super().site_link(value, base)
+        parts = urlsplit(target)
+        if parts.path.startswith('/webtoon/'):
+            return urlunsplit(parts._replace(path='/serie/' + parts.path.removeprefix('/webtoon/')))
+        return target
+
+    def html_request(self, http, page, query, sort, tag):
+        if not query and not tag:
+            return super().html_request(http, page, query, sort, tag)
+        term = re.sub(r'[^a-z0-9]+', '-', query.lower()).strip('-')
+        path = '/tag/' + tag + '/' if tag else '/search/' + (term + '/' if term else '')
+        return path + (f'page/{page}/' if page > 1 else ''), {}
+
+    def html_search_paginates(self):
+        return True
+
+    def vocabulary(self, http):
+        genres = super().vocabulary(http)
+        soup, final = self.soup(http, self.ROOT + '/wp-manga-tag-sitemap.xml')
+        tags = {}
+        for loc in soup.select('loc'):
+            link = self.site_link(node_text(loc), final)
+            match = re.fullmatch(rf'/tag/({SEGMENT})/?', urlsplit(link).path)
+            if match:
+                slug = match[1]
+                tags[slug] = {'label': slug.replace('-', ' ').title(), 'sourceId': slug, 'category': 'tag'}
+        # The suggested filter route is /tag/, which takes priority over genre search upstream.
+        return [*genres, *tags.values()]
+
+
+class TopManhuaFan(Madara):
+    def html_request(self, http, page, query, sort, tag):
+        if query and not tag:
+            return ('/', {'s': query, 'post_type': 'wp-manga', **({'page': page} if page > 1 else {})}) if page <= 100 else ('', {})
+        return super().html_request(http, page, query, sort, tag)
+
+    def html_search_paginates(self):
+        return True
+
+    def page_headers(self, _url):
+        return {'Referer': self.ROOT + '/'}
+
+
+class Zazamanga(Madara):
+    def html_request(self, http, page, query, sort, tag):
+        if page > 100:
+            return '', {}
+        path = f'/{self.genre_section}/{tag}' if tag else '/' if query else f'/{self.section}'
+        args = {'s': query, 'post_type': 'wp-manga'} if query else {'m_orderby': 'latest' if sort == 'updated' else 'views'}
+        if page > 1:
+            args['page'] = page
+        return path, args
+
+    def html_search_paginates(self):
+        return True
+
+    def page_headers(self, _url):
+        return {'Referer': self.ROOT + '/'}
+
+
 VARIANTS = {'standard': Madara, 'aqua': AquaManga, 'raw': ManhwaRaw, 'mangahe': MangaHe,
             'hentai4free': Hentai4Free, 'district': MangaDistrict, 'ruby': RubyComics,
-            'rosesquad': RoseSquadScans, 'goodtoon': GoodToon, 'lgbtics': Lgbtics, 'setsu': SetsuScans}
+            'rosesquad': RoseSquadScans, 'goodtoon': GoodToon, 'lgbtics': Lgbtics, 'setsu': SetsuScans,
+            'cartoon': CartoonPorn, 'json_chapters': MadaraJsonChapters, 'toonily': Toonily,
+            'topmanhua_fan': TopManhuaFan, 'zaza': Zazamanga}
 PROFILE_COUNTS = Counter(urlsplit(identity[2]).hostname for identity, _ in PROFILES)
 ORIGINS = {host: OriginPace() for host in PROFILE_COUNTS}
 SOURCES = tuple(VARIANTS[options.get('variant', 'standard')](

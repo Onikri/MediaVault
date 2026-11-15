@@ -44,6 +44,7 @@ def candidates():
     import manga_namicomi
     import manga_saymanhwa
     import manga_native_sources as native
+    import manga_webcomics
     import manga_xcomic
     import manga_yii
 
@@ -56,6 +57,7 @@ def candidates():
                    manga_mangadot, manga_namicomi, manga_globalcomix, manga_dbmultiverse,
                    manga_saymanhwa, manga_mangatoon, manga_xcomic, manga_comicfury):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in module.SOURCES)
+    profiles.update((adapter.SOURCE_ID, adapter) for adapter in manga_webcomics.adapters())
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby
     return profiles, native.ADAPTERS

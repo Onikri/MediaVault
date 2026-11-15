@@ -58,8 +58,8 @@ def for_url(url):
     if selected is None:
         return HOSTS.get(parsed.hostname)
     adapter = ADAPTERS.get(selected)
-    if (adapter and getattr(adapter, 'scoped_urls', False)
-            and parsed.scheme == 'https' and parsed.netloc == urlsplit(adapter.ROOT).netloc):
+    if (adapter and getattr(adapter, 'scoped_urls', False) and parsed.scheme == 'https'
+            and parsed.netloc in getattr(adapter, 'reader_hosts', (urlsplit(adapter.ROOT).netloc,))):
         return adapter
     return None
 
