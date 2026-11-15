@@ -16,6 +16,7 @@ def source_provider(spec):
 def base_sources(installed):
     from manga_source_coverage import SOURCES
     from manga_tag_policy import alias_domains
+    from manga_native_sources import for_source
     jobs=[];seen=set()
     for domain,name,integration,*_ in SOURCES:
         if integration=='closed':jobs.append({'type':'unsupported','domain':domain,'name':name,'reason':'Сайт закрыт'});continue
@@ -48,6 +49,11 @@ def base_sources(installed):
         elif domain in HTML:
             url,allowed=HTML[domain];jobs.append({'type':'html','domain':domain,'name':name,'url':url,'hosts':sorted(allowed)})
         else:jobs.append({'type':'unsupported','domain':domain,'name':name,'reason':'Нет доступного каталога или установленного адаптера'})
+    for source in installed:
+        if str(source['id']) not in seen and (adapter:=for_source(source)):
+            jobs.append({'type':'bridge','domain':urlsplit(adapter.ROOT).hostname,
+                         'name':adapter.NAME+' · '+source['lang'],
+                         'source':{key:source.get(key) for key in ('id','name','lang','baseUrl','isNsfw')}})
     for kind in ('anime','manga','ranobe'):jobs.append({'type':'anilist','kind':kind,'domain':'anilist.co','name':{'anime':'Аниме','manga':'Манга','ranobe':'Ранобэ'}[kind]+' · AniList'})
     for kind in ('movie','tv'):jobs.append({'type':'kinobox','kind':kind,'domain':'fbphdplay.top','name':('Фильмы' if kind=='movie' else 'Сериалы')+' · Kinobox'})
     jobs.append({'type':'books','kind':'book','domain':'openlibrary.org','name':'Книги · Open Library'})
@@ -135,6 +141,9 @@ def fetch(spec,cursor):
             return result
         finally:http.close()
     if kind in {'bridge','bridge-detail','bridge-vocabulary'}:
+        from manga_native_sources import catalogue_job,for_source
+        if adapter:=for_source(spec['source']):
+            return catalogue_job(adapter,spec,page)
         from suwayomi_bridge import Client,filter_vocabulary,filtered_page
         from manga_discovery import result_row
         from manga_solver import source_timeout

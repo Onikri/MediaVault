@@ -96,9 +96,14 @@ def reference(manga,chapter=None,page=None):
 def parse_reference(value):
     try:
         root=urlsplit(os.getenv('PUBLIC_URL',''));url=urlsplit(value)
-        if not configured() or (url.scheme,url.netloc)!=(root.scheme,root.netloc) or url.query or url.fragment or url.username:return None
+        if root.scheme!='https' or not root.netloc or (url.scheme,url.netloc)!=(root.scheme,root.netloc) or url.query or url.fragment or url.username:return None
         match=re.fullmatch(re.escape(root.path.rstrip('/')+PREFIX)+r'm/([1-9]\d{0,9})(?:/c/([1-9]\d{0,6})(?:/p/(\d{1,4}))?)?',url.path)
-        return tuple(int(v) if v is not None else None for v in match.groups()) if match else None
+        if not match:return None
+        ids=tuple(int(v) if v is not None else None for v in match.groups())
+        if not configured():
+            from manga_native_sources import recorded_reader_url
+            if not recorded_reader_url(*ids[:2]):return None
+        return ids
     except (ValueError,TypeError):return None
 
 class Client:
@@ -245,6 +250,10 @@ def inspect(value):
     if not ids:raise SourceError('Некорректная ссылка на главу.')
     manga,chapter,page=ids
     if page is not None:raise SourceError('Открой главу, а не отдельную страницу.')
+    from manga_native_sources import for_source,record_reader_url,recorded_reader_url
+    if target:=recorded_reader_url(manga,chapter):
+        from manga_sources import inspect as native_inspect
+        return native_inspect(target)
     client=Client()
     native_access_error = None
     try:
@@ -256,7 +265,10 @@ def inspect(value):
             saved_source=saved.get('source') or client.get('/source/'+str(saved['sourceId']))
             if native:=native_reader_url(client,saved,saved_source,manga,chapter):
                 from manga_sources import inspect as native_inspect
-                return native_inspect(native)
+                result=native_inspect(native)
+                if (adapter:=for_source(saved_source)) and (result.get('episodes') or result.get('pages')):
+                    record_reader_url(manga,chapter,adapter,native)
+                return result
         except SourceError as error:
             if isinstance(error, SourceAccessError):
                 native_access_error = error
@@ -321,6 +333,9 @@ def native_reader_url(client,data,source,manga,chapter=None):
     from manga_catalog_adapters import UUID,LIB_SITES
     canonical=data.get('realUrl') or urljoin(source.get('baseUrl',''),data.get('url',''))
     parsed=urlsplit(canonical);lang=source.get('lang')
+    from manga_native_sources import for_source,saved_reader_url
+    if adapter:=for_source(source):
+        return saved_reader_url(adapter,client,source,canonical,manga,chapter)
     # Several installed extensions can search but fail at chapter/page retrieval.
     # Use this SAME site's existing native reader adapter, including saved IDs.
     from manga_sources import site_for
@@ -375,7 +390,11 @@ def native_reader_url(client,data,source,manga,chapter=None):
 def page_image(value):
     ids=parse_reference(value)
     if not ids or ids[1] is None or ids[2] is None:raise SourceError('Некорректная ссылка на страницу.')
-    manga,chapter,page=ids;client=Client()
+    manga,chapter,page=ids
+    from manga_native_sources import recorded_reader_url
+    if target:=recorded_reader_url(manga,chapter):
+        return native_page_image(target,page)
+    client=Client()
     try:
         try:return client.get(f'/manga/{manga}/chapter/{chapter}/page/{page}',{'updateProgress':'false'},timeout=25,image=True)
         except SourceError:
@@ -386,29 +405,32 @@ def page_image(value):
                 return reserve_page(client,saved,source,manga,chapter,page)
             target=native_reader_url(client,saved,source,manga,chapter)
             if not target:raise
-            from manga_sources import inspect as native_inspect
-            from manga_download import image_extension
-            from source_parser import PublicHttp
-            key='native-pages:'+target;now=time.monotonic()
-            with _lock:hit=_cache.get(key)
-            if hit and hit[0]>now:pages=hit[1]
-            else:
-                pages=native_inspect(target)['pages']
-                with _lock:_cache[key]=(now+300,pages)
-            if not 0<=page<len(pages):raise SourceError('Страница отсутствует в исходной главе.')
-            http=PublicHttp(timeout=(3,20));response=None
-            try:
-                response,_=http._open(pages[page],headers={'Referer':target});raw=bytearray()
-                for block in response.iter_content(65536):
-                    raw.extend(block)
-                    if len(raw)>30*1024*1024:raise SourceError('Страница превышает допустимый размер.')
-                extension=image_extension(raw[:32])
-                if not extension:raise SourceError('Источник вернул заглушку вместо страницы.')
-                return bytes(raw),'image/'+('jpeg' if extension=='jpg' else extension)
-            finally:
-                if response is not None:response.close()
-                http.close()
+            return native_page_image(target,page)
     finally:client.close()
+
+def native_page_image(target,page):
+    from manga_sources import inspect as native_inspect
+    from manga_download import image_extension
+    from source_parser import PublicHttp
+    key='native-pages:'+target;now=time.monotonic()
+    with _lock:hit=_cache.get(key)
+    if hit and hit[0]>now:pages=hit[1]
+    else:
+        pages=native_inspect(target)['pages']
+        with _lock:_cache[key]=(now+300,pages)
+    if not 0<=page<len(pages):raise SourceError('Страница отсутствует в исходной главе.')
+    http=PublicHttp(timeout=(3,20));response=None
+    try:
+        response,_=http._open(pages[page],headers={'Referer':target});raw=bytearray()
+        for block in response.iter_content(65536):
+            raw.extend(block)
+            if len(raw)>30*1024*1024:raise SourceError('Страница превышает допустимый размер.')
+        extension=image_extension(raw[:32])
+        if not extension:raise SourceError('Источник вернул заглушку вместо страницы.')
+        return bytes(raw),'image/'+('jpeg' if extension=='jpg' else extension)
+    finally:
+        if response is not None:response.close()
+        http.close()
 
 def search(title,language='all',format='all',offset=0,limit=8):
     from title_identity import aliases,match_title
@@ -424,11 +446,16 @@ def search(title,language='all',format='all',offset=0,limit=8):
     def work(source):
         provider='suwayomi:'+str(source['id']);result=[]
         if deadline-time.monotonic()<1:return {'provider':provider,'name':source['name'],'status':'pending','results':[],'attempted':False}
-        client=Client()
+        client=None
         try:
             queries=aliases(title)
             lang=source['lang'];pattern={'ja':r'[\u3040-\u30ff\u3400-\u9fff]','ko':r'[\uac00-\ud7af]','ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]'}[lang]
             queries=sorted(queries,key=lambda q:not bool(re.search(pattern,q,re.I)))
+            from manga_native_sources import for_source,search as native_search
+            if adapter:=for_source(source):
+                result=native_search(adapter,{**source,'_title':title,'_queries':queries[:2]},queries[0] if queries else '')
+                return {'provider':provider,'name':source['name'],'status':'ok' if result else 'empty','message':'','results':result,'attempted':True}
+            client=Client()
             for query in queries[:2]:
                 remaining=deadline-time.monotonic()
                 if remaining<1:break
@@ -445,7 +472,8 @@ def search(title,language='all',format='all',offset=0,limit=8):
                 if result:break
             return {'provider':provider,'name':source['name'],'status':'ok' if result else 'empty','message':'','results':result,'attempted':True}
         except (SourceError,ValueError,TypeError,KeyError,AttributeError):return {'provider':provider,'name':source['name'],'status':'unavailable','message':'Источник временно недоступен или изменил формат ответа.','results':[],'attempted':True}
-        finally:client.close()
+        finally:
+            if client is not None:client.close()
     with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(work,active[offset:offset+limit]))
     attempted=[r for r in rows if r['attempted']];next_offset=offset+len(attempted)
     return {'results':[v for row in attempted for v in row['results']],

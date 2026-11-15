@@ -280,9 +280,10 @@ def ensure(store):
     with _service_lock:
         if _service is None:
             _service=Indexer(store)
+            from manga_native_sources import merge_source_list
             try:
-                from suwayomi_bridge import sources
-                installed=sources()
+                from suwayomi_bridge import configured,sources
+                installed=sources() if configured() else []
             except Exception:installed=[]
-            _service.seed(installed);_service.start()
+            _service.seed(merge_source_list(installed));_service.start()
         return _service

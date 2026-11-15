@@ -16,8 +16,9 @@ def image_extension(header):
     return None
 
 def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
-    if not site_for(url):raise SourceError('Эта читалка пока не поддерживается.')
-    if site_for(url).family in {'lib','dex','naver','mangaraw','sen','toonkor','webtoons','suwayomi','novelcool','hentaichan','hentaichan-cc','remanga','hitomi','madara'}:
+    site=site_for(url)
+    if not site:raise SourceError('Эта читалка пока не поддерживается.')
+    if site.family in {'native','lib','dex','naver','mangaraw','sen','toonkor','webtoons','suwayomi','novelcool','hentaichan','hentaichan-cc','remanga','hitomi','madara'}:
         from manga_sources import inspect
         data=inspect(url,http);final=data['url'];pages=data['pages']
     else:

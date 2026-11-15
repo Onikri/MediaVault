@@ -1,0 +1,30 @@
+[
+  {
+    "package": "eu.kanade.tachiyomi.extension.en.anisascans",
+    "version": "1.6.56",
+    "revision": "fd90fc69d88153f3ac143fb419affd0890e897d2",
+    "path": "src/en/anisascans",
+    "theme": "madara"
+  },
+  {
+    "package": "eu.kanade.tachiyomi.extension.en.hentai3zcc",
+    "version": "1.6.0",
+    "revision": "e5aa4b1a399931f9e0e9d56147420590e52f365c",
+    "path": "src/en/hentai3zcc",
+    "theme": "manga18"
+  },
+  {
+    "package": "eu.kanade.tachiyomi.extension.en.likemanga",
+    "version": "1.6.0",
+    "revision": "1dfd0bcf25b48cb5bd42d9191918a29072c67a61",
+    "path": "src/en/likemanga",
+    "theme": "standalone"
+  },
+  {
+    "package": "eu.kanade.tachiyomi.extension.en.witchscans",
+    "version": "1.6.41",
+    "revision": "620f506d458760170c4c0aaa6c3a6286d58434d9",
+    "path": "src/en/witchscans",
+    "theme": "vinetheme"
+  }
+]

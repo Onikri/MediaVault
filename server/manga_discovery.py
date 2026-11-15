@@ -61,12 +61,15 @@ def query_matches(query,names):
     return bool(term) and any(term in normalized(name) for name in names)
 
 def installed_sources():
+    from manga_native_sources import merge_source_list
     from manga_hentaichan import SOURCE
     from manga_hentaichan_cc import SOURCE as CHAN_CC
     from manga_hmanga import SOURCE as HMANGA
     from manga_hitomi import SOURCES as HITOMI
     from manga_remanga import SOURCE as REMANGA
-    return [*bridge.sources(),dict(SOURCE),dict(CHAN_CC),dict(HMANGA),dict(REMANGA),*(dict(s) for s in HITOMI)]
+    try:installed=bridge.sources() if bridge.configured() else []
+    except SourceError:installed=[]
+    return merge_source_list([*installed,dict(SOURCE),dict(CHAN_CC),dict(HMANGA),dict(REMANGA),*(dict(s) for s in HITOMI)])
 
 def source_list(language='all',query=''):
     if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
@@ -168,6 +171,9 @@ def indexed_search(source,query):
     return list(found.values())[:40]
 
 def search_source(source,query):
+    import manga_native_sources
+    if adapter:=manga_native_sources.for_source(source):
+        return manga_native_sources.search(adapter,source,query)
     if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'} or str(source.get('id'))=='990000000000000020':
         from title_identity import match_title
         from source_parser import PublicHttp

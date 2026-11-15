@@ -57,6 +57,8 @@ MANGACHAN_HEADERS={'User-Agent':'MediaVault/5.1 (https://github.com/Onikri/Media
 def site_for(url):
     from suwayomi_bridge import parse_reference
     if parse_reference(url):return MangaSite("suwayomi","Дополнительные источники",os.getenv("PUBLIC_URL",""),"suwayomi",languages=("ru","uk","en","ja","ko"))
+    from manga_native_sources import for_url
+    if adapter:=for_url(url):return MangaSite('suwayomi:'+adapter.SOURCE_ID,adapter.NAME,adapter.ROOT,'native',languages=(adapter.LANGUAGE,))
     host=urlsplit(url).hostname
     return next((s for s in SITES if host in (urlsplit(s.root).hostname,*s.hosts) and (s.family!='hentaichan' or not urlsplit(url).path.startswith('/video')) and (s.family!='naver' or urlsplit(url).path.startswith(urlsplit(s.root).path+'/'))),None)
 def clean(value):return re.sub(r'\s+',' ',str(value or '')).strip()[:300]
@@ -257,6 +259,9 @@ def inspect(url,http=None):
     own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
     try:
         initial=site_for(url)
+        if initial and initial.family=='native':
+            from manga_native_sources import for_url
+            return for_url(url).inspect(url,http)
         if initial and initial.family=='hentaichan':
             from manga_hentaichan import inspect as inspect_hentaichan
             return inspect_hentaichan(url,http)

@@ -415,3 +415,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   `ukrainian/smakolykytl.ts`).
 - Ukrainian manga and Zenko novels (`server/manga_ukrainian.py`) follow the Apache-2.0
   Keiyoushi extensions (`src/uk/honeymanga`, `src/uk/zenko`). No code is copied verbatim.
+- Manga-shi (`server/manga_mangashi.py`) follows the Apache-2.0 Keiyoushi extension
+  `src/ru/mangashi` at revision `6f345a81459739e35d8fc94c05455464e856f771`.
+- The MangaHub family (`server/manga_mangahub.py`) follows the public reader protocol
+  in Apache-2.0 Keiyoushi `lib-multisrc/mangahub` at the same revision.
