@@ -35,7 +35,7 @@ export async function loadMangaFont(id){
 // the gitignored reader-fonts/local/, the deployed site receives them from the
 // owner's server after owner authentication (registerPrivateFonts). Each file
 // is assigned to a role by its name.
-const PRIVATE_ROLES=[[/beatdown|smash|hictor/i,'sfx-loud'],[/noisy|jinkies|hitch/i,'sfx'],[/kunkel/i,'chatter'],[/leo.?hand/i,'note'],[/guest/i,'note'],[/diamond/i,'note']];
+const PRIVATE_ROLES=[[/anime.?ace|wild.?words|dialog|speech|main/i,'speech'],[/beatdown|smash|hictor/i,'sfx-loud'],[/noisy|jinkies|hitch/i,'sfx'],[/kunkel/i,'chatter'],[/leo.?hand/i,'note'],[/guest/i,'note'],[/diamond/i,'note']];
 const privateFonts=[];
 function addPrivate(file,source){
  const name=String(file).split('/').pop().replace(/\.[^.]+$/,''),order=PRIVATE_ROLES.findIndex(([pattern])=>pattern.test(name));

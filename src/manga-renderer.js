@@ -8,13 +8,17 @@ import {measurer,drawLayout} from '../lmt/typeset/draw.js';
 import {periodicFill} from '../lmt/upstream/lib/inpaint/tone.ts';
 import {fitComicText,styleFont,comicInkColor} from './manga-typeset.js';
 import {prepareInkPatch,preparePageInk,compositeInkPatch,dilateInk} from './manga-cleaning.js';
-export const READER_RENDER_VERSION=12;
-export const READER_TYPESETTER='shaped-cyrillic-ru-v4';
+export const READER_RENDER_VERSION=13;
+export const READER_TYPESETTER='shaped-cyrillic-ru-v5';
+// The face of ordinary text when the listener leaves the choice to the reader.
+export const MAIN_FONT='comic-relief';
 // One main typeface carries speech, thoughts (italic) and shouts; only sound
 // effects, small side chatter and notes on objects get a situational face.
 const SITUATIONAL=new Set(['sfx','chatter','note']);
 const ROLE={sfx:'sfx',sign:'note',whisper_aside:'chatter',narration:'narration',thought:'thought',system_ui:'narration'};
-const roleOf=region=>ROLE[region.text_category]||(region.font_style==='sfx_art'?'sfx':'speech');
+// The role comes from what the text is, never from the style the model guessed
+// for its glyphs: that guess is noisy and gave ordinary lines stray faces.
+const roleOf=region=>ROLE[region.text_category]||'speech';
 // Usable interior of a caption: the flood-filled paper rows when known, an
 // ellipse for a detector balloon, the source box otherwise. The text is
 // centred on this figure as drawn; a balloon cut by the page edge stays cut.
@@ -48,15 +52,20 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
    const valid=b=>Array.isArray(b)&&b.length===4&&b.every(Number.isFinite)&&b[0]>=0&&b[1]>=0&&b[2]<=page.width&&b[3]<=page.height&&b[2]>b[0]&&b[3]>b[1];
    if(!valid(box)||!valid(region.text_bbox)){records.push({uid:region.uid,method:'declined',reason:'Некорректная область вёрстки'});continue;}
    if(cleanOnly){plans.push({region,box});continue;}
-   const idFont=font==='auto'?styleFont(region.font_style):font,weight=region.font_style==='bold_scream'?700:400;let family;
+   // One face for lines, thoughts and the author's text (a shout is the same
+   // face in bold); the model's style picks a face only for sound effects, side
+   // remarks, signs and system windows.
+   const role=roleOf(region),special=SITUATIONAL.has(role)||region.text_category==='system_ui';
+   const idFont=font==='auto'?(special?styleFont(region.font_style):MAIN_FONT):font,weight=region.font_style==='bold_scream'&&!special?700:400;let family;
    try{family=idFont==='serif'?'Georgia, serif':idFont==='mono'?'monospace':await loadMangaFont(idFont);}catch{family='system-ui';warnings.push('Шрифт не загрузился: использован системный шрифт.');}
    const flow=region.flow;
    if(flow&&(![flow.width,flow.height,flow.offsetY].every(Number.isFinite)||flow.width<=0||flow.height<=0||flow.offsetY<0||flow.offsetY+box[3]-box[1]>flow.height+1)){records.push({uid:region.uid,method:'declined',reason:'Некорректная связанная область'});continue;}
    const vertical=!flow&&verticalLettering(box,page.height,region.text_category,!!region.bubble_bbox),fitBox=flow?[0,0,flow.width,flow.height]:vertical?[0,0,box[3]-box[1],box[2]-box[0]]:box;
    if(!flow&&!vertical){
     // Shaped composition; linked webtoon cells and vertical captions keep the cell fitter below.
-    const role=roleOf(region),own=font==='auto'&&SITUATIONAL.has(role)?await loadPrivateFace(role,{loud:region.font_style==='bold_scream'?2:1,fallback:family}).catch(()=>null):null;
-    const face=own||{id:idFont,stack:family,weight,italic:role==='thought',upper:false};
+    // The owner's own typefaces come first: one named for dialogue replaces the main face.
+    const own=font==='auto'?await loadPrivateFace(SITUATIONAL.has(role)?role:'speech',{loud:region.font_style==='bold_scream'?2:1,fallback:family}).catch(()=>null):null;
+    const face=own?{...own,weight:SITUATIONAL.has(role)?own.weight:weight,italic:role==='thought'}:{id:idFont,stack:family,weight,italic:role==='thought',upper:false};
     plans.push({region,box,idFont:face.id,family,weight,role,face,shape:letteringShape(region,box),text:normalizeText(text,{caps:face.upper||caps&&!SITUATIONAL.has(role)})});continue;
    }
    const fit=fitComicText(text,fitBox,(value,size)=>{ctx.font=`${weight} ${size}px ${family}`;return ctx.measureText(value).width;},{oval:!flow&&!!region.bubble_bbox,max:Math.min(96,Math.max(42,Math.round(Math.sqrt((box[2]-box[0])*(box[3]-box[1]))/3)))});
