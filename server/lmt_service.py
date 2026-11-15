@@ -20,13 +20,13 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 from PIL import Image
-from lmt_runtime import LmtRuntime
+from lmt_runtime import LmtRuntime, private_fonts
 from lmt_fallback import FallbackBody, translate_refused
 
-VERSION = 5
+VERSION = 6
 MAX_IMAGE = 10 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = 24_000_000
 
@@ -40,6 +40,7 @@ class Options(BaseModel):
     font: Literal['comic-relief','pangolin','neucha','system'] = 'comic-relief'
     translator: Literal['hymt2','index'] = 'hymt2'
     captureDebug: bool = False
+    caps: bool = True
 
 class Body(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -180,6 +181,18 @@ async def status():
             if not r.is_success:raise ValueError()
         except Exception:value.update(ready=False,message='Hy-MT2 запускается на ВМ. Подожди и повтори перевод.')
     return value
+# The owner's own licensed lettering typefaces. Owner-only: they are neither in
+# the repository nor in the public site bundle.
+@app.get('/reader/lmt/fonts')
+async def fonts(subject=Depends(owner)):
+    return {'fonts':[{'name':p.name,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in private_fonts(os.getenv('LMT_DATA_DIR','/data'))]}
+
+@app.get('/reader/lmt/fonts/{index}')
+async def font(index:int,subject=Depends(owner)):
+    files=private_fonts(os.getenv('LMT_DATA_DIR','/data'))
+    if not 0<=index<len(files):raise HTTPException(404,'Шрифт не найден.')
+    return Response(files[index].read_bytes(),media_type='application/octet-stream',headers={'Cache-Control':'private, no-store'})
+
 @app.post('/reader/lmt/jobs',status_code=202)
 async def submit(body:Body,subject=Depends(owner)):
     p=app.state.processor

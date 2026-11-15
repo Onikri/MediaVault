@@ -8,6 +8,22 @@ import mimetypes
 import os
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+import json
+
+
+FONT_SUFFIXES = {'.otf', '.ttf', '.woff2'}
+
+
+def private_fonts(root):
+    """The owner's own licensed typefaces: files placed in <data>/reader-fonts.
+
+    They are never part of the image or the public site; the service hands them
+    only to the authenticated owner and to its own headless page."""
+    directory = Path(root) / 'reader-fonts'
+    if not directory.is_dir():
+        return []
+    files = [p for p in directory.iterdir() if p.is_file() and p.suffix.lower() in FONT_SUFFIXES and p.stat().st_size <= 4_000_000]
+    return sorted(files, key=lambda p: p.name)[:40]
 
 
 class LmtRuntime:
@@ -54,6 +70,16 @@ class LmtRuntime:
                 await route.fulfill(status=response.status_code, content_type='application/json', body=response.content)
             except Exception:
                 await route.fulfill(status=502, content_type='application/json', body='{"error":"Local LLM unavailable"}')
+            return
+        if request.url.startswith(self.ORIGIN + '/private-fonts/'):
+            fonts = private_fonts(self.directory.parent)
+            name = url.path.rsplit('/', 1)[-1]
+            if name == 'index.json':
+                await route.fulfill(content_type='application/json', body=json.dumps([p.name for p in fonts]))
+            elif name.isdigit() and int(name) < len(fonts):
+                await route.fulfill(content_type='application/octet-stream', body=fonts[int(name)].read_bytes())
+            else:
+                await route.fulfill(status=404, body='')
             return
         if request.url.startswith(self.ORIGIN + '/'):
             path = (self.assets / unquote(url.path).lstrip('/')).resolve()

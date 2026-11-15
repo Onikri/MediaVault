@@ -1,4 +1,5 @@
 import { fetchAsImageBitmap, yieldToMain } from "../utils";
+import { periodicFill } from "./tone";
 import { teleaInpaint } from "./telea";
 import {
   buildInkSeed,
@@ -680,7 +681,9 @@ function runTelea(page: ImageData, mask: Mask, cropRgb: Uint8ClampedArray): void
   }
   const crop = new Uint8ClampedArray(cropRgb);
   const img = new ImageData(crop, w, h);
-  teleaInpaint(img, mask.data, 3);
+  // MediaVault change: screentone/hatching is copied from its periodic twins;
+  // Telea fills only what has no twin (and everything on non-periodic crops).
+  teleaInpaint(img, periodicFill(img, mask.data).remaining, 3);
   for (let y = 0; y < h; y++) {
     const py = oy + y;
     if (py < 0 || py >= page.height) continue;

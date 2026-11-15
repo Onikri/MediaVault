@@ -11,10 +11,24 @@
  * The core function works on an in-place ImageData + binary mask and serves as
  * the final rung of the Fast ladder (`ladder.ts`); the legacy full-frame entry
  * point was retired when the method picker collapsed to Fast vs Quality.
+ *
+ * MediaVault change (2026-11): the march no longer keeps a binary heap over a
+ * Manhattan distance. The distance to the mask boundary is a two-pass 3-4
+ * chamfer transform (near-Euclidean, so the front normal is smooth instead of
+ * stair-stepped), pixels are visited in counting-sort order of that distance,
+ * neighbour weights come from a precomputed table, and the weight regains
+ * Telea's level-set term (neighbours at the same distance from the boundary
+ * count more). Measured with scripts/benchmarks/telea-bench.mjs.
  */
 
-const INF = 1e18;
+const UNREACHED = 1 << 29;
 const MAX_PIXELS_FRACTION = 0.8; // skip FMM if mask covers >80% of the image (degenerate)
+/** Chamfer units per pixel step. */
+const ORTHO = 3;
+const DIAGONAL = 4;
+/** Floor for the directional weight so a pixel whose known neighbours all lie
+ * across the front normal is still filled instead of keeping the old ink. */
+const DIRECTION_FLOOR = 0.02;
 
 /**
  * In-place Telea fast-marching inpainting on an RGBA ImageData buffer.
@@ -41,182 +55,127 @@ export function teleaInpaint(
     throw new Error("telea: mask covers too much of the image");
   }
 
-  const dist = new Float32Array(total).fill(INF);
-  const known = new Uint8Array(total); // 1 = distance finalized
-
-  // Binary min-heap over pixel indices, keyed by dist[idx].
-  const heap: number[] = [];
-  const heapIndex = new Int32Array(total).fill(-1);
-  const push = (idx: number) => {
-    heap.push(idx);
-    let c = heap.length - 1;
-    heapIndex[idx] = c;
-    while (c > 0) {
-      const p = (c - 1) >> 1;
-      if (dist[heap[p]] <= dist[heap[c]]) break;
-      heapIndex[heap[c]] = p;
-      heapIndex[heap[p]] = c;
-      const tmp = heap[p];
-      heap[p] = heap[c];
-      heap[c] = tmp;
-      c = p;
-    }
-  };
-  const pop = (): number => {
-    const top = heap[0];
-    const last = heap.pop()!;
-    if (heap.length > 0) {
-      heap[0] = last;
-      heapIndex[last] = 0;
-      let c = 0;
-      const n = heap.length;
-      for (;;) {
-        const l = c * 2 + 1;
-        const r = l + 1;
-        let s = c;
-        if (l < n && dist[heap[l]] < dist[heap[s]]) s = l;
-        if (r < n && dist[heap[r]] < dist[heap[s]]) s = r;
-        if (s === c) break;
-        heapIndex[heap[s]] = c;
-        heapIndex[heap[c]] = s;
-        const tmp = heap[s];
-        heap[s] = heap[c];
-        heap[c] = tmp;
-        c = s;
+  // Distance of every masked pixel to the nearest known pixel (3-4 chamfer).
+  const dist = new Int32Array(total);
+  for (let i = 0; i < total; i++) dist[i] = mask[i] ? UNREACHED : 0;
+  for (let y = 0, i = 0; y < height; y++) {
+    for (let x = 0; x < width; x++, i++) {
+      let v = dist[i];
+      if (v === 0) continue;
+      if (x > 0 && dist[i - 1] + ORTHO < v) v = dist[i - 1] + ORTHO;
+      if (y > 0) {
+        const up = i - width;
+        if (dist[up] + ORTHO < v) v = dist[up] + ORTHO;
+        if (x > 0 && dist[up - 1] + DIAGONAL < v) v = dist[up - 1] + DIAGONAL;
+        if (x < width - 1 && dist[up + 1] + DIAGONAL < v) v = dist[up + 1] + DIAGONAL;
       }
+      dist[i] = v;
     }
-    heapIndex[top] = -1;
-    return top;
-  };
-
-  // Seed: known pixels adjacent to the mask form the initial front.
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = y * width + x;
-      if (mask[idx]) continue;
-      known[idx] = 1;
-      dist[idx] = 0;
-      const isBoundary =
-        (x > 0 && mask[idx - 1]) ||
-        (x < width - 1 && mask[idx + 1]) ||
-        (y > 0 && mask[idx - width]) ||
-        (y < height - 1 && mask[idx + width]);
-      if (isBoundary) {
-        push(idx);
+  }
+  let maxDist = 0;
+  for (let y = height - 1, i = total - 1; y >= 0; y--) {
+    for (let x = width - 1; x >= 0; x--, i--) {
+      let v = dist[i];
+      if (v === 0) continue;
+      if (x < width - 1 && dist[i + 1] + ORTHO < v) v = dist[i + 1] + ORTHO;
+      if (y < height - 1) {
+        const down = i + width;
+        if (dist[down] + ORTHO < v) v = dist[down] + ORTHO;
+        if (x < width - 1 && dist[down + 1] + DIAGONAL < v) v = dist[down + 1] + DIAGONAL;
+        if (x > 0 && dist[down - 1] + DIAGONAL < v) v = dist[down - 1] + DIAGONAL;
       }
+      dist[i] = v;
+      if (v < UNREACHED && v > maxDist) maxDist = v;
     }
   }
 
-  const idxOf = (x: number, y: number) => y * width + x;
-  const inBounds = (x: number, y: number) =>
-    x >= 0 && x < width && y >= 0 && y < height;
+  // Visit order: nearest to the boundary first (counting sort, O(n)).
+  const starts = new Int32Array(maxDist + 2);
+  for (let i = 0; i < total; i++) {
+    const v = dist[i];
+    if (v > 0 && v < UNREACHED) starts[v + 1]++;
+  }
+  for (let v = 1; v < starts.length; v++) starts[v] += starts[v - 1];
+  const order = new Int32Array(starts[maxDist + 1]);
+  for (let i = 0; i < total; i++) {
+    const v = dist[i];
+    if (v > 0 && v < UNREACHED) order[starts[v]++] = i;
+  }
 
-  const NX = [1, -1, 0, 0];
-  const NY = [0, 0, 1, -1];
+  // Neighbour table: offsets and the distance weight 1 / (1 + |p−q|²).
+  const side = 2 * radius + 1;
+  const tableDx = new Int8Array(side * side - 1);
+  const tableDy = new Int8Array(side * side - 1);
+  const tableInvLen = new Float32Array(side * side - 1);
+  const tableDst = new Float32Array(side * side - 1);
+  let entries = 0;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const distSq = dx * dx + dy * dy;
+      tableDx[entries] = dx;
+      tableDy[entries] = dy;
+      tableInvLen[entries] = 1 / Math.sqrt(distSq);
+      tableDst[entries] = 1 / (1 + distSq);
+      entries++;
+    }
+  }
 
-  // Number of boundary pixels + masked pixels processed total.
-  let processed = 0;
-  const budget = total * 2;
+  const known = new Uint8Array(total);
+  for (let i = 0; i < total; i++) known[i] = mask[i] ? 0 : 1;
 
-  while (heap.length > 0 && processed < budget) {
-    const idx = pop();
-    if (known[idx] && mask[idx]) continue; // already finalized masked pixel
+  for (let n = 0; n < order.length; n++) {
+    const idx = order[n];
     const x = idx % width;
     const y = (idx / width) | 0;
-    processed++;
+    const here = dist[idx];
 
-    // Only masked pixels need color estimation; seed (known) pixels just
-    // propagate the front to their masked neighbors.
-    if (mask[idx]) {
-      // Compute gradient of the distance field at this front pixel.
-      const xL = inBounds(x - 1, y) ? dist[idxOf(x - 1, y)] : dist[idx];
-      const xR = inBounds(x + 1, y) ? dist[idxOf(x + 1, y)] : dist[idx];
-      const yU = inBounds(x, y - 1) ? dist[idxOf(x, y - 1)] : dist[idx];
-      const yD = inBounds(x, y + 1) ? dist[idxOf(x, y + 1)] : dist[idx];
-      let gx = (xR - xL) * 0.5;
-      let gy = (yD - yU) * 0.5;
-      const gnorm = Math.hypot(gx, gy);
-      if (gnorm < 1e-6) {
-        gx = 0;
-        gy = 0;
-      } else {
-        gx /= gnorm;
-        gy /= gnorm;
-      }
+    // Front normal = gradient of the distance field.
+    const xL = x > 0 ? dist[idx - 1] : here;
+    const xR = x < width - 1 ? dist[idx + 1] : here;
+    const yU = y > 0 ? dist[idx - width] : here;
+    const yD = y < height - 1 ? dist[idx + width] : here;
+    let gx = xR >= UNREACHED || xL >= UNREACHED ? 0 : xR - xL;
+    let gy = yD >= UNREACHED || yU >= UNREACHED ? 0 : yD - yU;
+    const gnorm = Math.hypot(gx, gy);
+    const flat = gnorm < 1e-6;
+    if (!flat) {
+      gx /= gnorm;
+      gy /= gnorm;
+    }
 
-      // Telea color estimation: weighted average of known neighbors.
-      // weight = dirWeight² · dstWeight
-      //   dirWeight = |N(p)·(p−q)| / |p−q|   (directional, along gradient)
-      //   dstWeight = 1 / (1 + distSq)
-      let r = 0,
-        g = 0,
-        b = 0,
-        sumW = 0;
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const qx = x + dx;
-          const qy = y + dy;
-          if (!inBounds(qx, qy)) continue;
-          const qIdx = qy * width + qx;
-          if (!known[qIdx]) continue;
+    // Telea colour estimate: weighted average of known neighbours.
+    // weight = dirWeight² · dstWeight · levWeight
+    //   dirWeight = |N(p)·(p−q)| / |p−q|     (along the front normal)
+    //   dstWeight = 1 / (1 + |p−q|²)
+    //   levWeight = 1 / (1 + |T(p)−T(q)|)    (same distance from the boundary)
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let sumW = 0;
+    for (let k = 0; k < entries; k++) {
+      const qx = x + tableDx[k];
+      const qy = y + tableDy[k];
+      if (qx < 0 || qy < 0 || qx >= width || qy >= height) continue;
+      const q = qy * width + qx;
+      if (!known[q]) continue;
+      const dir = flat ? 1 : Math.abs(tableDx[k] * gx + tableDy[k] * gy) * tableInvLen[k];
+      const level = 1 / (1 + Math.abs(here - dist[q]) / ORTHO);
+      const weight = (dir * dir + DIRECTION_FLOOR) * tableDst[k] * level;
+      const o = q * 4;
+      r += data[o] * weight;
+      g += data[o + 1] * weight;
+      b += data[o + 2] * weight;
+      sumW += weight;
+    }
 
-          const distSq = dx * dx + dy * dy;
-          const invLen = 1 / Math.sqrt(distSq);
-          // Telea dirWeight uses the ABSOLUTE normalized dot with the gradient:
-          // pixels aligned with the propagation direction (either side of the
-          // front) carry the boundary texture. Sign is irrelevant.
-          // Fall back to isotropic weight when gradient vanishes at front collision.
-          const dir = gnorm < 1e-6 ? 1 : Math.abs(dx * gx + dy * gy) * invLen;
-          const weight = dir * dir * (1 / (1 + distSq));
-          const o = qIdx * 4;
-          r += data[o] * weight;
-          g += data[o + 1] * weight;
-          b += data[o + 2] * weight;
-          sumW += weight;
-        }
-      }
-
+    if (sumW > 0) {
       const out = idx * 4;
-      if (sumW > 0) {
-        data[out] = r / sumW;
-        data[out + 1] = g / sumW;
-        data[out + 2] = b / sumW;
-        data[out + 3] = 255;
-      }
-
-      known[idx] = 1; // mask pixel finalized
+      data[out] = r / sumW;
+      data[out + 1] = g / sumW;
+      data[out + 2] = b / sumW;
+      data[out + 3] = 255;
     }
-    const myDist = dist[idx] + 1;
-
-    // Propagate the front to masked 4-neighbors.
-    for (let d = 0; d < 4; d++) {
-      const nx = x + NX[d];
-      const ny = y + NY[d];
-      if (!inBounds(nx, ny)) continue;
-      const nIdx = ny * width + nx;
-      if (!mask[nIdx] || known[nIdx]) continue;
-      if (myDist < dist[nIdx]) {
-        const wasQueued = heapIndex[nIdx] >= 0;
-        dist[nIdx] = myDist;
-        if (!wasQueued) push(nIdx);
-        else {
-          // re-heapify upward after decreasing key
-          let c = heapIndex[nIdx];
-          while (c > 0) {
-            const p = (c - 1) >> 1;
-            if (dist[heap[p]] <= dist[heap[c]]) break;
-            heapIndex[heap[c]] = p;
-            heapIndex[heap[p]] = c;
-            const tmp = heap[p];
-            heap[p] = heap[c];
-            heap[c] = tmp;
-            c = p;
-          }
-        }
-      }
-    }
+    known[idx] = 1;
   }
 }
-
-
