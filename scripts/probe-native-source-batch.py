@@ -1,0 +1,166 @@
+"""Audit a batch of direct catalogue profiles without reading pages or updating health."""
+
+import argparse
+from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from io import BytesIO
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+import time
+from urllib.parse import urlsplit
+from zipfile import ZIP_DEFLATED, ZipFile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def emit(row):
+    print(json.dumps(row, ensure_ascii=True), flush=True)
+
+
+def candidates():
+    import manga_native_sources as native
+
+    profiles = dict(native.ADAPTERS)
+    for module in (native.manga_madara, native.manga_themesia, native.manga_keyoapp, native.manga_vinetheme,
+                   native.manga_mangacatalog, native.manga_iken, native.manga_mangahub):
+        profiles.update((adapter.SOURCE_ID, adapter) for adapter in module.SOURCES)
+    standby = native.manga_mangahub.MANGA_HERE
+    profiles[standby.SOURCE_ID] = standby
+    return profiles, native.ADAPTERS
+
+
+def audit(adapter, check_search):
+    from source_parser import PublicHttp, SourceAccessError, SourceError, SourceRateLimitError, SourceTemporaryError
+
+    phase = 'catalogue'
+    http = PublicHttp(timeout=(3, 6), deadline=time.monotonic() + 12)
+    result = {}
+    try:
+        rows, more = adapter.catalogue(http)
+        result.update(rows=len(rows), more=bool(more))
+        if not rows:
+            return {**result, 'status': 'empty', 'phase': phase}
+        for row in rows:
+            target = adapter.site_link(row.get('url'))
+            if (str(row.get('sourceId')) != adapter.SOURCE_ID or not row.get('title') or not target
+                    or not adapter.TITLE_PATH.fullmatch(urlsplit(target).path)):
+                return {**result, 'status': 'identity_mismatch', 'phase': phase}
+        result['catalogue'] = True
+        if check_search:
+            phase = 'search'
+            http.deadline = time.monotonic() + 12
+            sample = next((row for row in rows if 2 <= len(row['title']) <= 100), rows[0])
+            found, _ = adapter.catalogue(http, query=sample['title'])
+            result['search'] = any(row.get('id') == sample['id'] for row in found)
+            if not result['search']:
+                return {**result, 'status': 'search_mismatch', 'phase': phase}
+        return {**result, 'status': 'passed', 'phase': phase}
+    except SourceRateLimitError as error:
+        return {**result, 'status': 'rate_limited', 'phase': phase, 'retry_after_seconds': error.retry_after}
+    except SourceAccessError:
+        return {**result, 'status': 'restricted', 'phase': phase}
+    except SourceTemporaryError:
+        return {**result, 'status': 'temporary_error', 'phase': phase}
+    except SourceError as error:
+        status = re.search(r'HTTP (\d{3})', str(error))
+        return {**result, 'status': 'source_error', 'phase': phase, 'http': int(status[1]) if status else None}
+    except Exception as error:
+        return {**result, 'status': 'adapter_error', 'phase': phase, 'error_type': type(error).__name__}
+    finally:
+        http.close()
+
+
+def probe_origin(adapters, enabled, check_search):
+    results = []
+    rate_limited = False
+    for adapter in adapters:
+        started = time.monotonic()
+        result = {'status': 'deferred', 'phase': 'catalogue'} if rate_limited else audit(adapter, check_search)
+        rate_limited |= result['status'] == 'rate_limited'
+        results.append({'source_id': adapter.SOURCE_ID, 'name': adapter.NAME,
+                        'enabled': adapter.SOURCE_ID in enabled, 'ms': round((time.monotonic()-started)*1000), **result})
+    return results
+
+
+def live(args):
+    sys.path.insert(0, str(ROOT / 'server'))
+    profiles, enabled = candidates()
+    unknown = set(args.source) - profiles.keys()
+    if unknown:
+        raise SystemExit('No direct profile for: ' + ', '.join(sorted(unknown)))
+    ordered = sorted(profiles.values(), key=lambda row: (row.SOURCE_ID in enabled, row.NAME.casefold(), row.SOURCE_ID))
+    if args.source:
+        selected = [row for row in ordered if row.SOURCE_ID in args.source]
+    else:
+        selected = ordered[args.offset:args.offset + args.batch_size]
+    groups = defaultdict(list)
+    for adapter in selected:
+        groups[urlsplit(adapter.ROOT).hostname].append(adapter)
+    started = time.monotonic()
+    emit({'event': 'started', 'total_profiles': len(profiles), 'selected': len(selected), 'origins': len(groups),
+          'workers': args.workers, 'search': args.search})
+    statuses = Counter()
+    catalogues = 0
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        jobs = [pool.submit(probe_origin, group, enabled, args.search) for group in groups.values()]
+        for future in as_completed(jobs):
+            for result in future.result():
+                statuses[result['status']] += 1
+                catalogues += bool(result.get('catalogue'))
+                emit({'event': 'source', **result})
+    emit({'event': 'summary', 'completed': sum(statuses.values()), 'catalogues_returned': catalogues,
+          'statuses': dict(statuses), 'seconds': round(time.monotonic() - started, 2)})
+
+
+def over_ssh(host, args):
+    payload = BytesIO()
+    with ZipFile(payload, 'w', ZIP_DEFLATED) as archive:
+        for path in [Path(__file__), *sorted((ROOT / 'server').glob('*.py'))]:
+            archive.write(path, path.relative_to(ROOT).as_posix())
+    bootstrap = """
+import io, runpy, sys, tempfile, zipfile
+from pathlib import Path
+with tempfile.TemporaryDirectory() as folder:
+    zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())).extractall(folder)
+    script = Path(folder) / 'scripts/probe-native-source-batch.py'
+    sys.argv = [str(script)] + ARGS
+    runpy.run_path(str(script), run_name='__main__')
+"""
+    command = ('from pathlib import Path\nimport subprocess\n'
+               'if Path("/opt/mediavault/deploy.lock").exists(): raise SystemExit("Deployment active")\n'
+               'raise SystemExit(subprocess.run('
+               "['docker', 'exec', '-i', 'oracle-importer-1', 'python', '-B', '-c', "
+               + repr('ARGS=' + repr(args) + '\n' + bootstrap) + '], input=' + repr(payload.getvalue()) + ').returncode)')
+    return subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=6', host, 'sudo -n python3 -'],
+                          input=command.encode()).returncode
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--batch-size', type=int, default=150, choices=range(1, 201), metavar='1-200')
+    parser.add_argument('--offset', type=int, default=0)
+    parser.add_argument('--workers', type=int, default=8, choices=range(1, 13), metavar='1-12')
+    parser.add_argument('--source', action='append', default=[], help='Repeat to rerun particular source IDs.')
+    parser.add_argument('--search', action='store_true', help='Also look up one returned title by exact ID.')
+    parser.add_argument('--ssh', metavar='HOST', help='Run temporarily inside the importer through SSH.')
+    args = parser.parse_args()
+    if args.offset < 0 or len(args.source) > args.batch_size or args.source and args.offset:
+        parser.error('Supply a nonnegative offset or up to batch-size explicit IDs.')
+    if args.ssh:
+        if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.@-]*', args.ssh):
+            parser.error('Invalid SSH host or alias.')
+        remote_args = ['--batch-size', str(args.batch_size), '--offset', str(args.offset), '--workers', str(args.workers)]
+        remote_args += [value for source in args.source for value in ('--source', source)]
+        if args.search:
+            remote_args.append('--search')
+        return over_ssh(args.ssh, remote_args)
+    live(args)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
