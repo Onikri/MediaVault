@@ -80,7 +80,7 @@ function letteringShape(region,box){
 }
 function overlap(a,b){const area=(a[2]-a[0])*(a[3]-a[1]),other=(b[2]-b[0])*(b[3]-b[1]),shared=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));return shared/Math.max(1,area+other-shared);}
 function maskRuns(patch,pageWidth,mask=patch.mask){const runs=[];for(let y=0;y<patch.height;y++){let x=0;while(x<patch.width){while(x<patch.width&&!mask[y*patch.width+x])x++;const start=x;while(x<patch.width&&mask[y*patch.width+x])x++;if(x>start)runs.push((patch.top+y)*pageWidth+patch.left+start,(patch.top+y)*pageWidth+patch.left+x);}}return runs;}
-export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false,cleanOnly=false,preparedClean,caps=true,voiceFonts={}}){
+export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,cache=false,status=()=>{},moebiusStrategy='page',captureDebug=false,cleanOnly=false,preparedClean,caps=true,voiceFonts={},modelBudgetMs=7000}){
  const start=performance.now(),bitmap=await createImageBitmap(blob);
  try{
   if(bitmap.width!==page.width||bitmap.height!==page.height||bitmap.width*bitmap.height>24_000_000)throw Error('Размер исходной страницы изменился.');
@@ -135,7 +135,8 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   // smart: the small model gets at most MODEL_BUDGET ms of inference per page
   // (loading the model is not counted), so a busy page is never held for
   // minutes; regions after it keep their backing or take the fast method.
-  const MODEL_BUDGET=7000,modelStart=()=>performance.now();let modelMs=0;
+  // A saved chapter on the VM may take longer per page than an open one.
+  const MODEL_BUDGET=Number.isFinite(modelBudgetMs)&&modelBudgetMs>0?Math.min(modelBudgetMs,300000):7000,modelStart=()=>performance.now();let modelMs=0;
   let lamaUnavailable=null,modelCalls=0,pageExecution,cleanupMask=captureDebug?new Uint8Array(original.width*original.height):null;
   if(mode==='moebius'&&moebiusStrategy==='page'&&!preparedClean){
    const t=performance.now(),eligible=[];

@@ -29,8 +29,10 @@ class Translation(BaseModel):
     directModel: Literal['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it'] = 'gemini-3.5-flash-lite'
     language: Literal['English','Japanese','Korean','Chinese (Simplified)'] = 'Japanese'
     direction: Literal['ltr','rtl'] = 'rtl'
-    directInput: Literal['vision','annotated','blocks','coordinates'] = 'vision'
-    directDetector: Literal['en-fast','rtdetr','ctd','yolo26n-manga','ppocrv6-det'] = 'rtdetr'
+    # The reader's defaults (manga-direct-profiles.js): the local detector frames
+    # the text and Google reads the framed page.
+    directInput: Literal['vision','annotated','blocks','coordinates'] = 'annotated'
+    directDetector: Literal['en-fast','rtdetr','ctd','yolo26n-manga','ppocrv6-det'] = 'en-fast'
     directBatchPages: Literal[2,3] = 2
     # smart: the reader's cleanup (paper fill, MI-GAN over the drawing).
     inpaint: Literal['smart','fast','quality','moebius','migan'] = 'smart'

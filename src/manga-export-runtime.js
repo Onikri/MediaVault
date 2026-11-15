@@ -17,14 +17,17 @@ window.translateExportChapter=async({count,options,slots,skip=[]})=>{
  await preloadPrivateFonts(fontService);
  const controller=new AbortController(),ignored=new Set(skip);
  const entries=Array.from({length:count},(_,index)=>({async:async()=>new Blob([fromBase64(await window.exportSourcePage(index))])}));
- const config=translationConfig({...options,firstPagePriority:true,directTimeoutMs:120000,engine:'vm',directViaOracle:true,chapterPipeline:false,cache:false,allowDownloads:true,skipPages:ignored});
+ const config=translationConfig({...options,firstPagePriority:true,directTimeoutMs:120000,engine:'vm',directViaOracle:true,chapterPipeline:false,cache:false,modelBudgetMs:120000,allowDownloads:true,skipPages:ignored});
  const service={session:{googleGatewayVersion:5},request:(path,request)=>window.exportGoogleRequest(path,request.body||{})};
  const chapter=new DirectChapter({entries,scope:'vm-export',keyScope:'vm-export',config,direction:options.direction,serverSlots:slots,service:()=>service});
  try{
   const pending=entries.map((_,index)=>index).filter(index=>!ignored.has(index)),failures=new Map();
-  const save=async (index,blob)=>{
+  // A region the renderer left in the original (its translation does not fit,
+  // the cleanup was declined) is retried once; after that the page is saved as
+  // the reader shows it. Untranslated lines still stop the page for review.
+  const save=async (index,blob,acceptPartial=false)=>{
     const result=await chapter.render(blob,index,config.font,value=>window.exportPageProgress(index,value),config,controller.signal);
-    if(result.unresolvedRegions?.length||result.inpaint?.unpainted){
+    if(result.unresolvedRegions?.length||result.inpaint?.unpainted&&!acceptPartial){
      result.renderedBitmap?.close();
      const error=Error(result.unresolvedRegions?.length?'Осталось реплик без перевода: '+result.unresolvedRegions.length:result.warnings?.[0]||'Фон восстановлен частично.');
      error.needsReview=!!result.unresolvedRegions?.length;
@@ -40,10 +43,10 @@ window.translateExportChapter=async({count,options,slots,skip=[]})=>{
     await window.exportRenderedPage(index,bytesBase64(image));
     failures.delete(index);
   };
-  const run=async indices=>{
+  const run=async (indices,acceptPartial=false)=>{
    for(let offset=0;offset<indices.length;offset+=9){
     const packet=indices.slice(offset,offset+9),loaded=await Promise.allSettled(packet.map(index=>entries[index].async()));
-    await Promise.all(packet.map((index,i)=>loaded[i].status==='fulfilled'?save(index,loaded[i].value).catch(error=>failures.set(index,error)):failures.set(index,loaded[i].reason)));
+    await Promise.all(packet.map((index,i)=>loaded[i].status==='fulfilled'?save(index,loaded[i].value,acceptPartial).catch(error=>failures.set(index,error)):failures.set(index,loaded[i].reason)));
    }
   };
   // Source reads, detection and rendering of later pages cannot hold up page 1.
@@ -51,7 +54,7 @@ window.translateExportChapter=async({count,options,slots,skip=[]})=>{
   await run(pending.slice(1));
   // Keep already verified pages and retry only missing work.
   if(failures.size){
-   await run([...failures].filter(([,error])=>!error?.needsReview).map(([index])=>index).sort((a,b)=>a-b));
+   await run([...failures].filter(([,error])=>!error?.needsReview).map(([index])=>index).sort((a,b)=>a-b),true);
    await chapter.recoverChapter();
    await run([...failures].filter(([,error])=>error?.needsReview).map(([index])=>index).sort((a,b)=>a-b));
    if(failures.size){
