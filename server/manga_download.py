@@ -37,10 +37,14 @@ def download_chapter(url,temporary,http,progress=lambda _:None,quality='best'):
                 with lock:clients.append(local.http)
         target=Path(temporary)/f'page-{index:04d}'
         from suwayomi_bridge import parse_reference,page_image
+        from manga_comici import page_reference, fetch_page
         if parse_reference(url):
             if hasattr(local.http,'budget'):local.http.budget.check()
             raw=page_image(url)[0]
             if hasattr(local.http,'budget'):local.http.budget.consume(len(raw))
+            target.write_bytes(raw)
+        elif reference := page_reference(url):
+            raw, _ = fetch_page(local.http, reference, headers)
             target.write_bytes(raw)
         else:local.http.download(url,target,headers=headers,maximum=30*1024*1024)
         with target.open('rb') as source:extension=image_extension(source.read(32))

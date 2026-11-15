@@ -28,8 +28,10 @@ def verify(value,refresh=False):
         from suwayomi_bridge import parse_reference,page_image
         from manga_download import image_extension
         from manga_native_sources import page_headers
+        from manga_comici import page_reference, fetch_page
         entries = value.get('episodes') or []
-        targets = [value['url']] if value.get('pages') else list(dict.fromkeys(e['url'] for e in entries))[:3]
+        targets = [value['url']] if value.get('pages') else list(dict.fromkeys(
+            item['url'] for item in entries if item.get('available') is not False))[:3]
         result = {'readable': False, 'verifiedPages': 0,
                   'readabilityError': 'У этого тайтла нет открытых глав на выбранном языке.'}
         if targets:
@@ -43,6 +45,8 @@ def verify(value,refresh=False):
                             raise SourceError('Источник не предоставил страницы открытой главы.')
                         if parse_reference(pages[0]):
                             raw = page_image(pages[0])[0]
+                        elif reference := page_reference(pages[0]):
+                            raw = fetch_page(http, reference, page_headers(chapter['url']))[0]
                         else:
                             response, _ = http._open(pages[0], headers=page_headers(chapter['url']))
                             try:

@@ -131,7 +131,9 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         from manga_iken import public_api as iken_public_api
         from manga_vinetheme import public_api as vine_public_api
         from manga_hentaihand import public_api as hentaihand_public_api
-        if not any(route(host, url.path, url.query) for route in (iken_public_api, vine_public_api, hentaihand_public_api)):
+        from manga_comici import public_route as comici_public_route
+        if not (any(route(host, url.path, url.query) for route in (iken_public_api, vine_public_api, hentaihand_public_api))
+                or comici_public_route(host, url.path, url.query, 'comici-json')):
             raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")
     if resolve_dns:
         try:
@@ -239,18 +241,29 @@ class PublicHttp:
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
-        if action in {'vine-json', 'vine-rsc', 'hentaihand-json'}:
+        comici = action in {'comici-json', 'comici-rsc', 'comici-html', 'comici-image'}
+        if comici:
+            from manga_comici import image_route, public_route
+            from manga_network_routes import configuration, routed
+            route_config = configuration()
+            origin = urlsplit(url)
+            if method != 'GET' or not (image_route(origin.netloc) if action == 'comici-image'
+                                       else public_route(origin.netloc, origin.path, origin.query, action)):
+                raise SourceError('Некорректный публичный маршрут Comici.')
+            outgoing['Accept-Language'] = 'ja,en;q=0.8'
+        if action in {'vine-json', 'vine-rsc', 'hentaihand-json', 'comici-json', 'comici-rsc'}:
             if action == 'hentaihand-json':
                 from manga_hentaihand import public_api as route
-            else:
+            elif not comici:
                 from manga_vinetheme import public_api, rsc_route
                 route = public_api if action == 'vine-json' else rsc_route
-            origin = urlsplit(url)
-            if method != 'GET' or not route(origin.netloc, origin.path, origin.query):
-                raise SourceError('Некорректный публичный маршрут источника.')
+            if not comici:
+                origin = urlsplit(url)
+                if method != 'GET' or not route(origin.netloc, origin.path, origin.query):
+                    raise SourceError('Некорректный публичный маршрут источника.')
             outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Sec-Fetch-Site': 'same-origin',
                              'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty'})
-            if action == 'vine-rsc':
+            if action in {'vine-rsc', 'comici-rsc'}:
                 outgoing.update({'RSC': '1', 'Accept': 'text/x-component, */*'})
             else:
                 outgoing['Accept'] = 'application/json, text/javascript, */*; q=0.01'
@@ -309,8 +322,11 @@ class PublicHttp:
                 request_timeout=timeout or self.timeout
                 if self.deadline:
                     remaining=max(.2,self.deadline-time.monotonic());request_timeout=(min(request_timeout[0],remaining),min(request_timeout[1],remaining))
+                options = {}
+                if comici and routed(url, route_config):
+                    options['proxies'] = {'https': route_config['httpProxy']}
                 response = self.session.request(method, url, headers=outgoing, data=data,
-                                                timeout=request_timeout, allow_redirects=False, stream=True)
+                                                timeout=request_timeout, allow_redirects=False, stream=True, **options)
             except requests.RequestException:
                 raise SourceTemporaryError("Источник не ответил. Повтори импорт позднее.") from None
             if response.status_code in {301, 302, 303, 307, 308}:
@@ -319,6 +335,14 @@ class PublicHttp:
                 if not location or hop == 5:
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
+                if comici:
+                    target = urlsplit(next_url)
+                    allowed = (image_route(target.netloc) if action == 'comici-image'
+                               else target.netloc == origin.netloc and target.path.rstrip('/') == origin.path.rstrip('/')
+                               and public_route(target.netloc, target.path, target.query, action)
+                               and (action == 'comici-rsc' or target.query == origin.query))
+                    if not allowed:
+                        raise SourceError('Comici перенаправил запрос на другой маршрут.')
                 if action in {'vine-json', 'vine-rsc'}:
                     target = urlsplit(next_url)
                     if (target.netloc != origin.netloc or target.path.rstrip('/') != origin.path.rstrip('/')

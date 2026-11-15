@@ -21,7 +21,7 @@ HOSTS = (
     'comic-ryu.jp', 'youngchampion.jp', 'manga-zegra.com', 'bigcomics.jp', 'comici.jp',
     # The other installed ComiciViewer publishers share the same regional wall.
     'asacomi.jp', 'bibibi-comic.com', 'studio.booklista.co.jp', 'championcross.jp',
-    'comicpash.jp', 'comicride.jp', 'comic-room-base.com', 'comirela.com', 'g-comi.jp',
+    'comic-growl.com', 'comicpash.jp', 'comicride.jp', 'comic-room-base.com', 'comirela.com', 'g-comi.jp',
     'hayacomic.jp', 'heros-web.com', 'hanayume.com', 'comic.j-nbooks.jp', 'kimicomi.com',
     'kansai.mag-garden.co.jp', 'mangaspa.nikkan-spa.jp', 'comics.manga-bang.com',
     'mangabu.jp', 'mangalt.jp', 'namicomic.jp', 'piacomic.jp', 'rimacomiplus.jp',

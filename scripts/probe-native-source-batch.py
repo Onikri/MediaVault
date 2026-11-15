@@ -22,12 +22,13 @@ def emit(row):
 
 
 def candidates():
+    import manga_comici
     import manga_hentaihand
     import manga_native_sources as native
 
     profiles = dict(native.ADAPTERS)
     for module in (native.manga_madara, native.manga_themesia, native.manga_keyoapp, native.manga_vinetheme,
-                   native.manga_mangacatalog, native.manga_iken, native.manga_mangahub, manga_hentaihand):
+                   native.manga_mangacatalog, native.manga_iken, native.manga_mangahub, manga_hentaihand, manga_comici):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in module.SOURCES)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby

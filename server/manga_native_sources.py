@@ -15,6 +15,7 @@ import manga_iken
 import manga_mangacatalog
 import manga_keyoapp
 import manga_vinetheme
+import manga_comici
 from manga_source_urls import split_reader_url
 from source_parser import PublicHttp, SourceError
 
@@ -22,7 +23,7 @@ from source_parser import PublicHttp, SourceError
 ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (
     manga_mangashi, *manga_mangahub.SOURCES, *manga_madara.ACTIVE_SOURCES, *manga_themesia.ACTIVE_SOURCES,
     *manga_iken.SOURCES, *manga_mangacatalog.ACTIVE_SOURCES, *manga_keyoapp.ACTIVE_SOURCES,
-    *manga_vinetheme.ACTIVE_SOURCES
+    *manga_vinetheme.ACTIVE_SOURCES, *manga_comici.ACTIVE_SOURCES
 )}
 HOSTS = {
     urlsplit(adapter.ROOT).hostname: adapter
@@ -130,7 +131,8 @@ def catalogue_job(adapter, spec, page):
                 raise SourceError('Сохранённый фильтр больше не совпадает со справочником источника.')
             tag, name = next(iter(options.items()))
             term = {**term, 'label': name}
-        rows, more = adapter.catalogue(http, page=page, tag=tag)
+        options = {'sort': adapter.index_sort} if getattr(type(adapter), 'index_sort', None) else {}
+        rows, more = adapter.catalogue(http, page=page, tag=tag, **options)
         if page == 1 and not rows and not term and not more:
             raise SourceError('Адаптер вернул пустую первую страницу каталога')
         details = []

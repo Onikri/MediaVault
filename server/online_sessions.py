@@ -27,7 +27,11 @@ class Session:
     lock:object=field(default_factory=threading.RLock)
     slots:object=field(default_factory=lambda:threading.BoundedSemaphore(8))
     def resource(self,url,*,synthetic=False):
+        original=url
         url=public_url(url,resolve_dns=False)
+        if self.kind=='manga':
+            from manga_comici import page_reference
+            if page_reference(original):url=original
         with self.lock:
             if not synthetic and url in self.reverse:return self.reverse[url]
             if len(self.resources)>=8000:raise SourceError('Слишком много частей в потоке.')
@@ -416,6 +420,11 @@ def install(app,owner,exports_owner=None):
             if s.kind=='manga' and parse_reference(url):
                 raw,mime=page_image(url)
                 return Response(raw,media_type=mime,headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
+            if s.kind=='manga':
+                from manga_comici import page_reference, fetch_page
+                if reference := page_reference(url):
+                    raw,mime=fetch_page(http,reference,s.headers)
+                    return Response(raw,media_type=mime,headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'})
             from hentaichan_video import open_media, video_media
             if s.kind in {'video', 'preview'} and video_media(url):
                 response,final=open_media(http,url,headers=s.headers,byte_range=range_header or None)

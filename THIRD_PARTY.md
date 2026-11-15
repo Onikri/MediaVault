@@ -437,3 +437,6 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   language filters in Apache-2.0 Keiyoushi `lib-multisrc/hentaihand`,
   `src/all/hentaihand` and `src/all/nhentaicom` at revision
   `6f345a81459739e35d8fc94c05455464e856f771`.
+- The Comici Viewer family (`server/manga_comici.py`) follows the public catalogue,
+  access metadata and 4 × 4 image tile order in Apache-2.0 Keiyoushi
+  `lib-multisrc/comiciviewer` at the same revision.
