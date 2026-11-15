@@ -133,7 +133,12 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         from manga_hentaihand import public_api as hentaihand_public_api
         from manga_comici import public_route as comici_public_route
         from manga_gigaviewer import public_route as giga_public_route
-        if not (any(route(host, url.path, url.query) for route in (iken_public_api, vine_public_api, hentaihand_public_api))
+        from manga_guya import public_api as guya_public_api
+        from manga_mangadventure import public_api as adventure_public_api
+        from manga_mangak import public_api as mangak_public_api
+        adapters = (iken_public_api, vine_public_api, hentaihand_public_api, guya_public_api,
+                    adventure_public_api, mangak_public_api)
+        if not (any(route(host, url.path, url.query) for route in adapters)
                 or comici_public_route(host, url.path, url.query, 'comici-json')
                 or giga_public_route(host, url.path, url.query, 'giga-json')):
             raise SourceError("Этот API не входит в список поддерживаемых публичных плееров.")

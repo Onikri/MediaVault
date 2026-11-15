@@ -2,20 +2,27 @@
 
 from io import BytesIO
 import json
+import re
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 import warnings
 
 from PIL import Image
 from requests import RequestException
 
-from source_parser import SourceError, public_url
+from source_parser import SourceError, SourceRateLimitError, public_url
 
 
 TILE_FRAGMENT = 'mv_comici_tiles='
 GIGA_FRAGMENT = 'mv_giga_page'
+MANGAK_FRAGMENT = 'mv_mangak_image'
+MANGAK_IMAGE_FALLBACK = 'rx.rzyn.net'
 TILES = frozenset(range(16))
 TRANSPOSE = tuple(index % 4 * 4 + index // 4 for index in range(16))
+
+
+def mangak_cdn(host):
+    return bool(re.fullmatch(r'rx\.qvzr[a-z]\.org', host or ''))
 
 
 def read_tiles(value):
@@ -46,6 +53,10 @@ def page_reference(value):
             raise SourceError('Некорректный адрес страницы GigaViewer.')
         tiles = TRANSPOSE if parts.fragment.endswith('=baku') else None
         return public_url(value, resolve_dns=False), tiles, 8, 'giga-image'
+    if parts.fragment == MANGAK_FRAGMENT:
+        if not mangak_cdn(host):
+            raise SourceError('Некорректный адрес страницы MangaK.')
+        return public_url(value, resolve_dns=False), None, 1, 'mangak-image'
     return None
 
 
@@ -76,7 +87,18 @@ def decode_page(raw, tiles, alignment=1):
 def fetch_page(http, reference, headers):
     """Both the online reader and CBZ use the exact same page transformation."""
     target, tiles, alignment, action = reference
-    response, _ = http._open(target, headers=headers, action=action)
+    try:
+        response, _ = http._open(target, headers=headers, action=action)
+    except SourceRateLimitError:
+        raise
+    except SourceError:
+        if action != 'mangak-image':
+            raise
+        parts = urlsplit(target)
+        if not mangak_cdn(parts.hostname):
+            raise
+        fallback = urlunsplit(parts._replace(netloc=MANGAK_IMAGE_FALLBACK))
+        response, _ = http._open(fallback, headers=headers)
     try:
         raw = bytearray()
         for block in response.iter_content(65536):

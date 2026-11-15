@@ -447,3 +447,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
 - The Yii family (`server/manga_yii.py`) follows Apache-2.0 Keiyoushi
   `lib-multisrc/yiimanga` and `lib-multisrc/yiimadara` and their installed
   publisher overrides at the same revision.
+- The Guya, MangAdventure, MangaK and Masonry adapters (`server/manga_guya.py`,
+  `server/manga_mangadventure.py`, `server/manga_mangak.py`,
+  `server/manga_masonry.py`) follow the corresponding Keiyoushi Apache-2.0
+  multisrc entries and installed publisher overrides at the same revision.
