@@ -462,3 +462,6 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   (`server/manga_mangamillion.py`, `server/manga_million_wire.py`,
   `server/manga_mangaball_native.py`, `server/manga_ball_million_profiles.py`)
   follow the public Keiyoushi source implementations at the same Apache-2.0 revision.
+- The MangaDot and NamiComi native adapters (`server/manga_mangadot.py`,
+  `server/manga_dot_wire.py`, `server/manga_namicomi.py` and related modules)
+  follow the public Keiyoushi protocols at the same Apache-2.0 revision.

@@ -15,7 +15,8 @@ FILES.extend(['server/manga_mangahub.py','server/manga_madara.py','server/manga_
               'server/manga_page_media.py','server/manga_gigaviewer.py','server/manga_gigaviewer_profiles.py',
               'server/manga_guya.py','server/manga_mangadventure.py','server/manga_mangak.py','server/manga_mangadex_native.py',
               'server/manga_mangamillion.py','server/manga_million_wire.py','server/manga_ball_million_profiles.py',
-              'server/manga_mangaball_native.py','server/mangaball_reader.py','server/manga_foolslide.py'])
+              'server/manga_mangaball_native.py','server/mangaball_reader.py','server/manga_foolslide.py',
+              'server/manga_dot_nami_http.py','server/manga_dot_nami_profiles.py','server/manga_namicomi.py'])
 CONFIG_FILES = ['server/manga-tag-policy.json']
 # GitHub serves repository LF bytes even when a Windows checkout uses CRLF.
 HASHES = {name: hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n',b'\n')).hexdigest() for name in FILES}

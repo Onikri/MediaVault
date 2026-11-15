@@ -337,7 +337,11 @@ class PublicHttp:
             if action == 'foolslide-form':
                 from manga_foolslide import public_form
                 foolslide_form = public_form(url, data)
-            if not (player_form or search_form or manga_form or million_register or foolslide_form
+            namicomi_form = False
+            if action == 'namicomi-access':
+                from manga_namicomi import public_access_form
+                namicomi_form = public_access_form(url, data)
+            if not (player_form or search_form or manga_form or million_register or foolslide_form or namicomi_form
                     or chan_search or senkognito_read or lostfilm_catalog or honey_chapters
                     or hikka_search or jaomix_toc or madara_form or giga_form):
                 raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
@@ -348,7 +352,8 @@ class PublicHttp:
                                  'Accept': 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8',
                                  'Origin': 'https://hentaichan.cc', 'Referer': 'https://hentaichan.cc/'})
                 data = json.dumps([{'name': data, 'page': 1, 'limit': 24}]).encode()
-            if manga_form or honey_chapters or hikka_search or giga_form:outgoing['Content-Type']='application/json'
+            if manga_form or honey_chapters or hikka_search or giga_form or namicomi_form:
+                outgoing['Content-Type'] = 'application/json'
             if player_form:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
                 outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
