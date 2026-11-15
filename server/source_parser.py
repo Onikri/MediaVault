@@ -308,6 +308,7 @@ class PublicHttp:
             outgoing['Accept'] = 'application/json, text/javascript, */*; q=0.01'
         if byte_range:
             outgoing["Range"] = byte_range
+        fury_form = False
         if method == "POST":
             # Explicit public playback/search forms; never login or arbitrary APIs.
             host = urlsplit(url).hostname
@@ -347,7 +348,15 @@ class PublicHttp:
             if action == 'namicomi-access':
                 from manga_namicomi import public_access_form
                 namicomi_form = public_access_form(url, data)
+            xcomic_form = False
+            if action == 'xcomic-graphql':
+                from manga_xcomic import graphql_form
+                xcomic_form = graphql_form(url, data)
+            if action == 'comicfury-warning':
+                from manga_comicfury import warning_form
+                fury_form = warning_form(url, data)
             if not (player_form or search_form or manga_form or million_register or foolslide_form or namicomi_form
+                    or xcomic_form or fury_form
                     or chan_search or senkognito_read or lostfilm_catalog or honey_chapters
                     or hikka_search or jaomix_toc or madara_form or giga_form):
                 raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
@@ -358,8 +367,11 @@ class PublicHttp:
                                  'Accept': 'text/x-component', 'Content-Type': 'text/plain;charset=UTF-8',
                                  'Origin': 'https://hentaichan.cc', 'Referer': 'https://hentaichan.cc/'})
                 data = json.dumps([{'name': data, 'page': 1, 'limit': 24}]).encode()
-            if manga_form or honey_chapters or hikka_search or giga_form or namicomi_form:
+            if manga_form or honey_chapters or hikka_search or giga_form or namicomi_form or xcomic_form:
                 outgoing['Content-Type'] = 'application/json'
+            if xcomic_form:
+                outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json',
+                                 'Origin': 'https://xcomic.me'})
             if player_form:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
                 outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
@@ -368,8 +380,9 @@ class PublicHttp:
             if self.deadline and time.monotonic() >= self.deadline:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             try:
-                # Clear cookies collected by previous HTML pages, including redirects.
-                self.session.cookies.clear()
+                # A Comic Fury warning can set a cookie for a redirect to the same page.
+                if not fury_form:
+                    self.session.cookies.clear()
                 request_timeout=timeout or self.timeout
                 if self.deadline:
                     remaining=max(.2,self.deadline-time.monotonic());request_timeout=(min(request_timeout[0],remaining),min(request_timeout[1],remaining))
@@ -399,6 +412,12 @@ class PublicHttp:
                     if (target.netloc != origin.netloc or target.path.rstrip('/') != origin.path.rstrip('/')
                             or not route(target.netloc, target.path, target.query)):
                         raise SourceError('VineTheme перенаправил запрос на другой маршрут.')
+                if fury_form:
+                    current, target = urlsplit(url), urlsplit(next_url)
+                    if (response.status_code not in {301, 302, 303} or current.netloc != target.netloc
+                            or current.path.rstrip('/') != target.path.rstrip('/') or current.query != target.query):
+                        raise SourceError('Comic Fury перенаправил подтверждение на другую страницу.')
+                    method, data = "GET", None
                 if method == "POST" and (action or urlsplit(next_url).netloc != urlsplit(url).netloc):
                     raise SourceError("Плеер перенаправил форму на другой сервер.")
                 if response.status_code == 303:

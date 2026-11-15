@@ -469,3 +469,6 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   (`server/manga_globalcomix.py`, `server/manga_dbmultiverse.py`,
   `server/manga_saymanhwa.py`, `server/manga_mangatoon.py`) follow the
   corresponding Apache-2.0 Keiyoushi public reader protocols at the same revision.
+- The XCOMIC and Comic Fury adapters (`server/manga_xcomic.py`,
+  `server/manga_xcomic_queries.py`, `server/manga_comicfury.py`) follow the
+  corresponding Apache-2.0 Keiyoushi protocols at the same revision.
