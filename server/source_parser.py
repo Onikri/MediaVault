@@ -138,8 +138,9 @@ def public_url(value, *, resolve_dns=True, allow_api=False):
         from manga_mangak import public_api as mangak_public_api
         from manga_mangamillion import public_api as million_api
         from manga_webcomic_protocols import public_api as webcomics_api
+        from manga_series_port import series_api
         adapters = (iken_public_api, vine_public_api, hentaihand_public_api, guya_public_api,
-                    adventure_public_api, mangak_public_api, million_api, webcomics_api)
+                    adventure_public_api, mangak_public_api, million_api, webcomics_api, series_api)
         if not (any(route(host, url.path, url.query) for route in adapters)
                 or comici_public_route(host, url.path, url.query, 'comici-json')
                 or giga_public_route(host, url.path, url.query, 'giga-json')):
@@ -256,6 +257,13 @@ class PublicHttp:
             if method != 'GET' or data is not None or not public_api(target.netloc, target.path, target.query):
                 raise SourceError('Некорректный маршрут JSON-каталога.')
             outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+        if action in {'native-series-json', 'native-series-html-api'}:
+            from manga_series_port import series_api
+            target = urlsplit(url)
+            if method != 'GET' or data is not None or not series_api(target.netloc, target.path, target.query):
+                raise SourceError('Некорректный маршрут публичного API каталога.')
+            outgoing.update({'Accept': 'application/json' if action.endswith('json') else 'text/html, */*',
+                             'X-Requested-With': 'XMLHttpRequest'})
         million_register = False
         if action == 'mangamillion-proto':
             from manga_mangamillion import TOKEN, public_api
@@ -316,6 +324,7 @@ class PublicHttp:
         if byte_range:
             outgoing["Range"] = byte_range
         fury_form = False
+        buff_form = False
         if method == "POST":
             # Explicit public playback/search forms; never login or arbitrary APIs.
             host = urlsplit(url).hostname
@@ -362,8 +371,16 @@ class PublicHttp:
             if action == 'comicfury-warning':
                 from manga_comicfury import warning_form
                 fury_form = warning_form(url, data)
+            catalogue_form = False
+            if action == 'native-series-form':
+                from manga_series_port import public_form
+                catalogue_form = public_form(url, data, headers or {})
+                buff_form = bool(catalogue_form and host == 'mangabuff.ru')
+                if buff_form:
+                    outgoing.update({'X-CSRF-TOKEN': headers['X-CSRF-TOKEN'], 'X-Requested-With': 'XMLHttpRequest',
+                                     'Accept': 'application/json', 'Origin': 'https://mangabuff.ru'})
             if not (player_form or search_form or manga_form or million_register or foolslide_form or namicomi_form
-                    or xcomic_form or fury_form
+                    or xcomic_form or fury_form or catalogue_form
                     or chan_search or senkognito_read or lostfilm_catalog or honey_chapters
                     or hikka_search or jaomix_toc or madara_form or giga_form):
                 raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
@@ -388,7 +405,7 @@ class PublicHttp:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             try:
                 # A Comic Fury warning can set a cookie for a redirect to the same page.
-                if not fury_form:
+                if not (fury_form or buff_form):
                     self.session.cookies.clear()
                 request_timeout=timeout or self.timeout
                 if self.deadline:
@@ -403,7 +420,8 @@ class PublicHttp:
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
                 response.close()
-                if action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json'} or not location or hop == 5:
+                if (action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json',
+                               'native-series-json', 'native-series-html-api'} or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
                 if publisher:

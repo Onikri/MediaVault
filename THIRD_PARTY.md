@@ -449,6 +449,10 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   documented in the corresponding Apache-2.0 Keiyoushi extensions at the same
   revision. The installer package, version and upstream folder for each profile
   are listed in `docs/native-source-inventory.csv`.
+- The second catalogue batch follows public HTML and API routes in the same
+  pinned Apache-2.0 Keiyoushi sources. This includes GroupLe, LibGroup,
+  MangaBox, MangaReader, FMReader, WPComics, Liliana, EZManhwa, HeanCMS and
+  standalone extension paths listed in `docs/native-source-inventory.csv`.
 - The Yii family (`server/manga_yii.py`) follows Apache-2.0 Keiyoushi
   `lib-multisrc/yiimanga` and `lib-multisrc/yiimadara` and their installed
   publisher overrides at the same revision.

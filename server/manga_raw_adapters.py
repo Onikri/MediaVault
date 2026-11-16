@@ -18,7 +18,7 @@ LANGUAGES=('ru','en','ja','ko')
 
 def api_url(value):
     p=urlsplit(value)
-    allowed=(p.hostname=='api.mangarw.com' and re.fullmatch(r'/api/v1/(?:search/?|manga/\d+(?:/chapters)?|chapter/\d+)',p.path)) or (p.hostname=='raw.senmanga.com' and re.fullmatch(r'/api/(?:directory|manga/[\w.-]+|read/[\w.-]+/[\w.-]+)',p.path)) or (p.hostname=='comic.naver.com' and re.fullmatch(r'/api/(?:search/(?:webtoon|bestChallenge|challenge)|article/list(?:/info)?)',p.path))
+    allowed=(p.hostname=='api.mangarw.com' and re.fullmatch(r'/api/v1/(?:search/?|manga/\d+(?:/chapters)?|chapter/\d+)',p.path)) or (p.hostname=='raw.senmanga.com' and re.fullmatch(r'/api/(?:directory|home|manga/[\w.-]+|read/[\w.-]+/[\w.-]+)',p.path)) or (p.hostname=='comic.naver.com' and re.fullmatch(r'/api/(?:search/(?:webtoon|bestChallenge|challenge)|article/list(?:/info)?)',p.path))
     if not allowed or any(v in {'.','..'} for v in p.path.split('/')):raise SourceError('Этот адрес не относится к публичным данным поддерживаемой читалки.')
     return public_url(value,allow_api=True)
 

@@ -123,4 +123,10 @@ python scripts/probe-native-source-batch.py --ssh mediavault-vm --inactive --bat
 | [Дополнительные варианты Madara](../server/manga_madara_profiles.py) | 6 | 6 | Пагинация каталога, списки глав JSON, старые пути Toonily и заголовки для CDN |
 | [Дополнительные варианты MangaThemesia](../server/manga_themesia.py) | 7 | 8 | Два языка Miau Scan, Comic Asura, динамические адреса тайтлов и открытые главы |
 
-Прямой код есть у 315 из 725 APK и 917 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 852 и поддерживает прогоны по 200 профилей.
+| [MangaBox, MangaReader, FMReader, WPComics, Liliana](../server/manga_html_families.py) | 14 | 14 | HTML-выдача, API глав, чтение из HTML-фрагментов и варианты японских читалок |
+| [GroupLe и LibGroup](../server/manga_ru_families.py) | 9 | 9 | Каталоги по ID сайта, жанры и теги, открытые выпуски и восстановление параметров ветки |
+| [EZManhwa и HeanCMS](../server/manga_json_families.py) | 4 | 4 | API карточек и глав, пагинация и состояние доступа |
+| [Самостоятельные каталоги](../server/manga_individual_catalogues.py) | 9 | 9 | MangaPill, MangaKatana, MangaBuff, MangaPoisk, Sen Manga, Manga Rw, Toonkor, RawBaka и TCB Scans |
+| [Архивы веб-комиксов](../server/manga_archive_ports.py) | 14 | 24 | Языковые издания, архивы по годам, группировка страниц и отдельный маршрут галереи |
+
+Прямой код есть у 365 из 725 APK и 977 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 912 и поддерживает прогоны по 200 профилей.
