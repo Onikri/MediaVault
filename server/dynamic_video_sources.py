@@ -18,7 +18,13 @@ def provider_for(url):
     # v5.hentasis5.top in November 2026); accept the whole family, not one host.
     if HENTASIS_HOST.fullmatch(host) and re.search(r'/\d+-[^/]+\.html$', parts.path, re.I):
         return 'hentasis', 'Hentasis'
-    return None
+    from hentai_video_sites import provider_for as native_provider
+    return native_provider(url)
+
+
+def native(identifier):
+    from hentai_video_sites import PROVIDERS
+    return identifier in PROVIDERS
 
 
 # Current mirrors first; a mirror that is down or redirected elsewhere is skipped.
@@ -58,6 +64,13 @@ def inspect(url, provider, http, dub_url=None, state=None):
     identifier, label = provider
     if dub_url and dub_url != url:
         raise SourceError('На этой странице нет выбранной дорожки.')
+    if native(identifier):
+        # The series, its episodes and their MP4s come from the site's own pages.
+        from hentai_video_sites import episodes as native_episodes
+        title, episodes = native_episodes(identifier, url, http)
+        return {'provider': identifier, 'title': title or label, 'url': url, 'episodes': episodes,
+                'dubs': [choice('Дорожка источника', url, player=label, episodes=episodes)],
+                'seasons': [], 'releases': [], 'complete': True, 'available': True, 'diagnostics': []}
     title = label
     diagnostics = []
     try:
@@ -105,6 +118,18 @@ def check_mp4(http, stream, *, open_stream=None):
 def resolve_dynamic(http, url, referer, title, provider=None):
     from browser_player import extract
 
+    if provider and native(provider):
+        from hentai_video_sites import streams as native_streams
+        playable = []
+        for stream in native_streams(provider, url, http):
+            try:
+                check_mp4(http, stream)
+            except SourceError:
+                continue  # One expired or broken quality does not hide the others.
+            playable.append(stream)
+        if not playable:
+            raise SourceError('Источник не отдал MP4 с поддержкой перемотки.')
+        return Page(title=title, streams=playable)
     if provider == 'hanime':
         # Cloudflare challenges the Oracle address for every HanimeTV page and
         # signed API call. The handshake and playlists go through the owner's

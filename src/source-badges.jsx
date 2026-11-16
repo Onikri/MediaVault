@@ -19,7 +19,10 @@ const SOURCES=[
   ['jutsu',/jut\.?su/i,'Jut.su',95],
   ['animedia',/animedia/i,'Animedia',310],
   ['hentasis',/hentasis/i,'Hentasis',320],
-  ['hanime',/hanime/i,'Hanime',335]
+  ['hanime1',/hanime1/i,'Hanime1',350],
+  ['hanime',/hanime/i,'Hanime',335],
+  ['hentaimama',/hentaimama/i,'HentaiMama',135],
+  ['hentaicomua',/hentai\.com\.ua/i,'Hentai UA',230]
 ];
 export function sourceOf(player){
   const name=String(player||'').trim();if(!name)return null;
