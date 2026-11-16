@@ -67,11 +67,18 @@ export function sliceImageDataIntoLines(
 
   const threshold = inkBrightness + (bgBrightness - inkBrightness) * thresholdRatio;
 
+  // MediaVault change: the balloon outline or a panel frame caught in the crop
+  // runs down its side through every row; counted as ink it fuses all lines
+  // into one image the recognizer cannot read (EVEN ANAS- TASIA → EVEN TASTA).
+  // Strokes touching the crop edge that span over half of it are background
+  // for both the line split and the line images.
+  const outline = edgeStrokes(grayPixels, width, height, threshold);
+
   const rowIntensities = new Array(height).fill(0);
   for (let y = 0; y < height; y++) {
     let count = 0;
     for (let x = 0; x < width; x++) {
-      if (grayPixels[y * width + x] < threshold) count++;
+      if (grayPixels[y * width + x] < threshold && !outline?.[y * width + x]) count++;
     }
     rowIntensities[y] = count;
   }
@@ -137,7 +144,7 @@ export function sliceImageDataIntoLines(
     let maxX = 0;
     for (let y = startY; y < endY; y++) {
       for (let x = 0; x < width; x++) {
-        if (grayPixels[y * width + x] < threshold) {
+        if (grayPixels[y * width + x] < threshold && !outline?.[y * width + x]) {
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
         }
@@ -155,13 +162,46 @@ export function sliceImageDataIntoLines(
     ctx.fillRect(0, 0, lineW, lineH);
 
     const tempCanvas = new OffscreenCanvas(width, height);
-    tempCanvas.getContext("2d")!.putImageData(imageData, 0, 0);
+    tempCanvas.getContext("2d")!.putImageData(outline ? withoutOutline(imageData, outline, bgBrightness) : imageData, 0, 0);
     ctx.drawImage(tempCanvas, startX, startY, lineW, lineH, 0, 0, lineW, lineH);
 
     lines.push(ctx.getImageData(0, 0, lineW, lineH));
   }
 
   return lines.length > 0 ? lines : [imageData];
+}
+
+// MediaVault change: dark strokes connected to the crop edge whose extent is
+// over half the crop's height or width (a balloon outline, a panel frame).
+// A letter clipped by the edge is smaller than that and stays text.
+function edgeStrokes(gray: Uint8Array, width: number, height: number, threshold: number): Uint8Array | null {
+  const seen = new Uint8Array(width * height), queue = new Int32Array(width * height);
+  let outline: Uint8Array | null = null;
+  const component = (seed: number) => {
+    let a = 0, z = 1, x1 = width, y1 = height, x2 = 0, y2 = 0;
+    queue[0] = seed; seen[seed] = 1;
+    while (a < z) {
+      const n = queue[a++], x = n % width, y = (n / width) | 0;
+      if (x < x1) x1 = x; if (x > x2) x2 = x; if (y < y1) y1 = y; if (y > y2) y2 = y;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy, i = yy * width + xx;
+        if (xx >= 0 && xx < width && yy >= 0 && yy < height && !seen[i] && gray[i] < threshold) { seen[i] = 1; queue[z++] = i; }
+      }
+    }
+    if (y2 - y1 + 1 > height * 0.5 || x2 - x1 + 1 > width * 0.5) {
+      outline ??= new Uint8Array(width * height);
+      for (let k = 0; k < z; k++) outline[queue[k]] = 1;
+    }
+  };
+  for (let x = 0; x < width; x++) for (const y of [0, height - 1]) { const n = y * width + x; if (!seen[n] && gray[n] < threshold) component(n); }
+  for (let y = 0; y < height; y++) for (const x of [0, width - 1]) { const n = y * width + x; if (!seen[n] && gray[n] < threshold) component(n); }
+  return outline;
+}
+
+function withoutOutline(imageData: ImageData, outline: Uint8Array, background: number): ImageData {
+  const copy = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+  for (let n = 0; n < outline.length; n++) if (outline[n]) { const p = n * 4; copy.data[p] = copy.data[p + 1] = copy.data[p + 2] = background; }
+  return copy;
 }
 
 export function normalizePolarity(imageData: ImageData): ImageData {
