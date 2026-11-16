@@ -407,6 +407,14 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   vector estimator, vocoder, configuration, character indexer and the ten voice styles).
 - `src/tts/supertonic.worker.js` ports the inference loop of Supertone's MIT-licensed
   `web/helper.js` (https://github.com/supertone-oss-archive/supertonic).
+- **Background music of the ranobe reader** — pieces by **Kevin MacLeod**
+  (https://incompetech.com), licensed **Creative Commons: By Attribution 4.0**
+  (https://creativecommons.org/licenses/by/4.0/). `src/tts/music-catalog.js` holds only
+  metadata (title, file name, mood tags, tempo, length, instruments, a shortened
+  description) taken from incompetech.com's `pieces.json` by
+  `scripts/build-music-catalog.py`; the audio is streamed by the viewer's browser from
+  incompetech.com and is not redistributed. The reader settings show the credit
+  «Музыка: Kevin MacLeod · incompetech.com · CC BY 4.0» with a link.
 
 ## Text sources
 

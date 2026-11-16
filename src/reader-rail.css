@@ -73,7 +73,7 @@
  .reader-rail{top:auto;left:var(--rail-gap);right:var(--rail-gap);width:auto;height:var(--rail-size);flex-direction:row;gap:6px}
  .reader-rail-group,.reader-rail-dock .narration-bar{flex-direction:row;width:auto;height:100%;padding:4px;border-radius:16px}
  .reader-rail .reader-control,.reader-rail-dock .narration-bar button{width:40px;min-width:40px;height:40px;min-height:40px}
- .reader-rail .reader-fullscreen,.reader-rail-count,.reader-rail-dock .narration-skip,.reader-rail-dock .narration-pace{display:none}
+ .reader-rail .reader-fullscreen,.reader-rail-count,.reader-rail-dock .narration-skip,.reader-rail-dock .narration-pace,.reader-rail :is(.reader-night,.reader-music){display:none}
  .reader-rail-dock{width:auto}
  .reader-rail-dock .narration-bar .narration-main{margin:0}
  .reader-rail-dock .narration-consent,.reader-rail-dock .narration-cast,.reader-rail-dock .narration-book,.reader-rail-dock .inline-error{left:var(--rail-gap);right:var(--rail-gap);width:auto;max-width:none;bottom:calc(var(--rail-size) + var(--rail-gap) * 2)}
@@ -86,3 +86,6 @@
 .text-reader.is-mini .immersive-stage,.text-reader.is-mini .reader-rail-group{display:none}
 .text-reader.is-mini .reader-rail{position:static;width:auto;height:auto;padding:8px;flex-direction:row;justify-content:center}
 .text-reader.is-mini .reader-rail-dock .narration-bar{flex-direction:row;width:auto}
+
+/* A switch in the rail (night, music) shows its state by colour only. */
+.reader-rail .reader-control[aria-pressed="true"]{color:var(--color-blossom,#ee3c35)}

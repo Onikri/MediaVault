@@ -106,6 +106,7 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
     {onMinimize&&<button className="reader-control" aria-label="Свернуть читалку" title="Свернуть — голос продолжит читать" onClick={onMinimize}><Minimize2 size={18}/></button>}
     {contents&&<button className="reader-control" aria-label="Главы и тома" title="Оглавление" onClick={()=>openPanel('contents')}><List size={19}/></button>}
     {settings&&<button className="reader-control" aria-label="Настройки читалки" title="Текст и тема" aria-expanded={settingsOpen} onClick={()=>openPanel('settings')}><Settings2 size={19}/></button>}
+    {rail&&actions}
     <button className="reader-control reader-fullscreen" aria-label={full?'Выйти из полного экрана':'На весь экран'} title={full?'Обычный размер':'На весь экран'} onClick={fullscreen}>{full?<Minimize size={18}/>:<Maximize size={18}/>}</button>
    </div>
    <div className="reader-rail-group reader-rail-pages">

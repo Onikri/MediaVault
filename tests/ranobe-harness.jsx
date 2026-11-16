@@ -41,6 +41,8 @@ const service={status:'connected',session:{serverVersion:gemini?59:58},request:a
     moods:['0-99|calm|4'],cast:known?[]:['Мирэй|f|young|звонкий голос','Кайто|m|young|мягкий голос']});
   }
   if(system.includes('ведёшь список персонажей'))return answer({same:[],characters:[]});
+  // MOCK sound director (not model output): a calm night piece, then silence for the quarrel.
+  if(system.includes('звукорежиссёр')){window.scored=(window.scored||0)+1;return answer({scenes:['1-1|1|2|тихая ночь','2-4|0|1|перебранка']});}
   throw Error('mock: unexpected model '+body.model);
  }
  throw Error('unexpected '+path);
