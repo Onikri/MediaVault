@@ -7,6 +7,10 @@ from unittest.mock import Mock
 from urllib.parse import parse_qs, urlsplit
 
 import manga_fifth_batch_profiles
+import manga_initmanga
+import manga_madara
+import manga_madaradex_guest
+import manga_mangataro
 from manga_russian_direct import svelte_value
 from manga_series_port import public_form
 from manga_source_urls import split_reader_url
@@ -51,12 +55,13 @@ class FifthBatchTests(TestCase):
         return adapter
 
     def test_profiles_are_staged_and_match_the_inventory(self):
-        selected = {adapter.SOURCE_ID: adapter for adapter in manga_fifth_batch_profiles.sources()}
+        historical = [adapter for adapter in manga_madara.SOURCES if adapter.NAME in {'Anisa Scans', 'MadaraDex'}]
+        selected = {adapter.SOURCE_ID: adapter for adapter in (*manga_fifth_batch_profiles.sources(), *historical)}
         candidates, active = runpy.run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(encoding='utf-8', newline='') as file:
             rows = [row for row in csv.DictReader(file) if row['source_id'] in selected]
-        self.assertEqual(len(selected), 61)
-        self.assertEqual(len({row['package'] for row in rows}), 29)
+        self.assertEqual(len(selected), 82)
+        self.assertEqual(len({row['package'] for row in rows}), 50)
         self.assertEqual(set(selected), {row['source_id'] for row in rows})
         for row in rows:
             source = candidates[row['source_id']]
@@ -169,3 +174,77 @@ class FifthBatchTests(TestCase):
         episodes = source.inspect(title, http)['episodes']
         self.assertEqual([split_reader_url(row['url'])[1] for row in episodes], [title + part for part in ('1/', '3/', '4/')])
         self.assertEqual(source.inspect(episodes[0]['url'], http)['pages'], [root + '/p1.webp', root + '/p2.webp'])
+
+    def test_madaradex_refreshes_guest_only_for_its_routes(self):
+        guest = manga_madaradex_guest.GuestSession()
+        root = manga_madaradex_guest.ROOT
+        header = manga_madaradex_guest.COOKIE_HEADER
+        guest.fingerprint = 'mdx_fp=' + 'a' * 32
+
+        def document(url, **options):
+            if url.endswith('admin-ajax.php'):
+                self.assertEqual(options['headers'][header], guest.fingerprint)
+                self.assertEqual(options['data'], {'action': 'mdx_auth_refresh'})
+                return '', url, {'Set-Cookie': 'mdx_auth=testing-token; Max-Age=500; Path=/'}
+            self.assertEqual(options['headers'][header], guest.fingerprint + '; mdx_auth=testing-token')
+            return '<html/>', url, {}
+
+        http = Mock(document=Mock(side_effect=document))
+        self.assertEqual(guest.request(http, root + '/title/example/', headers={})[0], '<html/>')
+        self.assertEqual(guest.request(http, root + '/title/other/', headers={})[0], '<html/>')
+        self.assertEqual(http.document.call_count, 3)
+        self.assertFalse(manga_madaradex_guest.transport_mode('https://example.com/page', 'GET', None, 'madaradex-cdn',
+                                                            {header: guest.cookie}))
+
+    def test_mangataro_signs_outline_and_preserves_the_reader_id(self):
+        source = self.source('MangaTaro')
+        root = source.ROOT
+        title = root + '/manga/work?mv_id=77'
+        chapter = root + '/read/work/chapter-5-782'
+
+        def handler(url, **options):
+            parts = urlsplit(url)
+            self.assertTrue(manga_mangataro.public_api(parts.netloc, parts.path, parts.query))
+            if parts.path == manga_mangataro.OUTLINE:
+                args = parse_qs(parts.query)
+                self.assertEqual(args['manga_id'], ['77'])
+                self.assertEqual(args['_t'][0], manga_mangataro.chapter_token(int(args['_ts'][0])))
+                row = {'chapters': [{'url': chapter, 'chapter': '5', 'language': 'en', 'group_name': 'Team'}]}
+            elif parts.path.startswith(manga_mangataro.DETAILS):
+                row = {'id': 77, 'slug': 'work', 'title': {'rendered': 'Work'}, '_embedded': {}}
+            elif parts.path == manga_mangataro.PAGES:
+                self.assertEqual(parts.query, 'chapter_id=782')
+                row = {'images': ['/1.png', '/2.png']}
+            else:
+                self.fail(f'Unexpected request {parts.path}')
+            return json.dumps(row), url, {}
+
+        http = Mock(document=Mock(side_effect=handler), deadline=None)
+        episodes = source.inspect(title, http)['episodes']
+        self.assertEqual([(split_reader_url(episode['url'])[1], episode['translator']) for episode in episodes], [(chapter, 'Team')])
+        http.document.side_effect = lambda url, **options: (
+            ('<body data-manga-id="77"></body>', url, {}) if url == root + '/manga/work' else handler(url, **options))
+        self.assertEqual(source.inspect(episodes[0]['url'], http)['pages'], [root + '/1.png', root + '/2.png'])
+
+    def test_initmanga_catalogue_skips_locked_chapters(self):
+        source = self.source('Mgread.io')
+        root = source.ROOT
+        title = root + '/manga/work/'
+        url = title + 'chapter-2/'
+        http = fixture({
+            title: '<body class="postid-72"><h1>Work</h1></body>',
+            root + manga_initmanga.OUTLINE + '?manga_id=72&per_page=50&paged=1': {
+                'total_pages': 1,
+                'items': [{'slug': 'chapter-1', 'number': 1, 'lock_type': 'coins', 'is_purchased': False},
+                          {'slug': 'chapter-2', 'number': 2, 'lock_type': 'none', 'is_purchased': False}],
+            },
+            url: '<div id="chapter-content"><img data-src="/2.webp"></div>',
+        })
+        episodes = source.inspect(title, http)['episodes']
+        self.assertEqual([split_reader_url(row['url'])[1] for row in episodes], [url])
+        self.assertEqual(source.inspect(episodes[0]['url'], http)['pages'], [root + '/2.webp'])
+        self.assertEqual(manga_initmanga.public_form(root + manga_initmanga.VAULT_API,
+                         {'action': 'imip_gate_unlock', 'cid': '7', 'nonce': 'valid_nonce'}, {'Referer': url}), 'vault')
+        self.assertFalse(manga_initmanga.public_form(root + manga_initmanga.VAULT_API,
+                         {'action': 'imip_gate_unlock', 'cid': '7', 'nonce': 'valid_nonce'},
+                         {'Referer': 'https://example.com/manga/work/chapter-2/'}))

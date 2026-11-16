@@ -141,6 +141,6 @@ python scripts/probe-native-source-batch.py --ssh mediavault-vm --inactive --bat
 | [Публичные JSON-каталоги](../server/manga_independent_json_ports.py) | 8 | 8 | Next.js, React Flight, вложенный JSON и поисковые формы |
 | [Самостоятельные адаптеры](../server/manga_standalone_ports.py) | 28 | 28 | Каталоги, списки глав, архивы и галереи |
 
-В пятой партии подготовлены 29 из 50 APK и 61 профиль. Реестр содержит прямые адаптеры для WaManga, Tomilo-lib, AstraManga, NineGrid, Rawkuma, Rizz Comic, Weeb Central, INKRUSH и остальных профилей этой части партии.
+В пятой партии подготовлены 50 APK и 82 профиля. Реестр содержит WaManga, Tomilo-lib, AstraManga, NineGrid, Rawkuma, Rizz Comic, Weeb Central, INKRUSH, MangaTaro, InitManga, Renascans, Pepper&Carrot и остальные профили партии. Исторические исходники Anisa Scans и Hentai3z.CC соответствуют установленным APK.
 
-Прямой код есть у 494 из 725 APK и 1 187 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 1 122 и поддерживает прогоны по 200 профилей.
+Прямой код есть у 515 из 725 APK и 1 208 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 1 143 и поддерживает прогоны по 200 профилей.

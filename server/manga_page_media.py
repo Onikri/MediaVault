@@ -41,6 +41,21 @@ def page_reference(value):
     """Validate internal page markers, which never go to the upstream server."""
     parts = urlsplit(value)
     host = parts.hostname or ''
+    if parts.fragment == 'mv_madaradex_guest':
+        from manga_madaradex_guest import IMAGE_HOST
+        if host != IMAGE_HOST:
+            raise SourceError('Некорректный адрес страницы MadaraDex.')
+        return public_url(value, resolve_dns=False), None, 1, 'madaradex-cdn'
+    if parts.fragment.startswith('mv_imip='):
+        from manga_initmanga import open_image_grant
+        target, _ = open_image_grant(value)
+        public_url(target, resolve_dns=False)
+        return value, None, 1, 'initmanga-image'
+    if parts.fragment.startswith('mv_rena_page='):
+        from manga_scanlation_catalogues import rena_marker
+        target, _ = rena_marker(value)
+        public_url(target, resolve_dns=False)
+        return value, None, 1, 'rena-image'
     if parts.fragment.startswith(TILE_FRAGMENT):
         from manga_comici import image_route
         if not image_route(host) or len(parts.fragment) > 86:
@@ -113,6 +128,27 @@ def decode_page(raw, tiles, alignment=1):
 def fetch_page(http, reference, headers):
     """Both the online reader and CBZ use the exact same page transformation."""
     target, tiles, alignment, action = reference
+    if action == 'madaradex-cdn':
+        from manga_madaradex_guest import SESSION
+
+        response, _ = SESSION.request(http, target, headers=headers, image=True)
+        return validated_image(read_image(http, response))
+    if action == 'initmanga-image':
+        from manga_initmanga import decode_image, open_image_grant
+
+        url, key = open_image_grant(target)
+        response, _ = http._open(url, headers=headers)
+        return validated_image(decode_image(read_image(http, response), key))
+    if action == 'rena-image':
+        from manga_scanlation_catalogues import rena_marker, renew_rena
+        from source_parser import SourceAccessError
+
+        url, _ = rena_marker(target)
+        try:
+            response, _ = http._open(url, headers=headers)
+        except SourceAccessError:
+            response, _ = http._open(renew_rena(http, target), headers=headers)
+        return validated_image(read_image(http, response))
     if action == 'ball-image':
         from manga_mangaball_native import parsed_page
         from mangaball_reader import reserve_image

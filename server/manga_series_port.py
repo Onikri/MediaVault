@@ -26,17 +26,24 @@ def series_api(host, path, query):
     from manga_direct_catalogues import public_api as direct_html
     from manga_direct_payloads import public_api as payloads
     from manga_html_families import public_api as html
+    from manga_html_archives import public_api as html_archives
+    from manga_illustrated_archives import public_api as illustrated
     from manga_independent_json_ports import public_api as independent_json
+    from manga_initmanga import public_api as initmanga
     from manga_inkstory import public_api as ink
     from manga_json_families import public_api as api
+    from manga_kappabeast import public_api as kappa
+    from manga_mangataro import public_api as mangataro
     from manga_natsuid import public_api as natsuid
     from manga_public_galleries import public_api as gallery_api
     from manga_remaining_families import public_api as remaining
     from manga_ru_families import public_api as ru
     from manga_ru_json_ports import public_api as ru_json
     from manga_russian_direct import public_api as russian_direct
+    from manga_sacachispa import public_api as sacachispa
     from manga_scan_directory import public_api as scan_directory
     from manga_scanlation_json import public_api as scanlation
+    from manga_scanlation_catalogues import public_api as scan_cats
     from manga_senkuro_native import public_api as senkuro
     from manga_spa_catalogues import public_api as spa_catalogue
     from manga_standalone_ports import public_api as standalone
@@ -46,7 +53,9 @@ def series_api(host, path, query):
         return bool(re.fullmatch(r'id=[0-9]{1,18}', query))
     return any(route(host, path, query) for route in (html, api, ru, archives, direct_html, payloads, remaining, senkuro, ink,
                                                      standalone, independent_json, natsuid, creator_feed, spa_catalogue,
-                                                     russian_direct, yarnovel, gallery_api, scanlation, scan_directory, ru_json))
+                                                     russian_direct, yarnovel, gallery_api, scanlation, scan_directory, ru_json,
+                                                     mangataro, initmanga, scan_cats, html_archives, kappa, illustrated,
+                                                     sacachispa))
 
 
 def public_form(url, data, headers):
@@ -67,9 +76,10 @@ def public_form(url, data, headers):
                 and isinstance(data['story'], str) and 4 <= len(data['story']) <= 160)
     from manga_standalone_ports import public_form as standalone
     from manga_fifth_families import public_form as fifth
+    from manga_hentailoop import public_form as loop
     from manga_ru_html_ports import public_form as russian_html
 
-    return standalone(url, data) or fifth(url, data) or russian_html(url, data)
+    return standalone(url, data) or fifth(url, data) or russian_html(url, data) or loop(url, data)
 
 
 def document_json(http, url, referer):

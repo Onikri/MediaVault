@@ -246,11 +246,29 @@ class PublicHttp:
 
     def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None, action=None):
         url = self.validate(value)
-        if RELAY_ROUTE is not None and method == 'GET' and not byte_range and action not in {'mangamillion-proto', 'globalcomix-json'}:
+        if (RELAY_ROUTE is not None and method == 'GET' and not byte_range
+                and action not in {'mangamillion-proto', 'globalcomix-json', 'madaradex-web', 'madaradex-cdn', 'fanfox-reader'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
+        if action == 'fanfox-reader':
+            from manga_html_readers import FOX_READER
+            target = urlsplit(url)
+            if (method != 'GET' or data is not None or target.netloc != 'm.fanfox.net' or target.query
+                    or not FOX_READER.fullmatch(target.path)):
+                raise SourceError('Некорректная ссылка на мобильную читалку FanFox.')
+            outgoing['Cookie'] = 'readway=2; isAdult=1'
+        mdx_mode = ''
+        if action in {'madaradex-web', 'madaradex-cdn', 'madaradex-refresh'} or (
+                action == 'madara-read' and headers and 'X-MediaVault-Mdx-Cookie' in headers):
+            from manga_madaradex_guest import COOKIE_HEADER, transport_mode
+            mdx_mode = transport_mode(url, method, data, action, headers or {})
+            if not mdx_mode:
+                raise SourceError('Некорректный маршрут гостевой сессии MadaraDex.')
+            outgoing['Cookie'] = headers[COOKIE_HEADER]
+            if mdx_mode == 'refresh':
+                outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://madaradex.org'})
         if action == 'webcomic-json':
             from manga_webcomic_protocols import public_api
             target = urlsplit(url)
@@ -354,6 +372,17 @@ class PublicHttp:
                 raise SourceError('Некорректная форма каталога Rawkuma.')
             natsuid_form = True
             outgoing.update({'Accept': 'text/html, */*', 'X-Requested-With': 'XMLHttpRequest'})
+        init_form = ''
+        if action == 'initmanga-public-form':
+            from manga_initmanga import public_form as init_public_form
+            init_form = init_public_form(url, data, headers or {})
+            if method != 'POST' or not init_form:
+                raise SourceError('Некорректная форма читалки InitManga.')
+            outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+            if init_form == 'key':
+                outgoing['Content-Type'] = 'application/json'
+                if headers.get('X-WP-Nonce'):
+                    outgoing['X-WP-Nonce'] = headers['X-WP-Nonce']
         if method == "POST":
             # Explicit public playback/search forms; never login or arbitrary APIs.
             host = urlsplit(url).hostname
@@ -419,7 +448,7 @@ class PublicHttp:
                                      'Accept': 'application/json', 'Origin': 'https://mangabuff.ru'})
                 if catalogue_form and host == 'manhwalike.com':
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'})
-                if catalogue_form and host == 'rizzfables.com':
+                if catalogue_form and host in {'rizzfables.com', 'hentailoop.com'}:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
             if action == 'native-series-data-form':
                 from manga_independent_json_ports import public_form
@@ -428,8 +457,16 @@ class PublicHttp:
                     outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
                     if isinstance(data, bytes):
                         outgoing['Content-Type'] = 'application/json'
+            mangataro_form = False
+            if action == 'mangataro-form':
+                from manga_mangataro import public_form
+                mangataro_form = public_form(url, data)
+                if mangataro_form:
+                    outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
+                                     'X-Requested-With': 'XMLHttpRequest'})
             if not (player_form or search_form or manga_form or million_register or foolslide_form or namicomi_form
-                    or xcomic_form or fury_form or catalogue_form or natsuid_form
+                    or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form
+                    or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
                     or hikka_search or jaomix_toc or madara_form or giga_form):
                 raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
@@ -463,7 +500,7 @@ class PublicHttp:
                 if publisher and routed(url, route_config):
                     options['proxies'] = {'https': route_config['httpProxy']}
                 body = data
-                if natsuid_form:
+                if natsuid_form or init_form == 'vault':
                     options['files'] = {key: (None, value) for key, value in data.items()}
                     body = None
                 response = self.session.request(method, url, headers=outgoing, data=body,
@@ -475,10 +512,12 @@ class PublicHttp:
                 response.close()
                 if (action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
-                               'natsuid-search', 'creator-feed-json'}
+                               'natsuid-search', 'creator-feed-json', 'fanfox-reader'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
+                if mdx_mode and (method != 'GET' or urlsplit(next_url).netloc != urlsplit(url).netloc):
+                    raise SourceError('MadaraDex перенаправил запрос гостевой сессии.')
                 if publisher:
                     target = urlsplit(next_url)
                     allowed = (image_route(target.netloc) if publisher_image
@@ -506,6 +545,9 @@ class PublicHttp:
                 continue
             if not 200 <= response.status_code < 300:
                 status = response.status_code
+                if (init_form == 'key' and status in {400, 401, 403}
+                        and response.headers.get('Content-Type', '').partition(';')[0].strip() == 'application/json'):
+                    return response, url
                 response.close()
                 if status == 429:
                     raise SourceRateLimitError(response.headers.get('Retry-After'))

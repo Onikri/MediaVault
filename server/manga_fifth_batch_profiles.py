@@ -19,6 +19,26 @@ import manga_scan_directory
 
 import manga_ru_json_ports
 
+import manga_historical_ports
+
+import manga_mangataro
+
+import manga_hentailoop
+
+import manga_initmanga
+
+import manga_html_readers
+
+import manga_scanlation_catalogues
+
+import manga_html_archives
+
+import manga_kappabeast
+
+import manga_illustrated_archives
+
+import manga_sacachispa
+
 
 PROFILES = (
     (manga_fifth_families.RizzComic, ('3062320139670175675', 'Rizz Comic', 'en', 'https://rizzfables.com', False)),
@@ -82,6 +102,25 @@ PROFILES = (
     (manga_scan_directory.StoneScape, ('5914422711950728870', 'StoneScape', 'en', 'https://stonescape.xyz', False)),
     (manga_ru_json_ports.AstraManga, ('7938304578940592570', 'AstraManga', 'ru', 'https://astramanga.org', False)),
     (manga_ru_json_ports.NineGrid, ('5811065998267343017', 'NineGrid', 'ru', 'https://9grid.cc', False)),
+    (manga_historical_ports.Hentai3z, ('1647077515907093606', 'Hentai3z.CC', 'en', 'https://hentai3z.cc', True)),
+    (manga_mangataro.MangaTaro, ('8358097306709528603', 'MangaTaro', 'en', 'https://mangataro.org', True)),
+    (manga_mangataro.MangaTaro, ('3390167717659783669', 'Rolia Scan', 'en', 'https://roliascan.com', False)),
+    (manga_hentailoop.HentaiLoop, ('3077154580363219152', 'HentaiLoop', 'all', 'https://hentailoop.com', True)),
+    (manga_initmanga.InitManga, ('3174596843279946873', 'Manga Drama', 'en', 'https://mangadrama.com', True)),
+    (manga_initmanga.InitManga, ('15083818169656208', 'Mgread.io', 'en', 'https://mgread.io', True)),
+    (manga_html_readers.FanFox, ('6484561431658238800', 'MangaFox', 'en', 'https://fanfox.net', True)),
+    (manga_html_readers.ManhwaRead, ('492596911850505683', 'ManhwaRead', 'en', 'https://manhwaread.com', True)),
+    (manga_html_readers.NewManhwa, ('3639911276143172075', 'New Manhwa', 'en', 'https://saymanhwa.com', True)),
+    (manga_scanlation_catalogues.ParadiseScans, ('5928300995303689257', 'Paradise Scans', 'en', 'https://paradisescans.com', True)),
+    (manga_scanlation_catalogues.Nuviatoon, ('9071935154458913856', 'Nuvia Toon', 'en', 'https://nuviatoon.org', False)),
+    (manga_scanlation_catalogues.Renascans, ('3447464472094373275', 'Renascans', 'en', 'https://renascans.net', False)),
+    (manga_html_archives.TodayManga, ('1147556681248758139', 'TodayManga', 'en', 'https://todaymanga.com', True)),
+    (manga_html_archives.ToonHey, ('5192468917881435636', 'ToonHey', 'en', 'https://toonhey.com', True)),
+    (manga_html_archives.OppaiStream, ('1938195875614354298', 'Oppai Stream', 'en', 'https://read.oppai.stream', True)),
+    (manga_kappabeast.KappaBeast, ('2598579144085032375', 'Kappa Beast', 'en', 'https://kappabeast.com', True)),
+    (manga_illustrated_archives.MangaDraft, ('6866320578550428692', 'MangaDraft', 'all', 'https://www.mangadraft.com', False)),
+    (manga_illustrated_archives.PepperCarrot, ('279282683217001983', 'Pepper&Carrot', 'all', 'https://www.peppercarrot.com', False)),
+    (manga_sacachispa.Sacachispa, ('388932303664463452', 'SACACHISPA', 'en', 'https://sacachispa.site', True)),
 )
 
 

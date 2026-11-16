@@ -2,6 +2,13 @@
 
 
 PROFILES = (
+    # Installed 1.6.56, recovered from fd90fc69d881.
+    (('8904806262353429205', 'Anisa Scans', 'https://anisascans.in', True), {
+        'chapter_mode': 'manga', 'metadata_interval': 1 / 3,
+    }),
+    (('2136088453725931591', 'MadaraDex', 'https://madaradex.org', True), {
+        'variant': 'madaradex', 'section': 'title', 'genre_section': 'genre',
+    }),
     (('7034264791241222160', 'CartoonPorn', 'https://cartoonporn.to', True), {
         'variant': 'cartoon', 'html': True, 'section': 'porncomic', 'uses_post_id': False,
         'selectors': {'cards': 'div.item_content, div.item-thumb', 'card_link': 'a[href*="/porncomic/"]',

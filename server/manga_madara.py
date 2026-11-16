@@ -243,14 +243,17 @@ class Madara:
     def soup(self, http, url, *, data=None, referer=None):
         self.origin.wait(getattr(http, 'deadline', None))
         headers = {'Referer': referer or self.ROOT + '/'}
-        options = {'method': 'POST', 'data': data, 'action': 'madara-read'} if data is not None else {}
-        raw, final, _ = http.document(url, headers=headers, **options)
+        raw, final, _ = self.request(http, url, headers=headers, data=data)
         if not self.site_link(final):
             raise SourceError('Madara перенаправил на другой источник.')
         from manga_sources import guard
         document = BeautifulSoup(raw, 'html.parser')
         guard(document)
         return document, final
+
+    def request(self, http, url, *, headers, data=None):
+        options = {'method': 'POST', 'data': data, 'action': 'madara-read'} if data is not None else {}
+        return http.document(url, headers=headers, **options)
 
     def catalogue_data(self, page, query, sort, tag):
         data = {**CATALOGUE_FORM, 'template': self.ajax_template, 'page': str(page - 1)}
@@ -867,7 +870,20 @@ class Zazamanga(Madara):
         return {'Referer': self.ROOT + '/'}
 
 
-VARIANTS = {'standard': Madara, 'aqua': AquaManga, 'raw': ManhwaRaw, 'mangahe': MangaHe,
+class MadaraDex(Madara):
+    def request(self, http, url, *, headers, data=None):
+        from manga_madaradex_guest import SESSION
+
+        return SESSION.request(http, url, headers=headers, data=data, method='POST' if data is not None else 'GET')
+
+    def page_images(self, soup, final):
+        from manga_madaradex_guest import IMAGE_HOST, MARKER
+
+        return [url + '#' + MARKER if urlsplit(url).hostname == IMAGE_HOST else url
+                for url in super().page_images(soup, final)]
+
+
+VARIANTS = {'standard': Madara, 'aqua': AquaManga, 'raw': ManhwaRaw, 'mangahe': MangaHe, 'madaradex': MadaraDex,
             'hentai4free': Hentai4Free, 'district': MangaDistrict, 'ruby': RubyComics,
             'rosesquad': RoseSquadScans, 'goodtoon': GoodToon, 'lgbtics': Lgbtics, 'setsu': SetsuScans,
             'cartoon': CartoonPorn, 'json_chapters': MadaraJsonChapters, 'toonily': Toonily,
