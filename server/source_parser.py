@@ -261,7 +261,7 @@ class PublicHttp:
                 and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
                                    'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
                                    'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto',
-                                   'manhwazone-document'}):
+                                   'manhwazone-document', 'honeytoon-sync'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
@@ -305,6 +305,16 @@ class PublicHttp:
             outgoing['Cookie'] = cookie
         if urlsplit(url).hostname == 'img.xchina.io':
             outgoing['Accept'] = 'image/avif,image/webp,image/png,image/jpeg,*/*'
+        if urlsplit(url).hostname == 'cdn.donmai.us':
+            outgoing.update({'Accept': 'image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5',
+                             'Sec-Fetch-Dest': 'image', 'Sec-Fetch-Mode': 'no-cors', 'Sec-Fetch-Site': 'same-site'})
+        if action == 'honeytoon-sync':
+            from manga_honeytoon_native import SYNC, public_api as honeytoon_api
+
+            origin = urlsplit(url)
+            if method != 'GET' or origin.path != SYNC or not honeytoon_api(origin.netloc, origin.path, origin.query):
+                raise SourceError('Некорректный публичный маршрут страницы Honeytoon.')
+            outgoing['Accept'] = 'image/*, application/octet-stream'
         if speedbinb:
             outgoing.update({'Accept': 'application/json, text/javascript, */*',
                              'X-Requested-With': 'XMLHttpRequest'})
@@ -563,7 +573,7 @@ class PublicHttp:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'})
                 if catalogue_form and host in {'rizzfables.com', 'hentailoop.com'}:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
-                if catalogue_form and host == 'rinkocomics.com':
+                if catalogue_form and host in {'rinkocomics.com', 'honeytoon.com'}:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
             if action == 'dcm-search':
                 from manga_comic_museum import public_search
@@ -590,8 +600,16 @@ class PublicHttp:
                 if ninehentai_form:
                     outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
                                      'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://9hentai.so'})
+            voyceme_form = False
+            if action == 'voyceme-graphql':
+                from manga_voyceme import public_form as voyceme_read
+
+                voyceme_form = voyceme_read(url, data)
+                if voyceme_form:
+                    outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
+                                     'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://www.voyce.me'})
             if not (player_form or search_form or manga_form or million_register or zerosum_viewer or manhwazone_session
-                    or foolslide_form or namicomi_form or ninehentai_form
+                    or foolslide_form or namicomi_form or ninehentai_form or voyceme_form
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
@@ -643,7 +661,7 @@ class PublicHttp:
                                'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
                                'natsuid-search', 'creator-feed-json', 'fanfox-reader', 'ysk-json',
-                               'webnex-json', 'webnex-image', 'zerosum-proto', 'manhwazone-livewire'}
+                               'webnex-json', 'webnex-image', 'zerosum-proto', 'manhwazone-livewire', 'honeytoon-sync'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))

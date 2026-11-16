@@ -22,18 +22,22 @@ PAYWALL = 'form.purchase-form, .chapter-locked, .purchase-required, .paywall'
 
 def series_api(host, path, query):
     from manga_alpha_manga import public_api as alpha
+    from manga_booru_pools import public_api as booru
+    from manga_comicklive import public_api as comicklive
     from manga_archive_ports import public_api as archives
     from manga_catalogue_api_ports import public_api as catalogue_api
     from manga_creator_feeds import public_api as creator_feed
     from manga_direct_catalogues import public_api as direct_html
     from manga_direct_payloads import public_api as payloads
     from manga_gallery_archive_ports import public_api as gallery_archives
+    from manga_honeytoon_native import public_api as honeytoon
     from manga_html_families import public_api as html
     from manga_html_archives import public_api as html_archives
     from manga_illustrated_archives import public_api as illustrated
     from manga_independent_json_ports import public_api as independent_json
     from manga_initmanga import public_api as initmanga
     from manga_inkstory import public_api as ink
+    from manga_jjcos import public_api as jjcos
     from manga_json_families import public_api as api
     from manga_kappabeast import public_api as kappa
     from manga_klto9 import public_api as klto9
@@ -46,6 +50,7 @@ def series_api(host, path, query):
     from manga_pandachaika import public_api as pandachaika
     from manga_natsuid import public_api as natsuid
     from manga_ninehentai import public_api as ninehentai
+    from manga_ososedki import public_api as ososedki
     from manga_public_galleries import public_api as gallery_api
     from manga_rayuba import public_api as rayuba
     from manga_reimanga import public_api as rei
@@ -70,6 +75,8 @@ def series_api(host, path, query):
     from manga_webnex import public_api as webnex
     from manga_standalone_ports import public_api as standalone
     from manga_toonlook import public_api as toonlook
+    from manga_twicomi import public_api as twicomi
+    from manga_voyceme import public_api as voyceme
     from manga_yarnovel import public_api as yarnovel
     from manga_zerosum import public_api as zerosum
 
@@ -82,7 +89,8 @@ def series_api(host, path, query):
                                                      sacachispa, speedbinb, webtoon_native, sixth, luscious, simply,
                                                      pandachaika, toonlook, alpha, catalogue_api, klto9, mangaplus,
                                                      small_readers, scan_api, manta, gallery_archives, mangamee, webnex,
-                                                     seventh, rayuba, zerosum, rei, rawkuma_me, korean_seventh, ninehentai))
+                                                     seventh, rayuba, zerosum, rei, rawkuma_me, korean_seventh, ninehentai,
+                                                     comicklive, jjcos, twicomi, booru, ososedki, honeytoon, voyceme))
 
 
 def public_form(url, data, headers):
@@ -108,9 +116,10 @@ def public_form(url, data, headers):
     from manga_small_readers import public_form as small_readers
     from manga_rinko import public_form as rinko
     from manga_girlstop import search_form as girlstop
+    from manga_honeytoon_native import search_form as honeytoon
 
     return (standalone(url, data) or fifth(url, data) or russian_html(url, data) or loop(url, data) or small_readers(url, data)
-            or rinko(url, data, headers.get('Referer', '')) or girlstop(url, data))
+            or rinko(url, data, headers.get('Referer', '')) or girlstop(url, data) or honeytoon(url, data))
 
 
 def document_json(http, url, referer):

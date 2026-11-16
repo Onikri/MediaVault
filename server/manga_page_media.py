@@ -68,6 +68,10 @@ def page_reference(value):
         from manga_unicomics import deferred
 
         return deferred(value), None, 1, 'unicomics-image'
+    if parts.fragment == 'mv_danbooru_post':
+        from manga_booru_pools import danbooru_reference
+
+        return danbooru_reference(value), None, 1, 'danbooru-image'
     if parts.fragment.startswith('mv_rena_page='):
         from manga_scanlation_catalogues import rena_marker
         target, _ = rena_marker(value)
@@ -157,6 +161,7 @@ def fetch_page(http, reference, headers):
         response, _ = http._open(url, headers=headers)
         return validated_image(decode_image(read_image(http, response), key))
     if action == 'speedbinb-image':
+        from manga_honeytoon_native import HoneytoonPage, merge_strips
         from manga_mangaplus import MangaPlusPage
         from manga_manhwazone import ManhwaZonePage
         from manga_rawkuma_overlay import RawkumaPage
@@ -169,6 +174,12 @@ def fetch_page(http, reference, headers):
         headers = {'Referer': referer}
         if isinstance(layout, PackedWebp):
             return validated_image(layout.fetch(http, referer))
+        if isinstance(layout, HoneytoonPage):
+            response, _ = http._open(url, headers=headers, action='honeytoon-sync')
+            metadata = response.headers.get('X-Part-Sizes')
+            mime = (response.headers.get('Content-Type') or '').partition(';')[0]
+            raw = read_image(http, response)
+            return validated_image(merge_strips(raw, metadata) if mime == 'application/octet-stream' and metadata else raw)
         if isinstance(layout, ManhwaZonePage):
             response, _ = http._open(url)
             return validated_image(read_image(http, response))
@@ -211,6 +222,11 @@ def fetch_page(http, reference, headers):
         from manga_unicomics import lazy_image
 
         response, _ = http._open(lazy_image(http, target), headers={'Referer': target})
+        return validated_image(read_image(http, response))
+    if action == 'danbooru-image':
+        from manga_booru_pools import danbooru_image
+
+        response, _ = http._open(danbooru_image(http, target), headers={'Referer': target})
         return validated_image(read_image(http, response))
     if action == 'rena-image':
         from manga_scanlation_catalogues import rena_marker, renew_rena

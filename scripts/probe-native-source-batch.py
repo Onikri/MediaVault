@@ -24,6 +24,15 @@ def emit(row):
 def candidates():
     import manga_fifth_batch_profiles
     import manga_additional_catalogues
+    import manga_booru_pools
+    import manga_comicklive
+    import manga_fourkhd
+    import manga_honeytoon_native
+    import manga_jjcos
+    import manga_multporn
+    import manga_ososedki
+    import manga_twicomi
+    import manga_voyceme
     import manga_alpha_manga
     import manga_catalogue_api_ports
     import manga_comic_museum
@@ -128,7 +137,9 @@ def candidates():
                   manga_comic_grast.SOURCES, manga_ksbd.SOURCES, manga_girlstop.SOURCES,
                   manga_reimanga.SOURCES, manga_vyvy.SOURCES, manga_manhwazone.SOURCES,
                   manga_rawkuma_overlay.SOURCES, manga_korean_seventh.SOURCES, manga_toon11.SOURCES,
-                  manga_ninehentai.SOURCES):
+                  manga_ninehentai.SOURCES, manga_comicklive.SOURCES, manga_jjcos.SOURCES,
+                  manga_twicomi.SOURCES, manga_booru_pools.SOURCES, manga_ososedki.SOURCES,
+                  manga_honeytoon_native.SOURCES, manga_fourkhd.SOURCES, manga_voyceme.SOURCES, manga_multporn.SOURCES):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in group)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby

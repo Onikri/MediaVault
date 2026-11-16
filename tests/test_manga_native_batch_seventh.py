@@ -13,18 +13,27 @@ from PIL import Image
 
 import manga_comic_grast
 import manga_comics_kingdom
+import manga_comicklive
+import manga_booru_pools
+import manga_fourkhd
 import manga_girlstop
+import manga_honeytoon_native
+import manga_jjcos
 import manga_korean_seventh
 import manga_ksbd
 import manga_manhwazone
+import manga_multporn
 import manga_ninehentai
 import manga_nexus_reader
+import manga_ososedki
 import manga_rawkuma_overlay
 import manga_rayuba
 import manga_reimanga
 import manga_seventh_data
 import manga_seventh_html
 import manga_toon11
+import manga_twicomi
+import manga_voyceme
 import manga_vyvy
 import manga_zerosum
 from manga_speedbinb import grant
@@ -34,7 +43,9 @@ from source_parser import PublicHttp, SourceError, public_url
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = (manga_seventh_data, manga_seventh_html, manga_rayuba, manga_zerosum, manga_nexus_reader,
            manga_comics_kingdom, manga_comic_grast, manga_ksbd, manga_girlstop, manga_reimanga,
-           manga_vyvy, manga_manhwazone, manga_rawkuma_overlay, manga_korean_seventh, manga_toon11, manga_ninehentai)
+           manga_vyvy, manga_manhwazone, manga_rawkuma_overlay, manga_korean_seventh, manga_toon11, manga_ninehentai,
+           manga_comicklive, manga_booru_pools, manga_jjcos, manga_twicomi, manga_ososedki,
+           manga_honeytoon_native, manga_fourkhd, manga_voyceme, manga_multporn)
 PROFILES = tuple(adapter for module in MODULES for adapter in module.SOURCES)
 
 
@@ -51,8 +62,8 @@ class SeventhBatchTests(TestCase):
         candidates, active = run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(encoding='utf-8', newline='') as file:
             rows = {row['source_id']: row for row in csv.DictReader(file)}
-        self.assertEqual(len(PROFILES), 26)
-        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 20)
+        self.assertEqual(len(PROFILES), 41)
+        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 30)
         for profile in PROFILES:
             with self.subTest(profile=profile.SOURCE_ID):
                 self.assertNotIn(profile.SOURCE_ID, active)
@@ -185,3 +196,41 @@ class SeventhBatchTests(TestCase):
         self.assertTrue(manga_manhwazone.livewire_form(endpoint, json.dumps(valid).encode(), title))
         valid['components'][0]['calls'][0]['method'] = 'anotherAction'
         self.assertFalse(manga_manhwazone.livewire_form(endpoint, json.dumps(valid).encode(), title))
+
+    def test_comicklive_keeps_cursors_for_each_query(self):
+        profile = manga_comicklive.ComickLive()
+        profile.origin.interval = 0
+        target = profile.ROOT + '/api/search'
+        params = {'type': 'comic', 'showAll': 'false', 'exclude_mylist': 'false', 'order_direction': 'desc'}
+        routes = {}
+        for query in ('first', 'other'):
+            opts = {**params, 'q': query}
+            routes[query_url(target, **opts, page=1)] = {'data': [{'title': query, 'slug': query}], 'next_cursor': query}
+            routes[query_url(target, **opts, page=2, cursor=query)] = {'data': [{'title': query, 'slug': query}]}
+        http = mock_site(routes)
+        profile.catalogue(http, query='first')
+        profile.catalogue(http, query='other')
+        rows, more = profile.catalogue(http, 2, query='first')
+        self.assertEqual(rows[0]['title'], 'first')
+        self.assertFalse(more)
+
+    def test_honeytoon_combines_strips_in_page_order(self):
+        parts = []
+        for ink in ('red', 'blue'):
+            output = BytesIO()
+            Image.new('RGB', (10, 5), ink).save(output, 'PNG')
+            parts.append(output.getvalue())
+        sizes = ','.join(str(len(part)) for part in parts)
+        with Image.open(BytesIO(manga_honeytoon_native.merge_strips(b''.join(parts), sizes))) as image:
+            self.assertEqual(image.size, (10, 10))
+            self.assertEqual(image.convert('RGB').getpixel((5, 2)), (255, 0, 0))
+            self.assertEqual(image.convert('RGB').getpixel((5, 7)), (0, 0, 255))
+        with self.assertRaises(SourceError):
+            manga_honeytoon_native.merge_strips(b''.join(parts), '1,1')
+
+    def test_voyceme_only_accepts_declared_read_queries(self):
+        url = manga_voyceme.GRAPHQL
+        body = {'operationName': 'Pages', 'query': manga_voyceme.QUERIES['Pages'], 'variables': {'chapterId': 19}}
+        self.assertTrue(manga_voyceme.public_form(url, json.dumps(body).encode()))
+        body['query'] += ' mutation Example { no }'
+        self.assertFalse(manga_voyceme.public_form(url, json.dumps(body).encode()))
