@@ -22,6 +22,7 @@ PAYWALL = 'form.purchase-form, .chapter-locked, .purchase-required, .paywall'
 
 def series_api(host, path, query):
     from manga_alpha_manga import public_api as alpha
+    from manga_asura_native import public_api as asura
     from manga_booru_pools import public_api as booru
     from manga_comicklive import public_api as comicklive
     from manga_archive_ports import public_api as archives
@@ -44,6 +45,10 @@ def series_api(host, path, query):
     from manga_korean_seventh import public_api as korean_seventh
     from manga_mangaplus import public_api as mangaplus
     from manga_mangamee import public_api as mangamee
+    from manga_mangabox import public_api as mangabox
+    from manga_mangameets import public_api as mangameets
+    from manga_mangaone import public_api as mangaone
+    from manga_park_publisher import public_api as manga_park
     from manga_manta_native import public_api as manta
     from manga_luscious_native import public_api as luscious
     from manga_mangataro import public_api as mangataro
@@ -90,7 +95,8 @@ def series_api(host, path, query):
                                                      pandachaika, toonlook, alpha, catalogue_api, klto9, mangaplus,
                                                      small_readers, scan_api, manta, gallery_archives, mangamee, webnex,
                                                      seventh, rayuba, zerosum, rei, rawkuma_me, korean_seventh, ninehentai,
-                                                     comicklive, jjcos, twicomi, booru, ososedki, honeytoon, voyceme))
+                                                     comicklive, jjcos, twicomi, booru, ososedki, honeytoon, voyceme,
+                                                     mangameets, manga_park, mangabox, mangaone, asura))
 
 
 def public_form(url, data, headers):
@@ -117,9 +123,11 @@ def public_form(url, data, headers):
     from manga_rinko import public_form as rinko
     from manga_girlstop import search_form as girlstop
     from manga_honeytoon_native import search_form as honeytoon
+    from manga_toomics import form as toomics
 
     return (standalone(url, data) or fifth(url, data) or russian_html(url, data) or loop(url, data) or small_readers(url, data)
-            or rinko(url, data, headers.get('Referer', '')) or girlstop(url, data) or honeytoon(url, data))
+            or rinko(url, data, headers.get('Referer', '')) or girlstop(url, data) or honeytoon(url, data)
+            or toomics(url, data))
 
 
 def document_json(http, url, referer):

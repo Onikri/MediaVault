@@ -15,23 +15,31 @@ import manga_comic_grast
 import manga_comics_kingdom
 import manga_comicklive
 import manga_booru_pools
+import manga_asura_native
 import manga_fourkhd
 import manga_girlstop
 import manga_honeytoon_native
+import manga_japanese_next
 import manga_jjcos
 import manga_korean_seventh
 import manga_ksbd
 import manga_manhwazone
+import manga_mangabox
+import manga_mangameets
+import manga_mangaone
+import manga_momonga
 import manga_multporn
 import manga_ninehentai
 import manga_nexus_reader
 import manga_ososedki
+import manga_park_publisher
 import manga_rawkuma_overlay
 import manga_rayuba
 import manga_reimanga
 import manga_seventh_data
 import manga_seventh_html
 import manga_toon11
+import manga_toomics
 import manga_twicomi
 import manga_voyceme
 import manga_vyvy
@@ -45,7 +53,9 @@ MODULES = (manga_seventh_data, manga_seventh_html, manga_rayuba, manga_zerosum, 
            manga_comics_kingdom, manga_comic_grast, manga_ksbd, manga_girlstop, manga_reimanga,
            manga_vyvy, manga_manhwazone, manga_rawkuma_overlay, manga_korean_seventh, manga_toon11, manga_ninehentai,
            manga_comicklive, manga_booru_pools, manga_jjcos, manga_twicomi, manga_ososedki,
-           manga_honeytoon_native, manga_fourkhd, manga_voyceme, manga_multporn)
+           manga_honeytoon_native, manga_fourkhd, manga_voyceme, manga_multporn, manga_mangameets,
+           manga_momonga, manga_toomics, manga_japanese_next, manga_park_publisher, manga_mangaone,
+           manga_mangabox, manga_asura_native)
 PROFILES = tuple(adapter for module in MODULES for adapter in module.SOURCES)
 
 
@@ -62,8 +72,8 @@ class SeventhBatchTests(TestCase):
         candidates, active = run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(encoding='utf-8', newline='') as file:
             rows = {row['source_id']: row for row in csv.DictReader(file)}
-        self.assertEqual(len(PROFILES), 41)
-        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 30)
+        self.assertEqual(len(PROFILES), 59)
+        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 40)
         for profile in PROFILES:
             with self.subTest(profile=profile.SOURCE_ID):
                 self.assertNotIn(profile.SOURCE_ID, active)

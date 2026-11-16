@@ -261,7 +261,8 @@ class PublicHttp:
                 and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
                                    'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
                                    'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto',
-                                   'manhwazone-document', 'honeytoon-sync'}):
+                                   'mangaone-proto', 'mangabox-read',
+                                   'manhwazone-document', 'honeytoon-sync', 'toomics-public-view', 'toomics-display'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
@@ -315,6 +316,12 @@ class PublicHttp:
             if method != 'GET' or origin.path != SYNC or not honeytoon_api(origin.netloc, origin.path, origin.query):
                 raise SourceError('Некорректный публичный маршрут страницы Honeytoon.')
             outgoing['Accept'] = 'image/*, application/octet-stream'
+        toomics_session = action in {'toomics-public-view', 'toomics-display'}
+        if toomics_session:
+            from manga_toomics import routed as toomics_route
+
+            if method != 'GET' or data is not None or not toomics_route(url, action):
+                raise SourceError('Некорректный маршрут открытой читалки Toomics.')
         if speedbinb:
             outgoing.update({'Accept': 'application/json, text/javascript, */*',
                              'X-Requested-With': 'XMLHttpRequest'})
@@ -389,6 +396,7 @@ class PublicHttp:
         if action == 'native-series-rsc':
             from manga_additional_catalogues import public_rsc as additional_rsc
             from manga_direct_payloads import public_api
+            from manga_japanese_next import public_rsc as japanese_rsc
             from manga_mangamee import public_rsc as mangamee_rsc
             from manga_reimanga import public_rsc as rei_rsc
             from manga_scanlation_json import public_rsc
@@ -396,7 +404,8 @@ class PublicHttp:
             revival = target.netloc == 'www.revivalscans.com' and public_api(target.netloc, target.path, target.query)
             route = (target.netloc, target.path, target.query)
             if method != 'GET' or data is not None or not (
-                    revival or public_rsc(*route) or additional_rsc(*route) or mangamee_rsc(*route) or rei_rsc(*route)):
+                    revival or public_rsc(*route) or additional_rsc(*route) or mangamee_rsc(*route)
+                    or rei_rsc(*route) or japanese_rsc(*route)):
                 raise SourceError('Некорректный маршрут React Flight.')
             outgoing.update({'RSC': '1', 'Accept': 'text/x-component'})
             if rei_rsc(*route):
@@ -407,6 +416,16 @@ class PublicHttp:
             if method != 'GET' or data is not None or not mangamee_api(target.netloc, target.path, target.query):
                 raise SourceError('Некорректный маршрут MangaMee.')
             outgoing['Accept'] = 'application/x-protobuf, application/octet-stream, */*'
+        mangaone_proto = action == 'mangaone-proto'
+        if mangaone_proto:
+            from manga_mangaone import transport as mangaone_route
+
+            if not mangaone_route(url, method, data):
+                raise SourceError('Некорректный маршрут Manga One.')
+            outgoing.update({'Accept': 'application/x-protobuf, application/octet-stream, */*',
+                             'X-Requested-With': 'XMLHttpRequest', 'Accept-Language': 'ja,en;q=0.8'})
+            if method == 'POST':
+                outgoing['Content-Type'] = 'application/x-protobuf'
         zerosum_viewer = False
         if action == 'zerosum-proto':
             from manga_zerosum import public_api as zerosum_api
@@ -573,7 +592,7 @@ class PublicHttp:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'})
                 if catalogue_form and host in {'rizzfables.com', 'hentailoop.com'}:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
-                if catalogue_form and host in {'rinkocomics.com', 'honeytoon.com'}:
+                if catalogue_form and host in {'rinkocomics.com', 'honeytoon.com', 'global.toomics.com'}:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
             if action == 'dcm-search':
                 from manga_comic_museum import public_search
@@ -590,6 +609,14 @@ class PublicHttp:
                 from manga_mangataro import public_form
                 mangataro_form = public_form(url, data)
                 if mangataro_form:
+                    outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
+                                     'X-Requested-With': 'XMLHttpRequest'})
+            mangabox_form = False
+            if action == 'mangabox-read':
+                from manga_mangabox import form as mangabox_request
+
+                mangabox_form = mangabox_request(url, data)
+                if mangabox_form:
                     outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
                                      'X-Requested-With': 'XMLHttpRequest'})
             ninehentai_form = False
@@ -609,7 +636,7 @@ class PublicHttp:
                     outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
                                      'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://www.voyce.me'})
             if not (player_form or search_form or manga_form or million_register or zerosum_viewer or manhwazone_session
-                    or foolslide_form or namicomi_form or ninehentai_form or voyceme_form
+                    or foolslide_form or namicomi_form or ninehentai_form or voyceme_form or mangabox_form or mangaone_proto
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
@@ -636,7 +663,7 @@ class PublicHttp:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             try:
                 # A Comic Fury warning can set a cookie for a redirect to the same page.
-                if not (fury_form or buff_form or webnex_document or manhwazone_session):
+                if not (fury_form or buff_form or webnex_document or manhwazone_session or toomics_session):
                     self.session.cookies.clear()
                 request_timeout=timeout or self.timeout
                 if self.deadline:
@@ -661,7 +688,8 @@ class PublicHttp:
                                'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
                                'natsuid-search', 'creator-feed-json', 'fanfox-reader', 'ysk-json',
-                               'webnex-json', 'webnex-image', 'zerosum-proto', 'manhwazone-livewire', 'honeytoon-sync'}
+                               'webnex-json', 'webnex-image', 'zerosum-proto', 'manhwazone-livewire', 'honeytoon-sync',
+                               'mangaone-proto', 'mangabox-read'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
@@ -669,6 +697,8 @@ class PublicHttp:
                     raise SourceError('Источник перенаправил гостевой запрос на другой сайт.')
                 if action == 'manhwazone-document' and urlsplit(next_url).netloc not in manhwazone_hosts:
                     raise SourceError('ManhwaZone перенаправил карточку на другой домен.')
+                if toomics_session and urlsplit(next_url).netloc != 'global.toomics.com':
+                    raise SourceError('Toomics перенаправил сессию на другой домен.')
                 if mdx_mode and (method != 'GET' or urlsplit(next_url).netloc != urlsplit(url).netloc):
                     raise SourceError('MadaraDex перенаправил запрос гостевой сессии.')
                 if publisher:

@@ -26,6 +26,14 @@ def candidates():
     import manga_additional_catalogues
     import manga_booru_pools
     import manga_comicklive
+    import manga_japanese_next
+    import manga_asura_native
+    import manga_mangabox
+    import manga_mangameets
+    import manga_mangaone
+    import manga_momonga
+    import manga_park_publisher
+    import manga_toomics
     import manga_fourkhd
     import manga_honeytoon_native
     import manga_jjcos
@@ -139,7 +147,10 @@ def candidates():
                   manga_rawkuma_overlay.SOURCES, manga_korean_seventh.SOURCES, manga_toon11.SOURCES,
                   manga_ninehentai.SOURCES, manga_comicklive.SOURCES, manga_jjcos.SOURCES,
                   manga_twicomi.SOURCES, manga_booru_pools.SOURCES, manga_ososedki.SOURCES,
-                  manga_honeytoon_native.SOURCES, manga_fourkhd.SOURCES, manga_voyceme.SOURCES, manga_multporn.SOURCES):
+                  manga_honeytoon_native.SOURCES, manga_fourkhd.SOURCES, manga_voyceme.SOURCES, manga_multporn.SOURCES,
+                  manga_japanese_next.SOURCES, manga_mangameets.SOURCES, manga_momonga.SOURCES,
+                  manga_park_publisher.SOURCES, manga_toomics.SOURCES, manga_mangaone.SOURCES,
+                  manga_mangabox.SOURCES, manga_asura_native.SOURCES):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in group)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby
