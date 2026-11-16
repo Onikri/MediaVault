@@ -22,7 +22,7 @@ html[data-blossom] .morph-search-bar{
 html[data-blossom] .morph-search-bar>.morph-search-icon{color:#a5a5b3;flex:none}
 html[data-blossom] .morph-search-bar input{
  flex:1;min-width:96px;width:100%;max-width:100%;height:38px;margin:0;padding:0;border:0;
- background:none!important;box-shadow:none!important;outline:0!important;color:#f2f2f5;font-size:16px;
+ background:none;box-shadow:none;outline:0;color:#f2f2f5;font-size:16px;
  font-weight:450;line-height:1.4;font-family:inherit;
 }
 html[data-blossom] .morph-search-bar input::placeholder{color:#a3a4b2;opacity:1}
@@ -57,7 +57,7 @@ html[data-blossom] .morph-search-suggestion{display:flex;align-items:center;posi
 html[data-blossom] .morph-search-suggestion>svg,.morph-search-remove-recent{position:relative;z-index:1;flex:none;color:#a7a7b5}
 html[data-blossom] .morph-search-suggestion>span:not(.morph-search-suggestion-highlight){position:relative;z-index:1;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html[data-blossom] .morph-search-suggestion-highlight{position:absolute;inset:0;border-radius:16px;background:rgba(255,255,255,.065)}
-html[data-blossom] .morph-search-remove-recent{display:grid;flex:0 0 27px!important;place-items:center;width:27px;height:27px;border-radius:50%;cursor:pointer}
+html[data-blossom] .morph-search-remove-recent{display:grid;flex:0 0 27px;place-items:center;width:27px;height:27px;border-radius:50%;cursor:pointer}
 html[data-blossom] .morph-search-remove-recent:hover{background:rgba(255,255,255,.12)}
 html[data-blossom] .morph-search-filters{display:flex;gap:5px;align-items:center;max-width:100%;overflow-x:auto;scrollbar-width:none;padding:11px 7px 9px;margin-top:6px;border-top:1px solid rgba(255,255,255,.055);border-bottom:1px solid rgba(255,255,255,.055)}
 html[data-blossom] .morph-search-filters::-webkit-scrollbar{display:none}
@@ -82,7 +82,7 @@ html[data-blossom] .morph-search-footer{display:flex;align-items:center;justify-
 html[data-blossom] .morph-search-footer button{display:inline-flex;align-items:center;gap:4px;min-width:max-content;border:0;background:none;color:#dedee6;font-size:11px;cursor:pointer}
 html[data-blossom] .morph-search-spinner{flex:none;color:#b9baca;animation:morph-search-spin 1s linear infinite}
 @keyframes morph-search-spin{to{transform:rotate(360deg)}}
-@media(max-width:640px){html[data-blossom] .blossom-search-dialog.morph-search-dialog{max-width:calc(100vw - 24px)}html[data-blossom] .morph-search-bar{padding-left:12px;gap:6px}html[data-blossom] .morph-search-bar input{font-size:14px;min-width:65px}html[data-blossom] .morph-search-footer{font-size:9px}html[data-blossom] .morph-search-footer kbd{display:none}}
+@media (--phone){html[data-blossom] .blossom-search-dialog.morph-search-dialog{max-width:calc(100vw - 24px)}html[data-blossom] .morph-search-bar{padding-left:12px;gap:6px}html[data-blossom] .morph-search-bar input{font-size:14px;min-width:65px}html[data-blossom] .morph-search-footer{font-size:9px}html[data-blossom] .morph-search-footer kbd{display:none}}
 @media(prefers-reduced-motion:reduce){html[data-blossom] .morph-search-spinner{animation:none}}
 
 /* The reference MorphingSearchChips glass is deliberately translucent, not
@@ -99,8 +99,7 @@ html[data-blossom] .morph-search-bar,html[data-blossom] .morph-search-panel{
 html[data-blossom] .morph-search-bar{background-color:rgba(34,35,43,.55)}
 html[data-blossom] .morph-search-panel{background-color:rgba(33,34,42,.55);margin-top:8px}
 html[data-blossom] .morph-search-chip-active{border:0}
-html[data-blossom] .morph-search-footer-caption{color:#a9aab5}
-@media(max-width:640px){html[data-blossom] .morph-search-bar{padding-inline:10px}}
+@media (--phone){html[data-blossom] .morph-search-bar{padding-inline:10px}}
 
 
 /* Unified accent-tinted search morph: original translucency/blurring, but no
@@ -113,15 +112,15 @@ html[data-blossom] .morph-search-bar{
  box-shadow:inset 0 1px rgba(255,255,255,.045),0 13px 32px -18px rgba(0,0,0,.40);
 }
 html[data-blossom] .morph-search-panel{
- border:0!important;outline:0!important;
+ border:0;outline:0;
  background:rgba(33,34,42,.62);
  backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
  box-shadow:0 24px 60px -24px rgba(0,0,0,.45);
 }
 html[data-blossom] .morph-search-filters{border-top:0;border-bottom:0;background:rgba(255,255,255,.012)}
 html[data-blossom] .morph-search-footer{border-top:0}
-html[data-blossom] .morph-search-token,html[data-blossom] .morph-search-chip-active{border:0!important;box-shadow:none}
-html[data-blossom] .morph-search-chip{box-shadow:none!important}
+html[data-blossom] .morph-search-token,html[data-blossom] .morph-search-chip-active{border:0;box-shadow:none}
+html[data-blossom] .morph-search-chip{box-shadow:none}
 /* The expanded field keeps exactly the search trigger's accent. */
 html[data-blossom] .morph-search-bar{background:var(--nav-search-accent);border-color:transparent;box-shadow:none;color:var(--nav-search-ink,#fff)}
 html[data-blossom] .morph-search-bar>.morph-search-icon,
@@ -141,7 +140,7 @@ html[data-blossom] .is-closing .morph-search-bar>:not(.morph-search-icon){opacit
 /* Dock search: a bottom sheet that opens out of the round search button
    (centre of the dock) and closes back into it. The field sits at thumb
    height; suggestions and results stack above it. */
-@media(max-width:1000px){
+@media (--tablet){
  html[data-blossom] .blossom-search-dialog.morph-search-dialog.is-sheet{position:fixed;top:auto;left:10px;right:10px;bottom:var(--dock-gap,10px);width:auto;max-width:none;max-height:none;translate:none;display:flex;flex-direction:column-reverse;gap:8px;background:transparent;box-shadow:none;border-radius:28px;
   clip-path:circle(26px at 50% calc(100% - 33px));transition:clip-path .48s cubic-bezier(.22,1,.36,1)}
  html[data-blossom] .blossom-search-dialog.morph-search-dialog.is-sheet.is-shown{clip-path:circle(160% at 50% calc(100% - 33px))}
@@ -149,4 +148,4 @@ html[data-blossom] .is-closing .morph-search-bar>:not(.morph-search-icon){opacit
  html[data-blossom] .is-sheet .morph-search-bar input{height:46px;font-size:16px}
  html[data-blossom] .blossom-search-dialog.is-sheet .morph-search-panel{position:relative;inset:auto;margin:0;background:color-mix(in srgb,var(--color-canvas-soft) 97%,transparent);max-height:calc(100dvh - var(--dock-gap,10px) - 90px - env(safe-area-inset-top));overflow:auto}
 }
-@media(max-width:1000px) and (prefers-reduced-motion:reduce){html[data-blossom] .blossom-search-dialog.morph-search-dialog.is-sheet{transition:none}}
+@media (--tablet) and (prefers-reduced-motion:reduce){html[data-blossom] .blossom-search-dialog.morph-search-dialog.is-sheet{transition:none}}

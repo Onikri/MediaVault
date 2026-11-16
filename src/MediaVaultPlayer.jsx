@@ -5,7 +5,6 @@ import RoomConversation from './RoomConversation.jsx';
 import {RoomPanel,roomSummary,roomMembers} from './WatchRoomControls.jsx';
 import RoomOverlay from './RoomOverlay.jsx';
 import './watch-room.css';
-import './interface-refinement.css';
 import {Music2,Pause,Play,Subtitles,PictureInPicture2,Maximize2,Minimize2,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown,Users,RotateCcw,RotateCw,Captions,Download,RectangleHorizontal,SlidersHorizontal,ChevronsRight,ChevronDown,SkipForward,LayoutGrid,Check,Square} from 'lucide-react';
 import './player.css';
 import './watch-page.css';

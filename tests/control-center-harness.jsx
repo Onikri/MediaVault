@@ -2,7 +2,7 @@
 // a fixture: no account, no VM, no media. Used by control-center-browser.cjs.
 import React,{useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/discovery-polish.css';import '/src/site-layout.css';import '/src/site-mobile.css';import '/src/interface-refinement.css';
+import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/site-layout.css';import '/src/site-mobile.css';import '/src/reader-save.css';import '/src/import-queue.css';import '/src/profile-menu.css';
 import {ThemeProvider,AppearanceSettings} from '/src/blossom/ThemeProvider.tsx';
 import ControlCenter from '/src/control/ControlCenter.jsx';
 

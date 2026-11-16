@@ -53,6 +53,9 @@ const SCENES={
  'title-manga':{site:'#watch=manga:shikimori:16498',ready:'.title-showcase'},
  'title-ranobe':{site:'#watch=ranobe:shikimori:16498',ready:'.title-showcase'},
  history:{site:'#history',ready:'.blossom-navbar'},
+ // The navbar squeezes its links while the search is open, more so once scrolled.
+ 'nav-search':{site:'#home',ready:'.blossom-navbar',async open(page){await page.evaluate(()=>dispatchEvent(new Event('mediavault:search-open')));await page.locator('.blossom-navbar.is-search-expanded').waitFor();}},
+ 'nav-search-scrolled':{site:'#home',ready:'.blossom-navbar',async open(page){await page.evaluate(()=>scrollTo(0,600));await page.locator('.blossom-navbar.is-scrolled').waitFor();await page.evaluate(()=>dispatchEvent(new Event('mediavault:search-open')));await page.locator('.blossom-navbar.is-search-expanded').waitFor();}},
  // Title dialogs: a character and a crew member.
  'title-character':{site:'#watch=anime:shikimori:16498',ready:'.title-showcase',async open(page){await page.locator('.title-character-grid>button').first().evaluate(b=>b.click());await page.locator('.character-dialog').waitFor();}},
  'title-person':{site:'#watch=anime:shikimori:16498',ready:'.title-showcase',async open(page){await page.getByRole('button',{name:/Манабу Окамото/}).first().evaluate(b=>b.click());await page.locator('.person-dialog').waitFor();}},
@@ -87,7 +90,7 @@ function writeHarnesses(){
  // The player: the design contract's title page with one playable episode.
  fs.writeFileSync(path.join(dir,'css-snapshot-player.html'),'<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="scene-root"></div><div id="root"></div><script type="module" src="/test-output/css-snapshot-player.jsx"></script></html>');
  fs.writeFileSync(path.join(dir,'css-snapshot-player.jsx'),`import React,{useState} from 'react';import{createRoot}from'react-dom/client';
- import {ThemeProvider} from '/src/blossom/ThemeProvider.tsx';import TitlePage from '/src/TitlePage.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/discovery-polish.css';import '/src/site-layout.css';import '/src/site-mobile.css';
+ import {ThemeProvider} from '/src/blossom/ThemeProvider.tsx';import TitlePage from '/src/TitlePage.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/site-layout.css';import '/src/site-mobile.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:'https://fixture.example'};
  const art=id=>({id,fileId:id,iv:'fixture',mime:'image/png'}),cover='https://art.test/cover',person='https://art.test/person';
  const profile={version:4,sourceId:'57334',sourceURL:'https://shikimori.io/animes/57334',title:'Дандадан',year:2024,format:'Аниме',description:'Двое школьников сталкиваются с необъяснимым. История о дружбе и сверхъестественном.',genres:['Комедия','Сверхъестественное'],characters:[],related:[],screenshots:[],staff:[{id:'41',name:'Фуга Ямасиро',role:'Режиссёр',image:person}],trailers:[{id:'X_SnV_SdO4k',title:'Тизер',image:cover}],cover,artwork:{[cover]:art('cover'),[person]:art('person')}};

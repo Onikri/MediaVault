@@ -18,6 +18,5 @@ installI18n().finally(()=>createRoot(document.getElementById('root')).render(<Cr
 
 
 import './import-layout.css';
-import './discovery-polish.css';
 import './site-layout.css';
 import './site-mobile.css';

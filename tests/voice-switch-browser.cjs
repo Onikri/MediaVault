@@ -15,7 +15,7 @@ const hls=(name)=>['-f','hls','-hls_time','4','-hls_playlist_type','vod','-hls_s
  for(const height of [360,720])ffmpeg(['-f','lavfi','-i',`testsrc2=size=${height*16/9}x${height}:rate=12`,'-f','lavfi','-i','sine=frequency=440:sample_rate=44100','-t','60','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-g','48','-c:a','aac',...hls(String(height))]);
  ffmpeg(['-f','lavfi','-i','testsrc2=size=640x360:rate=12','-t','60','-an','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-g','48',...hls('v360')]);
  for(const [name,frequency] of [['a0',330],['a1',660]])ffmpeg(['-f','lavfi','-i',`sine=frequency=${frequency}:sample_rate=44100`,'-t','60','-vn','-c:a','aac',...hls(name)]);
- const jsx=`import React from 'react';import {createRoot} from 'react-dom/client';import TitlePage from '/src/TitlePage.jsx';import OnlineWatch from '/src/OnlineWatch.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/discovery-polish.css';import '/src/world-library.css';
+ const jsx=`import React from 'react';import {createRoot} from 'react-dom/client';import TitlePage from '/src/TitlePage.jsx';import OnlineWatch from '/src/OnlineWatch.jsx';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/world-library.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:'https://fixture.example'};
  const item={id:'mal:57334',title:'Дандадан',kind:'anime',ids:{mal:'57334'},year:2024};
  const profile={title:'Дандадан',sourceId:'57334',cover:'https://fixture.example/poster.svg',year:2024,format:'ТВ-сериал',episodes:2,duration:24,description:'Фикстура.'};

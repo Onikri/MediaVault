@@ -9,7 +9,7 @@
  html[data-blossom] .title-scene-controls button::after{inset:-13px}
  html[data-blossom] .passport-rate button{min-height:40px}
 }
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .title-page .title-hero-copy>.eyebrow{font-size:11px}
  html[data-blossom] .title-page :is(.title-genre-list>a,.title-genre-list>span){font-size:12px}
  html[data-blossom] .title-page :is(.title-summary-more,.character-more,.credits-expand){font-size:13px}

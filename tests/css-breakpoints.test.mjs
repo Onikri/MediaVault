@@ -7,15 +7,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
-const LEGACY=new Set(`art-wall blossom/collection blossom/components/morph-search blossom/composition blossom/home-shelves
-blossom/integration blossom/reference  catalog-filter-dock chapter-scrub control/content-panel
-control/control-center device-shelf discovery-polish  export-sheet guest-access guest-activity history-page
-import-layout import-queue import-workspace interface-refinement library-calendar library-online local-title manga-desk
-manga-export manga-reader merged-catalog-toolbar music-dock music-import online  privacy reader-chrome
-reader-debug reader-morph reader-rail reader-save reader-settings-grid reader-shell reader-surface reader-view-settings
-retained-media room-chat-next room-conversation room-lobby shortcut-sheet site-layout site-mobile  
- styles       touch-comfort 
-watch-room world-library`.split(/\s+/).map(name=>'src/'+name+'.css'));
+const LEGACY=new Set(`art-wall chapter-scrub control/content-panel control/control-center device-shelf export-sheet guest-access
+guest-activity history-page import-workspace library-calendar local-title manga-desk manga-export manga-reader
+music-dock music-import online privacy reader-chrome reader-debug reader-morph reader-rail
+reader-settings-grid reader-shell reader-surface reader-view-settings retained-media room-chat-next
+room-conversation room-lobby shortcut-sheet watch-room`.split(/\s+/).filter(Boolean).map(name=>'src/'+name+'.css'));
 const css=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?css(path.join(dir,e.name)):e.name.endsWith('.css')?[path.join(dir,e.name)]:[]);
 const files=css(path.join(ROOT,'src')).map(f=>path.relative(ROOT,f).split(path.sep).join('/'));
 const tokens=new Set([...fs.readFileSync(path.join(ROOT,'src/blossom/breakpoints.css'),'utf8').matchAll(/@custom-media\s+(--[\w-]+)/g)].map(m=>m[1]));

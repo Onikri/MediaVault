@@ -10,7 +10,6 @@ import ProfileMenu from './ProfileMenu.jsx';
 import SceneSearch from './SceneSearch.jsx';
 import GuestAccess from './GuestAccess.jsx';
 import {clearGuestSession,readInviteToken,useGuestSession} from './guest-session.js';
-import './interface-refinement.css';
 import MangaSourceManager from './MangaSourceManager.jsx';
 import {roomLink} from './watch-room.js';
 import KodikConnection from './KodikConnection.jsx';

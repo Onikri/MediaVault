@@ -5,7 +5,7 @@ const root=path.resolve(__dirname,'..'),dir=path.join(root,'.codex-local/test-ou
  await fs.mkdir(dir,{recursive:true});
  await fs.writeFile(path.join(dir,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="'+base+'harness.jsx"></script>');
  await fs.writeFile(path.join(dir,'harness.jsx'),`
- import React from 'react';import{createRoot}from'react-dom/client';import WorldTitlePage from'/src/WorldTitlePage.jsx';import{ThemeProvider}from'/src/blossom/ThemeProvider.tsx';import MangaImport from'/src/MangaImport.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/import-layout.css';import'/src/discovery-polish.css';import'/src/site-layout.css';import'/src/site-mobile.css';
+ import React from 'react';import{createRoot}from'react-dom/client';import WorldTitlePage from'/src/WorldTitlePage.jsx';import{ThemeProvider}from'/src/blossom/ThemeProvider.tsx';import MangaImport from'/src/MangaImport.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/import-layout.css';import'/src/site-layout.css';import'/src/site-mobile.css';
  const late=location.search.includes('late'),source={title:'Ёцуба и!',aliases:['Ёцуба и!'],kind:'manga',provider:'mangalib',providerName:'MangaLib',language:'ru',url:'https://mangalib.me/ru/fixture'};
  const known=b=>b?.title?.aliases?.includes('Ёцуба и!');window.requests=[];window.inspections=[];
  const service={server:location.origin,status:'connected',session:{serverVersion:69},request:async(p,o={})=>{

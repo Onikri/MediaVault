@@ -1,4 +1,3 @@
-import './interface-refinement.css';
 import {alternativeTitleNames,publicationFacts} from './title-details.js';
 import {useCatalogFavorites} from './catalog-favorites.js';
 import {createImportClient,validateServer} from './import-service.js';

@@ -22,7 +22,7 @@ function useNarrow(){
 }
 
 function Panel({anchor,label,onClose,children,footer,compact=false}){
- const ref=useRef(null),phone=useNarrow(),narrow=phone||!!(matchMedia('(max-width:1000px)').matches&&document.documentElement.dataset.catalogMerged),reduced=useReducedMotion(),[place,setPlace]=useState(null);
+ const ref=useRef(null),phone=useNarrow(),narrow=phone||!!(matchMedia('(max-width:1024px)').matches&&document.documentElement.dataset.catalogMerged),reduced=useReducedMotion(),[place,setPlace]=useState(null);
  useLayoutEffect(()=>{
   if(narrow||!anchor)return;
   let frame=0;
@@ -146,7 +146,7 @@ const OPEN_KEY='mediavault_filters_open_v1';
 const MORPH={type:'spring',stiffness:420,damping:36,mass:.9};
 // Whether the filter row is unfolded; wide screens start unfolded, the choice is remembered.
 function useFiltersOpen(){
- const [open,setOpen]=useState(()=>{try{const saved=localStorage.getItem(OPEN_KEY);if(saved==='1'||saved==='0')return saved==='1';}catch{}return matchMedia('(min-width: 1181px)').matches;});
+ const [open,setOpen]=useState(()=>{try{const saved=localStorage.getItem(OPEN_KEY);if(saved==='1'||saved==='0')return saved==='1';}catch{}return matchMedia('(min-width:1025px)').matches;});
  const change=value=>{setOpen(value);try{localStorage.setItem(OPEN_KEY,value?'1':'0');}catch{}};
  return [open,change];
 }

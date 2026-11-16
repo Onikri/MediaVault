@@ -14,7 +14,7 @@ export default function MergedCatalogToolbar({stuck,children}){
   const sync=()=>{
    const focused=document.activeElement;
    if(focused?.matches('input,textarea')&&focused.closest('.catalog-toolbar,.fdock-panel'))return;
-   const mobile=matchMedia('(max-width:1000px)').matches;
+   const mobile=matchMedia('(max-width:1024px)').matches;
    const target=desired.current?(mobile?dock:header?.querySelector('.header-center-search')):null;
    if(target){const changed=slot.parentNode!==target;if(changed)target.append(slot);document.documentElement.dataset.catalogMerged='true';setHost(slot);if(changed)dispatchEvent(new CustomEvent('mediavault:catalog-merged',{detail:{mobile}}));}
    else{slot.remove();delete document.documentElement.dataset.catalogMerged;setHost(null);}
