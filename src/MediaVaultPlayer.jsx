@@ -7,11 +7,8 @@ import RoomOverlay from './RoomOverlay.jsx';
 import './watch-room.css';
 import './interface-refinement.css';
 import {Music2,Pause,Play,Subtitles,PictureInPicture2,Maximize2,Minimize2,Sparkles,X,Sun,Share2,Camera,Video,ChevronsUp,ChevronsDown,Users,RotateCcw,RotateCw,Captions,Download,RectangleHorizontal,SlidersHorizontal,ChevronsRight,ChevronDown,SkipForward,LayoutGrid,Check,Square} from 'lucide-react';
-import './player-redesign.css';
 import './player.css';
 import './player-refinement.css';
-import './player-comfort.css';
-import './player-next.css';
 import PlayerPopover from './PlayerPopover.jsx';
 import {AnimatePresence,motion} from 'motion/react';
 import {readProgress,writeProgress} from './playback-progress.js';
@@ -39,7 +36,6 @@ import {saveBlob} from './use-player-actions.js';
 import {chapterSpans,chapterIndexAt,normalizeChapters,parseChapterFile,toMatroskaXml,toWebVttChapters,chapterSubtitlePick} from './video-chapters.js';
 import {ChevronRight} from 'lucide-react';
 import {useColorGrade,readCustomPresets,writeCustomPresets} from './color-grade.js';
-import './player-shell.css';
 
 function VolumeGlyph({value,muted}){
   const level=muted?0:value;

@@ -1,0 +1,9 @@
+/* The site's three widths. Every width query in src uses these names:
+   @media (--phone){…}. vite.config.js substitutes them at build time.
+   Phone ≤640px, tablet ≤1024px, desktop ≥1025px. Height, pointer, hover and
+   reduced-motion queries are not widths and stay as they are. */
+@custom-media --phone (max-width:640px);
+@custom-media --tablet (max-width:1024px);
+@custom-media --desktop (min-width:1025px);
+@custom-media --above-phone (min-width:641px);
+@custom-media --tablet-only (min-width:641px) and (max-width:1024px);
