@@ -30,6 +30,14 @@ def candidates():
     import manga_comic_grast
     import manga_comics_kingdom
     import manga_ksbd
+    import manga_korean_seventh
+    import manga_ninehentai
+    import manga_toon11
+    import manga_girlstop
+    import manga_manhwazone
+    import manga_rawkuma_overlay
+    import manga_reimanga
+    import manga_vyvy
     import manga_gallery_archive_ports
     import manga_klto9
     import manga_mangaplus
@@ -117,7 +125,10 @@ def candidates():
                   manga_rinko.SOURCES, manga_unicomics.SOURCES, manga_webnex.SOURCES, manga_yellownote.SOURCES,
                   manga_seventh_data.SOURCES, manga_seventh_html.SOURCES, manga_rayuba.SOURCES,
                   manga_zerosum.SOURCES, manga_nexus_reader.SOURCES, manga_comics_kingdom.SOURCES,
-                  manga_comic_grast.SOURCES, manga_ksbd.SOURCES):
+                  manga_comic_grast.SOURCES, manga_ksbd.SOURCES, manga_girlstop.SOURCES,
+                  manga_reimanga.SOURCES, manga_vyvy.SOURCES, manga_manhwazone.SOURCES,
+                  manga_rawkuma_overlay.SOURCES, manga_korean_seventh.SOURCES, manga_toon11.SOURCES,
+                  manga_ninehentai.SOURCES):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in group)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby

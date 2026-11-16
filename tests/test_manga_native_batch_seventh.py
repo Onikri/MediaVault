@@ -1,6 +1,7 @@
 """Contract tests for different protocols in the seventh source migration batch."""
 
 import csv
+from io import BytesIO
 import json
 from pathlib import Path
 from runpy import run_path
@@ -8,13 +9,23 @@ from unittest import TestCase
 from unittest.mock import Mock
 from urllib.parse import urlsplit
 
+from PIL import Image
+
 import manga_comic_grast
 import manga_comics_kingdom
+import manga_girlstop
+import manga_korean_seventh
 import manga_ksbd
+import manga_manhwazone
+import manga_ninehentai
 import manga_nexus_reader
+import manga_rawkuma_overlay
 import manga_rayuba
+import manga_reimanga
 import manga_seventh_data
 import manga_seventh_html
+import manga_toon11
+import manga_vyvy
 import manga_zerosum
 from manga_speedbinb import grant
 from manga_webcomics import query_url
@@ -22,7 +33,8 @@ from source_parser import PublicHttp, SourceError, public_url
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = (manga_seventh_data, manga_seventh_html, manga_rayuba, manga_zerosum, manga_nexus_reader,
-           manga_comics_kingdom, manga_comic_grast, manga_ksbd)
+           manga_comics_kingdom, manga_comic_grast, manga_ksbd, manga_girlstop, manga_reimanga,
+           manga_vyvy, manga_manhwazone, manga_rawkuma_overlay, manga_korean_seventh, manga_toon11, manga_ninehentai)
 PROFILES = tuple(adapter for module in MODULES for adapter in module.SOURCES)
 
 
@@ -39,8 +51,8 @@ class SeventhBatchTests(TestCase):
         candidates, active = run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(encoding='utf-8', newline='') as file:
             rows = {row['source_id']: row for row in csv.DictReader(file)}
-        self.assertEqual(len(PROFILES), 11)
-        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 10)
+        self.assertEqual(len(PROFILES), 26)
+        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 20)
         for profile in PROFILES:
             with self.subTest(profile=profile.SOURCE_ID):
                 self.assertNotIn(profile.SOURCE_ID, active)
@@ -129,3 +141,47 @@ class SeventhBatchTests(TestCase):
         self.assertEqual(urlsplit(profile.canonical(episodes[0]['url'])).path, chapter_path)
         self.assertEqual(profile.inspect(episodes[0]['url'], http)['pages'], ['https://i.imgur.com/example.png'])
         self.assertEqual(public_url(chapter, resolve_dns=False), chapter)
+
+    def test_vyvy_replaces_expiring_links_with_stable_chapter_ids(self):
+        profile = manga_vyvy.VyvyManga()
+        profile.origin.interval = 0
+        title = profile.ROOT + '/manga/example'
+        template = '<h1>Example</h1><div class="list-group"><a href="/chapter/{token}" id="chapter-2"><span>Chapter 2</span></a></div>'
+        first = mock_site({title: template.format(token='expired')})
+        url = profile.inspect(title, first)['episodes'][0]['url']
+        second = mock_site({title: template.format(token='current'), profile.ROOT + '/chapter/current':
+                            '<img class="d-block" data-src="https://cdn.example.org/2.png">'})
+        self.assertEqual(profile.inspect(url, second)['pages'], ['https://cdn.example.org/2.png'])
+
+    def test_reimanga_pack_assigns_each_range_to_the_right_segment(self):
+        root = 'https://cdn.example.org/'
+        refs = manga_reimanga.pack_pages({'index': {'s': [2, 1], 'p': [[32], [64], [128]]},
+                                         'urls': [root + 'a.webp', root + 'b.webp']}, root)
+        self.assertEqual([(item.url, item.offset, item.size) for _, item in refs],
+                         [(root + 'a.webp', 0, 32), (root + 'a.webp', 32, 64), (root + 'b.webp', 0, 128)])
+        with self.assertRaises(SourceError):
+            manga_reimanga.pack_pages({'index': {'s': [2], 'p': [[32]]}, 'urls': [root + 'a.webp']}, root)
+
+    def test_rawkuma_overlay_draws_only_safe_elements(self):
+        overlay = manga_rawkuma_overlay.RawkumaPage(80, 60,
+            '<rect x="1" y="1" width="20" height="20" fill="#f00"/>'
+            '<g style="font-size:8px;fill:black"><text x="20" y="24" textLength="22">Example</text></g>', ())
+        original = BytesIO()
+        Image.new('RGB', (80, 60), 'white').save(original, 'PNG')
+        raw = overlay.overlay(original.getvalue(), Mock(), 'https://rawkuma.me/manga/example/chapter-1')
+        with Image.open(BytesIO(raw)) as image:
+            self.assertEqual(image.size, (80, 60))
+            color = image.getpixel((12, 12))
+            self.assertGreater(color[0], 180)
+            self.assertLess(color[1], 70)
+        with self.assertRaises(SourceError):
+            manga_rawkuma_overlay.svg_nodes('<!DOCTYPE foo><text/>')
+
+    def test_manhwazone_livewire_only_allows_chapter_loading(self):
+        title = manga_manhwazone.ROOT + '/series/example'
+        endpoint = manga_manhwazone.ROOT + '/livewire/update'
+        valid = {'_token': 'T' * 30, 'components': [{'snapshot': json.dumps({'data': {}, 'memo': {}, 'checksum': 'a' * 64}),
+                'updates': {}, 'calls': [{'path': '', 'method': 'bootLoad', 'params': []}]}]}
+        self.assertTrue(manga_manhwazone.livewire_form(endpoint, json.dumps(valid).encode(), title))
+        valid['components'][0]['calls'][0]['method'] = 'anotherAction'
+        self.assertFalse(manga_manhwazone.livewire_form(endpoint, json.dumps(valid).encode(), title))

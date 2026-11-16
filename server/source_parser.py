@@ -260,7 +260,8 @@ class PublicHttp:
                 and not speedbinb_routed
                 and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
                                    'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
-                                   'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto'}):
+                                   'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto',
+                                   'manhwazone-document'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
@@ -280,6 +281,20 @@ class PublicHttp:
             if method != 'GET' or origin.netloc != 'hotcomics.io' or not re.match(r'/en(?:/|$)', origin.path):
                 raise SourceError('Некорректный публичный запрос HotComics.')
             outgoing['Cookie'] = 'hc_vfs=Y'
+        manhwazone_session = action in {'manhwazone-document', 'manhwazone-livewire'}
+        if manhwazone_session:
+            from manga_manhwazone import HOSTS as manhwazone_hosts, TITLE as manhwazone_title
+            from manga_manhwazone import livewire_form
+
+            target = urlsplit(url)
+            if action == 'manhwazone-document':
+                if method != 'GET' or target.netloc not in manhwazone_hosts or not re.fullmatch(manhwazone_title, target.path):
+                    raise SourceError('Некорректная карточка ManhwaZone.')
+            else:
+                if method != 'POST' or not livewire_form(url, data, outgoing.get('Referer', '')):
+                    raise SourceError('Некорректный публичный запрос оглавления ManhwaZone.')
+                outgoing.update({'X-Livewire': '', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json',
+                                 'Content-Type': 'application/json', 'Origin': 'https://' + target.netloc})
         if action == 'webnex-image':
             from manga_webnex import cookie_header, public_api as webnex_api
             origin = urlsplit(url)
@@ -336,6 +351,8 @@ class PublicHttp:
                 raise SourceError('Некорректный маршрут публичного API каталога.')
             outgoing.update({'Accept': 'application/json' if action.endswith('json') else 'text/html, */*',
                              'X-Requested-With': 'XMLHttpRequest'})
+            if target.netloc == 'reimanga.net':
+                outgoing['Cookie'] = 'showAdultContent=true'
         if action == 'ysk-json':
             from manga_catalogue_api_ports import YSK, YSK_SEARCH, public_api
             target = urlsplit(url)
@@ -363,13 +380,17 @@ class PublicHttp:
             from manga_additional_catalogues import public_rsc as additional_rsc
             from manga_direct_payloads import public_api
             from manga_mangamee import public_rsc as mangamee_rsc
+            from manga_reimanga import public_rsc as rei_rsc
             from manga_scanlation_json import public_rsc
             target = urlsplit(url)
             revival = target.netloc == 'www.revivalscans.com' and public_api(target.netloc, target.path, target.query)
             route = (target.netloc, target.path, target.query)
-            if method != 'GET' or data is not None or not (revival or public_rsc(*route) or additional_rsc(*route) or mangamee_rsc(*route)):
+            if method != 'GET' or data is not None or not (
+                    revival or public_rsc(*route) or additional_rsc(*route) or mangamee_rsc(*route) or rei_rsc(*route)):
                 raise SourceError('Некорректный маршрут React Flight.')
             outgoing.update({'RSC': '1', 'Accept': 'text/x-component'})
+            if rei_rsc(*route):
+                outgoing['Cookie'] = 'showAdultContent=true'
         if action == 'mangamee-proto':
             from manga_mangamee import public_api as mangamee_api
             target = urlsplit(url)
@@ -561,7 +582,16 @@ class PublicHttp:
                 if mangataro_form:
                     outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
                                      'X-Requested-With': 'XMLHttpRequest'})
-            if not (player_form or search_form or manga_form or million_register or zerosum_viewer or foolslide_form or namicomi_form
+            ninehentai_form = False
+            if action == 'ninehentai-api':
+                from manga_ninehentai import form as ninehentai_read
+
+                ninehentai_form = ninehentai_read(url, data)
+                if ninehentai_form:
+                    outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
+                                     'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://9hentai.so'})
+            if not (player_form or search_form or manga_form or million_register or zerosum_viewer or manhwazone_session
+                    or foolslide_form or namicomi_form or ninehentai_form
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
@@ -588,7 +618,7 @@ class PublicHttp:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             try:
                 # A Comic Fury warning can set a cookie for a redirect to the same page.
-                if not (fury_form or buff_form or webnex_document):
+                if not (fury_form or buff_form or webnex_document or manhwazone_session):
                     self.session.cookies.clear()
                 request_timeout=timeout or self.timeout
                 if self.deadline:
@@ -613,12 +643,14 @@ class PublicHttp:
                                'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
                                'natsuid-search', 'creator-feed-json', 'fanfox-reader', 'ysk-json',
-                               'webnex-json', 'webnex-image', 'zerosum-proto'}
+                               'webnex-json', 'webnex-image', 'zerosum-proto', 'manhwazone-livewire'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
                 if (action in {'webnex-doc', 'hotcomics-doc'} and urlsplit(next_url).netloc != urlsplit(url).netloc):
                     raise SourceError('Источник перенаправил гостевой запрос на другой сайт.')
+                if action == 'manhwazone-document' and urlsplit(next_url).netloc not in manhwazone_hosts:
+                    raise SourceError('ManhwaZone перенаправил карточку на другой домен.')
                 if mdx_mode and (method != 'GET' or urlsplit(next_url).netloc != urlsplit(url).netloc):
                     raise SourceError('MadaraDex перенаправил запрос гостевой сессии.')
                 if publisher:

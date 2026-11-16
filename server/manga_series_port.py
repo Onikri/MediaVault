@@ -37,6 +37,7 @@ def series_api(host, path, query):
     from manga_json_families import public_api as api
     from manga_kappabeast import public_api as kappa
     from manga_klto9 import public_api as klto9
+    from manga_korean_seventh import public_api as korean_seventh
     from manga_mangaplus import public_api as mangaplus
     from manga_mangamee import public_api as mangamee
     from manga_manta_native import public_api as manta
@@ -44,8 +45,11 @@ def series_api(host, path, query):
     from manga_mangataro import public_api as mangataro
     from manga_pandachaika import public_api as pandachaika
     from manga_natsuid import public_api as natsuid
+    from manga_ninehentai import public_api as ninehentai
     from manga_public_galleries import public_api as gallery_api
     from manga_rayuba import public_api as rayuba
+    from manga_reimanga import public_api as rei
+    from manga_rawkuma_overlay import public_api as rawkuma_me
     from manga_remaining_families import public_api as remaining
     from manga_ru_families import public_api as ru
     from manga_ru_json_ports import public_api as ru_json
@@ -78,7 +82,7 @@ def series_api(host, path, query):
                                                      sacachispa, speedbinb, webtoon_native, sixth, luscious, simply,
                                                      pandachaika, toonlook, alpha, catalogue_api, klto9, mangaplus,
                                                      small_readers, scan_api, manta, gallery_archives, mangamee, webnex,
-                                                     seventh, rayuba, zerosum))
+                                                     seventh, rayuba, zerosum, rei, rawkuma_me, korean_seventh, ninehentai))
 
 
 def public_form(url, data, headers):
@@ -103,9 +107,10 @@ def public_form(url, data, headers):
     from manga_ru_html_ports import public_form as russian_html
     from manga_small_readers import public_form as small_readers
     from manga_rinko import public_form as rinko
+    from manga_girlstop import search_form as girlstop
 
     return (standalone(url, data) or fifth(url, data) or russian_html(url, data) or loop(url, data) or small_readers(url, data)
-            or rinko(url, data, headers.get('Referer', '')))
+            or rinko(url, data, headers.get('Referer', '')) or girlstop(url, data))
 
 
 def document_json(http, url, referer):

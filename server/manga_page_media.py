@@ -158,11 +158,32 @@ def fetch_page(http, reference, headers):
         return validated_image(decode_image(read_image(http, response), key))
     if action == 'speedbinb-image':
         from manga_mangaplus import MangaPlusPage
+        from manga_manhwazone import ManhwaZonePage
+        from manga_rawkuma_overlay import RawkumaPage
+        from manga_toon11 import ToonMirrorPage
+        from manga_reimanga import PackedWebp
         from manga_speedbinb import compose, grant, ptimg
         from manga_webnex import WebnexPage
 
         url, referer, layout = grant(target)
         headers = {'Referer': referer}
+        if isinstance(layout, PackedWebp):
+            return validated_image(layout.fetch(http, referer))
+        if isinstance(layout, ManhwaZonePage):
+            response, _ = http._open(url)
+            return validated_image(read_image(http, response))
+        if isinstance(layout, RawkumaPage):
+            response, _ = http._open(url, headers=headers)
+            return validated_image(layout.overlay(read_image(http, response), http, referer))
+        if isinstance(layout, ToonMirrorPage):
+            try:
+                response, _ = http._open(url, headers=headers)
+                return validated_image(read_image(http, response))
+            except SourceError:
+                if not layout.fallback or layout.fallback == url:
+                    raise
+                response, _ = http._open(layout.fallback, headers=headers)
+                return validated_image(read_image(http, response))
         if isinstance(layout, MangaPlusPage):
             headers['Plus-Vw-Token'] = layout.token
             response, _ = http._open(url, headers=headers, action='mangaplus-image')
