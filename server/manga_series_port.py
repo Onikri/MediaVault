@@ -45,6 +45,7 @@ def series_api(host, path, query):
     from manga_pandachaika import public_api as pandachaika
     from manga_natsuid import public_api as natsuid
     from manga_public_galleries import public_api as gallery_api
+    from manga_rayuba import public_api as rayuba
     from manga_remaining_families import public_api as remaining
     from manga_ru_families import public_api as ru
     from manga_ru_json_ports import public_api as ru_json
@@ -57,6 +58,7 @@ def series_api(host, path, query):
     from manga_senkuro_native import public_api as senkuro
     from manga_simply_native import public_api as simply
     from manga_sixth_profiles import public_api as sixth
+    from manga_seventh_data import public_api as seventh
     from manga_small_readers import public_api as small_readers
     from manga_spa_catalogues import public_api as spa_catalogue
     from manga_speedbinb_sources import public_api as speedbinb
@@ -65,6 +67,7 @@ def series_api(host, path, query):
     from manga_standalone_ports import public_api as standalone
     from manga_toonlook import public_api as toonlook
     from manga_yarnovel import public_api as yarnovel
+    from manga_zerosum import public_api as zerosum
 
     if host == 'mangarw.com' and path == '/api/v1/chapters':
         return bool(re.fullmatch(r'id=[0-9]{1,18}', query))
@@ -74,7 +77,8 @@ def series_api(host, path, query):
                                                      mangataro, initmanga, scan_cats, html_archives, kappa, illustrated,
                                                      sacachispa, speedbinb, webtoon_native, sixth, luscious, simply,
                                                      pandachaika, toonlook, alpha, catalogue_api, klto9, mangaplus,
-                                                     small_readers, scan_api, manta, gallery_archives, mangamee, webnex))
+                                                     small_readers, scan_api, manta, gallery_archives, mangamee, webnex,
+                                                     seventh, rayuba, zerosum))
 
 
 def public_form(url, data, headers):

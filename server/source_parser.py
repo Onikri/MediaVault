@@ -260,11 +260,26 @@ class PublicHttp:
                 and not speedbinb_routed
                 and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
                                    'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
-                                   'webnex-doc', 'webnex-image'}):
+                                   'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
+        webnex_document = action in {'webnex-doc', 'webnex-json'}
+        if webnex_document:
+            from manga_webnex import public_api as webnex_api
+
+            origin = urlsplit(url)
+            if (method != 'GET' or origin.netloc != 'webnex.cc'
+                    or action == 'webnex-json' and not webnex_api(origin.netloc, origin.path, origin.query)):
+                raise SourceError('Некорректный публичный запрос Webnex.')
+            if action == 'webnex-json':
+                outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+        if action == 'hotcomics-doc':
+            origin = urlsplit(url)
+            if method != 'GET' or origin.netloc != 'hotcomics.io' or not re.match(r'/en(?:/|$)', origin.path):
+                raise SourceError('Некорректный публичный запрос HotComics.')
+            outgoing['Cookie'] = 'hc_vfs=Y'
         if action == 'webnex-image':
             from manga_webnex import cookie_header, public_api as webnex_api
             origin = urlsplit(url)
@@ -361,6 +376,18 @@ class PublicHttp:
             if method != 'GET' or data is not None or not mangamee_api(target.netloc, target.path, target.query):
                 raise SourceError('Некорректный маршрут MangaMee.')
             outgoing['Accept'] = 'application/x-protobuf, application/octet-stream, */*'
+        zerosum_viewer = False
+        if action == 'zerosum-proto':
+            from manga_zerosum import public_api as zerosum_api
+
+            target = urlsplit(url)
+            viewer = target.path == '/api/v1/viewer'
+            zerosum_viewer = viewer and method == 'POST' and data == b''
+            if (not zerosum_api(target.netloc, target.path, target.query)
+                    or not (zerosum_viewer or not viewer and method == 'GET' and data is None)):
+                raise SourceError('Некорректный маршрут Zerosum Online.')
+            outgoing.update({'Accept': 'application/x-protobuf, application/octet-stream, */*',
+                             'X-Requested-With': 'XMLHttpRequest', 'Accept-Language': 'ja,en;q=0.8'})
         if action == 'inkstory-json':
             from manga_inkstory import SERVICES, public_api
             target = urlsplit(url)
@@ -534,7 +561,7 @@ class PublicHttp:
                 if mangataro_form:
                     outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
                                      'X-Requested-With': 'XMLHttpRequest'})
-            if not (player_form or search_form or manga_form or million_register or foolslide_form or namicomi_form
+            if not (player_form or search_form or manga_form or million_register or zerosum_viewer or foolslide_form or namicomi_form
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
@@ -561,7 +588,7 @@ class PublicHttp:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             try:
                 # A Comic Fury warning can set a cookie for a redirect to the same page.
-                if not (fury_form or buff_form):
+                if not (fury_form or buff_form or webnex_document):
                     self.session.cookies.clear()
                 request_timeout=timeout or self.timeout
                 if self.deadline:
@@ -585,10 +612,13 @@ class PublicHttp:
                 if (speedbinb or action in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto',
                                'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
-                               'natsuid-search', 'creator-feed-json', 'fanfox-reader', 'ysk-json', 'webnex-image'}
+                               'natsuid-search', 'creator-feed-json', 'fanfox-reader', 'ysk-json',
+                               'webnex-json', 'webnex-image', 'zerosum-proto'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
+                if (action in {'webnex-doc', 'hotcomics-doc'} and urlsplit(next_url).netloc != urlsplit(url).netloc):
+                    raise SourceError('Источник перенаправил гостевой запрос на другой сайт.')
                 if mdx_mode and (method != 'GET' or urlsplit(next_url).netloc != urlsplit(url).netloc):
                     raise SourceError('MadaraDex перенаправил запрос гостевой сессии.')
                 if publisher:

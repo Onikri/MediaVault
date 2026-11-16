@@ -88,8 +88,9 @@ class MangaPlusPage(XorPage):
         self.token = token
 
 
-def protobuf(http, url, source, headers, action):
-    response, final = http._open(url, headers=headers, action=action)
+def protobuf(http, url, source, headers, action, *, empty_post=False):
+    options = {'method': 'POST', 'data': b''} if empty_post else {}
+    response, final = http._open(url, headers=headers, action=action, **options)
     try:
         if final != url:
             raise SourceError(f'{source} перенаправил маршрут читалки.')

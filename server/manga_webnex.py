@@ -189,7 +189,7 @@ class Webnex(SeriesPort):
         parts = urlsplit(endpoint)
         if not public_api(parts.netloc, parts.path, parts.query):
             raise SourceError('Некорректный публичный маршрут читалки Webnex.')
-        raw, result, _ = http.document(endpoint, headers={'Referer': final}, action='native-series-json')
+        raw, result, _ = http.document(endpoint, headers={'Referer': final}, action='webnex-json')
         if result != endpoint:
             raise SourceError('Webnex перенаправил запрос страниц.')
         urls = [img for page in json.loads(raw)['pages'] if (img := image_url(page, final))]
