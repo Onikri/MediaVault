@@ -82,21 +82,89 @@ maintenance.write_text('services:\n  importer:\n    environment:\n      MEDIA_VA
 paused=[*updated,'-f',str(maintenance)]
 backup=Path('/opt/mediavault-backups')/(time.strftime('%Y%m%dT%H%M%SZ',time.gmtime())+'-'+revision[:12])
 backup.mkdir(parents=True,mode=0o700);os.chmod(backup.parent,0o700)
+# The backup is taken in three parts so the site is down only while the
+# databases are copied, not while 7 GB are compressed:
+#  1. with the importer running: every ordinary file (keys, profiles, models)
+#     into private-files.tar.gz; regenerable caches are left out;
+#  2. with the importer stopped: the small databases, the service key and the
+#     configuration into private-data.tar.gz, and a raw copy of each large
+#     database into RAM (its pages are read into the page cache beforehand);
+#  3. once the new release answers (or the old one is back): the large copies
+#     into private-databases.tar.gz.
+CACHE_DIRS={'temporary','.codex-local/alloha-delivery/segments','.codex-local/alloha-delivery/vod','.codex-local/alloha-delivery/logs','.codex-local/export-translations','catalogue-maintenance/hc-html-cache'}
+CHROMIUM_CACHES={'Cache','Code Cache','GPUCache','GrShaderCache','ShaderCache','DawnCache','DawnGraphiteCache','DawnWebGPUCache','GPUPersistentCache','component_crx_cache','CacheStorage','ScriptCache'}
+DATABASE=('.sqlite','.sqlite3','.db')
+SIDECARS=('-journal','-wal','-shm')
+LARGE=256*1024**2
+def private_files():
+    ordinary,databases=[],[]
+    for folder,names,entries in os.walk(data):
+        relative=Path(folder).relative_to(data)
+        names[:]=sorted(n for n in names if (relative/n).as_posix() not in CACHE_DIRS and n not in CHROMIUM_CACHES)
+        for name in sorted(entries):
+            path=Path(folder)/name
+            if path.is_symlink() or not path.is_file() or name.endswith(SIDECARS) and any(name.endswith(d+s) for d in DATABASE for s in SIDECARS):continue
+            (databases if name.endswith(DATABASE) else ordinary).append(path)
+    return ordinary,databases
+def size(path):
+    try:return path.stat().st_size
+    except FileNotFoundError:return 0
+def configuration(archive):
+    for i,path in enumerate(dict.fromkeys([env,*files,work/'Caddyfile'])):
+        if path.exists():archive.add(path,arcname='configuration/'+str(i)+'-'+path.name)
+ordinary,databases=private_files()
+large=[p for p in databases if size(p)>LARGE];small=[p for p in databases if p not in large]
+needed=sum(map(size,ordinary))+sum(map(size,databases))
+if shutil.disk_usage(backup).free<needed+512*1024**2:raise SystemExit('Insufficient disk space for a complete private backup.')
+with tarfile.open(backup/'private-files.tar.gz','w:gz',compresslevel=1) as archive:
+    for path in ordinary:
+        try:archive.add(path,arcname='data/'+path.relative_to(data).as_posix(),recursive=False)
+        except FileNotFoundError:pass  # a temporary file finished while it was listed
+os.chmod(backup/'private-files.tar.gz',0o600)
+def available_memory():
+    try:return int(next(l for l in Path('/proc/meminfo').read_text().splitlines() if l.startswith('MemAvailable:')).split()[1])*1024
+    except (OSError,StopIteration,ValueError):return 0
+ram=Path('/dev/shm');large_size=sum(map(size,large))
+in_ram=ram.is_dir() and available_memory()>large_size+4*1024**3 and shutil.disk_usage(ram).free>large_size+1024**3
+staging=(ram if in_ram else backup)/('mediavault-backup-'+revision[:12])
+def warm(path):
+    with path.open('rb') as source:
+        while source.read(16*1024**2):pass
+for path in large:warm(path)
+staged=[]
+def finish_large():
+    if not staged:return
+    try:
+        with tarfile.open(backup/'private-databases.tar.gz','w:gz',compresslevel=1) as archive:
+            for relative,copy in staged:archive.add(copy,arcname='data/'+relative)
+        os.chmod(backup/'private-databases.tar.gz',0o600)
+        with tarfile.open(backup/'private-databases.tar.gz') as archive:
+            if sorted(archive.getnames())!=sorted('data/'+r for r,_ in staged):raise RuntimeError('Large database backup verification failed.')
+    finally:
+        shutil.rmtree(staging,ignore_errors=True);staged.clear()
 stopped=False
 try:
     now=state()
     if now['cancelling'] or now['active'] and not resume_active:raise RuntimeError('Imports became active during build; update postponed.')
     execute([*base,'stop','importer'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);stopped=True
     before=state()
-    needed=sum(p.stat().st_size for p in data.rglob('*') if p.is_file())
-    if shutil.disk_usage(backup).free<needed+512*1024**2:raise RuntimeError('Insufficient disk space for a complete private backup.')
     with tarfile.open(backup/'private-data.tar.gz','w:gz') as archive:
-        archive.add(data,arcname='data')
-        for i,path in enumerate(dict.fromkeys([env,*files,work/'Caddyfile'])):
-            if path.exists():archive.add(path,arcname='configuration/'+str(i)+'-'+path.name)
+        archive.add(key,arcname='data/service.key')
+        for path in small:
+            for part in [path,*(path.with_name(path.name+s) for s in SIDECARS)]:
+                if part.is_file():archive.add(part,arcname='data/'+part.relative_to(data).as_posix())
+        configuration(archive)
     os.chmod(backup/'private-data.tar.gz',0o600)
     with tarfile.open(backup/'private-data.tar.gz') as archive:
         if 'data/service.key' not in archive.getnames() or 'data/tasks.sqlite' not in archive.getnames():raise RuntimeError('Private backup verification failed.')
+    staging.mkdir(parents=True,mode=0o700,exist_ok=True)
+    for path in large:
+        for part in [path,*(path.with_name(path.name+s) for s in SIDECARS)]:
+            if part.is_file():
+                relative=part.relative_to(data).as_posix();copy=staging/relative.replace('/','__')
+                shutil.copyfile(part,copy);os.chmod(copy,0o600)
+                if copy.stat().st_size!=part.stat().st_size:raise RuntimeError('Large database copy is incomplete.')
+                staged.append((relative,copy))
     (backup/'rollback.json').write_text(json.dumps({'compose':base,'image':old['Image'],'data':str(data),'revision':revision}))
     # Validate the retained queue before allowing the new worker to change it.
     execute([*paused,'up','-d','--no-deps','--no-build','--force-recreate','importer'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -139,5 +207,12 @@ except BaseException:
             except (subprocess.CalledProcessError,ValueError):pass
             time.sleep(2)
         else:print('Rollback health could not be confirmed; inspect the existing importer.',file=sys.stderr)
+    try:finish_large()
+    except Exception as error:print('Large database backup: '+str(error),file=sys.stderr)
     raise
+# The new release answers: the large copies go to disk now, outside the
+# window in which a failure would roll the release back.
+try:finish_large()
+except Exception as error:print('Large database backup: '+str(error),file=sys.stderr)
+if (backup/'private-databases.tar.gz').exists():print('Large databases: '+str(backup/'private-databases.tar.gz'))
 PY

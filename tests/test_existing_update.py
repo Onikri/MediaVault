@@ -17,7 +17,7 @@ REVISION='a'*40
 
 
 class ExistingUpdateTests(unittest.TestCase):
-    def exercise(self,root,*,active=False,health_failure=False,resume_active=False,image_revision=None):
+    def exercise(self,root,*,active=False,health_failure=False,resume_active=False,image_revision=None,prepare=None,on_stop=None,large=None):
         work=root/'legacy/media-vault/deploy/oracle';data=work/'data';data.mkdir(parents=True)
         for name,value in [('.env','private-fixture'),('compose.yaml','services: {}'),('release-v51.yaml','services: {}'),('Caddyfile','fixture')]:
             (work/name).write_text(value)
@@ -26,6 +26,7 @@ class ExistingUpdateTests(unittest.TestCase):
             db.executescript('CREATE TABLE tasks (id TEXT,status TEXT,data BLOB); CREATE TABLE settings (name TEXT,value BLOB);')
             db.execute('INSERT INTO tasks VALUES (?,?,?)',('task-fixture','running' if active else 'done',b'encrypted-task-fixture'))
             db.execute('INSERT INTO settings VALUES (?,?)',('oauth-fixture',b'encrypted-fixture'))
+        if prepare:prepare(data)
         files=[str(work/'compose.yaml'),str(work/'release-v51.yaml')]
         old={'Id':'old','Image':'sha256:old','Config':{'Labels':{
             'com.docker.compose.service':'importer','com.docker.compose.project':'oracle',
@@ -52,12 +53,14 @@ class ExistingUpdateTests(unittest.TestCase):
             raise AssertionError(args)
         def run(args,**kwargs):
             calls.append(args)
+            if on_stop and args[:2]==['docker','compose'] and 'stop' in args:on_stop()
             if args[:3]==['docker','image','inspect']:
                 return subprocess.CompletedProcess(args,0 if image_revision else 1,stdout=image_revision or '',stderr='')
             return subprocess.CompletedProcess(args,0)
         code=SCRIPT.read_text().split("python3 - \"$@\" <<'PY'\n",1)[1].rsplit('\nPY',1)[0]
         # Relocate only host deployment directories into this isolated fixture.
         code=code.replace("'/opt/mediavault-releases'",repr(str(root/'releases'))).replace("'/opt/mediavault-backups'",repr(str(root/'backups'))).replace("'/var/tmp/mediavault-update-'",repr(str(root/'update-')))
+        if large is not None:code=code.replace('LARGE=256*1024**2','LARGE='+str(large)).replace("ram=Path('/dev/shm')","ram=Path("+repr(str(root/'ram'))+")")
         try:
             with patch.object(sys,'argv',['update',REVISION,*(['--resume-active-jobs'] if resume_active else [])]),patch('subprocess.check_output',side_effect=output),patch('subprocess.run',side_effect=run),patch('time.sleep'),contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
                 exec(compile(code,str(SCRIPT),'exec'),{})
@@ -121,3 +124,37 @@ class ExistingUpdateTests(unittest.TestCase):
             for file in files:self.assertIn(file,ups[-1])
             self.assertNotIn(str(work/('release-'+REVISION[:12]+'.yaml')),ups[-1])
             self.assertEqual((data/'service.key').read_bytes(),b'private-fixture-key')
+
+    def test_backup_leaves_caches_out_and_copies_large_databases_while_stopped(self):
+        def prepare(data):
+            for relative in ['.codex-local/alloha-delivery/segments/a.ts','.codex-local/alloha-delivery/vod/b.mp4','temporary/c.part',
+                             '.codex-local/export-browser/owner/Default/Cache/d','catalogue-maintenance/hc-html-cache/e.html']:
+                (data/relative).parent.mkdir(parents=True,exist_ok=True);(data/relative).write_bytes(b'cache-fixture')
+            profile=data/'.codex-local/alloha-delivery/profiles/one/Cookies';profile.parent.mkdir(parents=True);profile.write_bytes(b'cookie-fixture')
+            with contextlib.closing(sqlite3.connect(data/'manga-discovery.sqlite')) as db,db:
+                db.execute('CREATE TABLE titles (id TEXT)');db.executemany('INSERT INTO titles VALUES (?)',[('t'*40+str(i),) for i in range(400)])
+            with contextlib.closing(sqlite3.connect(data/'places.sqlite')) as db,db:db.execute('CREATE TABLE places (owner TEXT)')
+        seen={}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'ram').mkdir()
+            def on_stop():
+                backups=list((root/'backups').glob('*'));seen['files']=bool(list(backups[0].glob('private-files.tar.gz')));seen['databases']=bool(list(backups[0].glob('private-databases.tar.gz')))
+            work,data,files,calls,error=self.exercise(root,prepare=prepare,on_stop=on_stop,large=20000)
+            self.assertIsNone(error)
+            self.assertEqual(seen,{'files':True,'databases':False},'ordinary files are archived before the stop, large databases after it')
+            folder=next((root/'backups').glob('*'))
+            with tarfile.open(folder/'private-files.tar.gz') as saved:
+                names=saved.getnames()
+                self.assertIn('data/.codex-local/alloha-delivery/profiles/one/Cookies',names)
+                self.assertFalse([n for n in names if 'cache-fixture' in n or n.endswith(('a.ts','b.mp4','c.part','/Cache/d','e.html'))],names)
+                self.assertFalse([n for n in names if n.endswith('.sqlite')],names)
+            with tarfile.open(folder/'private-data.tar.gz') as saved:
+                names=saved.getnames()
+                self.assertIn('data/tasks.sqlite',names);self.assertIn('data/places.sqlite',names);self.assertIn('data/service.key',names)
+                self.assertNotIn('data/manga-discovery.sqlite',names)
+                self.assertTrue(any(n.startswith('configuration/') and n.endswith('.env') for n in names))
+            with tarfile.open(folder/'private-databases.tar.gz') as saved:
+                self.assertEqual(saved.getnames(),['data/manga-discovery.sqlite'])
+                self.assertEqual(saved.extractfile('data/manga-discovery.sqlite').read(),(data/'manga-discovery.sqlite').read_bytes())
+            self.assertEqual(list((root/'ram').iterdir()),[],'the RAM copy is removed')
+
