@@ -1,4 +1,4 @@
-"""Coverage of the user's 18 requested manga websites.
+"""Coverage of the user's requested manga websites (YaoiChan removed by the owner).
 
 This is a capability/status audit, not a claim that every upstream is
 accessible. Source health and a real sample page are checked by the existing
@@ -15,7 +15,6 @@ SOURCES = (
     ('henchan.pro', 'HenChan', 'extension', None, ('henchan',), 'Suwayomi adapter when installed; source domain must be confirmed.'),
     ('hentaichan.cc', 'HentaiChan.cc', 'native', 'hentaichan-cc', (), 'Native public search and reader.'),
     ('y.hentaichan.live', 'Y-HentaiChan', 'unverified', None, (), 'Distinct subdomain; not an approved HentaiChan reader mirror.'),
-    ('yaoi-chan.me', 'YaoiChan', 'extension', None, ('yaoichan', 'yaoi-chan', 'яой-тян'), 'Only if an exact installed Suwayomi source exists.'),
     ('hmanga.su', 'HManga', 'native', 'hmanga', (), 'Native public HTML adapter on current hmanga.me; live reader check still required.'),
     ('hentaros.com', 'Hentaros', 'extension', None, ('hentaros',), 'Extension only if installed; no verified native parser.'),
     ('online.hentaimoody.com', 'HentaiMoody', 'extension', None, ('hentaimoody', 'hentai moody'), 'Extension only if installed; no verified native parser.'),
@@ -27,7 +26,15 @@ SOURCES = (
     ('хентай.онлайн', 'Хентай.онлайн', 'unverified', None, (), 'IDN host not verified; do not auto-route arbitrary aliases.'),
     ('newmanga.org', 'NewManga', 'closed', None, (), 'Website publicly announces permanent closure.'),
 )
-assert len(SOURCES) == 18
+assert len(SOURCES) == 17
+
+# Sites the owner removed: never crawled, searched or read, and their indexed
+# cards are retired (catalogue_indexer.retire_removed).
+REMOVED_DOMAINS = ('yaoi-chan.me',)
+
+def removed_host(value):
+    host = _host(str(value or ''))
+    return any(host == domain or host.endswith('.' + domain) for domain in REMOVED_DOMAINS)
 
 def _host(value):
     # PublicHttp / Suwayomi may report either a root URL or a hostname.

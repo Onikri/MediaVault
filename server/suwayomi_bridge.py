@@ -163,7 +163,11 @@ def cached(name,path,ttl):
     with _lock:_cache[name]=(now+ttl,value)
     return value
 
-def sources():return [s for s in cached('sources','/source/list',30) if str(s.get('id'))!='0']
+def sources():
+    # A site the owner removed stays out of search, catalogue and reader even
+    # while its extension remains installed in Suwayomi.
+    from manga_source_coverage import removed_host
+    return [s for s in cached('sources','/source/list',30) if str(s.get('id'))!='0' and not removed_host(s.get('baseUrl'))]
 def extensions():return cached('extensions','/extension/list',120)
 
 def indexed_reader(value):

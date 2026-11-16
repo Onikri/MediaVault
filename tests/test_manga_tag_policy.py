@@ -36,20 +36,20 @@ class PolicyTests(unittest.TestCase):
                 'genres':['Drama'],'language':'en'}])
         self.db.commit()
 
-    def test_delete_and_restore_rebuild_all_18_source_projections(self):
-        self.seed();self.assertEqual(browse(self.db,genre='Fantasy')['total'],18)
+    def test_delete_and_restore_rebuild_every_source_projection(self):
+        self.seed();self.assertEqual(browse(self.db,genre='Fantasy')["total"],len(SOURCES))
         removed={**BASE,'tags':[BASE['tags'][1]]}
-        result=self.put(removed);self.assertEqual(result['reindexedTitles'],18)
+        result=self.put(removed);self.assertEqual(result["reindexedTitles"],len(SOURCES))
         self.assertEqual(browse(self.db,genre='Fantasy')['total'],0)
         self.assertTrue(all(not row['tags'] for row in browse(self.db)['items']))
         self.assertNotIn('fantasy',{r['key'] for r in tags(self.db)['tags']})
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM catalog_tags WHERE tag_key='fantasy'").fetchone()[0],0)
-        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM catalog_tag_facts').fetchone()[0],54)
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM catalog_tag_facts').fetchone()[0],3*len(SOURCES))
         restored={**BASE,'tags':[{**BASE['tags'][0],'label':'Чудесные миры'},BASE['tags'][1],
             {'key':'journey','label':'Путешествие','aliases':['Journey','旅','여행']}]}
         self.put(restored)
-        self.assertEqual(browse(self.db,tag='Journey')['total'],18)
-        self.assertEqual(browse(self.db,genre='幻想')['total'],18)
+        self.assertEqual(browse(self.db,tag='Journey')["total"],len(SOURCES))
+        self.assertEqual(browse(self.db,genre='幻想')["total"],len(SOURCES))
         self.assertTrue(all('Чудесные миры' in row['genres'] for row in browse(self.db)['items']))
         self.assertTrue(self.put(restored)['unchanged'])
 
@@ -58,7 +58,7 @@ class PolicyTests(unittest.TestCase):
         for name in ('Fantasy','幻想','판타지','Фэнтези'):
             self.assertEqual(current().key(name),'')
             self.assertEqual(browse(self.db,tag=name)['total'],0)
-        self.put(BASE);self.assertEqual(browse(self.db,genre='Fantasy')['total'],18)
+        self.put(BASE);self.assertEqual(browse(self.db,genre='Fantasy')["total"],len(SOURCES))
 
     def test_source_specific_alias_is_not_assigned_to_other_sources(self):
         data={**BASE,'tags':[{**BASE['tags'][0],'sourceAliases':{'one.example':['Special label']}},BASE['tags'][1]]}
@@ -75,7 +75,7 @@ class PolicyTests(unittest.TestCase):
         invalid={**BASE,'tags':[BASE['tags'][0],{**BASE['tags'][1],'aliases':['Fantasy']}]}
         with self.assertRaises(DeployError):apply({'commit':'a'*40,'policy':invalid},self.store,verify_commit=False)
         self.assertEqual(current().revision,old)
-        self.assertEqual(browse(self.db,genre='Fantasy')['total'],18)
+        self.assertEqual(browse(self.db,genre='Fantasy')["total"],len(SOURCES))
         with patch('manga_tag_deploy.committed_policy',return_value=Policy(BASE)),self.assertRaises(DeployError) as raised:
             apply({'commit':'b'*40,'policy':{**BASE,'tags':[]}},self.store)
         self.assertEqual(raised.exception.status,409)
@@ -86,7 +86,7 @@ class PolicyTests(unittest.TestCase):
         with patch('manga_catalog_index.reindex',side_effect=fail),self.assertRaises(sqlite3.OperationalError):
             self.put({**BASE,'tags':[]})
         self.assertEqual(self.path.read_bytes(),old)
-        self.assertEqual(browse(self.db,genre='Fantasy')['total'],18)
+        self.assertEqual(browse(self.db,genre='Fantasy')["total"],len(SOURCES))
 
     def test_signature_covers_entire_body_and_expires(self):
         key=b'fixture-deploy-key-only';stamp='1800000000';body={'commit':'a'*40,'policy':BASE}

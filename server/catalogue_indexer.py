@@ -25,6 +25,37 @@ BRIDGE_SLOTS=4
 TRIP_AFTER=5
 JOB_ERRORS={'storage','repeated-page','empty-page','incomplete-write'}
 
+def retire_removed(db):
+    """Forget a site the owner removed: its crawl queue, indexed cards and search cache.
+
+    Jobs are dropped on every seed (cheap, by host); cards once per domain."""
+    from manga_source_coverage import REMOVED_DOMAINS,removed_host
+    tables={name for (name,) in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    db.create_function('mediavault_removed_host',1,removed_host,deterministic=True)
+    for domain in REMOVED_DOMAINS:
+        if 'catalogue_jobs' in tables:
+            jobs=[job for (job,) in db.execute("SELECT id FROM catalogue_jobs WHERE host=? OR json_extract(spec,'$.domain')=?",(domain,domain))]
+            for start in range(0,len(jobs),500):
+                chunk=jobs[start:start+500];marks=','.join('?'*len(chunk))
+                for table in ('catalogue_page_fingerprints','catalogue_page_items'):
+                    if table in tables:db.execute('DELETE FROM '+table+' WHERE job IN ('+marks+')',chunk)
+                db.execute('DELETE FROM catalogue_jobs WHERE id IN ('+marks+')',chunk)
+        if 'catalogue_tag_targets' in tables:
+            db.execute("DELETE FROM catalogue_tag_targets WHERE json_extract(target,'$.domain')=?",(domain,))
+        if 'catalog_policy_state' not in tables or db.execute('SELECT 1 FROM catalog_policy_state WHERE name=?',('retired:'+domain,)).fetchone():continue
+        titles=[title for (title,) in db.execute('SELECT id FROM catalog_titles WHERE mediavault_removed_host(source_url)')]
+        for start in range(0,len(titles),500):
+            chunk=titles[start:start+500];marks=','.join('?'*len(chunk))
+            for table in ('catalog_tags','catalog_tag_facts'):db.execute('DELETE FROM '+table+' WHERE title_id IN ('+marks+')',chunk)
+            db.execute('DELETE FROM catalog_titles WHERE id IN ('+marks+')',chunk)
+        if 'catalog_vocabulary' in tables:db.execute('DELETE FROM catalog_vocabulary WHERE mediavault_removed_host(source)')
+        if 'titles' in tables:
+            sources={source for (source,) in db.execute("SELECT DISTINCT source_id FROM titles WHERE mediavault_removed_host(json_extract(metadata,'$.sourceUrl'))")}
+            db.execute("DELETE FROM titles WHERE mediavault_removed_host(json_extract(metadata,'$.sourceUrl'))")
+            for table in ('query_cache','reachability'):
+                if table in tables and sources:db.execute('DELETE FROM '+table+' WHERE source_id IN ('+','.join('?'*len(sources))+')',list(sources))
+        db.execute('INSERT OR REPLACE INTO catalog_policy_state VALUES(?,?)',('retired:'+domain,str(len(titles))))
+
 def host_of(spec):
     return LIB_HOST if str(spec.get('type','')).startswith('lib') else spec.get('domain') or ''
 
@@ -64,6 +95,7 @@ class Indexer:
         from catalogue_sources import base_sources
         sources=base_sources(installed)
         with self.store.lock,self.store.db:
+            retire_removed(self.store.db)
             # The old HentaiChan feed was the home page, not its full catalogue.
             # Retire only that listing; retained cards and detail jobs stay intact.
             for key,raw in self.store.db.execute("SELECT id,spec FROM catalogue_jobs WHERE kind='html'").fetchall():

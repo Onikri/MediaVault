@@ -6,7 +6,6 @@ HTML = {
     'henchan.pro': ('https://henchan.pro/', {'henchan.pro'}),
     'hentaichan.cc': ('https://hentaichan.cc/catalog', {'hentaichan.cc'}),
     'y.hentaichan.live': ('https://y.hentaichan.live/', {'y.hentaichan.live'}),
-    'yaoi-chan.me': ('https://v18.yaoi-chan.me/catalog', {'v18.yaoi-chan.me'}),
     'hmanga.su': ('https://hmanga.me/', {'hmanga.me'}),
     'hentaros.com': ('https://hentaros.com/tag', {'hentaros.com'}),
     'online.hentaimoody.com': ('https://online.hentaimoody.com/', {'online.hentaimoody.com'}),

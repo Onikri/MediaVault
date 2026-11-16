@@ -70,6 +70,22 @@ class ContinuousTests(unittest.TestCase):
   result=content_catalog.browse(self.db,kind='book',genre='Fantasy',limit=2,offset=4)
   self.assertEqual(result['total'],8);self.assertEqual(len(result['items']),2);self.assertEqual(result['offset'],4)
 
+ def test_removed_yaoichan_is_neither_crawled_searched_nor_listed(self):
+  from catalogue_sources import base_sources
+  import suwayomi_bridge
+  keep={**self.row(),'provider':'mangachan','sourceUrl':'https://im.manga-chan.me/manga/1-keep.html','url':'https://im.manga-chan.me/manga/1-keep.html'}
+  gone=[{**self.row(n),'provider':p,'sourceUrl':u,'url':u} for n,(p,u) in enumerate([('yaoi-chan.me','https://v18.yaoi-chan.me/manga/2-gone.html'),('suwayomi:24665','https://yaoi-chan.me/manga/3-gone.html')],2)]
+  upsert(self.db,[keep,*gone]);self.db.commit()
+  installed=[{'id':'24665','name':'YaoiChan','lang':'ru','baseUrl':'https://yaoi-chan.me'},{'id':'1','name':'Other','lang':'ru','baseUrl':'https://other.example'}]
+  with patch.object(suwayomi_bridge,'cached',return_value=installed):self.assertEqual([s['id'] for s in suwayomi_bridge.sources()],['1'])
+  worker=Indexer(self.store,lambda s,c:{'rows':[]},lambda:self.now,interval=0)
+  with self.db:worker.enqueue({'type':'html-detail','domain':'yaoi-chan.me','name':'YaoiChan','row':gone[0]},5)
+  worker.seed(installed[1:])
+  self.assertFalse(any('yaoi' in json.dumps(job) for job in base_sources(installed)))
+  self.assertEqual(self.db.execute("SELECT COUNT(*) FROM catalogue_jobs WHERE host='yaoi-chan.me' OR spec LIKE '%yaoi-chan%'").fetchone()[0],0)
+  self.assertEqual([t['title'] for t in browse(self.db)['items']],['Garden 1'])
+  self.assertEqual(self.db.execute("SELECT COUNT(*) FROM catalog_tag_facts f LEFT JOIN catalog_titles t ON t.id=f.title_id WHERE t.id IS NULL").fetchone()[0],0)
+  worker.seed(installed[1:]);self.assertEqual(browse(self.db)['total'],1)
 class Http2Contracts(unittest.TestCase):
  def test_lib_catalogue_keeps_cover_and_detail_summary_without_fetching_images(self):
   from content_sources import lib_titles,lib_metadata

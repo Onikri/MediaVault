@@ -29,7 +29,7 @@ def base_sources(installed):
             matches=[s for s in installed if s.get('name','').casefold()==name.casefold() or (name=='AllHentai' and s.get('name')=='AllHentai')]
         # These extensions discard collapsed catalogue tags, and some return an
         # empty popular list even while the public catalogue is available.
-        if domain in {'hentaichan.live','manga-chan.me','yaoi-chan.me'}:
+        if domain in {'hentaichan.live','manga-chan.me'}:
             url,allowed=HTML[domain]
             jobs.append({'type':'html','domain':domain,'name':name,'url':url,'hosts':sorted(allowed),
                          **({'source':matches[0]} if matches else {})})
