@@ -10,8 +10,8 @@ import zipfile
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from typing import Annotated, Literal
 from source_parser import SourceError
 
 
@@ -29,11 +29,18 @@ class Translation(BaseModel):
     directModel: Literal['gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite','gemma-4-26b-a4b-it','gemma-4-31b-it'] = 'gemini-3.5-flash-lite'
     language: Literal['English','Japanese','Korean','Chinese (Simplified)'] = 'Japanese'
     direction: Literal['ltr','rtl'] = 'rtl'
-    directInput: Literal['vision','annotated','blocks','coordinates'] = 'vision'
-    directDetector: Literal['en-fast','rtdetr','ctd','yolo26n-manga','ppocrv6-det'] = 'rtdetr'
+    # The reader's defaults (manga-direct-profiles.js): the local detector frames
+    # the text and Google reads the framed page.
+    directInput: Literal['vision','annotated','blocks','coordinates'] = 'annotated'
+    directDetector: Literal['en-fast','rtdetr','ctd','yolo26n-manga','ppocrv6-det'] = 'en-fast'
     directBatchPages: Literal[2,3] = 2
-    inpaint: Literal['fast','quality','moebius','migan'] = 'fast'
+    # smart: the reader's cleanup (paper fill, MI-GAN over the drawing).
+    inpaint: Literal['smart','fast','quality','moebius','migan'] = 'smart'
     font: Literal['auto','comic-relief','balsamiq-sans','caveat','pangolin','neucha','ruslan-display','marck-script','press-start','pt-serif','system'] = 'auto'
+    caps: bool = True
+    # The face the owner picked for each voice: an open font id or one of their private faces.
+    voiceFonts: dict[Annotated[str, StringConstraints(pattern=r'^[a-z]{1,20}$')],
+                     Annotated[str, StringConstraints(pattern=r'^(?:private:)?[\w .()+-]{1,100}$')]] = Field(default_factory=dict, max_length=12)
 
 
 class CachedPage(BaseModel):
@@ -158,7 +165,8 @@ def produce(job, http, budget, progress):
                 (directory / f'{index:04d}.image').write_bytes(data)
                 if cache and index in identity:
                     cache.write(identity[index], data)
-                progress({'phase':'translating','chapter':chapter_index+1,'chaptersTotal':len(chapters),'pagesTotal':len(pages),'pagesLoaded':len(list(directory.glob('*.image')))})
+                loaded=len(list(directory.glob('*.image')))
+                progress({'phase':'translating','chapter':chapter_index+1,'chaptersTotal':len(chapters),'pagesTotal':len(pages),'pagesLoaded':loaded,'operation':f'Перевод на ВМ · готово {loaded} из {len(pages)}'})
             try:
                 for index in range(len(pages)):
                     budget.check()
@@ -179,7 +187,7 @@ def produce(job, http, budget, progress):
                     elif options['mode']=='cached':
                         raise SourceError('Глава переведена не полностью. Выбери перевод недостающих страниц.')
                 if options['mode']=='translate' and len(skip)<len(pages):
-                    progress({'phase':'translating','chapter':chapter_index+1,'chaptersTotal':len(chapters),'pagesLoaded':len(skip),'pagesTotal':len(pages)})
+                    progress({'phase':'translating','chapter':chapter_index+1,'chaptersTotal':len(chapters),'pagesLoaded':len(skip),'pagesTotal':len(pages),'operation':f'Перевод на ВМ · запускаем переводчик · готово {len(skip)} из {len(pages)}'})
                     translate_pages(job, Pages(), options['translation'], skip, save, progress, budget)
                 for index in range(len(pages)):
                     budget.check()
