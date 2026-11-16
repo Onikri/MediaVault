@@ -1,28 +1,41 @@
 import csv
+import base64
 from io import BytesIO
 import json
 from pathlib import Path
 import runpy
+import struct
 from unittest import TestCase
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
+from zipfile import ZipFile
 
 from bs4 import BeautifulSoup
 from PIL import Image
 
+import manga_additional_catalogues
+import manga_alpha_manga
+import manga_luscious_native
 import manga_niadd_novelcool
+import manga_pandachaika
+import manga_public_zip
+import manga_simply_native
 import manga_sixth_profiles
 import manga_speedbinb as speed
 import manga_speedbinb_sources
+import manga_toonlook
 import manga_webtoons_native
+import manga_wordpress_locales
 from manga_page_media import fetch_page, page_reference
-from manga_source_urls import split_reader_url
 from source_parser import SourceError, public_url
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = (*manga_speedbinb_sources.SOURCES, *manga_webtoons_native.SOURCES,
-            *manga_niadd_novelcool.SOURCES, *manga_sixth_profiles.SOURCES)
+            *manga_niadd_novelcool.SOURCES, *manga_sixth_profiles.SOURCES,
+            *manga_wordpress_locales.SOURCES, *manga_simply_native.SOURCES,
+            *manga_luscious_native.SOURCES, *manga_additional_catalogues.SOURCES,
+            *manga_pandachaika.SOURCES, *manga_toonlook.SOURCES, *manga_alpha_manga.SOURCES)
 
 
 def fixture(routes):
@@ -180,3 +193,114 @@ class SixthBatchTests(TestCase):
         text = 'a:' + json.dumps(rows) + '\n'
         http = fixture({chapter: '<script>self.__next_f.push(' + json.dumps([1, text]) + ')</script>'})
         self.assertEqual(source.pages(http, chapter), [source.ROOT + '/uploads/a/1.png', source.ROOT + '/uploads/a/2.png'])
+
+    def test_wordpress_locale_preserves_first_part_and_paginates_archive(self):
+        source = self.source('MyReadingManga', 'ja')
+        parent = source.ROOT + '/manga-story/'
+        bill = '<h1>[Author] Story (Japanese)</h1><a class="page-numbers">3</a>'
+        http = fixture({parent: bill + '<div class="entry-content"><img data-src="/1.webp"></div>',
+                        parent + '2/': '<div class="entry-content"><img src="/2.webp"></div>'})
+        title = source.inspect(parent, http)
+        self.assertEqual((title['title'], title['authors'], len(title['episodes'])), ('Story', ['Author'], 3))
+        self.assertEqual(source.inspect(title['episodes'][0]['url'], http)['pages'], [source.ROOT + '/1.webp'])
+        self.assertEqual(source.inspect(title['episodes'][1]['url'], http)['pages'], [source.ROOT + '/2.webp'])
+
+    def test_simply_keeps_language_and_order_of_full_images(self):
+        source = self.source('Simply Hentai', 'ru')
+        title = source.ROOT + '/series-one/story'
+        api = manga_simply_native.API
+        entry = {'series': {'slug': 'series-one'}, 'slug': 'story', 'title': 'Story'}
+        http = fixture({api + '/tag/russian?type=language&page=1': {'data': {'albums': [entry]}},
+                        api + '/manga/story': {'data': entry},
+                        api + '/manga/story/pages': {'data': {'pages': [
+                            {'page_num': 2, 'sizes': {'full': 'https://cdn.example/2.png'}},
+                            {'page_num': 1, 'sizes': {'full': 'https://cdn.example/1.png'}}]}}})
+        self.assertEqual(source.catalogue(http)[0][0]['language'], 'ru')
+        row = source.inspect(title, http)
+        self.assertEqual(source.inspect(row['episodes'][0]['url'], http)['pages'],
+                         ['https://cdn.example/1.png', 'https://cdn.example/2.png'])
+
+    def test_luscious_allows_only_the_published_read_queries(self):
+        source = self.source('Luscious', 'es')
+        def document(url, **kwargs):
+            self.assertTrue(public_url(url, resolve_dns=False))
+            query = parse_qs(urlsplit(url).query)
+            self.assertEqual(query['operationName'], ['AlbumList'])
+            body = json.loads(query['variables'][0])['input']
+            self.assertIn({'name': 'language_ids', 'value': '+3'}, body['filters'])
+            self.assertIn({'name': 'search_query', 'value': 'Story'}, body['filters'])
+            return ('{"data":{"album":{"list":{"items":[]}}}}', url, {})
+        http = Mock(document=Mock(side_effect=document), deadline=None)
+        self.assertEqual(source.catalogue(http, query='Story'), ([], False))
+        with self.assertRaises(SourceError):
+            public_url(manga_luscious_native.API + '?operationName=UpdateAlbum&query=mutation', resolve_dns=False)
+
+    def test_mangamen_preserves_translator_volume_and_native_order(self):
+        source = self.source('MangaMen')
+        title = source.ROOT + '/story'
+        chapter = title + '/chapter-2'
+        http = fixture({title: '<h1 itemprop="name">Story</h1><div class="chapter-item" data-volume="2" data-number="2.5">'
+                               f'<div class="chapter-item__name"><a href="{chapter}">Chapter</a></div>'
+                               '<div class="chapter-item__added"><span>Group</span></div></div>',
+                        chapter: '<script>window.__pg = [{"p":2,"u":"/2.png"},{"p":1,"u":"/1.png"}];</script>'})
+        row = source.inspect(title, http)
+        self.assertEqual((row['episodes'][0]['season'], row['episodes'][0]['number'], row['episodes'][0]['translator']),
+                         (2, 2.5, 'Group'))
+        self.assertEqual(source.inspect(row['episodes'][0]['url'], http)['pages'], [source.ROOT + '/1.png', source.ROOT + '/2.png'])
+
+    def test_public_zip_read_is_range_bounded_and_supports_cbz_page_transport(self):
+        image = BytesIO()
+        with Image.new('RGB', (8, 8), 'green') as source:
+            source.save(image, 'PNG')
+        payload = BytesIO()
+        with ZipFile(payload, 'w') as archive:
+            archive.writestr('02.png', image.getvalue())
+            archive.writestr('01.png', image.getvalue())
+            archive.writestr('padding.txt', b'\0' * (manga_public_zip.DIRECTORY_LIMIT + 1))
+        raw = payload.getvalue()
+        archive_url = 'https://panda.chaika.moe/archive/14/download/'
+        referer = 'https://panda.chaika.moe/archive/14'
+        requested = []
+        def open_range(url, headers, byte_range):
+            self.assertEqual((url, headers['Referer']), (archive_url, referer))
+            low, high = map(int, byte_range.removeprefix('bytes=').split('-'))
+            requested.append((low, high))
+            return Mock(status_code=206, headers={'Content-Range': f'bytes {low}-{high}/{len(raw)}'},
+                        iter_content=Mock(return_value=[raw[low:high + 1]])), url
+        http = Mock(_open=Mock(side_effect=open_range), deadline=None)
+        refs = manga_public_zip.download_refs(http, archive_url, referer)
+        self.assertEqual(len(refs), 2)
+        self.assertEqual(manga_public_zip.grant(refs[0])[3], '01.png')
+        self.assertEqual(fetch_page(http, page_reference(refs[0]), {}), (image.getvalue(), 'image/png'))
+        self.assertLess(max(end - start + 1 for start, end in requested), len(raw))
+        with self.assertRaises(SourceError):
+            page_reference(refs[0].replace('/14/', '/15/'))
+
+    def test_toonlook_exposes_only_selected_language_manifest(self):
+        source = self.source('ToonLook', 'zh')
+        title = source.ROOT + '/manhwa/story/'
+        chapter = source.ROOT + '/story-1?lang=zh'
+        pages = base64.b64encode(b'[{"src":"series/zh/story/1/01.webp"}]').decode()
+        manifest = {'base': 'https://cdn.example', 'lang': 'zh', 'data': pages}
+        http = fixture({title: '<div class="manga-titles"><h1>Story</h1></div>'
+                               '<a href="/story-1" class="chapter-item" data-langs="en zh" data-title-en="Chapter 1" data-title-zh="第1話"></a>',
+                        chapter: '<script>chapterData = ' + json.dumps(manifest) + ';</script>'})
+        row = source.inspect(title, http)
+        self.assertEqual(len(row['episodes']), 1)
+        self.assertEqual(row['episodes'][0]['language'], 'zh')
+        self.assertEqual(source.inspect(row['episodes'][0]['url'], http)['pages'],
+                         ['https://cdn.example/series/zh/story/1/01.webp'])
+
+    def test_alpha_manga_restores_an_explicit_tile_order(self):
+        tile = 16
+        body = struct.pack('<IIII', 0, (tile << 24) | (1 << 16), 16 << 15, tile << 24)
+        placeholder = b'\x89PNG\r\n\x1a\n' + b'\0' * 25 + b'\x02\0' + body
+        keys = manga_alpha_manga.keys('data:image/png;base64,' + base64.b64encode(placeholder).decode())
+        with Image.new('RGB', (32, 16), 'red') as image:
+            image.paste((0, 0, 255), (16, 0, 32, 16))
+            raw = BytesIO()
+            image.save(raw, 'PNG')
+        output = manga_alpha_manga.AlphaTileLayout(keys[0]).decode(raw.getvalue())
+        with Image.open(BytesIO(output)) as image:
+            self.assertEqual(image.getpixel((5, 5)), (0, 0, 255))
+            self.assertEqual(image.getpixel((25, 5)), (255, 0, 0))

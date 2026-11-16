@@ -21,6 +21,7 @@ PAYWALL = 'form.purchase-form, .chapter-locked, .purchase-required, .paywall'
 
 
 def series_api(host, path, query):
+    from manga_alpha_manga import public_api as alpha
     from manga_archive_ports import public_api as archives
     from manga_creator_feeds import public_api as creator_feed
     from manga_direct_catalogues import public_api as direct_html
@@ -33,7 +34,9 @@ def series_api(host, path, query):
     from manga_inkstory import public_api as ink
     from manga_json_families import public_api as api
     from manga_kappabeast import public_api as kappa
+    from manga_luscious_native import public_api as luscious
     from manga_mangataro import public_api as mangataro
+    from manga_pandachaika import public_api as pandachaika
     from manga_natsuid import public_api as natsuid
     from manga_public_galleries import public_api as gallery_api
     from manga_remaining_families import public_api as remaining
@@ -45,11 +48,13 @@ def series_api(host, path, query):
     from manga_scanlation_json import public_api as scanlation
     from manga_scanlation_catalogues import public_api as scan_cats
     from manga_senkuro_native import public_api as senkuro
+    from manga_simply_native import public_api as simply
     from manga_sixth_profiles import public_api as sixth
     from manga_spa_catalogues import public_api as spa_catalogue
     from manga_speedbinb_sources import public_api as speedbinb
     from manga_webtoons_native import public_api as webtoon_native
     from manga_standalone_ports import public_api as standalone
+    from manga_toonlook import public_api as toonlook
     from manga_yarnovel import public_api as yarnovel
 
     if host == 'mangarw.com' and path == '/api/v1/chapters':
@@ -58,7 +63,8 @@ def series_api(host, path, query):
                                                      standalone, independent_json, natsuid, creator_feed, spa_catalogue,
                                                      russian_direct, yarnovel, gallery_api, scanlation, scan_directory, ru_json,
                                                      mangataro, initmanga, scan_cats, html_archives, kappa, illustrated,
-                                                     sacachispa, speedbinb, webtoon_native, sixth))
+                                                     sacachispa, speedbinb, webtoon_native, sixth, luscious, simply,
+                                                     pandachaika, toonlook, alpha))
 
 
 def public_form(url, data, headers):

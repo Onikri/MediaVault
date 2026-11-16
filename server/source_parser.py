@@ -310,11 +310,13 @@ class PublicHttp:
             outgoing.update({'Accept': 'application/json' if action.endswith('json') else 'text/html, */*',
                              'X-Requested-With': 'XMLHttpRequest'})
         if action == 'native-series-rsc':
+            from manga_additional_catalogues import public_rsc as additional_rsc
             from manga_direct_payloads import public_api
             from manga_scanlation_json import public_rsc
             target = urlsplit(url)
             revival = target.netloc == 'www.revivalscans.com' and public_api(target.netloc, target.path, target.query)
-            if method != 'GET' or data is not None or not (revival or public_rsc(target.netloc, target.path, target.query)):
+            route = (target.netloc, target.path, target.query)
+            if method != 'GET' or data is not None or not (revival or public_rsc(*route) or additional_rsc(*route)):
                 raise SourceError('Некорректный маршрут React Flight.')
             outgoing.update({'RSC': '1', 'Accept': 'text/x-component'})
         if action == 'inkstory-json':
