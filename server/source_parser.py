@@ -257,6 +257,12 @@ class PublicHttp:
             if method != 'GET' or data is not None or not public_api(target.netloc, target.path, target.query):
                 raise SourceError('Некорректный маршрут JSON-каталога.')
             outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+        if action == 'creator-feed-json':
+            from manga_creator_feeds import public_api
+            target = urlsplit(url)
+            if method != 'GET' or data is not None or not public_api(target.netloc, target.path, target.query):
+                raise SourceError('Некорректный маршрут каталога авторов.')
+            outgoing.update({'Accept': 'text/css', 'X-Requested-With': 'XMLHttpRequest'})
         if action in {'native-series-json', 'native-series-html-api'}:
             from manga_series_port import series_api
             target = urlsplit(url)
@@ -266,9 +272,10 @@ class PublicHttp:
                              'X-Requested-With': 'XMLHttpRequest'})
         if action == 'native-series-rsc':
             from manga_direct_payloads import public_api
+            from manga_scanlation_json import public_rsc
             target = urlsplit(url)
-            if (target.netloc != 'www.revivalscans.com' or method != 'GET' or data is not None
-                    or not public_api(target.netloc, target.path, target.query)):
+            revival = target.netloc == 'www.revivalscans.com' and public_api(target.netloc, target.path, target.query)
+            if method != 'GET' or data is not None or not (revival or public_rsc(target.netloc, target.path, target.query)):
                 raise SourceError('Некорректный маршрут React Flight.')
             outgoing.update({'RSC': '1', 'Accept': 'text/x-component'})
         if action == 'inkstory-json':
@@ -340,6 +347,13 @@ class PublicHttp:
             outgoing["Range"] = byte_range
         fury_form = False
         buff_form = False
+        natsuid_form = False
+        if action == 'natsuid-search':
+            from manga_natsuid import public_form as natsuid_public_form
+            if method != 'POST' or not natsuid_public_form(url, data):
+                raise SourceError('Некорректная форма каталога Rawkuma.')
+            natsuid_form = True
+            outgoing.update({'Accept': 'text/html, */*', 'X-Requested-With': 'XMLHttpRequest'})
         if method == "POST":
             # Explicit public playback/search forms; never login or arbitrary APIs.
             host = urlsplit(url).hostname
@@ -405,6 +419,8 @@ class PublicHttp:
                                      'Accept': 'application/json', 'Origin': 'https://mangabuff.ru'})
                 if catalogue_form and host == 'manhwalike.com':
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'})
+                if catalogue_form and host == 'rizzfables.com':
+                    outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
             if action == 'native-series-data-form':
                 from manga_independent_json_ports import public_form
                 catalogue_form = public_form(url, data)
@@ -413,7 +429,7 @@ class PublicHttp:
                     if isinstance(data, bytes):
                         outgoing['Content-Type'] = 'application/json'
             if not (player_form or search_form or manga_form or million_register or foolslide_form or namicomi_form
-                    or xcomic_form or fury_form or catalogue_form
+                    or xcomic_form or fury_form or catalogue_form or natsuid_form
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
                     or hikka_search or jaomix_toc or madara_form or giga_form):
                 raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
@@ -446,7 +462,11 @@ class PublicHttp:
                 options = {}
                 if publisher and routed(url, route_config):
                     options['proxies'] = {'https': route_config['httpProxy']}
-                response = self.session.request(method, url, headers=outgoing, data=data,
+                body = data
+                if natsuid_form:
+                    options['files'] = {key: (None, value) for key, value in data.items()}
+                    body = None
+                response = self.session.request(method, url, headers=outgoing, data=body,
                                                 timeout=request_timeout, allow_redirects=False, stream=True, **options)
             except requests.RequestException:
                 raise SourceTemporaryError("Источник не ответил. Повтори импорт позднее.") from None
@@ -454,7 +474,8 @@ class PublicHttp:
                 location = response.headers.get("Location", "")
                 response.close()
                 if (action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json',
-                               'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json'}
+                               'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
+                               'natsuid-search', 'creator-feed-json'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))

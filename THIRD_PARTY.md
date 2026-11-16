@@ -490,3 +490,6 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
 - The fourth 50-APK batch (`server/manga_fourth_batch_profiles.py` and the
   adapters it imports) follows the corresponding Apache-2.0 Keiyoushi source
   and multisrc paths recorded in `docs/native-source-inventory.csv`.
+- The fifth batch (`server/manga_fifth_batch_profiles.py` and its adapters)
+  follows the corresponding Apache-2.0 Keiyoushi source and multisrc paths
+  recorded in `docs/native-source-inventory.csv`.

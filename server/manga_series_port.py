@@ -22,21 +22,31 @@ PAYWALL = 'form.purchase-form, .chapter-locked, .purchase-required, .paywall'
 
 def series_api(host, path, query):
     from manga_archive_ports import public_api as archives
+    from manga_creator_feeds import public_api as creator_feed
     from manga_direct_catalogues import public_api as direct_html
     from manga_direct_payloads import public_api as payloads
     from manga_html_families import public_api as html
     from manga_independent_json_ports import public_api as independent_json
     from manga_inkstory import public_api as ink
     from manga_json_families import public_api as api
+    from manga_natsuid import public_api as natsuid
+    from manga_public_galleries import public_api as gallery_api
     from manga_remaining_families import public_api as remaining
     from manga_ru_families import public_api as ru
+    from manga_ru_json_ports import public_api as ru_json
+    from manga_russian_direct import public_api as russian_direct
+    from manga_scan_directory import public_api as scan_directory
+    from manga_scanlation_json import public_api as scanlation
     from manga_senkuro_native import public_api as senkuro
+    from manga_spa_catalogues import public_api as spa_catalogue
     from manga_standalone_ports import public_api as standalone
+    from manga_yarnovel import public_api as yarnovel
 
     if host == 'mangarw.com' and path == '/api/v1/chapters':
         return bool(re.fullmatch(r'id=[0-9]{1,18}', query))
     return any(route(host, path, query) for route in (html, api, ru, archives, direct_html, payloads, remaining, senkuro, ink,
-                                                     standalone, independent_json))
+                                                     standalone, independent_json, natsuid, creator_feed, spa_catalogue,
+                                                     russian_direct, yarnovel, gallery_api, scanlation, scan_directory, ru_json))
 
 
 def public_form(url, data, headers):
@@ -56,8 +66,10 @@ def public_form(url, data, headers):
                 and data['result_from'] == str((int(page)-1)*20+1)
                 and isinstance(data['story'], str) and 4 <= len(data['story']) <= 160)
     from manga_standalone_ports import public_form as standalone
+    from manga_fifth_families import public_form as fifth
+    from manga_ru_html_ports import public_form as russian_html
 
-    return standalone(url, data)
+    return standalone(url, data) or fifth(url, data) or russian_html(url, data)
 
 
 def document_json(http, url, referer):
