@@ -74,6 +74,11 @@ def page_reference(value):
         from manga_dbmultiverse import page_marker
         page_marker(value)
         return value, None, 1, 'dbm-image'
+    if parts.fragment == 'mv_inkstory_page':
+        from manga_inkstory import xor_page
+        if not xor_page(value):
+            raise SourceError('Некорректный адрес страницы InkStory.')
+        return public_url(value, resolve_dns=False), None, 1, 'inkstory-image'
     if parts.fragment == SETSU_FRAGMENT:
         if host != 'i0.wp.com':
             raise SourceError('Некорректный адрес страницы Setsu Scans.')
@@ -131,6 +136,13 @@ def fetch_page(http, reference, headers):
         response, _ = http._open(url, headers={**headers, 'Referer': referer})
         raw = read_image(http, response)
         return (compose(raw, profile.LANGUAGE, balloons), 'image/jpeg') if balloons else validated_image(raw)
+    if action == 'inkstory-image':
+        from manga_inkstory import decode_image, xor_page
+        response, final = http._open(target, headers=headers)
+        if not xor_page(final):
+            response.close()
+            raise SourceError('InkStory перенаправил запрос на другой сервер изображений.')
+        return validated_image(decode_image(read_image(http, response)))
     if action == 'setsu-image':
         response, _ = setsu_image(http, target, headers)
     elif action == 'dex-image':

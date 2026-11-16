@@ -487,3 +487,6 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
 - The XCOMIC and Comic Fury adapters (`server/manga_xcomic.py`,
   `server/manga_xcomic_queries.py`, `server/manga_comicfury.py`) follow the
   corresponding Apache-2.0 Keiyoushi protocols at the same revision.
+- The fourth 50-APK batch (`server/manga_fourth_batch_profiles.py` and the
+  adapters it imports) follows the corresponding Apache-2.0 Keiyoushi source
+  and multisrc paths recorded in `docs/native-source-inventory.csv`.

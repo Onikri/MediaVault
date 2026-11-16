@@ -25,12 +25,18 @@ def series_api(host, path, query):
     from manga_direct_catalogues import public_api as direct_html
     from manga_direct_payloads import public_api as payloads
     from manga_html_families import public_api as html
+    from manga_independent_json_ports import public_api as independent_json
+    from manga_inkstory import public_api as ink
     from manga_json_families import public_api as api
+    from manga_remaining_families import public_api as remaining
     from manga_ru_families import public_api as ru
+    from manga_senkuro_native import public_api as senkuro
+    from manga_standalone_ports import public_api as standalone
 
     if host == 'mangarw.com' and path == '/api/v1/chapters':
         return bool(re.fullmatch(r'id=[0-9]{1,18}', query))
-    return any(route(host, path, query) for route in (html, api, ru, archives, direct_html, payloads))
+    return any(route(host, path, query) for route in (html, api, ru, archives, direct_html, payloads, remaining, senkuro, ink,
+                                                     standalone, independent_json))
 
 
 def public_form(url, data, headers):
@@ -49,7 +55,9 @@ def public_form(url, data, headers):
                 and bool(re.fullmatch(r'[1-9]\d{0,3}', page)) and int(page) <= 2000
                 and data['result_from'] == str((int(page)-1)*20+1)
                 and isinstance(data['story'], str) and 4 <= len(data['story']) <= 160)
-    return False
+    from manga_standalone_ports import public_form as standalone
+
+    return standalone(url, data)
 
 
 def document_json(http, url, referer):

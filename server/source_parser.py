@@ -271,6 +271,14 @@ class PublicHttp:
                     or not public_api(target.netloc, target.path, target.query)):
                 raise SourceError('Некорректный маршрут React Flight.')
             outgoing.update({'RSC': '1', 'Accept': 'text/x-component'})
+        if action == 'inkstory-json':
+            from manga_inkstory import SERVICES, public_api
+            target = urlsplit(url)
+            if (target.netloc not in SERVICES or method != 'GET' or data is not None
+                    or not public_api(target.netloc, target.path, target.query)):
+                raise SourceError('Некорректный публичный маршрут каталога InkStory.')
+            outgoing.update({'Accept': 'application/json', 'x-tsr-serverFn': 'true', 'Sec-Fetch-Site': 'same-origin',
+                             'User-Agent': 'Tachiyomi (+https://github.com/keiyoushi/extensions-source)'})
         million_register = False
         if action == 'mangamillion-proto':
             from manga_mangamillion import TOKEN, public_api
@@ -346,6 +354,15 @@ class PublicHttp:
                            and isinstance(data, str) and 0 < len(data) <= 200)
             senkognito_read=(action=='senkognito-read' and url=='https://api.senkognito.com/graphql'
                             and isinstance(data,bytes) and len(data)<=4096)
+            senkuro_native = False
+            if action == 'senkuro-native':
+                from manga_senkuro_native import public_form
+                app = (headers or {}).get('App-Id', '')
+                senkuro_native = public_form(url, data, app)
+                if senkuro_native:
+                    outgoing.update({'App-Id': app, 'App-Version': '060626', 'Content-Type': 'application/json',
+                                     'Accept': 'application/json',
+                                     'User-Agent': 'Tachiyomi (+https://github.com/keiyoushi/extensions-source)'})
             lostfilm_catalog=(url=='https://www.lostfilm.tv/ajaxik.php' and isinstance(data,dict) and set(data)=={'act','type','o','s','t'}
                               and data.get('act')=='serial' and data.get('type')=='search' and str(data.get('o','')).isdigit()
                               and data.get('s') in {'1','2','3'} and data.get('t')=='0')
@@ -386,9 +403,18 @@ class PublicHttp:
                 if buff_form:
                     outgoing.update({'X-CSRF-TOKEN': headers['X-CSRF-TOKEN'], 'X-Requested-With': 'XMLHttpRequest',
                                      'Accept': 'application/json', 'Origin': 'https://mangabuff.ru'})
+                if catalogue_form and host == 'manhwalike.com':
+                    outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'})
+            if action == 'native-series-data-form':
+                from manga_independent_json_ports import public_form
+                catalogue_form = public_form(url, data)
+                if catalogue_form:
+                    outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+                    if isinstance(data, bytes):
+                        outgoing['Content-Type'] = 'application/json'
             if not (player_form or search_form or manga_form or million_register or foolslide_form or namicomi_form
                     or xcomic_form or fury_form or catalogue_form
-                    or chan_search or senkognito_read or lostfilm_catalog or honey_chapters
+                    or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
                     or hikka_search or jaomix_toc or madara_form or giga_form):
                 raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if madara_form:outgoing['X-Requested-With']='XMLHttpRequest'
@@ -428,7 +454,8 @@ class PublicHttp:
                 location = response.headers.get("Location", "")
                 response.close()
                 if (action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json',
-                               'native-series-json', 'native-series-html-api', 'native-series-rsc'} or not location or hop == 5):
+                               'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json'}
+                        or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
                 if publisher:

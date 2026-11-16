@@ -12,6 +12,10 @@ from source_parser import SourceError
 
 
 def public_api(host, path, query):
+    from manga_long_archives import public_api as archive_api
+
+    if archive_api(host, path, query):
+        return True
     """Limit public JSON transport to protocol routes used by these adapters."""
     if host == 'arknights.global':
         if path == '/api/resource/comic/list':

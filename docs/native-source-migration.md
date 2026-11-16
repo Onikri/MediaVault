@@ -134,4 +134,11 @@ python scripts/probe-native-source-batch.py --ssh mediavault-vm --inactive --bat
 | [Каталоги JSON и React Flight](../server/manga_direct_payloads.py) | 8 | 9 | Идентификаторы изданий, порядок страниц, отсев закрытых глав |
 | [Галереи и веб-комиксы](../server/manga_direct_articles.py) | 15 | 15 | Одиночные выпуски, пагинация галерей и архивы отдельных серий |
 
-Прямой код есть у 415 из 725 APK и 1 072 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 1 007 и поддерживает прогоны по 200 профилей.
+| [Goda, Monochrome, галереи и HNI-Scantrad](../server/manga_remaining_families.py) | 7 | 7 | Публичные HTML-фрагменты и JSON, главы на нескольких языках, одиночные галереи |
+| [Senkuro и Senkognito](../server/manga_senkuro_native.py) | 2 | 2 | GraphQL, жанры и теги, ID глав и группы переводчиков |
+| [InkStory и PureManga](../server/manga_inkstory.py) | 2 | 2 | TanStack, раздельные метки и совместимый декодер страниц для читалки и CBZ |
+| [Архивы веб-комиксов](../server/manga_long_archives.py) | 3 | 7 | Издания xkcd, книги Darths & Droids и архив Schlock Mercenary |
+| [Публичные JSON-каталоги](../server/manga_independent_json_ports.py) | 8 | 8 | Next.js, React Flight, вложенный JSON и поисковые формы |
+| [Самостоятельные адаптеры](../server/manga_standalone_ports.py) | 28 | 28 | Каталоги, списки глав, архивы и галереи |
+
+Прямой код есть у 465 из 725 APK и 1 126 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 1 061 и поддерживает прогоны по 200 профилей.

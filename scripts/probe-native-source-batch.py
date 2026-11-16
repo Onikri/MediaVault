@@ -22,6 +22,7 @@ def emit(row):
 
 
 def candidates():
+    import manga_fourth_batch_profiles
     import manga_archive_ports
     import manga_bakkin
     import manga_comicfury
@@ -67,6 +68,7 @@ def candidates():
                    manga_saymanhwa, manga_mangatoon, manga_xcomic, manga_comicfury):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in module.SOURCES)
     profiles.update((adapter.SOURCE_ID, adapter) for adapter in manga_webcomics.adapters())
+    profiles.update((adapter.SOURCE_ID, adapter) for adapter in manga_fourth_batch_profiles.sources())
     for group in (manga_archive_ports.SOURCES, manga_html_families.SOURCES, manga_individual_catalogues.SOURCES,
                   manga_json_families.sources(), manga_ru_families.SOURCES, manga_direct_articles.sources(),
                   manga_direct_catalogues.sources(), manga_direct_payloads.sources(), manga_gallery_adults.sources()):
