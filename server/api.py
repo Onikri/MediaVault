@@ -159,6 +159,22 @@ def drive_error_message(error):
     return None
 
 
+STREAM_RETRIES=3
+
+def stream_retry(progress,error,now):
+    """Progress that requeues an interrupted Alloha film, or None.
+
+    Its encrypted parts and resume index stay on the VM and in Drive, so the
+    next pass continues from the last intact part without «Продолжить»."""
+    from alloha_stream import StreamInterrupted
+    retries=int(progress.get('streamRetries') or 0)
+    if not isinstance(error,StreamInterrupted) or retries>=STREAM_RETRIES:return None
+    delay=120*2**retries
+    return {'phase':'queued','streamRetries':retries+1,'resumeAt':now+delay,'operation':'Ждём Alloha',
+            'sourceError':str(error)[:400],
+            'message':f'Alloha прервал передачу серии. Готовые части сохранены — продолжим сами через {delay//60} мин.'}
+
+
 def import_auth_error(error):
     from google.auth.exceptions import RefreshError
     if isinstance(error,RefreshError):return not getattr(error,'retryable',False)
@@ -218,7 +234,7 @@ def worker():
             if cancelled():
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
             elif result.get('remaining'):
-                store.update(task_id,status='queued',progress={**result,'phase':'queued','operation':'Ожидает следующего прохода','recover_needed':False,'voicePauses':0,'resumeAt':0,'message':'Следующий файл оформления — после других заданий.' if data.get('kind')=='enrich' else 'Следующая серия — после одного файла из других заданий.'})
+                store.update(task_id,status='queued',progress={**result,'phase':'queued','operation':'Ожидает следующего прохода','recover_needed':False,'voicePauses':0,'streamRetries':0,'resumeAt':0,'message':'Следующий файл оформления — после других заданий.' if data.get('kind')=='enrich' else 'Следующая серия — после одного файла из других заданий.'})
                 wakeup.set()
             elif result["failed"]:
                 reason=store.get(task_id)["progress"].get("sourceError")
@@ -238,6 +254,8 @@ def worker():
                 resume=time.time()+seconds
                 store.update(task_id,status='queued',progress={'phase':'waiting','voicePauses':pauses,'resumeAt':resume,
                     'operation':'Ждём квоту озвучки Google','message':'Квота озвучки Google исчерпана. Продолжим сами в '+time.strftime('%H:%M',time.gmtime(resume))+' UTC; готовые главы и фразы сохранены.'})
+            elif (retry:=stream_retry(task['progress'],error,time.time())):
+                store.update(task_id,status='queued',progress=retry)
             elif import_auth_error(error):
                 if credential is not None:drive_grants.rejected(store,task["owner"],getattr(credential,'refresh_token',None))
                 store.update(task_id, status="waiting_auth", progress={"message": "Серверу нужно повторное разрешение Google. Завершённые серии сохранены."})
@@ -1030,7 +1048,7 @@ def resume(task_id: str, subject=Depends(owner)):
     private = store.get(task_id, subject, private=True)
     if not private["data"].get("vault_key"):
         raise HTTPException(409, "Открой библиотеку и запусти новое задание: завершённые серии будут пропущены.")
-    store.update(task_id, status="queued", progress={"message": "", "sourceError": "", "phase": "queued",'cursor':0,'saved':0,'skipped':0,'failed':0,'recover_needed':True})
+    store.update(task_id, status="queued", progress={"message": "", "sourceError": "", "phase": "queued",'cursor':0,'saved':0,'skipped':0,'failed':0,'recover_needed':True,'streamRetries':0,'resumeAt':0})
     wakeup.set()
     return task(task_id, subject)
 

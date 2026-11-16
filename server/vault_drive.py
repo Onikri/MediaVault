@@ -558,6 +558,29 @@ class VaultDrive:
         self._manifest_cache = checkpoints
         return checkpoints
 
+    def _trash_parts(self, parts):
+        """Best effort: encrypted parts no index refers to any more."""
+        for part in parts:
+            try:
+                self._retry(lambda: self.drive.trash(part['fileId']))
+            except Exception:
+                pass  # An orphan encrypted part is harmless; never fail the film for it.
+
+    def _discard_stream_partial(self, partial, catalog):
+        """Trash an unfinished stream's own asset folder, unless something else uses it."""
+        asset_id = partial.get('assetId')
+        if not asset_id or partial.get('folderId') != catalog['folderId']:
+            return
+        if any(item.get('folderId') == asset_id for item in catalog['items']):
+            return
+        try:
+            # A written recovery manifest means a complete film; leave it to recovery.
+            if self._retry(lambda: self.drive.list_children(asset_id, name="manifest.enc.json")):
+                return
+            self._retry(lambda: self.drive.trash(asset_id))
+        except Exception:
+            pass  # The stale folder stays orphaned; the new upload is unaffected.
+
     def completed(self, source_identity, *, collection="Без коллекции", episode=None, category="video", recover=True):
         fingerprint = source_fingerprint(source_identity, collection=collection, episode=episode, category=category)
         catalog, _ = self._latest()
@@ -612,14 +635,18 @@ class VaultDrive:
         partial = None
         if checkpoint_path and checkpoint_path.exists():
             partial = open_catalog(json.loads(checkpoint_path.read_text()), self._key)
-            if partial.get('checkpoint') != 'stream-v1' or partial.get('signature') != signature or partial['folderId'] != catalog['folderId']:
-                raise VaultError('Состав потока изменился. Незавершённые части не смешаны с другим видео.')
+            if partial.get('checkpoint') != 'stream-v1' or partial.get('signature') != signature or partial.get('folderId') != catalog['folderId']:
+                # Parts of another layout can never belong to this film. Drop them
+                # and save it from the start rather than fail on every resume.
+                self._discard_stream_partial(partial, catalog)
+                checkpoint_path.unlink(missing_ok=True)
+                partial = None
         if partial:
             item_id, asset_id, collection_id, storage, selected_part = (partial[k] for k in ('itemId','assetId','collectionId','storage','selectedPart'))
         else:
             item_id, asset_id, collection_id, storage, selected_part = self._folders(catalog, category, collection, section, part)
         recorded = list(partial.get('chunks', [])) if partial else []
-        confirmed = []
+        confirmed, stale = [], []
         def save_partial():
             if not checkpoint_path:
                 return
@@ -675,13 +702,18 @@ class VaultDrive:
                     digest = hashlib.sha256(raw).hexdigest()
                     if index < len(recorded):
                         previous = recorded[index]
-                        if previous['size'] != len(raw) or previous['sha256'] != digest:
-                            raise VaultError('Поток отличается от сохранённых частей. Смешивание видео остановлено.')
-                        future = Future()
-                        future.set_result(previous['fileId'])
-                        pending.append((future, previous['iv'], len(raw), digest))
-                        index += 1
-                        continue
+                        if previous['size'] == len(raw) and previous['sha256'] == digest:
+                            future = Future()
+                            future.set_result(previous['fileId'])
+                            pending.append((future, previous['iv'], len(raw), digest))
+                            index += 1
+                            continue
+                        # Saved parts up to here are byte-identical to this stream.
+                        # The rest came from another rendition (e.g. one where a
+                        # segment was lost), so it is replaced, never mixed in.
+                        stale.extend(recorded[index:])
+                        del recorded[index:]
+                        save_partial()
                     before = time.monotonic()
                     sealed = seal_chunk(raw, self._key, item_id, index)
                     encryption_ms += (time.monotonic() - before) * 1000
@@ -740,13 +772,20 @@ class VaultDrive:
                 checkpoint_path.unlink(missing_ok=True)
             if committed["id"] != item_id:
                 self._retry(lambda: self.drive.trash(asset_id))
+            else:
+                used = {chunk['fileId'] for chunk in chunks}
+                self._trash_parts([part for part in stale + recorded[len(chunks):] if part['fileId'] not in used])
             if progress:
                 progress({"loaded": loaded, "total": loaded, "phase": "done"})
             return copy.deepcopy(committed)
         except Exception as error:
             if not checkpoint_written:
                 if checkpoint_path and checkpoint_path.exists() and (confirmed or recorded):
+                    self._trash_parts(stale)  # No longer listed in the resume index.
                     raise  # Encrypted remote parts and their sealed resume index survive.
+                if checkpoint_path:
+                    # Nothing reusable is left: never point a resume at a trashed folder.
+                    checkpoint_path.unlink(missing_ok=True)
                 try:
                     self._retry(lambda: self.drive.trash(asset_id))
                 except Exception:
