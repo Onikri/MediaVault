@@ -1,0 +1,11 @@
+/* Fold (Fold.jsx): a long block fades out at its edge until it is unrolled. */
+.fold{position:relative;display:grid;min-width:0}
+.fold-body{overflow:hidden;min-width:0}
+.fold[data-folded] .fold-body{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 140px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 140px),transparent)}
+.fold-toggle{justify-self:center;display:inline-flex;align-items:center;gap:8px;min-height:42px;margin-top:6px;padding:0 18px;border:0;border-radius:999px;background:color-mix(in srgb,var(--color-petal) 7%,transparent);color:var(--color-on-surface);font:600 13px/1 var(--font-ui);cursor:pointer;transition:background var(--motion-fast) var(--ease-expressive),transform var(--motion-fast) var(--ease-expressive)}
+.fold-toggle:hover,.fold-toggle:focus-visible{background:color-mix(in srgb,var(--color-petal) 13%,transparent);outline:0}
+.fold-toggle:active{transform:scale(.97)}
+.fold-toggle svg{transition:transform var(--motion-standard) var(--ease-expressive)}
+.fold-toggle[aria-expanded=true] svg{transform:rotate(180deg)}
+.fold[data-folded] .fold-toggle{margin-top:-28px;position:relative;z-index:1;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+@media(prefers-reduced-motion:reduce){.fold-toggle,.fold-toggle svg{transition:none}}

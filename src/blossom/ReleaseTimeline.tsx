@@ -1,4 +1,5 @@
 import ReleaseMonthCalendar from './ReleaseMonthCalendar.tsx';
+import Fold from '../Fold.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {CalendarDays,List} from 'lucide-react';
 import {jikan} from '../media-metadata.js';
@@ -26,7 +27,7 @@ export default function ReleaseTimeline({identity,releases=[],server}:{identity?
  function entry(x:any){return <><span className="release-episode-number">{String(x.episode).padStart(2,'0')}</span><div><strong>{x.title||x.titleRomanji||x.titleJapanese||'Серия '+x.episode}</strong><time dateTime={x.date}>{new Date(x.date).toLocaleDateString(uiLocale(),{day:'numeric',month:'short',year:'numeric'})}</time>{description(x)&&<small>{description(x)}</small>}</div><small>{Date.parse(x.date)<Date.now()?'Вышла':'Ожидается'}</small></>;}
 
  return <section ref={root} id="titleSchedule" className="release-timeline release-calendar"><div className="section-heading"><h2><CalendarDays size={19}/>Календарь выпуска</h2><div className="section-view-switch" role="group" aria-label="Вид календаря"><button aria-label="Список дат" aria-pressed={view==='list'} onClick={()=>setView('list')}><List size={17}/></button><button aria-label="Календарь по месяцам" aria-pressed={view==='month'} onClick={()=>setView('month')}><CalendarDays size={17}/></button></div></div>
- {view==='list'?<ol className="release-calendar-entries release-compact-list">{values.map(x=><li key={x.episode+':'+x.date}>{entry(x)}</li>)}</ol>:<ReleaseMonthCalendar key={identity} entries={values} renderEntry={entry}/>}
+ {view==='list'?<Fold limit={720} phoneLimit={430} label={'Все серии · '+values.length}><ol className="release-calendar-entries release-compact-list">{values.map(x=><li key={x.episode+':'+x.date}>{entry(x)}</li>)}</ol></Fold>:<ReleaseMonthCalendar key={identity} entries={values} renderEntry={entry}/>}
  {!values.length&&!busy&&!error&&<p className="fine">Каталоги пока не предоставили даты серий.</p>}{busy&&<p role="status" className="fine">Получаем даты… {values.length||''}</p>}{error&&<button className="text-link" onClick={()=>setRetry(v=>v+1)}>{error} Повторить</button>}
  <p className="fine">Оригинальные даты выпуска. График выбранной озвучки может отличаться.</p></section>;
 }

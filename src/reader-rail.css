@@ -89,3 +89,14 @@
 
 /* A switch in the rail (night, music) shows its state by colour only. */
 .reader-rail .reader-control[aria-pressed="true"]{color:var(--color-blossom,#ee3c35)}
+
+/* «⋯» (phones): the controls the bottom bar has no room for, with their names,
+   in a frosted menu that springs up from the bar. */
+.reader-rail .reader-more{display:none}
+.reader-control-label{display:none}
+.reader-more-menu{position:absolute;z-index:30;right:0;bottom:calc(100% + 10px);display:grid;gap:2px;min-width:220px;padding:6px;border-radius:20px;background:color-mix(in srgb,#17161b 82%,transparent);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);box-shadow:0 22px 60px #0009;transform-origin:100% 100%}
+.reader-rail .reader-more-menu .reader-control{display:flex!important;width:100%!important;min-width:0!important;height:48px!important;min-height:48px!important;justify-content:flex-start;align-items:center;gap:12px;padding:0 14px;border-radius:14px;color:#ece9e3;white-space:nowrap}
+.reader-more-menu .reader-control:hover,.reader-more-menu .reader-control:focus-visible{background:#ffffff12;outline:0}
+.reader-more-menu .reader-control[aria-pressed="true"]{color:var(--color-blossom-light,#ff6655);background:color-mix(in srgb,var(--color-blossom,#ee3c35) 12%,transparent)}
+.reader-more-menu .reader-control-label{display:inline;font:500 14px/1 var(--font-ui,system-ui);text-align:left}
+@media (max-width:720px){.reader-rail .reader-more{display:inline-flex}.reader-rail>.reader-rail-group>.reader-minimize{display:none}}

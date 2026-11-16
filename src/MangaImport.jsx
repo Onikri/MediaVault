@@ -34,7 +34,9 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  const searchAbort=useRef(null);
  const [format,setFormat]=useState('all'),[language,setLanguage]=useState(()=>initialLanguage||(compact&&destination==='online'?defaultReadingLanguage():'all')),[quality,setQuality]=useState('best'),[sources,setSources]=useState([]),[providers,setProviders]=useState([]),[searching,setSearching]=useState(false),[revision,setRevision]=useState(0),[inspection,setInspection]=useState(null),[url,setUrl]=useState(''),[collection,setCollection]=useState(item?.title||''),[volume,setVolume]=useState('all'),[team,setTeam]=useState(''),[mode,setMode]=useState('all'),[one,setOne]=useState(''),[first,setFirst]=useState('0'),[last,setLast]=useState('20'),[list,setList]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState('');
  useEffect(()=>{const language={ja:'Japanese',en:'English',ko:'Korean',zh:'Chinese (Simplified)'}[inspection?.language];if(language)setExportSettings(v=>({...v,language}));},[inspection?.language]);
- const placement=useRetainedMedia(online,{label:collection||item?.title||'Манга',kind:'reader'},()=>setOnline(false));
+ // The label names the open chapter: the title page and the history resume from it.
+ const openChapter=inspection?.episodes?.find(e=>e.url===one),chapterLabel=openChapter&&Number.isFinite(Number(openChapter.number))?', глава '+openChapter.number:'';
+ const placement=useRetainedMedia(online,{label:(collection||item?.title||'Манга')+chapterLabel,kind:'reader'},()=>setOnline(false));
  const [sourceIds,setSourceIds]=useState([]);
  const searchTitle=item?Object.fromEntries(['id','kind','title','titles','aliases','ids','year'].map(k=>[k,item[k]])):null;
  const identityKey=JSON.stringify(searchTitle);

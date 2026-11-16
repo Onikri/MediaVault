@@ -1,0 +1,25 @@
+/* Touch comfort. On a touch screen every small control gets an invisible hit
+   area of at least ~44 px around it, so the look stays as designed while a
+   finger no longer misses. Phones also get a floor of 11–12 px for text that
+   carries information (dates, roles, notes). */
+@media(pointer:coarse){
+ html[data-blossom] :is(.title-scene-controls button,.title-genre-list>a,.title-genre-list>span,.title-summary-more,.character-more,.title-names-more,.passport-facts a,.section-view-switch button,.title-discussion a.text-link,.title-hero-status a,.title-hero-copy .eyebrow a,.fine .text-link,.music-nav-toggle,.credits-expand,.episode-ost-episodes>button,.catalog-views button,.media-card .bookmark-button){position:relative;touch-action:manipulation}
+ html[data-blossom] :is(.title-scene-controls button,.title-genre-list>a,.title-summary-more,.character-more,.title-names-more,.passport-facts a,.section-view-switch button,.title-discussion a.text-link,.title-hero-status a,.title-hero-copy .eyebrow a,.fine .text-link,.music-nav-toggle,.credits-expand,.episode-ost-episodes>button,.catalog-views button,.media-card .bookmark-button)::after{content:'';position:absolute;inset:-10px -6px}
+ html[data-blossom] :is(.catalog-views button,.media-card .bookmark-button)::after{inset:-8px}
+ html[data-blossom] .title-scene-controls button::after{inset:-13px}
+ html[data-blossom] .passport-rate button{min-height:40px}
+}
+@media(max-width:640px){
+ html[data-blossom] .title-page .title-hero-copy>.eyebrow{font-size:11px}
+ html[data-blossom] .title-page :is(.title-genre-list>a,.title-genre-list>span){font-size:12px}
+ html[data-blossom] .title-page :is(.title-summary-more,.character-more,.credits-expand){font-size:13px}
+ html[data-blossom] .title-page :is(.release-calendar-entries small,.release-calendar-entries time,.release-episode-number){font-size:12px}
+ html[data-blossom] .title-page :is(p.fine,.soundtrack-note,.music-empty-note){font-size:12px;line-height:1.55}
+ html[data-blossom] .title-page .passport-facts dt{font-size:12px}
+ html[data-blossom] .title-page .title-scene-controls span{font-size:11px}
+ html[data-blossom] .title-page .trailer-cover small{font-size:11px}
+ html[data-blossom] .title-page :is(.title-discussion a.text-link,.fine .text-link){font-size:12px}
+ html[data-blossom] .mobile-dock-label{font-size:11px}
+ html[data-blossom] :is(.card-caption-details .media-meta,.catalog-provider){font-size:11px}
+ html[data-blossom] .section-heading>.fine{font-size:12px}
+}

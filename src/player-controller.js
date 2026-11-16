@@ -1,3 +1,4 @@
+import {showShortcuts,isHelpKey} from './ShortcutSheet.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {useReducedMotion} from 'motion/react';
 import {writeProgress} from './playback-progress.js';
@@ -19,6 +20,10 @@ import {upscalerById,autoUpscaler,migrateUpscaler} from './upscaler-catalog.js';
 import useExternalAudio from './use-external-audio.js';
 import {captureEpisodePreview} from './episode-preview-cache.js';
 import {buildPlaybackLibrary} from './player-model.js';
+const PLAYER_KEYS=[
+ ['Воспроизведение',[['Пробел / K','Пауза и продолжение'],['J / ←','Назад на 10 секунд'],['L / →','Вперёд на 10 секунд'],['0…9','Перейти к 0–90 % серии'],['S','Пропустить опенинг или эндинг'],['N','Следующая серия']]],
+ ['Звук и экран',[['↑ / ↓','Громкость'],['M','Без звука'],['C','Субтитры'],['F','Полный экран'],['Esc','Закрыть панель или выйти из кинотеатра'],['?','Эта подсказка']]],
+];
 export default function usePlayerController({item,source,catalog,libraryId,userId,mediaRef,onSelectItem,onError,busy,renderEpisodeArtwork,onPlaybackChange,onlineControls,onPreview,onClose,autoPlay=false,characterService,roomControl}){
   const timeline=useRef(null),clockDrawn=useRef(0),keyboardHandler=useRef(null);
   const ownRef=useRef(null),canvasRef=useRef(null),stageRef=useRef(null),railRef=useRef(null);
@@ -314,7 +319,10 @@ export default function usePlayerController({item,source,catalog,libraryId,userI
       if(event.altKey||event.ctrlKey||event.metaKey||
         ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)||
         document.activeElement?.isContentEditable)return;
+      // «?» (Shift+/ or Shift+7 on a Russian layout) opens the key sheet before digits seek.
+      if(isHelpKey(event)){event.preventDefault();showShortcuts('Видеоплеер',PLAYER_KEYS);return;}
       switch(event.code){
+        case 'KeyS':if(canSkip){event.preventDefault();seek(skipRange.end);}break;
         case 'Space':case 'KeyK':event.preventDefault();toggle();break;
         case 'ArrowLeft':case 'KeyJ':event.preventDefault();seek((videoRef.current?.currentTime||0)-10);break;
         case 'ArrowRight':case 'KeyL':event.preventDefault();seek((videoRef.current?.currentTime||0)+10);break;

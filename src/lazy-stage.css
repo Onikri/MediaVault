@@ -1,0 +1,5 @@
+/* The stage a lazily loaded part (player, reader, console) occupies while its
+   code arrives: the same rounded surface, with a slow sheen passing over it. */
+.lazy-stage{min-height:clamp(220px,40vw,520px);border-radius:var(--radius-xl,27px);background:linear-gradient(110deg,var(--color-surface,#19191e) 30%,color-mix(in srgb,var(--color-surface-raised,#24242b) 85%,var(--color-blossom,#ee3c35)) 50%,var(--color-surface,#19191e) 70%) 0 0/260% 100%;animation:lazy-sheen 1.8s var(--ease-expressive,cubic-bezier(.22,1,.36,1)) infinite}
+@keyframes lazy-sheen{from{background-position:130% 0}to{background-position:-130% 0}}
+@media(prefers-reduced-motion:reduce){.lazy-stage{animation:none}}

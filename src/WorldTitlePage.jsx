@@ -1,10 +1,10 @@
+import CrashBoundary from './CrashBoundary.jsx';
 import {useEffect,useMemo,useState,useRef,useCallback,lazy,Suspense} from 'react';
 import {mergeTitleIdentity,preserveCatalogFacts} from './title-details.js';
 import {profileForSeason} from './use-season-source.js';
 import {fetchCatalog,mergeCatalog,normalized} from './catalog.js';
 import {loadTitleProfile,translate} from './title-metadata.js';
 import TitlePage from './TitlePage.jsx';
-import ImportSelection from './ImportSelection.jsx';
 import {OnlineBooks} from './OnlineLibrary.jsx';
 import RanobeSources from './RanobeSources.jsx';
 import {localLabel} from './taxonomy.js';
@@ -22,6 +22,8 @@ import {useTabIdentity} from './tab-identity.js';
 
 // Online titles use the collection's presentation, without its Drive writes.
 const LocalMediaViewer=lazy(()=>import('./MediaViewer.jsx'));
+// Sources, the online player and the manga reader: fetched as the title page opens.
+const loadSelection=()=>import('./ImportSelection.jsx'),ImportSelection=lazy(loadSelection);
 const remoteArtwork=Object.freeze({});
 const emptyValue=v=>v==null||v===''||(Array.isArray(v)&&!v.length);
 // Catalog values win; a supplement adds what they lack (cast, crew, seasons…).
@@ -34,6 +36,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  const [item,setItem]=useState(value),[profile,setProfile]=useState(null),[supplement,setSupplement]=useState(null),[loading,setLoading]=useState(false),[saveOpen,setSaveOpen]=useState(false),[saveTo,setSaveTo]=useState('local'),[viewSeason,setViewSeason]=useState(null),[seasonProfiles,setSeasonProfiles]=useState({});
  const tagPolicyVersion=useMangaPolicy(service);
  useTabIdentity(item?.title||value.title,item?.kind||value.kind);
+ useEffect(()=>{loadSelection().catch(()=>{});},[]);
  const [indexedFacts,setIndexedFacts]=useState(null);
  const factIds=[...new Set([value.catalogId,...(value.catalogIds||[]),...(value.sources||[]).map(source=>source.catalogId)].filter(id=>typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)))].slice(0,100).join(',');
  const factUrls=[...new Set([value.sourceUrl,value.sourceURL,value.url].filter(url=>typeof url==='string'&&url.startsWith('https://')))].join('\n');
@@ -102,7 +105,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  const heroActions=<ExportSheet open={saveOpen} onOpenChange={setSaveOpen} title={sheetTitle} subtitle={displayProfile.title||item.title} destination={saveTo} onDestination={setSaveTo} destinations={DESTINATIONS} trigger={<ExportTrigger label={sheetTitle}/>}>
   {['ranobe','book'].includes(item.kind)
    ?<RanobeExport key={saveTo} item={{...item,description:displayProfile.description,authors:displayProfile.authors||item.authors}} book={stats?.book} service={service} state={state} destination={saveTo} onOpenLibrary={onOpenLibrary} onSubmitted={onSubmitted}/>
-   :<ImportSelection sheet key={item.id+':'+saveTo} destination={saveTo} initialVoice={share?.voiceName||''} preferredSource={stats?.kind==='manga'?stats.source:''} onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} state={state} service={service} onSubmitted={()=>{setSaveOpen(false);onSubmitted?.();}}/>}
+   :<Suspense fallback={<div className="lazy-stage" role="status" aria-label="Загружаем…"/>}><ImportSelection sheet key={item.id+':'+saveTo} destination={saveTo} initialVoice={share?.voiceName||''} preferredSource={stats?.kind==='manga'?stats.source:''} onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} state={state} service={service} onSubmitted={()=>{setSaveOpen(false);onSubmitted?.();}}/></Suspense>}
  </ExportSheet>;
  // Related works from Fantlab (other books of the cycle, adaptations) and
  // Wikidata (sequels) open by their own catalog; anime and manga keep Shikimori.
@@ -120,7 +123,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   onRelated?.(value);
  }
  const materials=<><div className="section-heading watch-materials-heading"><h2>{['manga','ranobe','book'].includes(item.kind)?'Читать':'Смотреть'}</h2></div>
-  {['ranobe','book'].includes(item.kind)?<RanobeSources item={searchItem} service={service} state={state} expected={displayProfile.chapters}/>:<ImportSelection compact key={item.id} destination="online" onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} expected={displayProfile.chapters} onMangaPublication={receivePublication} onSeasonBrowse={setViewSeason} state={state} service={service} onSubmitted={onSubmitted}/>}
+  <CrashBoundary label={['ranobe','book'].includes(item.kind)?'Читалка':item.kind==='manga'?'Читалка манги':'Плеер'}><Suspense fallback={<div className="lazy-stage" role="status" aria-label="Загружаем…"/>}>{['ranobe','book'].includes(item.kind)?<RanobeSources item={searchItem} service={service} state={state} expected={displayProfile.chapters}/>:<ImportSelection compact key={item.id} destination="online" onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} expected={displayProfile.chapters} onMangaPublication={receivePublication} onSeasonBrowse={setViewSeason} state={state} service={service} onSubmitted={onSubmitted}/>}</Suspense></CrashBoundary>
  </>;
  return <><TitlePage onLocalFile={()=>localInput.current?.click()} title={title} state={state} actions={remoteArtwork} onBack={onBack} onRelated={openRelated} online onOnlinePlay={destinationAction} heroActions={heroActions} onlineProfile={displayProfile} onlineBusy={loading} materials={materials} onlineFacts={facts} server={service.server} backLabel="К результатам поиска"/><input ref={localInput} type="file" accept=".cbz,.zip" hidden onChange={e=>{const file=e.target.files?.[0];if(file)setLocalFile({id:'local:'+file.name+':'+file.lastModified,name:file.name,category:'manga',size:file.size,file});e.target.value='';}}/>{localFile&&<Suspense fallback={<p role="status">Открываем файл…</p>}><LocalMediaViewer item={localFile} catalog={{items:[localFile]}} libraryId="local" userId={state.user?.sub} readWhole={()=>Promise.resolve(localFile.file)} onClose={()=>setLocalFile(null)} readerService={service}/></Suspense>}</>;
 }

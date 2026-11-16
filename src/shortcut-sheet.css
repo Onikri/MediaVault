@@ -1,0 +1,20 @@
+/* The keyboard sheet (ShortcutSheet.jsx): frosted glass over the page or the
+   fullscreen player, key caps as raised tone pills, no borders. */
+.shortcut-scrim{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:24px 16px;background:color-mix(in srgb,var(--color-canvas,#0c0c0f) 55%,transparent);backdrop-filter:blur(6px) saturate(1.1);-webkit-backdrop-filter:blur(6px) saturate(1.1);perspective:1200px}
+.shortcut-sheet{width:min(760px,100%);max-height:min(82vh,720px);overflow:auto;scrollbar-width:thin;padding:26px 28px 20px;border-radius:28px;color:var(--color-on-surface,#f0e8e5);background:radial-gradient(120% 90% at 0% 0%,color-mix(in srgb,var(--color-blossom,#ee3c35) 14%,transparent),transparent 60%),color-mix(in srgb,var(--color-surface,#19191e) 84%,transparent);backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);box-shadow:0 40px 120px #000a,inset 0 1px 0 color-mix(in srgb,var(--color-petal,#f0e8e5) 8%,transparent);outline:0;transform-origin:50% 100%;will-change:transform,opacity}
+.shortcut-sheet header{display:grid;gap:4px;margin-bottom:18px}
+.shortcut-sheet header>span{font:700 11px/1 var(--font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--color-blossom-light,#ff6655)}
+.shortcut-sheet h2{margin:0;font:800 clamp(22px,3vw,28px)/1.1 var(--font-display);letter-spacing:-.03em}
+.shortcut-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px 28px}
+.shortcut-group h3{margin:0 0 8px;font:600 12px/1.2 var(--font-ui);color:var(--color-on-muted,#b9b4bd)}
+.shortcut-group dl{display:grid;gap:4px;margin:0}
+.shortcut-group dl>div{display:grid;grid-template-columns:minmax(96px,auto) 1fr;align-items:center;gap:14px;padding:6px 8px;margin-inline:-8px;border-radius:12px;transition:background var(--motion-fast,180ms)}
+.shortcut-group dl>div:hover{background:color-mix(in srgb,var(--color-petal,#f0e8e5) 5%,transparent)}
+.shortcut-group dt{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.shortcut-group dd{margin:0;font:500 14px/1.35 var(--font-ui);color:var(--color-on-surface,#f0e8e5)}
+.shortcut-alt{display:inline-flex;align-items:center;gap:4px}
+.shortcut-alt i{font:normal 11px/1 var(--font-ui);color:var(--color-quiet,#8f8b91);margin-right:2px}
+.shortcut-sheet kbd{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 8px;border-radius:9px;font:700 12px/1 var(--font-ui);color:var(--color-on-surface,#f0e8e5);background:linear-gradient(180deg,color-mix(in srgb,var(--color-petal,#f0e8e5) 13%,transparent),color-mix(in srgb,var(--color-petal,#f0e8e5) 6%,transparent));box-shadow:0 2px 0 #0007,inset 0 1px 0 color-mix(in srgb,var(--color-petal,#f0e8e5) 14%,transparent)}
+.shortcut-foot{margin:18px 0 0;font:500 12px/1 var(--font-ui);color:var(--color-quiet,#8f8b91);display:flex;align-items:center;gap:6px}
+.shortcut-foot kbd{min-width:22px;height:22px;font-size:11px}
+@media(max-width:640px){.shortcut-sheet{padding:20px 18px 16px;border-radius:22px}.shortcut-group dl>div{grid-template-columns:minmax(84px,auto) 1fr}}

@@ -2,6 +2,7 @@
 // role pass is a labelled mock; speech synthesis is the real Supertonic model.
 import React from 'react';
 import {createRoot} from 'react-dom/client';
+import ShortcutHost from '../src/ShortcutSheet.jsx';
 import '/src/styles.css';import '/src/site-layout.css';import '/src/interface-refinement.css';
 import RanobeSources from '/src/RanobeSources.jsx';
 import {RetainedMediaProvider,VideoDock} from '/src/RetainedMedia.jsx';
@@ -55,4 +56,5 @@ function Site(){
  React.useEffect(()=>{const back=()=>setPage('title');addEventListener('hashchange',back);return()=>removeEventListener('hashchange',back);},[]);
  return <RetainedMediaProvider><header className="fixture-header" style={{display:"flex",justifyContent:"flex-end",gap:8,padding:8}}><VideoDock/><button type="button" onClick={()=>setPage(p=>p==='title'?'other':'title')}>{page==='title'?'Другая страница':'К тайтлу'}</button></header>{page==='title'?title:<p className="fixture-other">Другая страница сайта</p>}</RetainedMediaProvider>;
 }
-createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).get('tray')?<Site/>:title);
+// The site mounts the key sheet host at its root (main.jsx); the harness does the same.
+createRoot(document.getElementById('root')).render(<>{new URLSearchParams(location.search).get('tray')?<Site/>:title}<ShortcutHost/></>);
