@@ -51,6 +51,10 @@ def page_reference(value):
         target, _ = open_image_grant(value)
         public_url(target, resolve_dns=False)
         return value, None, 1, 'initmanga-image'
+    if parts.fragment.startswith('mv_speedbinb='):
+        from manga_speedbinb import grant
+        grant(value)
+        return value, None, 1, 'speedbinb-image'
     if parts.fragment.startswith('mv_rena_page='):
         from manga_scanlation_catalogues import rena_marker
         target, _ = rena_marker(value)
@@ -139,6 +143,15 @@ def fetch_page(http, reference, headers):
         url, key = open_image_grant(target)
         response, _ = http._open(url, headers=headers)
         return validated_image(decode_image(read_image(http, response), key))
+    if action == 'speedbinb-image':
+        from manga_speedbinb import compose, grant, ptimg
+
+        url, referer, layout = grant(target)
+        headers = {'Referer': referer}
+        if layout == 'ptimg':
+            url, layout = ptimg(http, url, referer)
+        response, _ = http._open(url, headers=headers, action='speedbinb-image')
+        return validated_image(compose(read_image(http, response), layout))
     if action == 'rena-image':
         from manga_scanlation_catalogues import rena_marker, renew_rena
         from source_parser import SourceAccessError

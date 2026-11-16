@@ -45,7 +45,10 @@ def series_api(host, path, query):
     from manga_scanlation_json import public_api as scanlation
     from manga_scanlation_catalogues import public_api as scan_cats
     from manga_senkuro_native import public_api as senkuro
+    from manga_sixth_profiles import public_api as sixth
     from manga_spa_catalogues import public_api as spa_catalogue
+    from manga_speedbinb_sources import public_api as speedbinb
+    from manga_webtoons_native import public_api as webtoon_native
     from manga_standalone_ports import public_api as standalone
     from manga_yarnovel import public_api as yarnovel
 
@@ -55,7 +58,7 @@ def series_api(host, path, query):
                                                      standalone, independent_json, natsuid, creator_feed, spa_catalogue,
                                                      russian_direct, yarnovel, gallery_api, scanlation, scan_directory, ru_json,
                                                      mangataro, initmanga, scan_cats, html_archives, kappa, illustrated,
-                                                     sacachispa))
+                                                     sacachispa, speedbinb, webtoon_native, sixth))
 
 
 def public_form(url, data, headers):

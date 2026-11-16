@@ -245,13 +245,34 @@ class PublicHttp:
         value=PublicHttp(validate=self.validate,timeout=self.timeout,deadline=self.deadline);value.bulk=getattr(self,'bulk',False);return value
 
     def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None, action=None):
-        url = self.validate(value)
+        speedbinb = action in {'speedbinb-info', 'speedbinb-body'}
+        speedbinb_site = action in {'speedbinb-site', 'speedbinb-xhr'}
+        speedbinb_routed = speedbinb or speedbinb_site or action == 'speedbinb-image'
+        if speedbinb:
+            from manga_speedbinb import api_route
+            if method != 'GET' or data is not None or not api_route(value, (headers or {}).get('Referer'), action):
+                raise SourceError('Некорректный маршрут читалки SpeedBinb.')
+        if speedbinb_site:
+            from manga_speedbinb import reader_url
+            reader_url(value)
+        url = public_url(value, allow_api=True) if speedbinb and self.validate is public_url else self.validate(value)
         if (RELAY_ROUTE is not None and method == 'GET' and not byte_range
+                and not speedbinb_routed
                 and action not in {'mangamillion-proto', 'globalcomix-json', 'madaradex-web', 'madaradex-cdn', 'fanfox-reader'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
+        if speedbinb:
+            outgoing.update({'Accept': 'application/json, text/javascript, */*',
+                             'X-Requested-With': 'XMLHttpRequest'})
+        if action == 'speedbinb-xhr':
+            outgoing.update({'Accept': 'text/html, text/javascript, */*',
+                             'X-Requested-With': 'XMLHttpRequest'})
+        if speedbinb_routed:
+            from manga_network_routes import configuration, routed
+            speedbinb_config = configuration()
+            outgoing['Accept-Language'] = 'ja,en;q=0.8'
         if action == 'fanfox-reader':
             from manga_html_readers import FOX_READER
             target = urlsplit(url)
@@ -499,6 +520,8 @@ class PublicHttp:
                 options = {}
                 if publisher and routed(url, route_config):
                     options['proxies'] = {'https': route_config['httpProxy']}
+                if speedbinb_routed and routed(url, speedbinb_config):
+                    options['proxies'] = {'https': speedbinb_config['httpProxy']}
                 body = data
                 if natsuid_form or init_form == 'vault':
                     options['files'] = {key: (None, value) for key, value in data.items()}
@@ -510,7 +533,7 @@ class PublicHttp:
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
                 response.close()
-                if (action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json',
+                if (speedbinb or action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
                                'natsuid-search', 'creator-feed-json', 'fanfox-reader'}
                         or not location or hop == 5):
