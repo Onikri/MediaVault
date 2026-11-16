@@ -20,7 +20,14 @@ const ART='<svg xmlns="http://www.w3.org/2000/svg" width="640" height="960"><pat
 // Catalogue fixtures shared by the site scenes.
 const anime=(id,title,russian)=>({mal_id:id,title,russian,synopsis:'Описание для проверки интерфейса.',type:'TV',episodes:12,year:2021,score:8.4,images:{jpg:{image_url:'https://art.fixture/'+id+'.svg',large_image_url:'https://art.fixture/'+id+'.svg'},webp:{image_url:'https://art.fixture/'+id+'.svg',large_image_url:'https://art.fixture/'+id+'.svg'}},genres:[{mal_id:1,name:'Drama'}],aired:{from:'2021-01-10'}});
 const SHELF=[anime(16498,'Mushoku Tensei','Реинкарнация безработного'),anime(20,'Naruto','Наруто'),anime(5114,'Fullmetal Alchemist','Стальной алхимик: Братство'),anime(9253,'Steins;Gate','Врата Штейна'),anime(1535,'Death Note','Тетрадь смерти'),anime(11061,'Hunter x Hunter','Охотник х Охотник')];
-const PROFILE={id:16498,russian:'Реинкарнация безработного: История о приключениях в другом мире',name:'Mushoku Tensei',kind:'tv',score:8.5,description:'Описание произведения. Длинный текст должен занимать нормальную колонку, а не превращаться в вертикальный столбец отдельных букв.',aired_on:'2021-01-10',episodes:12,status:'released',rating:'r',image:{original:'https://art.fixture/p.svg'},genres:[{name:'Drama',russian:'Драма'}],studios:[{id:1,name:'Studio Bind'}]};
+// Title parts, so the character grid, stills, staff, related titles and trailers render.
+const PARTS={
+ roles:[...['Рудэус Грейрат','Эрис Борея Грейрат','Рокси Мигурдия','Сильфиэтта','Пол Грейрат','Зенит Грейрат'].map((russian,i)=>({roles:[i<3?'Main':'Supporting'],roles_russian:[i<3?'Главная':'Второстепенная'],character:{id:100+i,name:'Character '+i,russian,image:{original:'https://art.fixture/c'+i+'.svg'}},person:null})),
+  ...['Манабу Окамото','Ёсинори Канада'].map((russian,i)=>({roles:[i?'Character Design':'Director'],roles_russian:[i?'Дизайн персонажей':'Режиссёр'],character:null,person:{id:200+i,name:'Person '+i,russian,image:{original:'https://art.fixture/p'+i+'.svg'}}}))],
+ screenshots:[1,2,3,4,5,6].map(i=>({original:'https://art.fixture/s'+i+'.svg',preview:'https://art.fixture/s'+i+'.svg'})),
+ related:[{relation_russian:'Продолжение',anime:{id:45576,russian:'Реинкарнация безработного 2',kind:'tv',aired_on:'2023-07-03',image:{original:'https://art.fixture/r1.svg'}}},{relation_russian:'Адаптация',manga:{id:70261,russian:'Реинкарнация безработного',kind:'light_novel',aired_on:'2014-01-23',image:{original:'https://art.fixture/r2.svg'}}}],
+};
+const PROFILE={id:16498,videos:[{id:1,kind:'pv',name:'Трейлер',url:'https://youtube.com/watch?v=abc',image_url:'https://art.fixture/v1.svg',player_url:'https://youtube.com/embed/abc',hosting:'youtube'}],russian:'Реинкарнация безработного: История о приключениях в другом мире',name:'Mushoku Tensei',kind:'tv',score:8.5,description:'Описание произведения. Длинный текст должен занимать нормальную колонку, а не превращаться в вертикальный столбец отдельных букв.',aired_on:'2021-01-10',episodes:12,status:'released',rating:'r',image:{original:'https://art.fixture/p.svg'},genres:[{name:'Drama',russian:'Драма'}],studios:[{id:1,name:'Studio Bind'}]};
 async function siteRoutes(context){
  await context.route(/^https:\/\//,route=>{
   const req=route.request(),u=new URL(req.url()),cors={'access-control-allow-origin':'*'};
@@ -29,8 +36,9 @@ async function siteRoutes(context){
   if(u.pathname==='/artwork'||u.hostname==='art.fixture'||u.hostname==='art.test')return route.fulfill({headers:cors,contentType:'image/svg+xml',body:ART});
   if(req.resourceType()==='image')return route.fulfill({headers:cors,contentType:'image/png',body:PNG});
   let data={data:[],results:[],sources:[],voices:[],providers:[],items:[],pending:false};
-  if(u.pathname.endsWith('/anime-home'))data={current:SHELF,popular:SHELF.slice().reverse(),season:{label:'Тестовый сезон'}};
-  else if(u.pathname.includes('/shikimori')||u.hostname.startsWith('shikimori'))data=u.searchParams.has('identity')?PROFILE:[];
+  if(/\/music\/anime\/\d+$/.test(u.pathname))data={tracks:[['OP','Tabibito no Uta','Yuiko Ohara',[1,2,3]],['ED','Only','Yuiko Ohara',[1,2]],['OP','Mukanjyo','Sora Amamiya',[4,5]]].map(([type,title,artist,episodes],i)=>({id:'animethemes:'+(i+1),type,title,artists:[artist],episodes,cover:'https://art.fixture/m'+i+'.svg',source:'AnimeThemes'}))};
+  else if(u.pathname.endsWith('/anime-home'))data={current:SHELF,popular:SHELF.slice().reverse(),season:{label:'Тестовый сезон'}};
+  else if(u.pathname.includes('/shikimori')||u.hostname.startsWith('shikimori'))data=u.searchParams.has('part')?PARTS[u.searchParams.get('part')]||[]:u.searchParams.has('identity')?PROFILE:[];
   else if(u.pathname.includes('/jikan')||u.hostname==='api.jikan.moe'){const p=u.searchParams.get('path')||u.pathname;data=/\/full$|\/anime\/\d+$/.test(p)?{data:SHELF[0]}:{data:SHELF,pagination:{has_next_page:false}};}
   else if(u.hostname==='graphql.anilist.co')data={data:{Page:{media:[]}}};
   return route.fulfill({headers:cors,contentType:'application/json',body:JSON.stringify(data)});
@@ -45,6 +53,9 @@ const SCENES={
  'title-manga':{site:'#watch=manga:shikimori:16498',ready:'.title-showcase'},
  'title-ranobe':{site:'#watch=ranobe:shikimori:16498',ready:'.title-showcase'},
  history:{site:'#history',ready:'.blossom-navbar'},
+ // Title dialogs: a character and a crew member.
+ 'title-character':{site:'#watch=anime:shikimori:16498',ready:'.title-showcase',async open(page){await page.locator('.title-character-grid>button').first().evaluate(b=>b.click());await page.locator('.character-dialog').waitFor();}},
+ 'title-person':{site:'#watch=anime:shikimori:16498',ready:'.title-showcase',async open(page){await page.getByRole('button',{name:/Манабу Окамото/}).first().evaluate(b=>b.click());await page.locator('.person-dialog').waitFor();}},
  player:{harness:'player',async open(page){
   await page.locator('.title-episode-card').first().click();
   await page.waitForFunction(()=>document.querySelector('.mv-player video')?.readyState>=2,null,{timeout:90000});
@@ -146,7 +157,7 @@ async function settle(page){
      await page.screenshot({path:path.join(OUT,name+'-'+width+'.png'),fullPage:!!scene.site,animations:'disabled',caret:'hide'});
      report.push(name+' '+width+': '+dump.elements.length+' elements, '+dump.table.length+' styles'+(errors.length?' ERRORS '+errors.join(' | '):''));
      console.log(report.at(-1));
-    }catch(e){report.push(name+' '+width+': FAILED '+e.message.split('\n')[0]);console.error(report.at(-1));}
+    }catch(e){await page.screenshot({path:path.join(OUT,name+'-'+width+'-failed.png')}).catch(()=>{});report.push(name+' '+width+': FAILED '+e.message.split('\n')[0]);console.error(report.at(-1));}
     await context.close();
    }
   }

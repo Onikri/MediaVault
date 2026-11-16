@@ -43,7 +43,6 @@ import TitleEpisodeCard from './TitleEpisodeCard.jsx';
 import './watch-page.css';
 import {browseHref,animeSeason} from './anime-navigation.js';
 import {publishBackdrop} from './blossom/theme.js';
-import './player-refinement.css';
 import EpisodeMotionPreview from './EpisodeMotionPreview.jsx';
 import {uiLocale} from './i18n/index.js';
 

@@ -9,8 +9,6 @@ import {tracks,toggleTrack,spotifySearch,youtubeSearch} from './music-library.js
 import {connectSpotify,connectYouTube,playlists,findTracks,addToPlaylist,spotifyRedirect} from './music-connectors.js';
 import './soundtrack.css';
 import './title-sections.css';
-import './soundtrack-rows.css';
-import './song-cards.css';
 import ArtistInfo from './ArtistInfo.jsx';
 import {playMusic,musicSnapshot,subscribeMusic} from './music-player.js';
 const cache=new Map();

@@ -2,7 +2,7 @@
    episode, the staff) become horizontal rails that snap card by card instead
    of a column many screens tall. Every card stays; cards entering from the
    edge rise and sharpen with the scroll (scroll-driven, GPU-only). */
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .title-page :is(.title-character-grid,.credits-grid,.episode-ost-list){
   display:grid;grid-template-columns:none;grid-auto-flow:column;gap:10px;
   overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;

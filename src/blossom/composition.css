@@ -146,7 +146,7 @@ html[data-blossom] .title-sidebar .ratings-grid{display:flex;flex-direction:colu
 html[data-blossom] .title-sidebar .rating-card{border:0;border-radius:14px;background:var(--color-surface);padding:16px}
 html[data-blossom] .title-sidebar .rating-value{font-size:26px}
 html[data-blossom] .title-page .title-character-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
-html[data-blossom] .title-page .title-character-grid>button{display:flex;flex-direction:column;align-items:start;padding:0;border:0;background:none;text-align:left;border-radius:15px;overflow:hidden;min-width:0}
+html[data-blossom] .title-page .title-character-grid>button{flex-direction:column;align-items:start;text-align:left;overflow:hidden;min-width:0}
 html[data-blossom] .title-page .title-character-grid>button>img{width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;border-radius:15px}
 html[data-blossom] .title-page .title-character-grid>button>span{padding:10px 1px;display:block;width:100%;min-width:0}
 html[data-blossom] .title-character-grid strong{font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis}

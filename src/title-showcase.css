@@ -33,15 +33,15 @@ html[data-blossom] .title-showcase .title-facts{position:static;border:0;backgro
 html[data-blossom] .title-showcase .title-facts h2{font-size:18px;margin:0 0 20px}
 html[data-blossom] .title-showcase .title-facts dl>div{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 0}
 html[data-blossom] .title-showcase .title-facts dd{text-align:right;overflow-wrap:anywhere}
-@media(max-width:1150px){
+@media (--tablet){
  html[data-blossom] .title-showcase-content{grid-template-columns:230px minmax(0,1fr)}
  .title-showcase-info-layer{grid-column:2}
 }
-@media(max-width:1000px){
+@media (--tablet){
  html[data-blossom] .title-showcase-content{grid-template-columns:220px minmax(0,1fr);gap:28px}
  html[data-blossom] .hero-stage.title-feature.title-showcase{padding-inline:28px}
 }
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .hero-stage.title-feature.title-showcase{
   min-height:calc(100svh - 5px);padding:clamp(280px,40svh,420px) 24px 64px;
   border-radius:0 0 24px 24px;
@@ -60,15 +60,13 @@ html[data-blossom] .title-showcase .title-background-youtube .youtube-official{w
 html[data-blossom] .title-showcase .title-background-youtube iframe{left:50%;top:50%;width:max(100cqw,177.78cqh);height:max(100cqh,56.25cqw);inset:auto;transform:translate(-50%,-50%);max-width:none;border-radius:0;pointer-events:none}
 
 /* Fit the entire desktop composition, including real metadata, above the fold. */
-@media(min-width:1000px){
+@media (--desktop){
  html[data-blossom] .hero-stage.title-feature.title-showcase{height:calc(100svh - 12px);min-height:0;padding:clamp(108px,calc(100svh - var(--showcase-content-height,430px) - 66px),46svh) clamp(24px,3.4vw,64px) 54px}
  html[data-blossom] .title-showcase-content{grid-template-columns:clamp(170px,18vw,265px) minmax(0,1fr) clamp(205px,21vw,280px);gap:clamp(20px,2.6vw,44px)}
  html[data-blossom] .title-showcase-info-layer{grid-column:auto}
  html[data-blossom] .title-showcase .title-hero-copy h1{font-size:clamp(28px,3vw,47px);margin-bottom:14px;line-height:1.08}
  html[data-blossom] .title-showcase .title-hero-description{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.65;margin-block:14px}
- html[data-blossom] .title-showcase .title-hero-actions{margin-top:18px;gap:12px}
  html[data-blossom] .title-showcase .title-genre-list{margin-top:12px;gap:5px}
- html[data-blossom] .title-showcase .title-hero-facts{margin-top:14px}
  html[data-blossom] .title-showcase .title-facts h2{margin-bottom:12px;font-size:17px}
  html[data-blossom] .title-showcase .title-facts dl{gap:0}
  html[data-blossom] .title-showcase .title-facts dl>div{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:12px;padding:8px 0;min-height:0;align-items:baseline}
@@ -78,7 +76,7 @@ html[data-blossom] .title-showcase .title-background-youtube iframe{left:50%;top
  html[data-blossom] .title-showcase .title-facts h3{margin:14px 0 8px}
  html[data-blossom] .title-showcase .title-facts .title-genre-list{margin:0;gap:5px}
 }
-@media(min-width:1000px) and (max-height:800px){
+@media (--desktop) and (max-height:800px){
  html[data-blossom] .title-showcase .title-hero-copy h1{font-size:clamp(27px,2.65vw,39px)}
  html[data-blossom] .title-showcase .title-hero-description{-webkit-line-clamp:3;font-size:12px}
  html[data-blossom] .title-showcase .title-showcase-poster-layer .title-poster{max-height:calc(100svh - 200px);aspect-ratio:3/4}
@@ -90,7 +88,7 @@ html[data-blossom] .title-showcase.without-info .title-showcase-content{grid-tem
 html[data-blossom] .title-showcase .title-showcase-poster-layer{width:100%}
 html[data-blossom] .title-showcase .poster-actions{width:100%;max-width:300px}
 html[data-blossom] .title-showcase .poster-actions .btn-primary{padding:10px 12px;font-size:12px;border-radius:100px}
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .title-showcase.without-info .title-showcase-content{grid-template-columns:minmax(0,1fr)}
  html[data-blossom] .title-showcase .title-showcase-poster-layer{width:clamp(150px,40vw,210px)}
 }
@@ -127,7 +125,7 @@ html[data-blossom] .title-showcase-tilt{width:100%}
 .title-page .title-page-back:hover svg{transform:translateX(-2px)}
 .title-page .title-page-back:active{transform:scale(.92)}
 .title-page .title-page-back:focus-visible{outline:0;box-shadow:0 0 0 2px var(--color-blossom)}
-@media(max-width:640px){.title-page .title-page-back{width:30px;height:30px;margin-right:10px}}
+@media (--phone){.title-page .title-page-back{width:30px;height:30px;margin-right:10px}}
 @media(prefers-reduced-motion:reduce){.title-page .title-page-back,.title-page .title-page-back svg{transition:none}}
 
 /* Phone showcase: the cover stands in the middle under a leaf-shaped mask with
@@ -135,7 +133,7 @@ html[data-blossom] .title-showcase-tilt{width:100%}
    artwork zooms. Watch, bookmark and save sit in one row right under it. */
 .title-phone-mask{position:absolute;width:0;height:0}
 .title-phone-back{display:none}
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .title-page .hero-stage.title-feature.title-showcase{min-height:0;padding:calc(78px + env(safe-area-inset-top)) 20px 40px}
  html[data-blossom] .title-showcase-content{gap:22px}
  html[data-blossom] .title-showcase .title-showcase-poster-layer{--phone-cover-w:min(64vw,268px);position:relative;width:100%;justify-self:center;isolation:isolate}
@@ -155,7 +153,7 @@ html[data-blossom] .title-showcase-tilt{width:100%}
  html[data-blossom] .title-showcase .poster-actions>.btn-primary svg{width:24px;height:24px;margin:0 0 0 2px}
  html[data-blossom] .title-showcase .poster-actions .poster-action-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
  html[data-blossom] .title-showcase .poster-action-icons>*{order:1}
- html[data-blossom] .title-showcase .poster-action-icons button,html[data-blossom] .title-showcase .poster-action-icons .title-save-action{width:46px;height:46px;background:color-mix(in srgb,var(--color-petal) 10%,color-mix(in srgb,var(--color-canvas) 60%,transparent));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+ html[data-blossom] .title-showcase .poster-action-icons button{width:46px;height:46px;background:color-mix(in srgb,var(--color-petal) 10%,color-mix(in srgb,var(--color-canvas) 60%,transparent));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
  html[data-blossom] .title-showcase .poster-actions>small{order:2;flex-basis:100%;margin-top:-2px;font-size:11px}
  /* Copy: centred head, readable body. */
  html[data-blossom] .title-showcase .title-showcase-copy-layer>.title-hero-copy{display:flex;flex-direction:column;align-items:center;text-align:center}

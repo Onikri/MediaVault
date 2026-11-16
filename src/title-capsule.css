@@ -21,7 +21,7 @@ html[data-blossom] .title-tabbar>button:hover{color:var(--color-petal);backgroun
 html[data-blossom] .title-tabbar>button[aria-current]{color:var(--color-petal);background:transparent}
 html[data-blossom] .title-tabbar>button[aria-current]>svg{opacity:1;color:var(--title-accent,var(--color-blossom))}
 html[data-blossom] .title-tab-indicator{position:absolute;inset:0;border-radius:999px;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
-@media(max-width:900px){html[data-blossom] .title-tabbar>button{padding:0 13px;font-size:12.5px;height:38px;min-height:38px}html[data-blossom] .title-tabbar>button>svg{display:none}}
+@media (--tablet){html[data-blossom] .title-tabbar>button{padding:0 13px;font-size:12.5px;height:38px;min-height:38px}html[data-blossom] .title-tabbar>button>svg{display:none}}
 
 /* Navbar brand ↔ library section: both share one slot so the links beside it never jump. */
 .navbar-brand-morph{position:relative;display:inline-grid;align-items:center;justify-items:start;min-height:38px;overflow:visible}

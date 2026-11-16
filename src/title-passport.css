@@ -57,5 +57,5 @@ html[data-blossom] .title-showcase .title-passport .passport-facts dd,.passport-
 .passport-rate-note{font-size:10.5px;color:var(--color-quiet)}
 @media(prefers-reduced-motion:reduce){.passport-rate button,.passport-facts dd a{transition:none}}
 /* Older mobile rules lay the facts table out in columns; the passport keeps one. */
-html[data-blossom] .title-showcase .title-passport dl.passport-facts{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:0!important}
-html[data-blossom] .title-showcase .title-passport dl.passport-facts>div{grid-template-columns:minmax(112px,1fr) minmax(0,1.25fr)!important;padding:7px 0!important;border:0!important;background:none!important}
+html[data-blossom] .title-showcase .title-passport dl.passport-facts{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+html[data-blossom] .title-showcase .title-passport dl.passport-facts>div{grid-template-columns:minmax(112px,1fr) minmax(0,1.25fr);padding:7px 0;border:0;background:none}

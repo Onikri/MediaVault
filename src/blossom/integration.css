@@ -141,7 +141,7 @@ html[data-blossom] .title-description p,html[data-blossom] .title-facts dd{color
 html[data-blossom] .title-genre-list>a,html[data-blossom] .title-genre-list>span,html[data-blossom] .anime-status{background:var(--color-surface-raised);color:var(--color-petal-shadow);border-color:var(--color-border);border-radius:999px}
 html[data-blossom] .title-facts a,html[data-blossom] .title-facts button,html[data-blossom] .title-save-actions button{color:var(--color-petal-shadow)}
 html[data-blossom] .platform-rating{border-color:var(--color-border);background:var(--color-canvas-soft)}
-html[data-blossom] .entity-card,html[data-blossom] .person-dialog,html[data-blossom] .song-profile{background:var(--color-surface)!important;border-color:var(--color-border)!important;color:var(--color-petal);backdrop-filter:none}
+
 html[data-blossom] .character-attributes dt,html[data-blossom] .fine{color:var(--color-on-muted)}
 html[data-blossom] .anime-explore .explore-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
 html[data-blossom] .entity-biography{background:var(--color-surface);border-color:var(--color-border)}

@@ -5,7 +5,7 @@ import {useEffect,useState} from 'react';
 import {ArrowLeft,ChevronRight,ExternalLink} from 'lucide-react';
 import {normalizeCatalog} from './catalog.js';
 import {plainText} from './title-metadata.js';
-import './player-refinement.css';
+import './watch-page.css';
 export default function AnimeExplore({route,service,onChoose,onBack}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[page,setPage]=useState(1),[retry,setRetry]=useState(0);
  const signature=JSON.stringify(route);
