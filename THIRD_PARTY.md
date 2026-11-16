@@ -453,6 +453,12 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   pinned Apache-2.0 Keiyoushi sources. This includes GroupLe, LibGroup,
   MangaBox, MangaReader, FMReader, WPComics, Liliana, EZManhwa, HeanCMS and
   standalone extension paths listed in `docs/native-source-inventory.csv`.
+- The third catalogue batch follows the Apache-2.0 GalleryAdults and Manga18
+  multisrc layouts and standalone extension protocols listed in
+  `docs/native-source-inventory.csv` at the same pinned revision. MediaVault
+  implements the catalogue, reader and link translation in
+  `server/manga_gallery_adults.py`, `server/manga_direct_catalogues.py`,
+  `server/manga_direct_payloads.py` and `server/manga_direct_articles.py`.
 - The Yii family (`server/manga_yii.py`) follows Apache-2.0 Keiyoushi
   `lib-multisrc/yiimanga` and `lib-multisrc/yiimadara` and their installed
   publisher overrides at the same revision.

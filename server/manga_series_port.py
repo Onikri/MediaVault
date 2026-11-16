@@ -22,13 +22,15 @@ PAYWALL = 'form.purchase-form, .chapter-locked, .purchase-required, .paywall'
 
 def series_api(host, path, query):
     from manga_archive_ports import public_api as archives
+    from manga_direct_catalogues import public_api as direct_html
+    from manga_direct_payloads import public_api as payloads
     from manga_html_families import public_api as html
     from manga_json_families import public_api as api
     from manga_ru_families import public_api as ru
 
     if host == 'mangarw.com' and path == '/api/v1/chapters':
         return bool(re.fullmatch(r'id=[0-9]{1,18}', query))
-    return any(route(host, path, query) for route in (html, api, ru, archives))
+    return any(route(host, path, query) for route in (html, api, ru, archives, direct_html, payloads))
 
 
 def public_form(url, data, headers):

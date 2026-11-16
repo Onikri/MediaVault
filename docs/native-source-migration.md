@@ -129,4 +129,9 @@ python scripts/probe-native-source-batch.py --ssh mediavault-vm --inactive --bat
 | [Самостоятельные каталоги](../server/manga_individual_catalogues.py) | 9 | 9 | MangaPill, MangaKatana, MangaBuff, MangaPoisk, Sen Manga, Manga Rw, Toonkor, RawBaka и TCB Scans |
 | [Архивы веб-комиксов](../server/manga_archive_ports.py) | 14 | 24 | Языковые издания, архивы по годам, группировка страниц и отдельный маршрут галереи |
 
-Прямой код есть у 365 из 725 APK и 977 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 912 и поддерживает прогоны по 200 профилей.
+| [GalleryAdults](../server/manga_gallery_adults.py) | 9 | 53 | Языковые профили, параметры поиска, списки страниц и полноразмерные изображения |
+| [Каталоги HTML](../server/manga_direct_catalogues.py) | 18 | 18 | Каталоги, фильтры и оглавления, курсор Jump Rookie, HTML-фрагменты MangaKuro и закодированный список страниц Manga18 |
+| [Каталоги JSON и React Flight](../server/manga_direct_payloads.py) | 8 | 9 | Идентификаторы изданий, порядок страниц, отсев закрытых глав |
+| [Галереи и веб-комиксы](../server/manga_direct_articles.py) | 15 | 15 | Одиночные выпуски, пагинация галерей и архивы отдельных серий |
+
+Прямой код есть у 415 из 725 APK и 1 072 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 1 007 и поддерживает прогоны по 200 профилей.

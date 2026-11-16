@@ -27,9 +27,13 @@ def candidates():
     import manga_comicfury
     import manga_comici
     import manga_dbmultiverse
+    import manga_direct_articles
+    import manga_direct_catalogues
+    import manga_direct_payloads
     import manga_foolslide
     import manga_gigaviewer
     import manga_globalcomix
+    import manga_gallery_adults
     import manga_guya
     import manga_hentaihand
     import manga_html_families
@@ -64,7 +68,8 @@ def candidates():
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in module.SOURCES)
     profiles.update((adapter.SOURCE_ID, adapter) for adapter in manga_webcomics.adapters())
     for group in (manga_archive_ports.SOURCES, manga_html_families.SOURCES, manga_individual_catalogues.SOURCES,
-                  manga_json_families.sources(), manga_ru_families.SOURCES):
+                  manga_json_families.sources(), manga_ru_families.SOURCES, manga_direct_articles.sources(),
+                  manga_direct_catalogues.sources(), manga_direct_payloads.sources(), manga_gallery_adults.sources()):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in group)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby

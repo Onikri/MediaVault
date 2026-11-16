@@ -264,6 +264,13 @@ class PublicHttp:
                 raise SourceError('Некорректный маршрут публичного API каталога.')
             outgoing.update({'Accept': 'application/json' if action.endswith('json') else 'text/html, */*',
                              'X-Requested-With': 'XMLHttpRequest'})
+        if action == 'native-series-rsc':
+            from manga_direct_payloads import public_api
+            target = urlsplit(url)
+            if (target.netloc != 'www.revivalscans.com' or method != 'GET' or data is not None
+                    or not public_api(target.netloc, target.path, target.query)):
+                raise SourceError('Некорректный маршрут React Flight.')
+            outgoing.update({'RSC': '1', 'Accept': 'text/x-component'})
         million_register = False
         if action == 'mangamillion-proto':
             from manga_mangamillion import TOKEN, public_api
@@ -421,7 +428,7 @@ class PublicHttp:
                 location = response.headers.get("Location", "")
                 response.close()
                 if (action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json',
-                               'native-series-json', 'native-series-html-api'} or not location or hop == 5):
+                               'native-series-json', 'native-series-html-api', 'native-series-rsc'} or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
                 if publisher:
@@ -461,6 +468,24 @@ class PublicHttp:
                 raise SourceError(f"Источник вернул HTTP {status}.")
             return response, url
         raise SourceError("Слишком много перенаправлений.")
+
+    def leslie_image_exists(self, value, referer):
+        from manga_madara import SEGMENT
+
+        url = urlsplit(value)
+        if url.netloc != 'leslie-victims.pages.dev' or url.query or not re.fullmatch(
+                rf'/content/{SEGMENT}/{SEGMENT}/\d{{2,3}}\.webp', url.path):
+            raise SourceError('Некорректная ссылка на страницу комикса.')
+        try:
+            response, final = self._open(value, headers={'Referer': referer}, method='HEAD')
+        except SourceError as error:
+            if str(error) == 'Источник вернул HTTP 404.':
+                return False
+            raise
+        try:
+            return final == value and response.headers.get('Content-Type', '').startswith('image/')
+        finally:
+            response.close()
 
     def document(self, value, *, headers=None, method="GET", data=None, timeout=None, action=None):
         options = {'timeout': timeout} if timeout else {}
