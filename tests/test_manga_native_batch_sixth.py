@@ -15,17 +15,31 @@ from PIL import Image
 
 import manga_additional_catalogues
 import manga_alpha_manga
+import manga_catalogue_api_ports
+import manga_comic_museum
+import manga_gallery_archive_ports
+import manga_klto9
 import manga_luscious_native
+import manga_mangaplus
+import manga_mangamee
+import manga_manta_native
 import manga_niadd_novelcool
+import manga_omega
 import manga_pandachaika
 import manga_public_zip
+import manga_rinko
+import manga_scan_api_ports
 import manga_simply_native
 import manga_sixth_profiles
+import manga_small_readers
 import manga_speedbinb as speed
 import manga_speedbinb_sources
 import manga_toonlook
+import manga_unicomics
+import manga_webnex
 import manga_webtoons_native
 import manga_wordpress_locales
+import manga_yellownote
 from manga_page_media import fetch_page, page_reference
 from source_parser import SourceError, public_url
 
@@ -35,7 +49,12 @@ PROFILES = (*manga_speedbinb_sources.SOURCES, *manga_webtoons_native.SOURCES,
             *manga_niadd_novelcool.SOURCES, *manga_sixth_profiles.SOURCES,
             *manga_wordpress_locales.SOURCES, *manga_simply_native.SOURCES,
             *manga_luscious_native.SOURCES, *manga_additional_catalogues.SOURCES,
-            *manga_pandachaika.SOURCES, *manga_toonlook.SOURCES, *manga_alpha_manga.SOURCES)
+            *manga_pandachaika.SOURCES, *manga_toonlook.SOURCES, *manga_alpha_manga.SOURCES,
+            *manga_catalogue_api_ports.SOURCES, *manga_gallery_archive_ports.SOURCES,
+            *manga_klto9.SOURCES, *manga_mangaplus.SOURCES, *manga_small_readers.SOURCES,
+            *manga_scan_api_ports.SOURCES, *manga_manta_native.SOURCES, *manga_mangamee.SOURCES,
+            *manga_comic_museum.SOURCES, *manga_omega.SOURCES, *manga_rinko.SOURCES,
+            *manga_unicomics.SOURCES, *manga_webnex.SOURCES, *manga_yellownote.SOURCES)
 
 
 def fixture(routes):
@@ -55,6 +74,23 @@ def encode_table(cid, key, values):
     return ''.join(encoded)
 
 
+def wire_integer(value):
+    data = bytearray()
+    while value >= 128:
+        data.append((value & 127) | 128)
+        value >>= 7
+    data.append(value)
+    return bytes(data)
+
+
+def wire_field(number, value):
+    if isinstance(value, int):
+        return wire_integer(number << 3) + wire_integer(value)
+    if isinstance(value, str):
+        value = value.encode()
+    return wire_integer((number << 3) | 2) + wire_integer(len(value)) + value
+
+
 class SixthBatchTests(TestCase):
     def source(self, name, language=None):
         profile = next(item for item in PROFILES if item.NAME == name and (language is None or language == item.LANGUAGE))
@@ -65,12 +101,47 @@ class SixthBatchTests(TestCase):
         candidates, active = runpy.run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(encoding='utf-8', newline='') as file:
             rows = {row['source_id']: row for row in csv.DictReader(file)}
+        self.assertEqual(len(PROFILES), 128)
+        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 50)
         for profile in PROFILES:
             row = rows[profile.SOURCE_ID]
             self.assertEqual((profile.NAME, profile.LANGUAGE), (row['source'], row['language']))
             self.assertIs(type(candidates[profile.SOURCE_ID]), type(profile))
             self.assertNotIn(profile.SOURCE_ID, active)
             self.assertTrue(row['evidence'].endswith('#шестая-партия'))
+
+    def test_unicomics_saved_chapter_and_deferred_image(self):
+        profile = self.source('UniComics')
+        root = profile.ROOT
+        title = root + '/comics/series/example'
+        reader = root + '/comics/online/example/issue/1'
+        first_page = reader + '/2'
+        http = fixture({
+            title: f'<div class="series-main"><h1>Тест</h1></div><div class="comics-grid">'
+                   f'<div class="comic-card"><span class="comic-title-ru">Тест №1</span>'
+                   f'<div class="buttons-grid"><a href="{reader}">Читать</a></div></div></div>',
+            reader: f'<select class="mobilePageSelector"><option value="{first_page}">2</option></select>',
+            first_page: '<img class="image_online" src="/img/example.png">',
+        })
+        info = profile.inspect(title, http)
+        chapter = info['episodes'][0]['url']
+        pages = profile.inspect(chapter, http)['pages']
+        self.assertEqual(pages, [first_page + '#mv_unicomics_page'])
+        target, _, _, action = page_reference(pages[0])
+        self.assertEqual((target, action), (first_page, 'unicomics-image'))
+        self.assertEqual(manga_unicomics.lazy_image(http, target), root + '/img/example.png')
+
+    def test_rinko_locked_chapter_and_ajax_scope(self):
+        profile = self.source('Rinko Comics')
+        title = profile.ROOT + '/comic/example/'
+        http = fixture({title: '<div class="comic-info-upper"><h1>Example</h1></div>'
+                        '<li class="chapter" data-reason="coins" data-permalink="/example-chapter-1/">'
+                        '<a href="#"><span class="chapter-number">Chapter 1</span></a></li>'})
+        chapter = profile.inspect(title, http)['episodes'][0]
+        self.assertFalse(chapter['available'])
+        form = {'action': 'load_more_chapters', 'nonce': 'public123', 'comic_id': '9', 'offset': '10'}
+        self.assertTrue(manga_rinko.public_form(manga_rinko.AJAX, form, title))
+        self.assertFalse(manga_rinko.public_form(manga_rinko.AJAX, form, 'https://example.com/comic/example/'))
 
     def test_speedbinb_selects_page_keys_and_preserves_order(self):
         cid, key = 'title-1', 'A' * 32
@@ -304,3 +375,58 @@ class SixthBatchTests(TestCase):
         with Image.open(BytesIO(output)) as image:
             self.assertEqual(image.getpixel((5, 5)), (0, 0, 255))
             self.assertEqual(image.getpixel((25, 5)), (255, 0, 0))
+
+    def test_ysk_localization_and_chapter_page_contract(self):
+        source = self.source('YSK Comics', 'ar')
+        title = source.ROOT + '/ar/comic/test-series'
+        http = fixture({
+            source.ROOT + '/api/comic/test-series': {'data': {'slug': 'test-series', 'full_name': 'Story',
+                                                            'language_code': 'ar', 'genres': [{'name': 'Action'}]}},
+            source.ROOT + '/api/comic/chapter/test-series?page=1':
+                {'data': {'data_messages': [{'slug': 'xyz', 'rank': '2'}], 'meta': {'link_next': None}}},
+            source.ROOT + '/api/chapters/images/xyz': {'data': ['https://cdn.example/01.png']},
+        })
+        card = source.inspect(title, http)
+        self.assertEqual((card['language'], card['genres']), ('ar', ['Action']))
+        self.assertEqual(source.inspect(card['episodes'][0]['url'], http)['pages'], ['https://cdn.example/01.png'])
+        self.assertTrue(all(call.kwargs['headers']['x-localization'] == 'ar' for call in http.document.call_args_list))
+
+    def test_manga_plus_returns_signed_public_pages_and_skips_non_image_frames(self):
+        source = self.source('MANGA Plus by SHUEISHA', 'ru')
+        url = source.ROOT + '/viewer/88?mv_title=11'
+        image_url = 'https://jumpg-assets.tokyo-cdn.com/page.png'
+        image = BytesIO()
+        with Image.new('RGB', (12, 12), 'blue') as original:
+            original.save(image, 'PNG')
+        page = wire_field(1, image_url) + wire_field(5, '0a0b')
+        confirmed = wire_field(1, wire_field(1, page)) + wire_field(1, wire_field(2, b'')) + wire_field(9, 11) + wire_field(19, 'public-token')
+        binary = wire_field(1, wire_field(10, confirmed))
+        mock = Mock(status_code=200, iter_content=Mock(return_value=[binary]))
+        route = (manga_mangaplus.API + '/manga_viewer_v3?chapter_id=88&split=yes&img_quality=super_high&clang=rus')
+        self.assertEqual(public_url(route, resolve_dns=False), route)
+        http = Mock(_open=Mock(return_value=(mock, route)), deadline=None)
+        pages = source.pages(http, url)
+        self.assertEqual(len(pages), 1)
+        request = http._open.call_args
+        self.assertEqual((request.args[0], request.kwargs['action']), (route, 'mangaplus-proto'))
+        encrypted = bytes(byte ^ (10, 11)[idx % 2] for idx, byte in enumerate(image.getvalue()))
+        http._open.return_value = (Mock(iter_content=Mock(return_value=[encrypted])), image_url)
+        self.assertEqual(fetch_page(http, page_reference(pages[0]), {}), (image.getvalue(), 'image/png'))
+        self.assertEqual(http._open.call_args.kwargs['headers']['Plus-Vw-Token'], 'public-token')
+        with self.assertRaises(SourceError):
+            page_reference(pages[0].replace('/page.png', '/other.png'))
+
+    def test_klto9_restores_old_fragment_and_uses_real_chapter_id(self):
+        source = self.source('Klto9')
+        title = source.ROOT + '/teap-story.html'
+        list_path = 'A' * 25 + '.lst'
+        page_path = 'A' * 30 + '.iog'
+        http = fixture({title: '<h1 class="cinema-title">Story</h1>',
+                        source.ROOT + '/' + list_path + '?manga=story':
+                            [{'id': '91', 'manga': 'story', 'chapter': '1.5'}],
+                        source.ROOT + '/' + page_path + '?cid=91':
+                            '<img data-pagespeed-lazy-src="https://cdn.example/1.png">'})
+        with patch.object(manga_klto9, 'suffix', side_effect=lambda length, extension: '/' + 'A' * length + extension):
+            old = source.saved_chapter({'url': '91#story#1.5'}, source.ROOT, title)
+            self.assertEqual(old, source.ROOT + '/zmqs-story-chapter-1.5.html?cid=91')
+            self.assertEqual(source.inspect(old, http)['pages'], ['https://cdn.example/1.png'])

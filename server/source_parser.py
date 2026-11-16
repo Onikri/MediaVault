@@ -258,11 +258,23 @@ class PublicHttp:
         url = public_url(value, allow_api=True) if speedbinb and self.validate is public_url else self.validate(value)
         if (RELAY_ROUTE is not None and method == 'GET' and not byte_range
                 and not speedbinb_routed
-                and action not in {'mangamillion-proto', 'globalcomix-json', 'madaradex-web', 'madaradex-cdn', 'fanfox-reader'}):
+                and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
+                                   'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
+                                   'webnex-doc', 'webnex-image'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
                 return routed
         outgoing = playback_headers(headers)
+        if action == 'webnex-image':
+            from manga_webnex import cookie_header, public_api as webnex_api
+            origin = urlsplit(url)
+            cookie = (headers or {}).get('Cookie')
+            if (method != 'GET' or origin.netloc != 'webnex.cc'
+                    or not webnex_api(origin.netloc, origin.path, origin.query) or not cookie_header(cookie)):
+                raise SourceError('Некорректный маршрут изображения Webnex.')
+            outgoing['Cookie'] = cookie
+        if urlsplit(url).hostname == 'img.xchina.io':
+            outgoing['Accept'] = 'image/avif,image/webp,image/png,image/jpeg,*/*'
         if speedbinb:
             outgoing.update({'Accept': 'application/json, text/javascript, */*',
                              'X-Requested-With': 'XMLHttpRequest'})
@@ -309,16 +321,46 @@ class PublicHttp:
                 raise SourceError('Некорректный маршрут публичного API каталога.')
             outgoing.update({'Accept': 'application/json' if action.endswith('json') else 'text/html, */*',
                              'X-Requested-With': 'XMLHttpRequest'})
+        if action == 'ysk-json':
+            from manga_catalogue_api_ports import YSK, YSK_SEARCH, public_api
+            target = urlsplit(url)
+            language = (headers or {}).get('x-localization')
+            if (method != 'GET' or data is not None or language not in {'ar', 'en'}
+                    or target.netloc not in {YSK, YSK_SEARCH} or not public_api(target.netloc, target.path, target.query)):
+                raise SourceError('Некорректный публичный маршрут YSK Comics.')
+            outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'x-localization': language})
+        if action in {'mangaplus-proto', 'mangaplus-image'}:
+            from manga_mangaplus import SESSION, TOKEN, page_host, public_api
+            target = urlsplit(url)
+            allowed_method = method == 'GET' and data is None
+            if action == 'mangaplus-proto':
+                if (not allowed_method or not public_api(target.netloc, target.path, target.query)
+                        or (headers or {}).get('Session-Token') != SESSION):
+                    raise SourceError('Некорректный маршрут MANGA Plus.')
+                outgoing.update({'Accept': 'application/x-protobuf, application/octet-stream, */*', 'Session-Token': SESSION})
+            else:
+                token = (headers or {}).get('Plus-Vw-Token', '')
+                if not allowed_method or not page_host(target.hostname or '') or token and not TOKEN.fullmatch(token):
+                    raise SourceError('Некорректная страница MANGA Plus.')
+                if token:
+                    outgoing['Plus-Vw-Token'] = token
         if action == 'native-series-rsc':
             from manga_additional_catalogues import public_rsc as additional_rsc
             from manga_direct_payloads import public_api
+            from manga_mangamee import public_rsc as mangamee_rsc
             from manga_scanlation_json import public_rsc
             target = urlsplit(url)
             revival = target.netloc == 'www.revivalscans.com' and public_api(target.netloc, target.path, target.query)
             route = (target.netloc, target.path, target.query)
-            if method != 'GET' or data is not None or not (revival or public_rsc(*route) or additional_rsc(*route)):
+            if method != 'GET' or data is not None or not (revival or public_rsc(*route) or additional_rsc(*route) or mangamee_rsc(*route)):
                 raise SourceError('Некорректный маршрут React Flight.')
             outgoing.update({'RSC': '1', 'Accept': 'text/x-component'})
+        if action == 'mangamee-proto':
+            from manga_mangamee import public_api as mangamee_api
+            target = urlsplit(url)
+            if method != 'GET' or data is not None or not mangamee_api(target.netloc, target.path, target.query):
+                raise SourceError('Некорректный маршрут MangaMee.')
+            outgoing['Accept'] = 'application/x-protobuf, application/octet-stream, */*'
         if action == 'inkstory-json':
             from manga_inkstory import SERVICES, public_api
             target = urlsplit(url)
@@ -473,6 +515,11 @@ class PublicHttp:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'})
                 if catalogue_form and host in {'rizzfables.com', 'hentailoop.com'}:
                     outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
+                if catalogue_form and host == 'rinkocomics.com':
+                    outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
+            if action == 'dcm-search':
+                from manga_comic_museum import public_search
+                catalogue_form = isinstance(data, dict) and public_search(url, data)
             if action == 'native-series-data-form':
                 from manga_independent_json_ports import public_form
                 catalogue_form = public_form(url, data)
@@ -525,7 +572,7 @@ class PublicHttp:
                 if speedbinb_routed and routed(url, speedbinb_config):
                     options['proxies'] = {'https': speedbinb_config['httpProxy']}
                 body = data
-                if natsuid_form or init_form == 'vault':
+                if natsuid_form or init_form == 'vault' or action == 'dcm-search':
                     options['files'] = {key: (None, value) for key, value in data.items()}
                     body = None
                 response = self.session.request(method, url, headers=outgoing, data=body,
@@ -535,9 +582,10 @@ class PublicHttp:
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
                 response.close()
-                if (speedbinb or action in {'mangamillion-proto', 'globalcomix-json', 'webcomic-json',
+                if (speedbinb or action in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto',
+                               'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
-                               'natsuid-search', 'creator-feed-json', 'fanfox-reader'}
+                               'natsuid-search', 'creator-feed-json', 'fanfox-reader', 'ysk-json', 'webnex-image'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))

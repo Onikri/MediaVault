@@ -25,6 +25,20 @@ def candidates():
     import manga_fifth_batch_profiles
     import manga_additional_catalogues
     import manga_alpha_manga
+    import manga_catalogue_api_ports
+    import manga_comic_museum
+    import manga_gallery_archive_ports
+    import manga_klto9
+    import manga_mangaplus
+    import manga_mangamee
+    import manga_manta_native
+    import manga_omega
+    import manga_rinko
+    import manga_unicomics
+    import manga_webnex
+    import manga_yellownote
+    import manga_small_readers
+    import manga_scan_api_ports
     import manga_luscious_native
     import manga_pandachaika
     import manga_simply_native
@@ -88,7 +102,11 @@ def candidates():
                   manga_speedbinb_sources.SOURCES, manga_webtoons_native.SOURCES, manga_niadd_novelcool.SOURCES,
                   manga_sixth_profiles.SOURCES, manga_wordpress_locales.SOURCES, manga_simply_native.SOURCES,
                   manga_luscious_native.SOURCES, manga_additional_catalogues.SOURCES, manga_pandachaika.SOURCES,
-                  manga_toonlook.SOURCES, manga_alpha_manga.SOURCES):
+                  manga_toonlook.SOURCES, manga_alpha_manga.SOURCES, manga_catalogue_api_ports.SOURCES,
+                  manga_gallery_archive_ports.SOURCES, manga_klto9.SOURCES, manga_mangaplus.SOURCES,
+                  manga_small_readers.SOURCES, manga_scan_api_ports.SOURCES, manga_manta_native.SOURCES,
+                  manga_comic_museum.SOURCES, manga_mangamee.SOURCES, manga_omega.SOURCES,
+                  manga_rinko.SOURCES, manga_unicomics.SOURCES, manga_webnex.SOURCES, manga_yellownote.SOURCES):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in group)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby

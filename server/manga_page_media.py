@@ -59,6 +59,15 @@ def page_reference(value):
         from manga_public_zip import grant
         grant(value)
         return value, None, 1, 'public-zip-image'
+    if parts.fragment == 'mv_dcm_page':
+        from manga_comic_museum import preview
+        if not (target := preview(value, marked=True)):
+            raise SourceError('Некорректная страница Digital Comic Museum.')
+        return target, None, 1, 'dcm-image'
+    if parts.fragment == 'mv_unicomics_page':
+        from manga_unicomics import deferred
+
+        return deferred(value), None, 1, 'unicomics-image'
     if parts.fragment.startswith('mv_rena_page='):
         from manga_scanlation_catalogues import rena_marker
         target, _ = rena_marker(value)
@@ -148,18 +157,40 @@ def fetch_page(http, reference, headers):
         response, _ = http._open(url, headers=headers)
         return validated_image(decode_image(read_image(http, response), key))
     if action == 'speedbinb-image':
+        from manga_mangaplus import MangaPlusPage
         from manga_speedbinb import compose, grant, ptimg
+        from manga_webnex import WebnexPage
 
         url, referer, layout = grant(target)
         headers = {'Referer': referer}
+        if isinstance(layout, MangaPlusPage):
+            headers['Plus-Vw-Token'] = layout.token
+            response, _ = http._open(url, headers=headers, action='mangaplus-image')
+            return validated_image(layout.decode(read_image(http, response)))
+        if isinstance(layout, WebnexPage) and layout.cookie:
+            headers['Cookie'] = layout.cookie
+            response, _ = http._open(url, headers=headers, action='webnex-image')
+            return validated_image(read_image(http, response))
+        if hasattr(layout, 'decode'):
+            response, _ = http._open(url, headers=headers)
+            return validated_image(layout.decode(read_image(http, response)))
         if layout == 'ptimg':
             url, layout = ptimg(http, url, referer)
         response, _ = http._open(url, headers=headers, action='speedbinb-image')
-        raw = read_image(http, response)
-        return validated_image(layout.decode(raw) if hasattr(layout, 'decode') else compose(raw, layout))
+        return validated_image(compose(read_image(http, response), layout))
     if action == 'public-zip-image':
         from manga_public_zip import read_member
         return validated_image(read_member(http, target))
+    if action == 'dcm-image':
+        from manga_comic_museum import lazy_image
+        url = lazy_image(http, target)
+        response, _ = http._open(url, headers={'Referer': target})
+        return validated_image(read_image(http, response))
+    if action == 'unicomics-image':
+        from manga_unicomics import lazy_image
+
+        response, _ = http._open(lazy_image(http, target), headers={'Referer': target})
+        return validated_image(read_image(http, response))
     if action == 'rena-image':
         from manga_scanlation_catalogues import rena_marker, renew_rena
         from source_parser import SourceAccessError

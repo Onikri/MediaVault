@@ -23,9 +23,11 @@ PAYWALL = 'form.purchase-form, .chapter-locked, .purchase-required, .paywall'
 def series_api(host, path, query):
     from manga_alpha_manga import public_api as alpha
     from manga_archive_ports import public_api as archives
+    from manga_catalogue_api_ports import public_api as catalogue_api
     from manga_creator_feeds import public_api as creator_feed
     from manga_direct_catalogues import public_api as direct_html
     from manga_direct_payloads import public_api as payloads
+    from manga_gallery_archive_ports import public_api as gallery_archives
     from manga_html_families import public_api as html
     from manga_html_archives import public_api as html_archives
     from manga_illustrated_archives import public_api as illustrated
@@ -34,6 +36,10 @@ def series_api(host, path, query):
     from manga_inkstory import public_api as ink
     from manga_json_families import public_api as api
     from manga_kappabeast import public_api as kappa
+    from manga_klto9 import public_api as klto9
+    from manga_mangaplus import public_api as mangaplus
+    from manga_mangamee import public_api as mangamee
+    from manga_manta_native import public_api as manta
     from manga_luscious_native import public_api as luscious
     from manga_mangataro import public_api as mangataro
     from manga_pandachaika import public_api as pandachaika
@@ -45,14 +51,17 @@ def series_api(host, path, query):
     from manga_russian_direct import public_api as russian_direct
     from manga_sacachispa import public_api as sacachispa
     from manga_scan_directory import public_api as scan_directory
+    from manga_scan_api_ports import public_api as scan_api
     from manga_scanlation_json import public_api as scanlation
     from manga_scanlation_catalogues import public_api as scan_cats
     from manga_senkuro_native import public_api as senkuro
     from manga_simply_native import public_api as simply
     from manga_sixth_profiles import public_api as sixth
+    from manga_small_readers import public_api as small_readers
     from manga_spa_catalogues import public_api as spa_catalogue
     from manga_speedbinb_sources import public_api as speedbinb
     from manga_webtoons_native import public_api as webtoon_native
+    from manga_webnex import public_api as webnex
     from manga_standalone_ports import public_api as standalone
     from manga_toonlook import public_api as toonlook
     from manga_yarnovel import public_api as yarnovel
@@ -64,7 +73,8 @@ def series_api(host, path, query):
                                                      russian_direct, yarnovel, gallery_api, scanlation, scan_directory, ru_json,
                                                      mangataro, initmanga, scan_cats, html_archives, kappa, illustrated,
                                                      sacachispa, speedbinb, webtoon_native, sixth, luscious, simply,
-                                                     pandachaika, toonlook, alpha))
+                                                     pandachaika, toonlook, alpha, catalogue_api, klto9, mangaplus,
+                                                     small_readers, scan_api, manta, gallery_archives, mangamee, webnex))
 
 
 def public_form(url, data, headers):
@@ -87,8 +97,11 @@ def public_form(url, data, headers):
     from manga_fifth_families import public_form as fifth
     from manga_hentailoop import public_form as loop
     from manga_ru_html_ports import public_form as russian_html
+    from manga_small_readers import public_form as small_readers
+    from manga_rinko import public_form as rinko
 
-    return standalone(url, data) or fifth(url, data) or russian_html(url, data) or loop(url, data)
+    return (standalone(url, data) or fifth(url, data) or russian_html(url, data) or loop(url, data) or small_readers(url, data)
+            or rinko(url, data, headers.get('Referer', '')))
 
 
 def document_json(http, url, referer):
