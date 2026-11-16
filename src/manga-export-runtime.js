@@ -17,7 +17,7 @@ window.translateExportChapter=async({count,options,slots,skip=[]})=>{
  await preloadPrivateFonts(fontService);
  const controller=new AbortController(),ignored=new Set(skip);
  const entries=Array.from({length:count},(_,index)=>({async:async()=>new Blob([fromBase64(await window.exportSourcePage(index))])}));
- const config=translationConfig({...options,firstPagePriority:true,directTimeoutMs:120000,engine:'vm',directViaOracle:true,chapterPipeline:false,cache:false,modelBudgetMs:120000,allowDownloads:true,skipPages:ignored});
+ const config=translationConfig({...options,firstPagePriority:true,directTimeoutMs:120000,engine:'vm',directViaOracle:true,cache:false,modelBudgetMs:Infinity,allowDownloads:true,skipPages:ignored});
  const service={session:{googleGatewayVersion:5},request:(path,request)=>window.exportGoogleRequest(path,request.body||{})};
  const chapter=new DirectChapter({entries,scope:'vm-export',keyScope:'vm-export',config,direction:options.direction,serverSlots:slots,service:()=>service});
  try{

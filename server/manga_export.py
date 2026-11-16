@@ -165,7 +165,8 @@ def produce(job, http, budget, progress):
                 (directory / f'{index:04d}.image').write_bytes(data)
                 if cache and index in identity:
                     cache.write(identity[index], data)
-                progress({'phase':'translating','chapter':chapter_index+1,'chaptersTotal':len(chapters),'pagesTotal':len(pages),'pagesLoaded':len(list(directory.glob('*.image')))})
+                loaded=len(list(directory.glob('*.image')))
+                progress({'phase':'translating','chapter':chapter_index+1,'chaptersTotal':len(chapters),'pagesTotal':len(pages),'pagesLoaded':loaded,'operation':f'Перевод на ВМ · готово {loaded} из {len(pages)}'})
             try:
                 for index in range(len(pages)):
                     budget.check()
@@ -186,7 +187,7 @@ def produce(job, http, budget, progress):
                     elif options['mode']=='cached':
                         raise SourceError('Глава переведена не полностью. Выбери перевод недостающих страниц.')
                 if options['mode']=='translate' and len(skip)<len(pages):
-                    progress({'phase':'translating','chapter':chapter_index+1,'chaptersTotal':len(chapters),'pagesLoaded':len(skip),'pagesTotal':len(pages)})
+                    progress({'phase':'translating','chapter':chapter_index+1,'chaptersTotal':len(chapters),'pagesLoaded':len(skip),'pagesTotal':len(pages),'operation':f'Перевод на ВМ · запускаем переводчик · готово {len(skip)} из {len(pages)}'})
                     translate_pages(job, Pages(), options['translation'], skip, save, progress, budget)
                 for index in range(len(pages)):
                     budget.check()

@@ -44,9 +44,9 @@ export class DirectChapter{
   job.promise=new Promise((resolve,reject)=>Object.assign(job,{resolve,reject}));job.promise.catch(()=>{});
   this.jobs.set(index,job);this.pageStates.set(index,{page:index+1,state:'queued'});this.notify(index,{phase:'queued',message:background?'Готовим следующую страницу заранее':'Быстрый режим · готовим страницу на устройстве'});
   if(this.recovered.has(index)){this.finish(job,this.recovered.get(index));return job;}
-  if(!background&&this.config.chapterPipeline!==false&&!this.chapterStarted){this.chapterStarted=true;if(index>=this.batchSize())this.focus(index,true);for(let n=0;n<this.entries.length;n++)if(!this.jobs.has(n))this.request(n,null,true);}
-  if(!background&&this.config.chapterPipeline!==false){const{count,start}=this.packetRange(index);for(let n=start;n<Math.min(start+count,this.entries.length);n++)if(!this.jobs.has(n))this.request(n,null,true);}
-  if(!background&&this.config.directInput!=='blocks'&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(6,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n))this.request(n,null,true);}
+  if(!background&&this.config.chapterPipeline!==false&&!this.chapterStarted){this.chapterStarted=true;if(index>=this.batchSize())this.focus(index,true);for(let n=0;n<this.entries.length;n++)if(!this.jobs.has(n)&&!this.config.skipPages?.has(n))this.request(n,null,true);}
+  if(!background&&this.config.chapterPipeline!==false){const{count,start}=this.packetRange(index);for(let n=start;n<Math.min(start+count,this.entries.length);n++)if(!this.jobs.has(n)&&!this.config.skipPages?.has(n))this.request(n,null,true);}
+  if(!background&&this.config.directInput!=='blocks'&&this.batchSize()===3){const capacity=this.serverSlots.length||(this.getKey===directKey?Math.max(1,directKeys(this.keyScope).length):1),start=Math.floor(index/3)*3,end=Math.min(this.entries.length,start+(this.config.saveData?3:Math.min(6,capacity)*3));for(let n=start;n<end;n++)if(!this.jobs.has(n)&&!this.config.skipPages?.has(n))this.request(n,null,true);}
   queueMicrotask(()=>this.drain());return job;
  }
  personalSlot(key){return this.getKey===directKey?([0,1,2,3,4,5].find(i=>directKey(keySlotScope(this.keyScope,i))===key)??0):0;}

@@ -135,8 +135,8 @@ export async function renderComicPage({blob,page,font='auto',mode='hybrid',lama,
   // smart: the small model gets at most MODEL_BUDGET ms of inference per page
   // (loading the model is not counted), so a busy page is never held for
   // minutes; regions after it keep their backing or take the fast method.
-  // A saved chapter on the VM may take longer per page than an open one.
-  const MODEL_BUDGET=Number.isFinite(modelBudgetMs)&&modelBudgetMs>0?Math.min(modelBudgetMs,300000):7000,modelStart=()=>performance.now();let modelMs=0;
+  // A chapter saved on the VM has no cap (Infinity): nobody waits on a page there.
+  const MODEL_BUDGET=modelBudgetMs>0?modelBudgetMs:7000,modelStart=()=>performance.now();let modelMs=0;
   let lamaUnavailable=null,modelCalls=0,pageExecution,cleanupMask=captureDebug?new Uint8Array(original.width*original.height):null;
   if(mode==='moebius'&&moebiusStrategy==='page'&&!preparedClean){
    const t=performance.now(),eligible=[];
