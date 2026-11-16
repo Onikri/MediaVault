@@ -16,4 +16,4 @@
 .device-shelf-player{position:relative;border-radius:18px;overflow:hidden}
 .device-shelf-player>.circle-button{position:absolute;z-index:5;top:10px;right:10px}
 .device-shelf-empty{margin:0;font-size:13px;color:var(--color-on-muted)}
-@media(max-width:640px){.device-shelf{padding:14px}.device-shelf-head{grid-template-columns:auto minmax(0,1fr)}.device-shelf-actions{grid-column:1/-1}}
+@media (--phone){.device-shelf{padding:14px}.device-shelf-head{grid-template-columns:auto minmax(0,1fr)}.device-shelf-actions{grid-column:1/-1}}

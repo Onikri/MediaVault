@@ -31,4 +31,4 @@
 .history-day li:hover .history-forget,.history-forget:focus-visible{opacity:1}
 .history-forget:hover{background:color-mix(in srgb,var(--color-blossom) 22%,var(--color-canvas-soft));color:#fff}
 @media(hover:none){.history-forget{opacity:1}}
-@media(max-width:640px){.history-day>ul{grid-template-columns:1fr}.history-card{grid-template-columns:60px minmax(0,1fr) auto;gap:12px}.history-poster{width:60px}.history-filter>button{padding:0 12px}}
+@media (--phone){.history-day>ul{grid-template-columns:1fr}.history-card{grid-template-columns:60px minmax(0,1fr) auto;gap:12px}.history-poster{width:60px}.history-filter>button{padding:0 12px}}

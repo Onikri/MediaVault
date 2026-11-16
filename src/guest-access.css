@@ -27,6 +27,6 @@
 .guest-alt{display:block;width:100%;margin-top:12px;padding:10px;border:0;background:none;color:var(--color-on-muted,#a3a3aa);font:600 12.5px/1.4 var(--font-ui,system-ui);cursor:pointer}
 .guest-alt:hover{color:var(--color-petal,#f3ecea)}
 .guest-spin{animation:guest-spin 1s linear infinite}@keyframes guest-spin{to{transform:rotate(360deg)}}
-@media(max-width:640px){.guest-wall{grid-template-columns:repeat(3,minmax(0,1fr))}.guest-wall-column:nth-child(n+4){display:none}.guest-card{padding:28px 22px 22px;border-radius:26px}}
+@media (--phone){.guest-wall{grid-template-columns:repeat(3,minmax(0,1fr))}.guest-wall-column:nth-child(n+4){display:none}.guest-card{padding:28px 22px 22px;border-radius:26px}}
 @media(prefers-reduced-motion:reduce){.guest-wall-column>img,.guest-wall-column>span{animation:none}}
 html .guest-input input,html .guest-input input:focus,html .guest-input input:focus-visible{outline:0!important;box-shadow:none!important;border:0!important;background:none!important}

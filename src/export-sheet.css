@@ -16,7 +16,7 @@
 .export-sheet-close:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
 .export-sheet-destination{margin:0 0 4px}
 .export-sheet-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 2px 16px;scrollbar-width:thin;scrollbar-color:var(--color-surface-raised) transparent}
-@media(max-width:600px){.export-sheet{right:10px;left:10px;width:auto;top:auto;bottom:calc(var(--dock-h,0px) + 10px);max-height:82dvh;transform-origin:center bottom}}
+@media (--phone){.export-sheet{right:10px;left:10px;width:auto;top:auto;bottom:calc(var(--dock-h,0px) + 10px);max-height:82dvh;transform-origin:center bottom}}
 
 /* Forms inside the window: one column, compact fields, quiet hints. */
 .export-sheet .export-form{display:grid;gap:14px;margin:0;padding:0;background:transparent;box-shadow:none}

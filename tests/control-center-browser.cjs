@@ -58,7 +58,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   assert.match(await page.locator('.cc-table[aria-label="Процессы"]').innerText(),/python3[\s\S]*38\.5%/);
   await page.waitForFunction(()=>document.querySelectorAll('.cc-spark polyline').length===2,null,{timeout:12000});
   await fits('Storage');await page.screenshot({path:path.join(dir,'storage-'+width+'.png'),fullPage:true});
-  assert.equal(await page.locator('.cc-rail .cc-who').isVisible(),width>860,'Identity block only on the wide rail');
+  assert.equal(await page.locator('.cc-rail .cc-who').isVisible(),width>1024,'Identity block only on the wide rail');
   assert.deepEqual(errors,[],'No page errors at '+width);
   await context.close();
  }

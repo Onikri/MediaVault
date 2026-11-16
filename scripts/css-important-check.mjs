@@ -56,6 +56,8 @@ for(const f of files){
 const overlap=(x,y)=>{
  if(x.sub.pseudo!==y.sub.pseudo)return false;
  if(x.sub.tag&&y.sub.tag&&x.sub.tag!==y.sub.tag)return false;
+ // html and body pass values down by inheritance, not by competing in the cascade.
+ if(['html','body'].includes(y.sub.tag)&&x.sub.tag!==y.sub.tag)return false;
  if((x.sub.id&&x.sub.id===y.sub.id)||x.sub.cls.some(c=>y.sub.cls.includes(c)||y.sub.cls.some(d=>cooccur(c,d))))return true;
  if(y.sub.cls.length||y.sub.id){if(x.sub.cls.length||x.sub.id)return false;return false;}
  // y's subject is a bare tag or *: it competes when it is global or shares context.
@@ -64,8 +66,10 @@ const overlap=(x,y)=>{
 const later=(x,y)=>y.rank!==x.rank?y.rank>x.rank:y.f!==x.f?null:(y.line-x.line||y.col-x.col)>0;
 for(const target of targets.map(t=>t.split(path.sep).join('/'))){
  for(const d of decls.filter(x=>x.f===target&&x.important)){
-  const rivals=decls.filter(o=>o!==d&&(o.prop===d.prop||o.fam===d.fam||o.prop===d.fam||d.prop===o.fam)&&overlap(d,o)&&!(o.f===d.f&&o.line===d.line&&o.sel===d.sel));
+  const rivals=decls.filter(o=>o!==d&&(o.prop===d.prop||o.fam===d.fam||o.prop===d.fam||d.prop===o.fam)&&overlap(d,o)&&!(o.f===d.f&&o.line===d.line&&o.col===d.col));
   const blockers=[];
+  // A bare tag or * subject can carry any class; rules on those classes are not visible here.
+  if(!d.sub.cls.length&&!d.sub.id)blockers.push('bare subject: not analysed');
   for(const o of rivals){
    if(o.important){blockers.push('!important '+o.f+':'+o.line+' '+o.sel);continue;}
    const c=cmp(o.spec,d.spec),l=later(d,o);

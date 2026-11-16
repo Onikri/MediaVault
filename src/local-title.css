@@ -15,4 +15,4 @@
 .local-title-card-list strong{display:block;font-size:12px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .local-title-card-list small{display:block;font-size:10px;color:var(--color-on-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .local-title>.btn-primary{justify-self:start;display:inline-flex;gap:8px;align-items:center}
-@media(max-width:600px){.local-title .import-field-grid{grid-template-columns:minmax(0,1fr)}.local-title-kinds>button{font-size:11px;padding:7px 9px}}
+@media (--phone){.local-title .import-field-grid{grid-template-columns:minmax(0,1fr)}.local-title-kinds>button{font-size:11px;padding:7px 9px}}

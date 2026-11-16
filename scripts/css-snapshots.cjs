@@ -77,6 +77,7 @@ const SCENES={
   await SCENES.player.open(page);
   await page.getByRole('button',{name:'Музыка из аниме',exact:true}).click();await page.locator('.player-popover.mvx-menu').waitFor();
  }},
+ control:{harness:'control',async open(page){await page.locator('.cc-air').first().waitFor();}},
  'ranobe-reader':{harness:'ranobe',async open(page){
   await page.getByRole('button',{name:/Начать читать/}).click({timeout:120000});
   await page.locator('.ranobe-prose p').first().waitFor();
@@ -101,6 +102,7 @@ function writeHarnesses(){
  const actions={readArtwork:async()=>new Blob([png],{type:'image/png'}),prepareStream:async()=>'/test-output/css-snapshot-video.mp4',readWhole:async()=>new Blob(),error:()=>{},saveTitleProfile:async()=>profile};
  function Demo(){const[selected,setSelected]=useState(null);return <><header className="app-header"><div className="header-inner"><b>MediaVault</b></div></header><main className="app-main"><TitlePage title={title} state={{catalog,user:{sub:'user-a'},libraryId:'library',admin:false}} actions={actions} onBack={()=>{}} onPlay={setSelected} selected={selected} onRelated={()=>{}} onClosePlayer={()=>setSelected(null)}/></main></>;}
  createRoot(document.getElementById('root')).render(<ThemeProvider><Demo/></ThemeProvider>);`);
+ fs.writeFileSync(path.join(dir,'css-snapshot-control.html'),'<!doctype html><html lang="ru" data-blossom><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/tests/control-center-harness.jsx"></script></html>');
  fs.writeFileSync(path.join(dir,'css-snapshot-ranobe.html'),'<!doctype html><html lang="ru" data-blossom><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/tests/ranobe-harness.jsx"></script></html>');
 }
 
