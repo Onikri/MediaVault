@@ -61,6 +61,7 @@ import {HomeDiscover} from './blossom/HomeDiscover.tsx';
 import {SearchDialog} from './blossom/components/SearchDialog.tsx';
 import {blossomRecord} from './blossom/media-adapter.js';
 import {uiLocale} from './i18n/index.js';
+import {usePlaceSync} from './use-place-sync.js';
 
 const WatchRoomPage=lazy(()=>import('./WatchRoomPage.jsx'));
 // The admin console and the readers load when they open, not with the first page.
@@ -135,6 +136,7 @@ function MediaVaultApp(){
   const importService=useImportService(state,actions);
   useMangaPolicy(importService);
   const retained=useRetainedWorkspace();useEffect(()=>{setHistoryScope(state.user?.sub);retained?.scope(state.user?.sub);},[retained,state.user?.sub]);
+  usePlaceSync(state.user?.sub,importService,retained);
   const [importTab,setImportTab]=useState('catalog');
   const guestSession=useGuestSession(),guest=!state.user?guestSession:null;
   const [guestScreen,setGuestScreen]=useState(()=>readInviteToken()?{mode:'invite',invite:readInviteToken()}:location.hash==='#signin'?{mode:'login'}:null);

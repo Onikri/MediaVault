@@ -1,3 +1,4 @@
+import {notePlace} from './place-sync.js';
 // Per-account, per-library positions. Decrypted video and access credentials are never stored.
 const key=(user,library,id)=>'mediavault_progress_v2:'+encodeURIComponent(user||'anonymous')+':'+encodeURIComponent(library||'local')+':'+encodeURIComponent(id);
 export function readProgress(user,library,id,storage){
@@ -11,6 +12,7 @@ export function writeProgress(user,library,item,time,duration,storage){
     const value={itemId:item.id,time:Math.max(0,Math.floor(time)),duration:Number.isFinite(duration)?duration:null,updatedAt:Date.now(),done,episode:item.episode,season:item.season,voiceId:item.voiceId,dub:item.dub};
     if(time<1||done)storage.removeItem(key(user,library,item.id));else storage.setItem(key(user,library,item.id),JSON.stringify(value));
     if(item.collectionId){const group=key(user,library,'collection:'+item.collectionId);if(done||time<1){if(readProgress(user,library,'collection:'+item.collectionId,storage)?.itemId===item.id)storage.removeItem(group);}else storage.setItem(group,JSON.stringify(value));}
+    if(library==='online'){notePlace(user,key(user,library,item.id),storage);if(item.collectionId)notePlace(user,key(user,library,'collection:'+item.collectionId),storage);}
   }catch{}
 }
 

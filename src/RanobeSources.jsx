@@ -11,6 +11,7 @@ import {searchRanobe,inspectRanobe,ranobeProgress,providerLanguage,readerInAddre
 import {useContentLanguage,CONTENT_LANGUAGES} from './content-language.js';
 import {OnlineBooks} from './OnlineLibrary.jsx';
 import './ranobe.css';
+import {usePlaceRevision} from './use-place-sync.js';
 const RanobeReader=lazy(()=>import('./RanobeReader.jsx'));
 // A reader minimized to the tray outlives its title page. «Вернуться к чтению»
 // reopens it through the page that is mounted now, or navigates back to the
@@ -75,7 +76,13 @@ export default function RanobeSources({item,service,state,expected=0}){
   catch(e){if(!abort.signal.aborted)setError(e.message||'Не удалось получить список глав.');}
   finally{if(inspection.current===abort){inspection.current=null;if(!abort.signal.aborted)setBusy(false);}}
  }
+ // Another device of this profile may have read on: its place arrives here.
+ const placeRevision=usePlaceRevision('r:');
  const progress=opened?ranobeProgress(userId,opened.url):null;
+ useEffect(()=>{
+  if(!placeRevision||open||busy||(opened&&ranobeProgress(userId,opened.url)))return;
+  const saved=search.results.find(r=>ranobeProgress(userId,r.url));if(saved&&saved.url!==source?.url)choose(saved);
+ },[placeRevision]);
  useEffect(()=>{if(!opened)return;publishTitleStats({kind:isBook?'book':'ranobe',chapters:opened.episodes.length,volumes:new Set(opened.episodes.map(e=>e.season).filter(Boolean)).size||null,source:opened.url,sourceName:opened.providerName,language:opened.language,book:{...opened,provider:source?.provider||opened.provider}});},[opened?.url,opened?.episodes?.length]);
  useEffect(()=>()=>publishTitleStats(null),[]);
  const resume=useMemo(()=>progress&&opened?opened.episodes.findIndex(c=>c.url===progress.chapter):-1,[opened,progress?.chapter]);

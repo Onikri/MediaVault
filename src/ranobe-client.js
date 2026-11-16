@@ -1,6 +1,7 @@
 // Light-novel sources served by the MediaVault server (/ranobe/*).
 // Chapter text stays in memory only; progress stores a chapter URL and a
 // paragraph index per profile and book, never chapter text.
+import {notePlace} from './place-sync.js';
 const chapters=new Map();
 const LIMIT=24;
 
@@ -26,7 +27,7 @@ export function ranobeProgress(user,book,storage=globalThis.localStorage){
  try{const value=JSON.parse(storage.getItem(key(user,book))||'null');return value&&typeof value.chapter==='string'?value:null;}catch{return null;}
 }
 export function saveRanobeProgress(user,book,value,storage=globalThis.localStorage){
- try{storage.setItem(key(user,book),JSON.stringify({chapter:String(value.chapter),paragraph:Math.max(0,Number(value.paragraph)||0),title:String(value.title||'').slice(0,200),updatedAt:Date.now()}));}catch{}
+ try{storage.setItem(key(user,book),JSON.stringify({chapter:String(value.chapter),paragraph:Math.max(0,Number(value.paragraph)||0),title:String(value.title||'').slice(0,200),updatedAt:Date.now()}));notePlace(user,key(user,book),storage);}catch{}
 }
 export const providerLanguage=code=>({uk:'Українська',ru:'Русский',en:'English',ja:'日本語',ko:'한국어',und:'Язык уточняется'})[code]||code?.toUpperCase()||'';
 

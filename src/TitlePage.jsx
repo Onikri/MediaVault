@@ -5,6 +5,7 @@ import {createImportClient,validateServer} from './import-service.js';
 import {lazy,Suspense,useEffect,useRef,useState,useMemo,useSyncExternalStore} from 'react';
 import {useRetainedWorkspace} from './RetainedMedia.jsx';
 import {titleResume} from './title-resume.js';
+import {requestPlaceSync} from './place-sync.js';
 import {useReducedMotion} from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {ArrowLeft,Play,Star,ChevronRight,RefreshCw,Cloud,CloudUpload,Users,X,ExternalLink,Film,BookOpen,Bookmark,Download,FolderOpen} from 'lucide-react';
@@ -190,6 +191,8 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   const ownRating=online?localRating:p.userRatings?.[state.user?.sub]||0;
   const sharePayload=useTitleShare(),published=useTitleStats();
   useEffect(()=>{if(title.items?.length)loadViewer().catch(()=>{});},[title.id]);
+  // The place may have moved on another device of this profile.
+  useEffect(()=>{if(online)requestPlaceSync();},[title.id,online]);
   // An online title resumes where the viewer stopped: the hero button names the place.
   const workspace=useRetainedWorkspace(),viewing=useSyncExternalStore(workspace?workspace.subscribe:noSubscribe,()=>workspace?workspace.getSnapshot().history:NO_HISTORY,()=>NO_HISTORY);
   const onlineResume=online?titleResume(viewing,new URLSearchParams(location.hash.slice(1)).get('watch')):null;

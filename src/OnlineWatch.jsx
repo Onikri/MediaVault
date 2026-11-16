@@ -28,6 +28,7 @@ import {useVideoChapters,collapsEmbeds} from './video-chapters.js';
 const signedOutForChapters=service=>['disconnected','unconfigured'].includes(service.status)&&!service.session;
 import {bestQualityRow,qualityHeights} from './watch-quality.js';
 import {voiceSwitchState} from './voice-switch.js';
+import {usePlaceRevision} from './use-place-sync.js';
 
 const noEntries=Object.freeze([]);
 export default function OnlineWatch({item:basisItem,profile:basisProfile=basisItem,discovery:basisDiscovery,service,userId,onSeasonBrowse}){
@@ -70,6 +71,15 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const browseVoice=titleVoices.find(v=>v.id===voice?.id);
  const allohaRevision=(voice?.variants||[]).filter(isAllohaVariant).map(v=>v.id+':'+v.url).join('|');
  function persist(change){saved.current=saveWatch(userId,identity,change);}
+ // The episode chosen on another device of this profile, while nothing plays here.
+ const placeRevision=usePlaceRevision(userId?'w:'+encodeURIComponent(identity):'');
+ useEffect(()=>{
+  if(!placeRevision||playing)return;
+  const next=readWatch(userId,identity);saved.current=next;
+  if(next.voiceId)setVoiceId(next.voiceId);
+  if(Number(next.episode)>0)setEpisode(Number(next.episode));
+  if(Number(next.season)>0&&!catalogueSeasonHint(item)){setSeason(Number(next.season));setBrowseSeason(Number(next.season));}
+ },[placeRevision]);
  useEffect(()=>{if(voice&&voice.id!==voiceId)setVoiceId(voice.id);},[voice?.id,voiceId]);
  async function inspect(candidate,signal,selectedSeason=season){
   selectedSeason=catalogueSeasonHint(item)||selectedSeason;

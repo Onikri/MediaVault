@@ -1,3 +1,4 @@
+import {noteHistory} from './place-sync.js';
 // Only the live media tree and its capability stay in RAM. History contains no
 // signed media URLs, cookies, decrypted images, keys or serialized React props.
 export function createRetainedMediaStore(){
@@ -5,7 +6,7 @@ export function createRetainedMediaStore(){
  function readHistory(){try{const value=JSON.parse(localStorage.getItem('mv_viewing_history_v1:'+scope)||'[]');history=Array.isArray(value)?value.filter(v=>v&&typeof v.id==='string'&&typeof v.label==='string'&&typeof v.route==='string'&&v.route.startsWith('#')).slice(0,40):[];}catch{history=[];}}
  function emit(){snapshot={rows:[...rows.values()],active,popup,history};for(const fn of listeners)fn();}
  function pause(row){row?.host?.querySelector('video.mv-player-media')?.pause();row?.host?.querySelector('[role=dialog]')?.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}
- function remember(row){const item={id:row.id,label:row.label,kind:row.kind,route:row.route,at:Date.now(),...(row.resumeItemId?{resumeItemId:row.resumeItemId}:{})};history=[item,...history.filter(v=>v.id!==row.id)].slice(0,40);try{localStorage.setItem('mv_viewing_history_v1:'+scope,JSON.stringify(history));}catch{}}
+ function remember(row){const item={id:row.id,label:row.label,kind:row.kind,route:row.route,at:Date.now(),...(row.resumeItemId?{resumeItemId:row.resumeItemId}:{})};history=[item,...history.filter(v=>v.id!==row.id)].slice(0,40);try{localStorage.setItem('mv_viewing_history_v1:'+scope,JSON.stringify(history));}catch{}noteHistory(scope,item.id);}
  const store={rows,getSnapshot:()=>snapshot,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},
   scope(value){value=value||'guest';if(value===scope)return;for(const [id,row] of rows){if((row.userId||'guest')!==value){pause(row);rows.delete(id);if(active===id)active='';if(popup===id)popup='';}}scope=value;readHistory();emit();},
   attach(id,descriptor,anchor,node){let row=rows.get(id);if(row){Object.assign(row,descriptor,{anchor,node});}else{row={...descriptor,id,anchor,node,playing:false,time:0};rows.set(id,row);}emit();},
@@ -17,8 +18,10 @@ export function createRetainedMediaStore(){
   popup(id){if(active!==id)return;popup=popup===id?'':id;if(!popup&&!rows.get(id)?.anchor)pause(rows.get(id));emit();},
   return(id){const row=rows.get(id);if(!row)return;popup='';row.wantReturn=true;row.restore?.();if(!row.restore&&row.route){if(location.hash!==row.route)location.hash=row.route;else dispatchEvent(new HashChangeEvent('hashchange'));}emit();},
   close(id){const row=rows.get(id);if(!row)return;pause(row);active=active===id?'':active;popup=popup===id?'':popup;if(row.anchor&&row.stop)row.stop();else rows.delete(id);emit();},
-  forget(id){history=history.filter(v=>v.id!==id);try{localStorage.setItem('mv_viewing_history_v1:'+scope,JSON.stringify(history));}catch{}emit();},
-  forgetAll(){history=[];try{localStorage.removeItem('mv_viewing_history_v1:'+scope);}catch{}emit();},
+  forget(id){history=history.filter(v=>v.id!==id);try{localStorage.setItem('mv_viewing_history_v1:'+scope,JSON.stringify(history));}catch{}noteHistory(scope,id);emit();},
+  forgetAll(){for(const row of history)noteHistory(scope,row.id);history=[];try{localStorage.removeItem('mv_viewing_history_v1:'+scope);}catch{}emit();},
+  // Another device of this profile changed the history.
+  reload(user){if((user||'guest')!==scope)return;readHistory();emit();},
   clear(){for(const row of rows.values())pause(row);rows.clear();active='';popup='';emit();},
   revisit(item){if(rows.has(item.id)&&active===item.id){store.return(item.id);return;}if(item.resumeItemId)dispatchEvent(new CustomEvent('mediavault:resume-item',{detail:{id:item.resumeItemId}}));else{if(location.hash!==item.route)location.hash=item.route;else dispatchEvent(new HashChangeEvent('hashchange'));}},
  };
