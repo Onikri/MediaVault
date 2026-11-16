@@ -131,7 +131,7 @@ class HentaiVideoSitesTests(unittest.TestCase):
 
     def test_only_the_hentaimama_player_form_may_be_posted(self):
         from source_parser import PublicHttp
-        http = PublicHttp()
+        http = PublicHttp(validate=lambda url: url)  # no DNS: the form check alone must refuse
         try:
             for data in [{'action': 'get_player_contents', 'a': '1; drop', 'i': '1'}, {'action': 'other', 'a': '1', 'i': '1'},
                          {'action': 'get_player_contents', 'a': '1', 'i': '1', 'extra': 'x'}]:
