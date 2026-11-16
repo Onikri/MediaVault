@@ -36,10 +36,13 @@ export default function RoleText({text,segments,colors,speaking,show=true}){
   if(at<0)return;
   const speech=segment.kind!=='narration',named=speech&&segment.speaker,color=named?colors?.[segment.speaker]:null;
   const mood=emotionLabel(segment),label=named&&(segment.speaker!==last||mood);
-  const chip=label&&<b key={'n'+i} className="role-name" style={color?{'--role':color}:undefined} aria-label={(uiLanguage()==='uk'?'Говорить ':'Говорит ')+segment.speaker+(mood?', '+mood:'')}>{segment.speaker}{mood&&<i>{mood}</i>}</b>;
   const before=at>cursor?text.slice(cursor,at):'';
+  // lead: the paragraph opens with this line; with room in the margin the
+  // reader hangs the name there, so the line itself starts like any paragraph.
+  const lead=label&&cursor===0&&/^\s*[—–―-]?\s*[«"„“]?\s*$/.test(before);
+  const chip=label&&<b key={'n'+i} className={'role-name'+(lead?' is-lead':'')} style={color?{'--role':color}:undefined} aria-label={(uiLanguage()==='uk'?'Говорить ':'Говорит ')+segment.speaker+(mood?', '+mood:'')}>{segment.speaker}{mood&&<i>{mood}</i>}</b>;
   // "— Line": the name goes before the dialogue dash, like a script.
-  const dash=chip&&/^\s*[—–―-]\s*$/.test(before);
+  const dash=chip&&(lead||/^\s*[—–―-]\s*$/.test(before));
   if(dash)out.push(chip);
   if(before)out.push(before);
   out.push(<span key={i} data-segment={segment.id} className={'role-segment'+(speech?' role-speech':'')+(segment.kind==='thought'?' role-thought':'')+(segment.id===speaking?' is-speaking':'')} style={color?{'--role':color}:undefined}>

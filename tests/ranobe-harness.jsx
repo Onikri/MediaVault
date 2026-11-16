@@ -35,9 +35,9 @@ const service={status:'connected',session:{serverVersion:gemini?59:58},request:a
     {name:'Кайто',aliases:[],gender:'m',age:'young',importance:'main',traits:'рассеянный добряк',speech:'мягко, виновато',timbre:'warm',pitch:0,energy:-1,pace:.97,voice:'мягкий тихий юношеский голос',geminiVoice:'Achird'}],
    lexicon:[{word:'Мирэй',stressed:'Мирэ́й'}]});
   if(system.includes('помощник режиссёра')){
-   const lines=user.split('Сегменты:\n')[1].split('\n').map(l=>/^(\d+) ([NSTQ]) (.*)$/.exec(l)).filter(Boolean);
+   const lines=user.split('Сегменты:\n')[1].split('\n').map(l=>/^(\d+) ([NSTQ?]) (.*)$/.exec(l)).filter(Boolean);// atoms of a cut paragraph come as «?»
    const known=/^1 Мирэй/m.test(user);
-   return answer({lines:lines.filter(([,,k])=>k!=='N').map(([,i])=>i==='1'?'1|S|'+(known?'1':'Мирэй')+'|angry|7':i==='3'?'3|S|'+(known?'2':'Кайто')+'|pleading|6':i+'|S|?|neutral|4'),
+   return answer({lines:lines.filter(([,,k])=>k!=='N').map(([,i,,text])=>/сказал|ответил|спросил/.test(text)?i+'|N':i==='1'?'1|S|'+(known?'1':'Мирэй')+'|angry|7':i==='3'?'3|S|'+(known?'2':'Кайто')+'|pleading|6':i+'|S|?|neutral|4'),
     moods:['0-99|calm|4'],cast:known?[]:['Мирэй|f|young|звонкий голос','Кайто|m|young|мягкий голос']});
   }
   if(system.includes('ведёшь список персонажей'))return answer({same:[],characters:[]});

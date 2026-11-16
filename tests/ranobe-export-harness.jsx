@@ -29,8 +29,8 @@ const service={status:'connected',session:{serverVersion:Number(query.get('versi
     characters:[{name:'Мирэй',aliases:[],gender:'f',age:'young',importance:'main',traits:'вспыльчивая',speech:'резко',timbre:'bright',pitch:1,energy:1,pace:1.05,voice:'звонкий девичий голос',geminiVoice:'Zephyr'},
      {name:'Кайто',aliases:[],gender:'m',age:'young',importance:'main',traits:'добряк',speech:'мягко',timbre:'warm',pitch:0,energy:-1,pace:.97,voice:'мягкий юношеский голос',geminiVoice:'Achird'}],lexicon:[]});
    if(system.includes('помощник режиссёра')){
-    const lines=user.split('Сегменты:\n')[1].split('\n').map(l=>/^(\d+) ([NSTQ]) (.*)$/.exec(l)).filter(Boolean),known=/^1 Мирэй/m.test(user);
-    return answer({lines:lines.filter(([,,k])=>k!=='N').map(([,i,,text])=>i+'|S|'+(/Мирэй|опоздал/.test(text)?(known?'1':'Мирэй'):(known?'2':'Кайто'))+'|neutral|5'),moods:[],cast:known?[]:['Мирэй|f|young|звонкий','Кайто|m|young|мягкий']});
+    const lines=user.split('Сегменты:\n')[1].split('\n').map(l=>/^(\d+) ([NSTQ?]) (.*)$/.exec(l)).filter(Boolean),known=/^1 Мирэй/m.test(user);// atoms of a cut paragraph come as «?»
+    return answer({lines:lines.filter(([,,k])=>k!=='N').map(([,i,,text])=>/сказал|ответил|спросил/.test(text)?i+'|N':i+'|S|'+(/Мирэй|опоздал/.test(text)?(known?'1':'Мирэй'):(known?'2':'Кайто'))+'|neutral|5'),moods:[],cast:known?[]:['Мирэй|f|young|звонкий','Кайто|m|young|мягкий']});
    }
    if(system.includes('ведёшь список персонажей'))return answer({same:[],characters:[]});
    throw Error('mock: unexpected model request');

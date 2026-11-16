@@ -22,6 +22,14 @@ export default function RanobeReader({book,item,start,service,userId,onClose,onM
  const entry=book.episodes[index];
  const mode=useRetainedMedia(true,{label:book.title+(entry?', глава '+entry.number:''),kind:'reader'},onStop||onClose),report=useRetainedReport();
  useEffect(()=>{report({playing:voicePlaying,toggle:()=>voice.current?.toggle()});},[voicePlaying,report]);
+ // Room in the left margin for the speakers' names (see ranobe.css).
+ const [margin,setMargin]=useState(false);
+ useEffect(()=>{
+  const surface=body.current;if(!surface||!chapter)return;
+  const measure=()=>{const line=surface.querySelector('.ranobe-prose p');if(line)setMargin(line.getBoundingClientRect().left-surface.getBoundingClientRect().left>=130);};
+  const observer=new ResizeObserver(measure);observer.observe(surface);measure();
+  return()=>observer.disconnect();
+ },[chapter,prefs.width,prefs.size]);
  function update(change){setPrefs(old=>{const next={...old,...change};saveBookPreferences(userId,next);return next;});}
 
  useEffect(()=>{
@@ -85,7 +93,7 @@ export default function RanobeReader({book,item,start,service,userId,onClose,onM
   className={'book-reader ranobe-reader text-reader'+(mode==='popup'?' is-mini':'')} paged={false} settings={options} settingsOpen={settings} onSettingsOpenChange={setSettings} contents={contents}
   progress={{current:index+1,total:book.episodes.length,label:'Глава '+(index+1)+' / '+book.episodes.length}}
   onPrevious={()=>go(index-1)} onNext={()=>go(index+1)} canPrevious={index>0} canNext={index<book.episodes.length-1}>
-  <div ref={body} className="book-reading-surface book-flow-scroll ranobe-surface" style={surface} onWheel={()=>{scrollPause.current=Date.now()+4000;}} onTouchMove={()=>{scrollPause.current=Date.now()+4000;}}>
+  <div ref={body} className={'book-reading-surface book-flow-scroll ranobe-surface'+(margin?' has-role-margin':'')} style={surface} onWheel={()=>{scrollPause.current=Date.now()+4000;}} onTouchMove={()=>{scrollPause.current=Date.now()+4000;}}>
    {loading&&<div className="reader-book-loading" role="status">Открываем главу…</div>}
    {error&&<div className="reader-book-error" role="alert">{error} <button type="button" className="text-link" onClick={()=>{setIndex(i=>i);setChapter(null);readRanobeChapter(service,entry.url,item).then(setChapter).catch(e=>setError(e.message));}}>Повторить</button></div>}
    {chapter&&<article className={'reader-prose ranobe-prose'+(voicePlaying?' is-listening':'')} translate="no" lang={chapter.language||book.language}>

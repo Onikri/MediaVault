@@ -18,3 +18,9 @@
 .ranobe-surface{overflow-y:auto;height:100%}
 .ranobe-prose h2{font:700 calc(var(--book-size) * 1.3)/1.25 var(--book-font);margin:1.2em 0 1em}
 .ranobe-prose p{padding:2px 6px;margin:0 -6px .9em}
+
+/* Wide reader: the speaker's name hangs in the left margin, so a dialogue
+   paragraph starts where every other paragraph does, as in a printed book. */
+.ranobe-surface.has-role-margin .ranobe-prose p{position:relative}
+.ranobe-surface.has-role-margin .role-name.is-lead{position:absolute;right:calc(100% + .7rem);top:calc(2px + (var(--book-leading) * var(--book-size) - .72 * 1.3 * var(--book-size)) / 2);margin:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;max-width:9rem;text-indent:0;text-align:right;white-space:nowrap}
+.ranobe-surface.has-role-margin .role-name.is-lead i{margin:0;font-size:.9em}

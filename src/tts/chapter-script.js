@@ -11,14 +11,19 @@ import {castVoices,savedCast} from './voices.js';
 import {savedBible,applyLexicon} from './bible.js';
 import {ROLE_MODELS,BIBLE_MODELS} from './google.js';
 import {geminiCast,geminiNarrator,geminiRows,savedGeminiCast} from './gemini-voice.js';
+import {clampSpeed,SPEEDS} from './stretch.js';
 
 export const PREFS='mediavault_tts_prefs_v2';
-export const DEFAULTS={engine:'gemini',geminiNarrator:'auto',pace:1,narrator:'auto',roles:true,rolesModel:ROLE_MODEL,bibleModel:'gemini-3.5-flash-lite'};
+export const DEFAULTS={engine:'gemini',geminiNarrator:'auto',pace:1,speed:1,narrator:'auto',roles:true,rolesModel:ROLE_MODEL,bibleModel:'gemini-3.5-flash-lite'};
 // Only models offered in the panel are kept (non-Lite Flash is never used).
 export function cleanPrefs(value){
  const prefs={...DEFAULTS,...(value&&typeof value==='object'?value:{})};
  if(!BIBLE_MODELS.some(([id])=>id===prefs.bibleModel))prefs.bibleModel=DEFAULTS.bibleModel;
  if(!ROLE_MODELS.some(([id])=>id===prefs.rolesModel))prefs.rolesModel=DEFAULTS.rolesModel;
+ // The old «pace» asked the voice to hurry; it is the listening speed now.
+ if(!(value&&'speed' in value)&&Number(prefs.pace)!==1)prefs.speed=Number(prefs.pace)||1;
+ // Snapped to the speeds the panel offers.
+ prefs.speed=SPEEDS.reduce((best,v)=>Math.abs(v-clampSpeed(prefs.speed))<Math.abs(best-clampSpeed(prefs.speed))?v:best,1);
  return prefs;
 }
 export function readPrefs(){try{return cleanPrefs(JSON.parse(localStorage.getItem(PREFS)||'{}'));}catch{return {...DEFAULTS};}}
@@ -51,6 +56,8 @@ export async function chapterScript({paragraphs,bookKey,chapterKey,meta,service,
  const cast=castVoices(segments,characters,{narrator:prefs.narrator,saved:own.cast||{},bible});
  const narrator=geminiNarrator(bible,prefs.geminiNarrator),saved=own.saved||{};
  const voices=geminiCast(cast,{narrator,saved,self:bible?.narratorName});
- const rows=geminiRows(spoken,{cast,voices,narrator,bible,pace:prefs.pace,saved});
+ // The listening speed is applied by the player (stretch.js); a saved chapter
+ // keeps the reference voice at its own tempo.
+ const rows=geminiRows(spoken,{cast,voices,narrator,bible,saved});
  return {rows,bible,analysis,stats};
 }

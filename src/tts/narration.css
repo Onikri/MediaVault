@@ -20,7 +20,6 @@
 .narration-cast label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
 .narration-switch{justify-content:flex-start!important}
 .ranobe-prose p.is-speaking{background:color-mix(in srgb,var(--color-blossom,#ee3c35) 14%,transparent);border-radius:8px;transition:background .25s}
-@media (max-width:520px){.narration-pace{display:none}}
 .narration .fine{color:#c9c3ba}.narration select option{color:#111}
 
 /* What is being read now: speaker (in their role colour), emotion, phrase. */
