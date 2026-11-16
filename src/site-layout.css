@@ -67,3 +67,4 @@ html[data-blossom] .empty-state{border:0;background:var(--color-surface);border-
 html[data-blossom] .profile-actions .btn-secondary,html[data-blossom] .import-library-dialog .btn-secondary{border:0;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
 /* Section rhythm: the same vertical gap between blocks everywhere. */
 html[data-blossom] .app-main>.page-title-row+*{margin-top:0}
+.crash-boundary.crash-page{max-width:640px;margin:20vh auto 0;padding:16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}

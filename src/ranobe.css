@@ -33,3 +33,6 @@
 .ranobe-desk .reader-embedded{position:relative!important;inset:auto!important;z-index:1!important;height:var(--desk-height)!important;min-height:0!important;border-radius:0}
 .ranobe-desk .reader-embedded:fullscreen{height:100dvh!important}
 .ranobe-desk .retained-media-host .reader-embedded{height:var(--desk-height)!important;border-radius:0}
+/* A reader that failed to open (CrashBoundary): its message in place of the reader. */
+.crash-boundary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:14px;padding:12px 14px}
+.crash-boundary p{flex:1 1 220px;margin:0}

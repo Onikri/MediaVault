@@ -2,6 +2,7 @@ import {lazy,Suspense,useEffect,useMemo,useRef,useState} from 'react';
 import {RetainedMediaSlot,useRetainedWorkspace} from './RetainedMedia.jsx';
 import {BookOpen,RefreshCw} from 'lucide-react';
 import PlaybackReveal from './PlaybackReveal.jsx';
+import CrashBoundary from './CrashBoundary.jsx';
 import {SourceList} from './ReaderFilters.jsx';
 import MangaDeskPanel,{languageCode,useDeskStyle} from './MangaDeskPanel.jsx';
 import {rankSources,useSourceFavorites} from './source-ranking.js';
@@ -109,7 +110,7 @@ export default function RanobeSources({item,service,state,expected=0}){
   <div className="manga-desk-reader">
    {error&&<div className="inline-error" role="alert"><p>{error}</p></div>}
    <PlaybackReveal active={reading}>{reading?<RetainedMediaSlot id={retainedId} kind="reader" userId={userId} label={(opened||held.data.book).title} data={{book:opened||held.data.book,start:open}} restore={restore}>
-    <Suspense fallback={<div className="reader-idle-loading" role="status">Открываем читалку…</div>}><RanobeReader embed book={opened||held.data.book} item={item} start={open} service={service} userId={userId} onClose={close} onMinimize={workspace?minimize:undefined} onStop={()=>setOpenState(null)}/></Suspense>
+    <CrashBoundary label="Читалка"><Suspense fallback={<div className="reader-idle-loading" role="status">Открываем читалку…</div>}><RanobeReader embed book={opened||held.data.book} item={item} start={open} service={service} userId={userId} onClose={close} onMinimize={workspace?minimize:undefined} onStop={()=>setOpenState(null)}/></Suspense></CrashBoundary>
    </RetainedMediaSlot>
    :<div className="watch-idle mv-player mvx mvx-idle reader-idle" style={item.cover?{'--watch-poster':`url("${String(item.cover).replace(/["\\]/g,'')}")`}:undefined}>
     <div className="mvx-idle-poster" aria-hidden="true"/>
