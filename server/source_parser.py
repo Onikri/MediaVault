@@ -974,13 +974,16 @@ class PublicHttp:
         # whether a browser challenge goes to the solver; undeclared traffic
         # keeps the legacy per-action routing below.
         route_source, route_operation = transport.resolve(self, url, headers, expect)
-        solved = None
+        solved = solved_key = None
         started = time.time()
         for hop in range(6):
             pace(url,getattr(self,'bulk',False))
             if self.deadline and time.monotonic() >= self.deadline:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
             decision = transport.decide(route_source, route_operation, url) if route_source else None
+            if solved is not None and (decision is None or transport.session_key(decision) != solved_key):
+                # A redirect to another host or exit never carries these cookies.
+                solved = None
             solver_session = None
             options = {}
             send = outgoing
@@ -1011,7 +1014,7 @@ class PublicHttp:
                         if solver_session.cookies_work is False:
                             # This site already refused the solved cookies: a new
                             # solver run would not help a non-page request either.
-                            solved = solver_session
+                            solved, solved_key = solver_session, transport.session_key(decision)
                         send, jar = dict(outgoing), {}
                         transport.apply(solver_session, send, jar)
                         if jar:
@@ -1047,6 +1050,7 @@ class PublicHttp:
                     if solved is None:
                         solve_url = url if method == 'GET' else f'https://{decision.host}/'
                         solved = transport.solve(decision, solve_url, self.deadline, started)
+                        solved_key = transport.session_key(decision)
                         continue
                     solved.cookies_work = False
                     if decision.page_allowed(method, send.get('Accept'), expect):

@@ -416,6 +416,21 @@ class SolverTests(TransportCase):
             with self.assertRaises(SourceChallengeError):
                 self.http(site, MANGANATO, 'chapters').document('https://www.natomanga.com/manga/a')
 
+    def test_solved_cookies_never_follow_a_redirect_to_another_host(self):
+        def answer(method, url, headers, options):
+            if url.startswith('https://www.natomanga.com/'):
+                if cleared(headers, options):
+                    return response(302, b'', {'Location': 'https://cdn.example.net/next'})
+                return response(403, CHALLENGE_PAGE, {'Server': 'cloudflare', 'Content-Type': 'text/html'})
+            return response(200, b'<html>next</html>')
+        site = FakeSite(answer)
+        with patch.object(transport.requests, 'post', side_effect=byparr()):
+            self.http(site, MANGANATO, 'chapters').document('https://www.natomanga.com/manga/solo')
+        last = site.calls[-1]
+        self.assertEqual(last['url'], 'https://cdn.example.net/next')
+        self.assertNotEqual(last['headers'].get('User-Agent'), UA)
+        self.assertNotIn('cookies', last['options'])
+
     def test_post_challenge_is_solved_on_the_site_root(self):
         def answer(method, url, headers, options):
             if cleared(headers, options):
