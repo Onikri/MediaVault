@@ -32,7 +32,8 @@ def candidates():
 def probe_archive():
     payload = BytesIO()
     server = ROOT / 'server'
-    paths = [Path(__file__), *sorted(server.glob('*.py')), server / 'manga_native_activation.json']
+    paths = [Path(__file__), *sorted(server.glob('*.py')), server / 'manga_native_activation.json',
+             server / 'manga_source_transport.json']
     with ZipFile(payload, 'w', ZIP_DEFLATED) as archive:
         for path in paths:
             archive.write(path, path.relative_to(ROOT).as_posix())
@@ -43,7 +44,13 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
     from source_parser import PublicHttp, SourceAccessError, SourceError, SourceRateLimitError, SourceTemporaryError
 
     phase = 'catalogue'
-    http = PublicHttp(timeout=(3, 6), deadline=time.monotonic() + 12)
+    # Requests run in the source's transport scope, so its declared routes
+    # (Japan exit, browser-challenge solver) apply exactly as in the reader.
+    from source_transport import solver_budget
+
+    extra = solver_budget(adapter.SOURCE_ID, 0)  # a browser-challenge solve, when declared
+    http = PublicHttp(timeout=(3, 6), deadline=time.monotonic() + 12 + extra, source=adapter.SOURCE_ID,
+                      operation='catalogue')
     result = {}
     try:
         rows, more = adapter.catalogue(http)
@@ -59,12 +66,14 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
         sample = next((row for row in rows if 2 <= len(row['title']) <= 100), rows[0])
         if check_search:
             phase = 'search'
-            http.deadline = time.monotonic() + 12
+            http.operation = 'search'
+            http.deadline = time.monotonic() + 12 + extra
             found, _ = adapter.catalogue(http, query=sample['title'])
             result['search'] = any(row.get('id') == sample['id'] for row in found)
         if check_chapters:
             phase = 'chapters'
-            http.deadline = time.monotonic() + 12
+            http.operation = 'chapters'
+            http.deadline = time.monotonic() + 12 + extra
             detail = adapter.inspect(sample['url'], http)
             episodes = detail.get('episodes', [])
             result['chapter_count'] = len(episodes)
@@ -80,8 +89,10 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
             result['chapters'] = True
             if check_pages:
                 phase = 'pages'
-                http.deadline = time.monotonic() + 20
+                http.operation = 'pages'
+                http.deadline = time.monotonic() + 20 + extra
                 chapter = adapter.inspect(episodes[0]['url'], http)
+                http.operation = 'images'
                 pages = chapter.get('pages') or []
                 result['page_count'] = len(pages)
                 if not pages:

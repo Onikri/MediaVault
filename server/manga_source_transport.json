@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "sources": {
+    "7324763859222949244": {
+      "name": "Line Manga",
+      "routes": [
+        {"hosts": ["manga.line.me"], "operations": ["*"], "exit": "japan"}
+      ]
+    },
+    "3115293328774708452": {
+      "name": "Sokuyomi",
+      "routes": [
+        {"hosts": ["cdn.sokuyomi.jp"], "operations": ["*"], "exit": "direct", "format": "image"},
+        {"hosts": ["sokuyomi.jp"], "operations": ["*"], "exit": "japan"}
+      ]
+    },
+    "1024627298672457456": {
+      "name": "Manganato",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["natomanga.com", "nelomanga.net", "manganato.gg"], "operations": ["*"],
+         "exit": "direct", "solver": true, "format": "html"}
+      ]
+    },
+    "4005973248538140146": {
+      "name": "ManhuaUS",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["manhuaus.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+      ]
+    }
+  }
+}

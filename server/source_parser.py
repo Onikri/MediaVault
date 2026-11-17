@@ -40,22 +40,71 @@ if _soupsieve is not None and hasattr(_soupsieve, 'NOSTRICT') and not getattr(_s
 
 
 class SourceError(RuntimeError):
-    pass
+    # Machine-readable status of a source failure (see source_status()).
+    status = 'error'
 
 
 class SourceAccessError(SourceError):
-    pass
+    status = 'access_denied'
 
 
 class SourceTemporaryError(SourceError):
     """A network failure or temporary upstream response."""
+    status = 'temporary'
 
 
 class SourceRedirectError(SourceError):
     """An upstream redirect that the requested route does not allow."""
+    status = 'redirect'
+
+
+class SourceChallengeError(SourceAccessError):
+    """A browser challenge (Cloudflare, DDoS-Guard) the transport could not pass."""
+    status = 'challenge'
+
+    def __init__(self, message='Источник требует проверку браузера.', *, solver='none'):
+        super().__init__(message)
+        # none | unavailable | failed | busy | budget | cooldown | rejected
+        self.solver = solver
+
+
+class SourceRegionError(SourceAccessError):
+    """The source refuses the exit's country (HTTP 451, Cloudflare 1009, geo pages)."""
+    status = 'region_blocked'
+
+
+class SourcePaidError(SourceAccessError):
+    """A paid or subscription-only chapter. Never bypassed."""
+    status = 'paid_chapter'
+
+
+class SourceAuthError(SourceAccessError):
+    """The request needs a signed-in account. Never bypassed."""
+    status = 'auth_required'
+
+
+class SourceParserError(SourceError):
+    """The upstream answered, but not in the format the adapter understands."""
+    status = 'parser_error'
+
+
+class SourceRouteError(SourceTemporaryError):
+    """The declared exit (the Japan tunnel) is down: an explicit temporary failure."""
+    status = 'route_unavailable'
+
+
+def source_status(error):
+    """Status of any adapter failure, including older adapters' plain SourceErrors."""
+    if not isinstance(error, SourceError):
+        return 'parser_error' if isinstance(error, (ValueError, KeyError, TypeError, AttributeError)) else 'error'
+    if type(error) is SourceError and re.search(r'изменил[аи]? формат|неожиданн\w* формат', str(error), re.I):
+        return 'parser_error'
+    return error.status
 
 
 class SourceRateLimitError(SourceError):
+    status = 'rate_limited'
+
     def __init__(self, retry_after):
         super().__init__("Источник вернул HTTP 429.")
         try:
@@ -247,7 +296,7 @@ def decode_document(raw, declared=None):
 
 
 class PublicHttp:
-    def __init__(self, *, session=None, validate=public_url, timeout=(6, 20), deadline=None):
+    def __init__(self, *, session=None, validate=public_url, timeout=(6, 20), deadline=None, source=None, operation=None):
         self.session = session or requests.Session()
         if session is None:
             self.session.mount('https://',_SOURCE_POOL)
@@ -255,6 +304,13 @@ class PublicHttp:
         self.validate = validate
         self.timeout = timeout
         self.deadline = deadline
+        # Which source/operation the requests serve (source_transport routes).
+        # A client created inside an adapter call inherits the caller's scope.
+        if source is None:
+            from source_transport import current
+            source, operation = current()
+        self.source = None if source is None else str(source)
+        self.operation = operation
         # Session is source-only and is never shared with Google Drive.
         self.session.headers.clear()
 
@@ -262,9 +318,14 @@ class PublicHttp:
         self.session.close()
 
     def fork(self):
-        value=PublicHttp(validate=self.validate,timeout=self.timeout,deadline=self.deadline);value.bulk=getattr(self,'bulk',False);return value
+        value=PublicHttp(validate=self.validate,timeout=self.timeout,deadline=self.deadline,source=self.source,operation=self.operation);value.bulk=getattr(self,'bulk',False);return value
 
-    def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None, action=None):
+    def scope(self, source, operation):
+        """``with http.scope(source_id, 'search'):`` routes requests by the source's declarations."""
+        from source_transport import scope
+        return scope(self, source, operation)
+
+    def _open(self, value, *, headers=None, method="GET", data=None, byte_range=None, timeout=None, action=None, expect=None):
         speedbinb = action in {'speedbinb-info', 'speedbinb-body'}
         speedbinb_site = action in {'speedbinb-site', 'speedbinb-xhr'}
         speedbinb_routed = speedbinb or speedbinb_site or action == 'speedbinb-image'
@@ -908,10 +969,21 @@ class PublicHttp:
             if player_form:
                 outgoing["X-Requested-With"] = "XMLHttpRequest"
                 outgoing["Accept"] = "application/json, text/javascript, */*; q=0.01"
+        import source_transport as transport
+        # Declared routes (source ID + operation + domain) decide the exit and
+        # whether a browser challenge goes to the solver; undeclared traffic
+        # keeps the legacy per-action routing below.
+        route_source, route_operation = transport.resolve(self, url, headers, expect)
+        solved = None
+        started = time.time()
         for hop in range(6):
             pace(url,getattr(self,'bulk',False))
             if self.deadline and time.monotonic() >= self.deadline:
                 raise SourceError('Источник не уложился во время проверки. Можно повторить его отдельно.')
+            decision = transport.decide(route_source, route_operation, url) if route_source else None
+            solver_session = None
+            options = {}
+            send = outgoing
             try:
                 # A Comic Fury warning can set a cookie for a redirect to the same page.
                 if not (fury_form or buff_form or webnex_document or manhwazone_session or toomics_session
@@ -921,7 +993,6 @@ class PublicHttp:
                 request_timeout=timeout or self.timeout
                 if self.deadline:
                     remaining=max(.2,self.deadline-time.monotonic());request_timeout=(min(request_timeout[0],remaining),min(request_timeout[1],remaining))
-                options = {}
                 if publisher and routed(url, route_config):
                     options['proxies'] = {'https': route_config['httpProxy']}
                 if speedbinb_routed and routed(url, speedbinb_config):
@@ -930,14 +1001,59 @@ class PublicHttp:
                     options['proxies'] = {'https': publus_routes['httpProxy']}
                 if japanese_public and routed(url, japanese_routes):
                     options['proxies'] = {'https': japanese_routes['httpProxy']}
+                if decision is not None:
+                    options.pop('proxies', None)
+                    if decision.proxy:
+                        options['proxies'] = {'https': decision.proxy, 'http': decision.proxy}
+                    if decision.solver:
+                        solver_session = solved or transport.sessions.get(transport.session_key(decision))
+                    if solver_session:
+                        if solver_session.cookies_work is False:
+                            # This site already refused the solved cookies: a new
+                            # solver run would not help a non-page request either.
+                            solved = solver_session
+                        send, jar = dict(outgoing), {}
+                        transport.apply(solver_session, send, jar)
+                        if jar:
+                            options['cookies'] = jar
+                        if (solver_session.cookies_work is False
+                                and decision.page_allowed(method, send.get('Accept'), expect)):
+                            # Clearance cookies do not work outside the solver's
+                            # browser for this site: read pages through it.
+                            return transport.solver_page(decision, url, self.deadline), url
                 body = data
                 if natsuid_form or init_form == 'vault' or action == 'dcm-search':
                     options['files'] = {key: (None, value) for key, value in data.items()}
                     body = None
-                response = self.session.request(method, url, headers=outgoing, data=body,
+                response = self.session.request(method, url, headers=send, data=body,
                                                 timeout=request_timeout, allow_redirects=False, stream=True, **options)
+            except requests.exceptions.ProxyError:
+                if options.get('proxies'):
+                    transport.route_down()
+                    raise SourceRouteError('Японский шлюз не принял соединение. Повтори позже.') from None
+                raise SourceTemporaryError("Источник не ответил. Повтори импорт позднее.") from None
             except requests.RequestException:
                 raise SourceTemporaryError("Источник не ответил. Повтори импорт позднее.") from None
+            if decision is not None and decision.solver and response.status_code not in {301, 302, 303, 307, 308}:
+                kind = None
+                if response.status_code in {401, 403, 429, 451, 503}:
+                    kind = transport.classify(response.status_code, response.headers, self._peek(response, 65536))
+                elif (200 <= response.status_code < 300 and expect == 'page'
+                      and 'html' in response.headers.get('Content-Type', '').lower()):
+                    head = self._peek(response, MAX_DOCUMENT, strict=True)
+                    kind = 'challenge' if transport.classify(200, response.headers, head) == 'challenge' else None
+                if kind == 'challenge':
+                    response.close()
+                    if solved is None:
+                        solve_url = url if method == 'GET' else f'https://{decision.host}/'
+                        solved = transport.solve(decision, solve_url, self.deadline, started)
+                        continue
+                    solved.cookies_work = False
+                    if decision.page_allowed(method, send.get('Accept'), expect):
+                        return transport.solver_page(decision, url, self.deadline), url
+                    raise SourceChallengeError('Источник отклонил решённую проверку браузера.', solver='rejected')
+                if solver_session is not None and 200 <= response.status_code < 300:
+                    solver_session.cookies_work = True
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
                 if action == 'pixivcomic-store' and location:
@@ -1018,7 +1134,11 @@ class PublicHttp:
                 if (init_form == 'key' and status in {400, 401, 403}
                         and response.headers.get('Content-Type', '').partition(';')[0].strip() == 'application/json'):
                     return response, url
+                kind = (transport.classify(status, response.headers, self._peek(response, 65536))
+                        if status in {401, 403, 429, 451, 503} else None)
                 response.close()
+                if kind and not (kind == 'challenge' and status == 429):
+                    raise transport.error_for(kind, url)
                 if status == 429:
                     raise SourceRateLimitError(response.headers.get('Retry-After'))
                 if status in {401, 403}:
@@ -1028,6 +1148,34 @@ class PublicHttp:
                 raise SourceError(f"Источник вернул HTTP {status}.")
             return response, url
         raise SourceError("Слишком много перенаправлений.")
+
+    @staticmethod
+    def _peek(response, limit, strict=False):
+        """Read (and keep) up to ``limit`` bytes of a streamed answer to classify it.
+
+        The body stays readable: the response becomes a consumed one whose
+        iter_content() replays the bytes. A body declared larger is not read."""
+        if getattr(response, '_content_consumed', False):
+            raw = response._content if isinstance(response._content, bytes) else b''
+        else:
+            declared = response.headers.get('Content-Length', '')
+            if declared.isdigit() and int(declared) > limit:
+                return ''
+            parts, size = [], 0
+            try:
+                for block in response.iter_content(65536):
+                    size += len(block)
+                    if size > limit:
+                        if strict:
+                            raise SourceError("Страница или плейлист слишком велики.")
+                        break
+                    parts.append(block)
+            except requests.RequestException:
+                raise SourceTemporaryError("Соединение с источником оборвалось во время чтения ответа.") from None
+            raw = b''.join(parts)
+            response._content = raw
+            response._content_consumed = True
+        return decode_document(raw[:262144], response.encoding)
 
     def leslie_image_exists(self, value, referer):
         from manga_madara import SEGMENT
@@ -1051,7 +1199,7 @@ class PublicHttp:
         options = {'timeout': timeout} if timeout else {}
         if action:
             options['action'] = action
-        response, url = self._open(value, headers=headers, method=method, data=data, **options)
+        response, url = self._open(value, headers=headers, method=method, data=data, expect='page', **options)
         try:
             parts, size, start = [], 0, time.monotonic()
             for block in response.iter_content(65536):
@@ -1061,6 +1209,10 @@ class PublicHttp:
                 parts.append(block)
             text = decode_document(b"".join(parts), response.encoding)
             if BLOCKED.search(text):
+                from source_transport import classify, error_for
+                kind = classify(200, response.headers, text)
+                if kind:
+                    raise error_for(kind, url)
                 raise SourceError("Страница требует проверку браузера или подписку. Выбери другой публичный источник.")
             return text, url, dict(response.headers)
         except requests.RequestException:
