@@ -237,9 +237,10 @@ def subjects(data, sealer, extra=()):
 class Episodes:
     """The direct reader's episode list per title, fetched once (online only)."""
 
-    def __init__(self, online):
+    def __init__(self, online, report=None):
         self.online = online
         self.titles = {}
+        self.errors = (report if report is not None else {}).setdefault('title_errors', {})
 
     def chapter(self, resolver, link):
         """(exact episode URL, None) or (None, reason) for an old chapter link."""
@@ -257,10 +258,14 @@ class Episodes:
         if title not in self.titles:
             from manga_sources import inspect
             from source_parser import SourceError
-            try:
-                self.titles[title] = inspect(title).get('episodes') or []
-            except SourceError:
-                self.titles[title] = None
+            self.titles[title] = None
+            for attempt in (1, 2):
+                try:
+                    self.titles[title] = inspect(title).get('episodes') or []
+                    break
+                except SourceError as error:
+                    self.errors[title] = f'{type(error).__name__}: {str(error)[:200]}'
+                    time.sleep(2 * attempt)
             time.sleep(0.5)
         episodes = self.titles[title]
         if episodes is None:
@@ -330,7 +335,7 @@ def migrate_places(data, resolver, sealer, apply, report, online=False):
         counts = collections.Counter()
         writes = []
         existing = {(o, p): a for o, p, a, _ in rows}
-        episodes = Episodes(online)
+        episodes = Episodes(online, report)
         for owner, place, at, value in opened:
             key = value['k']
             text = json.dumps(value, ensure_ascii=False)
@@ -416,16 +421,16 @@ def run(data, apply=False, root=None, map_path=None, only=None, online=False):
     resolver = Resolver(map_path, root, report)
     sealer = Sealer((data / 'service.key').read_bytes())
     parts = set(only or ('catalogue', 'places', 'sealed'))
+    if 'places' in parts:
+        # A chapter's progress key is the reader's exact episode URL: with
+        # --online each title's episode list is read once to find it.
+        migrate_places(data, resolver, sealer, apply, report, online)
+        resolver.memo.clear()
     with offline(report):
         if 'catalogue' in parts:
             migrate_catalogue(data, resolver, apply, report)
         if 'sealed' in parts:
             report_sealed(data, resolver, sealer, report)
-    if 'places' in parts:
-        # A chapter's progress key is the reader's exact episode URL: with
-        # --online each title's episode list is read once to find it.
-        resolver.memo.clear()
-        migrate_places(data, resolver, sealer, apply, report, online)
     report['references'] = dict(resolver.reasons)
     report['unresolved_by_source'] = sorted(
         ({'reason': reason, 'source': source, 'links': n} for (reason, source), n in resolver.unresolved.items()),
