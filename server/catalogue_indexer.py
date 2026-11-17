@@ -109,6 +109,12 @@ class Indexer:
                 old=json.loads(raw);new=replacements.get(old.get('domain'))
                 if new and (new['type']!=old['type'] or old['type']=='html' and new.get('url')!=old.get('url')):
                     self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(key,));self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(key,))
+            # The full AniList crawl used to page one listing and stalls at its
+            # 5000-entry depth; it now walks id spans (catalogue_sources.anilist_span).
+            # A job left on the old page cursor starts the new walk once.
+            for key, in self.store.db.execute("SELECT id FROM catalogue_jobs WHERE kind='anilist' AND json_extract(spec,'$.term') IS NULL AND json_extract(cursor,'$.from') IS NULL AND COALESCE(json_extract(cursor,'$.page'),1)>1").fetchall():
+                for table in ('catalogue_page_fingerprints','catalogue_page_items'):self.store.db.execute('DELETE FROM '+table+' WHERE job=?',(key,))
+                self.store.db.execute("UPDATE catalogue_jobs SET cursor=?,state='queued',due=?,pages=0,records=0,attempts=0,expected=NULL,error='' WHERE id=?",('{"page":1}',self.clock(),key))
             for spec in sources:
                 self.enqueue(spec)
                 # Each source's own genre/tag list becomes owner vocabulary and

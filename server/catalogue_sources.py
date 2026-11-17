@@ -224,7 +224,9 @@ def fetch(spec,cursor):
         from metadata_catalog import MEDIA_FIELDS
         media='ANIME' if spec['kind']=='anime' else 'MANGA'
         formats=',format_in:[NOVEL]' if spec['kind']=='ranobe' else ',format_not_in:[NOVEL]' if spec['kind']=='manga' else ''
-        term=spec.get('term');definition=',$term:[String]' if term else '';argument=','+('genre_in' if term.get('field')=='genre' else 'tag_in')+':$term' if term else ''
+        term=spec.get('term')
+        if not term:return anilist_span(spec,cursor,media,formats,MEDIA_FIELDS)
+        definition=',$term:[String]' if term else '';argument=','+('genre_in' if term.get('field')=='genre' else 'tag_in')+':$term' if term else ''
         body={'query':'query($page:Int'+definition+'){Page(page:$page,perPage:40){pageInfo{hasNextPage,total}media(type:'+media+',sort:ID'+formats+argument+'){'+MEDIA_FIELDS+'}}}','variables':{'page':page,**({'term':[term['label']]} if term else {})}}
         data=get_json('https://graphql.anilist.co',body=body);info=data.get('data',{}).get('Page',{}).get('pageInfo') or {}
         if 'hasNextPage' not in info:raise SourceError('Каталог не предоставил пагинацию')
@@ -243,3 +245,30 @@ def fetch(spec,cursor):
         total=int(data.get('numFound') or 0)
         return {'rows':rows,'next':{'page':page+1} if rows and page*40<total else None,'total':total}
     raise SourceError('Неизвестный адаптер каталога')
+
+# AniList never serves past the 5000th entry of one listing ("Page depth
+# exceeds maximum"), so the full AniList crawl walks the id space instead:
+# each cursor is a span of ids, paged inside the span, and the newest id seen
+# by the same request tells where the space ends. Every title gets the same
+# rows and the same ingest as before; only the walk changes.
+ANILIST_SPAN=2000
+def anilist_span(spec,cursor,media,formats,fields,request=None,pause=None):
+    from metadata_catalog import get_json
+    from content_metadata import anilist_rows
+    import time
+    request=request or (lambda body:get_json('https://graphql.anilist.co',body=body));pause=pause or time.sleep
+    start=max(0,int(cursor.get('from',0)));page=max(1,int(cursor.get('span',1))) if 'from' in cursor else 1
+    query=('query($ids:[Int],$page:Int){a:Page(page:$page,perPage:40){pageInfo{hasNextPage}media(type:'+media+',id_in:$ids,sort:ID'+formats+'){'+fields+'}}'
+           'b:Page(perPage:1){media(type:'+media+',sort:ID_DESC'+formats+'){id}}}')
+    while True:
+        data=request({'query':query,'variables':{'ids':list(range(start+1,start+ANILIST_SPAN+1)),'page':page}}).get('data') or {}
+        info=(data.get('a') or {}).get('pageInfo') or {};newest=((data.get('b') or {}).get('media') or [{}])[0].get('id')
+        if 'hasNextPage' not in info or not isinstance(newest,int):raise SourceError('Каталог не предоставил пагинацию')
+        rows=anilist_rows({'data':{'Page':data['a']}},spec['kind'])
+        after=None if start+ANILIST_SPAN>=newest else {'from':start+ANILIST_SPAN,'span':1}
+        following={'from':start,'span':page+1} if info['hasNextPage'] else after
+        # A span without titles of this kind (ids of the other media type) is
+        # skipped within the same turn (at most the whole id space, ~110 spans):
+        # the indexer treats an empty page with a next cursor as a broken source.
+        if rows or not following:return {'rows':rows,'next':following,'total':None}
+        start,page=following['from'],following['span'];pause(1.1)
