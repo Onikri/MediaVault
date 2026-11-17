@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 import urllib.error
 import urllib.request
 
@@ -75,6 +76,19 @@ class RoutingTests(unittest.TestCase):
         self.assertNotIn('.google.com', config['bypasses'][0]['matchers'])
         self.assertEqual(config['chains'][0]['hops'][0]['nodes'][0]['addr'], 'jp-vpn:1081')
         self.assertEqual(sorted(s['addr'] for s in config['services']), [':1080', ':8080'])
+
+    def test_transport_manifest_matches_the_router_and_is_written_once(self):
+        value = install.transport_manifest()
+        self.assertEqual(value['version'], 1)
+        self.assertEqual(value['japan']['hosts'], list(gateway.HOSTS))
+        for url in (value['japan']['httpProxy'], value['japan']['status'], value['solver']['url']):
+            self.assertRegex(url, r'^http://[a-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9/_-]*)?$')
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'source-transport.json'
+            with mock.patch.object(install.os, 'chown', create=True):
+                self.assertTrue(install.publish(target, value, 0o644))
+                self.assertFalse(install.publish(target, value, 0o644))
+            self.assertEqual(json.loads(target.read_text()), value)
 
     def test_manifest_keeps_the_proxy_name_the_importer_accepts(self):
         manifest = install.route_manifest()

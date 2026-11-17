@@ -57,6 +57,32 @@ def route_manifest():
     return {'revision': revision, 'hosts': list(gateway.HOSTS), 'httpProxy': ROUTE_PROXY}
 
 
+def transport_manifest():
+    """/data/source-transport.json, read by the server transport (docs/source-network-services.md)."""
+    value = {'version': 1,
+             'japan': {'httpProxy': 'http://jp-router:8080', 'status': 'http://jp-vpn:8090/status',
+                       'hosts': list(gateway.HOSTS)},
+             'solver': {'url': 'http://byparr:8191/v1', 'maxTimeout': 60}}
+    if len(json.dumps(value)) > 16384:
+        raise RuntimeError('Transport manifest exceeds 16 KB')
+    return value
+
+
+def publish(target, value, mode):
+    """Atomically write an importer-owned JSON file when its content changed."""
+    try:
+        if json.loads(target.read_text()) == value:
+            return False
+    except (OSError, ValueError):
+        pass
+    temporary = target.with_name('.' + target.name + '.tmp')
+    temporary.write_text(json.dumps(value))
+    temporary.chmod(mode)
+    os.chown(temporary, 1000, 1000)
+    temporary.replace(target)
+    return True
+
+
 def detach(overlay):
     """Suwayomi's overlay without the gateway services or dependencies on them."""
     changed = copy.deepcopy(overlay)
@@ -262,19 +288,11 @@ class Installer:
         if previous:
             self.run(['docker', 'rm', previous])
 
-        # 4. Route manifest for the importer; a new revision resets stale quarantines.
+        # 4. Manifests for the importer: the legacy route file (a new revision
+        # resets stale quarantines) and the transport contract file.
         manifest = route_manifest()
-        target = data / 'manga-source-routes.json'
-        try:
-            current = json.loads(target.read_text())
-        except (OSError, ValueError):
-            current = None
-        if current != manifest:
-            temporary = data / '.manga-source-routes.json.tmp'
-            temporary.write_text(json.dumps(manifest))
-            temporary.chmod(0o600)
-            os.chown(temporary, 1000, 1000)
-            temporary.replace(target)
+        publish(data / 'manga-source-routes.json', manifest, 0o600)
+        publish(data / 'source-transport.json', transport_manifest(), 0o644)
 
         record = {'project': PROJECT, 'root': str(ROOT), 'network': network, 'gatewayImage': 'mediavault-jp-gateway:' + image_tag(),
                   'byparrImage': BYPARR_IMAGE, 'exit': health.get('exit'), 'generation': health.get('generation'),
