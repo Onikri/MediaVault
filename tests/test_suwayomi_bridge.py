@@ -143,6 +143,27 @@ class BridgeTests(unittest.TestCase):
                 with self.assertRaisesRegex(SourceError,'WebView') as failure:client.get('/source/list')
                 self.assertNotIn('secret',str(failure.exception))
                 response.close.assert_called_once();client.close()
+    def test_every_suwayomi_request_is_counted_by_operation_source_and_outcome(self):
+        with tempfile.TemporaryDirectory() as directory:
+            auth=Path(directory)/'auth';auth.write_text(json.dumps({'username':'fixture','password':'fixture-private'}))
+            with patch.dict(os.environ,{'SUWAYOMI_AUTH_FILE':str(auth),'DATA_DIR':directory,'SUWAYOMI_CALLS_TAG':'fixture'}),patch('suwayomi_bridge.requests.Session') as session:
+                bridge._calls.clear();bridge._manga_sources.clear()
+                response=session.return_value.get.return_value;response.status_code=200
+                client=bridge.Client()
+                response.iter_content.return_value=iter([b'{"mangaList":[{"id":42,"title":"A"}],"hasNextPage":false}'])
+                client.get('/source/77/search',{'searchTerm':'A'})
+                response.iter_content.return_value=iter([b'[{"index":1}]'])
+                client.get('/manga/42/chapters')
+                response.status_code=500;response.iter_content.return_value=iter([b'timed out'])
+                with self.assertRaises(SourceError):client.get('/manga/42/chapter/1/page/0',image=True)
+                with self.assertRaises(SourceError):client.get('/manga/9/chapter/1')
+                client.close();bridge.flush_calls()
+            lines=[json.loads(v) for v in (Path(directory)/bridge.CALLS_FILE).read_text().splitlines()]
+        self.assertEqual(len(lines),1);self.assertEqual(lines[0]['process'],'fixture')
+        self.assertEqual({k:v[0] for k,v in lines[0]['calls'].items()},
+                         {'search|77|ok':1,'chapters|77|ok':1,'page|77|timeout':1,'chapter|-|upstream':1})
+        self.assertEqual(bridge.call_kind('/source/list'),('source-list','-'))
+        self.assertEqual(bridge.call_kind('/source/5/popular/3'),('catalogue','5'))
     def test_storage_errors_do_not_recommend_reopening_a_healthy_session(self):
         with tempfile.TemporaryDirectory() as directory:
             auth=Path(directory)/'auth';auth.write_text(json.dumps({'username':'fixture','password':'fixture-private'}))

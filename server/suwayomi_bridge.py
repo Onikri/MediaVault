@@ -106,6 +106,74 @@ def parse_reference(value):
         return ids
     except (ValueError,TypeError):return None
 
+# Cutover metric: every HTTP request to Suwayomi, by operation, source ID and
+# outcome. Aggregates are appended to DATA_DIR/suwayomi-calls.jsonl (one line
+# per process and flush) so the rollout can prove "zero calls" per source.
+CALLS_FILE='suwayomi-calls.jsonl';CALLS_FLUSH=60;CALLS_ROTATE=8*1024*1024
+_calls={};_calls_lock=threading.Lock();_calls_since=[time.time(),time.monotonic()];_manga_sources={}
+_CALL_ROUTES=(
+    (re.compile(r'/source/(\d+)/(?:popular|latest)/\d+'),'catalogue'),
+    (re.compile(r'/source/(\d+)/(?:search|quick-search)'),'search'),
+    (re.compile(r'/source/(\d+)/(?:filters|preferences)'),'settings'),
+    (re.compile(r'/source/(\d+)'),'source'),
+    (re.compile(r'/manga/(\d+)/chapter/\d+/page/\d+'),'page'),
+    (re.compile(r'/manga/(\d+)/chapter/\d+'),'chapter'),
+    (re.compile(r'/manga/(\d+)/chapters'),'chapters'),
+    (re.compile(r'/manga/(\d+)(?:/full)?'),'card'),
+)
+
+def call_kind(path):
+    """(operation, source ID or '-') for a Suwayomi API path."""
+    for pattern,operation in _CALL_ROUTES:
+        match=pattern.fullmatch(path)
+        if match:
+            if operation in {'catalogue','search','settings','source'}:return operation,match[1]
+            with _calls_lock:return operation,_manga_sources.get(match[1],'-')
+    if path.startswith('/extension/'):return 'extension','-'
+    if path=='/source/list':return 'source-list','-'
+    return 'other','-'
+
+def _remember_sources(path,data):
+    pairs=[]
+    if isinstance(data,dict):
+        match=re.fullmatch(r'/source/(\d+)/(?:popular|latest|search|quick-search).*',path)
+        if match and isinstance(data.get('mangaList'),list):
+            pairs=[(str(row['id']),match[1]) for row in data['mangaList'] if isinstance(row,dict) and row.get('id') is not None]
+        match=re.fullmatch(r'/manga/(\d+)(?:/full)?',path)
+        nested=data.get('source')
+        source=data.get('sourceId') or (nested.get('id') if isinstance(nested,dict) else None)
+        if match and source:pairs.append((match[1],str(source)))
+    if not pairs:return
+    with _calls_lock:
+        if len(_manga_sources)>50000:_manga_sources.clear()
+        _manga_sources.update(pairs)
+
+def record_call(path,outcome,elapsed):
+    operation,source=call_kind(path)
+    key=f'{operation}|{source}|{outcome}'
+    with _calls_lock:
+        entry=_calls.setdefault(key,[0,0,0])
+        entry[0]+=1;entry[1]+=round(elapsed*1000);entry[2]=max(entry[2],round(elapsed*1000))
+        due=time.monotonic()-_calls_since[1]>=CALLS_FLUSH
+    if due:flush_calls()
+
+def flush_calls():
+    with _calls_lock:
+        if not _calls:
+            _calls_since[:]=[time.time(),time.monotonic()];return
+        counts=dict(_calls);_calls.clear();started=_calls_since[0];_calls_since[:]=[time.time(),time.monotonic()]
+    line=json.dumps({'from':round(started,1),'to':round(time.time(),1),'pid':os.getpid(),
+                     'process':os.getenv('SUWAYOMI_CALLS_TAG') or ('api' if any('uvicorn' in a for a in __import__('sys').argv[:1]) else 'tool'),
+                     # value: [calls, total ms, max ms]
+                     'calls':counts},separators=(',',':'))
+    path=Path(os.getenv('DATA_DIR','/data'))/CALLS_FILE
+    try:
+        if path.is_file() and path.stat().st_size>CALLS_ROTATE:path.replace(path.with_name(CALLS_FILE+'.1'))
+        with open(path,'a',encoding='utf-8') as handle:handle.write(line+'\n')
+    except OSError:pass
+
+__import__('atexit').register(flush_calls)
+
 class Client:
     def __init__(self):
         if not configured():raise SourceError('Suwayomi ещё не подключён к серверу.')
@@ -118,6 +186,19 @@ class Client:
         self.session.auth=(auth['username'],auth['password'])
     def close(self):self.session.close()
     def get(self,path,params=None,timeout=12,image=False,body=None):
+        started=time.monotonic();outcome='ok'
+        try:
+            value=self._request(path,params,timeout,image,body)
+            if not image:_remember_sources(path,value)
+            return value
+        except BridgeError as error:
+            outcome=error.code;raise
+        except SourceError:
+            outcome='source';raise
+        except Exception:
+            outcome='error';raise
+        finally:record_call(path,outcome,time.monotonic()-started)
+    def _request(self,path,params,timeout,image,body):
         # Paths are constructed only by this module, never taken from external URLs.
         if not re.fullmatch(r'/[a-zA-Z0-9_./-]+',path) or '..' in path:raise SourceError('Некорректный запрос к каталогу.')
         # The only write-shaped call is the stateless filtered search; it never
@@ -561,7 +642,9 @@ def apply_domain_overrides(client=None,installed=None):
                 props=item.get('props') if isinstance(item,dict) else None
                 if not isinstance(props,dict) or props.get('key')!='overrideBaseUrl':continue
                 if props.get('currentValue')!=target:
+                    started=time.monotonic()
                     response=client.session.post(client.root+'/api/v1/source/'+str(source['id'])+'/preferences',json={'position':position,'value':target},timeout=(3,20),allow_redirects=False)
+                    record_call('/source/'+str(source['id'])+'/preferences','ok' if response.status_code==200 else 'upstream',time.monotonic()-started)
                     if response.status_code!=200:raise BridgeError('upstream','Каталог источников не принял домен расширения.')
                     changed.append((source.get('name'),target))
                 break

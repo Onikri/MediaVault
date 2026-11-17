@@ -32,6 +32,8 @@
 python scripts/build-source-migration-register.py .codex-local/extension-audit-results/inventory.json .codex-local/upstream/keiyoushi-6f345a814597.tar.gz docs/native-source-inventory.csv
 ```
 
+Замеры до переключения, пилот двух путей, переключение партиями с откатом и остановка Suwayomi описаны в [плане отключения](suwayomi-cutover.md).
+
 Ключ `--require-complete` завершает проверку ошибкой, если ещё есть хотя бы одна операция без `verified` или обоснованного `not_applicable`. Результаты отдельных живых прогонов находятся в [журнале проверки](native-source-verification.md).
 
 ## Пакетная проверка
