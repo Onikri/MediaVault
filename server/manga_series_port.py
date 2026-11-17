@@ -58,6 +58,7 @@ def series_api(host, path, query):
     from manga_mangaplus import public_api as mangaplus
     from manga_mangamee import public_api as mangamee
     from manga_mangabox import public_api as mangabox
+    from manga_mangack import public_api as mangack
     from manga_mangameets import public_api as mangameets
     from manga_mangaone import public_api as mangaone
     from manga_mangafive import public_api as mangafive
@@ -74,6 +75,7 @@ def series_api(host, path, query):
     from manga_ninehentai import public_api as ninehentai
     from manga_ososedki import public_api as ososedki
     from manga_pixivcomic import public_api as pixivcomic
+    from manga_pornpics import public_api as pornpics
     from manga_public_galleries import public_api as gallery_api
     from manga_publus_sources import public_api as publus
     from manga_rayuba import public_api as rayuba
@@ -120,7 +122,7 @@ def series_api(host, path, query):
                                                      mangameets, manga_park, mangabox, mangaone, asura, lusttoon, corocoro,
                                                      ciao, dynasty, mokuro, toonkotsu, firecross, hakusensha,
                                                      drecomics, ebookrenta, mangaplaza, coronaex, publus, docomo, mangafive,
-                                                     dmm, pixivcomic, bookwalker, mangalix, toonz, cubari))
+                                                     dmm, pixivcomic, bookwalker, mangalix, toonz, cubari, mangack, pornpics))
 
 
 def public_form(url, data, headers):

@@ -256,6 +256,11 @@ class PublicHttp:
             from manga_speedbinb import reader_url
             reader_url(value)
         clipstudio = action in {'clipstudio-cgi', 'clipstudio-epub'}
+        if action == 'mangahere-xhr':
+            from manga_mangahere import xhr_route
+
+            if method != 'GET' or data is not None or not xhr_route(value, (headers or {}).get('Referer', '')):
+                raise SourceError('Некорректный маршрут читалки MangaHere.')
         if clipstudio:
             from manga_clipstudio import cgi_route, epub_route
 
@@ -284,6 +289,7 @@ class PublicHttp:
                                    'hakusensha-public', 'alphapolis-guest-title', 'coronaex-public',
                                    'publus-source-json', 'publus-source-document',
                                    'pixivcomic-public', 'pixivcomic-store', 'bookwalker-public-view',
+                                   'mangahere-xhr', 'viz-page', 'toonz-rsc', 'akuma-guest',
                                    'manhwazone-document', 'honeytoon-sync', 'toomics-public-view', 'toomics-display'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
@@ -296,6 +302,18 @@ class PublicHttp:
                 outgoing['Authorization'] = 'Bearer ' + clip_token
         else:
             outgoing = playback_headers(headers)
+        akuma_session = action == 'akuma-guest'
+        if akuma_session:
+            from manga_akuma import guest_route
+
+            csrf = (headers or {}).get('X-CSRF-TOKEN', '')
+            if not guest_route(url, method, data, csrf):
+                raise SourceError('Некорректный запрос гостевой сессии источника.')
+            if method == 'GET':
+                self.session.cookies.clear()
+            else:
+                outgoing.update({'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest',
+                                 'Origin': 'https://akuma.moe'})
         if action == 'publus-config':
             outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
         publus_source = action in {'publus-source-json', 'publus-source-document'}
@@ -654,6 +672,14 @@ class PublicHttp:
             outgoing['Accept'] = 'application/json, text/javascript, */*; q=0.01'
         if byte_range:
             outgoing["Range"] = byte_range
+        if action == 'mangahere-xhr':
+            outgoing.update({'Accept-Language': 'en-US,en;q=0.9', 'X-Requested-With': 'XMLHttpRequest'})
+        if action == 'viz-page':
+            from manga_viz import viewer_route
+
+            if method != 'GET' or data is not None or not viewer_route(url, outgoing.get('Referer', '')):
+                raise SourceError('Некорректный маршрут открытой читалки VIZ.')
+            outgoing.update({'X-Client-Login': 'false', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'})
         fury_form = False
         buff_form = False
         natsuid_form = False
@@ -801,7 +827,7 @@ class PublicHttp:
             if not (player_form or search_form or manga_form or million_register or zerosum_viewer or manhwazone_session
                     or foolslide_form or namicomi_form or ninehentai_form or voyceme_form or mangabox_form or mangaone_proto
                     or ciao_json or firecross_session or honto_session or alphapolis_session or drecomics_form or docomo_form
-                    or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form
+                    or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form or akuma_session
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
                     or hikka_search or jaomix_toc or madara_form or giga_form):
@@ -828,7 +854,7 @@ class PublicHttp:
             try:
                 # A Comic Fury warning can set a cookie for a redirect to the same page.
                 if not (fury_form or buff_form or webnex_document or manhwazone_session or toomics_session
-                        or firecross_session or honto_session or alphapolis_session or publus_source):
+                        or firecross_session or honto_session or alphapolis_session or publus_source or akuma_session):
                     self.session.cookies.clear()
                 request_timeout=timeout or self.timeout
                 if self.deadline:
@@ -853,7 +879,11 @@ class PublicHttp:
                 if action == 'pixivcomic-store' and location:
                     from manga_webcomics import param
 
-                    next_url = self.validate(urljoin(url, location))
+                    try:
+                        next_url = self.validate(urljoin(url, location))
+                    except (SourceError, ValueError):
+                        response.close()
+                        raise
                     if urlsplit(next_url).netloc not in {'comic.pixiv.net', 'comic-store-viewer.pixiv.net'}:
                         response.close()
                         raise SourceError('Pixiv Comic перенаправил том на другой домен.')
@@ -867,6 +897,7 @@ class PublicHttp:
                                'webnex-json', 'webnex-image', 'zerosum-proto', 'manhwazone-livewire', 'honeytoon-sync',
                                'mangaone-proto', 'mangabox-read', 'corocoro-proto', 'ciaoplus-json', 'firecross-guest-reader',
                                'hakusensha-public', 'alphapolis-guest-form', 'drecomics-viewer', 'coronaex-public',
+                               'mangahere-xhr', 'viz-page', 'toonz-rsc', 'akuma-guest',
                                'publus-source-json', 'docomo-reader', 'pixivcomic-public'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")

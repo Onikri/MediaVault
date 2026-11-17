@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 
 from PIL import Image
 
+import manga_akuma
 import manga_alphapolis
 import manga_bookwalker_jp
 import manga_clipstudio
@@ -25,12 +26,16 @@ import manga_ebookrenta
 import manga_flower_comics
 import manga_hakusensha
 import manga_honto
+import manga_mangack
+import manga_mangahere
 import manga_mangaplaza
 import manga_mangafive
 import manga_mangalix
 import manga_publus_sources
 import manga_pixivcomic
+import manga_pornpics
 import manga_toonz
+import manga_viz
 from manga_publus_pack import image_path, rc4
 from manga_publus_tiles import keyed_moves
 from manga_speedbinb import grant
@@ -41,7 +46,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MODULES = (manga_clipstudio_sources, manga_hakusensha, manga_honto, manga_mangaplaza, manga_ebookrenta,
            manga_drecomics, manga_flower_comics, manga_alphapolis, manga_coronaex, manga_publus_sources,
            manga_docomo, manga_mangafive, manga_dmm, manga_pixivcomic, manga_bookwalker_jp, manga_mangalix,
-           manga_toonz, manga_cubari)
+           manga_toonz, manga_cubari, manga_mangahere, manga_mangack, manga_viz, manga_pornpics, manga_akuma)
 PROFILES = tuple(profile for module in MODULES for profile in module.SOURCES)
 
 
@@ -50,8 +55,8 @@ class EighthBatchTests(TestCase):
         candidates, active = run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(newline='', encoding='utf-8') as file:
             rows = {row['source_id']: row for row in csv.DictReader(file)}
-        self.assertEqual(len(PROFILES), 26)
-        self.assertEqual(len({rows[adapter.SOURCE_ID]['package'] for adapter in PROFILES}), 21)
+        self.assertEqual(len(PROFILES), 65)
+        self.assertEqual(len({rows[adapter.SOURCE_ID]['package'] for adapter in PROFILES}), 26)
         for adapter in PROFILES:
             row = rows[adapter.SOURCE_ID]
             self.assertNotIn(adapter.SOURCE_ID, active)
@@ -80,6 +85,14 @@ class EighthBatchTests(TestCase):
             chapter = next(chapter for chapter in chapters if chapter['translator'] == 'One')
             self.assertEqual(source.pages(None, source.canonical(chapter['url'])),
                              ['https://cubari.moe/5.png', 'https://cubari.moe/2.png'])
+
+    def test_mangahere_packed_page_and_scoped_xhr(self):
+        self.assertEqual(manga_mangahere.unpack(
+            "eval(function(p,a,c,k,e,d){return p;}('2 0=1;',3,3,'name|value|var'.split('|'),0,{}))"
+        ), 'var name=value;')
+        endpoint = manga_mangahere.ROOT + '/manga/example/c001/chapterfun.ashx?cid=20&page=1&key='
+        self.assertTrue(manga_mangahere.xhr_route(endpoint, manga_mangahere.ROOT + '/manga/example/c001/1.html'))
+        self.assertFalse(manga_mangahere.xhr_route(endpoint, manga_mangahere.ROOT + '/manga/example/c002/1.html'))
 
     def test_clip_studio_retries_vertical_and_keeps_both_halves(self):
         url = 'https://viewer.example.org/csr/view.cgi'
