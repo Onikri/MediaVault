@@ -3,7 +3,7 @@
 import json
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import manga_masonry
 import manga_native_registry
@@ -34,8 +34,18 @@ class NativeCatalogueRegressionTests(TestCase):
         self.assertEqual(source.catalogue(http, page=2, sort='updated'), ([], False))
         self.assertEqual(source.vocabulary(http), [{'label': 'Blonde', 'sourceId': 'blonde', 'category': 'tag'}])
         self.assertEqual(seen, [source.ROOT + '/sort/newest/'] * 2)
-        # Full indexing walks the paginated archive, not the newest listing.
-        self.assertIsNone(getattr(type(source), 'index_sort', None))
+
+    def test_masonry_index_walks_archive_and_stops_on_an_empty_page(self):
+        source = manga_masonry.SOURCES[0]
+        pager = '<ul class="pagination-a"><li class="next"><a href="/archive/page/2/">Next</a></li></ul>'
+        full = '<div class="list-gallery"><figure><a href="/demo-gallery/" title="Gallery"></a></figure></div>'
+        pages = {source.ROOT + '/archive/': full + pager, source.ROOT + '/archive/page/2/': pager}
+        http = Mock(document=Mock(side_effect=lambda url, **_options: (pages[url], url, {})))
+        with patch.object(manga_native_sources, 'PublicHttp', return_value=http):
+            first = manga_native_sources.catalogue_job(source, {'type': 'bridge'}, 1)
+            last = manga_native_sources.catalogue_job(source, {'type': 'bridge'}, 2)
+        self.assertEqual((len(first['rows']), first['next']), (1, {'page': 2}))
+        self.assertEqual((last['rows'], last['next']), ([], None))
 
     def test_vocabulary_job_for_adapter_without_vocabulary_is_empty(self):
         bare = SimpleNamespace(NAME='Bare', ROOT='https://example.com')

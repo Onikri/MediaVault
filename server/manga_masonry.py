@@ -20,6 +20,8 @@ class Masonry:
     IS_NSFW = True
     LANGUAGE = 'all'
     TITLE_PATH = CHAPTER_PATH = TITLE_PATH
+    # Full indexing walks the paginated archive (100 galleries a page).
+    index_sort = 'archive'
 
     def __init__(self, sid, name, root):
         self.SOURCE_ID, self.NAME, self.ROOT = sid, name, root
@@ -72,6 +74,8 @@ class Masonry:
             path = f'/tag/{tag}/page/{page}/'
         elif tag:
             raise SourceError('Некорректный тег каталога Masonry.')
+        elif sort == 'archive':
+            path = '/archive/' if page == 1 else f'/archive/page/{page}/'
         elif sort == 'updated':
             # The newest listing is a single infinite-scroll page now; the
             # paginated archive below is the complete catalogue.
@@ -93,7 +97,8 @@ class Masonry:
             name = (anchor.get('title') or node_text(card.select_one('figcaption'))).strip()
             if match and name:
                 rows[match[1]] = self.row(name, match[1], self.image(card.select_one('img'), final))
-        return list(rows.values()), bool(soup.select_one('.pagination-a li.next'))
+        # Some archives keep a next link on pages without galleries.
+        return list(rows.values()), bool(rows) and bool(soup.select_one('.pagination-a li.next'))
 
     def vocabulary(self, http):
         soup, _ = self.document(http, self.ROOT + '/sort/newest/')
