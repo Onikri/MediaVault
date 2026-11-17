@@ -279,8 +279,14 @@ class PublicHttp:
             publus_routes = configuration()
         trusted_api = speedbinb or clipstudio or publus
         url = public_url(value, allow_api=True) if trusted_api and self.validate is public_url else self.validate(value)
+        japanese_public = (action in {'cycomi-reader', 'nicovideo-public', 'japanese-published-image'}
+                           or action == 'native-series-json' and urlsplit(url).netloc in {'comic-walker.com', 'web.cycomi.com'})
+        if japanese_public:
+            from manga_network_routes import configuration, routed
+
+            japanese_routes = configuration()
         if (RELAY_ROUTE is not None and method == 'GET' and not byte_range
-                and not speedbinb_routed and not clipstudio and not publus
+                and not speedbinb_routed and not clipstudio and not publus and not japanese_public
                 and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
                                    'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
                                    'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto',
@@ -302,6 +308,18 @@ class PublicHttp:
                 outgoing['Authorization'] = 'Bearer ' + clip_token
         else:
             outgoing = playback_headers(headers)
+        if japanese_public:
+            outgoing['Accept-Language'] = 'ja,en;q=0.8'
+        if action == 'nicovideo-public':
+            from manga_japanese_readers import public_api as japanese_api
+
+            endpoint = urlsplit(url)
+            if (method != 'GET' or data is not None or endpoint.netloc not in {'sp.manga.nicovideo.jp', 'api.nicomanga.jp'}
+                    or not japanese_api(endpoint.netloc, endpoint.path, endpoint.query)):
+                raise SourceError('Некорректный маршрут открытого API Nicovideo.')
+            outgoing.update({'User-Agent': ('Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 '
+                                            '(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36'),
+                             'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
         akuma_session = action == 'akuma-guest'
         if akuma_session:
             from manga_akuma import guest_route
@@ -808,6 +826,14 @@ class PublicHttp:
                 docomo_form = docomo_request(url, data, outgoing.get('Referer', ''))
                 if docomo_form:
                     outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+            cycomi_form = False
+            if action == 'cycomi-reader':
+                from manga_japanese_readers import cy_viewer_form
+
+                cycomi_form = cy_viewer_form(url, data, (headers or {}).get('Referer', ''))
+                if cycomi_form:
+                    outgoing.update({'Content-Type': 'application/json', 'Accept': 'application/json',
+                                     'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://cycomi.com'})
             ninehentai_form = False
             if action == 'ninehentai-api':
                 from manga_ninehentai import form as ninehentai_read
@@ -826,7 +852,7 @@ class PublicHttp:
                                      'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://www.voyce.me'})
             if not (player_form or search_form or manga_form or million_register or zerosum_viewer or manhwazone_session
                     or foolslide_form or namicomi_form or ninehentai_form or voyceme_form or mangabox_form or mangaone_proto
-                    or ciao_json or firecross_session or honto_session or alphapolis_session or drecomics_form or docomo_form
+                    or ciao_json or firecross_session or honto_session or alphapolis_session or drecomics_form or docomo_form or cycomi_form
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form or akuma_session
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
@@ -866,6 +892,8 @@ class PublicHttp:
                     options['proxies'] = {'https': speedbinb_config['httpProxy']}
                 if publus and routed(url, publus_routes):
                     options['proxies'] = {'https': publus_routes['httpProxy']}
+                if japanese_public and routed(url, japanese_routes):
+                    options['proxies'] = {'https': japanese_routes['httpProxy']}
                 body = data
                 if natsuid_form or init_form == 'vault' or action == 'dcm-search':
                     options['files'] = {key: (None, value) for key, value in data.items()}
@@ -898,6 +926,7 @@ class PublicHttp:
                                'mangaone-proto', 'mangabox-read', 'corocoro-proto', 'ciaoplus-json', 'firecross-guest-reader',
                                'hakusensha-public', 'alphapolis-guest-form', 'drecomics-viewer', 'coronaex-public',
                                'mangahere-xhr', 'viz-page', 'toonz-rsc', 'akuma-guest',
+                               'cycomi-reader', 'nicovideo-public',
                                'publus-source-json', 'docomo-reader', 'pixivcomic-public'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")

@@ -26,6 +26,7 @@ import manga_ebookrenta
 import manga_flower_comics
 import manga_hakusensha
 import manga_honto
+import manga_japanese_readers
 import manga_mangack
 import manga_mangahere
 import manga_mangaplaza
@@ -34,6 +35,7 @@ import manga_mangalix
 import manga_publus_sources
 import manga_pixivcomic
 import manga_pornpics
+import manga_sugocomics
 import manga_toonz
 import manga_viz
 from manga_publus_pack import image_path, rc4
@@ -46,7 +48,8 @@ ROOT = Path(__file__).resolve().parents[1]
 MODULES = (manga_clipstudio_sources, manga_hakusensha, manga_honto, manga_mangaplaza, manga_ebookrenta,
            manga_drecomics, manga_flower_comics, manga_alphapolis, manga_coronaex, manga_publus_sources,
            manga_docomo, manga_mangafive, manga_dmm, manga_pixivcomic, manga_bookwalker_jp, manga_mangalix,
-           manga_toonz, manga_cubari, manga_mangahere, manga_mangack, manga_viz, manga_pornpics, manga_akuma)
+           manga_toonz, manga_cubari, manga_mangahere, manga_mangack, manga_viz, manga_pornpics, manga_akuma,
+           manga_japanese_readers, manga_sugocomics)
 PROFILES = tuple(profile for module in MODULES for profile in module.SOURCES)
 
 
@@ -55,8 +58,8 @@ class EighthBatchTests(TestCase):
         candidates, active = run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(newline='', encoding='utf-8') as file:
             rows = {row['source_id']: row for row in csv.DictReader(file)}
-        self.assertEqual(len(PROFILES), 65)
-        self.assertEqual(len({rows[adapter.SOURCE_ID]['package'] for adapter in PROFILES}), 26)
+        self.assertEqual(len(PROFILES), 69)
+        self.assertEqual(len({rows[adapter.SOURCE_ID]['package'] for adapter in PROFILES}), 30)
         for adapter in PROFILES:
             row = rows[adapter.SOURCE_ID]
             self.assertNotIn(adapter.SOURCE_ID, active)

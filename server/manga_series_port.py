@@ -51,6 +51,7 @@ def series_api(host, path, query):
     from manga_initmanga import public_api as initmanga
     from manga_inkstory import public_api as ink
     from manga_jjcos import public_api as jjcos
+    from manga_japanese_readers import public_api as japanese_readers
     from manga_json_families import public_api as api
     from manga_kappabeast import public_api as kappa
     from manga_klto9 import public_api as klto9
@@ -122,7 +123,8 @@ def series_api(host, path, query):
                                                      mangameets, manga_park, mangabox, mangaone, asura, lusttoon, corocoro,
                                                      ciao, dynasty, mokuro, toonkotsu, firecross, hakusensha,
                                                      drecomics, ebookrenta, mangaplaza, coronaex, publus, docomo, mangafive,
-                                                     dmm, pixivcomic, bookwalker, mangalix, toonz, cubari, mangack, pornpics))
+                                                     dmm, pixivcomic, bookwalker, mangalix, toonz, cubari, mangack, pornpics,
+                                                     japanese_readers))
 
 
 def public_form(url, data, headers):
