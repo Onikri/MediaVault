@@ -24,6 +24,17 @@ class MangaExportTests(unittest.TestCase):
         value=Exports(self.root,reserve=0,**kwargs);self.managers.append(value);return value
     def options(self,format='cbz'):
         data=png();return Options(mode='cached',format=format,name='Глава 1',cached=[{'chapter':0,'page':0,'imageHash':hashlib.sha256(data).hexdigest()}]).model_dump(),data
+    def test_translation_options_match_the_reader(self):
+        from manga_export import Translation
+        from pydantic import ValidationError
+        self.assertEqual(Translation().inpaint, 'smart')
+        value = Translation.model_validate({'inpaint': 'smart', 'caps': False, 'voiceFonts': {'speech': 'private:v_CCFaceFront_v1.36', 'sfx': 'neucha'}})
+        self.assertEqual(value.voiceFonts['speech'], 'private:v_CCFaceFront_v1.36')
+        self.assertFalse(value.caps)
+        for bad in ({'voiceFonts': {'Speech': 'neucha'}}, {'voiceFonts': {'speech': '../x'}}, {'inpaint': 'hybrid'}):
+            with self.assertRaises(ValidationError):
+                Translation.model_validate(bad)
+
     def test_staged_upload_owner_hash_and_commit(self):
         options,data=self.options();manager=self.manager(start_worker=False)
         value=manager.start('A','','manga',manga=options);identity=value['id']

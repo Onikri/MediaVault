@@ -1,5 +1,14 @@
 // The narration director. It owns the book (the title bible: cast, voices,
-// point of view) and splits each chapter between workers:
+// point of view) and splits each chapter between a small crew of model roles
+// on the server's key pool:
+//   editor   — once per book, reads a sample and writes down how this book
+//              marks speech, the author's words and thoughts (format.js);
+//   workers  — tag the atoms of a chapter part: who speaks, aloud or in
+//              thought, with what emotion (all keys in parallel, fast);
+//   arbiter  — reads again, with more context and more thinking, only the
+//              paragraphs the workers left in doubt («pro» key slots first);
+//   director — merges new speakers into the cast.
+// The orchestration itself is this module's code, not a model:
 // 1. the heuristic roles are instant, so the voice can start at once;
 // 2. the chapter is cut into parts at paragraph borders — a small part at the
 //    reading position first, then larger ones — and every part goes to a
@@ -12,8 +21,9 @@
 //    into the bible, so the next chapters name them consistently;
 // 5. the result is stored on the device and the next chapter is prepared in
 //    the background, so turning the page needs no waiting and no tokens.
-import {heuristicRoles,rolesRequest,parseRoles,applyRoles,ROLE_MODEL,ROLES_VERSION} from './roles.js';
-import {generate} from './google.js';
+import {atomRoles,mergeAtoms,suspects,rolesRequest,parseRoles,applyRoles,ROLE_MODEL,ROLES_VERSION} from './roles.js';
+import {generate,nextProSlot} from './google.js';
+import {studyFormat,savedFormat,formatLine} from './format.js';
 import {buildBible,saveBible,aliasMap,reconcileRequest,mergeCast} from './bible.js';
 import {readRoles,writeRoles,textHash} from './role-store.js';
 import {P} from './role-prompts.js';
@@ -25,7 +35,7 @@ const remember=(key,value)=>{memory.set(key,value);while(memory.size>30)memory.d
 // Parts as [from, to) segment indexes. Sizes are in characters as sent
 // (author text is cut to ~330): a first part of ~2600 answers in about two
 // seconds; ~7500 (about 2000 input tokens) keeps every answer short.
-export function planChunks(segments,{start=0,first=2600,size=7500,limit=90}={}){
+export function planChunks(segments,{start=0,first=2600,size=7500,limit=150}={}){
  const weight=s=>Math.min(s.kind==='narration'?330:430,s.text.length)+8;
  const take=(from,budget,stop)=>{
   let to=from,sum=0;
@@ -50,11 +60,11 @@ function narratorLine(bible){
 // Google refuses to read (promptFeedback.blockReason, the same on every model)
 // is not retried: the caller splits it so only the refused paragraph is left.
 export class Refused extends Error{}
-async function work(request,{model,service,userId,signal}){
+async function work(request,{model,service,userId,signal,slot=null}){
  let last;
  for(const candidate of [...new Set([model,ROLE_MODEL,'gemini-3.1-flash-lite'])]){
   try{
-   const answer=await generate({service,userId,model:candidate,request,signal,timeout:60000,pool:true});
+   const answer=await generate({service,userId,model:candidate,request,signal,timeout:60000,pool:true,slot});
    if(answer?.promptFeedback?.blockReason&&!answer.candidates?.length)throw new Refused(answer.promptFeedback.blockReason);
    return {parsed:parseRoles(answer),model:candidate,usage:answer?.usageMetadata||{}};
   }catch(error){last=error;if(signal?.aborted||error instanceof Refused)throw error;}
@@ -62,22 +72,46 @@ async function work(request,{model,service,userId,signal}){
  throw last;
 }
 // A refused part is halved (twice at most); the halves that pass are tagged.
-async function workParts(segments,from,to,options,depth=0){
+// bare: without the neighbours' text. A text Google refuses blocks a request
+// even when it is only context, so a refused part is first asked again alone
+// and only then halved; the halves stay bare.
+async function workParts(segments,from,to,options,depth=0,bare=false){
  const {cast,context,stats}=options,part=segments.slice(from,to);
  try{
-  const result=await work(rolesRequest(part,cast,{...context,before:segments.slice(Math.max(0,from-6),from)}),options);
+  const around=bare?{}:{before:segments.slice(Math.max(0,from-8),from),after:segments.slice(to,to+4)};
+  const result=await work(rolesRequest(part,cast,{...context,format:formatLine(await options.format?.()),...around}),options);
   return [{...result,ids:new Set(part.map(s=>s.id))}];
  }catch(error){
-  if(!(error instanceof Refused)||depth>=2||to-from<4)throw error;
+  if(!(error instanceof Refused))throw error;
+  if(!bare)return workParts(segments,from,to,options,depth,true);
+  if(depth>=2||to-from<4)throw error;
   stats.refused++;
   let middle=from+Math.floor((to-from)/2);
   while(middle<to-1&&segments[middle].p===segments[middle-1].p)middle++;
-  const halves=await Promise.allSettled([workParts(segments,from,middle,options,depth+1),workParts(segments,middle,to,options,depth+1)]);
+  const halves=await Promise.allSettled([workParts(segments,from,middle,options,depth+1,true),workParts(segments,middle,to,options,depth+1,true)]);
   const done=halves.filter(h=>h.status==='fulfilled').flatMap(h=>h.value);
   if(!done.length)throw error;
   if(done.length<halves.length)stats.partial++;
   return done;
  }
+}
+
+// Doubtful paragraphs as [from, to) atom ranges for the arbiter. Paragraphs
+// with at most `gap` clear ones between them go in one request, the clear
+// ones included (the arbiter reads a scene, not single lines); a range ends
+// at a paragraph border once it holds about `size` characters.
+export function arbiterParts(atoms,doubt,size=5000,gap=2){
+ const parts=[];let from=-1,last=-1,sum=0;
+ atoms.forEach((atom,i)=>{
+  if(!doubt.has(atom.p))return;
+  const opens=i===0||atoms[i-1].p!==atom.p;
+  if(from>=0&&opens&&(atom.p-atoms[last].p>gap+1||sum>size)){parts.push([from,last+1]);from=-1;}
+  if(from<0){from=i;sum=0;}
+  for(let k=Math.max(last+1,from);k<=i;k++)sum+=atoms[k].text.length+8;
+  last=i;
+ });
+ if(from>=0)parts.push([from,last+1]);
+ return parts;
 }
 
 // The bible is written once per book; concurrent readers share the request.
@@ -133,31 +167,55 @@ export function detach(chapterKey,listener){for(const [key,job] of running)if(ke
 
 async function run(key,{paragraphs,bible,meta={},service,userId,model=ROLE_MODEL,start=0,onBible=()=>{},bookKey},emit){
  const cached=memory.get(key)||await readRoles(key);
- if(cached?.segments?.length===heuristicRoles(paragraphs).length){remember(key,cached);const value={...cached,done:true,cached:true};emit(value);return value;}
- let segments=heuristicRoles(paragraphs);
+ if(cached?.segments?.length){remember(key,cached);const value={...cached,done:true,cached:true};emit(value);return value;}
+ // `segments` are atoms while the crew works; listeners and the store get them merged.
+ let segments=atomRoles(paragraphs);
+ const view=()=>mergeAtoms(segments,paragraphs);
  const book=latest.get(bookKey)||bible,began=performance.now(),cast=book?.characters||[],canonical=aliasMap(book);
  const context={title:meta.title||'',tone:book?.tone||'',language:meta.language||'ru',pov:narratorLine(book)};
  // failed: no answer (network, quota) — the chapter is not stored and is tried
  // again next time; refused: Google will not read that text — stored as it is.
- const chunks=planChunks(segments,{start}),fresh=new Map(),stats={parts:chunks.length,done:0,failed:0,refused:0,partial:0,input:0,output:0,requests:0,models:{},firstMs:0,ms:0};
+ const chunks=planChunks(segments,{start}),fresh=new Map(),stats={parts:chunks.length,done:0,failed:0,refused:0,partial:0,input:0,output:0,requests:0,models:{},firstMs:0,ms:0,arbiter:{paragraphs:0,requests:0,changed:0}};
+ // The editor's note on this book's punctuation. The part at the reading
+ // position does not wait for a first study; the others wait a few seconds.
+ const study=service?studyFormat({bookKey,paragraphs,service,userId}).catch(()=>null):Promise.resolve(null);
+ const known=savedFormat(bookKey);
+ const formatFor=index=>()=>known||(index===0?null:Promise.race([study,new Promise(resolve=>setTimeout(()=>resolve(null),8000))]));
  const characters=()=>[...fresh.values()].map(({lines,...c})=>c);
- emit({segments,characters:[],done:false,stats:{...stats}});
+ emit({segments:view(),characters:[],done:false,stats:{...stats}});
  const options={model,service,userId,cast,context,stats};
- await Promise.all(chunks.map(async([from,to])=>{
-  try{
-   for(const {parsed,usage,model:used,ids} of await workParts(segments,from,to,options)){
+ const take=({parsed,usage,model:used,ids})=>{
     segments=applyRoles(segments,parsed,{cast,canonical,ids});
     for(const c of parsed.cast){
      if(canonical.get(plain(c.name)))continue;
      const entry=fresh.get(plain(c.name))||{...c,lines:[]};fresh.set(plain(c.name),entry);
     }
-    for(const s of segments)if(ids.has(s.id)&&s.speaker){const entry=fresh.get(plain(s.speaker));if(entry&&entry.lines.length<3)entry.lines.push(s.text);}
+    for(const s of segments)if(ids.has(s.id)&&s.speaker){const entry=fresh.get(plain(s.speaker));if(entry&&entry.lines.length<3&&!entry.lines.includes(s.text))entry.lines.push(s.text);}
     stats.input+=usage.promptTokenCount||0;stats.output+=usage.candidatesTokenCount||0;stats.requests++;stats.models[used]=(stats.models[used]||0)+1;
-   }
-  }catch(error){if(error instanceof Refused)stats.partial++;else stats.failed++;}
+ };
+ await Promise.all(chunks.map(async([from,to],index)=>{
+  try{for(const result of await workParts(segments,from,to,{...options,format:formatFor(index)}))take(result);}
+  catch(error){if(error instanceof Refused)stats.partial++;else stats.failed++;}
   stats.done++;if(!stats.firstMs)stats.firstMs=Math.round(performance.now()-began);
-  emit({segments,characters:characters(),done:false,stats:{...stats}});
+  emit({segments:view(),characters:characters(),done:false,stats:{...stats}});
  }));
+ // The arbiter: only the paragraphs left in doubt, with their neighbours as
+ // context. Its failure changes nothing: the workers' answer stays.
+ const doubt=suspects(segments);
+ if(doubt.size&&service){
+  stats.arbiter.paragraphs=doubt.size;
+  const format=formatLine(known||await Promise.race([study,new Promise(resolve=>setTimeout(()=>resolve(null),3000))]));
+  await Promise.all(arbiterParts(segments,doubt).map(async([from,to])=>{
+   try{
+    const part=segments.slice(from,to),before=JSON.stringify(part.map(s=>[s.kind,s.speaker]));
+    const result=await work(rolesRequest(part,cast,{...context,format,arbiter:true,before:segments.slice(Math.max(0,from-12),from),after:segments.slice(to,to+8)}),{...options,model:ROLE_MODEL,slot:nextProSlot()});
+    take({...result,ids:new Set(part.map(s=>s.id))});stats.arbiter.requests++;
+    const now=new Map(segments.map(s=>[s.id,s]));
+    stats.arbiter.changed+=part.filter((s,i)=>JSON.stringify([now.get(s.id).kind,now.get(s.id).speaker])!==JSON.stringify(JSON.parse(before)[i])).length;
+   }catch{}
+   emit({segments:view(),characters:characters(),done:false,stats:{...stats}});
+  }));
+ }
  // The director: new speakers join the bible (it may still be being written for a new book).
  if(fresh.size)try{
   const merged=await direct(bookKey,bible,[...fresh.values()],{service,userId,meta,onBible,stats});
@@ -172,8 +230,8 @@ async function run(key,{paragraphs,bible,meta={},service,userId,model=ROLE_MODEL
   }
  }catch{}
  stats.ms=Math.round(performance.now()-began);
- const value={segments,characters:characters(),done:true,stats};
- if(!stats.failed){remember(key,value);writeRoles(key,{segments,characters:value.characters,stats});}
+ const value={segments:view(),characters:characters(),done:true,stats};
+ if(!stats.failed){remember(key,value);writeRoles(key,{segments:value.segments,characters:value.characters,stats});}
  emit(value);
  return value;
 }

@@ -1,6 +1,6 @@
-import {useEffect,useState} from 'react';
+import {lazy,Suspense,useEffect,useState} from 'react';
+const MediaVaultPlayer=lazy(()=>import('./MediaVaultPlayer.jsx'));
 import {FolderOpen,HardDrive,Play,Music2,FileText,ImageIcon,RefreshCw,X} from 'lucide-react';
-import MediaVaultPlayer from './MediaVaultPlayer.jsx';
 import {chooseDeviceFolder,deviceFolderState,fileKind,forgetDeviceFolder,listDeviceLibrary,reconnectDeviceFolder} from './device-library.js';
 import './device-shelf.css';
 
@@ -31,7 +31,7 @@ export default function DeviceShelf({userId}){
    </div>
   </header>
   {error&&<p className="inline-error" role="alert">{error}</p>}
-  {playing&&<div className="device-shelf-player"><button type="button" className="circle-button" aria-label="Закрыть" onClick={()=>setPlaying(null)}><X size={17}/></button><MediaVaultPlayer key={item.id} item={item} source={playing.url} userId={userId} libraryId="device" autoPlay catalog={{items:[item]}}/></div>}
+  {playing&&<div className="device-shelf-player"><button type="button" className="circle-button" aria-label="Закрыть" onClick={()=>setPlaying(null)}><X size={17}/></button><Suspense fallback={<div className="lazy-stage" role="status" aria-label="Загружаем…"/>}><MediaVaultPlayer key={item.id} item={item} source={playing.url} userId={userId} libraryId="device" autoPlay catalog={{items:[item]}}/></Suspense></div>}
   {state.ready&&(titles.length?<div className="device-shelf-titles">{titles.map(title=><article key={title.id} className="device-title"><h3>{title.title}<small>{title.folder}</small></h3><ol>{title.files.slice(0,60).map(entry=>{const Icon=ICON[fileKind(entry.name)];return <li key={entry.name}><button type="button" onClick={()=>open(title,entry).catch(e=>setError(e.message))}><Icon size={14} aria-hidden="true"/><span>{entry.name}</span></button></li>;})}</ol></article>)}</div>
    :<p className="device-shelf-empty">Пока пусто. Нажми «Сохранить» на странице тайтла и выбери «На устройство».</p>)}
  </section>;

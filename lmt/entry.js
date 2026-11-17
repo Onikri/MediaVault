@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './shim.js';
 import {serializePipeline} from './pipeline-queue.js';
-import {loadMangaFont} from '../reader-fonts/catalog.js';
+import {loadRoleFace,registerPrivateFonts} from '../reader-fonts/catalog.js';
+import {typesetPage,TYPESETTER} from './typeset/index.js';
+import {getRtDetrLayout} from './upstream/lib/detections/rtdetr.ts';
 import {resolveMangaOcr} from '../src/ocr-profiles.js';
 import {validateConfig} from './config.js';
 import {getCachedSegmentation} from './upstream/lib/detections/segmentation.ts';
 const contexts=new Map();
+// The owner's server runs this page in its own headless browser and serves the
+// owner's private typefaces next to it; the public site has no such folder.
+let privateFontsLoad;
+const privateFonts=()=>privateFontsLoad||=(async()=>{
+ if(typeof globalThis.mvProgress!=='function')return;
+ const names=await(await fetch('./private-fonts/index.json')).json();
+ registerPrivateFonts(await Promise.all(names.map(async(name,i)=>({name,data:await(await fetch('./private-fonts/'+i)).arrayBuffer()}))));
+})().catch(()=>{});
 async function pipeline(bytes,config,progress){
  if(config.operation==='gemma-prepare'||config.operation==='gemma-render'){
   const{prepareGemmaPage,renderGemmaPage}=await import('./gemma-device.js');
@@ -16,7 +26,7 @@ async function pipeline(bytes,config,progress){
  if(config.mode!=='api'&&config.deviceTranslator==='webllm'&&!navigator.gpu)throw Error('Для локального LMT нужен WebGPU. Используй совместимый браузер или режим своего LLM-сервера.');
  globalThis.lmtProgress=progress;
  const ort=await import('onnxruntime-web/all');ort.env.wasm.numThreads=1;ort.env.wasm.wasmPaths=new URL('./',location.href).href;
- const [{detectTextBubble},{inpaintImageAuto,inpaintImageQuality},{drawFittedText,calculateFittedTextLayout}]=await Promise.all([import('./upstream/lib/detections/main.ts'),import('./upstream/lib/inpaint/ladder.ts'),import('./upstream/lib/canvas/text-fit.ts')]);
+ const [{detectTextBubble},{inpaintImageAuto,inpaintImageQuality}]=await Promise.all([import('./upstream/lib/detections/main.ts'),import('./upstream/lib/inpaint/ladder.ts')]);
  const source=URL.createObjectURL(new Blob([bytes]));let bitmap;const timings={},started=performance.now();
  try{
   bitmap=await createImageBitmap(new Blob([bytes]));if(bitmap.width*bitmap.height>24000000)throw Error('Страница превышает 24 Мп.');
@@ -43,19 +53,20 @@ async function pipeline(bytes,config,progress){
   const valid=boxes.map((b,i)=>({box:b,index:i,text:String(translated.translations?.[i]||'')})).filter(v=>texts[v.index]&&v.text);
   if(!valid.length)throw Error('Модель не вернула переведённые реплики. Попробуй другую модель.');
   progress('Восстанавливаем фон и набираем русский текст');t=performance.now();const segmentation=getCachedSegmentation(source);const cleaned=await(config.inpaint==='quality'?inpaintImageQuality:inpaintImageAuto)(source,valid.map(v=>v.box),{segmentation});timings.inpaintMs=Math.round(performance.now()-t);
-  const cleanBitmap=await createImageBitmap(await(await fetch(cleaned.url)).blob()),canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;const ctx=canvas.getContext('2d');ctx.drawImage(cleanBitmap,0,0);cleanBitmap.close();t=performance.now();
+  const cleanBitmap=await createImageBitmap(await(await fetch(cleaned.url)).blob()),canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(cleanBitmap,0,0);cleanBitmap.close();t=performance.now();
   const debug=config.captureDebug?{cleanedImage:await(await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.94))).arrayBuffer()}:undefined;
   const blocked=new Set(cleaned.regions.filter(r=>['declined','skipped'].includes(r.method)).map(r=>r.index));const warnings=[];if(valid.length<boxes.length)warnings.push('Часть областей не распознана; выбери другой OCR или проверь исходный язык.');if(blocked.size)warnings.push('Часть областей оставлена в оригинале; полный текст доступен под страницей.');if(config.inpaint==='quality'&&cleaned.regions.some(r=>r.lamaStage==='failed'))warnings.push('LaMa не выполнила часть редро: использован быстрый клининг.');
-  const fontStack=await loadMangaFont(config.font||'comic-relief'),layouts=[];
-  for(const [i,value]of valid.entries())if(!blocked.has(i)){
-   const box={...value.box,style:{...value.box.style,bold:false}},layout=calculateFittedTextLayout(value.text,box.x2-box.x1,box.y2-box.y1,fontStack,undefined,false,false,40);
-   ctx.font=`400 ${layout.fontSize}px ${fontStack}`;
-   if(layout.fontSize<4||layout.blockH>layout.maxH+.5||layout.lines.some(line=>ctx.measureText(line).width>layout.maxW+.5))throw Error('Русская реплика не помещается в область. Попробуй другой детектор или шрифт.');
-   await drawFittedText(ctx,value.text,box,fontStack,40);layouts.push({index:value.index,fontSize:layout.fontSize,lines:layout.lines.length,fits:true});
-  }
+  // Balloon boxes and the free-text split come from the detector when it has them (RT-DETR); otherwise the typesetter finds the balloon itself.
+  const shapes=(config.detector||'comic-bubble')==='comic-bubble'?getRtDetrLayout():{bubbles:[],freeText:[]},overlap=(p,q)=>Math.max(0,Math.min(p.x2,q.x2)-Math.max(p.x1,q.x1))*Math.max(0,Math.min(p.y2,q.y2)-Math.max(p.y1,q.y1)),area=p=>(p.x2-p.x1)*(p.y2-p.y1);
+  const items=valid.filter((_,i)=>!blocked.has(i)).map(v=>{const bubble=shapes.bubbles.filter(q=>overlap(v.box,q)>=.7*area(v.box)&&area(q)<bitmap.width*bitmap.height*.5).sort((p,q)=>area(p)-area(q))[0],free=!bubble&&shapes.freeText.some(q=>overlap(v.box,q)>=.5*Math.min(area(v.box),area(q)));return {index:v.index,text:v.text,original:texts[v.index],box:v.box,bubble,kind:free?'free':undefined,style:translated.styles?.[v.index]};});
+  const originalCanvas=document.createElement('canvas');originalCanvas.width=bitmap.width;originalCanvas.height=bitmap.height;const originalCtx=originalCanvas.getContext('2d',{willReadFrequently:true});originalCtx.drawImage(bitmap,0,0);
+  await privateFonts();
+  const faces=new Set(),set=await typesetPage(ctx,items,{caps:config.caps!==false,original:originalCtx,faceFor:async(role,hint)=>{const face=await loadRoleFace(role,config.font||'comic-relief',hint);faces.add(face.id);return face;}}),layouts=set.layouts;
+  originalCanvas.width=originalCanvas.height=0;
+  if(layouts.some(l=>!l.fits))warnings.push('Часть реплик не поместилась в свои области и не набрана; полный текст доступен под страницей.');
   timings.typesetMs=Math.round(performance.now()-t);
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.94));if(!blob)throw Error('Не удалось собрать страницу.');timings.totalMs=Math.round(performance.now()-started);
-  return {detected,debug,detectionReport:{found:boxes.length,translated:valid.length,rejected:boxes.flatMap((b,i)=>texts[i]?[]:['B'+(i+1)]),missed:'unknown'},engine:'Libre Manga Translator',sourceLanguage:config.language,targetLanguage:'ru',machineTranslation:true,detection:{model:detection.model,panelModel:detection.panelModel,panels:detection.panels.length},translationDiagnostics:translated.translationDiagnostics,typesetting:{engine:'fitted-cyrillic-v2',font:config.font||'comic-relief',layouts},timings,warnings,inpaint:{requested:config.inpaint||'fast',methods:[...new Set(cleaned.regions.map(r=>r.method))],unpainted:blocked.size,segmentationUsed:!!segmentation},inputMode:config.apiInput==='vision'&&config.mode==='api'?'vision':'ocr',renderedImage:await blob.arrayBuffer(),renderedMime:blob.type,regions:valid.map(v=>({x:v.box.x1/bitmap.width,y:v.box.y1/bitmap.height,w:(v.box.x2-v.box.x1)/bitmap.width,h:(v.box.y2-v.box.y1)/bitmap.height,original:texts[v.index],text:v.text,placement:'note'}))};
+  return {detected,debug,detectionReport:{found:boxes.length,translated:valid.length,rejected:boxes.flatMap((b,i)=>texts[i]?[]:['B'+(i+1)]),missed:'unknown'},engine:'Libre Manga Translator',sourceLanguage:config.language,targetLanguage:'ru',machineTranslation:true,detection:{model:detection.model,panelModel:detection.panelModel,panels:detection.panels.length},translationDiagnostics:translated.translationDiagnostics,typesetting:{engine:TYPESETTER,font:config.font||'comic-relief',faces:[...faces],caps:config.caps!==false,baseSize:set.base,layouts},timings,warnings,inpaint:{requested:config.inpaint||'fast',methods:[...new Set(cleaned.regions.map(r=>r.method))],unpainted:blocked.size,segmentationUsed:!!segmentation},inputMode:config.apiInput==='vision'&&config.mode==='api'?'vision':'ocr',renderedImage:await blob.arrayBuffer(),renderedMime:blob.type,regions:valid.map(v=>({x:v.box.x1/bitmap.width,y:v.box.y1/bitmap.height,w:(v.box.x2-v.box.x1)/bitmap.width,h:(v.box.y2-v.box.y1)/bitmap.height,original:texts[v.index],text:v.text,role:layouts.find(l=>l.index===v.index)?.role,placement:'note'}))};
  }finally{globalThis.lmtProgress=null;bitmap?.close();URL.revokeObjectURL(source);}
 }
 globalThis.mangaTranslate=pipeline;

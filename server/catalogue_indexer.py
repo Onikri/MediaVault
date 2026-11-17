@@ -18,12 +18,46 @@ BASE_KINDS=('lib','bridge','remanga','html')
 # Per-host request spacing in seconds; LibGroup tolerates a faster pace and
 # slows down again by itself on 429.
 PACE={LIB_HOST:0.6}
+# Hosts that must never be asked faster: AniList answers 30 requests a
+# minute and a burst of 429s would rest the whole host.
+FLOOR={'anilist.co':2.2}
 HOST_SLOTS=2
 # Bridge jobs all run inside the one local Suwayomi process.
 BRIDGE_SLOTS=4
 # Consecutive transport failures that pause a whole host.
 TRIP_AFTER=5
 JOB_ERRORS={'storage','repeated-page','empty-page','incomplete-write'}
+
+def retire_removed(db):
+    """Forget a site the owner removed: its crawl queue, indexed cards and search cache.
+
+    Jobs are dropped on every seed (cheap, by host); cards once per domain."""
+    from manga_source_coverage import REMOVED_DOMAINS,removed_host
+    tables={name for (name,) in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    db.create_function('mediavault_removed_host',1,removed_host,deterministic=True)
+    for domain in REMOVED_DOMAINS:
+        if 'catalogue_jobs' in tables:
+            jobs=[job for (job,) in db.execute("SELECT id FROM catalogue_jobs WHERE host=? OR json_extract(spec,'$.domain')=?",(domain,domain))]
+            for start in range(0,len(jobs),500):
+                chunk=jobs[start:start+500];marks=','.join('?'*len(chunk))
+                for table in ('catalogue_page_fingerprints','catalogue_page_items'):
+                    if table in tables:db.execute('DELETE FROM '+table+' WHERE job IN ('+marks+')',chunk)
+                db.execute('DELETE FROM catalogue_jobs WHERE id IN ('+marks+')',chunk)
+        if 'catalogue_tag_targets' in tables:
+            db.execute("DELETE FROM catalogue_tag_targets WHERE json_extract(target,'$.domain')=?",(domain,))
+        if 'catalog_policy_state' not in tables or db.execute('SELECT 1 FROM catalog_policy_state WHERE name=?',('retired:'+domain,)).fetchone():continue
+        titles=[title for (title,) in db.execute('SELECT id FROM catalog_titles WHERE mediavault_removed_host(source_url)')]
+        for start in range(0,len(titles),500):
+            chunk=titles[start:start+500];marks=','.join('?'*len(chunk))
+            for table in ('catalog_tags','catalog_tag_facts'):db.execute('DELETE FROM '+table+' WHERE title_id IN ('+marks+')',chunk)
+            db.execute('DELETE FROM catalog_titles WHERE id IN ('+marks+')',chunk)
+        if 'catalog_vocabulary' in tables:db.execute('DELETE FROM catalog_vocabulary WHERE mediavault_removed_host(source)')
+        if 'titles' in tables:
+            sources={source for (source,) in db.execute("SELECT DISTINCT source_id FROM titles WHERE mediavault_removed_host(json_extract(metadata,'$.sourceUrl'))")}
+            db.execute("DELETE FROM titles WHERE mediavault_removed_host(json_extract(metadata,'$.sourceUrl'))")
+            for table in ('query_cache','reachability'):
+                if table in tables and sources:db.execute('DELETE FROM '+table+' WHERE source_id IN ('+','.join('?'*len(sources))+')',list(sources))
+        db.execute('INSERT OR REPLACE INTO catalog_policy_state VALUES(?,?)',('retired:'+domain,str(len(titles))))
 
 def host_of(spec):
     return LIB_HOST if str(spec.get('type','')).startswith('lib') else spec.get('domain') or ''
@@ -64,6 +98,7 @@ class Indexer:
         from catalogue_sources import base_sources
         sources=base_sources(installed)
         with self.store.lock,self.store.db:
+            retire_removed(self.store.db)
             # The old HentaiChan feed was the home page, not its full catalogue.
             # Retire only that listing; retained cards and detail jobs stay intact.
             for key,raw in self.store.db.execute("SELECT id,spec FROM catalogue_jobs WHERE kind='html'").fetchall():
@@ -77,6 +112,12 @@ class Indexer:
                 old=json.loads(raw);new=replacements.get(old.get('domain'))
                 if new and (new['type']!=old['type'] or old['type']=='html' and new.get('url')!=old.get('url')):
                     self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(key,));self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(key,))
+            # The full AniList crawl used to page one listing and stalls at its
+            # 5000-entry depth; it now walks id spans (catalogue_sources.anilist_span).
+            # A job left on the old page cursor starts the new walk once.
+            for key, in self.store.db.execute("SELECT id FROM catalogue_jobs WHERE kind='anilist' AND json_extract(spec,'$.term') IS NULL AND json_extract(cursor,'$.from') IS NULL AND COALESCE(json_extract(cursor,'$.page'),1)>1").fetchall():
+                for table in ('catalogue_page_fingerprints','catalogue_page_items'):self.store.db.execute('DELETE FROM '+table+' WHERE job=?',(key,))
+                self.store.db.execute("UPDATE catalogue_jobs SET cursor=?,state='queued',due=?,pages=0,records=0,attempts=0,expected=NULL,error='' WHERE id=?",('{"page":1}',self.clock(),key))
             for spec in sources:
                 self.enqueue(spec)
                 # Each source's own genre/tag list becomes owner vocabulary and
@@ -152,7 +193,8 @@ class Indexer:
                 next_time=max(time.monotonic(),self.rate.get(host,0));self.rate[host]=next_time+self.pace.get(host,self.base_pace(host))
             if self.stop.wait(max(0,next_time-time.monotonic())):return False
             result=self.fetch(spec,job['cursor']);rows=result.get('rows') or []
-            if not rows and result.get('next'):raise RuntimeError('empty-page')
+            # An AniList id span may hold no title of this kind; the walk goes on.
+            if not rows and result.get('next') and not result.get('emptySpan'):raise RuntimeError('empty-page')
             if not rows and not result.get('catalogues') and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html'}:raise RuntimeError('empty-page')
             digest=hashlib.sha256(canonical_json(sorted(str(r.get('sourceUrl') or r.get('url') or r.get('id')) for r in rows))).hexdigest()
             with self.store.lock,self.store.db:
@@ -210,7 +252,7 @@ class Indexer:
         return True
 
     def base_pace(self,host):
-        return min(self.interval,PACE.get(host,self.interval))
+        return max(FLOOR.get(host,0) if self.interval else 0,min(self.interval,PACE.get(host,self.interval)))
 
     def answered(self,host):
         with self.rate_lock:

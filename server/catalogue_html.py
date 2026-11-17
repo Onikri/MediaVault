@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from manga_source_tags import unique
 from source_parser import SourceError
 
-CHAN = {'manga-chan.me', 'hentaichan.live', 'h-chan.me', 'yaoi-chan.me', 'y.hentaichan.live'}
+CHAN = {'manga-chan.me', 'hentaichan.live', 'h-chan.me', 'y.hentaichan.live'}
 SPECIAL = CHAN | {'online.hentaimoody.com', 'hentaros.com'}
 
 

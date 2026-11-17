@@ -2,10 +2,11 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {Play,Pause,SkipBack,SkipForward,Users,Headphones,X,Volume2,RefreshCw,KeyRound,Download} from 'lucide-react';
 import {TTS_BYTES,ttsConsent,setTtsConsent,PRESET_VOICES} from './model.js';
 import {startNarrationEngine,engineReady,synthesize} from './engine.js';
-import {heuristicRoles,ROLE_MODEL} from './roles.js';
+import {atomRoles,mergeAtoms,ROLE_MODEL} from './roles.js';
 import {analyseChapter,detach,prefetchChapter,studyBook,adoptBible,forgetStudy} from './director.js';
 import {castVoices,narratorCast,savedCast,saveCast,PRESET_TRAITS} from './voices.js';
 import {createNarrator,utterancesOf,playClip,localClip,voiceChain} from './player.js';
+import {SPEEDS} from './stretch.js';
 import {createClipStore,chapterReadiness,chapterAudio,renderPhrase,audiobookWriter,audiobookFileName} from './audiobook.js';
 import {savedBible,forgetBible,applyLexicon,TIMBRES} from './bible.js';
 import {ROLE_MODELS,BIBLE_MODELS,personalKey,savePersonalKey} from './google.js';
@@ -42,7 +43,9 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  const store=useRef(null);store.current||=createClipStore();
  const [audiobook,setAudiobook]=useState(null),audiobookAbort=useRef(null);
  useEffect(()=>()=>audiobookAbort.current?.abort(),[]);
- const narrator=useRef(null),speech=useRef({}),localProvider=useRef(''),live=useRef({}),rowsRef=useRef([]),wantPlay=useRef(false);live.current={onSpeaking,onFinished};
+ const narrator=useRef(null),speech=useRef({}),localProvider=useRef(''),live=useRef({}),rowsRef=useRef([]),wantPlay=useRef(false),speedRef=useRef(prefs.speed);live.current={onSpeaking,onFinished};
+ speedRef.current=prefs.speed;
+ useEffect(()=>{narrator.current?.setSpeed(prefs.speed);},[prefs.speed]);
  function update(change){setPrefs(old=>{const next={...old,...change};try{localStorage.setItem(PREFS,JSON.stringify(next));}catch{}return next;});}
  const meta=useMemo(()=>({title:book?.title||title,aliases:book?.aliases||[],authors:book?.authors||[],description:book?.description||'',year:book?.year||null,kind:book?.kind||'book',language}),[book?.title,title,language]);
  // Gemini native audio voices come from the server (version 59+); Supertonic runs on the device.
@@ -66,7 +69,7 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  // Leaving the chapter does not cancel requests already sent: their answer is
  // stored on the device for the next visit.
  useEffect(()=>{
-  setSegments(heuristicRoles(paragraphs));setCharacters([]);setAnalysis('');setRoleStats(null);
+  setSegments(mergeAtoms(atomRoles(paragraphs),paragraphs));setCharacters([]);setAnalysis('');setRoleStats(null);
   if(!prefs.roles||!service||!paragraphs.length)return;
   let live=true;setAnalysis('running');
   const listener=value=>{if(!live)return;setSegments(value.segments);setCharacters(value.characters||[]);setRoleStats({...value.stats,cached:!!value.cached});if(value.done)setAnalysis(value.stats?.failed?'partial':'model');};
@@ -84,8 +87,9 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  useEffect(()=>{saveCast(bookKey,voices);},[bookKey,voices]);
  const geminiNarratorVoice=useMemo(()=>geminiNarrator(bible,prefs.geminiNarrator),[bible,prefs.geminiNarrator]);
  const geminiVoices=useMemo(()=>geminiCast(voices,{narrator:geminiNarratorVoice,saved:geminiSaved,self:bible?.narratorName}),[voices,geminiNarratorVoice,geminiSaved,bible?.narratorName]);
- const rows=useMemo(()=>engine==='gemini'?geminiRows(spoken,{cast:voices,voices:geminiVoices,narrator:geminiNarratorVoice,bible,pace:prefs.pace,saved:geminiSaved})
-  :utterancesOf(spoken,{cast:voices,narrator:narratorVoice,pace:prefs.pace}),[engine,spoken,voices,narratorVoice,geminiVoices,geminiNarratorVoice,bible,prefs.pace,geminiSaved]);
+ // Rows are voiced at their own tempo; the listening speed is the player's.
+ const rows=useMemo(()=>engine==='gemini'?geminiRows(spoken,{cast:voices,voices:geminiVoices,narrator:geminiNarratorVoice,bible,saved:geminiSaved})
+  :utterancesOf(spoken,{cast:voices,narrator:narratorVoice}),[engine,spoken,voices,narratorVoice,geminiVoices,geminiNarratorVoice,bible,geminiSaved]);
  rowsRef.current=rows;
  const colors=useMemo(()=>roleColors(voices),[voices]);
  // The reader draws the same roles in the text (names, colours, emotions).
@@ -139,7 +143,7 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
  useEffect(()=>{
   // CPU: 4 flow steps (measured CER: 3 steps ru 1.6% / uk 4.7%, 5 steps 0.5% / 0.8%).
   const gemini=provider==='gemini',raw=clipMaker(gemini,provider==='wasm'?4:5);
-  narrator.current=createNarrator({language,steps:provider==='wasm'?4:5,lookahead:gemini?3:4,
+  narrator.current=createNarrator({language,steps:provider==='wasm'?4:5,lookahead:gemini?3:4,speed:speedRef.current,
    synth:(row,i,signal,lang)=>store.current.obtain(row,lang,()=>raw(row,i,signal,lang)),
    onSegment:row=>live.current.onSpeaking?.(row),onState:setState,onEnd:()=>live.current.onFinished?.(),onError:e=>{setError(e.message||'Озвучка остановилась.');}});
   const rows=rowsRef.current,first=Math.max(0,rows.findIndex(r=>r.p>=startParagraph));
@@ -147,7 +151,7 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
   if(wantPlay.current&&provider){wantPlay.current=false;narrator.current.play();}
   return()=>narrator.current?.destroy();
  },[language,provider]);
- // New roles, voices or pace: while playing, the phrase being read finishes
+ // New roles or voices: while playing, the phrase being read finishes
  // and only the phrases after it change; paused, the queue is rebuilt.
  useEffect(()=>{
   const player=narrator.current;if(!player)return;
@@ -228,7 +232,7 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
    <button type="button" className="narration-main" aria-label={state.playing?'Пауза озвучки':phase==='ready'?'Продолжить озвучку':'Слушать главу'} title={state.playing?'Пауза':busy?loadingText:'Слушать'} aria-busy={busy||!!(state.playing&&state.buffering)} disabled={busy||!rows.length} onClick={toggle}>{state.playing?<Pause size={18}/>:busy?<span className="narration-ring" aria-hidden="true"/>:phase==='ready'?<Play size={18}/>:<Headphones size={18}/>}</button>
    <button type="button" className="narration-skip" aria-label="Предыдущая фраза" title="Предыдущая фраза" disabled={!(phase==='ready'||state.playing)} onClick={()=>narrator.current?.skip(-1)}><SkipBack size={15}/></button>
    <button type="button" className="narration-skip" aria-label="Следующая фраза" title="Следующая фраза" disabled={!(phase==='ready'||state.playing)} onClick={()=>narrator.current?.skip(1)}><SkipForward size={15}/></button>
-   <label className="narration-pace" title="Темп чтения"><span className="sr-only">Темп</span><select aria-label="Темп озвучки" value={prefs.pace} onChange={e=>update({pace:Number(e.target.value)})}>{[.8,.9,1,1.1,1.2,1.35].map(v=><option key={v} value={v}>{v}×</option>)}</select></label>
+   <label className="narration-pace" title="Скорость озвучки: голос не меняется"><span className="sr-only">Скорость</span><select aria-label="Скорость озвучки" value={prefs.speed} onChange={e=>update({speed:Number(e.target.value)})}>{SPEEDS.map(v=><option key={v} value={v}>{String(v).replace('.',',')}×</option>)}</select></label>
    <button type="button" className="narration-people" aria-label="Роли и голоса" title="Роли и голоса" aria-expanded={castOpen} onClick={()=>setCastOpen(v=>!v)}><Users size={16}/>{people.length>0&&<span>{people.length}</span>}</button>
    <button type="button" className="narration-save" aria-label="Сохранить главу аудиокнигой" title="Сохранить главу аудиокнигой" aria-expanded={!!audiobook} aria-busy={audiobook?.phase==='running'||undefined} disabled={!rows.length} onClick={()=>audiobook?setAudiobook(old=>old.phase==='running'?old:null):openAudiobook()}><Download size={16}/></button>
    <small className="narration-status sr-only" aria-live="polite">{busy?loadingText:state.playing?(state.buffering?'Готовим фразу…':provider==='gemini'?'Gemini':provider==='webgpu'?'Видеокарта':'Процессор'):''}</small>
@@ -260,7 +264,7 @@ export default function Narration({paragraphs,language,bookKey,chapterKey,title,
   {error&&<p className="inline-error" role="alert">{error}</p>}
   {castOpen&&<div className="narration-cast">
    <header><strong>Роли и голоса</strong><button type="button" aria-label="Закрыть роли" onClick={()=>setCastOpen(false)}><X size={15}/></button></header>
-   <label className="narration-cast-pace">Темп чтения<select aria-label="Темп чтения" value={prefs.pace} onChange={e=>update({pace:Number(e.target.value)})}>{[.8,.9,1,1.1,1.2,1.35].map(v=><option key={v} value={v}>{v}×</option>)}</select></label>
+   <label className="narration-cast-pace" title="Скорость озвучки: голос не меняется">Скорость<select aria-label="Скорость прослушивания" value={prefs.speed} onChange={e=>update({speed:Number(e.target.value)})}>{SPEEDS.map(v=><option key={v} value={v}>{String(v).replace('.',',')}×</option>)}</select></label>
    <dl className="narration-facts">
     <dt>Персонажи книги</dt><dd>{bibleState==='running'?'Изучаем героев: '+modelName(prefs.bibleModel)+'…':bible?modelName(bible.model)+(bible.tone?' · '+bible.tone:''):bibleState.startsWith('error:')?'Не получилось: '+bibleState.slice(6):prefs.roles?'Ждём ключ Google':'Выключено'}</dd>
     <dt>Роли и эмоции</dt><dd>{rolesFact}</dd>

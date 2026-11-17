@@ -33,7 +33,8 @@ const hueOf=name=>{const known=sourceOf(name);if(known?.hue!=null)return known.h
 
 // Source, language, team and chapters of the online reader: the right column
 // of the reading desk. One plaque names the site the pages come from.
-export default function MangaDeskPanel({source,sourceLanguage,sourceChapters,sourceState='idle',sourceNote,sourceMenu,language,onLanguage,teams=[],team,onTeam,allTeamsLabel='Все команды',entries=[],current,onOpen,progress,read=new Set(),service,userId,loading=false,reading=false}){
+// The ranobe reader uses the same desk: its own languages, no page art.
+export default function MangaDeskPanel({languages=LANGUAGE_CODES,art=true,source,sourceLanguage,sourceChapters,sourceState='idle',sourceNote,sourceMenu,language,onLanguage,teams=[],team,onTeam,allTeamsLabel='Все команды',entries=[],current,onOpen,progress,read=new Set(),service,userId,loading=false,reading=false}){
  const reduce=useReducedMotion(),[menu,setMenu]=useState(''),panel=useRef(null);
  const toggle=name=>setMenu(old=>old===name?'':name);
  useEffect(()=>{if(menu==='team'&&teams.length<2)setMenu('');},[teams.length,menu]);
@@ -51,7 +52,7 @@ export default function MangaDeskPanel({source,sourceLanguage,sourceChapters,sou
    {source&&sourceNote&&<p className="desk-source-note" role="status">{sourceNote}</p>}
    <AnimatePresence initial={false}>{menu==='source'&&<motion.div key="sources" className="desk-reveal" {...reveal} transition={reduce?{duration:.12}:spring}><div className="desk-source-menu">{sourceMenu}</div></motion.div>}</AnimatePresence>
   </section>
-  <div className="desk-language"><UiSegmented className="is-wide" label="Язык глав" value={language} options={LANGUAGE_CODES} onChange={value=>{setMenu(old=>old==='team'?'':old);onLanguage(value);}}/></div>
+  <div className="desk-language"><UiSegmented className="is-wide" label="Язык глав" value={language} options={languages} onChange={value=>{setMenu(old=>old==='team'?'':old);onLanguage(value);}}/></div>
   {teamRows.length>1&&<section className="desk-team">
    <button type="button" className="desk-team-button" aria-expanded={menu==='team'} onClick={()=>toggle('team')}>
     <span className="desk-team-label">Перевод</span><strong>{chosenTeam?chosenTeam.name:allTeamsLabel}</strong>{chosenTeam&&<small>{chosenTeam.count} {plural(chosenTeam.count,CHAPTER)}</small>}<ChevronDown className="desk-chevron" size={15} aria-hidden="true"/>
@@ -63,14 +64,14 @@ export default function MangaDeskPanel({source,sourceLanguage,sourceChapters,sou
     </ul>
    </motion.div>}</AnimatePresence>
   </section>}
-  <NowReading chapter={chapter} previous={entries[index-1]} next={entries[index+1]} onOpen={onOpen} progress={progress?.url===chapter?.url?progress:null} reading={reading} reduce={reduce} service={service} userId={userId}/>
+  <NowReading chapter={chapter} previous={entries[index-1]} next={entries[index+1]} onOpen={onOpen} progress={progress?.url===chapter?.url?progress:null} reading={reading} reduce={reduce} service={service} userId={userId} art={art}/>
   <ChapterList entries={entries} current={current} onOpen={onOpen} read={read} loading={loading} reduce={reduce} primaryTeam={team||teamRows[0]?.name||''}/>
  </aside>;
 }
 
-function NowReading({chapter,previous,next,onOpen,progress,reading,reduce,service,userId}){
+function NowReading({chapter,previous,next,onOpen,progress,reading,reduce,service,userId,art:thumbnails=true}){
  const root=useRef(null),targets=useMemo(()=>chapter?[chapter]:[],[chapter?.url]);
- const thumbs=useChapterThumbnails(root,targets,service,userId,!!chapter&&!!service);
+ const thumbs=useChapterThumbnails(root,targets,service,userId,thumbnails&&!!chapter&&!!service);
  if(!chapter)return null;
  const art=thumbs[chapter.url]||chapter.thumbnail,name=chapterName(chapter),fraction=progress?.total?Math.min(1,(progress.page+1)/progress.total):0;
  return <section className="desk-now" ref={root} aria-label="Текущая глава">

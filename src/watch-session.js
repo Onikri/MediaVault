@@ -1,7 +1,8 @@
+import {notePlace} from './place-sync.js';
 // Stable account/title identities; expiring source URLs never enter storage.
 export const watchKey=(user,title)=>'mv_watch_v1:'+encodeURIComponent(user||'anonymous')+':'+encodeURIComponent(title);
 export function readWatch(user,title,storage=globalThis.localStorage){try{return JSON.parse(storage.getItem(watchKey(user,title))||'{}')||{};}catch{return {};}}
-export function saveWatch(user,title,change,storage=globalThis.localStorage){try{const value={...readWatch(user,title,storage),...change,updatedAt:Date.now()};storage.setItem(watchKey(user,title),JSON.stringify(value));return value;}catch{return change;}}
+export function saveWatch(user,title,change,storage=globalThis.localStorage){try{const value={...readWatch(user,title,storage),...change,updatedAt:Date.now()};storage.setItem(watchKey(user,title),JSON.stringify(value));notePlace(user,watchKey(user,title),storage);return value;}catch{return change;}}
 export function onlineEpisodeId(identity,season,episode){return 'online:'+identity+':s'+(season||1)+':e'+episode;}
 // filter: 'all' | 'ru' | 'uk'; prefer: which language sorts first.
 export function orderedVoices(voices,saved={},{filter='all',prefer='ru',preferName=''}={}){

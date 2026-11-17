@@ -121,6 +121,20 @@ class SiteAdapterTests(unittest.TestCase):
 
 
 class ApiTests(unittest.TestCase):
+    def test_interrupted_alloha_stream_resumes_by_itself_a_few_times(self):
+        import api
+        from alloha_stream import StreamInterrupted
+        progress,delays={'cursor':4},[]
+        for _ in range(api.STREAM_RETRIES):
+            retry=api.stream_retry(progress,StreamInterrupted('Alloha прервал передачу.'),1000)
+            self.assertEqual(retry['phase'],'queued')
+            self.assertNotIn('cursor',retry,'the same episode continues')
+            delays.append(retry['resumeAt']-1000)
+            progress={**progress,**retry}
+        self.assertEqual(delays,[120,240,480])
+        self.assertIsNone(api.stream_retry(progress,StreamInterrupted('again'),1000),'then the owner decides')
+        self.assertIsNone(api.stream_retry({},SourceError('Источник не найден.'),1000))
+
     def test_owner_can_save_private_google_configuration_encrypted_without_echo(self):
         from fastapi.testclient import TestClient
         import api

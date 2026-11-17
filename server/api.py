@@ -159,6 +159,22 @@ def drive_error_message(error):
     return None
 
 
+STREAM_RETRIES=3
+
+def stream_retry(progress,error,now):
+    """Progress that requeues an interrupted Alloha film, or None.
+
+    Its encrypted parts and resume index stay on the VM and in Drive, so the
+    next pass continues from the last intact part without «Продолжить»."""
+    from alloha_stream import StreamInterrupted
+    retries=int(progress.get('streamRetries') or 0)
+    if not isinstance(error,StreamInterrupted) or retries>=STREAM_RETRIES:return None
+    delay=120*2**retries
+    return {'phase':'queued','streamRetries':retries+1,'resumeAt':now+delay,'operation':'Ждём Alloha',
+            'sourceError':str(error)[:400],
+            'message':f'Alloha прервал передачу серии. Готовые части сохранены — продолжим сами через {delay//60} мин.'}
+
+
 def import_auth_error(error):
     from google.auth.exceptions import RefreshError
     if isinstance(error,RefreshError):return not getattr(error,'retryable',False)
@@ -218,7 +234,7 @@ def worker():
             if cancelled():
                 store.update(task_id, status="cancelled", progress={"phase": "cancelled"}, forget_key=True)
             elif result.get('remaining'):
-                store.update(task_id,status='queued',progress={**result,'phase':'queued','operation':'Ожидает следующего прохода','recover_needed':False,'voicePauses':0,'resumeAt':0,'message':'Следующий файл оформления — после других заданий.' if data.get('kind')=='enrich' else 'Следующая серия — после одного файла из других заданий.'})
+                store.update(task_id,status='queued',progress={**result,'phase':'queued','operation':'Ожидает следующего прохода','recover_needed':False,'voicePauses':0,'streamRetries':0,'resumeAt':0,'message':'Следующий файл оформления — после других заданий.' if data.get('kind')=='enrich' else 'Следующая серия — после одного файла из других заданий.'})
                 wakeup.set()
             elif result["failed"]:
                 reason=store.get(task_id)["progress"].get("sourceError")
@@ -238,6 +254,8 @@ def worker():
                 resume=time.time()+seconds
                 store.update(task_id,status='queued',progress={'phase':'waiting','voicePauses':pauses,'resumeAt':resume,
                     'operation':'Ждём квоту озвучки Google','message':'Квота озвучки Google исчерпана. Продолжим сами в '+time.strftime('%H:%M',time.gmtime(resume))+' UTC; готовые главы и фразы сохранены.'})
+            elif (retry:=stream_retry(task['progress'],error,time.time())):
+                store.update(task_id,status='queued',progress=retry)
             elif import_auth_error(error):
                 if credential is not None:drive_grants.rejected(store,task["owner"],getattr(credential,'refresh_token',None))
                 store.update(task_id, status="waiting_auth", progress={"message": "Серверу нужно повторное разрешение Google. Завершённые серии сохранены."})
@@ -338,7 +356,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 75, "continuousCatalogue":True, "contentManagement":True, "globalTagPolicy":True, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "catalogSignedFilters":True,"allohaVodCache":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","comic","rumanga"],"mangaReadingModes":["paged","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 76, "readingPlaces":True, "continuousCatalogue":True, "contentManagement":True, "globalTagPolicy":True, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "catalogSignedFilters":True,"allohaVodCache":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","comic","rumanga"],"mangaReadingModes":["paged","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -1030,7 +1048,7 @@ def resume(task_id: str, subject=Depends(owner)):
     private = store.get(task_id, subject, private=True)
     if not private["data"].get("vault_key"):
         raise HTTPException(409, "Открой библиотеку и запусти новое задание: завершённые серии будут пропущены.")
-    store.update(task_id, status="queued", progress={"message": "", "sourceError": "", "phase": "queued",'cursor':0,'saved':0,'skipped':0,'failed':0,'recover_needed':True})
+    store.update(task_id, status="queued", progress={"message": "", "sourceError": "", "phase": "queued",'cursor':0,'saved':0,'skipped':0,'failed':0,'recover_needed':True,'streamRetries':0,'resumeAt':0})
     wakeup.set()
     return task(task_id, subject)
 
@@ -1073,3 +1091,7 @@ install_chapter_thumbnails(app, viewer)
 
 from character_profile import install as install_character_profile
 install_character_profile(app)
+
+# Where a profile stopped reading or watching, shared between its devices.
+from reading_places import install as install_reading_places
+install_reading_places(app, viewer, lambda: store, lambda: os.getenv("DATA_DIR", "/data"))

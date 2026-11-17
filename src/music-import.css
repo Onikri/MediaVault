@@ -42,5 +42,5 @@
 .music-import-track strong{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-petal)}
 .music-import-track small{font-size:12px;color:var(--color-on-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .music-import-provider:focus-visible,.music-import-playlist:focus-visible,.music-import-tracks li button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
-@media(max-width:640px){.music-import-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.music-import-client{grid-template-columns:1fr}}
+@media (--phone){.music-import-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.music-import-client{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.music-import-provider,.music-import-play{transition:none}.music-import-spin{animation:none}}

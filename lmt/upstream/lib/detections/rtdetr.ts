@@ -31,7 +31,13 @@ const INPUT_SIZE = 640;
 interface DetectedGroups {
   textBoxes: Bbox[];
   bubbleBoxes: Bbox[];
+  freeText: Bbox[];
 }
+
+// MediaVault change: the typesetter needs the balloon boxes and the
+// text_bubble / text_free split that the merged result drops.
+let lastLayout: { bubbles: Bbox[]; freeText: Bbox[] } = { bubbles: [], freeText: [] };
+export const getRtDetrLayout = () => lastLayout;
 
 async function runRtDetrSingle(
   session: ort.InferenceSession,
@@ -92,6 +98,7 @@ async function runRtDetrSingle(
 
     const textBoxes: Bbox[] = [];
     const bubbleBoxes: Bbox[] = [];
+    const freeText: Bbox[] = [];
     const count = Math.min(labelsData.length, scoresData.length);
 
     for (let i = 0; i < count; i++) {
@@ -121,12 +128,13 @@ async function runRtDetrSingle(
       const box: Bbox = { x1, y1, x2, y2, confidence: score };
       if (label === 1 || label === 2) {
         textBoxes.push(box);
+        if (label === 2) freeText.push(box);
       } else if (label === 0) {
         bubbleBoxes.push(box);
       }
     }
 
-    return { textBoxes, bubbleBoxes };
+    return { textBoxes, bubbleBoxes, freeText };
   } finally {
     imageTensor?.dispose?.();
     sizeTensor?.dispose?.();
@@ -147,11 +155,12 @@ export async function runRtDetrDetection(
 
   try {
     if (!shouldTile(origWidth, origHeight)) {
-      const { textBoxes, bubbleBoxes } = await runRtDetrSingle(
+      const { textBoxes, bubbleBoxes, freeText } = await runRtDetrSingle(
         session,
         bitmap,
         minConfidence,
       );
+      lastLayout = { bubbles: bubbleBoxes, freeText };
       const targetBoxes = textBoxes.length > 0 ? textBoxes : bubbleBoxes;
       const nms = containmentNMS(targetBoxes);
       return refineDetections(nms, origWidth, origHeight).boxes;
@@ -161,6 +170,7 @@ export async function runRtDetrDetection(
     const tiles = planDetectionTiles(origWidth, origHeight);
     const allTextBoxes: Bbox[] = [];
     const allBubbleBoxes: Bbox[] = [];
+    const allFreeText: Bbox[] = [];
 
     for (const tile of tiles) {
       const tileCanvas = new OffscreenCanvas(tile.w, tile.h);
@@ -203,9 +213,14 @@ export async function runRtDetrDetection(
         });
       }
 
+      for (const b of tileResult.freeText) {
+        allFreeText.push({ x1: b.x1 + tile.x, y1: b.y1 + tile.y, x2: b.x2 + tile.x, y2: b.y2 + tile.y, confidence: b.confidence });
+      }
+
       await yieldToMain();
     }
 
+    lastLayout = { bubbles: allBubbleBoxes, freeText: allFreeText };
     const targetBoxes =
       allTextBoxes.length > 0 ? allTextBoxes : allBubbleBoxes;
     const merged = mergeTiledBoxes(targetBoxes);

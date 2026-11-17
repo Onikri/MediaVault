@@ -2,7 +2,9 @@ import ReaderPageTrack from './ReaderPageTrack.jsx';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
-import {ArrowLeft,ChevronDown,ChevronLeft,ChevronRight,ChevronUp,Settings2,Maximize,Minimize,Minimize2,List,Grid2X2,X} from 'lucide-react';
+import {ArrowLeft,ChevronDown,ChevronLeft,ChevronRight,ChevronUp,Settings2,Maximize,Minimize,Minimize2,List,Grid2X2,X,Ellipsis} from 'lucide-react';
+import {showShortcuts} from './ShortcutSheet.jsx';
+import {isHelpKey} from './reader-keys.js';
 import './reader-shell.css';
 import './reader-morph.css';
 import './reader-rail.css';
@@ -31,11 +33,21 @@ const zoneIcon={left:ChevronLeft,right:ChevronRight,top:ChevronUp,bottom:Chevron
 // always visible — nothing appears on hover, so nothing moves under the
 // pointer. dock (the narration player) sits at the bottom of the rail;
 // onMinimize hides the reader to the tray while its voice keeps reading.
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='vertical',navigationDirection='reading',chapterControl,gesturesEnabled=true,layout='overlay',dock=null,onMinimize,navigationLabels,pagePreview,statusWide=false,onStep,zoneGuide=0}){
+// Reader keys: [{keys:'N', label, group, match(event), run(event)}]. The sheet
+// lists the shell's own keys first, then the reader's, grouped.
+export {keyIs} from './reader-keys.js';
+function readerKeySheet(m){
+ const groups=new Map([['Страницы и главы',m.paged?[['← / →','Предыдущая и следующая страница'],['Пробел','Следующая страница']]:[]],['Экран',[]]]);
+ for(const k of m.keys){if(!groups.has(k.group))groups.set(k.group,[]);groups.get(k.group).push([k.keys,k.label]);}
+ groups.get('Экран').push(['F','Полный экран'],['Esc',m.rail?'Свернуть читалку':'Скрыть панели или закрыть'],['?','Эта подсказка']);
+ return [...groups.entries()];
+}
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='vertical',navigationDirection='reading',chapterControl,gesturesEnabled=true,layout='overlay',dock=null,onMinimize,navigationLabels,pagePreview,statusWide=false,onStep,zoneGuide=0,keys=[],shortcutTitle='Читалка'}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({}),stage=useRef(null);
  const rail=layout==='rail',reduce=useReducedMotion();
- const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[fullscreenError,setFullscreenError]=useState(''),[zone,setZone]=useState(''),[guide,setGuide]=useState(false),[sheet,setSheet]=useState(false),[portal,setPortal]=useState(null);
- methods.current={onClose,onMinimize,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel,rail};
+ const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[fullscreenError,setFullscreenError]=useState(''),[zone,setZone]=useState(''),[guide,setGuide]=useState(false),[sheet,setSheet]=useState(false),[portal,setPortal]=useState(null),[more,setMore]=useState(false);
+ useEffect(()=>{if(!more)return;const away=event=>{if(!event.target.closest?.('.reader-more-menu,.reader-more'))setMore(false);};document.addEventListener('pointerdown',away,true);return()=>document.removeEventListener('pointerdown',away,true);},[more]);
+ methods.current={onClose,onMinimize,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel,rail,keys,shortcutTitle};
  const navigation=navigationDirection==='reading'?direction:navigationDirection==='left'?'rtl':'ltr';methods.current.direction=navigation;
  const hide=useCallback(()=>{clearTimeout(timer.current);setVisible(false);},[]);
  const show=useCallback(()=>{clearTimeout(timer.current);setVisible(true);timer.current=setTimeout(()=>{if(!root.current?.querySelector('.reader-chrome:focus-within'))setVisible(false);},2800);},[]);
@@ -62,7 +74,11 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
    const first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}return;
   }
   if(e.key==='Escape'){e.preventDefault();if(m.rail)(m.onMinimize||m.onClose)?.();else if(visible)hide();else m.onClose?.();return;}
-  if(e.key.toLowerCase()==='f'){e.preventDefault();fullscreen();return;}
+  if(e.code==='KeyF'||String(e.key||'').toLowerCase()==='f'){e.preventDefault();fullscreen();return;}
+  // Every reader shares this sheet; a reader adds its own keys (chapters, text size, voice).
+  if(isHelpKey(e)){e.preventDefault();showShortcuts(m.shortcutTitle,readerKeySheet(m));return;}
+  if(e.altKey||e.ctrlKey||e.metaKey)return;
+  const own=m.keys.find(k=>k.match(e));if(own){e.preventDefault();own.run(e);return;}
   if(m.paged&&['ArrowLeft','ArrowRight',' '].includes(e.key)){
    e.preventDefault();const delta=e.key===' '?1:(e.key==='ArrowRight'?1:-1)*(m.direction==='rtl'?-1:1);
    if(delta>0&&m.canNext)m.onNext?.();if(delta<0&&m.canPrevious)m.onPrevious?.();hide();
@@ -103,9 +119,11 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
   {rail?<aside className="reader-rail" aria-label="Управление читалкой">
    <div className="reader-rail-group">
     <button className="reader-control" aria-label="Закрыть читалку" title="Закрыть" onClick={onClose}><X size={19}/></button>
-    {onMinimize&&<button className="reader-control" aria-label="Свернуть читалку" title="Свернуть — голос продолжит читать" onClick={onMinimize}><Minimize2 size={18}/></button>}
+    {onMinimize&&<button className="reader-control reader-minimize" aria-label="Свернуть читалку" title="Свернуть — голос продолжит читать" onClick={onMinimize}><Minimize2 size={18}/></button>}
     {contents&&<button className="reader-control" aria-label="Главы и тома" title="Оглавление" onClick={()=>openPanel('contents')}><List size={19}/></button>}
     {settings&&<button className="reader-control" aria-label="Настройки читалки" title="Текст и тема" aria-expanded={settingsOpen} onClick={()=>openPanel('settings')}><Settings2 size={19}/></button>}
+    {rail&&actions}
+    {rail&&<button className="reader-control reader-more" aria-label="Ещё" title="Ещё" aria-expanded={more} onClick={()=>setMore(v=>!v)}><Ellipsis size={19}/></button>}
     <button className="reader-control reader-fullscreen" aria-label={full?'Выйти из полного экрана':'На весь экран'} title={full?'Обычный размер':'На весь экран'} onClick={fullscreen}>{full?<Minimize size={18}/>:<Maximize size={18}/>}</button>
    </div>
    <div className="reader-rail-group reader-rail-pages">
@@ -113,6 +131,13 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
     <span className="reader-rail-count" aria-live="polite" title={progress?.label}>{progress?.current||0}<small>из {progress?.total||0}</small></span>
     <button className="reader-control" aria-label={navigationLabels?.next||'Вперёд'} title={navigationLabels?.next||'Вперёд'} disabled={!canNext} onClick={onNext}><ChevronRight size={20}/></button>
    </div>
+   {/* Phones: what does not fit in the bottom bar opens from «⋯» with its name. */}
+   <AnimatePresence>{more&&<motion.div className="reader-more-menu" role="menu" aria-label="Ещё" onClick={event=>{if(event.target.closest('button'))setMore(false);}}
+    initial={reduce?{opacity:0}:{opacity:0,y:14,scale:.92,filter:'blur(6px)'}} animate={{opacity:1,y:0,scale:1,filter:'blur(0px)'}} exit={reduce?{opacity:0}:{opacity:0,y:10,scale:.95,filter:'blur(4px)'}} transition={reduce?{duration:.1}:{type:'spring',stiffness:420,damping:30}}>
+    {actions}
+    {onMinimize&&<button className="reader-control" aria-label="Свернуть читалку" onClick={onMinimize}><Minimize2 size={18}/><span className="reader-control-label">Свернуть — голос продолжит</span></button>}
+    <button className="reader-control" aria-label={full?'Выйти из полного экрана':'На весь экран'} onClick={fullscreen}>{full?<Minimize size={18}/>:<Maximize size={18}/>}<span className="reader-control-label">{full?'Обычный размер':'На весь экран'}</span></button>
+   </motion.div>}</AnimatePresence>
    {dock&&<div className="reader-rail-dock">{dock}</div>}
    {fullscreenError&&<small className="reader-rail-note" role="status">{fullscreenError}</small>}
   </aside>:<>

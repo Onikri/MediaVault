@@ -5,7 +5,7 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
 (async()=>{
  await fs.mkdir(dir,{recursive:true});const html=path.join(ROOT,'test-output/blossom-harness.html'),jsx=html.replace('.html','.jsx');
  await fs.writeFile(html,'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="scene-root"></div><div id="root"></div><script type="module" src="/test-output/blossom-harness.jsx"></script></html>');
- await fs.writeFile(jsx,`import React from 'react';import {createRoot} from 'react-dom/client';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/discovery-polish.css';import '/src/site-layout.css';import '/src/site-mobile.css';import App from '/src/App.jsx';window.MEDIA_VAULT_CONFIG={importServerUrl:"https://fixture.example"};createRoot(document.getElementById('root')).render(<App/>);`);
+ await fs.writeFile(jsx,`import React from 'react';import {createRoot} from 'react-dom/client';import '/src/styles.css';import '/src/title-page.css';import '/src/import-layout.css';import '/src/site-layout.css';import '/src/site-mobile.css';import App from '/src/App.jsx';window.MEDIA_VAULT_CONFIG={importServerUrl:"https://fixture.example"};createRoot(document.getElementById('root')).render(<App/>);`);
  const {createServer}=await import('vite');vite=await createServer({root:ROOT,logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
  for(const width of [360,768,1280]){

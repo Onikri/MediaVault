@@ -83,12 +83,12 @@ html[data-blossom] .fdock-count{display:inline-grid;place-items:center;min-width
 .fdock-add{display:inline-flex;align-items:center;gap:7px;justify-self:start;height:36px;min-height:0;padding:0 14px 0 11px;border:0;border-radius:12px;background:color-mix(in srgb,var(--color-petal) 8%,transparent);color:var(--color-petal);font:600 13px/1 var(--font-ui);cursor:pointer}
 .fdock-add:hover{background:color-mix(in srgb,var(--color-petal) 13%,transparent)}
 .fdock-empty{margin:2px 2px 0;font-size:12px;line-height:1.5;color:var(--color-quiet)}
-@media(max-width:1180px){
+@media (--tablet){
  html[data-blossom] .catalog-toolbar.is-open{flex-wrap:wrap}
  html[data-blossom] .catalog-toolbar.is-open>.fdock-search{flex-basis:100%}
  html[data-blossom] .fdock{flex:1 1 100%}
 }
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .catalog-toolbar{--fdock-top:72px;margin:0 -14px 14px;padding:8px 14px;gap:8px;border-radius:0;background:var(--color-canvas)}
  html[data-blossom] .catalog-toolbar.is-stuck{background:color-mix(in srgb,var(--color-canvas) 82%,transparent)}
  html[data-blossom] .fdock-row{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
@@ -123,7 +123,7 @@ html[data-blossom] .pager-jump input{width:64px;height:36px;margin:0;padding:0 1
 html[data-blossom] .pager-jump input::-webkit-inner-spin-button,html[data-blossom] .pager-jump input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 html[data-blossom] .pager-jump input:focus-visible{outline:2px solid var(--color-blossom);outline-offset:1px}
 html[data-blossom] .pager-jump>span:last-child{padding-right:10px}
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .catalog-pager{gap:8px}
  html[data-blossom] .pager-pages{order:-1;flex-basis:100%;justify-content:center;background:none}
  html[data-blossom] .pager-pages button{min-width:36px;height:36px;padding:0 7px}
@@ -141,3 +141,9 @@ html[data-blossom] .pager-jump>span:last-child{padding-right:10px}
 .fdock-signed-list{display:grid;gap:3px}.fdock-signed-option{display:grid;grid-template-columns:minmax(0,1fr) 34px 34px;gap:5px;align-items:center;padding:5px 2px}
 .fdock-signed-option>span{font-size:13px;overflow-wrap:anywhere}.fdock-signed-option button{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:var(--color-canvas-soft);color:var(--color-on-muted);transition:transform .2s,background-color .2s}
 .fdock-signed-option button[aria-pressed=true]{background:var(--color-blossom);color:var(--color-petal)}.fdock-signed-option button:active{transform:scale(.94)}
+
+/* The dock inside the navbar (MergedCatalogToolbar): a flat inline strip, not a
+   sticky card. Placed last so it wins over the dock's own states. */
+html[data-blossom] .catalog-nav-slot .catalog-toolbar,html[data-blossom] .catalog-nav-slot .catalog-toolbar.is-stuck{position:static;top:auto;padding:0;margin:0;background:none;box-shadow:none;backdrop-filter:none}
+html[data-blossom] .catalog-nav-slot .fdock-search{background:var(--color-canvas)}
+@media (--tablet){html[data-blossom] .mobile-dock .catalog-toolbar,html[data-blossom] .mobile-dock .catalog-toolbar.is-open{flex-wrap:nowrap}}

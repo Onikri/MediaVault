@@ -5,7 +5,7 @@ const expectText=(locator,text)=>locator.filter({hasText:text}).waitFor();
 (async()=>{
  await fs.mkdir(DIR,{recursive:true});await fs.writeFile(path.join(DIR,'world-harness.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/test-output/world-harness.jsx"></script>');
  await fs.writeFile(path.join(DIR,'world-harness.jsx'),`
- import React from'react';import{createRoot}from'react-dom/client';import CatalogBrowser from'/src/CatalogBrowser.jsx';import MangaImport from'/src/MangaImport.jsx';import TitlePage from'/src/TitlePage.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/import-workspace.css';import'/src/import-layout.css';import'/src/discovery-polish.css';
+ import React from'react';import{createRoot}from'react-dom/client';import CatalogBrowser from'/src/CatalogBrowser.jsx';import MangaImport from'/src/MangaImport.jsx';import TitlePage from'/src/TitlePage.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/import-workspace.css';import'/src/import-layout.css';
  window.searchBodies=[];window.cancelled=[];window.inspected=[];let counter=0;
  const result={id:'suwayomi:1:42',provider:'suwayomi:1',providerName:'Source A',sourceId:'1',kind:'manga',title:'Новый тайтл только в источнике',aliases:['Новый тайтл только в источнике'],url:'https://media.example/__manga/suwayomi/m/42',language:'ru',format:'manga',genres:['Комедия'],sourceOnly:true};
  const service={server:location.origin,status:'connected',session:{serverVersion:16},jobs:[],request:async(p,o={})=>{

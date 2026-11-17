@@ -1,15 +1,17 @@
 import {lazy,Suspense,useEffect,useMemo,useRef,useState} from 'react';
 import {RetainedMediaSlot,useRetainedWorkspace} from './RetainedMedia.jsx';
 import {BookOpen,RefreshCw} from 'lucide-react';
-import ChapterIndex from './ChapterIndex.jsx';
 import PlaybackReveal from './PlaybackReveal.jsx';
-import {FilterGroup,SourceList} from './ReaderFilters.jsx';
+import CrashBoundary from './CrashBoundary.jsx';
+import {SourceList} from './ReaderFilters.jsx';
+import MangaDeskPanel,{languageCode,useDeskStyle} from './MangaDeskPanel.jsx';
 import {rankSources,useSourceFavorites} from './source-ranking.js';
 import {publishTitleStats} from './title-context.js';
 import {searchRanobe,inspectRanobe,ranobeProgress,providerLanguage,readerInAddress,addressWithReader} from './ranobe-client.js';
 import {useContentLanguage,CONTENT_LANGUAGES} from './content-language.js';
 import {OnlineBooks} from './OnlineLibrary.jsx';
 import './ranobe.css';
+import {usePlaceRevision} from './use-place-sync.js';
 const RanobeReader=lazy(()=>import('./RanobeReader.jsx'));
 // A reader minimized to the tray outlives its title page. «Вернуться к чтению»
 // reopens it through the page that is mounted now, or navigates back to the
@@ -31,7 +33,7 @@ export default function RanobeSources({item,service,state,expected=0}){
  const [open,setOpenState]=useState(null),restored=useRef(false),inspection=useRef(null);
  const [books,setBooks]=useState({}),favorites=useSourceFavorites(userId,isBook?'book':'ranobe'),picked=useRef(false);
  function setOpen(value){setOpenState(value);rememberReader(value?value.index:-1);}
- const workspace=useRetainedWorkspace(),retainedId='ranobe:'+(userId||'guest')+':'+item.id;
+ const deskStyle=useDeskStyle(),workspace=useRetainedWorkspace(),retainedId='ranobe:'+(userId||'guest')+':'+item.id;
  // Read, not subscribed: the slot writes its element into the store on every
  // render, so a subscription here would loop.
  const held=workspace?.rows.get(retainedId)||null;
@@ -74,7 +76,13 @@ export default function RanobeSources({item,service,state,expected=0}){
   catch(e){if(!abort.signal.aborted)setError(e.message||'Не удалось получить список глав.');}
   finally{if(inspection.current===abort){inspection.current=null;if(!abort.signal.aborted)setBusy(false);}}
  }
+ // Another device of this profile may have read on: its place arrives here.
+ const placeRevision=usePlaceRevision('r:');
  const progress=opened?ranobeProgress(userId,opened.url):null;
+ useEffect(()=>{
+  if(!placeRevision||open||busy||(opened&&ranobeProgress(userId,opened.url)))return;
+  const saved=search.results.find(r=>ranobeProgress(userId,r.url));if(saved&&saved.url!==source?.url)choose(saved);
+ },[placeRevision]);
  useEffect(()=>{if(!opened)return;publishTitleStats({kind:isBook?'book':'ranobe',chapters:opened.episodes.length,volumes:new Set(opened.episodes.map(e=>e.season).filter(Boolean)).size||null,source:opened.url,sourceName:opened.providerName,language:opened.language,book:{...opened,provider:source?.provider||opened.provider}});},[opened?.url,opened?.episodes?.length]);
  useEffect(()=>()=>publishTitleStats(null),[]);
  const resume=useMemo(()=>progress&&opened?opened.episodes.findIndex(c=>c.url===progress.chapter):-1,[opened,progress?.chapter]);
@@ -93,21 +101,23 @@ export default function RanobeSources({item,service,state,expected=0}){
  const entries=opened?.episodes||[],current=open?entries[open.index]?.url:resume>=0?entries[resume]?.url:'';
  const reading=!!open&&!!(opened||held?.data?.book);
  const start=index=>setOpen({index,paragraph:index===resume&&progress?progress.paragraph||0:0});
- return <section className="reader-stage ranobe-stage ranobe-sources" data-reading={reading||undefined} aria-label={isBook?'Книга онлайн':'Ранобэ онлайн'}>
-  <aside className="reader-stage-filters" aria-label="Фильтры чтения">
-   <FilterGroup legend={isBook?'Язык текста':'Язык перевода'} value={language} options={languages} onChange={setReadingLanguage}/>
-   <SourceList sources={shown} value={source?.url} favorites={favorites} expected={Number(expected)||0} loading={search.loading} pending={search.loading?0:pending}
-    info={r=>({chapters:books[r.url]?.episodes?.length,error:!!books[r.url]?.error,translator:r.translator})} onChoose={row=>{setOpen(null);choose(row);}} noun={isBook?['раздел','раздела','разделов']:['глава','главы','глав']}/>
-   {search.error&&<p className="inline-error" role="alert">{search.error}</p>}
-   {!search.loading&&!search.error&&!search.results.length&&<p className="reader-filter-note">{isBook?'Свободный текст книги пока не найден':'Доступное издание пока не найдено'}.{search.providers.some(p=>p.status==='unavailable')?' Часть источников не ответила.':''}</p>}
-   {search.fallback&&<p className="reader-filter-note">{isBook?'На выбранном языке свободного текста нет — показаны издания на других языках.':'На выбранном языке перевода нет — показаны издания на других языках.'}</p>}
-   <button type="button" className="text-link" disabled={search.loading} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={13}/>Искать заново</button>
-   {files}
-  </aside>
-  <div className="reader-stage-main">
-   {error&&<p className="inline-error" role="alert">{error}</p>}
+ const sourceState=busy?'searching':opened?'ready':search.loading||pending?'searching':'empty';
+ const sourceNote=busy?(isBook?'Готовим книгу и оглавление':'Загружаем главы'):!opened?(sourceState==='searching'?(isBook?'Ищем полный текст в библиотеках':'Ищем переводы и сравниваем источники'):isBook?'Свободный текст книги пока не найден':'Доступный перевод пока не найден'):'';
+ // The source picker opens inside the desk panel next to the reader, as in the manga reader.
+ const sourceMenu=<>
+  <SourceList sources={shown} value={source?.url} favorites={favorites} expected={Number(expected)||0} loading={search.loading} pending={search.loading?0:pending}
+   info={r=>({chapters:books[r.url]?.episodes?.length,error:!!books[r.url]?.error,translator:r.translator})} onChoose={row=>{setOpen(null);choose(row);}} noun={isBook?['раздел','раздела','разделов']:['глава','главы','глав']}/>
+  {search.error&&<p className="inline-error" role="alert">{search.error}</p>}
+  {!search.loading&&!search.error&&!search.results.length&&<p className="reader-filter-note">{isBook?'Свободный текст книги пока не найден':'Доступное издание пока не найдено'}.{search.providers.some(p=>p.status==='unavailable')?' Часть источников не ответила.':''}</p>}
+  {search.fallback&&<p className="reader-filter-note">{isBook?'На выбранном языке свободного текста нет — показаны издания на других языках.':'На выбранном языке перевода нет — показаны издания на других языках.'}</p>}
+  <button type="button" className="text-link" disabled={search.loading} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={13}/>Искать заново</button>
+  {files}
+ </>;
+ return <div className="manga-desk ranobe-desk" data-reading={reading||undefined} style={deskStyle} aria-label={isBook?'Книга онлайн':'Ранобэ онлайн'} role="region">
+  <div className="manga-desk-reader">
+   {error&&<div className="inline-error" role="alert"><p>{error}</p></div>}
    <PlaybackReveal active={reading}>{reading?<RetainedMediaSlot id={retainedId} kind="reader" userId={userId} label={(opened||held.data.book).title} data={{book:opened||held.data.book,start:open}} restore={restore}>
-    <Suspense fallback={<div className="reader-idle-loading" role="status">Открываем читалку…</div>}><RanobeReader embed book={opened||held.data.book} item={item} start={open} service={service} userId={userId} onClose={close} onMinimize={workspace?minimize:undefined} onStop={()=>setOpenState(null)}/></Suspense>
+    <CrashBoundary label="Читалка"><Suspense fallback={<div className="reader-idle-loading" role="status">Открываем читалку…</div>}><RanobeReader embed book={opened||held.data.book} item={item} start={open} service={service} userId={userId} onClose={close} onMinimize={workspace?minimize:undefined} onStop={()=>setOpenState(null)}/></Suspense></CrashBoundary>
    </RetainedMediaSlot>
    :<div className="watch-idle mv-player mvx mvx-idle reader-idle" style={item.cover?{'--watch-poster':`url("${String(item.cover).replace(/["\\]/g,'')}")`}:undefined}>
     <div className="mvx-idle-poster" aria-hidden="true"/>
@@ -116,11 +126,13 @@ export default function RanobeSources({item,service,state,expected=0}){
      <p className="mvx-meta" role="status">{busy?<><span className="mvx-spinner"/><span>{isBook?'Готовим книгу и оглавление':'Загружаем главы'}</span></>
       :opened?<><span>{entries.length} {isBook?'разделов':'глав'}</span><span>{opened.providerName}</span><span>{providerLanguage(opened.language)}</span></>
       :search.loading||pending?<><span className="mvx-spinner"/><span>{isBook?'Ищем полный текст в библиотеках':'Ищем переводы и сравниваем источники'}</span></>
-      :<span>Выбери источник слева</span>}</p>
+      :<span>Выбери перевод в панели справа</span>}</p>
      {opened&&entries.length>0&&<button type="button" className="mvx-primary" onClick={()=>start(resume>=0?resume:0)}><BookOpen size={16}/>{resume>=0?'Продолжить · '+(isBook?entries[resume].title:'глава '+entries[resume].number):'Начать читать'}</button>}
     </div>
    </div>}</PlaybackReveal>
   </div>
-  <ChapterIndex entries={entries} current={current} loading={busy} onOpen={entry=>start(entries.indexOf(entry))} emptyText={isBook?'Выбери издание слева — здесь появится оглавление.':'Выбери источник слева — здесь появятся главы и тома.'}/>
- </section>;
+  <MangaDeskPanel art={false} languages={languages.map(([id,label])=>[id,['all','ru','uk','en','ja','ko'].includes(id)?(id==='all'?'Все':languageCode(id)):label])} source={opened?.providerName||source?.providerName} sourceLanguage={opened?.language} sourceChapters={opened?entries.length:undefined}
+   sourceState={sourceState} sourceNote={sourceNote} sourceMenu={sourceMenu} language={language} onLanguage={setReadingLanguage}
+   entries={entries} current={current} onOpen={entry=>start(entries.indexOf(entry))} service={service} userId={userId} loading={busy||search.loading} reading={reading}/>
+ </div>;
 }

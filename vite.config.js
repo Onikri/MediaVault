@@ -1,4 +1,4 @@
-import {copyFileSync, mkdirSync, cpSync} from 'node:fs';
+import {copyFileSync, mkdirSync, cpSync, readFileSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {defineConfig} from 'vite';
@@ -16,6 +16,23 @@ const runtimeFiles = [
   'manifest.webmanifest'
 ];
 
+// Breakpoint tokens: @media (--phone) → the query defined in breakpoints.css.
+const breakpoints = Object.fromEntries([...readFileSync(resolve(projectRoot, 'src/blossom/breakpoints.css'), 'utf8')
+  .matchAll(/@custom-media\s+(--[\w-]+)\s+([^;]+);/g)].map(match => [match[1], match[2].trim()]));
+const breakpointMedia = {
+  postcssPlugin: 'mediavault-breakpoints',
+  AtRule: {
+    'custom-media': rule => rule.remove(),
+    media(rule) {
+      if (!rule.params.includes('(--')) return;
+      rule.params = rule.params.replace(/\((--[\w-]+)\)/g, (_, name) => {
+        if (!breakpoints[name]) throw rule.error('Unknown breakpoint ' + name);
+        return breakpoints[name];
+      });
+    }
+  }
+};
+
 export default defineConfig({
   cacheDir: resolve(projectRoot,'.codex-local/cache/vite'),
   base: './',
@@ -28,6 +45,7 @@ export default defineConfig({
   optimizeDeps: {entries: ['index.html','src/**/*.{js,jsx}'],include:['hyphen/ru/index.js']},
   server: {port: 8080, strictPort: true,watch:{ignored:path=>['.codex-local','test-output'].some(dir=>path.replaceAll('\\','/').startsWith(resolve(projectRoot,dir).replaceAll('\\','/')+'/'))}},
   preview: {port: 8080, strictPort: true},
+  css: {postcss: {plugins: [breakpointMedia]}},
   esbuild: {jsx: 'automatic'},
   worker: {format: 'es'},
   build: {

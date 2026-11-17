@@ -49,6 +49,22 @@ let browser,vite;
  // Sample button plays a voice through the same relay.
  await page.getByRole('button',{name:'Пример голоса: Кайто'}).click();
  await page.waitForFunction(()=>window.speak.some(b=>/Так звучит мой голос/.test(b.text)&&b.voice!=='Kore'),null,{timeout:30000});
+ // The source picker lives in the desk panel next to the reader (as in the manga reader).
+ assert.ok(await page.locator('.ranobe-desk .desk-panel').isVisible(),'desk panel beside the reader');
+ assert.equal(await page.locator('.reader-stage-filters').count(),0,'no separate filter column');
+ await page.locator('.desk-source-plaque').click();
+ assert.ok(await page.locator('.desk-source-menu .reader-source-pick').first().isVisible(),'sources open inside the panel');
+ // Night mode: one button in the rail, back to the day theme.
+ await page.keyboard.press('Escape');await page.getByRole('button',{name:'Ночной режим'}).click();
+ assert.match(await page.locator('.ranobe-reader').getAttribute('class'),/reader-theme-night/);
+ await page.getByRole('button',{name:'Дневной режим'}).click();
+ assert.doesNotMatch(await page.locator('.ranobe-reader').getAttribute('class'),/reader-theme-night/);
+ // The sound director scores the chapter once (MOCKED answer) and names the scene.
+ await page.route('https://incompetech.com/**',route=>route.abort());
+ await page.getByRole('button',{name:'Фоновая музыка'}).click();
+ await page.waitForFunction(()=>window.scored===1&&/тихая ночь|перебранка|Браузер не дал/.test(document.querySelector('.reader-music')?.title||''),null,{timeout:30000});
+ assert.equal(await page.getByRole('button',{name:'Фоновая музыка'}).getAttribute('aria-pressed'),'true');
+ await page.getByRole('button',{name:'Фоновая музыка'}).click();
  assert.deepEqual(errors,[]);
  console.log('Gemini narration: OK (fixture server; MOCKED tone instead of Gemini audio; MOCKED Google bible/roles answers).');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

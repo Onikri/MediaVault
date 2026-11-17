@@ -29,7 +29,7 @@
 .rcx-text a{color:var(--color-blossom-light,#ff6655);text-decoration:underline;text-underline-offset:2px}
 .rcx-text.is-jumbo{font-size:36px;line-height:1.2}
 .rcx-gif{display:block;max-width:min(240px,100%);height:auto;margin-top:4px;border-radius:10px;background:#ffffff0d}
-.rcx-quote{display:grid;gap:1px;max-width:100%;margin:2px 0 4px;padding:5px 10px!important;border-radius:8px;background:#ffffff0d!important;text-align:left;box-shadow:inset 2px 0 0 color-mix(in srgb,var(--x-accent) 70%,transparent)}
+.rcx-quote{display:grid;gap:1px;max-width:100%;margin:2px 0 4px;padding:5px 10px !important;border-radius:8px;background:#ffffff0d!important;text-align:left;box-shadow:inset 2px 0 0 color-mix(in srgb,var(--x-accent) 70%,transparent)}
 .rcx-quote:hover{background:#ffffff16!important}
 .rcx-quote strong{font-size:12px;font-weight:650;color:var(--x-text)}
 .rcx-quote span{font-size:12px;color:var(--x-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -49,7 +49,7 @@
 @media(hover:none){.rcx-actions{display:none}.rcx-msg.is-open .rcx-actions{display:flex}.rcx-msg.is-open{background:#ffffff0a}}
 
 /* Footer: new messages, typing, reply, composer */
-.rcx-unread{position:absolute;left:50%;bottom:92px;z-index:3;display:inline-flex!important;align-items:center;gap:6px;height:30px;padding:0 12px!important;border-radius:99px;background:var(--x-accent)!important;color:#fff!important;font-size:12px;font-weight:650;transform:translateX(-50%);box-shadow:0 8px 20px -6px #000c}
+.rcx-unread{position:absolute;left:50%;bottom:92px;z-index:3;display:inline-flex!important;align-items:center;gap:6px;height:30px;padding:0 12px !important;border-radius:99px;background:var(--x-accent)!important;color:#fff!important;font-size:12px;font-weight:650;transform:translateX(-50%);box-shadow:0 8px 20px -6px #000c}
 .rcx-typing{min-height:18px;margin:4px 0 2px;font-size:12px;color:var(--x-muted)}
 .rcx-ellipsis i{display:inline-block;font-style:normal;animation:rcx-wave 1.2s ease-in-out infinite}
 .rcx-ellipsis i:nth-child(2){animation-delay:.15s}.rcx-ellipsis i:nth-child(3){animation-delay:.3s}
@@ -62,8 +62,8 @@
 .rcx-compose textarea{flex:1;min-width:0;min-height:40px;max-height:120px;box-sizing:border-box;padding:10px 8px;border:0;background:transparent;color:var(--x-text);font:inherit;font-size:14px;line-height:20px;resize:none;outline:0;box-shadow:none!important}
 .rcx-compose textarea::placeholder{color:var(--x-muted)}
 .rcx-tool{display:grid;place-items:center;flex:none;width:36px;height:40px;border-radius:10px;color:var(--x-muted)}
-.rcx-tool:hover,.rcx-tool[aria-expanded=true]{color:var(--x-text);background:#ffffff10!important}
-.rcx-gif-button{font-size:11px!important;font-weight:800!important;letter-spacing:.02em}
+.rcx-tool:hover,.rcx-tool[aria-expanded=true]{color:var(--x-text);background:#ffffff10 !important}
+.rcx-gif-button{font-size:11px !important;font-weight:800 !important;letter-spacing:.02em}
 .rcx-send{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:10px;background:var(--x-accent)!important;color:#fff!important;transition:opacity .15s}
 .rcx-send:disabled{background:#ffffff14!important;color:#ffffff80!important;cursor:default}
 

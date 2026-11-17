@@ -18,3 +18,15 @@
 .profile-menu-live{width:7px;height:7px;border-radius:50%;background:var(--color-blossom)}
 .profile-menu-exit{width:100%;margin-top:6px;background:none;color:var(--color-on-muted)}
 .profile-menu-exit:hover{background:color-mix(in srgb,var(--color-blossom) 12%,transparent);color:var(--color-blossom-light,var(--color-blossom))}
+
+/* Profile avatar and its editor */
+.profile-avatar-image{position:relative;display:grid;place-items:center;border:0;padding:0;overflow:hidden;border-radius:50%;width:100%;height:100%;background:var(--color-canvas-soft);color:var(--color-petal)}
+.profile-avatar-image>img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.profile-avatar-editor{display:grid;justify-items:center;gap:6px}
+.profile-avatar-editor small{font-size:9px;color:var(--color-on-muted)}
+.profile-avatar-editor>button>svg{position:absolute;bottom:5px;right:8px;color:white;filter:drop-shadow(0 1px 2px #000)}
+.profile-avatar-editor>.text-link{display:flex;align-items:center;gap:4px;font-size:10px}
+.profile-avatar-editor>.profile-avatar{width:64px;height:64px;min-width:64px}
+.profile-avatar-editor .profile-avatar-image{cursor:pointer}
+html[data-blossom] .blossom-navbar #profileBtn{width:38px!important;min-width:38px!important;max-width:38px!important;height:38px!important;min-height:38px!important;flex:0 0 38px;padding:0;border:0;border-radius:50%;box-shadow:none;aspect-ratio:1}
+html[data-blossom] .blossom-navbar #profileBtn:focus-visible{outline:none;background:var(--color-surface-raised)}

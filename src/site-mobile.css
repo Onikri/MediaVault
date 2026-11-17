@@ -4,7 +4,7 @@
 
 html[data-blossom] .mobile-dock{display:none}
 
-@media(max-width:1000px){
+@media (--tablet){
  html[data-blossom]{--dock-h:66px;--dock-gap:calc(10px + env(safe-area-inset-bottom));--dock-clear:calc(var(--dock-h) + var(--dock-gap) + 18px)}
 
  /* Top bar: brand on the left, personal actions on the right. */
@@ -34,25 +34,14 @@ html[data-blossom] .mobile-dock{display:none}
  html[data-blossom] .app-footer{margin-bottom:0}
 }
 
-@media(max-width:640px){
+@media (--phone){
  /* Page headings: compact, no decorative icons. */
  html[data-blossom] .page-title-row{margin-bottom:18px}
  html[data-blossom] .page-title-row h1.page-title{font-size:clamp(34px,10vw,44px);line-height:1.02}
  html[data-blossom] .page-title-row .page-subtitle{font-size:13px;line-height:1.5}
 
  /* Library: sections scroll as a row, filters open from the search field. */
- html[data-blossom] .online-library-workspace .library-sidebar-filters:not(.is-open){display:none}
  html[data-blossom] .app-shell[data-view=collection]>.app-main>.chip-row{display:none}
- html[data-blossom] .library-sidebar-filters label,html[data-blossom] .library-sidebar-filters input,html[data-blossom] .library-sidebar-filters select,html[data-blossom] .library-sidebar-filters .mv-select-trigger{width:100%;max-width:none}
- html[data-blossom] .library-sidebar-filters{display:grid;grid-template-columns:1fr 1fr;gap:10px 10px;margin-top:12px}
- html[data-blossom] .library-sidebar-filters>.filter-heading{grid-column:1/-1}
- html[data-blossom] .library-sidebar.blossom-catalog-sidebar{padding:8px;border-radius:20px;margin-bottom:14px}
- html[data-blossom] .library-sidebar.blossom-catalog-sidebar>.filter-heading{display:none}
- html[data-blossom] .library-sidebar nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0}
- html[data-blossom] .library-sidebar nav::-webkit-scrollbar{display:none}
- html[data-blossom] .library-sidebar nav>button{flex:none;width:auto;min-height:38px;padding:0 14px;border-radius:999px;white-space:nowrap}
- html[data-blossom] .library-sidebar nav>button small{display:none}
- html[data-blossom] .library-drive-note{display:none}
  html[data-blossom] .catalog-main-tabs.catalog-action-bar{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:6px;margin-inline:-14px;padding-inline:14px;scroll-padding-inline:14px}
  html[data-blossom] .catalog-main-tabs.catalog-action-bar::-webkit-scrollbar{display:none}
  html[data-blossom] .catalog-main-tabs.catalog-action-bar>*{flex:none}
@@ -86,7 +75,6 @@ html[data-blossom] .mobile-dock{display:none}
  html[data-blossom] .profile-card{flex-direction:column;align-items:stretch;text-align:left}
  html[data-blossom] .profile-actions{flex-direction:column;align-items:stretch}
  html[data-blossom] .profile-actions .btn{width:100%;justify-content:center}
- html[data-blossom] .guest-create .btn{width:100%;justify-content:center}
 
  /* Search and overlays use the full width. */
  html[data-blossom] .morph-search-facets label{flex:1}
@@ -95,16 +83,14 @@ html[data-blossom] .mobile-dock{display:none}
  .scene-lens{max-width:calc(100vw - 24px)}
 }
 html[data-blossom] .online-access .btn{border:0;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
-@media(max-width:640px){
- html[data-blossom] .library-sidebar.blossom-catalog-sidebar{display:flex;flex-direction:column;gap:12px}
- html[data-blossom] .library-sidebar .library-sidebar-filters{margin-top:0;padding:4px 6px 6px}
+@media (--phone){
  html[data-blossom] .hero-stage.title-feature.title-showcase{padding-top:clamp(220px,30svh,300px)}
  html[data-blossom] .title-showcase .poster-actions{max-width:none}
 }
 
 /* The bottom dock already says where you are, so the phone top bar keeps only
    the personal actions; a title page puts its way back in the freed corner. */
-@media(max-width:1000px){
+@media (--tablet){
  html[data-blossom] .blossom-navbar .header-brand-area{display:none}
  html[data-blossom] .blossom-navbar .header-inner,html[data-blossom] .blossom-navbar.is-scrolled .header-inner{justify-content:flex-end}
 }

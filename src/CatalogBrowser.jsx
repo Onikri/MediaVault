@@ -59,7 +59,7 @@ const titlesWord=n=>{const t=n%10,h=n%100;return t===1&&h!==11?'тайтл':t>=2
 
 export function TitleDetails(props){return <WorldTitlePage {...props}/>;}
 
-export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpenLibrary,initialQuery,initialFilters,initialKind,initialTarget,initialItem,destination,favoritesOnly=false}){
+export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpenLibrary,initialQuery,initialFilters,initialKind,initialTarget,initialItem,destination,favoritesOnly=false,tabLabel=''}){
  const contentLanguageValue=useContentLanguage();
   const bookmarks=useCatalogFavorites(state.user?.sub);
   const [layout,setLayout]=useState(()=>{try{const value=localStorage.getItem('mediavault_catalog_view_v2');return ['grid','compact','list','table'].includes(value)?value:'grid';}catch{return 'grid';}});
@@ -71,7 +71,8 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const [filters,setFilters]=useState(()=>({year:'',genre:'',tag:'',format:'',age:'',...Object.fromEntries(Object.entries(initialFilters||{}).filter(([key,value])=>['year','genre'].includes(key)&&value))})),[voice,setVoice]=useState(''),[showFilters,setShowFilters]=useState(true),[page,setPage]=useState(1),[composing,setComposing]=useState(false);
   useEffect(()=>{if(preset){setSelected(preset);onlineTitleLocation(preset,true);}},[preset]);
   const reduced=useReducedMotion();
-  useTabIdentity('',kind,!selected&&!explore);
+  // «Всё» and «Избранное» name the tab themselves, not the kind of the first shelf.
+  useTabIdentity(tabLabel,tabLabel?'':kind,!selected&&!explore);
   const [order,setOrder]=useState(()=>{try{return localStorage.getItem(SORT_KEY)||'popular';}catch{return 'popular';}});
   const changeOrder=value=>{setOrder(value);setPage(1);try{localStorage.setItem(SORT_KEY,value);}catch{}};
   const [columns,setColumns]=useState(()=>typeof innerWidth==='number'?Math.max(2,Math.floor((Math.min(innerWidth,1760)-120)/250)):4),contentRef=useRef(null);

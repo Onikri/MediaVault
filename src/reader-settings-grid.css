@@ -17,7 +17,7 @@
 .reader-panel-body .lmt-settings>.reader-checkbox{display:flex;align-items:center}
 .reader-translation-settings{animation:reader-settings-enter .2s ease-out}
 @keyframes reader-settings-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@media(max-width:520px){.reader-panel-body .lmt-settings{grid-template-columns:minmax(0,1fr);gap:16px}.reader-panel-body{padding:18px}.reader-panel:has(.reader-translation-settings){width:calc(100% - 24px)}}
+@media (--phone){.reader-panel-body .lmt-settings{grid-template-columns:minmax(0,1fr);gap:16px}.reader-panel-body{padding:18px}.reader-panel:has(.reader-translation-settings){width:calc(100% - 24px)}}
 @media(prefers-reduced-motion:reduce){.reader-translation-settings{animation:none}.reader-panel-body .lmt-settings button{transition:none}}
 
 .reader-model-storage{grid-column:1/-1;min-width:0;border:1px solid color-mix(in srgb,var(--color-petal) 9.41%,transparent);border-radius:12px;padding:16px}.reader-model-storage legend{font-size:13px;padding:0 6px}.reader-model-storage-actions{display:flex;flex-wrap:wrap;gap:8px}.reader-model-storage progress{width:100%;height:5px;accent-color:var(--color-blossom)}
@@ -39,5 +39,7 @@
 .reader-panel .reader-panel-body .lmt-settings>label.reader-checkbox{display:flex;align-items:center;gap:10px;grid-column:1/-1}
 .reader-panel .reader-panel-body .lmt-settings button.mv-switch{width:32px;height:18px;min-height:18px;padding:0;border:0;border-radius:100px;flex:none}
 .reader-panel .reader-google-key,.reader-panel .reader-model-storage{border:0;background:var(--color-canvas);padding:12px;border-radius:16px}.reader-panel-body .lmt-settings>.reader-google-keys{border:0;padding:0}.reader-google-keys>summary{padding:6px 0;font-size:11px}
-@media(max-width:520px){.reader-panel .reader-panel-body .lmt-settings{grid-template-columns:minmax(0,1fr);gap:12px}.reader-translation-heading h3{font-size:12px}}
+@media (--phone){.reader-panel .reader-panel-body .lmt-settings{grid-template-columns:minmax(0,1fr);gap:12px}.reader-translation-heading h3{font-size:12px}}
 .reader-language-result{grid-column:1/-1;font-size:11px;line-height:1.6;color:var(--color-petal);margin:0}.reader-language-result small{display:block;color:var(--color-on-muted);font-size:10px}.reader-translation-spinner{animation:reader-translation-spin 1s linear infinite}.reader-language-working{animation:reader-language-pulse 1s ease-in-out infinite alternate}@keyframes reader-translation-spin{to{transform:rotate(360deg)}}@keyframes reader-language-pulse{to{opacity:.35}}@media(prefers-reduced-motion:reduce){.reader-translation-spinner,.reader-language-working{animation:none}}
+/* A face for each voice of the lettering. */
+.reader-voice-fonts{grid-column:1/-1;min-width:0}.reader-voice-fonts summary{font-size:10px;color:var(--color-on-muted);cursor:pointer;padding:4px 0}.reader-voice-fonts .reader-settings-grid{margin-top:8px}.reader-voice-fonts label{display:grid;gap:6px;font-size:10px}

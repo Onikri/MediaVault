@@ -229,6 +229,111 @@ class AllohaImportTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(b''.join(open_chunk(drive.download(c['fileId']),vault._key,item['id'],n,c['iv']) for n,c in enumerate(item['chunks'])),raw)
             self.assertFalse(checkpoint.exists())
         finally:vault.close()
+    async def test_refused_segment_never_poisons_stream_resume(self):
+        """A segment lost after every recovery stops the pipe before ffmpeg skips it.
+        «Продолжить» then finishes the film instead of failing on a mismatched part."""
+        drive=FakeDrive();vault=VaultDrive(drive,sleep=lambda _:None);library=vault.initialize(PHRASE)
+        job={'version':3,'library_id':library,'sources':[IFRAME],'collection':'Stream resume','quality':'720',
+             'section':'anime','entries':[{'number':1,'season':1,'url':IFRAME}]}
+        cache=self.root/'resume-cache'
+        run=lambda:asyncio.to_thread(run_job,job,vault,alloha_streamer=self.importer.stream,alloha_cache=cache,temporary_dir=self.root,log=lambda _:None)
+        try:
+            NativeSource.fail_always=True
+            from alloha_stream import StreamInterrupted
+            with self.assertRaisesRegex(StreamInterrupted,'Alloha'):await run()
+            self.assertEqual(vault.refresh()['items'],[])
+            self.assertFalse(any(name.startswith('part-') for _,name in drive.upload_calls),'no part after the lost segment')
+            NativeSource.fail_always=False
+            result=await run()
+            self.assertEqual(result['saved'],1)
+            item=vault.refresh()['items'][0]
+            output=self.root/'resumed.mp4'
+            output.write_bytes(b''.join(open_chunk(drive.download(c['fileId']),vault._key,item['id'],n,c['iv']) for n,c in enumerate(item['chunks'])))
+            info=verify_video(output)
+            self.assertAlmostEqual(float(info['format']['duration']),2.4,delta=.3)
+            self.assertEqual(list(cache.iterdir()),[])
+        finally:vault.close()
+
+    async def test_stream_resume_replaces_parts_that_differ(self):
+        """Parts saved from an older or damaged stream are replaced from the first
+        byte that differs; verified identical parts are still reused."""
+        import io
+        from vault_drive import CHUNK_SIZE
+        drive=FakeDrive();vault=VaultDrive(drive,sleep=lambda _:None);library=vault.initialize(PHRASE)
+        good=b'A'*CHUNK_SIZE+b'B'*CHUNK_SIZE+b'C'*1000
+        damaged=b'A'*CHUNK_SIZE+b'X'*CHUNK_SIZE+b'Y'*CHUNK_SIZE+b'Z'*10
+        checkpoint=self.root/'differ'/'stream.enc.json'
+        class Broken(io.BytesIO):
+            def read(self,size=-1):
+                if self.tell()>=3*CHUNK_SIZE:raise SourceError('injected interruption')
+                return super().read(size)
+        options={'name':'differ.mp4','collection':'Differ','checkpoint':checkpoint,'stream_identity':'verified-layout'}
+        try:
+            with self.assertRaisesRegex(SourceError,'interruption'):
+                vault.upload_stream(Broken(damaged),validate=lambda:None,**options)
+            parts=[c for c,name in drive.upload_calls if name.startswith('part-')]
+            self.assertEqual(len(parts),3)
+            first_part,stale=parts[0],set(parts[1:])
+            previous=sum(name.startswith('part-') for _,name in drive.upload_calls)
+            vault.close();vault=VaultDrive(drive,sleep=lambda _:None);vault.unlock(library,PHRASE)
+            item=vault.upload_stream(io.BytesIO(good),validate=lambda:None,**options)
+            self.assertEqual(sum(name.startswith('part-') for _,name in drive.upload_calls),previous+2)
+            self.assertEqual(item['chunks'][0]['fileId'],first_part)
+            self.assertEqual(b''.join(open_chunk(drive.download(c['fileId']),vault._key,item['id'],n,c['iv']) for n,c in enumerate(item['chunks'])),good)
+            self.assertTrue(stale<=set(drive.trashed))
+            self.assertFalse(checkpoint.exists())
+        finally:vault.close()
+
+    async def test_stream_differing_from_the_first_part_then_failing_leaves_no_dead_resume(self):
+        import io
+        from vault_drive import CHUNK_SIZE
+        drive=FakeDrive();vault=VaultDrive(drive,sleep=lambda _:None);library=vault.initialize(PHRASE)
+        good=b'G'*CHUNK_SIZE+b'H'*100
+        checkpoint=self.root/'dead'/'stream.enc.json'
+        class Broken(io.BytesIO):
+            def read(self,size=-1):
+                if self.tell()>=CHUNK_SIZE:raise SourceError('injected interruption')
+                return super().read(size)
+        options={'name':'dead.mp4','collection':'Dead','checkpoint':checkpoint,'stream_identity':'verified-layout'}
+        try:
+            with self.assertRaisesRegex(SourceError,'interruption'):
+                vault.upload_stream(Broken(b'D'*CHUNK_SIZE+b'E'*100),validate=lambda:None,**options)
+            self.assertTrue(checkpoint.exists())
+            drive.fail_parts=True
+            with self.assertRaises(Exception):
+                vault.upload_stream(io.BytesIO(good),validate=lambda:None,**options)
+            self.assertFalse(checkpoint.exists(),'the resume index never points at a trashed folder')
+            drive.fail_parts=False
+            item=vault.upload_stream(io.BytesIO(good),validate=lambda:None,**options)
+            self.assertNotIn(item['folderId'],drive.trashed)
+            self.assertEqual(b''.join(open_chunk(drive.download(c['fileId']),vault._key,item['id'],n,c['iv']) for n,c in enumerate(item['chunks'])),good)
+        finally:vault.close()
+
+    async def test_stream_resume_with_renewed_layout_starts_clean(self):
+        """A stream whose layout changed is not mixed with saved parts: they are
+        discarded and the film is saved from the start instead of failing forever."""
+        import io
+        from vault_drive import CHUNK_SIZE
+        drive=FakeDrive();vault=VaultDrive(drive,sleep=lambda _:None);library=vault.initialize(PHRASE)
+        raw=b'renewed-payload-'*(CHUNK_SIZE//8)
+        checkpoint=self.root/'renewed'/'stream.enc.json'
+        class Broken(io.BytesIO):
+            def read(self,size=-1):
+                if self.tell()>=CHUNK_SIZE:raise SourceError('injected interruption')
+                return super().read(size)
+        options={'name':'renewed.mp4','collection':'Renewed','checkpoint':checkpoint}
+        try:
+            with self.assertRaisesRegex(SourceError,'interruption'):
+                vault.upload_stream(Broken(raw),validate=lambda:None,stream_identity='old-layout',**options)
+            old_asset=drive.files[next(c for c,name in drive.upload_calls if name.startswith('part-'))]['parents'][0]
+            vault.close();vault=VaultDrive(drive,sleep=lambda _:None);vault.unlock(library,PHRASE)
+            item=vault.upload_stream(io.BytesIO(raw),validate=lambda:None,stream_identity='new-layout',**options)
+            self.assertNotEqual(item['folderId'],old_asset)
+            self.assertIn(old_asset,drive.trashed)
+            self.assertEqual(b''.join(open_chunk(drive.download(c['fileId']),vault._key,item['id'],n,c['iv']) for n,c in enumerate(item['chunks'])),raw)
+            self.assertFalse(checkpoint.exists())
+        finally:vault.close()
+
     async def test_refusal_reopens_without_fetching_saved_segments(self):
         NativeSource.fail_second=True
         output=await self.download();info=verify_video(output)

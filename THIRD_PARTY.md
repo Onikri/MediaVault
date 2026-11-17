@@ -407,6 +407,14 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   vector estimator, vocoder, configuration, character indexer and the ten voice styles).
 - `src/tts/supertonic.worker.js` ports the inference loop of Supertone's MIT-licensed
   `web/helper.js` (https://github.com/supertone-oss-archive/supertonic).
+- **Background music of the ranobe reader** — pieces by **Kevin MacLeod**
+  (https://incompetech.com), licensed **Creative Commons: By Attribution 4.0**
+  (https://creativecommons.org/licenses/by/4.0/). `src/tts/music-catalog.js` holds only
+  metadata (title, file name, mood tags, tempo, length, instruments, a shortened
+  description) taken from incompetech.com's `pieces.json` by
+  `scripts/build-music-catalog.py`; the audio is streamed by the viewer's browser from
+  incompetech.com and is not redistributed. The reader settings show the credit
+  «Музыка: Kevin MacLeod · incompetech.com · CC BY 4.0» with a link.
 
 ## Text sources
 
@@ -501,3 +509,5 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   `6f345a81459739e35d8fc94c05455464e856f771`, including the shared reader
   formats from `lib/clipstudioreader` and `lib/publus`. The inventory records
   the corresponding extension path for each publisher.
+- MediaVault modifications to the Libre Manga Translator sources (AGPL-3.0-or-later, published with the rest of [lmt/](lmt/)), 2026-11: the page typesetter was replaced by [lmt/typeset/](lmt/typeset/) (balloon-shaped composition, Russian hyphenation, page-wide sizing, roles) and is shared with `src/manga-renderer.js`; `lib/detections/rtdetr.ts` additionally exposes balloon boxes and the free-text class; `lib/inpaint/telea.ts` was rewritten around a chamfer distance transform with the level-set weight; `lib/inpaint/tone.ts` (new) restores periodic screentone before Telea and is called from `lib/inpaint/ladder.ts`. Upstream `lib/canvas/text-fit.ts` is kept unmodified.
+- Private lettering fonts of the site owner are not part of this repository or of the public site bundle and are not redistributed by it: they live in the gitignored `reader-fonts/local/` (local builds) or on the owner's server, which serves them only to the authenticated owner (`/reader/lmt/fonts`), under the owner's own licences.

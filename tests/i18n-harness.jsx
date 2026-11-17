@@ -1,7 +1,7 @@
 // Interface language harness: real ControlCenter shell, fixture panels, no server.
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import '/src/styles.css';import '/src/site-layout.css';import '/src/interface-refinement.css';
+import '/src/styles.css';import '/src/site-layout.css';import '/src/title-page.css';import '/src/reader-save.css';import '/src/import-queue.css';import '/src/profile-menu.css';
 import {ThemeProvider,AppearanceSettings} from '/src/blossom/ThemeProvider.tsx';
 import ControlCenter from '/src/control/ControlCenter.jsx';
 import LanguageSettings from '/src/i18n/LanguageSettings.jsx';

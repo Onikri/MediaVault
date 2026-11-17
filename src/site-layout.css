@@ -3,7 +3,7 @@
    both widen together; the top (unscrolled) navbar spreads nearly edge to edge. */
 html[data-blossom]{--site-width:min(1720px,calc(100% - clamp(40px,5vw,112px)))}
 
-@media(min-width:901px){
+@media (--desktop){
  html[data-blossom] .app-shell>.app-main{width:var(--site-width);max-width:1720px}
  html[data-blossom] .app-shell>.blossom-navbar{width:min(2200px,calc(100% - 28px))}
  html[data-blossom] .app-shell>.blossom-navbar.is-scrolled{width:var(--site-width)}
@@ -24,7 +24,7 @@ html[data-blossom] .morph-search-footer{padding:9px 12px 3px}
 html[data-blossom] .morph-search-results{margin-top:6px}
 
 /* ---------- Bigger cards ---------- */
-@media(min-width:901px){
+@media (--desktop){
  html[data-blossom] .blossom-catalog-content .catalog-grid.catalog-layout-grid{grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:26px 20px}
  html[data-blossom] .blossom-catalog-content .catalog-layout-compact{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
  html[data-blossom] .media-grid.library-layout-grid{grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:26px 20px}
@@ -33,7 +33,7 @@ html[data-blossom] .morph-search-results{margin-top:6px}
 }
 
 /* Title page: the wider column gives the right rail (room chat, ratings, order) room. */
-@media(min-width:1200px){html[data-blossom] .title-page .mv-title-layout{grid-template-columns:minmax(0,1fr) clamp(300px,22vw,360px);gap:clamp(28px,2.6vw,44px)}}
+@media (--desktop){html[data-blossom] .title-page .mv-title-layout{grid-template-columns:minmax(0,1fr) clamp(300px,22vw,360px);gap:clamp(28px,2.6vw,44px)}}
 
 /* Collection toolbar: one calm row, rounded surfaces, no outlines. */
 html[data-blossom] .admin-bar{border:0;border-radius:22px;background:var(--color-surface);padding:12px}
@@ -52,7 +52,6 @@ html[data-blossom] .morph-search-footer .morph-search-frame:hover{background:rgb
 /* Title showcase starts at the very top, behind the navbar: no black band. */
 html[data-blossom] .app-shell:has(.title-showcase)>.app-main{padding-top:0}
 html[data-blossom] .app-main .library-workspace:has(.title-showcase){margin-top:0}
-@media(max-width:900px){html[data-blossom] .app-main .library-workspace:has(.title-showcase)>.library-sidebar{display:none}}
 
 /* ---------- Grid alignment, both versions ---------- */
 /* Page headings: eyebrow, title and subtitle on one left edge; no decorative icon. */
@@ -67,3 +66,4 @@ html[data-blossom] .empty-state{border:0;background:var(--color-surface);border-
 html[data-blossom] .profile-actions .btn-secondary,html[data-blossom] .import-library-dialog .btn-secondary{border:0;background:var(--color-surface-raised,rgb(255 255 255 / .08))}
 /* Section rhythm: the same vertical gap between blocks everywhere. */
 html[data-blossom] .app-main>.page-title-row+*{margin-top:0}
+.crash-boundary.crash-page{max-width:640px;margin:20vh auto 0;padding:16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}

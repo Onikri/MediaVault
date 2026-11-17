@@ -1,6 +1,5 @@
 import GoogleKeySettings from './GoogleKeyFields.jsx';
 import useMangaPolicy from './use-manga-policy.js';
-import SharedTitlePage from './SharedTitlePage.jsx';
 import {RetainedMediaProvider,VideoDock,useRetainedWorkspace} from './RetainedMedia.jsx';
 import {ChapterSaveDock} from './ChapterSaveView.jsx';
 import NotificationBell from './NotificationBell.jsx';
@@ -11,8 +10,6 @@ import ProfileMenu from './ProfileMenu.jsx';
 import SceneSearch from './SceneSearch.jsx';
 import GuestAccess from './GuestAccess.jsx';
 import {clearGuestSession,readInviteToken,useGuestSession} from './guest-session.js';
-import './interface-refinement.css';
-import ControlCenter from './control/ControlCenter.jsx';
 import MangaSourceManager from './MangaSourceManager.jsx';
 import {roomLink} from './watch-room.js';
 import KodikConnection from './KodikConnection.jsx';
@@ -21,6 +18,7 @@ import {readOnlineTitle} from './title-route.js';
 import {setHistoryScope} from './history-scope.js';
 import {kindIcon} from './tab-identity.js';
 import DeviceShelf from './DeviceShelf.jsx';
+import CrashBoundary from './CrashBoundary.jsx';
 import React,{lazy,Suspense,useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {motion,useReducedMotion} from 'motion/react';
 import ServerImport from './ServerImport.jsx';
@@ -44,7 +42,6 @@ import {useVault,formatSize,labels} from './vault.js';
 import Icon,{BrandMark} from './Icons.jsx';
 import Artwork from './Artwork.jsx';
 import {MusicShelf} from './Soundtrack.jsx';
-import MediaViewer from './MediaViewer.jsx';
 import MiniMusicPlayer from './MiniMusicPlayer.jsx';
 import {playMusic} from './music-player.js';
 import OnlineLibrary from './OnlineLibrary.jsx';
@@ -63,8 +60,13 @@ import {HomeDiscover} from './blossom/HomeDiscover.tsx';
 import {SearchDialog} from './blossom/components/SearchDialog.tsx';
 import {blossomRecord} from './blossom/media-adapter.js';
 import {uiLocale} from './i18n/index.js';
+import {usePlaceSync} from './use-place-sync.js';
 
 const WatchRoomPage=lazy(()=>import('./WatchRoomPage.jsx'));
+// The admin console and the readers load when they open, not with the first page.
+const ControlCenter=lazy(()=>import('./control/ControlCenter.jsx'));
+const MediaViewer=lazy(()=>import('./MediaViewer.jsx'));
+const SharedTitlePage=lazy(()=>import('./SharedTitlePage.jsx'));
 const sections=[{id:'anime',art:'video',name:'Аниме',formats:'ТАЙТЛЫ · СЕЗОНЫ · СЕРИИ',icon:'video'},
   {id:'manga',art:'manga',name:'Манга',formats:'ТАЙТЛЫ · ТОМА · ГЛАВЫ',icon:'manga'},
   {id:'ranobe',art:'book',name:'Ранобэ',formats:'ТАЙТЛЫ · ТОМА',icon:'book'},
@@ -133,6 +135,7 @@ function MediaVaultApp(){
   const importService=useImportService(state,actions);
   useMangaPolicy(importService);
   const retained=useRetainedWorkspace();useEffect(()=>{setHistoryScope(state.user?.sub);retained?.scope(state.user?.sub);},[retained,state.user?.sub]);
+  usePlaceSync(state.user?.sub,importService,retained);
   const [importTab,setImportTab]=useState('catalog');
   const guestSession=useGuestSession(),guest=!state.user?guestSession:null;
   const [guestScreen,setGuestScreen]=useState(()=>readInviteToken()?{mode:'invite',invite:readInviteToken()}:location.hash==='#signin'?{mode:'login'}:null);
@@ -285,7 +288,7 @@ function MediaVaultApp(){
         <HistoryTimeline recent={recent} onOpen={open} userId={state.user?.sub} libraryId={state.libraryId} actions={actions} onForgetCollection={id=>{const next=history.filter(v=>v.id!==id);setHistory(next);writeLocal(localPrefix+'_history',next);}} onClearCollection={()=>{setHistory([]);writeLocal(localPrefix+'_history',[]);}} renderCover={item=>{const profile=itemProfile(item),preview=item.previewArtwork,url=preview?'drive:'+preview.id:profile?.cover||item.preview;return url?<TitleImage url={url} profile={preview?{...profile,artwork:{...profile?.artwork,[url]:preview}}:profile} actions={actions} libraryId={state.libraryId}/>:<Artwork kind={item.category}/>;}} empty={<EmptyState icon="history" title="История пуста" text="Открой тайтл в библиотеке или файл из коллекции — он появится здесь." button="Открыть библиотеку" onClick={()=>go('library')}/>}/>
       </>}
 
-      {view==='profile'&&<ControlCenter state={state} guest={guest} service={importService} initialTab={profileTab} onLogout={logout} onOpenRoom={id=>window.open(roomLink(id),'_blank','noopener')} panels={{
+      {view==='profile'&&<Suspense fallback={<div className="lazy-stage" role="status" aria-label="Загружаем…"/>}><ControlCenter state={state} guest={guest} service={importService} initialTab={profileTab} onLogout={logout} onOpenRoom={id=>window.open(roomLink(id),'_blank','noopener')} panels={{
         account:<>        <section className="profile-card"><ProfileAvatar user={state.user} className="profile-avatar" editable/><div className="profile-meta"><h2>{state.user?(state.user.given_name||'Твой профиль'):guest?guest.guest.name:'Добро пожаловать'}</h2><p>{state.user?state.user.email:guest?'Гостевой профиль · @'+guest.guest.login+(guest.guest.expiresAt?' · до '+new Date(guest.guest.expiresAt*1000).toLocaleDateString(uiLocale()):''):'Войди, чтобы открыть свою коллекцию'}</p><span id="status" className={'status-pill'+(state.catalog?' connected':'')}>{state.status}</span></div><div className="profile-actions"><button id="loginBtn" className="btn btn-primary" disabled={!!state.user||busy} onClick={actions.login}>{state.user?<><Icon name="check" size={17}/>Вход выполнен</>:<><GoogleMark/>Войти через Google</>}</button>{!state.user&&!guest&&<button className="btn btn-secondary" onClick={()=>setGuestScreen({mode:'login'})}><Icon name="user" size={17}/>Вход по приглашению</button>}{state.user&&(!state.driveConnected||state.catalog)&&<button id="driveBtn" className="btn btn-secondary" disabled={busy} onClick={connect}><Icon name="cloud" size={18}/>{state.driveConnected?'Обновить доступ к файлам':state.catalog?'Подключить Drive заново':'Разрешить доступ к файлам'}</button>}</div></section>
         {state.notice&&<aside id="notice" className="notice-card"><span><Icon name={state.authConfigured?'lock':'cloud'} size={21}/></span><div><h3 className="notice-title">{state.authConfigured?state.notice.title:'Остался один шаг для входа'}</h3><p>{state.authConfigured?state.notice.text:'Нужно завершить настройку Google. Пока коллекция закрыта, твои файлы остаются в твоём Drive.'}</p>{!state.authConfigured&&<a className="text-link" href={guide} target="_blank" rel="noopener noreferrer">Как подключить Google<Icon name="arrow" size={15}/></a>}</div></aside>}
         {state.driveConnected&&!state.catalog&&<LibrarySetup state={state} libraryId={libraryId} setLibraryId={setLibraryId} passphrase={passphrase} setPassphrase={setPassphrase} again={again} setAgain={setAgain} onOpen={openLibrary} onFind={actions.findMyLibrary}/>}
@@ -296,7 +299,7 @@ function MediaVaultApp(){
         storage:!guest||state.user?<>{state.catalog&&<section className="settings-card"><div className="section-heading"><h2 className="section-title">Твоя коллекция</h2><span className="status-pill connected"><Icon name="check" size={13}/> Открыта</span></div><div className="profile-stats"><div><strong>{items.length}</strong><span>{plural(items.length)}</span></div><div><strong>{formatSize(totalSize)}</strong><span>в твоём Drive</span></div><div><strong>{state.admin?'Владелец':'Зритель'}</strong><span>твой доступ</span></div></div><button className="btn btn-secondary" onClick={()=>go('collection')}>В мою коллекцию<Icon name="arrow" size={17}/></button></section>}<section className="settings-card connection-settings-card"><h2>Подключения и импорт</h2><p className="fine">Настройки соединения с сервером и Google Диском доступны только в профиле.</p><ImportSettings service={importService} state={state} onConnect={showLibrarySetup}/><div className="connection-settings-status" role="status"><span className={importService.status==='connected'?'is-ready':''}>{importService.status==='connected'?'Сервер подключён':'Сервер не подключён'}</span><span>{state.driveConnected?'Браузер: Google Диск подключён':'Браузер: Google Диск не подключён'}</span></div></section><DriveServerStatus service={importService} enabled={!!(state.admin&&state.user)}/></>:null,
         sources:!guest||state.user?<>{state.admin&&<section className="settings-card"><h2>Переводчик Google</h2><GoogleKeySettings scope={state.user?.sub} service={importService} server onSaveServer={slots=>importService.request('/reader/google/keys',{method:'POST',body:{slots}})}/></section>}<AllohaConnection service={importService}/><KodikConnection service={importService}/><YouTubeServerSession service={importService} enabled={!!(state.admin&&state.user)}/><MusicConnections userId={state.user?.sub}/>{state.admin&&importService.status==='connected'&&Number(importService.session?.serverVersion)>=14&&<section className="settings-card manga-sources-card"><h2>Читалки манги</h2><p className="fine">Расширения Suwayomi на ВМ. Подключённые читалки появятся в общем поиске переводов.</p><MangaSourceManager service={importService}/></section>}</>:null,
         privacy:<DeviceSettings state={state} actions={{...actions,biometricUnlock:()=>{unlockedHere.current=true;return actions.biometricUnlock();}}}/>
-      }}/>}
+      }}/></Suspense>}
     </motion.main>
     <CookieNotice state={state} actions={actions}/>
     <SceneSearch/>
@@ -305,10 +308,10 @@ function MediaVaultApp(){
     <Dialog.Root open={libraryDialog} onOpenChange={value=>{setLibraryDialog(value);if(!value){setPassphrase('');setAgain('');}}}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="server-dialog import-library-dialog" onCloseAutoFocus={event=>{event.preventDefault();libraryOpener.current?.isConnected&&libraryOpener.current.focus({preventScroll:true});}}><Dialog.Close className="icon-button dialog-close" aria-label="Закрыть подключение библиотеки"><Icon name="close" size={18}/></Dialog.Close><Dialog.Title>{onlineAccess?'Онлайн-просмотр':'Библиотека для импорта'}</Dialog.Title><Dialog.Description>Выбранные тайтл, озвучка и серии останутся на странице.</Dialog.Description>{!state.user&&guest&&onlineAccess?<><p>{importService.error||'Ты вошёл как гость «'+guest.guest.name+'». Подключаем источники.'}</p><button className="btn btn-primary" onClick={()=>importService.refresh().then(()=>setLibraryDialog(false)).catch(()=>{})}>Подключить</button></>:!state.user?<div className="form-actions"><button className="btn btn-primary" disabled={busy} onClick={actions.login}><GoogleMark/>Войти через Google</button><button className="btn btn-secondary" onClick={()=>{setLibraryDialog(false);setGuestScreen({mode:'login'});}}>Вход по приглашению</button></div>:!state.admin?<><p>Войди владельцем: roma.shevchenko2020@gmail.com.</p><button className="btn btn-secondary" onClick={actions.logout}>Сменить аккаунт</button></>:onlineAccess?<><p>{importService.error||'Подключаем источники. Google Диск открывать не требуется.'}</p><button className="btn btn-primary" onClick={()=>importService.refresh().catch(()=>{})}>Подключить сервер</button></>:!state.driveConnected?<button className="btn btn-primary" disabled={busy} onClick={actions.connectDrive}>Разрешить доступ к библиотеке</button>:!state.catalog?<LibrarySetup state={state} libraryId={libraryId} setLibraryId={setLibraryId} passphrase={passphrase} setPassphrase={setPassphrase} again={again} setAgain={setAgain} onOpen={create=>openLibrary(create,true)} onFind={actions.findMyLibrary}/>:<button className="btn btn-primary" onClick={()=>setLibraryDialog(false)}>Библиотека открыта — продолжить</button>}</Dialog.Content></Dialog.Portal></Dialog.Root>
     {searchOpen&&<SearchDialog service={importService} onClose={()=>setSearchOpen(false)} onChoose={item=>openSearchResult(item)} onBrowse={(query,kind,filters)=>openSearchResult(null,query,kind,filters)}/> }
 
-    {selected&&selected.category!=='video'&&state.catalog&&<MediaViewer userId={state.user?.sub} key={selected.category==='manga'?'manga-reader':selected.id} item={selected} catalog={state.catalog} libraryId={state.libraryId} onSelectItem={open} onClose={closeViewer} readWhole={actions.readWhole} readRange={actions.readRange} readerService={importService} prepareStream={actions.prepareStream} onError={actions.error}/>}
+    {selected&&selected.category!=='video'&&state.catalog&&<Suspense fallback={null}><MediaViewer userId={state.user?.sub} key={selected.category==='manga'?'manga-reader':selected.id} item={selected} catalog={state.catalog} libraryId={state.libraryId} onSelectItem={open} onClose={closeViewer} readWhole={actions.readWhole} readRange={actions.readRange} readerService={importService} prepareStream={actions.prepareStream} onError={actions.error}/></Suspense>}
   </div>;
 }
 
 function GoogleMark(){return <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.8 12.2c0-.7-.1-1.4-.2-2.1H12v4h5.5a4.7 4.7 0 0 1-2.1 3.1v2.6h3.4c2-1.8 3-4.4 3-7.6ZM12 22c2.8 0 5.1-.9 6.8-2.4l-3.4-2.6a6.2 6.2 0 0 1-9.2-3.2H2.7v2.7A10.2 10.2 0 0 0 12 22ZM6.2 13.8a6.1 6.1 0 0 1 0-3.6V7.5H2.7a10 10 0 0 0 0 9l3.5-2.7ZM12 6c1.5 0 2.8.5 3.9 1.5l3-3A10.2 10.2 0 0 0 2.7 7.5l3.5 2.7A6.1 6.1 0 0 1 12 6Z"/></svg>}
 
-export default function App(){const [share,setShare]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('share'));useEffect(()=>{const update=()=>setShare(new URLSearchParams(location.hash.slice(1)).get('share'));addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);const [room,setRoom]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('room'));useEffect(()=>{const update=()=>setRoom(new URLSearchParams(location.hash.slice(1)).get('room'));addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);return <ThemeProvider><RetainedMediaProvider>{share?<SharedTitlePage token={share}/>:room?<Suspense fallback={<div className="watch-room-gate">Загружаем комнату…</div>}><WatchRoomPage identity={room}/></Suspense>:<MediaVaultApp/>}</RetainedMediaProvider></ThemeProvider>;}
+export default function App(){const [share,setShare]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('share'));useEffect(()=>{const update=()=>setShare(new URLSearchParams(location.hash.slice(1)).get('share'));addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);const [room,setRoom]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('room'));useEffect(()=>{const update=()=>setRoom(new URLSearchParams(location.hash.slice(1)).get('room'));addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);return <ThemeProvider><RetainedMediaProvider>{share?<Suspense fallback={<div className="watch-room-gate">Открываем…</div>}><SharedTitlePage token={share}/></Suspense>:room?<CrashBoundary label="Комната" className="crash-page"><Suspense fallback={<div className="watch-room-gate">Загружаем комнату…</div>}><WatchRoomPage identity={room}/></Suspense></CrashBoundary>:<MediaVaultApp/>}</RetainedMediaProvider></ThemeProvider>;}

@@ -4,7 +4,7 @@ import {ArrowRight,Cloud,LayoutGrid,List,Table2} from 'lucide-react';
 import './import-queue.css';
 import {uiLocale} from './i18n/index.js';
 const names={queued:'В очереди',running:'Выполняется',completed:'Завершено',failed:'Прервано',waiting_auth:'Нужен вход Google',cancelling:'Останавливается',cancelled:'Остановлено',merged:'Объединено'};
-const phases={queued:'Ожидает выполнения',artwork:'Получаем изображения',preparing:'Подготовка',downloading:'Скачиваем файл',assembling:'Собираем видео',uploading:'Шифруем и записываем в Drive',episode_done:'Файл добавлен',done:'Готово',failed:'Нужно продолжить',merged:'Объединено с другим заданием'};
+const phases={queued:'Ожидает выполнения',translating:'Перевод на ВМ',artwork:'Получаем изображения',preparing:'Подготовка',downloading:'Скачиваем файл',assembling:'Собираем видео',uploading:'Шифруем и записываем в Drive',episode_done:'Файл добавлен',done:'Готово',failed:'Нужно продолжить',merged:'Объединено с другим заданием'};
 const active=new Set(['running','queued','cancelling']);
 function initial(){try{return JSON.parse(localStorage.getItem('mv_import_queue_view_v1'))||{};}catch{return {};}}
 export default function ImportQueue({service}){

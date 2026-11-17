@@ -55,7 +55,7 @@
 .cc-text-button:hover{color:var(--color-petal)}
 .cc-confirm{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cc-confirm>span{font-size:13px;color:var(--color-on-muted)}
-.cc-surface,.cc-onair,.cc-room,.cc-guest-pane,.cc-rule-list{background:var(--color-surface);border-radius:22px}
+.cc-onair,.cc-room,.cc-guest-pane,.cc-rule-list{background:var(--color-surface);border-radius:22px}
 .cc-quiet{display:grid;gap:6px;padding:6px 0 2px}.cc-quiet>p:first-child{margin:0;font:650 17px/1.4 var(--font-display);letter-spacing:-.015em}
 .cc .mv-select-trigger{height:36px;border-radius:999px;padding:0 14px;font-size:13px;font-weight:600}
 
@@ -196,7 +196,7 @@
 .cc-tasks .queue-auth-wait{margin:0 0 18px;padding:18px 20px;font-size:13px}
 .cc-tasks .queue-auth-wait p{font-size:12.5px}
 .cc-tasks .queue-status i{display:none}
-@media(max-width:1180px){.cc-tasks .import-queue .queue-task{grid-template-columns:minmax(0,1fr) auto;gap:9px 16px}}
+@media (--tablet){.cc-tasks .import-queue .queue-task{grid-template-columns:minmax(0,1fr) auto;gap:9px 16px}}
 .cc-tasks .queue-status{font-weight:650}
 .cc-tasks .queue-status.status-running{color:var(--color-petal)}.cc-tasks .queue-status.status-failed{color:var(--cc-bad)}.cc-tasks .queue-status.status-waiting_auth{color:var(--cc-warn)}.cc-tasks .queue-status.status-completed{color:var(--cc-ok)}
 
@@ -222,7 +222,9 @@
 .cc-reset{justify-self:start}
 
 /* Settings sections reused from the rest of the site, put on the same surfaces */
-.cc-body>.settings-card,.cc-body>.profile-card,.cc-body>.notice-card,.cc-body>.music-connections,.cc-body>section.kodik-connection{margin:0!important;min-width:0;padding:24px 26px!important;border:0!important;border-radius:22px;background:var(--color-surface)!important;box-shadow:none!important}
+.cc-body>.settings-card,.cc-body>.profile-card,.cc-body>.notice-card,.cc-body>.music-connections,.cc-body>section.kodik-connection{min-width:0;border-radius:22px}
+/* Cards inside the control center drop the standalone card frame from integration.css. */
+html[data-blossom] .cc-body>:is(.settings-card,.profile-card,.notice-card,.music-connections,section.kodik-connection){margin:0;padding:24px 26px;border:0;background:var(--color-surface);box-shadow:none}
 .cc-body>.settings-card h2,.cc-body>.music-connections h2,.cc-body .section-title{margin:0 0 8px;font:700 20px/1.2 var(--font-display)!important;letter-spacing:-.025em}
 .cc-body .fine{font-size:13px;line-height:1.6}
 .cc-body .profile-card{display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap}
@@ -237,14 +239,14 @@
 .cc-body .profile-stats{margin:18px 0}
 .cc-body .manga-source-manager{margin-top:12px}
 
-@media(max-width:1180px){.cc-health{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:1000px){
+@media (--tablet){.cc-health{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (--tablet){
  .cc-guests{grid-template-columns:minmax(0,1fr)}
  .cc-guest-index{position:static}
  .cc-guests.is-detail .cc-guest-index{display:none}
  .cc-split{grid-template-columns:minmax(0,1fr)}
 }
-@media(max-width:860px){
+@media (--tablet){
  .cc{grid-template-columns:minmax(0,1fr);gap:18px;margin-top:4px}
  .cc-rail{position:static;max-height:none;overflow:visible;gap:0}
  .cc-who,.cc-exit,.cc-group-label{display:none}
@@ -256,7 +258,7 @@
  .cc-head{min-height:0;margin-bottom:22px;align-items:flex-start;flex-direction:column;gap:14px}
  .cc-body,.cc-overview{gap:32px}
 }
-@media(max-width:640px){
+@media (--phone){
  .cc-health{grid-template-columns:repeat(2,minmax(0,1fr))}
  .cc-health-item{padding:15px}
  .cc-onair,.cc-guest-pane{padding:18px}
@@ -268,7 +270,7 @@
  .cc-rule{flex-direction:column;align-items:flex-start;gap:12px;padding:15px 18px}
  .cc-savebar{border-radius:20px;bottom:84px}
  .cc-savebar>span{flex-basis:100%}
- .cc-body>.settings-card,.cc-body>.profile-card,.cc-body>.notice-card,.cc-body>.music-connections,.cc-body>section.kodik-connection{padding:18px!important}
+ html[data-blossom] .cc-body>:is(.settings-card,.profile-card,.notice-card,.music-connections,section.kodik-connection){padding:18px}
  .cc-guest-head h2{font-size:26px}
 }
 @media(prefers-reduced-motion:reduce){.cc-timeline-track>i{transition:none}.cc-bars i{animation:none}}
@@ -292,8 +294,8 @@
 .cc-table strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cc-table small{font-size:12px;color:var(--color-quiet);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cc-table .is-warn{color:var(--cc-warn)}
-@media(max-width:860px){.cc-space-grid,.cc-load{grid-template-columns:minmax(0,1fr)}}
-@media(max-width:640px){.cc-table>div{grid-template-columns:minmax(0,1fr) auto auto;gap:10px}.cc-table>div>span:nth-child(2){display:none}}
+@media (--tablet){.cc-space-grid,.cc-load{grid-template-columns:minmax(0,1fr)}}
+@media (--phone){.cc-table>div{grid-template-columns:minmax(0,1fr) auto auto;gap:10px}.cc-table>div>span:nth-child(2){display:none}}
 @media(prefers-reduced-motion:reduce){.cc-meter{transition:none}}
 
 /* Interface language */

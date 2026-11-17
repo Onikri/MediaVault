@@ -95,12 +95,12 @@
 .lc-track.is-on{color:var(--color-blossom-light)}
 .lc-agenda-empty{margin:0;font-size:13px;line-height:1.6;color:var(--color-quiet)}
 
-@media(max-width:1180px){
+@media (--tablet){
  .lc-board{grid-template-columns:minmax(0,1fr)}
  .lc-agenda{position:static;max-height:none;overflow:visible}
  .lc-agenda-list{grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
 }
-@media(max-width:760px){
+@media (--phone){
  .lc-toolbar{flex-direction:column;align-items:stretch}
  .lc-modes{width:100%}.lc-modes>button{flex:1;justify-content:center}
  .lc-nav{justify-content:space-between}

@@ -18,6 +18,10 @@ class GatewayRetry(SourceError):
         self.seconds = seconds
 
 
+STAGES = {'queued': 'в очереди', 'detecting': 'поиск текста', 'detected': 'текст размечен', 'translating': 'перевод Google',
+          'cleaning': 'очистка фона и набор', 'error': 'ошибка, повторим'}
+
+
 def translate_pages(job, pages, options, skip, save, progress, budget):
     return asyncio.run(_translate_pages(job, pages, options, skip, save, progress, budget))
 
@@ -77,6 +81,41 @@ async def _translate_pages(job, pages, options, skip, save, progress, budget):
                 while time.monotonic()<until:
                     budget.check()
                     await asyncio.sleep(min(.2,max(0,until-time.monotonic())))
+    lmt = os.environ.get('LMT_INTERNAL_URL', 'http://lmt:7861').rstrip('/')
+    def private_font_list():
+        # The owner's licensed lettering faces live with the LMT worker, as for the reader.
+        try:
+            response = requests.get(lmt + '/reader/lmt/fonts', headers=headers, timeout=(4, 30))
+            return response.json() if response.status_code == 200 else {'fonts': []}
+        except (requests.RequestException, ValueError):
+            return {'fonts': []}
+    def private_font(index):
+        if type(index) is not int or not 0 <= index < 40:
+            return ''
+        response = requests.get(f'{lmt}/reader/lmt/fonts/{index}', headers=headers, timeout=(4, 60))
+        if response.status_code != 200 or len(response.content) > 4_000_000:
+            raise SourceError('Шрифт владельца не получен с LMT.')
+        return base64.b64encode(response.content).decode()
+    # The stage of every page, as the reader shows it, for the job queue and the save dialog.
+    total = len(pages)
+    finished = set(skip)
+    def stage_text(index, value):
+        label = STAGES.get(str(value.get('phase') or ''), 'обработка')
+        detail = str(value.get('message') or '').strip()
+        line = f'Перевод на ВМ · готово {len(finished)} из {total} · стр. {index + 1}: {label}'
+        return line, (f'Стр. {index + 1}: {label}' + (f' · {detail}' if detail else ''))[:250]
+    def page_progress(index, value):
+        if type(index) is not int or not isinstance(value, dict):
+            return
+        operation, message = stage_text(index, value)
+        progress({'phase': 'translating', 'page': index + 1, 'pagesTotal': total, 'pagesLoaded': len(finished),
+                  'stage': str(value.get('phase') or '')[:20], 'operation': operation, 'message': message})
+    def rendered(index, image):
+        save(index, base64.b64decode(image, validate=True))
+        if type(index) is int:
+            finished.add(index)
+            progress({'phase': 'translating', 'page': index + 1, 'pagesTotal': total, 'pagesLoaded': len(finished), 'stage': 'saved',
+                      'operation': f'Перевод на ВМ · готово {len(finished)} из {total}', 'message': f'Стр. {index + 1}: готова'})
     keys = await google_request('/reader/google/keys', {})
     slots = [s['slot'] for s in keys.get('slots', []) if s.get('configured') and options['directModel'] in s.get('availableModels', [])]
     if not slots:
@@ -105,9 +144,11 @@ async def _translate_pages(job, pages, options, skip, save, progress, budget):
             await context.route('**/*', route)
             page = await context.new_page()
             await page.expose_function('exportGoogleRequest', google_request)
+            await page.expose_function('exportFontList', lambda: asyncio.to_thread(private_font_list))
+            await page.expose_function('exportFont', lambda index: asyncio.to_thread(private_font, index))
             await page.expose_function('exportSourcePage', lambda index: base64.b64encode(pages[index]).decode() if type(index) is int and 0 <= index < len(pages) else '')
-            await page.expose_function('exportRenderedPage', lambda index, image: save(index, base64.b64decode(image, validate=True)))
-            await page.expose_function('exportPageProgress', lambda index, value: progress({'phase': 'translating', 'page': index + 1, 'message': str(value.get('message') or 'Перевод и оформление')[:250]}))
+            await page.expose_function('exportRenderedPage', rendered)
+            await page.expose_function('exportPageProgress', page_progress)
             await page.goto(origin + '/manga-export.html')
             await page.wait_for_function('typeof window.translateExportChapter==="function"')
             task = await page.evaluate_handle('args => { const state={done:false}; window.translateExportChapter(args).then(()=>state.done=true,error=>{state.error=error.message;state.done=true}); return state; }',

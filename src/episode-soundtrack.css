@@ -26,4 +26,4 @@
 .episode-ost-actions>button:hover,.episode-ost-actions>a:hover{background:var(--color-surface-raised,rgb(255 255 255 / .1))}
 .episode-ost-toggle{justify-self:start;height:34px;padding:0 14px;border:0;border-radius:999px;background:var(--color-canvas-soft);color:var(--color-on-muted);font:600 12px/1 var(--font-ui,system-ui);cursor:pointer}
 .episode-ost-toggle:hover{color:var(--color-petal)}
-@media(max-width:640px){.episode-ost{padding:14px;border-radius:20px}.episode-ost-list{grid-template-columns:1fr}}
+@media (--phone){.episode-ost{padding:14px;border-radius:20px}.episode-ost-list{grid-template-columns:1fr}}

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-14T18:44:30Z",
+  "generatedAt": "2026-11-16T11:44:56Z",
   "scope": "public_taxonomy_only",
   "coverageGuaranteed": false,
   "sources": [
@@ -17,18 +17,18 @@
       "domain": "hentaichan.live",
       "name": "HentaiChan",
       "integration": "native",
-      "status": "partial",
-      "tagsFound": 259,
-      "reason": "one_public_catalogue_page",
+      "status": "stale",
+      "tagsFound": 367,
+      "reason": "public_catalogue_unavailable",
       "note": "Native public HTML parser and reader."
     },
     {
       "domain": "h-chan.me",
       "name": "H-Chan",
       "integration": "mirror",
-      "status": "partial",
-      "tagsFound": 259,
-      "reason": "one_public_catalogue_page",
+      "status": "stale",
+      "tagsFound": 367,
+      "reason": "public_catalogue_unavailable",
       "note": "Only confirmed x17.h-chan.me mirror is allowed; root domain is not assumed equivalent."
     },
     {
@@ -36,7 +36,7 @@
       "name": "MangaChan",
       "integration": "native",
       "status": "stale",
-      "tagsFound": 121,
+      "tagsFound": 122,
       "reason": "public_catalogue_unavailable",
       "note": "Native HTML adapter uses im.manga-chan.me and known mirror host."
     },
@@ -62,9 +62,9 @@
       "domain": "y.hentaichan.live",
       "name": "Y-HentaiChan",
       "integration": "unverified",
-      "status": "partial",
-      "tagsFound": 190,
-      "reason": "one_public_catalogue_page",
+      "status": "stale",
+      "tagsFound": 288,
+      "reason": "public_catalogue_unavailable",
       "note": "Distinct subdomain; not an approved HentaiChan reader mirror."
     },
     {
@@ -606,8 +606,8 @@
       "category": "genre",
       "label": "Демоны",
       "originalLabels": [
-        "демоны",
-        "Демоны"
+        "Демоны",
+        "демоны"
       ],
       "sources": [
         "h-chan.me",
@@ -622,8 +622,8 @@
       "category": "genre",
       "label": "Детектив",
       "originalLabels": [
-        "Детектив",
-        "детектив"
+        "детектив",
+        "Детектив"
       ],
       "sources": [
         "hentailib.me",
@@ -675,8 +675,8 @@
       "category": "genre",
       "label": "Драма",
       "originalLabels": [
-        "Драма",
-        "драма"
+        "драма",
+        "Драма"
       ],
       "sources": [
         "h-chan.me",
@@ -788,8 +788,8 @@
       "category": "genre",
       "label": "История",
       "originalLabels": [
-        "история",
-        "История"
+        "История",
+        "история"
       ],
       "sources": [
         "hentailib.me",
@@ -841,8 +841,8 @@
       "category": "genre",
       "label": "Комедия",
       "originalLabels": [
-        "Комедия",
-        "комедия"
+        "комедия",
+        "Комедия"
       ],
       "sources": [
         "hentailib.me",
@@ -1006,8 +1006,8 @@
       "category": "genre",
       "label": "Мистика",
       "originalLabels": [
-        "мистика",
-        "Мистика"
+        "Мистика",
+        "мистика"
       ],
       "sources": [
         "hentailib.me",
@@ -1264,8 +1264,8 @@
       "category": "genre",
       "label": "Психология",
       "originalLabels": [
-        "Психология",
-        "психология"
+        "психология",
+        "Психология"
       ],
       "sources": [
         "hentailib.me",
@@ -1334,8 +1334,8 @@
       "category": "genre",
       "label": "Сверхъестественное",
       "originalLabels": [
-        "Сверхъестественное",
-        "сверхъестественное"
+        "сверхъестественное",
+        "Сверхъестественное"
       ],
       "sources": [
         "h-chan.me",
@@ -1366,8 +1366,8 @@
       "category": "genre",
       "label": "Сёдзё-ай",
       "originalLabels": [
-        "Сёдзё-ай",
-        "сёдзё-ай"
+        "сёдзё-ай",
+        "Сёдзё-ай"
       ],
       "sources": [
         "hentailib.me",
@@ -1407,8 +1407,8 @@
       "category": "genre",
       "label": "Сёнэн-ай",
       "originalLabels": [
-        "сёнэн-ай",
-        "Сёнэн-ай"
+        "Сёнэн-ай",
+        "сёнэн-ай"
       ],
       "sources": [
         "hentailib.me",
@@ -1535,8 +1535,8 @@
       "category": "genre",
       "label": "Трагедия",
       "originalLabels": [
-        "трагедия",
-        "Трагедия"
+        "Трагедия",
+        "трагедия"
       ],
       "sources": [
         "hentailib.me",
@@ -1562,8 +1562,8 @@
       "category": "genre",
       "label": "Триллер",
       "originalLabels": [
-        "триллер",
-        "Триллер"
+        "Триллер",
+        "триллер"
       ],
       "sources": [
         "hentailib.me",
@@ -1578,8 +1578,8 @@
       "category": "genre",
       "label": "Ужасы",
       "originalLabels": [
-        "Ужасы",
-        "ужасы"
+        "ужасы",
+        "Ужасы"
       ],
       "sources": [
         "hentailib.me",
@@ -1704,8 +1704,8 @@
       "label": "Экшен",
       "originalLabels": [
         "action",
-        "боевик",
-        "Боевик"
+        "Боевик",
+        "боевик"
       ],
       "sources": [
         "h-chan.me",
@@ -1785,8 +1785,8 @@
       "category": "genre",
       "label": "Юри",
       "originalLabels": [
-        "Юри",
-        "юри"
+        "юри",
+        "Юри"
       ],
       "sources": [
         "h-chan.me",
@@ -1907,8 +1907,8 @@
       "category": "tag",
       "label": "Footfuck",
       "originalLabels": [
-        "Footfuck",
-        "footfuck"
+        "footfuck",
+        "Footfuck"
       ],
       "sources": [
         "h-chan.me",
@@ -2228,8 +2228,8 @@
       "category": "tag",
       "label": "Tomboy",
       "originalLabels": [
-        "tomboy",
-        "Tomboy"
+        "Tomboy",
+        "tomboy"
       ],
       "sources": [
         "h-chan.me",
@@ -2278,8 +2278,8 @@
       "category": "tag",
       "label": "X-Ray",
       "originalLabels": [
-        "x-ray",
-        "X-Ray"
+        "X-Ray",
+        "x-ray"
       ],
       "sources": [
         "h-chan.me",
@@ -2382,8 +2382,8 @@
       "category": "tag",
       "label": "Андроид",
       "originalLabels": [
-        "андроид",
-        "Андроид"
+        "Андроид",
+        "андроид"
       ],
       "sources": [
         "h-chan.me",
@@ -2397,8 +2397,8 @@
       "category": "tag",
       "label": "Анилингус",
       "originalLabels": [
-        "анилингус",
-        "Анилингус"
+        "Анилингус",
+        "анилингус"
       ],
       "sources": [
         "h-chan.me",
@@ -2586,8 +2586,8 @@
       "category": "tag",
       "label": "Бара",
       "originalLabels": [
-        "Бара",
-        "бара"
+        "бара",
+        "Бара"
       ],
       "sources": [
         "hentailib.me",
@@ -2610,8 +2610,8 @@
       "category": "tag",
       "label": "Без проникновения",
       "originalLabels": [
-        "Без проникновения",
-        "без проникновения"
+        "без проникновения",
+        "Без проникновения"
       ],
       "sources": [
         "h-chan.me",
@@ -2625,8 +2625,8 @@
       "category": "tag",
       "label": "Без текста",
       "originalLabels": [
-        "без текста",
-        "Без текста"
+        "Без текста",
+        "без текста"
       ],
       "sources": [
         "h-chan.me",
@@ -2640,8 +2640,8 @@
       "category": "tag",
       "label": "Без трусиков",
       "originalLabels": [
-        "Без трусиков",
-        "без трусиков"
+        "без трусиков",
+        "Без трусиков"
       ],
       "sources": [
         "h-chan.me",
@@ -2655,8 +2655,8 @@
       "category": "tag",
       "label": "Без цензуры",
       "originalLabels": [
-        "Без цензуры",
-        "без цензуры"
+        "без цензуры",
+        "Без цензуры"
       ],
       "sources": [
         "h-chan.me",
@@ -2795,8 +2795,8 @@
       "category": "tag",
       "label": "Большая грудь",
       "originalLabels": [
-        "Большая грудь",
-        "большая грудь"
+        "большая грудь",
+        "Большая грудь"
       ],
       "sources": [
         "h-chan.me",
@@ -3117,8 +3117,8 @@
       "category": "tag",
       "label": "Вибратор",
       "originalLabels": [
-        "вибратор",
-        "Вибратор"
+        "Вибратор",
+        "вибратор"
       ],
       "sources": [
         "h-chan.me",
@@ -3536,8 +3536,8 @@
       "category": "tag",
       "label": "Глубокий минет",
       "originalLabels": [
-        "глубокий минет",
-        "Глубокий минет"
+        "Глубокий минет",
+        "глубокий минет"
       ],
       "sources": [
         "h-chan.me",
@@ -3616,8 +3616,8 @@
       "category": "tag",
       "label": "групповой_секс",
       "originalLabels": [
-        "Групповой секс",
-        "групповой секс"
+        "групповой секс",
+        "Групповой секс"
       ],
       "sources": [
         "h-chan.me",
@@ -3715,8 +3715,8 @@
       "category": "tag",
       "label": "Демоны",
       "originalLabels": [
-        "демоны",
-        "Демоны"
+        "Демоны",
+        "демоны"
       ],
       "sources": [
         "h-chan.me",
@@ -3870,8 +3870,8 @@
       "category": "tag",
       "label": "Дыра в стене",
       "originalLabels": [
-        "дыра в стене",
-        "Дыра в стене"
+        "Дыра в стене",
+        "дыра в стене"
       ],
       "sources": [
         "h-chan.me",
@@ -4044,8 +4044,8 @@
       "category": "tag",
       "label": "Зомби",
       "originalLabels": [
-        "Зомби",
-        "зомби"
+        "зомби",
+        "Зомби"
       ],
       "sources": [
         "h-chan.me",
@@ -4072,8 +4072,8 @@
       "category": "tag",
       "label": "Зрелые женщины",
       "originalLabels": [
-        "зрелые женщины",
-        "Зрелые женщины"
+        "Зрелые женщины",
+        "зрелые женщины"
       ],
       "sources": [
         "h-chan.me",
@@ -4216,8 +4216,8 @@
       "category": "tag",
       "label": "инцест",
       "originalLabels": [
-        "Инцест",
-        "инцест"
+        "инцест",
+        "Инцест"
       ],
       "sources": [
         "h-chan.me",
@@ -4296,8 +4296,8 @@
       "category": "tag",
       "label": "Камера",
       "originalLabels": [
-        "камера",
-        "Камера"
+        "Камера",
+        "камера"
       ],
       "sources": [
         "h-chan.me",
@@ -4406,8 +4406,8 @@
       "category": "tag",
       "label": "Колготки",
       "originalLabels": [
-        "Колготки",
-        "колготки"
+        "колготки",
+        "Колготки"
       ],
       "sources": [
         "h-chan.me",
@@ -4458,8 +4458,8 @@
       "category": "tag",
       "label": "Косплей",
       "originalLabels": [
-        "Косплей",
-        "косплей"
+        "косплей",
+        "Косплей"
       ],
       "sources": [
         "h-chan.me",
@@ -4549,8 +4549,8 @@
       "category": "tag",
       "label": "Куннилингус",
       "originalLabels": [
-        "куннилингус",
-        "Куннилингус"
+        "Куннилингус",
+        "куннилингус"
       ],
       "sources": [
         "h-chan.me",
@@ -4564,8 +4564,8 @@
       "category": "tag",
       "label": "Купальники",
       "originalLabels": [
-        "купальники",
-        "Купальники"
+        "Купальники",
+        "купальники"
       ],
       "sources": [
         "h-chan.me",
@@ -4670,8 +4670,8 @@
       "category": "tag",
       "label": "Маленькая грудь",
       "originalLabels": [
-        "маленькая грудь",
-        "Маленькая грудь"
+        "Маленькая грудь",
+        "маленькая грудь"
       ],
       "sources": [
         "h-chan.me",
@@ -4696,8 +4696,8 @@
       "category": "tag",
       "label": "Мастурбация",
       "originalLabels": [
-        "Мастурбация",
-        "мастурбация"
+        "мастурбация",
+        "Мастурбация"
       ],
       "sources": [
         "h-chan.me",
@@ -4920,8 +4920,8 @@
       "category": "tag",
       "label": "Молоко",
       "originalLabels": [
-        "Молоко",
-        "молоко"
+        "молоко",
+        "Молоко"
       ],
       "sources": [
         "h-chan.me",
@@ -5082,8 +5082,8 @@
       "category": "tag",
       "label": "На природе",
       "originalLabels": [
-        "на природе",
-        "На природе"
+        "На природе",
+        "на природе"
       ],
       "sources": [
         "h-chan.me",
@@ -5347,8 +5347,8 @@
       "category": "tag",
       "label": "Обмен телами",
       "originalLabels": [
-        "обмен телами",
-        "Обмен телами"
+        "Обмен телами",
+        "обмен телами"
       ],
       "sources": [
         "h-chan.me",
@@ -5443,8 +5443,8 @@
       "category": "tag",
       "label": "Огромный член",
       "originalLabels": [
-        "Огромный член",
-        "огромный член"
+        "огромный член",
+        "Огромный член"
       ],
       "sources": [
         "h-chan.me",
@@ -5602,8 +5602,8 @@
       "category": "tag",
       "label": "Парень пассив",
       "originalLabels": [
-        "парень пассив",
-        "Парень пассив"
+        "Парень пассив",
+        "парень пассив"
       ],
       "sources": [
         "h-chan.me",
@@ -5629,8 +5629,8 @@
       "category": "tag",
       "label": "Переодевание",
       "originalLabels": [
-        "переодевание",
-        "Переодевание"
+        "Переодевание",
+        "переодевание"
       ],
       "sources": [
         "h-chan.me",
@@ -5694,8 +5694,8 @@
       "category": "tag",
       "label": "Пляж",
       "originalLabels": [
-        "Пляж",
-        "пляж"
+        "пляж",
+        "Пляж"
       ],
       "sources": [
         "h-chan.me",
@@ -5732,8 +5732,8 @@
       "category": "tag",
       "label": "Подглядывание",
       "originalLabels": [
-        "Подглядывание",
-        "подглядывание"
+        "подглядывание",
+        "Подглядывание"
       ],
       "sources": [
         "h-chan.me",
@@ -5759,8 +5759,8 @@
       "category": "tag",
       "label": "Подчинение",
       "originalLabels": [
-        "Подчинение",
-        "подчинение"
+        "подчинение",
+        "Подчинение"
       ],
       "sources": [
         "h-chan.me",
@@ -5922,8 +5922,8 @@
       "category": "tag",
       "label": "Принуждение",
       "originalLabels": [
-        "принуждение",
-        "Принуждение"
+        "Принуждение",
+        "принуждение"
       ],
       "sources": [
         "h-chan.me",
@@ -6443,8 +6443,8 @@
       "category": "tag",
       "label": "сетакон",
       "originalLabels": [
-        "сетакон",
-        "Сетакон"
+        "Сетакон",
+        "сетакон"
       ],
       "sources": [
         "h-chan.me",
@@ -6579,8 +6579,8 @@
       "category": "tag",
       "label": "Спортивная форма",
       "originalLabels": [
-        "спортивная форма",
-        "Спортивная форма"
+        "Спортивная форма",
+        "спортивная форма"
       ],
       "sources": [
         "h-chan.me",
@@ -6658,8 +6658,8 @@
       "category": "tag",
       "label": "Страпон",
       "originalLabels": [
-        "страпон",
-        "Страпон"
+        "Страпон",
+        "страпон"
       ],
       "sources": [
         "h-chan.me",
@@ -6774,8 +6774,8 @@
       "category": "tag",
       "label": "Темнокожие",
       "originalLabels": [
-        "темнокожие",
-        "Темнокожие"
+        "Темнокожие",
+        "темнокожие"
       ],
       "sources": [
         "h-chan.me",
@@ -6789,8 +6789,8 @@
       "category": "tag",
       "label": "Тентакли",
       "originalLabels": [
-        "Тентакли",
-        "тентакли"
+        "тентакли",
+        "Тентакли"
       ],
       "sources": [
         "h-chan.me",
@@ -6857,8 +6857,8 @@
       "category": "tag",
       "label": "Трап",
       "originalLabels": [
-        "трап",
-        "Трап"
+        "Трап",
+        "трап"
       ],
       "sources": [
         "h-chan.me",
@@ -6935,8 +6935,8 @@
       "category": "tag",
       "label": "Ужасы",
       "originalLabels": [
-        "Ужасы",
-        "ужасы"
+        "ужасы",
+        "Ужасы"
       ],
       "sources": [
         "hentailib.me",
@@ -7037,8 +7037,8 @@
       "category": "tag",
       "label": "Фантазии",
       "originalLabels": [
-        "фантазии",
-        "Фантазии"
+        "Фантазии",
+        "фантазии"
       ],
       "sources": [
         "h-chan.me",
@@ -7093,8 +7093,8 @@
       "category": "tag",
       "label": "Фестиваль",
       "originalLabels": [
-        "Фестиваль",
-        "фестиваль"
+        "фестиваль",
+        "Фестиваль"
       ],
       "sources": [
         "h-chan.me",
@@ -7181,8 +7181,8 @@
       "category": "tag",
       "label": "Футанари",
       "originalLabels": [
-        "футанари",
-        "Футанари"
+        "Футанари",
+        "футанари"
       ],
       "sources": [
         "h-chan.me",
@@ -7324,8 +7324,8 @@
       "category": "tag",
       "label": "Чикан",
       "originalLabels": [
-        "чикан",
-        "Чикан"
+        "Чикан",
+        "чикан"
       ],
       "sources": [
         "h-chan.me",
@@ -7491,8 +7491,8 @@
       "category": "tag",
       "label": "Эксгибиционизм",
       "originalLabels": [
-        "эксгибиционизм",
-        "Эксгибиционизм"
+        "Эксгибиционизм",
+        "эксгибиционизм"
       ],
       "sources": [
         "h-chan.me",
@@ -7641,8 +7641,8 @@
       "category": "tag",
       "label": "Яндере",
       "originalLabels": [
-        "яндере",
-        "Яндере"
+        "Яндере",
+        "яндере"
       ],
       "sources": [
         "h-chan.me",

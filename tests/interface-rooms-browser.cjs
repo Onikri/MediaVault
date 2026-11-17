@@ -38,7 +38,7 @@ app.mount('/lmt',StaticFiles(directory=os.environ['ORT_ROOT']),name='runtime')
  await fs.writeFile(path.join(dir,'index.html'),'<meta name="viewport" content="width=device-width"><div id="root"></div><script type="module" src="'+base+'fixture.jsx"></script>');
  const size=(await fs.stat(path.join(dir,'fixture.mp4'))).size;
  await fs.writeFile(path.join(dir,'fixture.jsx'),`
- import React from'react';import{createRoot}from'react-dom/client';import{ThemeProvider}from'/src/blossom/ThemeProvider.tsx';import Player from'/src/MediaVaultPlayer.jsx';import Room from'/src/WatchRoomPage.jsx';import{AnimeCard}from'/src/blossom/components/AnimeCard.tsx';import'/src/styles.css';import'/src/title-page.css';import'/src/interface-refinement.css';
+ import React from'react';import{createRoot}from'react-dom/client';import{ThemeProvider}from'/src/blossom/ThemeProvider.tsx';import Player from'/src/MediaVaultPlayer.jsx';import Room from'/src/WatchRoomPage.jsx';import{AnimeCard}from'/src/blossom/components/AnimeCard.tsx';import'/src/styles.css';import'/src/title-page.css';import '/src/reader-save.css';import '/src/import-queue.css';import '/src/profile-menu.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:${JSON.stringify(server)}};const identity=new URLSearchParams(location.hash.slice(1)).get('room');
  const item={id:'room-fixture-v1',name:'Совместный просмотр',category:'video',size:${size}};
  const service={server:${JSON.stringify(server)},request:async(path,options={})=>{const r=await fetch(${JSON.stringify(server)}+path,{method:options.method||'GET',headers:{'Authorization':'Bearer fixture','Content-Type':'application/json'},body:options.body?JSON.stringify(options.body):undefined}),d=await r.json();if(!r.ok)throw Error(d.detail);return d;}};

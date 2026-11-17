@@ -71,7 +71,7 @@
 @keyframes reader-save-open{from{opacity:0;transform:translate(-50%,-48%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 @keyframes reader-save-rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 @keyframes reader-save-fade{from{opacity:0}to{opacity:1}}
-@media(max-width:600px){
+@media (--phone){
  .reader-save-sheet{top:auto;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));width:auto;transform:none;max-height:88dvh;animation-name:reader-save-rise}
  .reader-save-body{padding:18px 16px 16px}
  .reader-save-count strong{font-size:36px}
@@ -83,3 +83,9 @@
  html[data-blossom] .blossom-navbar .chapter-save-dock .reader-save-ring{width:26px;height:26px}
 }
 @media(prefers-reduced-motion:reduce){.reader-save-sheet,.reader-save-backdrop,.reader-save-sheet[data-state=closed],.reader-save-backdrop[data-state=closed],.chapter-save-dock{animation:none!important}.reader-save-ring circle+circle{transition:none}}
+
+/* Reader title in the top bar */
+.reader-title-group{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.reader-title-group>.mv-viewer-title{flex:1;min-width:0}
+.immersive-reader[data-chrome] .reader-top{width:min(920px,calc(100% - 32px))}
+@media (--phone){.reader-title-group{display:grid;gap:3px}.reader-title-group>.mv-viewer-title strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.reader-title-group .reader-chapter-menu .mv-select-trigger{height:25px;min-height:25px}.immersive-reader[data-chrome] .reader-top{width:calc(100% - 16px)}}

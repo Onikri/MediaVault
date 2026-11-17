@@ -21,6 +21,10 @@ from alloha_import import PREFIX
 logger = logging.getLogger(__name__)
 
 
+class StreamInterrupted(SourceError):
+    """An Alloha film stopped on its way to Drive; its saved parts resume later."""
+
+
 class StreamingVideo:
     def __init__(self, http, directory, *, checkpoint=None):
         self.http, self.directory = http, Path(directory)
@@ -181,6 +185,11 @@ class StreamingVideo:
             value, self.first = self.first, b''
         else:
             value = self.process.stdout.read(size)
+        if self.failure:
+            # ffmpeg skips a segment it could not get and keeps muxing. Bytes from
+            # that point on belong to a damaged film: stop before a part is saved,
+            # so «Продолжить» resumes from the last intact part.
+            raise StreamInterrupted('Alloha прервал передачу. Готовые части сохранены — задание можно продолжить.')
         self.loaded += len(value)
         if value:
             self.tail = (self.tail + value[-16:])[-16:]
@@ -212,6 +221,11 @@ class StreamingVideo:
         return {'width': self.width, 'height': self.height, 'duration': self.last_time, 'audio': True}
 
     def upload(self, vault, **options):
-        with self.opened():
-            return vault.upload_stream(self, validate=self.validate, quality=int(self.http.selected),
-                                       checkpoint=self.checkpoint, stream_identity=self.http.fingerprint, **options)
+        try:
+            with self.opened():
+                return vault.upload_stream(self, validate=self.validate, quality=int(self.http.selected),
+                                           checkpoint=self.checkpoint, stream_identity=self.http.fingerprint, **options)
+        except SourceError as error:
+            if isinstance(error, StreamInterrupted) or self.http.cancelled():
+                raise
+            raise StreamInterrupted(str(error)) from error

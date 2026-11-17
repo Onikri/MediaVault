@@ -30,7 +30,7 @@
 .home-top-copy small{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--color-on-muted)}
 .home-top-copy small svg{color:#f5b301}
 .home-airing-card:focus-visible,.home-top-track button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:3px;border-radius:18px}
-@media(max-width:640px){
+@media (--phone){
  .home-airing-track{grid-auto-columns:78vw;gap:10px}
  .home-top-track{grid-auto-columns:58vw}
  .home-top-rank{font-size:86px;margin-right:-10px}
@@ -45,5 +45,5 @@ html[data-blossom] nav.home-sections>button img{border-radius:10px;transition:tr
 html[data-blossom] nav.home-sections>button:hover{background:color-mix(in srgb,var(--color-blossom) 16%,transparent);transform:translateY(-2px)}
 html[data-blossom] nav.home-sections>button:hover img{transform:rotate(-6deg) scale(1.06)}
 html[data-blossom] nav.home-sections>button:focus-visible{outline:2px solid var(--color-blossom);outline-offset:2px}
-@media(max-width:640px){html[data-blossom] nav.home-sections{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}html[data-blossom] nav.home-sections>button{min-height:88px;padding:10px;gap:10px;font-size:12px;border-radius:16px}html[data-blossom] nav.home-sections>button img{width:28px;height:28px}}
+@media (--phone){html[data-blossom] nav.home-sections{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}html[data-blossom] nav.home-sections>button{min-height:88px;padding:10px;gap:10px;font-size:12px;border-radius:16px}html[data-blossom] nav.home-sections>button img{width:28px;height:28px}}
 @media(prefers-reduced-motion:reduce){html[data-blossom] nav.home-sections>button,html[data-blossom] nav.home-sections>button img{transition:none}}

@@ -22,8 +22,6 @@ html[data-blossom] .app-shell[data-view=home]>.app-main{padding-top:12px}
 html[data-blossom] .home-discover .hero-stage{margin-top:0;margin-bottom:0;height:min(810px,94vh);min-height:620px;border:0;background:var(--color-canvas-soft)}
 html[data-blossom] .home-feature .hero-photo{position:absolute;inset:0;background:var(--color-canvas-soft);filter:none}
 html[data-blossom] .home-feature .hero-photo img{width:100%;height:100%;object-fit:cover}
-html[data-blossom] .home-feature .hero-video-wrap{inset:0;opacity:1;overflow:hidden}
-html[data-blossom] .home-feature .hero-video-wrap iframe{position:absolute;width:100%;height:100%;inset:0;border:0;transform:scale(1.2)}
 html[data-blossom] .home-feature .hero-vignette{background:linear-gradient(90deg,#09090dc9,#09090d60 65%,#09090d20),linear-gradient(0deg,#09090df2,transparent 85%)}
 html[data-blossom] .home-feature .hero-content{left:clamp(32px,6vw,100px);bottom:62px;max-width:min(720px,68%)}
 html[data-blossom] .home-feature .hero-content h1{font-size:clamp(35px,4.2vw,66px);line-height:1.07;letter-spacing:-.055em;margin:15px 0 17px}
@@ -58,8 +56,6 @@ html[data-blossom] .card-score svg{width:13px;height:13px}
 html[data-blossom] .anime-preview{border:0;background:var(--color-surface-raised);border-radius:18px;box-shadow:0 16px 40px #0005}
 html[data-blossom] .anime-preview h3{font-size:17px}
 html[data-blossom] .anime-preview .preview-synopsis{font-size:12px}
-html[data-blossom] .blossom-catalog-sidebar{border:0;background:var(--color-surface);border-radius:21px;padding:20px;overflow:clip}
-html[data-blossom] .blossom-catalog-sidebar .catalog-filters{max-height:calc(100dvh - 225px);overflow:auto;padding-right:7px;scrollbar-gutter:stable}
 html[data-blossom] .blossom-catalog-content .catalog-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:23px 18px}
 html[data-blossom] .catalog-views{display:flex;align-items:center;gap:3px;margin-left:auto;padding:3px;background:var(--color-canvas-soft);border-radius:100px}
 html[data-blossom] .catalog-views button{display:grid;place-items:center;width:33px;height:32px;background:none;color:var(--color-on-muted);border:0;border-radius:100px}
@@ -78,19 +74,9 @@ html[data-blossom] .library-table td,html[data-blossom] .library-table th{border
 html[data-blossom] .library-table td:first-child button{display:flex;align-items:center;gap:12px}
 html[data-blossom] .library-table td:first-child img{width:35px;height:47px;object-fit:cover;border-radius:6px}
 html[data-blossom] .blossom-search-dialog{width:min(640px,calc(100% - 24px));border:0;border-radius:23px;background:var(--color-surface);box-shadow:0 25px 90px #0008}
-html[data-blossom] .blossom-search-dialog .search-kind-row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:3px;flex:none}
-html[data-blossom] .blossom-search-dialog .search-kind-row button{white-space:nowrap;padding:7px 12px;border:0}
-html[data-blossom] .blossom-search-dialog .search-body{max-height:min(540px,60dvh);border-radius:0 0 20px 20px;scrollbar-gutter:stable}
-html[data-blossom] .search-hit{border-radius:12px}
-html[data-blossom] .search-hit small b{font-weight:500;color:var(--color-blossom-light)}
-html[data-blossom] .search-progress{font-size:11px;color:var(--color-on-muted);padding:10px 14px}
 /* Title: one contained cinematic hero, followed by content; no page-wide fog. */
 html[data-blossom] .app-shell:has(.title-page)>.app-main{padding-top:12px}
-html[data-blossom] .app-shell:has(.title-page)>.app-main>.page-title-row,
-html[data-blossom] .app-shell:has(.title-page)>.app-main>.search-bar,
-html[data-blossom] .app-shell:has(.title-page)>.app-main>.chip-row,
-html[data-blossom] .app-shell:has(.title-page)>.app-main>.admin-bar,
-html[data-blossom] .library-workspace.title-is-open .library-toolbar{display:none}
+html[data-blossom] .app-shell:has(.title-page)>.app-main>.page-title-row,html[data-blossom] .app-shell:has(.title-page)>.app-main>.search-bar,html[data-blossom] .app-shell:has(.title-page)>.app-main>.chip-row,html[data-blossom] .app-shell:has(.title-page)>.app-main>.admin-bar{display:none}
 html[data-blossom] .online-library:has(.title-page)>.online-media-nav,
 html[data-blossom] .online-library:has(.title-page)>.online-access,
 html[data-blossom] .import-workspace:has(.title-page)>.import-workspace-heading,
@@ -103,7 +89,6 @@ html[data-blossom] .title-feature .title-scene-images img{filter:none;opacity:.9
 html[data-blossom] .title-feature .title-background-video{position:absolute;inset:0;overflow:hidden}
 html[data-blossom] .title-feature .title-background-video iframe{position:absolute;width:100%;height:100%;border:0;inset:0;transform:scale(1.3);pointer-events:none}
 html[data-blossom] .title-feature .title-scene-shade{background:linear-gradient(90deg,#0b0b0edb,#0b0b0e93 65%,#0b0b0e55),linear-gradient(0deg,#0b0b0ef2,transparent 95%)}
-html[data-blossom] .title-feature .title-hero-shade{display:none}
 html[data-blossom] .title-feature .title-poster{width:230px;height:auto;aspect-ratio:3/4;border:0;border-radius:17px;overflow:hidden;box-shadow:0 10px 35px #0004;align-self:end;margin:0;background:var(--color-surface)}
 html[data-blossom] .title-feature .title-poster>img{width:100%;height:100%;object-fit:cover}
 html[data-blossom] .title-feature .title-hero-copy{position:relative;display:flex;flex-direction:column;align-items:start;gap:0;max-width:870px;min-width:0;grid-column:auto;grid-row:auto}
@@ -117,13 +102,6 @@ html[data-blossom] .title-feature .title-score small{font-size:9px;opacity:.75}
 html[data-blossom] .title-feature .title-hero-description{order:3;max-width:760px;white-space:pre-line;line-height:1.85;font-size:14px;color:var(--color-petal-shadow);margin:0 0 18px;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden}
 html[data-blossom] .title-feature .title-genre-list{order:4;margin:0 0 18px;display:flex;flex-wrap:wrap;gap:8px}
 html[data-blossom] .title-feature .title-genre-list>a,html[data-blossom] .title-feature .title-genre-list>span{border:0;padding:6px 11px;font-size:10px;background:#ffffff10;color:var(--color-petal);border-radius:100px}
-html[data-blossom] .title-feature .title-hero-facts{order:5;display:flex;flex-wrap:wrap;gap:12px 22px;margin:0 0 20px;width:100%}
-html[data-blossom] .title-feature .title-hero-facts>div{display:flex;align-items:baseline;gap:7px;min-width:0}
-html[data-blossom] .title-feature .title-hero-facts dt{font-size:10px;color:var(--color-on-muted)}
-html[data-blossom] .title-feature .title-hero-facts dd{font-size:11px;color:var(--color-petal);margin:0}
-html[data-blossom] .title-feature .title-hero-actions{order:6;display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:0}
-html[data-blossom] .title-feature .title-save-actions{display:flex;gap:7px}
-html[data-blossom] .title-feature .title-save-actions>button{width:41px;height:41px;border:0;border-radius:13px;background:#ffffff12;color:var(--color-petal)}
 html[data-blossom] .title-feature .title-scene-controls{position:absolute;right:25px;bottom:20px;margin:0;border:0;background:#ffffff10;z-index:5;float:none}
 
 html[data-blossom] .title-shortcuts{position:sticky;top:82px;z-index:20;display:flex;gap:7px;padding:9px 0;margin:20px 0 10px;background:rgb(var(--canvas-rgb)/.94);backdrop-filter:blur(16px);border:0;border-radius:100px;overflow-x:auto;scrollbar-width:none}
@@ -146,7 +124,7 @@ html[data-blossom] .title-sidebar .ratings-grid{display:flex;flex-direction:colu
 html[data-blossom] .title-sidebar .rating-card{border:0;border-radius:14px;background:var(--color-surface);padding:16px}
 html[data-blossom] .title-sidebar .rating-value{font-size:26px}
 html[data-blossom] .title-page .title-character-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
-html[data-blossom] .title-page .title-character-grid>button{display:flex;flex-direction:column;align-items:start;padding:0;border:0;background:none;text-align:left;border-radius:15px;overflow:hidden;min-width:0}
+html[data-blossom] .title-page .title-character-grid>button{flex-direction:column;align-items:start;text-align:left;overflow:hidden;min-width:0}
 html[data-blossom] .title-page .title-character-grid>button>img{width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;border-radius:15px}
 html[data-blossom] .title-page .title-character-grid>button>span{padding:10px 1px;display:block;width:100%;min-width:0}
 html[data-blossom] .title-character-grid strong{font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis}
@@ -167,46 +145,21 @@ html[data-blossom] .title-playback .mv-player:not(:fullscreen){width:100%;height
 html[data-blossom] .title-playback .mv-player:not(:fullscreen) .mv-player-screen{width:100%;height:auto;aspect-ratio:16/9;min-height:0;max-height:none}
 html[data-blossom] .title-playback .mv-viewer-tools{padding:9px 0 0;min-height:0;border:0;background:none}
 html[data-blossom] .title-close-playback{position:absolute;right:12px;top:12px;z-index:9;width:30px;height:30px;border:0;background:#1119}
-html[data-blossom] body.player-theater .title-page .mv-title-layout{grid-template-columns:minmax(0,1fr)}
-html[data-blossom] .mv-player-control-group .is-active{color:var(--color-blossom-light)}
-html[data-blossom] .soundtrack-tracks{display:flex;flex-direction:column;gap:0}
-html[data-blossom] .soundtrack-track{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:13px;padding:15px 0;min-height:60px;border:0;border-bottom:1px solid var(--color-border);border-radius:0;background:transparent}
-html[data-blossom] .soundtrack-kind{width:29px;height:29px;border-radius:9px;background:var(--color-surface-raised);color:var(--color-blossom-light);font-size:9px}
-html[data-blossom] .soundtrack-track>div:nth-child(2){min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 10px}
-html[data-blossom] .soundtrack-track strong{font-size:13px;font-weight:700;line-height:1.45}
-html[data-blossom] .soundtrack-track small{font-size:11px;color:var(--color-on-muted);margin:0;line-height:1.45}
-html[data-blossom] .soundtrack-track .soundtrack-anime{flex-basis:100%}
-html[data-blossom] .soundtrack-actions{display:flex;gap:5px;align-items:center;opacity:1;width:auto;flex-wrap:nowrap;padding:0}
-html[data-blossom] .soundtrack-actions>button,html[data-blossom] .soundtrack-more>summary{width:29px;height:29px;min-height:0;padding:5px;display:grid;place-items:center;border:0;border-radius:9px;background:transparent;color:var(--color-petal);cursor:pointer}
-html[data-blossom] .soundtrack-actions>button:hover,html[data-blossom] .soundtrack-more>summary:hover{background:var(--color-surface-raised)}
-html[data-blossom] .soundtrack-more{position:relative}
-html[data-blossom] .soundtrack-more>summary{list-style:none}
-html[data-blossom] .soundtrack-more>summary::-webkit-details-marker{display:none}
-html[data-blossom] .soundtrack-more>div{position:absolute;right:0;top:35px;z-index:30;width:190px;padding:7px;background:var(--color-surface-raised);border:0;border-radius:14px;box-shadow:0 10px 40px #0007}
-html[data-blossom] .soundtrack-more a,html[data-blossom] .soundtrack-more div>button{display:block;width:100%;padding:9px 10px;background:transparent;color:var(--color-petal);text-align:left;font-size:11px;border:0;border-radius:8px}
 html[data-blossom] .soundtrack-note{font-size:10px;opacity:.7}
-html[data-blossom] .release-dates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 22px}
-html[data-blossom] .release-dates>div{display:grid;grid-template-columns:55px 1fr;align-items:center;gap:4px 10px;padding:14px 0;border-bottom:1px solid var(--color-border)}
-html[data-blossom] .release-dates time{grid-row:span 2;display:flex;flex-direction:column;color:var(--color-petal)}
-html[data-blossom] .release-dates strong{font-size:12px}
-html[data-blossom] .release-dates small{font-size:10px;color:var(--color-on-muted)}
-html[data-blossom] .release-dates>div>span{font-size:12px}
-html[data-blossom] .title-rating>div{display:flex;flex-wrap:wrap;gap:4px}
-html[data-blossom] .title-rating button{width:23px;height:27px;padding:0;font-size:11px;border:0;background:var(--color-surface);border-radius:6px}
 html[data-blossom] .app-footer{margin-top:55px;padding-top:25px;font-size:11px;justify-content:flex-start;gap:10px}
 html[data-blossom] .app-footer a{margin-left:auto;color:var(--color-on-muted)}
 html[data-blossom] *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--color-on-muted) 32%,transparent) transparent}
 html[data-blossom] ::-webkit-scrollbar{width:5px;height:5px}
 html[data-blossom] ::-webkit-scrollbar-track{background:transparent;margin:12px}
 html[data-blossom] ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--color-on-muted) 32%,transparent);border-radius:100px}
-@media(max-width:1199px){html[data-blossom] .blossom-navbar .desktop-nav .nav-link{padding:8px 11px}html[data-blossom] .blossom-navbar .header-brand-area{gap:15px}html[data-blossom] .blossom-catalog-content .catalog-grid{grid-template-columns:repeat(3,minmax(0,1fr))}html[data-blossom] .blossom-catalog-content .catalog-layout-compact{grid-template-columns:repeat(4,minmax(0,1fr))}html[data-blossom] .title-page .title-feature{grid-template-columns:190px minmax(0,1fr);gap:28px;padding-inline:35px}html[data-blossom] .title-feature .title-poster{width:190px}html[data-blossom] .title-page .mv-title-layout{grid-template-columns:minmax(0,1fr) 240px;gap:25px}}
-@media(max-width:1000px){html[data-blossom] .blossom-navbar .desktop-nav{display:none}html[data-blossom] .blossom-navbar .mobile-toggle{display:inline-grid}html[data-blossom] .blossom-navbar .header-brand-area{gap:10px}}
-@media(max-width:900px){html[data-blossom] .title-page .mv-title-layout{grid-template-columns:minmax(0,1fr)}html[data-blossom] .mv-title-layout>.title-sidebar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:25px}html[data-blossom] .blossom-catalog-content .catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}html[data-blossom] .blossom-catalog-content .catalog-layout-compact{grid-template-columns:repeat(3,minmax(0,1fr))}html[data-blossom] .title-feature h1{font-size:38px}html[data-blossom] .title-page .title-feature{min-height:690px}}
-@media(max-width:640px){html[data-blossom] .blossom-navbar{top:9px;width:calc(100% - 18px)}html[data-blossom] .blossom-navbar.is-scrolled{top:8px;width:calc(100% - 26px)}html[data-blossom] .blossom-navbar .header-inner{padding:7px 9px;gap:6px;min-height:55px}html[data-blossom] .blossom-navbar .brand.logo{font-size:16px;padding:9px 11px}html[data-blossom] .blossom-navbar .header-actions{gap:3px}html[data-blossom] .blossom-navbar .header-search{width:32px;height:32px;min-height:0;padding:7px}html[data-blossom] .blossom-navbar .header-search span,html[data-blossom] .blossom-navbar .header-search kbd{display:none}html[data-blossom] .blossom-navbar .header-actions .icon-button,html[data-blossom] .blossom-navbar .avatar-button{width:28px;height:30px}html[data-blossom] .app-shell[data-view=home]>.app-main{padding-top:5px}html[data-blossom] .home-discover .hero-stage{min-height:670px;height:min(740px,95dvh);border-radius:24px}html[data-blossom] .home-feature .hero-content{left:25px;right:25px;max-width:none;bottom:80px}html[data-blossom] .home-feature .hero-content h1{font-size:34px}html[data-blossom] .home-feature .hero-content>p{font-size:12px;-webkit-line-clamp:4}html[data-blossom] .hero-small-poster{width:88px;height:117px;border-radius:10px}html[data-blossom] .hero-gallery-controls{right:20px;bottom:22px}html[data-blossom] .home-sections{gap:3px;padding:24px 0 0}html[data-blossom] .home-sections>button{font-size:11px;padding:8px 9px;gap:5px}html[data-blossom] .home-sections svg{width:14px;height:14px}html[data-blossom] .section-head{gap:12px}html[data-blossom] .section-head h2{font-size:25px}html[data-blossom] .carousel-section{padding-top:33px}html[data-blossom] .carousel-rail{grid-auto-columns:46%;gap:12px}html[data-blossom] .card-caption .media-name{font-size:12px}html[data-blossom] .card-caption .media-meta{font-size:9px}html[data-blossom] .blossom-catalog-sidebar .catalog-filters{max-height:65dvh}html[data-blossom] .catalog-views button{width:28px;height:29px}html[data-blossom] .app-shell:has(.title-page)>.app-main{padding-top:5px}html[data-blossom] .title-page .title-feature{display:flex;flex-direction:column;align-items:start;gap:22px;min-height:720px;padding:127px 24px 50px;border-radius:24px}html[data-blossom] .title-feature .title-poster{width:98px;flex:none;align-self:start;border-radius:11px}html[data-blossom] .title-feature .title-hero-copy{display:flex;max-width:100%;align-items:start;grid-column:auto}html[data-blossom] .title-feature h1{font-size:32px;line-height:1.13;margin-bottom:15px}html[data-blossom] .title-feature .title-hero-status{font-size:10px;gap:5px}html[data-blossom] .title-feature .title-hero-status small{display:none}html[data-blossom] .title-feature .title-hero-description{font-size:12px;line-height:1.8;-webkit-line-clamp:6}html[data-blossom] .title-feature .title-genre-list{gap:6px}html[data-blossom] .title-feature .title-genre-list>a,html[data-blossom] .title-feature .title-genre-list>span{font-size:9px;padding:5px 8px}html[data-blossom] .title-feature .title-hero-facts{gap:7px 12px}html[data-blossom] .title-feature .title-hero-facts dt{font-size:9px}html[data-blossom] .title-feature .title-hero-facts dd{font-size:10px}html[data-blossom] .title-feature .title-hero-actions{flex-wrap:wrap;gap:8px}html[data-blossom] .title-feature .title-hero-actions .btn{font-size:11px;padding:12px 17px}html[data-blossom] .title-feature .title-save-actions>button{width:36px;height:36px}html[data-blossom] .title-page-back{left:13px;top:88px;font-size:10px}html[data-blossom] .title-shortcuts{top:73px;margin-top:16px;padding:7px 0}html[data-blossom] .title-shortcuts>button{font-size:11px;padding:8px 12px}html[data-blossom] .title-page .mv-title-layout{gap:30px;margin-top:18px}html[data-blossom] .mv-title-layout>.title-page-main{gap:30px}html[data-blossom] .title-page h2{font-size:23px}html[data-blossom] .title-page .title-character-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}html[data-blossom] .title-page .title-character-grid strong{font-size:11px}html[data-blossom] .title-stills .title-horizontal{grid-auto-columns:90%}html[data-blossom] .mv-title-layout>.title-sidebar{display:flex;flex-direction:column;gap:25px}html[data-blossom] .soundtrack-track{gap:9px;grid-template-columns:27px minmax(0,1fr) auto;padding:12px 0}html[data-blossom] .soundtrack-track>div:nth-child(2){display:block}html[data-blossom] .soundtrack-track small{display:block;margin-top:3px;font-size:9px}html[data-blossom] .soundtrack-track strong{font-size:12px}html[data-blossom] .soundtrack-actions{gap:0}html[data-blossom] .soundtrack-actions>button,html[data-blossom] .soundtrack-more>summary{width:25px;height:27px;padding:5px}html[data-blossom] .release-dates{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 13px}html[data-blossom] .release-dates>div{grid-template-columns:47px 1fr;gap:3px 6px}}
+@media (--tablet){html[data-blossom] .blossom-navbar .desktop-nav .nav-link{padding:8px 11px}html[data-blossom] .blossom-navbar .header-brand-area{gap:15px}html[data-blossom] .blossom-catalog-content .catalog-grid{grid-template-columns:repeat(3,minmax(0,1fr))}html[data-blossom] .blossom-catalog-content .catalog-layout-compact{grid-template-columns:repeat(4,minmax(0,1fr))}html[data-blossom] .title-page .title-feature{grid-template-columns:190px minmax(0,1fr);gap:28px;padding-inline:35px}html[data-blossom] .title-feature .title-poster{width:190px}html[data-blossom] .title-page .mv-title-layout{grid-template-columns:minmax(0,1fr) 240px;gap:25px}}
+@media (--tablet){html[data-blossom] .blossom-navbar .desktop-nav{display:none}html[data-blossom] .blossom-navbar .mobile-toggle{display:inline-grid}html[data-blossom] .blossom-navbar .header-brand-area{gap:10px}}
+@media (--tablet){html[data-blossom] .title-page .mv-title-layout{grid-template-columns:minmax(0,1fr)}html[data-blossom] .mv-title-layout>.title-sidebar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:25px}html[data-blossom] .blossom-catalog-content .catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}html[data-blossom] .blossom-catalog-content .catalog-layout-compact{grid-template-columns:repeat(3,minmax(0,1fr))}html[data-blossom] .title-feature h1{font-size:38px}html[data-blossom] .title-page .title-feature{min-height:690px}}
+@media (--phone){html[data-blossom] .blossom-navbar{top:9px;width:calc(100% - 18px)}html[data-blossom] .blossom-navbar.is-scrolled{top:8px;width:calc(100% - 26px)}html[data-blossom] .blossom-navbar .header-inner{padding:7px 9px;gap:6px;min-height:55px}html[data-blossom] .blossom-navbar .brand.logo{font-size:16px;padding:9px 11px}html[data-blossom] .blossom-navbar .header-actions{gap:3px}html[data-blossom] .blossom-navbar .header-search{width:32px;height:32px;min-height:0;padding:7px}html[data-blossom] .blossom-navbar .header-search span,html[data-blossom] .blossom-navbar .header-search kbd{display:none}html[data-blossom] .blossom-navbar .header-actions .icon-button,html[data-blossom] .blossom-navbar .avatar-button{width:28px;height:30px}html[data-blossom] .app-shell[data-view=home]>.app-main{padding-top:5px}html[data-blossom] .home-discover .hero-stage{min-height:670px;height:min(740px,95dvh);border-radius:24px}html[data-blossom] .home-feature .hero-content{left:25px;right:25px;max-width:none;bottom:80px}html[data-blossom] .home-feature .hero-content h1{font-size:34px}html[data-blossom] .home-feature .hero-content>p{font-size:12px;-webkit-line-clamp:4}html[data-blossom] .hero-small-poster{width:88px;height:117px;border-radius:10px}html[data-blossom] .hero-gallery-controls{right:20px;bottom:22px}html[data-blossom] .home-sections{gap:3px;padding:24px 0 0}html[data-blossom] .home-sections>button{font-size:11px;padding:8px 9px;gap:5px}html[data-blossom] .home-sections svg{width:14px;height:14px}html[data-blossom] .section-head{gap:12px}html[data-blossom] .section-head h2{font-size:25px}html[data-blossom] .carousel-section{padding-top:33px}html[data-blossom] .carousel-rail{grid-auto-columns:46%;gap:12px}html[data-blossom] .card-caption .media-name{font-size:12px}html[data-blossom] .card-caption .media-meta{font-size:9px}html[data-blossom] .catalog-views button{width:28px;height:29px}html[data-blossom] .app-shell:has(.title-page)>.app-main{padding-top:5px}html[data-blossom] .title-page .title-feature{display:flex;flex-direction:column;align-items:start;gap:22px;min-height:720px;padding:127px 24px 50px;border-radius:24px}html[data-blossom] .title-feature .title-poster{width:98px;flex:none;align-self:start;border-radius:11px}html[data-blossom] .title-feature .title-hero-copy{display:flex;max-width:100%;align-items:start;grid-column:auto}html[data-blossom] .title-feature h1{font-size:32px;line-height:1.13;margin-bottom:15px}html[data-blossom] .title-feature .title-hero-status{font-size:10px;gap:5px}html[data-blossom] .title-feature .title-hero-status small{display:none}html[data-blossom] .title-feature .title-hero-description{font-size:12px;line-height:1.8;-webkit-line-clamp:6}html[data-blossom] .title-feature .title-genre-list{gap:6px}html[data-blossom] .title-feature .title-genre-list>a,html[data-blossom] .title-feature .title-genre-list>span{font-size:9px;padding:5px 8px}html[data-blossom] .title-page-back{left:13px;top:88px;font-size:10px}html[data-blossom] .title-shortcuts{top:73px;margin-top:16px;padding:7px 0}html[data-blossom] .title-shortcuts>button{font-size:11px;padding:8px 12px}html[data-blossom] .title-page .mv-title-layout{gap:30px;margin-top:18px}html[data-blossom] .mv-title-layout>.title-page-main{gap:30px}html[data-blossom] .title-page h2{font-size:23px}html[data-blossom] .title-page .title-character-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}html[data-blossom] .title-page .title-character-grid strong{font-size:11px}html[data-blossom] .title-stills .title-horizontal{grid-auto-columns:90%}html[data-blossom] .mv-title-layout>.title-sidebar{display:flex;flex-direction:column;gap:25px}}
 @media(prefers-reduced-motion:reduce){html[data-blossom] .hero-gallery-dots>span{transition:none}}
 
 html[data-blossom] .blossom-catalog-content>.section-heading{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .title-page .title-feature{display:grid;grid-template-columns:85px minmax(0,1fr);align-items:start;gap:15px;padding-top:127px}
  html[data-blossom] .title-feature .title-poster{grid-column:1;grid-row:1/span 3;width:85px;align-self:start}
  html[data-blossom] .title-feature .title-hero-copy{display:contents}
@@ -215,8 +168,6 @@ html[data-blossom] .blossom-catalog-content>.section-heading{display:flex;flex-w
  html[data-blossom] .title-feature .title-hero-status{grid-column:2;grid-row:3;margin:0}
  html[data-blossom] .title-feature .title-hero-description{grid-column:1/-1;grid-row:4;margin:4px 0 0}
  html[data-blossom] .title-feature .title-genre-list{grid-column:1/-1;grid-row:5;margin:0}
- html[data-blossom] .title-feature .title-hero-facts{grid-column:1/-1;grid-row:6;margin:0}
- html[data-blossom] .title-feature .title-hero-actions{grid-column:1/-1;grid-row:7;margin:4px 0 0}
 }
 
 /* One poster grid and card treatment for online titles and the private collection. */
@@ -226,7 +177,7 @@ html[data-blossom] .blossom-catalog-content .catalog-grid.catalog-layout-compact
 html[data-blossom] .media-grid.library-layout-compact{grid-template-columns:repeat(auto-fill,minmax(113px,1fr));gap:20px 17px}
 html[data-blossom] .blossom-catalog-content .catalog-grid.catalog-layout-list,
 html[data-blossom] .media-grid.library-layout-list{grid-template-columns:minmax(0,1fr);gap:12px}
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .blossom-catalog-content .catalog-grid,
  html[data-blossom] .media-grid.library-layout-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}
  html[data-blossom] .blossom-catalog-content .catalog-grid.catalog-layout-compact,
@@ -250,9 +201,10 @@ html[data-blossom] .blossom-navbar .header-search:hover{transform:none;backgroun
 html[data-blossom] .blossom-navbar .header-search:focus-visible{outline:2px solid var(--color-blossom-light);outline-offset:2px}
 html[data-blossom] .blossom-navbar .desktop-nav .nav-link:hover{transform:none;background:transparent;color:var(--color-petal)}
 html[data-blossom] .blossom-navbar .header-actions .avatar-button{flex:none}
-@media(max-width:1100px) and (min-width:1001px){html[data-blossom] .blossom-navbar .desktop-nav .nav-link{padding-inline:9px;font-size:12px}html[data-blossom] .blossom-navbar .header-actions{gap:5px}}
-@media(max-width:1000px){html[data-blossom] .blossom-navbar .header-brand-area{gap:7px}}
-@media(max-width:640px){
+/* Narrow desktops close the action gap smoothly (5px at 1025, 8px from 1100). */
+@media (--desktop){html[data-blossom] .blossom-navbar .header-actions{gap:clamp(5px,calc(5px + (100vw - 1025px) * .04),8px)}}
+@media (--tablet){html[data-blossom] .blossom-navbar .header-brand-area{gap:7px}}
+@media (--phone){
  html[data-blossom] .blossom-navbar .header-inner{padding-inline:8px;gap:4px}
  html[data-blossom] .blossom-navbar .header-brand-area{gap:4px}
  html[data-blossom] .blossom-navbar .brand.logo{font-size:clamp(13px,4.15vw,16px);padding:8px 9px}
@@ -275,8 +227,8 @@ html[data-blossom] .blossom-navbar .header-actions>.import-settings-trigger,html
 html[data-blossom] .connection-settings-card>.import-settings-trigger{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:10px 16px;margin-top:12px}
 html[data-blossom] .connection-settings-status{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;color:var(--color-on-muted);font-size:12px}
 html[data-blossom] .connection-settings-status .is-ready{color:var(--color-blossom-light)}
-@media(max-width:1000px){html[data-blossom] .blossom-navbar .header-center-search{left:50%}}
-@media(max-width:640px){html[data-blossom] .blossom-navbar .header-center-search .header-search{width:32px;min-width:32px;height:32px;min-height:32px;padding:6px}html[data-blossom] .blossom-navbar .header-center-search .header-search span,html[data-blossom] .blossom-navbar .header-center-search .header-search kbd{display:none}}
+@media (--tablet){html[data-blossom] .blossom-navbar .header-center-search{left:50%}}
+@media (--phone){html[data-blossom] .blossom-navbar .header-center-search .header-search{width:32px;min-width:32px;height:32px;min-height:32px;padding:6px}html[data-blossom] .blossom-navbar .header-center-search .header-search span,html[data-blossom] .blossom-navbar .header-center-search .header-search kbd{display:none}}
 /* Preserve the original navbar material above. Only the search trigger and
    text-navigation spacing change; the navbar shell remains untouched. */
 html[data-blossom] .blossom-navbar .header-center-search .header-search{
@@ -299,18 +251,15 @@ html[data-blossom] .blossom-navbar .header-brand-area{
 html[data-blossom] .blossom-navbar .desktop-nav{
   transition:gap .34s cubic-bezier(.2,.8,.22,1);
 }
-@media(min-width:1001px) and (max-width:1600px){
-  html[data-blossom] .blossom-navbar .header-brand-area{gap:clamp(10px,1.1vw,18px)}
+/* Desktop links: compact up to 1600px, then they grow back to the roomy
+   17px / 13px of wide screens. */
+@media (--desktop){
   html[data-blossom] .blossom-navbar .desktop-nav .nav-link{
-    padding-inline:clamp(8px,.8vw,12px);font-size:12px;
-  }
-  html[data-blossom] .blossom-navbar.is-search-expanded .header-brand-area{gap:8px}
-  html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav{gap:3px}
-  html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link{
-    padding-inline:5px;font-size:11.5px;letter-spacing:-.01em;
+    padding-inline:clamp(8px,calc(min(.8vw,12px) + max(0px,(100vw - 1600px) * .1)),17px);
+    font-size:clamp(12px,calc(12px + max(0px,(100vw - 1600px) * .02)),13px);
   }
 }
-@media(max-width:640px){html[data-blossom] .blossom-navbar .header-center-search .header-search{min-width:32px;max-width:32px}}
+@media (--phone){html[data-blossom] .blossom-navbar .header-center-search .header-search{min-width:32px;max-width:32px}}
 @media(prefers-reduced-motion:reduce){
   html[data-blossom] .blossom-navbar .desktop-nav .nav-link,
   html[data-blossom] .blossom-navbar .header-brand-area,
@@ -322,7 +271,7 @@ html[data-blossom] .blossom-navbar .desktop-nav{
    middle morphs, so right-side controls move with the search rather than being
    painted over by an absolutely positioned 340px field. The existing navbar
    surface/blurring is untouched. */
-@media(min-width:641px){
+@media (--above-phone){
  html[data-blossom] .blossom-navbar .header-inner{
   --search-slot:164px;
   display:grid;
@@ -377,17 +326,17 @@ html[data-blossom] .blossom-navbar .desktop-nav{
  html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav{gap:1px}
  html[data-blossom] .blossom-navbar.is-search-expanded .header-actions{transform:translateX(5px)}
 }
-@media(min-width:641px) and (max-width:1199px){
+@media (--tablet-only){
  html[data-blossom] .blossom-navbar .header-inner{--search-slot:136px}
  html[data-blossom] .blossom-navbar.is-scrolled .header-inner{--search-slot:122px}
  html[data-blossom] .blossom-navbar.is-search-expanded .header-inner,
  html[data-blossom] .blossom-navbar.is-scrolled.is-search-expanded .header-inner{--search-slot:clamp(180px,25vw,260px)}
  html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link{padding-inline:3px;font-size:10.5px}
 }
-@media(min-width:641px) and (max-width:1000px){
+@media (--tablet-only){
  html[data-blossom] .blossom-navbar.is-search-expanded .header-actions .avatar-button{opacity:0;visibility:hidden;pointer-events:none}
 }
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .blossom-navbar .header-center-search{min-width:55px;max-width:70px}
  html[data-blossom] .blossom-navbar .header-center-search .header-search{
   min-width:55px;max-width:70px;padding-inline:9px;
@@ -405,7 +354,7 @@ html[data-blossom] .blossom-navbar .desktop-nav{
 
 /* Small phones cannot fit three visible clusters plus a real input.
    Temporarily yield the left/right slots to the focused search, then restore. */
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{
   width:calc(100% - 20px);max-width:none;min-width:0;
  }
@@ -415,11 +364,6 @@ html[data-blossom] .blossom-navbar .desktop-nav{
  html[data-blossom] .blossom-navbar.is-search-expanded .header-brand-area,
  html[data-blossom] .blossom-navbar.is-search-expanded .header-actions{
   opacity:0;visibility:hidden;pointer-events:none;
- }
-}
-@media(min-width:1200px) and (max-width:1350px){
- html[data-blossom] .blossom-navbar.is-scrolled.is-search-expanded .header-inner{
-  --search-slot:278px;
  }
 }
 
@@ -444,18 +388,12 @@ html[data-blossom] .blossom-navbar .desktop-nav .nav-link:focus-visible{
 
 /* Reserve real breathing room beside the opening field on 1001–1350px
    laptops, including the narrower scrolled state. */
-@media(min-width:1200px) and (max-width:1350px){
- html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:300px}
- html[data-blossom] .blossom-navbar.is-scrolled.is-search-expanded .header-inner{--search-slot:260px}
- html[data-blossom] .blossom-navbar.is-scrolled.is-search-expanded .desktop-nav .nav-link{padding-inline:3px;font-size:11px}
-}
-@media(min-width:1001px) and (max-width:1120px){
- html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:200px}
- html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link{font-size:10px;padding-inline:2px}
-}
-@media(min-width:1001px) and (max-width:1070px){
- html[data-blossom] .blossom-navbar.is-search-expanded .header-brand-area .brand.logo{font-size:16px;padding-inline:12px}
- html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link{font-size:9.5px;padding-inline:1px}
+/* Open search on desktops: the field widens with the window (300px at 1280,
+   340px from 1440) and the links tighten to make room for it. */
+@media (--desktop){
+ html[data-blossom] .blossom-navbar.is-scrolled.is-search-expanded .header-inner{--search-slot:clamp(200px,calc(260px + (100vw - 1280px) * .2875),306px)}
+ html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link{font-size:clamp(9.5px,calc(10px + (100vw - 1120px) * .009375),11.5px);padding-inline:clamp(1px,min(.48vw,calc(2px + (100vw - 1120px) * .0259)),7px)}
+ html[data-blossom] .blossom-navbar.is-scrolled.is-search-expanded .desktop-nav .nav-link{padding-inline:clamp(1px,calc(3px + (100vw - 1280px) * .02445),7px);font-size:clamp(9.5px,calc(11px + (100vw - 1280px) * .003125),11.5px)}
 }
 /* One accent belongs to search; navigation and the brand stay neutral. */
 html[data-blossom]{--nav-search-accent:color-mix(in srgb,var(--color-blossom) 84%,#16161a)}
@@ -469,7 +407,7 @@ html[data-blossom] .blossom-navbar .header-center-search .header-search,
 html[data-blossom] .blossom-navbar .header-center-search .header-search:hover,
 html[data-blossom] .blossom-navbar .header-center-search .header-search:focus-visible{background:var(--nav-search-accent);color:var(--nav-search-ink,#fff);box-shadow:none}
 html[data-blossom] .blossom-navbar .header-actions{align-items:center;margin-block:0}
-@media(max-width:640px){html[data-blossom] .blossom-navbar .header-inner{min-height:56px;padding-block:9px}html[data-blossom] .blossom-navbar .header-center-search .header-search{height:38px;min-height:38px}}
+@media (--phone){html[data-blossom] .blossom-navbar .header-inner{min-height:56px;padding-block:9px}html[data-blossom] .blossom-navbar .header-center-search .header-search{height:38px;min-height:38px}}
 
 /* Content-grid alignment; the top state deliberately spreads beyond the grid. */
 html[data-blossom] .blossom-navbar{width:min(1600px,calc(100% - 24px))}
@@ -477,10 +415,10 @@ html[data-blossom] .blossom-navbar.is-scrolled{width:min(1268px,calc(100% - 72px
 html[data-blossom] .blossom-navbar .brand.logo{color:var(--color-crimson)}
 html[data-blossom] .blossom-navbar .header-inner{transition:none}
 html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:340px}
-@media(min-width:641px) and (max-width:1120px){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:max(180px,20vw)}}
-@media(min-width:1121px) and (max-width:1350px){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:300px}}
-@media(max-width:900px){html[data-blossom] .blossom-navbar.is-scrolled{width:calc(100% - 40px)}}
-@media(max-width:640px){
+@media (--tablet-only){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:max(180px,20vw)}}
+
+@media (--tablet){html[data-blossom] .blossom-navbar.is-scrolled{width:calc(100% - 40px)}}
+@media (--phone){
  html[data-blossom] .blossom-navbar.is-scrolled{width:calc(100% - 28px)}
  html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{position:absolute;left:10px;right:10px;top:50%;width:auto;max-width:none;transform:translateY(-50%)}
 }
@@ -498,16 +436,18 @@ html[data-blossom] .blossom-navbar.is-search-expanded .header-search{width:100%;
 html[data-blossom] .blossom-navbar .avatar-button,html[data-blossom] .blossom-navbar .icon-button{width:38px;height:38px;min-height:38px}
 html[data-blossom] .blossom-navbar.is-player-expanded #profileBtn,html[data-blossom] .blossom-navbar.is-player-expanded .header-actions>.import-settings-trigger{opacity:1;visibility:visible;pointer-events:auto}
 html[data-blossom] .blossom-navbar.is-player-expanded .header-center-search{opacity:1;visibility:visible}
-@media(min-width:641px) and (max-width:1120px){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:max(180px,20vw)}}
-@media(min-width:1121px) and (max-width:1350px){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:300px}}
-@media(max-width:640px){
+@media (--tablet-only){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:max(180px,20vw)}}
+/* The open search field on desktops widens with the window: 300px at 1280, 340px from 1440. */
+@media (--desktop){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:clamp(200px,calc(300px + (100vw - 1280px) * .25),340px)}}
+
+@media (--phone){
  html[data-blossom] .blossom-navbar .header-inner,html[data-blossom] .blossom-navbar.is-scrolled .header-inner{padding:9px;min-height:56px}
  html[data-blossom] .blossom-navbar .mobile-toggle{order:1}
  html[data-blossom] .blossom-navbar .header-brand-area{height:38px}
  html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{width:auto;left:9px;right:9px;justify-self:stretch}
 }
 
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .blossom-navbar .header-center-search{position:relative;inset:auto;transform:none;order:1;flex:none;margin-left:auto}
  html[data-blossom] .blossom-navbar .header-actions{order:2;flex:none}
  html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{position:absolute;top:50%;left:9px;right:9px;transform:translateY(-50%);margin:0}
@@ -521,7 +461,7 @@ html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search>butt
 html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search>button.header-search{visibility:hidden;pointer-events:none}
 
 /* Keep the mobile anchor in its normal layout while the portal morphs to it. */
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .blossom-navbar.is-search-expanded .header-center-search{position:relative;inset:auto;transform:none;width:38px;min-width:38px;max-width:38px;margin-left:auto;justify-self:center}
 }
 
@@ -537,7 +477,7 @@ html[data-blossom] .library-layout-list .anime-card.media-open .media-kind-badge
 html[data-blossom] .library-layout-list .anime-card.media-open .card-cover-shade{display:none}
 html[data-blossom] .library-layout-list .anime-card.media-open .anime-card-video{display:none}
 html[data-blossom] .library-layout-list .anime-card.media-open .card-caption-details{justify-content:flex-start;gap:8px 12px}
-@media(max-width:640px){
+@media (--phone){
  html[data-blossom] .anime-card .card-caption{padding:12px 10px;gap:6px}
  html[data-blossom] .anime-card .card-caption .media-name{font-size:13px;line-height:1.35}
  html[data-blossom] .catalog-layout-compact .anime-card .card-caption{padding:9px 8px;gap:5px}

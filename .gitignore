@@ -15,3 +15,6 @@ deploy/oracle/data/
 
 demo/player-redesign/media/
 src/i18n/source-strings.json
+
+# Owner-supplied licensed fonts: local builds only, never committed.
+/reader-fonts/local/

@@ -1,10 +1,14 @@
-import {useEffect,useRef,useState} from 'react';
-import ReaderShell from './ReaderShell.jsx';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {Moon,Sun,Music} from 'lucide-react';
+import ReaderShell,{keyIs} from './ReaderShell.jsx';
+import {ReaderSettingsTabs} from './ReaderViewSettings.jsx';
 import {bookPreferences,saveBookPreferences} from './book-content.js';
 import {readRanobeChapter,saveRanobeProgress} from './ranobe-client.js';
 import Narration from './tts/Narration.jsx';
 import RoleText,{segmentsByParagraph} from './tts/RoleText.jsx';
 import {useRetainedMedia,useRetainedReport} from './RetainedMedia.jsx';
+import {createSoundtrack,scoreChapter,sceneAt,musicPrefs,saveMusicPrefs,MUSIC_CREDIT} from './tts/soundtrack.js';
+import {MUSIC} from './tts/music-catalog.js';
 import './reader-surface.css';
 import './ranobe.css';
 
@@ -16,12 +20,23 @@ import './ranobe.css';
 // called when the tray closes it.
 export default function RanobeReader({book,item,start,service,userId,onClose,onMinimize,onStop,embed=false}){
  const root=useRef(null),body=useRef(null),restored=useRef(false),follow=useRef(true),scrollPause=useRef(0);
- const [prefs,setPrefs]=useState(()=>bookPreferences(userId)),[settings,setSettings]=useState(false);
+ const [prefs,setPrefs]=useState(()=>bookPreferences(userId)),[settings,setSettings]=useState(false),[settingsTab,setSettingsTab]=useState('view'),[followVoice,setFollowVoice]=useState(true);
  const [index,setIndex]=useState(start?.index||0),[chapter,setChapter]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [speaking,setSpeaking]=useState(-1),[speakingSegment,setSpeakingSegment]=useState(null),[script,setScript]=useState(null),voice=useRef(null),[voicePlaying,setVoicePlaying]=useState(false),[continueVoice,setContinueVoice]=useState(false),[startParagraph,setStartParagraph]=useState(start?.paragraph||0);
  const entry=book.episodes[index];
  const mode=useRetainedMedia(true,{label:book.title+(entry?', глава '+entry.number:''),kind:'reader'},onStop||onClose),report=useRetainedReport();
  useEffect(()=>{report({playing:voicePlaying,toggle:()=>voice.current?.toggle()});},[voicePlaying,report]);
+ // Room in the left margin for the speakers' names (see ranobe.css).
+ const [margin,setMargin]=useState(false);
+ useEffect(()=>{
+  const surface=body.current;if(!surface||!chapter)return;
+  const measure=()=>{const line=surface.querySelector('.ranobe-prose p');if(line)setMargin(line.getBoundingClientRect().left-surface.getBoundingClientRect().left>=130);};
+  const observer=new ResizeObserver(measure);observer.observe(surface);measure();
+  return()=>observer.disconnect();
+ },[chapter,prefs.width,prefs.size]);
+ // Night: a warm, dim page with little blue light; the button returns to the day theme.
+ const night=prefs.theme==='night';
+ const toggleNight=()=>update(night?{theme:prefs.dayTheme||'paper'}:{theme:'night',dayTheme:prefs.theme});
  function update(change){setPrefs(old=>{const next={...old,...change};saveBookPreferences(userId,next);return next;});}
 
  useEffect(()=>{
@@ -41,11 +56,43 @@ export default function RanobeReader({book,item,start,service,userId,onClose,onM
   requestAnimationFrame(()=>{const node=body.current?.querySelector('[data-p="'+target+'"]');if(node&&target>0)node.scrollIntoView({block:'start'});else body.current?.scrollTo({top:0});});
   const observer=new IntersectionObserver(rows=>{
    const visible=rows.filter(r=>r.isIntersecting).map(r=>Number(r.target.dataset.p)).sort((a,b)=>a-b)[0];
-   if(Number.isFinite(visible))saveRanobeProgress(userId,book.url,{chapter:entry.url,paragraph:visible,title:entry.title});
+   if(Number.isFinite(visible)){setVisible(visible);saveRanobeProgress(userId,book.url,{chapter:entry.url,paragraph:visible,title:entry.title});}
   },{root:body.current,rootMargin:'-30% 0px -60% 0px'});
   body.current.querySelectorAll('[data-p]').forEach(n=>observer.observe(n));
   return()=>observer.disconnect();
  },[chapter]);
+
+ // The sound director: background music chosen per scene of the chapter
+ // (tts/soundtrack.js). It follows the voice while narration plays and the
+ // reading position otherwise; it yields to other music and video.
+ const [music,setMusicState]=useState(musicPrefs),[scenes,setScenes]=useState(null),[scoring,setScoring]=useState(''),[visible,setVisible]=useState(start?.paragraph||0),[yielded,setYielded]=useState(false),[blocked,setBlocked]=useState(false);
+ const soundtrack=useRef(null);
+ const setMusic=change=>setMusicState(old=>{const next={...old,...change};saveMusicPrefs(next);return next;});
+ useEffect(()=>{const player=createSoundtrack();player.onBlocked=()=>setBlocked(true);soundtrack.current=player;return()=>player.destroy();},[]);
+ useEffect(()=>{
+  if(!music.on||!chapter||!service)return;
+  let live=true;setScenes(null);setScoring('running');
+  const meta={title:item?.title||book.title,language:chapter.language||book.language};
+  scoreChapter({chapterKey:entry.url,paragraphs:chapter.paragraphs,meta,service,userId}).then(value=>{
+   if(!live)return;setScenes(value);setScoring('');
+   // The next chapter is scored in the background, so it starts with its music.
+   const following=book.episodes[index+1];
+   if(following)readRanobeChapter(service,following.url,item).then(data=>scoreChapter({chapterKey:following.url,paragraphs:data.paragraphs,meta,service,userId})).catch(()=>{});
+  }).catch(e=>{if(live)setScoring('error:'+(e.message||'нет ответа'));});
+  return()=>{live=false;};
+ },[music.on,chapter,entry?.url]);
+ const position=voicePlaying&&speaking>=0?speaking:visible,scene=useMemo(()=>sceneAt(scenes,position),[scenes,position]);
+ useEffect(()=>{soundtrack.current?.volume(music.volume);},[music.volume]);
+ useEffect(()=>{soundtrack.current?.speaking(voicePlaying);},[voicePlaying]);
+ useEffect(()=>{const player=soundtrack.current;if(!player)return;player.enable(music.on&&!yielded&&(mode!=='hidden'||voicePlaying));player.set(scene);},[music.on,yielded,mode,voicePlaying,scene]);
+ useEffect(()=>{
+  const yieldTo=()=>setYielded(true),video=event=>{if(event.target?.tagName==='VIDEO')yieldTo();};
+  addEventListener('mediavault-music-playing',yieldTo);document.addEventListener('play',video,true);
+  return()=>{removeEventListener('mediavault-music-playing',yieldTo);document.removeEventListener('play',video,true);};
+ },[]);
+ function toggleMusic(){setYielded(false);setBlocked(false);setMusic({on:!music.on||yielded});}
+ const track=scene&&scene.track>=0?MUSIC[scene.track]:null;
+ const musicState=!music.on?'Фоновая музыка по настроению сцены':yielded?'Музыка уступила другому звуку · нажми, чтобы вернуть':blocked?'Браузер не дал включить звук · нажми ещё раз':scoring==='running'?'Звукорежиссёр читает главу…':scoring.startsWith('error:')?'Звукорежиссёр не ответил: '+scoring.slice(6):scene?(scene.mood||'Сцена')+' · '+(track?track[0]:'тишина'):'Музыка включена';
 
  function go(next,{keepVoice=false}={}){
   if(next<0||next>=book.episodes.length)return;
@@ -60,15 +107,40 @@ export default function RanobeReader({book,item,start,service,userId,onClose,onM
  }
 
  const surface={'--book-width':prefs.width+'px','--book-font':prefs.font==='serif'?'Georgia,serif':'system-ui,sans-serif','--book-size':prefs.size+'px','--book-leading':prefs.lineHeight};
- const options=<div className="reader-book-settings">
-  <label>Тема<select aria-label="Тема ранобэ" value={prefs.theme} onChange={e=>update({theme:e.target.value})}><option value="paper">Бумага</option><option value="dark">Тёмная</option><option value="black">Чёрная · OLED</option></select></label>
+ // Settings in three tabs like the manga reader: how the page looks, how it reads, its sound.
+ const options=<ReaderSettingsTabs tabs={[['view','Вид'],['reading','Чтение'],['sound','Звук']]} value={settingsTab} onChange={setSettingsTab}><div className="reader-book-settings">
+  {settingsTab==='view'&&<>
+  <label>Тема<select aria-label="Тема ранобэ" value={prefs.theme} onChange={e=>update({theme:e.target.value})}><option value="paper">Бумага</option><option value="dark">Тёмная</option><option value="black">Чёрная · OLED</option><option value="night">Ночная · тёплая</option></select></label>
   <label>Шрифт<select aria-label="Шрифт ранобэ" value={prefs.font} onChange={e=>update({font:e.target.value})}><option value="serif">Книжный</option><option value="sans">Без засечек</option></select></label>
   <label>Размер текста<select aria-label="Размер текста ранобэ" value={prefs.size} onChange={e=>update({size:Number(e.target.value)})}>{[16,18,20,22,24,28].map(v=><option key={v} value={v}>{v} px</option>)}</select></label>
   <label>Интерлиньяж<select aria-label="Межстрочный интервал ранобэ" value={prefs.lineHeight} onChange={e=>update({lineHeight:Number(e.target.value)})}>{[1.5,1.75,2].map(v=><option key={v} value={v}>{v}</option>)}</select></label>
   <label>Ширина<select aria-label="Ширина текста ранобэ" value={prefs.width} onChange={e=>update({width:Number(e.target.value)})}>{[560,720,900,1100].map(v=><option key={v} value={v}>{v} px</option>)}</select></label>
-  <label className="narration-switch"><input type="checkbox" defaultChecked onChange={e=>{follow.current=e.target.checked;}}/>Следовать за голосом</label>
+  </>}
+  {settingsTab==='reading'&&<>
+  <label className="narration-switch"><input type="checkbox" checked={followVoice} onChange={e=>{follow.current=e.target.checked;setFollowVoice(e.target.checked);}}/>Следовать за голосом</label>
   <label className="narration-switch"><input type="checkbox" checked={prefs.roles} onChange={e=>update({roles:e.target.checked})}/>Показывать роли в тексте</label>
- </div>;
+  </>}
+  {settingsTab==='sound'&&<>
+  <label className="narration-switch"><input type="checkbox" checked={music.on&&!yielded} onChange={toggleMusic}/>Фоновая музыка по сценам</label>
+  {music.on&&<label>Громкость музыки<input type="range" min="0" max="1" step="0.05" aria-label="Громкость фоновой музыки" value={music.volume} onChange={e=>setMusic({volume:Number(e.target.value)})}/></label>}
+  {music.on&&<p className="reader-hint" role="status">{musicState}</p>}
+  <p className="reader-hint">Звукорежиссёр (Gemini) делит главу на сцены и подбирает к каждой трек или тишину. <a href="https://incompetech.com" target="_blank" rel="noopener noreferrer">{MUSIC_CREDIT}</a></p>
+  </>}
+ </div></ReaderSettingsTabs>;
+ const actions=<>
+  <button type="button" className="reader-control reader-night" aria-label={night?'Дневной режим':'Ночной режим'} title={night?'Дневной режим':'Ночной режим: тёплый тусклый фон'} aria-pressed={night} onClick={toggleNight}>{night?<Sun size={18}/>:<Moon size={18}/>}<span className="reader-control-label">{night?'Дневной режим':'Ночной режим'}</span></button>
+  <button type="button" className="reader-control reader-music" aria-label="Фоновая музыка" title={musicState} aria-pressed={music.on&&!yielded} aria-busy={music.on&&scoring==='running'||undefined} onClick={toggleMusic}><Music size={18}/><span className="reader-control-label">{music.on&&!yielded?'Музыка включена':'Фоновая музыка'}</span></button>
+ </>;
+ const TEXT_SIZES=[16,18,20,22,24,28];
+ const stepTextSize=delta=>{const at=TEXT_SIZES.indexOf(prefs.size),next=TEXT_SIZES[Math.max(0,Math.min(TEXT_SIZES.length-1,(at<0?2:at)+delta))];if(next!==prefs.size)update({size:next});};
+ const keys=[
+  {keys:'N',label:'Следующая глава',group:'Страницы и главы',match:keyIs('n'),run:()=>go(index+1)},
+  {keys:'P',label:'Предыдущая глава',group:'Страницы и главы',match:keyIs('p'),run:()=>go(index-1)},
+  {keys:'+ / −',label:'Крупнее или мельче текст',group:'Текст',match:keyIs('+','=','-','Equal','Minus','NumpadAdd','NumpadSubtract'),run:e=>stepTextSize(/-|Minus|Subtract/.test(String(e.key)+e.code)?-1:1)},
+  {keys:'L',label:night?'Дневной режим':'Ночной режим',group:'Текст',match:keyIs('l'),run:toggleNight},
+  {keys:'K',label:'Озвучка: пауза и продолжение',group:'Озвучка и музыка',match:keyIs('k'),run:()=>voice.current?.toggle()},
+  {keys:'M',label:'Фоновая музыка по сценам',group:'Озвучка и музыка',match:keyIs('m'),run:toggleMusic},
+ ];
  const contents=<nav className="reader-chapter-list">{book.episodes.map((c,i)=><button key={c.url} aria-current={i===index||undefined} onClick={()=>go(i)}><span translate="no">{c.number}. {c.title}</span></button>)}</nav>;
  const narration=chapter&&<Narration key={entry.url} paragraphs={chapter.paragraphs} language={chapter.language||book.language} bookKey={book.url} chapterKey={entry.url}
   title={book.title+' · '+(chapter.title||entry.title)} chapter={chapter.title||entry.title} book={{title:item?.title||book.title,aliases:item?.aliases,authors:item?.authors,description:item?.description,year:item?.year,kind:item?.kind||'ranobe'}} service={service} userId={userId} startParagraph={startParagraph} autoplay={continueVoice}
@@ -82,10 +154,10 @@ export default function RanobeReader({book,item,start,service,userId,onClose,onM
  const away=embed||mode!=='attached';
  return <ReaderShell readerRef={root} title={book.title} subtitle={'Глава '+entry?.number+(entry?.title?' · '+entry.title:'')} onClose={onClose} onMinimize={onMinimize} theme={prefs.theme}
   layout="rail" dock={narration} inline={away} embedded={away} navigationLabels={{previous:'Предыдущая глава',next:'Следующая глава'}}
-  className={'book-reader ranobe-reader text-reader'+(mode==='popup'?' is-mini':'')} paged={false} settings={options} settingsOpen={settings} onSettingsOpenChange={setSettings} contents={contents}
+  className={'book-reader ranobe-reader text-reader'+(mode==='popup'?' is-mini':'')} paged={false} settings={options} actions={actions} keys={keys} shortcutTitle="Читалка ранобэ" settingsOpen={settings} onSettingsOpenChange={setSettings} contents={contents}
   progress={{current:index+1,total:book.episodes.length,label:'Глава '+(index+1)+' / '+book.episodes.length}}
   onPrevious={()=>go(index-1)} onNext={()=>go(index+1)} canPrevious={index>0} canNext={index<book.episodes.length-1}>
-  <div ref={body} className="book-reading-surface book-flow-scroll ranobe-surface" style={surface} onWheel={()=>{scrollPause.current=Date.now()+4000;}} onTouchMove={()=>{scrollPause.current=Date.now()+4000;}}>
+  <div ref={body} className={'book-reading-surface book-flow-scroll ranobe-surface'+(margin?' has-role-margin':'')} style={surface} onWheel={()=>{scrollPause.current=Date.now()+4000;}} onTouchMove={()=>{scrollPause.current=Date.now()+4000;}}>
    {loading&&<div className="reader-book-loading" role="status">Открываем главу…</div>}
    {error&&<div className="reader-book-error" role="alert">{error} <button type="button" className="text-link" onClick={()=>{setIndex(i=>i);setChapter(null);readRanobeChapter(service,entry.url,item).then(setChapter).catch(e=>setError(e.message));}}>Повторить</button></div>}
    {chapter&&<article className={'reader-prose ranobe-prose'+(voicePlaying?' is-listening':'')} translate="no" lang={chapter.language||book.language}>

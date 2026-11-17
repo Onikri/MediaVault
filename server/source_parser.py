@@ -860,13 +860,17 @@ class PublicHttp:
                 if voyceme_form:
                     outgoing.update({'Accept': 'application/json', 'Content-Type': 'application/json',
                                      'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://www.voyce.me'})
+            # HentaiMama's public player list for one episode post (hentai_video_sites).
+            mama_player=(url=='https://hentaimama.io/wp-admin/admin-ajax.php' and isinstance(data,dict) and set(data)=={'action','a','i'}
+                         and data.get('action')=='get_player_contents' and bool(re.fullmatch(r'\d{1,9}',str(data.get('a',''))))
+                         and bool(re.fullmatch(r'\d{1,2}',str(data.get('i','')))))
             if not (player_form or search_form or manga_form or million_register or zerosum_viewer or manhwazone_session
                     or foolslide_form or namicomi_form or ninehentai_form or voyceme_form or mangabox_form or mangaone_proto
                     or ciao_json or firecross_session or honto_session or alphapolis_session or drecomics_form or docomo_form or cycomi_form
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form or akuma_session
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
-                    or hikka_search or jaomix_toc or madara_form or giga_form or ninth and ninth.post):
+                    or hikka_search or jaomix_toc or madara_form or giga_form or mama_player or ninth and ninth.post):
                 raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if madara_form:outgoing['X-Requested-With']='XMLHttpRequest'
             if chan_search:
