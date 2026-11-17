@@ -319,8 +319,11 @@ class Madara:
             return urlunsplit(parsed._replace(path=path))
         return image
 
+    def vocabulary_path(self):
+        return f'/{self.section}/'
+
     def vocabulary(self, http):
-        soup, final = self.soup(http, self.ROOT + f'/{self.section}/')
+        soup, final = self.soup(http, self.ROOT + self.vocabulary_path())
         values = {}
         for node in soup.select('.genres a[href], .genres-content a[href]'):
             target = self.site_link(node['href'], final)
@@ -854,6 +857,10 @@ class TopManhuaFan(Madara):
 
 
 class Zazamanga(Madara):
+    def vocabulary_path(self):
+        # /manga/ answers with a redirect to plain-HTTP /manga.
+        return f'/{self.section}'
+
     def html_request(self, http, page, query, sort, tag):
         if page > 100:
             return '', {}

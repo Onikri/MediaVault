@@ -465,7 +465,15 @@ class HentaiKisu(DirectCatalogue):
         query = self.catalogue_params(page, query, tag)
         if query:
             return super().catalogue(http, page, query=query, sort=sort, tag=tag)
-        data = self.json(http, query_url(self.ROOT + '/backend/infinite.index.php', p=page))
+        from source_parser import SourceRedirectError
+
+        try:
+            data = self.json(http, query_url(self.ROOT + '/backend/infinite.index.php', p=page))
+        except SourceRedirectError:
+            # Past the last page the endpoint redirects to the home page.
+            if page > 1:
+                return [], False
+            raise
         if not isinstance(data, list):
             raise SourceError('Источник изменил формат каталога.')
         rows = {}

@@ -153,7 +153,16 @@ class Senkuro(JsonSeries):
                 raise SourceError('Некорректная метка каталога.')
             variables['label'] = {'include': [tag], 'exclude': []}
         rows = items(self.graphql(http, 'search', variables), 'mangas')
-        return [self.record_data(row) for row in rows if isinstance(row, dict)], len(rows) >= 10
+        records, failure = [], None
+        for row in rows:
+            try:
+                records.append(self.record_data(row))
+            except (SourceError, AttributeError, TypeError) as error:
+                # One malformed listing entry must not stop the whole catalogue.
+                failure = failure or error
+        if failure and not records:
+            raise failure if isinstance(failure, SourceError) else SourceError('Каталог изменил формат тайтлов.')
+        return records, len(rows) >= 10
 
     def vocabulary(self, http):
         return [{'label': self.label(row), 'sourceId': row['slug'],

@@ -125,7 +125,10 @@ def catalogue_job(adapter, spec, page):
     http = PublicHttp(timeout=(3, 12), deadline=time.monotonic() + 22)
     try:
         if spec['type'] == 'bridge-vocabulary':
-            return {'rows': [], 'next': None, 'vocabulary': adapter.vocabulary(http)}
+            # A Suwayomi filter job queued before activation may meet an
+            # adapter whose site exposes no genre or tag list.
+            vocabulary = getattr(adapter, 'vocabulary', None)
+            return {'rows': [], 'next': None, 'vocabulary': vocabulary(http) if vocabulary else []}
         if spec['type'] == 'bridge-detail':
             stored = spec['row']
             url = stored.get('sourceUrl') or stored['url']

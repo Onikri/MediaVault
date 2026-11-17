@@ -7,7 +7,8 @@ from source_parser import PublicHttp, SourceError, public_url
 
 ROOT='https://senkognito.com'
 API='https://api.senkognito.com/graphql'
-SLUG=r'[A-Za-z0-9_-]{1,200}'
+# Senkuro builds slugs from full light-novel titles; some exceed 200 characters.
+SLUG=r'[A-Za-z0-9_-]{1,400}'
 ID=r'[A-Za-z0-9_-]{1,120}'
 NAMES='titles{lang content} originalName{lang content} alternativeNames{lang content}'
 QUERIES={

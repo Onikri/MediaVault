@@ -51,6 +51,10 @@ class SourceTemporaryError(SourceError):
     """A network failure or temporary upstream response."""
 
 
+class SourceRedirectError(SourceError):
+    """An upstream redirect that the requested route does not allow."""
+
+
 class SourceRateLimitError(SourceError):
     def __init__(self, retry_after):
         super().__init__("Источник вернул HTTP 429.")
@@ -951,7 +955,7 @@ class PublicHttp:
                 response.close()
                 if ninth and not (ninth.redirect and location and hop < 5
                                   and urlsplit(urljoin(url, location)).netloc == urlsplit(url).netloc):
-                    raise SourceError("Некорректное перенаправление источника.")
+                    raise SourceRedirectError("Некорректное перенаправление источника.")
                 if (speedbinb or clipstudio or publus or action in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto',
                                'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
@@ -963,7 +967,7 @@ class PublicHttp:
                                'cycomi-reader', 'nicovideo-public',
                                'publus-source-json', 'docomo-reader', 'pixivcomic-public'}
                         or not location or hop == 5):
-                    raise SourceError("Некорректное перенаправление источника.")
+                    raise SourceRedirectError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
                 if action == 'publus-source-document' and urlsplit(next_url).netloc != origin.netloc:
                     raise SourceError('Издатель Publus перенаправил гостевой запрос на другой домен.')

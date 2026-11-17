@@ -20,7 +20,6 @@ class Masonry:
     IS_NSFW = True
     LANGUAGE = 'all'
     TITLE_PATH = CHAPTER_PATH = TITLE_PATH
-    index_sort = 'updated'
 
     def __init__(self, sid, name, root):
         self.SOURCE_ID, self.NAME, self.ROOT = sid, name, root
@@ -74,7 +73,11 @@ class Masonry:
         elif tag:
             raise SourceError('Некорректный тег каталога Masonry.')
         elif sort == 'updated':
-            path = f'/updates/sort/newest/mpage/{page}/'
+            # The newest listing is a single infinite-scroll page now; the
+            # paginated archive below is the complete catalogue.
+            if page > 1:
+                return [], False
+            path = '/sort/newest/'
         else:
             path = '/' if page == 1 else '/archive/' if page == 2 else f'/archive/page/{page - 1}/'
         soup, final = self.document(http, self.ROOT + path)
@@ -93,7 +96,7 @@ class Masonry:
         return list(rows.values()), bool(soup.select_one('.pagination-a li.next'))
 
     def vocabulary(self, http):
-        soup, _ = self.document(http, self.ROOT + '/updates/sort/newest/')
+        soup, _ = self.document(http, self.ROOT + '/sort/newest/')
         result = {}
         for control in soup.select('#filter-a span:has(> input)'):
             label = node_text(control.select_one('label'))
