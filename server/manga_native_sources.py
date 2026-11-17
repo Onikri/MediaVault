@@ -1,6 +1,7 @@
 """Dispatch migrated Suwayomi IDs to native catalogue and reader adapters."""
 
 from contextlib import closing
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -26,6 +27,24 @@ ADAPTERS = {adapter.SOURCE_ID: adapter for adapter in (
     *manga_iken.SOURCES, *manga_mangacatalog.ACTIVE_SOURCES, *manga_keyoapp.ACTIVE_SOURCES,
     *manga_vinetheme.ACTIVE_SOURCES, *manga_comici.ACTIVE_SOURCES, *manga_gigaviewer.ACTIVE_SOURCES
 )}
+ACTIVATION = Path(__file__).with_name('manga_native_activation.json')
+
+
+def activated_profiles():
+    # Profiles of the later migration batches go live only after a server-side
+    # check of their catalogue, chapter list, pages and first image.
+    try:
+        listed = json.loads(ACTIVATION.read_text(encoding='utf-8'))['sourceIds']
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+    import manga_native_registry
+
+    profiles = manga_native_registry.profiles()
+    return {sid: profiles[sid] for sid in listed if isinstance(sid, str) and sid in profiles}
+
+
+for _sid, _adapter in activated_profiles().items():
+    ADAPTERS.setdefault(_sid, _adapter)
 HOSTS = {
     urlsplit(adapter.ROOT).hostname: adapter
     for adapter in ADAPTERS.values()
