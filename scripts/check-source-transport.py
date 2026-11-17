@@ -65,7 +65,7 @@ def check(source_id, query=None):
     def step(name, operation, call):
         nonlocal phase
         phase = name
-        http.deadline = time.monotonic() + budget + 15
+        http.deadline = time.monotonic() + budget + 25
         began = time.monotonic()
         with http.scope(source_id, operation):
             value = call()

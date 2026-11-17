@@ -48,6 +48,7 @@ LEGACY_PROXY = 'http://suwayomi-jp-router:8080'
 SESSION_TTL = 25 * 60
 FAILURE_COOLDOWN = 90
 PAGE_REUSE = 60
+RETRY_RESERVE = 10
 STATUS_TTL = 10
 MAX_SOLVES = 2
 HOST = re.compile(r'(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}')
@@ -512,7 +513,9 @@ def solve(decision, url, deadline, started, *, fetch_page=False):
             raise SourceChallengeError('Решатель недавно не справился с этим источником. Повтори позже.',
                                        solver='cooldown')
         remaining = (deadline - time.monotonic()) if deadline else decision.infra.get('solverTimeout', 60)
-        budget = min(decision.infra.get('solverTimeout', 60), remaining - 1)
+        # Byparr waits for network idle until maxTimeout: leave the retried
+        # request its own share of the caller's budget.
+        budget = min(decision.infra.get('solverTimeout', 60), remaining - RETRY_RESERVE)
         if budget < 6:
             raise SourceChallengeError('Источнику нужна проверка браузера, но время запроса уже истекло.',
                                        solver='budget')
