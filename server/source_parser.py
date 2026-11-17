@@ -22,6 +22,22 @@ import requests
 from anime_dl_core.http import DEFAULT_USER_AGENT
 from ua_players import COLLAPS_HOSTS
 
+try:
+    import soupsieve as _soupsieve
+except ImportError:  # pragma: no cover - bs4 always installs it
+    _soupsieve = None
+if _soupsieve is not None and hasattr(_soupsieve, 'NOSTRICT') and not getattr(_soupsieve.compile, 'mediavault', False):
+    # soupsieve 4 rejects combinators inside :has() unless NOSTRICT is set.
+    # The source adapters were written against the previous lenient rules,
+    # so keep those rules for every BeautifulSoup .select() in the server.
+    _strict_compile = _soupsieve.compile
+
+    def _lenient_compile(pattern, namespaces=None, flags=0, **kwargs):
+        return _strict_compile(pattern, namespaces, flags | _soupsieve.NOSTRICT, **kwargs)
+
+    _lenient_compile.mediavault = True
+    _soupsieve.compile = _lenient_compile
+
 
 class SourceError(RuntimeError):
     pass

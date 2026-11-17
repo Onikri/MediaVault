@@ -16,6 +16,7 @@ import time
 from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from manga_direct_payloads import JsonSeries
@@ -67,7 +68,7 @@ def unseal(value):
         data = base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
         key = hashlib.sha256(SEAL_KEY + data[:16]).digest()
         pages = json.loads(AESGCM(key).decrypt(data[16:28], data[28:], None))['p']
-    except (ValueError, KeyError, TypeError):
+    except (InvalidTag, ValueError, KeyError, TypeError):
         raise SourceError('Yaoi.me изменил защиту списка страниц.') from None
     if not isinstance(pages, list) or not all(isinstance(p, str) and re.fullmatch(r'[A-Za-z0-9_-]{8,200}', p) for p in pages):
         raise SourceError('Yaoi.me изменил формат списка страниц.')
