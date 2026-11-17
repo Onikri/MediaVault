@@ -101,8 +101,11 @@ def parse_reference(value):
         if not match:return None
         ids=tuple(int(v) if v is not None else None for v in match.groups())
         if not configured():
+            # Without Suwayomi an old link is still ours when its title or
+            # chapter is recorded or in the exported legacy ID map.
             from manga_native_sources import recorded_reader_url
-            if not recorded_reader_url(*ids[:2]):return None
+            from suwayomi_legacy import known
+            if not recorded_reader_url(*ids[:2]) and not known(*ids[:2]):return None
         return ids
     except (ValueError,TypeError):return None
 
@@ -344,11 +347,22 @@ def inspect(value):
             return native_inspect(target)
         except SourceError as error:
             recorded, recorded_error = target, error
+    # The exported ID map names the same title/chapter on its direct reader,
+    # with or without a running Suwayomi.
+    from suwayomi_legacy import resolve as legacy_target
+    if (target:=legacy_target(manga,chapter)) and target!=recorded:
+        from manga_sources import inspect as native_inspect
+        try:
+            return native_inspect(target)
+        except SourceError as error:
+            recorded, recorded_error = target, error
     try:
         client = Client()
     except SourceError:
         if recorded_error:
             raise recorded_error from None
+        if not configured():
+            raise SourceError('Источник этой сохранённой ссылки пока не подключён напрямую.') from None
         raise
     native_access_error = None
     try:
@@ -497,11 +511,19 @@ def page_image(value):
             return native_page_image(target, page)
         except SourceError as error:
             recorded, recorded_error = target, error
+    from suwayomi_legacy import resolve as legacy_target
+    if (target:=legacy_target(manga,chapter)) and target!=recorded:
+        try:
+            return native_page_image(target, page)
+        except SourceError as error:
+            recorded, recorded_error = target, error
     try:
         client = Client()
     except SourceError:
         if recorded_error:
             raise recorded_error from None
+        if not configured():
+            raise SourceError('Источник этой сохранённой страницы пока не подключён напрямую.') from None
         raise
     try:
         try:return client.get(f'/manga/{manga}/chapter/{chapter}/page/{page}',{'updateProgress':'false'},timeout=25,image=True)
