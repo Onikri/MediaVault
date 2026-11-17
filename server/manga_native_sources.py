@@ -98,8 +98,11 @@ def search(adapter, source, query):
     from manga_discovery import query_matches
     from title_identity import match_title
 
+    from source_transport import solver_budget
+
     selected = source.get('_title') or source.get('_alias_title')
-    http = PublicHttp(timeout=(3, 7), deadline=time.monotonic() + 18)
+    http = PublicHttp(timeout=(3, 7), deadline=time.monotonic() + solver_budget(getattr(adapter, 'SOURCE_ID', None), 18),
+                      source=getattr(adapter, 'SOURCE_ID', None), operation='search')
     try:
         for term in source.get('_queries', [query]):
             rows, _ = adapter.catalogue(http, query=term)
@@ -144,8 +147,10 @@ def catalogue_vocabulary(adapter, http):
 
 def catalogue_job(adapter, spec, page):
     from manga_source_tags import unique
+    from source_transport import solver_budget
 
-    http = PublicHttp(timeout=(3, 12), deadline=time.monotonic() + 22)
+    http = PublicHttp(timeout=(3, 12), deadline=time.monotonic() + solver_budget(getattr(adapter, 'SOURCE_ID', None), 22),
+                      source=getattr(adapter, 'SOURCE_ID', None), operation='details' if spec['type'] == 'bridge-detail' else 'catalogue')
     try:
         if spec['type'] == 'bridge-vocabulary':
             return {'rows': [], 'next': None, 'vocabulary': catalogue_vocabulary(adapter, http)}

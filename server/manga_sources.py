@@ -261,7 +261,10 @@ def inspect(url,http=None):
         initial=site_for(url)
         if initial and initial.family=='native':
             from manga_native_sources import for_url
-            return for_url(url).inspect(url,http)
+            adapter=for_url(url)
+            from source_transport import operation_for,scope
+            with scope(http,getattr(adapter,'SOURCE_ID',None),operation_for(adapter,url)):
+                return adapter.inspect(url,http)
         if initial and initial.family=='hentaichan':
             from manga_hentaichan import inspect as inspect_hentaichan
             return inspect_hentaichan(url,http)
