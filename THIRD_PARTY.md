@@ -518,5 +518,13 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   `src/en/webdexscans`, `src/en/schalescans`, `src/ja/idolgravureprincessdate`
   and `src/ru/nudemoon` at revision `6f345a81459739e35d8fc94c05455464e856f771`,
   including the public request signatures and page sealing those extensions use.
+- The Japan-routed readers (`server/manga_japan_routed.py` and the page
+  descramblers in `server/manga_japan_scramble.py`) follow the Apache-2.0
+  Keiyoushi sources `src/ja/fodfuji`, `src/ja/linemanga`, `src/ja/sokuyomi`
+  and `src/ja/soraraw` (including `CanvaDescrambler` and `Canva2Descrambler`)
+  at revision `6f345a81459739e35d8fc94c05455464e856f771`; the `canva` mode uses
+  the Python port of Keiyoushi `core/.../keiyoushi/utils/SeedRandom.kt` in
+  `manga_comic_grast.py`, itself a port of David Bau's `seedrandom` (MIT,
+  https://github.com/davidbau/seedrandom).
 - MediaVault modifications to the Libre Manga Translator sources (AGPL-3.0-or-later, published with the rest of [lmt/](lmt/)), 2026-11: the page typesetter was replaced by [lmt/typeset/](lmt/typeset/) (balloon-shaped composition, Russian hyphenation, page-wide sizing, roles) and is shared with `src/manga-renderer.js`; `lib/detections/rtdetr.ts` additionally exposes balloon boxes and the free-text class; `lib/inpaint/telea.ts` was rewritten around a chamfer distance transform with the level-set weight; `lib/inpaint/tone.ts` (new) restores periodic screentone before Telea and is called from `lib/inpaint/ladder.ts`. Upstream `lib/canvas/text-fit.ts` is kept unmodified.
 - Private lettering fonts of the site owner are not part of this repository or of the public site bundle and are not redistributed by it: they live in the gitignored `reader-fonts/local/` (local builds) or on the owner's server, which serves them only to the authenticated owner (`/reader/lmt/fonts`), under the owner's own licences.

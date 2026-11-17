@@ -34,7 +34,8 @@ def inventory():
 class NinthBatchTests(TestCase):
     def test_profiles_match_the_installed_inventory(self):
         rows = inventory()
-        self.assertEqual(len(manga_ninth_sources.SOURCES), 38)
+        # 38 profiles of the batch plus the four Japan-routed readers.
+        self.assertEqual(len(manga_ninth_sources.SOURCES), 42)
         for adapter in manga_ninth_sources.SOURCES:
             row = rows[adapter.SOURCE_ID]
             self.assertEqual((adapter.NAME, adapter.LANGUAGE), (row['source'], row['language']))

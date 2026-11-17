@@ -23,6 +23,9 @@ class Route:
     data: object = None
     # Follow redirects only inside the same host.
     redirect: bool = True
+    # Send through the admin-configured Japan route (manga-source-routes.json)
+    # when the host is listed there; country-limited readers answer only it.
+    japan: bool = False
 
 
 CHECKS = {}

@@ -307,7 +307,8 @@ class PublicHttp:
         trusted_api = speedbinb or clipstudio or publus or bool(ninth)
         url = public_url(value, allow_api=True) if trusted_api and self.validate is public_url else self.validate(value)
         japanese_public = (action in {'cycomi-reader', 'nicovideo-public', 'japanese-published-image'}
-                           or action == 'native-series-json' and urlsplit(url).netloc in {'comic-walker.com', 'web.cycomi.com'})
+                           or action == 'native-series-json' and urlsplit(url).netloc in {'comic-walker.com', 'web.cycomi.com'}
+                           or bool(ninth and ninth.japan))
         if japanese_public:
             from manga_network_routes import configuration, routed
 
