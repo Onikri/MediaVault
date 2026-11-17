@@ -143,4 +143,4 @@ python scripts/probe-native-source-batch.py --ssh mediavault-vm --inactive --bat
 
 В пятой партии подготовлены 50 APK и 82 профиля. Реестр содержит WaManga, Tomilo-lib, AstraManga, NineGrid, Rawkuma, Rizz Comic, Weeb Central, INKRUSH, MangaTaro, InitManga, Renascans, Pepper&Carrot и остальные профили партии. Исторические исходники Anisa Scans и Hentai3z.CC соответствуют установленным APK.
 
-Прямой код есть у 515 из 725 APK и 1 208 из 1 640 профилей. В рабочем маршруте подключены 65 профилей. Скрипт с ключом `--inactive` видит остальные 1 143 и поддерживает прогоны по 200 профилей.
+Прямой код есть у 655 из 725 APK и 1 512 из 1 640 профилей. После сквозной проверки на Oracle 17 ноября 2026 года в рабочем маршруте подключён 571 профиль, список ведётся в [manga_native_activation.json](../server/manga_native_activation.json). Ещё 27 APK без переноса имеют внешние блокеры, 43 APK не перенесены. Подробности в [журнале проверки](native-source-verification.md#девятая-партия).
