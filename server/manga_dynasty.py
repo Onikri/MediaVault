@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from manga_direct_payloads import strings
 from manga_madara import SEGMENT, image_url, node_text, release_date
 from manga_series_port import MAX_CHAPTERS, MAX_PAGES, SeriesPort, number, picture
-from manga_webcomics import query_url
+from manga_webcomics import param, query_url
 from source_parser import PublicHttp, SourceError
 
 ROOT = 'https://dynasty-scans.com'
@@ -37,8 +37,11 @@ class Dynasty(SeriesPort):
         super().__init__(('669095474988166464', 'Dynasty Scans', 'en', ROOT, True), TITLE, CHAPTER,
                          hosts=('www.dynasty-scans.com',), interval=1.)
 
-    def is_chapter(self, url):
+    def is_standalone(self, url):
         return super().is_chapter(url) and urlsplit(url).path.rstrip('/') != '/chapters/added'
+
+    def is_chapter(self, url):
+        return self.is_standalone(url) and bool(param(url, 'mv_title'))
 
     def title_for(self, url):
         return self.site_link(url.split('?', 1)[0].rstrip('/'))
@@ -118,7 +121,7 @@ class Dynasty(SeriesPort):
         data = self.json_for(http, target)
         if data.get('permalink') != self.title_key(target):
             raise SourceError('Dynasty Scans вернул данные другого произведения.')
-        single = self.is_chapter(target)
+        single = self.is_standalone(target)
         name = data.get('title' if single else 'name')
         if not isinstance(name, str) or not name:
             raise SourceError('Dynasty Scans не предоставил название.')
@@ -135,10 +138,16 @@ class Dynasty(SeriesPort):
     def details(self, http, url):
         return self.detail_payload(http, url)[0]
 
+    def saved_chapter(self, row, root, title):
+        target = super().saved_chapter(row, root, title)
+        if self.is_standalone(target) and self.is_title(title):
+            return query_url(target, mv_title=urlsplit(title).path.strip('/'))
+        return ''
+
     def saved_chapter_matches(self, target, title):
         if not self.is_chapter(target) or not self.is_title(title):
             return False
-        if self.is_chapter(title):
+        if self.is_standalone(title):
             return self.chapter_identity(title) == self.chapter_identity(target)
         http = PublicHttp(timeout=(3, 6))
         try:
@@ -159,11 +168,12 @@ class Dynasty(SeriesPort):
         if not self.is_title(url):
             raise SourceError('Некорректная ссылка Dynasty Scans.')
         row, data, pages = self.detail_payload(http, url)
-        if self.is_chapter(url):
-            if not 1 <= len(pages) <= MAX_PAGES:
+        if self.is_standalone(url):
+            reading = self.is_chapter(url)
+            if reading and not 1 <= len(pages) <= MAX_PAGES:
                 raise SourceError('Dynasty Scans не предоставил полный список изображений.')
             chapters = self.chapters_for(url, [data])
-            return self.reader_result(row, url, chapters, pages)
+            return self.reader_result(row, url, chapters, pages if reading else [])
         entries_all = list(entries(data.get('taggings')))
         total = int(number(data.get('total_pages')) or 1)
         for page in range(2, min(total, 80) + 1):

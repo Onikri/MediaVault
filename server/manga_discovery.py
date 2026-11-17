@@ -184,8 +184,14 @@ def indexed_search(source,query):
 
 def search_source(source,query):
     import manga_native_sources
-    if adapter:=manga_native_sources.for_source(source):
-        return manga_native_sources.search(adapter,source,query)
+    adapter = manga_native_sources.for_source(source)
+    if adapter:
+        try:
+            return manga_native_sources.search(adapter, source, query)
+        except SourceError:
+            # Reuse the same installed ID if its direct parser temporarily fails.
+            if not bridge.configured():
+                raise
     if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'} or str(source.get('id'))=='990000000000000020':
         from title_identity import match_title
         from source_parser import PublicHttp
@@ -216,7 +222,7 @@ def search_source(source,query):
                 if found:break
             return list(found.values())
         finally:http.close()
-    if source.get('name') in NATIVE_SOURCES:
+    if not adapter and source.get('name') in NATIVE_SOURCES:
         try:return native_search_source(source,query)
         except SourceError:
             # The installed extension can reach the same catalogue when the

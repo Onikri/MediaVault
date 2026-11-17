@@ -255,10 +255,20 @@ def inspect(value):
     manga,chapter,page=ids
     if page is not None:raise SourceError('Открой главу, а не отдельную страницу.')
     from manga_native_sources import for_source,record_reader_url,recorded_reader_url
+    recorded = None
+    recorded_error = None
     if target:=recorded_reader_url(manga,chapter):
         from manga_sources import inspect as native_inspect
-        return native_inspect(target)
-    client=Client()
+        try:
+            return native_inspect(target)
+        except SourceError as error:
+            recorded, recorded_error = target, error
+    try:
+        client = Client()
+    except SourceError:
+        if recorded_error:
+            raise recorded_error from None
+        raise
     native_access_error = None
     try:
         # LibGroup can fail before chapter/page calls while initializing its
@@ -267,7 +277,8 @@ def inspect(value):
         try:
             saved=client.get(f'/manga/{manga}',{'onlineFetch':'false'},timeout=8)
             saved_source=saved.get('source') or client.get('/source/'+str(saved['sourceId']))
-            if native:=native_reader_url(client,saved,saved_source,manga,chapter):
+            native = native_reader_url(client, saved, saved_source, manga, chapter)
+            if native and native != recorded:
                 from manga_sources import inspect as native_inspect
                 result=native_inspect(native)
                 if (adapter:=for_source(saved_source)) and (result.get('episodes') or result.get('pages')):
@@ -278,7 +289,9 @@ def inspect(value):
                 native_access_error = error
             # The normal path retains bounded retries and indexed NovelCool
             # recovery for providers without a public catalogue adapter.
-            if 'native' in locals() and native and saved_source.get('name')!='MangaDex':raise
+            if ('native' in locals() and native and not for_source(saved_source)
+                    and saved_source.get('name') != 'MangaDex'):
+                raise
         try:data=client.get(f'/manga/{manga}',{'onlineFetch':'true' if chapter is None else 'false'},timeout=25)
         except SourceError as error:
             recovered=inspect_indexed_reader(value)
@@ -396,9 +409,19 @@ def page_image(value):
     if not ids or ids[1] is None or ids[2] is None:raise SourceError('Некорректная ссылка на страницу.')
     manga,chapter,page=ids
     from manga_native_sources import recorded_reader_url
+    recorded = None
+    recorded_error = None
     if target:=recorded_reader_url(manga,chapter):
-        return native_page_image(target,page)
-    client=Client()
+        try:
+            return native_page_image(target, page)
+        except SourceError as error:
+            recorded, recorded_error = target, error
+    try:
+        client = Client()
+    except SourceError:
+        if recorded_error:
+            raise recorded_error from None
+        raise
     try:
         try:return client.get(f'/manga/{manga}/chapter/{chapter}/page/{page}',{'updateProgress':'false'},timeout=25,image=True)
         except SourceError:
@@ -408,7 +431,8 @@ def page_image(value):
                 from mangaball_reader import page as reserve_page
                 return reserve_page(client,saved,source,manga,chapter,page)
             target=native_reader_url(client,saved,source,manga,chapter)
-            if not target:raise
+            if not target or target == recorded:
+                raise
             return native_page_image(target,page)
     finally:client.close()
 
@@ -427,9 +451,10 @@ def native_page_image(target,page):
     try:
         from manga_page_media import page_reference, fetch_page
         from manga_native_sources import page_headers
+        headers = page_headers(target)
         if reference := page_reference(pages[page]):
-            return fetch_page(http, reference, page_headers(target))
-        response,_=http._open(pages[page],headers={'Referer':target});raw=bytearray()
+            return fetch_page(http, reference, headers)
+        response,_=http._open(pages[page],headers=headers);raw=bytearray()
         for block in response.iter_content(65536):
             raw.extend(block)
             if len(raw)>30*1024*1024:raise SourceError('Страница превышает допустимый размер.')

@@ -119,30 +119,53 @@ def search(adapter, source, query):
         http.close()
 
 
+def catalogue_term(item):
+    if not isinstance(item, dict):
+        return None
+    key = item.get('sourceId', item.get('key'))
+    category = item.get('category', item.get('kind'))
+    label = item.get('label')
+    from manga_source_tags import clean_label
+
+    label = clean_label(label)
+    if not label or category not in {'genre', 'tag'}:
+        return None
+    if type(key) is int:
+        key = str(key)
+    if not isinstance(key, (str, dict)) or not key:
+        return None
+    return {'sourceId': key, 'category': category, 'label': label}
+
+
+def catalogue_vocabulary(adapter, http):
+    vocabulary = getattr(adapter, 'vocabulary', None)
+    return [term for item in vocabulary(http) if (term := catalogue_term(item))] if vocabulary else []
+
+
 def catalogue_job(adapter, spec, page):
     from manga_source_tags import unique
 
     http = PublicHttp(timeout=(3, 12), deadline=time.monotonic() + 22)
     try:
         if spec['type'] == 'bridge-vocabulary':
-            # A Suwayomi filter job queued before activation may meet an
-            # adapter whose site exposes no genre or tag list.
-            vocabulary = getattr(adapter, 'vocabulary', None)
-            return {'rows': [], 'next': None, 'vocabulary': vocabulary(http) if vocabulary else []}
+            return {'rows': [], 'next': None, 'vocabulary': catalogue_vocabulary(adapter, http)}
         if spec['type'] == 'bridge-detail':
             stored = spec['row']
             url = stored.get('sourceUrl') or stored['url']
             found = adapter.details(http, url)
             for field in ('genres', 'tags'):
-                found[field] = unique([*found[field], *(stored.get(field) or [])])
+                found[field] = unique([*(found.get(field) or []), *(stored.get(field) or [])])
             return {'rows': [{**stored, **found, 'metadataInspected': True}], 'next': None}
-        term = spec.get('term')
+        term = catalogue_term(spec['term']) if spec.get('term') else None
+        if spec.get('term') and not term:
+            raise SourceError('Сохранённый фильтр источника имеет неизвестный формат.')
         tag = term['sourceId'] if term else ''
         if isinstance(tag, dict):
             # A queued Suwayomi job used a mutable filter position. Recover the
             # stable upstream filter by exact label without changing its cursor.
             label = term['label'].casefold()
-            vocabulary = adapter.vocabulary(http)
+            vocabulary = [entry for entry in catalogue_vocabulary(adapter, http)
+                          if isinstance(entry['sourceId'], str)]
             matching = [v for v in vocabulary if v['label'].casefold() == label]
             if not matching and (legacy_label := getattr(adapter, 'legacy_term_label', None)):
                 label = legacy_label(label)
@@ -162,7 +185,7 @@ def catalogue_job(adapter, spec, page):
         for row in rows:
             if term:
                 field = 'genres' if term['category'] == 'genre' else 'tags'
-                row[field] = [term['label']]
+                row[field] = unique([*(row.get(field) or []), term['label']])
             details.append({
                 **{key: value for key, value in spec.items() if key != 'term'},
                 'type': 'bridge-detail', 'url': row['url'], 'row': row,

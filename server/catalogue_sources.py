@@ -6,7 +6,7 @@ import httpx,requests
 from content_source_routes import LIB,HTML
 from content_sources import checked_get,permitted,html_terms,lib_terms,lib_titles,lib_metadata
 from manga_source_tags import from_api,from_html,unique
-from source_parser import SourceError
+from source_parser import SourceAccessError, SourceError, SourceTemporaryError
 
 def source_provider(spec):
     if spec.get('source',{}).get('id'):return 'suwayomi:'+str(spec['source']['id'])
@@ -142,9 +142,17 @@ def fetch(spec,cursor):
         finally:http.close()
     if kind in {'bridge','bridge-detail','bridge-vocabulary'}:
         from manga_native_sources import catalogue_job,for_source
-        if adapter:=for_source(spec['source']):
-            return catalogue_job(adapter,spec,page)
-        from suwayomi_bridge import Client,filter_vocabulary,filtered_page
+        from suwayomi_bridge import Client,configured,filter_vocabulary,filtered_page
+        adapter = for_source(spec['source'])
+        fallback = cursor.get('route') == 'suwayomi' or spec.get('route') == 'suwayomi'
+        if adapter and not fallback:
+            try:
+                return catalogue_job(adapter,spec,page)
+            except (SourceAccessError, SourceTemporaryError):
+                # A different pager can start a new scan. Preserve any ongoing cursor.
+                if kind != 'bridge' or page != 1 or spec.get('term') or not configured():
+                    raise
+                fallback = True
         from manga_discovery import result_row
         from manga_solver import source_timeout
         client=Client()
@@ -168,8 +176,12 @@ def fetch(spec,cursor):
                 if not row:continue
                 # A title listed under the extension's own filter carries that label.
                 if term:row[field]=unique([*(row.get(field) or []),term['label']])
-                rows.append(row);details.append({**{k:v for k,v in spec.items() if k!='term'},'type':'bridge-detail','manga':raw['id'],'row':row})
-            return {'rows':rows,'next':{'page':page+1} if data['hasNextPage'] else None,'details':details}
+                detail={**{k:v for k,v in spec.items() if k!='term'},'type':'bridge-detail','manga':raw['id'],'row':row}
+                if fallback:detail['route']='suwayomi'
+                rows.append(row);details.append(detail)
+            next_cursor={'page':page+1} if data['hasNextPage'] else None
+            if fallback and next_cursor:next_cursor['route']='suwayomi'
+            return {'rows':rows,'next':next_cursor,'details':details}
         finally:client.close()
     if kind in {'html','html-detail'}:
         url=cursor.get('url') or spec['url'];hosts=set(spec['hosts'])

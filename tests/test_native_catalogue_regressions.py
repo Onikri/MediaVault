@@ -9,7 +9,7 @@ import manga_masonry
 import manga_native_registry
 import manga_native_sources
 import manga_senkuro_native
-from source_parser import SourceError, SourceRedirectError, public_url
+from source_parser import SourceAccessError, SourceError, SourceRedirectError, public_url
 
 
 def adapter(name):
@@ -54,6 +54,26 @@ class NativeCatalogueRegressionTests(TestCase):
         bare = SimpleNamespace(NAME='Bare', ROOT='https://example.com')
         result = manga_native_sources.catalogue_job(bare, {'type': 'bridge-vocabulary'}, 1)
         self.assertEqual(result, {'rows': [], 'next': None, 'vocabulary': []})
+
+    def test_failed_direct_catalogue_keeps_extension_cursor_and_detail_route(self):
+        from catalogue_sources import fetch
+
+        source = adapter('FOD')
+        spec = {'type': 'bridge', 'domain': 'manga.fod.fujitv.co.jp',
+                'source': {'id': source.SOURCE_ID, 'name': source.NAME, 'baseUrl': source.ROOT, 'lang': 'ja'}}
+        response = {'mangaList': [{'id': 17, 'title': 'Example', 'url': '/books/17/chapter'}], 'hasNextPage': True}
+        bridge = Mock()
+        bridge.get.return_value = response
+        with patch.object(manga_native_sources, 'catalogue_job', side_effect=SourceAccessError('edge 403')) as direct, \
+                patch('suwayomi_bridge.Client', return_value=bridge), patch('suwayomi_bridge.configured', return_value=True):
+            initial = fetch(spec, {'page': 1})
+            self.assertEqual(initial['next'], {'page': 2, 'route': 'suwayomi'})
+            self.assertEqual(initial['details'][0]['route'], 'suwayomi')
+            fetch(spec, initial['next'])
+            self.assertEqual(direct.call_count, 1)
+            self.assertTrue(bridge.get.call_args.args[0].endswith('/popular/2'))
+            with self.assertRaises(SourceAccessError):
+                fetch(spec, {'page': 2})
 
     def test_zazamanga_vocabulary_avoids_the_plain_http_redirect(self):
         source = adapter('Zazamanga')

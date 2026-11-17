@@ -1,4 +1,4 @@
-"""Audit a batch of direct catalogue profiles without reading pages or updating health."""
+"""Audit direct source profiles without changing source or index health."""
 
 import argparse
 from collections import Counter, defaultdict
@@ -27,6 +27,16 @@ def candidates():
     import manga_native_sources as native
 
     return dict(manga_native_registry.profiles()), native.ADAPTERS
+
+
+def probe_archive():
+    payload = BytesIO()
+    server = ROOT / 'server'
+    paths = [Path(__file__), *sorted(server.glob('*.py')), server / 'manga_native_activation.json']
+    with ZipFile(payload, 'w', ZIP_DEFLATED) as archive:
+        for path in paths:
+            archive.write(path, path.relative_to(ROOT).as_posix())
+    return payload.getvalue()
 
 
 def audit(adapter, check_search, check_chapters, check_pages=False):
@@ -121,41 +131,114 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
         http.close()
 
 
-def probe_origin(adapters, enabled, check_search, check_chapters, check_pages=False):
+def probe_suwayomi(source, check_search, check_chapters, check_pages):
+    from manga_solver import source_timeout
+    from source_parser import SourceError
+    from suwayomi_bridge import BridgeError, Client
+
+    sid = str(source['id'])
+    timeout = source_timeout(sid, 8)
+    result, phase = {}, 'catalogue'
+    client = Client()
+    try:
+        data = client.get(f'/source/{sid}/popular/1', timeout=timeout)
+        rows = data.get('mangaList', [])
+        result.update(rows=len(rows), more=bool(data.get('hasNextPage')))
+        sample = next((row for row in rows if type(row.get('id')) is int and 2 <= len(row.get('title') or '') <= 100), None)
+        if not sample:
+            return {**result, 'status': 'empty', 'phase': phase}
+        result['catalogue'] = True
+        if check_search:
+            phase = 'search'
+            found = client.get(f'/source/{sid}/search', {'searchTerm': sample['title'], 'pageNum': 1}, timeout=timeout)
+            result['search'] = any(row.get('id') == sample['id'] for row in found.get('mangaList', []))
+        if check_chapters:
+            phase = 'chapters'
+            mid = sample['id']
+            detail = client.get(f'/manga/{mid}', {'onlineFetch': 'true'}, timeout=timeout)
+            detail_source = str(detail.get('sourceId') or (detail.get('source') or {}).get('id') or '')
+            if detail_source and detail_source != sid:
+                return {**result, 'status': 'identity_mismatch', 'phase': phase}
+            chapters = client.get(f'/manga/{mid}/chapters', {'onlineFetch': 'true'}, timeout=timeout)
+            result['chapter_count'] = len(chapters)
+            chapter = next((row for row in reversed(chapters) if type(row.get('index')) is int and row['index'] >= 1), None)
+            if chapter is None:
+                return {**result, 'status': 'empty', 'phase': phase}
+            result['chapters'] = True
+            if check_pages:
+                phase = 'pages'
+                index = chapter['index']
+                count = client.get(f'/manga/{mid}/chapter/{index}', timeout=max(timeout, 10)).get('pageCount')
+                if type(count) is not int or count < 1:
+                    return {**result, 'status': 'empty', 'phase': phase}
+                raw, _ = client.get(f'/manga/{mid}/chapter/{index}/page/0', {'updateProgress': 'false'},
+                                    timeout=max(timeout, 10), image=True)
+                result.update(pages=True, page_count=count, image_bytes=len(raw))
+        if check_search and not result['search']:
+            return {**result, 'status': 'search_mismatch', 'phase': 'search'}
+        return {**result, 'status': 'passed', 'phase': phase}
+    except BridgeError as error:
+        return {**result, 'status': error.code, 'phase': phase}
+    except SourceError:
+        return {**result, 'status': 'source_error', 'phase': phase}
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return {**result, 'status': 'format', 'phase': phase}
+    finally:
+        client.close()
+
+
+def probe_origin(adapters, enabled, check_search, check_chapters, check_pages=False, *, suwayomi=False):
     results = []
     rate_limited = False
     for adapter in adapters:
         started = time.monotonic()
-        result = {'status': 'deferred', 'phase': 'catalogue'} if rate_limited else audit(adapter, check_search, check_chapters, check_pages)
-        rate_limited |= result['status'] == 'rate_limited'
-        results.append({'source_id': adapter.SOURCE_ID, 'name': adapter.NAME,
-                        'enabled': adapter.SOURCE_ID in enabled, 'ms': round((time.monotonic()-started)*1000), **result})
+        sid, name = (str(adapter['id']), adapter['name']) if suwayomi else (adapter.SOURCE_ID, adapter.NAME)
+        probe = probe_suwayomi if suwayomi else audit
+        result = {'status': 'deferred', 'phase': 'catalogue'} if rate_limited else probe(adapter, check_search, check_chapters, check_pages)
+        rate_limited |= result['status'] in {'rate_limited', 'rate-limit'}
+        results.append({'source_id': sid, 'name': name, 'enabled': sid in enabled,
+                        'route': 'suwayomi' if suwayomi else 'direct', 'ms': round((time.monotonic()-started)*1000), **result})
     return results
 
 
 def live(args):
     sys.path.insert(0, str(ROOT / 'server'))
     profiles, enabled = candidates()
+    if args.suwayomi:
+        from suwayomi_bridge import sources
+
+        profiles = {str(row['id']): row for row in sources()}
     unknown = set(args.source) - profiles.keys()
     if unknown:
-        raise SystemExit('No direct profile for: ' + ', '.join(sorted(unknown)))
-    ordered = sorted(profiles.values(), key=lambda row: (row.SOURCE_ID in enabled, row.NAME.casefold(), row.SOURCE_ID))
+        raise SystemExit('No profile for this route: ' + ', '.join(sorted(unknown)))
+
+    def identity(row):
+        return (str(row['id']), row['name']) if args.suwayomi else (row.SOURCE_ID, row.NAME)
+
+    def order(row):
+        sid, name = identity(row)
+        return sid in enabled, name.casefold(), sid
+
+    ordered = sorted(profiles.values(), key=order)
     if args.inactive:
-        ordered = [row for row in ordered if row.SOURCE_ID not in enabled]
+        ordered = [row for row in ordered if identity(row)[0] not in enabled]
     if args.source:
-        selected = [row for row in ordered if row.SOURCE_ID in args.source]
+        selected = [row for row in ordered if identity(row)[0] in args.source]
     else:
         selected = ordered[args.offset:args.offset + args.batch_size]
     groups = defaultdict(list)
     for adapter in selected:
-        groups[urlsplit(adapter.ROOT).hostname].append(adapter)
+        base = adapter.get('baseUrl', '') if args.suwayomi else adapter.ROOT
+        groups[urlsplit(base).hostname].append(adapter)
     started = time.monotonic()
     emit({'event': 'started', 'total_profiles': len(profiles), 'selected': len(selected), 'origins': len(groups),
-          'workers': args.workers, 'search': args.search, 'chapters': args.chapters, 'inactive_only': args.inactive})
+          'route': 'suwayomi' if args.suwayomi else 'direct', 'workers': args.workers,
+          'search': args.search, 'chapters': args.chapters, 'inactive_only': args.inactive})
     statuses = Counter()
     operations = Counter()
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        jobs = [pool.submit(probe_origin, group, enabled, args.search, args.chapters, args.pages) for group in groups.values()]
+        jobs = [pool.submit(probe_origin, group, enabled, args.search, args.chapters, args.pages, suwayomi=args.suwayomi)
+                for group in groups.values()]
         for future in as_completed(jobs):
             for result in future.result():
                 statuses[result['status']] += 1
@@ -163,14 +246,12 @@ def live(args):
                 emit({'event': 'source', **result})
     emit({'event': 'summary', 'completed': sum(statuses.values()), 'catalogues_returned': operations['catalogue'],
           'searches_matched': operations['search'], 'chapter_lists_returned': operations['chapters'],
+          'images_returned': operations['pages'],
           'statuses': dict(statuses), 'seconds': round(time.monotonic() - started, 2)})
 
 
 def over_ssh(host, args):
-    payload = BytesIO()
-    with ZipFile(payload, 'w', ZIP_DEFLATED) as archive:
-        for path in [Path(__file__), *sorted((ROOT / 'server').glob('*.py'))]:
-            archive.write(path, path.relative_to(ROOT).as_posix())
+    payload = probe_archive()
     bootstrap = """
 import io, runpy, sys, tempfile, zipfile
 from pathlib import Path
@@ -187,7 +268,7 @@ with tempfile.TemporaryDirectory() as folder:
               'ARGS=' + repr(args) + '\n' + bootstrap]
     command = ('from pathlib import Path\nimport subprocess\n'
                'if Path("/opt/mediavault/deploy.lock").exists(): raise SystemExit("Deployment active")\n'
-               'raise SystemExit(subprocess.run(' + repr(runner) + ', input=' + repr(payload.getvalue()) + ').returncode)')
+               'raise SystemExit(subprocess.run(' + repr(runner) + ', input=' + repr(payload) + ').returncode)')
     return subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=6', host, 'sudo -n python3 -'],
                           input=command.encode()).returncode
 
@@ -197,6 +278,7 @@ def main():
     parser.add_argument('--batch-size', type=int, default=150, choices=range(1, 201), metavar='1-200')
     parser.add_argument('--offset', type=int, default=0)
     parser.add_argument('--inactive', action='store_true', help='Limit the window to unactivated direct profiles.')
+    parser.add_argument('--suwayomi', action='store_true', help='Probe the installed extension directly through Suwayomi.')
     parser.add_argument('--workers', type=int, default=8, choices=range(1, 13), metavar='1-12')
     parser.add_argument('--source', action='append', default=[], help='Repeat to rerun particular source IDs.')
     parser.add_argument('--search', action='store_true', help='Also look up one returned title by exact ID.')
@@ -213,6 +295,8 @@ def main():
         remote_args += [value for source in args.source for value in ('--source', source)]
         if args.inactive:
             remote_args.append('--inactive')
+        if args.suwayomi:
+            remote_args.append('--suwayomi')
         if args.search:
             remote_args.append('--search')
         if args.chapters:
