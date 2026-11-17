@@ -18,7 +18,7 @@
 .narration-cast ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px;max-height:34vh;overflow:auto}
 .narration-cast li{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .narration-cast label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
-.narration-switch{justify-content:flex-start}
+.narration-switch{justify-content:flex-start !important}
 .ranobe-prose p.is-speaking{background:color-mix(in srgb,var(--color-blossom,#ee3c35) 14%,transparent);border-radius:8px;transition:background .25s}
 .narration .fine{color:#c9c3ba}.narration select option{color:#111}
 

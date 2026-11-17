@@ -1,4 +1,5 @@
-// Which !important declarations would win anyway? For each one, every other
+// Which !important declarations would win anyway? Conservative: a rule whose
+// subject is a bare tag competes unless the element's tag is known from JSX. For each one, every other
 // declaration of the same property whose selector could hit the same element
 // (shares a class with the subject, or has no class at all) is compared by
 // specificity and bundle order. A declaration is "free" when no competitor is
@@ -13,7 +14,8 @@ import path from 'node:path';
 import postcss from 'postcss';
 
 const args=process.argv.slice(2),onlyFree=args.includes('--free');
-const [orderFile,...targets]=args.filter(a=>!a.startsWith('--'));
+const checks=args.filter(a=>/^[^-].*:\d+:[a-z-]+$/.test(a));
+const [orderFile,...targets]=args.filter(a=>!a.startsWith('--')&&!checks.includes(a));
 const tokens=fs.readFileSync(orderFile,'utf8').split('\n').find(l=>l.startsWith('styles_css')).trim().split(/\s+/);
 const nameOf=t=>'src/'+t.replace(/_css$/,'').replace(/^blossom_components_/,'blossom/components/').replace(/^blossom_/,'blossom/').replace(/^control_/,'control/')+'.css';
 const order=new Map(tokens.map((t,i)=>[nameOf(t),i]));
@@ -34,11 +36,13 @@ const cmp=(x,y)=>x[0]-y[0]||x[1]-y[1]||x[2]-y[2];
 const subject=sel=>{const s=sel.trim().split(/\s+|>|\+|~/).filter(Boolean).at(-1)||'';const pseudo=(s.match(/::[\w-]+/)||[''])[0];const clean=s.replace(/:not\([^)]*\)/g,'').replace(/::?[\w-]+(\([^)]*\))?/g,'');return {cls:[...clean.matchAll(/\.([\w-]+)/g)].map(m=>m[1]),id:(clean.match(/#([\w-]+)/)||[])[1],tag:(clean.match(/^[a-zA-Z][\w-]*/)||[''])[0].toLowerCase(),pseudo,chain:[...sel.replace(/:not\([^)]*\)/g,'').matchAll(/\.([\w-]+)/g)].map(m=>m[1])};};
 // Classes that sit on one element together: every className attribute in the
 // components, literal parts and expressions alike.
-const together=new Map();
+const together=new Map(),tagsOf=new Map();
 for(const f of walk2('src')){
  const text=fs.readFileSync(f,'utf8');
- for(const m of text.matchAll(/className=(\{(?:[^{}]|\{[^{}]*\})*\}|"[^"]*"|'[^']*')/g)){
-  const names=[...new Set([...m[1].matchAll(/[A-Za-z][\w-]*/g)].map(x=>x[0]))];
+ for(const m of text.matchAll(/<([A-Za-z][\w.]*)(?:[^<>{}]|\{(?:[^{}]|\{[^{}]*\})*\})*?className=(\{(?:[^{}]|\{[^{}]*\})*\}|"[^"]*"|'[^']*')/g)){
+  const tag=/^[a-z]/.test(m[1])?m[1]:'?';
+  const names=[...new Set([...m[2].matchAll(/[A-Za-z][\w-]*/g)].map(x=>x[0]))];
+  for(const n of names){if(!tagsOf.has(n))tagsOf.set(n,new Set());tagsOf.get(n).add(tag);}
   for(const a of names){if(!together.has(a))together.set(a,new Set());for(const b of names)together.get(a).add(b);}
  }
 }
@@ -60,12 +64,17 @@ const overlap=(x,y)=>{
  if(['html','body'].includes(y.sub.tag)&&x.sub.tag!==y.sub.tag)return false;
  if((x.sub.id&&x.sub.id===y.sub.id)||x.sub.cls.some(c=>y.sub.cls.includes(c)||y.sub.cls.some(d=>cooccur(c,d))))return true;
  if(y.sub.cls.length||y.sub.id){if(x.sub.cls.length||x.sub.id)return false;return false;}
- // y's subject is a bare tag or *: it competes when it is global or shares context.
- return !y.sub.chain.length||y.sub.chain.some(c=>x.sub.chain.includes(c));
+ // y's subject is a bare tag or *: its ancestors may be anything. It competes
+ // unless every element carrying x's classes is known to be another tag.
+ if(!y.sub.tag)return true;
+ const known=x.sub.cls.map(c=>tagsOf.get(c)).filter(Boolean);
+ if(x.sub.tag)return x.sub.tag===y.sub.tag;
+ if(!known.length||known.some(set=>set.has('?')))return true;
+ return known.every(set=>set.has(y.sub.tag));
 };
 const later=(x,y)=>y.rank!==x.rank?y.rank>x.rank:y.f!==x.f?null:(y.line-x.line||y.col-x.col)>0;
 for(const target of targets.map(t=>t.split(path.sep).join('/'))){
- for(const d of decls.filter(x=>x.f===target&&x.important)){
+ for(const d of decls.filter(x=>x.f===target&&(x.important||checks.includes(x.f+':'+x.line+':'+x.prop)))){
   const rivals=decls.filter(o=>o!==d&&(o.prop===d.prop||o.fam===d.fam||o.prop===d.fam||d.prop===o.fam)&&overlap(d,o)&&!(o.f===d.f&&o.line===d.line&&o.col===d.col));
   const blockers=[];
   // A bare tag or * subject can carry any class; rules on those classes are not visible here.

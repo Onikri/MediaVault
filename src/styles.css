@@ -453,7 +453,7 @@ button { border: 0; }
   .import-field-grid { grid-template-columns:1fr;gap:0; }
   .server-dialog { padding:24px 19px;border-radius:17px; }
   .server-dialog h2 { font-size:21px; }
-  .job-payload { font-size:13px; }
+  .job-payload { font-size:13px !important; }
   .bottom-nav { padding-left:4px;padding-right:4px; }
 }
 

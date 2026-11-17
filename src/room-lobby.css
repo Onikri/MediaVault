@@ -142,10 +142,7 @@
 @keyframes tf-flip{from{opacity:0;transform:rotateX(90deg)}to{opacity:1;transform:none}}
 @keyframes tf-blink{50%{opacity:0}}
 
-@media(max-width:1100px) and (min-width:901px){
- .room-lobby-band{grid-template-columns:minmax(0,1fr);grid-template-areas:"time" "people" "frames"}
-}
-@media(max-width:900px){
+@media (--tablet){
  .room-lobby-stage{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;grid-template-areas:"bar" "show" "form" "band";row-gap:24px;padding:12px 16px 28px}
  .room-lobby-bar{margin-bottom:max(0px,calc(22vh - 60px))}
  .room-lobby-show{grid-template-columns:clamp(96px,28vw,150px) minmax(0,1fr);column-gap:16px;row-gap:14px;align-items:end}

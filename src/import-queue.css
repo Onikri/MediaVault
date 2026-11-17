@@ -9,7 +9,7 @@
 .export-workspace .import-field-grid{gap:12px}
 .export-workspace .episode-selection{padding:14px 0;border:0}
 .export-workspace .chip-row{display:flex;gap:4px;padding:4px;background:var(--color-canvas);border-radius:99px}
-.export-workspace .chip-row>button{border:0;border-radius:99px;flex:1;font-size:11px}
+.export-workspace .chip-row>button{border:0 !important;border-radius:99px !important;flex:1;font-size:11px}
 .export-workspace .chip-active{background:var(--color-surface-raised)!important}
 .export-workspace .import-submit{margin-top:18px;border-radius:99px;min-height:42px}
 .export-workspace .form-field{margin-bottom:16px}
