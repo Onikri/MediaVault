@@ -6,6 +6,8 @@ import manga_tappytoon
 import manga_yaoime
 import manga_nudemoon
 import manga_webcomicsapp
+import manga_kisslove
+import manga_supabase_scans
 
-MODULES = (manga_hiper, manga_taddyink, manga_tappytoon, manga_yaoime, manga_nudemoon, manga_webcomicsapp)
+MODULES = (manga_hiper, manga_taddyink, manga_tappytoon, manga_yaoime, manga_nudemoon, manga_webcomicsapp, manga_kisslove, manga_supabase_scans)
 SOURCES = tuple(source for module in MODULES for source in module.SOURCES)

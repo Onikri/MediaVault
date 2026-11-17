@@ -75,12 +75,32 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
                 result['page_count'] = len(pages)
                 if not pages:
                     return {**result, 'status': 'empty', 'phase': phase}
-                first = pages[0]['url'] if isinstance(pages[0], dict) else pages[0]
-                import manga_native_sources as native
-                headers = getattr(adapter, 'page_headers', None)
-                headers = headers(first) if headers else {'Referer': adapter.ROOT + '/'}
-                raw, _, response_headers = http.document(first, headers=headers, action=getattr(adapter, 'image_action', None))
-                result['image_bytes'] = len(raw.encode('utf-8', 'surrogateescape')) if isinstance(raw, str) else len(raw)
+                # Fetch the first image exactly as the reader and CBZ export do.
+                from manga_download import image_extension
+                from manga_page_media import fetch_page, page_reference
+                from suwayomi_bridge import page_image, parse_reference
+
+                first = pages[0]
+                target = chapter.get('url') or episodes[0]['url']
+                custom = getattr(adapter, 'page_headers', None)
+                headers = custom(target) if custom else {'Referer': target}
+                if parse_reference(first):
+                    raw = page_image(first)[0]
+                elif reference := page_reference(first):
+                    raw = fetch_page(http, reference, headers)[0]
+                else:
+                    response, _ = http._open(first, headers=headers)
+                    try:
+                        raw = bytearray()
+                        for block in response.iter_content(65536):
+                            raw.extend(block)
+                            if len(raw) > 30 * 1024 * 1024:
+                                break
+                    finally:
+                        response.close()
+                if not image_extension(bytes(raw[:32])):
+                    return {**result, 'status': 'not_image', 'phase': phase}
+                result['image_bytes'] = len(raw)
                 result['pages'] = True
         if check_search and not result['search']:
             return {**result, 'status': 'search_mismatch', 'phase': 'search'}
