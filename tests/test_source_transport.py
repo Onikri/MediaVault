@@ -396,6 +396,11 @@ class SolverTests(TransportCase):
                 self.http(site, MANGANATO, 'chapters').document('https://www.natomanga.com/manga/a')
         self.assertEqual(caught.exception.solver, 'unavailable')
         transport.sessions.clear()
+        with patch.object(transport.requests, 'post', side_effect=requests.ReadTimeout):
+            with self.assertRaises(SourceChallengeError) as caught:
+                self.http(site, MANGANATO, 'chapters').document('https://www.natomanga.com/manga/t')
+        self.assertEqual(caught.exception.solver, 'timeout')
+        transport.sessions.clear()
         with patch.object(transport.requests, 'post') as solver:
             with self.assertRaises(SourceChallengeError) as caught:
                 self.http(site, MANGANATO, 'chapters', deadline=time.monotonic() + 4).document(

@@ -546,6 +546,10 @@ def call_solver(decision, url, budget):
     try:
         response = requests.post(decision.solver_url(), json=body, headers=headers,
                                  timeout=(3, budget + 5), allow_redirects=False)
+    except requests.Timeout:
+        # Byparr is shared and solves one browser per CPU: a slow run is a
+        # timeout, not a missing service.
+        raise SourceChallengeError('Решатель не успел пройти проверку браузера.', solver='timeout') from None
     except requests.RequestException:
         raise SourceChallengeError('Решатель проверки браузера недоступен.', solver='unavailable') from None
     try:
@@ -553,6 +557,8 @@ def call_solver(decision, url, budget):
     except ValueError:
         value = {}
     solution = value.get('solution') if isinstance(value, dict) else None
+    if response.status_code == 408:
+        raise SourceChallengeError('Решатель не успел пройти проверку браузера.', solver='timeout')
     if response.status_code != 200 or value.get('status') != 'ok' or not isinstance(solution, dict):
         raise SourceChallengeError('Решатель проверки браузера не справился с источником.', solver='failed')
     agent = solution.get('userAgent')
