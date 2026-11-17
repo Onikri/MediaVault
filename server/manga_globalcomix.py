@@ -16,7 +16,7 @@ ROOT = 'https://globalcomix.com'
 API = 'https://api.globalcomix.com'
 API_PREFIX = '/v1'
 ID = r'[1-9][0-9]{0,14}'
-SLUG = r'[A-Za-z0-9][A-Za-z0-9_-]{0,219}'
+SLUG = r'[A-Za-z0-9_-]{1,220}'
 CHAPTER = r'[A-Za-z0-9_-]{1,128}'
 TITLE_PATH = re.compile(rf'/c/({SLUG})/?')
 CHAPTER_PATH = re.compile(rf'/read/({CHAPTER})(?:/[0-9]+)?/?')
@@ -58,7 +58,7 @@ def client_header():
 
 def get(http, endpoint, params=()):
     PACE.wait(http.deadline)
-    reply = json_data(document(http, API, API_PREFIX + endpoint, params, action='globalcomix-json'))
+    reply = json_data(document(http, API, API_PREFIX + endpoint, params, action='globalcomix-json', referer=ROOT + '/'))
     return mapping(mapping(reply).get('payload'))
 
 
@@ -67,7 +67,7 @@ def slug_from(item):
         value = item.get(key)
         if isinstance(value, str) and re.fullmatch(SLUG, value):
             return value
-    return re.sub(r'[^a-z0-9]+', '-', str(item.get('name', '')).lower()).strip('-')
+    return re.sub(r'[^a-z0-9]+', '-', str(item.get('name', '')).strip().lower())
 
 
 class GlobalComix:

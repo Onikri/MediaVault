@@ -111,6 +111,29 @@ class SixthBatchTests(TestCase):
             self.assertTrue(profile.SOURCE_ID not in active or profile.SOURCE_ID in __import__('manga_native_sources').activated_profiles())
             self.assertTrue(row['evidence'].endswith('#шестая-партия'))
 
+    def test_roku_preview_fragment_keeps_title_identity_and_page_count(self):
+        profile = self.source('Roku Hentai')
+        title = profile.ROOT + '/example'
+        card = profile.record(title + '#5,0', 'Example')
+        http = fixture({title: '<div class="site-manga-info__info"><h6>Example</h6></div>'})
+        detail = profile.inspect(card['url'], http)
+        self.assertEqual(detail['id'], card['id'])
+        self.assertEqual(parse_qs(urlsplit(detail['episodes'][0]['url']).query)['count'], ['5'])
+
+    def test_gaugau_series_and_episode_index_share_title_identity(self):
+        profile = self.source('がうがうモンスター＋')
+        title = profile.ROOT + '/list/work/example'
+        card = profile.record(title, 'Example')
+        http = fixture({title + '/episodes': '<div class="mbOff"><h1>Example</h1></div>'})
+        self.assertEqual(profile.inspect(card['url'], http)['id'], card['id'])
+
+    def test_probe_uses_route_predicate_for_wordpress_first_part(self):
+        adapter = self.source('Yaoi Manga Online', 'ja')
+        matches_route = runpy.run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['matches_route']
+        title = adapter.ROOT + '/example/'
+        self.assertTrue(matches_route(adapter, adapter.first_part(title), 'chapter'))
+        self.assertFalse(matches_route(adapter, title, 'chapter'))
+
     def test_unicomics_saved_chapter_and_deferred_image(self):
         profile = self.source('UniComics')
         root = profile.ROOT

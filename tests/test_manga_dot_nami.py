@@ -3,6 +3,7 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
+import manga_globalcomix as globalcomix
 import manga_mangadot as dot
 import manga_namicomi as nami
 from manga_dot_wire import route_data
@@ -110,8 +111,9 @@ class NamiComiTests(TestCase):
                       'publishAt': '2020-03-03T04:10:00Z', 'titleId': 'idComic'}} for identity in access]
         checks = []
 
-        def document(http, host, path, params=(), body=None, action=None):
+        def document(http, host, path, params=(), body=None, action=None, *, referer):
             self.assertEqual(host, nami.API)
+            self.assertEqual(referer, nami.ROOT + '/')
             args = dict(params)
             if path == '/gating/check':
                 self.assertEqual(action, 'namicomi-access')
@@ -164,7 +166,8 @@ class NamiComiTests(TestCase):
         keys = ['chapter' + str(index) for index in range(201)]
         seen = []
 
-        def document(http, host, path, *, body, action):
+        def document(http, host, path, *, body, action, referer):
+            self.assertEqual(referer, nami.ROOT + '/')
             batch = [item['entityId'] for item in json.loads(body)['entities']]
             seen.append(len(batch))
             return json.dumps({'data': {'attributes': {'map': {key: True for key in batch}}}})
@@ -175,3 +178,14 @@ class NamiComiTests(TestCase):
         with patch.object(nami, 'document', return_value='{"data":{"attributes":{"map":{"chapter1":1}}}}'):
             with self.assertRaises(SourceError):
                 nami.gate(self.http, ['chapter1'])
+
+
+class GlobalComixTests(TestCase):
+    def test_catalogue_keeps_published_slug_starting_with_a_hyphen(self):
+        source = next(item for item in globalcomix.SOURCES if item.LANGUAGE == 'ar')
+        items = {'results': [{'id': 95, 'name': 'مثال', 'slug': '-123-'}], 'pagination': {}}
+        with patch.object(globalcomix, 'get', return_value=items):
+            rows, _ = source.catalogue(Mock())
+        self.assertEqual(source.site_link(rows[0]['url']), globalcomix.ROOT + '/c/-123-')
+        self.assertTrue(globalcomix.public_request(globalcomix.API + '/v1/read/-123-'))
+        self.assertFalse(globalcomix.public_request(globalcomix.API + '/v1/read/../comics'))
