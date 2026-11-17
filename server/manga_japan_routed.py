@@ -408,15 +408,16 @@ class LineManga(JsonSeries):
         chapters = {}
         for item in as_list(result.get('rows')):
             bid = text(item.get('id'))
-            if line_locked(item) or not re.fullmatch(LINE_BOOK, bid):
+            if not re.fullmatch(LINE_BOOK, bid):
                 continue
             name = text(item.get('name'))
             if series_name:
                 name = name.replace(series_name, '').strip() or name
             volume = item.get('volume')
             target = query_url(LINE + '/book/viewer', id=bid, mv_product=pid)
-            chapters[target] = self.chapter(target, name, volume + 1 if type(volume) is int else None,
-                                            day(item.get('permit_start')).replace('/', '-'))
+            chapters[target] = {**self.chapter(target, name, volume + 1 if type(volume) is int else None,
+                                               day(item.get('permit_start')).replace('/', '-')),
+                                'locked': line_locked(item)}
         return row, self.order(chapters)
 
     def pages(self, http, url):
@@ -598,12 +599,13 @@ class Sokuyomi(JsonSeries):
             for edge in as_list(as_dict(data.get(key)).get('edges')):
                 node = as_dict(edge.get('node'))
                 cslug = text(node.get('slug'))
-                if soku_locked(node, coin) or not re.fullmatch(SOKU_SLUG, cslug):
+                if not re.fullmatch(SOKU_SLUG, cslug):
                     continue
                 target = query_url(f'{SOKU}/viewer/{kind}/{cslug}/', mv_title=slug)
                 n = node.get(number_key)
-                chapters[target] = self.chapter(target, text(node.get('name')), n if isinstance(n, (int, float)) else None,
-                                                day(node.get('opend_at')))
+                chapters[target] = {**self.chapter(target, text(node.get('name')),
+                                                   n if isinstance(n, (int, float)) else None, day(node.get('opend_at'))),
+                                    'locked': soku_locked(node, coin)}
         return row, self.order(chapters)
 
     def pages(self, http, url):

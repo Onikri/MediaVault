@@ -16,7 +16,8 @@ from source_parser import SourceError
 
 BOX = {
     'www.mangabats.com': (), 'www.kakamanga.com': ('www.mangakakalove.com',),
-    'www.natomanga.com': ('www.nelomanga.net', 'www.manganato.gg'),
+    # natomanga.com now answers search and title pages from manganami.com.
+    'www.natomanga.com': ('www.manganami.com', 'www.nelomanga.net', 'www.manganato.gg'),
 }
 READER_HOSTS = {'manganow.to', 'jmanga.cloud', 'rawotaku.com'}
 FM_HOSTS = {'nihonkuni.com', 'rawinu.com', 'weloma.net', 'love4u.net'}
