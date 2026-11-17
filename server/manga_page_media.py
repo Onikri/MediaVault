@@ -165,6 +165,7 @@ def fetch_page(http, reference, headers):
         from manga_honeytoon_native import HoneytoonPage, merge_strips
         from manga_mangaplus import MangaPlusPage
         from manga_manhwazone import ManhwaZonePage
+        from manga_publus_reader import PublusPage
         from manga_rawkuma_overlay import RawkumaPage
         from manga_toon11 import ToonMirrorPage
         from manga_reimanga import PackedWebp
@@ -173,7 +174,7 @@ def fetch_page(http, reference, headers):
 
         url, referer, layout = grant(target)
         headers = {'Referer': referer}
-        if isinstance(layout, (PackedWebp, ComicPage, EpubPage)):
+        if isinstance(layout, (PackedWebp, ComicPage, EpubPage, PublusPage)):
             return validated_image(layout.fetch(http, referer))
         if isinstance(layout, HoneytoonPage):
             response, _ = http._open(url, headers=headers, action='honeytoon-sync')

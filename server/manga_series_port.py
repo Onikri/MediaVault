@@ -24,6 +24,7 @@ def series_api(host, path, query):
     from manga_alpha_manga import public_api as alpha
     from manga_asura_native import public_api as asura
     from manga_booru_pools import public_api as booru
+    from manga_bookwalker_jp import public_api as bookwalker
     from manga_ciaoplus import public_api as ciao
     from manga_clipstudio_sources import public_api as firecross
     from manga_comicklive import public_api as comicklive
@@ -32,8 +33,11 @@ def series_api(host, path, query):
     from manga_archive_ports import public_api as archives
     from manga_catalogue_api_ports import public_api as catalogue_api
     from manga_creator_feeds import public_api as creator_feed
+    from manga_cubari import public_api as cubari
     from manga_direct_catalogues import public_api as direct_html
     from manga_direct_payloads import public_api as payloads
+    from manga_dmm import public_api as dmm
+    from manga_docomo import public_api as docomo
     from manga_drecomics import public_api as drecomics
     from manga_dynasty import public_api as dynasty
     from manga_ebookrenta import public_api as ebookrenta
@@ -56,6 +60,8 @@ def series_api(host, path, query):
     from manga_mangabox import public_api as mangabox
     from manga_mangameets import public_api as mangameets
     from manga_mangaone import public_api as mangaone
+    from manga_mangafive import public_api as mangafive
+    from manga_mangalix import public_api as mangalix
     from manga_mangaplaza import public_api as mangaplaza
     from manga_park_publisher import public_api as manga_park
     from manga_manta_native import public_api as manta
@@ -67,7 +73,9 @@ def series_api(host, path, query):
     from manga_natsuid import public_api as natsuid
     from manga_ninehentai import public_api as ninehentai
     from manga_ososedki import public_api as ososedki
+    from manga_pixivcomic import public_api as pixivcomic
     from manga_public_galleries import public_api as gallery_api
+    from manga_publus_sources import public_api as publus
     from manga_rayuba import public_api as rayuba
     from manga_reimanga import public_api as rei
     from manga_rawkuma_overlay import public_api as rawkuma_me
@@ -92,6 +100,7 @@ def series_api(host, path, query):
     from manga_standalone_ports import public_api as standalone
     from manga_toonlook import public_api as toonlook
     from manga_toonkotsu import public_api as toonkotsu
+    from manga_toonz import public_api as toonz
     from manga_twicomi import public_api as twicomi
     from manga_voyceme import public_api as voyceme
     from manga_yarnovel import public_api as yarnovel
@@ -110,7 +119,8 @@ def series_api(host, path, query):
                                                      comicklive, jjcos, twicomi, booru, ososedki, honeytoon, voyceme,
                                                      mangameets, manga_park, mangabox, mangaone, asura, lusttoon, corocoro,
                                                      ciao, dynasty, mokuro, toonkotsu, firecross, hakusensha,
-                                                     drecomics, ebookrenta, mangaplaza, coronaex))
+                                                     drecomics, ebookrenta, mangaplaza, coronaex, publus, docomo, mangafive,
+                                                     dmm, pixivcomic, bookwalker, mangalix, toonz, cubari))
 
 
 def public_form(url, data, headers):

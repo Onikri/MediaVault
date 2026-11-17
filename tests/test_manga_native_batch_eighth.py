@@ -7,28 +7,41 @@ import json
 from pathlib import Path
 from runpy import run_path
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from urllib.parse import urlsplit
 
 from PIL import Image
 
 import manga_alphapolis
+import manga_bookwalker_jp
 import manga_clipstudio
 import manga_clipstudio_sources
 import manga_coronaex
+import manga_cubari
 import manga_drecomics
+import manga_docomo
+import manga_dmm
 import manga_ebookrenta
 import manga_flower_comics
 import manga_hakusensha
 import manga_honto
 import manga_mangaplaza
+import manga_mangafive
+import manga_mangalix
+import manga_publus_sources
+import manga_pixivcomic
+import manga_toonz
+from manga_publus_pack import image_path, rc4
+from manga_publus_tiles import keyed_moves
 from manga_speedbinb import grant
 from manga_webcomics import param
 from source_parser import SourceError
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = (manga_clipstudio_sources, manga_hakusensha, manga_honto, manga_mangaplaza, manga_ebookrenta,
-           manga_drecomics, manga_flower_comics, manga_alphapolis, manga_coronaex)
+           manga_drecomics, manga_flower_comics, manga_alphapolis, manga_coronaex, manga_publus_sources,
+           manga_docomo, manga_mangafive, manga_dmm, manga_pixivcomic, manga_bookwalker_jp, manga_mangalix,
+           manga_toonz, manga_cubari)
 PROFILES = tuple(profile for module in MODULES for profile in module.SOURCES)
 
 
@@ -37,14 +50,36 @@ class EighthBatchTests(TestCase):
         candidates, active = run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(newline='', encoding='utf-8') as file:
             rows = {row['source_id']: row for row in csv.DictReader(file)}
-        self.assertEqual(len(PROFILES), 10)
-        self.assertEqual(len({rows[adapter.SOURCE_ID]['package'] for adapter in PROFILES}), 10)
+        self.assertEqual(len(PROFILES), 26)
+        self.assertEqual(len({rows[adapter.SOURCE_ID]['package'] for adapter in PROFILES}), 21)
         for adapter in PROFILES:
             row = rows[adapter.SOURCE_ID]
             self.assertNotIn(adapter.SOURCE_ID, active)
             self.assertIs(type(adapter), type(candidates[adapter.SOURCE_ID]))
             self.assertEqual((adapter.NAME, adapter.LANGUAGE), (row['source'], row['language']))
             self.assertTrue(row['evidence'].endswith('#восьмая-партия'))
+
+    def test_mangalix_reads_literals_without_evaluating_expressions(self):
+        data = manga_mangalix.parse_catalogue(
+            r"""const data=[{id:1,slug:'safe',title:'A \u{1F4DA}',available:true,empty:void 0,}];"""
+        )
+        self.assertEqual(data, [{'id': 1, 'slug': 'safe', 'title': 'A 📚', 'available': True, 'empty': None}])
+        with self.assertRaises(SourceError):
+            manga_mangalix.parse_catalogue("const data=[{id:1,slug:'safe',title:someFunction()}];")
+
+    def test_cubari_keeps_translation_groups_and_page_order(self):
+        source = manga_cubari.SOURCES[0]
+        link = 'https://imgur.com/a/example'
+        row = {'title': 'Example', 'groups': {'a': 'One', 'b': 'Two'},
+               'chapters': {'3.5': {'volume': 2, 'groups': {
+                   'a': ['/5.png', {'src': '/2.png'}], 'b': ['/7.png']
+               }}}}
+        with patch.object(source, 'json', return_value=row):
+            _, chapters = source.series(None, link)
+            self.assertEqual({chapter['translator'] for chapter in chapters}, {'One', 'Two'})
+            chapter = next(chapter for chapter in chapters if chapter['translator'] == 'One')
+            self.assertEqual(source.pages(None, source.canonical(chapter['url'])),
+                             ['https://cubari.moe/5.png', 'https://cubari.moe/2.png'])
 
     def test_clip_studio_retries_vertical_and_keeps_both_halves(self):
         url = 'https://viewer.example.org/csr/view.cgi'
@@ -118,3 +153,13 @@ class EighthBatchTests(TestCase):
             manga_coronaex.read_grid(b64encode(bytes((2, 1, 1, 1))).decode())
         for page, title in ((2, 17003), (100, 5140)):
             self.assertEqual(sorted(manga_ebookrenta.layout(page, title)), list(range(49)))
+
+    def test_publus_config_crypto_and_tile_coverage(self):
+        self.assertEqual(rc4(b'Plaintext', b'Key').hex(), 'bbf316e8d940af0ad3')
+        self.assertEqual(image_path('p0003', 0), 'p0003/0.jpeg')
+        keys = (bytes(range(32)), bytes(range(32, 64)), bytes(range(64, 96)))
+        moves = list(keyed_moves('p0003', 0, 524, 699, 64, 64, keys, (190, 784, 53)))
+        coverage = Image.new('1', (524, 699))
+        for _, _, x, y, width, height in moves:
+            coverage.paste(1, (x, y, x + width, y + height))
+        self.assertEqual(coverage.histogram()[0], 0)

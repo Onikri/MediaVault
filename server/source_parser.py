@@ -264,16 +264,26 @@ class PublicHttp:
             valid = cgi_route(value, clip_ref) if action == 'clipstudio-cgi' else epub_route(value, clip_token)
             if method != 'GET' or data is not None or not valid:
                 raise SourceError('Некорректный публичный маршрут Clip Studio Reader.')
-        trusted_api = speedbinb or clipstudio
+        publus = action in {'publus-config', 'publus-image'}
+        if publus:
+            from manga_publus_reader import permitted
+
+            if method != 'GET' or data is not None or not permitted(value, action):
+                raise SourceError('Некорректный адрес открытой читалки Publus.')
+            from manga_network_routes import configuration, routed
+            publus_routes = configuration()
+        trusted_api = speedbinb or clipstudio or publus
         url = public_url(value, allow_api=True) if trusted_api and self.validate is public_url else self.validate(value)
         if (RELAY_ROUTE is not None and method == 'GET' and not byte_range
-                and not speedbinb_routed and not clipstudio
+                and not speedbinb_routed and not clipstudio and not publus
                 and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
                                    'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
                                    'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto',
                                    'mangaone-proto', 'mangabox-read', 'corocoro-proto', 'ciaoplus-json',
                                    'firecross-guest-title', 'firecross-guest-reader', 'comicfesta-document', 'honto-public',
                                    'hakusensha-public', 'alphapolis-guest-title', 'coronaex-public',
+                                   'publus-source-json', 'publus-source-document',
+                                   'pixivcomic-public', 'pixivcomic-store', 'bookwalker-public-view',
                                    'manhwazone-document', 'honeytoon-sync', 'toomics-public-view', 'toomics-display'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
@@ -286,6 +296,43 @@ class PublicHttp:
                 outgoing['Authorization'] = 'Bearer ' + clip_token
         else:
             outgoing = playback_headers(headers)
+        if action == 'publus-config':
+            outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+        publus_source = action in {'publus-source-json', 'publus-source-document'}
+        if publus_source:
+            from manga_publus_sources import BOOST, NETTAI, PASH, public_api as publus_source_api
+
+            origin = urlsplit(url)
+            allowed = origin.netloc in {urlsplit(base).netloc for base in (BOOST, NETTAI, PASH)}
+            if (not allowed or method != 'GET' or data is not None or
+                    action == 'publus-source-json' and not publus_source_api(origin.netloc, origin.path, origin.query)):
+                raise SourceError('Некорректный запрос издателя Publus.')
+            if action == 'publus-source-json':
+                outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+        if action in {'pixivcomic-public', 'pixivcomic-store'}:
+            from manga_pixivcomic import API_HOST, CLIENT_HASH, CLIENT_TIME, KEY, public_api as pixivcomic_api
+
+            origin = urlsplit(url)
+            if method != 'GET' or data is not None:
+                raise SourceError('Некорректный запрос Pixiv Comic.')
+            if action == 'pixivcomic-store':
+                if origin.netloc != API_HOST or origin.query or not re.fullmatch(rf'/store/viewers/{KEY}/master', origin.path):
+                    raise SourceError('Некорректный адрес тома Pixiv Comic.')
+            else:
+                if not pixivcomic_api(origin.netloc, origin.path, origin.query):
+                    raise SourceError('Некорректный запрос каталога Pixiv Comic.')
+                outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'pixivcomic'})
+                if origin.path.endswith('/read_v4'):
+                    when, digest = ((headers or {}).get(key, '') for key in ('X-Client-Time', 'X-Client-Hash'))
+                    if not isinstance(when, str) or not CLIENT_TIME.fullmatch(when) or not isinstance(digest, str) or not CLIENT_HASH.fullmatch(digest):
+                        raise SourceError('Некорректные параметры открытого выпуска Pixiv Comic.')
+                    outgoing.update({'X-Client-Time': when, 'X-Client-Hash': digest})
+        if action == 'bookwalker-public-view':
+            from manga_bookwalker_jp import VIEWER_HOSTS
+
+            origin = urlsplit(url)
+            if method != 'GET' or data is not None or origin.netloc not in VIEWER_HOSTS:
+                raise SourceError('Некорректный запрос Auth-адреса BookWalker.')
         webnex_document = action in {'webnex-doc', 'webnex-json'}
         if webnex_document:
             from manga_webnex import public_api as webnex_api
@@ -583,9 +630,11 @@ class PublicHttp:
                                                   else public_route(origin.netloc, origin.path, origin.query, action)):
                 raise SourceError('Некорректный публичный маршрут издателя.')
             outgoing['Accept-Language'] = 'ja,en;q=0.8'
-        if action in {'vine-json', 'vine-rsc', 'hentaihand-json', 'comici-json', 'comici-rsc', 'giga-json', 'giga-graphql'}:
+        if action in {'vine-json', 'vine-rsc', 'toonz-rsc', 'hentaihand-json', 'comici-json', 'comici-rsc', 'giga-json', 'giga-graphql'}:
             if action == 'hentaihand-json':
                 from manga_hentaihand import public_api as route
+            elif action == 'toonz-rsc':
+                from manga_toonz import rsc_route as route
             elif not publisher:
                 from manga_vinetheme import public_api, rsc_route
                 route = public_api if action == 'vine-json' else rsc_route
@@ -595,7 +644,7 @@ class PublicHttp:
                     raise SourceError('Некорректный публичный маршрут источника.')
             outgoing.update({'X-Requested-With': 'XMLHttpRequest', 'Sec-Fetch-Site': 'same-origin',
                              'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty'})
-            if action in {'vine-rsc', 'comici-rsc'}:
+            if action in {'vine-rsc', 'comici-rsc', 'toonz-rsc'}:
                 outgoing.update({'RSC': '1', 'Accept': 'text/x-component, */*'})
             else:
                 outgoing['Accept'] = 'application/json, text/javascript, */*; q=0.01'
@@ -726,6 +775,13 @@ class PublicHttp:
                 drecomics_form = drecomics_request(url, data)
                 if drecomics_form:
                     outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
+            docomo_form = False
+            if action == 'docomo-reader':
+                from manga_docomo import public_form as docomo_request
+
+                docomo_form = docomo_request(url, data, outgoing.get('Referer', ''))
+                if docomo_form:
+                    outgoing.update({'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'})
             ninehentai_form = False
             if action == 'ninehentai-api':
                 from manga_ninehentai import form as ninehentai_read
@@ -744,7 +800,7 @@ class PublicHttp:
                                      'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://www.voyce.me'})
             if not (player_form or search_form or manga_form or million_register or zerosum_viewer or manhwazone_session
                     or foolslide_form or namicomi_form or ninehentai_form or voyceme_form or mangabox_form or mangaone_proto
-                    or ciao_json or firecross_session or honto_session or alphapolis_session or drecomics_form
+                    or ciao_json or firecross_session or honto_session or alphapolis_session or drecomics_form or docomo_form
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
@@ -772,7 +828,7 @@ class PublicHttp:
             try:
                 # A Comic Fury warning can set a cookie for a redirect to the same page.
                 if not (fury_form or buff_form or webnex_document or manhwazone_session or toomics_session
-                        or firecross_session or honto_session or alphapolis_session):
+                        or firecross_session or honto_session or alphapolis_session or publus_source):
                     self.session.cookies.clear()
                 request_timeout=timeout or self.timeout
                 if self.deadline:
@@ -782,6 +838,8 @@ class PublicHttp:
                     options['proxies'] = {'https': route_config['httpProxy']}
                 if speedbinb_routed and routed(url, speedbinb_config):
                     options['proxies'] = {'https': speedbinb_config['httpProxy']}
+                if publus and routed(url, publus_routes):
+                    options['proxies'] = {'https': publus_routes['httpProxy']}
                 body = data
                 if natsuid_form or init_form == 'vault' or action == 'dcm-search':
                     options['files'] = {key: (None, value) for key, value in data.items()}
@@ -792,17 +850,31 @@ class PublicHttp:
                 raise SourceTemporaryError("Источник не ответил. Повтори импорт позднее.") from None
             if response.status_code in {301, 302, 303, 307, 308}:
                 location = response.headers.get("Location", "")
+                if action == 'pixivcomic-store' and location:
+                    from manga_webcomics import param
+
+                    next_url = self.validate(urljoin(url, location))
+                    if urlsplit(next_url).netloc not in {'comic.pixiv.net', 'comic-store-viewer.pixiv.net'}:
+                        response.close()
+                        raise SourceError('Pixiv Comic перенаправил том на другой домен.')
+                    if param(next_url, 'cid') and (param(next_url, 'u1') or param(next_url, 'u2')):
+                        return response, url
                 response.close()
-                if (speedbinb or clipstudio or action in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto',
+                if (speedbinb or clipstudio or publus or action in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto',
                                'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
                                'natsuid-search', 'creator-feed-json', 'fanfox-reader', 'ysk-json',
                                'webnex-json', 'webnex-image', 'zerosum-proto', 'manhwazone-livewire', 'honeytoon-sync',
                                'mangaone-proto', 'mangabox-read', 'corocoro-proto', 'ciaoplus-json', 'firecross-guest-reader',
-                               'hakusensha-public', 'alphapolis-guest-form', 'drecomics-viewer', 'coronaex-public'}
+                               'hakusensha-public', 'alphapolis-guest-form', 'drecomics-viewer', 'coronaex-public',
+                               'publus-source-json', 'docomo-reader', 'pixivcomic-public'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))
+                if action == 'publus-source-document' and urlsplit(next_url).netloc != origin.netloc:
+                    raise SourceError('Издатель Publus перенаправил гостевой запрос на другой домен.')
+                if action == 'bookwalker-public-view' and urlsplit(next_url).netloc not in VIEWER_HOSTS:
+                    raise SourceError('BookWalker перенаправил читалку на другой домен.')
                 if action == 'firecross-guest-title' and not firecross_route(next_url, method, data, action, ''):
                     raise SourceError('FireCross перенаправил страницу на другой маршрут.')
                 if action == 'honto-public' and not honto_document(next_url, method, None):

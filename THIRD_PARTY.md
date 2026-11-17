@@ -497,3 +497,7 @@ loading and safe inline image-list decoding replace its standalone CLI workflow.
   `docs/native-source-inventory.csv`. The server implementation in
   `server/manga_speedbinb.py` follows Keiyoushi's `lib/speedbinb` protocol
   and tile layout at revision `6f345a81459739e35d8fc94c05455464e856f771`.
+- The eighth batch uses the Apache-2.0 Keiyoushi sources at revision
+  `6f345a81459739e35d8fc94c05455464e856f771`, including the shared reader
+  formats from `lib/clipstudioreader` and `lib/publus`. The inventory records
+  the corresponding extension path for each publisher.
