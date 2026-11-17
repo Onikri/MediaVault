@@ -226,6 +226,9 @@ def fetch(spec,cursor):
         formats=',format_in:[NOVEL]' if spec['kind']=='ranobe' else ',format_not_in:[NOVEL]' if spec['kind']=='manga' else ''
         term=spec.get('term')
         if not term:return anilist_span(spec,cursor,media,formats,MEDIA_FIELDS)
+        # A genre/tag listing ends at AniList's 5000-entry depth; the id-span
+        # walk above already covers every title past it.
+        if (page-1)*40>=5000:return {'rows':[],'next':None,'total':None}
         definition=',$term:[String]' if term else '';argument=','+('genre_in' if term.get('field')=='genre' else 'tag_in')+':$term' if term else ''
         body={'query':'query($page:Int'+definition+'){Page(page:$page,perPage:40){pageInfo{hasNextPage,total}media(type:'+media+',sort:ID'+formats+argument+'){'+MEDIA_FIELDS+'}}}','variables':{'page':page,**({'term':[term['label']]} if term else {})}}
         data=get_json('https://graphql.anilist.co',body=body);info=data.get('data',{}).get('Page',{}).get('pageInfo') or {}
@@ -271,4 +274,4 @@ def anilist_span(spec,cursor,media,formats,fields,request=None,pause=None):
         # skipped within the same turn (at most the whole id space, ~110 spans):
         # the indexer treats an empty page with a next cursor as a broken source.
         if rows or not following:return {'rows':rows,'next':following,'total':None}
-        start,page=following['from'],following['span'];pause(1.1)
+        start,page=following['from'],following['span'];pause(2.2)

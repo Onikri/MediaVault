@@ -65,4 +65,17 @@ class AniListSpanTests(unittest.TestCase):
    db.close()
   finally:env.stop();temp.cleanup()
 
+ def test_a_tag_listing_stops_at_the_depth_limit_without_asking(self):
+  with patch('metadata_catalog.get_json',lambda *a,**k:self.fail('asked past the depth')):
+   result=catalogue_sources.fetch({'type':'anilist','kind':'manga','domain':'anilist.co','term':{'field':'genre','label':'Fantasy'}},{'page':126})
+  self.assertEqual((result['rows'],result['next']),([],None))
+
+ def test_anilist_is_never_asked_faster_than_its_limit(self):
+  db=sqlite3.connect(':memory:',check_same_thread=False);initialize(db)
+  temp=tempfile.TemporaryDirectory();env=patch.dict(os.environ,{'DATA_DIR':temp.name,'MEDIA_VAULT_DISABLE_WORKER':'1'});env.start()
+  try:
+   worker=Indexer(SimpleNamespace(db=db,lock=threading.RLock()),lambda s,c:{},lambda:1000)
+   self.assertGreaterEqual(worker.base_pace('anilist.co'),2.0);self.assertLessEqual(worker.base_pace('other.example'),1.1)
+  finally:db.close();env.stop();temp.cleanup()
+
 if __name__=='__main__':unittest.main()

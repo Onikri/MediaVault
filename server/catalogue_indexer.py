@@ -18,6 +18,9 @@ BASE_KINDS=('lib','bridge','remanga','html')
 # Per-host request spacing in seconds; LibGroup tolerates a faster pace and
 # slows down again by itself on 429.
 PACE={LIB_HOST:0.6}
+# Hosts that must never be asked faster: AniList answers 30 requests a
+# minute and a burst of 429s would rest the whole host.
+FLOOR={'anilist.co':2.2}
 HOST_SLOTS=2
 # Bridge jobs all run inside the one local Suwayomi process.
 BRIDGE_SLOTS=4
@@ -248,7 +251,7 @@ class Indexer:
         return True
 
     def base_pace(self,host):
-        return min(self.interval,PACE.get(host,self.interval))
+        return max(FLOOR.get(host,0) if self.interval else 0,min(self.interval,PACE.get(host,self.interval)))
 
     def answered(self,host):
         with self.rate_lock:
