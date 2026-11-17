@@ -67,7 +67,7 @@
 .reader-next-chapter:hover{background:color-mix(in srgb,var(--reader-ink) 12%,var(--reader-paper))}
 
 /* Phones: the same rail becomes one still bar along the bottom edge. */
-@media (max-width:720px){
+@media (--phone){
  .immersive-reader[data-layout=rail]{--rail-size:56px;--rail-gap:8px}
  .immersive-reader[data-layout=rail] .immersive-stage{right:0;bottom:calc(var(--rail-size) + var(--rail-gap) * 2)}
  .reader-rail{top:auto;left:var(--rail-gap);right:var(--rail-gap);width:auto;height:var(--rail-size);flex-direction:row;gap:6px}
@@ -99,4 +99,4 @@
 .reader-more-menu .reader-control:hover,.reader-more-menu .reader-control:focus-visible{background:#ffffff12;outline:0}
 .reader-more-menu .reader-control[aria-pressed="true"]{color:var(--color-blossom-light,#ff6655);background:color-mix(in srgb,var(--color-blossom,#ee3c35) 12%,transparent)}
 .reader-more-menu .reader-control-label{display:inline;font:500 14px/1 var(--font-ui,system-ui);text-align:left}
-@media (max-width:720px){.reader-rail .reader-more{display:inline-flex}.reader-rail>.reader-rail-group>.reader-minimize{display:none}}
+@media (--phone){.reader-rail .reader-more{display:inline-flex}.reader-rail>.reader-rail-group>.reader-minimize{display:none}}

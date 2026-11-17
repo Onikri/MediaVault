@@ -62,7 +62,7 @@
 .immersive-reader .reader-content .reader-page[data-shape=strip] .reader-image-stack>img:not(.reader-translated-overlay){width:100%!important;height:auto!important;max-width:100%!important;max-height:none!important}
 .immersive-reader .reader-content.reader-mode-pages:has(>.reader-page[data-shape=strip]){display:block}
 
-@media(max-width:600px){
+@media (--phone){
  .immersive-reader[data-layout=overlay][data-chrome] .reader-top{top:8px;width:calc(100% - 16px)}
  .immersive-reader[data-layout=overlay][data-chrome] .reader-control{width:36px;min-width:36px;height:36px;min-height:36px}
  .immersive-reader[data-layout=overlay]>.reader-chrome.reader-pager{right:8px;width:54px;height:min(64%,460px);min-height:200px}
@@ -78,7 +78,7 @@
 .immersive-reader[data-layout=overlay] .reader-panel-body .reader-filmstrip button[aria-current=true]{background:color-mix(in srgb,var(--reader-accent) 30%,var(--color-canvas,#0c0c0f));color:#fff}
 .immersive-reader[data-layout=overlay] .reader-panel-body .reader-filmstrip img{height:132px;border-radius:8px;object-fit:cover;object-position:top}
 /* Phones: icons on the first line, the chapter jump on its own line below. */
-@media(max-width:600px){
+@media (--phone){
  .immersive-reader[data-layout=overlay][data-chrome] .reader-top{flex-wrap:wrap;row-gap:4px;border-radius:22px}
  .immersive-reader[data-layout=overlay] .reader-top .reader-top-actions{margin-left:auto}
  .immersive-reader[data-layout=overlay] .reader-top .reader-title-group{order:3;flex:1 0 100%;padding:0 2px 2px}

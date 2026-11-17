@@ -6,7 +6,7 @@
 .narration-bar button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;min-width:38px;padding:0 10px;border:0;border-radius:999px;background:none;color:inherit;font:600 13px var(--font-ui,inherit);cursor:pointer}
 .narration-bar button:hover:not(:disabled),.narration-bar button:focus-visible{outline:none;background:color-mix(in srgb,currentColor 10%,transparent)}
 .narration-bar button:disabled{opacity:.55;cursor:progress}
-.narration-bar .narration-main,.narration-bar .narration-start{background:var(--color-blossom,#ee3c35);color:#fff;padding:0 16px}
+.narration-bar .narration-main{background:var(--color-blossom,#ee3c35);color:#fff;padding:0 16px}
 .narration-pace{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:12px;opacity:.85}
 .narration-pace select,.narration-cast select{height:32px;border:0;border-radius:10px;padding:0 8px;background:color-mix(in srgb,currentColor 8%,transparent);color:inherit;font:inherit}
 .narration-status{font-size:12px;opacity:.7;padding-right:8px;white-space:nowrap}
@@ -18,19 +18,15 @@
 .narration-cast ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px;max-height:34vh;overflow:auto}
 .narration-cast li{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .narration-cast label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
-.narration-switch{justify-content:flex-start!important}
+.narration-switch{justify-content:flex-start}
 .ranobe-prose p.is-speaking{background:color-mix(in srgb,var(--color-blossom,#ee3c35) 14%,transparent);border-radius:8px;transition:background .25s}
 .narration .fine{color:#c9c3ba}.narration select option{color:#111}
 
 /* What is being read now: speaker (in their role colour), emotion, phrase. */
-.narration-caption{order:-1;margin:0;padding:10px 16px;border-radius:16px;background:#1f1c22f0;backdrop-filter:blur(18px);font-size:13.5px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.narration-caption b{margin-right:8px;color:#f3d9a8}
-.narration-caption i{margin-right:8px;font-style:normal;font-size:12px;color:#c9c3ba}
 .narration-cast li>span{flex:1;min-width:0;font-weight:600}
 .narration-cast li small{margin-left:8px;font-weight:400;color:#c9c3ba}
 .narration-sample{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:10px;background:color-mix(in srgb,currentColor 8%,transparent);color:inherit;cursor:pointer}
 .narration-sample:disabled{opacity:.5;cursor:progress}.narration-sample[aria-pressed="true"]{background:var(--color-blossom,#ee3c35);color:#fff}
-.narration-voice-row{justify-content:flex-start!important}
 /* Roles drawn in the text: name before the line, line in the character colour. */
 .role-speech{color:color-mix(in srgb,var(--role,currentColor) 62%,currentColor)}
 .role-thought{font-style:italic}

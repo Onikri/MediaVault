@@ -7,10 +7,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
-const LEGACY=new Set(` chapter-scrub     
-     manga-desk  manga-reader
-music-dock  online  reader-chrome reader-debug reader-morph reader-rail
-reader-settings-grid reader-shell reader-surface reader-view-settings retained-media room-chat-next
+const LEGACY=new Set(`      
+       
+music-dock       
+     room-chat-next
 room-conversation room-lobby  watch-room`.split(/\s+/).filter(Boolean).map(name=>'src/'+name+'.css'));
 const css=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?css(path.join(dir,e.name)):e.name.endsWith('.css')?[path.join(dir,e.name)]:[]);
 const files=css(path.join(ROOT,'src')).map(f=>path.relative(ROOT,f).split(path.sep).join('/'));

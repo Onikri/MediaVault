@@ -77,6 +77,8 @@ const SCENES={
   await SCENES.player.open(page);
   await page.getByRole('button',{name:'Музыка из аниме',exact:true}).click();await page.locator('.player-popover.mvx-menu').waitFor();
  }},
+ 'ranobe-menu':{harness:'ranobe',async open(page){await SCENES['ranobe-reader'].open(page);const more=page.getByRole('button',{name:'Ещё',exact:true});if(await more.isVisible()){await more.click();await page.getByRole('menu').waitFor();}}},
+ 'ranobe-settings':{harness:'ranobe',async open(page){await SCENES['ranobe-reader'].open(page);await page.getByRole('button',{name:'Настройки читалки'}).first().evaluate(b=>b.click());await page.getByRole('tab').first().waitFor();}},
  control:{harness:'control',async open(page){await page.locator('.cc-air').first().waitFor();}},
  'ranobe-reader':{harness:'ranobe',async open(page){
   await page.getByRole('button',{name:/Начать читать/}).click({timeout:120000});
