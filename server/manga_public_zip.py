@@ -98,12 +98,18 @@ class RemoteZip(RawIOBase):
         return self.directory_start, self.directory_data, self.total
 
 
-def download_refs(http, url, referer):
+def download_refs(http, url, referer, *, order=None):
     try:
         with RemoteZip(http, url, referer) as stream, zipfile.ZipFile(stream) as archive:
             files = [item for item in archive.infolist() if not item.is_dir() and IMAGE.search(item.filename)
                      and not item.filename.startswith('__MACOSX/')]
-            files.sort(key=lambda info: info.filename.casefold())
+            if order is None:
+                files.sort(key=lambda info: info.filename.casefold())
+            else:
+                by_name = {item.filename: item for item in files}
+                if len(by_name) != len(files) or any(name not in by_name for name in order):
+                    raise SourceError('ZIP не содержит страницы, перечисленные в читалке.')
+                files = [by_name[name] for name in order]
             if not 1 <= len(files) <= 1500 or len(files) != len({item.filename for item in files}) or any(
                     item.flag_bits & 1 or max(item.file_size, item.compress_size) > PAGE_LIMIT for item in files):
                 raise SourceError('ZIP содержит недоступные страницы или превышает лимит.')

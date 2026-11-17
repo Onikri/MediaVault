@@ -261,7 +261,7 @@ class PublicHttp:
                 and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
                                    'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
                                    'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto',
-                                   'mangaone-proto', 'mangabox-read',
+                                   'mangaone-proto', 'mangabox-read', 'corocoro-proto', 'ciaoplus-json',
                                    'manhwazone-document', 'honeytoon-sync', 'toomics-public-view', 'toomics-display'}):
             routed = RELAY_ROUTE(url, headers)
             if routed is not None:
@@ -416,6 +416,27 @@ class PublicHttp:
             if method != 'GET' or data is not None or not mangamee_api(target.netloc, target.path, target.query):
                 raise SourceError('Некорректный маршрут MangaMee.')
             outgoing['Accept'] = 'application/x-protobuf, application/octet-stream, */*'
+        ciao_json = action == 'ciaoplus-json'
+        if ciao_json:
+            from manga_ciaoplus import transport as ciao_signature
+
+            digest = ciao_signature(url, method, data)
+            if digest is None:
+                raise SourceError('Некорректный маршрут Ciao Plus.')
+            outgoing.update({'X-Bambi-Hash': digest, 'Accept': 'application/json',
+                             'X-Requested-With': 'XMLHttpRequest', 'Accept-Language': 'ja,en;q=0.8'})
+        corocoro_proto = action == 'corocoro-proto'
+        if method == 'PUT' and not corocoro_proto:
+            raise SourceError('Этот PUT не относится к поддерживаемой читалке.')
+        if corocoro_proto:
+            from manga_corocoro import transport as corocoro_route
+
+            if not corocoro_route(url, method, data):
+                raise SourceError('Некорректный маршрут Corocoro Online.')
+            outgoing.update({'Accept': 'application/x-protobuf, application/octet-stream, */*',
+                             'X-Requested-With': 'XMLHttpRequest', 'Accept-Language': 'ja,en;q=0.8'})
+            if method == 'PUT':
+                outgoing['Content-Type'] = 'application/octet-stream'
         mangaone_proto = action == 'mangaone-proto'
         if mangaone_proto:
             from manga_mangaone import transport as mangaone_route
@@ -637,6 +658,7 @@ class PublicHttp:
                                      'X-Requested-With': 'XMLHttpRequest', 'Origin': 'https://www.voyce.me'})
             if not (player_form or search_form or manga_form or million_register or zerosum_viewer or manhwazone_session
                     or foolslide_form or namicomi_form or ninehentai_form or voyceme_form or mangabox_form or mangaone_proto
+                    or ciao_json
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
@@ -689,7 +711,7 @@ class PublicHttp:
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',
                                'natsuid-search', 'creator-feed-json', 'fanfox-reader', 'ysk-json',
                                'webnex-json', 'webnex-image', 'zerosum-proto', 'manhwazone-livewire', 'honeytoon-sync',
-                               'mangaone-proto', 'mangabox-read'}
+                               'mangaone-proto', 'mangabox-read', 'corocoro-proto', 'ciaoplus-json'}
                         or not location or hop == 5):
                     raise SourceError("Некорректное перенаправление источника.")
                 next_url = self.validate(urljoin(url, location))

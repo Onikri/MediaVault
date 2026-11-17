@@ -88,8 +88,8 @@ class MangaPlusPage(XorPage):
         self.token = token
 
 
-def protobuf(http, url, source, headers, action, *, empty_post=False):
-    options = {'method': 'POST', 'data': b''} if empty_post else {}
+def protobuf(http, url, source, headers, action, *, empty_post=False, empty_put=False):
+    options = {'method': 'PUT' if empty_put else 'POST', 'data': b''} if empty_put or empty_post else {}
     response, final = http._open(url, headers=headers, action=action, **options)
     try:
         if final != url:

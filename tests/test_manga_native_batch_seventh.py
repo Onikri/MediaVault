@@ -16,6 +16,11 @@ import manga_comics_kingdom
 import manga_comicklive
 import manga_booru_pools
 import manga_asura_native
+import manga_blacktoon
+import manga_ciaoplus
+import manga_corocoro
+import manga_dle_readers
+import manga_dynasty
 import manga_fourkhd
 import manga_girlstop
 import manga_honeytoon_native
@@ -23,13 +28,16 @@ import manga_japanese_next
 import manga_jjcos
 import manga_korean_seventh
 import manga_ksbd
+import manga_lusttoon
 import manga_manhwazone
 import manga_mangabox
 import manga_mangameets
 import manga_mangaone
+import manga_mokuro
 import manga_momonga
 import manga_multporn
 import manga_ninehentai
+import manga_nicomanga
 import manga_nexus_reader
 import manga_ososedki
 import manga_park_publisher
@@ -40,6 +48,7 @@ import manga_seventh_data
 import manga_seventh_html
 import manga_toon11
 import manga_toomics
+import manga_toonkotsu
 import manga_twicomi
 import manga_voyceme
 import manga_vyvy
@@ -55,7 +64,8 @@ MODULES = (manga_seventh_data, manga_seventh_html, manga_rayuba, manga_zerosum, 
            manga_comicklive, manga_booru_pools, manga_jjcos, manga_twicomi, manga_ososedki,
            manga_honeytoon_native, manga_fourkhd, manga_voyceme, manga_multporn, manga_mangameets,
            manga_momonga, manga_toomics, manga_japanese_next, manga_park_publisher, manga_mangaone,
-           manga_mangabox, manga_asura_native)
+           manga_mangabox, manga_asura_native, manga_corocoro, manga_ciaoplus, manga_lusttoon,
+           manga_blacktoon, manga_nicomanga, manga_dle_readers, manga_dynasty, manga_mokuro, manga_toonkotsu)
 PROFILES = tuple(adapter for module in MODULES for adapter in module.SOURCES)
 
 
@@ -72,8 +82,8 @@ class SeventhBatchTests(TestCase):
         candidates, active = run_path(str(ROOT / 'scripts/probe-native-source-batch.py'))['candidates']()
         with (ROOT / 'docs/native-source-inventory.csv').open(encoding='utf-8', newline='') as file:
             rows = {row['source_id']: row for row in csv.DictReader(file)}
-        self.assertEqual(len(PROFILES), 59)
-        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 40)
+        self.assertEqual(len(PROFILES), 69)
+        self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 50)
         for profile in PROFILES:
             with self.subTest(profile=profile.SOURCE_ID):
                 self.assertNotIn(profile.SOURCE_ID, active)
@@ -244,3 +254,48 @@ class SeventhBatchTests(TestCase):
         self.assertTrue(manga_voyceme.public_form(url, json.dumps(body).encode()))
         body['query'] += ' mutation Example { no }'
         self.assertFalse(manga_voyceme.public_form(url, json.dumps(body).encode()))
+
+    def test_corocoro_only_allows_empty_viewer_put(self):
+        url = query_url(manga_corocoro.API, rq='chapter/viewer', chapter_id='123')
+        ranking = query_url(manga_corocoro.API, rq='title/list/ranking')
+        self.assertEqual(public_url(url, resolve_dns=False), url)
+        self.assertTrue(manga_corocoro.transport(url, 'PUT', b''))
+        self.assertFalse(manga_corocoro.transport(url, 'POST', b''))
+        self.assertFalse(manga_corocoro.transport(url, 'PUT', b'data'))
+        self.assertTrue(manga_corocoro.transport(ranking, 'GET', None))
+
+    def test_ciaoplus_scope_and_layout(self):
+        url = query_url(manga_ciaoplus.API + '/title/list', platform='3', title_id_list='00123')
+        self.assertEqual(public_url(url, resolve_dns=False), url)
+        expected = manga_ciaoplus.digest({'platform': '3', 'title_id_list': '00123'})
+        self.assertEqual(manga_ciaoplus.transport(url, 'GET', None), expected)
+        self.assertIsNone(manga_ciaoplus.transport(url + '&title_id_list=456', 'GET', None))
+        self.assertIsNone(manga_ciaoplus.transport(manga_ciaoplus.API + '/login', 'POST', {}))
+        self.assertEqual(sorted(manga_ciaoplus.tile_order(27)), list(range(16)))
+
+    def test_nicomanga_keeps_original_chapter_ownership_and_titles(self):
+        profile = manga_nicomanga.Nicomanga()
+        profile.origin.interval = 0
+        root = profile.ROOT
+        title = root + '/manga82/1424bfba.html'
+        chapter = root + '/manga82/1424bfba/chapter-c286i321256.html'
+        payload = {'manga': {'n': 'Example', 'genres_list': [{'n': 'Action'}]},
+                   'chapters_list': [{'ur': chapter, 'n': 'Chapter 2', 'chapter': '2'},
+                                     {'ur': root + '/manga83/1424bfbc/chapter-c2i321257.html', 'chapter': '2'}]}
+        raw = json.dumps(payload).encode()
+        key = manga_nicomanga.OBFUSCATION
+        encoded = ''.join(chr(19968 + (byte ^ key[i % len(key)])) for i, byte in enumerate(raw))
+        http = mock_site({title: f'<script>0:Ta,</script><script>{encoded}</script>'})
+        entry = profile.inspect(title, http)
+        self.assertEqual(entry['title'], 'Example')
+        self.assertEqual(entry['genres'], ['Action'])
+        self.assertEqual([profile.canonical(row['url']) for row in entry['episodes']], [chapter])
+
+    def test_comx_uses_page_segment_even_for_first_search_page(self):
+        profile = manga_dle_readers.SOURCES[1]
+        url = profile.ROOT + '/search/Example/page/1/'
+        http = mock_site({url: '<div id="dle-content"><div class="readed"><div class="readed__title">'
+                               '<a href="/112-example.html">Example</a></div></div></div>'})
+        rows, more = profile.catalogue(http, query='Example')
+        self.assertEqual(rows[0]['title'], 'Example')
+        self.assertFalse(more)
