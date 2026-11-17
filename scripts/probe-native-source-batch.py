@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -179,11 +180,14 @@ with tempfile.TemporaryDirectory() as folder:
     sys.argv = [str(script)] + ARGS
     runpy.run_path(str(script), run_name='__main__')
 """
+    # A hard limit inside the container, so a source that ignores its
+    # deadline cannot keep the probe (or the importer's CPU) busy.
+    limit = max(30, int(os.environ.get('PROBE_TIMEOUT') or 3600))
+    runner = ['docker', 'exec', '-i', 'oracle-importer-1', 'timeout', '-s', 'KILL', str(limit), 'python', '-B', '-c',
+              'ARGS=' + repr(args) + '\n' + bootstrap]
     command = ('from pathlib import Path\nimport subprocess\n'
                'if Path("/opt/mediavault/deploy.lock").exists(): raise SystemExit("Deployment active")\n'
-               'raise SystemExit(subprocess.run('
-               "['docker', 'exec', '-i', 'oracle-importer-1', 'python', '-B', '-c', "
-               + repr('ARGS=' + repr(args) + '\n' + bootstrap) + '], input=' + repr(payload.getvalue()) + ').returncode)')
+               'raise SystemExit(subprocess.run(' + repr(runner) + ', input=' + repr(payload.getvalue()) + ').returncode)')
     return subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=6', host, 'sudo -n python3 -'],
                           input=command.encode()).returncode
 

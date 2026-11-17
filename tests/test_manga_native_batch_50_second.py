@@ -51,7 +51,8 @@ class NativeBatchSecondTests(TestCase):
             identity = row['source_id']
             adapter = candidates[identity]
             self.assertEqual((adapter.NAME, adapter.LANGUAGE), (row['source'], row['language']))
-            self.assertNotIn(identity, active)
+            # Checked profiles go live through manga_native_activation.json.
+            self.assertTrue(identity not in active or identity in __import__('manga_native_sources').activated_profiles())
             self.assertIn(identity, INDEX)
 
     def test_mangabox_uses_slug_and_keeps_fraction_and_image_order(self):

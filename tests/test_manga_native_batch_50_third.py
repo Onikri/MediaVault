@@ -45,7 +45,8 @@ class ThirdBatchTests(TestCase):
         for row in rows:
             source = candidates[row['source_id']]
             self.assertEqual((source.NAME, source.LANGUAGE), (row['source'], row['language']))
-            self.assertNotIn(source.SOURCE_ID, active)
+            # Checked profiles go live through manga_native_activation.json.
+            self.assertTrue(source.SOURCE_ID not in active or source.SOURCE_ID in __import__('manga_native_sources').activated_profiles())
             self.assertIs(type(source), type(ports[source.SOURCE_ID]))
             self.assertEqual(row['evidence'], 'native-source-verification.md#третья-партия-из-50-apk')
 

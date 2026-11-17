@@ -45,7 +45,8 @@ class FourthBatchTests(TestCase):
             source = candidates[row['source_id']]
             self.assertEqual((source.NAME, source.LANGUAGE), (row['source'], row['language']))
             self.assertIs(type(source), type(sources[source.SOURCE_ID]))
-            self.assertNotIn(source.SOURCE_ID, active)
+            # Checked profiles go live through manga_native_activation.json.
+            self.assertTrue(source.SOURCE_ID not in active or source.SOURCE_ID in __import__('manga_native_sources').activated_profiles())
             self.assertEqual(row['evidence'], 'native-source-verification.md#четвёртая-партия-из-50-apk')
 
     def test_goda_chapter_ids_survive_the_reader_and_saved_urls(self):

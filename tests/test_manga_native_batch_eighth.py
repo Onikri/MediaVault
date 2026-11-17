@@ -62,7 +62,8 @@ class EighthBatchTests(TestCase):
         self.assertEqual(len({rows[adapter.SOURCE_ID]['package'] for adapter in PROFILES}), 30)
         for adapter in PROFILES:
             row = rows[adapter.SOURCE_ID]
-            self.assertNotIn(adapter.SOURCE_ID, active)
+            # Checked profiles go live through manga_native_activation.json.
+            self.assertTrue(adapter.SOURCE_ID not in active or adapter.SOURCE_ID in __import__('manga_native_sources').activated_profiles())
             self.assertIs(type(adapter), type(candidates[adapter.SOURCE_ID]))
             self.assertEqual((adapter.NAME, adapter.LANGUAGE), (row['source'], row['language']))
             self.assertTrue(row['evidence'].endswith('#восьмая-партия'))

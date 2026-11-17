@@ -107,7 +107,8 @@ class SixthBatchTests(TestCase):
             row = rows[profile.SOURCE_ID]
             self.assertEqual((profile.NAME, profile.LANGUAGE), (row['source'], row['language']))
             self.assertIs(type(candidates[profile.SOURCE_ID]), type(profile))
-            self.assertNotIn(profile.SOURCE_ID, active)
+            # Checked profiles go live through manga_native_activation.json.
+            self.assertTrue(profile.SOURCE_ID not in active or profile.SOURCE_ID in __import__('manga_native_sources').activated_profiles())
             self.assertTrue(row['evidence'].endswith('#шестая-партия'))
 
     def test_unicomics_saved_chapter_and_deferred_image(self):

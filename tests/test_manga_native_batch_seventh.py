@@ -86,7 +86,8 @@ class SeventhBatchTests(TestCase):
         self.assertEqual(len({rows[profile.SOURCE_ID]['package'] for profile in PROFILES}), 50)
         for profile in PROFILES:
             with self.subTest(profile=profile.SOURCE_ID):
-                self.assertNotIn(profile.SOURCE_ID, active)
+                # Checked profiles go live through manga_native_activation.json.
+                self.assertTrue(profile.SOURCE_ID not in active or profile.SOURCE_ID in __import__('manga_native_sources').activated_profiles())
                 self.assertIs(type(candidates[profile.SOURCE_ID]), type(profile))
                 row = rows[profile.SOURCE_ID]
                 self.assertEqual((profile.NAME, profile.LANGUAGE), (row['source'], row['language']))

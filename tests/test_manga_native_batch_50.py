@@ -40,7 +40,8 @@ class NativeBatchTests(TestCase):
         candidates, active = probe.candidates()
         for row in rows:
             source_id = row['source_id']
-            self.assertNotIn(source_id, active)
+            # Checked profiles go live through manga_native_activation.json.
+            self.assertTrue(source_id not in active or source_id in __import__('manga_native_sources').activated_profiles())
             source = candidates[source_id]
             self.assertEqual((source.NAME, source.LANGUAGE), (row['source'], row['language']))
             self.assertTrue(callable(source.catalogue) and callable(source.inspect))

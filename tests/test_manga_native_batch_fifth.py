@@ -67,7 +67,8 @@ class FifthBatchTests(TestCase):
             source = candidates[row['source_id']]
             self.assertEqual((source.NAME, source.LANGUAGE), (row['source'], row['language']))
             self.assertIs(type(source), type(selected[source.SOURCE_ID]))
-            self.assertNotIn(source.SOURCE_ID, active)
+            # Checked profiles go live through manga_native_activation.json.
+            self.assertTrue(source.SOURCE_ID not in active or source.SOURCE_ID in __import__('manga_native_sources').activated_profiles())
             self.assertEqual(row['evidence'], 'native-source-verification.md#пятая-партия')
 
     def test_wamanga_reads_fractions_and_sorts_pages(self):
