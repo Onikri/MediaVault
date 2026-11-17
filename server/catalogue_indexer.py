@@ -193,7 +193,8 @@ class Indexer:
                 next_time=max(time.monotonic(),self.rate.get(host,0));self.rate[host]=next_time+self.pace.get(host,self.base_pace(host))
             if self.stop.wait(max(0,next_time-time.monotonic())):return False
             result=self.fetch(spec,job['cursor']);rows=result.get('rows') or []
-            if not rows and result.get('next'):raise RuntimeError('empty-page')
+            # An AniList id span may hold no title of this kind; the walk goes on.
+            if not rows and result.get('next') and not result.get('emptySpan'):raise RuntimeError('empty-page')
             if not rows and not result.get('catalogues') and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html'}:raise RuntimeError('empty-page')
             digest=hashlib.sha256(canonical_json(sorted(str(r.get('sourceUrl') or r.get('url') or r.get('id')) for r in rows))).hexdigest()
             with self.store.lock,self.store.db:

@@ -22,7 +22,7 @@ class AniListSpanTests(unittest.TestCase):
  def walk(self,ids,newest):
   request,calls=fake(ids,newest);cursor={'page':1};seen=[]
   while True:
-   result=anilist_span({'kind':'anime'},cursor,'ANIME','','id',request=request,pause=lambda s:None)
+   result=anilist_span({'kind':'anime'},cursor,'ANIME','','id',request=request)
    seen+=[int(r['providerId']) for r in result['rows']]
    if not result['next']:return seen,calls
    cursor=result['next']
@@ -31,16 +31,33 @@ class AniListSpanTests(unittest.TestCase):
   ids=list(range(1,13001))+[50000,50001,60000]
   seen,_=self.walk(ids,60000)
   self.assertEqual(seen,ids)
-  row=anilist_span({'kind':'anime'},{'page':1},'ANIME','','id',request=fake([5],5)[0],pause=lambda s:None)['rows'][0]
+  row=anilist_span({'kind':'anime'},{'page':1},'ANIME','','id',request=fake([5],5)[0])['rows'][0]
   self.assertEqual((row['genres'],row['tags'],row['kind']),(['Drama'],['Time Skip'],'anime'))
 
- def test_spans_without_this_kind_are_skipped_in_one_turn(self):
-  request,calls=fake([3,9001],9001)
-  first=anilist_span({'kind':'manga'},{'page':1},'MANGA','','id',request=request,pause=lambda s:None)
-  self.assertEqual([r['providerId'] for r in first['rows']],['3'])
-  second=anilist_span({'kind':'manga'},first['next'],'MANGA','','id',request=request,pause=lambda s:None)
-  self.assertEqual([r['providerId'] for r in second['rows']],['9001']);self.assertIsNone(second['next'])
-  self.assertEqual(len(calls),1+4)# the empty spans 2001..8000 were read in the same turn
+ def test_a_span_without_this_kind_is_an_expected_empty_page(self):
+  request,calls=fake([3,9001],9001);cursor={'page':1};pages=[]
+  while cursor:
+   result=anilist_span({'kind':'manga'},cursor,'MANGA','','id',request=request)
+   pages.append(([r['providerId'] for r in result['rows']],result['emptySpan']));cursor=result['next']
+  self.assertEqual(pages,[(['3'],False),([],True),([],True),([],True),(['9001'],False)])
+  self.assertEqual(len(calls),5)# one request per indexer turn
+
+ def test_the_indexer_walks_on_through_empty_spans_and_slows_on_429(self):
+  db=sqlite3.connect(':memory:',check_same_thread=False);initialize(db)
+  temp=tempfile.TemporaryDirectory();env=patch.dict(os.environ,{'DATA_DIR':temp.name,'MEDIA_VAULT_DISABLE_WORKER':'1'});env.start()
+  try:
+   answers=[{'rows':[],'next':{'from':2000,'span':1},'emptySpan':True},catalogue_sources.AniListBusy('x')]
+   def fetch(spec,cursor):
+    value=answers.pop(0)
+    if isinstance(value,Exception):raise value
+    return value
+   clock=[1000];worker=Indexer(SimpleNamespace(db=db,lock=threading.RLock()),fetch,lambda:clock[0],interval=0)
+   with db:key=worker.enqueue({'type':'anilist','kind':'manga','domain':'anilist.co','name':'x'})
+   self.assertTrue(worker.run_once())
+   self.assertEqual(db.execute('SELECT cursor,state FROM catalogue_jobs WHERE id=?',(key,)).fetchone(),('{"from":2000,"span":1}','queued'))
+   clock[0]+=10;self.assertTrue(worker.run_once())
+   self.assertNotIn('anilist.co',worker.paused);self.assertGreater(worker.pace.get('anilist.co',0),0)
+  finally:db.close();env.stop();temp.cleanup()
 
  def test_term_jobs_keep_the_listing_walk(self):
   bodies=[]
