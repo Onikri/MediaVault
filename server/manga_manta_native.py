@@ -110,7 +110,8 @@ class Manta(JsonSeries):
             title = node['content'] if node else node_text(doc.select_one('main h1, h1'))
         if not title:
             raise SourceError('Manta не предоставил название тайтла.')
-        desc = details.get('description') or {}
+        desc = details.get('description')
+        desc = desc if isinstance(desc, dict) else {'short': desc}
         row = self.record(url, title, self.cover(series.get('image')),
                           description='\n\n'.join(desc[key] for key in ('short', 'long') if isinstance(desc.get(key), str) and desc[key]),
                           tags=[self.local_name(tag.get('name')) for tag in items(details, 'tags') if isinstance(tag, dict)],
@@ -134,7 +135,7 @@ class Manta(JsonSeries):
     def inspect(self, value, http):
         url = self.canonical(value)
         if self.is_chapter(url) and not self.title_for(url):
-            data = self.episode(http, url)
+            data = self.episode_data(http, url)
             parent = str(data.get('seriesId') or '')
             if re.fullmatch(ID, parent):
                 url = query_url(url.split('?')[0], mv_title=parent)
@@ -144,7 +145,7 @@ class Manta(JsonSeries):
                 return self.reader_result(row, url, [self.chapter(url, title, number(data.get('ord')) or 0)], self.images(data, url))
         return super().inspect(url, http)
 
-    def episode(self, http, url):
+    def episode_data(self, http, url):
         data = self.request(http, '/front/v1/episodes/' + self.chapter_key(url))
         if not isinstance(data, dict) or str(data.get('id')) != self.chapter_key(url):
             raise SourceAccessError('Manta не предоставил открытую версию главы.')
@@ -159,7 +160,7 @@ class Manta(JsonSeries):
         return [value for value in values if value and 'just-black.jpg' not in value]
 
     def pages(self, http, url):
-        return self.images(self.episode(http, url), url)
+        return self.images(self.episode_data(http, url), url)
 
 
 SOURCES = (Manta('8753096034341798862', 'en'), Manta('2857546552946901153', 'es'))

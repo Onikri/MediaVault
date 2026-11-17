@@ -35,7 +35,7 @@ def main():
                 row = json.loads(line)
             except ValueError:
                 continue
-            if row.get('event') == 'source':
+            if isinstance(row, dict) and row.get('event') == 'source' and row.get('route', 'direct') == 'direct':
                 final[row['source_id']] = row
     passed = {sid for sid, row in final.items()
               if row.get('status') == 'passed' and row.get('search') and row.get('chapters') and row.get('pages')}

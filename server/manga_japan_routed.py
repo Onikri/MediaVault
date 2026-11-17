@@ -25,7 +25,7 @@ from manga_japanese_readers import JapanesePage, packed_refs
 from manga_madara import image_url
 from manga_ninth_routes import Route, register
 from manga_webcomics import param, query_url
-from source_parser import SourceAccessError, SourceError
+from source_parser import SourceAccessError, SourceError, SourceTemporaryError
 
 FOD = 'https://manga.fod.fujitv.co.jp'
 LINE = 'https://manga.line.me'
@@ -691,6 +691,7 @@ class SoraRaw(JsonSeries):
         super().__init__(('8499664924001897518', 'SoraRaw', 'ja', SORA, True),
                          rf'/manga/({SORA_SLUG})/?', rf'/manga/({SORA_SLUG})/({SORA_CHAPTER})/?', interval=.35)
         self.cache_lock = threading.Lock()
+        self.search_lock = threading.Lock()
         self.cache = {}
 
     def is_title(self, url):
@@ -763,17 +764,27 @@ class SoraRaw(JsonSeries):
         return rows, False
 
     def search(self, http, query):
-        def part(index):
+        def fetch_part(index):
             client = http.fork() if hasattr(http, 'fork') else http
             try:
-                raw, _, _ = client.document(f'{SORA}/mangas_{index}.json', headers={'Referer': SORA + '/'},
-                                            action='n9:soraraw')
+                for attempt in range(2):
+                    try:
+                        raw, _, _ = client.document(f'{SORA}/mangas_{index}.json', headers={'Referer': SORA + '/'},
+                                                    action='n9:soraraw')
+                        break
+                    except SourceTemporaryError:
+                        deadline = getattr(client, 'deadline', None)
+                        if attempt or (deadline and deadline - time.monotonic() < 2):
+                            raise
             finally:
                 if client is not http:
                     client.close()
             # Keep only what the search and the result rows read (~20 MB of JSON).
             return [{key: entry.get(key) for key in SEARCH_FIELDS}
                     for entry in as_list(as_dict(loads(raw, 'SoraRaw')).get('list'))]
+
+        def part(index):
+            return self.cached(f'catalogue-part:{index}', self.CATALOG_TTL, lambda: fetch_part(index))
 
         def load():
             from concurrent.futures import ThreadPoolExecutor
@@ -785,7 +796,14 @@ class SoraRaw(JsonSeries):
             with ThreadPoolExecutor(max_workers=6) as pool:
                 return [entry for chunk in pool.map(part, range(1, pages + 1)) for entry in chunk]
 
-        entries = self.cached('catalog', self.CATALOG_TTL, load)
+        deadline = getattr(http, 'deadline', None)
+        remaining = max(0, deadline - time.monotonic()) if deadline else 20
+        if not self.search_lock.acquire(timeout=remaining):
+            raise SourceTemporaryError('SoraRaw ещё загружает поисковый каталог.')
+        try:
+            entries = self.cached('catalog', self.CATALOG_TTL, load)
+        finally:
+            self.search_lock.release()
         words = [w.casefold() for w in query.split()]
         found = []
         for entry in entries:

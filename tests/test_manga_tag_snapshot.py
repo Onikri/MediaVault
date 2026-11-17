@@ -47,8 +47,8 @@ class SnapshotTests(unittest.TestCase):
             self.assertEqual(json.loads(output.read_text(encoding='utf-8'))['tags'],[])
 
     def test_exact_requested_sources(self):
-        self.assertEqual(len(snapshot.SOURCES),18)
-        self.assertEqual(len({row[0] for row in snapshot.SOURCES}),18)
+        self.assertEqual(len(snapshot.SOURCES),17)
+        self.assertEqual(len({row[0] for row in snapshot.SOURCES}),17)
 
     def test_lib_group_taxonomy_is_extracted_not_invented(self):
         payload = {'data':{'genres':[{'id':1,'name':'Фэнтези'}, {'name':{'ru':'Романтика','en':'Romance'}}],
@@ -114,11 +114,11 @@ class SnapshotTests(unittest.TestCase):
         original = [('tag','Фэнтези'),('genre','Romance')]
         with patch.object(snapshot, 'source_tags', return_value=(original,'partial','one_public_catalogue_page')):
             data=snapshot.build(object(), now='2026-11-13T00:00:00Z',pause=0)
-        self.assertEqual(len(data['sources']),18)
+        self.assertEqual(len(data['sources']),17)
         self.assertTrue(data['tags'])
         key=next(v for v in data['tags'] if v['key']=='фэнтези')
         self.assertEqual(key['category'],'tag')
-        self.assertEqual(len(key['sources']),17)  # closed site excluded
+        self.assertEqual(len(key['sources']),16)  # closed site excluded
         self.assertFalse(data['coverageGuaranteed'])
         old={'sources':data['sources'],'tags':data['tags']}
         with patch.object(snapshot,'source_tags',return_value=([],'unavailable','temporary_failure')):

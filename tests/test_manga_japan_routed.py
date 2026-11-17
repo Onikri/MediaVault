@@ -17,7 +17,7 @@ import manga_japan_scramble as scramble
 from manga_ninth_routes import prepare
 from manga_page_media import page_reference
 from manga_speedbinb import grant
-from source_parser import PublicHttp, SourceError, public_url
+from source_parser import PublicHttp, SourceError, SourceTemporaryError, public_url
 
 FOD, LINE, SOKU, SORA = japan.SOURCES
 ROUTES = {'hosts': ['manga.fod.fujitv.co.jp', 'manga.line.me', 'sokuyomi.jp', 'soraraw.com', 'mangarawgo.site'],
@@ -258,3 +258,21 @@ class AdapterTests(TestCase):
         rows, more = SORA.catalogue(http, query='ブルーロック')
         self.assertEqual(([r['title'] for r in rows], more), (['ブルーロック', 'Other'], False))
         self.assertTrue(rows[1].get('adult'))
+
+    def test_soraraw_retries_a_truncated_catalogue_part(self):
+        source = japan.SoraRaw()
+        url = 'https://soraraw.com/mangas_1.json'
+        calls = []
+
+        def fixture(value, **_):
+            calls.append(value)
+            if value.endswith('/config.json'):
+                return '{"m": 1}', value, {}
+            if calls.count(url) == 1:
+                raise SourceTemporaryError('connection ended before response')
+            return '{"list":[{"name":"Example","slug":"example-1"}]}', value, {}
+
+        http = SimpleNamespace(document=fixture, deadline=None)
+        self.assertEqual([row['title'] for row in source.search(http, 'Example')], ['Example'])
+        self.assertEqual([row['title'] for row in source.search(http, 'Example')], ['Example'])
+        self.assertEqual(calls.count(url), 2)

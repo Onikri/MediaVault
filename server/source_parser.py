@@ -1063,6 +1063,8 @@ class PublicHttp:
             if BLOCKED.search(text):
                 raise SourceError("Страница требует проверку браузера или подписку. Выбери другой публичный источник.")
             return text, url, dict(response.headers)
+        except requests.RequestException:
+            raise SourceTemporaryError("Соединение с источником оборвалось во время чтения ответа.") from None
         finally:
             response.close()
 

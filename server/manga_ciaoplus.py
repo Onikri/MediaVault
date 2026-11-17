@@ -196,7 +196,7 @@ class CiaoPlus(JsonSeries):
                 continue
             if str(entry.get('title_id', '')).zfill(5) != key:
                 continue
-            target = row['url'].rstrip('/') + '/episode/' + identifier
+            target = ROOT + '/comics/title/' + key + '/episode/' + identifier
             title = str(entry.get('episode_name') or '').strip()
             n = number(entry.get('index'))
             if n is not None and title.startswith(row['title'].strip()):

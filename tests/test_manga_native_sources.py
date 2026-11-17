@@ -4,7 +4,7 @@ import os
 import unittest
 from decimal import Decimal
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 from urllib.parse import parse_qs, urlsplit
 from zipfile import ZipFile
 
@@ -14,7 +14,7 @@ from manga_download import download_chapter
 import manga_mangashi
 from manga_mangashi import ROOT, SOURCE_ID
 from manga_mangahub import ONE_MANGA_CO, MangaHub, OneManga
-from manga_native_sources import record_reader_url
+from manga_native_sources import catalogue_job, record_reader_url
 from manga_sources import inspect
 from source_parser import SourceError
 from suwayomi_bridge import native_reader_url, page_image, PREFIX
@@ -90,6 +90,31 @@ class NativeMigrationTest(unittest.TestCase):
             sources = installed_sources()
         self.assertEqual([source['baseUrl'] for source in sources if source['id'] == SOURCE_ID], [ROOT])
 
+    def test_native_filter_survives_adapter_and_legacy_vocabulary_formats(self):
+        adapter = Mock()
+        adapter.vocabulary.return_value = [
+            {'key': '42', 'label': 'Спорт', 'kind': 'genre'},
+            {'sourceId': '43', 'label': 'Спорт', 'category': 'tag'},
+            {'label': 'incomplete'},
+        ]
+        adapter.catalogue.return_value = ([{'url': TITLE, 'genres': ['Драма']}], False)
+        with patch('manga_native_sources.PublicHttp'):
+            vocabulary = catalogue_job(adapter, {'type': 'bridge-vocabulary'}, 1)['vocabulary']
+            self.assertEqual(vocabulary[0], {'sourceId': '42', 'label': 'Спорт', 'category': 'genre'})
+            term = {'sourceId': {'position': 2}, 'label': 'Спорт', 'category': 'genre'}
+            result = catalogue_job(adapter, {'type': 'bridge', 'term': term}, 1)
+        self.assertEqual(adapter.catalogue.call_args.kwargs['tag'], '42')
+        self.assertEqual(result['rows'][0]['genres'], ['Драма', 'Спорт'])
+
+    def test_native_search_failure_retries_same_installed_source(self):
+        client = Mock()
+        client.get.return_value = {'mangaList': [{'id': 14, 'title': 'Blue Lock', 'url': '/manga/bluelock/'}]}
+        with patch('manga_native_sources.search', side_effect=SourceError('origin down')), \
+                patch('suwayomi_bridge.configured', return_value=True), patch('suwayomi_bridge.Client', return_value=client):
+            rows = search_source(SOURCE, 'Blue Lock')
+        self.assertEqual([row['sourceId'] for row in rows], [SOURCE_ID])
+        self.assertEqual(client.get.call_args.args[0], '/source/' + SOURCE_ID + '/search')
+
     def test_reader_keeps_paginated_fractional_chapter_and_downloads_through_same_adapter(self):
         http = Http()
         title = inspect(TITLE, http)
@@ -125,6 +150,16 @@ class NativeMigrationTest(unittest.TestCase):
             with patch('suwayomi_bridge.native_page_image', return_value=(PNG, 'image/png')) as image:
                 self.assertEqual(page_image(legacy + '/p/0'), (PNG, 'image/png'))
                 image.assert_called_once_with(SECOND, 0)
+
+    def test_recorded_page_falls_back_to_same_bridge_chapter(self):
+        client = Mock()
+        client.get.return_value = (PNG, 'image/png')
+        with patch.dict(os.environ, {'PUBLIC_URL': 'https://vault.example'}), \
+                patch('manga_native_sources.recorded_reader_url', return_value=SECOND), \
+                patch('suwayomi_bridge.native_page_image', side_effect=SourceError('expired reader')), \
+                patch('suwayomi_bridge.Client', return_value=client):
+            self.assertEqual(page_image('https://vault.example' + PREFIX + 'm/75/c/2/p/0'), (PNG, 'image/png'))
+        self.assertEqual(client.get.call_args.args[0], '/manga/75/chapter/2/page/0')
 
     def test_mangahub_relative_saved_links_retain_the_host_and_chapter(self):
         self.assertEqual(ONE_MANGA_CO.saved_chapter_url('/test/chapter-3.5', 'test', ONE_MANGA_CO.ROOT),
