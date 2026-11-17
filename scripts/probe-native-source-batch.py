@@ -33,6 +33,7 @@ def candidates():
     import manga_mangahere
     import manga_pornpics
     import manga_sugocomics
+    import manga_ninth_sources
     import manga_mangalix
     import manga_toonz
     import manga_viz
@@ -193,14 +194,15 @@ def candidates():
                   manga_docomo.SOURCES, manga_mangafive.SOURCES, manga_dmm.SOURCES, manga_pixivcomic.SOURCES,
                   manga_bookwalker_jp.SOURCES, manga_mangalix.SOURCES, manga_toonz.SOURCES, manga_cubari.SOURCES,
                   manga_mangahere.SOURCES, manga_mangack.SOURCES, manga_viz.SOURCES, manga_pornpics.SOURCES,
-                  manga_akuma.SOURCES, manga_japanese_readers.SOURCES, manga_sugocomics.SOURCES):
+                  manga_akuma.SOURCES, manga_japanese_readers.SOURCES, manga_sugocomics.SOURCES,
+                  manga_ninth_sources.SOURCES):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in group)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby
     return profiles, native.ADAPTERS
 
 
-def audit(adapter, check_search, check_chapters):
+def audit(adapter, check_search, check_chapters, check_pages=False):
     from source_parser import PublicHttp, SourceAccessError, SourceError, SourceRateLimitError, SourceTemporaryError
 
     phase = 'catalogue'
@@ -239,6 +241,21 @@ def audit(adapter, check_search, check_chapters):
                 if not url or not adapter.CHAPTER_PATH.fullmatch(urlsplit(url).path):
                     return {**result, 'status': 'identity_mismatch', 'phase': phase}
             result['chapters'] = True
+            if check_pages:
+                phase = 'pages'
+                http.deadline = time.monotonic() + 20
+                chapter = adapter.inspect(episodes[0]['url'], http)
+                pages = chapter.get('pages') or []
+                result['page_count'] = len(pages)
+                if not pages:
+                    return {**result, 'status': 'empty', 'phase': phase}
+                first = pages[0]['url'] if isinstance(pages[0], dict) else pages[0]
+                import manga_native_sources as native
+                headers = getattr(adapter, 'page_headers', None)
+                headers = headers(first) if headers else {'Referer': adapter.ROOT + '/'}
+                raw, _, response_headers = http.document(first, headers=headers, action=getattr(adapter, 'image_action', None))
+                result['image_bytes'] = len(raw.encode('utf-8', 'surrogateescape')) if isinstance(raw, str) else len(raw)
+                result['pages'] = True
         if check_search and not result['search']:
             return {**result, 'status': 'search_mismatch', 'phase': 'search'}
         return {**result, 'status': 'passed', 'phase': phase}
@@ -257,12 +274,12 @@ def audit(adapter, check_search, check_chapters):
         http.close()
 
 
-def probe_origin(adapters, enabled, check_search, check_chapters):
+def probe_origin(adapters, enabled, check_search, check_chapters, check_pages=False):
     results = []
     rate_limited = False
     for adapter in adapters:
         started = time.monotonic()
-        result = {'status': 'deferred', 'phase': 'catalogue'} if rate_limited else audit(adapter, check_search, check_chapters)
+        result = {'status': 'deferred', 'phase': 'catalogue'} if rate_limited else audit(adapter, check_search, check_chapters, check_pages)
         rate_limited |= result['status'] == 'rate_limited'
         results.append({'source_id': adapter.SOURCE_ID, 'name': adapter.NAME,
                         'enabled': adapter.SOURCE_ID in enabled, 'ms': round((time.monotonic()-started)*1000), **result})
@@ -291,11 +308,11 @@ def live(args):
     statuses = Counter()
     operations = Counter()
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        jobs = [pool.submit(probe_origin, group, enabled, args.search, args.chapters) for group in groups.values()]
+        jobs = [pool.submit(probe_origin, group, enabled, args.search, args.chapters, args.pages) for group in groups.values()]
         for future in as_completed(jobs):
             for result in future.result():
                 statuses[result['status']] += 1
-                operations.update(key for key in ('catalogue', 'search', 'chapters') if result.get(key))
+                operations.update(key for key in ('catalogue', 'search', 'chapters', 'pages') if result.get(key))
                 emit({'event': 'source', **result})
     emit({'event': 'summary', 'completed': sum(statuses.values()), 'catalogues_returned': operations['catalogue'],
           'searches_matched': operations['search'], 'chapter_lists_returned': operations['chapters'],
@@ -334,6 +351,7 @@ def main():
     parser.add_argument('--source', action='append', default=[], help='Repeat to rerun particular source IDs.')
     parser.add_argument('--search', action='store_true', help='Also look up one returned title by exact ID.')
     parser.add_argument('--chapters', action='store_true', help='Validate one title’s chapter list without downloading images.')
+    parser.add_argument('--pages', action='store_true', help='Also open the first chapter and fetch its first image.')
     parser.add_argument('--ssh', metavar='HOST', help='Run temporarily inside the importer through SSH.')
     args = parser.parse_args()
     if args.offset < 0 or len(args.source) > args.batch_size or args.source and (args.offset or args.inactive):
@@ -349,6 +367,8 @@ def main():
             remote_args.append('--search')
         if args.chapters:
             remote_args.append('--chapters')
+        if args.pages:
+            remote_args.append('--pages')
         return over_ssh(args.ssh, remote_args)
     live(args)
     return 0

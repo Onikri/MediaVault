@@ -277,7 +277,14 @@ class PublicHttp:
                 raise SourceError('Некорректный адрес открытой читалки Publus.')
             from manga_network_routes import configuration, routed
             publus_routes = configuration()
-        trusted_api = speedbinb or clipstudio or publus
+        ninth = None
+        if isinstance(action, str) and action.startswith('n9:'):
+            # Sources ported in the ninth batch declare their exact routes,
+            # headers, guest cookies and forms in one place.
+            from manga_ninth_routes import prepare as ninth_prepare
+
+            ninth = ninth_prepare(action, value, method, data, headers or {})
+        trusted_api = speedbinb or clipstudio or publus or bool(ninth)
         url = public_url(value, allow_api=True) if trusted_api and self.validate is public_url else self.validate(value)
         japanese_public = (action in {'cycomi-reader', 'nicovideo-public', 'japanese-published-image'}
                            or action == 'native-series-json' and urlsplit(url).netloc in {'comic-walker.com', 'web.cycomi.com'})
@@ -286,7 +293,7 @@ class PublicHttp:
 
             japanese_routes = configuration()
         if (RELAY_ROUTE is not None and method == 'GET' and not byte_range
-                and not speedbinb_routed and not clipstudio and not publus and not japanese_public
+                and not speedbinb_routed and not clipstudio and not publus and not japanese_public and not ninth
                 and action not in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto', 'globalcomix-json',
                                    'madaradex-web', 'madaradex-cdn', 'fanfox-reader', 'ysk-json',
                                    'webnex-doc', 'webnex-json', 'webnex-image', 'hotcomics-doc', 'zerosum-proto',
@@ -308,6 +315,9 @@ class PublicHttp:
                 outgoing['Authorization'] = 'Bearer ' + clip_token
         else:
             outgoing = playback_headers(headers)
+        if ninth:
+            outgoing.update(ninth.headers)
+            data = ninth.data
         if japanese_public:
             outgoing['Accept-Language'] = 'ja,en;q=0.8'
         if action == 'nicovideo-public':
@@ -856,7 +866,7 @@ class PublicHttp:
                     or xcomic_form or fury_form or catalogue_form or natsuid_form or mangataro_form or init_form or akuma_session
                     or mdx_mode == 'refresh'
                     or chan_search or senkognito_read or senkuro_native or lostfilm_catalog or honey_chapters
-                    or hikka_search or jaomix_toc or madara_form or giga_form):
+                    or hikka_search or jaomix_toc or madara_form or giga_form or ninth and ninth.post):
                 raise SourceError("Этот POST не относится к поддерживаемой публичной форме.")
             if madara_form:outgoing['X-Requested-With']='XMLHttpRequest'
             if chan_search:
@@ -880,7 +890,8 @@ class PublicHttp:
             try:
                 # A Comic Fury warning can set a cookie for a redirect to the same page.
                 if not (fury_form or buff_form or webnex_document or manhwazone_session or toomics_session
-                        or firecross_session or honto_session or alphapolis_session or publus_source or akuma_session):
+                        or firecross_session or honto_session or alphapolis_session or publus_source or akuma_session
+                        or ninth and ninth.cookies):
                     self.session.cookies.clear()
                 request_timeout=timeout or self.timeout
                 if self.deadline:
@@ -918,6 +929,9 @@ class PublicHttp:
                     if param(next_url, 'cid') and (param(next_url, 'u1') or param(next_url, 'u2')):
                         return response, url
                 response.close()
+                if ninth and not (ninth.redirect and location and hop < 5
+                                  and urlsplit(urljoin(url, location)).netloc == urlsplit(url).netloc):
+                    raise SourceError("Некорректное перенаправление источника.")
                 if (speedbinb or clipstudio or publus or action in {'mangamillion-proto', 'mangaplus-proto', 'mangaplus-image', 'mangamee-proto',
                                'globalcomix-json', 'webcomic-json',
                                'native-series-json', 'native-series-html-api', 'native-series-rsc', 'inkstory-json',

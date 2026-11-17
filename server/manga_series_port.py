@@ -108,6 +108,7 @@ def series_api(host, path, query):
     from manga_voyceme import public_api as voyceme
     from manga_yarnovel import public_api as yarnovel
     from manga_zerosum import public_api as zerosum
+    from manga_ninth_routes import public_api as ninth
 
     if host == 'mangarw.com' and path == '/api/v1/chapters':
         return bool(re.fullmatch(r'id=[0-9]{1,18}', query))
@@ -124,7 +125,7 @@ def series_api(host, path, query):
                                                      ciao, dynasty, mokuro, toonkotsu, firecross, hakusensha,
                                                      drecomics, ebookrenta, mangaplaza, coronaex, publus, docomo, mangafive,
                                                      dmm, pixivcomic, bookwalker, mangalix, toonz, cubari, mangack, pornpics,
-                                                     japanese_readers))
+                                                     japanese_readers, ninth))
 
 
 def public_form(url, data, headers):
