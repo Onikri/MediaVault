@@ -16,6 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 REGISTER = ROOT / 'docs/native-source-inventory.csv'
 ACTIVATION = ROOT / 'server/manga_native_activation.json'
 LIVE = ('search', 'catalogue', 'metadata', 'chapters', 'pages')
+# Sources whose current route carries more than the direct adapter does:
+# manga_discovery searches them with the owner's Lib session, the Russian
+# alias resolution for MangaDex or their own dedicated search modules.
+HOLD_NAMES = frozenset({'MangaLib', 'HentaiLib', 'SlashLib', 'MangaDex', 'Senkognito', 'HentaiChan', 'HenChan',
+                        'HentaiChan.cc', 'Hitomi', 'HManga', 'ReManga', 'Remanga'})
 
 
 def main():
@@ -47,7 +52,7 @@ def main():
         writer = csv.DictWriter(file, fieldnames=fields, lineterminator='\n')
         writer.writeheader()
         writer.writerows(rows)
-    known = {row['source_id'] for row in rows}
+    known = {row['source_id'] for row in rows if row['source'] not in HOLD_NAMES}
     try:
         current = set(json.loads(ACTIVATION.read_text(encoding='utf-8'))['sourceIds'])
     except (OSError, ValueError, KeyError):
