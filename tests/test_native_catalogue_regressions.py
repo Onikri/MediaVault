@@ -46,6 +46,9 @@ class NativeCatalogueRegressionTests(TestCase):
             last = manga_native_sources.catalogue_job(source, {'type': 'bridge'}, 2)
         self.assertEqual((len(first['rows']), first['next']), (1, {'page': 2}))
         self.assertEqual((last['rows'], last['next']), ([], None))
+        pages = {source.ROOT + '/archive/': pager, source.ROOT + '/sort/newest/': full}
+        rows, more = source.catalogue(http, page=1, sort=source.index_sort)
+        self.assertEqual(([row['title'] for row in rows], more), (['Gallery'], False))
 
     def test_vocabulary_job_for_adapter_without_vocabulary_is_empty(self):
         bare = SimpleNamespace(NAME='Bare', ROOT='https://example.com')

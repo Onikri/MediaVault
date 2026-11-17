@@ -97,6 +97,9 @@ class Masonry:
             name = (anchor.get('title') or node_text(card.select_one('figcaption'))).strip()
             if match and name:
                 rows[match[1]] = self.row(name, match[1], self.image(card.select_one('img'), final))
+        if sort == 'archive' and page == 1 and not rows and not query and not tag:
+            # Joymii Hub's archive lists no galleries; its newest page still does.
+            return self.catalogue(http, 1, sort='updated')
         # Some archives keep a next link on pages without galleries.
         return list(rows.values()), bool(rows) and bool(soup.select_one('.pagination-a li.next'))
 
