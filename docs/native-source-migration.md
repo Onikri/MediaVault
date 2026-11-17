@@ -143,4 +143,32 @@ python scripts/probe-native-source-batch.py --ssh mediavault-vm --inactive --bat
 
 В пятой партии подготовлены 50 APK и 82 профиля. Реестр содержит WaManga, Tomilo-lib, AstraManga, NineGrid, Rawkuma, Rizz Comic, Weeb Central, INKRUSH, MangaTaro, InitManga, Renascans, Pepper&Carrot и остальные профили партии. Исторические исходники Anisa Scans и Hentai3z.CC соответствуют установленным APK.
 
-Прямой код есть у 659 из 725 APK и 1 516 из 1 640 профилей. После сквозной проверки на Oracle 17 ноября 2026 года в рабочем маршруте подключены 561 профиль, список ведётся в [manga_native_activation.json](../server/manga_native_activation.json). Четыре японских источника (FOD, Line Manga, Sokuyomi, SoraRaw) ходят через тот же японский маршрут, что и Suwayomi ([журнал](native-source-verification.md#японский-маршрут)). Ещё 23 APK без переноса имеют внешние блокеры, 43 APK не перенесены. Подробности в [журнале проверки](native-source-verification.md#девятая-партия).
+Прямой код есть у 663 из 725 APK и 1 520 из 1 640 профилей. После сквозной проверки на Oracle 17 ноября 2026 года в рабочем маршруте подключены 572 профиля, список ведётся в [manga_native_activation.json](../server/manga_native_activation.json). Четыре японских источника (FOD, Line Manga, Sokuyomi, SoraRaw) ходят через тот же японский маршрут, что и Suwayomi ([журнал](native-source-verification.md#японский-маршрут)). Оставшиеся 62 APK без прямого кода распределены по пакетам ниже.
+
+## Пакеты оставшихся расширений
+
+План отключения Suwayomi от 17 ноября 2026 года делит оставшиеся расширения на пакеты. У каждого пакета один исполнитель. Машиночитаемый список с ID профилей, требуемым транспортом и причиной лежит в [native-source-packages.json](native-source-packages.json). Поле `transport` объявляет, что нужно источнику: `plain` (обычный HTTP), `japan` (японский маршрут), `cloudflare-managed`, `cloudflare-block`, `cloudflare-js`, `turnstile`, `turnstile-token`, `ddos-guard`, `basedflare`, `clearance-token`, `waf-webview`, `webview-cookie`, `js-runtime`, `guest-account`, `cloudfront-403`, `user-server`, `login` или `dead`. Профили с защитой остаются неактивными до контракта серверного транспорта (агент B, сессия `suw-transport`).
+
+| Пакет | Исполнитель | APK | Профили | Содержание |
+| --- | --- | ---: | ---: | --- |
+| C0 | agent C | 351 | 948 | Профили с прямым кодом без живой активации, см. ниже |
+| C1 | agent C (эта сессия) | 12 | 16 | Открытые каталоги и веб-комиксы: Mehgazone, マンガ図書館Z, Pawchive, COMIC FUZ подключены. Hiveworks, Sunshine Butterfly, Philia Scans, InfinityScans, Project Suki, AllManga, Pixiv ждут переноса. Mangago заблокирован: ключ перестановки страниц вычисляется кодом `chapter.js` сайта, в сервере нет движка JS |
+| C2 | отдельная сессия, не начата | 15 | 15 | Японские магазины с бесплатными главами: GANMA!, Jump Toon, Piccoma, Mecha Comic, Manga Saison, Manga Kingdom, eBookJapan, Reader Store, U-NEXT, Young Jump+, Zebrack, Magazine Pocket, Ameba Manga, Music Book Japan (японский маршрут), MangaNo (анонимная регистрация Firebase каждый час, нужно решение владельца) |
+| C3 | отдельная сессия, не начата | 13 | 17 | Англоязычные издатели: BookWalker, INKR, J-Novel, K Manga, Kodansha, Manga UP!, Mangamo, Coolmic, emaqi, Omoi, Tapas, Comikey (5 профилей), WebNovel |
+| C4 | agent C после контракта транспорта B | 20 | 66 | Проверки Cloudflare, Turnstile, DDoS-Guard, BasedFlare, токены clearance: Kagane (18), OniSaga (8), Manhuarm (7), MangaFire (7, WebView WAF отдельной задачей), HDoujin (6), Lunar Manga (4), SchaleNetwork (3) и 13 сайтов с одним профилем |
+| C5 | agent C, ждёт данных владельца | 6 | 10 | Komga (3), LANraragi (2), Mango, StashApp — адрес и ключ сервиса пользователя. Madokami — вход (HTTP 401). Kyokotsu не отвечает ни напрямую, ни через Suwayomi |
+
+Эталон для сверки снят через установленные расширения (`probe-native-source-batch.py --suwayomi`). Каталог, точный поиск, оглавление, страницы и первое изображение прошли у 29 профилей. Остальные расширения упёрлись в таймаут Suwayomi (8 с), проверку браузера или собственную ошибку. Подробности в [журнале](native-source-verification.md#десятая-партия).
+
+### Адаптеры без живой активации (C0)
+
+Из 1 520 профилей с прямым кодом рабочий маршрут используют 572. Ещё 948 профилей из 351 APK живую активацию не прошли:
+
+| Состояние в реестре | Профили |
+| --- | ---: |
+| Код проверен локально, живой прогон не прошёл или не запускался | 808 |
+| Пройдена часть операций | 65 |
+| Внешний блокер | 47 |
+| Все операции проверены, источник оставлен на прежнем маршруте (`HOLD_NAMES`: MangaDex и Lib) | 28 |
+
+Крупнейшие группы: Manga Million (108), MangaDot (108), MangaDex (62), Madara (52), XCOMIC (44), Manga Ball (42), GalleryAdults (40), GlobalComix (34, нужен `GLOBALCOMIX_CLIENT_ID`), HentaiHand (33), Akuma (27), NamiComi (25), Comici Viewer (23). Повторный прогон этих профилей запускается ключом `--inactive` пакетного пробника, результат применяет `apply-native-probe.py`.

@@ -1,0 +1,862 @@
+{
+ "checkedAt": "2026-11-17",
+ "packages": {
+  "C1": "agent C (эта сессия)",
+  "C2": "отдельная сессия, не начата",
+  "C3": "отдельная сессия, не начата",
+  "C4": "agent C после контракта транспорта B",
+  "C5": "agent C; ждёт данных владельца"
+ },
+ "extensions": [
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.allanime",
+   "name": "AllManga",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "pending",
+   "transport": "plain",
+   "note": "GraphQL mkissa.to; через Suwayomi страницы не уложились в таймаут",
+   "profiles": [
+    "4709139914729853090"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.comicfuz",
+   "name": "COMIC FUZ",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "live",
+   "transport": "plain",
+   "note": "Protobuf API, AES-CBC страниц; платные главы скрыты",
+   "profiles": [
+    "7341666123577520203"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.hiveworks",
+   "name": "Hiveworks Comics",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Каталог-хаб, комиксы на собственных доменах ComicControl",
+   "profiles": [
+    "6620819060709781499"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.infinityscans",
+   "name": "InfinityScans",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "pending",
+   "transport": "webview-cookie",
+   "note": "Перехватчик WebView для cookie сессии, RSC-страницы",
+   "profiles": [
+    "7769612119788415733"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.mangago",
+   "name": "Mangago",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "blocked",
+   "transport": "js-runtime",
+   "note": "Ключ перестановки вычисляется кодом chapter.js сайта (QuickJS), в сервере нет движка JS",
+   "profiles": [
+    "2470059397662084186"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.mehgazone",
+   "name": "Mehgazone",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "live",
+   "transport": "plain",
+   "note": "WordPress REST по поддоменам; посты Patreon исключены",
+   "profiles": [
+    "2698265163169248715"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.pawchive",
+   "name": "Pawchive",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "live",
+   "transport": "plain",
+   "note": "API семейства Kemono; файлы на шардах nN, предпросмотр как запасной вариант",
+   "profiles": [
+    "4284527942812494681"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.philiascans",
+   "name": "Philia Scans",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "pending",
+   "transport": "plain",
+   "note": "API с ключами страниц и HMAC-перехватчиком изображений",
+   "profiles": [
+    "5404809838386240671"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.pixiv",
+   "name": "Pixiv",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Публичный ajax; R18 и часть серий требуют вход",
+   "profiles": [
+    "2134233417037741790",
+    "4964829535501435742",
+    "5123765142540943901",
+    "6934645150441404855",
+    "7732030561788182970"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.projectsuki",
+   "name": "Project Suki",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Большой HTML-разборщик; через Suwayomi поиск возвращает ошибку",
+   "profiles": [
+    "8965918600406781666"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.sunshinebutterflyscans",
+   "name": "Sunshine Butterfly Scans",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "pending",
+   "transport": "plain",
+   "note": "JSON-список глав; страницы через Suwayomi тоже не открылись",
+   "profiles": [
+    "9191177608229286435"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.mangatoshokanz",
+   "name": "マンガ図書館Z",
+   "package": "C1",
+   "owner": "agent C (эта сессия)",
+   "state": "live",
+   "transport": "plain",
+   "note": "Перестановка плиток virgo; R18-зеркало требует cookie возраста",
+   "profiles": [
+    "7564150377964448106"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.amebamanga",
+   "name": "Ameba Manga",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "2623577517578458051"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.ebookjapan",
+   "name": "eBookJapan",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "124967435702149192"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.ganma",
+   "name": "GANMA!",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "8045942616403978870"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.jumptoon",
+   "name": "Jump Toon",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "2618336401735517644"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.magazinepocket",
+   "name": "Magazine Pocket",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "583369548372015159"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.mangakingdom",
+   "name": "Manga Kingdom",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "3806352284314527898"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.mangasaison",
+   "name": "Manga Saison",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "7468001507218227155"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.mangano",
+   "name": "MangaNo",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "guest-account",
+   "note": "Каждый час анонимная регистрация Firebase (accounts:signUp); нужно решение владельца",
+   "profiles": [
+    "7717838940254847800"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.mechacomic",
+   "name": "Mecha Comic",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "4109851891728963895"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.musicbookjp",
+   "name": "Music Book Japan",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "japan",
+   "note": "Только из Японии (oversea.html с Oracle)",
+   "profiles": [
+    "4867228037042567585"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.piccoma",
+   "name": "Piccoma",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "7159690625157327655"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.readerstore",
+   "name": "Reader Store",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "424606783143704524"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.unext",
+   "name": "U-NEXT",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "1896940876613282856"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.ynjn",
+   "name": "Young Jump+",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "3322701627784242064"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ja.zebrack",
+   "name": "Zebrack",
+   "package": "C2",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Японский магазин: бесплатные главы, защита изображений",
+   "profiles": [
+    "1426538841423697673"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.bookwalker",
+   "name": "BookWalker",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "2744810059574599668"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.comikey",
+   "name": "Comikey",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "374080003312345029",
+    "1684620622390751911",
+    "2769857481066602061",
+    "4174862482785095737",
+    "4923846262931005728"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.coolmic",
+   "name": "Coolmic",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "5279120461134453793"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.emaqi",
+   "name": "emaqi",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "3383118804501081522"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.inkr",
+   "name": "INKR",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "6949560025265725268"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.jnovel",
+   "name": "J-Novel",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "2482510125735992610"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.kmanga",
+   "name": "K Manga",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "8143442163119480220"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.kodansha",
+   "name": "Kodansha",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "8879500923091081231"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.mangaup",
+   "name": "Manga UP!",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "7689478295161479290"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.mangamo",
+   "name": "Mangamo",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "6458420328066857684"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.azuki",
+   "name": "Omoi",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "8195282477201261072"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.tapastic",
+   "name": "Tapas",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "5554748812413853237"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.webnovel",
+   "name": "WebNovel",
+   "package": "C3",
+   "owner": "отдельная сессия, не начата",
+   "state": "pending",
+   "transport": "plain",
+   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "profiles": [
+    "4081135203808920563"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.batcave",
+   "name": "BatCave",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-managed",
+   "note": "Cloudflare «Just a moment» (403)",
+   "profiles": [
+    "7422099479605463706"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.coffeemangaunoriginal",
+   "name": "Coffee Manga (Unoriginal)",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "turnstile-token",
+   "note": "Страницы после первой выдаются по токену Turnstile (WebView reader.js)",
+   "profiles": [
+    "2571489285618757730"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.comix",
+   "name": "Comix",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-block",
+   "note": "Cloudflare «Attention Required» (403)",
+   "profiles": [
+    "7537715367149829912"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.deviantart",
+   "name": "DeviantArt",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudfront-403",
+   "note": "CloudFront 403 для адреса Oracle",
+   "profiles": [
+    "5211324870873630158"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.doujinio",
+   "name": "Doujin.io - J18",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "basedflare",
+   "note": "BasedFlare bot-check (403)",
+   "profiles": [
+    "2738692054520731722"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.hdoujin",
+   "name": "HDoujin",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "clearance-token",
+   "note": "Токен clearance из браузера",
+   "profiles": [
+    "2220258354919443918",
+    "2603728112834757616",
+    "3677056573528884471",
+    "4628927315861565171",
+    "6580865433441960135",
+    "8377507648400729012"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.kagane",
+   "name": "Kagane",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-managed",
+   "note": "Cloudflare: зеркала и проверка браузера",
+   "profiles": [
+    "253007717341293260",
+    "538178062602483073",
+    "1008382500205235233",
+    "1157710231944574609",
+    "1471532184931679941",
+    "1720654391539317254",
+    "2006734767320263070",
+    "3249170492103400191",
+    "3281832279225761326",
+    "4024736764982024684",
+    "6053574930456302165",
+    "6291099060619088371",
+    "7702420917357144001",
+    "7861921616625741963",
+    "8751507648303673848",
+    "8791972639916297003",
+    "8929946374100381402",
+    "9016992318016575502"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.likemanga",
+   "name": "LikeManga",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-managed",
+   "note": "Cloudflare «Just a moment» на mgread.io (403)",
+   "profiles": [
+    "6236979603959140497"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.lunaranime",
+   "name": "Lunar Manga",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-managed",
+   "note": "Cloudflare challenge-platform; через Suwayomi страницы не открылись",
+   "profiles": [
+    "2848743514286834588",
+    "5813468393870703615",
+    "7328677245254276970",
+    "8130073422666383933"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.mangacloud",
+   "name": "MangaCloud",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "turnstile",
+   "note": "Turnstile на главной",
+   "profiles": [
+    "8787213233662904706"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.mangafire",
+   "name": "MangaFire",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "waf-webview",
+   "note": "Cloudflare «Attention Required» и WAF-cookie waf_pass из WebView; отдельная задача адаптера",
+   "profiles": [
+    "524110931382140732",
+    "758400875161895515",
+    "3849324770075062403",
+    "6084907896154116083",
+    "6228021941803932286",
+    "7842137233968841729",
+    "8098539940032331958"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.manhuarm",
+   "name": "Manhuarm",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-managed",
+   "note": "Cloudflare «Just a moment» (403)",
+   "profiles": [
+    "797946349800265191",
+    "5618121635049025093",
+    "6421419166134585378",
+    "7611240442736670513",
+    "7690709834650404718",
+    "8537659881437820380",
+    "8547169224512757621"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.ko.sbxh",
+   "name": "Newtoki (SBXH)",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-managed",
+   "note": "Newtoki: смена доменов и Cloudflare",
+   "profiles": [
+    "5836877907605844302"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.onisaga",
+   "name": "OniSaga",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-managed",
+   "note": "Cloudflare «Just a moment» (403)",
+   "profiles": [
+    "2644848669022862951",
+    "3793216737618759530",
+    "5205171098698400162",
+    "5348722599884573141",
+    "5431409047697637162",
+    "5869426157802671832",
+    "8616495687402045560",
+    "9030342464252097773"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.koharu",
+   "name": "SchaleNetwork",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "clearance-token",
+   "note": "Токен clearance из браузера",
+   "profiles": [
+    "713326856395200688",
+    "1484902275639232927",
+    "8839994618804276749"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.spyfakku",
+   "name": "SpyFakku",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-managed",
+   "note": "Через Suwayomi проходит с решателем, прямой клиент получает проверку",
+   "profiles": [
+    "6202325652827735606"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.templescan",
+   "name": "Temple Scan",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "turnstile",
+   "note": "Страница /challenge с Turnstile",
+   "profiles": [
+    "4210732525216763379"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.theblank",
+   "name": "The Blank",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-block",
+   "note": "Cloudflare «Attention Required» (403)",
+   "profiles": [
+    "7514642512113015247"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.yabai",
+   "name": "Yabai",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "ddos-guard",
+   "note": "DDoS-Guard (403)",
+   "profiles": [
+    "1928970119194827182"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.yakshacomics",
+   "name": "YakshaComics",
+   "package": "C4",
+   "owner": "agent C после контракта транспорта B",
+   "state": "blocked",
+   "transport": "cloudflare-js",
+   "note": "JS-проверка Cloudflare",
+   "profiles": [
+    "4871612284225100668"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.komga",
+   "name": "Komga",
+   "package": "C5",
+   "owner": "agent C; ждёт данных владельца",
+   "state": "blocked",
+   "transport": "user-server",
+   "note": "Нужен адрес и вход пользовательского Komga",
+   "profiles": [
+    "4508733312114627536",
+    "5132811728275817394",
+    "8074481155021144106"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.kyokotsu",
+   "name": "Kyokotsu",
+   "package": "C5",
+   "owner": "agent C; ждёт данных владельца",
+   "state": "blocked",
+   "transport": "dead",
+   "note": "Не отвечает ни напрямую, ни через Suwayomi (таймаут соединения)",
+   "profiles": [
+    "6496583791379304482",
+    "6733343923088422754"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.lanraragi",
+   "name": "LANraragi (1)",
+   "package": "C5",
+   "owner": "agent C; ждёт данных владельца",
+   "state": "blocked",
+   "transport": "user-server",
+   "note": "Нужен адрес и ключ пользовательского LANraragi",
+   "profiles": [
+    "4482480338677079857",
+    "6188058704030343819"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.en.madokami",
+   "name": "Madokami",
+   "package": "C5",
+   "owner": "agent C; ждёт данных владельца",
+   "state": "blocked",
+   "transport": "login",
+   "note": "HTTP 401 без учётной записи",
+   "profiles": [
+    "7291521832235473745"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.mango",
+   "name": "Mango",
+   "package": "C5",
+   "owner": "agent C; ждёт данных владельца",
+   "state": "blocked",
+   "transport": "user-server",
+   "note": "Нужен адрес и вход пользовательского Mango",
+   "profiles": [
+    "2882993841250976719"
+   ]
+  },
+  {
+   "apk": "eu.kanade.tachiyomi.extension.all.stashapp",
+   "name": "StashApp",
+   "package": "C5",
+   "owner": "agent C; ждёт данных владельца",
+   "state": "blocked",
+   "transport": "user-server",
+   "note": "Нужен адрес и ключ пользовательского StashApp",
+   "profiles": [
+    "4332882684116196542"
+   ]
+  }
+ ]
+}

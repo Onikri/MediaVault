@@ -46,6 +46,7 @@ def register_api(api):
 def _load():
     # Importing the modules registers their routes.
     import manga_ninth_sources  # noqa: F401
+    import manga_tenth_sources  # noqa: F401
 
 
 def prepare(action, value, method, data, headers):
