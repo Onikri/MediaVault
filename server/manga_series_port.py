@@ -25,15 +25,20 @@ def series_api(host, path, query):
     from manga_asura_native import public_api as asura
     from manga_booru_pools import public_api as booru
     from manga_ciaoplus import public_api as ciao
+    from manga_clipstudio_sources import public_api as firecross
     from manga_comicklive import public_api as comicklive
+    from manga_coronaex import public_api as coronaex
     from manga_corocoro import public_api as corocoro
     from manga_archive_ports import public_api as archives
     from manga_catalogue_api_ports import public_api as catalogue_api
     from manga_creator_feeds import public_api as creator_feed
     from manga_direct_catalogues import public_api as direct_html
     from manga_direct_payloads import public_api as payloads
+    from manga_drecomics import public_api as drecomics
     from manga_dynasty import public_api as dynasty
+    from manga_ebookrenta import public_api as ebookrenta
     from manga_gallery_archive_ports import public_api as gallery_archives
+    from manga_hakusensha import public_api as hakusensha
     from manga_honeytoon_native import public_api as honeytoon
     from manga_html_families import public_api as html
     from manga_html_archives import public_api as html_archives
@@ -51,6 +56,7 @@ def series_api(host, path, query):
     from manga_mangabox import public_api as mangabox
     from manga_mangameets import public_api as mangameets
     from manga_mangaone import public_api as mangaone
+    from manga_mangaplaza import public_api as mangaplaza
     from manga_park_publisher import public_api as manga_park
     from manga_manta_native import public_api as manta
     from manga_luscious_native import public_api as luscious
@@ -103,7 +109,8 @@ def series_api(host, path, query):
                                                      seventh, rayuba, zerosum, rei, rawkuma_me, korean_seventh, ninehentai,
                                                      comicklive, jjcos, twicomi, booru, ososedki, honeytoon, voyceme,
                                                      mangameets, manga_park, mangabox, mangaone, asura, lusttoon, corocoro,
-                                                     ciao, dynasty, mokuro, toonkotsu))
+                                                     ciao, dynasty, mokuro, toonkotsu, firecross, hakusensha,
+                                                     drecomics, ebookrenta, mangaplaza, coronaex))
 
 
 def public_form(url, data, headers):

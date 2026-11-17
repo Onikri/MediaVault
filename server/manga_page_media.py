@@ -161,6 +161,7 @@ def fetch_page(http, reference, headers):
         response, _ = http._open(url, headers=headers)
         return validated_image(decode_image(read_image(http, response), key))
     if action == 'speedbinb-image':
+        from manga_clipstudio import ComicPage, EpubPage
         from manga_honeytoon_native import HoneytoonPage, merge_strips
         from manga_mangaplus import MangaPlusPage
         from manga_manhwazone import ManhwaZonePage
@@ -172,7 +173,7 @@ def fetch_page(http, reference, headers):
 
         url, referer, layout = grant(target)
         headers = {'Referer': referer}
-        if isinstance(layout, PackedWebp):
+        if isinstance(layout, (PackedWebp, ComicPage, EpubPage)):
             return validated_image(layout.fetch(http, referer))
         if isinstance(layout, HoneytoonPage):
             response, _ = http._open(url, headers=headers, action='honeytoon-sync')

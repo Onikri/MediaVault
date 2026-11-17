@@ -25,7 +25,7 @@ COORD = re.compile(r'i:(\d{1,5}),(\d{1,5})\+(\d{1,5}),(\d{1,5})>(\d{1,5}),(\d{1,
 MARKER = 'mv_speedbinb='
 MAX_PAGES = 1500
 READER_HOSTS = ('booklive.jp', 'cmoa.jp', 'kirapo.jp', 'futabanet.jp', 'ohtabooks.com',
-                'yondemill.jp', 'yanmaga.jp', 'yomonga.com')
+                'yondemill.jp', 'yanmaga.jp', 'yomonga.com', 'mangaplaza.com')
 ALLOWED_INFO = re.compile(r'/[^?#]*bibGetCntntInfo(?:\.php)?')
 U_KEYS = tuple(f'u{i}' for i in range(10))
 GRANTS = OrderedDict()

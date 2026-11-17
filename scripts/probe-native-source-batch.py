@@ -28,15 +28,22 @@ def candidates():
     import manga_comicklive
     import manga_japanese_next
     import manga_asura_native
+    import manga_alphapolis
     import manga_blacktoon
     import manga_ciaoplus
+    import manga_clipstudio_sources
     import manga_corocoro
+    import manga_coronaex
     import manga_dle_readers
     import manga_dynasty
+    import manga_drecomics
+    import manga_ebookrenta
+    import manga_flower_comics
     import manga_lusttoon
     import manga_mangabox
     import manga_mangameets
     import manga_mangaone
+    import manga_mangaplaza
     import manga_momonga
     import manga_mokuro
     import manga_nicomanga
@@ -45,6 +52,8 @@ def candidates():
     import manga_toonkotsu
     import manga_fourkhd
     import manga_honeytoon_native
+    import manga_hakusensha
+    import manga_honto
     import manga_jjcos
     import manga_multporn
     import manga_ososedki
@@ -161,7 +170,10 @@ def candidates():
                   manga_park_publisher.SOURCES, manga_toomics.SOURCES, manga_mangaone.SOURCES,
                   manga_mangabox.SOURCES, manga_asura_native.SOURCES, manga_corocoro.SOURCES,
                   manga_ciaoplus.SOURCES, manga_lusttoon.SOURCES, manga_blacktoon.SOURCES, manga_nicomanga.SOURCES,
-                  manga_dle_readers.SOURCES, manga_dynasty.SOURCES, manga_mokuro.SOURCES, manga_toonkotsu.SOURCES):
+                  manga_dle_readers.SOURCES, manga_dynasty.SOURCES, manga_mokuro.SOURCES, manga_toonkotsu.SOURCES,
+                  manga_clipstudio_sources.SOURCES, manga_honto.SOURCES, manga_hakusensha.SOURCES,
+                  manga_mangaplaza.SOURCES, manga_ebookrenta.SOURCES, manga_drecomics.SOURCES,
+                  manga_flower_comics.SOURCES, manga_alphapolis.SOURCES, manga_coronaex.SOURCES):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in group)
     standby = native.manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby
