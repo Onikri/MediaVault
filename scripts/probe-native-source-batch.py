@@ -53,7 +53,7 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
         for row in rows:
             target = adapter.site_link(row.get('url'))
             if (str(row.get('sourceId')) != adapter.SOURCE_ID or not row.get('title') or not target
-                    or not adapter.TITLE_PATH.fullmatch(urlsplit(target).path)):
+                    or not matches_route(adapter, target, 'title')):
                 return {**result, 'status': 'identity_mismatch', 'phase': phase}
         result['catalogue'] = True
         sample = next((row for row in rows if 2 <= len(row['title']) <= 100), rows[0])
@@ -75,7 +75,7 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
                 return {**result, 'status': 'empty', 'phase': phase}
             for entry in episodes:
                 url = adapter.site_link(entry.get('url'))
-                if not url or not adapter.CHAPTER_PATH.fullmatch(urlsplit(url).path):
+                if not url or not matches_route(adapter, url, 'chapter'):
                     return {**result, 'status': 'identity_mismatch', 'phase': phase}
             result['chapters'] = True
             if check_pages:
@@ -129,6 +129,13 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
         return {**result, 'status': 'adapter_error', 'phase': phase, 'error_type': type(error).__name__}
     finally:
         http.close()
+
+
+def matches_route(adapter, url, kind):
+    matcher = getattr(adapter, 'is_' + kind, None)
+    if matcher is not None:
+        return matcher(url)
+    return bool(getattr(adapter, kind.upper() + '_PATH').fullmatch(urlsplit(url).path))
 
 
 def probe_suwayomi(source, check_search, check_chapters, check_pages):

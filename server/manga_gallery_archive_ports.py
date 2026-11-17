@@ -384,6 +384,9 @@ class Roku(SingleGallery):
     def title_for(self, url):
         return self.ROOT + urlsplit(url).path.rstrip('/')
 
+    def title_identity(self, value):
+        return super().title_identity(self.title_for(value))
+
     def image_style(self, node, base):
         match = re.search(r"""url\(['"]([^'"]+)['"]\)""", node.get('style', '')) if node else None
         return image_url(match[1], base) if match else ''

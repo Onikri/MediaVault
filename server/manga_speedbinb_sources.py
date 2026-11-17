@@ -306,6 +306,9 @@ class Gaugau(SpeedCatalogue):
     def title_for(self, url):
         return self.ROOT + '/list/work/' + self.chapter_key(url)
 
+    def title_identity(self, value):
+        return '/list/work/' + self.title_key(value)
+
     def title_document(self, http, url):
         target = self.ROOT + '/list/work/' + self.title_key(url) + '/episodes'
         return super().title_document(http, target)
