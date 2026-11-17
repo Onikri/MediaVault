@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from source_parser import PublicHttp, SourceError, public_url
 
 
-def document(http, host, endpoint, params=(), body=None, action=None):
+def document(http, host, endpoint, params=(), body=None, action=None, *, referer=None):
     target = host + endpoint + ('?' + urlencode(params) if params else '')
 
     def validate(value):
@@ -17,7 +17,7 @@ def document(http, host, endpoint, params=(), body=None, action=None):
     upstream = PublicHttp(validate=validate, timeout=http.timeout, deadline=http.deadline)
     try:
         kwargs = {'method': 'POST', 'data': body} if body is not None else {}
-        raw, final, _ = upstream.document(target, headers={'Referer': host + '/'}, action=action, **kwargs)
+        raw, final, _ = upstream.document(target, headers={'Referer': referer or host + '/'}, action=action, **kwargs)
         if final != target:
             raise SourceError('Издатель перенаправил запрос на другой маршрут.')
         return raw

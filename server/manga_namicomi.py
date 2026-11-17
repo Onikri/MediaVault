@@ -49,7 +49,7 @@ def public_access_form(url, body):
 
 def get(http, path, params=()):
     PACE.wait(http.deadline)
-    return mapping(json_data(document(http, API, path, params)))
+    return mapping(json_data(document(http, API, path, params, referer=ROOT + '/')))
 
 
 def regions(item, key):
@@ -83,7 +83,7 @@ def gate(http, ids):
         body = json.dumps({'entities': [{'entityId': id_, 'entityType': 'chapter'} for id_ in batch]},
                           separators=(',', ':')).encode()
         PACE.wait(http.deadline)
-        reply = json_data(document(http, API, '/gating/check', body=body, action='namicomi-access'))
+        reply = json_data(document(http, API, '/gating/check', body=body, action='namicomi-access', referer=ROOT + '/'))
         decisions = mapping(mapping(mapping(reply).get('data')).get('attributes')).get('map')
         decisions = mapping(decisions)
         if any(type(decisions.get(identity)) is not bool for identity in batch):
