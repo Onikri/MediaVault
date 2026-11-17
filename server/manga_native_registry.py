@@ -22,6 +22,7 @@ def profiles():
     import manga_pornpics
     import manga_sugocomics
     import manga_ninth_sources
+    import manga_tenth_sources
     import manga_mangalix
     import manga_toonz
     import manga_viz
@@ -184,7 +185,7 @@ def profiles():
                   manga_bookwalker_jp.SOURCES, manga_mangalix.SOURCES, manga_toonz.SOURCES, manga_cubari.SOURCES,
                   manga_mangahere.SOURCES, manga_mangack.SOURCES, manga_viz.SOURCES, manga_pornpics.SOURCES,
                   manga_akuma.SOURCES, manga_japanese_readers.SOURCES, manga_sugocomics.SOURCES,
-                  manga_ninth_sources.SOURCES):
+                  manga_ninth_sources.SOURCES, manga_tenth_sources.SOURCES):
         profiles.update((adapter.SOURCE_ID, adapter) for adapter in group)
     standby = manga_mangahub.MANGA_HERE
     profiles[standby.SOURCE_ID] = standby
