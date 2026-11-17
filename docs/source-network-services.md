@@ -29,6 +29,24 @@ and the server transport (agent B).
 `manga_network_routes.configuration()`, the manifest can switch to
 `jp-router` and the legacy alias can go after Suwayomi is removed.
 
+## Transport manifest
+
+The installer also writes `/data/source-transport.json` (importer `/data`,
+mode 0644, uid 1000, < 16 KB), which the server transport reads first:
+
+```json
+{"version": 1,
+ "japan": {"httpProxy": "http://jp-router:8080", "status": "http://jp-vpn:8090/status",
+           "hosts": ["comic-ryu.jp", "…the router whitelist, same as gateway.HOSTS…"]},
+ "solver": {"url": "http://byparr:8191/v1", "maxTimeout": 60}}
+```
+
+`hosts` is the router's whitelist. A source declared Japan-only whose host is
+not listed must fail with an explicit error, because the router would send it
+out directly. The whitelist stays while Suwayomi runs: Suwayomi sends all of
+its traffic to the router over SOCKS. After Suwayomi is removed, an all-Japan
+port can be added and `hosts` set to `null`.
+
 ## Routing semantics
 
 - The router decides per destination host (the CONNECT/SOCKS target). Hosts in
@@ -163,6 +181,22 @@ separately and drops the tunnel only after 6 consecutive failures; a second
 resolver (`8.8.8.8`) was added; failed endpoints are skipped for 30 min; the feed
 is refreshed when older than 15 min; the last good endpoint is retried first;
 a lost `tun0` is reported at once. MTU was not the cause (no evidence in the logs).
+
+## Live on 2026-11-17 (production, after migration at 23:23 UTC)
+
+- `mediavault-jp-vpn`, `mediavault-jp-router` and `mediavault-byparr` are `healthy` in
+  project `mediavault-network`. `oracle-suwayomi-jp-vpn-1` and `oracle-suwayomi-jp-router-1`
+  have been removed and Suwayomi's `suwayomi.yaml` no longer contains them. Suwayomi was
+  not restarted.
+- From the importer: `jp-router` and `suwayomi-jp-router` → `soraraw.com` / `mangafire.to`
+  `123.1.82.88 JP`. `www.cloudflare.com` → `141.144.225.42 DE` (direct). FOD 301, LINE Manga 200,
+  Sokuyomi 200, SoraRaw 200.
+- Byparr with `X-Proxy-Server: http://jp-router:8080` → `123.1.82.88 JP` (6.0 s). Without the
+  header → `141.144.225.42 DE` (6.4 s).
+- Suwayomi through the new router, without a restart: Big Comics and Comic Ryu searches
+  for `の` returned 24 titles each (6.4 s and 4.3 s).
+- Rotation seen from the importer: `ProxyError … 503` in 3–6 ms for 14 s. Then the new
+  exit `27.92.196.60`; `/status` generation 1 → 2.
 
 ## Measured on 2026-11-17 (isolated network, no Suwayomi, no importer)
 
