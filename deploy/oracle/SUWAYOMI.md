@@ -8,9 +8,17 @@ Upstream: https://github.com/Suwayomi/Suwayomi-Server (MPL-2.0; Android compatib
 
 ### Publisher-scoped Japanese egress
 
-`sudo python3 deploy/oracle/enable-suwayomi-japan.py` installs a private SOCKS5
-router and a separate OpenVPN network namespace. Suwayomi's native SOCKS setting
-points at `suwayomi-jp-router:1080`. GOST routes only Comic Ryu, Young Champion,
+Since 2026-11-17 the Japan gateway and its router are MediaVault services, not
+part of Suwayomi: `sudo python3 deploy/oracle/install-network-services.py`
+runs them as the Compose project `mediavault-network` (`deploy/oracle/network/`,
+installed into `/opt/mediavault-network`). The names Suwayomi and the importer
+use (`suwayomi-jp-router:1080` SOCKS, `:8080` HTTP CONNECT) remain network
+aliases. The contract (hosts, exit identity, failure behaviour, Byparr API) is
+in `docs/source-network-services.md`. The rest of this section is the original
+2026-11-11 design and verification; paths under `/opt/mediavault-suwayomi/japan-egress`
+are the retired location.
+
+GOST routes only Comic Ryu, Young Champion,
 Manga Zegra, Big Comics, the other configured Comici publishers and the listed
 country-limited Japanese catalogues through the Japanese gateway;
 all other destinations remain direct. Neither service publishes a host port.
@@ -21,18 +29,12 @@ not an unverified open SOCKS list. The gateway fetches its public feed, consider
 only Japanese endpoints, rebuilds an allowlisted configuration, verifies the
 server certificate/hostname and HTTPS normally, checks the exit country and
 publisher search JSON, and tries another endpoint after a failure. It retains
-the last working public profile privately under
-`/opt/mediavault-suwayomi/japan-egress/.codex-local/state/`. GOST 3.3.3 comes from
+the last working public profile privately in its state directory. GOST 3.3.3 comes from
 the [official release](https://github.com/go-gost/gost/releases/tag/v3.3.3), with
 an ARM64 archive SHA256 pinned in the Dockerfile. The unprivileged SOCKS worker
 has an owner-based firewall rule prohibiting public egress outside `tun0`,
 including during reconnection. Readiness/liveness does not grant access to paid
 or login-only chapters. Free volunteer relays can disappear and provide no SLA.
-
-Installation backs up the existing Compose/config, checks active imports,
-preserves the private configuration fingerprints and recreates only the source
-service and these two gateways. A failure restores the previous settings and
-image references. Private backups/logs live inside the gateway's `.codex-local`.
 
 Live Oracle verification on 2026-11-11: direct publisher searches returned403;
 the Japanese route returned200 JSON for all four. Actual **Suwayomi** searches
@@ -125,6 +127,11 @@ After the existing importer has been updated to backend v14, the maintainer runs
 No host port or admin UI is exposed. Basic authentication is required internally. Credentials are generated on the VM in `/data/suwayomi-auth.json`, owned by UID1000 with mode0600. Suwayomi gets its own data directory, **not** Drive credentials or importer data. JVM heap768MiB, container limit2304MiB/1CPU, source concurrency2; automatic downloads and whole-library updates are disabled. The official image launcher enables bundled ARM64 KCEF and Xvfb, which LibGroup uses even when reading browser storage for a public request. Challenge-solving services are disabled on a fresh installation; the optional private solver below enables them. Actual account/subscription requirements remain distinct from a broken runtime.
 
 ### Private FlareSolverr
+
+Byparr now runs in the `mediavault-network` project as `mediavault-byparr`
+(alias `byparr`, same pinned image); see `docs/source-network-services.md` for
+the commands it actually supports. `enable-suwayomi-flaresolverr.py --engine byparr`
+adopts that existing container and only changes Suwayomi's solver settings.
 
 `sudo python3 deploy/oracle/enable-suwayomi-flaresolverr.py` installs the official
 FlareSolverr v3.5.2 ARM64 image pinned by digest. It joins the existing private

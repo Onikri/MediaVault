@@ -1,0 +1,106 @@
+# MediaVault source network services: Japan VPN gateway, its domain router
+# and the Byparr challenge solver. A Compose project of its own
+# (`mediavault-network`), independent of Suwayomi: none of these services
+# depends on it, mounts its data or reads its settings. They join the
+# importer's private network so the importer reaches them by name; no host
+# port is published. Installed and migrated by deploy/oracle/install-network-services.py
+# into /opt/mediavault-network (the .env there pins JP_GATEWAY_TAG).
+# Contract for clients: docs/source-network-services.md.
+name: mediavault-network
+
+x-gateway: &gateway
+  image: mediavault-jp-gateway:${JP_GATEWAY_TAG:?run install-network-services.py}
+  restart: unless-stopped
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  pids_limit: 64
+  cpus: 0.3
+  logging:
+    driver: json-file
+    options: {max-size: 5m, max-file: "2"}
+
+services:
+  jp-vpn:
+    <<: *gateway
+    build: {context: ./jp-gateway}
+    container_name: mediavault-jp-vpn
+    cap_add: [NET_ADMIN, SETUID, SETGID, KILL]
+    devices: ["/dev/net/tun:/dev/net/tun"]
+    # Both resolvers are reached through the tunnel (VPN Gate pushes
+    # redirect-gateway), so answers are Japanese; the second is a fallback.
+    dns: [1.1.1.1, 8.8.8.8]
+    mem_limit: 128m
+    volumes: ["./state/jp:/state"]
+    tmpfs: ["/tmp:size=16m", "/run:size=4m"]
+    healthcheck:
+      test: [CMD, python, /app/gateway.py, healthcheck]
+      interval: 30s
+      timeout: 5s
+      start_period: 300s
+      retries: 3
+    networks:
+      sources:
+        aliases: [jp-vpn, suwayomi-jp-vpn]
+
+  jp-router:
+    <<: *gateway
+    container_name: mediavault-jp-router
+    user: "65534:65534"
+    mem_limit: 64m
+    environment: {HOME: /tmp}
+    tmpfs: ["/tmp:size=4m,uid=65534,gid=65534,mode=0700"]
+    command: [/usr/local/bin/gost, -C, /app/router.json]
+    volumes: ["./jp-gateway/router.json:/app/router.json:ro"]
+    healthcheck:
+      test: [CMD, python, -c, "import socket;[socket.create_connection(('127.0.0.1',p),3).close() for p in (1080,8080)]"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      sources:
+        # suwayomi-jp-router stays as an alias: Suwayomi's SOCKS setting and
+        # /data/manga-source-routes.json (httpProxy) use that name.
+        aliases: [jp-router, suwayomi-jp-router]
+
+  byparr:
+    # Byparr 3.1.1 (ARM64), upstream revision b041dd2998110fc61789ae65e2506bd5b79edba5.
+    image: ghcr.io/thephaseless/byparr@sha256:c66fa161187b8fa527bfad7eefa2647ea1c553f77df68cbffd6fe83366d1787b
+    container_name: mediavault-byparr
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    mem_limit: 2560m
+    memswap_limit: 2560m
+    cpus: 1.0
+    pids_limit: 1024
+    shm_size: 512m
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=1g,mode=1777"]
+    volumes: ["./byparr:/config"]
+    environment:
+      LOG_LEVEL: info
+      LOG_HTML: "false"
+      TZ: Etc/UTC
+      BROWSER_TIMEZONE: Europe/Berlin
+      BROWSER_LOCALE: en-US
+    # The image's own check calls /health, which launches a browser for
+    # google.com every time; /docs proves the API is serving without that.
+    healthcheck:
+      test: [CMD, curl, -fsS, -o, /dev/null, "http://127.0.0.1:8191/docs"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+    networks:
+      sources:
+        aliases: [byparr]
+
+networks:
+  sources:
+    # The importer's private network (created by its Compose project).
+    name: ${SOURCES_NETWORK:-oracle_default}
+    external: true
