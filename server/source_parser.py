@@ -64,7 +64,7 @@ class SourceChallengeError(SourceAccessError):
 
     def __init__(self, message='Источник требует проверку браузера.', *, solver='none'):
         super().__init__(message)
-        # none | unavailable | failed | busy | budget | cooldown | rejected
+        # none | unavailable | timeout | failed | busy | budget | cooldown | rejected
         self.solver = solver
 
 

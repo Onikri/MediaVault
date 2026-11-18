@@ -95,7 +95,7 @@ with http.scope(adapter.SOURCE_ID, 'chapters'):
 
 | Статус | Класс | Когда |
 | --- | --- | --- |
-| `challenge` | `SourceChallengeError(SourceAccessError)` | Проверка не пройдена. Поле `solver`: `none` (решатель не объявлен), `unavailable`, `failed`, `busy`, `budget`, `cooldown`, `rejected`. |
+| `challenge` | `SourceChallengeError(SourceAccessError)` | Проверка не пройдена. Поле `solver`: `none` (решатель не объявлен), `unavailable` (нет соединения с Byparr), `timeout` (Byparr не успел, он общий и занят), `failed`, `busy`, `budget`, `cooldown`, `rejected`. |
 | `rate_limited` | `SourceRateLimitError` | HTTP 429, `retry_after` в секундах. |
 | `region_blocked` | `SourceRegionError(SourceAccessError)` | HTTP 451, Cloudflare 1009, страница о недоступности в регионе. На ответах 2xx текст о регионе не проверяется. |
 | `paid_chapter` | `SourcePaidError(SourceAccessError)` | В ответе `requires_subscription`, `subscription_required`, `requires_purchase` или `is_paid_locked`. |
