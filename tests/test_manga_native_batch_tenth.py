@@ -29,7 +29,7 @@ def inventory():
 class TenthBatchTests(TestCase):
     def test_profiles_match_the_installed_inventory(self):
         rows = inventory()
-        self.assertEqual(len(manga_tenth_sources.SOURCES), 4)
+        self.assertEqual(len(manga_tenth_sources.SOURCES), 14)
         for adapter in manga_tenth_sources.SOURCES:
             row = rows[adapter.SOURCE_ID]
             self.assertEqual((adapter.NAME, adapter.LANGUAGE), (row['source'], row['language']))

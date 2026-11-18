@@ -3,7 +3,7 @@
  "packages": {
   "C1": "agent C (эта сессия)",
   "C2": "отдельная сессия, не начата",
-  "C3": "отдельная сессия, не начата",
+  "C3": "сессия C3 (loving-varahamihira)",
   "C4": "agent C после контракта транспорта B",
   "C5": "agent C; ждёт данных владельца"
  },
@@ -340,10 +340,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.bookwalker",
    "name": "BookWalker",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "blocked",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "Гостю нет бесплатных вышедших глав (0 из 42 проверенных серий: платные или предзаказ), ReadService/Open для остальных требует покупку; Suwayomi тоже падает на оглавлении",
    "profiles": [
     "2744810059574599668"
    ]
@@ -352,10 +352,10 @@
    "apk": "eu.kanade.tachiyomi.extension.all.comikey",
    "name": "Comikey",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
-   "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "blocked",
+   "transport": "app-check",
+   "note": "Список страниц выдаёт только читалка в WebView с токеном Firebase App Check (reCAPTCHA Enterprise); обход проверки ботов не делаем, Suwayomi тоже не открывает страницы",
    "profiles": [
     "374080003312345029",
     "1684620622390751911",
@@ -368,10 +368,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.coolmic",
    "name": "Coolmic",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "Гостевой CSRF и /decryption_keys, PBKDF2 + AES-CBC страниц; только бесплатные эпизоды",
    "profiles": [
     "5279120461134453793"
    ]
@@ -380,10 +380,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.emaqi",
    "name": "emaqi",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "GraphQL, RSA-OAEP ключ страниц, AES-GCM/CBC; бесплатные главы и пробные тома",
    "profiles": [
     "3383118804501081522"
    ]
@@ -392,10 +392,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.inkr",
    "name": "INKR",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "icq/icd API, статический AES-ключ .ikc; только free/ad главы, explicit скрыты",
    "profiles": [
     "6949560025265725268"
    ]
@@ -404,10 +404,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.jnovel",
    "name": "J-Novel",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "RSC и анонимный манифест E4P (RC4/Blowfish/ChaCha8, XEBP); только preview-части",
    "profiles": [
     "2482510125735992610"
    ]
@@ -416,10 +416,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.kmanga",
    "name": "K Manga",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "Подписанные X-Kmanga-Hash запросы гостя, сборка плиток 4x4; только бесплатные эпизоды",
    "profiles": [
     "8143442163119480220"
    ]
@@ -428,10 +428,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.kodansha",
    "name": "Kodansha",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "API Azuki, XOR 174 страниц; только главы в бесплатном окне",
    "profiles": [
     "8879500923091081231"
    ]
@@ -440,10 +440,10 @@
    "apk": "eu.kanade.tachiyomi.extension.all.mangaup",
    "name": "Manga UP!",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "Protobuf global-api без secret, AES-CBC страниц; только главы без цены",
    "profiles": [
     "7689478295161479290"
    ]
@@ -452,10 +452,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.mangamo",
    "name": "Mangamo",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
-   "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "blocked",
+   "transport": "firebase-anonymous",
+   "note": "Firestore и выдача страниц отвечают 403/401 без анонимного пользователя Firebase (accounts:signUp); создание учётной записи не включено без разрешения владельца",
    "profiles": [
     "6458420328066857684"
    ]
@@ -464,10 +464,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.azuki",
    "name": "Omoi",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "Каталог /discover, API Azuki, XOR 174; только бесплатные главы",
    "profiles": [
     "8195282477201261072"
    ]
@@ -476,10 +476,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.tapastic",
    "name": "Tapas",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "story-api и HTML; эпизоды free/unlocked, новеллы и платные скрыты",
    "profiles": [
     "5554748812413853237"
    ]
@@ -488,10 +488,10 @@
    "apk": "eu.kanade.tachiyomi.extension.en.webnovel",
    "name": "WebNovel",
    "package": "C3",
-   "owner": "отдельная сессия, не начата",
-   "state": "pending",
+   "owner": "сессия C3 (loving-varahamihira)",
+   "state": "live",
    "transport": "plain",
-   "note": "Англоязычный издатель: открытые и бесплатные главы",
+   "note": "/go/pcm с гостевым _csrfToken; только открытые гостю главы",
    "profiles": [
     "4081135203808920563"
    ]
