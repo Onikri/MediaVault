@@ -75,6 +75,13 @@ def classify(error):
     code = getattr(error, 'code', None)
     if code:
         return code
+    try:
+        from source_parser import source_status
+        status = source_status(error)
+        if status:
+            return status if isinstance(status, str) else status.get('status') or str(status)
+    except ImportError:
+        pass
     if isinstance(error, SourceRateLimitError):
         return 'rate-limit'
     if isinstance(error, SourceAccessError):
@@ -96,9 +103,18 @@ def direct_chain(sid, query, chapter_number, cbz):
     if adapter is None:
         return {'status': 'no-adapter'}
     steps, result = Steps(), {}
-    http = PublicHttp(timeout=(3, 15), deadline=time.monotonic() + 240)
+    http = PublicHttp(timeout=(3, 15), deadline=time.monotonic() + 240, source=sid, operation='search')
+
+    def scoped(operation, call):
+        # The same source/operation scope the production dispatchers set, so
+        # the transport applies this source's Japan exit or solver rule.
+        def run():
+            with http.scope(sid, operation):
+                return call()
+        return run
+
     try:
-        rows, _ = steps.run('search', lambda: adapter.catalogue(http, query=query))
+        rows, _ = steps.run('search', scoped('search', lambda: adapter.catalogue(http, query=query)))
         result['search_rows'] = len(rows)
         exact = [row for row in rows if norm(row.get('title')) == norm(query)
                  or any(norm(v) == norm(query) for v in row.get('aliases') or [])]
@@ -106,7 +122,7 @@ def direct_chain(sid, query, chapter_number, cbz):
             return summary(steps, {**result, 'status': 'no-exact-match', 'phase': 'search'})
         card = exact[0]
         result['title'] = card.get('title')
-        detail = steps.run('card', lambda: adapter.inspect(card['url'], http))
+        detail = steps.run('card', scoped('chapters', lambda: adapter.inspect(card['url'], http)))
         episodes = [e for e in detail.get('episodes') or [] if not e.get('locked')]
         result['chapters'] = len(detail.get('episodes') or [])
         result['open_chapters'] = len(episodes)
@@ -114,7 +130,7 @@ def direct_chain(sid, query, chapter_number, cbz):
             return summary(steps, {**result, 'status': 'no-chapters', 'phase': 'card'})
         target = pick(episodes, chapter_number, lambda e: e.get('number'))
         result['chapter_number'] = number(target.get('number'))
-        chapter = steps.run('open', lambda: adapter.inspect(target['url'], http))
+        chapter = steps.run('open', scoped('pages', lambda: adapter.inspect(target['url'], http)))
         pages = chapter.get('pages') or []
         result['page_count'] = len(pages)
         if not pages:
@@ -134,12 +150,12 @@ def direct_chain(sid, query, chapter_number, cbz):
             finally:
                 response.close()
 
-        raw = steps.run('first_image', lambda: fetch(pages[0]))
+        raw = steps.run('first_image', scoped('images', lambda: fetch(pages[0])))
         if not image_extension(bytes(raw[:32])):
             return summary(steps, {**result, 'status': 'not-image', 'phase': 'first_image'})
         result['first_image_bytes'] = len(raw)
         if cbz:
-            result.update(steps.run('cbz', lambda: build_cbz([raw] + [fetch(p) for p in pages[1:MAX_CBZ_PAGES]])))
+            result.update(steps.run('cbz', scoped('images', lambda: build_cbz([raw] + [fetch(p) for p in pages[1:MAX_CBZ_PAGES]]))))
         return summary(steps, {**result, 'status': 'passed'})
     except Exception as error:  # every failure is reported, never hidden as empty
         return summary(steps, {**result, 'status': 'error', 'phase': steps.phase, 'error': classify(error)})

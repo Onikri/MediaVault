@@ -452,6 +452,33 @@ class SolverTests(TransportCase):
         self.assertEqual(site.calls[-1]['method'], 'POST')
 
 
+class SlotTests(TransportCase):
+    def test_solver_slots_are_shared_through_file_locks(self):
+        try:
+            import fcntl  # noqa: F401
+        except ImportError:
+            self.skipTest('flock slots exist only on the Linux importer')
+        # Separate open files conflict under flock even inside one process,
+        # exactly as the importer and a side process do.
+        with patch.dict(os.environ, {'SOURCE_SOLVER_SLOTS': str(self.data)}),                 patch.object(transport.sessions, 'slots', threading.BoundedSemaphore(5)):
+            first, second = transport.acquire_slot(1), transport.acquire_slot(1)
+            self.assertIsNotNone(first)
+            self.assertIsNotNone(second)
+            self.assertIsNone(transport.acquire_slot(0.3))
+            first()
+            third = transport.acquire_slot(1)
+            self.assertIsNotNone(third)
+            second()
+            third()
+
+    def test_without_flock_the_process_limit_still_applies(self):
+        with patch.dict(sys.modules, {'fcntl': None}),                 patch.object(transport.sessions, 'slots', threading.BoundedSemaphore(1)):
+            release = transport.acquire_slot(0.1)
+            self.assertIsNotNone(release)
+            self.assertIsNone(transport.acquire_slot(0.1))
+            release()
+
+
 class StatusTests(TransportCase):
     def open(self, status, body=b'', headers=None):
         site = FakeSite(lambda *_: response(status, body, headers or {'Content-Type': 'text/html'}))
