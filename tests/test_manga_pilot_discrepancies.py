@@ -36,7 +36,8 @@ class Listed(JsonSeries):
 class PilotDiscrepancyTests(TestCase):
     def test_manganato_accepts_the_manganami_mirror(self):
         adapter = next(a for a in manga_html_families.SOURCES if a.SOURCE_ID == '1024627298672457456')
-        for url in ('https://www.manganami.com/manga/one-piece', 'https://www.manganami.com/search/story/one_piece'):
+        for url in ('https://www.manganami.com/manga/one-piece', 'https://www.manganami.com/search/story/one_piece',
+                    'https://www.natumanga.com/manga/one-piece'):
             self.assertTrue(adapter.site_link(url), url)
         self.assertTrue(adapter.is_title(adapter.site_link('https://www.manganami.com/manga/one-piece')))
         self.assertTrue(manga_html_families.public_api('www.manganami.com', '/api/manga/one-piece/chapters', 'limit=-1'))
