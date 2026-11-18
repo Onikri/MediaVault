@@ -519,10 +519,15 @@ def solve(decision, url, deadline, started, *, fetch_page=False):
         if budget < 6:
             raise SourceChallengeError('Источнику нужна проверка браузера, но время запроса уже истекло.',
                                        solver='budget')
-        acquired = sessions.slots.acquire(timeout=max(0.1, budget - 5))
-        if not acquired:
+        release = acquire_slot(max(0.1, budget - 5))
+        if release is None:
             raise SourceChallengeError('Решатель проверки браузера занят. Повтори позже.', solver='busy')
         try:
+            if deadline:
+                # Waiting for a free browser spent part of the caller's budget.
+                budget = min(budget, deadline - time.monotonic() - RETRY_RESERVE)
+                if budget < 6:
+                    raise SourceChallengeError('Решатель был занят, и время запроса истекло.', solver='busy')
             # The solver and the retried request must leave through one exit:
             # recheck it right before the run.
             if decision.rule.exit == 'japan' and decision.infra.get('status'):
@@ -533,9 +538,52 @@ def solve(decision, url, deadline, started, *, fetch_page=False):
             sessions.put(key, Attempt(time.time(), None, str(error)))
             raise
         finally:
-            sessions.slots.release()
+            release()
         sessions.put(key, Attempt(time.time(), session))
         return session
+
+
+def slot_dir():
+    return Path(os.getenv('SOURCE_SOLVER_SLOTS', '/tmp'))
+
+
+def acquire_slot(timeout):
+    """One of MAX_SOLVES Byparr slots shared by every process of the container.
+
+    The importer's workers and side processes (probes, live checks) all call
+    the same single-CPU Byparr; a per-process limit alone let three browsers
+    run at once and each solve take over a minute. Returns a release
+    callable, or None when no slot frees up within ``timeout``."""
+    if not sessions.slots.acquire(timeout=timeout):
+        return None
+    try:
+        import fcntl
+    except ImportError:  # Windows development checkout: the process limit only
+        return sessions.slots.release
+    end = time.monotonic() + timeout
+    while True:
+        for index in range(MAX_SOLVES):
+            try:
+                handle = os.open(slot_dir() / f'mediavault-solver-{index}.lock', os.O_RDWR | os.O_CREAT, 0o600)
+            except OSError:
+                return sessions.slots.release
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                os.close(handle)
+                continue
+
+            def release(handle=handle):
+                try:
+                    fcntl.flock(handle, fcntl.LOCK_UN)
+                finally:
+                    os.close(handle)
+                    sessions.slots.release()
+            return release
+        if time.monotonic() >= end:
+            sessions.slots.release()
+            return None
+        time.sleep(0.25)
 
 
 def call_solver(decision, url, budget):
