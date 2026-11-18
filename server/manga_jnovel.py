@@ -1,7 +1,7 @@
 """J-Novel Club manga (keiyoushi ``src/en/jnovel`` at 6f345a8).
 
 The series list, search and series pages are read from the site's React
-Server Component stream (``rsc: 1``). Only preview parts are listed: the
+Server Component stream (``rsc: 1``). Only preview parts open (the others stay listed as paid): the
 site gives every guest their embedded reader, whose ``info.json`` names an
 anonymous E4P manifest (``manga_e4p``). Rentals and purchased volumes need
 an account and stay out of the open route.
@@ -149,15 +149,16 @@ class JNovel(JsonSeries):
         chapters = {}
         for volume in volumes:
             for part in volume.get('parts') or []:
-                # A guest reads only the open preview parts.
-                if not isinstance(part, dict) or part.get('preview') is not True or not re.fullmatch(SLUG, str(part.get('slug', ''))):
+                if not isinstance(part, dict) or not re.fullmatch(SLUG, str(part.get('slug', ''))):
                     continue
                 name = str(part.get('title') or '')
                 name = name.removeprefix(title).strip() or name
                 n = part.get('number')
                 target = query_url(f'{ROOT}/read/{part["slug"]}', mv_series=slug)
                 chapters[target] = {**self.chapter(target, name, float(n) if type(n) is int else None,
-                                                   seconds(part.get('launch'))), 'season': 1}
+                                                   seconds(part.get('launch'))), 'season': 1,
+                                    # A guest reads only the open preview parts.
+                                    'locked': part.get('preview') is not True}
         return row, self.order(chapters)
 
     def pages(self, http, url):

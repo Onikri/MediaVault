@@ -192,7 +192,9 @@ class AdapterTests(TestCase):
                                         'expired_on': 1763348098}]}}
         http = document({'https://manga.line.me/api/book/product_list': product})
         row, chapters = LINE.series(http, 'https://manga.line.me/product/periodic?id=Z0001684')
-        self.assertEqual(([c['title'] for c in chapters], row['status']), (['1', '3'], 'ongoing'))
+        # Paid rows stay listed with an explicit lock; they are never opened.
+        self.assertEqual(([(c['title'], c['locked']) for c in chapters], row['status']),
+                         ([('1', False), ('2', True), ('3', False)], 'ongoing'))
         chapter = LINE.site_link(chapters[0]['url'])
         self.assertEqual(LINE.title_for(chapter), 'https://manga.line.me/product/periodic?id=Z0001684')
         plain = ("var imgs = {};\n imgs[0] = {\n 'url':    'https://cdn.example/a.jpg',\n 'height': 10\n };\n"
@@ -203,7 +205,7 @@ class AdapterTests(TestCase):
         refs = LINE.pages(document({'https://manga.line.me/book/viewer': portal}), chapter)
         self.assertEqual(grant(page_reference(refs[0])[0])[2].scheme, 'line:2:64:1:0')
 
-    def test_sokuyomi_hides_paid_issues(self):
+    def test_sokuyomi_lists_paid_issues_as_locked(self):
         edge = lambda slug, coin, campaign=None, sale=True: {'node': {'slug': slug, 'name': slug, 'chapter_number': 1,
                                                                       'consumption_coin': coin, 'is_available_for_sale': sale,
                                                                       'chapter_consumption_coin': campaign}}
@@ -213,8 +215,9 @@ class AdapterTests(TestCase):
                                                    edge('camp0001', 30, {'consumption_coin': 0})]}}}
         http = document({japan.SOKU_API: data})
         row, chapters = SOKU.series(http, 'https://sokuyomi.jp/comics/title001/detail/')
-        self.assertEqual(sorted(urlsplit(c['url']).path for c in chapters),
-                         ['/viewer/chapter/camp0001/', '/viewer/chapter/free0001/'])
+        self.assertEqual(sorted((urlsplit(c['url']).path, c['locked']) for c in chapters),
+                         [('/viewer/chapter/camp0001/', False), ('/viewer/chapter/free0001/', False),
+                          ('/viewer/chapter/paid0001/', True)])
         self.assertEqual(row['tags'], ['tag'])
         viewer = {'data': {'getChapterViewer': {'chapter_pages': [{'page_number': 2, 'key': 'c/b.webp'},
                                                                   {'page_number': 1, 'key': 'c/a.webp'}]}}}

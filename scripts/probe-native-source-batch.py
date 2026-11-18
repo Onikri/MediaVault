@@ -87,11 +87,16 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
                 if not url or not matches_route(adapter, url, 'chapter'):
                     return {**result, 'status': 'identity_mismatch', 'phase': phase}
             result['chapters'] = True
+            result['locked_chapters'] = sum(1 for entry in episodes if entry.get('locked'))
             if check_pages:
                 phase = 'pages'
+                # Paid chapters stay listed; the reader check uses the first open one.
+                opened = next((entry for entry in episodes if not entry.get('locked')), None)
+                if opened is None:
+                    return {**result, 'status': 'paid_only', 'phase': phase}
                 http.operation = 'pages'
                 http.deadline = time.monotonic() + 20 + extra
-                chapter = adapter.inspect(episodes[0]['url'], http)
+                chapter = adapter.inspect(opened['url'], http)
                 http.operation = 'images'
                 pages = chapter.get('pages') or []
                 result['page_count'] = len(pages)
@@ -103,7 +108,7 @@ def audit(adapter, check_search, check_chapters, check_pages=False):
                 from suwayomi_bridge import page_image, parse_reference
 
                 first = pages[0]
-                target = chapter.get('url') or episodes[0]['url']
+                target = chapter.get('url') or opened['url']
                 custom = getattr(adapter, 'page_headers', None)
                 headers = custom(target) if custom else {'Referer': target}
                 if parse_reference(first):

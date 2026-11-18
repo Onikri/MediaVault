@@ -5,7 +5,7 @@ title IDs of the catalogue or of a search, ``icd-api`` hydrates any object
 IDs (titles, chapters, images, genres, creators, chapter pages) through
 ``content_json/batch``. The catalogue is sorted locally by reads or by the
 latest chapter, like the extension; explicit titles stay hidden like its
-default. Only free and ad-supported chapters are listed: others return no
+default. Only free and ad-supported chapters open, the others stay listed as paid: others return no
 pages without a login. Page images (``w1600.ikc``) are AES-CBC encrypted
 with the client's static key behind a 4-byte size and a 16-byte IV, decoded
 like the extension's ``ImageInterceptor``.
@@ -243,8 +243,6 @@ class Inkr(JsonSeries):
         chapters = {}
         key = self.title_key(url)
         for value in self.objects(http, chapter_oids, CHAPTER_FIELDS).values():
-            if str(value.get('revenueType') or '').lower() not in {'ad', 'free'}:
-                continue
             found = re.fullmatch(r'ik-chapter-([0-9]{1,10})', str(value.get('oid', '')))
             if not found:
                 continue
@@ -253,7 +251,7 @@ class Inkr(JsonSeries):
             chapters[target] = {**self.chapter(target, str(value.get('name') or ''),
                                                float(order) if isinstance(order, (int, float)) else None,
                                                str(value.get('firstPublishedDate') or value.get('publishedDate') or '')[:10]),
-                                'season': 1}
+                                'season': 1, 'locked': str(value.get('revenueType') or '').lower() not in {'ad', 'free'}}
         return row, self.order(chapters)
 
     def pages(self, http, url):

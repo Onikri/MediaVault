@@ -3,7 +3,7 @@
 Rankings and the newest list come from ``story-api.tapas.io``; search,
 series cards and episode pages are public HTML on ``tapas.io``, and the
 episode list is the site's own XHR. Only free or guest-unlocked comic
-episodes are listed: a locked episode page has no images, and a novel
+episodes open; the others stay listed as paid (``locked``): a locked episode page has no images, and a novel
 episode is not a comic. Both requests carry the extension's birth date
 cookies so that mature series answer the same way as in the app.
 """
@@ -201,14 +201,14 @@ class Tapas(JsonSeries):
             if not isinstance(episodes, list):
                 raise SourceError('Tapas не предоставил список эпизодов.')
             for item in episodes:
-                if (not isinstance(item, dict) or type(item.get('id')) is not int or item.get('scheduled')
-                        or not (item.get('free') or item.get('unlocked'))):
+                if not isinstance(item, dict) or type(item.get('id')) is not int or item.get('scheduled'):
                     continue
                 scene = item.get('scene')
                 target = query_url(f'{ROOT}/episode/{item["id"]}', mv_series=key)
-                chapters[target] = self.chapter(target, str(item.get('title') or f'Episode {scene}'),
-                                                float(scene) if isinstance(scene, (int, float)) else None,
-                                                date_of(item.get('publish_date')))
+                chapters[target] = {**self.chapter(target, str(item.get('title') or f'Episode {scene}'),
+                                                   float(scene) if isinstance(scene, (int, float)) else None,
+                                                   date_of(item.get('publish_date'))),
+                                    'locked': not (item.get('free') or item.get('unlocked'))}
             if not (body.get('pagination') or {}).get('has_next'):
                 break
         return row, self.order(chapters)

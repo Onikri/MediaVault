@@ -3,7 +3,7 @@
 The ``/go/pcm`` API of www.webnovel.com answers the comic category list,
 search, details, the chapter list and chapter contents. Every call carries
 the ``_csrfToken`` that the home page sets as a guest cookie, exactly like
-the extension's CSRF interceptor. Only chapters open to a guest are listed
+the extension's CSRF interceptor. Only chapters open to a guest are read, the others stay listed as paid
 (free, or premium chapters the site marks as authorised); privileged early
 chapters above the guest level stay hidden like upstream. Page links are
 signed for about ten minutes.
@@ -182,12 +182,11 @@ class WebNovel(JsonSeries):
             levels = item.get('userLevel'), item.get('chapterLevel')
             if not all(type(value) is int for value in levels) or levels[0] < levels[1]:
                 continue
-            if (item.get('isVip') or item.get('price')) and item.get('isAuth') != 1:
-                continue
             index = item.get('chapterIndex')
             target = f'{ROOT}/comic/{comic}/{item["chapterId"]}'
             chapters[target] = {**self.chapter(target, str(item.get('chapterName') or f'Chapter {index}'),
-                                               float(index) if type(index) is int else None), 'season': 1}
+                                               float(index) if type(index) is int else None), 'season': 1,
+                                'locked': bool(item.get('isVip') or item.get('price')) and item.get('isAuth') != 1}
         return row, self.order(chapters)
 
     def pages(self, http, url):

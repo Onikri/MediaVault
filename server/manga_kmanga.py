@@ -4,7 +4,7 @@ Every request to ``api.kmanga.kodansha.com`` carries the web client's
 ``X-Kmanga-Hash``: SHA-512 over the SHA-256 of the sorted, individually
 hashed parameters plus the hashed birthday cookie, for the guest client 0
 (the extension's logged-out default). Only episodes without a point price
-(or marked free by the site) are listed. Viewer pages are 4x4 tile puzzles
+(or marked free by the site) open; the others stay listed as paid. Viewer pages are 4x4 tile puzzles
 whose order derives from the response's scramble seed, recomposed like the
 extension's ``ImageInterceptor``.
 """
@@ -266,7 +266,7 @@ class KManga(JsonSeries):
                 if not isinstance(item, dict) or type(item.get('episode_id')) is not int or item.get('title_id') != int(key):
                     continue
                 point = item.get('point')
-                if type(point) is not int or point > 0 and item.get('badge') != 3 and item.get('rental_finish_time') is None:
+                if type(point) is not int:
                     continue
                 date = ''
                 try:
@@ -276,7 +276,8 @@ class KManga(JsonSeries):
                 target = f'{ROOT}/title/{key}/episode/{item["episode_id"]}'
                 name = ' '.join(str(item.get('episode_name') or '').split()) or f'Episode {item.get("index")}'
                 n = item.get('index') if type(item.get('index')) is int else None
-                chapters[target] = {**self.chapter(target, name, float(n) if n is not None else None, date), 'season': 1}
+                chapters[target] = {**self.chapter(target, name, float(n) if n is not None else None, date), 'season': 1,
+                                    'locked': point > 0 and item.get('badge') != 3 and item.get('rental_finish_time') is None}
         return row, self.order(chapters)
 
     def pages(self, http, url):

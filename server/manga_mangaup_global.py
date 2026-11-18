@@ -3,7 +3,7 @@
 The web client reads Protobuf from ``global-api.manga-up.com/api``: the full
 title list (sorted locally by bookmarks or update date), word and tag
 search, title details and the viewer. Guests send no ``secret``; only
-chapters without a price are listed, because the viewer returns no pages
+chapters without a price open (the others stay listed as paid), because the viewer returns no pages
 for the others. Page images are AES-CBC encrypted with the key and IV of
 the same viewer response, decoded like the extension's ``ImageInterceptor``.
 """
@@ -161,12 +161,13 @@ class MangaUpGlobal(JsonSeries):
         rows = {}
         for item in chapters:
             cid = item.integer(1)
-            if not 1 <= cid < 10 ** 10 or item.fields.get(6):
+            if not 1 <= cid < 10 ** 10:
                 continue
             title = item.string(2) + (f' - {item.string(3)}' if item.string(3) else '')
             date = date_of(item.string(9))
             target = f'{ROOT}/manga/{key}/{cid}'
-            rows[target] = {**self.chapter(target, title, None, date.date().isoformat() if date else ''), 'season': 1}
+            rows[target] = {**self.chapter(target, title, None, date.date().isoformat() if date else ''), 'season': 1,
+                            'locked': bool(item.fields.get(6))}
         return row, self.order(rows)
 
     def pages(self, http, url):

@@ -5,8 +5,8 @@ series data and the contents of free chapters, free volumes and the trial
 pages of a volume. A content request carries a fresh RSA public key
 (``X-Hash``); the answer wraps the page key with RSA-OAEP-SHA256 and every
 page is AES encrypted (CBC, or GCM when the first byte is 2) behind a 16
-byte IV, decoded like the extension's ``ImageInterceptor``. Login and paid
-chapters are not part of the guest route.
+byte IV, decoded like the extension's ``ImageInterceptor``. Paid chapters
+stay listed as ``locked``; login is not part of the guest route.
 """
 
 import base64
@@ -403,24 +403,24 @@ class Emaqi(JsonSeries):
         slug = self.title_key(row['url'])
         chapters = {}
         for item in data.get('chapters') or []:
-            if not isinstance(item, dict) or not number(item.get('chapterNumber')) or not item.get('free'):
+            if not isinstance(item, dict) or not number(item.get('chapterNumber')):
                 continue
             n = item['chapterNumber']
             target = query_url(f'{ROOT}/reader/{slug}', type='chapter', chapter=str(n), mv_comic=comic)
             chapters[target] = {**self.chapter(target, str(item.get('name') or f'Chapter {n}'), float(n),
-                                               str(item.get('releasesAt') or '')[:10]), 'season': 1}
+                                               str(item.get('releasesAt') or '')[:10]), 'season': 1,
+                                'locked': not item.get('free')}
         for item in volumes.get('volumes') or []:
             if not isinstance(item, dict) or not number(item.get('volumeNumber')):
                 continue
             trial = type(item.get('trialPage')) is int and item['trialPage'] > 0
-            if not item.get('free') and not trial:
-                continue
             n = item['volumeNumber']
             name = str(item.get('name') or '') or 'Oneshot'
             target = query_url(f'{ROOT}/reader/{slug}', type='volume', volume=str(n), mv_comic=comic)
             # Volumes follow the chapters, like the extension's list.
             chapters[target] = {**self.chapter(target, name if item.get('free') else f'(Preview) {name}', float(n),
-                                               str(item.get('releasesAt') or '')[:10]), 'season': 2}
+                                               str(item.get('releasesAt') or '')[:10]), 'season': 2,
+                                'locked': not item.get('free') and not trial}
         return row, self.order(chapters)
 
     def pages(self, http, url):

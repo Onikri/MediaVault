@@ -3,7 +3,8 @@
 Both stores run on the Azuki platform: one public API answers series,
 volume, chapter and page requests for the organisation key of the store.
 Kodansha also lists its catalogue through that API; Omoi lists it on the
-``/discover`` page. Only chapters inside their free window are listed,
+``/discover`` page. Only chapters inside their free window open; the others stay listed as
+paid (``locked``),
 because the guest page list answers 401 for the others. Page images are
 XOR-ed with one byte (174), decoded like the extensions' interceptors.
 """
@@ -209,7 +210,7 @@ class Azuki(JsonSeries):
         now = datetime.now(timezone.utc)
         chapters = {}
         for item in items:
-            if not isinstance(item, dict) or not re.fullmatch(UUID, str(item.get('uuid', ''))) or not free_now(item, now):
+            if not isinstance(item, dict) or not re.fullmatch(UUID, str(item.get('uuid', ''))):
                 continue
             label = str(item.get('label') or '').strip()
             name = f'Chapter {label}' if label else str(item.get('short_name') or 'Chapter')
@@ -218,7 +219,8 @@ class Azuki(JsonSeries):
             n = float(label) if re.fullmatch(r'[0-9]{1,5}(?:\.[0-9]{1,3})?', label) else None
             date = (stamp(item.get('release_date')) or now).date().isoformat() if item.get('release_date') else ''
             target = f'{self.ROOT}/series/{slug}/read/{item["uuid"]}'
-            chapters[target] = self.chapter(target, name, n, date)
+            # Chapters outside their free window stay listed as paid.
+            chapters[target] = {**self.chapter(target, name, n, date), 'locked': not free_now(item, now)}
         return row, self.order(chapters)
 
     def pages(self, http, url):

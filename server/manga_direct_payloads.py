@@ -8,7 +8,7 @@ from manga_madara import SEGMENT, image_url, node_text, release_date
 from manga_series_port import Archive, Cards, MAX_CHAPTERS, MAX_PAGES, Meta, SeriesPort, number, picture
 from manga_vinetheme import dictionaries, flight_models, flight_stream, resolve_fields
 from manga_webcomics import param, query_url
-from source_parser import SourceAccessError, SourceError
+from source_parser import SourceAccessError, SourceError, SourcePaidError
 
 
 ID = r'[0-9]{1,18}'
@@ -51,6 +51,9 @@ class JsonSeries(SeriesPort):
                             self.chapter_identity(url)), None)
             if chapter is None:
                 raise SourceAccessError('Источник не предоставил эту главу в открытом списке.')
+            if chapter.get('locked'):
+                # Paid chapters stay listed with their status and are never bypassed.
+                raise SourcePaidError('Глава платная или доступна только по подписке.')
             pages = self.pages(http, self.site_link(chapter['url']))
             if not 1 <= len(pages) <= MAX_PAGES or not all(pages):
                 raise SourceError('Источник не предоставил полный список изображений главы.')

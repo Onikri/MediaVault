@@ -2,7 +2,7 @@
 
 Search and rankings come from ``/api/v1/search_titles``; the title page
 embeds its episodes in the ``:page-objects`` attribute of ``<title-page>``.
-Only free episodes are listed: the guest viewer gives no images for the
+Only free episodes open; the others stay listed as paid (``locked``): the guest viewer gives no images for the
 others. Every page is a signed JSON envelope of an AES-CBC image whose key
 the site's own ``/api/v1/decryption_keys`` form releases for the guest
 session (CSRF token from the home page); the key is stretched with
@@ -234,7 +234,7 @@ class Coolmic(JsonSeries):
         row['adult'] = bool(title.get('is_mature'))
         chapters = {}
         for item in episodes:
-            if not isinstance(item, dict) or type(item.get('id')) is not int or item.get('is_free') is not True:
+            if not isinstance(item, dict) or type(item.get('id')) is not int:
                 continue
             if item.get('is_closed'):
                 continue
@@ -246,7 +246,8 @@ class Coolmic(JsonSeries):
             order = item.get('display_order')
             target = query_url(f'{ROOT}/episodes/{item["id"]}', mv_title=key)
             chapters[target] = {**self.chapter(target, f'Chapter {item.get("number") or order}',
-                                               float(order) if type(order) is int else None, date), 'season': 1}
+                                               float(order) if type(order) is int else None, date), 'season': 1,
+                                'locked': item.get('is_free') is not True}
         return row, self.order(chapters)
 
     def pages(self, http, url):
