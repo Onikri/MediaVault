@@ -18,7 +18,7 @@
       "name": "Manganato",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["natomanga.com", "manganami.com", "nelomanga.net", "manganato.gg"], "operations": ["*"],
+        {"hosts": ["natomanga.com", "natumanga.com", "manganami.com", "nelomanga.net", "manganato.gg"], "operations": ["*"],
          "exit": "direct", "solver": true, "format": "html"}
       ]
     },

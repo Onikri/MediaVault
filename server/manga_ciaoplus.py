@@ -105,7 +105,8 @@ class CiaoPage:
                     result.paste(bitmap.crop((x, y, x + tile_w, y + tile_h)),
                                  (target % 4 * tile_w, target // 4 * tile_h))
             out = BytesIO()
-            result.save(out, format='PNG')
+            # The same JPEG q90 as every other descrambled page (and Suwayomi).
+            result.save(out, format='JPEG', quality=90)
             return out.getvalue()
         except (OSError, ValueError, Image.DecompressionBombError):
             raise SourceError('Ciao Plus вернул повреждённое изображение.') from None

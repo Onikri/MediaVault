@@ -369,3 +369,11 @@ Mangago заблокирован: ключ перестановки страни
 
 Прямые запросы с импортёра к оставшимся сайтам: Cloudflare «Just a moment» у OniSaga, Manhuarm, BatCave, LikeManga (mgread.io); «Attention Required» у MangaFire, The Blank, Comix; Turnstile у Temple Scan и MangaCloud; DDoS-Guard у Yabai; BasedFlare у Doujin.io; CloudFront 403 у DeviantArt; HTTP 401 у Madokami; Kyokotsu не принимает соединение. Music Book Japan перенаправляет адрес Oracle на `oversea.html`. Японские и англоязычные магазины пакетов C2 и C3 отвечают напрямую. Распределение по пакетам и объявленный транспорт каждого профиля: [native-source-packages.json](native-source-packages.json).
 
+### Расхождения пилота двух путей
+
+Агент E сравнил прямой путь с Suwayomi на одних и тех же тайтлах и нашёл три расхождения. 18 ноября 2026 года они исправлены:
+
+- Manganato. `www.natomanga.com` меняет зеркала: сначала поиск и карточки отдавал `www.manganami.com`, к утру 18 ноября все три домена перенаправляют на `www.natumanga.com`. Адаптер и маршрут транспорта источника принимают оба зеркала.
+- LINE Manga и Sokuyomi. Платные главы снова есть в оглавлении с полем `locked`. Открытие такой главы любым адаптером на `JsonSeries` возвращает `SourcePaidError` (статус `paid_chapter`), страницы не запрашиваются. На Oracle LINE Manga показал 278 глав, из них 272 платные, как и расширение. Sokuyomi показал 35 глав, из них 32 платные. Пакетный пробник проверяет чтение по первой открытой главе и возвращает `paid_only`, если открытых глав нет.
+- Ciao Plus. Собранные страницы сохраняются в JPEG q90, как все остальные страницы с перестановкой: первая страница весит 662 КБ вместо 2,74 МБ в PNG.
+
