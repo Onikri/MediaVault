@@ -17,6 +17,8 @@ def base_sources(installed):
     from manga_source_coverage import SOURCES
     from manga_tag_policy import alias_domains
     from manga_native_sources import for_source
+    from manga_profile_languages import included
+    installed = [s for s in installed if included(s.get('lang'))]
     jobs=[];seen=set()
     for domain,name,integration,*_ in SOURCES:
         if integration=='closed':jobs.append({'type':'unsupported','domain':domain,'name':name,'reason':'Сайт закрыт'});continue

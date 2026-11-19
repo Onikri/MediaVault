@@ -358,7 +358,7 @@ class StrictBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"application": "MediaVault", "version": 76, "readingPlaces":True, "continuousCatalogue":True, "contentManagement":True, "globalTagPolicy":True, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "catalogSignedFilters":True,"allohaVodCache":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko"], "mangaFormats":["manga","manhwa","manhua","comic","rumanga"],"mangaReadingModes":["paged","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
+    return {"application": "MediaVault", "version": 76, "readingPlaces":True, "continuousCatalogue":True, "contentManagement":True, "globalTagPolicy":True, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "catalogSignedFilters":True,"allohaVodCache":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko","zh"], "mangaFormats":["manga","manhwa","manhua","comic","rumanga"],"mangaReadingModes":["paged","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
             "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
@@ -611,14 +611,14 @@ class TitleDiscovery(StrictBody):
     continuing: bool = False
 
 class MangaDiscovery(TitleDiscovery):
-    language:str=Field(default='auto',pattern=r'^(auto|all|ru|uk|en|ja|ko)$')
+    language:str=Field(default='auto',pattern=r'^(auto|all|ru|uk|en|ja|ko|zh)$')
     format:str=Field(default='all',pattern=r'^(all|manga|manhwa|manhua|webtoon)$')
     bridgeOffset:int=Field(default=0,ge=0,le=10000)
     bridgeLimit:int=Field(default=8,ge=1,le=16)
 
 class MangaGlobalSearch(StrictBody):
     query:str=Field(min_length=2,max_length=160)
-    language:str=Field(default='all',pattern=r'^(all|ru|uk|en|ja|ko)$')
+    language:str=Field(default='all',pattern=r'^(all|ru|uk|en|ja|ko|zh)$')
     sourceIds:list[str]|None=Field(default=None,max_length=1000)
     refresh:bool=False
     title:dict|None=None
@@ -637,7 +637,7 @@ def manga_public_results(value):
     return {**value,'results':[project_row(row) for row in value['results']]} if isinstance(value,dict) and isinstance(value.get('results'),list) else value
 
 def manga_catalog_filters(language,year,age,source_ids):
-    if language not in {'all','ru','uk','en','ja','ko'} or age not in {'','adult','under18'}:
+    if language not in {'all','ru','uk','en','ja','ko','zh'} or age not in {'','adult','under18'}:
         raise HTTPException(422,'Выбери язык и возрастную категорию каталога.')
     if year and (not str(year).isdigit() or not 1800<=int(year)<=2200):
         raise HTTPException(422,'Укажи корректный год выпуска.')
@@ -819,7 +819,7 @@ def manga_bridge_status(subject=Depends(owner)):
 @app.get('/manga/bridge/extensions')
 def manga_bridge_extensions(language:str='all',q:str='',subject=Depends(owner)):
     from suwayomi_bridge import extension_catalog
-    if language not in {'all','ru','uk','en','ja','ko'}:raise HTTPException(422,'Выбери язык источника.')
+    if language not in {'all','ru','uk','en','ja','ko','zh'}:raise HTTPException(422,'Выбери язык источника.')
     return extension_catalog(language,q)
 
 class MangaExtension(StrictBody):

@@ -13,7 +13,11 @@ def identity(spec):
 # Every LibGroup site (MangaLib, HentaiLib, SlashLib) is one API host.
 LIB_HOST='api.cdnrulib.link'
 HOST_SQL="CASE WHEN kind LIKE 'lib%' THEN '"+LIB_HOST+"' ELSE COALESCE(json_extract(spec,'$.domain'),'') END"
-CLAIMABLE="state IN ('queued','retry','done','partial') AND due<=?"
+from manga_profile_languages import PROFILE_LANGUAGES
+_PROFILE_CODES = ','.join("'" + lang + "'" for lang in sorted(PROFILE_LANGUAGES))
+_LANG = "lower(replace(json_extract(spec,'$.source.lang'),'_', '-'))"
+_SCOPE = f"(kind NOT LIKE 'bridge%' OR {_LANG} IS NULL OR substr({_LANG},1,instr({_LANG}||'-','-')-1) IN ({_PROFILE_CODES}))"
+CLAIMABLE=_SCOPE+" AND state IN ('queued','retry','done','partial') AND due<=?"
 BASE_KINDS=('lib','bridge','remanga','html')
 # Per-host request spacing in seconds; LibGroup tolerates a faster pace and
 # slows down again by itself on 429.

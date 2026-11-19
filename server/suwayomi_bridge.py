@@ -12,7 +12,7 @@ from source_parser import SourceAccessError,SourceError,public_url
 from manga_source_tags import from_api
 
 PREFIX='/__manga/suwayomi/'
-LANGUAGES={'ru','uk','en','ja','ko'}
+from manga_profile_languages import LANGUAGES, primary_language
 _cache={};_lock=threading.RLock();_install_lock=threading.Lock();_origins={}
 
 class BridgeError(SourceError):
@@ -284,12 +284,12 @@ def status():
     if not configured():return {'configured':False,'ready':False,'message':'Дополнительные источники пока не подключены.'}
     try:
         active=sources();available=extensions()
-        return {'configured':True,'ready':True,'availableExtensions':len(available),'installedExtensions':sum(bool(x.get('installed')) for x in available),'sources':[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))} for s in active if s.get('lang') in LANGUAGES]}
+        return {'configured':True,'ready':True,'availableExtensions':len(available),'installedExtensions':sum(bool(x.get('installed')) for x in available),'sources':[{'id':str(s['id']),'name':s['name'],'language':s['lang'],'adult':bool(s.get('isNsfw'))} for s in active if primary_language(s.get('lang')) in LANGUAGES]}
     except SourceError:return {'configured':True,'ready':False,'message':'Каталог источников запускается или временно недоступен.'}
 
 def extension_catalog(language='all',query=''):
     query=query.casefold().strip()[:80]
-    result=[{'package':x['pkgName'],'name':x['name'],'language':x['lang'],'adult':bool(x.get('isNsfw')),'installed':bool(x.get('installed')),'hasUpdate':bool(x.get('hasUpdate')),'obsolete':bool(x.get('obsolete'))} for x in extensions() if x['lang'] in {*LANGUAGES,'all'} and (language=='all' or x['lang'] in {language,'all'}) and (not query or query in x['name'].casefold())]
+    result=[{'package':x['pkgName'],'name':x['name'],'language':x['lang'],'adult':bool(x.get('isNsfw')),'installed':bool(x.get('installed')),'hasUpdate':bool(x.get('hasUpdate')),'obsolete':bool(x.get('obsolete'))} for x in extensions() if primary_language(x['lang']) in {*LANGUAGES,'all'} and (language=='all' or primary_language(x['lang']) in {language,'all'}) and (not query or query in x['name'].casefold())]
     result.sort(key=lambda x:(not x['installed'],x['language'],x['name'].casefold(),x['package']))
     return {'extensions':result,'total':len(extensions()),'matching':len(result)}
 
@@ -395,7 +395,7 @@ def inspect(value):
                 raise native_access_error from None
             raise
         source=data.get('source') or client.get('/source/'+str(data['sourceId']))
-        lang=source.get('lang','')
+        lang=primary_language(source.get('lang'))
         if lang not in LANGUAGES:raise SourceError('Этот источник пока не поддерживает выбранный язык чтения.')
         if chapter is None and source.get('name')=='Manga Ball':
             languages=mangaball_languages(client,manga)
@@ -444,7 +444,7 @@ def native_reader_url(client,data,source,manga,chapter=None):
     """Map only this cached source/title/chapter, never substitute a search hit."""
     from manga_catalog_adapters import UUID,LIB_SITES
     canonical=data.get('realUrl') or urljoin(source.get('baseUrl',''),data.get('url',''))
-    parsed=urlsplit(canonical);lang=source.get('lang')
+    parsed=urlsplit(canonical);lang=primary_language(source.get('lang'))
     from manga_native_sources import for_source,saved_reader_url
     if adapter:=for_source(source):
         return saved_reader_url(adapter,client,source,canonical,manga,chapter,data=data)
@@ -586,7 +586,7 @@ def search(title,language='all',format='all',offset=0,limit=8):
         client=None
         try:
             queries=aliases(title)
-            lang=source['lang'];pattern={'ja':r'[\u3040-\u30ff\u3400-\u9fff]','ko':r'[\uac00-\ud7af]','ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','all':r'.'}[lang]
+            lang=primary_language(source['lang']);pattern={'zh':r'[一-鿿]','ja':r'[\u3040-\u30ff\u3400-\u9fff]','ko':r'[\uac00-\ud7af]','ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','all':r'.'}[lang]
             queries=sorted(queries,key=lambda q:not bool(re.search(pattern,q,re.I)))
             from manga_native_sources import for_source,search as native_search
             if adapter:=for_source(source):

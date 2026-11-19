@@ -606,7 +606,9 @@ def run(args):
                 continue
             if row.get('working'):
                 hints[row['source_id']] = row['working']
-    selected = [sid for sid in sorted(profiles) if not args.source or sid in args.source]
+    from manga_profile_languages import included
+    selected = [sid for sid in sorted(profiles)
+                if (sid in args.source if args.source else included(profiles[sid].LANGUAGE))]
     if args.retry:
         retry = set(args.retry)
         selected = [sid for sid in selected if sid not in done or done[sid].get('status') in retry

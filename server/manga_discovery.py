@@ -11,7 +11,8 @@ from manga_source_tags import from_api
 import suwayomi_bridge as bridge
 
 LANGUAGES={'all',*bridge.LANGUAGES}
-DISCOVERY_VERSION=5
+from manga_profile_languages import primary_language
+DISCOVERY_VERSION=6
 # A source that failed its search twice in a row (challenge, login wall,
 # timeout, DNS, HTTP 5xx) is left out of ordinary searches for a growing
 # pause. It stays installed and listed with the reason; «Повторить поиск»
@@ -21,7 +22,7 @@ SEARCH_BACKOFF=(3600,6*3600,24*3600)
 TRANSIENT={'upstream','timeout','network'};TRANSIENT_BACKOFF=(600,1800,3600)
 NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'SlashLib':2,'MangaDex':0,'Senkognito':None}
 def language_queries(values,language):
-    pattern={'ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[language]
+    pattern={'zh':r'[一-鿿]','ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[primary_language(language)]
     # Native title first; Latin title/romanization is the useful second query
     # on Japanese/Korean catalogues, not the first Russian display-name alias.
     def rank(value):
@@ -73,7 +74,7 @@ def installed_sources():
 
 
 def source_matches_language(source, language):
-    lang = source.get('lang')
+    lang = primary_language(source.get('lang'))
     if lang in bridge.LANGUAGES:
         return language == 'all' or lang == language
     if lang == language == 'all':
@@ -381,8 +382,13 @@ class Discovery:
             if for_source(source):
                 source['_nativeAdapter']=True
         installed={str(s['id']) for s in active}
+        if title and language == 'all' and not source_ids:
+            original = primary_language(title.get('originalLanguage'))
+            form = str(title.get('format') or '').lower()
+            if (original and original != 'zh') or (not original and form in {'manhwa', 'rumanga'}):
+                active = [s for s in active if primary_language(s['lang']) != 'zh']
         if source_ids and any(v not in installed for v in source_ids):raise ValueError('Выбранный источник не установлен. Обнови каталог источников.')
-        selected=list({str(s['id']):s for s in active if (language=='all' or s['lang']==language) and (not source_ids or str(s['id']) in source_ids)}.values())
+        selected=list({str(s['id']):s for s in active if (language=='all' or primary_language(s['lang'])==language) and (not source_ids or str(s['id']) in source_ids)}.values())
         with self.condition,self.db:self._sync_network(active)
         from manga_network_routes import configuration,routed
         routes=configuration()

@@ -11,7 +11,7 @@ from manga_source_tags import from_api,labels
 UUID=r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}'
 LIB='https://api.cdnlibs.org'
 LIB_SITES={1:('mangalib','MangaLib','https://mangalib.me'),2:('slashlib','SlashLib','https://v2.shlib.life'),4:('hentailib','HentaiLib','https://hentailib.me')}
-DEX_LANGUAGES=('ru','uk','en','ja','ko')
+DEX_LANGUAGES=('ru','uk','en','ja','ko','zh','zh-hk')
 CONTENT_RATINGS=('safe','suggestive','erotica','pornographic')
 DEX_USER_AGENT='MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal catalogue)'
 def lib_context(http,site_id):
@@ -51,6 +51,8 @@ def get(url,http):
 def names(attributes):
     return list(dict.fromkeys(v for row in [attributes.get('title',{}),*attributes.get('altTitles',[])] for v in row.values() if isinstance(v,str) and v.strip()))
 def dex_search(query,language,http):
+    language = {'zh-Hans': 'zh', 'zh-CN': 'zh', 'zh-Hant': 'zh-hk', 'zh-TW': 'zh-hk',
+                'zh-HK': 'zh-hk', 'ko-KR': 'ko'}.get(language, language)
     languages=DEX_LANGUAGES if language=='all' else [language if language in DEX_LANGUAGES else 'ru']
     params=[('title',query),('limit','25'),('includes[]','cover_art')]+[('availableTranslatedLanguage[]',l) for l in languages]+[('contentRating[]',r) for r in CONTENT_RATINGS]
     rows=get('https://api.mangadex.org/manga?'+urlencode(params),http).get('data',[]);out=[]

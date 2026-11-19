@@ -37,7 +37,7 @@ import AnimeExplore from './AnimeExplore.jsx';
 import {browseRoute} from './anime-navigation.js';
 import {useTabIdentity} from './tab-identity.js';
 const noTitles=Object.freeze([]);
-const SOURCE_LANGUAGES=[['all','Все языки'],['ru','Русский'],['uk','Українська'],['en','Английский'],['ja','Японский, оригинал'],['ko','Корейский, оригинал']];
+const SOURCE_LANGUAGES=[['all','Все языки'],['ru','Русский'],['uk','Українська'],['en','Английский'],['ja','Японский, оригинал'],['ko','Корейский, оригинал'],['zh','Китайский · маньхуа']];
 // Search results and short lists are ordered on the loaded page.
 const SORTS=[['default','По совпадению'],['score','По рейтингу'],['new','Сначала новые'],['old','Сначала старые'],['title','По названию, А–Я'],['length','Больше серий и глав']];
 const SORT_KEY='mediavault_catalog_sort_v1';

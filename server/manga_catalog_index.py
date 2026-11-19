@@ -213,7 +213,8 @@ def _conditions(q='', tag='', provider='', format='', source_id='', *, genre='',
     if readingMode=='webtoon':sql.append("(t.format='webtoon' OR json_extract(t.metadata,'$.readingMode') IN ('webtoon','vertical','scroll'))")
     if readingMode=='paged':sql.append("(t.format!='webtoon' AND COALESCE(json_extract(t.metadata,'$.readingMode'),'') NOT IN ('webtoon','vertical','scroll'))")
     if language and language!='all':
-        sql.append('t.language=?');args.append(language)
+        sql.append("(t.language=? COLLATE NOCASE OR t.language LIKE ?)")
+        args.extend((language, language+'-%'))
     if year:
         sql.append('t.year=?');args.append(str(year))
     if age=='adult':sql.append('(t.adult=1 OR CAST(json_extract(t.metadata,\'$.age\') AS INTEGER)>=18)')
