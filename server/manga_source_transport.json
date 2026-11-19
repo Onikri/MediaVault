@@ -365,9 +365,8 @@
     },
     "2327480808438768017": {
       "name": "Atsumaru",
-      "solverBudget": 45,
       "routes": [
-        {"hosts": ["atsu.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+        {"hosts": ["atsu.moe"], "operations": ["*"], "exit": "warp", "tls": "chrome"}
       ]
     },
     "7621724834621233483": {
@@ -421,9 +420,8 @@
     },
     "7266624490370375187": {
       "name": "HentaiHere",
-      "solverBudget": 45,
       "routes": [
-        {"hosts": ["hentaihere.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+        {"hosts": ["hentaihere.com"], "operations": ["*"], "exit": "warp", "tls": "chrome"}
       ]
     },
     "3077154580363219152": {
@@ -470,9 +468,8 @@
     },
     "6862842453918709699": {
       "name": "Komix",
-      "solverBudget": 45,
       "routes": [
-        {"hosts": ["komix.to"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+        {"hosts": ["komix.to"], "operations": ["*"], "exit": "warp", "tls": "chrome"}
       ]
     },
     "1698654724978495521": {
@@ -935,6 +932,12 @@
       "solverBudget": 45,
       "routes": [
         {"hosts": ["zinmanga.net"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1562897350957827542": {
+      "name": "NewXToon",
+      "routes": [
+        {"hosts": ["newxtoon5.com"], "operations": ["*"], "exit": "warp", "tls": "chrome"}
       ]
     }
   }

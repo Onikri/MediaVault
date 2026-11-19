@@ -83,6 +83,7 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(value['japan']['hosts'], list(gateway.HOSTS))
         for url in (value['japan']['httpProxy'], value['japan']['status'], value['solver']['url']):
             self.assertRegex(url, r'^http://[a-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9/_-]*)?$')
+        self.assertEqual(value['warp'], {'proxy': 'socks5h://warp:1080'})
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / 'source-transport.json'
             with mock.patch.object(install.os, 'chown', create=True):
@@ -122,14 +123,19 @@ class ComposeTests(unittest.TestCase):
 
     def test_services_are_private_and_independent_of_suwayomi(self):
         services = self.compose['services']
-        self.assertEqual(sorted(services), ['byparr', 'jp-router', 'jp-vpn'])
+        self.assertEqual(sorted(services), ['byparr', 'jp-router', 'jp-vpn', 'warp'])
         for name, service in services.items():
             with self.subTest(service=name):
                 self.assertNotIn('ports', service)
                 self.assertNotIn('network_mode', service)
                 self.assertNotIn('depends_on', service)
                 self.assertNotIn('suwayomi', json.dumps(service.get('volumes', [])))
-                self.assertEqual(service['cap_drop'], ['ALL'])
+                if name == 'warp':
+                    # The WARP image needs sudo for its daemon; it adds only NET_ADMIN.
+                    self.assertEqual(service['cap_add'], ['NET_ADMIN'])
+                    self.assertRegex(service['image'], r'@sha256:[a-f0-9]{64}$')
+                else:
+                    self.assertEqual(service['cap_drop'], ['ALL'])
                 self.assertIn('healthcheck', service)
         self.assertTrue(self.compose['networks']['sources']['external'])
 

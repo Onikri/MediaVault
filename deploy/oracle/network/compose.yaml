@@ -99,6 +99,35 @@ services:
       sources:
         aliases: [byparr]
 
+  warp:
+    # Cloudflare WARP client as a SOCKS5 exit (caomingjun/warp, ARM64 image digest).
+    # Only routes declared with "exit": "warp" use it; nothing else leaves through it.
+    image: caomingjun/warp@sha256:61b7efc9783619f491628ac5f473fd6eecf941bb15173f30b4654e9e614618bb
+    container_name: mediavault-warp
+    restart: unless-stopped
+    # The image starts warp-svc and its TUN device through sudo, so it keeps Docker's
+    # default capabilities plus NET_ADMIN; it publishes no port and joins only `sources`.
+    cap_add: [NET_ADMIN]
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "0"
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 0.5
+    pids_limit: 256
+    volumes: ["./warp:/var/lib/cloudflare-warp"]
+    healthcheck:
+      test: [CMD-SHELL, /healthcheck/index.sh]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 2m, max-file: "2"}
+    networks:
+      sources:
+        aliases: [warp]
+
 networks:
   sources:
     # The importer's private network (created by its Compose project).

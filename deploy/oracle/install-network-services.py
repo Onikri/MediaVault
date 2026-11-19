@@ -36,6 +36,12 @@ LEGACY = ('suwayomi-jp-vpn', 'suwayomi-jp-router')
 ROUTE_PROXY = 'http://suwayomi-jp-router:8080'
 BYPARR = 'mediavault-byparr'
 BYPARR_IMAGE = 'ghcr.io/thephaseless/byparr@sha256:c66fa161187b8fa527bfad7eefa2647ea1c553f77df68cbffd6fe83366d1787b'
+# Cloudflare WARP as a SOCKS exit for sources that refuse the Oracle address but serve
+# Cloudflare's own network (atsu.moe, Komix, NewXToon, HentaiHere; probe 2026-11-19).
+WARP_PROXY = 'socks5h://warp:1080'
+WARP_TRACE = ('from curl_cffi import requests as c\n'
+              'r=c.get("https://www.cloudflare.com/cdn-cgi/trace",proxies={"https":"socks5h://warp:1080"},timeout=20)\n'
+              'print(dict(l.split("=",1) for l in r.text.splitlines() if "=" in l).get("warp"))\n')
 # Cloudflare-fronted hosts: /cdn-cgi/trace reports the exit seen by the site.
 ROUTED_TRACE = 'https://soraraw.com/cdn-cgi/trace'
 DIRECT_TRACE = 'https://www.cloudflare.com/cdn-cgi/trace'
@@ -62,7 +68,8 @@ def transport_manifest():
     value = {'version': 1,
              'japan': {'httpProxy': 'http://jp-router:8080', 'status': 'http://jp-vpn:8090/status',
                        'hosts': list(gateway.HOSTS)},
-             'solver': {'url': 'http://byparr:8191/v1', 'maxTimeout': 60}}
+             'solver': {'url': 'http://byparr:8191/v1', 'maxTimeout': 60},
+             'warp': {'proxy': WARP_PROXY}}
     if len(json.dumps(value)) > 16384:
         raise RuntimeError('Transport manifest exceeds 16 KB')
     return value
@@ -189,6 +196,16 @@ class Installer:
             time.sleep(5)
         raise RuntimeError(f'Route check failed: {last}')
 
+    def wait_warp(self):
+        for _ in range(40):
+            try:
+                if self.exec_importer(WARP_TRACE) in {'on', 'plus'}:
+                    return
+            except subprocess.SubprocessError:
+                pass
+            time.sleep(3)
+        raise RuntimeError('WARP exit did not report warp=on')
+
     def wait_byparr(self):
         for _ in range(30):
             try:
@@ -288,7 +305,13 @@ class Installer:
         if previous:
             self.run(['docker', 'rm', previous])
 
-        # 4. Manifests for the importer: the legacy route file (a new revision
+        # 4. WARP exit (registration kept in ./warp across restarts).
+        warp_state = ROOT / 'warp'
+        warp_state.mkdir(exist_ok=True, mode=0o700)
+        self.run([*self.compose, 'up', '-d', '--no-deps', 'warp'])
+        self.wait_warp()
+
+        # 5. Manifests for the importer: the legacy route file (a new revision
         # resets stale quarantines) and the transport contract file.
         manifest = route_manifest()
         publish(data / 'manga-source-routes.json', manifest, 0o600)

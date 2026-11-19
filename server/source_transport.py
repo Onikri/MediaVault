@@ -42,7 +42,7 @@ from source_parser import (SourceAuthError, SourceChallengeError, SourceError, S
 DECLARATIONS = Path(__file__).with_name('manga_source_transport.json')
 OPERATIONS = frozenset({'search', 'catalogue', 'details', 'chapters', 'pages', 'images'})
 FORMATS = frozenset({'html', 'json', 'image', 'cbz', 'any'})
-EXITS = frozenset({'direct', 'japan'})
+EXITS = frozenset({'direct', 'japan', 'warp'})
 # TLS/HTTP2 fingerprints a route may present through curl_cffi. Byparr's browser is
 # Firefox: replaying its clearance cookies with its own User-Agent needs a Firefox
 # handshake, or Cloudflare sees a mismatched client and rejects the cookies.
@@ -58,6 +58,8 @@ STATUS_TTL = 10
 MAX_SOLVES = 2
 HOST = re.compile(r'(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}')
 SERVICE = re.compile(r'http://[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?(?::[0-9]{2,5})?(?:/[a-z0-9/_-]{0,64})?')
+# Cloudflare WARP client (mediavault-warp) as a SOCKS exit on the private network.
+SOCKS = re.compile(r'socks5h://[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?:[0-9]{2,5}')
 
 # Browser challenges (solvable), as opposed to bans, logins and paywalls.
 CHALLENGE = re.compile(
@@ -122,6 +124,10 @@ def parse_rule(value):
         raise ValueError('Invalid route exit, solver or format')
     if tls and tls not in TLS_PROFILES:
         raise ValueError('Unknown route TLS profile')
+    if exit_name == 'warp' and (not tls or solver):
+        # WARP is a SOCKS exit only curl_cffi speaks here, and Byparr leaves through
+        # Oracle: its cookies would be bound to another address.
+        raise ValueError('A WARP route needs a TLS profile and no solver')
     return Rule(tuple(hosts), frozenset(operations), exit_name, solver, fmt, tls)
 
 
@@ -283,6 +289,10 @@ def infrastructure():
             for item in (proxy, status, url, japan_url):
                 if item is not None and (not isinstance(item, str) or not SERVICE.fullmatch(item)):
                     raise ValueError
+            warp = value.get('warp') or {}
+            warp_proxy = warp.get('proxy') if isinstance(warp, dict) else None
+            if warp_proxy is not None and (not isinstance(warp_proxy, str) or not SOCKS.fullmatch(warp_proxy)):
+                raise ValueError
             if hosts is not None and (not isinstance(hosts, list)
                                       or any(not isinstance(h, str) or not HOST.fullmatch(h) for h in hosts)):
                 raise ValueError
@@ -290,13 +300,13 @@ def infrastructure():
             if type(timeout) is not int or not 10 <= timeout <= 120:
                 raise ValueError
             return {'mode': 'gateway', 'proxy': proxy, 'status': status, 'hosts': hosts,
-                    'solver': url, 'solverJapan': japan_url, 'solverTimeout': timeout}
+                    'solver': url, 'solverJapan': japan_url, 'solverTimeout': timeout, 'warp': warp_proxy}
     except (OSError, ValueError, TypeError, AttributeError):
         pass
     from manga_network_routes import configuration
     legacy = configuration()
     return {'mode': 'legacy', 'proxy': legacy.get('httpProxy'), 'status': None, 'hosts': legacy.get('hosts', []),
-            'solver': DEFAULT_SOLVER, 'solverJapan': None, 'solverTimeout': 60}
+            'solver': DEFAULT_SOLVER, 'solverJapan': None, 'solverTimeout': 60, 'warp': None}
 
 
 _status = {'time': 0.0, 'value': None}
@@ -381,6 +391,10 @@ def decide(source, operation, url):
     infra = infrastructure()
     if rule.exit == 'direct':
         return Decision(entry.source, operation, host, rule, 'direct', None, infra)
+    if rule.exit == 'warp':
+        if not infra.get('warp'):
+            raise SourceRouteError('Выход WARP не настроен на сервере.')
+        return Decision(entry.source, operation, host, rule, 'warp', infra['warp'], infra)
     if not infra.get('proxy'):
         raise SourceRouteError('Японский маршрут не настроен на сервере.')
     allowed = infra.get('hosts')

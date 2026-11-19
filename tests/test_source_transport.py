@@ -637,3 +637,48 @@ class ImpersonatedTlsTests(TransportCase):
         for rule in solver_rules:
             self.assertIn(rule.tls, {'firefox', 'chrome'}, rule.hosts)
         self.assertEqual(sum(rule.tls == 'chrome' for rule in solver_rules), 1)  # mgread.io opens with Chrome alone
+
+
+class WarpExitTests(TransportCase):
+    ATSU = '2327480808438768017'
+    DOCUMENT = {'version': 1, 'sources': {ATSU: {'name': 'Atsumaru', 'routes': [
+        {'hosts': ['atsu.moe'], 'operations': ['*'], 'exit': 'warp', 'tls': 'chrome'}]}}}
+
+    def setUp(self):
+        super().setUp()
+        self.declarations.write_text(json.dumps(self.DOCUMENT))
+        transport._declared.update(key=None, value={})
+
+    def warp(self, proxy='socks5h://warp:1080'):
+        (self.data / 'source-transport.json').write_text(json.dumps({
+            'version': 1, 'japan': {'httpProxy': 'http://jp-gateway:8080', 'status': 'http://jp-gateway:8090/status'},
+            'solver': {'url': 'http://byparr:8191/v1', 'maxTimeout': 60}, 'warp': {'proxy': proxy}}))
+
+    def test_warp_route_needs_a_tls_profile_and_no_solver(self):
+        self.assertEqual(transport.parse_rule({'hosts': ['atsu.moe'], 'exit': 'warp', 'tls': 'chrome'}).exit, 'warp')
+        for bad in ({'hosts': ['atsu.moe'], 'exit': 'warp'},
+                    {'hosts': ['atsu.moe'], 'exit': 'warp', 'tls': 'chrome', 'solver': True}):
+            with self.assertRaises(ValueError):
+                transport.parse_rule(bad)
+
+    def test_requests_leave_through_the_warp_socks_exit(self):
+        self.warp()
+        curl = FakeCurlSession(FakeCurlAnswer(body=b'{"items": []}', headers={'Content-Type': 'application/json'}))
+        with patch.object(transport, '_impersonating_session', return_value=curl):
+            self.http(FakeSite(lambda *a: self.fail('plain requests must not be used')), self.ATSU, 'catalogue').document(
+                'https://atsu.moe/api/infinite/trending?page=0')
+        self.assertEqual(curl.calls[0]['proxies'], {'https': 'socks5h://warp:1080', 'http': 'socks5h://warp:1080'})
+
+    def test_missing_or_invalid_warp_exit_fails_closed(self):
+        with self.assertRaises(SourceRouteError):
+            transport.decide(self.ATSU, 'catalogue', 'https://atsu.moe/')
+        self.warp('http://evil.example:1080')
+        transport._status.update(time=0.0, value=None)
+        with self.assertRaises(SourceRouteError):
+            transport.decide(self.ATSU, 'catalogue', 'https://atsu.moe/')
+
+    def test_shipped_warp_routes(self):
+        shipped = transport.parse(json.loads(Path(transport.__file__).with_name('manga_source_transport.json')
+                                             .read_text(encoding='utf-8')))
+        warp = sorted(rule.hosts[0] for entry in shipped.values() for rule in entry.rules if rule.exit == 'warp')
+        self.assertEqual(warp, ['atsu.moe', 'hentaihere.com', 'komix.to', 'newxtoon5.com'])
