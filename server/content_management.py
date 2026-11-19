@@ -2,7 +2,7 @@
 from pathlib import Path
 import difflib,hashlib,json,os,threading,time
 from urllib.parse import urlsplit
-from fastapi import Depends,HTTPException
+from fastapi import BackgroundTasks,Depends,HTTPException
 from pydantic import BaseModel,ConfigDict,Field
 from manga_tag_policy import Policy,current,canonical_json,normalize
 from manga_tag_deploy import atomic_write,_update_lock
@@ -24,8 +24,12 @@ def public_policy(store=None):
         data.pop('includeDiscovered',None);data.pop('hiddenTags',None)
         return {'revision':hashlib.sha256(canonical_json(data)).hexdigest(),'policy':data,'scope':'all'}
 
-def with_policy(result,revision,store):
-    value=public_policy(store)
+def with_policy(result,revision,store,db=None):
+    if db is None:
+        value=public_policy(store)
+    else:
+        from content_vocabulary import public
+        value=public(store,db)
     return {**result,**({'tagPolicy':value} if value['revision']!=revision else {})}
 
 def prioritize(store,subject,tag='',genre=''):
@@ -229,17 +233,20 @@ def install(app,owner,viewer,manager):
         with store.lock,store.db:return {'indexed':content_catalog.ingest(store.db,body.items)}
 
     @app.get('/catalog/content')
-    def content(q:str='',kind:str='anime',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',format:str='',year:str='',age:str='',offset:int=0,limit:int=60,sort:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
+    def content(background:BackgroundTasks,q:str='',kind:str='anime',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',format:str='',year:str='',age:str='',offset:int=0,limit:int=60,sort:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
+        from manga_discovery import catalogue_reader
         store=manager()
-        with store.lock:result=content_catalog.browse(store.db,kind=kind,q=q[:160],tag=tag[:4096],genre=genre[:4096],excludeGenre=excludeGenre[:4096],excludeTag=excludeTag[:4096],format=format[:60],year=year[:4],age=age[:20],offset=offset,limit=limit,sort=sort[:20])
-        prioritize(store,subject,tag,genre)
-        return with_policy(result,tagPolicyRevision,store)
+        if tag or genre:background.add_task(prioritize,store,subject,tag,genre)
+        with catalogue_reader(store) as db:
+            result=content_catalog.browse(db,kind=kind,q=q[:160],tag=tag[:4096],genre=genre[:4096],excludeGenre=excludeGenre[:4096],excludeTag=excludeTag[:4096],format=format[:60],year=year[:4],age=age[:20],offset=offset,limit=limit,sort=sort[:20],prepared=True)
+            return with_policy(result,tagPolicyRevision,store,db)
 
     @app.get('/catalog/content/title')
     def content_title(kind:str,provider:str,id:str,subject=Depends(viewer)):
+        from manga_discovery import catalogue_reader
         if kind not in content_catalog.KINDS or not 1<=len(provider)<=100 or not 1<=len(id)<=100:
             raise HTTPException(404,'Тайтл отсутствует в индексе.')
         store=manager()
-        with store.lock:result=content_catalog.title(store.db,kind,provider,id)
+        with catalogue_reader(store) as db:result=content_catalog.title(db,kind,provider,id,prepared=True)
         if result is None:raise HTTPException(404,'Тайтл отсутствует в индексе.')
         return result

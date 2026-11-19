@@ -29,45 +29,51 @@ def add(db,label,source,category,kind):
     if not classify(label,category,kind,current(),source):return 0
     return db.execute('INSERT OR IGNORE INTO catalog_vocabulary VALUES(?,?,?,?)',(label,source,category,kind)).rowcount
 
-def public(store):
-    policy=current()
+def public(store, db=None):
+    if db is not None:
+        return _public(db,id(store.db))
     with store.lock,store.db:
         initialize(store.db)
-        generation=store.db.execute("SELECT value FROM content_catalog_state WHERE name='vocabulary'").fetchone()
-        stamp=(id(store.db),policy.revision,generation[0] if generation else '')
-        with _lock:
-            if stamp in _cache:return _cache[stamp]
-        data=policy.public()
-        # Clients use an explicit public vocabulary, never private exclusion
-        # terms or an unrestricted fallback on unfiltered remote metadata.
-        if policy.include_discovered:
-            known={row['key']:dict(row) for row in data['tags']}
-            from catalog_taxonomy import classify
-            for label,source,category,kind in store.db.execute('SELECT label,source,category,kind FROM catalog_vocabulary ORDER BY label,source'):
-                classified=classify(label,category,kind,policy,source)
-                if not classified:continue
-                category,label=classified
-                key=policy.key(label,source)
-                if not key:continue
-                if key not in known:known[key]={'key':key,'label':label,'aliases':[label]}
-                if key not in policy.rules:
-                    row=known[key]
-                    if label not in row['aliases']:row['aliases'].append(label)
-                    if category=='genres':row['genreHint']=True;row['category']='genre'
-                    else:row.setdefault('category','tag')
-            # Source-derived genres must be selectable even before any source
-            # happens to send the same literal label in its tag array.
-            from catalog_taxonomy import origin_sql
-            key=policy.key('Хентай')
-            if key and key not in known:
-                tables={r[0] for r in store.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-                has_origin=any(store.db.execute('SELECT 1 FROM '+table+' t WHERE '+origin_sql('t',manga)+'=1 LIMIT 1').fetchone() for table,manga in [('catalog_titles',True),('content_titles',False)] if table in tables)
-                if has_origin:known[key]={'key':key,'label':policy.label(key,'Хентай'),'aliases':['Хентай','Hentai'],'category':'genre'}
-            data['tags']=list(known.values())
-        # The private switch is implemented by expanding observed, allowed
-        # source labels; its private hidden list is never delivered publicly.
-        data.pop('includeDiscovered',None);data.pop('hiddenTags',None)
-        value={'revision':hashlib.sha256(canonical_json(data)).hexdigest(),'policy':data,'scope':'all'}
-        with _lock:
-            _cache.clear();_cache[stamp]=value
-        return value
+        return _public(store.db,id(store.db))
+
+
+def _public(db,identity):
+    policy=current()
+    generation=db.execute("SELECT value FROM content_catalog_state WHERE name='vocabulary'").fetchone()
+    stamp=(identity,policy.revision,generation[0] if generation else '')
+    with _lock:
+        if stamp in _cache:return _cache[stamp]
+    data=policy.public()
+    # Clients use an explicit public vocabulary, never private exclusion
+    # terms or an unrestricted fallback on unfiltered remote metadata.
+    if policy.include_discovered:
+        known={row['key']:dict(row) for row in data['tags']}
+        from catalog_taxonomy import classify
+        for label,source,category,kind in db.execute('SELECT label,source,category,kind FROM catalog_vocabulary ORDER BY label,source'):
+            classified=classify(label,category,kind,policy,source)
+            if not classified:continue
+            category,label=classified
+            key=policy.key(label,source)
+            if not key:continue
+            if key not in known:known[key]={'key':key,'label':label,'aliases':[label]}
+            if key not in policy.rules:
+                row=known[key]
+                if label not in row['aliases']:row['aliases'].append(label)
+                if category=='genres':row['genreHint']=True;row['category']='genre'
+                else:row.setdefault('category','tag')
+        # Source-derived genres must be selectable even before any source
+        # happens to send the same literal label in its tag array.
+        from catalog_taxonomy import origin_sql
+        key=policy.key('Хентай')
+        if key and key not in known:
+            tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            has_origin=any(db.execute('SELECT 1 FROM '+table+' t WHERE '+origin_sql('t',manga)+'=1 LIMIT 1').fetchone() for table,manga in [('catalog_titles',True),('content_titles',False)] if table in tables)
+            if has_origin:known[key]={'key':key,'label':policy.label(key,'Хентай'),'aliases':['Хентай','Hentai'],'category':'genre'}
+        data['tags']=list(known.values())
+    # The private switch is implemented by expanding observed, allowed
+    # source labels; its private hidden list is never delivered publicly.
+    data.pop('includeDiscovered',None);data.pop('hiddenTags',None)
+    value={'revision':hashlib.sha256(canonical_json(data)).hexdigest(),'policy':data,'scope':'all'}
+    with _lock:
+        _cache.clear();_cache[stamp]=value
+    return value

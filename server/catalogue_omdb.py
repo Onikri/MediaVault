@@ -3,11 +3,13 @@
 import bz2
 import csv
 import io
+import os
 import re
 import threading
 import time
 from bisect import bisect_right
 from functools import lru_cache
+from pathlib import Path
 
 import requests
 
@@ -15,11 +17,18 @@ ROOT = 'https://www.omdb.org'
 PAGE_SIZE = 100  # content_catalog.ingest accepts at most 100 rows per write
 MAX_EXPORT = 32 * 1024 * 1024
 LANGUAGES = {'en', 'ru', 'uk', 'ja', 'ko', 'zh'}
+EXPORTS = ('all_movies', 'all_series', 'all_movie_aliases_iso', 'movie_links',
+           'all_categories', 'category_names', 'movie_categories')
 _snapshot_lock = threading.Lock()
 
 
+def decoded_csv(packed):
+    with bz2.BZ2File(packed) as data, io.TextIOWrapper(data, encoding='utf-8-sig', newline='') as text:
+        yield from csv.DictReader(text)
+
+
 def csv_rows(name):
-    with requests.get(f'{ROOT}/data/{name}.csv.bz2', stream=True, timeout=(5, 30),
+    with requests.get(f'{ROOT}/data/{name}.csv.bz2', stream=True, timeout=(12, 30),
                       headers={'User-Agent': 'MediaVault-Catalogue/1.0'}) as response:
         response.raise_for_status()
         packed = io.BytesIO()
@@ -28,8 +37,7 @@ def csv_rows(name):
             if packed.tell() > MAX_EXPORT:
                 raise ValueError('OMDB export exceeded the download limit')
     packed.seek(0)
-    with bz2.BZ2File(packed) as data, io.TextIOWrapper(data, encoding='utf-8-sig', newline='') as text:
-        yield from csv.DictReader(text)
+    yield from decoded_csv(packed)
 
 
 def load_snapshot(read_csv=csv_rows):
@@ -108,7 +116,18 @@ def load_snapshot(read_csv=csv_rows):
 
 @lru_cache(maxsize=1)
 def _daily_snapshot(day):
-    return load_snapshot()
+    folder = Path(os.getenv('DATA_DIR','/data'))/'catalogue-omdb'
+    files = {name:folder/(name+'.csv.bz2') for name in EXPORTS}
+    local = all(path.is_file() for path in files.values())
+    read_local = lambda name: decoded_csv(files[name])
+    if local and min(path.stat().st_mtime for path in files.values()) >= time.time()-86400:
+        return load_snapshot(read_local)
+    try:
+        return load_snapshot()
+    except requests.RequestException:
+        if not local:
+            raise
+        return load_snapshot(read_local)
 
 
 def catalogue(kind, cursor, snapshot=None):

@@ -35,9 +35,12 @@ def origin_sql(alias='t',manga=False):
     raw=alias+'.raw'
     return "catalog_hentai_origin(json_extract("+raw+",'$.provider'),COALESCE(NULLIF(json_extract("+raw+",'$.sourceUrl'),''),NULLIF(json_extract("+raw+",'$.sourceURL'),''),json_extract("+raw+",'$.url')),"+alias+".kind)"
 
-def initialize_origins(db,manga=False):
+def register_origin_functions(db):
     db.create_function('catalog_hentai_origin',3,hentai_origin,deterministic=True)
     db.create_function('catalog_not_hentai',1,lambda value:norm(value) in HENTAI_NEGATIVE,deterministic=True)
+
+def initialize_origins(db,manga=False):
+    register_origin_functions(db)
     table='catalog_titles' if manga else 'content_titles'
     stamp=hashlib.sha256(json.dumps(HENTAI,sort_keys=True).encode()).hexdigest()[:12]
     prefix='catalog_hentai_origin_' if manga else 'content_hentai_origin_'

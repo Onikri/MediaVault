@@ -5,6 +5,7 @@ search responses are candidates, not claims that chapters are readable.
 """
 from pathlib import Path
 from urllib.parse import urljoin
+from contextlib import closing,contextmanager
 import hashlib,json,os,re,secrets,sqlite3,threading,time,unicodedata
 from source_parser import SourceAccessError,SourceError,SourceTemporaryError,public_url
 from manga_source_tags import from_api
@@ -302,7 +303,7 @@ class Discovery:
         self.fetch=fetch or search_source;self.stopping=False;self.threads=[]
         with self.db:
             self.db.executescript('''
-              PRAGMA journal_mode=DELETE;
+              PRAGMA journal_mode=WAL;
               CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,owner TEXT NOT NULL,signature TEXT NOT NULL,
                 query TEXT NOT NULL,language TEXT NOT NULL,state TEXT NOT NULL,created REAL NOT NULL,updated REAL NOT NULL,expires REAL NOT NULL,dispatched REAL NOT NULL);
               CREATE INDEX IF NOT EXISTS jobs_owner_signature ON jobs(owner,signature,state,expires);
@@ -323,6 +324,8 @@ class Discovery:
             ''')
             from manga_catalog_index import initialize as initialize_catalog
             initialize_catalog(self.db)
+            from content_catalog import initialize as initialize_content_catalog
+            initialize_content_catalog(self.db)
             if self.db.execute('PRAGMA user_version').fetchone()[0]<1:
                 stale=[];sources=set()
                 for row in self.db.execute('SELECT id,source_id,metadata FROM titles'):
@@ -630,6 +633,22 @@ class Discovery:
             if not any(t.is_alive() for t in threads):self.db.close()
 
 _manager=None;_manager_lock=threading.Lock()
+
+@contextmanager
+def catalogue_reader(store):
+    if not isinstance(store,Discovery):
+        with store.lock:yield store.db
+        return
+    from catalog_taxonomy import register_origin_functions
+    from manga_tag_policy import normalize
+    with closing(sqlite3.connect(store.path.resolve().as_uri()+'?mode=ro',uri=True,timeout=5)) as reader:
+        reader.row_factory=sqlite3.Row
+        reader.execute('PRAGMA query_only=ON')
+        reader.create_function('catalog_normalize',1,normalize,deterministic=True)
+        register_origin_functions(reader)
+        reader.execute('BEGIN')
+        yield reader
+
 def manager():
     global _manager
     with _manager_lock:

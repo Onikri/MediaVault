@@ -118,8 +118,8 @@ def ingest(db,rows):
     if new_facts:invalidate(db)
     return count
 
-def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='',year='',age='',limit=60,offset=0,sort='updated'):
-    initialize(db)
+def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='',year='',age='',limit=60,offset=0,sort='updated',prepared=False):
+    if not prepared:initialize(db)
     if kind not in KINDS:return {'items':[],'total':0}
     policy=current();where=['kind=?'];params=[kind]
     for word in normalize(q).split()[:12]:
@@ -160,8 +160,8 @@ def read_work(db,key,policy,preferred_id=''):
     providers=list(dict.fromkeys(record['provider'] for _,record in records))
     return {**row,**merged,'hentaiExcluded':excluded,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records),'providers':providers}
 
-def title(db,kind,provider,source_id):
-    initialize(db)
+def title(db,kind,provider,source_id,*,prepared=False):
+    if not prepared:initialize(db)
     identity=title_key(kind,provider,provider+':'+source_id)
     match=db.execute('SELECT '+work_sql()+' FROM content_titles t WHERE id=?',(identity,)).fetchone()
     return read_work(db,match[0],current(),preferred_id=identity) if match else None

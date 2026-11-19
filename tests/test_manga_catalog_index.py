@@ -3,6 +3,7 @@ import sqlite3
 import sys
 import unittest
 import os
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from pathlib import Path
 
@@ -134,6 +135,23 @@ class CatalogIndexTests(unittest.TestCase):
         self.assertEqual({row['provider'] for row in result['items']},{'hmanga','mirror'})
         beyond=browse(self.db,q='Green Garden',offset=130000,limit=1)
         self.assertEqual((beyond['total'],beyond['workTotal'],beyond['offset'],beyond['items']),(3,2,130000,[]))
+
+    def test_catalogue_reads_the_committed_index_while_a_crawl_batch_is_writing(self):
+        from manga_discovery import Discovery, catalogue_reader
+        with TemporaryDirectory() as directory:
+            store=Discovery(directory,start_workers=False)
+            try:
+                with store.lock,store.db:
+                    upsert(store.db,[self.work(slug='committed')])
+                with store.lock,store.db:
+                    upsert(store.db,[self.work(title_name='Upcoming',slug='uncommitted')])
+                    with catalogue_reader(store) as db:
+                        self.assertEqual(db.execute('PRAGMA journal_mode').fetchone()[0],'wal')
+                        self.assertEqual(browse(db)['workTotal'],1)
+                with catalogue_reader(store) as db:
+                    self.assertEqual(browse(db)['workTotal'],2)
+            finally:
+                store.close()
 
     def test_facet_query_filters_before_limit_and_metadata_check_is_cached(self):
         upsert(self.db,[{**self.work(),'tags':['Comedy','Time Travel'],'metadataInspected':True}])

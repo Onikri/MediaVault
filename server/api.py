@@ -21,7 +21,7 @@ import threading
 import time
 from urllib.parse import urlencode, urlsplit
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.exceptions import RequestValidationError
@@ -359,7 +359,7 @@ class StrictBody(BaseModel):
 @app.get("/health")
 def health():
     return {"application": "MediaVault", "version": 76, "readingPlaces":True, "continuousCatalogue":True, "contentManagement":True, "globalTagPolicy":True, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "catalogSignedFilters":True,"allohaVodCache":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko","zh"], "mangaFormats":["manga","manhwa","manhua","comic","rumanga"],"mangaReadingModes":["paged","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
-            "worldCatalogueBrowse": True, "origin": ORIGIN, "worker": "server", "paidServices": False}
+            "worldCatalogueBrowse": True, "catalogueReadSnapshots": True, "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
 @app.post("/auth/session")
@@ -676,21 +676,22 @@ content_management.install(app,content_owner,viewer,lambda:__import__('manga_dis
 
 
 @app.get('/manga/catalog')
-def manga_catalog(q:str='',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',readingMode:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,sort:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
-    from manga_discovery import manager
+def manga_catalog(background:BackgroundTasks,q:str='',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',readingMode:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,sort:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
+    from manga_discovery import catalogue_reader,manager
     from manga_catalog_index import browse
     store=manager()
-    with store.lock:
-        result=browse(store.db,q=q,tag=tag,genre=genre,excludeGenre=excludeGenre,excludeTag=excludeTag,readingMode=readingMode,provider=provider,format=format,offset=offset,limit=limit,sort=sort,**manga_catalog_filters(language,year,age,sourceIds))
-    content_management.prioritize(store,subject,tag,genre)
-    return content_management.with_policy(result,tagPolicyRevision,store)
+    if tag or genre:background.add_task(content_management.prioritize,store,subject,tag,genre)
+    with catalogue_reader(store) as db:
+        result=browse(db,q=q,tag=tag,genre=genre,excludeGenre=excludeGenre,excludeTag=excludeTag,readingMode=readingMode,provider=provider,format=format,offset=offset,limit=limit,sort=sort,**manga_catalog_filters(language,year,age,sourceIds))
+        return content_management.with_policy(result,tagPolicyRevision,store,db)
 
 @app.get('/manga/catalog/tags')
 def manga_catalog_tags(provider:str='',sourceId:str='',sourceIds:str='',language:str='all',q:str='',limit:int=500,subject=Depends(viewer)):
-    from manga_discovery import manager
+    from functools import partial
+    from manga_discovery import catalogue_reader,manager
     from manga_catalog_index import cached_tags
     store=manager()
-    return cached_tags(store.db,store.lock,provider=provider,source_id=sourceId,limit=limit,q=q,**manga_catalog_filters(language,'','',sourceIds))
+    return cached_tags(store.db,store.lock,reader=partial(catalogue_reader,store),provider=provider,source_id=sourceId,limit=limit,q=q,**manga_catalog_filters(language,'','',sourceIds))
 
 @app.get('/manga/catalog/stats')
 def manga_catalog_stats(subject=Depends(viewer)):
@@ -761,13 +762,13 @@ def manga_catalog_enrich(body:MangaCatalogEnrich,subject=Depends(viewer)):
 
 @app.get('/manga/catalog/{catalog_id}')
 def manga_catalog_title(catalog_id:str,subject=Depends(viewer)):
-    from manga_discovery import manager
+    from manga_discovery import catalogue_reader,manager
     from manga_catalog_index import title
     if not re.fullmatch(r'[a-f0-9]{32}',catalog_id):
         raise HTTPException(422,'Неверный идентификатор записи каталога.')
     store=manager()
-    with store.lock:
-        result=title(store.db,catalog_id)
+    with catalogue_reader(store) as db:
+        result=title(db,catalog_id)
     if result is None:
         raise HTTPException(404,'Произведение не найдено в индексе.')
     return result

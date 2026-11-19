@@ -390,8 +390,8 @@ def tags(conn, *, provider='', source_id='', limit=100, q='', **filters):
     return {'tags':[{'type':kind,'key':key,'original':original,'originalLabels':json.loads(originals) if originals else [],'works':count}
                     for kind,key,original,count,originals in rows if clean_label(original)]}
 
-# Facets read every tag row of the whole index (about 12 s at 200k titles) under
-# the catalogue lock, while they change slowly. Each answer (about 80 KB per
+# Facets read every tag row of the whole index and change slowly.
+# Each answer (about 80 KB per
 # filter set and tag policy) is kept in memory and in DATA_DIR, so a restart
 # answers at once. An answer older than TAGS_TTL is still served immediately
 # while one background refresh replaces it; only a never-seen key waits.
@@ -419,12 +419,14 @@ def _save_tag_cache(path):
         temporary.write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8');os.replace(temporary,path)
     except OSError:pass
 
-def cached_tags(conn, lock, *, ttl=None, clock=time.time, background=True, path=None, **kwargs):
+def cached_tags(conn, lock, *, ttl=None, clock=time.time, background=True, path=None, reader=None, **kwargs):
     ttl=TAGS_TTL if ttl is None else ttl;path=path or TAGS_FILE
     key=(current().revision,json.dumps(kwargs,sort_keys=True,default=str))
     def compute():
-        with lock:
-            value=tags(conn,**kwargs)
+        if reader is None:
+            with lock:value=tags(conn,**kwargs)
+        else:
+            with reader() as db:value=tags(db,**kwargs)
         with _tag_guard:
             _tag_cache.pop(key,None);_tag_cache[key]=(clock(),value)
             while len(_tag_cache)>64:_tag_cache.pop(next(iter(_tag_cache)))
