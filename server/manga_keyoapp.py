@@ -391,7 +391,8 @@ SOURCES = (
     Keyoapp('7739452864322240494', 'Kitsune Dawn', 'https://kitsunedawn.com', True, layout='redesign', query_limit=100),
     Keyoapp('4513668905743562887', 'Luna Toons', 'https://lunatoons.net', True, layout='v2'),
     Keyoapp('3314074618469377356', 'MeiToon', 'https://meitoon.org'),
-    Keyoapp('80073424419623517', 'Mist Scans', 'https://mistscans.com'),
+    # mistscans.com lost its DNS; the extension moved to mistscans.org (Nov 2026).
+    Keyoapp('80073424419623517', 'Mist Scans', 'https://mistscans.org'),
     Keyoapp('3025454996745441538', 'Nyanu Kafe', 'https://nyanukafe.com', fields={
         'authors': 'div.w-full.flex-wrap > div:nth-child(1) > div:last-child',
         'artists': 'div.w-full.flex-wrap > div:nth-child(2) > div:last-child',

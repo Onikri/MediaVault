@@ -1,7 +1,9 @@
 """XCOMIC title and edition routes, keeping chapter and translation identities."""
 
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+import time
 from datetime import datetime, timezone
 from html import unescape
 import json
@@ -31,10 +33,20 @@ LANGS = {'pt-BR': 'pt_br', 'es-419': 'es_419', 'zh-Hant': 'zh_hk', 'other': '_t'
 CODES = {LANGS.get(lang, lang): lang for _, lang in XCOMIC}
 FILTER = re.compile(r'[a-z0-9][a-z0-9_]{0,90}')
 LIMIT = 12
-EDITIONS = 120
+# Long-running titles carry hundreds of editions (Chainsaw Man: 340). The site
+# allows one root field per GraphQL request, so each edition is one probe, as
+# in the extension; probes are cached for all language profiles of the site.
+EDITIONS = 500
+PROBE_TTL = 6 * 3600
+PROBE_CAPACITY = 20000
 CHAPTERS_LIMIT = 6000
 PACE = OriginPace()
 PACE.interval = .2
+# Edition probes are tiny; the extension sends them five at a time unpaced.
+PROBE_PACE = OriginPace()
+PROBE_PACE.interval = .05
+_probes = OrderedDict()
+_probes_lock = Lock()
 
 
 def valid_id(value):
@@ -79,7 +91,7 @@ def graphql_form(url, body):
 
 def gql(http, operation, variables):
     body = json.dumps({'query': QUERIES[operation], 'variables': variables}, ensure_ascii=False).encode()
-    PACE.wait(http.deadline)
+    (PROBE_PACE if operation == PROBE else PACE).wait(http.deadline)
     raw = document(http, ROOT, '/query/', body=body, action='xcomic-graphql')
     payload = mapping(json_data(raw))
     if payload.get('errors'):
@@ -100,6 +112,23 @@ def node(http, operation, identity):
         raise SourceError('XCOMIC вернул другой идентификатор.')
     value = result.get('data')
     return mapping(value) if value is not None else None
+
+
+def probe(http, identity):
+    """An edition's language and state, shared by every language profile."""
+    now = time.monotonic()
+    with _probes_lock:
+        hit = _probes.get(identity)
+        if hit and hit[0] > now:
+            _probes.move_to_end(identity)
+            return hit[1]
+    row = node(http, PROBE, identity)
+    with _probes_lock:
+        _probes[identity] = now + PROBE_TTL, row
+        _probes.move_to_end(identity)
+        while len(_probes) > PROBE_CAPACITY:
+            _probes.popitem(last=False)
+    return row
 
 
 def title_node(http, identity):
@@ -297,7 +326,7 @@ class XComic:
 
     def editions(self, http, ids):
         def read(key):
-            row = node(http, PROBE, key)
+            row = probe(http, key)
             if not row or row.get('isPublic') is False or row.get('dbStatus') not in (None, 'normal'):
                 return None
             if self.lang != 'all' and row.get('translatedLanguage') != self.lang:

@@ -48,7 +48,14 @@ class LinkedArchive(JsonSeries):
     def chapter_document(self, http, url):
         wire = self.upstream(url)
         page, actual = self.document(http, wire)
-        if urlsplit(actual).path.rstrip('/') != urlsplit(wire).path.rstrip('/'):
+        requested = urlsplit(wire).path.rstrip('/')
+        allowed = {requested}
+        # ToonLook (Nov 2026) moved chapters under their title:
+        # /29-chapter-1 -> /manhwa/<title>/29-chapter-1/. Same chapter, same title.
+        parent = urlsplit(self.title_for(url)).path.rstrip('/')
+        if parent:
+            allowed.add(parent + '/' + requested.rsplit('/', 1)[-1])
+        if urlsplit(actual).path.rstrip('/') not in allowed:
             raise SourceError('Источник перенаправил запрос на другую главу.')
         return page, actual
 

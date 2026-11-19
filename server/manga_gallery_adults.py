@@ -17,6 +17,10 @@ EXTENSIONS = {'j': 'jpg', 'p': 'png', 'g': 'gif', 'b': 'bmp', 'w': 'webp'}
 PAGE_LIMIT = 1500
 IMAGE_FIELDS = ('data-src', 'data-original', 'data-lazy-src', 'data-cfsrc')
 READER_IMAGE = 'img#gimg, img#fimg, img#readerImg'
+# A gallery whose image list is only on its per-page reader pages: the chapter
+# lists page markers and each image is resolved when that page is loaded (as the
+# extension does), instead of fetching every reader page before the first one.
+PAGE_MARKER = 'mv_gallery_page'
 
 
 @dataclass(frozen=True)
@@ -216,14 +220,22 @@ class GalleryAdults(SeriesPort):
         return f'{self.ROOT}/{self.layout.page_prefix}/{gallery}/{index}/'
 
     def reader_pages(self, http, gid, count):
-        pages = []
-        for index in range(1, count + 1):
-            target = self.page_url(gid, index)
-            doc, final = self.document(http, target)
-            if urlsplit(final).path.rstrip('/') != urlsplit(target).path.rstrip('/'):
-                raise SourceError('Читалка переадресовала запрос на другую страницу.')
-            pages.append(picture(doc.select_one(READER_IMAGE), final, IMAGE_FIELDS))
-        return pages
+        return [self.page_url(gid, index) + '#' + PAGE_MARKER for index in range(1, count + 1)]
+
+    def is_reader_page(self, url):
+        parts = urlsplit(url)
+        return (parts.scheme == 'https' and parts.hostname == self.hostname and not parts.query
+                and bool(re.fullmatch(rf'/{re.escape(self.layout.page_prefix)}/[0-9]{{1,14}}/[1-9][0-9]{{0,3}}/', parts.path)))
+
+    def reader_image(self, http, url):
+        target = url.split('#', 1)[0]
+        doc, final = self.document(http, target)
+        if urlsplit(final).path.rstrip('/') != urlsplit(target).path.rstrip('/'):
+            raise SourceError('Читалка переадресовала запрос на другую страницу.')
+        image = picture(doc.select_one(READER_IMAGE), final, IMAGE_FIELDS)
+        if not image:
+            raise SourceError('Читалка галереи не предоставила изображение страницы.')
+        return image
 
     def manifest_images(self, doc, final):
         for script in doc.select('script'):
@@ -302,3 +314,16 @@ def sources():
     from manga_third_batch_profiles import GALLERY
 
     return tuple(GalleryAdults(identity, package) for package, identity in GALLERY)
+
+
+def reader_page(value):
+    """(adapter, page URL) for a deferred gallery page marker, or an error."""
+    import manga_native_registry
+
+    parts = urlsplit(value)
+    if parts.fragment != PAGE_MARKER:
+        raise SourceError('Некорректная страница галереи.')
+    for adapter in dict(manga_native_registry.profiles()).values():
+        if isinstance(adapter, GalleryAdults) and adapter.is_reader_page(value):
+            return adapter, value.split('#', 1)[0]
+    raise SourceError('Некорректная страница галереи.')

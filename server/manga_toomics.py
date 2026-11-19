@@ -14,8 +14,11 @@ from source_parser import SourceAccessError, SourceError
 
 ROOT = 'https://global.toomics.com'
 HOST = 'global.toomics.com'
-LANGS = ('en', 'es', 'mx', 'fr', 'de', 'it', 'por', 'sc', 'tc')
-VARIANTS = {'zh-Hans': 'sc', 'zh-Hant': 'tc', 'es-419': 'mx', 'pt-BR': 'por'}
+LANGS = ('en', 'es', 'mx', 'esp', 'fr', 'de', 'it', 'por', 'sc', 'tc')
+# Since Nov 2026 the Spanish (/es) and Latin American (/mx) stores redirect to
+# one /esp store; saved links keep their old prefix.
+VARIANTS = {'zh-Hans': 'sc', 'zh-Hant': 'tc', 'es': 'esp', 'es-419': 'esp', 'pt-BR': 'por'}
+LEGACY = {'esp': ('es', 'mx')}
 LANG_PATH = '(?:' + '|'.join(LANGS) + ')'
 ID = r'[1-9]\d{0,12}'
 TITLE = rf'/{LANG_PATH}/webtoon/episode/toon/({ID})(?:/search/Y)?/?'
@@ -65,11 +68,15 @@ class Toomics(SeriesPort):
     def parent_url(self, identity):
         return f'{ROOT}/{self.locale}/webtoon/episode/toon/{identity}/search/Y'
 
+    def own_path(self, url):
+        prefix = urlsplit(url).path.strip('/').split('/', 1)[0]
+        return prefix == self.locale or prefix in LEGACY.get(self.locale, ())
+
     def is_title(self, url):
-        return super().is_title(url) and urlsplit(url).path.startswith('/' + self.locale + '/')
+        return super().is_title(url) and self.own_path(url)
 
     def is_chapter(self, url):
-        return super().is_chapter(url) and urlsplit(url).path.startswith('/' + self.locale + '/')
+        return super().is_chapter(url) and self.own_path(url)
 
     def chapter_identity(self, url):
         parsed = urlsplit(url)
@@ -111,7 +118,12 @@ class Toomics(SeriesPort):
                                           headers={'Referer': ROOT + '/' + self.locale, 'User-Agent': USER_AGENT})
             if final != target:
                 raise SourceError('Toomics перенаправил поиск.')
-            content = json.loads(raw).get('content')
+            payload = json.loads(raw)
+            # Since Nov 2026 the results are {"webtoon": {"sHtml": ...}} (the
+            # extension reads the same field); older answers used "content".
+            content = payload.get('content') if isinstance(payload, dict) else None
+            if content is None and isinstance(payload, dict) and isinstance(payload.get('webtoon'), dict):
+                content = payload['webtoon'].get('sHtml')
             if not isinstance(content, str):
                 raise SourceError('Toomics изменил формат поиска.')
             doc = BeautifulSoup(decode_markup(content), 'html.parser')

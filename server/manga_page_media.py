@@ -64,6 +64,10 @@ def page_reference(value):
         if not (target := preview(value, marked=True)):
             raise SourceError('Некорректная страница Digital Comic Museum.')
         return target, None, 1, 'dcm-image'
+    if parts.fragment == 'mv_gallery_page':
+        from manga_gallery_adults import reader_page
+
+        return reader_page(value)[1] + '#mv_gallery_page', None, 1, 'gallery-page'
     if parts.fragment == 'mv_unicomics_page':
         from manga_unicomics import deferred
 
@@ -223,6 +227,12 @@ def fetch_page(http, reference, headers):
         from manga_comic_museum import lazy_image
         url = lazy_image(http, target)
         response, _ = http._open(url, headers={'Referer': target})
+        return validated_image(read_image(http, response))
+    if action == 'gallery-page':
+        from manga_gallery_adults import reader_page
+
+        adapter, page = reader_page(target)
+        response, _ = http._open(adapter.reader_image(http, page), headers={'Referer': page})
         return validated_image(read_image(http, response))
     if action == 'unicomics-image':
         from manga_unicomics import lazy_image

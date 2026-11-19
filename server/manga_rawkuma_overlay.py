@@ -21,7 +21,11 @@ from manga_speedbinb import remember
 from manga_webcomics import query_url
 from source_parser import SourceError
 
-ROOT = 'https://rawkuma.me'
+# Rawkuma.me moved to mangamachina.com (extension ceb9d60b, 2026-11-15); saved
+# rawkuma.me links keep opening on the new host.
+HOST = 'mangamachina.com'
+ROOT = 'https://' + HOST
+LEGACY_HOSTS = ('rawkuma.me', 'www.rawkuma.me')
 TITLE = rf'/(?:es/)?manga/({SEGMENT})/?'
 CHAPTER = rf'/(?:es/)?manga/({SEGMENT})/({SEGMENT})/?'
 FAMILY = re.compile(r'[A-Za-z0-9_ -]{1,64}')
@@ -31,7 +35,7 @@ MAX_OVERLAY = 64 * 1024
 
 
 def public_api(host, path, query):
-    if host != 'rawkuma.me' or path != '/api/series':
+    if host != HOST or path != '/api/series':
         return False
     pairs = parse_qsl(query)
     args = dict(pairs)
@@ -170,7 +174,7 @@ class RawkumaPage:
 
 class RawkumaMe(JsonSeries):
     def __init__(self, sid, lang):
-        super().__init__((sid, 'Rawkuma.me', lang, ROOT, True), TITLE, CHAPTER, interval=.35)
+        super().__init__((sid, 'Rawkuma.me', lang, ROOT, True), TITLE, CHAPTER, interval=.35, legacy_hosts=LEGACY_HOSTS)
 
     @property
     def site(self):
@@ -213,9 +217,18 @@ class RawkumaMe(JsonSeries):
     def flight(self, http, target):
         self.origin.wait(getattr(http, 'deadline', None))
         raw, final, _ = http.document(target)
-        if urlsplit(final).netloc != 'rawkuma.me' or self.chapter_identity(final) != self.chapter_identity(target):
+        if urlsplit(final).netloc != HOST or self.chapter_identity(final) != self.chapter_identity(target):
             raise SourceError('Rawkuma.me перенаправил запрос на другую страницу.')
-        return raw, flight_objects(raw)
+        try:
+            return raw, flight_objects(raw)
+        except SourceError:
+            # MangaMachina pages repeat shared references so often that resolving
+            # them exceeds the parse budget; the cards, series and reader objects
+            # are literal, so read the stream's objects as they are.
+            from manga_additional_catalogues import flight_models, flight_stream
+            from manga_vinetheme import dictionaries
+
+            return raw, [node for model in flight_models(flight_stream(raw)).values() for node in dictionaries(model)]
 
     def catalogue(self, http, page=1, *, query='', sort='popular', tag=''):
         query = self.catalogue_params(page, query, tag)
@@ -227,7 +240,8 @@ class RawkumaMe(JsonSeries):
         raw, values = self.flight(http, query_url(ROOT + '/manga', **params))
         rows = {}
         for item in values:
-            if all(k in item for k in ('slug', 'title', 'altTitles', 'chapters')):
+            # Listing cards carry only slug, title and cover since the move.
+            if all(k in item for k in ('slug', 'title', 'cover')) and not {'pages', 'fonts'} & item.keys():
                 if row := self.summary(item):
                     rows[row['url']] = row
         return list(rows.values()), bool(BeautifulSoup(raw, 'html.parser').select_one('a[rel=next]'))

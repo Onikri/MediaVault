@@ -1199,7 +1199,7 @@ class PublicHttp:
         finally:
             response.close()
 
-    def document(self, value, *, headers=None, method="GET", data=None, timeout=None, action=None):
+    def document(self, value, *, headers=None, method="GET", data=None, timeout=None, action=None, limit=MAX_DOCUMENT):
         options = {'timeout': timeout} if timeout else {}
         if action:
             options['action'] = action
@@ -1208,8 +1208,10 @@ class PublicHttp:
             parts, size, start = [], 0, time.monotonic()
             for block in response.iter_content(65536):
                 size += len(block)
-                if size > MAX_DOCUMENT or time.monotonic() - start > 20 or self.deadline and time.monotonic() > self.deadline:
+                if size > limit:
                     raise SourceError("Страница или плейлист слишком велики.")
+                if time.monotonic() - start > 20 or self.deadline and time.monotonic() > self.deadline:
+                    raise SourceTemporaryError("Источник отдаёт страницу слишком долго.")
                 parts.append(block)
             text = decode_document(b"".join(parts), response.encoding)
             if BLOCKED.search(text):

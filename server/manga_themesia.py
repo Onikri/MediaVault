@@ -212,7 +212,7 @@ class MangaThemesia:
                     except ValueError:
                         continue
                     if values:
-                        pages = [image_url(value, url) for value in values]
+                        pages = [self.script_image(value, url) for value in values]
                         break
                 if pages:
                     break
@@ -222,6 +222,9 @@ class MangaThemesia:
 
     def reader_image(self, node, url):
         return image(node, url)
+
+    def script_image(self, value, url):
+        return image_url(value, url)
 
     def series_link(self, soup, url):
         for anchor in soup.select('.allc a[href], .ts-breadcrumb a[href], [class*="breadcrumb"] a[href], a[rel="up"][href]'):
@@ -274,12 +277,47 @@ PAID_CHAPTERS = ', '.join(selector.strip() + ':has(a[href]):not(:has(a[data-bs-t
 
 class MiauScan(MangaThemesia):
     LANGUAGE_MARK = re.compile(r'^\(\s*Portugu[êe]s\s*\)\s*', re.I)
+    # leemiau.com moved to leer.lectovela.com (extension 04d0ed69, 2026-11-16).
+    LEGACY_HOSTS = frozenset({'leemiau.com', 'www.leemiau.com'})
+    # Chapters from 2023 still list http://miauscans.com/wp-content/uploads/...;
+    # that domain now redirects to an unrelated site, while the same uploads are
+    # served by the current host.
+    OLD_UPLOADS = frozenset({'miauscans.com', 'www.miauscans.com', 'leemiau.com', 'www.leemiau.com'})
+
+    def script_image(self, value, url):
+        try:
+            parts = urlsplit(value) if isinstance(value, str) else None
+        except ValueError:
+            parts = None
+        if parts and parts.netloc in self.OLD_UPLOADS and parts.path.startswith('/wp-content/uploads/'):
+            value = urlunsplit(('https', self.host, parts.path, parts.query, ''))
+        return super().script_image(value, url)
+
+    def site_link(self, value, base=None):
+        found = super().site_link(value, base)
+        if found or not isinstance(value, str):
+            return found
+        try:
+            parts = urlsplit(value)
+        except ValueError:
+            return ''
+        if parts.scheme in {'http', 'https'} and parts.netloc in self.LEGACY_HOSTS:
+            return super().site_link(urlunsplit(parts._replace(scheme='https', netloc=self.host)))
+        return ''
 
     def __init__(self, identity, language):
         super().__init__(identity, language=language, chapters=CHAPTERS + ', #chapterlist .lm4-chapter-item')
         self.chapter_name_selector = '.lm4-chapter-name, .chapternum'
         self.chapter_date_selector = '.lm4-chapter-date, .chapterdate'
         self.chapter_date_format = '%d/%m/%Y'
+
+    def series_link(self, soup, url):
+        # The lectovela reader links its title from the top bar and summary card.
+        for anchor in soup.select('a.lm-reader-summary-mini[href], a.lm-reader-topbar-btn[href]'):
+            link = self.site_link(anchor['href'], url)
+            if self.TITLE_PATH.fullmatch(urlsplit(link).path):
+                return link
+        return super().series_link(soup, url)
 
     def catalogue_route(self, page, query, sort, tag):
         path, selectors, nxt = super().catalogue_route(page, query, sort, tag)
@@ -317,7 +355,7 @@ class MiauScan(MangaThemesia):
         return [row for row in super().vocabulary(http) if row['sourceId'] != '307']
 
     def reader_image(self, node, url):
-        return image_url(node.get('data-lm-orig-src'), url) or super().reader_image(node, url)
+        return self.script_image(node.get('data-lm-orig-src'), url) or super().reader_image(node, url)
 
 
 class ComicAsura(MangaThemesia):
@@ -433,8 +471,8 @@ SOURCES = (
                  alternate='.alternative .desktop-titles'),
     MangaThemesia(('427734044452073936', 'Athrea Scans', 'https://athreascans.com', True),
                  chapters='#chapterlist li:has(.eph-num):has(a[href])', interval=0.5),
-    MiauScan(('2886862669347225416', 'Miau Scan', 'https://leemiau.com', True), 'es'),
-    MiauScan(('6705370418823255358', 'Miau Scan', 'https://leemiau.com', True), 'pt-BR'),
+    MiauScan(('2886862669347225416', 'Miau Scan', 'https://leer.lectovela.com', True), 'es'),
+    MiauScan(('6705370418823255358', 'Miau Scan', 'https://leer.lectovela.com', True), 'pt-BR'),
     ComicAsura(('499082788596590240', 'Comic Asura', 'https://comicasura.net', True)),
     MangaThemesia(('1124131000360667434', 'Scythe Scans', 'https://scythescans.com', False), interval=1/3),
     MangaThemesia(('1911019612901009263', 'Eva Scans', 'https://evascans.net', False),

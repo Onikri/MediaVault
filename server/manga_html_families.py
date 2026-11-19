@@ -15,10 +15,18 @@ from source_parser import SourceError
 
 
 BOX = {
-    'www.mangabats.com': (), 'www.kakamanga.com': ('www.mangakakalove.com',),
+    'www.mangabats.com': (), 'www.kakamanga.com': ('www.mangakakalove.com', 'www.katamanga.com'),
     # natomanga.com rotates mirrors: manganami.com, then natumanga.com (Nov 2026).
     'www.natomanga.com': ('www.natumanga.com', 'www.manganami.com', 'www.nelomanga.net', 'www.manganato.gg'),
 }
+# On 2026-11-19 natomanga/manganami redirect to natumanga.com, a redesigned
+# Next.js site the MangaBox markup no longer matches (the extension breaks the
+# same way); manganato.gg still serves the MangaBox site. Manganato reads from
+# it and rewrites saved links on the other mirrors to it (IDs are path-only).
+MANGANATO_HOME = 'www.manganato.gg'
+# The same day kakamanga.com started redirecting to the redesigned katamanga.com;
+# mangakakalove.com keeps the MangaBox site.
+KAKALOT_HOME = 'www.mangakakalove.com'
 READER_HOSTS = {'manganow.to', 'jmanga.cloud', 'rawotaku.com'}
 FM_HOSTS = {'nihonkuni.com', 'rawinu.com', 'weloma.net', 'love4u.net'}
 LILI_HOSTS = {'manhuaplus.org', 'raw1001.net'}
@@ -66,8 +74,22 @@ class MangaBox(SeriesPort):
                 author='li:-soup-contains("Author") a, td:-soup-contains("Author") + td a',
                 status='li:-soup-contains("Status"), td:-soup-contains("Status") + td')
 
-    def __init__(self, identity, mirrors=(), legacy_hosts=()):
+    def __init__(self, identity, mirrors=(), legacy_hosts=(), *, home_mirror=False):
         super().__init__(identity, SERIES, SUBCHAPTER, hosts=mirrors, legacy_hosts=legacy_hosts, interval=.25)
+        self.mirror_hosts = frozenset(mirrors) - {self.hostname} if home_mirror else frozenset()
+
+    def page_headers(self, _url):
+        # The image CDN (2xstorage) accepts only the site's origin as Referer,
+        # as the extension sends it; a chapter URL gets HTTP 403.
+        return {'Referer': self.ROOT + '/'}
+
+    def canonical(self, value):
+        target = super().canonical(value)
+        parts = urlsplit(target)
+        if target and parts.hostname in self.mirror_hosts:
+            # A saved link on another mirror reads from the profile's home mirror.
+            return self.site_link(urlunsplit(parts._replace(netloc=self.hostname)))
+        return target
 
     def title_for(self, url):
         return self.ROOT + '/manga/' + self.chapter_key(url)
@@ -380,10 +402,12 @@ class WPComics(SeriesPort):
 SOURCES = (
     MangaBox(('4215511432986138970', 'Mangabat', 'en', 'https://www.mangabats.com', True),
              legacy_hosts=('m.mangabat.com', 'h.mangabat.com', 'readmangabat.com', 'www.mangabat.com')),
-    MangaBox(('2528986671771677900', 'Mangakakalot', 'en', 'https://www.kakamanga.com', True), BOX['www.kakamanga.com'],
-             legacy_hosts=('mangakakalot.com', 'www.mangakakalot.com')),
-    MangaBox(('1024627298672457456', 'Manganato', 'en', 'https://www.natomanga.com', True), BOX['www.natomanga.com'],
-             legacy_hosts=('chapmanganato.to', 'manganato.com', 'readmanganato.com')),
+    MangaBox(('2528986671771677900', 'Mangakakalot', 'en', 'https://' + KAKALOT_HOME, True),
+             ('www.kakamanga.com', *(host for host in BOX['www.kakamanga.com'] if host != KAKALOT_HOME)),
+             legacy_hosts=('mangakakalot.com', 'www.mangakakalot.com'), home_mirror=True),
+    MangaBox(('1024627298672457456', 'Manganato', 'en', 'https://' + MANGANATO_HOME, True),
+             ('www.natomanga.com', *(host for host in BOX['www.natomanga.com'] if host != MANGANATO_HOME)),
+             legacy_hosts=('chapmanganato.to', 'manganato.com', 'readmanganato.com'), home_mirror=True),
     MangaReader(('855054225815309342', 'MangaNow', 'en', 'https://manganow.to', True)),
     MangaReader(('6141590427749684419', 'Jmanga', 'ja', 'https://jmanga.cloud', True)),
     MangaReader(('7370546749583817262', 'Raw Otaku', 'ja', 'https://rawotaku.com', True)),

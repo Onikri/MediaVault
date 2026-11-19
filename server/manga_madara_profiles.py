@@ -86,7 +86,7 @@ PROFILES = (
     (('6421630287504544593', 'TopManhua.net', 'https://topmanhua.net', True), {'chapter_mode': 'manga'}),
     (('6032516943051342273', 'TritiniaScans', 'https://tritinia.org', False), {'chapter_mode': 'manga'}),
     (('58992897252080929', 'KokoMangas', 'https://kokomangas.com', True), {'chapter_mode': 'manga'}),
-    (('3062846066388633553', 'WebtoonScan', 'https://webtoonscan.com', True), {}),
+    (('3062846066388633553', 'WebtoonScan', 'https://webtoonscan.org', True), {}),  # .com lost its DNS (Nov 2026)
     (('6540843430852844328', 'WuxiaWorld', 'https://wuxiaworld.site', False), {'chapter_mode': 'manga', 'section': 'novel'}),
     (('4439807782838127935', 'YaoiScan', 'https://yaoiscan.com', True), {}),
     (('5990114708086767078', 'Zinmanga', 'https://mangazin.org', True), {'manga_only': False}),
