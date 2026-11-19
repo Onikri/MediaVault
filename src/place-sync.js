@@ -85,7 +85,7 @@ export function applyPlaces(user,entries,dirty,storage){
 
 let active=null;
 // A writer calls this after it saved a place on this device.
-export function notePlace(user,storageKey,storage){const key=syncKeyFor(user,storageKey);if(!key)return;markPlace(user,key,Date.now(),storage);if(active?.user===user)active.schedule();}
+export function notePlace(user,storageKey,storage,at=Date.now()){const key=syncKeyFor(user,storageKey);if(!key)return;markPlace(user,key,at,storage);if(active?.user===user)active.schedule();}
 export function noteHistory(user,id,storage){if(!user||user==='guest'||!id)return;markPlace(user,'h:'+id,Date.now(),storage);if(active?.user===user)active.schedule();}
 // A page that shows a resume place asks for a fresh copy when it opens.
 export function requestPlaceSync(){active?.refresh();}

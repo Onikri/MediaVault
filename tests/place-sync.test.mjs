@@ -91,7 +91,8 @@ test('the newest place wins; an offline phone keeps its change and sends it late
  pc.sync.stop();phone.sync.stop();
 });
 
-test('manga pages, episode seconds and the chosen episode follow the profile; finished and removed places stay removed',async()=>{
+test('manga pages, episode seconds and the chosen episode follow the profile; finished and removed places stay removed',async(t)=>{
+ t.mock.method(Date,'now',()=>1795088400000);
  const remote=server(),pc=device(remote,'alice'),phone=device(remote,'alice');
  await pc.sync.start();await phone.sync.start();
  writeReading('alice','online',{id:'online:https://manga.example/c/3',collectionId:'online-title:shiki-9'},14,30,pc.storage);
