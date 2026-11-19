@@ -682,3 +682,30 @@ class WarpExitTests(TransportCase):
                                              .read_text(encoding='utf-8')))
         warp = sorted(rule.hosts[0] for entry in shipped.values() for rule in entry.rules if rule.exit == 'warp')
         self.assertEqual(warp, ['atsu.moe', 'hentaihere.com', 'komix.to', 'newxtoon5.com'])
+
+
+class CdnClearanceTests(TransportCase):
+    challenged_until_cleared = SolverTests.challenged_until_cleared
+    def test_cdn_image_is_cleared_on_the_site_root_and_reuses_its_zone_cookie(self):
+        jpeg = b'\xff\xd8\xff\xe0' + b'0' * 4000
+        site = self.challenged_until_cleared(jpeg)
+        with patch.object(transport.requests, 'post', side_effect=byparr()) as solver:
+            response, final = self.http(site, MANGANATO, 'images')._open(
+                'https://cdn1.natomanga.com/manga/solo/1.jpg', headers={'Referer': 'https://www.natomanga.com/'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(solver.call_count, 1)
+        # Byparr opens the site's HTML root, not the image.
+        self.assertEqual(solver.call_args.kwargs['json']['url'], 'https://natomanga.com/')
+        retry = site.calls[-1]
+        self.assertEqual(retry['url'], 'https://cdn1.natomanga.com/manga/solo/1.jpg')
+        self.assertEqual(retry['options']['cookies'], {'cf_clearance': 'ok'})
+
+    def test_solver_answer_outside_the_declared_site_is_still_rejected(self):
+        site = self.challenged_until_cleared()
+        with patch.object(transport.requests, 'post', side_effect=byparr()) as solver:
+            def elsewhere(endpoint, json=None, **kwargs):
+                value = byparr()(endpoint, json={**json, 'url': 'https://evil.example/'}, **kwargs)
+                return value
+            solver.side_effect = elsewhere
+            with self.assertRaises(SourceChallengeError):
+                self.http(site, MANGANATO, 'chapters').document('https://www.natomanga.com/manga/solo')

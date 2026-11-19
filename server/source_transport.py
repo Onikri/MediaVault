@@ -93,6 +93,10 @@ class Rule:
             return False
         return operation is None or '*' in self.operations or operation in self.operations
 
+    def site(self, host):
+        """The declared domain a host belongs to (a CDN subdomain belongs to its site)."""
+        return next((domain for domain in self.hosts if host == domain or host.endswith('.' + domain)), host)
+
 
 @dataclass(frozen=True)
 class Declaration:
@@ -635,7 +639,9 @@ def call_solver(decision, url, budget):
     agent = solution.get('userAgent')
     final = solution.get('url') if isinstance(solution.get('url'), str) else ''
     if (not isinstance(agent, str) or not 20 <= len(agent) <= 512 or re.search(r'[\r\n\x00]', agent)
-            or (urlsplit(final).hostname or '').lower() != decision.host):
+            or not decision.rule.matches((urlsplit(final).hostname or '').lower(), None)):
+        # A CDN subdomain is cleared on its site's root; anything outside the
+        # declared domains is another site.
         raise SourceChallengeError('Решатель вернул ответ другого сайта.', solver='failed')
     html = solution.get('response') if isinstance(solution.get('response'), str) else ''
     return Session(_clean_cookies(solution.get('cookies'), decision.host), agent, time.time(), decision.exit_id,

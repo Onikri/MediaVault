@@ -1062,7 +1062,14 @@ class PublicHttp:
                 if kind == 'challenge':
                     response.close()
                     if solved is None:
-                        solve_url = url if method == 'GET' else f'https://{decision.host}/'
+                        site = decision.rule.site(decision.host)
+                        # Byparr clears challenges on HTML pages. A CDN subdomain (page
+                        # images) takes its site's clearance, which Cloudflare scopes to
+                        # the whole zone; a POST is cleared on its own host's root.
+                        if site != decision.host and expect != 'page':
+                            solve_url = f'https://{site}/'
+                        else:
+                            solve_url = url if method == 'GET' else f'https://{decision.host}/'
                         solved = transport.solve(decision, solve_url, self.deadline, started)
                         solved_key = transport.session_key(decision)
                         continue
