@@ -128,7 +128,7 @@ def classify(error):
     if isinstance(error, SourceAccessError):
         # Per-chapter closures (paid/rental/members-only chapters) are not site blocks.
         if re.search(r'только часть|платн|подписк|premium|покуп|закрыта у|на условиях|ограничил[аи]? чтение|'
-                     r'ограничивает доступ к выпуску|не передал открытые|не предоставил открытую|требует доступ на стороне|'
+                     r'ограничивает доступ к (?:этому )?(?:выпуску|главе)|не передал открытые|не предоставил открытую|требует доступ на стороне|'
                      r'не открыл главу|не открыл страницы', text, re.I):
             return 'paid_only', text
         if re.search(r'на языке|другом языке', text, re.I):
