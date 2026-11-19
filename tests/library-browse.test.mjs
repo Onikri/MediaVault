@@ -1,8 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {browseQuery,fetchBrowsePage} from '../src/catalog.js';
+import {browseQuery,fetchBrowsePage,mergeCatalog,validExternalIds} from '../src/catalog.js';
 import {titleSlug} from '../src/title-route.js';
 import {tabTitle,kindIcon} from '../src/tab-identity.js';
+import {contentCatalogParams} from '../src/use-content-catalog.js';
+
+test('the server catalogue uses the grid page size beyond page 208', ()=>{
+ const params=contentCatalogParams({kind:'anime',query:'',filters:{genre:['Drama','Comedy']},page:209,limit:28,sort:'old'});
+ assert.equal(params.get('offset'),String(208*28));
+ assert.equal(params.get('limit'),'28');
+ assert.equal(params.get('sort'),'old');
+ assert.deepEqual(JSON.parse(params.get('genre')),['Drama','Comedy']);
+});
+
+test('works with conflicting film IDs stay separate in the combined results', ()=>{
+ assert.deepEqual(validExternalIds({imdb:'tt0012345'}),{imdb:'tt0012345'});
+ const rows=['tt0012345','tt1234567'].map(imdb=>({id:imdb,kind:'movie',title:'Same Name',year:2004,ids:{imdb}}));
+ assert.equal(mergeCatalog(rows).length,2);
+ assert.equal(mergeCatalog([...rows,{...rows[0],id:'alias',title:'Another Name'}]).length,2);
+});
 
 test('browse pages are one ordered AniList list with a stable tie-break', ()=>{
  const one=browseQuery({kind:'anime',page:1,perPage:24,sort:'score'}),five=browseQuery({kind:'anime',page:5,perPage:24,sort:'score'});

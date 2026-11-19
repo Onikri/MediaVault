@@ -229,8 +229,17 @@ def install(app,owner,viewer,manager):
         with store.lock,store.db:return {'indexed':content_catalog.ingest(store.db,body.items)}
 
     @app.get('/catalog/content')
-    def content(q:str='',kind:str='anime',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',format:str='',year:str='',age:str='',offset:int=0,limit:int=60,tagPolicyRevision:str='',subject=Depends(viewer)):
+    def content(q:str='',kind:str='anime',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',format:str='',year:str='',age:str='',offset:int=0,limit:int=60,sort:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
         store=manager()
-        with store.lock:result=content_catalog.browse(store.db,kind=kind,q=q[:160],tag=tag[:4096],genre=genre[:4096],excludeGenre=excludeGenre[:4096],excludeTag=excludeTag[:4096],format=format[:60],year=year[:4],age=age[:20],offset=offset,limit=limit)
+        with store.lock:result=content_catalog.browse(store.db,kind=kind,q=q[:160],tag=tag[:4096],genre=genre[:4096],excludeGenre=excludeGenre[:4096],excludeTag=excludeTag[:4096],format=format[:60],year=year[:4],age=age[:20],offset=offset,limit=limit,sort=sort[:20])
         prioritize(store,subject,tag,genre)
         return with_policy(result,tagPolicyRevision,store)
+
+    @app.get('/catalog/content/title')
+    def content_title(kind:str,provider:str,id:str,subject=Depends(viewer)):
+        if kind not in content_catalog.KINDS or not 1<=len(provider)<=100 or not 1<=len(id)<=100:
+            raise HTTPException(404,'Тайтл отсутствует в индексе.')
+        store=manager()
+        with store.lock:result=content_catalog.title(store.db,kind,provider,id)
+        if result is None:raise HTTPException(404,'Тайтл отсутствует в индексе.')
+        return result

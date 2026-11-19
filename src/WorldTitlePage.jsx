@@ -2,7 +2,7 @@ import CrashBoundary from './CrashBoundary.jsx';
 import {useEffect,useMemo,useState,useRef,useCallback,lazy,Suspense} from 'react';
 import {mergeTitleIdentity,preserveCatalogFacts} from './title-details.js';
 import {profileForSeason} from './use-season-source.js';
-import {fetchCatalog,mergeCatalog,normalized} from './catalog.js';
+import {catalogItem,fetchCatalog,mergeCatalog,normalized} from './catalog.js';
 import {loadTitleProfile,translate} from './title-metadata.js';
 import TitlePage from './TitlePage.jsx';
 import {OnlineBooks} from './OnlineLibrary.jsx';
@@ -62,7 +62,11 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  useEffect(()=>{
   const abort=new AbortController();setItem(value);setProfile(null);setSupplement(null);setViewSeason(null);setSeasonProfiles({});setSaveOpen(false);setLoading(true);
   const tasks=[];
-  if(!value.sourceOnly&&value.providerId&&!['youtube'].includes(value.provider)&&!(value.provider==='openlibrary'&&!/^OL\d+W$/.test(value.providerId)))tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem(old=>({...mergeCatalog(value.kind==='book'?[old,...rows]:[...rows,old])[0],id:value.id}));}));
+  if(value.provider==='omdb'&&value.providerId&&service.session?.worldCatalogueBrowse)tasks.push(
+   service.request('/catalog/content/title?'+new URLSearchParams({kind:value.kind,provider:value.provider,id:value.providerId}),{signal:abort.signal})
+    .then(row=>{if(!abort.signal.aborted)setItem(catalogItem({...row,id:value.id}));})
+  );
+  else if(!value.sourceOnly&&value.providerId&&!['youtube','omdb'].includes(value.provider)&&!(value.provider==='openlibrary'&&!/^OL\d+W$/.test(value.providerId)))tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem(old=>({...mergeCatalog(value.kind==='book'?[old,...rows]:[...rows,old])[0],id:value.id}));}));
   // Books: the Russian description and edition from Fantlab, the same work by ID.
   if(value.kind==='book'&&value.provider!=='fantlab'){
    const same=row=>[row.titles?.en,row.titles?.ru].some(t=>t&&(value.aliases||[value.title]).some(a=>normalized(a)===normalized(t)));
@@ -72,12 +76,12 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   }
   if(value.ids?.mal)tasks.push(loadTitleProfile(value.ids.mal,value.kind,{server:service.server,signal:abort.signal,onPartial:data=>{if(!abort.signal.aborted)setProfile(data);}}).then(data=>{if(!abort.signal.aborted)setProfile(data);}));
   Promise.allSettled(tasks).then(()=>{if(!abort.signal.aborted)setLoading(false);});return()=>abort.abort();
- },[value.id,service.server,destination]);
+ },[value.id,service.server,destination,service.session?.worldCatalogueBrowse]);
  const [sourcePublication,setSourcePublication]=useState(null);
  const receivePublication=useCallback(value=>setSourcePublication({id:item.id,value}),[item.id]);
  const searchItem=useMemo(()=>mergeTitleIdentity(item,profile||{}),[item,profile]);
 
- const supplementKey=item.kind+':'+(item.ids?.kinopoisk||'')+':'+(item.ids?.imdb||'')+':'+(item.ids?.fantlab||'');
+ const supplementKey=item.kind+':'+(item.ids?.kinopoisk||'')+':'+(item.ids?.imdb||'')+':'+(item.ids?.wikidata||'')+':'+(item.ids?.fantlab||'');
  useEffect(()=>{
   if(!['movie','tv','book'].includes(item.kind))return;
   const abort=new AbortController();

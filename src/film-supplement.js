@@ -32,6 +32,11 @@ async function entities(list,signal,props='labels|claims'){
  return rows;
 }
 async function wikidataEntity(item,signal){
+ const linked=item.ids?.wikidata;
+ if(/^Q[1-9]\d*$/.test(linked||'')){
+  const entity=(await entities([linked],signal,'labels|claims|sitelinks'))[linked];
+  if(entity?.claims)return entity;
+ }
  const statements=[item.ids?.kinopoisk&&'haswbstatement:P2603='+item.ids.kinopoisk,item.ids?.imdb&&'haswbstatement:P345='+item.ids.imdb].filter(Boolean);
  for(const query of statements){
   const found=await wikidata({action:'query',list:'search',srsearch:query,srlimit:'2'},signal);

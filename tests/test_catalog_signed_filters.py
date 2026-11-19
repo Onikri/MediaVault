@@ -46,6 +46,23 @@ class SignedFilters(unittest.TestCase):
   self.assertEqual(set(result['items'][0]['aliases']),{'Мир','World'})
   self.assertEqual(content_catalog.browse(self.db,kind='anime',q='World',genre='Fantasy',tag='Robots')['total'],1)
   self.assertEqual(content_catalog.browse(self.db,kind='anime',excludeTag='Robots')['total'],0)
+ def test_catalogue_orders_works_before_paging_and_keeps_distinct_remakes(self):
+  def row(provider,source_id,year,imdb):
+   return {'id':f'{provider}:{source_id}','provider':provider,'providerId':str(source_id),
+           'kind':'movie','title':'One Name','year':year,'ids':{'imdb':imdb}}
+  content_catalog.ingest(self.db,[row('omdb',1,1930,'tt0001000'),{**row('fixture',2,'1930','tt0001000'),'cover':'https://fixture.example/poster.jpg'},
+                                  row('omdb',3,2020,'tt1234567'),row('omdb',4,None,'tt1234568')])
+  first=content_catalog.browse(self.db,kind='movie',sort='new',limit=1)
+  second=content_catalog.browse(self.db,kind='movie',sort='new',limit=1,offset=1)
+  self.assertEqual((first['total'],first['items'][0]['ids']['imdb'],second['items'][0]['ids']['imdb']),
+                   (3,'tt1234567','tt0001000'))
+  self.assertEqual({*second['items'][0]['providers']},{'omdb','fixture'})
+  self.assertEqual([r['ids']['imdb'] for r in content_catalog.browse(self.db,kind='movie',sort='old')['items']],
+                   ['tt0001000','tt1234567','tt1234568'])
+  detail=content_catalog.title(self.db,'movie','omdb','1')
+  self.assertEqual(detail['id'],'omdb:1')
+  self.assertEqual(detail['cover'],'https://fixture.example/poster.jpg')
+  self.assertIsNone(content_catalog.title(self.db,'tv','omdb','1'))
  def test_malformed_or_overlarge_filter_lists_do_not_widen_the_query(self):
   from fastapi import HTTPException
   for value in ['["Fantasy"',json.dumps(['Fantasy']*65)]:

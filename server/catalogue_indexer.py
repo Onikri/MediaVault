@@ -18,7 +18,7 @@ _PROFILE_CODES = ','.join("'" + lang + "'" for lang in sorted(PROFILE_LANGUAGES)
 _LANG = "lower(replace(json_extract(spec,'$.source.lang'),'_', '-'))"
 _SCOPE = f"(kind NOT LIKE 'bridge%' OR {_LANG} IS NULL OR substr({_LANG},1,instr({_LANG}||'-','-')-1) IN ({_PROFILE_CODES}))"
 CLAIMABLE=_SCOPE+" AND state IN ('queued','retry','done','partial') AND due<=?"
-BASE_KINDS=('lib','bridge','remanga','html')
+BASE_KINDS=('lib','bridge','remanga','html','omdb')
 # Per-host request spacing in seconds; LibGroup tolerates a faster pace and
 # slows down again by itself on 429.
 PACE={LIB_HOST:0.6}
@@ -245,7 +245,7 @@ class Indexer:
                     before=self.store.db.total_changes
                     self.store.db.executemany('INSERT OR IGNORE INTO catalogue_page_items VALUES(?,?)',[(job['id'],str(r.get('sourceUrl') or r.get('url') or r.get('id'))) for r in rows])
                     count=self.store.db.total_changes-before
-                due=self.clock()+(2 if next_cursor else 86400 if '-detail' in spec['type'] else 21600)
+                due=self.clock()+(2 if next_cursor else 86400 if '-detail' in spec['type'] or spec['type']=='omdb' else 21600)
                 self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),priority=CASE WHEN ? THEN priority ELSE MIN(priority,10) END,attempts=0,error=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),bool(next_cursor),result.get('reason',''),self.clock(),job['id']))
                 if '-detail' in spec['type'] and not next_cursor:
                     self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(job['id'],));self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
@@ -318,12 +318,13 @@ class Indexer:
             pending_catalogues={domain:count for domain,count in self.store.db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind IN ('html','lib','bridge','remanga') AND json_extract(spec,'$.term') IS NOT NULL AND state IN ('queued','retry','running') GROUP BY json_extract(spec,'$.domain')")}
             stored=dict(self.store.db.execute('SELECT provider,COUNT(*) FROM catalog_titles GROUP BY provider'))
             from catalogue_sources import source_provider
-            for spec,state,pages,records,error,due,expected in self.store.db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books') ORDER BY id"):
+            for spec,state,pages,records,error,due,expected in self.store.db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books','omdb') ORDER BY id"):
                 spec=json.loads(spec)
                 if '-detail' in spec['type'] or spec['type'].endswith('-vocabulary') or spec.get('term'):continue
                 details=pending_details.get(spec['domain'],0)
                 catalogues=pending_catalogues.get(spec['domain'],0)
                 rows.append({'domain':spec['domain'],'name':spec['name'],'status':'enriching' if state in {'done','partial'} and (details or catalogues) else state,'pages':pages,'indexed':records,'storedTitles':stored.get(source_provider(spec),0),'expected':expected,'pendingDetails':details,'pendingCatalogues':catalogues,'error':error,'retryAt':due if state=='retry' else None})
+                if spec['type']=='omdb':rows[-1].pop('storedTitles')  # This source writes to content_titles.
                 if spec['type']=='mirror':rows[-1]['mirrorOf']=spec['primary']
                 if self.paused.get(host_of(spec),0)>self.clock():rows[-1]['pausedUntil']=self.paused[host_of(spec)]
             by_domain={r['domain']:r for r in rows}

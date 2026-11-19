@@ -3,9 +3,14 @@ import {useEffect,useState} from 'react';
 import {acceptContentPolicy,contentPolicyRevision} from './manga-tag-policy.js';
 const sent=new Map();
 const empty=Object.freeze([]);
-export default function useContentCatalog({service,state,kind,query,filters,rows,revision,page=1}){
- const filterScope=JSON.stringify(filters);
- const [result,setResult]=useState({items:empty});
+export function contentCatalogParams({kind,query,filters,page=1,limit=30,sort=''}){
+ return new URLSearchParams({q:query,kind,tag:filterParam(filters.tag),genre:filterParam(filters.genre),excludeGenre:filterParam(filters.excludeGenre),excludeTag:filterParam(filters.excludeTag),format:filters.format||'',age:filters.age||'',year:filters.year||'',limit:String(limit),offset:String((page-1)*limit),sort});
+}
+
+export default function useContentCatalog({service,state,kind,query,filters,rows,revision,page=1,limit=30,sort=''}){
+ const params=contentCatalogParams({kind,query,filters,page,limit,sort}).toString();
+ const key=JSON.stringify([service.server,params]);
+ const [result,setResult]=useState({items:empty}),[retryCount,setRetryCount]=useState(0);
  const enabled=!!service?.server&&Number(service.session?.serverVersion)>=74;
  useEffect(()=>{
   if(!enabled||!state?.admin||!rows?.length)return;
@@ -15,11 +20,24 @@ export default function useContentCatalog({service,state,kind,query,filters,rows
   },450);return()=>{clearTimeout(timer);abort.abort();};
  },[enabled,rows,service.server,state?.admin]);
  useEffect(()=>{
-  if(!enabled){setResult({items:empty});return;}
+  if(!enabled)return;
   const abort=new AbortController();let busy=false;
-  const read=async()=>{if(busy||document.hidden)return;busy=true;try{const value=await service.request('/catalog/content?'+new URLSearchParams({q:query,kind,tag:filterParam(filters.tag),genre:filterParam(filters.genre),excludeGenre:filterParam(filters.excludeGenre),excludeTag:filterParam(filters.excludeTag),format:filters.format||'',age:filters.age||'',year:filters.year||'',tagPolicyRevision:contentPolicyRevision(),limit:'30',offset:String((page-1)*30)}),{signal:abort.signal});if(!abort.signal.aborted){acceptContentPolicy(value);setResult({items:value.items||empty,ready:true,filterScope,query,kind,server:service.server,page,hasMore:Number(value.offset||0)+(value.items||[]).length<Number(value.total||0),pages:Number(value.total)>0?Math.ceil(Number(value.total)/30):null});}}catch(error){if(!abort.signal.aborted)setResult({items:empty,query,kind,server:service.server,page,filterScope,error:error.message});}finally{busy=false;}};
+  const read=async()=>{
+   if(busy||document.hidden)return;
+   busy=true;
+   try{
+    const value=await service.request('/catalog/content?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(20000)])});
+    if(abort.signal.aborted)return;
+    acceptContentPolicy(value);
+    const items=value.items||empty,total=Number(value.total)||0;
+    setResult({items,key,ready:true,total,hasMore:Number(value.offset||0)+items.length<total,pages:total?Math.ceil(total/limit):null});
+   }catch(error){
+    if(!abort.signal.aborted)setResult(old=>({...(old.key===key?old:{items:empty}),key,error:error.message}));
+   }finally{busy=false;}
+  };
   const timer=setTimeout(read,150),poll=setInterval(read,15000);addEventListener('focus',read);addEventListener('mediavault:catalog-facts-updated',read);
   return()=>{clearTimeout(timer);clearInterval(poll);removeEventListener('focus',read);removeEventListener('mediavault:catalog-facts-updated',read);abort.abort();};
- },[enabled,kind,query,filters.tag,filters.genre,filters.excludeTag,filters.excludeGenre,filters.format,filters.age,filters.year,revision,service.server,page]);
- return result.query===query&&result.kind===kind&&result.server===service.server&&result.page===page&&result.filterScope===filterScope?result:{items:empty};
+ },[enabled,key,revision,retryCount]);
+ const current=enabled&&result.key===key?result:{items:empty};
+ return {...current,loading:enabled&&!current.ready&&!current.error,retry:()=>{setResult(old=>old.key===key?{...old,error:''}:old);setRetryCount(value=>value+1);}};
 }

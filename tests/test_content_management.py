@@ -141,5 +141,12 @@ class ContentHttpTests(ContentFixture,unittest.TestCase):
     self.assertEqual(self.client.get('/admin/content').status_code,403)
     self.assertEqual(self.client.put('/admin/content/policy',json={'revision':current().revision,'policy':BASE}).status_code,403)
     self.assertEqual(self.client.post('/catalog/content/facts',json={'items':[]}).status_code,403)
+ def test_indexed_title_can_be_opened_from_its_shared_identity(self):
+  content_catalog.ingest(self.store.db,[{'id':'omdb:200','provider':'omdb','providerId':'200','kind':'tv','title':'Indexed Series','year':1980}])
+  self.api.app.dependency_overrides[self.api.viewer]=lambda:'fixture-reader'
+  response=self.client.get('/catalog/content/title',params={'kind':'tv','provider':'omdb','id':'200'})
+  self.assertEqual(response.status_code,200)
+  self.assertEqual(response.json()['title'],'Indexed Series')
+  self.assertEqual(self.client.get('/catalog/content/title',params={'kind':'movie','provider':'omdb','id':'200'}).status_code,404)
 
 if __name__=='__main__':unittest.main()

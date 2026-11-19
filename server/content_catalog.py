@@ -4,6 +4,13 @@ from urllib.parse import urlsplit
 from manga_tag_policy import current,normalize
 
 KINDS=frozenset({'movie','tv','anime','manga','ranobe','book'})
+RELEASE_YEAR = "MAX(CASE WHEN typeof(json_extract(t.raw,'$.year')) IN ('integer','text') AND CAST(json_extract(t.raw,'$.year') AS INTEGER) BETWEEN 1 AND 9999 THEN CAST(json_extract(t.raw,'$.year') AS INTEGER) END)"
+ORDERS = {
+    'updated': 'MAX(t.updated) DESC',
+    'new': f'{RELEASE_YEAR} IS NULL,{RELEASE_YEAR} DESC',
+    'old': f'{RELEASE_YEAR} IS NULL,{RELEASE_YEAR}',
+    'title': 'MIN(t.search)',
+}
 
 def work_sql(alias='t'):
     p=alias+'.' if alias else ''
@@ -71,6 +78,9 @@ def safe_url(value):
         return value if p.scheme=='https' and p.hostname and not p.username and not p.password else ''
     except ValueError:return ''
 
+def title_key(kind,provider,identity):
+    return hashlib.sha256((kind+'\0'+provider+'\0'+identity).encode()).hexdigest()[:32]
+
 def ingest(db,rows):
     initialize(db);count=0;new_facts=0
     for row in rows[:100]:
@@ -88,7 +98,7 @@ def ingest(db,rows):
         data['ids']={k:str(v)[:100] for k,v in (data.get('ids') or {}).items() if k in {'mal','anilist','kitsu','imdb','wikidata','fantlab','kinopoisk','openlibrary'}} if isinstance(data.get('ids'),dict) else {}
         if not isinstance(data.get('titles'),dict):data['titles']={}
         data['titles']={k:v[:500] for k,v in data['titles'].items() if k in {'ru','uk','en','native','romaji'} and isinstance(v,str)}
-        key=hashlib.sha256((data['kind']+'\0'+provider+'\0'+identity).encode()).hexdigest()[:32]
+        key=title_key(data['kind'],provider,identity)
         previous=db.execute('SELECT raw FROM content_titles WHERE id=?',(key,)).fetchone()
         if previous:
             old=json.loads(previous[0])
@@ -98,6 +108,9 @@ def ingest(db,rows):
             for field in ('ids','titles'):data[field]={**old.get(field,{}),**data[field]}
         raw=json.dumps(data,ensure_ascii=False,separators=(',',':'))
         if len(raw.encode())>24000:continue
+        if provider=='omdb' and previous and previous[0]==raw:
+            count+=1
+            continue
         search=normalize(' '.join([title,*data['aliases'],*data['titles'].values()]))[:5000]
         db.execute('INSERT OR REPLACE INTO content_titles VALUES(?,?,?,?,?)',(key,data['kind'],search,raw,int(time.time())))
         new_facts+=_index(db,key,data,current())
@@ -105,7 +118,7 @@ def ingest(db,rows):
     if new_facts:invalidate(db)
     return count
 
-def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='',year='',age='',limit=60,offset=0):
+def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='',year='',age='',limit=60,offset=0,sort='updated'):
     initialize(db)
     if kind not in KINDS:return {'items':[],'total':0}
     policy=current();where=['kind=?'];params=[kind]
@@ -122,24 +135,36 @@ def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='
     elif age=='under18':where.append("CAST(json_extract(t.raw,'$.age') AS INTEGER)<18")
     condition=' AND '.join(where);limit=min(100,max(1,limit));offset=max(0,min(10_000_000,offset))
     work=work_sql();total=db.execute('SELECT COUNT(DISTINCT '+work+') FROM content_titles t WHERE '+condition,params).fetchone()[0]
-    keys=[value[0] for value in db.execute('SELECT '+work+' FROM content_titles t WHERE '+condition+' GROUP BY '+work+' ORDER BY MAX(updated) DESC,'+work+' LIMIT ? OFFSET ?',[*params,limit,offset])]
-    rows=[]
-    for key in keys:
-        records=[(identity,json.loads(raw)) for identity,raw in db.execute('SELECT id,raw FROM content_titles t WHERE '+work+'=? ORDER BY updated DESC,id',(key,))]
-        if not records:continue
-        from catalog_taxonomy import hentai_excluded
-        excluded=any(hentai_excluded(record) for _,record in records) or bool(db.execute('SELECT 1 FROM content_tag_facts f JOIN content_titles peer ON peer.id=f.title_id WHERE '+work_sql('peer')+'=? AND catalog_not_hentai(f.original)=1 LIMIT 1',(key,)).fetchone())
-        identity,row=records[0];merged={'genres':[],'tags':[]}
-        for _,record in records:
-            source=urlsplit(record.get('sourceUrl') or record.get('sourceURL') or '').hostname or ''
-            facts=policy.facts({**record,'hentaiExcluded':excluded},source)
-            for field in merged:merged[field]=list(dict.fromkeys([*merged[field],*facts[field]]))[:120]
-        aliases=list(dict.fromkeys([value for _,record in records for value in [record['title'],*record.get('aliases',[])]]))[:120]
-        ids={};titles={}
-        for _,record in reversed(records):ids.update(record.get('ids') or {});titles.update(record.get('titles') or {})
-        rows.append({**row,**merged,'hentaiExcluded':excluded,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records)})
-
+    order=ORDERS.get(sort,ORDERS['updated'])
+    keys=[value[0] for value in db.execute('SELECT '+work+' FROM content_titles t WHERE '+condition+' GROUP BY '+work+' ORDER BY '+order+','+work+' LIMIT ? OFFSET ?',[*params,limit,offset])]
+    rows=[row for key in keys if (row:=read_work(db,key,policy)) is not None]
     return {'items':rows,'total':total,'offset':offset,'limit':limit}
+
+def read_work(db,key,policy,preferred_id=''):
+    records=[(identity,json.loads(raw)) for identity,raw in db.execute('SELECT id,raw FROM content_titles t WHERE '+work_sql()+'=? ORDER BY updated DESC,id',(key,))]
+    if not records:return None
+    from catalog_taxonomy import hentai_excluded
+    excluded=any(hentai_excluded(record) for _,record in records) or bool(db.execute('SELECT 1 FROM content_tag_facts f JOIN content_titles peer ON peer.id=f.title_id WHERE '+work_sql('peer')+'=? AND catalog_not_hentai(f.original)=1 LIMIT 1',(key,)).fetchone())
+    identity,row=next((entry for entry in records if entry[0]==preferred_id),records[0])
+    for field in ('cover','description'):
+        if not row.get(field):
+            row[field]=next((record[field] for _,record in records if record.get(field)),'')
+    merged={'genres':[],'tags':[]}
+    for _,record in records:
+        source=urlsplit(record.get('sourceUrl') or record.get('sourceURL') or '').hostname or ''
+        facts=policy.facts({**record,'hentaiExcluded':excluded},source)
+        for field in merged:merged[field]=list(dict.fromkeys([*merged[field],*facts[field]]))[:120]
+    aliases=list(dict.fromkeys([value for _,record in records for value in [record['title'],*record.get('aliases',[])]]))[:120]
+    ids={};titles={}
+    for _,record in reversed(records):ids.update(record.get('ids') or {});titles.update(record.get('titles') or {})
+    providers=list(dict.fromkeys(record['provider'] for _,record in records))
+    return {**row,**merged,'hentaiExcluded':excluded,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records),'providers':providers}
+
+def title(db,kind,provider,source_id):
+    initialize(db)
+    identity=title_key(kind,provider,provider+':'+source_id)
+    match=db.execute('SELECT '+work_sql()+' FROM content_titles t WHERE id=?',(identity,)).fetchone()
+    return read_work(db,match[0],current(),preferred_id=identity) if match else None
 
 def facts(db):
     initialize(db)

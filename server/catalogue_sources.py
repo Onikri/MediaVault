@@ -58,6 +58,8 @@ def base_sources(installed):
                          'source':{key:source.get(key) for key in ('id','name','lang','baseUrl','isNsfw')}})
     for kind in ('anime','manga','ranobe'):jobs.append({'type':'anilist','kind':kind,'domain':'anilist.co','name':{'anime':'Аниме','manga':'Манга','ranobe':'Ранобэ'}[kind]+' · AniList'})
     for kind in ('movie','tv'):jobs.append({'type':'kinobox','kind':kind,'domain':'fbphdplay.top','name':('Фильмы' if kind=='movie' else 'Сериалы')+' · Kinobox'})
+    for kind,name in (('movie','Фильмы'),('tv','Сериалы')):
+        jobs.append({'type':'omdb','kind':kind,'domain':'www.omdb.org','name':name+' · omdb'})
     jobs.append({'type':'books','kind':'book','domain':'openlibrary.org','name':'Книги · Open Library'})
     return jobs
 
@@ -104,6 +106,9 @@ def fetch(spec,cursor):
     page=int(cursor.get('page',1));kind=spec['type'];details=[];vocabulary=[]
     if kind=='unsupported':return {'rows':[],'next':None,'state':'unsupported','reason':spec['reason']}
     if kind=='mirror':return {'rows':[],'next':None,'state':'done','reason':'Зеркало '+spec['primary']}
+    if kind=='omdb':
+        from catalogue_omdb import catalogue
+        return catalogue(spec['kind'],cursor)
     if kind in {'lib','lib-detail','lib-vocabulary'}:
         with httpx.Client(http2=True,timeout=15,headers=headers(spec)) as client:
             root='https://api.cdnrulib.link';hosts={'api.cdnrulib.link'}

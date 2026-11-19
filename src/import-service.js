@@ -53,6 +53,7 @@ export function createImportClient(server,googleToken,fetcher=fetch,guestSession
     signing=(async()=>{
       const health=await request('/health',{auth:false});
       if(health.application!=='MediaVault'||health.version<4||health.origin!==window.location.origin)throw Error('Этот адрес не подтвердил конфигурацию MediaVault.');
+      const capabilities={serverVersion:health.version,worldCatalogueBrowse:health.worldCatalogueBrowse===true};
       const token=await googleToken();
       const guest=!token&&guestSession();
       if(guest){
@@ -60,12 +61,12 @@ export function createImportClient(server,googleToken,fetcher=fetch,guestSession
         const response=await fetcher(server+'/guests/me',{signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+guest.token}});
         const data=await response.json().catch(()=>({}));
         if(!response.ok){if(response.status===401||response.status===403)clearGuestSession();throw Error(typeof data.detail==='string'?data.detail:'Сервер не подтвердил гостевой вход.');}
-        session={token:guest.token,guest:data.guest,role:'guest',driveConnected:false,serverVersion:health.version};return session;
+        session={token:guest.token,guest:data.guest,role:'guest',driveConnected:false,...capabilities};return session;
       }
       if(!token)throw Error('Сначала войди через Google.');
       const response=await fetcher(server+'/auth/session',{method:'POST',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+token}});
       const data=await response.json();if(!response.ok)throw Error(data.detail||'Сервер не подтвердил вход.');
-      session={...data,serverVersion:health.version,googleGatewayVersion:health.googleGatewayVersion||0,ranobeDriveAudio:health.ranobeDriveAudio===true,mangaDriveTranslation:health.mangaDriveTranslation===true};return session;
+      session={...data,...capabilities,googleGatewayVersion:health.googleGatewayVersion||0,ranobeDriveAudio:health.ranobeDriveAudio===true,mangaDriveTranslation:health.mangaDriveTranslation===true};return session;
     })();
     try{return await signing;}finally{signing=null;}
   }

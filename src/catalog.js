@@ -28,9 +28,9 @@ const yearOf=value=>value?Number(String(value).slice(0,4))||null:null;
 const fuzzyDate=value=>!value?.year?null:[value.year,...(value.month?[String(value.month).padStart(2,'0')]:[]),...(value.month&&value.day?[String(value.day).padStart(2,'0')]:[])].join('-');
 const unique=values=>[...new Set(values.filter(Boolean))];
 export const genreLabels={Action:'Экшен',Adventure:'Приключения',Comedy:'Комедия',Drama:'Драма',Fantasy:'Фэнтези',Horror:'Ужасы',Mystery:'Детектив',Romance:'Романтика','Sci-Fi':'Фантастика','Science Fiction':'Фантастика','Slice of Life':'Повседневность',Sports:'Спорт',Supernatural:'Сверхъестественное',Suspense:'Триллер',Thriller:'Триллер',Mecha:'Меха',Music:'Музыка',Psychological:'Психология',Historical:'История',School:'Школа'};
-export const providers={kitsu:'Kitsu',anilist:'AniList',shikimori:'Shikimori',jikan:'MyAnimeList / Jikan',kinobox:'Кинопоиск · Kinobox',openlibrary:'Open Library',fantlab:'Fantlab',imdb:'IMDb',tvmaze:'TVmaze',wikidata:'Wikidata'};
+export const providers={kitsu:'Kitsu',anilist:'AniList',shikimori:'Shikimori',jikan:'MyAnimeList / Jikan',kinobox:'Кинопоиск · Kinobox',openlibrary:'Open Library',fantlab:'Fantlab',imdb:'IMDb',tvmaze:'TVmaze',wikidata:'Wikidata',omdb:'omdb.org'};
 const ageOf=value=>/^(R18|rx|r_plus)|18\+|NC-17/i.test(value||'')?18:/^R\b|R - 17|17\+/i.test(value||'')?17:/^PG[-_]13|13\+/i.test(value||'')?13:/^PG\b/i.test(value||'')?12:/^G\b/i.test(value||'')?0:null;
-export const validExternalIds=values=>Object.fromEntries(Object.entries(values||{}).filter(([key,value])=>['mal','anilist','kitsu','shikimori'].includes(key)?/^[1-9]\d{0,11}$/.test(String(value)):key==='imdb'?/^tt[1-9]\d{0,11}$/.test(String(value)):typeof value==='string'&&!!value));
+export const validExternalIds=values=>Object.fromEntries(Object.entries(values||{}).filter(([key,value])=>['mal','anilist','kitsu','shikimori'].includes(key)?/^[1-9]\d{0,11}$/.test(String(value)):key==='imdb'?/^tt(?=\d*[1-9])\d{1,12}$/.test(String(value)):typeof value==='string'&&!!value));
 const dates=values=>(values||[]).map(x=>({...x,date:typeof x.date==='number'?new Date(x.date*1000).toISOString():x.date})).filter(x=>x.date&&!Number.isNaN(Date.parse(x.date)));
 function record(provider,id,kind,values){
   if(['manga','ranobe'].includes(kind))kind=/novel|раноб[эе]/i.test(values.format||'')?'ranobe':'manga';
@@ -134,18 +134,24 @@ export function normalizeCatalog(provider,data,kind='anime'){
   return [];
 }
 
+export function catalogItem(value){
+  const list=value=>Array.isArray(value)?value:[];
+  return {...value,providers:unique([...list(value.providers),value.provider]),
+    aliases:unique([...list(value.aliases),value.title,...Object.values(value.titles||{})]),
+    genres:list(value.genres),tags:list(value.tags),links:list(value.links),releases:list(value.releases),
+    ids:value.ids||{},titles:value.titles||{}};
+}
+
 export function mergeCatalog(values){
-  const result=[],list=value=>Array.isArray(value)?value:[];
+  const result=[];
   for(const value of values){
     // Saved/deep-linked titles can be partial while catalogue enrichment loads.
     // Give both sides the same collection shape before merging either order.
-    const item={...value,providers:unique([...list(value.providers),value.provider]),
-      aliases:unique([...list(value.aliases),value.title,...Object.values(value.titles||{})]),
-      genres:list(value.genres),tags:list(value.tags),links:list(value.links),releases:list(value.releases),
-      ids:value.ids||{},titles:value.titles||{}};
+    const item=catalogItem(value);
     const current=result.find(other=>other.kind===item.kind&&(
       Object.keys(item.ids||{}).some(key=>item.ids[key]&&item.ids[key]===other.ids?.[key])||
-      ((!item.ids?.mal||!other.ids?.mal||item.ids.mal===other.ids.mal)&&(!item.year||!other.year||item.year===other.year)&&item.aliases.some(alias=>normalized(alias).length>3&&other.aliases.some(x=>normalized(x)===normalized(alias))))));
+      (['mal','imdb','kinopoisk'].every(key=>!item.ids[key]||!other.ids[key]||item.ids[key]===other.ids[key])&&
+        (!item.year||!other.year||item.year===other.year)&&item.aliases.some(alias=>normalized(alias).length>3&&other.aliases.some(x=>normalized(x)===normalized(alias))))));
     if(!current){result.push({...item});continue;}
     current.providers=unique([...current.providers,...item.providers]);current.aliases=unique([...current.aliases,...item.aliases]);
     current.genres=unique([...current.genres,...item.genres]);current.tags=unique([...current.tags,...item.tags]);current.links=[...current.links,...item.links];current.ids={...current.ids,...item.ids};
