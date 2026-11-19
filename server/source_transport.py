@@ -43,6 +43,11 @@ DECLARATIONS = Path(__file__).with_name('manga_source_transport.json')
 OPERATIONS = frozenset({'search', 'catalogue', 'details', 'chapters', 'pages', 'images'})
 FORMATS = frozenset({'html', 'json', 'image', 'cbz', 'any'})
 EXITS = frozenset({'direct', 'japan'})
+# TLS/HTTP2 fingerprints a route may present through curl_cffi. Byparr's browser is
+# Firefox: replaying its clearance cookies with its own User-Agent needs a Firefox
+# handshake, or Cloudflare sees a mismatched client and rejects the cookies.
+TLS_PROFILES = frozenset({'chrome', 'firefox'})
+MAX_IMPERSONATED = 64 * 1024 * 1024
 DEFAULT_SOLVER = 'http://byparr:8191/v1'
 LEGACY_PROXY = 'http://suwayomi-jp-router:8080'
 SESSION_TTL = 25 * 60
@@ -79,6 +84,7 @@ class Rule:
     exit: str = 'direct'
     solver: bool = False
     format: str = 'any'
+    tls: str = ''
 
     def matches(self, host, operation):
         if not any(host == domain or host.endswith('.' + domain) for domain in self.hosts):
@@ -98,7 +104,7 @@ class Declaration:
 
 
 def parse_rule(value):
-    if not isinstance(value, dict) or not set(value) <= {'hosts', 'operations', 'exit', 'solver', 'format'}:
+    if not isinstance(value, dict) or not set(value) <= {'hosts', 'operations', 'exit', 'solver', 'format', 'tls'}:
         raise ValueError('Unknown route field')
     hosts = value.get('hosts')
     if (not isinstance(hosts, list) or not 1 <= len(hosts) <= 32
@@ -111,9 +117,12 @@ def parse_rule(value):
     exit_name = value.get('exit', 'direct')
     solver = value.get('solver', False)
     fmt = value.get('format', 'any')
+    tls = value.get('tls', '')
     if exit_name not in EXITS or type(solver) is not bool or fmt not in FORMATS:
         raise ValueError('Invalid route exit, solver or format')
-    return Rule(tuple(hosts), frozenset(operations), exit_name, solver, fmt)
+    if tls and tls not in TLS_PROFILES:
+        raise ValueError('Unknown route TLS profile')
+    return Rule(tuple(hosts), frozenset(operations), exit_name, solver, fmt, tls)
 
 
 def parse(value):
@@ -617,6 +626,74 @@ def call_solver(decision, url, budget):
     html = solution.get('response') if isinstance(solution.get('response'), str) else ''
     return Session(_clean_cookies(solution.get('cookies'), decision.host), agent, time.time(), decision.exit_id,
                    url, html, final)
+
+
+# ------------------------------------------------------------------ TLS impersonation
+
+_impersonation = threading.local()
+
+
+def _impersonating_session(profile):
+    """One curl_cffi session per thread and profile (curl handles are not thread-safe)."""
+    sessions_by_profile = getattr(_impersonation, 'sessions', None)
+    if sessions_by_profile is None:
+        sessions_by_profile = _impersonation.sessions = {}
+    session = sessions_by_profile.get(profile)
+    if session is None:
+        from curl_cffi import requests as curl_requests
+        session = sessions_by_profile[profile] = curl_requests.Session(impersonate=impersonation_target(profile))
+    return session
+
+
+def impersonation_target(profile):
+    """The newest curl_cffi target of a browser family ('chrome' is curl_cffi's own alias)."""
+    if profile == 'chrome':
+        return 'chrome'
+    from curl_cffi.requests.impersonate import BrowserType
+    versions = [(int(m.group(1)), b.value) for b in BrowserType
+                if (m := re.fullmatch(re.escape(profile) + r'([0-9]+)', b.value))]
+    if not versions:
+        raise SourceError('Профиль TLS не поддерживается этой версией curl_cffi.')
+    return max(versions)[1]
+
+
+def impersonated(decision, method, url, headers, data, timeout, options, *, keep_agent):
+    """Send one request with a browser TLS/HTTP2 fingerprint; answer as a requests.Response.
+
+    Some Cloudflare zones challenge Python's TLS handshake but serve the same
+    request from a browser fingerprint. The browser profile brings its own
+    User-Agent and client hints; ours would contradict the handshake, so it is
+    dropped unless a solver session needs its own (its cookies are bound to it).
+    """
+    from curl_cffi.requests import exceptions as curl_errors
+
+    send = {k: v for k, v in (headers or {}).items()
+            if keep_agent or k.lower() not in {'user-agent', 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform'}}
+    try:
+        answer = _impersonating_session(decision.rule.tls).request(
+            method, url, headers=send, data=data, timeout=timeout, allow_redirects=False,
+            proxies=options.get('proxies'), cookies=options.get('cookies'))
+    except curl_errors.ProxyError:
+        raise requests.exceptions.ProxyError('impersonated proxy error') from None
+    except curl_errors.Timeout:
+        raise requests.Timeout('impersonated request timed out') from None
+    except curl_errors.RequestException:
+        raise requests.ConnectionError('impersonated request failed') from None
+    content = answer.content or b''
+    if len(content) > MAX_IMPERSONATED:
+        raise SourceError('Ответ источника слишком велик.')
+    response = requests.Response()
+    response.status_code = answer.status_code
+    response.headers = requests.structures.CaseInsensitiveDict(
+        {str(k): str(v) for k, v in answer.headers.items()})
+    response._content = content
+    response._content_consumed = True
+    response.url = url
+    response.reason = getattr(answer, 'reason', '') or ''
+    response.encoding = requests.utils.get_encoding_from_headers(response.headers)
+    response.cookies = requests.cookies.cookiejar_from_dict(
+        {str(k): str(v) for k, v in dict(answer.cookies).items()})
+    return response
 
 
 # ------------------------------------------------------------------ classification

@@ -9,6 +9,7 @@ Japan gateway status endpoint and Byparr are patched ``requests.get`` /
 from io import BytesIO
 import json
 import os
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -531,3 +532,108 @@ class StatusTests(TransportCase):
         with self.assertRaises(SourceError) as caught:
             self.open(404, b'missing')
         self.assertEqual(str(caught.exception), 'Источник вернул HTTP 404.')
+
+
+class FakeCurlAnswer:
+    def __init__(self, status=200, body=TITLE_PAGE, headers=None, cookies=None):
+        self.status_code, self.content = status, body
+        self.headers = headers or {'Content-Type': 'text/html; charset=utf-8'}
+        self.cookies = cookies or {}
+        self.reason = 'OK'
+
+
+class FakeCurlSession:
+    """curl_cffi Session stand-in: records requests, answers from a queue."""
+
+    def __init__(self, *answers):
+        self.answers, self.calls = list(answers), []
+
+    def request(self, method, url, **options):
+        self.calls.append({'method': method, 'url': url, **options})
+        return self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+
+
+class ImpersonatedTlsTests(TransportCase):
+    NATO_TLS = {'version': 1, 'sources': {MANGANATO: {'name': 'Manganato', 'solverBudget': 45, 'routes': [
+        {'hosts': ['natomanga.com'], 'operations': ['*'], 'exit': 'direct', 'solver': True, 'format': 'html',
+         'tls': 'chrome'}]}}}
+
+    def setUp(self):
+        super().setUp()
+        self.declarations.write_text(json.dumps(self.NATO_TLS))
+        transport._declared.update(key=None, value={})
+
+    def test_tls_profile_is_validated(self):
+        rule = transport.parse_rule({'hosts': ['example.org'], 'tls': 'chrome'})
+        self.assertEqual(rule.tls, 'chrome')
+        self.assertEqual(transport.parse_rule({'hosts': ['example.org']}).tls, '')
+        with self.assertRaises(ValueError):
+            transport.parse_rule({'hosts': ['example.org'], 'tls': 'netscape'})
+
+    def test_declared_route_sends_a_browser_fingerprint_without_our_user_agent(self):
+        site = FakeSite(lambda *a: self.fail('plain requests must not be used for a TLS route'))
+        curl = FakeCurlSession(FakeCurlAnswer())
+        with patch.object(transport, '_impersonating_session', return_value=curl) as factory:
+            text, final, _ = self.http(site, MANGANATO, 'details').document('https://www.natomanga.com/manga/solo')
+        self.assertIn('Solo Leveling', text)
+        self.assertEqual(final, 'https://www.natomanga.com/manga/solo')
+        factory.assert_called_with('chrome')
+        sent = curl.calls[0]
+        self.assertFalse(sent['allow_redirects'])
+        self.assertNotIn('user-agent', {k.lower() for k in sent['headers']})
+        self.assertEqual(site.calls, [])
+
+    def test_challenge_on_a_tls_route_still_goes_to_the_solver_and_replays_its_agent(self):
+        curl = FakeCurlSession(FakeCurlAnswer(403, CHALLENGE_PAGE, {'Content-Type': 'text/html', 'Server': 'cloudflare'}),
+                               FakeCurlAnswer())
+        with patch.object(transport, '_impersonating_session', return_value=curl), \
+                patch.object(transport.requests, 'post', side_effect=byparr()) as solver:
+            text, _, _ = self.http(FakeSite(lambda *a: None), MANGANATO, 'chapters').document(
+                'https://www.natomanga.com/manga/solo')
+        self.assertIn('Solo Leveling', text)
+        self.assertEqual(solver.call_count, 1)
+        retry = curl.calls[-1]
+        self.assertEqual(retry['headers']['User-Agent'], UA)
+        self.assertEqual(retry['cookies'], {'cf_clearance': 'ok'})
+
+    def test_curl_errors_keep_the_ordinary_temporary_failure(self):
+        from curl_cffi.requests import exceptions as curl_errors
+
+        class Broken(FakeCurlSession):
+            def request(self, method, url, **options):
+                raise curl_errors.Timeout('slow')
+
+        with patch.object(transport, '_impersonating_session', return_value=Broken()):
+            with self.assertRaises(SourceTemporaryError):
+                self.http(FakeSite(lambda *a: None), MANGANATO, 'details').document('https://www.natomanga.com/manga/solo')
+
+    def test_oversized_answer_is_refused(self):
+        curl = FakeCurlSession(FakeCurlAnswer(body=b'x' * (transport.MAX_IMPERSONATED + 1)))
+        with patch.object(transport, '_impersonating_session', return_value=curl):
+            with self.assertRaises(SourceError):
+                self.http(FakeSite(lambda *a: None), MANGANATO, 'details').document('https://www.natomanga.com/manga/solo')
+
+    def test_shipped_tls_routes(self):
+        shipped = transport.parse(json.loads(Path(transport.__file__).with_name('manga_source_transport.json')
+                                             .read_text(encoding='utf-8')))
+        for source, host in (('6384784374922886076', 'g.nude-moon.fun'), ('4306337471481207984', 'lgbtics.com'),
+                             ('15083818169656208', 'mgread.io')):
+            self.assertEqual(shipped[source].rule(host, 'catalogue').tls, 'chrome', source)
+
+    def test_firefox_profile_maps_to_the_newest_firefox_target(self):
+        target = transport.impersonation_target('firefox')
+        self.assertRegex(target, r'^firefox[0-9]+$')
+        from curl_cffi.requests.impersonate import BrowserType
+        newest = max(int(b.value[7:]) for b in BrowserType if re.fullmatch(r'firefox[0-9]+', b.value))
+        self.assertEqual(target, f'firefox{newest}')
+        self.assertEqual(transport.impersonation_target('chrome'), 'chrome')
+
+    def test_solver_routes_replay_cookies_with_the_solvers_browser_family(self):
+        # Byparr answers as Firefox; its cookies must travel with a Firefox handshake.
+        shipped = transport.parse(json.loads(Path(transport.__file__).with_name('manga_source_transport.json')
+                                             .read_text(encoding='utf-8')))
+        solver_rules = [rule for entry in shipped.values() for rule in entry.rules if rule.solver]
+        self.assertGreater(len(solver_rules), 100)
+        for rule in solver_rules:
+            self.assertIn(rule.tls, {'firefox', 'chrome'}, rule.hosts)
+        self.assertEqual(sum(rule.tls == 'chrome' for rule in solver_rules), 1)  # mgread.io opens with Chrome alone

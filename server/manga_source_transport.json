@@ -19,336 +19,922 @@
       "solverBudget": 45,
       "routes": [
         {"hosts": ["natomanga.com", "natumanga.com", "manganami.com", "nelomanga.net", "manganato.gg"], "operations": ["*"],
-         "exit": "direct", "solver": true, "format": "html"}
+         "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "4005973248538140146": {
       "name": "ManhuaUS",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["manhuaus.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["manhuaus.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "1843646695111412994": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8600626646399125374": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "186393818771246102": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5014742859693294263": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "3989593922015638091": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5988433661218368889": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8524245811050879736": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8524619729907384865": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "77326570497325152": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5371778608318819884": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8167173986295647123": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "9222445553932717105": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "1099564256126272699": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "1422819830508615430": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "1707768678643970514": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5085561039221748061": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5330127039501257395": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "3825200464570758229": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8353987132172753017": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5610655855358487221": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8163761313345392776": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5253884715906393116": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "7045343433771927648": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "2760962895634785428": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5229751861519354976": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "1740877429814102450": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "7558912456429140642": {
       "name": "Akuma",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["akuma.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "6247824327199706550": {
       "name": "Asura Scans",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["asurascans.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["asurascans.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "7909401032149692930": {
       "name": "Borat Scans",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["boratscans.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["boratscans.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "6573506892686767219": {
       "name": "DragonTea",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["dragontea.ink"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["dragontea.ink"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8574043921162024664": {
       "name": "Hachiraw",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["hachiraw.net"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["hachiraw.net"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "3422463439145930309": {
       "name": "Hentai Cosplay",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["hentai-cosplay-xxx.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["hentai-cosplay-xxx.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "6335003343669033128": {
       "name": "HotComics",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["hotcomics.io"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["hotcomics.io"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "6580524146378639197": {
       "name": "Kumaraw",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["kumaraw.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["kumaraw.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8622937201319058235": {
       "name": "LinkManga",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["linkmanga.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["linkmanga.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "972271455406675873": {
       "name": "Lua Scans",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["luacomic.org"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["luacomic.org"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "4513668905743562887": {
       "name": "Luna Toons",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["lunatoons.net"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["lunatoons.net"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "3436561761894030433": {
       "name": "Manga18.Club",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["manga18.club"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["manga18.club"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5795673090229968734": {
       "name": "Manhwa18.today",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["manhwa18.today"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["manhwa18.today"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "15083818169656208": {
       "name": "Mgread.io",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["mgread.io"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["mgread.io"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "chrome"}
       ]
     },
     "8692263513374836785": {
       "name": "Rage Scans",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["ragescans.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["ragescans.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "8546397272954539389": {
       "name": "Setsu Scans",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["setsuscans.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["setsuscans.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "1326600535134927871": {
       "name": "Team Shadowi",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["team-shadowi.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["team-shadowi.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "5192468917881435636": {
       "name": "ToonHey",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["toonhey.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["toonhey.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "3416472212573239071": {
       "name": "Vision Haze",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["visionhaze.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["visionhaze.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     },
     "4986437736966387160": {
       "name": "XoManga",
       "solverBudget": 45,
       "routes": [
-        {"hosts": ["xomanga.site"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html"}
+        {"hosts": ["xomanga.site"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "6384784374922886076": {
+      "name": "Nude-Moon",
+      "routes": [
+        {"hosts": ["g.nude-moon.fun", "nude-moon.org"], "operations": ["*"], "exit": "direct", "tls": "chrome"}
+      ]
+    },
+    "4306337471481207984": {
+      "name": "Lgbtics",
+      "routes": [
+        {"hosts": ["lgbtics.com"], "operations": ["*"], "exit": "direct", "tls": "chrome"}
+      ]
+    },
+    "2327480808438768017": {
+      "name": "Atsumaru",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["atsu.moe"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7621724834621233483": {
+      "name": "BrainRotComics",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["brainrotcomics.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2348696469980851942": {
+      "name": "Colorized Mangas",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["colorizedmangas.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7602260701584916302": {
+      "name": "Danbooru",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["danbooru.donmai.us"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2529980242070778875": {
+      "name": "Battle In 5 Seconds After Meeting",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["deatte5.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1057298314437889941": {
+      "name": "Digital Comic Museum",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["digitalcomicmuseum.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5861653560535486832": {
+      "name": "Ero18x",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["ero18x.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "27704135061035291": {
+      "name": "Frieren Online",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["frieren.online"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7266624490370375187": {
+      "name": "HentaiHere",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["hentaihere.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3077154580363219152": {
+      "name": "HentaiLoop",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["hentailoop.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2299981010822511979": {
+      "name": "HentaiRead",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["hentairead.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1145415569668934781": {
+      "name": "Kaizen Scan",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["kaizenscan.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1879005209022234038": {
+      "name": "KaliScans.org (unoriginal)",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["kaliscans.org"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3112384885023225761": {
+      "name": "Kissmanga.in",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["kissmanga.in"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3040035304874076216": {
+      "name": "Kiutaku",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["kiutaku.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "6862842453918709699": {
+      "name": "Komix",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["komix.to"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1698654724978495521": {
+      "name": "Luminare Translations",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["luminaretranslations.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2338066431666790211": {
+      "name": "Manga-Bay",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["manga-bay.biz"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5763592680824441822": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "8745608410209813897": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "215476983335793342": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "9084885867242726177": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7169636154814402936": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3523848676838462162": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1966498126669070992": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5586454452949519981": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1448906013733277368": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2111498029521981284": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5041529786391483797": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5403969342368317365": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4804845656972446863": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2439898977058946574": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3325308670866777803": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "34408487862399605": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2825403839562372201": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7073775592097997189": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3556430745170330371": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3534664804437641640": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "8772354233322170397": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "6595061459576629533": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4574102257618973368": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "8221555371810647857": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "615885128031081811": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5484157652338210397": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3777339391626194173": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5768573366655393544": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "35546023386335815": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3357030332736127152": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7203647082681930008": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "8131533018433339643": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1966275254426034210": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7985165645382797194": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4654428466578189678": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4940984854904039527": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1133911619191823359": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "6778483817278233868": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "8648105733020574748": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "6193642890428176406": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "117702463567484484": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1555837267200004397": {
+      "name": "Manga Ball",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangaball.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4008409601887986192": {
+      "name": "MangaBuff",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangabuff.ru"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "6958928548959982041": {
+      "name": "VyvyManga",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mangavyvy.net"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4273874799952447458": {
+      "name": "Goda",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["manhuascans.org"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5617855959190673282": {
+      "name": "Manhwa-raw",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["manhwa-raw.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "492596911850505683": {
+      "name": "ManhwaRead",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["manhwaread.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3314074618469377356": {
+      "name": "MeiToon",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["meitoon.org"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "80073424419623517": {
+      "name": "Mist Scans",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["mistscans.org"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "225835804698740720": {
+      "name": "Photos18",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["photos18.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5160001879976399540": {
+      "name": "Raven Scans",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["ravenscans.org"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7185601298150078890": {
+      "name": "Read Comics Online",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["readcomicsonline.ru"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5627909338430537186": {
+      "name": "ReiManga",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["reimanga.net"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "8393977756208732343": {
+      "name": "Senkognito",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["senkuro.me"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2054192099319007885": {
+      "name": "ToonGod",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["toongod.org"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "225310046014902430": {
+      "name": "Toonz",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["toonz.to"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4511819378822109646": {
+      "name": "V2PH",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["v2ph.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "897097334505121559": {
+      "name": "One Punch Man Online",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["w21.1punchman.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "6750082404202711318": {
+      "name": "WebtoonXYZ",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["webtoon.xyz"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4082152694771839662": {
+      "name": "Wildtoon",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["wildtoon.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3691755476092994375": {
+      "name": "XlecX",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["xlecx.one"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "923206914242009120": {
+      "name": "XYZ Comics",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["xyzcomics.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4439807782838127935": {
+      "name": "YaoiScan",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoiscan.com"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "1987105317893699901": {
+      "name": "Zinmanga.net",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["zinmanga.net"], "operations": ["*"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
       ]
     }
   }

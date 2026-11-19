@@ -1034,8 +1034,12 @@ class PublicHttp:
                 if natsuid_form or init_form == 'vault' or action == 'dcm-search':
                     options['files'] = {key: (None, value) for key, value in data.items()}
                     body = None
-                response = self.session.request(method, url, headers=send, data=body,
-                                                timeout=request_timeout, allow_redirects=False, stream=True, **options)
+                if decision is not None and decision.rule.tls and 'files' not in options:
+                    response = transport.impersonated(decision, method, url, send, body, request_timeout, options,
+                                                      keep_agent=solver_session is not None)
+                else:
+                    response = self.session.request(method, url, headers=send, data=body,
+                                                    timeout=request_timeout, allow_redirects=False, stream=True, **options)
             except requests.exceptions.ProxyError:
                 if options.get('proxies'):
                     transport.route_down()
