@@ -73,7 +73,7 @@ services:
     cap_drop: [ALL]
     mem_limit: 2560m
     memswap_limit: 2560m
-    cpus: 1.0
+    cpus: 2.0
     pids_limit: 1024
     shm_size: 512m
     tmpfs: ["/tmp:rw,nosuid,nodev,size=1g,mode=1777"]
