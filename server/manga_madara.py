@@ -166,7 +166,8 @@ class Madara:
                  genre_section='manga-genre', manga_only=True, uses_post_id=True, date_format='%B %d, %Y',
                  language='en', selectors=None, ajax_template=CATALOGUE_FORM['template'],
                  metadata_interval=0, thumbnail_original=False, alt_names=True,
-                 scoped_urls=False, raw_marker=None, origin=None, chapter_volumes=False, quality_paths=False):
+                 scoped_urls=False, raw_marker=None, origin=None, chapter_volumes=False, quality_paths=False,
+                 listing=None):
         self.SOURCE_ID = sid
         self.NAME = name
         self.ROOT = root
@@ -175,6 +176,9 @@ class Madara:
         self.html = html
         self.chapter_mode = chapter_mode
         self.section = section
+        # Where the HTML catalogue lists titles, when that is not the title section
+        # (a site may list on / or /webtoons/ while titles live under /manga/).
+        self.listing = listing or f'/{section}/'
         self.genre_section = genre_section
         self.manga_only = manga_only
         self.uses_post_id = uses_post_id
@@ -289,7 +293,7 @@ class Madara:
         return rows, more
 
     def html_request(self, http, page, query, sort, tag):
-        path = f'/{self.genre_section}/{tag}/' if tag else '/' if query else f'/{self.section}/'
+        path = f'/{self.genre_section}/{tag}/' if tag else '/' if query else self.listing
         path += f'page/{page}/' if page > 1 else ''
         params = {'s': query, 'post_type': 'wp-manga'} if query else {'m_orderby': 'latest' if sort == 'updated' else 'views'}
         return path, params
@@ -320,7 +324,7 @@ class Madara:
         return image
 
     def vocabulary_path(self):
-        return f'/{self.section}/'
+        return self.listing
 
     def vocabulary(self, http):
         soup, final = self.soup(http, self.ROOT + self.vocabulary_path())

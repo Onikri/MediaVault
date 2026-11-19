@@ -425,3 +425,34 @@ class CloudflarePrecursorTests(TestCase):
                      '<script src="/cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1"></script>',
                      '<form id="challenge-form" action="/?__cf_chl_f_tk=x">'):
             self.assertEqual(source_transport.classify(403, {'Server': 'cloudflare'}, page), 'challenge', page)
+
+
+class MadaraListingTests(TestCase):
+    """Sites whose catalogue page and title section moved apart (live audit after the solver routes)."""
+
+    def profile(self, sid):
+        import manga_native_registry
+
+        return manga_native_registry.profiles()[sid]
+
+    def test_listing_path_is_separate_from_the_title_section(self):
+        cases = {'5861653560535486832': ('/', 'https://ero18x.com/manga/some-title/'),
+                 '5617855959190673282': ('/', 'https://manhwa-raw.com/manga/some-title/'),
+                 '2054192099319007885': ('/webtoons/', 'https://www.toongod.org/webtoon/some-title/')}
+        for sid, (listing, title) in cases.items():
+            source = self.profile(sid)
+            path, params = source.html_request(None, 1, '', 'popular', '')
+            self.assertEqual(path, listing, source.NAME)
+            self.assertEqual(params, {'m_orderby': 'views'})
+            self.assertEqual(source.html_request(None, 2, '', 'popular', '')[0], listing + 'page/2/')
+            self.assertTrue(source.TITLE_PATH.fullmatch(urlsplit(title).path), title)
+
+    def test_yaoiscan_titles_live_under_read(self):
+        source = self.profile('4439807782838127935')
+        self.assertTrue(source.TITLE_PATH.fullmatch('/read/19-days/'))
+        self.assertFalse(source.TITLE_PATH.fullmatch('/manga/19-days/'))
+
+    def test_default_listing_is_the_title_section(self):
+        source = self.profile('1987105317893699901')  # Zinmanga keeps /manga/
+        self.assertEqual(source.listing, '/manga/')
+        self.assertEqual(source.html_request(None, 1, '', 'updated', '')[0], '/manga/')

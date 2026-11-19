@@ -49,7 +49,7 @@ PROFILES = (
     (('5944672760629857205', 'Bun Manga', 'https://bunmanga.com', False), {}),
     (('3890119680043332770', 'Cucumber Manga', 'https://cucumbermanga.com', True), {'chapter_mode': 'manga'}),
     (('7432245132662185058', 'Decadence Scans', 'https://reader.decadencescans.com', True), {'chapter_mode': 'manga'}),
-    (('5861653560535486832', 'Ero18x', 'https://ero18x.com', True), {'html': True, 'chapter_mode': 'manga'}),
+    (('5861653560535486832', 'Ero18x', 'https://ero18x.com', True), {'html': True, 'chapter_mode': 'manga', 'listing': '/'}),
     (('5246625723235112128', 'GakaMangas', 'https://gakamangas.com', False), {'chapter_mode': 'manga', 'manga_only': False}),
     (('4598626990187882152', 'GalaxyDegenScans', 'https://gdscans.com', True), {'chapter_mode': 'manga'}),
     (('8561426018751869351', 'Hentai1.io', 'https://hentai1.io', True), {'html': True}),
@@ -89,7 +89,7 @@ PROFILES = (
     (('58992897252080929', 'KokoMangas', 'https://kokomangas.com', True), {'chapter_mode': 'manga'}),
     (('3062846066388633553', 'WebtoonScan', 'https://webtoonscan.org', True), {'section': 'manhwa'}),  # .com lost its DNS (Nov 2026)
     (('6540843430852844328', 'WuxiaWorld', 'https://wuxiaworld.site', False), {'chapter_mode': 'manga', 'section': 'novel'}),
-    (('4439807782838127935', 'YaoiScan', 'https://yaoiscan.com', True), {}),
+    (('4439807782838127935', 'YaoiScan', 'https://yaoiscan.com', True), {'section': 'read'}),
     (('5990114708086767078', 'Zinmanga', 'https://mangazin.org', True), {'manga_only': False}),
     (('6660493687892371703', 'AllPornComic.io', 'https://allporncomic.io', True), {'chapter_mode': 'manga', 'date_format': '%d/%m/%Y'}),
     (('4205510315534778593', 'GingeRTooN', 'https://gingertoon.com', True), {'html': True, 'chapter_mode': 'manga', 'date_format': '%m.%d.%Y'}),
@@ -99,7 +99,8 @@ PROFILES = (
     (('2676315620251021475', 'Manhwa68', 'https://manhwa68.com', True), {'chapter_mode': 'manga', 'manga_only': False, 'date_format': '%b %d, %Y'}),
     (('3386088694317815151', 'Manhwa Comics', 'https://manhwacomics.com', True), {'chapter_mode': 'manga', 'section': 'manhwa', 'date_format': '%d %b %Y'}),
     (('20045885295638720', 'Petrotechsociety', 'https://www.petrotechsociety.org', True), {'date_format': '%d/%m/%Y'}),
-    (('2054192099319007885', 'ToonGod', 'https://www.toongod.org', True), {'html': True, 'section': 'webtoons', 'date_format': '%d %b %Y'}),
+    (('2054192099319007885', 'ToonGod', 'https://www.toongod.org', True), {'html': True, 'section': 'webtoon', 'listing': '/webtoons/',
+                                                                       'date_format': '%d %b %Y'}),
     (('1103204227230640533', 'Comics Valley', 'https://comicsvalley.com', True), {
         'language': 'all', 'section': 'comics-new', 'chapter_mode': 'manga', 'date_format': '%d/%m/%Y',
     }),
@@ -108,7 +109,7 @@ PROFILES = (
         'selectors': {'chapter_name': 'a + a'},
     }),
     (('5617855959190673282', 'Manhwa-raw', 'https://manhwa-raw.com', True), {
-        'variant': 'raw', 'language': 'all', 'html': True, 'date_format': '%d/%m/%Y',
+        'variant': 'raw', 'language': 'all', 'html': True, 'date_format': '%d/%m/%Y', 'listing': '/',
         'selectors': {
             'status': '.post-content_item:-soup-contains("Status") > .summary-content',
             'description': '.post-content_item:-soup-contains("Summary") .summary-container',
