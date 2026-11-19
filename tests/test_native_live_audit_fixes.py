@@ -401,3 +401,27 @@ class ByparrRouteTests(TestCase):
             self.assertGreaterEqual(source_transport.solver_budget(source, 20), 45)
             routed.add(host)
         self.assertEqual(routed, self.HOSTS)
+
+
+class CloudflarePrecursorTests(TestCase):
+    # Cloudflare now injects this loader into ordinary 200 pages (seen on FSI Comics, 2026-11-19);
+    # it measures the visitor and is not a challenge, so the page must still be read.
+    PRECURSOR = ("<script>(function(){var u='/cdn-cgi/challenge-platform/scripts/precursor/main.js?ray=a5d0092d3fe1e4f2',"
+                 "s=document.createElement('script');s.src=u;document.head.appendChild(s)})();</script>")
+
+    def test_precursor_loader_on_a_public_page_is_not_a_challenge(self):
+        import source_parser
+        import source_transport
+
+        page = '<html><head><title>Chapter 1</title></head><body><img src="/p/1.jpg">' + self.PRECURSOR + '</body></html>'
+        self.assertIsNone(source_transport.CHALLENGE.search(page))
+        self.assertIsNone(source_parser.BLOCKED.search(page))
+        self.assertIsNone(source_transport.classify(200, {'Server': 'cloudflare'}, page))
+
+    def test_real_challenge_pages_are_still_recognised(self):
+        import source_transport
+
+        for page in ('<title>Just a moment...</title>',
+                     '<script src="/cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1"></script>',
+                     '<form id="challenge-form" action="/?__cf_chl_f_tk=x">'):
+            self.assertEqual(source_transport.classify(403, {'Server': 'cloudflare'}, page), 'challenge', page)

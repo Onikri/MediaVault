@@ -56,7 +56,7 @@ SERVICE = re.compile(r'http://[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?(?::[0-9]{2,5
 
 # Browser challenges (solvable), as opposed to bans, logins and paywalls.
 CHALLENGE = re.compile(
-    r'/cdn-cgi/challenge-platform(?!/scripts/jsd/)|cf-chl-|__cf_chl_|checking your browser|'
+    r'/cdn-cgi/challenge-platform(?!/scripts/(?:jsd|precursor)/)|cf-chl-|__cf_chl_|checking your browser|'
     r'enable javascript and cookies to continue|verify (?:that )?you are human|'
     r'<title[^>]*>\s*just a moment|ddos-guard\.net/[^"\']*check|<title[^>]*>\s*ddos-guard',
     re.I)
