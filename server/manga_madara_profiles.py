@@ -242,7 +242,8 @@ PROFILES = (
         'variant': 'setsu', 'chapter_mode': 'manga', 'metadata_interval': 0.5,
         'selectors': {'status': 'div.summary-heading:-soup-contains("status", "Status") + div.summary-content'},
     }),
-    (('2738031143723682744', 'GoodToon', 'https://www.goodtoon010.com', True), {
+    # goodtoon010 redirects to goodtoon012 (numbered domains rotate).
+    (('2738031143723682744', 'GoodToon', 'https://www.goodtoon012.com', True), {
         'variant': 'goodtoon', 'language': 'ko', 'html': True, 'uses_post_id': False, 'chapter_mode': 'manga',
         'date_format': '%y.%m.%d',
         'selectors': {'title': 'h1.summary-title, div.post-title h3, div.post-title h1, #manga-title > h1',

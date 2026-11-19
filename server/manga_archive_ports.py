@@ -2,7 +2,7 @@
 
 from datetime import date
 import re
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 
@@ -76,8 +76,18 @@ def html_group(adapter, http, page, query, tag, *, path, cards, selector, title,
 
 def hololive(adapter, http, page, query, _sort, tag):
     path = '' if adapter.LANGUAGE == 'ja' else '/' + adapter.LANGUAGE
-    return html_group(adapter, http, page, query, tag, path=path + '/alt/holonometria/manga/',
-                      cards='.manga__item', selector='a[href]', title='.manga__title')
+    rows, more = html_group(adapter, http, page, query, tag, path=path + '/alt/holonometria/manga/',
+                            cards='.manga__item', selector='a[href]', title='.manga__title')
+    # The cards now link only their first episode (/<title>/ep0/); the title is its parent.
+    from dataclasses import replace
+
+    titles = {}
+    for row in rows:
+        parts = urlsplit(row.path)
+        parent = re.sub(r'/ep[0-9]{1,4}/?$', '/', parts.path)
+        row = replace(row, path=urlunsplit(parts._replace(path=parent))) if parent != parts.path else row
+        titles.setdefault(row.path, row)
+    return list(titles.values()), more
 
 
 def ohara(adapter, http, page, query, _sort, tag):

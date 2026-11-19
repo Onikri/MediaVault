@@ -18,7 +18,7 @@ IDENTITIES = {
     'kaijimangaonline': ('4534836110470234374', 'Kaiji Manga Online', 'en', 'https://w9.kaijimanga.com', False),
     'maidsamamangaonline': ('7167497376777041176', 'Read Maid Sama Manga Online', 'en', 'https://w14.maid-sama.com', False),
     'ruridragonmangaonline': ('2796812439185810666', 'RuriDragon Manga Online', 'en', 'https://w2.ruridragon.com', False),
-    'theexiledheavyknightmangaonline': ('7393909338134202317', 'Read The Exiled Heavy Knight Manga Online', 'en', 'https://w3.theexiledheavyknight.com', False),
+    'theexiledheavyknightmangaonline': ('7393909338134202317', 'Read The Exiled Heavy Knight Manga Online', 'en', 'https://w4.theexiledheavyknight.com', False),  # w3 redirects to w4
     'readhorimiyaonline': ('855674716623999161', 'Read Horimiya Online', 'en', 'https://read-horimiya.online', False),
     'thegirlfromrandomchattingmangaonline': ('7628399752617522749', 'The Girl from Random Chatting Manga Online', 'en', 'https://thegirlfromrandomchatting.com', False),
     'readvagabondmanga': ('5300358436613908601', 'Read Vagabond Manga', 'en', 'https://readbagabondo.com', False),

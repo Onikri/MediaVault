@@ -905,11 +905,18 @@ def report(args):
     for row in rows.values():
         if row.get('errors') is not None and row.get('status') not in {'hang', 'worker_died', 'audit_crash'}:
             verdict(row)
-    owners = Counter(row.get('owner') for row in rows.values())
-    statuses = Counter(row.get('status') for row in rows.values())
     hosts = defaultdict(list)
     for row in rows.values():
         hosts[row.get('host')].append(row)
+    for items in hosts.values():
+        # One language of a multi-language site being empty is the site's catalogue,
+        # not our parser, when other languages of the same site list titles.
+        if any(any((r.get('catalogue_rows') or {}).values()) for r in items):
+            for r in items:
+                if r.get('status') == 'empty_catalogue':
+                    r['status'], r['owner'], r['reason'] = 'empty_language', 'site', 'empty_language'
+    owners = Counter(row.get('owner') for row in rows.values())
+    statuses = Counter(row.get('status') for row in rows.values())
     host_owner = Counter()
     for items in hosts.values():
         best = 'ok' if any(r.get('owner') == 'ok' for r in items) else Counter(r.get('owner') for r in items).most_common(1)[0][0]

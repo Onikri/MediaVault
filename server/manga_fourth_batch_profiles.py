@@ -37,7 +37,7 @@ PROFILES = (
     (manga_independent_json_ports.NexComic, ('3024771939240549070', 'NexComic', 'en', 'https://nexcomic.com', True)),
     (manga_standalone_ports.BaoBua, ('514187608699312366', 'BaoBua', 'all', 'https://baobua.net', True)),
     (manga_standalone_ports.BuonDua, ('1435103006121310663', 'Buon Dua', 'all', 'https://buondua.com', True)),
-    (manga_standalone_ports.DokiRaw, ('3967449247820755680', 'Dokiraw', 'ja', 'https://dokiraw.quest', True)),
+    (manga_standalone_ports.DokiRaw, ('3967449247820755680', 'Dokiraw', 'ja', 'https://dokiraw.men', True)),  # dokiraw.quest redirects here
     (manga_standalone_ports.EggComics, ('7229505035165953281', 'Eggporncomics', 'en', 'https://eggporncomics.com', True)),
     (manga_standalone_ports.EveriaUnoriginal, ('8698756602692547891', 'EveriaClub (unoriginal)', 'all', 'https://www.everiaclub.com', True)),
     (manga_standalone_ports.HachiRaw, ('8574043921162024664', 'Hachiraw', 'ja', 'https://hachiraw.net', True)),

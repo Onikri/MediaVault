@@ -7,7 +7,7 @@ IDENTITIES = {
     'mangapoisk': ('4092015241327675443', 'MangaPoisk', 'ru', 'https://mangapoisk.me', True),
     'senmanga': ('7715542271185249444', 'Sen Manga', 'ja', 'https://raw.senmanga.com', True),
     'mangarw': ('7145934117309913101', 'Manga Rw', 'ja', 'https://mangarw.com', False),
-    'toonkor': ('6596496791271983268', 'Toonkor', 'ko', 'https://toonkor2.org', True),
+    'toonkor': ('6596496791271983268', 'Toonkor', 'ko', 'https://008.toonkor.net', True),  # toonkor2.org redirects here
     'rawbaka': ('6022634600056613514', 'RawBaka', 'ja', 'https://rawbaka.site', True),
     'tcbscans': ('1435116756378369709', 'TCB Scans', 'en', 'https://tcbonepiecechapters.com', False),
     'holonometria_en': ('1334492919632049277', 'HOLONOMETRIA', 'en', 'https://holoearth.com', False),

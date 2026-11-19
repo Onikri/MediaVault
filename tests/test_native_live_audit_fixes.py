@@ -299,3 +299,62 @@ class GalleryDeferredPageTests(TestCase):
                       f'{self.source.ROOT}/{self.source.layout.page_prefix}/1/1/?x=1#mv_gallery_page'):
             with self.assertRaises(SourceError):
                 page_reference(value)
+
+
+class JNovelRscRedirectTests(TestCase):
+    def test_rsc_requests_follow_the_cache_key_redirect_only(self):
+        from urllib.parse import urlsplit
+        from manga_jnovel import route
+
+        for url in ('https://j-novel.club/series?type=manga&page=1',
+                    'https://j-novel.club/series?type=manga&page=1&_rsc',
+                    'https://j-novel.club/series?type=manga&page=1&_rsc=1x2y3',
+                    'https://j-novel.club/series/ascendance-of-a-bookworm-manga?_rsc=abc'):
+            found = route(urlsplit(url), 'GET', None, {})
+            self.assertTrue(found and found.redirect and found.headers.get('rsc') == '1', url)
+        for url in ('https://j-novel.club/series?type=manga&_rsc=%2F..%2F',
+                    'https://j-novel.club/series/x?other=1',
+                    'https://j-novel.club/series?type=novel'):
+            self.assertIsNone(route(urlsplit(url), 'GET', None, {}), url)
+
+
+class DomainMoveTests(TestCase):
+    def test_profiles_point_at_the_hosts_their_old_domains_redirect_to(self):
+        import manga_native_registry
+
+        profiles = dict(manga_native_registry.profiles())
+        expected = {'2738031143723682744': 'https://www.goodtoon012.com', '3967449247820755680': 'https://dokiraw.men',
+                    '6596496791271983268': 'https://008.toonkor.net', '4730948540511990292': 'https://kodokustudio.com',
+                    '7393909338134202317': 'https://w4.theexiledheavyknight.com', '80073424419623517': 'https://mistscans.org',
+                    '3062846066388633553': 'https://webtoonscan.org', '1024627298672457456': 'https://www.manganato.gg',
+                    '2528986671771677900': 'https://www.mangakakalove.com'}
+        for sid, root in expected.items():
+            self.assertEqual(profiles[sid].ROOT.rstrip('/'), root, sid)
+
+    def test_kodoku_api_answers_on_the_new_host(self):
+        from manga_direct_payloads import public_api
+
+        self.assertTrue(public_api('kodokustudio.com', '/api/series', ''))
+
+
+class GalleryPathMoveTests(TestCase):
+    def test_hennojin_titles_under_home_manga_are_titles(self):
+        import manga_native_registry
+
+        source = dict(manga_native_registry.profiles())['2486465102799235219']
+        self.assertTrue(source.is_title('https://hennojin.com/home/manga/toraisi666-gal-illya-chan-english/'))
+        self.assertFalse(source.is_title('https://hennojin.com/home/page/2/'))
+        self.assertFalse(source.is_title('https://hennojin.com/home/'))
+
+    def test_holonometria_cards_linking_their_first_episode_list_the_title(self):
+        from bs4 import BeautifulSoup
+        import manga_archive_ports
+        import manga_native_registry
+
+        source = dict(manga_native_registry.profiles())['1334492919632049277']
+        html = ('<ul><li class="manga__item"><p class="manga__title">Vesta de Cooking</p><img src="/t.jpg">'
+                '<a class="manga__btn" href="https://holoearth.com/en/alt/holonometria/manga/vestadecooking/ep0/">Read</a></li></ul>')
+        page = 'https://holoearth.com/en/alt/holonometria/manga/'
+        with patch.object(source, 'document', return_value=(BeautifulSoup(html, 'html.parser'), page)):
+            rows, _ = manga_archive_ports.hololive(source, Mock(), 1, '', 'popular', '')
+        self.assertEqual([row.path for row in rows], ['https://holoearth.com/en/alt/holonometria/manga/vestadecooking/'])
