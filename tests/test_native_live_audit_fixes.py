@@ -5,6 +5,7 @@ real titles and chapters on the site and failed in our code.
 """
 
 import json
+from urllib.parse import urlsplit
 import time
 from unittest import TestCase
 from unittest.mock import Mock, patch
@@ -358,3 +359,19 @@ class GalleryPathMoveTests(TestCase):
         with patch.object(source, 'document', return_value=(BeautifulSoup(html, 'html.parser'), page)):
             rows, _ = manga_archive_ports.hololive(source, Mock(), 1, '', 'popular', '')
         self.assertEqual([row.path for row in rows], ['https://holoearth.com/en/alt/holonometria/manga/vestadecooking/'])
+
+
+class MadaraSectionTests(TestCase):
+    def test_sites_with_a_moved_title_section_recognise_their_titles(self):
+        import manga_native_registry
+
+        profiles = dict(manga_native_registry.profiles())
+        cases = {'3876544289472679486': 'https://hunlightcomics.com/m/reincarnated-fighting-gamer/',
+                 '6718273076571980404': 'https://yaoihub.org/read/some-title/',
+                 '7329798563365402763': 'https://doujindistrict.com/read/some-title/',
+                 '2311025425739352818': 'https://www.pornhwaz.com/webtoon/some-title/',
+                 '4265503553734005106': 'https://mangapark.tv/manhwa/some-title/',
+                 '3062846066388633553': 'https://webtoonscan.org/manhwa/some-title/'}
+        for sid, url in cases.items():
+            source = profiles[sid]
+            self.assertTrue(source.TITLE_PATH.fullmatch(urlsplit(url).path), (sid, url))
