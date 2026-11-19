@@ -165,7 +165,8 @@ def classify(error):
 def diagnose(root, japan_proxy=None):
     """One plain GET of the site's home page: is it alive, blocked or moved?"""
     import requests
-    from source_parser import BLOCKED, USER_AGENT
+    from source_parser import USER_AGENT
+    from source_transport import classify as classify_http
 
     host = urlsplit(root).hostname or ''
     found = {'host': host}
@@ -190,7 +191,7 @@ def diagnose(root, japan_proxy=None):
             marks = []
             if 'cf-ray' in headers.lower() or 'cloudflare' in found['server'].lower():
                 marks.append('cloudflare')
-            if BLOCKED.search(text) or response.headers.get('cf-mitigated') == 'challenge':
+            if classify_http(response.status_code, response.headers, text) == 'challenge':
                 marks.append('challenge')
             if DDOS_GUARD.search(found['server']) or DDOS_GUARD.search(text[:20000]):
                 marks.append('ddos-guard')
@@ -513,7 +514,7 @@ def verdict(record):
     owner = {
         'hang': 'ours', 'adapter_crash': 'ours', 'parser_error': 'ours', 'route_rejected': 'ours',
         'identity_mismatch': 'ours', 'not_image': 'ours', 'tiny_image': 'ours', 'no_pages': 'ours',
-        'redirect': 'ours?', 'challenge': 'blocked', 'geo_blocked': 'blocked', 'rate_limited': 'blocked',
+        'redirect': 'ours?', 'challenge': 'blocked', 'geo_blocked': 'blocked', 'rate_limited': 'site',
         'access_denied': 'blocked', 'auth_required': 'site', 'route_unavailable': 'route', 'dns': 'site',
         'tls_error': 'site', 'connect_error': 'site', 'timeout': 'site', 'http_5xx': 'site', 'http_404': 'ours?',
         'http_4xx': 'site', 'source_error': 'unknown', 'paid_only': 'site', 'no_chapters': 'site',
@@ -529,11 +530,12 @@ def verdict(record):
         elif moved and status in {'redirect', 'http_404', 'timeout', 'connect_error', 'dns', 'empty_catalogue',
                                   'source_error', 'access_denied', 'unknown', 'parser_error'}:
             status, owner = 'domain_moved', 'ours'
-        elif marks & {'ddos-guard'} and status in {'access_denied', 'challenge', 'timeout', 'http_4xx', 'source_error'}:
+        elif ('ddos-guard' in marks and status in {'access_denied', 'challenge'}
+              and (diag.get('http') == 403 or 'challenge' in marks)):
             status, owner = 'ddos_guard', 'blocked'
         elif 'challenge' in marks and status in {'access_denied', 'timeout', 'http_4xx', 'source_error', 'unknown', 'empty_catalogue'}:
             status, owner = 'challenge', 'blocked'
-        elif 'captcha' in marks and status in {'access_denied', 'source_error', 'http_4xx'}:
+        elif 'captcha' in marks and diag.get('http') in {403, 503} and status in {'access_denied', 'http_4xx'}:
             status, owner = 'captcha', 'blocked'
         elif status in {'timeout', 'connect_error', 'tls_error'} and not alive:
             owner = 'site'
@@ -548,7 +550,7 @@ def verdict(record):
             owner = 'ours?' if alive else 'site'
         elif status in {'http_5xx', 'empty_catalogue'} and not alive:
             owner = 'site'
-        elif status in {'empty_catalogue', 'no_chapters'} and alive and not marks & {'captcha', 'ddos-guard', 'tiny'}:
+        elif status in {'empty_catalogue', 'no_chapters'} and alive and 'tiny' not in marks:
             # The site answers normally, yet our parser found no titles/chapters.
             owner = 'ours?'
     rows = record.get('catalogue_rows') or {}

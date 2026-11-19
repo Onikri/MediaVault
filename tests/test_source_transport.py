@@ -500,6 +500,17 @@ class StatusTests(TransportCase):
                     self.open(status, body, headers)
                 self.assertEqual(source_status(caught.exception), name)
 
+    def test_retry_after_date_on_service_unavailable(self):
+        from email.utils import formatdate
+        with self.assertRaises(SourceRateLimitError) as caught:
+            self.open(503, b'wait', {'Retry-After': formatdate(time.time() + 1800, usegmt=True)})
+        self.assertGreaterEqual(caught.exception.retry_after, 1798)
+        self.assertLessEqual(caught.exception.retry_after, 1800)
+
+    def test_challenge_header_prevents_successful_body_from_reaching_parser(self):
+        with self.assertRaises(SourceChallengeError):
+            self.open(200, b'<html>challenge</html>', {'cf-mitigated': 'challenge'})
+
     def test_region_words_on_an_ordinary_page_are_not_a_block(self):
         text, _, _ = self.open(200, b'<p>This manga is only available in Japan as a print edition.</p>')
         self.assertIn('only available', text)

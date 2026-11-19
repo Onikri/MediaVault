@@ -27,7 +27,7 @@ MANGANATO_HOME = 'www.manganato.gg'
 # The same day kakamanga.com started redirecting to the redesigned katamanga.com;
 # mangakakalove.com keeps the MangaBox site.
 KAKALOT_HOME = 'www.mangakakalove.com'
-READER_HOSTS = {'manganow.to', 'jmanga.cloud', 'rawotaku.com'}
+READER_HOSTS = {'manganow.to', 'jmanga.party', 'rawotaku.com'}
 FM_HOSTS = {'nihonkuni.com', 'rawinu.com', 'weloma.net', 'love4u.net'}
 LILI_HOSTS = {'manhuaplus.org', 'raw1001.net'}
 CHAPTER_ID = r'[a-zA-Z0-9_-]{1,100}'
@@ -144,12 +144,25 @@ class MangaReader(SeriesPort):
                 author='.anisc-info .item:has(.item-head:-soup-contains("Authors", "著者")) a',
                 status='.anisc-info .item:has(.item-head:-soup-contains("Status", "地位")) .name')
 
-    def __init__(self, identity):
-        super().__init__(identity, rf'/(?:manga|raw-manga)/({SEGMENT})/?', rf'/read/({SEGMENT})(?:/{SEGMENT})+/?', interval=.5)
+    def __init__(self, identity, *, legacy_hosts=(), title_section=None):
+        self.title_section = title_section or ('raw-manga' if identity[2] == 'ja' else 'manga')
+        title_paths = 'manga|raw-manga|read' if self.title_section == 'read' else 'manga|raw-manga'
+        super().__init__(identity, rf'/(?:{title_paths})/({SEGMENT})/?', rf'/read/({SEGMENT})(?:/{SEGMENT})+/?',
+                         hosts=legacy_hosts, legacy_hosts=legacy_hosts, interval=.5)
         self.japanese = self.LANGUAGE == 'ja'
 
+    def site_link(self, value, base=None):
+        target = super().site_link(value, base)
+        parts = urlsplit(target)
+        if parts.hostname in self.legacy_hosts:
+            path = parts.path
+            if self.title_section == 'read' and self.TITLE_PATH.fullmatch(path):
+                path = '/read/' + self.title_key(target)
+            return urlunsplit(parts._replace(netloc=urlsplit(self.ROOT).netloc, path=path))
+        return target
+
     def title_for(self, url):
-        return self.ROOT + ('/raw-manga/' if self.japanese else '/manga/') + self.chapter_key(url)
+        return f'{self.ROOT}/{self.title_section}/{self.chapter_key(url)}'
 
     def catalogue(self, http, page=1, *, query='', sort='popular', tag=''):
         query = self.catalogue_params(page, query, tag)
@@ -409,7 +422,8 @@ SOURCES = (
              ('www.natomanga.com', *(host for host in BOX['www.natomanga.com'] if host != MANGANATO_HOME)),
              legacy_hosts=('chapmanganato.to', 'manganato.com', 'readmanganato.com'), home_mirror=True),
     MangaReader(('855054225815309342', 'MangaNow', 'en', 'https://manganow.to', True)),
-    MangaReader(('6141590427749684419', 'Jmanga', 'ja', 'https://jmanga.cloud', True)),
+    MangaReader(('6141590427749684419', 'Jmanga', 'ja', 'https://jmanga.party', True),
+                legacy_hosts=('jmanga.cloud', 'jmanga.cool'), title_section='read'),
     MangaReader(('7370546749583817262', 'Raw Otaku', 'ja', 'https://rawotaku.com', True)),
     FMReader(('3811800324362294701', 'NihonKuni', 'ja', 'https://nihonkuni.com', True)),
     FMReader(('7788489411010171607', 'RawINU', 'ja', 'https://rawinu.com', True)),

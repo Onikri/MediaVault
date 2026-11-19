@@ -41,6 +41,7 @@ def series_api(host, path, query):
     from manga_drecomics import public_api as drecomics
     from manga_dynasty import public_api as dynasty
     from manga_ebookrenta import public_api as ebookrenta
+    from manga_fifth_families import murim_feed
     from manga_gallery_archive_ports import public_api as gallery_archives
     from manga_hakusensha import public_api as hakusensha
     from manga_honeytoon_native import public_api as honeytoon
@@ -125,7 +126,7 @@ def series_api(host, path, query):
                                                      ciao, dynasty, mokuro, toonkotsu, firecross, hakusensha,
                                                      drecomics, ebookrenta, mangaplaza, coronaex, publus, docomo, mangafive,
                                                      dmm, pixivcomic, bookwalker, mangalix, toonz, cubari, mangack, pornpics,
-                                                     japanese_readers, ninth))
+                                                     japanese_readers, ninth, murim_feed))
 
 
 def public_form(url, data, headers):

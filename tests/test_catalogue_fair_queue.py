@@ -58,6 +58,18 @@ class FairQueueTests(unittest.TestCase):
   for _ in range(20):worker.answered(LIB_HOST)
   self.assertNotIn(LIB_HOST,worker.pace)
 
+ def test_retry_after_pauses_other_jobs_for_the_host(self):
+  from source_parser import SourceRateLimitError
+  def fetch(spec,cursor):
+   raise SourceRateLimitError('1800')
+  worker=self.worker(fetch)
+  self.detail(worker,'limited.example',2)
+  self.assertTrue(worker.run_once())
+  self.assertEqual(worker.paused['limited.example'],self.now+1800)
+  self.assertIsNone(worker.claim())
+  self.detail(worker,'available.example',1)
+  self.assertEqual(worker.claim()['host'],'available.example')
+
  def test_bridge_sources_share_the_suwayomi_slots(self):
   worker=self.worker()
   for n in range(4):self.detail(worker,f'bridge{n}.example',3,kind='bridge-detail')

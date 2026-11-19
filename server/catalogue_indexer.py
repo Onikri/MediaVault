@@ -196,6 +196,13 @@ class Indexer:
             with self.rate_lock:
                 next_time=max(time.monotonic(),self.rate.get(host,0));self.rate[host]=next_time+self.pace.get(host,self.base_pace(host))
             if self.stop.wait(max(0,next_time-time.monotonic())):return False
+            with self.rate_lock:
+                resume = self.paused.get(host, 0)
+            if resume > self.clock():
+                with self.store.lock, self.store.db:
+                    self.store.db.execute("UPDATE catalogue_jobs SET state='retry',due=?,updated=?,lease='' WHERE id=? AND lease=?",
+                                          (resume, self.clock(), job['id'], job['lease']))
+                return True
             result=self.fetch(spec,job['cursor']);rows=result.get('rows') or []
             # An AniList id span may hold no title of this kind; the walk goes on.
             if not rows and result.get('next') and not result.get('emptySpan'):raise RuntimeError('empty-page')
@@ -244,10 +251,22 @@ class Indexer:
                     self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(job['id'],));self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
             self.answered(host)
         except Exception as error:
-            code=getattr(getattr(error,'response',None),'status_code',None)
+            from source_parser import SourceRateLimitError
+            response = getattr(error, 'response', None)
+            code = getattr(response, 'status_code', None)
+            retry_after = getattr(response, 'headers', {}).get('Retry-After')
             reason='Недостаточно свободного места' if str(error)=='storage' else 'Источник повторяет страницу каталога' if str(error)=='repeated-page' else 'Источник вернул пустую промежуточную страницу' if str(error)=='empty-page' else 'Источник временно не отдаёт метаданные'
-            wait=30 if code==429 else min(3600,30*2**min(job['attempts'],7))
-            if str(error) not in JOB_ERRORS:self.failed(job['host'],code)
+            if code == 429 or (code == 503 and retry_after):
+                error = SourceRateLimitError(retry_after, http_status=code)
+            wait = min(3600, 30 * 2**min(job['attempts'], 7))
+            if isinstance(error, SourceRateLimitError):
+                wait = error.retry_after
+                reason = 'Источник попросил отложить следующий запрос'
+                self.failed(job['host'], 429)
+                with self.rate_lock:
+                    self.paused[job['host']] = max(self.paused.get(job['host'], 0), self.clock() + wait)
+            elif str(error) not in JOB_ERRORS:
+                self.failed(job['host'], code)
             with self.store.lock,self.store.db:self.store.db.execute("UPDATE catalogue_jobs SET state='retry',due=?,attempts=attempts+1,error=?,updated=?,lease='' WHERE id=? AND lease=?",(self.clock()+wait,reason,self.clock(),job['id'],job['lease']))
         finally:
             with self.store.lock:

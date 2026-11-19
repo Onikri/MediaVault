@@ -9,11 +9,13 @@ from __future__ import annotations
 import html
 import ipaddress
 import json
+import math
 import re
 import socket
 import threading
 import time
 from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
@@ -105,12 +107,16 @@ def source_status(error):
 class SourceRateLimitError(SourceError):
     status = 'rate_limited'
 
-    def __init__(self, retry_after):
-        super().__init__("Источник вернул HTTP 429.")
+    def __init__(self, retry_after, *, http_status=429):
+        super().__init__(f"Источник вернул HTTP {http_status}.")
         try:
-            self.retry_after = min(900, max(1, int(retry_after)))
+            delay = int(retry_after)
         except (TypeError, ValueError):
-            self.retry_after = 60
+            try:
+                delay = math.ceil(parsedate_to_datetime(retry_after).timestamp() - time.time())
+            except (TypeError, ValueError, OverflowError, OSError):
+                delay = 60
+        self.retry_after = min(2**31 - 1, max(1, delay))
 
 
 # Use the same public browser UA as the player adapters' returned stream headers.
@@ -1037,6 +1043,10 @@ class PublicHttp:
                 raise SourceTemporaryError("Источник не ответил. Повтори импорт позднее.") from None
             except requests.RequestException:
                 raise SourceTemporaryError("Источник не ответил. Повтори импорт позднее.") from None
+            retry_after = response.headers.get('Retry-After')
+            if response.status_code == 429 or (response.status_code == 503 and retry_after):
+                response.close()
+                raise SourceRateLimitError(retry_after, http_status=response.status_code)
             if decision is not None and decision.solver and response.status_code not in {301, 302, 303, 307, 308}:
                 kind = None
                 if response.status_code in {401, 403, 429, 451, 503}:
@@ -1141,15 +1151,16 @@ class PublicHttp:
                 kind = (transport.classify(status, response.headers, self._peek(response, 65536))
                         if status in {401, 403, 429, 451, 503} else None)
                 response.close()
-                if kind and not (kind == 'challenge' and status == 429):
+                if kind:
                     raise transport.error_for(kind, url)
-                if status == 429:
-                    raise SourceRateLimitError(response.headers.get('Retry-After'))
                 if status in {401, 403}:
                     raise SourceAccessError("Источник требует вход, проверку браузера или ограничивает доступ.")
-                if status in {408, 502, 504} or status == 503 and not response.headers.get('Retry-After'):
+                if status in {408, 502, 503, 504}:
                     raise SourceTemporaryError(f"Источник вернул HTTP {status}.")
                 raise SourceError(f"Источник вернул HTTP {status}.")
+            if response.headers.get('cf-mitigated', '').strip().lower() == 'challenge':
+                response.close()
+                raise transport.error_for('challenge', url)
             return response, url
         raise SourceError("Слишком много перенаправлений.")
 

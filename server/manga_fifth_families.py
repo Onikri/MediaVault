@@ -143,6 +143,20 @@ BLOG_INCLUSIONS = ('Series', 'Manga', 'Manhwa', 'Manhua', 'Doujinshi', 'Web Nove
 BLOG_EXCLUSIONS = ('Anime', 'Novel', 'Novela', 'Chapter')
 
 
+def murim_feed(host, path, query):
+    if host != 'www.murimscans.site':
+        return False
+    catalogue = path == '/feeds/posts/default/'
+    if not catalogue and not re.fullmatch(r'/feeds/posts/default/-/(?:' + SEGMENT + r'/){0,3}' + SEGMENT + r'/?', path):
+        return False
+    args = parse_qs(query, keep_blank_values=True)
+    required = {'alt', 'start-index', 'max-results'} | ({'q', 'orderby'} if catalogue else set())
+    return (args.keys() == required and all(len(values) == 1 for values in args.values())
+            and args['alt'] == ['json'] and args['max-results'] == (['21'] if catalogue else ['150'])
+            and bool(re.fullmatch(r'[1-9][0-9]{0,6}', args['start-index'][0]))
+            and (not catalogue or args['orderby'] == ['published'] and 1 <= len(args['q'][0]) <= 600))
+
+
 def blog_value(row, key):
     value = row.get(key) or {}
     return str(value.get('$t', '')) if isinstance(value, dict) else ''
@@ -264,7 +278,10 @@ class MurimScan(JsonSeries):
         doc, final = self.document(http, wire_url)
         if urlsplit(final).path != urlsplit(wire_url).path:
             raise SourceError('Источник перенаправил запрос на другой выпуск.')
-        return [picture(node, final, ('data-src',)) for node in doc.select('.post-body img[src], .check-box img[src]')]
+        pages = doc.select('article.chapter .chapter-raw-content img')
+        if not pages:
+            pages = doc.select('.post-body img[src], .check-box img[src]')
+        return [picture(node, final, ('data-src',)) for node in pages]
 
 
 def public_form(url, data):
