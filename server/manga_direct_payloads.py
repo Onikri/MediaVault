@@ -645,7 +645,7 @@ def public_api(host, path, query):
         return (set(args) <= {'page', 'search', '_'} and args.get('_') == ['/'] and
                 len(args.get('page', [])) == 1 and bool(re.fullmatch(r'[1-9]\d{0,3}', args['page'][0])) and
                 len(args.get('search', [])) <= 1 and len(args.get('search', [''])[0]) <= 160)
-    if host == 'kodokueasyaccess.com':
+    if host in {'kodokustudio.com', 'kodokueasyaccess.com'}:
         return not query and bool(re.fullmatch(
             rf'/api/series(?:/{KodokuStudio.SLUG}(?:/chapters(?:/{SEGMENT}/[a-z]{{2,8}})?)?)?', path))
     if host == 'one-piece-fans2.com':

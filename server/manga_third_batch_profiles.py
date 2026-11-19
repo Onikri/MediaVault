@@ -82,7 +82,8 @@ HTML = (
 
 PAYLOADS = (
     ('explosm', ('491094567635736188', 'Cyanide & Happiness', 'en', 'https://explosm.net', False)),
-    ('kodokustudio', ('4730948540511990292', 'Kodoku Studio', 'all', 'https://kodokueasyaccess.com', True)),
+    # kodokueasyaccess.com redirects to kodokustudio.com (Nov 2026).
+    ('kodokustudio', ('4730948540511990292', 'Kodoku Studio', 'all', 'https://kodokustudio.com', True)),
     ('leslievictims', ('1228130671216317629', 'Leslie&Victims', 'en', 'https://leslie-victims.pages.dev', False)),
     ('mangabolt', ('286088605022156276', 'MangaBolt', 'en', 'https://mangabolt.com', False)),
     ('mangade', ('3447999145778061665', 'MangaDE', 'en', 'https://mangade.io', True)),

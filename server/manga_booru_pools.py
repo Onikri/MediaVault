@@ -190,7 +190,9 @@ class E621(BooruPools):
             batch = ids[start:start + 200]
             query = 'status:all id:' + ','.join(batch)
             data = self.json(http, query_url(E621_ROOT + '/posts.json', tags=query, limit=len(batch)))
-            for entry in data.get('posts') or []:
+            # Since Nov 2026 posts.json answers a bare list; it used to be {"posts": [...]}.
+            entries = data if isinstance(data, list) else data.get('posts') or [] if isinstance(data, dict) else []
+            for entry in entries:
                 key = str(entry.get('id') or '')
                 if key in batch:
                     result[key] = entry
@@ -200,10 +202,19 @@ class E621(BooruPools):
         if not isinstance(entry, dict) or (entry.get('flags') or {}).get('deleted'):
             return ''
         order = ('preview', 'sample', 'file') if cover else ('file', 'sample', 'preview')
+        files = entry.get('files') if isinstance(entry.get('files'), dict) else {}
         for kind in order:
-            url = image_url((entry.get(kind) or {}).get('url'), E621_ROOT)
-            if url and not re.search(r'\.(?:mp4|webm)$', urlsplit(url).path, re.I):
-                return url
+            if files:
+                # Current shape: files.original.url, files.sample/preview.{webp,jpg}. A null URL
+                # means e621 withholds the file from anonymous readers; it is not rebuilt.
+                found = files.get('original' if kind == 'file' else kind) or {}
+                candidates = [found.get('url'), found.get('jpg'), found.get('webp')] if isinstance(found, dict) else []
+            else:
+                candidates = [(entry.get(kind) or {}).get('url')]
+            for value in candidates:
+                url = image_url(value, E621_ROOT) if value else ''
+                if url and not re.search(r'\.(?:mp4|webm)$', urlsplit(url).path, re.I):
+                    return url
         return ''
 
     def row_for(self, data, cover=''):

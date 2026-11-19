@@ -30,21 +30,32 @@ STATUSES = {0: 'ongoing', 1: 'completed', 2: 'hiatus'}
 MAX_MANIFEST = 4 * 1024 * 1024
 
 
+# Since Nov 2026 the site's Next.js answers an RSC request without the `_rsc`
+# cache key with a same-host 307 to the same URL plus `_rsc`; follow only that.
+RSC_KEY = re.compile(r'[A-Za-z0-9_-]{0,64}')
+RSC_ROUTE = Route(headers={'rsc': '1', 'Accept': 'text/x-component'}, redirect=True)
+
+
 def route(url, method, data, headers):
     if method != 'GET' or data is not None:
         return None
     if url.netloc == 'j-novel.club':
+        try:
+            # The redirect appends a bare `_rsc` (no `=`), which strict parsing rejects.
+            query = re.sub(r'(^|&)_rsc(?=&|$)', r'\1_rsc=', url.query)
+            args = dict(parse_qsl(query, keep_blank_values=True, strict_parsing=True, max_num_fields=5))
+        except ValueError:
+            return None
+        if '_rsc' in args and not RSC_KEY.fullmatch(args['_rsc']):
+            return None
+        args.pop('_rsc', None)
         if url.path == '/series':
-            try:
-                args = dict(parse_qsl(url.query, keep_blank_values=True, strict_parsing=True, max_num_fields=4))
-            except ValueError:
-                return None
             if (args.get('type') == 'manga' and set(args) <= {'type', 'page', 'search'}
                     and re.fullmatch(r'[1-9][0-9]{0,3}', args.get('page', '1')) and len(args.get('search', '')) <= 160):
-                return Route(headers={'rsc': '1', 'Accept': 'text/x-component'}, redirect=False)
+                return RSC_ROUTE
             return None
-        if re.fullmatch(rf'/series/{SLUG}', url.path) and not url.query:
-            return Route(headers={'rsc': '1', 'Accept': 'text/x-component'}, redirect=False)
+        if re.fullmatch(rf'/series/{SLUG}', url.path) and not args:
+            return RSC_ROUTE
         if re.fullmatch(rf'/read/{SLUG}', url.path) and not url.query:
             return Route(headers={'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8'}, redirect=False)
         return None

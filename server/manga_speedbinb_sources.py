@@ -7,7 +7,7 @@ from urllib.parse import parse_qsl, quote, unquote, urljoin, urlsplit, urlunspli
 from bs4 import BeautifulSoup
 
 from manga_madara import SEGMENT, image_url, node_text, release_date
-from manga_series_port import Cards, MAX_CHAPTERS, Meta, SeriesPort, number, picture
+from manga_series_port import Cards, MAX_CHAPTERS, PAYWALL, Meta, SeriesPort, number, picture
 from manga_speedbinb import CID, chapter_pages, reader_pages, reader_url
 from manga_webcomics import param, query_url
 from source_parser import SourceAccessError, SourceError
@@ -541,6 +541,20 @@ class Yanmaga(SpeedCatalogue):
                 return self.order(rows), False
             offset += len(entries)
         return self.order(rows)[:MAX_CHAPTERS], True
+
+    def page_document(self, http, url):
+        doc, final = self.document(http, url)
+        # Since Nov 2026 a chapter answers with a redirect to the same chapter
+        # under /viewer/ (plus the reader's cid): /comics/<t>/<c> -> /viewer/comics/<t>/<c>.
+        moved = urlsplit(final)
+        if moved.path.startswith('/viewer/'):
+            # The viewer adds its own cid; the chapter is the same when the path is.
+            final = urlunsplit(moved._replace(path=moved.path.removeprefix('/viewer'), query=urlsplit(url).query))
+        if not self.is_chapter(final) or self.chapter_identity(url) != self.chapter_identity(final):
+            raise SourceError('Источник перенаправил на другую главу.')
+        if doc.select_one(PAYWALL):
+            raise SourceAccessError('Глава доступна на условиях источника.')
+        return doc, urlunsplit(moved)
 
     def pages(self, http, url):
         doc, final = self.page_document(http, url)

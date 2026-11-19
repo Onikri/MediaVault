@@ -24,6 +24,11 @@ TYPES = {'Manga': 'manga', 'Manhua': 'manhua', 'Manhwa': 'manhwa', 'Comic': 'com
 MARKER = 'mv_ball_page='
 
 
+# The chapter listing of a long series (One Piece: every language's chapters)
+# is ~6 MB of JSON, above the generic 4 MB page limit.
+API_LIMIT = 24 * 1024 * 1024
+
+
 def request(http, endpoint, *, params=None, payload=None):
     from mangaball_reader import api_only
 
@@ -31,7 +36,7 @@ def request(http, endpoint, *, params=None, payload=None):
     reply = PublicHttp(validate=api_only(target), timeout=http.timeout, deadline=http.deadline)
     try:
         options = {'method': 'POST', 'data': json.dumps(payload).encode()} if payload else {}
-        raw, final, _ = reply.document(target, headers={'Referer': ROOT + '/'}, **options)
+        raw, final, _ = reply.document(target, headers={'Referer': ROOT + '/'}, limit=API_LIMIT, **options)
         if final != target:
             raise SourceError('Manga Ball перенаправил запрос на другой маршрут.')
         result = json.loads(raw)

@@ -298,7 +298,8 @@ class EveriaGallery(WordPressGallery):
 class Hennojin(DirectCatalogue):
     def __init__(self, identity):
         self.nonce_page = '/home'
-        series = rf'/((?:(?!home/|tags/|tag/|category/|search/|artists/|group/){SEGMENT}/){{0,4}}{SEGMENT})/?'
+        # Titles moved under /home/manga/<slug>/ (Nov 2026); /home/page/<n> stays the listing.
+        series = rf'/((?:(?!home/page/|tags/|tag/|category/|search/|artists/|group/){SEGMENT}/){{0,4}}{SEGMENT})/?'
         super().__init__(identity, Layout(
             series, series,
             Cards('.grid-items .layer-content', '.title_link > a[href]', next='.paginate .next'),

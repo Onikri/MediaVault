@@ -53,8 +53,9 @@ PROFILES = (
     (('5246625723235112128', 'GakaMangas', 'https://gakamangas.com', False), {'chapter_mode': 'manga', 'manga_only': False}),
     (('4598626990187882152', 'GalaxyDegenScans', 'https://gdscans.com', True), {'chapter_mode': 'manga'}),
     (('8561426018751869351', 'Hentai1.io', 'https://hentai1.io', True), {'html': True}),
-    (('7329798563365402763', 'HM2D', 'https://doujindistrict.com', True), {'chapter_mode': 'manga'}),
-    (('3876544289472679486', 'Hunlight Comics', 'https://hunlightcomics.com', True), {'chapter_mode': 'manga'}),
+    # Sites that moved their title section (Nov 2026); the extension does not check the path.
+    (('7329798563365402763', 'HM2D', 'https://doujindistrict.com', True), {'chapter_mode': 'manga', 'section': 'read'}),
+    (('3876544289472679486', 'Hunlight Comics', 'https://hunlightcomics.com', True), {'chapter_mode': 'manga', 'section': 'm'}),
     (('5815628626283130746', 'KaliScan.org (unoriginal)', 'https://kaliscan.org', True), {'chapter_mode': 'manga'}),
     (('4307007494151154546', 'KSGroupScans', 'https://ksgroupscans.com', True), {'chapter_mode': 'manga'}),
     (('8802607595629671202', 'LHTranslation', 'https://lhtranslation.net', False), {'chapter_mode': 'manga'}),
@@ -66,7 +67,7 @@ PROFILES = (
     (('1099222169691387069', 'Mangaforfree.com', 'https://mangaforfree.com', True), {'chapter_mode': 'admin'}),
     (('5502656519292762717', 'MangaManiacs', 'https://mangamaniacs.org', True), {}),
     (('2031498907928923621', 'MangaOwl.io (unoriginal)', 'https://mangaowl.io', True), {'chapter_mode': 'manga', 'section': 'read-1'}),
-    (('4265503553734005106', 'MangaPark.tv (unoriginal)', 'https://mangapark.tv', True), {'chapter_mode': 'manga'}),
+    (('4265503553734005106', 'MangaPark.tv (unoriginal)', 'https://mangapark.tv', True), {'chapter_mode': 'manga', 'section': 'manhwa'}),
     (('3606721916149050760', 'Mangasushi', 'https://mangasushi.org', False), {'chapter_mode': 'manga'}),
     (('7638481723868333116', 'ManhuaHot', 'https://manhuahot.com', False), {}),
     (('4005973248538140146', 'ManhuaUS', 'https://manhuaus.com', False), {'chapter_mode': 'manga', 'manga_only': False}),
@@ -81,12 +82,12 @@ PROFILES = (
     (('2527256034272235453', 'OctopusManga', 'https://octopusmanga.com', True), {'chapter_mode': 'manga'}),
     (('4403086215261921832', 'Orchisasia', 'https://www.orchisasia.org', True), {'section': 'comic'}),
     (('3740623306758763677', 'Paritehaber', 'https://www.paritehaber.com', True), {}),
-    (('2311025425739352818', 'Pornhwaz', 'https://www.pornhwaz.com', True), {}),
+    (('2311025425739352818', 'Pornhwaz', 'https://www.pornhwaz.com', True), {'section': 'webtoon'}),
     (('5756634909776784131', 'Sleepy Translations', 'https://sleepytranslations.com', False), {'chapter_mode': 'manga'}),
     (('6421630287504544593', 'TopManhua.net', 'https://topmanhua.net', True), {'chapter_mode': 'manga'}),
     (('6032516943051342273', 'TritiniaScans', 'https://tritinia.org', False), {'chapter_mode': 'manga'}),
     (('58992897252080929', 'KokoMangas', 'https://kokomangas.com', True), {'chapter_mode': 'manga'}),
-    (('3062846066388633553', 'WebtoonScan', 'https://webtoonscan.com', True), {}),
+    (('3062846066388633553', 'WebtoonScan', 'https://webtoonscan.org', True), {'section': 'manhwa'}),  # .com lost its DNS (Nov 2026)
     (('6540843430852844328', 'WuxiaWorld', 'https://wuxiaworld.site', False), {'chapter_mode': 'manga', 'section': 'novel'}),
     (('4439807782838127935', 'YaoiScan', 'https://yaoiscan.com', True), {}),
     (('5990114708086767078', 'Zinmanga', 'https://mangazin.org', True), {'manga_only': False}),
@@ -176,7 +177,7 @@ PROFILES = (
         'thumbnail_original': True,
     }),
     (('6718273076571980404', 'Yaoihub', 'https://yaoihub.org', True), {
-        'chapter_mode': 'manga', 'metadata_interval': 2,
+        'chapter_mode': 'manga', 'metadata_interval': 2, 'section': 'read',
     }),
     (('7450882931813509619', 'MangaForFree.net', 'https://mangaforfree.net', True), {
         'chapter_mode': 'admin', 'metadata_interval': 1, 'raw_marker': 'contains',
@@ -232,7 +233,7 @@ PROFILES = (
         'chapter_mode': 'manga', 'selectors': {'chapters': 'li.wp-manga-chapter:not(.premium-block)'},
     }),
     (('5475936177780301452', 'Rose Squad Scans', 'https://rosesquadscans.aishiteru.org', True), {
-        'variant': 'rosesquad', 'chapter_mode': 'manga', 'date_format': '%m.%d.%Y', 'metadata_interval': 2,
+        'variant': 'rosesquad', 'chapter_mode': 'manga', 'date_format': '%m.%d.%Y', 'metadata_interval': 2, 'section': 'series',
     }),
     (('6792243715659475719', 'Ruby Comics', 'https://rubycomics.net', True), {
         'variant': 'ruby', 'chapter_mode': 'manga', 'thumbnail_original': True,
@@ -242,7 +243,8 @@ PROFILES = (
         'variant': 'setsu', 'chapter_mode': 'manga', 'metadata_interval': 0.5,
         'selectors': {'status': 'div.summary-heading:-soup-contains("status", "Status") + div.summary-content'},
     }),
-    (('2738031143723682744', 'GoodToon', 'https://www.goodtoon010.com', True), {
+    # goodtoon010 redirects to goodtoon012 (numbered domains rotate).
+    (('2738031143723682744', 'GoodToon', 'https://www.goodtoon012.com', True), {
         'variant': 'goodtoon', 'language': 'ko', 'html': True, 'uses_post_id': False, 'chapter_mode': 'manga',
         'date_format': '%y.%m.%d',
         'selectors': {'title': 'h1.summary-title, div.post-title h3, div.post-title h1, #manga-title > h1',
