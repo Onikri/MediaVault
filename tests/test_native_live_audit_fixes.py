@@ -375,3 +375,29 @@ class MadaraSectionTests(TestCase):
         for sid, url in cases.items():
             source = profiles[sid]
             self.assertTrue(source.TITLE_PATH.fullmatch(urlsplit(url).path), (sid, url))
+
+
+class ByparrRouteTests(TestCase):
+    # Behind a Cloudflare check for the Oracle IP; with the solver route the live audit
+    # opened up to five chapters with images on each (solver2 run, 2026-11-19).
+    HOSTS = {'akuma.moe', 'asurascans.com', 'boratscans.com', 'dragontea.ink', 'hachiraw.net',
+             'hentai-cosplay-xxx.com', 'hotcomics.io', 'kumaraw.com', 'linkmanga.com', 'luacomic.org',
+             'lunatoons.net', 'manga18.club', 'manhwa18.today', 'mgread.io', 'ragescans.com',
+             'setsuscans.com', 'team-shadowi.com', 'toonhey.com', 'visionhaze.com', 'xomanga.site'}
+
+    def test_challenged_sites_go_through_the_solver_for_every_language_profile(self):
+        import manga_native_registry
+        import source_transport
+
+        routed = set()
+        for source, profile in manga_native_registry.profiles().items():
+            host = (urlsplit(profile.ROOT).hostname or '').removeprefix('www.')
+            if host not in self.HOSTS:
+                continue
+            entry = source_transport.declared(source)
+            self.assertIsNotNone(entry, (source, host))
+            rule = entry.rule(urlsplit(profile.ROOT).hostname, 'catalogue')
+            self.assertTrue(rule and rule.solver and rule.exit == 'direct', (source, host))
+            self.assertGreaterEqual(source_transport.solver_budget(source, 20), 45)
+            routed.add(host)
+        self.assertEqual(routed, self.HOSTS)
