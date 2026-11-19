@@ -359,7 +359,7 @@ class StrictBody(BaseModel):
 @app.get("/health")
 def health():
     return {"application": "MediaVault", "version": 76, "readingPlaces":True, "continuousCatalogue":True, "contentManagement":True, "globalTagPolicy":True, "mangaTagPolicy":True, "mangaCatalogIndex":True, "ranobeDriveText":True, "ranobeDriveAudio":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"narration-export.html")), "mangaDriveTranslation":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")),"videoChapters":True,"mangaOriginProbe":True,"titleSharing":True, "allohaConnector":True, "catalogSignedFilters":True,"allohaVodCache":True, "geminiVoice":True, "bookLanguageFallback":True, "browserStagedVideo":True, "mangaSearchBackoff":True, "googleKeyPool":True, "ranobeReader":True, "bookReader":True, "lostfilmCatalogue":True, "playerBalancer":True, "ukrainianContent":True, "hikkaMetadata":True, "controlCenter":True, "systemStatus":True, "siteRules":True, "mangaExports":True, "mangaTranslationExport":os.path.isfile(os.path.join(os.getenv("MANGA_EXPORT_ASSETS","/app/export-assets"),"manga-export.html")), "parallelImportWorkers":max(1,min(2,int(os.getenv("IMPORT_WORKERS","2")))), "kodikCatalogue":True, "mangaDiscoveryWorkers":max(1,min(8,int(os.getenv("MANGA_DISCOVERY_WORKERS","8")))), "watchRooms":True, "roomConversation":True, "driveGrantStatus":True, "mangaSourceHealth":True, "progressiveTitleBackgrounds":True, "franchiseSeasons":True, "characterProfiles":True, "progressiveDiscovery":True, "playbackPreparationVersion":2, "chapterThumbnails":True, "nativeTitleBackgrounds":True, "lyricsRelay":True, "animeDiscovery":True, "googleGatewayVersion":5, "googleParallelKeys":6, "mangaGlobalDiscovery":True, "onlinePlayback":True, "mangaLanguages":["ru","uk","en","ja","ko","zh"], "mangaFormats":["manga","manhwa","manhua","comic","rumanga"],"mangaReadingModes":["paged","webtoon"], "readerTranslation":True, "animeMusic":True, "mangaImport":True,"platformRatings":True,"voiceDiscovery": True, "sourceQualities": True, "rememberedDevices": True, "oauthConfigured": bool(client_secret() and PUBLIC_URL.startswith("https://")),
-            "worldCatalogueBrowse": True, "catalogueReadSnapshots": True, "origin": ORIGIN, "worker": "server", "paidServices": False}
+            "worldCatalogueBrowse": True, "catalogueReadSnapshots": True, "catalogueReleaseStatuses": True, "origin": ORIGIN, "worker": "server", "paidServices": False}
 
 
 @app.post("/auth/session")
@@ -676,13 +676,13 @@ content_management.install(app,content_owner,viewer,lambda:__import__('manga_dis
 
 
 @app.get('/manga/catalog')
-def manga_catalog(background:BackgroundTasks,q:str='',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',readingMode:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,sort:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
+def manga_catalog(background:BackgroundTasks,q:str='',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',readingMode:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,sort:str='',status:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
     from manga_discovery import catalogue_reader,manager
     from manga_catalog_index import browse
     store=manager()
     if tag or genre:background.add_task(content_management.prioritize,store,subject,tag,genre)
     with catalogue_reader(store) as db:
-        result=browse(db,q=q,tag=tag,genre=genre,excludeGenre=excludeGenre,excludeTag=excludeTag,readingMode=readingMode,provider=provider,format=format,offset=offset,limit=limit,sort=sort,**manga_catalog_filters(language,year,age,sourceIds))
+        result=browse(db,q=q,tag=tag,genre=genre,excludeGenre=excludeGenre,excludeTag=excludeTag,readingMode=readingMode,provider=provider,format=format,offset=offset,limit=limit,sort=sort,status=status,**manga_catalog_filters(language,year,age,sourceIds))
         return content_management.with_policy(result,tagPolicyRevision,store,db)
 
 @app.get('/manga/catalog/tags')

@@ -1,4 +1,5 @@
 import {filterValues} from './catalog-taxonomy.js';
+import {releaseStatusOptions} from './release-status.js';
 import MergedCatalogToolbar from './MergedCatalogToolbar.jsx';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
@@ -169,7 +170,7 @@ export function SortMenu({value,options,onChange,label='Сортировка'}){
 }
 
 const InlineToolbar=({children})=>children;
-export default function CatalogFilterDock({mergeNavigation=false,search,kind,filters,onFilter,onReset,fields=['genre','year','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceTitle='Озвучка',voiceNote,language,sources,morphId='filters'}){
+export default function CatalogFilterDock({mergeNavigation=false,search,kind,filters,onFilter,onReset,fields=['genre','year','status','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceTitle='Озвучка',voiceNote,language,sources,morphId='filters'}){
  const [panel,setPanel]=useState(null),anchors=useRef({}),sentinel=useRef(null),[stuck,setStuck]=useState(false),reduced=useReducedMotion(),[open,setOpen]=useFiltersOpen(),toggle=useRef(null),fold=useRef(null);
  const ToolbarHost=mergeNavigation?MergedCatalogToolbar:InlineToolbar;
  const chosenTags=splitTags(filters.tag);
@@ -183,6 +184,7 @@ export default function CatalogFilterDock({mergeNavigation=false,search,kind,fil
  const items=[
   use('genre')&&{key:'genre',label:mergeNavigation?'Жанры':'Жанр',value:[splitTags(filters.genre).join(', '),splitTags(filters.excludeGenre).length?'− '+splitTags(filters.excludeGenre).join(', '):''].filter(Boolean).join(' · '),clear:()=>{onFilter('genre','');onFilter('excludeGenre','');}},
   use('year')&&{key:'year',label:'Год',value:filters.year,clear:()=>onFilter('year','')},
+  use('status')&&['anime','manga','ranobe','movie','tv'].includes(kind)&&{key:'status',label:'Статус',value:filters.status&&releaseStatusOptions.find(([id])=>id===filters.status)?.[1],clear:()=>onFilter('status','')},
   use('tag')&&kind!=='book'&&{key:'tag',label:'Теги',value:[splitTags(filters.tag).join(', '),splitTags(filters.excludeTag).length?'− '+splitTags(filters.excludeTag).join(', '):''].filter(Boolean).join(' · '),clear:()=>{onFilter('tag','');onFilter('excludeTag','');}},
   use('format')&&formats.length>0&&{key:'format',label:'Формат',value:filters.format,clear:()=>onFilter('format','')},
   kind==='manga'&&{key:'readingMode',label:'Подача',value:filters.readingMode==='webtoon'?'Вебтун':filters.readingMode==='paged'?'Страницы':'',clear:()=>onFilter('readingMode','')},
@@ -230,6 +232,7 @@ export default function CatalogFilterDock({mergeNavigation=false,search,kind,fil
    {current.key==='genre'&&!mergeNavigation&&<ChoicePanel label="Жанры" findLabel="Найти жанр" options={genres} value={filters.genre} onPick={value=>{onFilter('genre',value);shut(true);}}/>}
    {current.key==='tag'&&!mergeNavigation&&<TagPanel value={filters.tag} options={tags} onChange={value=>onFilter('tag',value)}/>}
    {current.key==='year'&&<YearPanel years={years} value={filters.year} onChange={value=>{onFilter('year',value);if(years)shut(true);}}/>}
+   {current.key==='status'&&<Options label="Статус выпуска" options={releaseStatusOptions} selected={id=>id===(filters.status||'')} onPick={id=>{onFilter('status',id);shut(true);}}/>}
    {current.key==='tag'&&mergeNavigation&&<SignedPanel label="Теги" options={tags} positive={filters.tag} negative={filters.excludeTag} onChange={(yes,no)=>{onFilter('tag',yes);onFilter('excludeTag',no);}}/>}
    {current.key==='readingMode'&&<Options label="Подача" options={[["","Любая"],["webtoon","Вебтун"],["paged","Страницы"]]} selected={value=>value===(filters.readingMode||'')} onPick={value=>{onFilter('readingMode',value);shut(true);}}/>}
    {current.key==='format'&&<ChoicePanel label="Форматы" findLabel="Найти формат" options={formats} value={filters.format} onPick={value=>{onFilter('format',same(value,filters.format||'')?'':value);shut(true);}}/>}

@@ -63,6 +63,20 @@ class SignedFilters(unittest.TestCase):
   self.assertEqual(detail['id'],'omdb:1')
   self.assertEqual(detail['cover'],'https://fixture.example/poster.jpg')
   self.assertIsNone(content_catalog.title(self.db,'tv','omdb','1'))
+ def test_release_status_survives_catalogue_refresh_and_filters_before_count(self):
+  from content_metadata import anilist_rows
+  media=[{'id':1,'title':{'english':'Garden Past'},'format':'TV','status':'FINISHED'},
+         {'id':2,'title':{'english':'Garden Now'},'format':'TV','status':'RELEASING'},
+         {'id':3,'title':{'english':'Garden Future'},'format':'TV','status':'NOT_YET_RELEASED'},
+         {'id':4,'title':{'english':'Garden Unknown'},'format':'TV','status':'HIATUS'}]
+  rows=anilist_rows({'data':{'Page':{'media':media}}},'anime')
+  content_catalog.ingest(self.db,rows)
+  content_catalog.ingest(self.db,[{**rows[0],'status':''}])
+  for state,title in [('released','Garden Past'),('ongoing','Garden Now'),('anons','Garden Future')]:
+   result=content_catalog.browse(self.db,kind='anime',q='garden',status=state,limit=1)
+   self.assertEqual(result['total'],1)
+   self.assertEqual((result['items'][0]['title'],result['items'][0]['releaseStatus']),(title,state))
+  self.assertEqual(content_catalog.browse(self.db,kind='anime')['total'],4)
  def test_malformed_or_overlarge_filter_lists_do_not_widen_the_query(self):
   from fastapi import HTTPException
   for value in ['["Fantasy"',json.dumps(['Fantasy']*65)]:

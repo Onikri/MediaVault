@@ -8,6 +8,7 @@ import re
 import threading
 import time
 from bisect import bisect_right
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -43,6 +44,7 @@ def csv_rows(name):
 def load_snapshot(read_csv=csv_rows):
     kinds = {}
     titles = {}
+    today = date.today()
     for kind, filename in (('movie', 'all_movies'), ('tv', 'all_series')):
         kind_ids = []
         for record in read_csv(filename):
@@ -59,6 +61,10 @@ def load_snapshot(read_csv=csv_rows):
                 'year': int(year[1]) if year else None, 'genres': [], 'tags': [], 'ids': {},
                 'sourceUrl': f'{ROOT}/movie/{identity}',
             }
+            if kind=='movie':
+                try:release_day=date.fromisoformat(record['date'])
+                except ValueError:pass
+                else:titles[identity]['status']='anons' if release_day>today else 'released'
             kind_ids.append(identity)
         if not kind_ids:
             raise ValueError(f'Empty OMDB {kind} export')

@@ -233,12 +233,12 @@ def install(app,owner,viewer,manager):
         with store.lock,store.db:return {'indexed':content_catalog.ingest(store.db,body.items)}
 
     @app.get('/catalog/content')
-    def content(background:BackgroundTasks,q:str='',kind:str='anime',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',format:str='',year:str='',age:str='',offset:int=0,limit:int=60,sort:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
+    def content(background:BackgroundTasks,q:str='',kind:str='anime',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',format:str='',year:str='',age:str='',offset:int=0,limit:int=60,sort:str='',status:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
         from manga_discovery import catalogue_reader
         store=manager()
         if tag or genre:background.add_task(prioritize,store,subject,tag,genre)
         with catalogue_reader(store) as db:
-            result=content_catalog.browse(db,kind=kind,q=q[:160],tag=tag[:4096],genre=genre[:4096],excludeGenre=excludeGenre[:4096],excludeTag=excludeTag[:4096],format=format[:60],year=year[:4],age=age[:20],offset=offset,limit=limit,sort=sort[:20],prepared=True)
+            result=content_catalog.browse(db,kind=kind,q=q[:160],tag=tag[:4096],genre=genre[:4096],excludeGenre=excludeGenre[:4096],excludeTag=excludeTag[:4096],format=format[:60],year=year[:4],age=age[:20],offset=offset,limit=limit,sort=sort[:20],status=status,prepared=True)
             return with_policy(result,tagPolicyRevision,store,db)
 
     @app.get('/catalog/content/title')

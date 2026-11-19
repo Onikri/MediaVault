@@ -1,0 +1,5 @@
+{
+  "released": ["released", "finished", "finished airing", "completed", "complete", "ended", "concluded", "завершён", "завершен", "завершена", "вышел", "вышла", "вышло", "вышли", "完結", "已完结"],
+  "ongoing": ["ongoing", "on going", "releasing", "currently airing", "airing", "publishing", "currently publishing", "running", "current", "continuing", "returning series", "онгоинг", "выходит", "публикуется", "連載中", "连载中"],
+  "anons": ["anons", "announced", "announcement", "not yet released", "not yet aired", "not yet published", "upcoming", "tba", "planned", "in development", "in production", "анонс", "анонсирован", "анонсирована", "анонсировано", "未发行"]
+}

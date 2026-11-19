@@ -4,7 +4,7 @@ import {acceptContentPolicy,contentPolicyRevision} from './manga-tag-policy.js';
 const sent=new Map();
 const empty=Object.freeze([]);
 export function contentCatalogParams({kind,query,filters,page=1,limit=30,sort=''}){
- return new URLSearchParams({q:query,kind,tag:filterParam(filters.tag),genre:filterParam(filters.genre),excludeGenre:filterParam(filters.excludeGenre),excludeTag:filterParam(filters.excludeTag),format:filters.format||'',age:filters.age||'',year:filters.year||'',limit:String(limit),offset:String((page-1)*limit),sort});
+ return new URLSearchParams({q:query,kind,tag:filterParam(filters.tag),genre:filterParam(filters.genre),excludeGenre:filterParam(filters.excludeGenre),excludeTag:filterParam(filters.excludeTag),format:filters.format||'',age:filters.age||'',year:filters.year||'',status:filters.status||'',limit:String(limit),offset:String((page-1)*limit),sort});
 }
 
 export default function useContentCatalog({service,state,kind,query,filters,rows,revision,page=1,limit=30,sort='',off=false}){

@@ -4,6 +4,7 @@ import {mangaPolicy,globalContentPolicy} from './manga-tag-policy.js';
 import {russianText,translate,imageURL} from './title-metadata.js';
 import {contentLanguage} from './content-language.js';
 import {uiLanguage} from './i18n/index.js';
+import {releaseStatus} from './release-status.js';
 // Free metadata only. Source discovery and every media byte stay on the import server.
 const strip=value=>String(value||'').replace(/<[^>]*>/g,' ').replace(/\[\/?(?:b|i|u|url|spoiler|quote)[^\]]*\]/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
 export const normalized=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -158,7 +159,7 @@ export function mergeCatalog(values){
     current.hentaiExcluded=!!(current.hentaiExcluded||item.hentaiExcluded||item.workFacts?.hentaiExcluded);
     current.releases=[...current.releases,...item.releases].filter((e,i,a)=>a.findIndex(x=>x.date===e.date&&x.episode===e.episode)===i);
     if(item.titles.ru){current.titles={...current.titles,...item.titles};current.title=item.titles.ru;current.description=item.description||current.description;}
-    for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','startDate','endDate','score','trailer','background','episodesAired','duration','authors'])if(current[key]==null||current[key]==='')current[key]=item[key];
+    for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','releaseStatus','startDate','endDate','score','trailer','background','episodesAired','duration','authors'])if(current[key]==null||current[key]==='')current[key]=item[key];
     for(const key of ['scores','countries'])if(!current[key]?.length&&item[key]?.length)current[key]=item[key];
   }
   return result;
@@ -166,6 +167,7 @@ export function mergeCatalog(values){
 
 export function matchesFilters(item,filters){
   if(filters.year&&String(item.year)!==String(filters.year))return false;
+  if(filters.status&&(item.releaseStatus||releaseStatus(item.statusCode)||releaseStatus(item.status))!==filters.status)return false;
     const manga=item.kind==='manga'||globalContentPolicy(),match=(left,right)=>manga?(mangaPolicy().key(right)?mangaPolicy().key(left)===mangaPolicy().key(right):!globalContentPolicy()&&normalized(left).includes(normalized(right))):normalized(localLabel(left)).includes(normalized(localLabel(right)))||normalized(left).includes(normalized(right));
   if(!matchesTaxonomy(item,filters))return false;
   const formatKey=value=>({манга:'manga',манхва:'manhwa',маньхуа:'manhua',комикс:'comic',руманга:'rumanga',вебтун:'webtoon'}[normalized(value)]||normalized(value));
@@ -265,18 +267,20 @@ export const BROWSE_KINDS=['anime','manga','ranobe'];
 export const CATALOG_SORTS=[['popular','По популярности'],['trending','Сейчас обсуждают'],['score','По рейтингу'],['favourites','Чаще в избранном'],['new','Сначала новые'],['old','Сначала старые'],['title','По названию'],['length','Больше серий и глав']];
 const ANILIST_GENRES=new Set(['Action','Adventure','Comedy','Drama','Ecchi','Fantasy','Hentai','Horror','Mahou Shoujo','Mecha','Music','Mystery','Psychological','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Thriller']);
 const ANILIST_FORMATS=new Set(['TV','TV_SHORT','MOVIE','SPECIAL','OVA','ONA','MUSIC','MANGA','NOVEL','ONE_SHOT']);
-export function browseQuery({kind='anime',page=1,perPage=24,sort='popular',year,genre,tag,format}={}){
+export function browseQuery({kind='anime',page=1,perPage=24,sort='popular',year,genre,tag,format,status}={}){
   const manga=kind!=='anime',order={popular:'POPULARITY_DESC',trending:'TRENDING_DESC',score:'SCORE_DESC',favourites:'FAVOURITES_DESC',new:'START_DATE_DESC',old:'START_DATE',title:'TITLE_ROMAJI',length:manga?'CHAPTERS_DESC':'EPISODES_DESC'}[sort]||'POPULARITY_DESC';
   // ID breaks ties, so equal scores keep one place across page requests.
   const args=['type:$type','sort:[$sort,ID]'],variables={type:manga?'MANGA':'ANIME',sort:order,page:Math.max(1,Number(page)||1),perPage:Math.min(50,Math.max(1,Number(perPage)||24))},defs=['$type:MediaType','$sort:MediaSort','$page:Int','$perPage:Int'];
   const add=(name,type,value,arg=name)=>{defs.push('$'+name+':'+type);args.push(arg+':$'+name);variables[name]=value;};
+  const state={released:'FINISHED',ongoing:'RELEASING',anons:'NOT_YET_RELEASED'}[status];
+  if(state)add('status','MediaStatus',state);
   const pickedFormat=String(format||'').toUpperCase().replace(/\s+/g,'_');
   if(ANILIST_FORMATS.has(pickedFormat))add('format','[MediaFormat]',[pickedFormat],'format_in');
   else if(kind==='ranobe')add('format','[MediaFormat]',['NOVEL'],'format_in');
   else if(kind==='manga')add('notFormat','[MediaFormat]',['NOVEL'],'format_not_in');
   if(year&&/^\d{4}$/.test(String(year))){if(manga){add('from','FuzzyDateInt',Number(year)*10000,'startDate_greater');add('to','FuzzyDateInt',(Number(year)+1)*10000,'startDate_lesser');}else add('year','Int',Number(year),'seasonYear');}
   // Dated sorts would otherwise open with undated announcements.
-  else if(sort==='new'||sort==='old')add('dated','FuzzyDateInt',10000000,'startDate_greater');
+  else if(status!=='anons'&&(sort==='new'||sort==='old'))add('dated','FuzzyDateInt',10000000,'startDate_greater');
   const labels=[genre,...String(tag||'').split(',')].map(v=>String(v||'').trim()).filter(Boolean).map(queryLabel);
   const genres=labels.filter(v=>ANILIST_GENRES.has(v)),tags=labels.filter(v=>!ANILIST_GENRES.has(v));
   if(genres.length)add('genres','[String]',genres,'genre_in');

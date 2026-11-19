@@ -67,7 +67,7 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
  useEffect(()=>{
   if(!canRead)return;
   const abort=new AbortController(),{signal}=abort;
-  const filtered=hasCatalogFilters(filters);
+  const filtered=hasCatalogFilters({...filters,status:''});
   const candidateParams=mangaCatalogParams({query,language,sourceIds,page,sort,limit,filters:{}}).toString();
   let initial=true,busy=false,enriching=false,refreshAfterRead=false;
   let candidates=recent?.candidates||empty.candidates;

@@ -2,6 +2,7 @@
 import hashlib,json,re,time
 from urllib.parse import urlsplit
 from manga_tag_policy import current,normalize
+from release_status import condition as status_condition, initialize_index as initialize_status_index, work_status
 
 KINDS=frozenset({'movie','tv','anime','manga','ranobe','book'})
 RELEASE_YEAR = "MAX(CASE WHEN typeof(json_extract(t.raw,'$.year')) IN ('integer','text') AND CAST(json_extract(t.raw,'$.year') AS INTEGER) BETWEEN 1 AND 9999 THEN CAST(json_extract(t.raw,'$.year') AS INTEGER) END)"
@@ -25,6 +26,7 @@ def initialize(db):
     db.execute('CREATE TABLE IF NOT EXISTS content_titles(id TEXT PRIMARY KEY,kind TEXT NOT NULL,search TEXT NOT NULL,raw TEXT NOT NULL,updated INTEGER NOT NULL)')
     db.execute('CREATE INDEX IF NOT EXISTS content_titles_kind ON content_titles(kind,updated)')
     db.execute('CREATE INDEX IF NOT EXISTS content_work_identity ON content_titles('+work_sql('')+')')
+    initialize_status_index(db,table='content_titles',document='raw',work=work_sql(''),kind='kind')
     db.execute('CREATE TABLE IF NOT EXISTS content_catalog_state(name TEXT PRIMARY KEY,value TEXT NOT NULL)')
     db.execute('CREATE TABLE IF NOT EXISTS content_tag_facts(title_id TEXT NOT NULL,kind TEXT NOT NULL,source TEXT NOT NULL,category TEXT NOT NULL,original TEXT NOT NULL,PRIMARY KEY(title_id,category,original))')
     db.execute('CREATE TABLE IF NOT EXISTS content_tags(title_id TEXT NOT NULL,category TEXT NOT NULL,tag_key TEXT NOT NULL,original TEXT NOT NULL,PRIMARY KEY(title_id,category,tag_key,original))')
@@ -105,6 +107,7 @@ def ingest(db,rows):
             for field in ('tags','genres','aliases'):data[field]=list(dict.fromkeys([*data[field],*old.get(field,[])]))[:120]
             for field in ('sourceUrl','sourceURL','url','cover','description'):
                 if not data.get(field):data[field]=old.get(field,'')
+            if not data.get('status') and old.get('status'):data['status']=old['status']
             for field in ('ids','titles'):data[field]={**old.get(field,{}),**data[field]}
         raw=json.dumps(data,ensure_ascii=False,separators=(',',':'))
         if len(raw.encode())>24000:continue
@@ -118,7 +121,7 @@ def ingest(db,rows):
     if new_facts:invalidate(db)
     return count
 
-def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='',year='',age='',limit=60,offset=0,sort='updated',prepared=False):
+def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='',year='',age='',limit=60,offset=0,sort='updated',status='',prepared=False):
     if not prepared:initialize(db)
     if kind not in KINDS:return {'items':[],'total':0}
     policy=current();where=['kind=?'];params=[kind]
@@ -127,6 +130,8 @@ def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='
     from catalog_taxonomy import clauses
     extra,values=clauses(db,kind=kind,tag=tag,genre=genre,excludeGenre=excludeGenre,excludeTag=excludeTag)
     where.extend(extra);params.extend(values)
+    restriction,states=status_condition(status,table='content_titles',document='raw',work=work_sql(),peer_work=work_sql('peer'),kind=kind)
+    if restriction:where.append(restriction);params.extend(states)
     from catalog_taxonomy import format_label
     db.create_function('catalog_format',2,format_label,deterministic=True)
     if format:where.append("catalog_format(json_extract(t.raw,'$.format'),t.kind)=?");params.append(format_label(format,kind))
@@ -158,7 +163,8 @@ def read_work(db,key,policy,preferred_id=''):
     ids={};titles={}
     for _,record in reversed(records):ids.update(record.get('ids') or {});titles.update(record.get('titles') or {})
     providers=list(dict.fromkeys(record['provider'] for _,record in records))
-    return {**row,**merged,'hentaiExcluded':excluded,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records),'providers':providers}
+    state=work_status(record for _,record in records)
+    return {**row,**merged,'hentaiExcluded':excluded,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records),'providers':providers,'releaseStatus':state}
 
 def title(db,kind,provider,source_id,*,prepared=False):
     if not prepared:initialize(db)

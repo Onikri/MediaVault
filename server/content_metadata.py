@@ -17,7 +17,7 @@ def anilist_rows(payload,kind):
                      'sourceUrl':item.get('siteUrl') or 'https://anilist.co/'+('anime' if kind=='anime' else 'manga')+'/'+str(identity),
                      'genres':item.get('genres') or [],'tags':[v['name'] for v in item.get('tags') or [] if isinstance(v,dict) and isinstance(v.get('name'),str)],
                      'cover':(item.get('coverImage') or {}).get('large',''),'year':item.get('seasonYear') or (item.get('startDate') or {}).get('year'),
-                     'format':item.get('format') or '', 'description':item.get('description') or ''})
+                     'format':item.get('format') or '', 'description':item.get('description') or '', 'status':item.get('status') or ''})
     return rows
 
 def movie_rows(payload,kind):
@@ -32,7 +32,8 @@ def movie_rows(payload,kind):
                      'sourceUrl':'https://www.kinopoisk.ru/'+('series' if kind=='tv' else 'film')+'/'+identity+'/',
                      'genres':[v['name'] for v in item.get('genres') or [] if isinstance(v,dict) and isinstance(v.get('name'),str)],
                      'tags':[v['name'] for v in item.get('countries') or [] if isinstance(v,dict) and isinstance(v.get('name'),str)],
-                     'cover':(item.get('gallery') or {}).get('posterUrl',''),'year':item.get('year'),'description':item.get('synopsis') or ''})
+                     'cover':(item.get('gallery') or {}).get('posterUrl',''),'year':item.get('year'),'description':item.get('synopsis') or '',
+                     'status':item['status'] if isinstance(item.get('status'),str) else ''})
     return rows
 
 def scan(store,keys=None):

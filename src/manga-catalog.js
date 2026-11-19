@@ -12,7 +12,7 @@ export function loadMangaTaxonomy(){
 }
 
 export function mangaCatalogParams({query='',filters={},language='all',sourceIds=[],page=1,limit=30,sort=''}={}){
- const values={q:query.trim(),tag:filters.tag,genre:filters.genre,excludeGenre:filters.excludeGenre,excludeTag:filters.excludeTag,readingMode:filters.readingMode,year:filters.year,format:filters.format,age:filters.age,language,sourceIds:[...sourceIds].sort().join(','),offset:(Math.max(1,page)-1)*limit,limit,sort};
+ const values={q:query.trim(),tag:filters.tag,genre:filters.genre,excludeGenre:filters.excludeGenre,excludeTag:filters.excludeTag,readingMode:filters.readingMode,year:filters.year,format:filters.format,age:filters.age,status:filters.status,language,sourceIds:[...sourceIds].sort().join(','),offset:(Math.max(1,page)-1)*limit,limit,sort};
  return new URLSearchParams(Object.entries(values).filter(([,v])=>v!==undefined&&v!==null&&v!==''&&(!Array.isArray(v)||v.length>0)).map(([key,value])=>[key,filterParam(value)]));
 }
 

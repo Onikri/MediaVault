@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 from manga_source_tags import unique, clean_label
 from manga_tag_policy import current, normalize, project_row
+from release_status import condition as status_condition, initialize_index as initialize_status_index, work_status
 
 FORMAT = {'manga', 'manhwa', 'manhua', 'webtoon','comic','rumanga'}
 
@@ -80,6 +81,7 @@ def initialize(conn):
     with conn:conn.execute("UPDATE catalog_titles SET work_key=catalog_normalize(title) WHERE work_key=''")
     # Covers the per-work aggregates, so a page reads the index, not the rows.
     conn.execute('CREATE INDEX IF NOT EXISTS catalog_titles_works ON catalog_titles(work_key,year,chapter_count,first_seen)')
+    initialize_status_index(conn,table='catalog_titles',document='metadata',work='work_key')
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(conn)
     revision=conn.execute("SELECT value FROM catalog_policy_state WHERE name='revision'").fetchone()
@@ -236,13 +238,15 @@ SORTS = {
     'added': 't.first_seen DESC,t.id',
 }
 
-def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30, offset=0, sort='', **filters):
+def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30, offset=0, sort='', status='', **filters):
     limit = min(100,max(1,int(limit)))
     offset = min(10_000_000,max(0,int(offset)))
     facet={k:filters.pop(k,'') for k in ['genre','excludeGenre','excludeTag']}
     where,args = _conditions(provider,format,source_id,**filters)
     from catalog_taxonomy import clauses
     extra,values=clauses(conn,kind='manga',tag=tag,manga=True,**facet)
+    restriction,states=status_condition(status,table='catalog_titles',document='metadata',work='t.work_key',peer_work='peer.work_key')
+    if restriction:extra.append(restriction);values.extend(states)
     if extra:where+=(' AND ' if where else ' WHERE ')+' AND '.join(extra);args.extend(values)
     return _browse_works(conn,where,args,sort,limit,offset,q=q)
 
@@ -296,6 +300,7 @@ def _browse_works(conn,where,args,sort,limit,offset,q=''):
             row['genres']=list(dict.fromkeys([*row['genres'],*[v for v in facts[key]['genres'] if is_hentai(v,current())]]))
             row['hentaiExcluded']=facts[key]['hentaiExcluded']
             row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated,'workKey':key,'workFacts':facts[key]})
+            if facts[key].get('releaseStatus'):row['releaseStatus']=facts[key]['releaseStatus']
             result.append(row)
     return {'total':total,'workTotal':works_total,'limit':limit,'offset':offset,'works':len(keys),'items':result}
 
@@ -317,9 +322,13 @@ def _work_facts(conn,keys):
     records=[(key,json.loads(raw)) for key,raw in conn.execute('SELECT work_key,metadata FROM catalog_titles WHERE work_key IN ('+marks+')',keys)]
     blocked.update(key for key,row in records if hentai_excluded(row))
     facts={key:{'genres':[],'tags':[],'hentaiExcluded':key in blocked} for key in keys}
+    states={key:[] for key in keys}
     for key,row in records:
+        states[key].append(row)
         public=_public_metadata({**row,'hentaiExcluded':key in blocked})
         for field in ['genres','tags']:facts[key][field]=list(dict.fromkeys([*facts[key][field],*public.get(field,[])]))[:120]
+    for key,rows in states.items():
+        if status:=work_status(rows):facts[key]['releaseStatus']=status
     return facts
 
 def _public_metadata(row):

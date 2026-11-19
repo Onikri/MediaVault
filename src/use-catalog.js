@@ -11,7 +11,8 @@ export function useCatalog(query,kind,year,server,page=1,composing=false,filters
   // Providers accept one value. The server index applies OR lists and exclusions.
   const genres=filterValues(filters.genre),tags=filterValues(filters.tag);
   const genre=genres.length===1?genres[0]:undefined,tag=tags.length===1?tags[0]:undefined;
-  const cacheKey=JSON.stringify([text,kind,year,server,page,genre,tag,...(browse?[filters.format,sort,perPage]:[]),off]);
+  const status=filters.status;
+  const cacheKey=JSON.stringify([text,kind,year,server,page,genre,tag,status,...(browse?[filters.format,sort,perPage]:[]),off]);
   const [revision,setRevision]=useState(0),[snapshot,setSnapshot]=useState(null);
   const key=cacheKey+':'+revision+':'+composing;
   const retry=useCallback(()=>{cache.delete(cacheKey);setRevision(value=>value+1);},[cacheKey]);
@@ -32,9 +33,9 @@ export function useCatalog(query,kind,year,server,page=1,composing=false,filters
         try{
           let found=null;
           if(browse){
-            try{found=await fetchBrowsePage({kind,page,perPage,sort,year,genre,tag,format:filters.format,signal:abort.signal});}catch(error){if(abort.signal.aborted)return;}
+            try{found=await fetchBrowsePage({kind,page,perPage,sort,year,genre,tag,format:filters.format,status,signal:abort.signal});}catch(error){if(abort.signal.aborted)return;}
             // AniList down or empty: page through Shikimori alone, still one list.
-            if(!found?.length){found=await fetchCatalog('shikimori',{query:'',kind,year,genre,tag,server,page,signal:abort.signal});states.anilist='unavailable';states.shikimori='ok';}
+            if(!found||(!found.length&&!status)){found=await fetchCatalog('shikimori',{query:'',kind,year,genre,tag,server,page,signal:abort.signal});states.anilist='unavailable';states.shikimori='ok';}
           }else found=await fetchCatalog(provider,{query:text,kind,year,genre,tag,server,page,signal:abort.signal});
           if(abort.signal.aborted)return;
           results[provider]=found;if(states[provider]==='loading')states[provider]='ok';if(browse&&found.russian)states.shikimori='ok';if(found.pages)pages[provider]=found.pages;

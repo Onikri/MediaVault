@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {browseQuery,fetchBrowsePage,mergeCatalog,validExternalIds} from '../src/catalog.js';
+import {browseQuery,fetchBrowsePage,mergeCatalog,validExternalIds,matchesFilters} from '../src/catalog.js';
 import {titleSlug} from '../src/title-route.js';
 import {tabTitle,kindIcon} from '../src/tab-identity.js';
 import {contentCatalogParams} from '../src/use-content-catalog.js';
+import {mangaCatalogParams} from '../src/manga-catalog.js';
 
 test('the server catalogue uses the grid page size beyond page 208', ()=>{
  const params=contentCatalogParams({kind:'anime',query:'',filters:{genre:['Drama','Comedy']},page:209,limit:28,sort:'old'});
@@ -11,6 +12,19 @@ test('the server catalogue uses the grid page size beyond page 208', ()=>{
  assert.equal(params.get('limit'),'28');
  assert.equal(params.get('sort'),'old');
  assert.deepEqual(JSON.parse(params.get('genre')),['Drama','Comedy']);
+});
+
+test('release filters are serialized to both catalogues and the AniList browse fallback', ()=>{
+ const filters={status:'anons'};
+ assert.equal(mangaCatalogParams({filters,page:3,limit:24}).get('status'),'anons');
+ assert.equal(contentCatalogParams({kind:'anime',query:'',filters,page:3,limit:24}).get('status'),'anons');
+ const result=browseQuery({sort:'new',status:'anons'});
+ assert.equal(result.variables.status,'NOT_YET_RELEASED');
+ assert.match(result.query,/status:\$status/);
+ assert.equal(result.variables.dated,undefined);
+ assert.equal(matchesFilters({kind:'manga',status:'Завершён'},{status:'released'}),true);
+ assert.equal(matchesFilters({kind:'manga',status:'UNKNOWN'},{status:'released'}),false);
+ assert.equal(matchesFilters({kind:'anime',releaseStatus:'released',status:'RELEASING'},{status:'ongoing'}),false);
 });
 
 test('works with conflicting film IDs stay separate in the combined results', ()=>{

@@ -136,6 +136,23 @@ class CatalogIndexTests(unittest.TestCase):
         beyond=browse(self.db,q='Green Garden',offset=130000,limit=1)
         self.assertEqual((beyond['total'],beyond['workTotal'],beyond['offset'],beyond['items']),(3,2,130000,[]))
 
+    def test_release_status_filters_works_before_pagination(self):
+        rows=[
+            {**self.work(title_name='Published Garden',slug='published'), 'status':'Завершён'},
+            {**self.work('other','Published Garden','published-mirror'), 'status':'Онгоинг'},
+            {**self.work(title_name='Open Garden',slug='open'), 'status':'OnGoing'},
+            {**self.work(title_name='Future Garden',slug='future'), 'status':'Анонс'},
+            {**self.work(title_name='Unknown Garden',slug='unknown'), 'status':'Приостановлен'},
+        ]
+        upsert(self.db,rows)
+        for state, title_name in [('released','Published Garden'),('ongoing','Open Garden'),('anons','Future Garden')]:
+            with self.subTest(state=state):
+                result=browse(self.db,q='Garden',status=state,limit=1)
+                self.assertEqual(result['workTotal'],1)
+                self.assertEqual({(row['title'],row['releaseStatus']) for row in result['items']},{(title_name,state)})
+        self.assertEqual(browse(self.db,status='released')['total'],2)
+        self.assertEqual(browse(self.db)['workTotal'],4)
+
     def test_catalogue_reads_the_committed_index_while_a_crawl_batch_is_writing(self):
         from manga_discovery import Discovery, catalogue_reader
         with TemporaryDirectory() as directory:
