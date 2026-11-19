@@ -56,7 +56,8 @@ class AniListSpanTests(unittest.TestCase):
    self.assertTrue(worker.run_once())
    self.assertEqual(db.execute('SELECT cursor,state FROM catalogue_jobs WHERE id=?',(key,)).fetchone(),('{"from":2000,"span":1}','queued'))
    clock[0]+=10;self.assertTrue(worker.run_once())
-   self.assertNotIn('anilist.co',worker.paused);self.assertGreater(worker.pace.get('anilist.co',0),0)
+   self.assertEqual(worker.paused['anilist.co'],clock[0]+60)
+   self.assertGreater(worker.pace.get('anilist.co',0),0)
   finally:db.close();env.stop();temp.cleanup()
 
  def test_term_jobs_keep_the_listing_walk(self):
