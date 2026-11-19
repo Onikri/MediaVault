@@ -10,6 +10,7 @@ from urllib.parse import urlencode, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
+from animevost_source import HOSTS as ANIMEVOST_HOSTS, episode_list as animevost_episodes
 from hentaichan_video import HOSTS as HENTAICHAN_HOSTS, ROOT as HENTAICHAN_ROOT
 from source_parser import PublicHttp, Resolver, SourceError, episode_number, is_alloha_player, parse_page, public_url
 
@@ -51,7 +52,7 @@ SITES = (
     Site("yummy", "YummyAnime", "https://yummyanime.tv", ("yummyanime.tv",), ".movie-item", ".movie-item__title"),
     Site("animego", "AnimeGo", "https://animego.me", ("animego.me", "animego.org"), ".animes-list-item, .anime-item, .ani-grid__item", ".ani-grid__item-title, .h5, h2, h3"),
     Site("jutsu", "Jut.su", "https://jut.su", ("jut.su",), ".all_anime_global, .all_anime", ".aaname, .anime_name"),
-    Site("animevost", "AnimeVost", "https://animevost.org", ("animevost.org",), ".shortstory", ".shortstoryHead h2, .shortstoryHead a", "/index.php"),
+    Site("animevost", "AnimeVost", "https://animevost.org", ANIMEVOST_HOSTS, ".shortstory", ".shortstoryHead h2, .shortstoryHead a", "/index.php"),
     Site("anilibria", "AniLiberty / AniLibria", "https://aniliberty.top", ("anilibria.tv", "anilibria.top", "aniliberty.top"), ".release, .release-item, .goodcell, a[href*='/anime/releases/release/']", "h2, h3, .title"),
     Site('animejoy','AnimeJoy','https://animejoy.ru',('animejoy.ru',),'.shortstory','.ntitle a, .ntitle, h2'),
     Site('sovet','SovetRomantica','https://sovetromantica.com',('sovetromantica.com',),'.anime--block__desu','.anime--block__name'),
@@ -164,8 +165,11 @@ def parse_search(site, text, base, query=""):
 
 def player_choices(text, base):
     """Kodik publishes real translation/season IDs in its HTML select options."""
-    from player_catalog import alloha_choices
+    from player_catalog import alloha_choices, choice
     from anistar_source import choices as anistar_choices
+    if episodes := animevost_episodes(text, base):
+        return [choice('AnimeVost', episodes[0]['url'], identity='animevost', language='ru',
+                       player='AnimeVost', episodes=episodes)], []
     published = anistar_choices(text, base)
     if published:
         return published, []

@@ -31,6 +31,52 @@ class PlayerContractTests(unittest.TestCase):
         banner='<iframe src="/html5banner/loliland/vide/index7.html"></iframe>'
         self.assertEqual(parse_page(banner,'https://animevost.org/123-reze.html').players,[])
 
+    def test_animevost_uses_its_episode_list_and_only_resolves_the_selected_id(self):
+        from site_adapters import inspect_source
+
+        markup = '''
+          <h1>Test title</h1>
+          <iframe src="/html5banner/ad.html"></iframe>
+          <a href="/tip/tv/999-another-show.html">22 серия</a>
+          <script>var data = {"2 серия":"4321","1 серия":"1234",};</script>
+        '''
+
+        for host in ('animevost.org', 'v14.vost.pw'):
+            with self.subTest(host=host):
+                root = f'https://{host}/tip/tv/123-test.html'
+                frame = f'https://{host}/frame2.php?play=4321'
+                embed = f'https://{host}/frame5.php?play=4321'
+
+                class Http(FixtureHttp):
+                    def document(self, url, **kwargs):
+                        self.calls.append((url, kwargs))
+                        if url == root:
+                            return markup, url, {}
+                        if url == frame:
+                            return '<iframe src="/frame5.php?play=4321"></iframe>', url, {}
+                        if url == embed:
+                            return ('<a download href="https://std.miskuzi.link/4321.mp4">480p</a>'
+                                    '<a download href="//hd.miskuzi.link/720/4321.mp4">720p</a>'
+                                    '<a download href="https://other.example/video.mp4">720p</a>', url, {})
+                        raise AssertionError('Unexpected request')
+
+                http = Http({})
+                source = inspect_source(root, http=http)
+                self.assertEqual(source['provider'], 'animevost')
+                self.assertEqual([ep['number'] for ep in source['episodes']], [1, 2])
+                self.assertEqual(source['dubs'][0]['name'], 'AnimeVost')
+                self.assertEqual(source['dubs'][0]['episodes'], source['episodes'])
+                selected = source['episodes'][1]['url']
+                page = Resolver(http).resolve(selected)
+                self.assertEqual([stream['quality'] for stream in page.streams], [480, 720])
+                self.assertTrue(all(stream['url'].endswith('/4321.mp4') for stream in page.streams))
+                self.assertEqual(http.calls[-2:], [(frame, {'headers': {'Referer': root}}),
+                                                  (embed, {'headers': {'Referer': frame}})])
+                count = len(http.calls)
+                with self.assertRaises(SourceError):
+                    Resolver(http).resolve(root + '?mv_animevost_id=12345')
+                self.assertEqual(http.calls[count:], [(root, {})])
+
     def test_iframe_html_request_retains_the_publisher_referer(self):
         class Http:
             def document(self,url,**kwargs):

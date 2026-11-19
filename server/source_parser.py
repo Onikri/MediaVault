@@ -1334,7 +1334,9 @@ class PageParser(HTMLParser):
         try:
             target=public_url(urljoin(self.base, html.unescape(value).replace("\\/", "/")), resolve_dns=False)
             # This published iframe is AnimeVost's advertisement, not a series.
-            if urlsplit(target).hostname=='animevost.org' and urlsplit(target).path.startswith('/html5banner/'):return None
+            if urlsplit(target).path.startswith('/html5banner/'):
+                from animevost_source import HOSTS as animevost_hosts
+                if urlsplit(target).hostname in animevost_hosts:return None
             return target
         except SourceError:
             return None
@@ -1475,6 +1477,9 @@ def parse_page(text, base):
     # Preserve alternate translations; only identical episode URLs collapse.
     page.episodes = list({(entry["number"], entry["url"]): entry for entry in page.episodes}.values())
     page.episodes.sort(key=lambda entry: entry["number"])
+    from animevost_source import is_title_page as is_animevost_title, episode_list as animevost_episodes
+    if is_animevost_title(base):
+        page.episodes = animevost_episodes(text, base)
     if '__NUXT_DATA__' in text:
         from public_page_data import episode_streams
         published=episode_streams(text,base)
@@ -1572,6 +1577,9 @@ class Resolver:
         from hentaichan_video import resolve, video_page
         if video_page(url):
             return resolve(url, self.http)
+        from animevost_source import is_title_page as animevost_title, resolve as resolve_animevost
+        if animevost_title(url):
+            return resolve_animevost(public_url(url, resolve_dns=False), self.http)
         from dynamic_video_sources import provider_for, resolve_dynamic
         provider = provider_for(url)
         if provider:
