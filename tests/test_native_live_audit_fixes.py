@@ -456,3 +456,17 @@ class MadaraListingTests(TestCase):
         source = self.profile('1987105317893699901')  # Zinmanga keeps /manga/
         self.assertEqual(source.listing, '/manga/')
         self.assertEqual(source.html_request(None, 1, '', 'updated', '')[0], '/manga/')
+
+
+class KeyoappV2MoveTests(TestCase):
+    def test_kaizen_and_mist_read_titles_and_chapters_from_the_site_root(self):
+        import manga_native_registry
+
+        profiles = manga_native_registry.profiles()
+        for sid, root, title in (('1145415569668934781', 'https://kaizenscan.com', 'accidental-baby'),
+                                 ('80073424419623517', 'https://mistscans.org', 'giantess-partner')):
+            source = profiles[sid]
+            self.assertEqual(source.layout, 'v2', source.NAME)
+            self.assertTrue(source.TITLE_PATH.fullmatch(f'/{title}'))
+            self.assertTrue(source.CHAPTER_PATH.fullmatch(f'/{title}-chapter-1'))
+            self.assertFalse(source.TITLE_PATH.fullmatch(f'/series/{title}'))

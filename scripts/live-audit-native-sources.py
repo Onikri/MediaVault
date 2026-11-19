@@ -50,7 +50,7 @@ SHORT_QUERIES = {
     'zh-hans': ('的', 'a'), 'zh-hant': ('的', 'a'), 'ar': ('ال', 'a'), 'th': ('ก', 'a'),
 }
 PARKED = re.compile(r'domain (?:name )?(?:is )?for sale|buy this domain|parked (?:free|domain)|sedoparking|'
-                    r'this domain (?:has expired|is parked)|hugedomains', re.I)
+                    r'this domain (?:has expired|is parked)|hugedomains|the website has been stopped', re.I)
 CAPTCHA = re.compile(r'g-recaptcha|h-captcha|hcaptcha\.com|cf-turnstile|captcha', re.I)
 DDOS_GUARD = re.compile(r'ddos-guard', re.I)
 # Errors that a second candidate on the same site cannot change.

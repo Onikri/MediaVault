@@ -386,13 +386,14 @@ SOURCES = (
         'format': 'div[alt="Series Type"]',
     }),
     Keyoapp('8588684547293952127', 'Grim Scans', 'https://grimscans.com'),
-    Keyoapp('1145415569668934781', 'Kaizen Scan', 'https://kaizenscan.com', True),
+    # Kaizen Scan and Mist Scans moved to the v2 layout (titles at the site root) in Nov 2026.
+    Keyoapp('1145415569668934781', 'Kaizen Scan', 'https://kaizenscan.com', True, layout='v2'),
     Keyoapp('2816768640766208312', 'Kewn Scans', 'https://kewnscans.org'),
     Keyoapp('7739452864322240494', 'Kitsune Dawn', 'https://kitsunedawn.com', True, layout='redesign', query_limit=100),
     Keyoapp('4513668905743562887', 'Luna Toons', 'https://lunatoons.net', True, layout='v2'),
     Keyoapp('3314074618469377356', 'MeiToon', 'https://meitoon.org'),
     # mistscans.com lost its DNS; the extension moved to mistscans.org (Nov 2026).
-    Keyoapp('80073424419623517', 'Mist Scans', 'https://mistscans.org'),
+    Keyoapp('80073424419623517', 'Mist Scans', 'https://mistscans.org', layout='v2'),
     Keyoapp('3025454996745441538', 'Nyanu Kafe', 'https://nyanukafe.com', fields={
         'authors': 'div.w-full.flex-wrap > div:nth-child(1) > div:last-child',
         'artists': 'div.w-full.flex-wrap > div:nth-child(2) > div:last-child',
