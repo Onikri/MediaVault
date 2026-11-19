@@ -41,7 +41,8 @@ class StoreTests(unittest.TestCase):
             store.update(task['id'],status='completed',forget_key=True)
             self.assertNotIn('vault_key',store.get(task['id'],private=True)['data'])
             self.assertIsNone(store.next())
-            self.assertEqual((Path(directory)/'service.key').stat().st_mode&0o777,0o600)
+            if os.name != 'nt':  # Windows exposes only the read-only bit through st_mode.
+                self.assertEqual((Path(directory)/'service.key').stat().st_mode&0o777,0o600)
             store.close()
 
 

@@ -6,6 +6,7 @@ The derived vault key lives only in an expiring session, not the translation DB.
 from __future__ import annotations
 import base64, hashlib, hmac, io, json, os, re, secrets, sqlite3, threading, time, zipfile
 from collections import OrderedDict
+from contextlib import closing
 from concurrent.futures import Future
 from pathlib import Path
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -21,7 +22,8 @@ class ReadOnlySettings:
     def __init__(self, directory): self.root=Path(directory)
     def key(self): return (self.root/'service.key').read_bytes()
     def setting(self, name):
-        with sqlite3.connect((self.root/'tasks.sqlite').as_uri()+'?mode=ro',uri=True) as db:
+        # sqlite3's own context manager only commits; closing() releases the read-only handle.
+        with closing(sqlite3.connect((self.root/'tasks.sqlite').as_uri()+'?mode=ro',uri=True)) as db:
             row=db.execute('SELECT value FROM settings WHERE name=?',(name,)).fetchone()
         if not row:return None
         raw=row[0];return json.loads(AESGCM(self.key()).decrypt(raw[:12],raw[12:],name.encode()))

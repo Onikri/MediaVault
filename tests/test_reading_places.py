@@ -1,3 +1,4 @@
+from contextlib import closing
 import os
 from pathlib import Path
 import sqlite3
@@ -85,7 +86,7 @@ class ReadingPlaces(unittest.TestCase):
         raw = Path(self.directory.name, 'places.sqlite').read_bytes()
         for secret in (b'secret-book', b'secret-chapter', b'owner-a'):
             self.assertNotIn(secret, raw)
-        with sqlite3.connect(Path(self.directory.name, 'places.sqlite')) as database:
+        with closing(sqlite3.connect(Path(self.directory.name, 'places.sqlite'))) as database:
             self.assertEqual(database.execute('SELECT count(*) FROM places').fetchone()[0], reading_places.PAGE + 1)
 
     def test_restored_server_sends_everything_again(self):

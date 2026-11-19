@@ -130,4 +130,10 @@ def install(app, viewer, store_getter, directory_getter):
             raise HTTPException(403, 'Место чтения хранится только для профиля.')
         return places().sync(subject, body.since, body.entries)
 
+    def close():
+        current, state['store'] = state['store'], None
+        if current is not None:
+            current.close()
+
     app.state.reading_places = places
+    app.state.close_reading_places = close

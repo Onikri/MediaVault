@@ -38,7 +38,7 @@ class VMUpdateRollback(unittest.TestCase):
      returncode=1 if fail_new and arguments[2]=='mediavault-manga-batch' else 0
      stdout=json.dumps({'ready':True,'configured':True,'progressVersion':1})
     return CompletedProcess(arguments,returncode,stdout=stdout,stderr='')
-   with patch.object(module.os,'geteuid',return_value=0),patch.object(module.subprocess,'run',side_effect=run),patch.object(module.subprocess,'check_output',side_effect=inspect),patch.object(module.urllib.request,'urlopen',side_effect=lambda *a,**k:io.BytesIO(b'pass\n')),patch.object(module.time,'sleep'),redirect_stdout(io.StringIO()):
+   with patch.object(module.os,'geteuid',return_value=0,create=True),patch.object(module.subprocess,'run',side_effect=run),patch.object(module.subprocess,'check_output',side_effect=inspect),patch.object(module.urllib.request,'urlopen',side_effect=lambda *a,**k:io.BytesIO(b'pass\n')),patch.object(module.time,'sleep'),redirect_stdout(io.StringIO()):
     if fail_new:
      with self.assertRaises(module.UpdateError):module.install(REV,root=root)
     else:module.install(REV,root=root)

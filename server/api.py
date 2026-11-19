@@ -311,6 +311,8 @@ async def lifespan(application):
     # A live worker may still be finishing a bounded source request during shutdown.
     if not any(thread.is_alive() for thread in threads):
         store.close()
+    # The place store is bound to this task store; an open SQLite file also cannot be removed on Windows.
+    application.state.close_reading_places()
 
 
 app = FastAPI(title="MediaVault import service", version="8.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
