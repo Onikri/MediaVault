@@ -123,6 +123,18 @@ class CatalogIndexTests(unittest.TestCase):
         self.assertEqual(browse(self.db,q='Garden World')['items'][0]['title'],'Садовый мир')
         self.assertEqual(browse(self.db,q='Садовый мир')['items'][0]['title'],'Садовый мир')
 
+    def test_search_counts_groups_and_hydrates_only_matching_sources(self):
+        first={**self.work(title_name='Garden',slug='first'),'aliases':['Green Garden'],'year':2020}
+        matching={**self.work('mirror','Garden','matching'),'aliases':['Green Garden'],'year':2020}
+        other={**self.work('other','Garden','other'),'aliases':['Blue Garden'],'year':2020}
+        sequel={**self.work(title_name='Another Garden',slug='sequel'),'aliases':['Green Garden Story'],'year':2024}
+        upsert(self.db,[first,matching,other,sequel])
+        result=browse(self.db,q='Green Garden',limit=1)
+        self.assertEqual((result['total'],result['workTotal'],result['works']),(3,2,1))
+        self.assertEqual({row['provider'] for row in result['items']},{'hmanga','mirror'})
+        beyond=browse(self.db,q='Green Garden',offset=130000,limit=1)
+        self.assertEqual((beyond['total'],beyond['workTotal'],beyond['offset'],beyond['items']),(3,2,130000,[]))
+
     def test_facet_query_filters_before_limit_and_metadata_check_is_cached(self):
         upsert(self.db,[{**self.work(),'tags':['Comedy','Time Travel'],'metadataInspected':True}])
         facet=tags(self.db,q='TRAVEL',limit=1)['tags']

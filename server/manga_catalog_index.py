@@ -191,13 +191,9 @@ def upsert(conn, rows, source_id='', timestamp=None):
     if vocabulary_added:bump(conn)
     return count
 
-def _conditions(q='', tag='', provider='', format='', source_id='', *, genre='', excludeGenre='', excludeTag='', readingMode='', language='all', year='', age='', source_ids=()):
+def _conditions(provider='', format='', source_id='', *, readingMode='', language='all', year='', age='', source_ids=()):
     sql = []
     args = []
-    if q:
-        for word in normalize(q)[:160].split()[:12]:
-            sql.append("t.search_text LIKE ? ESCAPE '\\'")
-            args.append('%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%')
     if provider:
         sql.append('t.provider=?')
         args.append(provider)
@@ -242,27 +238,51 @@ SORTS = {
 
 def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30, offset=0, sort='', **filters):
     limit = min(100,max(1,int(limit)))
-    offset = min(100000,max(0,int(offset)))
+    offset = min(10_000_000,max(0,int(offset)))
     facet={k:filters.pop(k,'') for k in ['genre','excludeGenre','excludeTag']}
-    where,args = _conditions(q,'',provider,format,source_id,**filters)
+    where,args = _conditions(provider,format,source_id,**filters)
     from catalog_taxonomy import clauses
     extra,values=clauses(conn,kind='manga',tag=tag,manga=True,**facet)
     if extra:where+=(' AND ' if where else ' WHERE ')+' AND '.join(extra);args.extend(values)
     return _browse_works(conn,where,args,sort,limit,offset,q=q)
 
+def _search_where(where, words, *, use_index):
+    if not words:return where
+    prefix='s' if use_index else 't'
+    terms=' AND '.join(f"{prefix}.search_text LIKE ? ESCAPE '\\'" for _ in words)
+    if use_index:
+        # Scan the compact search index first. The work-order index otherwise
+        # needs a metadata-table lookup for every source row before testing LIKE.
+        terms=f't.rowid IN (SELECT s.rowid FROM catalog_titles s INDEXED BY catalog_titles_search WHERE {terms})'
+    return where+(' AND ' if where else ' WHERE ')+terms
+
 def _browse_works(conn,where,args,sort,limit,offset,q=''):
     # Page over works, then return every matching source row of those works
     # (a few per work) in page order; the client folds them into one card.
     # total stays the number of source rows; workTotal counts works for paging.
-    total,works_total = conn.execute('SELECT COUNT(*),COUNT(DISTINCT t.work_key) FROM catalog_titles t'+where,args).fetchone()
+    query=normalize(q)
+    words=query[:160].split()[:12]
+    args=[*args,*('%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for word in words)]
+    search_where=_search_where(where,words,use_index=True)
+    grouped=' FROM catalog_titles t'+search_where+' GROUP BY t.work_key'
     order=WORK_SORTS.get(sort) or WORK_SORTS['new'];ranking=[]
-    if normalize(q):
+    if words:
         order="MIN(CASE WHEN catalog_normalize(t.title)=? OR EXISTS(SELECT 1 FROM json_each(t.metadata,'$.aliases') a WHERE catalog_normalize(a.value)=?) THEN 0 ELSE 1 END),"+order
-        ranking=[normalize(q),normalize(q)]
-    keys = [k for (k,) in conn.execute('SELECT t.work_key FROM catalog_titles t'+where+' GROUP BY t.work_key ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,*ranking,limit,offset])]
+        ranking=[query,query]
+        page=conn.execute('SELECT t.work_key,SUM(COUNT(*)) OVER (),COUNT(*) OVER ()'+grouped+' ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,*ranking,limit,offset]).fetchall()
+        keys=[row[0] for row in page]
+    else:
+        page=[]
+        keys=[k for (k,) in conn.execute('SELECT t.work_key'+grouped+' ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,limit,offset])]
+    if page:
+        total,works_total=page[0][1:]
+    else:
+        total,works_total=conn.execute('SELECT COALESCE(SUM(sources),0),COUNT(*) FROM (SELECT COUNT(*) AS sources'+grouped+')',args).fetchone()
 
     result=[]
     if keys:
+        # The work-key index narrows hydration to just these works.
+        where=_search_where(where,words,use_index=False)
         place={k:i for i,k in enumerate(keys)}
         clause=(' AND ' if where else ' WHERE ')+'t.work_key IN ('+','.join('?'*len(keys))+')'
         rows=conn.execute('SELECT t.id,t.metadata,t.chapter_count,t.tag_state,t.updated,t.work_key FROM catalog_titles t'+where+clause+' ORDER BY t.chapter_count IS NULL,t.chapter_count DESC,t.id',[*args,*keys]).fetchall()

@@ -7,11 +7,11 @@ export function contentCatalogParams({kind,query,filters,page=1,limit=30,sort=''
  return new URLSearchParams({q:query,kind,tag:filterParam(filters.tag),genre:filterParam(filters.genre),excludeGenre:filterParam(filters.excludeGenre),excludeTag:filterParam(filters.excludeTag),format:filters.format||'',age:filters.age||'',year:filters.year||'',limit:String(limit),offset:String((page-1)*limit),sort});
 }
 
-export default function useContentCatalog({service,state,kind,query,filters,rows,revision,page=1,limit=30,sort=''}){
+export default function useContentCatalog({service,state,kind,query,filters,rows,revision,page=1,limit=30,sort='',off=false}){
  const params=contentCatalogParams({kind,query,filters,page,limit,sort}).toString();
  const key=JSON.stringify([service.server,params]);
  const [result,setResult]=useState({items:empty}),[retryCount,setRetryCount]=useState(0);
- const enabled=!!service?.server&&Number(service.session?.serverVersion)>=74;
+ const enabled=!off&&!!service?.server&&Number(service.session?.serverVersion)>=74;
  useEffect(()=>{
   if(!enabled||!state?.admin||!rows?.length)return;
   const abort=new AbortController(),timer=setTimeout(async()=>{
