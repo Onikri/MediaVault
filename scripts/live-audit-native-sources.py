@@ -485,12 +485,12 @@ def verdict(record):
         # Paid or closed chapters are skipped by readers too; they are not failures.
         bad = [result for result in bad if result.get('kind') != 'paid_only']
         record['status'] = 'ok' if not bad else 'partial'
+        # The profile works; some chapters failed. `chapter_issue` marks failures worth a look.
         record['owner'] = 'ok'
         if bad:
             record['reason'] = ','.join(sorted({result.get('kind', '?') for result in bad}))
-            if any(result.get('kind') in OURS | {'no_pages', 'tiny_image', 'source_error', 'adapter_crash'}
-                   for result in bad):
-                record['owner'] = 'ours?'
+            record['chapter_issue'] = any(result.get('kind') in OURS | {'no_pages', 'tiny_image', 'source_error', 'adapter_crash'}
+                                          for result in bad)
         return
     kinds = [error['kind'] for error in record['errors']]
     for result in chapters:
