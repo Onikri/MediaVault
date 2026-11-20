@@ -84,14 +84,15 @@ function SharedBackdrop({grant,service,paused}){
 
 function SharedTitle({grant,service}){
  const [open,setOpen]=useState(false),[more,setMore]=useState(false),[chapter,setChapter]=useState(grant.initial);
- const [start,setStart]=useState(grant.initial);
+ const [start,setStart]=useState({index:grant.initial,session:0});
  const manga=grant.kind==='manga',year=Number(grant.title.year)||null,description=String(grant.title.description||'').trim();
  const profile={title:grant.title.name,cover:grant.title.cover,description,year,ids:grant.title.ids,format:grant.title.format,readingMode:grant.title.readingMode};
  const kind=formatNames[grant.title.format]||grant.title.format||sectionNames[grant.title.section]||(manga?'Манга':grant.kind==='video'?'Видео':'');
  const units=grant.entries.length,unitWord=manga?plural(units,['глава','главы','глав']):plural(units,['серия','серии','серий']);
  const chapters=grant.entries.some(entry=>entry.season>1);
  const heading=useRef(null);
- function read(){setStart(chapter);setOpen(true);}
+ function startAt(index){setStart(previous=>({index,session:previous.session+1}));}
+ function read(){startAt(chapter);setOpen(true);}
  function close(){
   setOpen(false);
   requestAnimationFrame(()=>heading.current?.scrollIntoView({block:'start'}));
@@ -110,7 +111,7 @@ function SharedTitle({grant,service}){
      <label className="shared-title-chapters">
       <span>{manga?'Главы':'Серии'}</span>
       <select value={chapter} disabled={units===1} onChange={event=>{
-       const index=Number(event.target.value);setChapter(index);if(open)setStart(index);
+       const index=Number(event.target.value);setChapter(index);if(open)startAt(index);
       }} aria-label={manga?'Выбрать главу':'Выбрать серию'}>
        {grant.entries.map((entry,index)=><option key={index} value={index} title={entry.title||undefined}>
         {chapters&&entry.season===1?(manga?'Том 1 · ':'Сезон 1 · '):''}{entryLabel(entry,manga)}
@@ -126,7 +127,7 @@ function SharedTitle({grant,service}){
    </div>
   </header>
   {open&&<section className="shared-title-reader" aria-label={manga?'Читалка':'Плеер'}>
-   <OnlineViewer key={start} inline entries={grant.entries} initial={grant.entries[start]} kind={grant.kind}
+   <OnlineViewer key={start.session} inline entries={grant.entries} initial={grant.entries[start.index]} kind={grant.kind}
     title={grant.title.name} service={service} userId={'share:'+grant.id} onClose={close}
     onEntryChange={entry=>{const index=grant.entries.findIndex(value=>value.url===entry.url);if(index>=0)setChapter(index);}}
     language={grant.language} dub={grant.dub} quality={grant.quality} sourceUrl={grant.referer} metadata={profile}

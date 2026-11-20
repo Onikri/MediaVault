@@ -69,6 +69,16 @@ const reveal=async page=>{const reader=page.locator('.immersive-reader').last();
   await page.getByRole('button',{name:'Читать',exact:true}).click();
   await page.locator('.immersive-reader').waitFor();
   assert.equal(opened[0],grant.entries[1].url);
+  await page.locator('.immersive-reader').focus();
+  await page.keyboard.press('p');
+  await page.waitForFunction(()=>document.querySelector('.shared-title-chapters select')?.value==='0');
+  await page.locator('.immersive-reader').waitFor();
+  await Promise.all([
+   page.waitForRequest(request=>request.url().endsWith('/online/prepare')&&request.postDataJSON()?.url===grant.entries[1].url),
+   page.getByRole('combobox',{name:'Выбрать главу'}).selectOption('1')
+  ]);
+  await page.locator('.immersive-reader').waitFor();
+  assert.deepEqual(opened.slice(0,3),[grant.entries[1].url,grant.entries[0].url,grant.entries[1].url]);
   await reveal(page);
   assert.equal(await page.getByRole('button',{name:'Отладка страницы'}).count(),0,'Server diagnostics stay hidden from a visitor');
   assert.equal(await page.getByRole('button',{name:'Поделиться тайтлом'}).count(),0,'A visitor cannot reshare');
