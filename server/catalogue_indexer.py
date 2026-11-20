@@ -69,7 +69,8 @@ def host_of(spec):
 class Indexer:
     def __init__(self,store,fetch=None,clock=time.time,interval=1.1):
         self.store=store;self.clock=clock;self.fetch=fetch or __import__('catalogue_sources').fetch;self.stop=threading.Event();self.threads=[];self.rate={};self.rate_lock=threading.Lock();self.interval=interval;self.turn=0;self.inflight={}
-        self.pace={};self.failures={};self.trips={};self.paused={};self.served={};self.bridges=0;self.hosts=set();self.hosts_at=None
+        self.pace={};self.failures={};self.trips={};self.paused={};self.served={};self.bridges=0
+        self.claim_lock=threading.Lock()
         with store.lock,store.db:
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_jobs(id TEXT PRIMARY KEY,spec TEXT NOT NULL,cursor TEXT NOT NULL,state TEXT NOT NULL,priority INTEGER NOT NULL,due REAL NOT NULL,pages INTEGER NOT NULL DEFAULT 0,records INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT \'\',updated REAL NOT NULL,lease TEXT NOT NULL DEFAULT \'\')')
             store.db.execute('CREATE INDEX IF NOT EXISTS catalogue_jobs_due ON catalogue_jobs(state,due,priority)')
@@ -95,7 +96,6 @@ class Indexer:
         key=identity(spec);now=self.clock()
         host=host_of(spec)
         self.store.db.execute("INSERT INTO catalogue_jobs(id,spec,cursor,state,priority,due,updated,kind,host) VALUES(?,?,?,'queued',?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET spec=excluded.spec,priority=MAX(catalogue_jobs.priority,excluded.priority),host=excluded.host",(key,canonical_json(spec).decode(),'{"page":1}',priority,now,now,spec['type'],host))
-        self.hosts.add(host)
         return key
 
     def seed(self,installed):
@@ -135,53 +135,61 @@ class Indexer:
             for source,label,target in self.store.db.execute('SELECT source,label,target FROM catalogue_tag_targets').fetchall():
                 if policy.key(label,source) in keys:self.enqueue(json.loads(target),80)
 
-    def open_hosts(self,now):
-        if self.hosts_at is None or time.monotonic()-self.hosts_at>30:
-            self.hosts|={host for (host,) in self.store.db.execute('SELECT DISTINCT host FROM catalogue_jobs')};self.hosts_at=time.monotonic()
-        return [host for host in self.hosts if self.inflight.get(host,0)<HOST_SLOTS and self.paused.get(host,0)<=now]
+    def _candidate(self, db, now, columns):
+        # Hosts without a due job need no per-host index lookup.
+        bridge='' if self.bridges<BRIDGE_SLOTS else " AND kind NOT LIKE 'bridge%'"
+        eligible=db.execute('SELECT DISTINCT host FROM catalogue_jobs WHERE '+CLAIMABLE+bridge,(now,))
+        hosts=[host for (host,) in eligible if self.inflight.get(host,0)<HOST_SLOTS and self.paused.get(host,0)<=now]
+        self.turn+=1
+        due_first=self.turn%4==0
+        if not hosts:return None
+        row=None
+        # Reserve every third turn for a base catalogue page. A large detail
+        # queue must not delay discovery of the rest of the source for days.
+        if self.turn%3==1:
+            allowed=set(hosts)
+            for candidate in db.execute('SELECT '+columns+' FROM catalogue_jobs INDEXED BY catalogue_jobs_kind WHERE kind IN ('+','.join('?'*len(BASE_KINDS))+") AND json_extract(spec,'$.term') IS NULL AND "+CLAIMABLE+bridge+' ORDER BY updated,id',(*BASE_KINDS,now)):
+                if candidate[7] in allowed:row=candidate;break
+        if not row:
+            # One best job per open host, then the host's priority decides;
+            # equal priorities go to the host served longest ago, so every
+            # source moves at its own pace instead of waiting behind the
+            # oldest queue.
+            # The planner would pick the due index and sort a deep host queue.
+            order,index=('due,priority,id','catalogue_jobs_host_due') if due_first else ('priority DESC,due,id','catalogue_jobs_host_priority')
+            candidates=[]
+            for host in hosts:
+                found=db.execute('SELECT '+columns+' FROM catalogue_jobs INDEXED BY '+index+' WHERE host=? AND '+CLAIMABLE+bridge+' ORDER BY '+order+' LIMIT 1',(host,now)).fetchone()
+                if found:candidates.append(found)
+            if not candidates:return None
+            fair=lambda r:(self.inflight.get(r[7],0),self.served.get(r[7],0))
+            row=min(candidates,key=(lambda r:(fair(r)[0],r[9],r[8],fair(r)[1],r[0])) if due_first else (lambda r:(-r[8],*fair(r),r[9],r[0])))
+        return row
 
     def claim(self):
-        now=self.clock()
-        with self.store.lock,self.store.db:
-            self.turn+=1
-            due_first=self.turn%4==0
-            hosts=self.open_hosts(now)
-            if not hosts:return None
-            # Suwayomi runs every bridge source; keep it to a few requests.
-            bridge='' if self.bridges<BRIDGE_SLOTS else " AND kind NOT LIKE 'bridge%'"
-            columns='id,spec,cursor,pages,records,attempts,state,host,priority,due'
-            row=None
-            # Reserve every third turn for a base catalogue page. A large detail
-            # queue must not delay discovery of the rest of the source for days.
-            if self.turn%3==1:
-                allowed=set(hosts)
-                for candidate in self.store.db.execute('SELECT '+columns+' FROM catalogue_jobs INDEXED BY catalogue_jobs_kind WHERE kind IN ('+','.join('?'*len(BASE_KINDS))+") AND json_extract(spec,'$.term') IS NULL AND "+CLAIMABLE+bridge+' ORDER BY updated,id',(*BASE_KINDS,now)):
-                    if candidate[7] in allowed:row=candidate;break
-            if not row:
-                # One best job per open host, then the host's priority decides;
-                # equal priorities go to the host served longest ago, so every
-                # source moves at its own pace instead of waiting behind the
-                # oldest queue.
-                # The planner would pick the due index and sort a deep host queue.
-                order,index=('due,priority,id','catalogue_jobs_host_due') if due_first else ('priority DESC,due,id','catalogue_jobs_host_priority')
-                candidates=[]
-                for host in hosts:
-                    found=self.store.db.execute('SELECT '+columns+' FROM catalogue_jobs INDEXED BY '+index+' WHERE host=? AND '+CLAIMABLE+bridge+' ORDER BY '+order+' LIMIT 1',(host,now)).fetchone()
-                    if found:candidates.append(found)
-                if not candidates:return None
-                fair=lambda r:(self.inflight.get(r[7],0),self.served.get(r[7],0))
-                row=min(candidates,key=(lambda r:(fair(r)[0],r[9],r[8],fair(r)[1],r[0])) if due_first else (lambda r:(-r[8],*fair(r),r[9],r[0])))
+        from manga_discovery import catalogue_reader
+        columns='id,spec,cursor,pages,records,attempts,state,host,priority,due'
+        with self.claim_lock:
+            now=self.clock()
+            # A catalogue worker only needs the shared writer for the chosen lease.
+            with catalogue_reader(self.store) as db:
+                row=self._candidate(db,now,columns)
+            if row is None:return None
             names=columns.split(',')[:7]
             job=dict(zip(names,row));job['spec']=json.loads(job['spec']);job['cursor']=json.loads(job['cursor']);host=job['host']=row[7]
-            self.inflight[host]=self.inflight.get(host,0)+1;self.served[host]=self.turn
             job['bridge']=job['spec'].get('type','').startswith('bridge')
-            if job['bridge']:self.bridges+=1
-            if job['state'] in {'done','partial'}:
-                job['cursor']={'page':1};self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
-                self.store.db.execute('DELETE FROM catalogue_page_items WHERE job=?',(job['id'],))
-                self.store.db.execute('UPDATE catalogue_jobs SET pages=0,records=0,expected=NULL WHERE id=?',(job['id'],))
             job['lease']=os.urandom(12).hex()
-            self.store.db.execute("UPDATE catalogue_jobs SET state='running',lease=?,updated=? WHERE id=?",(job['lease'],now,job['id']))
+            with self.store.lock,self.store.db:
+                # An operator or source maintenance may have updated this job since the snapshot.
+                updated=self.store.db.execute("UPDATE catalogue_jobs SET state='running',lease=?,updated=? WHERE id=? AND state=? AND due=? AND cursor=? AND spec=?",
+                                              (job['lease'],now,row[0],row[6],row[9],row[2],row[1]))
+                if not updated.rowcount:return None
+                if job['state'] in {'done','partial'}:
+                    job['cursor']={'page':1};self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
+                    self.store.db.execute('DELETE FROM catalogue_page_items WHERE job=?',(job['id'],))
+                    self.store.db.execute('UPDATE catalogue_jobs SET pages=0,records=0,expected=NULL WHERE id=?',(job['id'],))
+            self.inflight[host]=self.inflight.get(host,0)+1;self.served[host]=self.turn
+            if job['bridge']:self.bridges+=1
             return job
 
     def run_once(self):
@@ -269,7 +277,7 @@ class Indexer:
                 self.failed(job['host'], code)
             with self.store.lock,self.store.db:self.store.db.execute("UPDATE catalogue_jobs SET state='retry',due=?,attempts=attempts+1,error=?,updated=?,lease='' WHERE id=? AND lease=?",(self.clock()+wait,reason,self.clock(),job['id'],job['lease']))
         finally:
-            with self.store.lock:
+            with self.claim_lock:
                 self.inflight[job['host']]=max(0,self.inflight.get(job['host'],1)-1)
                 if job['bridge']:self.bridges=max(0,self.bridges-1)
         return True
