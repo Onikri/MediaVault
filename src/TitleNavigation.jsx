@@ -46,7 +46,7 @@ export default function TitleNavigation({title,profile}){
    const merged=sections.length>1&&!!header&&anchor.current.getBoundingClientRect().top<=boundary;
    const bottom=scrollY>0&&scrollY+innerHeight>=document.documentElement.scrollHeight-2;
    const active=(bottom?nodes.at(-1)?.id:nodes.findLast(node=>node.top<=boundary+40)?.id)||nodes[0]?.id;
-   if(previous?.active===active&&previous.merged===merged&&previous.keys===keys)return;
+   if(previous&&previous.active===active&&previous.merged===merged&&previous.keys===keys)return;
    previous={sections,active,merged,keys};
    setState(previous);
    publishTitleNavigation({titleId:title.id,sections,active,merged});
