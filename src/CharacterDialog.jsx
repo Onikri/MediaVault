@@ -1,12 +1,11 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {X,ExternalLink,BookOpen,Tv,Images} from 'lucide-react';
 import {browseHref} from './anime-navigation.js';
 import './character-profile.css';
 
-export default function CharacterDialog({character,busy,error,onClose,renderArtwork,onRelated,workTitle=''}){
+export default function CharacterDialog({character,busy,error,onClose,renderArtwork,onRelated,returnFocusRef,workTitle=''}){
  const [spoilers,setSpoilers]=useState(false);
- const trigger=useRef(null);
  useEffect(()=>setSpoilers(false),[character?.id]);
 
  function openArts(){
@@ -23,11 +22,11 @@ export default function CharacterDialog({character,busy,error,onClose,renderArtw
   <Dialog.Portal>
    <Dialog.Overlay className="dialog-overlay"/>
    <Dialog.Content className="server-dialog character-sheet"
-    onOpenAutoFocus={()=>{trigger.current=document.activeElement;}}
     onCloseAutoFocus={event=>{
-     if(trigger.current?.isConnected){
+     const trigger=returnFocusRef?.current;
+     if(trigger?.isConnected){
       event.preventDefault();
-      trigger.current.focus({preventScroll:true});
+      trigger.focus({preventScroll:true});
      }
     }}>
     {character&&<>

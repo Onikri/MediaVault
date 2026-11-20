@@ -33,7 +33,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
   assert.ok(geometry.scroll<=geometry.w+1&&geometry.bottom<=1001,'Character profile fits the viewport');
   await page.keyboard.press('Escape');
   await sheet.waitFor({state:'detached'});
-  await card.evaluate(n=>{if(document.activeElement!==n)throw Error('Focus did not return to the character card');});
+  await page.waitForFunction(node=>document.activeElement===node,await card.elementHandle(),{timeout:5000});
   await page.locator('.title-credits').getByRole('button',{name:/Макото Синкай/}).click();await page.getByText('Подтверждённые сведения об авторе',{exact:true}).waitFor();await page.getByRole('link',{name:'Все аниме автора',exact:false}).click();await page.getByRole('heading',{name:'Макото Синкай',exact:true,level:1}).waitFor();assert.ok(facets.some(f=>f.kind==='person'&&f.identity==='1117'));
   await page.locator('.explore-grid button').first().click();await page.getByRole('link',{name:'CoMix Wave Films',exact:true}).click();await page.getByText('Описание студии из тестового каталога.',{exact:true}).waitFor();assert.ok(page.url().includes('browse=studio'));await page.reload();await page.getByText('Описание студии из тестового каталога.',{exact:true}).waitFor();assert.equal(await page.locator('.explore-grid button').count(),1);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await page.screenshot({path:path.join(DIR,'studio-'+width+'.png'),fullPage:true});await context.close();console.log('PASS linked genres/year/season/status, source-backed person/character cards, icon saves and reloadable studio address '+width);
  }
