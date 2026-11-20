@@ -1,4 +1,4 @@
-import {motion,useReducedMotion} from 'motion/react';
+import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {NavigationItem,NavigationRail} from './SectionNavigation.jsx';
 import {Hand,Wifi} from 'lucide-react';
@@ -7,6 +7,8 @@ import UiSegmented from './UiSegmented.jsx';
 import UiSelect from './UiSelect.jsx';
 import {TITLE_UPSCALE_MODELS} from './title-upscale-model.js';
 import './reader-view-settings.css';
+
+const spring={type:'spring',stiffness:420,damping:36};
 
 export function ReaderSettingsTabs({tabs,value,onChange,children}){
  const reduce=useReducedMotion();
