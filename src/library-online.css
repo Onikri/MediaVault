@@ -36,12 +36,14 @@ html[data-blossom] .online-library .section-heading>.heading-tools,html[data-blo
 html[data-blossom] .heading-tools>.catalog-views{margin:0}
 html[data-blossom] .app-shell[data-view=library]>.app-main>.page-title-row{margin-top:-28px}
 @media (--tablet){
+ html[data-blossom] .online-library .catalog-head{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0 0 12px}
+ html[data-blossom] .catalog-head>.catalog-main-tabs{justify-self:end}
  html[data-blossom] .fdock-item{flex:1 0 auto}
  html[data-blossom] .fdock-item>.fdock-pill{flex:1;justify-content:center}
 }
 @media (--phone){
  html[data-blossom] .app-shell[data-view=library]>.app-main>.page-title-row{margin-top:-22px}
- html[data-blossom] .online-library .catalog-head{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0 0 12px}
+ html[data-blossom] .catalog-head>.catalog-main-tabs{justify-self:center}
  html[data-blossom] .online-library .section-heading>.catalog-provider-row{order:5;flex-basis:100%;margin:0}
  html[data-blossom] .fdock-item{flex:none}
 }

@@ -19,10 +19,6 @@
 }
 
 /* Catalogue and unattended import */
-.catalog-main-tabs { margin: 20px 0 22px; overflow-x: auto; }
-.import-tabs.catalog-main-tabs { display: flex; max-width: 100%; width: 100%; overflow-x: auto; }
-.import-tabs.catalog-main-tabs button { flex-shrink: 0; }
-.catalog-main-tabs [role=tab] { white-space: nowrap; position: relative; }
 .tab-live-dot,.catalog-provider i,.queue-status i { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: var(--accent); margin-left: 6px; }
 .google-oauth-setup { border-top: 1px solid var(--line); padding-top: 15px; margin-top: 16px; }
 .google-oauth-setup h3 { color: var(--text); font-size: 14px; }

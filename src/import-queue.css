@@ -21,7 +21,3 @@
 .queue-auth-wait button{border:0;border-radius:99px;background:var(--color-blossom);color:white;padding:9px 13px;font-size:11px}
 .queue-toolbar .mv-select-trigger{min-width:120px;font-size:11px}
 @media (--phone){.queue-toolbar .mv-select-trigger{width:100%;min-width:0}}
-html[data-blossom] .import-workspace .catalog-action-bar{display:flex;flex-wrap:wrap;gap:8px;width:100%;max-width:100%;padding:0;margin:0 0 22px;border:0;background:transparent;box-shadow:none;border-radius:0}
-html[data-blossom] .import-workspace .catalog-action-bar>button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:8px 14px;border:0;background:var(--color-canvas-soft);color:var(--color-on-muted);border-radius:100px;box-shadow:none;font-size:11px;font-weight:650;line-height:1.4;margin:0}
-html[data-blossom] .import-workspace .catalog-action-bar>button[data-state=active]{background:var(--color-blossom);color:var(--color-on-blossom,#fff)}
-html[data-blossom] .import-workspace .catalog-action-bar>button:hover{filter:brightness(1.1)}

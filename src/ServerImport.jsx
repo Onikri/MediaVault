@@ -20,7 +20,7 @@ export default function ServerImport({state,actions,service,onConnect,onOpenLibr
   <Tabs.Root value={tab} onValueChange={setTab}>
    <div className={head?'catalog-head':'catalog-action-row'}>
     {head}
-    <NavigationRail as={Tabs.List} className="catalog-main-tabs catalog-action-bar" variant={head?'icons':'toolbar'}
+    <NavigationRail as={Tabs.List} className="catalog-main-tabs" variant={head?'icons':'toolbar'}
      count={3+Number(!!actions)+Number(!embedded)} aria-label="Каталог и импорт">
      <NavigationItem as={Tabs.Trigger} value="catalog" title="Найти произведение" icon={<Search/>} label="Найти произведение"/>
      <NavigationItem as={Tabs.Trigger} value="link" title="По ссылке" icon={<Link/>} label="По ссылке"/>

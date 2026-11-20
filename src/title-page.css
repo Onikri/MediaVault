@@ -59,7 +59,6 @@ html[data-blossom] .anime-preview .preview-specs{row-gap:6px}
 .online-library-workspace{display:grid;grid-template-columns:247px minmax(0,1fr);gap:28px;align-items:start}
 .online-library-workspace>.library-workspace-main{min-width:0}
 .online-library-workspace .online-media-nav,.online-library-workspace .catalog-kind-row,.online-library-workspace .world-catalog-intro,.online-library-workspace .catalog-search-hint{display:none}
-.online-library-workspace .catalog-main-tabs{margin:0 0 16px;border:0;gap:4px;flex-wrap:wrap}
 .online-library-workspace:has(.title-page){display:block}
 .online-library-workspace:has(.title-page)>aside,.import-workspace:has(.title-page) .catalog-main-tabs,.app-shell:has(.title-page) .page-title-row{display:none}
 html[data-blossom] .title-feature.title-showcase{box-shadow:0 1px 0 color-mix(in srgb,var(--color-petal) 13%,transparent);outline:0;border:0;background:var(--color-canvas)}
