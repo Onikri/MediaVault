@@ -418,7 +418,7 @@ class Discovery:
     def start(self,owner,query,language='all',source_ids=None,refresh=False,title=None):
         if not isinstance(query,str) or not 2<=len(query.strip())<=160 or any(unicodedata.category(c)=='Cc' for c in query):raise ValueError('Укажи запрос от 2 до 160 символов.')
         query=' '.join(query.split());key=normalize(query)
-        from title_identity import aliases
+        from title_identity import aliases,match_title
         if title is not None and (not isinstance(title,dict) or title.get('kind')!='manga' or not aliases(title) or len(json.dumps(title).encode())>50000):raise ValueError('Выбери конкретную мангу из каталога.')
         if language not in LANGUAGES:raise ValueError('Выбери язык источников.')
         if source_ids is not None and (not isinstance(source_ids,list) or not 1<=len(source_ids)<=1000 or any(not isinstance(v,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',v) for v in source_ids)):raise ValueError('Выбери хотя бы один установленный источник.')
@@ -481,9 +481,12 @@ class Discovery:
                 if title:source['_initialCacheKey']=cache_key
                 # A stale metadata index is useful immediately, but is not counted
                 # as a fresh provider response and never suppresses its refresh.
-                recent=json.loads(hit['results']) if hit else self._indexed(key,sid)
-                seed=list({value.get('url') or value['id']:value for value in [*saved.get(sid,[]),*recent]}.values())
-                if hit:seeded.extend(recent)
+                recent=json.loads(hit['results']) if hit else []
+                historical=self._indexed(key,sid) if not hit or title and not recent and sid not in saved else []
+                if title:
+                    historical=[{**value,'indexed':True,'stale':True} for value in historical if match_title(title,value)[0]]
+                seed=list({value.get('url') or value['id']:value for value in [*historical,*saved.get(sid,[]),*recent]}.values())
+                seeded.extend(recent)
                 pause=paused.get(sid) if not hit else None
                 self.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',(identity,sid,json.dumps(source,ensure_ascii=False),'done' if hit else 'skipped' if pause else 'queued',json.dumps([{**v,'stale':True} for v in seed] if pause else seed,ensure_ascii=False),int(bool(hit))))
                 if pause:
