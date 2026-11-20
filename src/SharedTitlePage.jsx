@@ -1,5 +1,8 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import TitlePage from './TitlePage.jsx';
+import {BookOpen} from 'lucide-react';
+import {TitleImage} from './TitlePage.jsx';
+import {plural} from './title-context.js';
+import './shared-title.css';
 import OnlineViewer from './OnlineViewer.jsx';
 
 const server=()=>String(window.MEDIA_VAULT_CONFIG?.importServerUrl||'').replace(/\/$/,'');
@@ -36,16 +39,35 @@ export default function SharedTitlePage({token}){
     return data;
    }};
  },[grant,token]);
- if(error)return <main className="page-container"><p className="inline-error" role="alert">{error}</p><button className="btn btn-secondary" onClick={()=>setRetry(v=>v+1)}>Повторить</button></main>;
- if(!grant||!service)return <main className="page-container"><p role="status">Открываем тайтл…</p></main>;
- const profile={title:grant.title.name,cover:grant.title.cover,description:grant.title.description,year:grant.title.year,ids:grant.title.ids};
- const title={id:'share:'+grant.id,name:grant.title.name,category:grant.kind==='manga'?'manga':'video',section:grant.kind==='manga'?'manga':'anime',items:[],parts:[]};
+ if(error)return <main className="shared-title shared-title-state"><p className="inline-error" role="alert">{error}</p><button className="btn btn-secondary" onClick={()=>setRetry(v=>v+1)}>Повторить</button></main>;
+ if(!grant||!service)return <main className="shared-title shared-title-state"><p role="status"><span className="loading-ring"/>Открываем тайтл…</p></main>;
+ return <SharedTitle grant={grant} service={service}/>;
+}
+
+// The recipient sees one title and its reader: no header, no back button and
+// no links to the rest of the site. Closing the reader keeps them on this page.
+function SharedTitle({grant,service}){
+ const [open,setOpen]=useState(true),[more,setMore]=useState(false),[session,setSession]=useState(0);
+ const manga=grant.kind==='manga',year=Number(grant.title.year)||null,description=String(grant.title.description||'').trim();
+ const profile={title:grant.title.name,cover:grant.title.cover,description,year,ids:grant.title.ids};
  const initial=grant.entries[grant.initial];
- const materials=<OnlineViewer inline entries={grant.entries} initial={initial} kind={grant.kind}
-  title={grant.title.name} service={service} userId={'share:'+grant.id} onClose={()=>{location.hash='home';}}
-  language={grant.language} dub={grant.dub} quality={grant.quality} sourceUrl={grant.referer} metadata={profile}
-  readerPreset={grant.translate?grant.translation:null}/>;
- return <TitlePage title={title} state={{admin:false}} actions={{}} online onlineProfile={profile} materials={materials}
-  server={service.server} onBack={()=>{location.hash='home';}} backLabel="На главную"
-  onOnlinePlay={()=>document.getElementById('titleMaterials')?.scrollIntoView({behavior:'smooth',block:'start'})}/>;
+ const units=grant.entries.length,unitWord=manga?plural(units,['глава','главы','глав']):plural(units,['серия','серии','серий']);
+ useEffect(()=>{const name=grant.title.name;const old=document.title;document.title=name;return()=>{document.title=old;};},[grant.title.name]);
+ return <main className="shared-title">
+  <header className="shared-title-hero">
+   {grant.title.cover&&<div className="shared-title-cover"><TitleImage url={grant.title.cover} actions={{}} fallback={false} alt={'Обложка: '+grant.title.name}/></div>}
+   <div className="shared-title-copy">
+    <p className="shared-title-kind">{[manga?'Манга':'Видео',year,units+' '+unitWord,grant.dub||null].filter(Boolean).join(' · ')}</p>
+    <h1>{grant.title.name}</h1>
+    {description&&<><p className={'shared-title-about'+(more?' is-open':'')}>{description}</p>{description.length>220&&<button type="button" className="shared-title-more" aria-expanded={more} onClick={()=>setMore(v=>!v)}>{more?'Свернуть':'Подробнее'}</button>}</>}
+    {!open&&<button type="button" className="btn btn-primary shared-title-resume" onClick={()=>{setSession(n=>n+1);setOpen(true);}}><BookOpen size={16}/>{manga?'Читать':'Смотреть'}</button>}
+   </div>
+  </header>
+  {open&&<section className="shared-title-reader" aria-label={manga?'Читалка':'Плеер'}>
+   <OnlineViewer key={session} inline entries={grant.entries} initial={initial} kind={grant.kind}
+    title={grant.title.name} service={service} userId={'share:'+grant.id} onClose={()=>setOpen(false)}
+    language={grant.language} dub={grant.dub} quality={grant.quality} sourceUrl={grant.referer} metadata={profile}
+    readerPreset={grant.translate?grant.translation:null} scrollOnOpen={session>0}/>
+  </section>}
+ </main>;
 }

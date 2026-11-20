@@ -1,0 +1,63 @@
+// A title opened by share link shows only that title and its reader: no links,
+// no way back into the site, no owner tools; closing the reader stays on the page.
+// The owner's reader offers the share button. The server is a mocked route set.
+const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{chromium}=require('playwright');
+const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');
+const reveal=async page=>{const reader=page.locator('.immersive-reader').last();await reader.waitFor();if(await reader.getAttribute('data-chrome')!=='true'){const box=await reader.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+2);await page.mouse.move(box.x+box.width/2,box.y+20);await page.waitForFunction(()=>document.querySelector('.immersive-reader')?.dataset.chrome==='true');}};
+(async()=>{
+ await fs.mkdir(DIR,{recursive:true});
+ await fs.writeFile(path.join(DIR,'shared-title-harness.html'),'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/test-output/shared-title-harness.jsx"></script></html>');
+ await fs.writeFile(path.join(DIR,'shared-title-harness.jsx'),`
+ import React from'react';import{createRoot}from'react-dom/client';import JSZip from'jszip';import'/src/styles.css';
+ import MangaReader from'/src/MangaReader.jsx';import{publishTitleShare}from'/src/title-context.js';
+ window.MEDIA_VAULT_CONFIG={importServerUrl:location.origin};
+ const mode=new URLSearchParams(location.search).get('mode');
+ if(mode==='owner'){
+  const c=document.createElement('canvas');c.width=400;c.height=600;c.getContext('2d').fillRect(0,0,400,600);const png=await new Promise(r=>c.toBlob(r,'image/png'));
+  const zip=new JSZip();zip.file('1.png',png);zip.file('2.png',png);const archive=await zip.generateAsync({type:'blob'});
+  const service={server:location.origin,status:'connected',session:{role:'owner',serverVersion:76},request:async(p,o={})=>{window.created=o.body;return{id:'b'.repeat(64),token:'T'.repeat(43)};}};
+  publishTitleShare({service,title:{title:'Тестовая манга'},kind:'manga',entries:[{url:'https://manga.example/c1',number:1,season:1,title:'Глава 1'}],initial:{url:'https://manga.example/c1'},referer:'https://manga.example/t',dub:'Нова',language:'ru',userId:'u'});
+  const item={id:'c1',category:'manga',name:'Тестовая манга · глава 1.cbz',episode:1,translationInfo:{language:'ru'}};
+  createRoot(document.getElementById('root')).render(<MangaReader item={item} catalog={{items:[item]}} userId="u" libraryId="fixture" readerService={service} onClose={()=>{}} readWhole={async()=>archive}/>);
+ }else{
+  location.hash='share='+'S'.repeat(43);const {default:App}=await import('/src/App.jsx');createRoot(document.getElementById('root')).render(<App/>);
+ }`);
+ const{createServer}=await import('vite');const vite=await createServer({root:ROOT,cacheDir:'.codex-local/shared-title-e2e-cache',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:5196,strictPort:false}});await vite.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ try{
+  const base='http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/shared-title-harness.html';
+  const page=await browser.newPage({viewport:{width:1280,height:860}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const grant={id:'a'.repeat(64),token:'grant-token',expiresAt:Math.floor(Date.now()/1000)+86400,kind:'manga',title:{name:'Поднятие уровня',cover:'',description:'Описание тайтла. '.repeat(30),year:2018,ids:{}},
+   entries:[1,2].map(n=>({url:'https://manga.example/c'+n,number:n,season:1,title:'Глава '+n})),initial:0,referer:null,dub:'Нова',language:'ru',quality:'best',translate:false,translation:{}};
+  const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
+  await page.route('**/shares/title/*',r=>r.fulfill({json:grant}));
+  await page.route('**/online/**',r=>{const m=r.request().method();if(m==='POST')return r.fulfill({json:{id:'manga-token-0123456789abcdef',pages:[1,2].map(n=>'/online/manga-token-0123456789abcdef/'+n),type:'manga'}});if(m==='DELETE')return r.fulfill({json:{closed:true}});return r.fulfill({contentType:'image/png',body:image});});
+  await page.goto(base);
+  await page.getByRole('heading',{name:'Поднятие уровня',level:1}).waitFor();
+  await page.locator('.immersive-reader').waitFor();
+  assert.equal(await page.locator('a[href]').count(),0,'The shared page links nowhere');
+  assert.equal(await page.getByRole('button',{name:/На главную|Библиотека|Назад/}).count(),0,'No way back into the site');
+  assert.equal(await page.evaluate(()=>scrollY),0,'The page opens at the title, not scrolled to the reader');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await reveal(page);
+  assert.equal(await page.getByRole('button',{name:'Отладка страницы'}).count(),0,'Server diagnostics stay hidden from a visitor');
+  assert.equal(await page.getByRole('button',{name:'Поделиться тайтлом'}).count(),0,'A visitor cannot reshare');
+  await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();
+  await page.getByRole('button',{name:'Читать',exact:true}).waitFor();
+  assert.match(await page.evaluate(()=>location.hash),/^#share=/,'Closing the reader keeps the visitor on the shared title');
+  await page.getByRole('button',{name:'Читать',exact:true}).click();await page.locator('.immersive-reader').waitFor();
+  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'No sideways scroll on a phone');
+  // The owner shares from inside the reader; the dialog stays in the reader (fullscreen-safe).
+  await page.setViewportSize({width:1280,height:860});await page.goto(base+'?mode=owner');
+  await page.locator('.reader-page img').first().waitFor();await reveal(page);
+  await page.getByRole('button',{name:'Поделиться тайтлом'}).click();
+  await page.getByRole('button',{name:'Создать ссылку'}).click();
+  const link=await page.getByLabel('Ссылка на тайтл').inputValue();
+  assert.match(link,/#share=T{43}$/);
+  assert.equal(await page.evaluate(()=>!!document.querySelector('.immersive-reader [role=dialog]')),true,'Share dialog renders inside the reader');
+  assert.equal(await page.evaluate(()=>window.created.kind),'manga');
+  assert.deepEqual(errors,[]);
+  console.log('shared title browser contract: ok');
+ }finally{await browser.close();await vite.close();}
+})().catch(error=>{console.error(error);process.exit(1);});

@@ -13,7 +13,7 @@ import {exportLocally} from './local-export.js';
 import './online.css';
 import {minimumEpisodeDuration,onlineEpisodeId} from './watch-session.js';
 import {inStreamAudio,keepsLoadedMedia} from './voice-switch.js';
-export default function OnlineViewer({entries,initial,kind,title,service,userId,onClose,onEntryChange,language='ru',dub='',metadata,quality='best',inline=false,sourceUrl,identity,voiceId,controls,onPreview,previews,onUnavailable,onPrepared,errorActions,readerPreset,onReaderProgress}){
+export default function OnlineViewer({entries,initial,kind,title,service,userId,onClose,onEntryChange,language='ru',dub='',metadata,quality='best',inline=false,sourceUrl,identity,voiceId,controls,onPreview,previews,onUnavailable,onPrepared,errorActions,readerPreset,onReaderProgress,scrollOnOpen=true}){
  useEffect(()=>()=>stopLmt(),[]);
  const [playbackQuality,setPlaybackQuality]=useState(quality),[qualityBasis,setQualityBasis]=useState(quality),[streamVoice,setStreamVoice]=useState(voiceId);
  const unavailable=useRef(onUnavailable);unavailable.current=onUnavailable;const prepared=useRef(onPrepared);prepared.current=onPrepared;
@@ -45,7 +45,7 @@ export default function OnlineViewer({entries,initial,kind,title,service,userId,
  };
  const playbackExtensions=useMemo(()=>media?.playbackTelemetry?[{id:'online-playback-state',setup:api=>reportOnlinePlayback({request:(...args)=>live.current.request(...args)},media.id,api,()=>reconnect.current())}]:[],[media?.id,media?.playbackTelemetry]);
  const host=useRef(null),clientId=useRef(null),activeLease=useRef(null);if(!clientId.current)clientId.current=onlineClientId('viewer');
- useEffect(()=>{if(inline){const frame=requestAnimationFrame(()=>{if(!document.fullscreenElement)host.current?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});});return()=>cancelAnimationFrame(frame);}},[initial?.url,inline]);
+ useEffect(()=>{if(inline&&scrollOnOpen){const frame=requestAnimationFrame(()=>{if(!document.fullscreenElement)host.current?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});});return()=>cancelAnimationFrame(frame);}},[initial?.url,inline,scrollOnOpen]);
  useEffect(()=>{const change=()=>setFull(document.fullscreenElement===host.current);document.addEventListener('fullscreenchange',change);return()=>document.removeEventListener('fullscreenchange',change);},[]);
  async function fullscreen(){setFullscreenError('');try{if(document.fullscreenElement)await document.exitFullscreen();else if(host.current?.requestFullscreen)await host.current.requestFullscreen();else setFullscreenError('Полный экран недоступен в этом браузере.');}catch{setFullscreenError('Браузер не разрешил полный экран.');}}
  useEffect(()=>{if(!busy)return;const start=performance.now();setElapsed(0);const timer=setInterval(()=>setElapsed(Math.floor((performance.now()-start)/1000)),1000);return()=>clearInterval(timer);},[busy,current.url,retry]);

@@ -15,6 +15,7 @@
     "test:rooms": "ROOMS_ONLY=1 node tests/interface-rooms-browser.cjs",
     "test:control": "node tests/control-center-browser.cjs",
     "test:browser": "node tests/browser.test.cjs",
+    "test:share": "node tests/shared-title-browser.cjs",
     "test:design": "node tests/design-browser.cjs",
     "test:title-sections": "node tests/title-showcase-browser.cjs && node tests/title-sections-browser.cjs",
     "test:ui": "node tests/ui.test.cjs",

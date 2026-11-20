@@ -3,7 +3,8 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {Check,Copy,Share2,X} from 'lucide-react';
 import {readLmt} from './LmtSettings.jsx';
 
-export default function ShareTitleButton({service,title,kind,entries=[],initial,referer,dub='',language='ru',quality='best',userId}){
+// variant 'reader' sits in the reader's top bar; container keeps the dialog inside a fullscreen reader.
+export default function ShareTitleButton({service,title,kind,entries=[],initial,referer,dub='',language='ru',quality='best',userId,variant='hero',container}){
  const [open,setOpen]=useState(false),[link,setLink]=useState(''),[identity,setIdentity]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[copied,setCopied]=useState(false);
  const [translate,setTranslate]=useState(kind==='manga'&&language!=='ru');
  if(service.session?.role==='guest'||service.session?.role==='share'||!entries.length)return null;
@@ -28,13 +29,13 @@ export default function ShareTitleButton({service,title,kind,entries=[],initial,
   catch(e){setError(e.message);}finally{setBusy(false);}
  }
  return <Dialog.Root open={open} onOpenChange={setOpen}>
-  <Dialog.Trigger className="circle-button" title="Поделиться тайтлом" aria-label="Поделиться тайтлом"><Share2 size={17}/></Dialog.Trigger>
-  <Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="server-dialog">
+  <Dialog.Trigger className={variant==='reader'?'reader-control':'circle-button'} title="Поделиться тайтлом" aria-label="Поделиться тайтлом"><Share2 size={variant==='reader'?19:17}/></Dialog.Trigger>
+  <Dialog.Portal container={container||undefined}><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="server-dialog">
    <Dialog.Close className="icon-button dialog-close" aria-label="Закрыть"><X size={18}/></Dialog.Close>
    <Dialog.Title>Поделиться тайтлом</Dialog.Title>
    <Dialog.Description>{title.title||title.name}{dub?' · '+dub:''}</Dialog.Description>
    {kind==='manga'&&!link&&<label className="reader-checkbox"><input type="checkbox" checked={translate} onChange={e=>setTranslate(e.target.checked)}/>Открывать с переводом на русский</label>}
-   <p className="fine">Получатель ссылки сможет открыть выбранный перевод и серии или главы этого тайтла. Доступ действует до закрытия ссылки владельцем.</p>
+   <p className="fine">По ссылке откроется только этот тайтл: выбранный перевод и его {kind==='manga'?'главы':'серии'}, без входа и без остального сайта. Ссылка работает, пока ты её не закроешь.</p>
    {link?<><input className="field-input" aria-label="Ссылка на тайтл" readOnly value={link} onFocus={e=>e.target.select()}/><div className="form-actions"><button className="btn btn-primary" onClick={copy}>{copied?<Check size={16}/>:<Copy size={16}/>}Скопировать</button><button className="text-link" disabled={busy} onClick={revoke}>Закрыть доступ по ссылке</button></div></>:<button className="btn btn-primary" disabled={busy||service.status!=='connected'} onClick={create}>{busy?'Создаём…':'Создать ссылку'}</button>}
    {error&&<p className="inline-error" role="alert">{error}</p>}
   </Dialog.Content></Dialog.Portal>
