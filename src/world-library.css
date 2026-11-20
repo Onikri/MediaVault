@@ -35,7 +35,25 @@
 .online-title-page .online-title-materials:has(.online-viewer-inline){backdrop-filter:none}
 @media (--phone){.online-title-materials .title-episode-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}.title-playback-selectors{gap:12px}}
 
-.title-source-picker{display:grid;gap:10px;min-width:0}.title-source-picker h4{margin:0}.title-source-options{display:grid;max-height:320px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.title-source-option{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:13px 12px;border:0;border-bottom:1px solid var(--border);background:transparent;color:inherit;text-align:left;cursor:pointer;min-width:0}.title-source-option:hover,.title-source-option[aria-pressed=true]{background:var(--surface-hover,rgba(255,255,255,.06))}.title-source-option[aria-pressed=true]{box-shadow:inset 3px 0 var(--accent)}.title-source-option>span{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}.title-source-option small{font-size:12px;color:var(--text-muted)}.title-source-counts{text-align:right;font-size:13px;font-variant-numeric:tabular-nums}.title-source-counts[data-state=error]{color:var(--warning,#eab99a)}.title-playback-selectors .world-source-filter{min-width:0}@media (--phone){.title-source-option{gap:10px;padding-inline:8px}.title-source-counts{font-size:12px}}
+.title-source-picker{display:grid;gap:10px;min-width:0}
+.title-source-picker h4{margin:0}
+.title-source-options{display:grid;gap:3px;max-height:320px;overflow:auto;overscroll-behavior:contain}
+.title-source-row{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;border-radius:10px}
+.title-source-row[data-favorite-control]{grid-template-columns:minmax(0,1fr) 36px}
+.title-source-row:hover{background:color-mix(in srgb,var(--color-petal,#f0e8e5) 5%,transparent)}
+.title-source-row[data-selected]{background:color-mix(in srgb,var(--color-petal,#f0e8e5) 9%,transparent)}
+.title-source-option{display:grid;grid-template-columns:minmax(0,1fr) 16px;align-items:center;gap:8px;min-width:0;min-height:48px;width:100%;padding:8px 10px;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.title-source-picker .title-source-option:focus-visible{outline:1px solid currentColor;outline-offset:-2px}
+.title-source-caption{display:grid;gap:3px;min-width:0}
+.title-source-caption strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:650 13px/1.3 var(--font-display,inherit)}
+.title-source-meta{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;min-width:0;color:var(--color-on-muted,#b9b4bd);font-variant-numeric:tabular-nums}
+.title-source-meta small{white-space:nowrap;font-size:11.5px;line-height:1.35}
+.title-source-meta small + small::before{content:"·";margin-inline-end:8px;color:var(--color-quiet,#8f8b91)}
+.title-source-check{visibility:hidden;color:var(--color-on-muted,#b9b4bd)}
+.title-source-option[aria-pressed=true] .title-source-check{visibility:visible}
+.title-source-caption .reader-source-fill{margin-top:2px;block-size:2px;background:color-mix(in srgb,currentColor 9%,transparent);border-radius:2px;overflow:hidden}
+.title-source-caption .reader-source-fill::after{content:"";display:block;inline-size:100%;block-size:100%;transform:scaleX(var(--fill));transform-origin:left;background:color-mix(in srgb,currentColor 38%,transparent)}
+.title-playback-selectors .world-source-filter{min-width:0}
 
 /* LostFilm catalogue shelf in the serials section */
 .lostfilm-shelf{display:grid;gap:16px;margin:8px 0 28px}

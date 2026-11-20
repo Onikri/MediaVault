@@ -1,5 +1,5 @@
 import {useId,useState} from 'react';
-import {Heart} from 'lucide-react';
+import {Check,Heart} from 'lucide-react';
 import {mangaLanguageName} from './manga-import.js';
 
 const plural=(n,forms)=>{const v=n%100;return forms[v>=11&&v<=14?2:n%10===1?0:n%10>=2&&n%10<=4?1:2];};
@@ -13,14 +13,21 @@ export default function TitleSourcePicker({sources,value,onChoose,info={},loadin
  const unavailable=matches.filter(s=>info[s.url]?.state==='error'||info[s.url]?.readable===false||info[s.url]?.chapterCount===0);
  const visible=matches.filter(s=>!unavailable.includes(s)&&(!requireVerified||info[s.url]?.readable===true||info[s.url]?.inspection?.episodes?.length));
  const pending=matches.filter(s=>!unavailable.includes(s)&&(requireVerified?info[s.url]?.readable!==true:!info[s.url]||['loading','verifying','pending'].includes(info[s.url]?.state))).length;
- const counts=s=>{const data=info[s.url]||s;return Number.isInteger(data.chapterCount)?`${data.chapterCount} ${plural(data.chapterCount,['глава','главы','глав'])} · ${data.volumeCount??'—'} ${plural(data.volumeCount,['том','тома','томов'])}${requireVerified&&data.readable!==true?' · проверяем страницы':''}`:data.state==='error'?data.error:'Проверяем главы и тома…';};
+ const counts=s=>{const data=info[s.url]||s;return [
+  Number.isInteger(data.chapterCount)?`${data.chapterCount} ${plural(data.chapterCount,['глава','главы','глав'])}`:'',
+  Number.isInteger(data.volumeCount)?`${data.volumeCount} ${plural(data.volumeCount,['том','тома','томов'])}`:'',
+ ].filter(Boolean).join(' · ');};
  return <section className="title-source-picker" aria-label="Источники чтения">
-  <div className="section-heading"><h4>Источники <span className="fine">{visible.length}</span></h4>{(loading||pending>0)&&<span className="fine" role="status">{pending>0?'Проверяем страницы · '+pending:'Поиск продолжается'}</span>}</div>
+  <div className="section-heading"><h4>Источники <span className="fine">{visible.length}</span></h4>{(loading||pending>0)&&<span className="fine" role="status">{pending>0?'Проверяем страницы · '+pending:'Ищем источники'}</span>}</div>
   <label className="input-label" htmlFor={id}>Поиск по источникам</label><input id={id} className="field-input" value={query} onChange={e=>setQuery(e.target.value)} type="search" placeholder="Сайт или перевод…"/>
-  <div className="title-source-options" role="group" aria-label="Выбрать источник чтения">{visible.map(s=>{const chapters=Number(info[s.url]?.chapterCount),favorite=!!favorites?.has(s);
-   return <div className="title-source-row" key={s.url} data-selected={value===s.url||undefined}>
-    <button type="button" className="title-source-option" aria-pressed={value===s.url} onClick={()=>onChoose(s.url)}><span><strong>{s.providerName}</strong><small>{mangaLanguageName(s.language)}</small></span><span className="title-source-counts" data-state={info[s.url]?.state}><span>{counts(s)}</span>{info[s.url]?.state==='error'&&<small>Выбрать и повторить проверку</small>}</span>
-     {expected>0&&Number.isFinite(chapters)&&chapters>0&&<i className="reader-source-fill" style={{'--fill':Math.min(1,chapters/expected)}} aria-hidden="true"/>}</button>
+  <div className="title-source-options" role="group" aria-label="Выбрать источник чтения">{visible.map(s=>{const chapters=Number(info[s.url]?.chapterCount),favorite=!!favorites?.has(s),selected=value===s.url,summary=counts(s);
+   return <div className="title-source-row" key={s.url} data-selected={selected||undefined} data-favorite-control={!!favorites||undefined}>
+    <button type="button" className="title-source-option" aria-pressed={selected} onClick={()=>onChoose(s.url)}>
+     <span className="title-source-caption" title={s.providerName}><strong>{s.providerName}</strong>
+      <span className="title-source-meta"><small>{mangaLanguageName(s.language)}</small>{summary&&<small>{summary}</small>}</span>
+      {expected>0&&Number.isFinite(chapters)&&chapters>0&&<i className="reader-source-fill" style={{'--fill':Math.min(1,chapters/expected)}} aria-hidden="true"/>}
+     </span><Check className="title-source-check" size={15} aria-hidden="true"/>
+    </button>
     {favorites&&<button type="button" className="reader-source-favorite" aria-pressed={favorite} aria-label={(favorite?'Убрать из любимых: ':'В любимые источники: ')+s.providerName} title={favorite?'Любимый источник — проверяется и открывается первым':'Сделать любимым: проверять и открывать первым'} onClick={()=>favorites.toggle(s)}><Heart size={14} fill={favorite?'currentColor':'none'}/></button>}
    </div>;})}</div>
   {!visible.length&&<p className="fine" role="status">{pending||loading?'Проверяем, отдают ли читалки страницы…':query?'Нет доступных источников с таким названием.':'Работающий источник для этого тайтла пока не найден.'}</p>}

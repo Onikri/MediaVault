@@ -1,0 +1,142 @@
+.title-share-control {
+  --share-size: 38px;
+  --share-width: var(--share-size);
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  flex: none;
+  inline-size: var(--share-width);
+  min-block-size: var(--share-size);
+  max-inline-size: 100%;
+  vertical-align: middle;
+  transition: inline-size 220ms cubic-bezier(.2,.8,.25,1);
+}
+
+.title-share-control[data-variant=hero] { --share-size: 36px; }
+.title-share-control[data-phase=choose] { --share-width: 196px; }
+.title-share-control[data-phase=busy], .title-share-control[data-phase=retry] { --share-width: 112px; }
+.title-share-control[data-phase=copied] { --share-width: 150px; }
+.title-share-control[data-phase=revoked] { --share-width: 146px; }
+.title-share-control[data-phase=manual] { --share-width: 220px; }
+
+.title-share-capsule {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-inline-size: 0;
+  inline-size: 100%;
+  min-block-size: var(--share-size);
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--color-surface-raised, #24242b);
+  color: var(--color-petal, #f0e8e5);
+  overflow: hidden;
+}
+
+.title-share-control .title-share-capsule > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 0 auto;
+  inline-size: auto;
+  block-size: auto;
+  min-block-size: calc(var(--share-size) - 6px);
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: 600 12px/1 var(--font-display, inherit);
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: none;
+  animation: title-share-reveal 160ms ease-out both;
+}
+
+.title-share-control[data-phase=choose] .title-share-capsule > button {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  padding-inline: 6px;
+}
+
+.title-share-control .title-share-capsule > button:hover {
+  background: color-mix(in srgb, currentColor 13%, transparent);
+}
+
+.title-share-control .title-share-capsule > button:focus-visible,
+.title-share-control .title-share-capsule > input:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: -2px;
+}
+
+.title-share-feedback {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  flex: 1 0 auto;
+  font: 600 12px/1 var(--font-display, inherit);
+  white-space: nowrap;
+  animation: title-share-reveal 160ms ease-out both;
+}
+
+.title-share-control .title-share-capsule > .title-share-revoke {
+  flex: none;
+  inline-size: calc(var(--share-size) - 6px);
+  padding: 0;
+  color: var(--color-on-muted, #b9b4bd);
+}
+
+.title-share-control .title-share-capsule > input {
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: calc(var(--share-size) - 6px);
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+}
+
+@keyframes title-share-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (--phone) {
+  html[data-blossom] .title-share-control[data-variant=hero] { --share-size: 46px; }
+  .title-share-control[data-variant=reader] { --share-size: 36px; }
+  .reader-top:has(.title-share-control[data-wide]) {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .reader-top:has(.title-share-control[data-wide]) .reader-top-actions { display: contents; }
+  .reader-top:has(.title-share-control[data-wide]) .reader-top-actions > :not(.title-share-control) { order: 1; }
+  .reader-top .title-share-control[data-wide] {
+    order: 2;
+    flex-basis: 100%;
+    inline-size: 100%;
+    justify-items: end;
+  }
+  .reader-top .title-share-control[data-wide] .title-share-capsule {
+    inline-size: min(100%, var(--share-width));
+    animation: title-share-expand 220ms cubic-bezier(.2,.8,.25,1);
+  }
+}
+
+@keyframes title-share-expand {
+  from { inline-size: var(--share-size); }
+  to { inline-size: min(100%, var(--share-width)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-share-control { transition: none; }
+  .title-share-control .title-share-capsule,
+  .title-share-control .title-share-feedback,
+  .title-share-control .title-share-capsule > button { animation: none; }
+}

@@ -69,7 +69,7 @@ html[data-blossom] .title-showcase::before,html[data-blossom] .title-showcase::a
 .poster-actions>.btn{width:100%;white-space:normal;font-size:12px;justify-content:center;min-height:42px;line-height:1.4}
 .poster-actions>small{color:var(--color-on-muted);font-size:10px;text-align:center}
 .poster-action-icons{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
-.poster-action-icons button{width:36px;height:36px;display:grid;place-items:center;flex:none;padding:0;border:0;border-radius:50%;background:var(--color-canvas-soft);color:var(--color-petal)}
+.poster-action-icons button:not(.title-share-capsule > button){width:36px;height:36px;display:grid;place-items:center;flex:none;padding:0;border:0;border-radius:50%;background:var(--color-canvas-soft);color:var(--color-petal)}
 .poster-action-icons [aria-pressed=true]{color:var(--color-blossom)}
 .title-episode-grid:has(.is-manga){grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
 .title-episode-card.is-manga .title-episode-art{aspect-ratio:2/3;height:auto}

@@ -87,10 +87,6 @@ html[data-blossom] .title-page>.title-stage .online-watch{max-width:1320px}
 .retained-media-host .reader-embedded{position:relative!important;inset:auto!important;z-index:1!important;height:clamp(440px,75dvh,950px)!important;min-height:0!important;border-radius:24px}
 .retained-media-host .reader-embedded:fullscreen{height:100dvh!important;border-radius:0}
 /* The source picker inside the filter column: one row per source, heart at the end. */
-.title-source-row{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:center;border-radius:12px;transition:background .15s}
-.title-source-row:hover{background:var(--color-canvas-soft)}
-.title-source-row[data-selected]{background:var(--color-surface)}
-@media(prefers-reduced-motion:reduce){.title-source-row{transition:none}}
 /* Side columns stay under the reader's own panels (voices, contents, settings). */
 /* While a chapter is open the reader takes the filter column's place; the
    chapter index stays on the right for navigation. Closing the reader brings

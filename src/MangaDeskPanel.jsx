@@ -4,7 +4,6 @@ import {ChevronDown,ChevronLeft,ChevronRight,Search} from 'lucide-react';
 import UiSegmented from './UiSegmented.jsx';
 import {plural} from './title-context.js';
 import {currentBackdrop,paletteFromSeed,rgb} from './blossom/theme.js';
-import {sourceOf} from './source-badges.jsx';
 import useChapterThumbnails from './use-chapter-thumbnails.js';
 import './manga-desk.css';
 
@@ -29,7 +28,6 @@ export function chapterName(entry){
  return rest&&!/^[\d.]+$/.test(rest)?rest:'';
 }
 const numberOf=entry=>Number.isFinite(Number(entry?.number))?String(entry.number):'—';
-const hueOf=name=>{const known=sourceOf(name);if(known?.hue!=null)return known.hue;let h=0;for(const c of String(name||''))h=(h*31+c.charCodeAt(0))%360;return h;};
 
 // Source, language, team and chapters of the online reader: the right column
 // of the reading desk. One plaque names the site the pages come from.
@@ -45,7 +43,7 @@ export default function MangaDeskPanel({languages=LANGUAGE_CODES,art=true,source
  return <aside className="desk-panel" ref={panel} aria-label="Источник и главы">
   <section className="desk-source" data-state={sourceState}>
    <button type="button" className="desk-source-plaque" aria-expanded={menu==='source'} onClick={()=>toggle('source')}>
-    {source?<span className="desk-source-tag" style={{'--source-hue':hueOf(source)}}>{source}</span>:<span className="desk-source-searching">{sourceState==='searching'&&<span className="mvx-spinner" aria-hidden="true"/>}{sourceNote||'Источник не выбран'}</span>}
+    {source?<span className="desk-source-tag" title={source}>{source}</span>:<span className="desk-source-searching">{sourceState==='searching'&&<span className="mvx-spinner" aria-hidden="true"/>}{sourceNote||'Источник не выбран'}</span>}
     {source&&<span className="desk-source-facts">{sourceLanguage&&<b>{languageCode(sourceLanguage)}</b>}{Number.isFinite(sourceChapters)&&<span>{sourceChapters} {plural(sourceChapters,CHAPTER)}</span>}{sourceState==='verifying'&&<span className="mvx-spinner" aria-label="Проверяем страницы"/>}</span>}
     <ChevronDown className="desk-chevron" size={16} aria-hidden="true"/>
    </button>

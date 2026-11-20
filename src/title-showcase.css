@@ -153,7 +153,7 @@ html[data-blossom] .title-showcase-tilt{width:100%}
  html[data-blossom] .title-showcase .poster-actions>.btn-primary svg{width:24px;height:24px;margin:0 0 0 2px}
  html[data-blossom] .title-showcase .poster-actions .poster-action-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
  html[data-blossom] .title-showcase .poster-action-icons>*{order:1}
- html[data-blossom] .title-showcase .poster-action-icons button{width:46px;height:46px;background:color-mix(in srgb,var(--color-petal) 10%,color-mix(in srgb,var(--color-canvas) 60%,transparent));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+ html[data-blossom] .title-showcase .poster-action-icons button:not(.title-share-capsule > button){width:46px;height:46px;background:color-mix(in srgb,var(--color-petal) 10%,color-mix(in srgb,var(--color-canvas) 60%,transparent));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
  html[data-blossom] .title-showcase .poster-actions>small{order:2;flex-basis:100%;margin-top:-2px;font-size:11px}
  /* Copy: centred head, readable body. */
  html[data-blossom] .title-showcase .title-showcase-copy-layer>.title-hero-copy{display:flex;flex-direction:column;align-items:center;text-align:center}

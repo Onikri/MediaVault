@@ -9,16 +9,21 @@ const reveal=async page=>{const reader=page.locator('.immersive-reader').last();
  await fs.writeFile(path.join(DIR,'shared-title-harness.html'),'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/test-output/shared-title-harness.jsx"></script></html>');
  await fs.writeFile(path.join(DIR,'shared-title-harness.jsx'),`
  import React from'react';import{createRoot}from'react-dom/client';import JSZip from'jszip';import'/src/styles.css';
- import MangaReader from'/src/MangaReader.jsx';import{publishTitleShare}from'/src/title-context.js';
+ import MangaReader from'/src/MangaReader.jsx';import{publishTitleShare}from'/src/title-context.js';import TitleSourcePicker from'/src/TitleSourcePicker.jsx';import'/src/manga-desk.css';import'/src/title-dossier.css';import'/src/world-library.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:location.origin};
  const mode=new URLSearchParams(location.search).get('mode');
  if(mode==='owner'){
   const c=document.createElement('canvas');c.width=400;c.height=600;c.getContext('2d').fillRect(0,0,400,600);const png=await new Promise(r=>c.toBlob(r,'image/png'));
   const zip=new JSZip();zip.file('1.png',png);zip.file('2.png',png);const archive=await zip.generateAsync({type:'blob'});
-  const service={server:location.origin,status:'connected',session:{role:'owner',serverVersion:76},request:async(p,o={})=>{window.created=o.body;return{id:'b'.repeat(64),token:'T'.repeat(43)};}};
+  const service={server:location.origin,status:'connected',session:{role:'owner',serverVersion:76},request:async(p,o={})=>{if(p.startsWith('/shares/title/')&&o.method==='DELETE'){window.revoked=p;return{revoked:true};}if(p!=='/shares/title')return{};await new Promise(r=>setTimeout(r,80));(window.shares||=[]).push(o.body);const mark=o.body.translate?'T':'O';return{id:'b'.repeat(64),token:mark.repeat(43)};}};
   publishTitleShare({service,title:{title:'Тестовая манга'},kind:'manga',entries:[{url:'https://manga.example/c1',number:1,season:1,title:'Глава 1'}],initial:{url:'https://manga.example/c1'},referer:'https://manga.example/t',dub:'Нова',language:'ru',userId:'u'});
   const item={id:'c1',category:'manga',name:'Тестовая манга · глава 1.cbz',episode:1,translationInfo:{language:'ru'}};
   createRoot(document.getElementById('root')).render(<MangaReader item={item} catalog={{items:[item]}} userId="u" libraryId="fixture" readerService={service} onClose={()=>{}} readWhole={async()=>archive}/>);
+ }else if(mode==='sources'){
+  const sources=[{url:'one',providerName:'Nude-Moon',language:'ru'},{url:'two',providerName:'HentaiChan.cc',language:'ru'}];
+  const favorites={has:source=>source.url==='two',toggle:()=>{}};
+  const info=Object.fromEntries(sources.map(s=>[s.url,{state:'ready',readable:true,chapterCount:1,volumeCount:1}]));
+  createRoot(document.getElementById('root')).render(<div className="desk-source-menu" style={{width:'min(100%, 282px)'}}><TitleSourcePicker sources={sources} value="two" onChoose={()=>{}} favorites={favorites} info={info}/></div>);
  }else{
   location.hash='share='+'S'.repeat(43);const {default:App}=await import('/src/App.jsx');createRoot(document.getElementById('root')).render(<App/>);
  }`);
@@ -27,6 +32,12 @@ const reveal=async page=>{const reader=page.locator('.immersive-reader').last();
  try{
   const base='http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/shared-title-harness.html';
   const page=await browser.newPage({viewport:{width:1280,height:860}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>{
+   Object.defineProperty(navigator,'clipboard',{configurable:true,value:{
+    async write([item]){window.copied=await (await item.getType('text/plain')).text();},
+    async writeText(link){window.copied=link;}
+   }});
+  });
   const grant={id:'a'.repeat(64),token:'grant-token',expiresAt:Math.floor(Date.now()/1000)+86400,kind:'manga',title:{name:'Поднятие уровня',cover:'',description:'Описание тайтла. '.repeat(30),year:2018,ids:{}},
    entries:[1,2].map(n=>({url:'https://manga.example/c'+n,number:n,season:1,title:'Глава '+n})),initial:0,referer:null,dub:'Нова',language:'ru',quality:'best',translate:false,translation:{}};
   const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
@@ -48,15 +59,37 @@ const reveal=async page=>{const reader=page.locator('.immersive-reader').last();
   await page.getByRole('button',{name:'Читать',exact:true}).click();await page.locator('.immersive-reader').waitFor();
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'No sideways scroll on a phone');
-  // The owner shares from inside the reader; the dialog stays in the reader (fullscreen-safe).
+  // The owner shares from the existing toolbar in both viewports.
   await page.setViewportSize({width:1280,height:860});await page.goto(base+'?mode=owner');
   await page.locator('.reader-page img').first().waitFor();await reveal(page);
   await page.getByRole('button',{name:'Поделиться тайтлом'}).click();
-  await page.getByRole('button',{name:'Создать ссылку'}).click();
-  const link=await page.getByLabel('Ссылка на тайтл').inputValue();
-  assert.match(link,/#share=T{43}$/);
-  assert.equal(await page.evaluate(()=>!!document.querySelector('.immersive-reader [role=dialog]')),true,'Share dialog renders inside the reader');
-  assert.equal(await page.evaluate(()=>window.created.kind),'manga');
+  assert.equal(await page.locator('.reader-top .title-share-capsule button').count(),2);
+  assert.equal(await page.locator('.server-dialog').count(),0,'The reader uses its toolbar');
+  await page.getByRole('button',{name:'С переводом',exact:true}).click();
+  await page.waitForFunction(()=>/#share=T{43}$/.test(window.copied||''));
+  assert.equal(await page.evaluate(()=>window.shares[0].translate),true);
+  assert.equal(await page.evaluate(()=>window.shares[0].kind),'manga');
+  await page.getByRole('button',{name:'Закрыть доступ по ссылке'}).click();
+  await page.waitForFunction(()=>window.revoked==='/shares/title/'+'b'.repeat(64));
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({width:360,height:800});
+  await reveal(page);
+  await page.getByRole('button',{name:'Поделиться тайтлом'}).click();
+  const choice=page.getByRole('button',{name:'Без перевода',exact:true});
+  await choice.waitFor();
+  await page.waitForFunction(()=>document.querySelector('.title-share-capsule')?.getBoundingClientRect().width>=195);
+  const box=await choice.boundingBox();
+  assert.ok(box.x>=0&&box.x+box.width<=360,'Phone action fits in the toolbar');
+  await choice.click();
+  await page.waitForFunction(()=>/#share=O{43}$/.test(window.copied||''));
+  assert.deepEqual(await page.evaluate(()=>[window.shares[1].translate,window.shares[1].translation]),[false,{}]);
+  await page.goto(base+'?mode=sources');
+  const picked=page.locator('.title-source-option').filter({hasText:'HentaiChan.cc'});
+  await picked.waitFor();
+  assert.equal(await picked.getAttribute('aria-pressed'),'true');
+  assert.equal(await picked.evaluate(node=>getComputedStyle(node).boxShadow),'none');
+  assert.equal(await picked.locator('strong').evaluate(node=>node.scrollWidth<=node.clientWidth),true,'Source name fits on one line');
+  assert.equal(await picked.locator('small').first().evaluate(node=>getComputedStyle(node).whiteSpace),'nowrap');
   assert.deepEqual(errors,[]);
   console.log('shared title browser contract: ok');
  }finally{await browser.close();await vite.close();}
