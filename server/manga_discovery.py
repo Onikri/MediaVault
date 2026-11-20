@@ -679,8 +679,14 @@ class Discovery:
                     latest_source=json.loads(latest['source']);expected=latest_source.get('_title') or latest_source.get('_alias_title')
                     if expected and not any(match_title(expected,v)[0] for v in values):state='queued'
                 encoded=json.dumps(values,ensure_ascii=False)
+                visible=encoded
+                if state=='done' and source.get('_title'):
+                    returned={value.get('url') for value in values}
+                    indexed=[{**value,'stale':True} for value in json.loads(row['results'])
+                             if value.get('indexed') and value.get('url') not in returned]
+                    if indexed:visible=json.dumps([*values,*indexed],ensure_ascii=False)
                 if state in {'done','unavailable'}:self._reachability(json.loads(row['source']),row['source_id'],state=='done',details,now)
-                self.db.execute('UPDATE work SET state=?,results=? WHERE job=? AND source_id=?',(state,encoded,row['job'],row['source_id']))
+                self.db.execute('UPDATE work SET state=?,results=? WHERE job=? AND source_id=?',(state,visible,row['job'],row['source_id']))
                 if state!='queued':self.db.execute('INSERT OR REPLACE INTO work_diagnostics VALUES(?,?,?)',(row['job'],row['source_id'],json.dumps(details,ensure_ascii=False)))
                 # Failed upstream requests are not persisted as successful empty
                 # cache entries for other owners or refreshed searches.

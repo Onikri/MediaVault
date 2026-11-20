@@ -182,6 +182,20 @@ class MangaDiscoveryTests(unittest.TestCase):
     self.assertEqual(calls,['1'])
     self.assertEqual(russian['progress']['cached'],1)
 
+ def test_empty_live_search_keeps_an_exact_indexed_edition(self):
+    from manga_catalog_index import upsert
+    title={'kind':'manga','title':'Moon Road','year':2020}
+    source=SOURCES[0]
+    with patch.object(discovery,'installed_sources',return_value=[source]):
+        manager=self.manager(fetch=lambda *args:[],workers=1)
+        with manager.lock,manager.db:
+            upsert(manager.db,[{**title,'id':'local-edition','provider':'fixture','url':'https://source.example/moon','language':'ru'}],
+                   source_id=source['id'])
+        result=wait_done(manager,'A',manager.start('A','Moon Road','ru',title=title)['id'])
+    self.assertEqual([row['id'] for row in result['results']],['local-edition'])
+    self.assertTrue(result['results'][0]['stale'])
+    self.assertEqual(manager.db.execute('SELECT results FROM query_cache').fetchone()[0],'[]')
+
  def test_source_retry_after_applies_even_on_explicit_refresh(self):
     def fetch(source,query):raise SourceRateLimitError(120)
     with patch.object(discovery,'installed_sources',return_value=SOURCES[:1]):
