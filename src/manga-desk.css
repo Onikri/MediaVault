@@ -8,10 +8,11 @@
  --desk-radius:26px;
  position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,25vw,368px);
  min-width:0;border-radius:var(--desk-radius);overflow:hidden;isolation:isolate;
- background:var(--color-canvas-soft,#131316);color:var(--color-petal,#f0e8e5);
+ color:var(--color-petal,#f0e8e5);
  scroll-margin-top:calc(var(--header-height,72px) + 12px)
 }
-.manga-desk-reader{position:relative;min-width:0;height:var(--desk-height);background:var(--color-canvas,#0c0c0f)}
+/* The preview and reading surface paint within the scrolling SVG aperture. */
+.manga-desk-reader{position:relative;min-width:0;height:var(--desk-height)}
 .manga-desk-reader>.inline-error{position:absolute;z-index:6;left:14px;right:14px;top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0;padding:12px 14px;border-radius:16px;background:color-mix(in srgb,var(--color-canvas,#0c0c0f) 92%,transparent);backdrop-filter:blur(18px);box-shadow:0 10px 40px #0007}
 .manga-desk-reader>.inline-error p{flex:1 1 220px;margin:0}
 .manga-desk .title-playback-reveal{height:100%;border-radius:0}
@@ -26,7 +27,7 @@
 .manga-desk .online-viewer-inline .immersive-reader.reader-embedded:fullscreen{height:100dvh!important}
 
 /* Panel */
-.desk-panel{display:flex;flex-direction:column;gap:12px;height:var(--desk-height);min-width:0;padding:16px 12px 0 14px;box-sizing:border-box}
+.desk-panel{display:flex;flex-direction:column;gap:12px;height:var(--desk-height);min-width:0;padding:16px 12px 0 14px;box-sizing:border-box;background:var(--color-canvas-soft,#131316)}
 .desk-source,.desk-team{display:grid;min-width:0}
 .desk-source-plaque,.desk-team-button{display:flex;align-items:center;gap:10px;width:100%;min-width:0;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background .18s}
 .desk-source-plaque{min-height:42px;padding:7px 10px;border-radius:12px;background:var(--color-surface,#19191e)}

@@ -43,6 +43,15 @@ const expectText=(locator,text)=>locator.filter({hasText:text}).waitFor();
   await page.getByRole('button',{name:'Выбрать Новый тайтл только в источнике',exact:true}).click();
   await page.getByRole('heading',{name:'Новый тайтл только в источнике',exact:true}).waitFor();
   await page.getByRole('button',{name:/^Читать главу/}).waitFor();assert.equal(await page.locator('.export-sheet').count(),0,'Saving is a secondary window opened from the showcase');assert.equal(await page.locator('.export-trigger').count(),1);
+  const aperture=await page.locator('.manga-desk .title-playback-reveal').evaluate(node=>{
+   const frame=node.parentElement, desk=frame.parentElement, panel=desk.querySelector('.desk-panel');
+   return {clip:getComputedStyle(node).clipPath,frame:getComputedStyle(frame).backgroundColor,
+    desk:getComputedStyle(desk).backgroundColor,panel:getComputedStyle(panel).backgroundColor};
+  });
+  assert.match(aperture.clip,/url\(/,'The reading desk keeps its SVG entrance mask');
+  assert.equal(aperture.frame,'rgba(0, 0, 0, 0)','The area surrounding the aperture is transparent');
+  assert.equal(aperture.desk,aperture.frame);
+  assert.notEqual(aperture.panel,aperture.frame,'The chapter panel has its own surface');
   assert.equal(await page.getByRole('button',{name:'Проверить следующие источники',exact:true}).count(),0);
   // Saving opens a non-modal window from the showcase; the page stays usable behind it.
   await page.locator('.export-trigger').click();const sheet=page.locator('.export-sheet');await sheet.waitFor();
