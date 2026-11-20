@@ -695,11 +695,10 @@ def manga_catalog_tags(provider:str='',sourceId:str='',sourceIds:str='',language
 
 @app.get('/manga/catalog/stats')
 def manga_catalog_stats(subject=Depends(viewer)):
-    from manga_discovery import manager
+    from manga_discovery import catalogue_reader,manager
     from manga_catalog_index import stats
-    store=manager()
-    with store.lock:
-        return stats(store.db)
+    with catalogue_reader(manager()) as db:
+        return stats(db)
 
 class MangaCatalogBackfill(StrictBody):
     offset:int=Field(default=0,ge=0,le=50000)

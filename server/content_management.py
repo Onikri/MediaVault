@@ -16,10 +16,12 @@ _pending_all=False
 def directory():return Path(os.getenv('DATA_DIR','/data'))
 
 def public_policy(store=None):
+    if store is not None:
+        from content_vocabulary import public
+        from manga_discovery import catalogue_reader
+        with catalogue_reader(store) as db:
+            return public(store,db)
     with _update_lock:
-        if store is not None:
-            from content_vocabulary import public
-            return public(store)
         data=current().public()
         data.pop('includeDiscovered',None);data.pop('hiddenTags',None)
         return {'revision':hashlib.sha256(canonical_json(data)).hexdigest(),'policy':data,'scope':'all'}

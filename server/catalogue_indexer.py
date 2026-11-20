@@ -312,13 +312,14 @@ class Indexer:
             thread=threading.Thread(target=work,daemon=True,name='catalogue-index-'+str(i));self.threads.append(thread);thread.start()
 
     def status(self):
-        with self.store.lock,self.store.db:
+        from manga_discovery import catalogue_reader
+        with catalogue_reader(self.store) as db:
             rows=[]
-            pending_details={domain:count for domain,count in self.store.db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind LIKE '%-detail' GROUP BY json_extract(spec,'$.domain')")}
-            pending_catalogues={domain:count for domain,count in self.store.db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind IN ('html','lib','bridge','remanga') AND json_extract(spec,'$.term') IS NOT NULL AND state IN ('queued','retry','running') GROUP BY json_extract(spec,'$.domain')")}
-            stored=dict(self.store.db.execute('SELECT provider,COUNT(*) FROM catalog_titles GROUP BY provider'))
+            pending_details={domain:count for domain,count in db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind LIKE '%-detail' GROUP BY json_extract(spec,'$.domain')")}
+            pending_catalogues={domain:count for domain,count in db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind IN ('html','lib','bridge','remanga') AND json_extract(spec,'$.term') IS NOT NULL AND state IN ('queued','retry','running') GROUP BY json_extract(spec,'$.domain')")}
+            stored=dict(db.execute('SELECT provider,COUNT(*) FROM catalog_titles GROUP BY provider'))
             from catalogue_sources import source_provider
-            for spec,state,pages,records,error,due,expected in self.store.db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books','omdb') ORDER BY id"):
+            for spec,state,pages,records,error,due,expected in db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books','omdb') ORDER BY id"):
                 spec=json.loads(spec)
                 if '-detail' in spec['type'] or spec['type'].endswith('-vocabulary') or spec.get('term'):continue
                 details=pending_details.get(spec['domain'],0)
@@ -332,11 +333,9 @@ class Indexer:
                 if row.get('mirrorOf') in by_domain:
                     primary=by_domain[row['mirrorOf']]
                     for field in ('status','pages','indexed','storedTitles','expected','pendingDetails','pendingCatalogues','retryAt'):row[field]=primary[field]
-            manga=self.store.db.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]
-            from content_catalog import initialize
-            initialize(self.store.db)
-            other=self.store.db.execute('SELECT COUNT(*) FROM content_titles').fetchone()[0]
-            pending=self.store.db.execute("SELECT COUNT(*) FROM catalogue_jobs WHERE state IN ('queued','retry','running')").fetchone()[0]
+            manga=sum(stored.values())
+            other=db.execute('SELECT COUNT(*) FROM content_titles').fetchone()[0]
+            pending=db.execute("SELECT COUNT(*) FROM catalogue_jobs WHERE state IN ('queued','retry','running')").fetchone()[0]
         completed=sum(r['status'] in {'done','unsupported'} for r in rows)
         return {'state':'running' if pending else 'done','continuous':True,'total':len(rows),'completed':completed,'indexed':manga+other,'pending':pending,'sources':rows}
 

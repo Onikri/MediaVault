@@ -170,10 +170,9 @@ def indexed_search(source,query):
     from title_identity import match_title
     selected=source.get('_title') or source.get('_alias_title');found={}
     try:
-        discovery=manager()
-        with discovery.lock:
+        with catalogue_reader(manager()) as db:
             for term in source.get('_queries',[query]):
-                for row in browse(discovery.db,q=term,source_id=str(source['id']),limit=20)['items']:
+                for row in browse(db,q=term,source_id=str(source['id']),limit=20)['items']:
                     if not row.get('url') or not row.get('title'):continue
                     row={**row,'aliases':row.get('aliases') or [row['title']],'sourceOnly':True,'sourceId':str(source['id']),'providerName':source.get('name',''),'indexed':True}
                     if selected and not match_title(selected,row)[0]:continue
@@ -183,6 +182,30 @@ def indexed_search(source,query):
     except Exception:
         return []
     return list(found.values())[:40]
+
+def indexed_title_sources(db, selected, sources):
+    """Return exact indexed editions before scheduling live source requests."""
+    from manga_tag_policy import normalize as work_normalize
+    from title_identity import aliases, match_title
+    keys = list(dict.fromkeys(key for name in aliases(selected) if (key := work_normalize(name))))
+    if not keys or not sources:
+        return {}
+    profiles = {str(source['id']):source for source in sources}
+    result = {}
+    for key in keys:
+        rows = db.execute('SELECT id,source_id,metadata FROM catalog_titles WHERE work_key=? LIMIT 120', (key,))
+        for identity, source_id, metadata in rows:
+            source = profiles.get(source_id)
+            if not source:
+                continue
+            row = json.loads(metadata)
+            if not row.get('url') or not match_title(selected, row)[0]:
+                continue
+            result.setdefault(source_id, {})[row['url']] = {
+                **row, 'id':row.get('id') or identity, 'indexed':True,
+                'sourceId':source_id, 'providerName':source['name'],
+            }
+    return {source_id:list(rows.values())[:40] for source_id,rows in result.items()}
 
 def search_source(source,query):
     import manga_native_sources
@@ -413,12 +436,16 @@ class Discovery:
                 source['_title']=clean_title
         source_paths=[str(s['id'])+('@direct' if s.get('_nativeAdapter') else '') for s in selected]
         signature=hashlib.sha256(json.dumps([DISCOVERY_VERSION,key,language,source_paths,title and aliases(title),routes.get('revision','direct')],ensure_ascii=False).encode()).hexdigest()
+        saved={}
+        if title:
+            with catalogue_reader(self) as reader:
+                saved=indexed_title_sources(reader,title,selected)
         now=self.clock()
         with self.condition,self.db:
             self._prune(now)
             paused={} if refresh or source_ids else {r['source_id']:dict(r) for r in self.db.execute('SELECT * FROM reachability WHERE skip_until>?',(now,))}
             hit=self.db.execute("SELECT id FROM jobs WHERE owner=? AND signature=? AND (state='running' OR state='done' AND updated>? AND ?=0) AND expires>? ORDER BY created DESC LIMIT 1",(owner,signature,now-self.cache_ttl,int(bool(refresh)),now)).fetchone()
-            if hit:return self._snapshot(owner,hit['id'])
+            if hit:return self._snapshot(owner,hit['id'],seed=(row for rows in saved.values() for row in rows))
             if self.db.execute("SELECT count(*) FROM jobs WHERE state='running'").fetchone()[0]>=self.max_jobs or self.db.execute("SELECT count(*) FROM jobs WHERE state='running' AND owner=?",(owner,)).fetchone()[0]>=self.per_owner:raise SearchLimit('Поиск уже выполняется. Дождись результата или останови предыдущий.')
             identity=secrets.token_urlsafe(24)
             self.db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',(identity,owner,signature,query,language,'running' if selected else 'done',now,now,now+86400,now))
@@ -427,8 +454,9 @@ class Discovery:
                 sid=str(source['id']);cache_key=self._cache_key(key,source);hit=None if refresh else self.db.execute('SELECT results FROM query_cache WHERE query=? AND source_id=? AND expires>?',(cache_key,sid,now)).fetchone()
                 # A stale metadata index is useful immediately, but is not counted
                 # as a fresh provider response and never suppresses its refresh.
-                seed=self._indexed(key,sid) if not hit else json.loads(hit['results'])
-                if hit:seeded.extend(seed)
+                recent=json.loads(hit['results']) if hit else self._indexed(key,sid)
+                seed=list({value.get('url') or value['id']:value for value in [*saved.get(sid,[]),*recent]}.values())
+                if hit:seeded.extend(recent)
                 pause=paused.get(sid) if not hit else None
                 self.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',(identity,sid,json.dumps(source,ensure_ascii=False),'done' if hit else 'skipped' if pause else 'queued',json.dumps([{**v,'stale':True} for v in seed] if pause else seed,ensure_ascii=False),int(bool(hit))))
                 if pause:
@@ -477,13 +505,14 @@ class Discovery:
         escaped=key.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
         return [json.loads(r[0]) for r in self.db.execute("SELECT metadata FROM titles WHERE source_id=? AND title_norm LIKE ? ESCAPE '\\' ORDER BY updated DESC LIMIT 40",(sid,'%'+escaped+'%'))]
 
-    def _snapshot(self,owner,identity):
-        job=self.db.execute('SELECT * FROM jobs WHERE id=? AND owner=? AND expires>?',(identity,owner,self.clock())).fetchone()
+    def _snapshot(self,owner,identity,db=None,seed=()):
+        db=db if db is not None else self.db
+        job=db.execute('SELECT * FROM jobs WHERE id=? AND owner=? AND expires>?',(identity,owner,self.clock())).fetchone()
         if not job:raise SearchMissing('Поиск не найден или срок хранения истёк.')
-        results={};providers=[];complete=failed=cached=0
+        results={row['id']:row for row in seed};providers=[];complete=failed=cached=0
         from manga_source_health import states,blocked
         health=states()
-        for row in self.db.execute('SELECT w.*,d.details FROM work w LEFT JOIN work_diagnostics d USING(job,source_id) WHERE w.job=? ORDER BY source_id',(identity,)):
+        for row in db.execute('SELECT w.*,d.details FROM work w LEFT JOIN work_diagnostics d USING(job,source_id) WHERE w.job=? ORDER BY source_id',(identity,)):
             source=json.loads(row['source']);items=json.loads(row['results'])
             if not blocked(row['source_id'],health) or source.get('_retryHealth'):
                 for value in items:results[value['id']]=value
@@ -498,7 +527,7 @@ class Discovery:
                 'results':ordered[:3000],'resultCount':len(ordered),'truncated':len(ordered)>3000,'providers':providers,'updated':job['updated'],'expiresAt':job['expires']}
 
     def status(self,owner,identity):
-        with self.lock:return self._snapshot(owner,identity)
+        with catalogue_reader(self) as db:return self._snapshot(owner,identity,db)
 
     def cancel(self,owner,identity):
         with self.condition,self.db:

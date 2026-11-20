@@ -20,6 +20,31 @@ def wait_done(manager,owner,identity):
     raise AssertionError('Discovery job did not finish')
 
 class NativeSourceFallbackTests(unittest.TestCase):
+    def test_indexed_title_is_available_before_worker_fetch_and_conflicting_year_is_ignored(self):
+        from manga_catalog_index import upsert
+        work={'kind':'manga','title':'Лунная дорога','aliases':['Moon Road'],'year':2020}
+        source={**SOURCES[0],'name':'Fixture'}
+        with tempfile.TemporaryDirectory() as directory,patch.object(discovery,'installed_sources',return_value=[source]):
+            manager=discovery.Discovery(directory,start_workers=False)
+            try:
+                with manager.db:
+                    upsert(manager.db,[{**work,'id':'valid','provider':'fixture','url':'https://source.example/new','language':'ru'},
+                                       {**work,'id':'other','provider':'fixture','url':'https://source.example/other','language':'ru','year':1999}],
+                           source_id=source['id'])
+                result=manager.start('owner','Moon Road','ru',title=work)
+                self.assertEqual([row['id'] for row in result['results']],['valid'])
+                self.assertEqual(result['progress']['completed'],0)
+                # A status poll can read the committed search snapshot while
+                # a different thread owns the catalogue writer lock.
+                with manager.lock:
+                    hits=[]
+                    poller=threading.Thread(target=lambda:hits.extend(manager.status('owner',result['id'])['results']),daemon=True)
+                    poller.start()
+                    poller.join(2)
+                    self.assertEqual([row['id'] for row in hits],['valid'])
+            finally:
+                manager.close()
+
     def test_source_search_keeps_punctuation_variants_without_accepting_unrelated_hits(self):
         source={'id':'2','name':'Fixture','lang':'en','baseUrl':'https://source.example'}
         rows=[{'id':1,'title':'Moon-Road','url':'/moon-road'},{'id':2,'title':'Moon Lake','url':'/moon-lake'}]

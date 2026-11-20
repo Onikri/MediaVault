@@ -460,12 +460,10 @@ def cached_tags(conn, lock, *, ttl=None, clock=time.time, background=True, path=
     return compute()
 
 def stats(conn):
-    total = conn.execute('SELECT COUNT(*) FROM catalog_titles').fetchone()[0]
-    tagged = conn.execute("SELECT COUNT(*) FROM catalog_titles WHERE tag_state='present'").fetchone()[0]
     rows = conn.execute('''SELECT provider,COUNT(*),
                   SUM(CASE WHEN tag_state='present' THEN 1 ELSE 0 END)
                   FROM catalog_titles GROUP BY provider ORDER BY COUNT(*) DESC''').fetchall()
-    return {'totalTitles':total,'titlesWithTags':tagged,
+    return {'totalTitles':sum(row[1] for row in rows),'titlesWithTags':sum(row[2] or 0 for row in rows),
             'perProvider':[{'provider':p,'titles':n,'withTags':t or 0} for p,n,t in rows],
             'note':'Only discovered titles are indexed; full upstream catalogue coverage is not implied.'}
 
