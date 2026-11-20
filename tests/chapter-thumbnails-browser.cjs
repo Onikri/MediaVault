@@ -1,6 +1,15 @@
 // Real React, viewport observation, JPEG decoding and IndexedDB; Oracle is a fixture.
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{chromium}=require('playwright');
 let browser,vite,last;
+async function visitChapters(page){
+ const rows=page.locator('.online-chapter-entry');
+ await rows.first().waitFor({state:'attached'});
+ for(let index=0;index<await rows.count();index++){
+  const row=rows.nth(index);
+  await row.scrollIntoViewIfNeeded();
+  if(index!==2)await row.locator('.online-chapter-art img').waitFor();
+ }
+}
 (async()=>{
  const root=process.cwd(),dir=path.join(root,'.codex-local/test-output/chapter-thumbnails'),base='/.codex-local/test-output/chapter-thumbnails/';await fs.mkdir(dir,{recursive:true});
  await fs.writeFile(path.join(dir,'index.html'),'<meta name="viewport" content="width=device-width"><div id="root"></div><script type="module" src="'+base+'fixture.jsx"></script>');
@@ -20,13 +29,14 @@ let browser,vite,last;
  for(const width of [390,1440]){
   const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];last=page;page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
   const url='http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html';await page.goto(url);await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>window.calls.length),0,'Offscreen chapters do not trigger background requests');
-  await page.locator('.world-chapters').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('.online-chapter-art img').length>=3);await page.locator('.online-chapter-entry').last().scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('.online-chapter-art img').length===11);
+  await visitChapters(page);assert.equal(await page.locator('.online-chapter-art img').count(),11);
   assert.ok(await page.evaluate(()=>window.maxInflight<=2),'Thumbnail queue is bounded to two lanes');
   assert.ok(await page.locator('.online-chapter-art img').first().evaluate(n=>n.complete&&n.naturalWidth===320));
   assert.equal(await page.locator('.title-episode-card').count(),12,'Failed thumbnail does not remove its chapter');
   await page.screenshot({path:path.join(dir,'chapters-'+width+'.png'),fullPage:false});
-  await page.reload();await page.locator('.world-chapters').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('.online-chapter-art img').length>=3);await page.locator('.online-chapter-entry').last().scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('.online-chapter-art img').length===11);
-  assert.ok(await page.evaluate(()=>window.calls.length<=1),'Successful thumbnails are restored from IndexedDB without Oracle requests');
+  await page.reload();await visitChapters(page);assert.equal(await page.locator('.online-chapter-art img').count(),11);
+  assert.deepEqual(await page.evaluate(()=>window.calls.filter(url=>!url.endsWith('/168'))),[],
+   'Successful thumbnails are restored from IndexedDB without Oracle requests');
   await page.locator('.title-episode-card').first().click();await page.locator('#chosen').getByText('166',{exact:true}).waitFor();
   assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.close();console.log('PASS visible unread chapters 166–177, bounded fetching, error isolation and durable thumbnails '+width);
  }

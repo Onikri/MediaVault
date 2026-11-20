@@ -7,6 +7,18 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {chromium}=require('playwright');
 const ROOT=path.resolve(__dirname,'..');
 let browser,vite;
+async function openChapter(page,url){
+ await page.goto(url,{waitUntil:'domcontentloaded',timeout:180000});
+ for(let attempt=0;attempt<2;attempt++){
+  const start=await page.evaluate(()=>performance.timeOrigin);
+  await page.getByRole('button',{name:/Начать читать/}).click({timeout:120000});
+  // A cold Vite server can reload the page once on discovering a lazy
+  // dependency. Only retry that navigation, and keep real reader errors visible.
+  await page.waitForFunction(start=>performance.timeOrigin!==start||document.querySelector('.ranobe-prose p'),start,{timeout:60000});
+  if(await page.locator('.ranobe-prose p').count())return;
+ }
+ await page.locator('.ranobe-prose p').first().waitFor();
+}
 (async()=>{
  fs.mkdirSync(path.join(ROOT,'test-output'),{recursive:true});
  fs.writeFileSync(path.join(ROOT,'test-output/ranobe.html'),'<!doctype html><html lang="ru" data-blossom><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/tests/ranobe-harness.jsx"></script></html>');
@@ -16,9 +28,7 @@ let browser,vite;
  const errors=[];
  // Phone
  const phone=await (await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,serviceWorkers:'block'})).newPage();phone.on('pageerror',e=>errors.push(e.message));
- await phone.goto(url,{waitUntil:'domcontentloaded',timeout:180000});
- await phone.getByRole('button',{name:/Начать читать/}).click({timeout:120000});
- await phone.locator('.ranobe-prose p').first().waitFor();
+ await openChapter(phone,url);
  const overflow=await phone.evaluate(()=>[...document.querySelectorAll('.reader-rail .reader-control,.reader-rail .narration-bar button')].filter(b=>b.getClientRects().length).map(b=>b.getBoundingClientRect().right).filter(r=>r>innerWidth+1));
  assert.deepEqual(overflow,[],'every bar button is on screen');
  await phone.getByRole('button',{name:'Ещё',exact:true}).click();
@@ -36,9 +46,7 @@ let browser,vite;
  await phone.getByText('Фоновая музыка по сценам').waitFor({timeout:3000});// music lives in the sound tab
  // Desktop keys
  const page=await (await browser.newContext({viewport:{width:1280,height:820},serviceWorkers:'block'})).newPage();page.on('pageerror',e=>errors.push(e.message));
- await page.goto(url,{waitUntil:'domcontentloaded',timeout:180000});
- await page.getByRole('button',{name:/Начать читать/}).click({timeout:120000});
- await page.locator('.ranobe-prose p').first().waitFor();
+ await openChapter(page,url);
  await page.locator('.ranobe-reader').click({position:{x:300,y:300}});
  const size=()=>page.evaluate(()=>getComputedStyle(document.querySelector('.ranobe-surface')).getPropertyValue('--book-size').trim());
  const before=await size();await page.keyboard.press('Equal');await page.waitForFunction(old=>getComputedStyle(document.querySelector('.ranobe-surface')).getPropertyValue('--book-size').trim()!==old,before);
