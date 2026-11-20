@@ -5,6 +5,23 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
 const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local','shared-title-fixture');
 const HARNESS='/.codex-local/shared-title-fixture/shared-title-harness';
 const reveal=async page=>{const reader=page.locator('.immersive-reader').last();await reader.waitFor();if(await reader.getAttribute('data-chrome')!=='true'){const box=await reader.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+2);await page.mouse.move(box.x+box.width/2,box.y+20);await page.waitForFunction(()=>document.querySelector('.immersive-reader')?.dataset.chrome==='true');}};
+const lastPageImage='[data-page="2"] .reader-image-stack img';
+async function reachEnd(page,view){
+ await page.locator('.reader-page img').first().waitFor();
+ if(view==='scroll'){
+  // Visit the last figure until its lazy image is available. Chapter restore
+  // can move the scroll container back once while it mounts.
+  for(let attempt=0;attempt<3;attempt++){
+   await page.locator('[data-page="2"]').scrollIntoViewIfNeeded();
+   if(await page.locator(lastPageImage).waitFor({timeout:1500}).then(()=>true,()=>false))break;
+  }
+ }else{
+  await page.locator('.immersive-reader').focus();
+  await page.keyboard.press('End');
+ }
+ await page.waitForFunction(selector=>document.querySelector(selector)?.naturalWidth>0,lastPageImage);
+ await page.locator('.reader-content').evaluate(node=>node.scrollTop=node.scrollHeight);
+}
 (async()=>{
  await fs.mkdir(DIR,{recursive:true});
  await fs.writeFile(path.join(DIR,'shared-title-harness.html'),'<html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="'+HARNESS+'.jsx"></script></html>');
@@ -124,12 +141,8 @@ const reveal=async page=>{const reader=page.locator('.immersive-reader').last();
   await page.setViewportSize({width:1280,height:860});
   for(const view of ['scroll','pages','spread','focus']){
    await page.goto(base+'?mode=auto-'+view);
-   await page.locator('.reader-page img').first().waitFor();
-   if(view==='scroll')await page.locator('.reader-content').evaluate(node=>node.scrollTop=node.scrollHeight);
-   else await page.keyboard.press('End');
-   await page.waitForFunction(()=>document.querySelector('[data-page="2"] .reader-image-stack img')?.naturalWidth>0);
+   await reachEnd(page,view);
    if(view==='spread')assert.equal(await page.locator('.reader-content .reader-page').count(),2);
-   await page.locator('.reader-content').evaluate(node=>node.scrollTop=node.scrollHeight);
    const sendWheel=delta=>page.locator('.reader-content').evaluate((node,delta)=>{
     node.dispatchEvent(new WheelEvent('wheel',{deltaY:delta,bubbles:true}));
    },delta);
@@ -146,9 +159,7 @@ const reveal=async page=>{const reader=page.locator('.immersive-reader').last();
   await page.setViewportSize({width:360,height:800});
   await page.goto(base+'?mode=auto-scroll');
   const surface=page.locator('.reader-content');
-  await page.locator('.reader-page img').first().waitFor();
-  await surface.evaluate(node=>node.scrollTop=node.scrollHeight);
-  await page.waitForFunction(()=>document.querySelector('[data-page="2"] .reader-image-stack img')?.naturalWidth>0);
+  await reachEnd(page,'scroll');
   await surface.evaluate(node=>{
    node.scrollTop=node.scrollHeight;
    const touch=y=>new Touch({identifier:1,target:node,clientX:130,clientY:y});
