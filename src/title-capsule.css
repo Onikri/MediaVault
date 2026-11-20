@@ -1,11 +1,16 @@
 /* The inline rail hands off the current section after it scrolls under the header. */
 .title-navigation-anchor {
-  margin-block: clamp(15px, 2.4vw, 30px) clamp(15px, 2vw, 26px);
+  margin-block: 12px 14px;
 }
 .title-tabbar.title-shortcuts {
+  --section-nav-icon: 14px;
   position: static;
+  background: transparent;
+  padding: 1px;
+  scrollbar-width: none;
   transition: opacity .18s ease-out, visibility .18s;
 }
+.title-tabbar > .mv-nav-item { min-height: 32px; }
 .title-tabbar.is-absorbed {
   opacity: 0;
   visibility: hidden;
@@ -21,7 +26,7 @@ html[data-blossom] .blossom-navbar .title-section-capsule.brand.logo {
   border-radius: var(--section-nav-cell-radius);
   background: var(--section-nav-current);
   color: var(--section-nav-ink);
-  font: 650 12px/1.1 var(--font-ui, system-ui);
+  font: 600 12px/1.1 var(--font-ui, system-ui);
   letter-spacing: 0;
 }
 .title-section-capsule > span {
@@ -41,7 +46,7 @@ html[data-blossom] .blossom-navbar .title-section-capsule.brand.logo {
   box-sizing: border-box;
   border: 1px solid var(--section-nav-divider);
   border-radius: var(--section-nav-radius);
-  background: var(--section-nav-tray);
+  background: var(--color-surface, #19191e);
   box-shadow: 0 12px 38px #0005;
   max-height: calc(100dvh - 110px);
   overflow: auto;
