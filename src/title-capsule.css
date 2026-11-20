@@ -1,29 +1,10 @@
-/* The inline rail hands off the current section after it scrolls under the header. */
-.title-navigation-anchor {
-  margin-block: 12px 14px;
-}
-.title-tabbar.title-shortcuts {
-  --section-nav-icon: 14px;
-  position: static;
-  background: transparent;
-  padding: 1px;
-  scrollbar-width: none;
-  transition: opacity .18s ease-out, visibility .18s;
-}
-.title-tabbar > .mv-nav-item { min-height: 32px; }
-.title-tabbar.is-absorbed {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
 html[data-blossom] .blossom-navbar .title-section-capsule.brand.logo {
   display: inline-grid;
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 6px;
   align-items: center;
   padding-inline: 9px;
-  border-radius: var(--section-nav-cell-radius);
+  border-radius: 999px;
   background: var(--section-nav-current);
   color: var(--section-nav-ink);
   font: 600 12px/1.1 var(--font-ui, system-ui);
@@ -58,7 +39,7 @@ html[data-blossom] .blossom-navbar .title-section-capsule.brand.logo {
   padding-inline: 10px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .title-tabbar.title-shortcuts, .title-section-capsule > svg { transition: none; }
+  .title-section-capsule > svg { transition: none; }
 }
 
 /* Navbar brand ↔ library section: both share one slot so the links beside it never jump. */

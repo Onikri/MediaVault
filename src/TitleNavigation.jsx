@@ -1,8 +1,6 @@
-import {useLayoutEffect,useRef,useState} from 'react';
+import {useLayoutEffect,useRef} from 'react';
 import {BookOpen,CalendarDays,Images,ListOrdered,Music2,Network,Play,Users} from 'lucide-react';
-import {NavigationItem,NavigationRail} from './SectionNavigation.jsx';
-import {jumpTitleSection,publishTitleNavigation} from './title-navigation-store.js';
-import './title-capsule.css';
+import {publishTitleNavigation,titleSectionTarget,titleDockBoundary,TITLE_SECTION_JUMP} from './title-navigation-store.js';
 
 const icons={titlePlayback:Play,titleCharacters:Users,titleStills:Images,titleSchedule:CalendarDays,titleMusic:Music2,titleRelated:Network,titleWatchOrder:ListOrdered};
 
@@ -25,55 +23,51 @@ export function TitleSectionIcon({id,label}){
 export default function TitleNavigation({title,profile}){
  const signature=JSON.stringify(titleSections(title,profile));
  const anchor=useRef(null);
- const [state,setState]=useState({sections:[],active:null,merged:false,keys:''});
 
  useLayoutEffect(()=>{
   const items=JSON.parse(signature);
   const header=document.querySelector('.blossom-navbar');
-  let frame=0,previous;
+  let frame=0,previous,preferred;
+  const rememberJump=event=>{preferred=event.detail;schedule();};
   const observer=new ResizeObserver(schedule);
   function schedule(){if(!frame)frame=requestAnimationFrame(update);}
   function update(){
    frame=0;
    if(!anchor.current)return;
-   const boundary=(header?.getBoundingClientRect().bottom||78)+16;
+   const boundary=titleDockBoundary();
    const nodes=items.flatMap(item=>{
-    const node=document.getElementById(item.id)||(item.id==='titlePlayback'?document.getElementById('titleMaterials'):null);
-    return node?.getClientRects().length?[{id:item.id,top:node.getBoundingClientRect().top}]:[];
+    const node=titleSectionTarget(item.id);
+    return node?.getClientRects().length?[{item,top:node.getBoundingClientRect().top}]:[];
    }).sort((a,b)=>a.top-b.top);
-   const sections=items.filter(item=>nodes.some(node=>node.id===item.id));
+   const sections=nodes.map(node=>node.item);
    const keys=sections.map(item=>item.id).join('|');
-   const merged=sections.length>1&&!!header&&anchor.current.getBoundingClientRect().top<=boundary;
    const bottom=scrollY>0&&scrollY+innerHeight>=document.documentElement.scrollHeight-2;
-   const active=(bottom?nodes.at(-1)?.id:nodes.findLast(node=>node.top<=boundary+40)?.id)||nodes[0]?.id;
-   if(previous&&previous.active===active&&previous.merged===merged&&previous.keys===keys)return;
-   previous={sections,active,merged,keys};
-   setState(previous);
-   publishTitleNavigation({titleId:title.id,sections,active,merged});
+   const natural=(bottom?nodes.at(-1):nodes.findLast(node=>node.top<=boundary+18))||nodes[0];
+   const chosen=preferred&&nodes.find(node=>node.item.id===preferred);
+   // A jump can share its vertical position with a section in the other column.
+   const onSameRow=chosen&&Math.abs(chosen.top-natural.top)<=18;
+   const visibleAtEnd=chosen&&bottom&&chosen.top>=boundary-2&&chosen.top<innerHeight;
+   const active=(onSameRow||visibleAtEnd?chosen:natural)?.item.id;
+   if(previous?.active===active&&previous?.keys===keys)return;
+   previous={active,keys};
+   publishTitleNavigation({titleId:title.id,sections,active});
   }
   update();
-  observer.observe(anchor.current);
   if(header)observer.observe(header);
   const content=anchor.current.closest('.title-page')||anchor.current.parentElement;
   if(content)observer.observe(content);
   addEventListener('scroll',schedule,{passive:true});
   addEventListener('resize',schedule);
+  addEventListener(TITLE_SECTION_JUMP,rememberJump);
   return()=>{
    cancelAnimationFrame(frame);
    observer.disconnect();
    removeEventListener('scroll',schedule);
    removeEventListener('resize',schedule);
+   removeEventListener(TITLE_SECTION_JUMP,rememberJump);
    publishTitleNavigation(null);
   };
  },[title.id,signature]);
 
- const {sections}=state;
- return <div ref={anchor} className="title-navigation-anchor" hidden={sections.length<2}>
-  <NavigationRail className={`title-shortcuts title-tabbar ${state.merged?'is-absorbed':''}`} count={sections.length}
-   data-scroll={sections.length>3} aria-label="Разделы тайтла" aria-hidden={state.merged} inert={state.merged}>
-   {sections.map(section=><NavigationItem key={section.id}
-    aria-current={state.active===section.id?'location':undefined} icon={<TitleSectionIcon {...section}/>} label={section.label}
-    onClick={()=>jumpTitleSection(section.id)}/>)}
-  </NavigationRail>
- </div>;
+ return <span ref={anchor} className="title-navigation-anchor" hidden/>;
 }

@@ -16,7 +16,7 @@ html[data-blossom] .blossom-navbar { container: primary-navigation / inline-size
     padding-inline: 3px;
     font: 650 12.5px/1 var(--font-ui, system-ui);
     letter-spacing: 0;
-    border-radius: var(--section-nav-cell-radius);
+    border-radius: 999px;
     color: var(--section-nav-muted);
   }
   html[data-blossom] .blossom-navbar .desktop-nav .nav-link-icon {
@@ -33,14 +33,14 @@ html[data-blossom] .blossom-navbar { container: primary-navigation / inline-size
     outline-offset: -3px;
   }
   html[data-blossom] .blossom-navbar .desktop-nav .nav-glide {
-    border-radius: var(--section-nav-cell-radius);
+    border-radius: 999px;
     background: var(--section-nav-current);
   }
   html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav,
   html[data-blossom][data-catalog-merged] .blossom-navbar .desktop-nav { --primary-nav-cell: 38px; }
   html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link-label { display: none; }
   html[data-blossom][data-catalog-merged] .blossom-navbar .desktop-nav .nav-link {
-    border-radius: var(--section-nav-cell-radius);
+    border-radius: 999px;
   }
   @container primary-navigation (width < 1120px) {
     html[data-blossom] .blossom-navbar .desktop-nav { --primary-nav-cell: 45px; }
@@ -51,12 +51,12 @@ html[data-blossom] .blossom-navbar { container: primary-navigation / inline-size
 @media (--tablet) {
   html[data-blossom] .mobile-dock[aria-label] {
     border: 1px solid var(--section-nav-divider);
-    border-radius: 20px;
+    border-radius: 999px;
     gap: 2px;
     background: color-mix(in srgb, var(--section-nav-tray) 95%, transparent);
   }
   html[data-blossom] .mobile-dock .mobile-dock-link {
-    border-radius: 12px;
+    border-radius: 999px;
     color: var(--section-nav-muted);
   }
   html[data-blossom] .mobile-dock .mobile-dock-icon {

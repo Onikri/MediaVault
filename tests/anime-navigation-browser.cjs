@@ -9,14 +9,31 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local/test-ou
   await page.route('**/*',async r=>{const u=new URL(r.request().url());if(u.hostname==='127.0.0.1')return r.continue();const headers={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'*'},json=d=>r.fulfill({json:d,headers});if(r.request().method()==='OPTIONS')return r.fulfill({status:204,headers});if(u.hostname!=='fixture.example')return json({data:{}});
    if(u.pathname.endsWith('.svg'))return r.fulfill({contentType:'image/svg+xml',headers,body:'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="440"><rect width="300" height="440" fill="#536979"/></svg>'});
    if(u.pathname==='/metadata/shikimori'){const kind=u.searchParams.get('kind'),part=u.searchParams.get('part');if(part==='roles')return json([{person:{id:1117,russian:'Макото Синкай',image:{original:'https://fixture.example/poster.svg'}},roles:['Director']},{character:{id:17,russian:'Мицуха',image:{original:'https://fixture.example/poster.svg'}},roles:['Main']}]);if(part)return json([]);if(kind==='person')return json({id:1117,russian:'Макото Синкай',description:'',image:{original:'https://fixture.example/poster.svg'}});if(kind==='character')return json({id:17,russian:'Мицуха',description:'',image:{original:'https://fixture.example/poster.svg'}});return json(u.searchParams.has('identity')?anime:[anime]);}
-   if(u.pathname==='/metadata/character-profile/17')return json({id:'17',name:'Мицуха',description:'Сведения о герое',attributes:[{key:'height',label:'Рост',value:'160 cm',source:'Каталог'}]});
+   if(u.pathname==='/metadata/character-profile/17')return json({id:'17',name:'Мицуха',nativeName:'宮水 三葉',aliases:['Mitsuha Miyamizu'],actors:['Моне Камисираиси'],description:'Сведения о герое',attributes:[{key:'height',label:'Рост',value:'160 cm',source:'Каталог'},{key:'ending',label:'Сюжет',value:'Тестовый спойлер',source:'Каталог',url:'https://fixture.example',spoiler:true}],appearances:[{kind:'anime',id:'32281',title:'Твоё имя',role:'Главный герой'}],sources:[{name:'Тестовый каталог',url:'https://fixture.example'}]});
    if(u.pathname==='/metadata/anime-browse'){facets.push(Object.fromEntries(u.searchParams));const kind=u.searchParams.get('kind');return json({provider:'shikimori',items:[anime],hasMore:false,entity:{name:u.searchParams.get('label')||'Раздел',description:kind==='person'?'Подтверждённые сведения об авторе':kind==='studio'?'Описание студии из тестового каталога.':'Сведения о герое из тестового каталога.',facts:kind==='character'?[['Возраст','17'],['Рост','160 cm'],['Пол','Женский']]:[],sourceUrl:'https://myanimelist.net/'}});}
    if(u.pathname==='/sources/discover')return json({voices:[],sources:[],providers:[],complete:true});return json({items:[],tracks:[],ratings:[],results:[]});
   });
   const base='http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/navigation/anime-nav.html';await page.goto(base);
   await page.getByRole('link',{name:'CoMix Wave Films',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Сохранить серии',exact:true}).innerText(),'','Saving is one icon in the showcase');
   assert.ok((await page.getByRole('link',{name:'Драма',exact:true}).getAttribute('href')).includes('identity=8'));assert.ok((await page.getByRole('link',{name:'Лето 2016',exact:true}).getAttribute('href')).includes('summer_2016'));assert.ok((await page.locator('.anime-status').getAttribute('href')).includes('released'));
-  await page.getByRole('button',{name:'Мицуха Главный герой',exact:true}).click();await page.locator('.character-sheet-facts').getByText('160 cm',{exact:true}).waitFor();await page.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
+  const card=page.getByRole('button',{name:'Мицуха Главный герой',exact:true});
+  await card.locator('.title-character-portrait img').waitFor();
+  await card.click();
+  const sheet=page.getByRole('dialog',{name:'Мицуха',exact:true});
+  await sheet.locator('.character-sheet-facts').getByText('160 cm',{exact:true}).waitFor();
+  assert.equal(await sheet.getByText('Моне Камисираиси',{exact:true}).count(),1);
+  assert.equal(await sheet.getByRole('button',{name:'Посмотреть арты',exact:true}).count(),1);
+  assert.equal(await sheet.getByRole('button',{name:'Твоё имя Главный герой',exact:true}).count(),1);
+  assert.equal(await sheet.getByText('Тестовый спойлер',{exact:true}).count(),0);
+  await sheet.getByRole('button',{name:/Показать сведения/}).click();
+  await sheet.getByText('Тестовый спойлер',{exact:true}).waitFor();
+  await sheet.getByRole('button',{name:/Скрыть сведения/}).click();
+  await sheet.screenshot({path:path.join(DIR,'character-profile-'+width+'.png')});
+  const geometry=await sheet.evaluate(n=>({w:n.clientWidth,scroll:n.scrollWidth,bottom:n.getBoundingClientRect().bottom}));
+  assert.ok(geometry.scroll<=geometry.w+1&&geometry.bottom<=1001,'Character profile fits the viewport');
+  await page.keyboard.press('Escape');
+  await sheet.waitFor({state:'detached'});
+  await card.evaluate(n=>{if(document.activeElement!==n)throw Error('Focus did not return to the character card');});
   await page.locator('.title-credits').getByRole('button',{name:/Макото Синкай/}).click();await page.getByText('Подтверждённые сведения об авторе',{exact:true}).waitFor();await page.getByRole('link',{name:'Все аниме автора',exact:false}).click();await page.getByRole('heading',{name:'Макото Синкай',exact:true,level:1}).waitFor();assert.ok(facets.some(f=>f.kind==='person'&&f.identity==='1117'));
   await page.locator('.explore-grid button').first().click();await page.getByRole('link',{name:'CoMix Wave Films',exact:true}).click();await page.getByText('Описание студии из тестового каталога.',{exact:true}).waitFor();assert.ok(page.url().includes('browse=studio'));await page.reload();await page.getByText('Описание студии из тестового каталога.',{exact:true}).waitFor();assert.equal(await page.locator('.explore-grid button').count(),1);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await page.screenshot({path:path.join(DIR,'studio-'+width+'.png'),fullPage:true});await context.close();console.log('PASS linked genres/year/season/status, source-backed person/character cards, icon saves and reloadable studio address '+width);
  }

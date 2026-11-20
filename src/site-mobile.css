@@ -46,7 +46,6 @@ html[data-blossom] .mobile-dock{display:none}
  html[data-blossom] .online-access .btn{width:100%}
 
  /* Title page */
- html[data-blossom] .title-page .title-character-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 
 
  /* History: whole card opens; the remove button keeps its own corner. */
