@@ -31,7 +31,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  useEffect(()=>()=>localAbort.current?.abort(),[]);
  const deskStyle=useDeskStyle(),[readerProgress,setReaderProgress]=useState(null);
  const [online,setOnline]=useState(false),[localProgress,setLocalProgress]=useState(''),[bridgeWindow,setBridgeWindow]=useState(null),[moreSearching,setMoreSearching]=useState(false);
- const searchAbort=useRef(null),extraSearchCache=useRef(new Map());
+ const searchAbort=useRef(null),extraSearchCache=useRef(new Map()),inspectionCache=useRef(new Map());
  const [format,setFormat]=useState('all'),[language,setLanguage]=useState(()=>initialLanguage||(compact&&destination==='online'?defaultReadingLanguage():'all')),[quality,setQuality]=useState('best'),[sources,setSources]=useState([]),[providers,setProviders]=useState([]),[searching,setSearching]=useState(false),[revision,setRevision]=useState(0),[inspection,setInspection]=useState(null),[url,setUrl]=useState(''),[collection,setCollection]=useState(item?.title||''),[volume,setVolume]=useState('all'),[team,setTeam]=useState(''),[mode,setMode]=useState('all'),[one,setOne]=useState(''),[first,setFirst]=useState('0'),[last,setLast]=useState('20'),[list,setList]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState('');
  useEffect(()=>{const language={ja:'Japanese',en:'English',ko:'Korean',zh:'Chinese (Simplified)'}[inspection?.language];if(language)setExportSettings(v=>({...v,language}));},[inspection?.language]);
  // The label names the open chapter: the title page and the history resume from it.
@@ -111,21 +111,27 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  async function inspect(value,automatic=false,targetChapter=null){
   if(!value)return;if(!automatic){manualSource.current=true;setOnline(false);}const version=++generation.current;setUrl(value);setBusy('inspect');setInspection(null);setError('');
   const inspectionTitle=mangaInspectionTitle(searchTitle,sources.find(s=>s.url===value));
+  const cacheKey=JSON.stringify([service.server,revision,inspectionTitle,value]);
   try{
    const cached=automatic||targetChapter?sourceInfo[value]:null;
-   const data=cached?.inspection||await service.request('/manga/inspect',{method:'POST',body:{url:value,...(item?{title:inspectionTitle}:{}),verifyPages:false,refresh:!automatic}});
+   const previous=automatic?inspectionCache.current.get(cacheKey):null;
+   const data=cached?.inspection||previous?.data||await service.request('/manga/inspect',{method:'POST',body:{url:value,...(item?{title:inspectionTitle}:{}),verifyPages:false,refresh:!automatic}});
    if(version!==generation.current)return;
-   if(!['ru','uk','en','ja','ko'].includes(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
+   if(!['ru','uk','en','ja','ko','zh'].includes(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
    if(!data.episodes?.length)throw Error('У этого тайтла нет открытых глав на языке «'+mangaLanguageName(data.language)+'».');
-   setInspection({...data,readable:undefined,...(cached?{readable:cached.readable,readabilityError:cached.readabilityError,verifiedChapterUrl:cached.verifiedChapterUrl,fromSourceInfo:true}:{})});setVolume('all');setTeam('');setOne(data.episodes[0].url);setFirst(String(data.episodes[0].number));setLast(String(data.episodes.at(-1).number));if(!item)setCollection(data.title);setBusy('');
-   if(cached){
-    if(targetChapter&&cached.readable&&data.episodes.some(e=>e.url===targetChapter)){
+   const known=cached?.readable!==undefined?cached:previous?.status||cached;
+   inspectionCache.current.set(cacheKey,{data,status:known});
+   while(inspectionCache.current.size>16)inspectionCache.current.delete(inspectionCache.current.keys().next().value);
+   setInspection({...data,readable:known?.readable,readabilityError:known?.readabilityError,verifiedChapterUrl:known?.verifiedChapterUrl,fromSourceInfo:!!cached});setVolume('all');setTeam('');setOne(data.episodes[0].url);setFirst(String(data.episodes[0].number));setLast(String(data.episodes.at(-1).number));if(!item)setCollection(data.title);setBusy('');
+   if(known){
+    if(targetChapter&&known.readable&&data.episodes.some(e=>e.url===targetChapter)){
      setMode('single');setOne(targetChapter);setOnline(true);
     }
     return;
    }
    const result=await service.request('/manga/summary',{method:'POST',body:{url:value,...(item?{title:inspectionTitle}:{}),verifyPages:Number(service.session?.serverVersion)>=47,refresh:!automatic}});
    if(version!==generation.current)return;setInspection(old=>old?{...old,...result}:old);
+   inspectionCache.current.set(cacheKey,{data,status:result});
    if(result.readable===false)setError(result.readabilityError||'Источник не отдал страницу.');
   }catch(cause){if(version===generation.current){setError(cause.message);setInspection(old=>old?{...old,readable:false,readabilityError:cause.message}:old);}}finally{if(version===generation.current)setBusy('');}
  }

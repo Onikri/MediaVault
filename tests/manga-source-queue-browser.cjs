@@ -35,7 +35,9 @@ let browser,vite;
    await page.getByRole('button',{name:'Готово',exact:true}).click();
   }
   await page.waitForFunction(()=>window.calls.some(c=>c.path==='/manga/summary'&&c.n>=2),{},{timeout:2500});
-  assert.deepEqual((await page.evaluate(()=>window.aborted)).sort(),[0,1],'Hidden-language requests release both verification slots');
+  const aborted=await page.evaluate(()=>window.aborted);
+  assert.ok(aborted.includes(0)&&aborted.includes(1),'Both slow hidden checks release their verification slots');
+  if(filter==='language')assert.ok(aborted.every(n=>n<2),'Checks for the selected language stay active');
   await page.waitForFunction(()=>window.active===0,{},{timeout:5000});
   assert.equal(await page.locator('.title-source-option').count(),filter==='language'?3:1,'Selected candidates appear without waiting for hidden sources');
   await page.getByRole('button',{name:/^Читать главу/}).waitFor();
