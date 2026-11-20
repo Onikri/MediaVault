@@ -81,6 +81,7 @@
 @media (--phone){
  .immersive-reader[data-layout=overlay][data-chrome] .reader-top{flex-wrap:wrap;row-gap:4px;border-radius:22px}
  .immersive-reader[data-layout=overlay] .reader-top .reader-top-actions{margin-left:auto}
+ .reader-top-actions:has(.reader-auto-scroll-control){flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 39px)}
  .immersive-reader[data-layout=overlay] .reader-top .reader-title-group{order:3;flex:1 0 100%;padding:0 2px 2px}
  .immersive-reader[data-layout=overlay] .reader-top .reader-title-group:has(.reader-chapter-menu) .mv-viewer-title{display:none}
  .immersive-reader[data-layout=overlay] .reader-top .reader-chapter-menu{flex:1;min-width:0}

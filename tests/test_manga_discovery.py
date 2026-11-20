@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 import manga_discovery as discovery
-from source_parser import SourceError
+from source_parser import SourceError, SourceRateLimitError
 
 SOURCES=[{'id':str(i+1),'name':'Fixture '+str(i+1),'lang':['ru','en','ja','ko'][i%4],'baseUrl':'https://source.example','isNsfw':False} for i in range(16)]
 ENV={'PUBLIC_URL':'https://media.example','SUWAYOMI_URL':'http://suwayomi:4567','SUWAYOMI_AUTH_FILE':'/private/auth'}
@@ -151,6 +151,46 @@ class MangaDiscoveryTests(unittest.TestCase):
     self.sources.stop();self.env.stop();self.directory.cleanup()
  def manager(self,**options):
     manager=discovery.Discovery(self.directory.name,**options);self.managers.append(manager);return manager
+ def test_native_and_extension_jobs_have_independent_lanes(self):
+    sources=[{**SOURCES[0],'name':'MangaDex'},{**SOURCES[1],'baseUrl':'https://second.example'}]
+    started=threading.Event()
+    calls=[]
+    def fetch(source,query):
+        calls.append((source['id'],bool(source.get('_bridgeFallback'))))
+        if source['id']=='1' and not source.get('_bridgeFallback'):
+            if not started.wait(3):raise AssertionError('The extension lane did not start')
+            raise discovery.BridgeFallback()
+        if source['id']=='2':started.set()
+        return []
+    with patch.object(discovery,'installed_sources',return_value=sources):
+        manager=self.manager(fetch=fetch,workers=2,bridge_workers=1)
+        result=wait_done(manager,'A',manager.start('A','Moon Road')['id'])
+    self.assertCountEqual(calls,[('1',False),('2',False),('1',True)])
+    self.assertEqual(result['progress']['completed'],2)
+
+ def test_title_search_reuses_same_profile_across_language_tabs(self):
+    calls=[]
+    selected={'kind':'manga','title':'Moon Road','year':2020}
+    def fetch(source,query):
+        calls.append(source['id'])
+        return [{'id':'1:moon','sourceId':'1','title':'Moon Road','aliases':['Лунная дорога'],
+                 'kind':'manga','language':'ru','year':2020,'url':'https://source.example/moon'}]
+    with patch.object(discovery,'installed_sources',return_value=SOURCES[:1]):
+        manager=self.manager(fetch=fetch,workers=1)
+        wait_done(manager,'A',manager.start('A','Moon Road','all',title=selected)['id'])
+        russian=wait_done(manager,'A',manager.start('A','Moon Road','ru',title=selected)['id'])
+    self.assertEqual(calls,['1'])
+    self.assertEqual(russian['progress']['cached'],1)
+
+ def test_source_retry_after_applies_even_on_explicit_refresh(self):
+    def fetch(source,query):raise SourceRateLimitError(120)
+    with patch.object(discovery,'installed_sources',return_value=SOURCES[:1]):
+        manager=self.manager(fetch=fetch,workers=1)
+        first=wait_done(manager,'A',manager.start('A','Moon Road')['id'])
+        second=wait_done(manager,'A',manager.start('A','Moon Road','ru',['1'],refresh=True)['id'])
+    self.assertEqual(first['providers'][0]['code'],'rate-limit')
+    self.assertEqual(second['providers'][0]['reason'],'rate-limit')
+    self.assertEqual(second['providers'][0]['state'],'skipped')
  def test_english_alias_from_a_multilingual_catalog_reaches_russian_sources(self):
     sources=[{'id':'1','name':'MangaDex','lang':'en'},{'id':'2','name':'Russian Catalogue','lang':'ru'}];seen=[]
     def fetch(source,query):

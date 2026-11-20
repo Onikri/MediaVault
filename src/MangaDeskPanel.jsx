@@ -9,7 +9,7 @@ import './manga-desk.css';
 
 const CHAPTER=['глава','главы','глав'];
 // Language of a source or a chapter, as short Latin codes.
-export const LANGUAGE_CODES=[['all','Все'],['ru','RU'],['uk','UA'],['en','EN'],['ja','JA'],['ko','KR']];
+export const LANGUAGE_CODES=[['all','Все'],['ru','RU'],['uk','UA'],['en','EN'],['ja','JA'],['ko','KR'],['zh','ZH']];
 export const languageCode=id=>LANGUAGE_CODES.find(([key])=>key===id)?.[1]||String(id||'').toUpperCase();
 const spring={type:'spring',stiffness:420,damping:38};
 
@@ -41,6 +41,7 @@ export default function MangaDeskPanel({languages=LANGUAGE_CODES,art=true,source
  const chosenTeam=teamRows.find(t=>t.name===team);
  const reveal=reduce?{initial:{opacity:0},animate:{opacity:1},exit:{opacity:0}}:{initial:{opacity:0,height:0},animate:{opacity:1,height:'auto'},exit:{opacity:0,height:0}};
  return <aside className="desk-panel" ref={panel} aria-label="Источник и главы">
+  <div className="desk-language"><UiSegmented className="is-wide" label="Язык глав" value={language} options={languages} onChange={value=>{setMenu(old=>old==='team'?'':old);onLanguage(value);}}/></div>
   <section className="desk-source" data-state={sourceState}>
    <button type="button" className="desk-source-plaque" aria-expanded={menu==='source'} onClick={()=>toggle('source')}>
     {source?<span className="desk-source-tag" title={source}>{source}</span>:<span className="desk-source-searching">{sourceState==='searching'&&<span className="mvx-spinner" aria-hidden="true"/>}{sourceNote||'Источник не выбран'}</span>}
@@ -50,7 +51,6 @@ export default function MangaDeskPanel({languages=LANGUAGE_CODES,art=true,source
    {source&&sourceNote&&<p className="desk-source-note" role="status">{sourceNote}</p>}
    <AnimatePresence initial={false}>{menu==='source'&&<motion.div key="sources" className="desk-reveal" {...reveal} transition={reduce?{duration:.12}:spring}><div className="desk-source-menu">{sourceMenu}</div></motion.div>}</AnimatePresence>
   </section>
-  <div className="desk-language"><UiSegmented className="is-wide" label="Язык глав" value={language} options={languages} onChange={value=>{setMenu(old=>old==='team'?'':old);onLanguage(value);}}/></div>
   {teamRows.length>1&&<section className="desk-team">
    <button type="button" className="desk-team-button" aria-expanded={menu==='team'} onClick={()=>toggle('team')}>
     <span className="desk-team-label">Перевод</span><strong>{chosenTeam?chosenTeam.name:allTeamsLabel}</strong>{chosenTeam&&<small>{chosenTeam.count} {plural(chosenTeam.count,CHAPTER)}</small>}<ChevronDown className="desk-chevron" size={15} aria-hidden="true"/>

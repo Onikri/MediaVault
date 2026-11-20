@@ -1,13 +1,13 @@
-"""Metadata-only global manga search: one SQLite queue, four shared workers.
+"""Metadata-only global manga search with a shared SQLite queue.
 
 No page bytes, credentials or account library data are stored here. Upstream
 search responses are candidates, not claims that chapters are readable.
 """
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin,urlsplit
 from contextlib import closing,contextmanager
 import hashlib,json,os,re,secrets,sqlite3,threading,time,unicodedata
-from source_parser import SourceAccessError,SourceError,SourceTemporaryError,public_url
+from source_parser import SourceAccessError,SourceError,SourceRateLimitError,SourceTemporaryError,public_url
 from manga_source_tags import from_api
 import suwayomi_bridge as bridge
 
@@ -22,6 +22,10 @@ DISCOVERY_VERSION=6
 SEARCH_BACKOFF=(3600,6*3600,24*3600)
 TRANSIENT={'upstream','timeout','network'};TRANSIENT_BACKOFF=(600,1800,3600)
 NATIVE_SOURCES={'MangaLib':1,'HentaiLib':4,'SlashLib':2,'MangaDex':0,'Senkognito':None}
+PUBLIC_READERS={'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'}
+
+class BridgeFallback(Exception):pass
+
 def language_queries(values,language):
     pattern={'zh':r'[一-鿿]','ru':r'[а-яё]','uk':r'[а-яіїєґ]','en':r'[a-z]','ja':r'[ぁ-ヿ一-鿿]','ko':r'[가-힣]','all':r'.'}[primary_language(language)]
     # Native title first; Latin title/romanization is the useful second query
@@ -171,6 +175,9 @@ def indexed_search(source,query):
     selected=source.get('_title') or source.get('_alias_title');found={}
     try:
         with catalogue_reader(manager()) as db:
+            if selected:
+                if exact:=indexed_title_sources(db,selected,[source]).get(str(source['id'])):
+                    return exact
             for term in source.get('_queries',[query]):
                 for row in browse(db,q=term,source_id=str(source['id']),limit=20)['items']:
                     if not row.get('url') or not row.get('title'):continue
@@ -209,15 +216,19 @@ def indexed_title_sources(db, selected, sources):
 
 def search_source(source,query):
     import manga_native_sources
-    adapter = manga_native_sources.for_source(source)
+    relay=source.get('_bridgeFallback',False)
+    adapter = manga_native_sources.for_source(source) if not relay else None
     if adapter:
         try:
             return manga_native_sources.search(adapter, source, query)
-        except SourceError:
+        except SourceRateLimitError:
+            raise
+        except SourceError as error:
             # Reuse the same installed ID if its direct parser temporarily fails.
             if not bridge.configured():
                 raise
-    if source.get('name') in {'HentaiChan','HenChan','HentaiChan.cc','Hitomi','HManga'} or str(source.get('id'))=='990000000000000020':
+            if source.get('_directSearch'):raise BridgeFallback from error
+    if not relay and (source.get('name') in PUBLIC_READERS or str(source.get('id'))=='990000000000000020'):
         from title_identity import match_title
         from source_parser import PublicHttp
         from functools import partial
@@ -247,20 +258,27 @@ def search_source(source,query):
                 if found:break
             return list(found.values())
         finally:http.close()
-    if not adapter and source.get('name') in NATIVE_SOURCES:
+    if not relay and not adapter and source.get('name') in NATIVE_SOURCES:
         try:return native_search_source(source,query)
-        except SourceError:
+        except SourceRateLimitError:
+            raise
+        except SourceError as error:
             # The installed extension can reach the same catalogue when the
             # public API redirects to an edge challenge or its alias API fails.
             if source['name'] not in {'MangaDex','SlashLib','Senkognito'}:raise
+            if source.get('_directSearch'):raise BridgeFallback from error
     client=bridge.Client()
     try:
         from title_identity import match_title
         found={};selected=source.get('_title') or source.get('_alias_title')
         responded=False;query_error=None
+        from manga_solver import source_timeout
+        timeout=source_timeout(source['id'],12)
+        deadline=time.monotonic()+max(18,timeout)
         for term in source.get('_queries',[query]):
-            from manga_solver import source_timeout
-            try:data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=source_timeout(source['id'],12))
+            left=deadline-time.monotonic()
+            if left<=1:raise bridge.BridgeError('timeout','Источник не успел проверить варианты названия.')
+            try:data=client.get('/source/'+str(source['id'])+'/search',{'searchTerm':term,'pageNum':1},timeout=min(timeout,left))
             except bridge.BridgeError as error:
                 if source.get('name')=='Raw UwU' and error.code in {'format','query'}:
                     from manga_search_recovery import rawuwu_empty
@@ -318,12 +336,16 @@ class SearchLimit(ValueError):pass
 class SearchMissing(LookupError):pass
 
 class Discovery:
-    def __init__(self,directory,*,workers=4,cache_ttl=900,max_jobs=8,per_owner=2,fetch=None,clock=time.time,start_workers=True):
+    def __init__(self,directory,*,workers=4,bridge_workers=None,cache_ttl=900,max_jobs=8,per_owner=2,fetch=None,clock=time.time,start_workers=True):
         self.path=Path(directory)/'manga-discovery.sqlite';self.path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         self.db=sqlite3.connect(self.path,check_same_thread=False);self.path.chmod(0o600)
         self.db.row_factory=sqlite3.Row;self.lock=threading.RLock();self.condition=threading.Condition(self.lock)
         self.clock=clock;self.cache_ttl=cache_ttl;self.max_jobs=max_jobs;self.per_owner=per_owner
         self.fetch=fetch or search_source;self.stopping=False;self.threads=[]
+        self.inflight={}
+        self.host_limits=bridge_workers is not None
+        self.bridge_limit=bridge_workers if bridge_workers is not None else workers
+        self.direct_limit=max(1,workers-self.bridge_limit) if self.host_limits else workers
         with self.db:
             self.db.executescript('''
               PRAGMA journal_mode=WAL;
@@ -378,7 +400,7 @@ class Discovery:
         if start_workers:
             from catalog_taxonomy import maintain_books
             cleanup=threading.Thread(target=maintain_books,args=(self,),daemon=True,name='catalog-taxonomy');self.maintenance_thread=cleanup;cleanup.start()
-            for i in range(max(1,min(workers,8))):
+            for i in range(max(1,min(workers,24))):
                 thread=threading.Thread(target=self._worker,daemon=True,name='manga-discovery-'+str(i));self.threads.append(thread);thread.start()
 
     def _prune(self,now):
@@ -405,8 +427,11 @@ class Discovery:
         active=[{k:s.get(k) for k in ('id','name','lang','baseUrl','isNsfw')} for s in installed_sources() if source_matches_language(s, 'all')]
         from manga_native_sources import for_source
         for source in active:
+            source['_directSearch']=source['name'] in NATIVE_SOURCES or source['name'] in PUBLIC_READERS or str(source['id'])=='990000000000000020'
+            source['_searchHost']=urlsplit(source.get('baseUrl') or '').hostname or ''
             if for_source(source):
                 source['_nativeAdapter']=True
+                source['_directSearch']=True
         installed={str(s['id']) for s in active}
         if title and language == 'all' and not source_ids:
             original = primary_language(title.get('originalLanguage'))
@@ -443,7 +468,8 @@ class Discovery:
         now=self.clock()
         with self.condition,self.db:
             self._prune(now)
-            paused={} if refresh or source_ids else {r['source_id']:dict(r) for r in self.db.execute('SELECT * FROM reachability WHERE skip_until>?',(now,))}
+            paused={r['source_id']:dict(r) for r in self.db.execute(
+                "SELECT * FROM reachability WHERE skip_until>? AND (?=0 OR code='rate-limit')",(now,int(bool(refresh or source_ids))))}
             hit=self.db.execute("SELECT id FROM jobs WHERE owner=? AND signature=? AND (state='running' OR state='done' AND updated>? AND ?=0) AND expires>? ORDER BY created DESC LIMIT 1",(owner,signature,now-self.cache_ttl,int(bool(refresh)),now)).fetchone()
             if hit:return self._snapshot(owner,hit['id'],seed=(row for rows in saved.values() for row in rows))
             if self.db.execute("SELECT count(*) FROM jobs WHERE state='running'").fetchone()[0]>=self.max_jobs or self.db.execute("SELECT count(*) FROM jobs WHERE state='running' AND owner=?",(owner,)).fetchone()[0]>=self.per_owner:raise SearchLimit('Поиск уже выполняется. Дождись результата или останови предыдущий.')
@@ -452,6 +478,7 @@ class Discovery:
             seeded=[]
             for source in selected:
                 sid=str(source['id']);cache_key=self._cache_key(key,source);hit=None if refresh else self.db.execute('SELECT results FROM query_cache WHERE query=? AND source_id=? AND expires>?',(cache_key,sid,now)).fetchone()
+                if title:source['_initialCacheKey']=cache_key
                 # A stale metadata index is useful immediately, but is not counted
                 # as a fresh provider response and never suppresses its refresh.
                 recent=json.loads(hit['results']) if hit else self._indexed(key,sid)
@@ -461,8 +488,10 @@ class Discovery:
                 self.db.execute('INSERT INTO work VALUES(?,?,?,?,?,?)',(identity,sid,json.dumps(source,ensure_ascii=False),'done' if hit else 'skipped' if pause else 'queued',json.dumps([{**v,'stale':True} for v in seed] if pause else seed,ensure_ascii=False),int(bool(hit))))
                 if pause:
                     until=time.strftime('%d.%m %H:%M',time.gmtime(pause['skip_until']))
+                    message=(f'Сайт просит вернуться после {until} UTC.' if pause['code']=='rate-limit' else
+                             f"Пропущен: {pause['failures']} отказа подряд ({pause['message'].rstrip('.')}). Снова спросим после {until} UTC или сразу по кнопке «Повторить».")
                     self.db.execute('INSERT OR REPLACE INTO work_diagnostics VALUES(?,?,?)',(identity,sid,json.dumps({'code':'paused','reason':pause['code'],'failures':pause['failures'],'retryAt':pause['skip_until'],
-                        'message':f"Пропущен: {pause['failures']} отказа подряд ({pause['message'].rstrip('.')}). Снова спросим после {until} UTC или сразу по кнопке «Повторить».",'elapsedMs':0},ensure_ascii=False)))
+                        'message':message,'elapsedMs':0},ensure_ascii=False)))
             # A fresh cached multilingual hit must expand the current job too:
             # no worker will revisit it just to discover its translated names.
             if seeded:self._expand_aliases(identity,query,seeded)
@@ -537,14 +566,31 @@ class Discovery:
             self.condition.notify_all();return self._snapshot(owner,identity)
 
     def _take(self):
-        row=self.db.execute("SELECT w.*,j.query,j.owner FROM work w JOIN jobs j ON j.id=w.job WHERE w.state='queued' AND j.state='running' AND NOT EXISTS (SELECT 1 FROM work busy WHERE busy.source_id=w.source_id AND busy.state='running') ORDER BY j.dispatched,j.created,CASE WHEN json_extract(w.source,'$.name') IN ('MangaLib','HentaiLib','MangaDex') THEN 0 ELSE 1 END,w.rowid LIMIT 1").fetchone()
+        from collections import Counter
+        direct=sum(lane for lane,_ in self.inflight.values())
+        bridged=len(self.inflight)-direct
+        if direct>=self.direct_limit and bridged>=self.bridge_limit:return None
+        filters=["w.state='queued'","j.state='running'"];params=[]
+        for field,values in (
+            ('w.source_id',list(self.inflight)),
+            ("json_extract(w.source,'$._searchHost')",[host for host,count in Counter(host for _,host in self.inflight.values()).items() if host and count>=2] if self.host_limits else []),
+        ):
+            if values:filters.append(field+' NOT IN ('+','.join('?' for _ in values)+')');params.extend(values)
+        lane="COALESCE(json_extract(w.source,'$._directSearch'),0)"
+        if direct>=self.direct_limit:filters.append(lane+'=0')
+        if bridged>=self.bridge_limit:filters.append(lane+'=1')
+        row=self.db.execute("SELECT w.*,j.query,j.owner FROM work w JOIN jobs j ON j.id=w.job WHERE "+
+            " AND ".join(filters)+" ORDER BY j.dispatched,j.created,"+lane+" DESC,w.rowid LIMIT 1",params).fetchone()
         if row:
             with self.db:
                 self.db.execute("UPDATE work SET state='running' WHERE job=? AND source_id=?",(row['job'],row['source_id']))
                 self.db.execute('UPDATE jobs SET dispatched=? WHERE id=?',(self.clock(),row['job']))
+            source=json.loads(row['source'])
+            self.inflight[row['source_id']]=(bool(source.get('_directSearch')),source.get('_searchHost',''))
         return row
 
     def _expand_aliases(self,job,query,values):
+        if not values:return
         from title_identity import aliases,normalized,match_title
         work_rows=self.db.execute('SELECT source_id,source,state,results FROM work WHERE job=?',(job,)).fetchall()
         selected=next((s['_title'] for w in work_rows if (s:=json.loads(w['source'])).get('_title')),None)
@@ -584,10 +630,20 @@ class Discovery:
                 if self.stopping:return
                 row=self._take()
                 if row is None:self.condition.wait(timeout=1);continue
-            started=time.monotonic();details={}
+            started=time.monotonic();details={};source=json.loads(row['source'])
             try:
-                values=self.fetch(json.loads(row['source']),row['query']);state='done'
+                values=self.fetch(source,row['query']);state='done'
                 if not isinstance(values,list):raise ValueError('Invalid result')
+            except BridgeFallback:
+                with self.condition,self.db:
+                    self.inflight.pop(row['source_id'],None)
+                    current=self.db.execute("SELECT source FROM work WHERE job=? AND source_id=? AND state='running'",(row['job'],row['source_id'])).fetchone()
+                    if current:
+                        fallback={**json.loads(current[0]),'_directSearch':False,'_bridgeFallback':True}
+                        self.db.execute("UPDATE work SET source=?,state='queued' WHERE job=? AND source_id=?",
+                                        (json.dumps(fallback,ensure_ascii=False),row['job'],row['source_id']))
+                    self.condition.notify_all()
+                continue
             except bridge.BridgeError as error:
                 values=[{**v,'stale':True} for v in json.loads(row['results'])]
                 state='skipped' if error.code=='link-required' else 'unavailable'
@@ -595,6 +651,9 @@ class Discovery:
             except SourceAccessError:
                 values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
                 details={'code':'restricted','message':'Источник требует вход, проверку браузера или ограничивает доступ.'}
+            except SourceRateLimitError as error:
+                values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
+                details={'code':'rate-limit','message':'Сайт попросил отложить запрос.','retryAfter':error.retry_after}
             except SourceTemporaryError as error:
                 values=[{**v,'stale':True} for v in json.loads(row['results'])];state='unavailable'
                 status = re.fullmatch(r'Источник вернул HTTP (\d{3})\.', str(error))
@@ -609,6 +668,7 @@ class Discovery:
             details['elapsedMs']=round((time.monotonic()-started)*1000)
             now=self.clock()
             with self.condition,self.db:
+                self.inflight.pop(row['source_id'],None)
                 job=self.db.execute('SELECT state FROM jobs WHERE id=?',(row['job'],)).fetchone()
                 if not job or job['state']!='running':continue
                 self._expand_aliases(row['job'],row['query'],values)
@@ -625,7 +685,8 @@ class Discovery:
                 # Failed upstream requests are not persisted as successful empty
                 # cache entries for other owners or refreshed searches.
                 if state=='done':
-                    self.db.execute('INSERT OR REPLACE INTO query_cache VALUES(?,?,?,?)',(self._cache_key(normalize(row['query']),json.loads(row['source'])),row['source_id'],encoded,now+self.cache_ttl))
+                    cache_key=source.get('_initialCacheKey') or self._cache_key(normalize(row['query']),source)
+                    self.db.execute('INSERT OR REPLACE INTO query_cache VALUES(?,?,?,?)',(cache_key,row['source_id'],encoded,now+self.cache_ttl))
                     for value in values:self.db.execute('INSERT OR REPLACE INTO titles VALUES(?,?,?,?,?,?)',(value['id'],row['source_id'],value['language'],normalize(' '.join(public_aliases(value))),json.dumps(value,ensure_ascii=False),now))
                     from manga_catalog_index import upsert as catalog_upsert
                     try:catalog_upsert(self.db,values,source_id=row['source_id'],timestamp=now)
@@ -643,7 +704,8 @@ class Discovery:
         failures=0 if ok else (old['failures'] if old else 0)+1
         pause=SEARCH_BACKOFF[min(failures-2,len(SEARCH_BACKOFF)-1)] if failures>=2 else 0
         # A regional wall is the origin's own statement, not a flaky outage.
-        if not ok and details.get('code')=='region':pause=SEARCH_BACKOFF[-1]
+        if not ok and details.get('code')=='rate-limit':pause=max(pause,details.get('retryAfter',60))
+        elif not ok and details.get('code')=='region':pause=SEARCH_BACKOFF[-1]
         # A 5xx or a timeout is usually a short outage of a small site; do not
         # hide a recovered catalogue for a day (MangaChan, YaoiChan).
         elif not ok and details.get('code') in TRANSIENT and failures>=2:pause=TRANSIENT_BACKOFF[min(failures-2,len(TRANSIENT_BACKOFF)-1)]
@@ -657,7 +719,8 @@ class Discovery:
     def close(self):
         with self.condition:self.stopping=True;self.condition.notify_all()
         threads=[*self.threads,*([self.maintenance_thread] if getattr(self,'maintenance_thread',None) else [])]
-        for thread in threads:thread.join(timeout=6)
+        until=time.monotonic()+6
+        for thread in threads:thread.join(timeout=max(0,until-time.monotonic()))
         with self.lock:
             if not any(t.is_alive() for t in threads):self.db.close()
 
@@ -681,7 +744,9 @@ def catalogue_reader(store):
 def manager():
     global _manager
     with _manager_lock:
-        if _manager is None:_manager=Discovery(os.getenv('DATA_DIR','/data'),workers=max(1,min(8,int(os.getenv('MANGA_DISCOVERY_WORKERS','8')))))
+        if _manager is None:
+            workers=max(2,min(24,int(os.getenv('MANGA_DISCOVERY_WORKERS','24'))))
+            _manager=Discovery(os.getenv('DATA_DIR','/data'),workers=workers,bridge_workers=min(8,max(1,workers//3)))
         return _manager
 
 def shutdown():

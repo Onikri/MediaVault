@@ -10,8 +10,8 @@ export default function useMangaSourceInfo(sources,title,service,revision,{enabl
   cache.current={};setInfo({});const current={active:0,cancelled:false,controllers:new Map(),metadata:0};run.current=current;
   const emit=()=>{if(!current.cancelled)setInfo({...cache.current});};
   pump.current=()=>{
-   const v=live.current;if(current.cancelled||!v.enabled||Number(v.service.session?.serverVersion||0)<29)return;
-   while(current.active<2){
+   const v=live.current;if(current.cancelled||!v.enabled||v.service.status!=='connected'||Number(v.service.session?.serverVersion||0)<29)return;
+   while(current.active<4){
     const candidates=[...v.sources].sort((a,b)=>Number(b.url===v.priority)-Number(a.url===v.priority));
     const source=candidates.find(s=>!current.controllers.has(s.url)&&(!cache.current[s.url]||cache.current[s.url].state==='pending'||cache.current[s.url].identityKey!==JSON.stringify(mangaInspectionTitle(v.title,s))));if(!source)return;
     const inspectionTitle=mangaInspectionTitle(v.title,source),identityKey=JSON.stringify(inspectionTitle),saved=cache.current[source.url],prior=saved?.identityKey===identityKey?saved:null,abort=new AbortController();let reserved=false,metadataReceived=false;current.active++;current.controllers.set(source.url,abort);cache.current[source.url]={...prior,identityKey,state:prior?.inspection?'verifying':'loading'};emit();
@@ -28,13 +28,13 @@ export default function useMangaSourceInfo(sources,title,service,revision,{enabl
      const value=await live.current.service.request('/manga/summary',{method:'POST',body:{url:source.url,title:inspectionTitle,...(Number(live.current.service.session?.serverVersion)>=47?{verifyPages:true,refresh:!!revision}:{})},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(75000)])});
      if(current.cancelled||abort.signal.aborted)return;
      cache.current[source.url]={...cache.current[source.url],...value,state:value.readable===false?'error':'ready',...(value.readable===false?{error:value.readabilityError||'Источник не отдал страницу.'}:{})};emit();
-    })().catch(error=>{if(current.cancelled||abort.signal.aborted)return;cache.current[source.url]={...cache.current[source.url],state:'error',error:error.message};emit();}).finally(()=>{if(reserved&&!metadataReceived&&abort.signal.aborted)current.metadata--;if(!current.cancelled&&abort.signal.aborted){const saved=cache.current[source.url];if(saved?.inspection)cache.current[source.url]={...saved,state:'pending'};else delete cache.current[source.url];emit();}current.active--;current.controllers.delete(source.url);pump.current();});
+    })().catch(error=>{if(current.cancelled||abort.signal.aborted)return;cache.current[source.url]={...cache.current[source.url],state:'error',error:error.name==='TimeoutError'?'Источник не успел подтвердить доступность страниц.':error.message};emit();}).finally(()=>{if(reserved&&!metadataReceived)current.metadata--;if(!current.cancelled&&abort.signal.aborted){const saved=cache.current[source.url];if(saved?.inspection)cache.current[source.url]={...saved,state:'pending'};else delete cache.current[source.url];emit();}current.active--;current.controllers.delete(source.url);pump.current();});
    }
   };
   pump.current();return()=>{current.cancelled=true;for(const controller of current.controllers.values())controller.abort();};
  },[identityKey,service.server,revision]);
  // A language/provider switch must release slots held by now-hidden readers.
  // Keep completed results cached so switching back needs no repeat image probe.
- useEffect(()=>{const wanted=new Set(sources.map(s=>s.url));for(const [url,controller]of run.current?.controllers||[])if(!enabled||!wanted.has(url))controller.abort();if(enabled)pump.current();},[urls,enabled,priority,service.session?.serverVersion]);
+ useEffect(()=>{const wanted=new Set(sources.map(s=>s.url));for(const [url,controller]of run.current?.controllers||[])if(!enabled||!wanted.has(url))controller.abort();if(enabled)pump.current();},[urls,enabled,priority,service.status,service.session?.serverVersion]);
  return info;
 }

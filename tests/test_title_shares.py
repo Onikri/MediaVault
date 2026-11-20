@@ -55,12 +55,27 @@ class TitleSharesTests(unittest.TestCase):
         token=self.client.get('/shares/title/'+row['token']).json()['token']
         def request(path,method='GET'):
             return Request({'type':'http','path':path,'method':method,'headers':[]})
-        for path,method in [('/online/prepare','POST'),('/reader/google/keys','GET'),('/reader/google/generate','POST')]:
+        for path,method in [('/online/prepare','POST'),('/reader/google/keys','GET'),('/reader/google/generate','POST'),('/manga/thumbnail','POST')]:
             self.assertEqual(self.shares.subject(token,request(path,method)),'share:'+row['id'])
         for path,method in [('/jobs','POST'),('/reader/google/keys','POST'),('/online/exports','POST'),
                             ('/sources/search','GET'),('/online/example/video/download','GET')]:
             with self.assertRaises(HTTPException) as caught:self.shares.subject(token,request(path,method))
             self.assertEqual(caught.exception.status_code,403)
+        with self.assertRaises(HTTPException):
+            self.shares.authorize_entry('share:'+row['id'],'manga','https://reader.example/other')
+
+    def test_card_only_link_for_titles_without_public_chapters(self):
+        body={**self.body,'title':{**self.body['title'],'format':'webtoon','readingMode':'scroll'},'kind':'title',
+              'entries':[],'initial':0,'translate':False,'translation':{}}
+        created=self.client.post('/shares/title',json=body)
+        self.assertEqual(created.status_code,201)
+        grant=self.client.get('/shares/title/'+created.json()['token']).json()
+        self.assertEqual(grant['title']['format'],'webtoon')
+        self.assertEqual(grant['entries'],[])
+        request=Request({'type':'http','path':'/manga/thumbnail','method':'POST','headers':[]})
+        with self.assertRaises(HTTPException) as caught:self.shares.subject(grant['token'],request)
+        self.assertEqual(caught.exception.status_code,403)
+        self.assertEqual(self.client.post('/shares/title',json={**body,'entries':self.body['entries']}).status_code,422)
 
     def test_invalid_urls_and_empty_selection_are_rejected(self):
         for changed in [{'entries':[]},{'initial':4},{'entries':[{'number':1,'url':'http://localhost/private'}]}]:

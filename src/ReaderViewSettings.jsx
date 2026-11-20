@@ -24,7 +24,7 @@ export function Toggle({label,checked,onChange,children}){
  return <label className="reader-view-toggle"><span>{label}{children}</span><input type="checkbox" role="switch" checked={!!checked} onChange={e=>onChange(e.target.checked)}/></label>;
 }
 // section="view": how pages look. section="navigation": how pages turn and load.
-export default function ReaderViewSettings({prefs,update,saveData=false,section='view',stripChapter=false,narrow=false,onShowZones}){
+export default function ReaderViewSettings({prefs,update,saveData=false,section='view',stripChapter=false,narrow=false,onShowZones,onEnableAutoScroll}){
  const reduce=useReducedMotion(),paged=prefs.mode!=='scroll';
  if(section==='navigation')return <div className="reader-layout-settings reader-view-settings">
   <section aria-label="Чтение">
@@ -41,6 +41,14 @@ export default function ReaderViewSettings({prefs,update,saveData=false,section=
    <p className="reader-hint">Вебтун читается сплошной лентой. Касание у верхнего или нижнего края прокручивает на экран, по центру открывает меню.</p>
   </section>}
   <button type="button" className="reader-zones-button" onClick={onShowZones}><Hand size={16}/>Показать зоны касания</button>
+  <section aria-label="Автоматическое чтение">
+   <h3>Автоматическое чтение</h3>
+   <Toggle label="Автопереход к следующей главе" checked={prefs.autoNext} onChange={autoNext=>update({autoNext})}>
+    <small>Продолжай прокрутку после последней страницы.</small>
+   </Toggle>
+   <Toggle label="Автопрокрутка" checked={prefs.autoScroll} onChange={autoScroll=>{update({autoScroll});if(autoScroll)onEnableAutoScroll?.();}}/>
+   {prefs.autoScroll&&<Row label="Скорость прокрутки"><UiSegmented label="Скорость прокрутки" value={prefs.autoScrollSpeed} onChange={autoScrollSpeed=>update({autoScrollSpeed})} options={[['slow','Медленно'],['normal','Обычно'],['fast','Быстро']]}/></Row>}
+  </section>
   <section aria-label="Загрузка">
    <h3>Загрузка</h3>
    <Row label="Соседние страницы"><UiSegmented label="Предзагрузка страниц" value={prefs.preload} onChange={preload=>update({preload:Number(preload)})} options={[[0,'Нет'],[1,'1'],[2,'2'],[4,'4']]}/></Row>

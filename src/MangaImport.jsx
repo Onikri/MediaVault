@@ -31,7 +31,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  useEffect(()=>()=>localAbort.current?.abort(),[]);
  const deskStyle=useDeskStyle(),[readerProgress,setReaderProgress]=useState(null);
  const [online,setOnline]=useState(false),[localProgress,setLocalProgress]=useState(''),[bridgeWindow,setBridgeWindow]=useState(null),[moreSearching,setMoreSearching]=useState(false);
- const searchAbort=useRef(null);
+ const searchAbort=useRef(null),extraSearchCache=useRef(new Map());
  const [format,setFormat]=useState('all'),[language,setLanguage]=useState(()=>initialLanguage||(compact&&destination==='online'?defaultReadingLanguage():'all')),[quality,setQuality]=useState('best'),[sources,setSources]=useState([]),[providers,setProviders]=useState([]),[searching,setSearching]=useState(false),[revision,setRevision]=useState(0),[inspection,setInspection]=useState(null),[url,setUrl]=useState(''),[collection,setCollection]=useState(item?.title||''),[volume,setVolume]=useState('all'),[team,setTeam]=useState(''),[mode,setMode]=useState('all'),[one,setOne]=useState(''),[first,setFirst]=useState('0'),[last,setLast]=useState('20'),[list,setList]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState('');
  useEffect(()=>{const language={ja:'Japanese',en:'English',ko:'Korean',zh:'Chinese (Simplified)'}[inspection?.language];if(language)setExportSettings(v=>({...v,language}));},[inspection?.language]);
  // The label names the open chapter: the title page and the history resume from it.
@@ -59,9 +59,25 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  const englishSearch='https://mangapill.com/search?'+new URLSearchParams({q:englishName});
  useEffect(()=>{generation.current++;attempted.current.clear();manualSource.current=false;setOnline(false);setBusy('');setInspection(null);setUrl('');setSources(matchingMangaSources(item,item?.sources||[],{attached:true}));setProviders([]);setBridgeWindow(null);setMoreSearching(false);setCollection(item?.title||'');setError('');setSourceIds([]);if(preferredSource)inspect(preferredSource);},[item?.id,service.server]);
  useEffect(()=>{
-  if(!item||service.status!=='connected'||!supported||sourceIds.length)return;
-  const abort=new AbortController();searchAbort.current=abort;setSearching(true);
-  service.request('/manga/search',{method:'POST',body:{title:searchTitle,...(languageAware?{language}:{}),...(rawAware?{format}:{})},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(45000)])}).then(data=>{if(!abort.signal.aborted){setSources(old=>[...new Map([...old,...matchingMangaSources(item,data.results||[])].map(s=>[s.url,s])).values()]);setProviders(data.providers||[]);setBridgeWindow(data.bridgeSearch||null);}}).catch(cause=>{if(!abort.signal.aborted)setError(cause.message);}).finally(()=>{if(!abort.signal.aborted)setSearching(false);});return()=>abort.abort();
+  if(!item||service.status!=='connected'||!supported||sourceIds.length){setSearching(false);return;}
+  const abort=new AbortController();searchAbort.current=abort;
+  const cacheKey=JSON.stringify([identityKey,service.server,language,format,revision]);
+  const previous=extraSearchCache.current.get(cacheKey);
+  const receive=data=>{
+   setSources(old=>[...new Map([...old,...matchingMangaSources(item,data.results||[])].map(s=>[s.url,s])).values()]);
+   setProviders(data.providers||[]);setBridgeWindow(data.bridgeSearch||null);
+  };
+  if(previous?.expires>Date.now()){receive(previous.data);setSearching(false);return()=>abort.abort();}
+  setSearching(true);
+  service.request('/manga/search',{method:'POST',body:{title:searchTitle,...(languageAware?{language}:{}),...(rawAware?{format}:{})},signal:AbortSignal.any([abort.signal,AbortSignal.timeout(45000)])}).then(data=>{
+   if(abort.signal.aborted)return;
+   extraSearchCache.current.set(cacheKey,{data,expires:Date.now()+12*60*1000});
+   while(extraSearchCache.current.size>16)extraSearchCache.current.delete(extraSearchCache.current.keys().next().value);
+   receive(data);
+  }).catch(cause=>{
+   if(!abort.signal.aborted&&(!compact||Number(service.session?.serverVersion)<16))
+    setError(cause.name==='TimeoutError'?'Дополнительные источники не ответили вовремя.':cause.message);
+  }).finally(()=>{if(!abort.signal.aborted)setSearching(false);});return()=>abort.abort();
  },[identityKey,service.status,supported,languageAware,rawAware,language,format,revision,JSON.stringify(sourceIds)]);
  useEffect(()=>{const rows=matchingMangaSources(item,[...(item?.sources||[]),...(globalSearch.results||[])],{attached:!!item?.sources?.length});if(rows.length)setSources(old=>[...new Map([...old,...rows].map(s=>[s.url,s])).values()]);},[identityKey,globalSearch.results,item?.sources]);
  useEffect(()=>{
@@ -146,10 +162,13 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
   }).slice(0,3);
  }
  // The hero's share button and chapter counts read what this reader chose.
- const shareKey=inspection?[inspection.url,team,initialChapter?.url,readerEntries.length,collection].join('|'):'';
+ const chapterEntries=inspection?selectChapters(deskEpisodes,{volume:'all',team,language:inspection.language}):[];
+ const shareKey=inspection?[item?.id,inspection.url,team,initialChapter?.url,chapterEntries.length,collection,sourceReady].join('|'):'';
  useEffect(()=>{
-  if(!compact||destination!=='online'||!inspection)return;
-  publishTitleShare({service,title:{...item,title:collection},kind:'manga',entries:readerEntries,initial:initialChapter,referer:inspection.url,dub:team,language:inspection.language,userId:state.user?.sub});
+  if(!compact||destination!=='online')return;
+  if(!inspection){publishTitleShare(null);publishTitleStats(null);return;}
+  publishTitleShare(sourceReady&&chapterEntries.length?{service,title:{...item,title:collection,format:inspection.format||item?.format,readingMode:inspection.readingMode},
+   kind:'manga',entries:chapterEntries,initial:initialChapter,referer:inspection.url,dub:team,language:inspection.language,userId:state.user?.sub}:null);
   const chapters=new Set(inspection.episodes.map(e=>(e.season||1)+':'+e.number)).size;
   publishTitleStats({kind:'manga',chapters,volumes:inspection.seasons?.length||null,source:inspection.url||url,sourceName:visibleSources.find(s=>s.url===url)?.providerName||inspection.providerName||'',language:inspection.language});
  },[shareKey]);
@@ -159,7 +178,6 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  const failedSource=s=>stateOf(s).state==='error'||stateOf(s).readable===false||stateOf(s).chapterCount===0;
  const shownSources=rankedSources.filter(s=>s.url===url||!failedSource(s)&&(!requireVerified||stateOf(s).readable===true||stateOf(s).inspection?.episodes?.length));
  const pendingSources=rankedSources.filter(s=>!failedSource(s)&&!shownSources.includes(s)).length;
- const chapterEntries=inspection?selectChapters(deskEpisodes,{volume:'all',team,language:inspection.language}):[];
  const current=chapterEntries.find(e=>e.url===one)||initialChapter;
  const searchingSources=searching||globalSearch.state==='running';
  // Teams of the open source, the most complete translation first.

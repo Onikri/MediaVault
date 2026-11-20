@@ -36,13 +36,16 @@ class Title(BaseModel):
     description: str = Field(default='', max_length=16000)
     year: int | None = None
     ids: dict = Field(default_factory=dict)
+    format: str = Field(default='', max_length=120)
+    readingMode: Literal['', 'scroll', 'pages'] = ''
+    section: str = Field(default='', max_length=40)
 
 
 class Create(BaseModel):
     model_config = ConfigDict(extra='forbid')
     title: Title
-    kind: Literal['video', 'manga']
-    entries: list[Entry] = Field(min_length=1, max_length=500)
+    kind: Literal['video', 'manga', 'title']
+    entries: list[Entry] = Field(max_length=500)
     initial: int = Field(default=0, ge=0, le=499)
     referer: str | None = Field(default=None, max_length=8192)
     dub: str = Field(default='', max_length=180)
@@ -73,9 +76,12 @@ class TitleShares:
         if payload.get('role') != 'share' or not subject.startswith('share:'):
             raise HTTPException(403, 'Нужна ссылка на тайтл.')
         row = self.record(subject[6:])
+        if row['kind'] == 'title':
+            raise HTTPException(403, 'По этой ссылке доступна только карточка тайтла.')
         path = request.url.path
         allowed = (
             request.method == 'POST' and path == '/online/prepare'
+            or request.method == 'POST' and path == '/manga/thumbnail' and row['kind'] == 'manga'
             or request.method == 'DELETE' and re.fullmatch(r'/online/[A-Za-z0-9_-]{20,100}', path)
             or request.method == 'POST' and re.fullmatch(r'/online/[A-Za-z0-9_-]{20,100}/(?:heartbeat|playback)', path)
             or request.method == 'GET' and re.fullmatch(r'/online/[A-Za-z0-9_-]{20,100}/[A-Za-z0-9_-]+', path)
@@ -86,16 +92,24 @@ class TitleShares:
             raise HTTPException(403, 'По этой ссылке доступен только выбранный тайтл.')
         return subject
 
-    def authorize_source(self, subject, body):
+    def authorize_entry(self, subject, kind, url):
         if not str(subject).startswith('share:'):
             return
         row = self.record(subject[6:])
-        if body.kind != row['kind'] or body.url not in {e['url'] for e in row['entries']}:
+        if kind != row['kind'] or url not in {e['url'] for e in row['entries']}:
             raise HTTPException(403, 'Эта серия или глава не открыта по ссылке.')
-        body.referer = row.get('referer')
+        return row
+
+    def authorize_source(self, subject, body):
+        row = self.authorize_entry(subject, body.kind, body.url)
+        if row:
+            body.referer = row.get('referer')
 
     def create(self, owner, body):
-        if body.initial >= len(body.entries):
+        if body.kind == 'title':
+            if body.entries or body.initial or body.translate or body.referer:
+                raise HTTPException(422, 'Ссылка на карточку не может открывать главы или серии.')
+        elif body.initial >= len(body.entries):
             raise HTTPException(422, 'Выбери опубликованную серию или главу.')
         token = secrets.token_urlsafe(32)
         identity = hashlib.sha256(token.encode()).hexdigest()

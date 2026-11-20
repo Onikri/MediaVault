@@ -50,7 +50,9 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
  methods.current={onClose,onMinimize,onPrevious,onNext,canPrevious,canNext,paged,direction,settingsOpen,panel,rail,keys,shortcutTitle};
  const navigation=navigationDirection==='reading'?direction:navigationDirection==='left'?'rtl':'ltr';methods.current.direction=navigation;
  const hide=useCallback(()=>{clearTimeout(timer.current);setVisible(false);},[]);
- const show=useCallback(()=>{clearTimeout(timer.current);setVisible(true);timer.current=setTimeout(()=>{if(!root.current?.querySelector('.reader-chrome:focus-within'))setVisible(false);},2800);},[]);
+ const show=useCallback(()=>{clearTimeout(timer.current);setVisible(true);timer.current=setTimeout(()=>{
+  if(!root.current?.querySelector('.reader-chrome:focus-within,.title-share-control:not([data-phase="idle"])'))setVisible(false);
+ },2800);},[]);
  const closePanel=()=>{setPanel('');onSettingsOpenChange?.(false);show();};
  const openPanel=value=>{show();setPanel(value==='settings'?'':value);onSettingsOpenChange?.(value==='settings');};
  const activePanel=settingsOpen?'settings':panel,shownPanel=useRef(activePanel);if(activePanel)shownPanel.current=activePanel;

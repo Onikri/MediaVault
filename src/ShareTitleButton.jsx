@@ -1,4 +1,5 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {Check,Link2Off,LoaderCircle,Share2} from 'lucide-react';
 import {readLmt} from './LmtSettings.jsx';
 import './title-share-control.css';
@@ -22,30 +23,54 @@ async function copyLink(link){
 
 export default function ShareTitleButton({service,title,kind,entries=[],initial,referer,dub='',language='ru',quality='best',userId,variant='hero'}){
  const [phase,setPhase]=useState('idle'),[message,setMessage]=useState(''),[manualLink,setManualLink]=useState('');
- const root=useRef(null),cached=useRef(new Map()),last=useRef(null),working=useRef(false),restoreFocus=useRef(false);
- const reader=variant==='reader',manga=kind==='manga';
+ const root=useRef(null),trigger=useRef(null),menu=useRef(null),cached=useRef(new Map()),last=useRef(null),working=useRef(false);
+ const menuId=useId(),reader=variant==='reader',manga=kind==='manga'&&entries.length>0;
  const wide=phase!=='idle';
- const ready=service.status==='connected'&&!['guest','share'].includes(service.session?.role);
- const dismiss=()=>setPhase('idle');
+ const ready=service?.status==='connected'&&!['guest','share'].includes(service.session?.role);
+ const dismiss=(focus=false)=>{if(focus)trigger.current?.focus({preventScroll:true});setPhase('idle');};
+ const [portal,setPortal]=useState(null);
+
+ useLayoutEffect(()=>{
+  if(!wide)return;
+  const host=()=>setPortal(document.fullscreenElement||document.body);
+  host();
+  document.addEventListener('fullscreenchange',host);
+  return()=>document.removeEventListener('fullscreenchange',host);
+ },[wide]);
+ useLayoutEffect(()=>{
+  if(!wide||!portal)return;
+  const place=()=>{
+   const anchor=trigger.current?.getBoundingClientRect(),node=menu.current;
+   if(!anchor||!node)return;
+   const above=anchor.bottom+node.offsetHeight+12>document.documentElement.clientHeight;
+   node.style.left=Math.max(8,Math.min(anchor.left+(anchor.width-node.offsetWidth)/2,document.documentElement.clientWidth-node.offsetWidth-8))+'px';
+   node.style.top=Math.max(8,above?anchor.top-node.offsetHeight-7:anchor.bottom+7)+'px';
+   node.dataset.above=String(above);
+  };
+  place();
+  window.addEventListener('resize',place);
+  window.addEventListener('scroll',place,true);
+  if(phase==='manual')menu.current?.querySelector('input')?.focus({preventScroll:true});
+  else if(phase==='choose')menu.current?.querySelector('button')?.focus({preventScroll:true});
+  return()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);};
+ },[wide,portal,phase]);
 
  useEffect(()=>{
   if(phase==='idle')return;
-  function outside(event){if(!working.current&&!root.current?.contains(event.target))dismiss();}
-  document.addEventListener('pointerdown',outside);
-  document.addEventListener('focusin',outside);
-  return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('focusin',outside);};
- },[phase]);
+  const outside=event=>{if(!working.current&&!root.current?.contains(event.target)&&!menu.current?.contains(event.target))dismiss();};
+  const escape=event=>{
+   if(event.key!=='Escape'||working.current)return;
+   event.preventDefault();
+   event.stopPropagation();
+   dismiss(menu.current?.contains(document.activeElement));
+  };
+  document.addEventListener('pointerdown',outside,true);
+  window.addEventListener('keydown',escape,true);
+  return()=>{document.removeEventListener('pointerdown',outside,true);window.removeEventListener('keydown',escape,true);};
+ },[wide]);
  useEffect(()=>{
-  if(restoreFocus.current&&phase!=='busy'){
-   const control=['copied','revoked'].includes(phase)?root.current:root.current?.querySelector(phase==='manual'?'input':'button:not(:disabled)');
-   control?.focus({preventScroll:true});
-   restoreFocus.current=false;
-  }
   if(!['copied','revoked'].includes(phase))return;
-  const timer=setTimeout(()=>{
-   restoreFocus.current=root.current?.contains(document.activeElement)||false;
-   dismiss();
-  },phase==='copied'?4800:1800);
+  const timer=setTimeout(()=>dismiss(menu.current?.contains(document.activeElement)),phase==='copied'?4800:1800);
   return()=>clearTimeout(timer);
  },[phase]);
 
@@ -55,8 +80,9 @@ export default function ShareTitleButton({service,title,kind,entries=[],initial,
   const preferences=translate?readLmt(userId):{};
   const translation=Object.fromEntries(translationFields.filter(key=>preferences[key]!==undefined).map(key=>[key,preferences[key]]));
   const body={
-   title:{name:title.title||title.name,cover:title.cover||'',description:title.description||'',year:Number(title.year)||null,ids:title.ids||{}},
-   kind,entries:entries.slice(offset,offset+500),initial:position-offset,referer:referer||null,dub,language,quality,translate,translation
+   title:{name:title.title||title.name,cover:/^https?:\/\//i.test(title.cover||'')?title.cover:'',description:title.description||'',year:Number(title.year)||null,ids:title.ids||{},
+    format:String(title.format||'').slice(0,120),section:title.section||'',readingMode:['scroll','pages'].includes(title.readingMode)?title.readingMode:''},
+   kind:entries.length?kind:'title',entries:entries.slice(offset,offset+500),initial:position-offset,referer:entries.length&&referer?referer:null,dub,language,quality,translate,translation
   };
   const key=JSON.stringify([service.server,userId,body]);
   const previous=cached.current.get(translate);
@@ -87,7 +113,6 @@ export default function ShareTitleButton({service,title,kind,entries=[],initial,
    if(row){
     last.current=row;
     setManualLink(row.link);
-    restoreFocus.current=true;
     setMessage('Выдели и скопируй ссылку');
     setPhase('manual');
    }else{
@@ -115,28 +140,21 @@ export default function ShareTitleButton({service,title,kind,entries=[],initial,
   }finally{working.current=false;}
  }
 
- if(['guest','share'].includes(service.session?.role)||!entries.length)return null;
- return <span ref={root} tabIndex={-1} className="title-share-control" data-variant={variant} data-phase={phase}
-  data-wide={wide||undefined} onClick={event=>event.stopPropagation()}
-  onKeyDown={event=>{
-   if(event.key==='Escape'&&wide&&!working.current){
-    event.preventDefault();
-    event.stopPropagation();
-    restoreFocus.current=true;
-    dismiss();
-   }
-  }}>
-  {phase==='idle'?<button type="button" className={reader?'reader-control title-share-trigger':'circle-button title-share-trigger'}
-   title="Поделиться тайтлом" aria-label="Поделиться тайтлом" disabled={!ready} aria-expanded={manga?false:undefined}
-   onClick={event=>{restoreFocus.current=event.detail===0;if(manga)setPhase('choose');else share(false);}}><Share2 size={reader?19:17}/></button>:
-  <span className="title-share-capsule" role={phase==='choose'?'group':undefined} aria-label={phase==='choose'?'Поделиться тайтлом':undefined} aria-busy={phase==='busy'}>
-   {phase==='choose'&&<><button type="button" onClick={event=>{restoreFocus.current=event.detail===0;share(true);}}>С переводом</button><button type="button" onClick={event=>{restoreFocus.current=event.detail===0;share(false);}}>Без перевода</button></>}
+ if(['guest','share'].includes(service?.session?.role))return null;
+ return <span ref={root} className="title-share-control" data-variant={variant} data-phase={phase} onClick={event=>event.stopPropagation()}>
+  <button ref={trigger} type="button" className={reader?'reader-control title-share-trigger':'circle-button title-share-trigger'}
+   title={ready?'Поделиться тайтлом':'Подключаемся к серверу'} aria-label="Поделиться тайтлом" disabled={!ready}
+   aria-expanded={wide} aria-controls={wide?menuId:undefined}
+   onClick={()=>{if(working.current)return;if(wide)dismiss();else if(manga)setPhase('choose');else share(false);}}><Share2 size={reader?19:17}/></button>
+  {wide&&portal&&createPortal(<span ref={menu} id={menuId} className="title-share-capsule" data-phase={phase}
+   role="group" aria-label="Варианты ссылки" aria-busy={phase==='busy'}>
+   {phase==='choose'&&<><button type="button" onClick={()=>share(true)}>С переводом</button><button type="button" onClick={()=>share(false)}>Без перевода</button></>}
    {phase==='busy'&&<span className="title-share-feedback"><LoaderCircle size={14} className="reader-translation-spinner" aria-hidden="true"/>Копируем…</span>}
    {phase==='copied'&&<><span className="title-share-feedback" title={message}><Check size={15} aria-hidden="true"/>Скопировано</span><button type="button" className="title-share-revoke" aria-label="Закрыть доступ по ссылке" title="Закрыть доступ по ссылке" onClick={revoke}><Link2Off size={15}/></button></>}
    {phase==='revoked'&&<span className="title-share-feedback"><Check size={15} aria-hidden="true"/>Доступ закрыт</span>}
    {phase==='retry'&&<button type="button" aria-label="Повторить отправку ссылки" title={message} onClick={()=>share(last.current?.translate===true)}>Повторить</button>}
    {phase==='manual'&&<><input aria-label="Ссылка на тайтл" title={message} readOnly value={manualLink} onFocus={event=>event.target.select()}/><button type="button" className="title-share-revoke" aria-label="Закрыть доступ по ссылке" title="Закрыть доступ по ссылке" onClick={revoke}><Link2Off size={15}/></button></>}
-  </span>}
+  </span>,portal)}
   <span className="sr-only" role="status">{message}</span>
  </span>;
 }

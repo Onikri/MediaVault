@@ -106,4 +106,8 @@ def install(app,owner):
         model_config=ConfigDict(extra='forbid')
         url:str=Field(min_length=1,max_length=8192)
     @app.post('/manga/thumbnail')
-    def get(body:Request,subject=Depends(owner)):return service.get(str(subject),body.url)
+    def get(body:Request,subject=Depends(owner)):
+        shares=getattr(app.state,'title_shares',None)
+        if shares:
+            shares.authorize_entry(subject,'manga',body.url)
+        return service.get(str(subject),body.url)

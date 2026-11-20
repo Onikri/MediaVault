@@ -149,7 +149,7 @@ jobs:
           set +e
           {
             failures=0
-            for suite in blossom design watch ui vm blocks cleaning migan voices manga reader music online translation gpu lmt gemma trusted rooms library-layout cards music-nav downloads; do
+            for suite in blossom design watch ui vm blocks cleaning migan voices manga reader share music online translation gpu lmt gemma trusted rooms library-layout cards music-nav downloads; do
               npm run "test:$suite"
               code=$?
               if [ "$code" -ne 0 ]; then failures=$((failures + 1)); fi
