@@ -45,9 +45,6 @@
 .immersive-reader[data-layout=overlay] .reader-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 14px 10px 20px;border:0}
 .immersive-reader[data-layout=overlay] .reader-panel h2{margin:0;font:700 17px/1.2 var(--font-display,inherit);letter-spacing:-.02em}
 .immersive-reader[data-layout=overlay] .reader-panel-body{flex:1;min-height:0;padding:6px 20px 22px}
-.reader-panel .reader-settings-tabs>button{flex:1 1 0;min-width:0}
-.reader-panel .reader-settings-tab-pill{background:color-mix(in srgb,var(--reader-accent,#ee3c35) 28%,var(--color-surface-raised,#24242b))}
-.reader-panel .reader-settings-tabs>button[aria-selected=true]{color:#fff}
 .reader-panel .mv-segmented-pill{background:color-mix(in srgb,var(--reader-accent,#ee3c35) 26%,var(--color-surface-raised,#24242b))}
 .reader-panel .reader-view-toggle>input:checked{background:var(--reader-accent,#ee3c35)}
 .reader-panel .reader-mode-picker>button[aria-pressed=true]{color:#fff!important;background:color-mix(in srgb,var(--reader-accent,#ee3c35) 26%,var(--color-surface-raised,#24242b))!important}

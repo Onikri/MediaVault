@@ -16,14 +16,8 @@
 .cc-nav{display:grid;gap:22px}
 .cc-group{display:grid;gap:2px}
 .cc-group-label{padding:0 12px 6px;font-size:12px;font-weight:600;color:var(--color-quiet)}
-.cc-link{position:relative;display:flex;align-items:center;gap:11px;width:100%;height:40px;padding:0 12px;border:0;border-radius:12px;background:none;color:var(--color-on-muted);font:500 14px/1 var(--font-ui);text-align:left;cursor:pointer;transition:color .18s}
-.cc-link>*:not(.cc-link-active){position:relative;z-index:1}
-.cc-link>span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cc-link:hover{color:var(--color-petal)}
-.cc-link[aria-current=page]{color:var(--color-petal);font-weight:600}
-.cc-link[aria-current=page]>svg{color:var(--color-blossom)}
-.cc-link-active{position:absolute;inset:0;border-radius:12px;background:var(--color-surface-raised)}
-.cc-link:focus-visible{outline:none;background:var(--color-surface)}
+.cc-link.mv-nav-item{justify-content:flex-start;width:100%;padding-inline:11px;text-align:start}
+.cc-link .mv-nav-label{flex:1}
 .cc-count{min-width:18px;font:650 13px/1 var(--font-display);font-variant-numeric:tabular-nums;color:var(--color-on-muted);text-align:right}
 .cc-count.is-live{color:var(--cc-live)}.cc-count.is-warn{color:var(--cc-warn)}
 .cc-exit{display:flex;align-items:center;gap:10px;width:fit-content;margin:0 12px;padding:0;border:0;background:none;color:var(--color-quiet);font:500 13px var(--font-ui);cursor:pointer}
@@ -158,6 +152,8 @@
 .cc-guest-sub>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cc-guest-pane{min-width:0;padding:24px 26px 22px}
 .cc-guest-detail{display:grid;gap:18px;min-width:0}
+.cc-guest-tabs{min-width:0}
+.cc-guest-tabs .cc-tabs{margin-block-end:14px}
 .cc-back{justify-self:start}
 .cc-guest-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px 20px;flex-wrap:wrap}
 .cc-guest-head h2{margin:0;font:750 30px/1.08 var(--font-display);letter-spacing:-.035em;overflow-wrap:anywhere}
@@ -169,14 +165,6 @@
 .cc-invite{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 16px;border-radius:999px;background:var(--color-canvas-soft)}
 .cc-invite>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--color-on-muted)}
 .cc-invite .cc-button{background:var(--color-surface-raised)}
-.cc-tabs{display:flex;gap:2px;padding:4px;border-radius:999px;background:var(--color-canvas-soft);overflow-x:auto;scrollbar-width:none!important}
-.cc-tabs::-webkit-scrollbar{display:none}
-.cc-tabs>button{position:relative;flex:1 0 auto;height:36px;padding:0 14px;border:0;border-radius:999px;background:none;color:var(--color-on-muted);font:600 13px/1 var(--font-ui);white-space:nowrap;cursor:pointer;transition:color .18s}
-.cc-tabs>button>span:last-child{position:relative;z-index:1;display:inline-flex;align-items:baseline;gap:6px}
-.cc-tabs small{font:600 11.5px var(--font-display);font-variant-numeric:tabular-nums;color:var(--color-quiet)}
-.cc-tabs>button[aria-selected=true]{color:var(--color-petal)}
-.cc-tabs>button:focus-visible{outline:none;color:var(--color-petal)}
-.cc-tab-active{position:absolute;inset:0;border-radius:999px;background:var(--color-surface-raised)}
 .cc-tab-body{min-width:0}
 .cc-access{display:grid;gap:12px}
 .cc-guest-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -253,8 +241,8 @@ html[data-blossom] .cc-body>:is(.settings-card,.profile-card,.notice-card,.music
  .cc-nav{display:flex;gap:2px;margin:0;padding:0;overflow-x:auto;scrollbar-width:none!important;scroll-snap-type:x proximity}
  .cc-nav::-webkit-scrollbar{display:none}
  .cc-group{display:contents}
- .cc-link{flex:none;width:auto;height:38px;padding:0 13px;border-radius:999px;font-size:13.5px;scroll-snap-align:start}
- .cc-link-active{border-radius:999px}
+ .cc-link.mv-nav-item{justify-content:center;width:132px;padding-inline:8px;scroll-snap-align:start;text-align:center}
+ .cc-link .mv-nav-label{flex:0 1 auto}
  .cc-head{min-height:0;margin-bottom:22px;align-items:flex-start;flex-direction:column;gap:14px}
  .cc-body,.cc-overview{gap:32px}
 }

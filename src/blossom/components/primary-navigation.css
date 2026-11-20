@@ -1,0 +1,83 @@
+html[data-blossom] .blossom-navbar { container: primary-navigation / inline-size; }
+
+@media (--desktop) {
+  html[data-blossom] .blossom-navbar .desktop-nav {
+    --primary-nav-cell: 105px;
+    flex: 0 1 auto;
+    gap: 2px;
+  }
+  html[data-blossom] .blossom-navbar .desktop-nav .nav-link {
+    inline-size: var(--primary-nav-cell);
+    flex: 0 0 var(--primary-nav-cell);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    padding-inline: 3px;
+    font: 650 12.5px/1 var(--font-ui, system-ui);
+    letter-spacing: 0;
+    border-radius: var(--section-nav-cell-radius);
+    color: var(--section-nav-muted);
+  }
+  html[data-blossom] .blossom-navbar .desktop-nav .nav-link-icon {
+    display: inline-grid;
+  }
+  html[data-blossom] .blossom-navbar .desktop-nav .nav-link[aria-current] {
+    color: var(--section-nav-ink);
+  }
+  html[data-blossom] .blossom-navbar .desktop-nav .nav-link[aria-current] .nav-link-icon {
+    color: var(--section-nav-accent);
+  }
+  html[data-blossom] .blossom-navbar .desktop-nav .nav-link:focus-visible {
+    outline: 2px solid var(--section-nav-accent);
+    outline-offset: -3px;
+  }
+  html[data-blossom] .blossom-navbar .desktop-nav .nav-glide {
+    border-radius: var(--section-nav-cell-radius);
+    background: var(--section-nav-current);
+  }
+  html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav,
+  html[data-blossom][data-catalog-merged] .blossom-navbar .desktop-nav { --primary-nav-cell: 38px; }
+  html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link-label { display: none; }
+  html[data-blossom][data-catalog-merged] .blossom-navbar .desktop-nav .nav-link {
+    border-radius: var(--section-nav-cell-radius);
+  }
+  @container primary-navigation (width < 1120px) {
+    html[data-blossom] .blossom-navbar .desktop-nav { --primary-nav-cell: 45px; }
+    html[data-blossom] .blossom-navbar .desktop-nav .nav-link-label { display: none; }
+  }
+}
+
+@media (--tablet) {
+  html[data-blossom] .mobile-dock[aria-label] {
+    border: 1px solid var(--section-nav-divider);
+    border-radius: 20px;
+    gap: 2px;
+    background: color-mix(in srgb, var(--section-nav-tray) 95%, transparent);
+  }
+  html[data-blossom] .mobile-dock .mobile-dock-link {
+    border-radius: 12px;
+    color: var(--section-nav-muted);
+  }
+  html[data-blossom] .mobile-dock .mobile-dock-icon {
+    block-size: 22px;
+    border-radius: 0;
+  }
+  html[data-blossom] .mobile-dock .mobile-dock-icon > svg {
+    inline-size: 18px;
+    block-size: 18px;
+    stroke-width: 1.75;
+  }
+  html[data-blossom] .mobile-dock .mobile-dock-link.is-active {
+    background: var(--section-nav-current);
+    color: var(--section-nav-ink);
+  }
+  html[data-blossom] .mobile-dock .mobile-dock-link.is-active .mobile-dock-icon {
+    background: none;
+    color: var(--section-nav-accent);
+  }
+  html[data-blossom] .mobile-dock .mobile-dock-link:focus-visible {
+    outline: 2px solid var(--section-nav-accent);
+    outline-offset: -3px;
+  }
+}

@@ -1,3 +1,4 @@
+import {NavigationItem} from '../SectionNavigation.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {Clapperboard,Gauge,HardDrive,ListChecks,LogOut,Palette,Plug,RefreshCw,ShieldCheck,SlidersHorizontal,UserRound,UsersRound} from 'lucide-react';
@@ -76,10 +77,9 @@ export default function ControlCenter({state,guest,service,initialTab,onLogout,p
   <aside className="cc-rail">
    <div className="cc-who"><strong>{name}</strong><span>{role}{state.user?.email?<small>{state.user.email}</small>:guest?<small>@{guest.guest.login}</small>:null}</span></div>
    <nav className="cc-nav" aria-label="Разделы">{groups.map(([id,label,items])=><div className="cc-group" key={id} role="group" aria-label={label}><span className="cc-group-label">{label}</span>
-    {items.map(([key,text,Icon])=><button key={key} type="button" className="cc-link" aria-current={current===key?'page':undefined} onClick={event=>choose(key,event)}>
-     {current===key&&<motion.span className="cc-link-active" layoutId="cc-link-active" transition={reduce?{duration:0}:{type:'spring',stiffness:520,damping:42}}/>}
-     <Icon size={17} aria-hidden="true"/><span>{text}</span><Counter value={counts[key]} tone={tones[key]}/>
-    </button>)}
+    {items.map(([key,text,Icon])=><NavigationItem key={key} className="cc-link" aria-current={current===key?'page':undefined}
+     label={text} icon={<Icon/>} detail={counts[key]?<Counter value={counts[key]} tone={tones[key]}/>:null}
+     onClick={event=>choose(key,event)}/>)}
    </div>)}</nav>
    {(state.user||guest)&&<button type="button" className="cc-exit" onClick={onLogout}><LogOut size={16}/>Выйти</button>}
   </aside>

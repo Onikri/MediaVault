@@ -8,6 +8,7 @@ import './reference.css';
 import './integration.css';
 import './composition.css';
 import './collection.css';
+import './components/primary-navigation.css';
 // Set the design scope before React mounts, avoiding a legacy-layout first frame.
 if(typeof document!=='undefined')applyPalette(chosenPalette(readAppearance()));
 const ThemeContext=createContext<any>(null);

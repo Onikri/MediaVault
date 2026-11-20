@@ -1,4 +1,6 @@
-import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
+import {motion,useReducedMotion} from 'motion/react';
+import * as Tabs from '@radix-ui/react-tabs';
+import {NavigationItem,NavigationRail} from './SectionNavigation.jsx';
 import {Hand,Wifi} from 'lucide-react';
 import ReaderModePicker from './ReaderModePicker.jsx';
 import UiSegmented from './UiSegmented.jsx';
@@ -6,18 +8,18 @@ import UiSelect from './UiSelect.jsx';
 import {TITLE_UPSCALE_MODELS} from './title-upscale-model.js';
 import './reader-view-settings.css';
 
-const spring={type:'spring',stiffness:420,damping:36};
-// Tabs of equal width whose selection pill morphs; the content slides in the direction of travel.
 export function ReaderSettingsTabs({tabs,value,onChange,children}){
- const reduce=useReducedMotion(),index=tabs.findIndex(([id])=>id===value);
- return <div className="reader-settings">
-  <div className="reader-settings-tabs" role="tablist" aria-label="Разделы настроек читалки">
-   {tabs.map(([id,label])=><button key={id} role="tab" aria-selected={id===value} onClick={()=>onChange(id)}>{id===value&&<motion.span layoutId="reader-settings-tab" className="reader-settings-tab-pill" transition={reduce?{duration:0}:spring}/>}<span>{label}</span></button>)}
-  </div>
-  <AnimatePresence mode="wait" initial={false} custom={index}>
-   <motion.div key={value} className="reader-settings-pane" custom={index} initial={reduce?{opacity:0}:{opacity:0,x:18}} animate={{opacity:1,x:0}} exit={reduce?{opacity:0}:{opacity:0,x:-12,transition:{duration:.12}}} transition={reduce?{duration:.1}:spring}>{children}</motion.div>
-  </AnimatePresence>
- </div>;
+ const reduce=useReducedMotion();
+ return <Tabs.Root className="reader-settings" value={value} onValueChange={onChange}>
+  <NavigationRail as={Tabs.List} className="reader-settings-tabs" count={tabs.length} aria-label="Разделы настроек читалки">
+   {tabs.map(([id,label])=><NavigationItem as={Tabs.Trigger} key={id} value={id} label={label}/>)}
+  </NavigationRail>
+  <Tabs.Content value={value} asChild>
+   <motion.div key={value} className="reader-settings-pane" initial={reduce?false:{opacity:0}} animate={{opacity:1}} transition={{duration:reduce?0:.15}}>
+    {children}
+   </motion.div>
+  </Tabs.Content>
+ </Tabs.Root>;
 }
 function Row({label,children,wide,hint}){return <div className={'reader-view-row'+(wide?' is-wide':'')}><span>{label}{hint&&<small>{hint}</small>}</span>{children}</div>;}
 export function Toggle({label,checked,onChange,children}){

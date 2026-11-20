@@ -1,7 +1,7 @@
 import Icon from './Icons.jsx';
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 const BookReader=lazy(()=>import('./BookReader.jsx'));
-import {motion,useReducedMotion} from 'motion/react';
+import {NavigationItem,NavigationRail} from './SectionNavigation.jsx';
 import {useSectionBrandFor} from './section-brand-store.js';
 import {Cloud,Radio,Music2,BookOpen,Play,Search,Link,Upload,ArrowUpRight} from 'lucide-react';
 import ServerImport from './ServerImport.jsx';
@@ -16,15 +16,21 @@ import MusicImport from './MusicImport.jsx';
 import './ranobe.css';
 export function LibraryModeSwitch({value,onChange}){return <div className="library-mode-switch" role="tablist" aria-label="Источник библиотеки"><button role="tab" aria-selected={value==='drive'} onClick={()=>onChange('drive')}><Cloud size={17}/><span>Google Диск<small>Моя коллекция</small></span></button><button role="tab" aria-selected={value==='online'} onClick={()=>onChange('online')}><Radio size={17}/><span>Онлайн<small>Открыть из источника</small></span></button></div>;}
 export default function OnlineLibrary({state,actions,service,category,onCategory,onOpenLibrary,initialItem,initialQuery,initialFilters,onChooseGlobal}){
- const [favoritesOnly,setFavoritesOnly]=useState(false),reduced=useReducedMotion(),[railNode,setRailNode]=useState(null);
+ const [favoritesOnly,setFavoritesOnly]=useState(false),[railNode,setRailNode]=useState(null);
  const [bookSelected,setBookSelected]=useState(()=>initialItem?.kind==='book'?initialItem:null);
  const global=category==='all'&&initialQuery&&onChooseGlobal;
  const section=['music','book','ranobe','manga','movie','tv'].includes(category)?category:'anime';
- const pill=reduced?null:{type:'spring',stiffness:480,damping:36};
- const tab=(key,active,label,icon,onClick)=><button key={key} type="button" className={active?'is-active':''} aria-current={active?'page':undefined} onClick={onClick}>{active&&<motion.span layoutId="library-rail-pill" className="library-rail-pill" transition={pill||{duration:0}} aria-hidden="true"/>}<Icon name={icon} size={16}/><span>{label}</span></button>;
- const railSections=[['all','Всё'],['anime','Аниме'],['manga','Манга'],['ranobe','Ранобэ'],['book','Книги'],['music','Музыка'],['movie','Фильмы'],['tv','Сериалы'],['art','Фото'],['favorites','Избранное']];
+
+
+ const railSections=[['all','Всё','library'],['anime','Аниме','video'],['manga','Манга','manga'],['ranobe','Ранобэ','book'],['book','Книги','book'],['music','Музыка','audio'],['movie','Фильмы','video'],['tv','Сериалы','video'],['art','Фото','image'],['favorites','Избранное','bookmark']];
  useSectionBrandFor(railNode,{sections:railSections,active:favoritesOnly?'favorites':category,onPick:id=>{if(id==='favorites'){setFavoritesOnly(true);return;}setFavoritesOnly(false);location.hash='library';onCategory(id);}});
- const rail=<nav ref={setRailNode} className="library-rail" aria-label="Разделы библиотеки">{[['all','Всё','library'],['anime','Аниме','video'],['manga','Манга','manga'],['ranobe','Ранобэ','book'],['book','Книги','book'],['music','Музыка','audio'],['movie','Фильмы','video'],['tv','Сериалы','video'],['art','Фото','image']].map(([id,label,icon])=>tab(id,category===id&&!favoritesOnly,label,icon,()=>{setFavoritesOnly(false);location.hash='library';onCategory(id);}))}{tab('favorites',favoritesOnly,'Избранное','bookmark',()=>setFavoritesOnly(v=>!v))}</nav>;
+ const rail=<NavigationRail ref={setRailNode} className="library-rail" variant="categories" count={railSections.length} aria-label="Разделы библиотеки">
+  {railSections.map(([id,label,icon])=><NavigationItem key={id} label={label} icon={<Icon name={icon}/>}
+   aria-current={(id==='favorites'?favoritesOnly:id===category&&!favoritesOnly)?'page':undefined} onClick={()=>{
+    if(id==='favorites'){setFavoritesOnly(value=>!value);return;}
+    setFavoritesOnly(false);location.hash='library';onCategory(id);
+   }}/>)}
+ </NavigationRail>;
  return <div className="library-workspace online-library-workspace is-railed"><div className="library-workspace-main"><div className="online-library world-catalog-page">{(global||category==='art'||section==="music"||(section==="book"&&bookSelected))&&rail}<nav className="online-media-nav" aria-label="Разделы онлайн-библиотеки">{[['anime','Аниме и видео'],['manga','Манга и манхва'],['ranobe','Ранобэ'],['music','Музыка'],['book','Книги']].map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>onCategory(id)}>{label}</button>)}</nav>{category!=='art'&&['anime','manga'].includes(section)&&service.status!=='connected'&&<aside className="online-access is-slim" role="status"><p><strong>{state.admin&&state.user?'Подключаем твой сервер.':'Источники откроются после входа.'}</strong>{service.error?' '+service.error:''}</p><button className="btn btn-secondary" onClick={state.admin&&state.user?()=>service.refresh().catch(()=>{}):onOpenLibrary}>{state.admin&&state.user?'Повторить подключение':'Войти'}</button></aside>}{category==='art'?<ArtWall key={initialQuery} initialQuery={initialQuery} initialTitle={initialFilters?.title||''}/>:global?<GlobalCatalog userId={state.user?.sub} favoritesOnly={favoritesOnly} initialQuery={initialQuery} service={service} onChoose={onChooseGlobal}/>:section==='music'?<OnlineMusic userId={state.user?.sub} initialQuery={initialQuery}/>:section==='book'&&bookSelected?<WorldTitlePage value={bookSelected} service={service} state={state} onBack={()=>setBookSelected(null)} onOpenLibrary={onOpenLibrary}/>:<><ServerImport head={rail} tabLabel={favoritesOnly?'Избранное':category==='all'?'Библиотека':''} favoritesOnly={favoritesOnly} key={section} embedded hideHeading destination="online" initialKind={section} initialItem={initialItem?.kind===section?initialItem:undefined} initialQuery={initialQuery} initialFilters={initialFilters} state={state} actions={actions} service={service} onOpenLibrary={onOpenLibrary} onConnect={onOpenLibrary}/>{section==='book'&&<details className="ranobe-file online-book-file"><summary>Открыть свой файл книги или ссылку</summary><OnlineBooks userId={state.user?.sub} service={service}/></details>}</>}</div></div></div>;
 }
 export function OnlineMusic({userId,initialQuery=''}){

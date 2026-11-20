@@ -1,3 +1,4 @@
+import {NavigationItem,NavigationRail} from './SectionNavigation.jsx';
 import {useSectionBrandFor} from './section-brand-store.js';
 import {taxonomyFacts,genreOptions,formatOptions,classifyLabel,filterValues,hasCatalogFilters} from './catalog-taxonomy.js';
 import CatalogIndexProgress from './CatalogIndexProgress.jsx';
@@ -143,7 +144,10 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   if(selected)return <TitleDetails destination={destination} onOpenLibrary={onOpenLibrary} value={selected} service={service} state={state} onBack={()=>{setSelected(null);location.hash='library';}} onSubmitted={onSubmitted} onRelated={r=>choose({id:'related:'+r.kind+':'+r.id,provider:'shikimori',providerId:String(r.ids?.mal||r.id),providers:['shikimori'],kind:r.kind,title:r.title,titles:{},aliases:[r.title],genres:[],tags:[],links:[],ids:{mal:String(r.ids?.mal||r.id)},releases:[],cover:r.cover,format:r.format})}/>;
   if(explore)return <AnimeExplore route={explore} service={service} onChoose={choose} onBack={()=>{location.hash='library';setExplore(null);}}/>;
   return <><section className="world-catalog-intro"><span className="eyebrow">ОБЩАЯ БИБЛИОТЕКА</span><h2>Найди свою историю</h2><p>Смотри и читай онлайн. Сохраняй любимое в личную коллекцию.</p><CatalogIndexProgress service={service}/></section>
-    <div ref={setSectionNode} className="catalog-kind-row" aria-label="Тип произведения">{kinds.map(([id,label])=><button key={id} className={'chip'+(kind===id?' chip-active':'')} onClick={()=>{setKind(id);setVoice('');setSourceIds([]);setFilters({year:'',genre:'',tag:'',format:'',age:''});setPage(1);}}>{label}</button>)}</div>
+    <NavigationRail ref={setSectionNode} className="catalog-kind-row" variant="categories" count={kinds.length} aria-label="Тип произведения">
+     {kinds.map(([id,label])=><NavigationItem key={id} label={label} aria-current={kind===id?'page':undefined}
+      onClick={()=>{setKind(id);setVoice('');setSourceIds([]);setFilters({year:'',genre:'',tag:'',format:'',age:''});setPage(1);}}/>)}
+    </NavigationRail>
     <div className="blossom-catalog-body is-docked"><div className="blossom-catalog-content" ref={contentRef}>
     <CatalogFilterDock mergeNavigation search={<CatalogSearch query={query} onQuery={value=>{setQuery(value);setPage(1);}} suggestions={suggestions} loading={loading} onChoose={choose} onComposing={setComposing}/>} kind={kind} filters={filters} onFilter={filter} sources={kind==='manga'?{options:sourceOptions.sources,error:sourceOptions.error,value:sourceIds,disabled:service.status!=='connected'||Number(service.session?.serverVersion)<16,onChange:value=>{setSourceIds(value);setPage(1);}}:null} onReset={()=>{setFilters({year:'',genre:'',tag:'',format:'',age:''});setVoice('');setPage(1);}} genres={genres} tags={tagOptions} formats={formats}
      voice={voice} onVoice={setVoice} voiceDisabled={service.status!=='connected'} voiceOptions={[...new Set([...voiceOptions.map(v=>typeof v==='string'?v:v.name),...Object.values(voices.results).flatMap(v=>v.dubs||[])])].filter(Boolean)}

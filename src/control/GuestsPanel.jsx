@@ -1,4 +1,6 @@
 import {useEffect,useState} from 'react';
+import * as Tabs from '@radix-ui/react-tabs';
+import {NavigationItem,NavigationRail} from '../SectionNavigation.jsx';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {ArrowLeft,Ban,Check,Copy,Link2,RotateCcw,Trash2,UserPlus} from 'lucide-react';
 import UiSelect from '../UiSelect.jsx';
@@ -57,16 +59,18 @@ function GuestDetail({guest,stats,service,link,busy,onChange,onReinvite,onRemove
    </div>
   </header>
   {link&&<CopyLink url={link}/>}
-  <nav className="cc-tabs" role="tablist" aria-label="Сведения о госте">{TABS.map(([id,l])=><button key={id} role="tab" type="button" aria-selected={tab===id} onClick={()=>setTab(id)}>
-   {tab===id&&<motion.span className="cc-tab-active" layoutId="cc-guest-tab" transition={reduce?{duration:0}:{type:'spring',stiffness:480,damping:38}}/>}
-   <span>{l}{id==='titles'&&report?<small>{report.titles.length}</small>:id==='addresses'&&report?<small>{report.addresses.length}</small>:id==='access'?<small>{guest.access?.scope==='titles'?guest.access.titles.length:'все'}</small>:null}</span>
-  </button>)}</nav>
+  <Tabs.Root className="cc-guest-tabs" value={tab} onValueChange={setTab}>
+   <NavigationRail as={Tabs.List} className="cc-tabs" variant="toolbar" count={TABS.length} aria-label="Сведения о госте">
+    {TABS.map(([id,label])=><NavigationItem as={Tabs.Trigger} key={id} value={id} label={label}
+     detail={id==='titles'&&report?report.titles.length:id==='addresses'&&report?report.addresses.length:null}/>)}
+   </NavigationRail>
   {error&&<p className="cc-error" role="alert">{error}</p>}
-  <AnimatePresence mode="wait" initial={false}><motion.div key={tab} className="cc-tab-body" initial={reduce?false:{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={reduce?undefined:{opacity:0}} transition={{duration:.16}}>
+  <Tabs.Content value={tab} asChild><motion.div key={tab} className="cc-tab-body" initial={reduce?false:{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={reduce?undefined:{opacity:0}} transition={{duration:.16}}>
    {tab==='access'?<div className="cc-access"><p className="cc-hint">Сейчас: {accessSummary(guest.access)}.</p><GuestAccessEditor guest={guest} busy={busy} onSave={access=>onChange(guest,{access})}/></div>
    :!report?(!error&&<p className="cc-hint">Загружаем активность…</p>)
    :tab==='overview'?<ActivityOverview report={report}/>:tab==='titles'?<Titles titles={report.titles}/>:tab==='addresses'?<Addresses addresses={report.addresses}/>:<Events events={report.events}/>}
-  </motion.div></AnimatePresence>
+  </motion.div></Tabs.Content>
+  </Tabs.Root>
   {report&&tab!=='access'&&<footer className="cc-guest-foot"><span className="cc-hint">Записываются только действия гостя на твоём сервере.</span><button type="button" className="cc-text-button" onClick={()=>{if(confirm('Очистить журнал и статистику гостя «'+guest.name+'»? Это нельзя отменить.'))clear().then(load);}}>Очистить журнал</button></footer>}
  </article>;
 }

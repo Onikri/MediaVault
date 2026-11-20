@@ -1,10 +1,4 @@
 /* Reader settings: grouped rows, tone-only separation, morphing selections. */
-.reader-panel .reader-settings-tabs{position:relative;display:flex;gap:2px;padding:4px;margin-bottom:18px;border-radius:99px;background:var(--color-canvas,#0c0c0f)}
-.reader-panel .reader-settings-tabs>button{position:relative;flex:1;height:36px;padding:0 12px;border:0;border-radius:99px;background:none!important;color:var(--color-quiet,#8f8b91);font:inherit;font-size:12px;cursor:pointer;transition:color .2s;box-shadow:none!important}
-.reader-panel .reader-settings-tabs>button[aria-selected=true]{color:var(--color-petal,#f0e8e5)}
-.reader-panel .reader-settings-tabs>button>span:not(.reader-settings-tab-pill){position:relative;z-index:1}
-.reader-settings-tab-pill{position:absolute;inset:0;border-radius:99px;background:var(--color-surface-raised,#24242b);box-shadow:0 1px 8px #0005}
-.reader-panel .reader-settings-tabs>button:focus-visible{outline:2px solid var(--color-blossom,#ee3c35);outline-offset:1px}
 .reader-settings-pane{min-width:0}
 .reader-view-settings{display:grid;gap:22px}
 .reader-view-settings .reader-mode-picker{margin:0}

@@ -4,6 +4,7 @@ import LibraryCalendar from './LibraryCalendar.jsx';
 import {Search,Link,CalendarDays,Download,HardDriveUpload} from 'lucide-react';
 import LocalTitleUpload from './LocalTitleUpload.jsx';
 import * as Tabs from '@radix-ui/react-tabs';
+import {NavigationItem,NavigationRail} from './SectionNavigation.jsx';
 import Icon from './Icons.jsx';
 import ReleaseAnnouncements from './ReleaseAnnouncements.jsx';
 import CatalogBrowser from './CatalogBrowser.jsx';
@@ -16,7 +17,18 @@ export default function ServerImport({state,actions,service,onConnect,onOpenLibr
  const Heading=embedded?'h2':'h1';
  return <section className={'import-workspace'+(online?' is-online':'')}>
   {!hideHeading&&<div className="import-workspace-heading"><div><p className="eyebrow">{online?'Сразу к истории':'Продолжение твоей коллекции'}</p><Heading>{online?'Смотри и читай сейчас':'Найти и сохранить'}</Heading><p>{online?'Выбери произведение и источник. Откроем здесь, без сохранения в Google Диск.':'Выбери тайтл, перевод и нужные главы или серии. Остальное сделает сервер.'}</p></div></div>}
-  <Tabs.Root value={tab} onValueChange={setTab}>{(()=>{const list=<Tabs.List className={'import-tabs catalog-main-tabs catalog-action-bar'+(head?' is-compact':'')} aria-label="Каталог и импорт"><Tabs.Trigger value="catalog" title="Найти произведение"><Search size={15}/><span className="tab-label">Найти произведение</span></Tabs.Trigger><Tabs.Trigger value="link" title="По ссылке"><Link size={15}/><span className="tab-label">По ссылке</span></Tabs.Trigger>{actions&&<Tabs.Trigger value="local" title="С компьютера"><HardDriveUpload size={15}/><span className="tab-label">С компьютера</span></Tabs.Trigger>}<Tabs.Trigger value="calendar" title="Календарь"><CalendarDays size={15}/><span className="tab-label">Календарь</span></Tabs.Trigger>{!embedded&&<Tabs.Trigger value="queue" title="Загрузки"><Download size={15}/><span className="tab-label">Загрузки</span>{service.active&&<i className="tab-live-dot"/>}</Tabs.Trigger>}</Tabs.List>;return head?<div className="catalog-head">{head}{list}</div>:list;})()}
+  <Tabs.Root value={tab} onValueChange={setTab}>
+   <div className={head?'catalog-head':'catalog-action-row'}>
+    {head}
+    <NavigationRail as={Tabs.List} className="catalog-main-tabs catalog-action-bar" variant={head?'icons':'toolbar'}
+     count={3+Number(!!actions)+Number(!embedded)} aria-label="Каталог и импорт">
+     <NavigationItem as={Tabs.Trigger} value="catalog" title="Найти произведение" icon={<Search/>} label="Найти произведение"/>
+     <NavigationItem as={Tabs.Trigger} value="link" title="По ссылке" icon={<Link/>} label="По ссылке"/>
+     {actions&&<NavigationItem as={Tabs.Trigger} value="local" title="С компьютера" icon={<HardDriveUpload/>} label="С компьютера"/>}
+     <NavigationItem as={Tabs.Trigger} value="calendar" title="Календарь" icon={<CalendarDays/>} label="Календарь"/>
+     {!embedded&&<NavigationItem as={Tabs.Trigger} value="queue" title="Загрузки" icon={<Download/>} label="Загрузки" detail={service.active?<i className="tab-live-dot"/>:null}/>}
+    </NavigationRail>
+   </div>
    <Tabs.Content value="catalog"><CatalogBrowser tabLabel={tabLabel} favoritesOnly={favoritesOnly} destination={destination} initialItem={initialItem} initialKind={initialKind} initialQuery={initialQuery} initialFilters={initialFilters} onOpenLibrary={onOpenLibrary} state={state} service={service} onSubmitted={submitted} onItems={setItems}/></Tabs.Content>
    {actions&&<Tabs.Content value="local"><div className="import-link-layout"><div className="import-link-intro"><p className="eyebrow">Своё произведение</p><h2>Добавить с компьютера</h2><p>Книга, ранобэ, манга или видео из твоих файлов. Файлы шифруются и сохраняются в твою коллекцию на Google Диске, а карточка каталога даёт тайтлу обложку, описание и онлайн-источники.</p></div><LocalTitleUpload state={state} actions={actions} service={service} onOpenLibrary={onOpenLibrary} initialKind={['book','ranobe','manga','anime','movie','tv','music'].includes(initialKind)?initialKind:'book'}/></div></Tabs.Content>}
    <Tabs.Content value="calendar"><LibraryCalendar userId={state.user?.sub}/><ReleaseAnnouncements service={service}/></Tabs.Content>

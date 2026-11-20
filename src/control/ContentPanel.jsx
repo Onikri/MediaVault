@@ -1,3 +1,5 @@
+import * as Tabs from '@radix-ui/react-tabs';
+import {NavigationItem,NavigationRail} from '../SectionNavigation.jsx';
 import {useEffect,useMemo,useState} from 'react';
 import {compileMangaPolicy,setMangaPolicy,normalizeTag} from '../manga-tag-policy.js';
 import {addContentLabels,pastedLabels} from './content-policy-editor.js';
@@ -36,7 +38,12 @@ export default function ContentPanel({service}){
  async function refresh(){setBusy(true);setError('');try{setJob(await service.request('/admin/content/refresh',{method:'POST'}));}catch(e){setError(e.message);}finally{setBusy(false);}}
  return <div className="content-panel">
   <div className="content-intro"><p>Один справочник для фильмов, сериалов, аниме, манги, манхвы, маньхуа, книг и ранобэ.</p><span>Правила хранятся приватно на Oracle. Изменяет только владелец.</span>{draft&&<label className="content-auto"><input type="checkbox" checked={!!draft.includeDiscovered} onChange={event=>change({...draft,includeDiscovered:event.target.checked})}/>Все найденные теги, кроме исключений</label>}</div>
-  <div className="content-tabs" role="tablist" aria-label="Управление контентом">{[['tags','Теги и жанры'],['exclusions','Исключения'],['sources','Источники и совпадения']].map(([key,label])=><button type="button" role="tab" aria-selected={section===key} key={key} onClick={()=>setSection(key)}>{label}</button>)}</div>
+  <Tabs.Root value={section} onValueChange={setSection}>
+   <NavigationRail as={Tabs.List} variant="toolbar" count={3} className="content-nav" aria-label="Управление контентом">
+    {[['tags','Теги и жанры'],['exclusions','Исключения'],['sources','Источники и совпадения']].map(([key,label])=>
+     <NavigationItem as={Tabs.Trigger} value={key} key={key} label={label}/>)}
+   </NavigationRail>
+   <Tabs.Content value={section}>
   {!draft&&!error&&<div className="content-skeleton" role="status">Загружаем приватный справочник…</div>}
   {error&&<p className="cc-error" role="alert">{error}<button type="button" className="cc-button" onClick={load}>Перечитать с сервера</button></p>}
   {validation.error&&<p className="cc-error" role="alert">{validation.error}</p>}
@@ -63,6 +70,8 @@ export default function ContentPanel({service}){
    <label>Проверить исходное название или найти похожие<input type="search" value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Название из облака тегов"/></label>
    <div className="content-matches" aria-busy={lookupBusy}>{vocabulary.map(row=><div key={row.label}><div><strong>{row.label}</strong><p>{row.works} тайтлов · {row.sources.join(', ')||'Каталоги метаданных'}</p><small>{row.keys?.length?'Уже сопоставлен со справочником':'Нет соответствия'} · {row.kinds.map(kind=>KIND[kind]||kind).join(', ')}</small></div><button type="button" className="cc-button" onClick={()=>add(row.label,row.category==='genres'?'genre':'tag')}>{draft.includeDiscovered?'Настроить':'Добавить'}</button>{draft.includeDiscovered&&<button type="button" className="cc-button" onClick={()=>change({...draft,hiddenTags:[...new Set([...(draft.hiddenTags||[]),row.label])]})}>Скрыть тег</button>}{current&&<button type="button" className="cc-button" onClick={()=>{edit({aliases:[...new Set([...current.aliases,row.label])]});setNotice('Добавлен синоним к «'+current.label+'». Сохрани изменения.');}}>Синоним к «{current.label}»</button>}</div>)}{!lookupBusy&&!vocabulary.length&&<p>В собранных метаданных совпадений пока нет. Можно добавить название вручную и проверить доступные источники.</p>}</div>
   </>}
+   </Tabs.Content>
+  </Tabs.Root>
   {notice&&<p className="content-notice" role="status">{notice}</p>}
   {dirty&&<div className="cc-savebar"><span>Есть несохранённые изменения</span><button type="button" className="cc-button" disabled={busy} onClick={()=>{setDraft(saved);setError('');setNotice('');}}>Отменить изменения</button><button type="button" className="btn btn-primary" disabled={busy||!compiled} onClick={save}>{busy?'Применяем…':'Сохранить и переиндексировать'}</button></div>}
  </div>;

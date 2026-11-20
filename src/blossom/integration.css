@@ -109,9 +109,9 @@ html[data-blossom] .title-hero-copy .eyebrow,html[data-blossom] .title-hero-stat
 html[data-blossom] .title-page-columns{grid-template-columns:minmax(0,1fr) 290px;gap:28px}
 html[data-blossom] .title-page-main>section,html[data-blossom] .title-sidebar>section{padding:24px;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface)}
 html[data-blossom] .title-page-main>.title-playback{background:none;border:0;padding:0}
-html[data-blossom] .title-shortcuts{background:none;border-color:var(--color-border);gap:22px}
-html[data-blossom] .title-shortcuts button{color:var(--color-on-muted);border-radius:0}
-html[data-blossom] .title-shortcuts [aria-current]{color:var(--color-blossom-light);border-bottom-color:var(--color-blossom)}
+
+
+
 html[data-blossom] .title-description p,html[data-blossom] .title-facts dd{color:var(--color-petal-shadow)}
 html[data-blossom] .title-genre-list>a,html[data-blossom] .title-genre-list>span,html[data-blossom] .anime-status{background:var(--color-surface-raised);color:var(--color-petal-shadow);border-color:var(--color-border);border-radius:999px}
 html[data-blossom] .title-facts a,html[data-blossom] .title-facts button{color:var(--color-petal-shadow)}

@@ -1,3 +1,4 @@
+import {NavigationItem,NavigationRail} from './SectionNavigation.jsx';
 import {useMemo,useState,useSyncExternalStore} from 'react';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {BookOpen,Clapperboard,Cloud,History,Music2,Play,Trash2,X} from 'lucide-react';
@@ -48,7 +49,10 @@ export default function HistoryTimeline({recent,onOpen,renderCover,userId,librar
  if(!entries.length)return empty;
  return <div className="history-page">
   <div className="history-toolbar">
-   <div className="history-filter" role="group" aria-label="Что показать">{[['all','Всё'],['library','Библиотека'],['collection','Коллекция']].map(([id,label])=><button key={id} type="button" aria-pressed={filter===id} onClick={()=>setFilter(id)}>{filter===id&&<motion.span layoutId="history-filter" className="history-filter-active" transition={reduce?{duration:0}:{type:'spring',stiffness:420,damping:36}}/>}<span>{label}</span><small>{counts[id]}</small></button>)}</div>
+   <NavigationRail as="div" className="history-filter" variant="local" count={3} role="group" aria-label="Что показать">
+    {[['all','Всё'],['library','Библиотека'],['collection','Коллекция']].map(([id,label])=>
+     <NavigationItem key={id} aria-pressed={filter===id} label={label} detail={counts[id]} onClick={()=>setFilter(id)}/>)}
+   </NavigationRail>
    <button type="button" className="history-clear" onClick={clearAll}><Trash2 size={15}/>Очистить историю</button>
   </div>
   {groups.map(group=><section key={group.label} className="history-day"><h2>{group.label}</h2><ul><AnimatePresence initial={false}>{group.rows.map(row=><motion.li key={row.key} layout={!reduce} initial={reduce?false:{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={reduce?{opacity:0}:{opacity:0,scale:.96}} transition={{duration:.22}}>
