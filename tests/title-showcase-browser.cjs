@@ -39,14 +39,27 @@ let browser,vite,last;
   await page.locator('.title-background-video video').waitFor();await page.waitForFunction(()=>document.querySelector('.title-background-video video')?.currentTime>.1);
   await page.evaluate(()=>{window.originalFrame=document.querySelector('.title-background-video video');window.originalPath=document.querySelector('.title-playback-mask path').getAttribute('d');window.originalVideo=window.player.media;});
   assert.ok((await page.locator('.title-playback-reveal').evaluate(n=>getComputedStyle(n).clipPath)).includes('url('),'Playback enters through the SVG mask');
-  await page.evaluate(()=>scrollTo(0,180));await page.waitForTimeout(180);
-  const plane=await page.evaluate(()=>({content:new DOMMatrix(getComputedStyle(document.querySelector('.title-showcase-content')).transform).m42,copy:getComputedStyle(document.querySelector('.title-showcase-copy-layer')).transform,cover:getComputedStyle(document.querySelector('.title-showcase-poster-layer')).getPropertyValue('--cover-scale')}));
-  // Phones keep the copy still and sink the cover into its leaf mask instead.
-  if(width<=640)assert.ok(Math.abs(plane.content)<1&&plane.copy==='none'&&Number(plane.cover)<1,'Phone cover shrinks into its mask while the copy stays readable: '+JSON.stringify(plane));
-  else assert.ok(plane.content<-5&&plane.copy==='none','Poster, copy and facts leave together as one plane (no split-speed parallax): '+JSON.stringify(plane));
-  await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(150);
-  assert.ok(Math.abs(await page.locator('.title-showcase-content').evaluate(n=>new DOMMatrix(getComputedStyle(n).transform).m42))<1,'Foreground scroll transform reverses at the top');
-  await page.evaluate(()=>scrollTo(0,document.querySelector('.title-showcase').getBoundingClientRect().height+150));
+  await page.evaluate(()=>{
+   const sheet=document.querySelector('.title-content-sheet');
+   scrollTo({top:scrollY+sheet.getBoundingClientRect().top-innerHeight*.5,behavior:'instant'});
+  });
+  await page.waitForFunction(()=>{
+   const content=document.querySelector('.title-showcase-content');
+   return new DOMMatrix(getComputedStyle(content).transform).m42>innerHeight*.02;
+  });
+  const plane=await page.evaluate(()=>{
+   const hero=document.querySelector('.title-showcase').getBoundingClientRect();
+   const sheet=document.querySelector('.title-content-sheet').getBoundingClientRect();
+   const content=new DOMMatrix(getComputedStyle(document.querySelector('.title-showcase-content')).transform);
+   return {overlap:hero.bottom-sheet.top,scale:content.a};
+  });
+  assert.ok(plane.overlap>height*.24&&plane.scale<1,'The sheet overtakes the shrinking foreground: '+JSON.stringify(plane));
+  await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+  await page.waitForFunction(()=>Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.title-showcase-content')).transform).m42)<2);
+  await page.evaluate(()=>{
+   const sheet=document.querySelector('.title-content-sheet');
+   scrollTo({top:scrollY+sheet.getBoundingClientRect().top+innerHeight,behavior:'instant'});
+  });
   await page.waitForFunction(()=>document.querySelector('.title-background-video video').paused);
   await page.waitForFunction(()=>document.querySelector('.title-playback-mask path').getAttribute('d')!==window.originalPath);
   if(width>=1150){const info=await page.locator('.title-showcase .title-facts').boundingBox();assert.ok(info.x>copy.x+copy.width-1,'Information sits to the right of the description');}

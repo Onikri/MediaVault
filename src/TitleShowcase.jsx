@@ -2,7 +2,7 @@
 import {Children,useRef,useLayoutEffect,useId,useState,useEffect} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowLeft} from 'lucide-react';
-import {motion,useMotionTemplate,useMotionValue,useSpring,useReducedMotion,useScroll,useTransform} from 'motion/react';
+import {motion,useMotionValueEvent,useMotionTemplate,useMotionValue,useSpring,useReducedMotion,useScroll,useTransform} from 'motion/react';
 import './title-showcase.css';
 
 const EASE=[.22,1,.36,1];
@@ -69,6 +69,8 @@ export default function TitleShowcase({background,children,backLabel,onBack,back
  // On tall profiles the takeover starts once the bottom of the showcase
  // enters the viewport. The sheet always keeps its natural scroll speed.
  const {scrollYProgress:takeover}=useScroll({target:root,offset:['end end','end start']});
+ const [covered,setCovered]=useState(false);
+ useMotionValueEvent(takeover,'change',progress=>setCovered(progress>=.99));
  const sheetOffset=useTransform(takeover,[0,.65,1],['0svh','48svh','66svh']);
  const foregroundY=useTransform(takeover,[0,.45,1],['0svh','7svh','13svh']);
  const foregroundScale=useTransform(takeover,[0,.6,1],[1,.96,.92]);
@@ -76,7 +78,7 @@ export default function TitleShowcase({background,children,backLabel,onBack,back
  const parts=Children.toArray(children),phone=usePhone(),clip='title-cover-'+useId().replace(/[^a-z0-9]/gi,'');
  const enter=(delay,from={y:22})=>reduce?{}:{initial:{opacity:0,...from},animate:{opacity:1,x:0,y:0,scale:1,filter:'blur(0px)'},transition:{duration:.8,ease:EASE,delay}};
  return <motion.section ref={root} style={reduce?undefined:{y:sheetOffset}} className={'hero-stage title-hero title-feature title-showcase is-revealed'+(reduce?'':' is-animated')+(!parts[2]?' without-info':'')} onPointerMove={event=>{if(!reduce&&event.pointerType==='mouse'){const r=event.currentTarget.getBoundingClientRect();pointer.set((event.clientX-r.left-r.width/2)/r.width*28);}}} onPointerLeave={()=>pointer.set(0)}>
-  {background(reduce?undefined:{y,x,scale})}
+  {background(reduce?undefined:{y,x,scale},covered)}
   <motion.div ref={content} className="title-showcase-content" style={reduce?undefined:{y:foregroundY,scale:foregroundScale,transformOrigin:"50% 80%"}}>
    <motion.div className="title-showcase-poster-layer" style={phone?{'--cover-clip':`url(#${clip})`}:undefined} {...enter(.05,{filter:'blur(14px)'})}>{phone&&<PhoneCover reduce={reduce} clip={clip}/>}<TiltPoster reduce={reduce}>{parts[0]}</TiltPoster></motion.div>
    <div className="title-showcase-copy-layer">{parts[1]}</div>
