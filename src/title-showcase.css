@@ -5,8 +5,10 @@ html[data-blossom] .hero-stage.title-feature.title-showcase{
  width:calc(100vw - 16px);max-width:none;margin:0 0 0 calc(50% - 50vw + 8px);
  min-height:calc(100svh - 12px);height:auto;box-sizing:border-box;
  padding:clamp(340px,46svh,620px) clamp(28px,4vw,76px) 88px;
- isolation:isolate;border-radius:0 0 30px 30px;
+ isolation:isolate;contain:paint;border-radius:0 0 30px 30px;
 }
+/* Keep full-bleed layers within the document during viewport changes. */
+html[data-blossom] .app-shell:has(.title-content-sheet) { overflow-x:clip; }
 html[data-blossom] .title-showcase-content{
  display:grid;grid-template-columns:clamp(220px,20vw,300px) minmax(0,1fr) clamp(210px,20vw,280px);
  align-items:start;gap:clamp(28px,3.2vw,52px);width:100%;min-width:0;
