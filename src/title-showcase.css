@@ -8,7 +8,7 @@ html[data-blossom] .hero-stage.title-feature.title-showcase{
  isolation:isolate;contain:paint;border-radius:0 0 30px 30px;
 }
 /* Keep full-bleed layers within the document during viewport changes. */
-html[data-blossom] .app-shell:has(.title-content-sheet) { overflow-x:clip; }
+html[data-blossom] #root:has(.title-content-sheet) { overflow-x:clip; }
 html[data-blossom] .title-showcase-content{
  display:grid;grid-template-columns:clamp(220px,20vw,300px) minmax(0,1fr) clamp(210px,20vw,280px);
  align-items:start;gap:clamp(28px,3.2vw,52px);width:100%;min-width:0;
