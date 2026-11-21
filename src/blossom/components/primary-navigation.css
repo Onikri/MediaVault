@@ -1,8 +1,36 @@
 html[data-blossom] .blossom-navbar { container: primary-navigation / inline-size; }
 
+html[data-blossom] {
+  --nav-glass-tint: rgb(var(--surface-rgb, 25 23 27) / .67);
+  --nav-glass-filter: blur(10px) saturate(.94);
+}
+
+html[data-blossom] .blossom-navbar .header-inner { isolation: isolate; }
+
+html[data-blossom] .blossom-navbar .header-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-color: var(--nav-glass-tint);
+  background-image: none;
+  backdrop-filter: var(--nav-glass-filter) var(--dock-refraction,);
+  -webkit-backdrop-filter: var(--nav-glass-filter) var(--dock-refraction,);
+  box-shadow: 0 8px 24px #0002, inset 0 1px 1px #ffffff24, inset 0 -1px 1px #ffffff16;
+  pointer-events: none;
+}
+
+.catalogue-announcements {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 @media (--desktop) {
   html[data-blossom] .blossom-navbar .desktop-nav {
-    --primary-nav-cell: 105px;
+    --primary-nav-cell: 112px;
     flex: 0 1 auto;
     gap: 2px;
   }
@@ -14,7 +42,7 @@ html[data-blossom] .blossom-navbar { container: primary-navigation / inline-size
     align-items: center;
     gap: 6px;
     padding-inline: 3px;
-    font: 650 12.5px/1 var(--font-ui, system-ui);
+    font: 650 14px/1 var(--font-ui, system-ui);
     letter-spacing: 0;
     border-radius: 999px;
     color: var(--section-nav-muted);
@@ -53,12 +81,16 @@ html[data-blossom] .blossom-navbar { container: primary-navigation / inline-size
     border: 1px solid var(--section-nav-divider);
     border-radius: 999px;
     gap: 2px;
-    background: color-mix(in srgb, var(--section-nav-tray) 95%, transparent);
+    background-color: var(--nav-glass-tint);
+    background-image: none;
+    backdrop-filter: var(--nav-glass-filter) var(--dock-refraction,);
+    -webkit-backdrop-filter: var(--nav-glass-filter) var(--dock-refraction,);
   }
   html[data-blossom] .mobile-dock .mobile-dock-link {
     border-radius: 999px;
     color: var(--section-nav-muted);
   }
+  html[data-blossom] .mobile-dock .mobile-dock-label { font-size: 12px; }
   html[data-blossom] .mobile-dock .mobile-dock-icon {
     block-size: 22px;
     border-radius: 0;

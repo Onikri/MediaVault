@@ -57,6 +57,8 @@ def base_sources(installed):
                          'name':adapter.NAME+' · '+source['lang'],
                          'source':{key:source.get(key) for key in ('id','name','lang','baseUrl','isNsfw')}})
     for kind in ('anime','manga','ranobe'):jobs.append({'type':'anilist','kind':kind,'domain':'anilist.co','name':{'anime':'Аниме','manga':'Манга','ranobe':'Ранобэ'}[kind]+' · AniList'})
+    for kind,name in (('anime','Аниме'),('ranobe','Ранобэ')):
+        jobs.append({'type':'anilist-trending','kind':kind,'domain':'anilist.co','name':name+' · Популярное сейчас'})
     for kind in ('movie','tv'):jobs.append({'type':'kinobox','kind':kind,'domain':'fbphdplay.top','name':('Фильмы' if kind=='movie' else 'Сериалы')+' · Kinobox'})
     for kind,name in (('movie','Фильмы'),('tv','Сериалы')):
         jobs.append({'type':'omdb','kind':kind,'domain':'www.omdb.org','name':name+' · omdb'})
@@ -248,10 +250,15 @@ def fetch(spec,cursor):
         return {'rows':rows,'next':next_html(raw,final,hosts,page),'details':details,'vocabulary':html_terms(raw,final,hosts)}
     from metadata_catalog import get_json
     from content_metadata import anilist_rows,movie_rows
-    if kind=='anilist':
+    if kind in {'anilist','anilist-trending'}:
         from metadata_catalog import MEDIA_FIELDS
         media='ANIME' if spec['kind']=='anime' else 'MANGA'
         formats=',format_in:[NOVEL]' if spec['kind']=='ranobe' else ',format_not_in:[NOVEL]' if spec['kind']=='manga' else ''
+        if kind=='anilist-trending':
+            query='{Page(perPage:40){media(type:'+media+',sort:[TRENDING_DESC,POPULARITY_DESC,SCORE_DESC,ID],status_in:[FINISHED,RELEASING,HIATUS]'+formats+'){'+MEDIA_FIELDS+'}}}'
+            rows=anilist_rows(anilist_json({'query':query}),spec['kind'])
+            if not rows:raise SourceError('Каталог не предоставил популярные релизы')
+            return {'rows':rows,'next':None,'total':len(rows)}
         term=spec.get('term')
         if not term:return anilist_span(spec,cursor,media,formats,MEDIA_FIELDS)
         # A genre/tag listing ends at AniList's 5000-entry depth; the id-span

@@ -66,18 +66,22 @@ export default function TitleShowcase({background,children,backLabel,onBack,back
  useLayoutEffect(()=>{const update=()=>root.current?.style.setProperty('--showcase-content-height',(content.current?.offsetHeight||0)+'px');update();const observer=new ResizeObserver(update);if(content.current)observer.observe(content.current);return()=>observer.disconnect();},[]);
  const {scrollYProgress}=useScroll({target:root,offset:['start start','end start']});
  const pointer=useMotionValue(0),x=useSpring(pointer,{stiffness:100,damping:25});
- const y=useTransform(scrollYProgress,[0,1],[0,390]),scale=useTransform(scrollYProgress,[0,1],[1.04,1.36]);
- const contentY=useTransform(scrollYProgress,[0,.75],[0,-70]),contentOpacity=useTransform(scrollYProgress,[0,.35,.8],[1,1,0]);
- const contentBlur=useTransform(scrollYProgress,[.3,.8],[0,6]),filter=useMotionTemplate`blur(${contentBlur}px)`;
+ // On tall profiles the takeover starts once the bottom of the showcase
+ // enters the viewport. The sheet always keeps its natural scroll speed.
+ const {scrollYProgress:takeover}=useScroll({target:root,offset:['end end','end start']});
+ const sheetOffset=useTransform(takeover,[0,.65,1],['0svh','48svh','66svh']);
+ const foregroundY=useTransform(takeover,[0,.45,1],['0svh','7svh','13svh']);
+ const foregroundScale=useTransform(takeover,[0,.6,1],[1,.96,.92]);
+ const y=useTransform(scrollYProgress,[0,1],[0,84]),scale=useTransform(scrollYProgress,[0,1],[1.04,1.12]);
  const parts=Children.toArray(children),phone=usePhone(),clip='title-cover-'+useId().replace(/[^a-z0-9]/gi,'');
  const enter=(delay,from={y:22})=>reduce?{}:{initial:{opacity:0,...from},animate:{opacity:1,x:0,y:0,scale:1,filter:'blur(0px)'},transition:{duration:.8,ease:EASE,delay}};
- return <section ref={root} className={'hero-stage title-hero title-feature title-showcase is-revealed'+(reduce?'':' is-animated')+(!parts[2]?' without-info':'')} onPointerMove={event=>{if(!reduce&&event.pointerType==='mouse'){const r=event.currentTarget.getBoundingClientRect();pointer.set((event.clientX-r.left-r.width/2)/r.width*28);}}} onPointerLeave={()=>pointer.set(0)}>
+ return <motion.section ref={root} style={reduce?undefined:{y:sheetOffset}} className={'hero-stage title-hero title-feature title-showcase is-revealed'+(reduce?'':' is-animated')+(!parts[2]?' without-info':'')} onPointerMove={event=>{if(!reduce&&event.pointerType==='mouse'){const r=event.currentTarget.getBoundingClientRect();pointer.set((event.clientX-r.left-r.width/2)/r.width*28);}}} onPointerLeave={()=>pointer.set(0)}>
   {background(reduce?undefined:{y,x,scale})}
-  <motion.div ref={content} className="title-showcase-content" style={reduce||phone?undefined:{y:contentY,opacity:contentOpacity,filter}}>
+  <motion.div ref={content} className="title-showcase-content" style={reduce?undefined:{y:foregroundY,scale:foregroundScale,transformOrigin:"50% 80%"}}>
    <motion.div className="title-showcase-poster-layer" style={phone?{'--cover-clip':`url(#${clip})`}:undefined} {...enter(.05,{filter:'blur(14px)'})}>{phone&&<PhoneCover reduce={reduce} clip={clip}/>}<TiltPoster reduce={reduce}>{parts[0]}</TiltPoster></motion.div>
    <div className="title-showcase-copy-layer">{parts[1]}</div>
    {parts[2]&&<motion.div className="title-showcase-info-layer" {...enter(.45,{x:18,y:0})}>{parts[2]}</motion.div>}
   </motion.div>
   {phone&&onBack&&<PhoneBack id={backId} label={backLabel} onBack={onBack}/>}
- </section>;
+ </motion.section>;
 }

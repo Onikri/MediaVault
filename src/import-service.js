@@ -53,7 +53,7 @@ export function createImportClient(server,googleToken,fetcher=fetch,guestSession
     signing=(async()=>{
       const health=await request('/health',{auth:false});
       if(health.application!=='MediaVault'||health.version<4||health.origin!==window.location.origin)throw Error('Этот адрес не подтвердил конфигурацию MediaVault.');
-      const capabilities={serverVersion:health.version,worldCatalogueBrowse:health.worldCatalogueBrowse===true,catalogueReleaseStatuses:health.catalogueReleaseStatuses===true};
+      const capabilities={serverVersion:health.version,worldCatalogueBrowse:health.worldCatalogueBrowse===true,catalogueReleaseStatuses:health.catalogueReleaseStatuses===true,catalogueAvailability:health.catalogueAvailability===true};
       const token=await googleToken();
       const guest=!token&&guestSession();
       if(guest){

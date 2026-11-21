@@ -4,7 +4,7 @@ html[data-blossom] .anime-card>.title-rating-badge{
  position:absolute;inset:auto;top:0;left:50%;bottom:auto;right:auto;
  display:inline-flex;align-items:center;justify-content:center;gap:4px;
  width:max-content;max-width:none;padding:6px 8px 7px;border:0;border-radius:0 0 8px 8px;
- background:var(--color-blossom);color:var(--color-petal);font-size:11px;line-height:1.2;font-weight:800;
+ background:var(--color-blossom);color:var(--color-petal);font-size:13px;line-height:1.2;font-weight:800;
  z-index:4;pointer-events:none;transform:translate(-50%,-100%);opacity:0;
  transition:transform .28s var(--ease-expressive),opacity .2s;
 }
@@ -27,7 +27,7 @@ html[data-blossom] .library-table .title-rating-badge.is-inline svg{width:11px;h
  html[data-blossom] .anime-card-shell.media-card>button.bookmark-button{width:28px;height:28px;min-width:0;left:7px;top:7px}
 }
 @container(max-width:130px){
- html[data-blossom] .anime-card>.title-rating-badge{padding:5px 4px;font-size:9px}
+ html[data-blossom] .anime-card>.title-rating-badge{padding:5px 4px;font-size:11px}
  html[data-blossom] .anime-card>.title-rating-badge svg{display:none}
  html[data-blossom] .anime-card-shell.media-card .anime-card>.media-kind-badge{padding:5px;right:5px;top:5px}
  html[data-blossom] .anime-card-shell.media-card>button.bookmark-button{width:22px;height:22px;left:5px;top:5px}

@@ -123,7 +123,7 @@ class Indexer:
                 for table in ('catalogue_page_fingerprints','catalogue_page_items'):self.store.db.execute('DELETE FROM '+table+' WHERE job=?',(key,))
                 self.store.db.execute("UPDATE catalogue_jobs SET cursor=?,state='queued',due=?,pages=0,records=0,attempts=0,expected=NULL,error='' WHERE id=?",('{"page":1}',self.clock(),key))
             for spec in sources:
-                self.enqueue(spec)
+                self.enqueue(spec,65 if spec['type']=='anilist-trending' else 10)
                 # Each source's own genre/tag list becomes owner vocabulary and
                 # a filtered catalogue route for that label.
                 if spec['type'] in {'lib','bridge','remanga'}:self.enqueue({**spec,'type':spec['type']+'-vocabulary'},30)
@@ -253,7 +253,8 @@ class Indexer:
                     before=self.store.db.total_changes
                     self.store.db.executemany('INSERT OR IGNORE INTO catalogue_page_items VALUES(?,?)',[(job['id'],str(r.get('sourceUrl') or r.get('url') or r.get('id'))) for r in rows])
                     count=self.store.db.total_changes-before
-                due=self.clock()+(2 if next_cursor else 86400 if '-detail' in spec['type'] or spec['type']=='omdb' else 21600)
+                interval={'anilist-trending':3600,'omdb':86400}.get(spec['type'],86400 if '-detail' in spec['type'] else 21600)
+                due=self.clock()+(2 if next_cursor else interval)
                 self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),priority=CASE WHEN ? THEN priority ELSE MIN(priority,10) END,attempts=0,error=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),bool(next_cursor),result.get('reason',''),self.clock(),job['id']))
                 if '-detail' in spec['type'] and not next_cursor:
                     self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(job['id'],));self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))

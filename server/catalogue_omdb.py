@@ -61,6 +61,8 @@ def load_snapshot(read_csv=csv_rows):
                 'year': int(year[1]) if year else None, 'genres': [], 'tags': [], 'ids': {},
                 'sourceUrl': f'{ROOT}/movie/{identity}',
             }
+            if year:
+                titles[identity]['startDate'] = record['date']
             if kind=='movie':
                 try:release_day=date.fromisoformat(record['date'])
                 except ValueError:pass

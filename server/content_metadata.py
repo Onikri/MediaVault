@@ -1,23 +1,42 @@
 """Bounded discovery using supported genre/subject filters and catalogue pages."""
-import re
+import re,time
+from datetime import date
 from urllib.parse import urlencode
 from manga_tag_policy import current
 from content_catalog import ingest
 
 def english(rule):return next((s for s in rule['aliases'] if re.fullmatch(r'[\x20-\x7e]+',s) and re.search('[a-zA-Z]',s)),rule['label'])
 
+def media_date(parts):
+    parts=parts or {}
+    year,month,day=(parts.get(key) for key in ('year','month','day'))
+    if not isinstance(year,int) or not 1<=year<=9999:return None
+    if not month:return f'{year:04d}'
+    try:valid=date(year,month,day or 1)
+    except (TypeError,ValueError):return None
+    return valid.isoformat() if day else valid.isoformat()[:7]
+
 def anilist_rows(payload,kind):
+    now=int(time.time())
     rows=[]
     for item in payload.get('data',{}).get('Page',{}).get('media',[])[:40]:
         title=item.get('title') or {};name=title.get('english') or title.get('romaji') or title.get('native');identity=item.get('id')
         if not name or not isinstance(identity,int):continue
+        upcoming=item.get('nextAiringEpisode') or {}
+        episode,airing_at=upcoming.get('episode'),upcoming.get('airingAt')
+        aired=max(0,episode-int(airing_at>now)) if isinstance(episode,int) and isinstance(airing_at,int) else None
+        score=item.get('averageScore')
         rows.append({'id':'anilist:'+str(identity),'provider':'anilist','providerId':str(identity),'kind':kind,'title':name,
                      'aliases':[v for v in title.values() if isinstance(v,str)],'titles':{'en':name,'native':title.get('native','')},
                      'ids':{'anilist':str(identity),**({'mal':str(item['idMal'])} if item.get('idMal') else {})},
                      'sourceUrl':item.get('siteUrl') or 'https://anilist.co/'+('anime' if kind=='anime' else 'manga')+'/'+str(identity),
                      'genres':item.get('genres') or [],'tags':[v['name'] for v in item.get('tags') or [] if isinstance(v,dict) and isinstance(v.get('name'),str)],
                      'cover':(item.get('coverImage') or {}).get('large',''),'year':item.get('seasonYear') or (item.get('startDate') or {}).get('year'),
-                     'format':item.get('format') or '', 'description':item.get('description') or '', 'status':item.get('status') or ''})
+                     'format':item.get('format') or '', 'description':item.get('description') or '', 'status':item.get('status') or '',
+                     'score':score/10 if isinstance(score,(int,float)) else None,'popularity':item.get('popularity'),
+                     'trending':item.get('trending'),'trendingAt':now,'episodes':item.get('episodes'),'episodesAired':aired,
+                     'firstAiringAt':airing_at if episode==1 else None,'chapters':item.get('chapters'),
+                     'startDate':media_date(item.get('startDate'))})
     return rows
 
 def movie_rows(payload,kind):
@@ -27,12 +46,17 @@ def movie_rows(payload,kind):
         if not re.fullmatch(r'\d{1,12}',identity) or not name:continue
         actual='tv' if item.get('type')=='Series' else 'movie'
         if actual!=kind:continue
+        ratings=item.get('rating') or {}
+        primary,secondary=(ratings.get(key) or {} for key in ('kinopoisk','imdb'))
         rows.append({'id':'kinobox:'+identity,'provider':'kinobox','providerId':identity,'kind':kind,'title':name,
                      'aliases':[v for v in title.values() if isinstance(v,str)],'ids':{'kinopoisk':identity},
                      'sourceUrl':'https://www.kinopoisk.ru/'+('series' if kind=='tv' else 'film')+'/'+identity+'/',
                      'genres':[v['name'] for v in item.get('genres') or [] if isinstance(v,dict) and isinstance(v.get('name'),str)],
                      'tags':[v['name'] for v in item.get('countries') or [] if isinstance(v,dict) and isinstance(v.get('name'),str)],
                      'cover':(item.get('gallery') or {}).get('posterUrl',''),'year':item.get('year'),'description':item.get('synopsis') or '',
+                     'startDate':item.get('releaseDate'),
+                     'score':primary.get('value') or secondary.get('value'),
+                     'popularity':primary.get('count') or secondary.get('count'),
                      'status':item['status'] if isinstance(item.get('status'),str) else ''})
     return rows
 

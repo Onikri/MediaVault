@@ -1,6 +1,7 @@
 import test,{beforeEach,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeCatalog,mergeCatalog,matchesFilters,providerUrl,safeImage,alternateSpelling,rankCatalog,fetchCatalog,catalogProviders} from '../src/catalog.js';
+import {normalizeCatalog,mergeCatalog,matchesFilters,providerUrl,safeImage,alternateSpelling,rankCatalog,fetchCatalog,catalogProviders,browseQuery} from '../src/catalog.js';
+import {catalogueAvailable} from '../src/release-status.js';
 import {mangaCatalogParams,mangaFacetOptions,mangaTagKey,mangaFormatLabel} from '../src/manga-catalog.js';
 import {tagLabels} from '../src/taxonomy.js';
 import {readFileSync} from 'node:fs';
@@ -9,6 +10,23 @@ const defaultPolicy=JSON.parse(readFileSync(new URL('../server/manga-tag-policy.
 const fixturePolicy=JSON.parse(readFileSync(new URL('./fixtures/manga-tag-policy.json',import.meta.url)));
 beforeEach(()=>setMangaPolicy(fixturePolicy));
 afterEach(()=>setMangaPolicy(defaultPolicy));
+
+test('the video catalogue distinguishes a planned episode from an aired episode',()=>{
+ const now=Date.parse('2026-11-21T12:00:00Z');
+ assert.equal(catalogueAvailable({kind:'anime',status:'FINISHED',year:2024},now),true);
+ assert.equal(catalogueAvailable({kind:'anime',status:'FINISHED',year:2050},now),false);
+ assert.equal(catalogueAvailable({kind:'anime',status:'RELEASING',episodes:12},now),false);
+ assert.equal(catalogueAvailable({kind:'anime',status:'RELEASING',episodesAired:0,year:2025},now),false);
+ assert.equal(catalogueAvailable({kind:'anime',status:'RELEASING',episodesAired:1},now),true);
+ assert.equal(catalogueAvailable({kind:'tv',status:'Running',startDate:'2026-11-20'},now),true);
+ assert.equal(catalogueAvailable({kind:'tv',status:'Running',startDate:'2026-11-21'},now),false);
+ assert.equal(catalogueAvailable({kind:'tv',status:'Running',startDate:'2026-11-21',firstAiringAt:now/1000-1},now),true);
+ assert.equal(catalogueAvailable({kind:'tv',status:'Running',startDate:'2026-11-22'},now),false);
+ const query=browseQuery({sort:'trending',status:'available'});
+ assert.equal(query.variables.sort,'TRENDING_DESC');
+ assert.deepEqual(query.variables.states,['FINISHED','RELEASING','HIATUS']);
+ assert.ok(!('states' in browseQuery({sort:'trending'}).variables));
+});
 
 test('source catalogue keeps zero offset on the first page for every grid size',()=>{
  for(const limit of [24,25,28,30])for(const filters of [{},{genre:['Drama'],excludeTag:['Robots']}]){

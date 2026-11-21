@@ -10,8 +10,7 @@ export function titleSectionTarget(id){
 
 export function titleDockBoundary(){
  const header=document.querySelector('.blossom-navbar');
- const dock=header?.querySelector('.title-dock');
- return Math.max(header?.getBoundingClientRect().bottom||78,dock?.getBoundingClientRect().bottom||0)+12;
+ return (header?.getBoundingClientRect().bottom||78)+12;
 }
 
 export function jumpTitleSection(id){

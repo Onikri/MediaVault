@@ -33,7 +33,7 @@ html[data-blossom] :focus-visible{outline:2px solid var(--color-blossom-light);o
 /* Supplied floating navigation: same hierarchy, MediaVault's existing actions. */
 html[data-blossom] .app-header.site-header{position:fixed;top:16px;left:50%;right:auto;transform:translateX(-50%);width:min(1268px,calc(100% - 32px));height:auto;min-height:0;border:0;background:none;backdrop-filter:none;z-index:60}
 html[data-blossom] .site-header .header-inner{width:100%;min-height:58px;padding:8px 14px;border-radius:100px;gap:16px;background:rgb(var(--canvas-rgb)/.6);border:1px solid transparent}
-html[data-blossom] .site-header.is-scrolled .header-inner{background:rgb(var(--surface-rgb)/.92);border-color:color-mix(in srgb,var(--color-blossom) 17.0%,transparent);backdrop-filter:blur(18px);box-shadow:0 16px 42px #0005}
+
 html[data-blossom] .site-header .header-brand-area{gap:20px;flex:1;min-width:0}
 html[data-blossom] .site-header .brand.logo{display:inline-flex;background:var(--color-burgundy);border-radius:100px;padding:9px 16px;color:var(--color-petal);gap:0;font:800 19px var(--font-display);letter-spacing:-.045em}
 html[data-blossom] .site-header .brand.logo>span>span{color:var(--color-petal-shadow)}

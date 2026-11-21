@@ -18,40 +18,54 @@ for(const width of[320,390,1025,1280,1440]){
  const main=await page.locator('.header-inner').boundingBox();
  const rail=await dock.boundingBox();
  assert.ok(rail.y>=main.y+main.height&&rail.y-main.y-main.height<=5,'Section dock hugs the header '+JSON.stringify({main,rail}));
- assert.ok(Math.abs(rail.x+rail.width/2-main.x-main.width/2)<1,'Section dock is centered');
- assert.ok(rail.height<=28,'Section dock stays compact');
+ assert.ok(main.x+main.width-rail.x-rail.width>=0&&main.x+main.width-rail.x-rail.width<12,'Section dock follows the right edge');
+ const cells=await dock.locator('button').evaluateAll(nodes=>nodes.map(node=>({x:node.offsetLeft,y:node.offsetTop})));
+ assert.ok(cells.every((cell,index)=>index===0||cell.x===cells[index-1].x&&cell.y>cells[index-1].y),'All title items form one column');
+ assert.ok(rail.width<=46,'The vertical rail occupies one narrow column');
  assert.equal(await dock.getByRole('button').count(),7);
  assert.equal(await current.getAttribute('aria-label'),'Смотреть');
  assert.equal(await dock.getByRole('button',{name:/Комментарии|Обсуждение/}).count(),0);
  assert.equal(await page.locator('.title-navigation-anchor').isVisible(),false,'The page has no duplicate section rail');
- for(const pill of [brand,dock.locator('.title-dock-bubble')])
-  assert.ok(await pill.evaluate(n=>parseFloat(getComputedStyle(n).borderTopLeftRadius)>=n.offsetHeight/2),'Dock components retain capsule outlines');
+ assert.ok(await brand.evaluate(n=>parseFloat(getComputedStyle(n).borderTopLeftRadius)>=n.offsetHeight/2),'The main navbar retains its brand capsule');
+ assert.ok(await dock.evaluate(n=>[n,...n.querySelectorAll('button,.title-dock-label')].every(element=>{
+  const style=getComputedStyle(element);
+  return style.backgroundColor==='rgba(0, 0, 0, 0)'&&style.borderInlineStartWidth==='0px'&&style.boxShadow==='none';
+ })),'The section controls and names have no panels or borders');
+ await page.waitForFunction(()=>getComputedStyle(document.querySelector('.title-dock-section[aria-current] .title-dock-label')).opacity==='0');
+ if(width<640)assert.equal((await current.boundingBox()).height,44,'Touch controls keep a 44 px target');
  if(width>1024){
   const lastLink=await page.locator('.desktop-nav .nav-link').last().boundingBox(),search=await page.locator('.header-search').boundingBox();
   assert.ok(lastLink.x+lastLink.width<=search.x-2,'The primary navigation leaves a clear search lane');
   assert.ok(await page.locator('.desktop-nav .nav-glide').evaluate(n=>parseFloat(getComputedStyle(n).borderTopLeftRadius)>=n.offsetHeight/2));
  }
 
- const first=await dock.locator('.title-dock-bubble').boundingBox();
+ const marker=dock.locator('.title-dock-marker');
+ const first=await marker.boundingBox();
+ assert.equal(first.width,2);
+ assert.equal(first.height,10);
  await dock.getByRole('button',{name:'Музыка',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('.title-dock-section[aria-current]')?.getAttribute('aria-label')==='Музыка');
- await page.waitForFunction(()=>{const b=document.querySelector('.title-dock-bubble');return b&&Math.abs(b.getBoundingClientRect().x-b.parentElement.getBoundingClientRect().x)<1;});
- const music=await dock.locator('.title-dock-bubble').boundingBox();
- assert.ok(music.x>first.x+40,'The selection bubble follows the change of section');
+ await page.waitForFunction(()=>{
+  const marker=document.querySelector('.title-dock-marker');
+  if(!marker)return false;
+  const indicator=marker.getBoundingClientRect(),button=marker.parentElement.getBoundingClientRect();
+  return Math.abs(indicator.y+indicator.height/2-button.y-button.height/2)<1;
+ });
+ const music=await marker.boundingBox();
+ assert.ok(music.y>first.y+40,'The selection marker follows the change of section vertically');
  assert.equal(await brand.textContent(),'MediaVault');
  const selectedTitle=dock.getByRole('button',{name:'Порядок просмотра',exact:true});
  await selectedTitle.focus();
  await page.keyboard.press('Enter');
  await page.waitForFunction(()=>document.querySelector('.title-dock-section[aria-current]')?.getAttribute('aria-label')==='Порядок просмотра');
- assert.ok(await current.locator('.title-dock-label').evaluate(n=>n.scrollWidth<=n.clientWidth+1),'Longest title is fully readable');
- assert.equal(await brand.textContent(),'MediaVault');
  await page.waitForFunction(()=>{
-  const bubble=document.querySelector('.title-dock-bubble');
-  return bubble&&Math.abs(bubble.getBoundingClientRect().width-bubble.parentElement.offsetWidth)<1;
+  const label=document.querySelector('.title-dock-section:focus-visible .title-dock-label');
+  return label&&label.scrollWidth<=label.clientWidth+1&&Number(getComputedStyle(label).opacity)>.9;
  });
- assert.ok((await dock.locator('.title-dock-bubble').boundingBox()).width>music.width+10,'The bubble expands to fit longer names');
+ assert.equal(await brand.textContent(),'MediaVault');
+ assert.equal((await dock.boundingBox()).width,rail.width,'The icon column keeps its width with a longer label');
  await selectedTitle.blur();
- if(width===390||width===1440)await page.screenshot({path:path.join(dir,'title-dock-'+width+'.png'),clip:{x:0,y:0,width,height:115}});
+ if(width===390||width===1440)await page.screenshot({path:path.join(dir,'title-dock-'+width+'.png'),clip:{x:0,y:0,width,height:360}});
  await page.evaluate(()=>scrollTo(0,0));
  await page.waitForFunction(()=>document.querySelector('.title-dock-section[aria-current]')?.getAttribute('aria-label')==='Смотреть');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
@@ -83,6 +97,6 @@ for(const scrolled of [false,true]){
  }
  assert.deepEqual(errors,[]);
  await page.close();
- console.log('PASS title dock, capsule outlines, section scroll, keyboard and search '+width);
+ console.log('PASS borderless title dock, section scroll, keyboard and search '+width);
 }
 })().catch(async e=>{console.error(e);await last?.screenshot({path:'.codex-local/test-output/title-navigation/title-capsule-failure.png'}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();for(const f of['title-capsule.html','title-capsule.jsx'])await fs.rm('.codex-local/test-output/title-navigation/'+f,{force:true});});

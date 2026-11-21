@@ -1,107 +1,112 @@
-/* The section dock is positioned outside the primary dock's layout box. */
 .title-dock {
+  --title-section-size: 32px;
   position: absolute;
-  inset-block-start: calc(100% + 2px);
-  inset-inline-start: 50%;
-  translate: -50% 0;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-end: 6px;
+  z-index: 3;
   display: grid;
-  gap: 3px;
-  inline-size: min(calc(100% - 16px), calc(126px + var(--title-dock-count) * 64px));
-  isolation: isolate;
 }
 
 .title-dock[hidden] { display: none; }
 
 .title-dock-section {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  height: 26px;
+  display: grid;
+  place-items: center;
+  inline-size: var(--title-section-size);
+  block-size: var(--title-section-size);
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 999px;
   background: transparent;
-  color: var(--section-nav-ink);
-  font: 650 11px/1 var(--font-ui, system-ui);
+  color: var(--section-nav-muted);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
-.title-dock-section::before {
-  content: "";
+.title-dock-section:focus-visible {
+  outline: none;
+  color: var(--section-nav-ink);
+}
+
+.title-dock-section[aria-current] { color: var(--section-nav-accent); }
+
+.title-dock-marker {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: calc(50% - 5px);
+  inline-size: 2px;
+  block-size: 10px;
+  border-radius: 1px;
+  background: currentColor;
+  pointer-events: none;
+}
+
+.title-dock-icon {
+  position: relative;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px #000b);
+}
+
+.title-dock-icon svg { display: block; width: 16px; height: 16px; stroke-width: 1.7; }
+
+.title-dock-section:focus-visible .title-dock-icon::after {
+  content: '';
   position: absolute;
   inset-inline: 0;
-  inset-block-start: 50%;
-  translate: 0 -50%;
-  height: 3px;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--section-nav-muted) 40%, var(--section-nav-tray));
-  box-shadow: 0 1px 3px #0006;
-  transition: height .2s, background-color .2s;
+  inset-block-end: -4px;
+  block-size: 2px;
+  background: currentColor;
 }
-
-.title-dock-section[aria-current]::before { visibility: hidden; }
-
-.title-dock-bubble {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 100%;
-  height: 100%;
-  padding-inline: 5px;
-  box-sizing: border-box;
-  border: 1px solid color-mix(in srgb, var(--section-nav-accent) 36%, var(--section-nav-tray));
-  border-radius: 999px;
-  background: var(--section-nav-tray);
-  box-shadow: 0 3px 9px #0004;
-  pointer-events: none;
-}
-
-.title-dock-icon, .title-dock-label {
-  position: relative;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.title-dock-icon { display: none; flex: none; color: var(--section-nav-accent); }
-.title-dock-icon svg { display: block; width: 13px; height: 13px; stroke-width: 1.8; }
-.title-dock-section[aria-current] .title-dock-icon,
-.title-dock-section:is(:hover, :focus-visible) .title-dock-icon { display: inline-flex; }
 
 .title-dock-label {
-  min-width: 0;
-  overflow: hidden;
-  max-inline-size: 140px;
-  text-overflow: ellipsis;
+  position: absolute;
+  inset-inline-end: calc(100% + 2px);
+  inset-block-start: 50%;
+  translate: 3px -50%;
+  opacity: 0;
+  pointer-events: none;
   white-space: nowrap;
+  color: var(--section-nav-ink);
+  text-shadow: 0 1px 4px #000, 0 0 8px #000;
+  font: 600 13px/1.25 var(--font-ui, system-ui);
+  transition: opacity .14s, translate .14s;
 }
 
-.title-dock-section:not([aria-current]):is(:hover, :focus-visible)::before {
-  height: 100%;
-  background: var(--section-nav-tray);
+.title-dock-section:focus-visible .title-dock-label {
+  opacity: 1;
+  translate: 0 -50%;
 }
 
-.title-dock-section:focus-visible {
-  outline: 2px solid var(--section-nav-accent);
-  outline-offset: 1px;
+@media (hover: hover) {
+  .title-dock-section:not([aria-current]):hover { color: var(--section-nav-ink); }
+  .title-dock-section:hover .title-dock-label {
+    opacity: 1;
+    translate: 0 -50%;
+  }
+}
+
+html[data-blossom] .app-shell:has(.title-dock) .title-content-sheet > :is(.title-stage, .mv-title-layout) {
+  max-inline-size: calc(100% - 56px);
+  margin-inline-end: 56px;
 }
 
 @media (pointer: coarse) {
-  .title-dock-section:not([aria-current])::before {
-    inset-block-start: auto;
-    inset-block-end: 1px;
-    height: 2px;
-    translate: none;
-  }
-  .title-dock-section .title-dock-icon { display: inline-flex; }
-  .title-dock-section:not([aria-current]) .title-dock-icon { color: var(--section-nav-muted); }
+  .title-dock { --title-section-size: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .title-dock-section::before { transition: none; }
+  .title-dock-label { transition: none; }
+}
+
+/* Briefly name the newly reached section while the marker moves to it. */
+@keyframes title-section-caption {
+  0% { opacity: 0; translate: 4px -50%; }
+  16%, 76% { opacity: 1; translate: 0 -50%; }
+  100% { opacity: 0; translate: 0 -50%; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .title-dock:not(:hover):not(:focus-within) .title-dock-section[aria-current] .title-dock-label {
+    animation: title-section-caption 1.8s ease-out;
+  }
 }

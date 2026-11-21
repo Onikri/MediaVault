@@ -14,12 +14,26 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
    if(u.pathname.includes('/jikan'))return r.fulfill({json:{data:{mal_id:16498,title:profile.name,title_english:profile.name,images:{jpg:{large_image_url:'https://art.fixture/p.svg'}},synopsis:profile.description}}});
    return r.fulfill({json:{data:[],results:[],sources:[],voices:[],providers:[],items:[],pending:false}});
   });
-  await page.goto('http://127.0.0.1:7924/#watch=anime:shikimori:16498');await page.getByRole('heading',{name:'Реинкарнация безработного: История о приключениях в другом мире',exact:true}).waitFor({state:'attached'});await page.evaluate(()=>document.fonts.ready);
+  await page.goto('http://127.0.0.1:7924/#watch=anime:shikimori:16498');await page.locator('.title-showcase').getByRole('heading',{name:'Реинкарнация безработного: История о приключениях в другом мире',exact:true}).waitFor({state:'attached'});await page.evaluate(()=>document.fonts.ready);
   const hero=await page.locator('.title-showcase').boundingBox(),content=await page.locator('.title-showcase-content').boundingBox(),copy=await page.locator('.title-hero-copy').boundingBox();
   if(width>=1000){assert.ok(copy.width>=350,'Description column stays readable in built CSS: '+JSON.stringify({width,hero,content,copy}));assert.ok(content.width>hero.width-160,'Scene content uses the viewport width');assert.ok(content.y+content.height<=height+1,'Content fits the first-screen scene');}
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.reload();
+  await page.locator('.title-content-sheet').waitFor({state:'attached'});
+  await page.locator('.title-showcase h1').waitFor();await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(1200);
+  await page.evaluate(()=>window.scrollTo({top:document.querySelector('.title-content-sheet').getBoundingClientRect().top+scrollY-innerHeight*.56,behavior:'instant'}));
+  await page.waitForTimeout(1200);
+  const overlap=await page.evaluate(()=>{
+   const hero=document.querySelector('.title-showcase'),sheet=document.querySelector('.title-content-sheet');
+   const edge=sheet.getBoundingClientRect().top;
+   return {overlap:hero.getBoundingClientRect().bottom-edge,covered:sheet.contains(document.elementFromPoint(innerWidth/2,edge+8))};
+  });
+  assert.ok(overlap.overlap>height*.22 && overlap.covered,JSON.stringify(overlap));
+  await page.screenshot({path:path.join(dir,'sheet-'+width+'.png')});
+  await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.locator('.title-content-sheet').waitFor({state:'attached'});
   const layers=await page.evaluate(async()=>{
    scrollTo(0,300);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-   const shell=document.querySelector('.app-shell'),main=shell.querySelector('.app-main'),nav=shell.querySelector('.blossom-navbar'),search=nav.querySelector('.header-search');
+   const shell=document.querySelector('.app-shell'),main=shell.querySelector('.app-main'),nav=shell.querySelector('.blossom-navbar'),search=nav.querySelector(innerWidth<700?'.avatar-button':'.header-search');
    const r=search.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
    const top=()=>document.elementFromPoint(x,y),overlay=(className,parent,style)=>{const node=document.createElement('div');node.className=className;Object.assign(node.style,style);parent.append(node);return node;};
    const player=overlay('retained-media-host',document.body,{position:'absolute',left:'0',top:scrollY+'px',width:'100vw',height:'160px'});
@@ -41,7 +55,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
   await page.goto('http://127.0.0.1:7924/?manga-fixture#watch=manga:shikimori:16498');
   await page.locator('.retained-media-host[data-mode=attached] .manga-playback-controls .title-playback-selectors').first().waitFor({timeout:7000});
   const searchAboveManga=await page.evaluate(async()=>{
-   const search=document.querySelector('.header-search'),filters=document.querySelector('.retained-media-host[data-mode=attached] .manga-playback-controls .title-playback-selectors');
+   const search=document.querySelector(innerWidth<700?'.blossom-navbar .avatar-button':'.header-search'),filters=document.querySelector('.retained-media-host[data-mode=attached] .manga-playback-controls .title-playback-selectors');
    const f=filters.getBoundingClientRect(),r=search.getBoundingClientRect();
    scrollBy(0,f.top+f.height/2-(r.top+r.height/2));
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));

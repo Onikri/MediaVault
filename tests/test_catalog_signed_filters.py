@@ -1,4 +1,4 @@
-import json,os,sqlite3,sys,tempfile,unittest
+import json,os,sqlite3,sys,tempfile,time,unittest
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
@@ -82,6 +82,28 @@ class SignedFilters(unittest.TestCase):
   for value in ['["Fantasy"',json.dumps(['Fantasy']*65)]:
    with self.assertRaises(HTTPException) as error:browse(self.db,genre=value)
    self.assertEqual(error.exception.status_code,422)
+ def test_available_titles_are_ranked_before_pagination_and_keep_ratings(self):
+  from content_metadata import anilist_rows
+  now=int(time.time())
+  def media(identity,name,state,score,popularity,trending,**extra):
+   return {'id':identity,'title':{'english':name},'format':'TV','seasonYear':2022,'status':state,
+           'averageScore':score,'popularity':popularity,'trending':trending,**extra}
+  records=[
+   media(1,'Popular now','RELEASING',89,1000,800,nextAiringEpisode={'episode':2,'airingAt':now+7200}),
+   media(2,'Well known','FINISHED',84,100000,10),
+   media(3,'No episodes yet','RELEASING',98,1000000,1000,nextAiringEpisode={'episode':1,'airingAt':now+7200},episodes=12),
+   media(4,'Future','NOT_YET_RELEASED',99,10000000,10000,seasonYear=2099),
+   media(5,'Stale trend','FINISHED',92,100,9999),
+  ]
+  rows=anilist_rows({'data':{'Page':{'media':records}}},'anime')
+  rows[-1]['trendingAt']=now-7201
+  content_catalog.ingest(self.db,rows)
+  content_catalog.ingest(self.db,[{**rows[0],'score':None,'trending':None,'trendingAt':None,'popularity':None}])
+  for offset,(title,score) in enumerate([('Popular now',8.9),('Well known',8.4),('Stale trend',9.2)]):
+   page=content_catalog.browse(self.db,kind='anime',status='available',sort='trending',limit=1,offset=offset)
+   self.assertEqual((page['total'],page['items'][0]['title'],page['items'][0]['score']),(3,title,score))
+  all_titles=content_catalog.browse(self.db,kind='anime',sort='trending',limit=1)
+  self.assertEqual((all_titles['total'],all_titles['items'][0]['title']),(5,'Future'))
  def test_resumable_book_cleanup_preserves_titles_raw_facts_and_crawl_queue(self):
   import threading
   from types import SimpleNamespace

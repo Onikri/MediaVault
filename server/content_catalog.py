@@ -11,7 +11,22 @@ ORDERS = {
     'new': f'{RELEASE_YEAR} IS NULL,{RELEASE_YEAR} DESC',
     'old': f'{RELEASE_YEAR} IS NULL,{RELEASE_YEAR}',
     'title': 'MIN(t.search)',
+    'trending': """MAX(CASE WHEN CAST(json_extract(t.raw,'$.trendingAt') AS INTEGER)>=unixepoch()-7200
+        THEN CAST(json_extract(t.raw,'$.trending') AS INTEGER) ELSE 0 END) DESC,
+        MAX(CAST(json_extract(t.raw,'$.popularity') AS INTEGER)) DESC,
+        MAX(CAST(json_extract(t.raw,'$.score') AS REAL)) DESC,"""+RELEASE_YEAR+' DESC',
+    'score': "MAX(CAST(json_extract(t.raw,'$.score') AS REAL)) DESC,"+RELEASE_YEAR+' DESC',
 }
+
+NUMERIC_LIMITS={'score':(0.01,10),'popularity':(0,1_000_000_000),'trending':(0,1_000_000_000),
+                'episodes':(1,100_000),'episodesAired':(0,100_000),'chapters':(0,100_000),'firstAiringAt':(1,4_000_000_000)}
+
+def catalogue_number(value,minimum,maximum):
+    if isinstance(value,bool) or not isinstance(value,(int,float,str)):return None
+    try:number=float(value)
+    except (ValueError,OverflowError):return None
+    if minimum<=number<=maximum:return int(number) if number.is_integer() else number
+    return None
 
 def work_sql(alias='t'):
     p=alias+'.' if alias else ''
@@ -92,6 +107,13 @@ def ingest(db,rows):
         title=row.get('title')
         if not isinstance(title,str) or not title.strip() or len(title)>500:continue
         data={k:row[k] for k in ('id','kind','provider','providerId','title','titles','format','year','language','age','status','ids','description') if k in row}
+        for field,(minimum,maximum) in NUMERIC_LIMITS.items():
+            if (value:=catalogue_number(row.get(field),minimum,maximum)) is not None:data[field]=value
+        if 'trending' in data:
+            data['trendingAt']=min(int(time.time()),catalogue_number(row.get('trendingAt'),1,4_000_000_000) or int(time.time()))
+        for field in ('startDate','endDate'):
+            if isinstance(row.get(field),str) and re.match(r'^\d{4}(?:-\d{2}){0,2}(?:$|T)',row[field]):
+                data[field]=row[field][:10]
         for field in ('tags','genres','aliases'):
             values=row.get(field);data[field]=list(dict.fromkeys(v.strip() for v in values if isinstance(v,str) and 0<len(v.strip())<=120))[:120] if isinstance(values,list) else []
         for field in ('sourceUrl','sourceURL','url','cover'):data[field]=safe_url(row.get(field))
@@ -108,6 +130,8 @@ def ingest(db,rows):
             for field in ('sourceUrl','sourceURL','url','cover','description'):
                 if not data.get(field):data[field]=old.get(field,'')
             if not data.get('status') and old.get('status'):data['status']=old['status']
+            for field in (*NUMERIC_LIMITS,'trendingAt','startDate','endDate','year'):
+                if data.get(field) is None and old.get(field) is not None:data[field]=old[field]
             for field in ('ids','titles'):data[field]={**old.get(field,{}),**data[field]}
         raw=json.dumps(data,ensure_ascii=False,separators=(',',':'))
         if len(raw.encode())>24000:continue
@@ -151,9 +175,10 @@ def read_work(db,key,policy,preferred_id=''):
     from catalog_taxonomy import hentai_excluded
     excluded=any(hentai_excluded(record) for _,record in records) or bool(db.execute('SELECT 1 FROM content_tag_facts f JOIN content_titles peer ON peer.id=f.title_id WHERE '+work_sql('peer')+'=? AND catalog_not_hentai(f.original)=1 LIMIT 1',(key,)).fetchone())
     identity,row=next((entry for entry in records if entry[0]==preferred_id),records[0])
-    for field in ('cover','description'):
-        if not row.get(field):
-            row[field]=next((record[field] for _,record in records if record.get(field)),'')
+    for field in ('cover','description','score','popularity','episodes','episodesAired','chapters','firstAiringAt','startDate','endDate'):
+        if row.get(field) in (None,''):
+            value=next((record[field] for _,record in records if record.get(field) not in (None,'')),None)
+            if value is not None:row[field]=value
     merged={'genres':[],'tags':[]}
     for _,record in records:
         source=urlsplit(record.get('sourceUrl') or record.get('sourceURL') or '').hostname or ''

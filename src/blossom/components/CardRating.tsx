@@ -5,6 +5,6 @@ import './card-rating.css';
 
 /** Shared rating: a cover-edge ribbon, or an in-flow table cell. */
 export function CardRating({score,inline=false,empty=null}:{score?:number|null;inline?:boolean;empty?:ReactNode}){
- if(typeof score!=='number'||!Number.isFinite(score))return <>{empty}</>;
+ if(typeof score!=='number'||!Number.isFinite(score)||score<=0)return <>{empty}</>;
  return <span className={'card-score title-rating-badge'+(inline?' is-inline':'')} aria-label={'Оценка '+scoreLabel(score)}><Star size={12} fill="currentColor"/>{scoreLabel(score)}</span>;
 }

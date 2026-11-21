@@ -4,7 +4,7 @@ import {mangaPolicy,globalContentPolicy} from './manga-tag-policy.js';
 import {russianText,translate,imageURL} from './title-metadata.js';
 import {contentLanguage} from './content-language.js';
 import {uiLanguage} from './i18n/index.js';
-import {releaseStatus} from './release-status.js';
+import {catalogueAvailable,releaseStatus} from './release-status.js';
 // Free metadata only. Source discovery and every media byte stay on the import server.
 const strip=value=>String(value||'').replace(/<[^>]*>/g,' ').replace(/\[\/?(?:b|i|u|url|spoiler|quote)[^\]]*\]/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
 export const normalized=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -61,7 +61,10 @@ export function normalizeCatalog(provider,data,kind='anime'){
   }
   if(provider==='anilist')return list(data.data?.Media||data.data?.Page?.media).map(a=>record(provider,a.id,kind,{
     titles:{ru:a.russian,en:a.title?.english,native:a.title?.native},title:a.title?.romaji,aliases:[a.title?.romaji,...(a.synonyms||[])],description:a.description,cover:a.coverImage?.large,
-    score:Number(a.averageScore)?Number(a.averageScore)/10:null,trailer:a.trailer?.site==='youtube'?{youtube_id:a.trailer.id}:null,background:a.bannerImage||'',year:a.seasonYear||a.startDate?.year,startDate:fuzzyDate(a.startDate),endDate:fuzzyDate(a.endDate),
+    score:Number(a.averageScore)?Number(a.averageScore)/10:null,popularity:a.popularity,trending:a.trending,
+    episodesAired:a.nextAiringEpisode?.airingAt>0?Math.max(0,a.nextAiringEpisode.episode-Number(a.nextAiringEpisode.airingAt*1000>Date.now())):null,
+    firstAiringAt:a.nextAiringEpisode?.episode===1?a.nextAiringEpisode.airingAt:null,
+    trailer:a.trailer?.site==='youtube'?{youtube_id:a.trailer.id}:null,background:a.bannerImage||'',year:a.seasonYear||a.startDate?.year,startDate:fuzzyDate(a.startDate),endDate:fuzzyDate(a.endDate),
     format:a.format,genres:a.genres,tags:(a.tags||[]).map(t=>t.name),age:a.isAdult?18:null,episodes:a.episodes,chapters:a.chapters,volumes:a.volumes,status:a.status,
     releases:[...(a.airingSchedule?.nodes||[]),...(a.nextAiringEpisode?[a.nextAiringEpisode]:[])].map(e=>({episode:e.episode,date:e.airingAt,kind:'original',provider:'anilist'})),
     ids:a.idMal?{mal:String(a.idMal)}:{},links:[{provider,url:a.siteUrl}]}));
@@ -159,7 +162,7 @@ export function mergeCatalog(values){
     current.hentaiExcluded=!!(current.hentaiExcluded||item.hentaiExcluded||item.workFacts?.hentaiExcluded);
     current.releases=[...current.releases,...item.releases].filter((e,i,a)=>a.findIndex(x=>x.date===e.date&&x.episode===e.episode)===i);
     if(item.titles.ru){current.titles={...current.titles,...item.titles};current.title=item.titles.ru;current.description=item.description||current.description;}
-    for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','releaseStatus','startDate','endDate','score','trailer','background','episodesAired','duration','authors'])if(current[key]==null||current[key]==='')current[key]=item[key];
+    for(const key of ['cover','description','year','format','age','ageLabel','episodes','chapters','volumes','status','releaseStatus','startDate','endDate','score','popularity','trending','trailer','background','episodesAired','firstAiringAt','duration','authors'])if(current[key]==null||current[key]==='')current[key]=item[key];
     for(const key of ['scores','countries'])if(!current[key]?.length&&item[key]?.length)current[key]=item[key];
   }
   return result;
@@ -167,7 +170,9 @@ export function mergeCatalog(values){
 
 export function matchesFilters(item,filters){
   if(filters.year&&String(item.year)!==String(filters.year))return false;
-  if(filters.status&&(item.releaseStatus||releaseStatus(item.statusCode)||releaseStatus(item.status))!==filters.status)return false;
+  if(filters.status==='available'){
+    if(!catalogueAvailable(item))return false;
+  }else if(filters.status&&(item.releaseStatus||releaseStatus(item.statusCode)||releaseStatus(item.status))!==filters.status)return false;
     const manga=item.kind==='manga'||globalContentPolicy(),match=(left,right)=>manga?(mangaPolicy().key(right)?mangaPolicy().key(left)===mangaPolicy().key(right):!globalContentPolicy()&&normalized(left).includes(normalized(right))):normalized(localLabel(left)).includes(normalized(localLabel(right)))||normalized(left).includes(normalized(right));
   if(!matchesTaxonomy(item,filters))return false;
   const formatKey=value=>({манга:'manga',манхва:'manhwa',маньхуа:'manhua',комикс:'comic',руманга:'rumanga',вебтун:'webtoon'}[normalized(value)]||normalized(value));
@@ -206,7 +211,7 @@ export function providerUrl(provider,{query='',kind='anime',page=1,identity,year
   throw Error('Для этого каталога нужно подключить сервер импорта.');
 }
 
-const aniFields='id idMal title{romaji english native} synonyms description coverImage{large} bannerImage trailer{id site thumbnail} averageScore format status genres tags{name} isAdult episodes chapters volumes seasonYear startDate{year month day} endDate{year month day} siteUrl nextAiringEpisode{episode airingAt} airingSchedule(perPage:50,notYetAired:true){nodes{episode airingAt}}';
+const aniFields='id idMal title{romaji english native} synonyms description coverImage{large} bannerImage trailer{id site thumbnail} averageScore popularity trending format status genres tags{name} isAdult episodes chapters volumes seasonYear startDate{year month day} endDate{year month day} siteUrl nextAiringEpisode{episode airingAt} airingSchedule(perPage:50,notYetAired:true){nodes{episode airingAt}}';
 // How many pages a provider can list for this request (16 titles per page), when it says so.
 export function catalogPages(provider,data){
   const count=provider==='kitsu'?Math.ceil(Number(data?.meta?.count)/16):provider==='anilist'?Number(data?.data?.Page?.pageInfo?.lastPage):0;
@@ -264,16 +269,17 @@ async function russianBookTitles(items,signal,fetcher){
 // never repeats page 1 the way three independently sorted catalogues did.
 // Shikimori only adds Russian names to the titles of that page.
 export const BROWSE_KINDS=['anime','manga','ranobe'];
-export const CATALOG_SORTS=[['popular','По популярности'],['trending','Сейчас обсуждают'],['score','По рейтингу'],['favourites','Чаще в избранном'],['new','Сначала новые'],['old','Сначала старые'],['title','По названию'],['length','Больше серий и глав']];
+export const CATALOG_SORTS=[['trending','Популярное сейчас'],['popular','По популярности'],['score','По рейтингу'],['favourites','Чаще в избранном'],['new','Сначала новые'],['old','Сначала старые'],['title','По названию'],['length','Больше серий и глав']];
 const ANILIST_GENRES=new Set(['Action','Adventure','Comedy','Drama','Ecchi','Fantasy','Hentai','Horror','Mahou Shoujo','Mecha','Music','Mystery','Psychological','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Thriller']);
 const ANILIST_FORMATS=new Set(['TV','TV_SHORT','MOVIE','SPECIAL','OVA','ONA','MUSIC','MANGA','NOVEL','ONE_SHOT']);
 export function browseQuery({kind='anime',page=1,perPage=24,sort='popular',year,genre,tag,format,status}={}){
   const manga=kind!=='anime',order={popular:'POPULARITY_DESC',trending:'TRENDING_DESC',score:'SCORE_DESC',favourites:'FAVOURITES_DESC',new:'START_DATE_DESC',old:'START_DATE',title:'TITLE_ROMAJI',length:manga?'CHAPTERS_DESC':'EPISODES_DESC'}[sort]||'POPULARITY_DESC';
   // ID breaks ties, so equal scores keep one place across page requests.
-  const args=['type:$type','sort:[$sort,ID]'],variables={type:manga?'MANGA':'ANIME',sort:order,page:Math.max(1,Number(page)||1),perPage:Math.min(50,Math.max(1,Number(perPage)||24))},defs=['$type:MediaType','$sort:MediaSort','$page:Int','$perPage:Int'];
+  const args=['type:$type',sort==='trending'?'sort:[$sort,POPULARITY_DESC,SCORE_DESC,ID]':'sort:[$sort,ID]'],variables={type:manga?'MANGA':'ANIME',sort:order,page:Math.max(1,Number(page)||1),perPage:Math.min(50,Math.max(1,Number(perPage)||24))},defs=['$type:MediaType','$sort:MediaSort','$page:Int','$perPage:Int'];
   const add=(name,type,value,arg=name)=>{defs.push('$'+name+':'+type);args.push(arg+':$'+name);variables[name]=value;};
   const state={released:'FINISHED',ongoing:'RELEASING',anons:'NOT_YET_RELEASED'}[status];
   if(state)add('status','MediaStatus',state);
+  if(status==='available')add('states','[MediaStatus]',['FINISHED','RELEASING','HIATUS'],'status_in');
   const pickedFormat=String(format||'').toUpperCase().replace(/\s+/g,'_');
   if(ANILIST_FORMATS.has(pickedFormat))add('format','[MediaFormat]',[pickedFormat],'format_in');
   else if(kind==='ranobe')add('format','[MediaFormat]',['NOVEL'],'format_in');

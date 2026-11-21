@@ -35,7 +35,7 @@ export function useCatalog(query,kind,year,server,page=1,composing=false,filters
           if(browse){
             try{found=await fetchBrowsePage({kind,page,perPage,sort,year,genre,tag,format:filters.format,status,signal:abort.signal});}catch(error){if(abort.signal.aborted)return;}
             // AniList down or empty: page through Shikimori alone, still one list.
-            if(!found||(!found.length&&!status)){found=await fetchCatalog('shikimori',{query:'',kind,year,genre,tag,server,page,signal:abort.signal});states.anilist='unavailable';states.shikimori='ok';}
+            if(!found||(!found.length&&(!status||status==='available'))){found=await fetchCatalog('shikimori',{query:'',kind,year,genre,tag,server,page,signal:abort.signal});states.anilist='unavailable';states.shikimori='ok';}
           }else found=await fetchCatalog(provider,{query:text,kind,year,genre,tag,server,page,signal:abort.signal});
           if(abort.signal.aborted)return;
           results[provider]=found;if(states[provider]==='loading')states[provider]='ok';if(browse&&found.russian)states.shikimori='ok';if(found.pages)pages[provider]=found.pages;

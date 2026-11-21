@@ -1,9 +1,9 @@
 /* Below the showcase: the stage (player or reader) spans the page, the
    dossier (characters, stills, credits, relations) follows in two columns.
    Separation is tone and spacing only, per the site's no-outline rule. */
-html[data-blossom] .title-page>.title-stage{margin:clamp(22px,3vw,40px) 0 0;padding:0;background:transparent;scroll-margin-top:110px;min-width:0}
-html[data-blossom] .title-page>.title-stage>.watch-materials-heading{margin:0 0 18px}
-html[data-blossom] .title-page>.title-stage .online-watch{max-width:1320px}
+html[data-blossom] .title-content-sheet>.title-stage{margin:clamp(22px,3vw,40px) 0 0;padding:0;background:transparent;scroll-margin-top:110px;min-width:0}
+html[data-blossom] .title-content-sheet>.title-stage>.watch-materials-heading{margin:0 0 18px}
+html[data-blossom] .title-content-sheet>.title-stage .online-watch{max-width:1320px}
 .title-hero-copy>.hero-character-links{order:6}
 .hero-character-links{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:14px 0 0;font-size:12px}
 .hero-character-links>span{color:var(--color-quiet)}
@@ -94,3 +94,21 @@ html[data-blossom] .title-page>.title-stage .online-watch{max-width:1320px}
 /* Panels of an embedded reader (voices, book card, consent) fit inside it. */
 .reader-embedded .reader-rail{contain:layout}
 .reader-embedded .reader-rail-dock :is(.narration-cast,.narration-book,.narration-consent){position:absolute!important;max-height:calc(100% - var(--rail-gap,8px) * 2)!important}
+
+html[data-blossom] .title-content-sheet {
+ position: relative;
+ display: flow-root;
+ margin-block-start: -20px;
+ padding-block: clamp(22px, 3vw, 40px) 32px;
+}
+html[data-blossom] .title-content-sheet::before {
+ content: '';
+ position: absolute;
+ inset: 0 calc(50% - 50vw + 8px);
+ border-radius: clamp(20px, 3vw, 38px) clamp(20px, 3vw, 38px) 0 0;
+ background: var(--color-canvas, #121116);
+ pointer-events: none;
+}
+html[data-blossom] .title-content-sheet > :is(.title-stage,.mv-title-layout) { position: relative; }
+html[data-blossom] .title-content-sheet > .title-stage,
+html[data-blossom] .title-content-sheet > .mv-title-layout:first-of-type { margin-block-start: 0; }

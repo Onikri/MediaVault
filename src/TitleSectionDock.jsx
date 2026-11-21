@@ -10,22 +10,17 @@ export default function TitleSectionDock({hidden=false}){
  const reduced=useReducedMotion();
  if(!title||title.sections.length<2)return null;
 
- const columns=title.sections.map(({id})=>id===title.active?'minmax(86px, max-content)':'minmax(0, 1fr)').join(' ');
- return <nav className="title-dock" aria-label="Разделы тайтла" hidden={hidden} style={{
-  '--title-dock-count':title.sections.length,
-  gridTemplateColumns:columns
- }}>
+ return <nav className="title-dock" aria-label="Разделы тайтла" hidden={hidden}>
   <LayoutGroup id={title.titleId}>
    {title.sections.map(section=>{
     const selected=section.id===title.active;
     return <button type="button" key={section.id} className="title-dock-section"
-     aria-label={section.label} title={selected?undefined:section.label} aria-current={selected?'location':undefined}
+     aria-label={section.label} aria-current={selected?'location':undefined}
      onClick={()=>jumpTitleSection(section.id)}>
-     {selected?<motion.span className="title-dock-bubble" layoutId={reduced?undefined:'active-section'}
-      transition={spring} aria-hidden="true">
-      <span className="title-dock-icon"><TitleSectionIcon {...section}/></span>
-      <span className="title-dock-label">{section.label}</span>
-     </motion.span>:<span className="title-dock-icon"><TitleSectionIcon {...section}/></span>}
+     {selected&&<motion.span className="title-dock-marker" layoutId={reduced?undefined:'active-section'}
+      transition={spring} aria-hidden="true"/>}
+     <span className="title-dock-icon"><TitleSectionIcon {...section}/></span>
+     <span className="title-dock-label" aria-hidden="true">{section.label}</span>
     </button>;
    })}
   </LayoutGroup>
