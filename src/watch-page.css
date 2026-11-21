@@ -110,3 +110,12 @@ html[data-blossom] .server-dialog.song-profile{border:1px solid var(--color-bord
 .online-watch .online-video-frameless>.inline-error{inset:auto 12px 12px;z-index:10;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border:0;border-radius:16px;font-size:11px;background:var(--color-canvas-soft)}
 .online-watch .online-video-frameless>.inline-error p{margin:0;flex:1}
 .online-watch .online-video-frameless>.inline-error button{font-size:11px;min-height:28px}
+
+.official-series { display: grid; justify-items: start; gap: 14px; }
+.official-series-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.official-series-heading small { display: block; margin-top: 4px; color: var(--color-on-muted); }
+.official-series-heading select { margin-inline-start: 6px; }
+.official-series-parts { display: flex; flex-wrap: wrap; gap: 6px; }
+.official-series-parts button[aria-pressed=true] { color: var(--color-petal); background: var(--color-burgundy); }
+.official-series .youtube-official { width: min(100%, 960px); }
+.official-series .youtube-official iframe { width: 100%; aspect-ratio: 16 / 9; display: block; border: 0; border-radius: 16px; }

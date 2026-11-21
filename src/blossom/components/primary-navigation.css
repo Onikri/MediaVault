@@ -30,7 +30,7 @@ html[data-blossom] .blossom-navbar .header-inner::before {
 
 @media (--desktop) {
   html[data-blossom] .blossom-navbar .desktop-nav {
-    --primary-nav-cell: 112px;
+    --primary-nav-cell: clamp(94px, 8cqw, 112px);
     flex: 0 1 auto;
     gap: 2px;
   }
@@ -69,6 +69,15 @@ html[data-blossom] .blossom-navbar .header-inner::before {
   html[data-blossom] .blossom-navbar.is-search-expanded .desktop-nav .nav-link-label { display: none; }
   html[data-blossom][data-catalog-merged] .blossom-navbar .desktop-nav .nav-link {
     border-radius: 999px;
+  }
+  /* The wide, expanded dock has room for the full site navigation next to search. */
+  @container primary-navigation (width >= 1450px) {
+    html[data-blossom]:not([data-catalog-merged]) .blossom-navbar.is-search-expanded .desktop-nav {
+      --primary-nav-cell: 94px;
+    }
+    html[data-blossom]:not([data-catalog-merged]) .blossom-navbar.is-search-expanded .desktop-nav .nav-link-label {
+      display: inline;
+    }
   }
   @container primary-navigation (width < 1120px) {
     html[data-blossom] .blossom-navbar .desktop-nav { --primary-nav-cell: 45px; }

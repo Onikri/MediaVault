@@ -5,7 +5,7 @@ import React,{useState} from 'react';import{createRoot}from'react-dom/client';im
 const short=location.search==='?manga',single=location.search==='?single';const ids=['titlePlayback','titleCharacters','titleStills','titleSchedule','titleMusic','titleRelated','titleWatchOrder'];function Fixture(){const[search,setSearch]=useState(false);return <ThemeProvider><AnimatedNavbar links={[{id:'home',label:'Главная'},{id:'library',label:'Библиотека'},{id:'collection',label:'Коллекция'},{id:'history',label:'История'}]} active="library" onNavigate={()=>{}} onSearch={()=>setSearch(true)} brand={<button className="brand logo">MediaVault</button>}><button id="profileBtn" className="avatar-button">Г</button></AnimatedNavbar><main className="app-main"><div style={{height:850}}>Тайтл</div><TitleNavigation title={{id:'fixture',section:short||single?'manga':'anime',category:short||single?'manga':'video',online:true,items:[]}} profile={single?{}:short?{characters:[{}]}:{sourceId:'20',characters:[{}],screenshots:['one'],related:[{}]}}/>{ids.map(id=><section key={id} id={id} style={{height:400,padding:20}}><h2>{id}</h2></section>)}</main>{search&&<SearchDialog service={{server:""}} onClose={()=>setSearch(false)} onChoose={()=>{}} onBrowse={()=>{}}/>}</ThemeProvider>;}createRoot(document.getElementById('root')).render(<Fixture/>);
 `);const{createServer}=await import('vite');vite=await createServer({root,cacheDir:path.join(root,'.codex-local/cache/vite-title-dock'),optimizeDeps:{entries:[path.join(dir,'title-capsule.jsx')]},logLevel:'error',server:{watch:null,host:'127.0.0.1',port:5197,strictPort:false}});await vite.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']});
 const base='http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/title-navigation/title-capsule.html';
-for(const width of[320,390,1025,1280,1440]){
+for(const width of[320,390,1025,1280,1440,1669]){
  const page=await browser.newPage({viewport:{width,height:900},hasTouch:width<640}),errors=[];
  last=page;
  page.on('pageerror',e=>errors.push(e.message));
@@ -74,6 +74,13 @@ for(const scrolled of [false,true]){
  await page.evaluate(value=>scrollTo(0,value?480:0),scrolled);await page.waitForTimeout(550);
  for(let cycle=0;cycle<2;cycle++){
   await page.locator('.header-search').click();await page.locator('.morph-search-bar').waitFor();assert.equal(await dock.isVisible(),false);
+  if(width===1669&&!scrolled){
+   await page.waitForFunction(()=>document.querySelector('.blossom-navbar')?.classList.contains('is-search-expanded'));
+   assert.ok(await page.locator('.desktop-nav .nav-link-label').first().isVisible(),'Full-width expanded search retains desktop labels');
+   const last=await page.locator('.desktop-nav .nav-link').last().boundingBox();
+   const search=await page.locator('.morph-search-bar').boundingBox();
+   assert.ok(last.x+last.width<search.x,'Labels have a dedicated lane beside expanded search');
+  }
   const sample=()=>page.evaluate(()=>new Promise(resolve=>{const rows=[],start=performance.now();function frame(now){const b=document.querySelector('.morph-search-bar')?.getBoundingClientRect(),h=document.querySelector('.header-inner').getBoundingClientRect(),button=document.querySelector('.header-search');if(b)rows.push({dy:Math.abs(b.y+b.height/2-h.y-h.height/2),w:b.width,h:b.height,r:parseFloat(getComputedStyle(document.querySelector('.morph-search-bar')).borderRadius)});else rows.push({closed:true,visible:getComputedStyle(button).visibility==='visible',opacity:getComputedStyle(button.parentElement).opacity});if(now-start<420)requestAnimationFrame(frame);else resolve(rows);}requestAnimationFrame(frame);}));
   const opening=await sample();assert.ok(opening.every(r=>r.dy<1&&r.w>=37&&Math.abs(r.h-38)<1&&r.r===19),'Opening never jumps vertically or distorts into an ellipse '+JSON.stringify(opening));
   await page.locator('.morph-search-close').click();const closing=await sample();assert.ok(closing.every(r=>r.closed?r.visible&&r.opacity==='1':r.dy<1&&r.w>=37&&Math.abs(r.h-38)<1),'Closing hands directly back to the circle '+JSON.stringify(closing));

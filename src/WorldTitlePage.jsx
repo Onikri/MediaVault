@@ -5,6 +5,9 @@ import {profileForSeason} from './use-season-source.js';
 import {catalogItem,fetchCatalog,mergeCatalog,normalized} from './catalog.js';
 import {loadTitleProfile,translate} from './title-metadata.js';
 import TitlePage from './TitlePage.jsx';
+import OfficialSeriesPlayer from './OfficialSeriesPlayer.jsx';
+import {officialSeries} from './official-series.js';
+import {guestLocked} from './guest-session.js';
 import {OnlineBooks} from './OnlineLibrary.jsx';
 import RanobeSources from './RanobeSources.jsx';
 import {localLabel} from './taxonomy.js';
@@ -126,8 +129,9 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
   }
   onRelated?.(value);
  }
+ const publishedSeries=guestLocked(service.session,searchItem)?null:officialSeries(searchItem);
  const materials=<><div className="section-heading watch-materials-heading"><h2>{['manga','ranobe','book'].includes(item.kind)?'Читать':'Смотреть'}</h2></div>
-  <CrashBoundary label={['ranobe','book'].includes(item.kind)?'Читалка':item.kind==='manga'?'Читалка манги':'Плеер'}><Suspense fallback={<div className="lazy-stage" role="status" aria-label="Загружаем…"/>}>{['ranobe','book'].includes(item.kind)?<RanobeSources item={searchItem} service={service} state={state} expected={displayProfile.chapters}/>:<ImportSelection compact key={item.id} destination="online" onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} expected={displayProfile.chapters} onMangaPublication={receivePublication} onSeasonBrowse={setViewSeason} state={state} service={service} onSubmitted={onSubmitted}/>}</Suspense></CrashBoundary>
+  <CrashBoundary label={['ranobe','book'].includes(item.kind)?'Читалка':item.kind==='manga'?'Читалка манги':'Плеер'}><Suspense fallback={<div className="lazy-stage" role="status" aria-label="Загружаем…"/>}>{['ranobe','book'].includes(item.kind)?<RanobeSources item={searchItem} service={service} state={state} expected={displayProfile.chapters}/>:publishedSeries?<OfficialSeriesPlayer key={item.id} title={item.title} source={publishedSeries}/>:<ImportSelection compact key={item.id} destination="online" onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} expected={displayProfile.chapters} onMangaPublication={receivePublication} onSeasonBrowse={setViewSeason} state={state} service={service} onSubmitted={onSubmitted}/>}</Suspense></CrashBoundary>
  </>;
  return <><TitlePage shareService={service} onLocalFile={()=>localInput.current?.click()} title={title} state={state} actions={remoteArtwork} onBack={onBack} onRelated={openRelated} online onOnlinePlay={destinationAction} heroActions={heroActions} onlineProfile={displayProfile} onlineBusy={loading} materials={materials} onlineFacts={facts} server={service.server} backLabel="К результатам поиска"/><input ref={localInput} type="file" accept=".cbz,.zip" hidden onChange={e=>{const file=e.target.files?.[0];if(file)setLocalFile({id:'local:'+file.name+':'+file.lastModified,name:file.name,category:'manga',size:file.size,file});e.target.value='';}}/>{localFile&&<Suspense fallback={<p role="status">Открываем файл…</p>}><LocalMediaViewer item={localFile} catalog={{items:[localFile]}} libraryId="local" userId={state.user?.sub} readWhole={()=>Promise.resolve(localFile.file)} onClose={()=>setLocalFile(null)} readerService={service}/></Suspense>}</>;
 }
