@@ -494,6 +494,11 @@ async function main() {
   await owner.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
   await owner.getByText('Главный герой истории. Мечтает стать Хокагэ.',{exact:true}).waitFor();
   await owner.getByRole('button',{name:'Закрыть персонажа',exact:true}).click();
+  // Return from Characters to the end of the overview before the sheet
+  // covers the rating controls. Keep them above the bottom navigation dock.
+  await owner.locator('.title-content-sheet').evaluate(sheet=>{
+    scrollTo({top:scrollY+sheet.getBoundingClientRect().top-innerHeight*.85,behavior:'instant'});
+  });
   await owner.getByRole('button',{name:'Оценка 8',exact:true}).click();
   await owner.getByText('8 из 10',{exact:true}).waitFor();
   // Focus previews the score immediately; aria-pressed changes only after the

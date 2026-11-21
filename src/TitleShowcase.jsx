@@ -71,9 +71,9 @@ export default function TitleShowcase({background,children,backLabel,onBack,back
  const {scrollYProgress:takeover}=useScroll({target:root,offset:['end end','end start']});
  const [covered,setCovered]=useState(false);
  useMotionValueEvent(takeover,'change',progress=>setCovered(progress>=.99));
- const sheetOffset=useTransform(takeover,[0,.65,1],['0svh','48svh','66svh']);
- const foregroundY=useTransform(takeover,[0,.45,1],['0svh','7svh','13svh']);
- const foregroundScale=useTransform(takeover,[0,.6,1],[1,.96,.92]);
+ const sheetOffset=useTransform(takeover,[0,.2,.68,1],['0svh','0svh','47svh','66svh']);
+ const foregroundY=useTransform(takeover,[0,.2,.52,1],['0svh','0svh','7svh','13svh']);
+ const foregroundScale=useTransform(takeover,[0,.2,.6,1],[1,1,.96,.92]);
  const y=useTransform(scrollYProgress,[0,1],[0,84]),scale=useTransform(scrollYProgress,[0,1],[1.04,1.12]);
  const parts=Children.toArray(children),phone=usePhone(),clip='title-cover-'+useId().replace(/[^a-z0-9]/gi,'');
  const enter=(delay,from={y:22})=>reduce?{}:{initial:{opacity:0,...from},animate:{opacity:1,x:0,y:0,scale:1,filter:'blur(0px)'},transition:{duration:.8,ease:EASE,delay}};
