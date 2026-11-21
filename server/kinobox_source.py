@@ -81,6 +81,26 @@ def anime_kinopoisk(selected, http):
     return next(iter(found)) if len(found) == 1 else None
 
 
+
+def series_kinopoisk(selected, http):
+    """Only bind title-only records to a series with the same name and year."""
+    from title_identity import aliases, normalized
+    names = aliases(selected)
+    year = str(selected.get('startDate') or selected.get('year') or '')[:4]
+    if not re.fullmatch(r'(?:19|20)\d{2}', year):
+        return None
+    wanted = {normalized(name).replace('ё', 'е') for name in names}
+    identities = set()
+    for name in names[:3]:
+        for row in _search(name[:160], http):
+            title = row.get('title') or {}
+            identity = str(row.get('id') or '')
+            if row.get('type') != 'Series' or str(row.get('year') or '') != year or not re.fullmatch(r'\d{1,9}', identity):
+                continue
+            if wanted & {normalized(title.get(key)).replace('ё', 'е') for key in ('russian', 'original')}:
+                identities.add(identity)
+    return next(iter(identities)) if len(identities) == 1 else None
+
 def players(selected, http):
     global _retry_at
     query = _ids(selected)
@@ -130,7 +150,10 @@ def inspect_player(row, kind, http):
         return None
     if kind_name.casefold() == 'collaps' and is_collaps(iframe):
         text, final, _ = http.document(iframe, headers={'Referer': iframe})
-        return {'url': iframe, 'player': 'Collaps', 'dubs': collaps_choices(iframe, text)}
+        dubs = collaps_choices(iframe, text)
+        seasons = sorted({e['season'] for dub in dubs for e in dub['episodes']}) if kind != 'movie' else []
+        return {'url': iframe, 'player': 'Collaps', 'dubs': dubs,
+                'seasons': [{'number': n, 'name': 'Сезон ' + str(n)} for n in seasons]}
     if kind_name.casefold() == 'alloha' and is_alloha_player(iframe):
         if kind == 'movie':
             return {'url': iframe, 'player': 'Alloha', 'dubs': _movie_alloha(row)}
@@ -148,8 +171,8 @@ def aliases_key(selected):
 def discover(selected):
     name = 'Kinobox · Alloha, Collaps'
     kind = selected.get('kind', 'anime')
-    if not _ids(selected) and kind == 'anime':
-        signature = hashlib.sha256(repr(('anime-kp', aliases_key(selected), selected.get('year'), selected.get('format'))).encode()).hexdigest()
+    if not _ids(selected) and kind in {'anime', 'tv'}:
+        signature = hashlib.sha256(repr(('title-kp', kind, aliases_key(selected), selected.get('startDate'), selected.get('year'), selected.get('format'))).encode()).hexdigest()
         with _lock:
             cached = _cache.get(signature)
         if cached and cached[0] > time.monotonic():
@@ -157,7 +180,8 @@ def discover(selected):
         else:
             http = PublicHttp(timeout=(3, 8), deadline=time.monotonic() + 15)
             try:
-                kinopoisk = anime_kinopoisk(selected, http)
+                match = anime_kinopoisk if kind == 'anime' else series_kinopoisk
+                kinopoisk = match(selected, http)
             except (SourceError, OSError):
                 kinopoisk = None
             finally:

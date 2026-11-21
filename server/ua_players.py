@@ -13,7 +13,7 @@ import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 PLAYERJS_HOSTS = ('ashdi.vip', 'hdvbua.pro', 'tortuga.tw', 'tortuga.wtf')
-COLLAPS_HOSTS = ('api.nextembed.ws', 'api.bhcesh.me', 'api.namy.ws', 'api.delivembd.ws')
+COLLAPS_HOSTS = ('api.nextembed.ws', 'api.bhcesh.me', 'api.namy.ws', 'api.delivembd.ws', 'api.embf.net')
 SELECTORS = ('mv_voice', 'mv_season', 'mv_episode', 'mv_audio')
 
 
@@ -34,7 +34,8 @@ def is_ua_trailer(url):
 
 
 def is_collaps(url):
-    return _host_in(url, COLLAPS_HOSTS) and urlsplit(url).path.startswith('/embed/')
+    parts = urlsplit(url)
+    return parts.hostname in COLLAPS_HOSTS and bool(re.fullmatch(r'/embed/[a-z]+/\d{1,10}', parts.path))
 
 
 def player_label(url):
@@ -196,16 +197,16 @@ def collaps_data(text):
             episodes = []
             for row in season.get('episodes') or []:
                 if not isinstance(row, dict) or not str(row.get('hls') or '').startswith('https://'): continue
-                episodes.append({'number': _number(row.get('episode')) or len(episodes) + 1, 'hls': row['hls'], 'names': _audio_names(row.get('audio'))})
+                episodes.append({'number': _number(row.get('episode')) or len(episodes) + 1, 'hls': row['hls'], 'names': _audio_names(row.get('audio')), 'cc': row.get('cc')})
             if episodes: result.append({'number': _number(season.get('season')) or len(result) + 1, 'episodes': episodes})
         return {'seasons': result}
     hls = re.search(r'\bhls\s*:\s*"(https://[^"]+)"', text)
     audio = _js_value(text, 'audio', '{')
-    return {'movie': {'hls': hls.group(1), 'names': _audio_names(audio or {})}} if hls else {}
+    return {'movie': {'hls': hls.group(1), 'names': _audio_names(audio or {}), 'cc': _js_value(text, 'cc', '[')}} if hls else {}
 
 
 def collaps_choices(embed_url, text):
-    from player_catalog import choice, voice_language
+    from player_catalog import choice, translation_kind, voice_language
     data = collaps_data(text)
     by_name = {}
     if data.get('movie'):
@@ -219,25 +220,53 @@ def collaps_choices(embed_url, text):
                 by_name.setdefault(name, []).append({'number': episode['number'], 'season': season['number'], 'url': url, 'title': 'Серия ' + str(episode['number'])})
     choices = []
     for name, episodes in by_name.items():
-        if re.search(r'\beng\b|original|оригинал', name, re.I): language = 'en'
-        else: language = voice_language(name, 'ru')
+        episodes.sort(key=lambda item: (item['season'], item['number']))
+        language = voice_language(name, 'und' if translation_kind(name) == 'original' else 'ru')
         choices.append(choice(name, episodes[0]['url'], identity='collaps:' + embed_url + ':' + name, player='Collaps', language=language, episodes=episodes))
     return choices
 
 
-def collaps_stream(text, selected):
-    """Return (hls_url, audio_index) for the selection, or (None, None)."""
+def collaps_episode(text, selected):
     data = collaps_data(text)
-    audio = _number(selected.get('mv_audio'))
     if data.get('movie'):
-        return data['movie']['hls'], audio
+        return data['movie']
     season, episode = _number(selected.get('mv_season')), _number(selected.get('mv_episode'))
     for row in data.get('seasons', []):
-        if season is not None and row['number'] != season: continue
+        if season is not None and row['number'] != season:
+            continue
         for item in row['episodes']:
             if episode is None or item['number'] == episode:
-                return item['hls'], audio
-    return None, None
+                return item
+    return None
+
+
+def collaps_stream(text, selected):
+    """Return (hls_url, audio_index) for the selection, or (None, None)."""
+    item = collaps_episode(text, selected)
+    return (item['hls'], _number(selected.get('mv_audio'))) if item else (None, None)
+
+
+def collaps_captions(item):
+    from source_parser import public_url, SourceError
+    tracks = item.get('cc')
+    if not isinstance(tracks, list):
+        return []
+    captions = []
+    for track in tracks[:32]:
+        if not isinstance(track, dict) or not isinstance(track.get('name'), str):
+            continue
+        try:
+            url = public_url(str(track.get('url') or ''), resolve_dns=False)
+        except SourceError:
+            continue
+        if not urlsplit(url).path.lower().endswith('.vtt'):
+            continue
+        name = re.sub(r'\s+-\s+\d+$', '', track['name'].strip())[:100]
+        if name:
+            language = next((lang for lang, pattern in [('en', r'eng|english|англ'), ('ru', r'рус|rus'), ('uk', r'укр|ukr')]
+                             if re.match(pattern, name, re.I)), 'und')
+            captions.append({'name': name, 'url': url, 'language': language})
+    return captions
 
 
 def prefer_audio(manifest, index):

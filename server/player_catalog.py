@@ -36,7 +36,7 @@ def player_name(url):
 UKRAINIAN_VOICE=re.compile(r"[іїєґ]|укр|україн|ukrain|\bukr\b|\bua\b|\(ua\)|uateam|fanvoxua|так\s*треба|tak\s*treba|amanogawa|unimay|inari\s*dub|dniprofilm|le\s*doyen|postmodern|\bqtv\b|\bictv\b|1\+1|\b[іi]нтер\b|новий\s*канал|cinemaker|gwean|струґачка|струга?чка",re.I)
 RUSSIAN_VOICE=re.compile(r"\b(?:рус(?:ский|ская|ские|ская озвучка)?|russian|rus|ru|ani\s*dub|ani\s*libria(?:\.tv)?|ani\s*liberty(?:\.tv)?|анилибрия|animevost|animedia|studio\s*band|студийн(?:ая|ой)\s*баз[аы]|lost\s*film(?:\.tv)?|new\s*studio|кубик\s+в\s+кубе)\b",re.I)
 ORIGINAL_LANGUAGES=(
-    ('en', re.compile(r'\b(?:английск\w*|english)\b',re.I)),
+    ('en', re.compile(r'\b(?:английск\w*|english|eng)\b',re.I)),
     ('ja', re.compile(r'\b(?:японск\w*|japanese)\b|日本語',re.I)),
     ('ko', re.compile(r'\b(?:корейск\w*|korean)\b|한국어',re.I)),
 )
@@ -60,7 +60,9 @@ def alloha_voice_language(name):
 
 def translation_kind(name, explicit=''):
     text=str(explicit or name).casefold()
-    return 'subtitles' if re.search(r'subtitle|субтит|\bsubs?\b',text) else 'voice'
+    if re.search(r'subtitle|субтит|\bsubs?\b',text):return 'subtitles'
+    if re.search(r'\b(?:original|оригинал\w*)\b',text):return 'original'
+    return 'voice'
 
 
 def normalized_studio(value):
@@ -193,7 +195,7 @@ def group_voices(inspections):
         for voice in source.get('dubs',[]):
             label=voice['name']
             if not voice.get('named',True) or re.search(r'^(?:неизвестн|unknown|название перевода не указано|озвучка не указана|(?:серия|episode)\s*\d)',label,re.I):continue
-            kind=voice.get('kind') or translation_kind(label)
+            kind=translation_kind(label) if voice.get('kind') in {None,'','voice'} else voice['kind']
             language=voice_language(label,voice.get('language') or 'und')
             name_key=normalized_studio(label)
             old_key=(re.sub(r'[\W_]+','',unicodedata.normalize('NFKC',label).casefold()),kind,language)
@@ -205,6 +207,9 @@ def group_voices(inspections):
             group=groups.setdefault(key,{'id':identifier,'name':label,'kind':kind,'language':language,'variants':[]})
             legacy=hashlib.sha256(repr(old_key).encode()).hexdigest()[:24]
             if legacy!=identifier and legacy not in group.setdefault('aliases',[]):group['aliases'].append(legacy)
+            if kind=='original':
+                previous=hashlib.sha256(repr((old_key[0],'voice',old_key[2])).encode()).hexdigest()[:24]
+                if previous not in group.setdefault('aliases',[]):group['aliases'].append(previous)
             variant={**voice,'sourceUrl':source['url'],'sourceTitle':source.get('title',''),
                      'provider':source.get('provider','public'),'providerName':source.get('providerName') or source.get('provider','public')}
             variant['id']=hashlib.sha256((variant['sourceUrl']+'|'+voice['url']+'|'+voice['id']).encode()).hexdigest()[:24]

@@ -51,3 +51,20 @@ test('the browser opens the embed and the stream itself, with the page token',as
  URL.revokeObjectURL(data.url);
  await assert.rejects(prepareCollaps('https://api.nextembed.ws/embed/movie/181',{fetcher}),/HTTP 410/);
 });
+
+test('the current Collaps mirror keeps VTT tracks scoped to the selected season and episode',async()=>{
+ const embed='https://api.embf.net/embed/movie/123';
+ const hls='https://media.example/season-2/master.m3u8';
+ const seasons=[{season:2,episodes:[
+  {episode:1,hls,cc:[{name:'Eng. full - 1',url:'https://media.example/one.vtt'}]},
+  {episode:2,hls,cc:[{name:'Рус. полные - 2',url:'https://media.example/two.vtt?token=fixture'},{name:'Unsafe',url:'https://name:password@media.example/two.vtt'}]},
+ ]}];
+ const fetcher=async url=>{
+  if(url===embed)return new Response('makePlayer({seasons:'+JSON.stringify(seasons)+'})');
+  assert.equal(url,hls);
+  return new Response('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=640x360\n360.m3u8');
+ };
+ const data=await prepareCollaps(embed+'?mv_season=2&mv_episode=2&mv_audio=1',{fetcher});
+ try{assert.deepEqual(data.subtitles,[{id:'collaps-cc-0',name:'Рус. полные',language:'ru',url:'https://media.example/two.vtt?token=fixture'}]);}
+ finally{URL.revokeObjectURL(data.url);}
+});

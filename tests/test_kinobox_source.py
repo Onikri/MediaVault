@@ -30,6 +30,27 @@ class KinoboxTests(unittest.TestCase):
         movie=self.run_discover('movie',alloha=False)
         self.assertTrue(any(s['providerName'].startswith('Alloha') for s in movie['sources']))
 
+    def test_current_collaps_mirror_exposes_english_original_and_exact_episode_captions(self):
+        import json
+        from ua_players import collaps_episode, collaps_captions
+        from player_catalog import group_voices
+        url = 'https://api.embf.net/embed/movie/123'
+        def episode(number, language):
+            return {'episode': str(number), 'hls': 'https://media.example/video.m3u8',
+                    'audio': {'names': ['LostFilm', 'Eng.Original']},
+                    'cc': [{'name': language + ' full - 1', 'url': 'https://media.example/' + language + '.vtt'}]}
+        html = 'makePlayer({seasons:' + json.dumps([{'season': '2', 'episodes': [episode(2, 'Eng')]},
+                                                    {'season': '1', 'episodes': [episode(1, 'Рус')]}]) + '})'
+        class Http:
+            def document(self, value, **_):
+                return html, value, 'text/html'
+        source = kinobox_source.inspect_player({'type': 'Collaps', 'iframeUrl': url}, 'tv', Http())
+        self.assertEqual([s['number'] for s in source['seasons']], [1, 2])
+        original = next(d for d in group_voices([source]) if d['kind'] == 'original')
+        self.assertEqual(original['language'], 'en')
+        entry = collaps_episode(html, {'mv_season': '2', 'mv_episode': '2'})
+        self.assertEqual(collaps_captions(entry), [{'language': 'en', 'name': 'Eng full', 'url': 'https://media.example/Eng.vtt'}])
+
     def test_profile_state_file_decides_availability(self):
         import json,tempfile,time,alloha_profiles
         with tempfile.TemporaryDirectory() as folder:

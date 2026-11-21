@@ -115,3 +115,10 @@ test('Ukrainian dubs are kept, filtered and ordered by content language',()=>{
  assert.deepEqual(orderedVoices(voices,{},{filter:'uk',prefer:'uk'}).map(v=>v.id),['uk']);
  assert.deepEqual(orderedVoices(voices,{},{filter:'ru'}).map(v=>v.id),['ru']);
 });
+
+test('an English original is shown alongside dubs in the all-languages voice list',()=>{
+ const voices=[{id:'en',name:'Eng.Original',language:'en',kind:'original'},{id:'ru',name:'LostFilm',language:'ru',kind:'voice'}];
+ assert.deepEqual(orderedVoices(voices).map(v=>v.id),['ru','en']);
+ assert.deepEqual(orderedVoices(voices,{voiceId:'en'}).map(v=>v.id),['en','ru']);
+ assert.deepEqual(orderedVoices(voices,{},{filter:'ru'}).map(v=>v.id),['ru']);
+});

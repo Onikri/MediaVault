@@ -13,8 +13,9 @@ import re
 import m3u8
 
 from source_parser import SourceError, public_url
+from ua_players import COLLAPS_HOSTS
 
-COLLAPS_EMBED = re.compile(r'https://api\.(?:nextembed\.ws|delivembd\.ws|namy\.ws|bhcesh\.me)/embed/[a-z]+/\d{1,10}(?:\?[\w=&%.-]{0,300})?')
+COLLAPS_EMBED = re.compile(r'https://(?:' + '|'.join(map(re.escape, COLLAPS_HOSTS)) + r')/embed/[a-z]+/\d{1,10}(?:\?[\w=&%.-]{0,300})?')
 MAX_SEGMENTS = 20000
 MAX_PLAYLIST = 4 * 1024**2
 EXTENSIONS = {'.ts', '.m4s', '.mp4', '.aac', '.m4a', '.mp3'}

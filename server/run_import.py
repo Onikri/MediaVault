@@ -90,7 +90,7 @@ def validate_job(value):
     if not isinstance(translation,dict) or set(translation)-{'name','kind','language','player','variantId'}:
         raise SourceError('Некорректный перевод.')
     if translation:
-        if translation.get('kind') not in ({'manga'} if section=='manga' else {'voice','subtitles'}) or any(not isinstance(v,str) or len(v)>180 for v in translation.values()):
+        if translation.get('kind') not in ({'manga'} if section=='manga' else {'voice','subtitles','original'}) or any(not isinstance(v,str) or len(v)>180 for v in translation.values()):
             raise SourceError('Некорректные параметры перевода.')
     output = value.get("output", "text")
     voice = value.get("voice") or None

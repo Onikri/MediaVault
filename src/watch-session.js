@@ -8,11 +8,11 @@ export function onlineEpisodeId(identity,season,episode){return 'online:'+identi
 export function orderedVoices(voices,saved={},{filter='all',prefer='ru',preferName=''}={}){
  const named=v=>!!preferName&&v.name.toLocaleLowerCase('ru').includes(preferName.toLocaleLowerCase('ru'));
  const wanted=v=>filter==='all'||(filter==='uk'?v.language==='uk':v.language!=='uk');
- return [...voices].filter(v=>v.language!=='en'&&wanted(v)&&!/^(?:неизвестн|unknown|название перевода не указано|озвучка не указана|(?:серия|episode)\s*\d)/i.test(v.name)).sort((a,b)=>
+ return [...voices].filter(v=>(v.language!=='en'||v.kind==='original'&&filter==='all')&&wanted(v)&&!/^(?:неизвестн|unknown|название перевода не указано|озвучка не указана|(?:серия|episode)\s*\d)/i.test(v.name)).sort((a,b)=>
   Number(!!(b.id===saved.voiceId||b.aliases?.includes(saved.voiceId)))-Number(!!(a.id===saved.voiceId||a.aliases?.includes(saved.voiceId)))||(saved.usage?.[b.id]||0)-(saved.usage?.[a.id]||0)||
   Number(named(b))-Number(named(a))||
   Number((b.language==='uk')===(prefer==='uk'))-Number((a.language==='uk')===(prefer==='uk'))||
-  Number(a.kind==='subtitles')-Number(b.kind==='subtitles')||a.name.localeCompare(b.name,'ru'));
+  Number(a.kind!=='voice'&&!!a.kind)-Number(b.kind!=='voice'&&!!b.kind)||a.name.localeCompare(b.name,'ru'));
 }
 export function variantsFor(voice,episode,failed=new Set()){
  const rank=v=>{const known=v.episodes?.length,found=v.episodes?.some(e=>Number(e.number)===Number(episode));return (known&&!found?10:0)+(v.provider==='yummy-official'?-1:v.player==='Kodik'?0:v.player==='Alloha'?2:1);};

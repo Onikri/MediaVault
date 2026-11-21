@@ -38,7 +38,7 @@ def voice_suggestions(query='',limit=30,language='all'):
 
 def _discover(selected,*,refresh=False,continuing=False):
     if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')
-    key=repr((selected.get('ids'),aliases(selected),selected.get('year'),selected.get('kind')))
+    key=repr((selected.get('ids'),aliases(selected),selected.get('startDate') or selected.get('year'),selected.get('kind')))
     with _lock:
         hit=_cache.get(key)
         if not refresh and hit and hit[0]>time.monotonic():return hit[1]
@@ -166,7 +166,7 @@ def discover(selected,*,refresh=False,continuing=False):
                                    'status': 'ok' if available else 'no_players', 'complete': True}],
                     'progress': 1, 'pending': False, 'complete': True, 'checkedAt': int(time.time())}
     if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')
-    key=repr((selected.get('ids'),aliases(selected),selected.get('year'),selected.get('kind')))
+    key=repr((selected.get('ids'),aliases(selected),selected.get('startDate') or selected.get('year'),selected.get('kind')))
     with _lock:hit=_cache.get(key)
     with _jobs_lock:
         job=_jobs.get(key)

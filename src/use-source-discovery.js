@@ -17,15 +17,16 @@ function prune(){for(const [key,search] of searches)if(!search.listeners.size&&(
 export default function useSourceDiscovery(item,service){
   const [data,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[revision,setRevision]=useState(0);
   const sourceURL=item?.provider==='hentaichan-video'?(item.sourceURL||item.sourceUrl):undefined;
+  const externalIds=JSON.stringify(item?.ids||{});
   useEffect(()=>{
     setData(null);setError('');setLoading(false);
     if(!item||!['anime','tv','movie'].includes(item.kind)||(!service.session?.serverVersion&&service.status!=='connected'))return;
     if(guestLocked(service.session,item)){setError(GUEST_LOCKED);return;}
     if(service.session?.serverVersion&&service.session.serverVersion<7){setError('Сервер импорта нужно обновить для полного списка озвучек и качеств.');return;}
-    const title=Object.fromEntries(['id','ids','title','titles','aliases','year','kind','format'].map(key=>[key,item[key]]));
+    const title=Object.fromEntries(['id','ids','title','titles','aliases','year','startDate','kind','format'].map(key=>[key,item[key]]));
     if(sourceURL){title.provider=item.provider;title.sourceURL=sourceURL;}
     // Keyed like the effect: the same work, not its (late-arriving) aliases.
-    const key=String(service.server||'')+'|'+JSON.stringify([item.id,item.kind,item.ids||{},item.year||null,sourceURL||'']);
+    const key=String(service.server||'')+'|'+JSON.stringify([item.id,item.kind,item.ids||{},item.startDate||item.year||null,sourceURL||'']);
     if(revision){const old=searches.get(key);old?.controller?.abort();searches.delete(key);}
     const search=share(key);
     const listener=value=>{setData(value.data);setError(value.error);setLoading(!value.done);};
@@ -57,6 +58,6 @@ export default function useSourceDiscovery(item,service){
       prune();
     }
     return leave;
-  },[item?.id,item?.year,sourceURL,service.server,service.session?.serverVersion||service.status==='connected',revision]);
+  },[item?.id,item?.year,item?.startDate,externalIds,sourceURL,service.server,service.session?.serverVersion||service.status==='connected',revision]);
   return {data,loading,error,retry:()=>setRevision(r=>r+1)};
 }

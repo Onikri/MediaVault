@@ -1544,15 +1544,16 @@ class Resolver:
 
     def ua_player(self, url, referer=None):
         """Ashdi / HDVB-UA / Tortuga Playerjs and Collaps: re-read the embed for fresh media."""
-        from ua_players import split_selectors, is_collaps, playerjs_stream, collaps_stream
+        from ua_players import split_selectors, is_collaps, playerjs_stream, collaps_episode, collaps_captions, _number
         embed, selected = split_selectors(url)
         # The embed itself is the validated page URL; Origin is reduced to its host.
         text, final, _ = self.http.document(embed, headers={'Referer': referer or embed})
         if is_collaps(embed):
-            media, audio = collaps_stream(text, selected)
-            if not media:raise SourceError('Выбранная серия больше не опубликована в плеере.')
-            return Page(streams=[{'url': media, 'type': 'hls', 'quality': None, 'audio': audio,
-                                  'headers': playback_headers({'Referer': embed, 'Origin': embed})}])
+            item = collaps_episode(text, selected)
+            if not item:raise SourceError('Выбранная серия больше не опубликована в плеере.')
+            return Page(streams=[{'url': item['hls'], 'type': 'hls', 'quality': None, 'audio': _number(selected.get('mv_audio')),
+                                  'headers': playback_headers({'Referer': embed, 'Origin': embed})}],
+                        subtitles=collaps_captions(item))
         media = playerjs_stream(embed, text, selected)
         if not media:raise SourceError('Выбранная озвучка или серия больше не опубликована в плеере.')
         return Page(streams=[{'url': media, 'type': 'hls' if '.m3u8' in media else 'mp4', 'quality': None,

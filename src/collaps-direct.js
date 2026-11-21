@@ -7,7 +7,7 @@
 // stream allow this site's origin (CORS). The browser therefore opens the
 // public embed itself, takes the published HLS and hands it to hls.js. No
 // server traffic, no address substitution: the viewer's own connection plays.
-const HOSTS=/^api\.(?:nextembed\.ws|delivembd\.ws|namy\.ws|bhcesh\.me)$/i;
+const HOSTS=/^api\.(?:nextembed\.ws|delivembd\.ws|namy\.ws|bhcesh\.me|embf\.net)$/i;
 
 export function collapsSelection(value){
  try{
@@ -31,16 +31,33 @@ function jsValue(text,key,opener){
 }
 const numberOf=value=>{const m=/\d+/.exec(String(value??''));return m?Number(m[0]):null;};
 
-export function collapsStream(text,{season=null,episode=null}={}){
+function collapsEpisode(text,{season=null,episode=null}={}){
  const seasons=jsValue(text,'seasons','[');
  if(Array.isArray(seasons)&&seasons.length){
   for(const row of seasons){
    if(!row||row.blocked||season!=null&&numberOf(row.season)!==season)continue;
-   for(const item of row.episodes||[])if(String(item?.hls||'').startsWith('https://')&&(episode==null||numberOf(item.episode)===episode))return item.hls;
+   for(const item of row.episodes||[])if(String(item?.hls||'').startsWith('https://')&&(episode==null||numberOf(item.episode)===episode))return item;
   }
   return null;
  }
- return /\bhls\s*:\s*"(https:\/\/[^"]+)"/.exec(text)?.[1]||null;
+ const hls=/\bhls\s*:\s*"(https:\/\/[^"]+)"/.exec(text)?.[1];
+ return hls?{hls,cc:jsValue(text,'cc','[')}:null;
+}
+
+export function collapsStream(text,selection){
+ return collapsEpisode(text,selection)?.hls||null;
+}
+
+function captionsOf(episode){
+ if(!Array.isArray(episode.cc))return [];
+ return episode.cc.slice(0,32).flatMap((track,index)=>{
+  const name=typeof track?.name==='string'?track.name.trim().replace(/\s+-\s+\d+$/,'').slice(0,100):'';
+  let url;
+  try{url=new URL(track?.url);}catch{return [];}
+  if(!name||url.protocol!=='https:'||url.username||url.password||!url.pathname.toLowerCase().endsWith('.vtt'))return [];
+  const language=/^(?:eng|english|англ)/i.test(name)?'en':/^(?:рус|rus|russian)/i.test(name)?'ru':/^(?:укр|ukr|ukrainian)/i.test(name)?'uk':'und';
+  return [{id:'collaps-cc-'+index,name,language,url:url.href}];
+ });
 }
 
 // The embed appends its page token to the stream address, as its own player does.
@@ -91,20 +108,20 @@ export async function collapsMaster(value,{signal,fetcher=fetch}={}){
  const request=collapsRequest(fetcher,signal);
  const page=await request(selection.embed);
  if(!page.ok)throw Object.assign(Error('Collaps не открыл плеер (HTTP '+page.status+').'),{status:page.status});
- const text=await page.text(),stream=collapsStream(text,selection);
+ const text=await page.text(),episode=collapsEpisode(text,selection),stream=episode?.hls;
  if(!stream)throw Error('Collaps не опубликовал эту серию.');
  const token=pageToken(text),address=token&&!stream.includes('&'+token)?stream+'&'+token:stream;
  const master=await request(address);
  if(!master.ok)throw Object.assign(Error('Collaps не отдал поток (HTTP '+master.status+').'),{status:master.status});
- return {selection,raw:await master.text(),base:master.url||address};
+ return {selection,raw:await master.text(),base:master.url||address,subtitles:captionsOf(episode)};
 }
 
 export async function prepareCollaps(value,{quality='best',signal,fetcher=fetch}={}){
- const {selection,raw,base}=await collapsMaster(value,{signal,fetcher}),maxHeight=quality==='best'?null:Number(quality);
+ const {selection,raw,base,subtitles}=await collapsMaster(value,{signal,fetcher}),maxHeight=quality==='best'?null:Number(quality);
  const playlist=directMaster(preferAudio(raw,selection.audio),base,maxHeight);
  const qualities=[...new Set([...raw.matchAll(/RESOLUTION=\d+x(\d+)/g)].map(m=>Number(m[1])))].sort((a,b)=>b-a);
  const url=URL.createObjectURL(new Blob([playlist],{type:'application/vnd.apple.mpegurl'}));
- return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,audioNames:audioNames(raw),subtitles:[],sourceIntervals:[]};
+ return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,audioNames:audioNames(raw),subtitles,sourceIntervals:[]};
 }
 
 // Shared by the viewer, the separate audio track and episode previews.

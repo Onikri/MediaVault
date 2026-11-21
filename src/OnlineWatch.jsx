@@ -68,7 +68,15 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const refreshedAlloha=useRef(new Set());
  const voice=voices.find(v=>v.id===voiceId||v.aliases?.includes(voiceId))
   ||(voiceId&&voices.find(v=>v.kind!=='subtitles'&&voiceEpisodeCount(v,season)))||voices[0];activeVoiceName.current=voice?.name||'';
- const browseVoice=titleVoices.find(v=>v.id===voice?.id);
+ const browseChoices=item.kind==='tv'?voicesForCatalogue(titleVoices,discovery.data?.sources,browseSeason):titleVoices;
+ const browseVoice=browseChoices.find(v=>v.id===voice?.id)||(item.kind==='tv'?browseChoices[0]:null);
+ const seasonOptions=item.kind==='tv'?[...new Map([
+  ...titleVoices.flatMap(v=>v.variants.flatMap(entry=>(entry.episodes||[]).map(e=>{
+   const number=Number(e.season)||1;
+   return [number,{number,name:'Сезон '+number}];
+  }))),
+  ...seasons.map(entry=>[Number(entry.number),entry])
+ ]).values()].sort((a,b)=>a.number-b.number):seasons;
  const allohaRevision=(voice?.variants||[]).filter(isAllohaVariant).map(v=>v.id+':'+v.url).join('|');
  function persist(change){saved.current=saveWatch(userId,identity,change);}
  // The episode chosen on another device of this profile, while nothing plays here.
@@ -99,7 +107,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   signal.throwIfAborted();for(const s of data.seasons||[])if(s.url)seasonUrls.current.set(identity+':'+candidate.id+':'+s.number,s.url);
   let rows=(data.episodes||[]).filter(e=>!e.season||Number(e.season)===Number(selectedSeason)).map(e=>({...e,season:e.season||Number(selectedSeason)}));
   const actualSeasons=[...new Set((data.episodes||[]).map(e=>Number(e.season)||1))];
-  if(!rows.length&&actualSeasons.length===1&&(data.seasons||[]).length<=1)rows=data.episodes;
+  if(!rows.length&&!(published&&item.kind==='tv')&&actualSeasons.length===1&&(data.seasons||[]).length<=1)rows=data.episodes;
   if(!rows.length)throw Error('У этой озвучки пока нет доступных серий.');
   const actualSeason=Number(rows[0].season)||Number(selectedSeason);
   const result={entries:rows,seasons:data.seasons||[],variant:candidate,season:actualSeason};cache.current.set(key,result);cache.current.set(identity+':'+candidate.id+':'+actualSeason,result);return result;
@@ -186,7 +194,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
    if(closed){releaseOnline(service,data);return;}
    leases.push(data);
    if(mode==='audio')setAudio({url:onlineMediaUrl(service,data),type:data.type,name:group.name});
-   else if(data.subtitles?.length)setCaptions(data.subtitles.map(t=>({...t,url:service.server.replace(/\/$/,'')+t.url})));
+   else if(data.subtitles?.length)setCaptions(data.subtitles.map(t=>({...t,url:onlineMediaUrl(service,data,t.url)})));
    // Kodik subtitle versions carry the text in the picture: the only way to
    // see them is to watch that version, so the player switches to it.
    else {leases.splice(leases.indexOf(data),1);releaseOnline(service,data);if(!closed)burnedCaptions.current?.(group);}
@@ -200,7 +208,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  useEffect(()=>{
   if(browseSeason===season||!browseVoice){setBrowseBusy(false);return;}
   const abort=new AbortController();setBrowseData(null);setBrowseBusy(true);setBrowseError('');
-  resolve(browseVoice,1,abort.signal,new Set(),browseSeason,false).then(value=>{if(!abort.signal.aborted)setBrowseData({...value,season:browseSeason});}).catch(e=>{if(!abort.signal.aborted)setBrowseError(e.message);}).finally(()=>{if(!abort.signal.aborted)setBrowseBusy(false);});
+  resolve(browseVoice,1,abort.signal,new Set(),browseSeason,false).then(value=>{if(!abort.signal.aborted)setBrowseData({...value,season:browseSeason,voiceId:browseVoice.id});}).catch(e=>{if(!abort.signal.aborted)setBrowseError(e.message);}).finally(()=>{if(!abort.signal.aborted)setBrowseBusy(false);});
   return()=>abort.abort();
  },[browseSeason,season,browseVoice?.id,browseAttempt,service.server]);
  const browsingOther=browseSeason!==season;
@@ -257,7 +265,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  function changeQuality(value){setQuality(value);persist({quality:value});if(value!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(Number(value)))){const row=bestQualityRow(knownRows,{quality:value,anyVoice:true});if(row)changeVoice(row.voiceId,value);}}
  function changeVideoMode(checked){setBestVideo(checked);if(checked)startScan('all');persist({bestVideo:checked});if(!checked&&quality!=='best'&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(Number(quality)))){setQuality('best');persist({quality:'best'});}}
  function startScan(scope='all'){setScanScope(scope);setScanRun(n=>n+1);}
- function startPlayback(number=episode,targetSeason=season,row){const recommended=row||(preferred?.entries.some(e=>Number(e.number)===Number(number))?preferred:base);if(!recommended)return;frozen.current={key:[identity,voice?.id,targetSeason,Number(number),quality,bestVideo,attempt,applyRevision].join(':'),value:recommended};setScanScope('');setSeason(targetSeason);setBrowseSeason(targetSeason);setEpisode(Number(number));setSourceSettings(false);if(row){setEntries(row.entries);setVariant(row.variant);}setPlaying(true);}
+ function startPlayback(number=episode,targetSeason=season,row){const recommended=row||(preferred?.entries.some(e=>Number(e.number)===Number(number))?preferred:base);if(!recommended)return;const targetVoice=browsingOther&&row?.voiceId?row.voiceId:voice?.id;if(targetVoice&&targetVoice!==voice?.id){failed.current.clear();setVoiceId(targetVoice);setSubtitleId('');persist({voiceId:targetVoice,audioId:'',subtitleId:''});}frozen.current={key:[identity,targetVoice,targetSeason,Number(number),quality,bestVideo,attempt,applyRevision].join(':'),value:recommended};setScanScope('');setSeason(targetSeason);setBrowseSeason(targetSeason);setEpisode(Number(number));setSourceSettings(false);if(row){setEntries(row.entries);setVariant(row.variant);}setPlaying(true);}
  function startCatalogPlayback(number){
   const value=foreign.row;if(!value||!foreign.item)return;
   const nextIdentity=String(foreign.item.ids?.mal||foreign.item.id),nextSeason=value.season;
@@ -273,14 +281,14 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   </div>
   <div className="watch-quality-note"><label><input type="checkbox" checked={bestVideo} onChange={e=>changeVideoMode(e.target.checked)}/>Лучшее видео из всех озвучек · звук отдельно</label><button type="button" className="text-link" onClick={()=>startScan('all')} disabled={qualityScan.busy&&!!scanScope}>{qualityScan.busy&&scanScope?'Ищем варианты…':'Найти другие качества'}</button>{playing&&preferred&&preferred.variant.id!==viewVariant?.id&&<button type="button" className="text-link" onClick={()=>{setScanScope('');setApplyRevision(n=>n+1);}}>Применить найденное · {preferred.qualities[0]}p</button>}<span role="status">{qualityScan.busy&&scanScope?'Проверяем качества: '+qualityScan.done+' / '+qualityScan.total:heights.length?'Доступно до '+heights[0]+'p':'Качества будут доступны в плеере'}{bestVideo&&videoVoiceId!==voice?.id?' · видео: '+(voices.find(v=>v.id===videoVoiceId)?.name||'другая версия'):''}</span></div>
 </div>;
- const episodeBrowser=<section ref={shelf} className="watch-episode-browser" aria-label="Сезоны и серии">  <div className="watch-episodes-heading"><h3>Серии</h3><span>{displayEntries.length||''}</span>{(catalogSeasons||seasons.length>1)&&<select aria-label="Сезон просмотра" value={catalogSeasons?'work:'+browseWorkId:browseSeason} onChange={e=>{if(e.target.value.startsWith('work:'))setBrowseWorkId(e.target.value.slice(5));else setBrowseSeason(Number(e.target.value));setCount(24);}}>{catalogSeasons?family.map(s=><option key={s.id} value={'work:'+s.id}>{s.name}</option>):seasons.map(s=><option key={s.number} value={s.number}>{s.name||'Сезон '+s.number}</option>)}</select>}</div>
+ const episodeBrowser=<section ref={shelf} className="watch-episode-browser" aria-label="Сезоны и серии">  <div className="watch-episodes-heading"><h3>Серии</h3><span>{displayEntries.length||''}</span>{(catalogSeasons||seasonOptions.length>1)&&<select aria-label="Сезон просмотра" value={catalogSeasons?'work:'+browseWorkId:browseSeason} onChange={e=>{if(e.target.value.startsWith('work:'))setBrowseWorkId(e.target.value.slice(5));else setBrowseSeason(Number(e.target.value));setCount(24);}}>{catalogSeasons?family.map(s=><option key={s.id} value={'work:'+s.id}>{s.name}</option>):seasonOptions.map(s=><option key={s.number} value={s.number}>{s.name||'Сезон '+s.number}</option>)}</select>}</div>
   {(browsingCatalog?foreignBusy:browsingOther&&browseBusy)&&<p className="fine" role="status">Загружаем серии: {catalogSeasons?familySeason?.name:'сезон '+browseSeason}…{playing?' Текущая серия продолжает играть.':''}</p>}
   {(browsingCatalog?foreignError:browsingOther&&browseError)&&<p className="inline-error" role="alert">{browsingCatalog?foreignError:browseError}<button className="text-link" onClick={()=>browsingCatalog?foreign.retry():setBrowseAttempt(n=>n+1)}>Повторить список серий</button></p>}
   <div className="watch-episode-grid">{displayEntries.slice(0,count).map(e=>{const art=displayPreviews[e.number]||e.thumbnail||e.image||displayProfile?.episodeImages?.[String(e.season||displaySeason)+':'+e.number]||displayProfile?.episodeImages?.[String(e.number)]||displayProfile?.cover;return <TitleEpisodeCard key={e.number} data-preview-key={e.url} number={e.number} title={'Серия '+e.number} detail={episodeDetail(e.title,e.number)} selected={playing&&!browsingCatalog&&browseSeason===season&&Number(e.number)===episode} onClick={()=>{if(browsingCatalog){startCatalogPlayback(e.number);return;}persist({episode:Number(e.number),season:e.season||browseSeason});startPlayback(e.number,browseSeason,displayRows);}} artwork={<EpisodeMotionPreview minimumDuration={minimumEpisodeDuration(displayProfile)} cacheKey={episodePreviewKey(displayIdentity,e.season||displaySeason,e.number,displayVariant?.id,userId)} onActive={setHovering} prepare={async signal=>{const target=previewTarget(e);if(!target)throw Error('Нет источника для превью.');const d=await service.request('/online/prepare',{method:'POST',body:{url:target.url,referer:previewVariant.sourceUrl,kind:'video',quality:'360',clientId:'motion-'+crypto.randomUUID(),...(Number(service.session?.serverVersion)>=49?{purpose:'preview'}:{})},signal});return {url:service.server.replace(/\/$/,'')+d.url,type:d.type,close:()=>service.request('/online/'+d.id,{method:'DELETE',keepalive:true}).catch(()=>{})};}}>{art?<img src={art} alt={displayPreviews[e.number]?'Кадр серии '+e.number:'Обложка тайтла'} loading='lazy' referrerPolicy='no-referrer'/>:null}</EpisodeMotionPreview>}/>;})}</div>
   {displayEntries.length>count&&<button className="text-link" onClick={()=>setCount(n=>n+24)}>Ещё серии</button>}
 </section>;
  const [sourceOpen,setSourceOpen]=useState('');
- const voiceHint=v=>[qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]?'до '+qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]+'p':'',voiceEpisodeCount(v,season)?voiceEpisodeCount(v,season)+' сер.':'',v.kind==='subtitles'?'субтитры':'',saved.current.usage?.[v.id]?'твой выбор':''].filter(Boolean).join(', ');
+ const voiceHint=v=>[qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]?'до '+qualityHeights(knownRows.filter(r=>r.voiceId===v.id))[0]+'p':'',voiceEpisodeCount(v,season)?voiceEpisodeCount(v,season)+' сер.':'',v.kind==='subtitles'?'субтитры':v.kind==='original'?'оригинал':'',saved.current.usage?.[v.id]?'твой выбор':''].filter(Boolean).join(', ');
  const sourceSections=[{id:'source',items:[
   {id:'voice',label:'Озвучка',value:voice?.name||(discovery.loading?'Ищем по сайтам…':discovery.data&&!voices.length?'Пока нет':'Не выбрана'),content:close=><Choices label="Озвучка" value={voice?.id||''} options={offeredVoices.map(v=>({value:v.id,label:v.name,hint:voiceHint(v),badges:<SourceBadges sources={sourcesOfVoice(v)}/>}))} onPick={id=>{changeVoice(id);close();}}/>},
   {id:'quality',label:'Качество',value:quality==='best'?'Лучшее, авто':quality+'p',content:close=><Choices label="Качество" value={quality} options={[{value:'best',label:'Лучшее, автоматически'},...heights.map(q=>({value:String(q),label:q+'p',hint:!bestVideo&&!knownRows.some(r=>r.voiceId===voice?.id&&r.qualities.includes(q))?'В другой озвучке':''})),...(quality!=='best'&&!heights.includes(Number(quality))?[{value:quality,label:quality+'p',hint:'Проверяем'}]:[])]} onPick={v=>{changeQuality(v);close();}}/>},
@@ -304,7 +312,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   title:profile?.title||item.title||'',names:chapterNames,kind:String(item.kind||item.format||'').slice(0,60),year:Number(item.year)||undefined,
   description:String(profile?.description||item.description||'').replace(/<[^>]+>/g,'').slice(0,1200),episodeTitle:current?.title&&!/^\d+$/.test(current.title)?String(current.title).slice(0,300):'',
   collaps:collapsEmbeds(voices,film?0:season,film?0:Number(current?.number||episode))}:null});
- const controls={chapters,configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasons.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:voice?.id,
+ const controls={chapters,configuration,episodeBrowser,seasonOptions:catalogSeasons?family.map(s=>({id:'work:'+s.id,name:s.name})):seasonOptions.map(s=>({id:String(s.number),name:s.name||'Сезон '+s.number})),browseSeasonId:catalogSeasons?'work:'+browseWorkId:String(browseSeason),onBrowseSeason:id=>{if(id.startsWith('work:'))setBrowseWorkId(id.slice(5));else setBrowseSeason(Number(id));setCount(24);},seasonName:activeFamilySeason?.name,voices:spoken.map(v=>({id:v.id,name:v.name,sources:sourcesOfVoice(v)})),currentSource:sourceOf(viewVariant?.player),voiceId:voice?.id,
   // A voice picked in the player is a real voice change: its own balancer and
   // stream (or its audio track inside the playing Collaps stream).
   onVoice:id=>{if(id&&id!==voice?.id)changeVoice(id);},
