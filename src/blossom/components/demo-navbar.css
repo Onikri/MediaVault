@@ -1,0 +1,117 @@
+/* The navbar of the approved design (motion lab title demo), applied to the
+   site's own bar: an open bar at the top that drops from the edge, narrows and
+   condenses into a floating glass capsule as --nav-t goes 0 → 1 (the title page
+   drives it from its showcase, other pages from the scroll). Typography and
+   sizes follow the design: system sans, 15px heavy wordmark, 12px links with
+   their icons, a ruby search button and glass circles for the actions. */
+
+@media (--above-phone) {
+  html[data-blossom] .blossom-navbar,
+  html[data-blossom] .blossom-navbar.is-scrolled {
+    top: calc(4px + 10px * var(--nav-t, 0));
+    width: calc(min(1520px, 100% - 32px) - 24px * var(--nav-t, 0));
+    transition: none;
+  }
+  html[data-blossom] .blossom-navbar .header-inner {
+    min-height: calc(64px - 10px * var(--nav-t, 0));
+    padding-block: calc(8px - 2px * var(--nav-t, 0));
+    padding-inline: calc(4px + 16px * var(--nav-t, 0)) calc(4px + 12px * var(--nav-t, 0));
+  }
+  html[data-blossom] .blossom-navbar .header-inner::before {
+    opacity: var(--nav-t, 0);
+    border-radius: 999px;
+    background-color: rgb(18 8 13 / .6);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), inset 0 1px 0 rgba(255,255,255,.07), 0 20px 55px -14px rgba(0,0,0,.88);
+    transform: scale(calc(1.018 - .018 * var(--nav-t, 0)), calc(.9 + .1 * var(--nav-t, 0)));
+    transition: none;
+  }
+}
+html[data-blossom][data-theme='noir'] .blossom-navbar .header-inner::before {
+  background-color: rgb(0 0 0 / .7);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12), inset 0 1px 0 rgba(255,255,255,.08), 0 18px 50px -12px rgba(0,0,0,.9);
+}
+
+/* Wordmark: the blossom-in-ring mark and the name, no plate or outline. */
+html[data-blossom] .blossom-navbar .brand.logo,
+html[data-blossom] .site-header .brand.logo {
+  display: inline-flex; align-items: center; gap: 10px; height: auto; min-height: 0; padding: 0 4px;
+  background: none; border: 0; box-shadow: none; border-radius: 0;
+  font: 900 15px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: -.025em; color: #fff;
+}
+html[data-blossom] .blossom-navbar .brand.logo > span > span { color: inherit; }
+html[data-blossom] .blossom-navbar .brand-mark { width: 28px; height: 28px; }
+
+/* Links: icon and label, 12px, a soft pill under the current one. */
+html[data-blossom] .blossom-navbar .desktop-nav { gap: 4px; }
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link {
+  height: 32px; min-height: 32px; padding: 0 12px; gap: 7px; border-radius: 999px;
+  font: 400 12px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; color: #a1a1aa; background: none;
+}
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link:hover { color: #fff; background: rgba(255,255,255,.05); }
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link[aria-current],
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link[aria-current]:hover { color: #fff; font-weight: 500; background: none; }
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link .nav-link-icon,
+html[data-blossom][data-catalog-merged] .blossom-navbar .desktop-nav .nav-link-icon { display: inline-grid; width: 17px; height: 17px; color: inherit; }
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link .nav-link-icon svg { width: 17px; height: 17px; }
+html[data-blossom] .blossom-navbar .desktop-nav .nav-link[aria-current] .nav-link-icon { color: #fff; }
+html[data-blossom] .blossom-navbar .nav-glide { top: 50%; height: 32px; margin-top: -16px; border: 0; border-radius: 999px; background: rgba(255,255,255,.08); }
+
+/* Search: the ruby button in the middle. */
+html[data-blossom] .blossom-navbar .header-center-search .header-search,
+html[data-blossom] .blossom-navbar .header-center-search .header-search:hover,
+html[data-blossom] .blossom-navbar .header-center-search .header-search:focus-visible {
+  width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 0; gap: 0; border: 0; border-radius: 999px;
+  display: grid; place-items: center; color: #fff; background: #e11d48; box-shadow: 0 0 20px rgba(225,29,72,.5);
+  transition: transform .2s, background-color .2s;
+}
+html[data-blossom] .blossom-navbar .header-center-search .header-search:hover { background: #f43f5e; }
+html[data-blossom] .blossom-navbar .header-center-search .header-search > span { display: none; }
+html[data-blossom] .blossom-navbar .header-center-search .header-search > svg { width: 15px; height: 15px; }
+html[data-blossom][data-theme='noir'] .blossom-navbar .header-center-search .header-search { background: #fff; color: #000; box-shadow: 0 0 20px rgba(255,255,255,.3); }
+
+/* Actions: glass circles with larger icons. */
+html[data-blossom] .blossom-navbar .header-actions { gap: 8px; }
+html[data-blossom] .blossom-navbar :is(.notification-bell, #profileBtn, .retained-dock, .music-nav-toggle) {
+  width: 38px; min-width: 38px; max-width: none; height: 38px; flex: 0 0 38px; padding: 0; border-radius: 999px;
+  display: grid; place-items: center; overflow: hidden;
+  color: #d4d4d8; border: 1px solid rgba(255,255,255,.07);
+  background: linear-gradient(to bottom, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  transition: color .2s, background .2s, border-color .2s;
+}
+html[data-blossom] .blossom-navbar :is(.notification-bell, #profileBtn, .retained-dock, .music-nav-toggle):hover,
+html[data-blossom] .blossom-navbar :is(.notification-bell, #profileBtn)[aria-expanded='true'] {
+  color: #fff; background: linear-gradient(to bottom, rgba(255,255,255,.14), rgba(255,255,255,.04)); border-color: rgba(255,255,255,.14);
+}
+html[data-blossom] .blossom-navbar :is(.notification-bell, #profileBtn) > :is(svg, .mi) { width: 20px; height: 20px; }
+html[data-blossom] .blossom-navbar #profileBtn > :is(.profile-avatar-image, img) { width: 100%; height: 100%; }
+html[data-blossom] .blossom-navbar .notification-bell > span {
+  top: -2px; right: -2px; min-width: 16px; width: auto; height: 16px; padding: 0 4px; border-radius: 999px;
+  font: 700 9px/16px ui-sans-serif, system-ui, sans-serif; color: #fff; background: #e11d48; box-shadow: 0 0 0 2px rgb(18 8 13);
+}
+html[data-blossom][data-theme='noir'] .blossom-navbar .notification-bell > span { color: #000; background: #fff; }
+
+/* Popovers in the design's glass: notifications, profile, music island, search. */
+html[data-blossom] :is(.profile-menu, #notification-center, .music-island, .morph-search-bar, .morph-search-panel) {
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgb(18 8 13 / .78);
+  backdrop-filter: blur(40px) saturate(1.5); -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 24px 60px -20px rgba(0,0,0,.9);
+}
+html[data-blossom] :is(.profile-menu, #notification-center) { border-radius: 24px; }
+html[data-blossom][data-theme='noir'] :is(.profile-menu, #notification-center, .music-island, .morph-search-bar, .morph-search-panel) { background: rgb(0 0 0 / .85); border-color: rgba(255,255,255,.14); }
+html[data-blossom] .morph-search-chip-active { background: rgb(225 29 72 / .25); border-color: rgb(244 63 94 / .35); }
+html[data-blossom][data-theme='noir'] .morph-search-chip-active { background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.2); }
+html[data-blossom] .profile-menu-list > button { border-radius: 16px; }
+html[data-blossom] .profile-menu-list > button:hover { background: rgba(255,255,255,.05); }
+
+/* Оформление in the profile menu. */
+.profile-menu-theme { display: grid; gap: 2px; margin: 6px 0; padding: 6px 0; border-block: 1px solid rgba(255,255,255,.07); }
+.profile-menu-theme > p { margin: 0; padding: 4px 12px 6px; font: 400 10px/1.4 ui-sans-serif, system-ui, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: #71717a; }
+.profile-menu-theme > button { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 0; border-radius: 16px; background: none; color: inherit; text-align: left; cursor: pointer; }
+.profile-menu-theme > button:hover { background: rgba(255,255,255,.05); }
+.profile-menu-theme .theme-preview { width: 36px; height: 36px; flex: none; border-radius: 12px; }
+.profile-menu-theme strong { display: block; font-size: 13px; color: #fff; }
+.profile-menu-theme small { display: block; font-size: 11px; color: #a1a1aa; }
+.profile-menu-theme > button > svg { margin-left: auto; color: #fb7185; }
+html[data-theme='noir'] .profile-menu-theme > button > svg { color: #fff; }

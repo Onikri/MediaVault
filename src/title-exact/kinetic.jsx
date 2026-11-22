@@ -34,9 +34,16 @@ function useKinetic(ref, enabled, apply, reset) {
  */
 export function KineticSectionBlock({id, sectionIndex, enabled, isNoir, children}) {
   const section = useRef(null), line = useRef(null);
-  useKinetic(section, enabled, (node, {smoothIndex, velocity}) => {
+  // The divider line follows focus on every section; the body moves only when enabled
+  // (the player's section stays still so its media never sits in a transformed box).
+  useKinetic(section, true, (node, {smoothIndex, velocity}) => {
     const delta = smoothIndex - sectionIndex, absDelta = Math.abs(delta);
     const focusFactor = Math.max(0, 1 - absDelta * 1.15);
+    if (line.current) {
+      line.current.style.width = `${Math.round(14 + focusFactor * 86)}%`;
+      line.current.style.opacity = (0.18 + focusFactor * 0.82).toFixed(2);
+    }
+    if (!enabled) return;
     const outOfFocus = Math.max(0, Math.min(1, (absDelta - 0.45) / 0.9));
     const clampedVel = Math.max(-0.7, Math.min(0.7, velocity));
     const translateY = clampedVel * 36 + delta * -18;
@@ -47,10 +54,6 @@ export function KineticSectionBlock({id, sectionIndex, enabled, isNoir, children
     node.style.transform = `perspective(1350px) translate3d(0, ${translateY.toFixed(1)}px, 0) scale(${scale.toFixed(4)}) rotateX(${rotateX.toFixed(2)}deg)`;
     node.style.filter = blur > 0.12 ? `blur(${blur.toFixed(1)}px)` : 'none';
     node.style.opacity = opacity.toFixed(3);
-    if (line.current) {
-      line.current.style.width = `${Math.round(14 + focusFactor * 86)}%`;
-      line.current.style.opacity = (0.18 + focusFactor * 0.82).toFixed(2);
-    }
   }, node => { node.style.transform = node.style.filter = node.style.opacity = ''; });
 
   return (

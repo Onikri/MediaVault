@@ -51,7 +51,7 @@ import './watch-page.css';
 import {browseHref,animeSeason} from './anime-navigation.js';
 import {publishBackdrop} from './blossom/theme.js';
 import EpisodeMotionPreview from './EpisodeMotionPreview.jsx';
-import {uiLocale} from './i18n/index.js';
+import {uiLocale,t as translateUi} from './i18n/index.js';
 
 const day=value=>{try{return value?new Intl.DateTimeFormat(uiLocale(),{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(value)):'';}catch{return '';}};
 const equivalent=value=>String(value||'').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]/gu,'');
@@ -276,7 +276,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
     p.related?.length>0&&{id:'related',label:'Связи',verticalLabel:'СВЯЗИ',node:<section id="titleRelated" className="title-related"><RelatedCards k={k(6)} isNoir={isNoir} related={p.related} onOpen={value=>onRelated({...value,artwork:p.artwork,savedAt:p.savedAt})} renderImage={value=>art(value.cover,value.title)}/></section>},
     section==='anime'&&/^\d+$/.test(String(p.sourceId||''))&&{id:'order',label:'Порядок просмотра',verticalLabel:'ПОРЯДОК',node:<WatchOrder identity={p.sourceId} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} cached={p.watchOrder} onRelated={onRelated} onLoaded={value=>{setProfile(old=>({...old,watchOrder:value}));if(!online&&state.admin&&state.driveWritable)actions.saveTitleProfile(title.id,{watchOrder:value},[],{background:true});}}/>},
     (p.staff?.length||p.characters?.some(c=>c.voiceActors?.length))&&{id:'creators',label:['manga','ranobe','book'].includes(section)?'Авторы':'Создатели',verticalLabel:['manga','ranobe','book'].includes(section)?'АВТОРЫ':'СОЗДАТЕЛИ',node:<CreditsPanel kind={section} profile={p} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} renderArtwork={value=>art(value.image,'')}/>},
-  ].filter(Boolean).map((c,i)=>({...c,id:chapter(c.id),key:c.id,glowPrimary:CHAPTER_GLOWS[c.id][0],glowSecondary:CHAPTER_GLOWS[c.id][1],node:c.node}));
+  ].filter(Boolean).map((c,i)=>({...c,verticalLabel:(w=>(w[0].length>2?w[0]:w.join(' ')).toUpperCase())(translateUi(c.label).split(' ')),id:chapter(c.id),key:c.id,glowPrimary:CHAPTER_GLOWS[c.id][0],glowSecondary:CHAPTER_GLOWS[c.id][1],node:c.node}));
   return <article data-kind={section} className={'kt-host kt-title-page'+(online?' online-title-page':'')} style={palette?{'--title-rgb':palette.base}:undefined}>
     {/* Marker for the site's :has(.title-page) rules that hide library chrome around a title. */}
     <span className="title-page" style={{display:'none'}} aria-hidden="true"/>

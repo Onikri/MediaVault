@@ -26,7 +26,7 @@ for(const width of[320,390,1025,1280,1440,1669]){
  assert.equal(await current.getAttribute('aria-label'),'Смотреть');
  assert.equal(await dock.getByRole('button',{name:/Комментарии|Обсуждение/}).count(),0);
  assert.equal(await page.locator('.title-navigation-anchor').isVisible(),false,'The page has no duplicate section rail');
- assert.ok(await brand.evaluate(n=>parseFloat(getComputedStyle(n).borderTopLeftRadius)>=n.offsetHeight/2),'The main navbar retains its brand capsule');
+ assert.equal(await brand.evaluate(n=>getComputedStyle(n).backgroundColor),'rgba(0, 0, 0, 0)','The wordmark sits on the bar without a plate, as in the design');
  assert.ok(await dock.evaluate(n=>[n,...n.querySelectorAll('button,.title-dock-label')].every(element=>{
   const style=getComputedStyle(element);
   return style.backgroundColor==='rgba(0, 0, 0, 0)'&&style.borderInlineStartWidth==='0px'&&style.boxShadow==='none';

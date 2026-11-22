@@ -250,6 +250,7 @@ export function getVerticalTypographySize(labelText, mode) {
 export function VerticalKineticTypography({ sections, smoothIndex, velocity, navIntro = 1, mode = 'cinema-dof' }) {
   return (
     <div
+      translate="no"
       className="relative h-[70vh] min-h-[460px] max-h-[780px] w-14 lg:w-[70px] xl:w-[84px] 2xl:w-[96px] select-none pointer-events-none"
       style={{
         perspective: '1200px',

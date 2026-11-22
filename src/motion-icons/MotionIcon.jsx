@@ -236,6 +236,21 @@ export const GLYPHS = [
       .to(q('.notes'), {y: 0, rotation: 0, duration: .75, ease: 'elastic.out(1,.32)'})
   },
   {
+    id: 'bell', label: 'Уведомления',
+    // A bell with a blossom clapper: it swings on hover and the clapper rings.
+    render: () => <g className="bell">
+      <path className="mi-ink dome" d="M96 50C76 50 64 66 64 86V108L54 122H138L128 108V86C128 66 116 50 96 50Z"/>
+      <rect className="mi-ink" x="90" y="42" width="12" height="12" rx="6"/>
+      <g transform="translate(96 132)"><g className="clapper"><circle className="mi-accent" r="10"/></g></g>
+    </g>,
+    intro: (tl, q) => tl
+      .from(q('.dome'), {scaleY: 0, transformOrigin: '50% 100%', duration: .55, ease: 'back.out(2)'}, .3)
+      .from(q('.clapper'), {scale: 0, duration: .4, ease: 'back.out(3)'}, .7),
+    hover: q => gsap.timeline()
+      .to(q('.bell'), {keyframes: [{rotation: 14}, {rotation: -11}, {rotation: 7}, {rotation: -4}, {rotation: 0}], svgOrigin: '96 44', duration: .9, ease: 'power1.inOut'})
+      .to(q('.clapper'), {keyframes: [{x: -6}, {x: 6}, {x: -3}, {x: 0}], duration: .8, ease: 'power1.inOut'}, .05)
+  },
+  {
     id: 'rooms', label: 'Комнаты',
     render: () => <g transform="rotate(-45 96 96)">
       <g className="link l1"><rect className="mi-stroke" x="50" y="81" width="58" height="30" rx="15" strokeWidth="11"/></g>

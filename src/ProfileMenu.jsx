@@ -1,3 +1,6 @@
+import {Check} from 'lucide-react';
+import {SiteIcon} from './motion-icons/MotionIcon.jsx';
+import {THEME_MODES,setThemeMode,useThemeMode} from './title-exact/theme-mode.js';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
@@ -24,7 +27,7 @@ export default function ProfileMenu({state,guest,importActive,onNavigate,onDownl
   state.admin&&{id:'guests',label:'Гости',icon:UsersRound,run:onGuests},
   {id:'settings',label:'Настройки',icon:Settings,run:()=>onNavigate('profile'),chevron:true},
  ].filter(Boolean);
- return <><button ref={trigger} id="profileBtn" className={'avatar-button'+(open?' nav-active':'')} onClick={()=>setOpen(v=>!v)} aria-haspopup="dialog" aria-expanded={open} aria-label="Профиль">{user?<ProfileAvatar user={user}/>:<UserIconFallback/>}</button>
+ return <><button ref={trigger} id="profileBtn" className={'avatar-button'+(open?' nav-active':'')} onClick={()=>setOpen(v=>!v)} aria-haspopup="dialog" aria-expanded={open} aria-label="Профиль">{user?<ProfileAvatar user={user} placeholder={<SiteIcon name="profile" size={20}/>}/>:<SiteIcon name="profile" size={20}/>}</button>
  {createPortal(<AnimatePresence>{open&&<motion.section ref={panel} role="dialog" aria-label="Профиль" className="profile-menu" style={box} initial={reduce?false:{opacity:0,scale:.94,y:-4}} animate={{opacity:1,scale:1,y:0}} exit={reduce?{opacity:0}:{opacity:0,scale:.96}} transition={{type:'spring',stiffness:420,damping:34}}>
   <header className="profile-menu-identity">
    {user&&<ProfileAvatar user={user} className="profile-menu-avatar"/>}
@@ -36,8 +39,15 @@ export default function ProfileMenu({state,guest,importActive,onNavigate,onDownl
    <button type="button" className="profile-menu-secondary" onClick={go(onGuestLogin)}><UserPlus size={16}/>Вход по приглашению</button>
   </div>}
   {state.deviceError&&<p className="device-help" role="status">{state.deviceError}</p>}
+  <ThemeRows/>
   <nav className="profile-menu-list" aria-label="Профиль">{items.map(item=><button type="button" key={item.id} onClick={go(item.run)}><item.icon size={17}/><span>{item.label}</span>{item.live&&<i className="profile-menu-live" aria-label="Идут загрузки"/>}{item.chevron&&<ChevronRight size={15}/>}</button>)}</nav>
   {(state.user||guest)&&<button type="button" className="profile-menu-exit" onClick={go(onLogout)}><LogOut size={16}/>Выйти</button>}
  </motion.section>}</AnimatePresence>,document.body)}</>;
 }
 function UserIconFallback(){return <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>;}
+
+// Оформление in the profile menu, as in the design: classic blossom or Нуар.
+function ThemeRows(){
+ const mode=useThemeMode();
+ return <div className="profile-menu-theme" role="group" aria-label="Оформление"><p>Оформление</p>{THEME_MODES.map(([id,name,note])=><button type="button" key={id} aria-pressed={mode===id} onClick={()=>setThemeMode(id)}><span className={'theme-preview is-'+id}/><span><strong>{name}</strong><small>{note}</small></span>{mode===id&&<Check size={15}/>}</button>)}</div>;
+}
