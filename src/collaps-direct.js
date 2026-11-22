@@ -121,7 +121,8 @@ export async function prepareCollaps(value,{quality='best',signal,fetcher=fetch}
  const playlist=directMaster(preferAudio(raw,selection.audio),base,maxHeight);
  const qualities=[...new Set([...raw.matchAll(/RESOLUTION=\d+x(\d+)/g)].map(m=>Number(m[1])))].sort((a,b)=>b-a);
  const url=URL.createObjectURL(new Blob([playlist],{type:'application/vnd.apple.mpegurl'}));
- return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,audioNames:audioNames(raw),subtitles,sourceIntervals:[]};
+ return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,audioNames:audioNames(raw),subtitles,sourceIntervals:[],
+  guardSlate:selection.embed.endsWith('/embed/movie/2491')}; // The Blacklist (2013), all seasons.
 }
 
 // Shared by the viewer, the separate audio track and episode previews.

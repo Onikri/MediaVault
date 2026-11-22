@@ -77,6 +77,7 @@ button:hover .knob-top,button[aria-expanded=true] .knob-top{transform:translateX
 /* Picture */
 .mvx .mvx-screen{position:relative;z-index:3;width:100%;aspect-ratio:16/9;overflow:hidden;background:#000;isolation:isolate;border-radius:0}
 .mvx .mvx-stage{position:absolute;inset:0;z-index:0;background:#000}
+.mvx.has-collaps-slate :is(.mvx-stage,.mvx-ambient){visibility:hidden}
 .mvx .mvx-stage>video,.mvx .mvx-canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:brightness(var(--video-brightness,1)) var(--picture-filter,brightness(1))}
 .mvx .mvx-ambient{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 90% at 0% 100%,rgb(var(--scene-rgb)/.3),transparent 60%);opacity:1;transition:opacity .8s}
 .mvx.is-playing .mvx-ambient,.mvx.ambient-off .mvx-ambient{opacity:0}

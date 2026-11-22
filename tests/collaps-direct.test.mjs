@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {collapsSelection,collapsStream,pageToken,preferAudio,directMaster,prepareCollaps} from '../src/collaps-direct.js';
+import {isCollapsSlate,SLATE_WIDTH,SLATE_HEIGHT,watchCollapsFrames} from '../src/collaps-video-guard.js';
 
 const serial=readFileSync(new URL('./fixtures/players/collaps_serial.html',import.meta.url),'utf8');
 const MASTER=`#EXTM3U
@@ -45,7 +46,7 @@ test('the browser opens the embed and the stream itself, with the page token',as
   if(url==='https://cdn.example/m/master.m3u8?a=1&tok42')return new Response(MASTER);
   return new Response('',{status:410});};
  const data=await prepareCollaps('https://api.nextembed.ws/embed/movie/180?mv_audio=0',{fetcher});
- assert.equal(data.direct,true);assert.equal(data.type,'hls');assert.deepEqual(data.qualities,[720,360]);
+ assert.equal(data.direct,true);assert.equal(data.type,'hls');assert.deepEqual(data.qualities,[720,360]);assert.equal(data.guardSlate,false);
  assert.deepEqual(data.audioNames,['rus0','ukr1'],'the dubs inside the stream, in the order Collaps numbers them');
  assert.match(data.url,/^blob:/);assert.deepEqual(asked.map(a=>a[1]),['omit','omit']);
  URL.revokeObjectURL(data.url);
@@ -67,4 +68,58 @@ test('the current Collaps mirror keeps VTT tracks scoped to the selected season 
  const data=await prepareCollaps(embed+'?mv_season=2&mv_episode=2&mv_audio=1',{fetcher});
  try{assert.deepEqual(data.subtitles,[{id:'collaps-cc-0',name:'Рус. полные',language:'ru',url:'https://media.example/two.vtt?token=fixture'}]);}
  finally{URL.revokeObjectURL(data.url);}
+});
+
+test('Blacklist playback enables slate detection for every season and keeps HD available',async()=>{
+ const embed='https://api.embf.net/embed/movie/2491';
+ const cdn='https://media.example';
+ const seasons=[1,10].map(season=>({season,episodes:[
+  {episode:7,hls:cdn+'/'+season+'/master.m3u8',cc:[{name:'Eng. full',url:cdn+'/english.vtt'}]},
+ ]}));
+ const fetcher=async url=>{
+  if(url===embed)return new Response('makePlayer({seasons:'+JSON.stringify(seasons)+'})');
+  return new Response(MASTER);
+ };
+ for(const season of [1,10]){
+  const data=await prepareCollaps(embed+'?mv_season='+season+'&mv_episode=7&mv_audio=1',{quality:'720',fetcher});
+  try{
+   const playlist=await fetch(data.url).then(response=>response.text());
+   assert.equal(data.guardSlate,true);
+   assert.deepEqual(data.qualities,[720,360]);
+   assert.match(playlist,/NAME="ukr1",DEFAULT=YES,AUTOSELECT=YES/);
+   assert.equal(data.subtitles[0].url,cdn+'/english.vtt');
+  }finally{URL.revokeObjectURL(data.url);}
+ }
+});
+
+function slateFrame(){
+ const gray=[
+  'fdfffffffffeeeff', 'fbcdeffffffa9aef', 'fffeeeeeffea89ef',
+  '7cfdcbcccdd989ef', '259cdddcdeeaaadf', '55769cefffea99df',
+  '655566afffd565bf', '554359ceeeebbbdf','3446beeeeeeeeeff',
+ ].join('');
+ return Uint8ClampedArray.from([...gray].flatMap(value=>{
+  const l=parseInt(value,16)*17;
+  return [l,l,l,255];
+ }));
+}
+
+test('the slate guard requires both image areas and stops checking after one rejection',()=>{
+ const frame=slateFrame(), white=new Uint8ClampedArray(SLATE_WIDTH*SLATE_HEIGHT*4).fill(255);
+ assert.equal(isCollapsSlate(frame),true);
+ assert.equal(isCollapsSlate(white),false);
+ const missingQr=frame.slice();
+ for(let y=0;y<4;y++)missingQr.fill(255,(y*SLATE_WIDTH+11)*4,(y*SLATE_WIDTH+16)*4);
+ assert.equal(isCollapsSlate(missingQr),false);
+ let current=white, rejected=0;
+ const video=Object.assign(new EventTarget(),{readyState:2,videoWidth:1280,seeking:false,
+  ownerDocument:{createElement:()=>({getContext:()=>({drawImage(){},getImageData:()=>({data:current})})})}});
+ const stop=watchCollapsFrames(video,()=>rejected++);
+ video.dispatchEvent(new Event('loadeddata'));
+ assert.equal(rejected,0);
+ current=frame;
+ video.dispatchEvent(new Event('seeked'));
+ video.dispatchEvent(new Event('playing'));
+ assert.equal(rejected,1);
+ stop();
 });
