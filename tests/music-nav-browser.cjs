@@ -17,7 +17,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
   await page.route('https://i.ytimg.com/**',r=>r.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a+kkAAAAASUVORK5CYII=','base64')}));
   let providerRequests=0;await page.route(/https:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\//,r=>{providerRequests++;return r.abort();});
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/test-output/music-nav-harness.html');
-  await page.getByRole('button',{name:'Включить Otonoke',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.music-dock-error')?.textContent);assert.equal(await page.locator('.music-panel').getAttribute('aria-hidden'),'true');assert.equal(await page.locator('iframe').count(),0);assert.equal(providerRequests,0);
+  await page.getByRole('button',{name:'Включить Otonoke',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.music-dock-error')?.textContent);assert.equal(await page.locator('.music-island').getAttribute('aria-hidden'),'true');assert.equal(await page.locator('iframe').count(),0);assert.equal(providerRequests,0);
   const island=page.locator('.kt-music');
   if(width>=640){
    // The design's island: a started song opens it in the bar; the disc folds it to a ring.
@@ -35,7 +35,7 @@ const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'test-output');let br
    await page.getByRole('button',{name:'Открыть плеер: Otonoke',exact:true}).click();await page.locator('.music-island.is-expanded').waitFor();
   }
   if(width>=640){await page.getByRole('button',{name:'Развернуть музыкальный плеер',exact:true}).click();await page.locator('.music-island.is-expanded').waitFor();}
-  assert.equal(await page.locator('.music-panel').getAttribute('aria-hidden'),'false');
+  assert.equal(await page.locator('.music-island').getAttribute('aria-hidden'),'false');
   await page.getByText('Подключи сервер Oracle в профиле для воспроизведения музыки.',{exact:true}).first().waitFor();
   await page.getByRole('button',{name:'Музыкальные аккаунты и плейлисты',exact:true}).click();
   await page.getByRole('combobox',{name:'Музыкальная платформа',exact:true}).selectOption('spotify');

@@ -49,7 +49,7 @@ export function useReleaseSchedule(identity, releases, server, enabled) {
 
 function Stamp({episode, watched, current, isNoir}) {
   const ring = isNoir ? '#fff' : '#f43f5e';
-  return <svg viewBox="0 0 64 64" className="absolute inset-0 m-auto w-[78%] h-[78%] overflow-visible" aria-hidden="true">
+  return <svg viewBox="0 0 64 64" className="absolute inset-0 w-full h-full overflow-visible" aria-hidden="true">
     {current && <circle cx="32" cy="32" r="30" fill="none" stroke={ring} strokeWidth="1.5" className="kt-pulse" opacity=".6"/>}
     <circle cx="32" cy="32" r="24" fill={watched ? ring : 'none'} fillOpacity={watched ? (current ? 1 : .22) : 0} stroke={ring} strokeWidth="2" strokeDasharray={watched ? 'none' : '3 4'}/>
     <text x="32" y="37" textAnchor="middle" fontWeight="900" fontSize={String(episode).length > 2 ? 12 : 15} fill={current && isNoir ? '#000' : '#fff'}>{episode}</text>
@@ -103,35 +103,48 @@ export function ScheduleSection({k, isNoir, identity, releases = [], server, act
       <AnimatePresence mode="wait" initial={false}>
         {view === 'calendar' ? <motion.div key="cal" initial={reduce ? false : {opacity: 0, y: 16}} animate={{opacity: 1, y: 0}} exit={{opacity: 0, y: -10}} transition={{duration: .35, ease}}>
           <KineticItem weight={1.05} {...k}>
-            <div className="grid lg:grid-cols-[minmax(0,1fr)_260px] gap-6 items-stretch">
-              <div className={`p-4 sm:p-6 rounded-3xl border ${glass(isNoir)}`}>
-                <div className="flex items-center justify-between mb-5">
-                  <button type="button" aria-label="Предыдущий месяц" disabled={at <= 0} onClick={() => setMonth(months[at - 1])} className="w-9 h-9 grid place-items-center rounded-full bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 disabled:opacity-30"><ChevronLeft size={16}/></button>
-                  <AnimatePresence mode="wait" initial={false}><motion.p key={shownMonth} initial={reduce ? false : {opacity: 0, y: 8}} animate={{opacity: 1, y: 0}} exit={{opacity: 0, y: -8}} transition={{duration: .25}} className="text-lg font-black tracking-tight text-white">{MONTHS[m]} <span className="font-mono font-normal text-zinc-500 text-sm">{y}</span></motion.p></AnimatePresence>
-                  <button type="button" aria-label="Следующий месяц" disabled={at < 0 || at >= months.length - 1} onClick={() => setMonth(months[at + 1])} className="w-9 h-9 grid place-items-center rounded-full bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 disabled:opacity-30"><ChevronRight size={16}/></button>
+            <div className="grid lg:grid-cols-[520px_minmax(0,1fr)] gap-5 items-stretch">
+              <div className={`p-5 rounded-[24px] border ${glass(isNoir)}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <button type="button" aria-label="Предыдущий месяц" disabled={at <= 0} onClick={() => setMonth(months[at - 1])} className="w-8 h-8 grid place-items-center rounded-full bg-white/[0.04] hover:bg-white/[0.1] text-zinc-400 hover:text-white disabled:opacity-25"><ChevronLeft size={15}/></button>
+                  <AnimatePresence mode="wait" initial={false}><motion.p key={shownMonth} initial={reduce ? false : {opacity: 0, y: 6}} animate={{opacity: 1, y: 0}} exit={{opacity: 0, y: -6}} transition={{duration: .2}} className="text-[17px] font-black tracking-tight text-white">{MONTHS[m]} <span className="font-mono font-normal text-zinc-500 text-[12px]">{y}</span></motion.p></AnimatePresence>
+                  <button type="button" aria-label="Следующий месяц" disabled={at < 0 || at >= months.length - 1} onClick={() => setMonth(months[at + 1])} className="w-8 h-8 grid place-items-center rounded-full bg-white/[0.04] hover:bg-white/[0.1] text-zinc-400 hover:text-white disabled:opacity-25"><ChevronRight size={15}/></button>
                 </div>
-                <div className="grid grid-cols-7 gap-1 text-center max-w-[640px] mx-auto">
-                  {DAYS.map((d, i) => <span key={d} className={`pb-2 text-[10px] font-mono uppercase tracking-[0.16em] ${i === weekday ? (isNoir ? 'text-white' : 'text-rose-300') : 'text-zinc-500'}`}>{d}</span>)}
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {DAYS.map((d, i) => <span key={d} className={`pb-2 text-[10px] font-mono uppercase tracking-[0.14em] ${i === weekday ? (isNoir ? 'text-white' : 'text-rose-300') : 'text-zinc-600'}`}>{d}</span>)}
                   {cells.map((day, i) => {
-                    if (!day) return <span key={'x' + i} className="aspect-square"/>;
+                    if (!day) return <span key={'x' + i} className="h-14"/>;
                     const v = byDay[y + '-' + pad(m + 1) + '-' + pad(day)];
                     return v ? <button key={day} type="button" onClick={() => choose(v)} title={`Серия ${v.episode} · ${title(v)}`} aria-label={`Серия ${v.episode}, ${say(v)}`} aria-pressed={focus === v}
-                      className={`group relative aspect-square rounded-2xl grid place-items-center transition-transform duration-300 hover:scale-110 ${focus === v ? 'bg-white/[0.05]' : ''}`}>
-                      <Stamp episode={v.episode} watched={isWatched(v) || (!activeEpisode && Date.parse(v.date) <= now)} current={isCurrent(v)} isNoir={isNoir}/>
-                      <span className="absolute top-1 left-1.5 text-[9px] font-mono text-zinc-500">{day}</span>
-                      {(v.filler || v.recap) && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-mono uppercase text-amber-300/80">{v.recap ? 'рекап' : 'филлер'}</span>}
-                    </button> : <span key={day} className="aspect-square grid place-items-center text-[12px] font-mono text-zinc-600">{day}</span>;
+                      className={`group relative h-14 rounded-2xl grid place-items-center transition-transform duration-300 hover:scale-110 ${focus === v ? 'bg-white/[0.06]' : ''}`}>
+                      <span className="relative w-12 h-12"><Stamp episode={v.episode} watched={isWatched(v) || (!activeEpisode && Date.parse(v.date) <= now)} current={isCurrent(v)} isNoir={isNoir}/></span>
+                      <span className="absolute top-0.5 left-1.5 text-[9px] font-mono text-zinc-500">{day}</span>
+                      {(v.filler || v.recap) && <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-300/80" title={v.recap ? 'рекап' : 'филлер'}/>}
+                    </button> : <span key={day} className="h-14 grid place-items-center text-[12px] font-mono text-zinc-600">{day}</span>;
                   })}
                 </div>
               </div>
-              {focus && <div className={`p-6 rounded-3xl border flex flex-col gap-5 ${glass(isNoir)}`} translate="no">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Серия {focus.episode}{focus.recap ? ' · рекап' : focus.filler ? ' · филлер' : ''}</p>
-                <p className="text-2xl font-black tracking-tight text-white leading-tight line-clamp-4">{title(focus)}</p>
-                <p className="text-[13px] text-zinc-400">{Date.parse(focus.date) <= now ? 'вышла' : 'выйдет'} {say(focus)}</p>
-                {onEpisode && Date.parse(focus.date) <= now && <button type="button" onClick={() => onEpisode(Number(focus.episode))} className={`self-start h-9 px-4 rounded-full text-[12px] font-semibold ${isNoir ? 'bg-white text-black' : 'bg-rose-600 hover:bg-rose-500 text-white'}`}>Смотреть серию</button>}
-                <div className="mt-auto">
-                  <div className="flex justify-between text-[10px] font-mono text-zinc-500 mb-2"><span>Вышло</span><span>{aired.length} / {totalCount}</span></div>
-                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden"><div className={`h-full rounded-full transition-[width] duration-700 ${isNoir ? 'bg-white' : 'bg-gradient-to-r from-rose-600 to-rose-400'}`} style={{width: Math.min(100, aired.length / Math.max(1, totalCount) * 100) + '%'}}/></div>
+              {focus && <div className={`p-5 rounded-[24px] border flex flex-col gap-3 min-w-0 ${glass(isNoir)}`} translate="no">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={`text-[10px] uppercase tracking-[0.2em] ${isNoir ? 'text-white' : 'text-rose-300'}`}>Серия {focus.episode}{focus.recap ? ' · рекап' : focus.filler ? ' · филлер' : ''} · {Date.parse(focus.date) <= now ? 'вышла' : 'выйдет'} {say(focus)}</p>
+                    <p className="mt-1.5 text-[22px] font-black tracking-tight text-white leading-snug line-clamp-2">{title(focus)}</p>
+                  </div>
+                  {onEpisode && Date.parse(focus.date) <= now && <button type="button" onClick={() => onEpisode(Number(focus.episode))} className={`shrink-0 h-8 px-3.5 rounded-full text-[12px] font-semibold ${isNoir ? 'bg-white text-black' : 'bg-rose-600 hover:bg-rose-500 text-white'}`}>Смотреть</button>}
+                </div>
+                <ol className="flex-1 grid content-start gap-0.5">
+                  {values.slice(Math.max(0, Math.min(values.indexOf(focus) - 2, values.length - 8)), Math.max(0, Math.min(values.indexOf(focus) - 2, values.length - 8)) + 8).map(v => {
+                    const on = v === focus, out = Date.parse(v.date) <= now;
+                    return <li key={v.episode}><button type="button" onClick={() => choose(v)} className={`w-full grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 h-9 px-2 rounded-xl text-left transition-colors ${on ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'}`}>
+                      <span className={`font-mono text-[11px] tabular-nums ${on ? (isNoir ? 'text-white' : 'text-rose-300') : 'text-zinc-500'}`}>{pad(v.episode)}</span>
+                      <span className={`truncate text-[12px] ${on ? 'text-white font-semibold' : out ? 'text-zinc-300' : 'text-zinc-500'}`}>{title(v)}</span>
+                      <span className="font-mono text-[10px] text-zinc-500">{local(v.date).d} {MONTHS_GEN[local(v.date).m].slice(0, 3)}</span>
+                    </button></li>;
+                  })}
+                </ol>
+                <div>
+                  <div className="flex justify-between text-[10px] font-mono text-zinc-500 mb-1.5"><span>Вышло</span><span>{aired.length} / {totalCount}</span></div>
+                  <div className="h-1 rounded-full bg-white/10 overflow-hidden"><div className={`h-full rounded-full transition-[width] duration-700 ${isNoir ? 'bg-white' : 'bg-gradient-to-r from-rose-600 to-rose-400'}`} style={{width: Math.min(100, aired.length / Math.max(1, totalCount) * 100) + '%'}}/></div>
                 </div>
               </div>}
             </div>

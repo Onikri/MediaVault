@@ -106,7 +106,7 @@ export function KineticSectionBlock({id, sectionIndex, enabled, isNoir, children
 /**
  * Кинетическая карточка контента с индивидуальным весом и 3D-инерцией.
  */
-export function KineticItem({weight = 1, drift = 0, sectionIndex = 0, enabled = true, className = '', children}) {
+export function KineticItem({weight = 1, drift = 0, sectionIndex = 0, enabled = true, className = '', style, children}) {
   const ref = useRef(null);
   useKinetic(ref, enabled, (node, {smoothIndex, velocity}) => {
     const clampedVel = Math.max(-0.75, Math.min(0.75, velocity));
@@ -120,5 +120,5 @@ export function KineticItem({weight = 1, drift = 0, sectionIndex = 0, enabled = 
     put(node, 'transform', `perspective(1000px) translate3d(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px, 0) scale(${scale.toFixed(4)}) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`);
   }, node => clearPut(node, ['transform']));
 
-  return <div ref={ref} className={`will-change-transform ${className}`}>{children}</div>;
+  return <div ref={ref} className={`will-change-transform ${className}`} style={style}>{children}</div>;
 }

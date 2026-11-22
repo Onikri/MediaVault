@@ -1,9 +1,9 @@
 import {useMemo, useRef, useState} from 'react';
 import {ArrowUpRight} from 'lucide-react';
 import {loadPerson} from '../../title-metadata.js';
-import {KineticItem} from '../kinetic.jsx';
 import {Dossier} from './Characters.jsx';
-import {SectionFrame, Switch, glass, rowScroll, useEntered} from './ui.jsx';
+import {SectionFrame, Switch, glass, useEntered} from './ui.jsx';
+import Panorama from './Panorama.jsx';
 
 /* Создатели: the crew in one snapping row of tall cards, split by craft.
    A photo makes a portrait card; without one the card is set in type (no
@@ -54,23 +54,26 @@ export function CreatorsSection({k, isNoir, profile, server, kind = 'anime', ren
       <p className="text-[13px] text-zinc-400">{people.length} в съёмочной группе · нажми на карточку, чтобы открыть досье</p>
       {crafts.length > 1 && <Switch label="Профессия" value={craft} onChange={setCraft} isNoir={isNoir} options={[['all', 'Все'], ...crafts.map(([id, name]) => [id, name])]}/>}
     </div>
-    <div ref={ref} key={craft} translate="no" className={`grid grid-flow-col auto-cols-[calc((100%-16px)/2)] md:auto-cols-[calc((100%-32px)/3)] lg:auto-cols-[calc((100%-64px)/5)] gap-4 -mb-3 ${rowScroll}`}>
-      {shown.map((p, idx) => <KineticItem key={p.id ?? p.name} weight={0.8 + (idx % 3) * 0.14} drift={(idx % 3) - 1} {...k}>
-        <button type="button" onClick={e => open(p, e.currentTarget)} aria-label={'Создатель: ' + p.name}
-          className={`group relative block w-full aspect-[3/4] snap-start rounded-3xl overflow-hidden border text-left transition-[transform,box-shadow,border-color,opacity] duration-700 hover:-translate-y-2 ${isNoir ? 'border-white/20 hover:border-white/60' : 'border-white/[0.08] hover:border-rose-300/40 hover:shadow-[0_28px_60px_-24px_rgba(225,29,72,0.55)]'} ${p.image ? '' : glass(isNoir)} ${entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-          style={{transitionDelay: entered ? `${Math.min(idx, 8) * 60}ms` : '0ms'}}>
+    <div ref={ref} key={craft}>
+      <Panorama items={shown} idOf={p => String(p.id ?? p.name)} k={k} isNoir={isNoir} label="Съёмочная группа" mapLabel="Карта группы"
+        renderCard={(p, idx) => <button type="button" onClick={e => open(p, e.currentTarget)} aria-label={'Создатель: ' + p.name}
+          className={`group relative block w-full aspect-[3/4] rounded-[22px] overflow-hidden border text-left transition-[transform,box-shadow,border-color,opacity] duration-700 hover:-translate-y-1.5 ${isNoir ? 'border-white/20 hover:border-white/60' : 'border-white/[0.08] hover:border-rose-300/40 hover:shadow-[0_24px_50px_-22px_rgba(225,29,72,0.55)]'} ${p.image ? '' : glass(isNoir)} ${entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+          style={{transitionDelay: entered ? `${Math.min(idx, 12) * 45}ms` : '0ms'}}>
           {p.image ? <>
             <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-700 ease-out group-hover:scale-[1.07] ${isNoir ? 'grayscale' : ''}`}>{renderArtwork(p)}</span>
-            <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent"/>
-          </> : <span aria-hidden="true" className="absolute inset-x-4 top-4 text-[44px] leading-[0.9] font-black tracking-tighter text-white/[0.06] break-words transition-colors duration-500 group-hover:text-white/[0.1]">{p.name}</span>}
-          <span className="absolute inset-0 rounded-3xl shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] pointer-events-none"/>
-          <span className="absolute inset-x-4 bottom-4">
-            <span className={`block text-[10px] uppercase tracking-[0.16em] line-clamp-2 ${accent}`}>{p.role}</span>
-            <span className="block mt-1.5 text-base sm:text-lg font-black tracking-tight text-white leading-tight">{p.name}</span>
-            <span className="mt-2 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-white/0 group-hover:text-white/80 transition-colors duration-500">Досье <ArrowUpRight size={12}/></span>
+            <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"/>
+          </> : <span aria-hidden="true" className="absolute inset-x-3.5 top-3.5 text-[30px] leading-[0.9] font-black tracking-tighter text-white/[0.07] break-words transition-colors duration-500 group-hover:text-white/[0.12]">{p.name}</span>}
+          <span className="absolute inset-x-3.5 bottom-3.5">
+            <span className={`block text-[9px] uppercase tracking-[0.14em] line-clamp-2 ${accent}`}>{p.role}</span>
+            <span className="block mt-1 text-[15px] font-black tracking-tight text-white leading-tight line-clamp-2">{p.name}</span>
           </span>
-        </button>
-      </KineticItem>)}
+          <span className="absolute top-3 right-3 w-7 h-7 grid place-items-center rounded-full bg-black/45 border border-white/15 text-white opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300"><ArrowUpRight size={13}/></span>
+        </button>}
+        renderMini={p => p.image ? <>
+          <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-500 group-hover:scale-110 ${isNoir ? 'grayscale' : ''}`}>{renderArtwork(p)}</span>
+          <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent"/>
+          <span className="absolute inset-x-2 bottom-1.5 text-[10px] font-bold leading-tight text-white line-clamp-2">{p.name}</span>
+        </> : <span className={`absolute inset-0 flex items-end p-2 ${glass(isNoir)}`}><span className="text-[10px] font-bold leading-tight text-white line-clamp-3">{p.name}</span></span>}/>
     </div>
     {person && <Dossier kind="person" characters={shown.length ? shown : people} character={person} busy={busy} error={error} origin={origin.current} isNoir={isNoir}
       onPick={value => open(value)} onClose={() => { generation.current++; setPerson(null); origin.current?.isConnected && origin.current.focus({preventScroll: true}); }} renderArtwork={renderArtwork}/>}

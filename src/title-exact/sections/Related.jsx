@@ -5,6 +5,8 @@ import {SectionFrame, Switch, ease, rowScroll} from './ui.jsx';
 
 /* Связи: a filter by kind and one row of large covers. No layout projection
    here (the kinetic section transforms would skew it): the row is re-keyed per filter. */
+const TONES = {'Манга': '#fbbf24', 'Ранобэ': '#a78bfa', 'Аниме': '#fb7185', 'Фильм': '#38bdf8', 'OVA': '#34d399', 'ONA': '#2dd4bf', 'Спецвыпуск': '#f472b6'};
+const tone = kind => TONES[kind] || '#e4e4e7';
 const kindOf = w => w.format || w.kindLabel || (w.kind === 'manga' ? 'Манга' : w.kind === 'ranobe' ? 'Ранобэ' : 'Аниме');
 export function RelatedRow({isNoir, related, onOpen, renderImage}) {
   const reduce = useReducedMotion();
@@ -19,7 +21,7 @@ export function RelatedRow({isNoir, related, onOpen, renderImage}) {
             <span className={`relative block aspect-[2/3] rounded-3xl overflow-hidden border bg-white/[0.03] transition-all duration-500 group-hover:-translate-y-2 ${isNoir ? 'border-white/20 group-hover:border-white/60' : 'border-white/[0.08] group-hover:border-rose-300/40 group-hover:shadow-[0_28px_60px_-24px_rgba(225,29,72,0.55)]'}`}>
               <span className={`absolute inset-0 kt-cover transition-transform duration-700 group-hover:scale-105 ${isNoir ? 'grayscale' : ''}`}>{renderImage(w)}</span>
               <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"/>
-              <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-semibold border backdrop-blur-md ${isNoir ? 'bg-white/10 text-white border-white/25' : 'bg-rose-500/20 text-rose-200 border-rose-500/30'}`}>{kindOf(w)}</span>
+              <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-black/70 border border-white/15 text-[10px] font-semibold text-white shadow-[0_4px_14px_rgba(0,0,0,0.45)]"><span className="w-1.5 h-1.5 rounded-full" style={{background: isNoir ? '#fff' : tone(kindOf(w))}}/>{kindOf(w)}</span>
               <span className="absolute right-3 bottom-3 w-9 h-9 grid place-items-center rounded-full bg-black/40 border border-white/15 text-white opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500"><ArrowUpRight size={16}/></span>
             </span>
             {w.relation && <span className="block mt-3 text-[10px] uppercase tracking-[0.18em] text-zinc-500">{w.relation}</span>}

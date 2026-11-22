@@ -5,36 +5,41 @@ import {ArrowUpRight, BookOpen, ChevronLeft, ChevronRight, ExternalLink, Images,
 import {gsap} from '../../motion-icons/gsap-setup.js';
 import {SplitText} from 'gsap/SplitText';
 import {browseHref} from '../../anime-navigation.js';
-import {KineticItem} from '../kinetic.jsx';
-import {SectionFrame, ease, glass, roundButton, rowScroll, useEntered} from './ui.jsx';
+import {SectionFrame, ease, glass, roundButton, useEntered} from './ui.jsx';
+import Panorama from './Panorama.jsx';
 
 gsap.registerPlugin(SplitText);
 const ROLES = {main: 'Главный', supporting: 'Второстепенный', background: 'Эпизодический'};
 const roleName = role => ROLES[String(role || '').toLowerCase()] || role || '';
 
-/* Персонажи: tall portrait cards in one snapping row; a card flies out into
-   the glass dossier (the design's «Досье»). */
+/* Персонажи: two rows of portrait cards with a panorama map of the whole cast;
+   a card flies out into the glass dossier (the design's «Досье»). */
+const plural = n => n % 10 === 1 && n % 100 !== 11 ? 'персонаж' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'персонажа' : 'персонажей';
 export function CharactersRow({k, isNoir, characters, onOpen, renderImage, emptyNote}) {
   const [ref, entered] = useEntered();
   if (!characters?.length) return <SectionFrame><p className="text-[13px] text-zinc-400">{emptyNote}</p></SectionFrame>;
   return <SectionFrame>
-    <p className="text-[13px] text-zinc-400">{characters.length} {characters.length % 10 === 1 && characters.length % 100 !== 11 ? 'персонаж' : [2, 3, 4].includes(characters.length % 10) && ![12, 13, 14].includes(characters.length % 100) ? 'персонажа' : 'персонажей'} · нажми на карточку, чтобы открыть досье</p>
-    <div ref={ref} translate="no" className={`grid grid-flow-col auto-cols-[calc((100%-16px)/2)] lg:auto-cols-[calc((100%-48px)/4)] gap-4 -mb-3 ${rowScroll}`}>
-      {characters.map((c, idx) => <KineticItem key={c.id || c.name} weight={0.8 + (idx % 3) * 0.14} drift={(idx % 3) - 1} {...k}>
-        <button type="button" onClick={e => onOpen(c, e.currentTarget)} aria-label={'Досье: ' + c.name}
-          className={`kt-char group relative block w-full aspect-[3/5] snap-start rounded-3xl overflow-hidden border text-left transition-[transform,box-shadow,border-color,opacity] duration-700 hover:-translate-y-2 ${isNoir ? 'border-white/20 hover:border-white/60' : 'border-white/[0.08] hover:border-rose-300/40 hover:shadow-[0_28px_60px_-24px_rgba(225,29,72,0.55)]'} ${entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-          style={{transitionDelay: entered ? `${Math.min(idx, 8) * 70}ms` : '0ms'}}>
-          <span className={`absolute inset-0 kt-cover transition-transform duration-700 ease-out group-hover:scale-[1.07] ${isNoir ? 'grayscale' : ''}`}>{renderImage(c)}</span>
-          <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/10"/>
-          <span className="absolute inset-0 rounded-3xl shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] pointer-events-none"/>
-          {roleName(c.role) && <span className="absolute top-4 left-4 px-2.5 py-1 rounded-full bg-black/30 backdrop-blur-md border border-white/15 text-[10px] uppercase tracking-[0.16em] text-white/90">{roleName(c.role)}</span>}
-          <span className="absolute inset-x-5 bottom-5">
-            <span className="block text-lg sm:text-xl font-black tracking-tight text-white leading-tight">{c.name}</span>
-            {c.voice && <span className={`block mt-1.5 text-[11px] ${isNoir ? 'text-zinc-300' : 'text-rose-200/80'}`}>Сэйю · {c.voice}</span>}
-            <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-white/0 group-hover:text-white/80 transition-colors duration-500">Досье <ArrowUpRight size={12}/></span>
+    <p className="text-[13px] text-zinc-400">{characters.length} {plural(characters.length)} · нажми на карточку, чтобы открыть досье</p>
+    <div ref={ref}>
+      <Panorama items={characters} idOf={c => String(c.id || c.name)} k={k} isNoir={isNoir} label="Персонажи" mapLabel="Карта персонажей"
+        renderCard={(c, idx) => <button type="button" onClick={e => onOpen(c, e.currentTarget)} aria-label={'Досье: ' + c.name}
+          className={`kt-char group relative block w-full aspect-[3/4] rounded-[22px] overflow-hidden border text-left transition-[transform,box-shadow,border-color,opacity] duration-700 hover:-translate-y-1.5 ${isNoir ? 'border-white/20 hover:border-white/60' : 'border-white/[0.08] hover:border-rose-300/40 hover:shadow-[0_24px_50px_-22px_rgba(225,29,72,0.55)]'} ${entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+          style={{transitionDelay: entered ? `${Math.min(idx, 12) * 45}ms` : '0ms'}}>
+          {c.image ? <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-700 ease-out group-hover:scale-[1.07] ${isNoir ? 'grayscale' : ''}`}>{renderImage(c)}</span>
+            : <span aria-hidden="true" className={`absolute inset-0 p-3.5 ${glass(isNoir)}`}><span className="block text-[30px] leading-[0.9] font-black tracking-tighter text-white/[0.07] break-words transition-colors duration-500 group-hover:text-white/[0.12]">{c.name}</span></span>}
+          <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"/>
+          {roleName(c.role) && <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full bg-black/45 border border-white/15 text-[9px] uppercase tracking-[0.14em] text-white/90">{roleName(c.role)}</span>}
+          <span className="absolute inset-x-3.5 bottom-3.5">
+            <span className="block text-[15px] font-black tracking-tight text-white leading-tight line-clamp-2">{c.name}</span>
+            {c.voice && <span className={`block mt-1 text-[10px] truncate ${isNoir ? 'text-zinc-300' : 'text-rose-200/80'}`}>Сэйю · {c.voice}</span>}
           </span>
-        </button>
-      </KineticItem>)}
+          <span className="absolute top-3 right-3 w-7 h-7 grid place-items-center rounded-full bg-black/45 border border-white/15 text-white opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300"><ArrowUpRight size={13}/></span>
+        </button>}
+        renderMini={c => <>
+          {c.image ? <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-500 group-hover:scale-110 ${isNoir ? 'grayscale' : ''}`}>{renderImage(c)}</span> : <span className={`absolute inset-0 ${glass(isNoir)}`}/>}
+          <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent"/>
+          <span className="absolute inset-x-2 bottom-1.5 text-[10px] font-bold leading-tight text-white line-clamp-2">{c.name}</span>
+        </>}/>
     </div>
   </SectionFrame>;
 }

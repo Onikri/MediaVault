@@ -1,11 +1,11 @@
 import {filterValues} from './catalog-taxonomy.js';
 import {releaseStatusOptions} from './release-status.js';
-import MergedCatalogToolbar from './MergedCatalogToolbar.jsx';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {AnimatePresence,LayoutGroup,animate,motion,useReducedMotion} from 'motion/react';
 import {ArrowDownUp,Check,ChevronDown,Plus,RotateCcw,Search,SlidersHorizontal,X} from 'lucide-react';
 import './catalog-filter-dock.css';
+import './catalog-design.css';
 
 // One sticky row of filters above the catalogue. Each filter opens its own
 // panel (a sheet on phones); several tags narrow results together.
@@ -173,7 +173,9 @@ const InlineToolbar=({children})=>children;
 const libraryStatusOptions=[['available','Уже доступны'],...releaseStatusOptions];
 export default function CatalogFilterDock({mergeNavigation=false,search,kind,filters,defaultStatus='',onFilter,onReset,fields=['genre','year','status','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceTitle='Озвучка',voiceNote,language,sources,morphId='filters'}){
  const [panel,setPanel]=useState(null),anchors=useRef({}),sentinel=useRef(null),[stuck,setStuck]=useState(false),reduced=useReducedMotion(),[open,setOpen]=useFiltersOpen(),toggle=useRef(null),fold=useRef(null);
- const ToolbarHost=mergeNavigation?MergedCatalogToolbar:InlineToolbar;
+ // The bar stays in the page as a sticky glass strip under the navbar capsule;
+ // the navbar keeps its sections and labels.
+ const ToolbarHost=InlineToolbar;
  const chosenTags=splitTags(filters.tag);
  const statusOptions=mergeNavigation?libraryStatusOptions:releaseStatusOptions;
  useEffect(()=>{const merged=event=>{if(event.detail.mobile){setPanel(null);setOpen(false);}};addEventListener('mediavault:catalog-merged',merged);return()=>removeEventListener('mediavault:catalog-merged',merged);},[]);

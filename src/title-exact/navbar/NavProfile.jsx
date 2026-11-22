@@ -34,7 +34,7 @@ export default function NavProfile({state, guest, importActive, onNavigate, onDo
   const rule = <div className="mx-3 my-1.5 h-px bg-white/[0.07]"/>;
   return <Tw>
     <button ref={trigger} id="profileBtn" type="button" className={`${iconButton} overflow-hidden ${avatarFill}`} aria-haspopup="dialog" aria-expanded={open} aria-label="Профиль" onClick={() => setOpen(v => !v)}>
-      {user ? <ProfileAvatar user={user} placeholder={<SiteIcon name="profile" size={17}/>}/> : <SiteIcon name="profile" size={17}/>}
+      {user ? <ProfileAvatar user={user} placeholder={<SiteIcon name="profile" size={18}/>}/> : <SiteIcon name="profile" size={18}/>}
     </button>
     <NavPopover open={open} anchor={trigger} onClose={close} title="Профиль" width={300} className="profile-menu">
       <header className="flex items-center gap-3 px-3 pt-2 pb-3">

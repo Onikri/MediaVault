@@ -2,7 +2,7 @@
 // written in Tailwind and kept verbatim. No preflight, so the rest of the site
 // is untouched; utilities are scoped under .mv-tw.
 module.exports = {
-  content: ['./src/title-exact/**/*.{js,jsx}'],
+  content: ['./src/title-exact/**/*.{js,jsx}', './src/MiniMusicPlayer.jsx', './src/RetainedMedia.jsx'],
   important: '.mv-tw',
   corePlugins: {preflight: false},
   theme: {extend: {}},

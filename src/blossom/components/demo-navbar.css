@@ -1,25 +1,6 @@
 /* The navbar itself is the design's Tailwind markup (src/title-exact/navbar).
    These rules only fit the site's own extra pieces into it. */
 
-/* Video and chapter docks join the design's 36px glass circles. */
-html[data-blossom] .kt-navbar .retained-dock {
-  width: 36px; min-width: 36px; max-width: none; height: 36px; flex: 0 0 36px; padding: 0; border-radius: 999px;
-  display: grid; place-items: center; overflow: hidden;
-  color: #d4d4d8; border: 1px solid rgba(255,255,255,.07);
-  background: linear-gradient(to bottom, rgba(255,255,255,.08), rgba(255,255,255,.02));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
-}
-html[data-blossom] .kt-navbar .retained-dock:hover { color: #fff; background: linear-gradient(to bottom, rgba(255,255,255,.14), rgba(255,255,255,.04)); }
-
-/* The full music player keeps the design's glass. */
-html[data-blossom] .music-island {
-  border: 1px solid rgba(255,255,255,.07);
-  background: rgb(18 8 13 / .78);
-  backdrop-filter: blur(40px) saturate(1.5); -webkit-backdrop-filter: blur(40px) saturate(1.5);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 24px 60px -20px rgba(0,0,0,.9);
-}
-html[data-blossom][data-theme='noir'] .music-island { background: rgb(0 0 0 / .85); border-color: rgba(255,255,255,.14); }
-
 /* Library: while the catalogue toolbar rides in the bar, the centre becomes
    its lane, the sections fold to their icons and the search circle steps aside. */
 html[data-blossom][data-catalog-merged] .kt-navbar .kt-nav-center {

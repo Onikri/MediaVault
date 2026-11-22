@@ -1,0 +1,107 @@
+/* Library and collection catalogues in the language of the title design:
+   glass capsules, pill controls, one ruby accent for what is chosen, the
+   system sans of the design. Behaviour stays in CatalogFilterDock. */
+
+html[data-blossom] { --kd-glass: rgb(18 8 13 / .62); --kd-line: rgba(255,255,255,.07); --kd-soft: rgba(255,255,255,.045); --kd-accent: #e11d48; --kd-accent-soft: rgb(225 29 72 / .18); --kd-accent-line: rgb(244 63 94 / .38); --kd-text: #f4f4f5; --kd-muted: #a1a1aa; --kd-quiet: #71717a; --kd-font: ui-sans-serif, system-ui, sans-serif; }
+html[data-blossom][data-theme='noir'] { --kd-glass: rgb(0 0 0 / .72); --kd-line: rgba(255,255,255,.12); --kd-accent: #ffffff; --kd-accent-soft: rgba(255,255,255,.14); --kd-accent-line: rgba(255,255,255,.45); }
+
+/* Page head */
+html[data-blossom] .app-main:has(.catalog-toolbar) .page-title-row .eyebrow { color: #fb7185; font: 600 10px/1.4 var(--kd-font); letter-spacing: .22em; text-transform: uppercase; }
+html[data-blossom][data-theme='noir'] .app-main:has(.catalog-toolbar) .page-title-row .eyebrow { color: #fff; }
+html[data-blossom] .app-main:has(.catalog-toolbar) .page-title { font: 900 clamp(30px, 3.4vw, 44px)/1.05 var(--kd-font); letter-spacing: -.035em; color: var(--kd-text); }
+html[data-blossom] .app-main:has(.catalog-toolbar) .page-subtitle { font: 400 13px/1.5 var(--kd-font); color: var(--kd-muted); }
+
+/* Sections: one glass capsule, the chosen section on a ruby pill. */
+html[data-blossom] .app-main:has(.catalog-toolbar) .mv-nav-rail[data-rail="categories"] {
+  gap: 2px; padding: 4px; border: 1px solid var(--kd-line); border-radius: 999px; background: var(--kd-glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 18px 40px -26px rgba(0,0,0,.9);
+}
+html[data-blossom] .app-main:has(.catalog-toolbar) .mv-nav-rail[data-rail="categories"] .mv-nav-item {
+  height: 36px; min-height: 0; padding: 0 14px; gap: 8px; border: 0; border-radius: 999px; background: transparent; box-shadow: none;
+  color: var(--kd-muted); font: 500 12.5px/1 var(--kd-font); transition: background-color .25s, color .25s, box-shadow .25s;
+}
+html[data-blossom] .app-main:has(.catalog-toolbar) .mv-nav-rail[data-rail="categories"] .mv-nav-item:where(:hover, :focus-visible) { color: #fff; background: rgba(255,255,255,.06); }
+html[data-blossom] .app-main:has(.catalog-toolbar) .mv-nav-rail[data-rail="categories"] .mv-nav-item:is([aria-current], [aria-pressed="true"]) {
+  color: #fff; font-weight: 650; background: linear-gradient(to bottom, #f43f5e, #be123c);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 8px 20px -8px rgba(225,29,72,.7);
+}
+html[data-blossom][data-theme='noir'] .app-main:has(.catalog-toolbar) .mv-nav-rail[data-rail="categories"] .mv-nav-item:is([aria-current], [aria-pressed="true"]) { color: #000; background: #fff; box-shadow: 0 8px 20px -8px rgba(255,255,255,.45); }
+html[data-blossom] .app-main:has(.catalog-toolbar) .mv-nav-rail[data-rail="categories"] .mv-nav-icon > svg { width: 16px; height: 16px; }
+html[data-blossom] .app-main:has(.catalog-toolbar) .mv-nav-rail[data-rail="categories"] .mv-nav-detail { font: 600 10px/1 var(--kd-font); opacity: .6; }
+html[data-blossom] .app-main:has(.catalog-toolbar) .catalog-head > .mv-nav-rail[data-rail="icons"] { gap: 6px; padding: 0; background: none; border: 0; }
+html[data-blossom] .app-main:has(.catalog-toolbar) .catalog-head > .mv-nav-rail[data-rail="icons"] .mv-nav-item {
+  width: 38px; height: 38px; min-height: 0; padding: 0; border-radius: 999px; border: 1px solid var(--kd-line); color: #d4d4d8;
+  background: linear-gradient(to bottom, rgba(255,255,255,.08), rgba(255,255,255,.02)); box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+}
+html[data-blossom] .app-main:has(.catalog-toolbar) .catalog-head > .mv-nav-rail[data-rail="icons"] .mv-nav-item:is(:hover, [aria-pressed="true"], [aria-current]) { color: #fff; border-color: var(--kd-accent-line); background: var(--kd-accent-soft); }
+
+/* The search and filter bar: glass, sticky under the navbar capsule. */
+html[data-blossom] .catalog-toolbar {
+  --fdock-top: 84px; gap: 8px; margin: 0 0 22px; padding: 6px; border: 1px solid var(--kd-line); border-radius: 26px; background: var(--kd-glass);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 18px 40px -26px rgba(0,0,0,.9); font-family: var(--kd-font);
+}
+html[data-blossom] .catalog-toolbar.is-stuck { background: rgb(18 8 13 / .82); box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 26px 60px -24px rgba(0,0,0,.95); }
+html[data-blossom][data-theme='noir'] .catalog-toolbar.is-stuck { background: rgb(0 0 0 / .86); }
+html[data-blossom] .catalog-toolbar .fdock-search { flex: 1 1 300px; background: var(--kd-soft); border: 1px solid var(--kd-line); border-radius: 20px !important; transition: border-color .25s, box-shadow .25s, background-color .25s; }
+html[data-blossom] .catalog-toolbar .fdock-search:focus-within { background: rgba(255,255,255,.07); border-color: var(--kd-accent-line); box-shadow: 0 0 0 4px rgb(225 29 72 / .12); }
+html[data-blossom] .catalog-toolbar .search-bar.catalog-search { height: 44px; padding: 0 10px 0 16px; gap: 10px; color: var(--kd-quiet); }
+html[data-blossom] .catalog-toolbar .catalog-search .search-input { font: 500 14px/1 var(--kd-font); color: var(--kd-text); }
+html[data-blossom] .catalog-toolbar .catalog-search .search-input::placeholder { color: var(--kd-quiet); }
+html[data-blossom] .catalog-toolbar .fdock { gap: 4px; padding: 0; background: transparent; border-radius: 20px !important; }
+html[data-blossom] .catalog-toolbar .fdock-row { gap: 4px; }
+html[data-blossom] .catalog-toolbar .fdock-item { border-radius: 999px; background: var(--kd-soft); box-shadow: inset 0 0 0 1px var(--kd-line); transition: background-color .25s, box-shadow .25s; }
+html[data-blossom] .catalog-toolbar .fdock-item:hover { background: rgba(255,255,255,.08); }
+html[data-blossom] .catalog-toolbar .fdock-item.is-open { background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); }
+html[data-blossom] .catalog-toolbar .fdock-item.is-set,
+html[data-blossom] .catalog-toolbar .fdock-item.is-set:hover,
+html[data-blossom] .catalog-toolbar .fdock-item.is-set.is-open { background: var(--kd-accent-soft); box-shadow: inset 0 0 0 1px var(--kd-accent-line); }
+html[data-blossom] .catalog-toolbar .fdock-pill { height: 36px; padding: 0 12px 0 15px; border-radius: 999px; color: var(--kd-muted); font: 600 12.5px/1 var(--kd-font); }
+html[data-blossom] .catalog-toolbar .fdock-item:hover .fdock-pill { color: #fff; }
+html[data-blossom] .catalog-toolbar .fdock-item.is-set .fdock-label { color: #fda4af; }
+html[data-blossom][data-theme='noir'] .catalog-toolbar .fdock-item.is-set .fdock-label { color: #fff; }
+html[data-blossom] .catalog-toolbar .fdock-value { color: #fff; font-weight: 700; }
+html[data-blossom] .catalog-toolbar .fdock-clear { height: 36px; border-radius: 0 999px 999px 0; color: #fda4af; }
+html[data-blossom] .catalog-toolbar .fdock-reset { height: 36px; border-radius: 999px; color: var(--kd-muted); font: 600 12.5px/1 var(--kd-font); }
+html[data-blossom] .catalog-toolbar .fdock-reset:hover { background: rgba(255,255,255,.07); color: #fff; }
+html[data-blossom] .catalog-toolbar .fdock-count, html[data-blossom] .fdock-toggle .fdock-count { min-width: 20px; height: 20px; border-radius: 999px; background: var(--kd-accent); color: #fff; font: 700 10.5px/1 var(--kd-font); }
+html[data-blossom][data-theme='noir'] :is(.catalog-toolbar, .fdock-toggle) .fdock-count { color: #000; }
+html[data-blossom] .catalog-toolbar .fdock-fold { width: 36px; height: 36px; border-radius: 999px; border: 1px solid var(--kd-line); background: var(--kd-soft); color: var(--kd-muted); }
+html[data-blossom] .catalog-toolbar .fdock-fold:hover { color: #fff; background: rgba(255,255,255,.1); }
+html[data-blossom] .catalog-toolbar .fdock-toggle { height: 44px; padding: 0 18px; border-radius: 20px !important; border: 1px solid var(--kd-line); background: var(--kd-soft); color: #fff; font: 600 13px/1 var(--kd-font); }
+html[data-blossom] .catalog-toolbar .fdock-toggle:hover { background: rgba(255,255,255,.08); }
+html[data-blossom] .catalog-toolbar .fdock-toggle.is-set { background: var(--kd-accent-soft); border-color: var(--kd-accent-line); }
+html[data-blossom] .catalog-toolbar .fdock-toggle > .fdock-toggle-face > svg { color: #fb7185; }
+
+/* Sort and view pills next to the results heading. */
+html[data-blossom] .sort-pill { height: 36px; padding: 0 12px 0 14px; border: 1px solid var(--kd-line); border-radius: 999px; background: var(--kd-soft); color: var(--kd-muted); font: 600 12px/1 var(--kd-font); }
+html[data-blossom] .sort-pill:hover, html[data-blossom] .sort-pill.is-open { background: rgba(255,255,255,.08); color: #fff; }
+html[data-blossom] .sort-pill-value { color: #fff; }
+html[data-blossom] .app-main:has(.catalog-toolbar) .section-heading .section-title,
+html[data-blossom] .app-main:has(.catalog-toolbar) .title-browser-toolbar h2 { font: 800 22px/1.1 var(--kd-font); letter-spacing: -.025em; color: var(--kd-text); }
+
+/* Filter panels: the design's glass popover. */
+.fdock-scrim { background: rgb(0 0 0 / .45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+html[data-blossom] .fdock-panel {
+  border: 1px solid var(--kd-line); border-radius: 26px; background: rgb(18 8 13 / .86); color: var(--kd-text); font-family: var(--kd-font);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5); backdrop-filter: blur(40px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 30px 70px -24px rgba(0,0,0,.95);
+}
+html[data-blossom][data-theme='noir'] .fdock-panel { background: rgb(0 0 0 / .9); }
+html[data-blossom] .fdock-panel.is-sheet { border-radius: 28px 28px 0 0; }
+html[data-blossom] .fdock-panel-head h3 { font: 800 15px/1.2 var(--kd-font); letter-spacing: -.02em; color: #fff; }
+html[data-blossom] .fdock-close { border-radius: 999px; background: rgba(255,255,255,.06); color: var(--kd-muted); }
+html[data-blossom] .fdock-panel-body { scrollbar-color: rgba(255,255,255,.18) transparent; }
+html[data-blossom] .fdock-panel-foot { border-top-color: var(--kd-line); }
+html[data-blossom] .fdock-panel-foot p { color: var(--kd-quiet); }
+html[data-blossom] .fdock-done { height: 36px; border-radius: 999px; background: var(--kd-accent); font: 650 12.5px/1 var(--kd-font); box-shadow: 0 10px 24px -10px rgba(225,29,72,.7); }
+html[data-blossom][data-theme='noir'] .fdock-done { color: #000; }
+html[data-blossom] .fdock-find { height: 42px; border-radius: 999px; border: 1px solid var(--kd-line); background: var(--kd-soft); color: var(--kd-quiet); }
+html[data-blossom] .fdock-find:focus-within { border-color: var(--kd-accent-line); background: rgba(255,255,255,.07); }
+html[data-blossom] .fdock-find input { color: #fff; font: 500 13.5px/1 var(--kd-font); }
+html[data-blossom] .fdock-options > button { height: 34px; border-radius: 999px; background: var(--kd-soft); box-shadow: inset 0 0 0 1px var(--kd-line); color: #d4d4d8; font: 550 12.5px/1 var(--kd-font); }
+html[data-blossom] .fdock-options > button:hover { background: rgba(255,255,255,.09); color: #fff; }
+html[data-blossom] .fdock-options > button.is-on { background: linear-gradient(to bottom, #f43f5e, #be123c); box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 8px 18px -8px rgba(225,29,72,.7); color: #fff; }
+html[data-blossom][data-theme='noir'] .fdock-options > button.is-on { background: #fff; color: #000; box-shadow: none; }
+html[data-blossom] .fdock-chosen li { border-radius: 999px; background: var(--kd-accent-soft); box-shadow: inset 0 0 0 1px var(--kd-accent-line); color: #fff; font: 600 12.5px/1 var(--kd-font); }

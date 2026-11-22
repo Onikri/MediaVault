@@ -35,7 +35,7 @@ export default function NavShell({links, active, onNavigate, onBrand, onSearch, 
   return <div className="mv-tw" style={{display: 'contents'}}><header ref={registerHeader} className={'kt-navbar fixed top-0 inset-x-0 pointer-events-none' + (scrolled ? ' is-scrolled' : '')} style={{zIndex: 100}}>
     {/* Soft haze over the showcase; it melts away as the bar condenses. */}
     <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/75 via-black/30 to-transparent pointer-events-none" style={{opacity: `max(0, calc(1 - ${t} * 1.15))`}}/>
-    <div className="max-w-[1520px] mx-auto px-4 sm:px-8" style={{transform: `translate3d(0, calc(4px + 10px * ${t}), 0)`}}>
+    <div className="mx-auto px-4 sm:px-8" style={{maxWidth: `calc(1520px + (100% - 1520px) * (1 - ${t}))`, transform: `translate3d(0, calc(4px + 10px * ${t}), 0)`}}>
       <div className="kt-nav-inner pointer-events-auto relative mx-auto flex items-center justify-between gap-4"
         style={{height: `calc(64px - 10px * ${t})`, paddingLeft: `calc(4px + 16px * ${t})`, paddingRight: `calc(4px + 12px * ${t})`, maxWidth: `calc(100% - 24px * ${t})`}}>
         {/* The glass capsule: its own layer, only opacity and scale change. */}
@@ -52,14 +52,14 @@ export default function NavShell({links, active, onNavigate, onBrand, onSearch, 
           <NavBrand onClick={onBrand}/>
           <nav className="kt-nav-links hidden min-[1025px]:flex items-center gap-1 text-xs text-zinc-400" aria-label="Основная навигация">
             {links.filter(v => v.id !== 'profile').map(v => <button type="button" key={v.id} aria-label={v.label} title={v.label} aria-current={active === v.id ? 'page' : undefined} onClick={() => go(v.id)}
-              className={`kt-link flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${active === v.id ? 'bg-white/[0.08] text-white font-medium' : 'hover:text-white hover:bg-white/[0.05]'}`}>
-              <SiteIcon name={v.id} variant="c" size={15}/>
-              <span className="kt-link-label max-[1279px]:hidden">{v.label}</span>
+              className={`kt-link flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${active === v.id ? 'bg-white/[0.08] text-white font-medium' : 'hover:text-white hover:bg-white/[0.05]'}`}>
+              <SiteIcon name={v.id} variant="c" size={17}/>
+              <span className="kt-link-label">{v.label}</span>
             </button>)}
           </nav>
         </div>
         {/* Centre: the ruby button that morphs into the search. */}
-        <div className="kt-nav-center header-center-search absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 hidden min-[1025px]:block">
+        <div className="kt-nav-center header-center-search relative z-10 hidden min-[1025px]:block min-[1280px]:absolute min-[1280px]:left-1/2 min-[1280px]:top-1/2 min-[1280px]:-translate-x-1/2 min-[1280px]:-translate-y-1/2">
           <NavSearchSlot open={searchActive} onOpen={onSearch}>{search}</NavSearchSlot>
         </div>
         {/* Right: music island, video dock, notifications, profile. */}

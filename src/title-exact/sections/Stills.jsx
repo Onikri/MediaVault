@@ -53,12 +53,15 @@ function FilmViewer({images, index, setIndex, isNoir, renderArtwork, caption}) {
 
 export function StillsMosaic({k, isNoir, images, renderArtwork, caption = 'Кадр'}) {
   const [index, setIndex] = useState(null), [ref, entered] = useEntered();
-  const tiles = images.slice(0, 9);
+  const limit = typeof matchMedia === 'function' && matchMedia('(min-width: 1280px)').matches ? 12 : 9, tiles = images.slice(0, limit);
+  // The last frame stretches over what the final row leaves, so the mosaic has no holes.
+  const cols = typeof matchMedia !== 'function' ? 4 : matchMedia('(min-width: 1280px)').matches ? 5 : matchMedia('(min-width: 640px)').matches ? 4 : 2;
+  const spare = tiles.length > 1 ? (cols - (4 + tiles.length - 1) % cols) % cols : 0;
   return <SectionFrame>
-    <div ref={ref} className="grid grid-cols-2 sm:grid-cols-4 gap-3 auto-rows-[130px] lg:auto-rows-[170px]">
+    <div ref={ref} className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 gap-3 auto-rows-[clamp(110px,calc((68vh-24px)/3),230px)]">
       {tiles.map((url, i) => {
-        const rest = i === 8 && images.length > 9 ? images.length - 8 : 0;
-        return <KineticItem key={url + i} weight={0.7 + (i % 3) * 0.32} drift={(i % 3) - 1} {...k} className={i === 0 ? 'col-span-2 row-span-2' : ''}>
+        const rest = i === limit - 1 && images.length > limit ? images.length - limit + 1 : 0;
+        return <KineticItem key={url + i} weight={0.7 + (i % 3) * 0.32} drift={(i % 3) - 1} {...k} className={i === 0 ? 'col-span-2 row-span-2' : ''} style={i > 0 && i === tiles.length - 1 && spare ? {gridColumn: `span ${spare + 1}`} : undefined}>
           <button type="button" onClick={() => setIndex(i)} aria-label={rest ? 'Все кадры · ' + images.length : 'Открыть ' + caption.toLowerCase() + ' ' + (i + 1)}
             className={`group relative w-full h-full rounded-3xl overflow-hidden border text-left bg-white/[0.03] transition-[opacity,transform,clip-path] duration-1000 ease-[cubic-bezier(.22,1,.36,1)] ${isNoir ? 'border-white/20' : 'border-white/[0.08]'} ${entered ? 'opacity-100' : 'opacity-0'}`}
             style={{clipPath: entered ? 'inset(0 0 0 0 round 24px)' : 'inset(40% 10% 40% 10% round 24px)', transitionDelay: entered ? `${i * 60}ms` : '0ms'}}>
