@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
-import {Check, Disc3, ExternalLink, MoreHorizontal, Play, Plus} from 'lucide-react';
+import {createPortal} from 'react-dom';
+import {Disc3, ExternalLink, Heart, MoreHorizontal, Play} from 'lucide-react';
 import {musicSnapshot, playMusic, subscribeMusic} from '../../music-player.js';
 import {spotifySearch, toggleTrack, tracks, youtubeSearch} from '../../music-library.js';
 import {PlaylistExport, SongDetails, songKind, useAnimeSoundtrack} from '../../Soundtrack.jsx';
@@ -9,25 +10,31 @@ import {SectionFrame, glass, useEntered} from './ui.jsx';
 
 /* Музыка: one row of square cards: the cover, OP/ED and where it plays, the
    song and its artists, «Слушать» into the navbar island and «В любимые». */
+// The menu lives in a portal above the card: the scrolling row would clip it.
 function More({t, onExport, isNoir}) {
-  const [open, setOpen] = useState(false), [about, setAbout] = useState(false), box = useRef(null);
+  const [open, setOpen] = useState(false), [about, setAbout] = useState(false), [box, setBox] = useState(null), trigger = useRef(null), menu = useRef(null);
   useEffect(() => {
     if (!open) return;
-    const away = e => { if (!box.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('pointerdown', away);
-    return () => document.removeEventListener('pointerdown', away);
+    const place = () => { const r = trigger.current?.getBoundingClientRect(); if (r) setBox({right: Math.max(12, innerWidth - r.right), bottom: Math.max(12, innerHeight - r.top + 8)}); };
+    const away = e => { if (!menu.current?.contains(e.target) && !trigger.current?.contains(e.target)) setOpen(false); };
+    const key = e => { if (e.key === 'Escape') setOpen(false); };
+    place();
+    addEventListener('scroll', place, true); addEventListener('resize', place);
+    document.addEventListener('pointerdown', away); document.addEventListener('keydown', key);
+    return () => { removeEventListener('scroll', place, true); removeEventListener('resize', place); document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
   }, [open]);
   const item = 'w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left text-[12px] text-zinc-200 hover:bg-white/[0.06] hover:text-white';
-  return <div ref={box} className="relative">
-    <button type="button" aria-label={'Ещё действия: ' + t.title} aria-expanded={open} onClick={() => setOpen(v => !v)} className="w-8 h-8 grid place-items-center rounded-full bg-white/[0.04] border border-white/[0.08] text-zinc-400 hover:text-white"><MoreHorizontal size={14}/></button>
-    {open && <div className={`absolute right-0 top-[calc(100%+8px)] z-30 w-60 p-1.5 rounded-2xl border backdrop-blur-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)] ${isNoir ? 'bg-black/90 border-white/20' : 'bg-[#12080d]/90 border-white/[0.1]'}`}>
+  return <>
+    <button ref={trigger} type="button" aria-label={'Ещё действия: ' + t.title} aria-expanded={open} onClick={() => setOpen(v => !v)} className="w-9 h-9 grid place-items-center rounded-full bg-white/[0.05] border border-white/[0.1] text-zinc-400 hover:text-white"><MoreHorizontal size={14}/></button>
+    {open && box && createPortal(<div className="mv-tw" style={{display: 'contents'}}><div ref={menu} role="menu" style={{position: 'fixed', right: box.right, bottom: box.bottom, zIndex: 1200}}
+      className={`w-60 p-1.5 rounded-2xl border backdrop-blur-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)] ${isNoir ? 'bg-black/90 border-white/20' : 'bg-[#12080d]/90 border-white/[0.1]'}`}>
       <a className={item} href={youtubeSearch(t)} target="_blank" rel="noopener noreferrer">Найти в YouTube Music<ExternalLink size={12}/></a>
       <a className={item} href={spotifySearch(t)} target="_blank" rel="noopener noreferrer">Найти в Spotify<ExternalLink size={12}/></a>
       <button type="button" className={item} onClick={() => { setOpen(false); onExport(t); }}>Добавить в плейлист платформы</button>
       <button type="button" className={item} aria-expanded={about} onClick={() => setAbout(v => !v)}>О песне</button>
       {about && <div className="px-3 pb-2 text-[12px] text-zinc-300 [&_a]:text-zinc-400 [&_a:hover]:text-white"><SongDetails track={t}/></div>}
-    </div>}
-  </div>;
+    </div></div>, document.body)}
+  </>;
 }
 
 export function MusicSection({k, isNoir, identity, animeTitle, cover, userId, renderArtwork}) {
@@ -39,33 +46,36 @@ export function MusicSection({k, isNoir, identity, animeTitle, cover, userId, re
   const values = all.filter(t => t.artists?.length || !all.some(x => x !== t && x.type === t.type && x.title.toLowerCase() === t.title.toLowerCase() && x.artists?.length));
   const queue = values.map(v => ({...v, cover: v.cover || v.animeCover}));
   return <section id="titleMusic" ref={ref}>
-    <SectionFrame>
+    <SectionFrame className={values.length <= 4 ? '!min-h-[52vh]' : ''}>
       {!values.length ? <p className="text-[13px] text-zinc-400" role="status">{error || (!data ? 'Ищем названия песен…' : 'Каталог пока не предоставил музыкальные темы.')}{error && <button type="button" className="ml-2 underline underline-offset-4" onClick={retry}>Повторить</button>}</p>
-        : <div translate="no" className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        : <div translate="no" className={`grid grid-flow-col auto-cols-[72%] sm:auto-cols-[calc((100%-16px)/2)] lg:auto-cols-[calc((100%-32px)/3)] xl:auto-cols-[calc((100%-48px)/4)] gap-4 overflow-x-auto overflow-y-visible snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
           {values.map((t, idx) => {
             const art = t.cover || t.animeCover, active = current?.track?.id === t.id, isSaved = saved.some(v => v.id === t.id);
             const play = () => playMusic({...t, cover: art}, queue);
-            return <KineticItem key={t.id} weight={0.8 + (idx % 3) * 0.12} drift={(idx % 3) - 1} {...k}>
-              <article className={`group relative flex items-center gap-3.5 p-2.5 pr-3 rounded-[20px] border transition-all duration-500 ${active ? (isNoir ? 'bg-white/[0.08] border-white/40' : 'bg-rose-950/30 border-rose-400/35 shadow-[0_18px_40px_-22px_rgba(225,29,72,0.7)]') : `${glass(isNoir)} hover:border-white/20`} ${entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
-                style={{transitionDelay: entered ? `${Math.min(idx, 9) * 50}ms` : '0ms'}}>
-                <button type="button" onClick={play} aria-label={(active ? 'Играет: ' : 'Включить ') + t.title} className="relative w-16 h-16 shrink-0 rounded-2xl overflow-hidden bg-white/[0.04]">
-                  {art ? <span className={`absolute inset-0 kt-cover transition-transform duration-700 ${active ? 'scale-110' : 'group-hover:scale-110'} ${isNoir ? 'grayscale' : ''}`}>{renderArtwork(art)}</span>
-                    : <span className="absolute inset-0 grid place-items-center text-zinc-600"><Disc3 size={24}/></span>}
-                  <span className={`absolute inset-0 grid place-items-center transition-all duration-300 ${active ? 'bg-black/45 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'}`}>
-                    {active ? <span className="flex items-end gap-[2px] h-4" aria-hidden="true">{[0, 1, 2, 3].map(b => <span key={b} className="w-[3px] h-full rounded-full bg-white" style={{animation: `mvEq .8s ${b * .12}s ease-in-out infinite alternate`}}/>)}</span>
-                      : <span className={`grid place-items-center w-9 h-9 rounded-full ${isNoir ? 'bg-white text-black' : 'bg-rose-600 text-white shadow-[0_0_18px_rgba(225,29,72,0.6)]'}`}><Play size={14} fill="currentColor" className="ml-0.5"/></span>}
-                  </span>
-                </button>
-                <span className="flex-1 min-w-0">
-                  <span className={`flex items-center gap-1.5 text-[9px] uppercase tracking-[0.16em] ${isNoir ? 'text-zinc-300' : 'text-rose-300/90'}`}>{t.type && <b className={`font-mono font-bold px-1.5 rounded ${isNoir ? 'bg-white text-black' : 'bg-rose-500/20 text-rose-200'}`}>{t.type}{t.sequence || ''}</b>}<span className="truncate">{songKind(t)}</span></span>
-                  <span className="block mt-1 text-[14px] font-black tracking-tight text-white truncate" title={t.title}>{t.title}</span>
-                  <span className="block text-[11px] text-zinc-400 truncate" title={t.artists?.join(', ')}>{t.artists?.join(', ') || 'Исполнитель не указан'}</span>
-                </span>
-                <span className="flex items-center gap-1 shrink-0">
-                  <button type="button" aria-pressed={isSaved} aria-label={(isSaved ? 'Убрать ' : 'Сохранить ') + t.title} title={isSaved ? 'В любимых' : 'В любимые'} onClick={() => setSaved(toggleTrack(userId, {...t, cover: art}))}
-                    className={`grid place-items-center w-8 h-8 rounded-full border transition-colors ${isSaved ? (isNoir ? 'bg-white/15 border-white/40 text-white' : 'bg-rose-500/15 border-rose-400/40 text-rose-200') : 'bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:text-white'}`}>{isSaved ? <Check size={13}/> : <Plus size={13}/>}</button>
-                  <More t={t} isNoir={isNoir} onExport={setExporting}/>
-                </span>
+            return <KineticItem key={t.id} weight={0.76 + (idx % 3) * 0.16} drift={(idx % 3) - 1} {...k}>
+              <article className={`group relative snap-start rounded-[26px] border overflow-visible transition-all duration-700 ${active ? (isNoir ? 'border-white/50' : 'border-rose-400/40 shadow-[0_30px_70px_-30px_rgba(225,29,72,0.7)]') : isNoir ? 'border-white/20 hover:border-white/40' : 'border-white/[0.08] hover:border-white/20'} ${entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+                style={{transitionDelay: entered ? `${Math.min(idx, 6) * 80}ms` : '0ms'}}>
+                <div className="relative aspect-[5/4] overflow-hidden rounded-t-[26px] bg-white/[0.03]">
+                  {art ? <span className={`absolute inset-0 kt-cover transition-transform duration-[1.4s] ease-out ${active ? 'scale-110' : 'group-hover:scale-105'} ${isNoir ? 'grayscale' : ''}`}>{renderArtwork(art)}</span>
+                    : <span className="absolute inset-0 grid place-items-center text-zinc-600"><Disc3 size={40}/></span>}
+                  <span className="absolute inset-0 bg-gradient-to-t from-[#0c070a] via-black/10 to-transparent"/>
+                  {t.type && <span className={`absolute top-3.5 left-3.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold tracking-[0.12em] border ${isNoir ? 'bg-white text-black border-white' : 'bg-black/55 text-white border-white/20'}`}>{t.type}{t.sequence || ''}</span>}
+                  <button type="button" onClick={play} aria-label={(active ? 'Играет: ' : 'Включить ') + t.title}
+                    className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full grid place-items-center transition-all duration-500 ${active ? 'scale-100 opacity-100' : 'scale-75 opacity-0 group-hover:scale-100 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:scale-100'} ${isNoir ? 'bg-white text-black' : 'bg-rose-600 text-white shadow-[0_0_40px_rgba(225,29,72,0.6)]'}`}>
+                    {active ? <span className="flex items-end gap-[3px] h-5" aria-hidden="true">{[0, 1, 2, 3].map(b => <span key={b} className={`w-[3px] h-full rounded-full ${isNoir ? 'bg-black' : 'bg-white'}`} style={{animation: `mvEq .8s ${b * .12}s ease-in-out infinite alternate`}}/>)}</span> : <Play size={20} fill="currentColor" className="ml-1"/>}
+                  </button>
+                </div>
+                <div className={`relative p-4 rounded-b-[26px] ${isNoir ? 'bg-black' : 'bg-[#0c070a]'}`}>
+                  <p className={`text-[10px] uppercase tracking-[0.18em] truncate ${isNoir ? 'text-zinc-300' : 'text-rose-300/90'}`}>{songKind(t)}</p>
+                  <p className="mt-1.5 text-[16px] font-black tracking-tight text-white truncate" title={t.title}>{t.title}</p>
+                  <p className="text-[12px] text-zinc-400 truncate" title={t.artists?.join(', ')}>{t.artists?.join(', ') || 'Исполнитель не указан'}</p>
+                  <div className="mt-3.5 flex items-center gap-1.5">
+                    <button type="button" onClick={play} className={`h-9 px-4 rounded-full text-[12px] font-semibold flex items-center gap-2 whitespace-nowrap ${isNoir ? 'bg-white text-black' : 'bg-rose-600 hover:bg-rose-500 text-white'}`}><Play size={12} fill="currentColor"/>{active ? 'Играет' : 'Слушать'}</button>
+                    <button type="button" aria-pressed={isSaved} aria-label={(isSaved ? 'Убрать ' : 'Сохранить ') + t.title} title={isSaved ? 'В любимых' : 'В любимые'} onClick={() => setSaved(toggleTrack(userId, {...t, cover: art}))}
+                      className={`grid place-items-center w-9 h-9 shrink-0 rounded-full border transition-colors ${isSaved ? (isNoir ? 'bg-white/15 border-white/40 text-white' : 'bg-rose-500/15 border-rose-400/40 text-rose-300') : 'bg-white/[0.05] border-white/[0.1] text-zinc-300 hover:text-white'}`}><Heart size={14} fill={isSaved ? 'currentColor' : 'none'}/></button>
+                    <span className="ml-auto"><More t={t} isNoir={isNoir} onExport={setExporting}/></span>
+                  </div>
+                </div>
               </article>
             </KineticItem>;
           })}

@@ -1,21 +1,32 @@
-import {useMemo, useState} from 'react';
+import {useMemo, useRef, useState} from 'react';
 import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
-import {ArrowUpRight} from 'lucide-react';
-import {SectionFrame, Switch, ease, rowScroll} from './ui.jsx';
+import {ArrowUpRight, ChevronLeft, ChevronRight} from 'lucide-react';
+import {SectionFrame, Switch, ease} from './ui.jsx';
 
 /* Связи: a filter by kind and one row of large covers. No layout projection
    here (the kinetic section transforms would skew it): the row is re-keyed per filter. */
 const TONES = {'Манга': '#fbbf24', 'Ранобэ': '#a78bfa', 'Аниме': '#fb7185', 'Фильм': '#38bdf8', 'OVA': '#34d399', 'ONA': '#2dd4bf', 'Спецвыпуск': '#f472b6'};
 const tone = kind => TONES[kind] || '#e4e4e7';
+const plural = n => n % 10 === 1 && n % 100 !== 11 ? 'связанное произведение' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'связанных произведения' : 'связанных произведений';
 const kindOf = w => w.format || w.kindLabel || (w.kind === 'manga' ? 'Манга' : w.kind === 'ranobe' ? 'Ранобэ' : 'Аниме');
 export function RelatedRow({isNoir, related, onOpen, renderImage}) {
   const reduce = useReducedMotion();
   const kinds = useMemo(() => ['Все', ...new Set(related.map(kindOf))], [related]), [kind, setKind] = useState('Все');
   const shown = related.filter(r => kind === 'Все' || kindOf(r) === kind);
+  const row = useRef(null);
+  const page = d => row.current?.scrollBy({left: d * row.current.clientWidth * .8, behavior: reduce ? 'auto' : 'smooth'});
+  const arrow = 'grid place-items-center w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12] transition-colors';
   return <SectionFrame>
-    {kinds.length > 2 && <div><Switch label="Тип связей" value={kind} onChange={setKind} isNoir={isNoir} options={kinds.map(x => [x, x])}/></div>}
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+      <p className="text-[13px] text-zinc-400"><b className="text-white font-bold tabular-nums">{shown.length}</b> {plural(shown.length)}{kind !== 'Все' ? ' · ' + kind.toLowerCase() : ''}</p>
+      {kinds.length > 2 && <Switch label="Тип связей" value={kind} onChange={setKind} isNoir={isNoir} options={kinds.map(x => [x, x])}/>}
+      <span className="ml-auto flex gap-1.5">
+        <button type="button" aria-label="Листать связи назад" onClick={() => page(-1)} className={arrow}><ChevronLeft size={16}/></button>
+        <button type="button" aria-label="Листать связи вперёд" onClick={() => page(1)} className={arrow}><ChevronRight size={16}/></button>
+      </span>
+    </div>
     <AnimatePresence mode="wait" initial={false}>
-      <motion.div key={kind} translate="no" className={`grid grid-flow-col auto-cols-[46%] md:auto-cols-[calc((100%-40px)/3)] lg:auto-cols-[calc((100%-60px)/4.2)] gap-5 ${rowScroll}`} exit={{opacity: 0, y: -10, transition: {duration: reduce ? 0 : .2}}}>
+      <motion.div ref={row} key={kind} translate="no" className="grid grid-flow-col auto-cols-[46%] md:auto-cols-[calc((100%-40px)/3)] lg:auto-cols-[calc((100%-60px)/4.2)] gap-5 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,#000_88%,transparent)]" exit={{opacity: 0, y: -10, transition: {duration: reduce ? 0 : .2}}}>
         {shown.map((w, idx) => <motion.div key={w.kind + w.id} className="snap-start" initial={reduce ? false : {opacity: 0, scale: .92, y: 24}} animate={{opacity: 1, scale: 1, y: 0}} transition={{duration: .5, ease, delay: Math.min(idx, 8) * .06}}>
           <button type="button" onClick={() => onOpen(w)} className="group block w-full text-left">
             <span className={`relative block aspect-[2/3] rounded-3xl overflow-hidden border bg-white/[0.03] transition-all duration-500 group-hover:-translate-y-2 ${isNoir ? 'border-white/20 group-hover:border-white/60' : 'border-white/[0.08] group-hover:border-rose-300/40 group-hover:shadow-[0_28px_60px_-24px_rgba(225,29,72,0.55)]'}`}>

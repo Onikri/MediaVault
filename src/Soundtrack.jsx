@@ -12,7 +12,8 @@ import './title-sections.css';
 import ArtistInfo from './ArtistInfo.jsx';
 import {playMusic,musicSnapshot,subscribeMusic} from './music-player.js';
 const cache=new Map();
-function episodesText(values){const text=(values||[]).join(', ');return text?(/[,-]/.test(text)||values.length>1?'серии ':'серия ')+text.replace(/-/g,'–'):'';}
+// "1-" from the catalogue is an open range: "с 1 серии".
+function episodesText(values){const text=(values||[]).join(', ');if(!text)return '';const open=/^(\d+)-$/.exec(text.trim());if(open)return 'с '+open[1]+' серии';return (/[,-]/.test(text)||values.length>1?'серии ':'серия ')+text.replace(/(\d+)-(?!\d)/g,'с $1').replace(/-/g,'–');}
 export function songKind(t){return [t.type==='OP'?'Опенинг':t.type==='ED'?'Эндинг':'Музыкальная тема',episodesText(t.episodes)].filter(Boolean).join(', ');}
 export function TrackList({values,userId,compact=false,hideAnimeTitle=false,renderArtwork}){
  const reduce=useReducedMotion(),current=useSyncExternalStore(subscribeMusic,musicSnapshot),height=usePlayerSpace(),[page,setPage]=useState(0),size=compact?Math.max(1,Math.min(4,Math.floor((height-110)/54))):4;

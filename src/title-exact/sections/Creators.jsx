@@ -55,14 +55,14 @@ export function CreatorsSection({k, isNoir, profile, server, kind = 'anime', ren
       {crafts.length > 1 && <Switch label="Профессия" value={craft} onChange={setCraft} isNoir={isNoir} options={[['all', 'Все'], ...crafts.map(([id, name]) => [id, name])]}/>}
     </div>
     <div ref={ref} key={craft}>
-      <Panorama items={shown} idOf={p => String(p.id ?? p.name)} k={k} isNoir={isNoir} label="Съёмочная группа" mapLabel="Карта группы"
+      <Panorama items={shown} idOf={p => String(p.id ?? p.name)} k={k} isNoir={isNoir} label="Съёмочная группа" mapLabel="Карта группы" caption="Нажми на карточку, чтобы открыть досье"
         renderCard={(p, idx) => <button type="button" onClick={e => open(p, e.currentTarget)} aria-label={'Создатель: ' + p.name}
           className={`group relative block w-full aspect-[3/4] rounded-[22px] overflow-hidden border text-left transition-[transform,box-shadow,border-color,opacity] duration-700 hover:-translate-y-1.5 ${isNoir ? 'border-white/20 hover:border-white/60' : 'border-white/[0.08] hover:border-rose-300/40 hover:shadow-[0_24px_50px_-22px_rgba(225,29,72,0.55)]'} ${p.image ? '' : glass(isNoir)} ${entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
           style={{transitionDelay: entered ? `${Math.min(idx, 12) * 45}ms` : '0ms'}}>
           {p.image ? <>
             <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-700 ease-out group-hover:scale-[1.07] ${isNoir ? 'grayscale' : ''}`}>{renderArtwork(p)}</span>
             <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"/>
-          </> : <span aria-hidden="true" className="absolute inset-x-3.5 top-3.5 text-[30px] leading-[0.9] font-black tracking-tighter text-white/[0.07] break-words transition-colors duration-500 group-hover:text-white/[0.12]">{p.name}</span>}
+          </> : <span aria-hidden="true" className="absolute inset-x-3.5 top-3.5 text-[30px] leading-[0.9] font-black tracking-tighter text-white/[0.16] break-words transition-colors duration-500 group-hover:text-white/[0.24]">{p.name}</span>}
           <span className="absolute inset-x-3.5 bottom-3.5">
             <span className={`block text-[9px] uppercase tracking-[0.14em] line-clamp-2 ${accent}`}>{p.role}</span>
             <span className="block mt-1 text-[15px] font-black tracking-tight text-white leading-tight line-clamp-2">{p.name}</span>

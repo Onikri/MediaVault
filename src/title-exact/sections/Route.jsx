@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {AnimatePresence, motion} from 'motion/react';
-import {ExternalLink} from 'lucide-react';
+import {ChevronLeft, ChevronRight, ExternalLink} from 'lucide-react';
 import {loadWatchOrder} from '../../franchise-seasons.js';
 import {KineticItem} from '../kinetic.jsx';
 import {SectionFrame, Switch, glass, useEntered} from './ui.jsx';
@@ -32,6 +32,15 @@ export function RouteSection({k, isNoir, identity, server, cached, onLoaded, onR
   const now = Date.now();
   const state = (item, idx) => idx === here ? 'current' : idx < here ? 'before' : !item.year || (item.date && Date.parse(item.date) > now) ? 'announced' : 'next';
   const ahead = items.length - here - 1, lit = isNoir ? '#fff' : '#f43f5e';
+  // The track opens on "Вы здесь" whenever the list or the mode changes.
+  useEffect(() => {
+    const box = ref.current;
+    if (!box || !items.length) return;
+    const frame = requestAnimationFrame(() => { box.scrollLeft = Math.max(0, here * (CARD + GAP) + CARD / 2 - box.clientWidth / 2); });
+    return () => cancelAnimationFrame(frame);
+  }, [value, mode, items.length, here]);
+  const page = d => ref.current?.scrollBy({left: d * ref.current.clientWidth * .8, behavior: 'smooth'});
+  const arrow = 'grid place-items-center w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12] transition-colors';
   if (!value) return <SectionFrame><p className="text-[13px] text-zinc-400" role="status">{error ? <>{error} <button type="button" className="underline underline-offset-4" onClick={() => setRetry(v => v + 1)}>Повторить</button></> : 'Получаем связи франшизы…'}</p></SectionFrame>;
   if (!items.length) return <SectionFrame><p className="text-[13px] text-zinc-400">Связанные произведения пока не указаны.</p></SectionFrame>;
   return <SectionFrame>
@@ -42,11 +51,12 @@ export function RouteSection({k, isNoir, identity, server, cached, onLoaded, onR
           <p className="mt-2 text-3xl font-light text-white tabular-nums"><span className="font-black">{here + 1}</span><span className="text-zinc-500"> из {items.length}</span>
             <span className="ml-3 text-[13px] text-zinc-400 font-normal">{ahead > 0 ? `впереди ${ahead}` : 'это последняя часть'}</span></p>
         </div>
-        {hasMain && <Switch label="Порядок просмотра" value={mode} onChange={setMode} isNoir={isNoir} options={[['main', 'Основные сезоны'], ['all', 'Все произведения']]}/>}
+        <span className="flex items-center gap-2">{hasMain && <Switch label="Порядок просмотра" value={mode} onChange={setMode} isNoir={isNoir} options={[['main', 'Основные сезоны'], ['all', 'Все произведения']]}/>}
+          <button type="button" aria-label="Листать маршрут назад" onClick={() => page(-1)} className={arrow}><ChevronLeft size={16}/></button><button type="button" aria-label="Листать маршрут вперёд" onClick={() => page(1)} className={arrow}><ChevronRight size={16}/></button></span>
       </div>
     </KineticItem>
     {/* Room above and below the track so the current checkpoint's pulse is never clipped. */}
-    <div ref={ref} className="relative -mx-2 px-2 py-6 -my-6 overflow-x-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.14)_transparent]">
+    <div ref={ref} className="relative -mx-2 px-2 py-6 -my-6 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <AnimatePresence mode="wait" initial={false}>
         <motion.ol key={mode} translate="no" aria-label={mode === 'main' && hasMain ? 'Основная история' : 'Порядок выхода'} className="relative w-max mx-auto flex gap-6" initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} transition={{duration: .25}}>
           {/* The line runs through the centres of the checkpoints (row of 24px, centre at 12px). */}
@@ -70,12 +80,11 @@ export function RouteSection({k, isNoir, identity, server, cached, onLoaded, onR
                     {item.cover ? <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-700 group-hover:scale-105 ${isNoir ? 'grayscale' : ''}`}>{renderImage(item)}</span>
                       : <span aria-hidden="true" className="absolute inset-0 grid place-items-center text-7xl font-black tracking-tighter text-white/[0.06]">{String(idx + 1).padStart(2, '0')}</span>}
                     <span className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"/>
-                    <span className="absolute top-3 left-3 font-mono text-[11px] text-white/80">{String(idx + 1).padStart(2, '0')}</span>
-                    <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.12em] backdrop-blur-md border ${current ? (isNoir ? 'bg-white text-black border-white' : 'bg-rose-600/80 text-white border-rose-300/40') : passed ? 'bg-black/40 text-zinc-200 border-white/15' : 'bg-black/40 text-zinc-400 border-white/10'}`}>{STATE[s]}</span>
+                    <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.12em] border shadow-[0_4px_14px_rgba(0,0,0,0.5)] ${current ? (isNoir ? 'bg-white text-black border-white' : 'bg-rose-600 text-white border-rose-300/40') : passed ? 'bg-black/75 text-zinc-200 border-white/15' : 'bg-black/75 text-zinc-300 border-white/10'}`}>{STATE[s]}</span>
                   </span>
                   <span className="block p-4">
                     <span className="block text-[15px] font-bold text-white leading-snug line-clamp-2 min-h-[2.6em]">{item.title || 'Название уточняется'}</span>
-                    <span className="mt-2 flex items-center gap-2 text-[12px] text-zinc-400">
+                    <span className="mt-2 flex items-center gap-2 text-[12px] text-zinc-400"><span className="font-mono text-[11px] text-zinc-500">{String(idx + 1).padStart(2, '0')}</span><span className="text-white/25">·</span>
                       {item.year && <><span className="font-mono text-zinc-300">{item.year}</span><span className="text-white/25">·</span></>}
                       <span>{FORMATS[item.kind] || item.kind || 'Аниме'}</span>
                     </span>

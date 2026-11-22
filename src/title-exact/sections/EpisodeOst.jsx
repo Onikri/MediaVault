@@ -31,7 +31,11 @@ export function EpisodeOst({identity, isNoir}) {
     loadEpisodeOst(server, identity, episode, AbortSignal.any([abort.signal, AbortSignal.timeout(20000)])).then(v => { if (!abort.signal.aborted) setData(v); }).catch(e => { if (!abort.signal.aborted) setError(e.message); });
     return () => abort.abort();
   }, [title, episode]);
-  useEffect(() => { strip.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({block: 'nearest', inline: 'center', behavior: reduce ? 'auto' : 'smooth'}); }, [episode, title]);
+  // Scroll the strip itself: scrollIntoView would drag the whole page to this block on load.
+  useEffect(() => {
+    const box = strip.current, on = box?.querySelector('[aria-selected="true"]');
+    if (box && on) box.scrollTo({left: on.offsetLeft - (box.clientWidth - on.offsetWidth) / 2, behavior: reduce ? 'auto' : 'smooth'});
+  }, [episode, title]);
   const tracks = (data?.tracks || []).filter(t => uncertain || !t.uncertain);
   const groups = useMemo(() => {
     const map = new Map();

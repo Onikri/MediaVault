@@ -19,14 +19,13 @@ export function CharactersRow({k, isNoir, characters, onOpen, renderImage, empty
   const [ref, entered] = useEntered();
   if (!characters?.length) return <SectionFrame><p className="text-[13px] text-zinc-400">{emptyNote}</p></SectionFrame>;
   return <SectionFrame>
-    <p className="text-[13px] text-zinc-400">{characters.length} {plural(characters.length)} · нажми на карточку, чтобы открыть досье</p>
     <div ref={ref}>
-      <Panorama items={characters} idOf={c => String(c.id || c.name)} k={k} isNoir={isNoir} label="Персонажи" mapLabel="Карта персонажей"
+      <Panorama items={characters} idOf={c => String(c.id || c.name)} k={k} isNoir={isNoir} label="Персонажи" mapLabel="Карта персонажей" caption={`${characters.length} ${plural(characters.length)} · нажми на карточку, чтобы открыть досье`}
         renderCard={(c, idx) => <button type="button" onClick={e => onOpen(c, e.currentTarget)} aria-label={'Досье: ' + c.name}
           className={`kt-char group relative block w-full aspect-[3/4] rounded-[22px] overflow-hidden border text-left transition-[transform,box-shadow,border-color,opacity] duration-700 hover:-translate-y-1.5 ${isNoir ? 'border-white/20 hover:border-white/60' : 'border-white/[0.08] hover:border-rose-300/40 hover:shadow-[0_24px_50px_-22px_rgba(225,29,72,0.55)]'} ${entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
           style={{transitionDelay: entered ? `${Math.min(idx, 12) * 45}ms` : '0ms'}}>
-          {c.image ? <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-700 ease-out group-hover:scale-[1.07] ${isNoir ? 'grayscale' : ''}`}>{renderImage(c)}</span>
-            : <span aria-hidden="true" className={`absolute inset-0 p-3.5 ${glass(isNoir)}`}><span className="block text-[30px] leading-[0.9] font-black tracking-tighter text-white/[0.07] break-words transition-colors duration-500 group-hover:text-white/[0.12]">{c.name}</span></span>}
+          <span aria-hidden="true" className={`absolute inset-0 p-3.5 bg-[radial-gradient(circle_at_30%_20%,rgba(244,63,94,0.22),transparent_65%)] ${glass(isNoir)}`}><span className="block text-[30px] leading-[0.9] font-black tracking-tighter text-white/[0.16] break-words transition-colors duration-500 group-hover:text-white/[0.24]">{c.name}</span></span>
+            {c.image && <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-700 ease-out group-hover:scale-[1.07] ${isNoir ? 'grayscale' : ''}`}>{renderImage(c)}</span>}
           <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"/>
           {roleName(c.role) && <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full bg-black/45 border border-white/15 text-[9px] uppercase tracking-[0.14em] text-white/90">{roleName(c.role)}</span>}
           <span className="absolute inset-x-3.5 bottom-3.5">
@@ -36,7 +35,7 @@ export function CharactersRow({k, isNoir, characters, onOpen, renderImage, empty
           <span className="absolute top-3 right-3 w-7 h-7 grid place-items-center rounded-full bg-black/45 border border-white/15 text-white opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300"><ArrowUpRight size={13}/></span>
         </button>}
         renderMini={c => <>
-          {c.image ? <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-500 group-hover:scale-110 ${isNoir ? 'grayscale' : ''}`}>{renderImage(c)}</span> : <span className={`absolute inset-0 ${glass(isNoir)}`}/>}
+          <span className={`absolute inset-0 ${glass(isNoir)}`}/>{c.image && <span className={`absolute inset-0 kt-cover kt-top transition-transform duration-500 group-hover:scale-110 ${isNoir ? 'grayscale' : ''}`}>{renderImage(c)}</span>}
           <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent"/>
           <span className="absolute inset-x-2 bottom-1.5 text-[10px] font-bold leading-tight text-white line-clamp-2">{c.name}</span>
         </>}/>
@@ -142,8 +141,8 @@ export function Dossier({characters, character, busy, error, origin, isNoir, onP
   const label = 'text-zinc-500 uppercase tracking-[0.16em] text-[10px]';
   return createPortal(<div className="mv-tw" style={{display: 'contents'}}><div ref={root} tabIndex={-1} className="fixed inset-0 flex items-center justify-center p-3 sm:p-10 outline-none" style={{zIndex: 1250}} role="dialog" aria-modal="true" aria-label={(kind === 'person' ? 'Создатель: ' : 'Досье: ') + character.name}>
     <div className="kt-dossier-veil absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose}/>
-    <div className={`kt-dossier-card relative w-full max-w-6xl max-h-full grid grid-cols-1 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] rounded-[32px] overflow-hidden border ${isNoir ? 'bg-black border-white/20' : 'bg-[#12080d]/90 border-white/[0.08]'} shadow-[0_40px_120px_-20px_rgba(0,0,0,0.9)]`}>
-      <div ref={art} className={`relative h-[38vh] md:h-auto md:min-h-[620px] overflow-hidden bg-white/[0.03] ${isNoir ? 'grayscale' : ''}`}>
+    <div className={`kt-dossier-card relative w-full max-w-6xl h-[calc(100vh-24px)] md:h-[min(680px,calc(100vh-64px))] grid grid-rows-[38vh_minmax(0,1fr)] md:grid-rows-1 grid-cols-1 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] rounded-[32px] overflow-hidden border ${isNoir ? 'bg-black border-white/20' : 'bg-[#12080d]/90 border-white/[0.08]'} shadow-[0_40px_120px_-20px_rgba(0,0,0,0.9)]`}>
+      <div ref={art} className={`relative h-full min-h-0 overflow-hidden bg-white/[0.03] ${isNoir ? 'grayscale' : ''}`}>
         <AnimatePresence mode="popLayout" initial={false} custom={dir.current}>
           <motion.span key={character.id} custom={dir.current} className="absolute inset-0 kt-cover kt-top"
             variants={{enter: d => ({opacity: 0, x: d * 90, scale: 1.08}), center: {opacity: 1, x: 0, scale: 1}, exit: d => ({opacity: 0, x: -d * 90, scale: 1.02})}}
@@ -152,15 +151,16 @@ export function Dossier({characters, character, busy, error, origin, isNoir, onP
         <span className={`absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:via-transparent ${isNoir ? 'md:to-black/90' : 'md:to-[#12080d]/90'}`}/>
         <span className="absolute left-6 bottom-6 font-mono text-[11px] tracking-[0.3em] text-white/60">{String(index + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}</span>
       </div>
-      <div ref={body} translate="no" className="kt-dossier-panel relative p-7 sm:p-10 flex flex-col gap-6 overflow-y-auto overscroll-contain max-h-[calc(100vh-24px-38vh)] md:max-h-[calc(100vh-80px)] [scrollbar-width:thin]">
+      <div ref={body} translate="no" className="kt-dossier-panel relative min-h-0 h-full p-7 sm:p-10 flex flex-col">
         <button type="button" onClick={onClose} aria-label={kind === 'person' ? 'Закрыть участника группы' : 'Закрыть персонажа'} className={`kt-dossier-close absolute top-5 right-5 ${roundButton}`}><X size={18}/></button>
+        <div className="flex-1 min-h-0 -mr-3 pr-3 flex flex-col gap-6 overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.14)_transparent]">
         {kind === 'person' ? <>
         <p className={`kt-dossier-in pr-12 text-[11px] uppercase tracking-[0.24em] ${accent}`}>{character.role || 'Создатель'}</p>
         <h3 key={character.id + ':' + character.name} className="kt-dossier-name pr-12 text-4xl sm:text-6xl font-black tracking-tight leading-[0.95] text-white">{character.name}</h3>
         {character.facts?.length > 0 && <div className="kt-dossier-in flex flex-wrap gap-2">
           {character.facts.slice(0, 6).map(([k, v]) => <span key={k} className={`px-3 py-1 rounded-full text-[11px] border ${isNoir ? 'border-white/25 text-white' : 'border-rose-400/25 bg-rose-500/10 text-rose-200'}`}>{k} · {v}</span>)}
         </div>}
-        <p className="kt-dossier-in text-[15px] leading-[1.75] text-zinc-300 max-w-xl whitespace-pre-line" role={busy ? 'status' : undefined}>{busy && !character.description ? 'Загружаем сведения…' : character.description || 'Русская биография пока не опубликована в каталоге.'}</p>
+        <div className="kt-dossier-in text-[15px] leading-[1.75] text-zinc-300 max-w-xl whitespace-pre-line" role={busy ? 'status' : undefined}>{busy && !character.description ? <span className="block space-y-2.5" aria-label="Загружаем сведения">{[92, 100, 84, 96, 60].map((w, i) => <span key={i} className="block h-3 rounded-full bg-white/[0.07] animate-pulse" style={{width: w + '%', animationDelay: i * 120 + 'ms'}}/>)}</span> : character.description || 'Русская биография пока не опубликована в каталоге.'}</div>
         <div className="kt-dossier-in grid grid-cols-2 gap-4 pt-5 border-t border-white/[0.08] text-[12px]">
           <div><p className={label}>В этом тайтле</p><p className="mt-1.5 text-white font-semibold">{character.role || 'Участник'}</p></div>
           <div><p className={label}>Работы</p><a href={browseHref('person', '', character.id, character.name)} onClick={onClose} className={`mt-1.5 inline-flex items-center gap-1.5 font-semibold ${accent} hover:text-white`}>Все аниме автора<ExternalLink size={12}/></a></div>
@@ -173,7 +173,7 @@ export function Dossier({characters, character, busy, error, origin, isNoir, onP
           {character.aliases?.slice(0, 3).map(a => <span key={'a' + a} className="px-3 py-1 rounded-full text-[11px] border border-white/15 text-zinc-300">{a}</span>)}
           {facts.slice(0, 6).map(f => <span key={f.key} title={f.source} className={`px-3 py-1 rounded-full text-[11px] border ${isNoir ? 'border-white/25 text-white' : 'border-rose-400/25 bg-rose-500/10 text-rose-200'}`}>{f.label} · {f.value}</span>)}
         </div>}
-        <p className="kt-dossier-in text-[15px] leading-[1.75] text-zinc-300 max-w-xl whitespace-pre-line" role={busy ? 'status' : undefined}>{busy && !character.description ? 'Загружаем сведения о персонаже…' : character.description || 'Описание пока не опубликовано в каталоге.'}</p>
+        <div className="kt-dossier-in text-[15px] leading-[1.75] text-zinc-300 max-w-xl whitespace-pre-line" role={busy ? 'status' : undefined}>{busy && !character.description ? <span className="block space-y-2.5" aria-label="Загружаем сведения">{[92, 100, 84, 96, 60].map((w, i) => <span key={i} className="block h-3 rounded-full bg-white/[0.07] animate-pulse" style={{width: w + '%', animationDelay: i * 120 + 'ms'}}/>)}</span> : character.description || 'Описание пока не опубликовано в каталоге.'}</div>
         <div className="kt-dossier-in grid grid-cols-2 gap-4 pt-5 border-t border-white/[0.08] text-[12px]">
           <div><p className={label}>Сэйю</p><p className="mt-1.5 text-white font-semibold">{voices || 'Не указаны'}</p></div>
           <div><p className={label}>Арты</p><button type="button" onClick={openArts} className={`mt-1.5 inline-flex items-center gap-1.5 font-semibold ${accent} hover:text-white`}><Images size={14}/>Посмотреть арты</button></div>
@@ -197,8 +197,9 @@ export function Dossier({characters, character, busy, error, origin, isNoir, onP
         </div>
         </>}
         {error && <p className="text-[12px] text-rose-300" role="alert">{error}</p>}
+        </div>
         {/* The design's row: arrows on the left, the bars on the right; only the drop animates. */}
-        {count > 1 && <div className="mt-auto flex items-center justify-between gap-4 pt-4">
+        {count > 1 && <div className="shrink-0 flex items-center justify-between gap-4 pt-5 mt-2 border-t border-white/[0.06]">
           <div className="flex gap-2">
             <button type="button" aria-label={kind === 'person' ? 'Предыдущий создатель' : 'Предыдущий персонаж'} onClick={() => go(index - 1)} className="w-11 h-11 grid place-items-center rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12]"><ChevronLeft size={18}/></button>
             <button type="button" aria-label={kind === 'person' ? 'Следующий создатель' : 'Следующий персонаж'} onClick={() => go(index + 1)} className="w-11 h-11 grid place-items-center rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12]"><ChevronRight size={18}/></button>

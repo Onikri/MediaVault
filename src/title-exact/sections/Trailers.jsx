@@ -37,16 +37,17 @@ export function TrailersSection({k, isNoir, profile, server, userId, onPlaybackC
           </>}
         </div>
       </KineticItem>
-      {list.length > 1 && <div className="flex lg:flex-col gap-4 overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto lg:max-h-[calc((min(100vw,1520px)-360px)*0.5625)] [scrollbar-width:thin] pb-1">
-        {list.map((x, i) => <KineticItem key={x.id || x.url} weight={0.8 + Math.min(i, 4) * 0.12} {...k} className="shrink-0 w-56 lg:w-auto">
-          <button type="button" onClick={() => pick(i)} aria-pressed={i === main} translate="no"
-            className={`group relative w-full aspect-video rounded-3xl overflow-hidden border text-left transition-all duration-500 ${i === main ? (isNoir ? 'border-white/60' : 'border-rose-400/50 shadow-[0_18px_40px_-18px_rgba(225,29,72,0.6)]') : isNoir ? 'border-white/20 opacity-70 hover:opacity-100' : 'border-white/[0.08] opacity-70 hover:opacity-100'}`}>
+      {list.length > 1 && <KineticItem weight={0.9} {...k} className="min-h-0">
+        <div className={`flex lg:flex-col gap-3 h-full overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${list.length > 3 ? 'lg:max-h-full' : ''}`}>
+        {list.map((x, i) => <button key={x.id || x.url} type="button" onClick={() => pick(i)} aria-pressed={i === main} translate="no"
+            className={`group relative shrink-0 w-56 lg:w-full aspect-video ${list.length <= 3 ? 'lg:aspect-auto lg:flex-1' : ''} lg:min-h-[110px] rounded-3xl overflow-hidden border text-left transition-all duration-500 ${i === main ? (isNoir ? 'border-white/60' : 'border-rose-400/50 shadow-[0_18px_40px_-18px_rgba(225,29,72,0.6)]') : isNoir ? 'border-white/20 opacity-70 hover:opacity-100' : 'border-white/[0.08] opacity-70 hover:opacity-100'}`}>
             <span className={`absolute inset-0 kt-cover transition-transform duration-700 group-hover:scale-110 ${isNoir ? 'grayscale' : ''}`}>{renderArtwork(x)}</span>
             <span className="absolute inset-0 bg-gradient-to-t from-black/85 to-transparent"/>
+            {i === main && <span className={`absolute top-3 left-3 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-[0.14em] ${isNoir ? 'bg-white text-black' : 'bg-rose-600 text-white'}`}>Сейчас</span>}
             <span className="absolute left-4 right-4 bottom-3"><span className="block text-[13px] font-bold text-white leading-snug line-clamp-2">{x.title}</span><span className="block mt-1 text-[10px] font-mono text-zinc-400">{String(i + 1).padStart(2, '0')}</span></span>
-          </button>
-        </KineticItem>)}
-      </div>}
+          </button>)}
+        </div>
+      </KineticItem>}
     </div>
   </SectionFrame>;
 }

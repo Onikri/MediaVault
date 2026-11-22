@@ -23,13 +23,13 @@ function fit(count, width, height) {
    panorama: every card shrinks and flies to the top-left into one map of the
    whole cast that fits the stage. Picking a card on the map zooms back into
    that place and the two rows return around it. */
-export default function Panorama({items, idOf, renderCard, renderMini, k, isNoir, mapLabel, rowsLabel = 'Ряды', label}) {
-  const [map, setMap] = useState(false), [box, setBox] = useState({cols: 1, cell: 0});
+export default function Panorama({items, idOf, renderCard, renderMini, k, isNoir, mapLabel, rowsLabel = 'Ряды', label, caption}) {
+  const [map, setMap] = useState(false), [box, setBox] = useState({cols: 1, cell: 0}), [mapHeight, setMapHeight] = useState(0);
   const stage = useRef(null), row = useRef(null), layer = useRef(null), pending = useRef(null);
   const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   useLayoutEffect(() => {
     if (!map) return;
-    const update = () => { const r = stage.current?.getBoundingClientRect(); if (r) setBox(fit(items.length, r.width, r.height)); };
+    const update = () => { const r = stage.current?.getBoundingClientRect(); if (r) setBox(fit(items.length, r.width, Math.max(r.height, Math.round(innerHeight * .62)))); };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(stage.current);
@@ -37,8 +37,9 @@ export default function Panorama({items, idOf, renderCard, renderMini, k, isNoir
   }, [map, items.length]);
   const flipTargets = node => node ? [...node.querySelectorAll('[data-flip-id]')] : [];
   const toMap = () => {
-    const r = stage.current.getBoundingClientRect();
-    setBox(fit(items.length, r.width, r.height));
+    const r = stage.current.getBoundingClientRect(), height = Math.max(r.height, Math.round(innerHeight * .62));
+    setMapHeight(height);
+    setBox(fit(items.length, r.width, height));
     pending.current = {state: Flip.getState(flipTargets(row.current))};
     setMap(true);
   };
@@ -75,8 +76,18 @@ export default function Panorama({items, idOf, renderCard, renderMini, k, isNoir
   const page = d => row.current?.scrollBy({left: d * row.current.clientWidth * .85, behavior: reduce ? 'auto' : 'smooth'});
   const button = 'grid place-items-center w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12] transition-colors disabled:opacity-30';
   return <div className="relative">
-    <div ref={stage} className="relative">
-      <div ref={row} translate="no" aria-label={label} className={`grid grid-rows-2 grid-flow-col gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden auto-cols-[calc((100%-12px)/2)] md:auto-cols-[calc((100%-36px)/4)] xl:auto-cols-[calc((100%-60px)/6)] ${map ? 'invisible' : ''}`}>
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      {caption && <p className="text-[13px] text-zinc-400">{caption}</p>}
+      <span className="ml-auto flex items-center gap-2">
+        {!map && <><button type="button" className={button} aria-label="Листать назад" onClick={() => page(-1)}><ChevronLeft size={16}/></button><button type="button" className={button} aria-label="Листать вперёд" onClick={() => page(1)}><ChevronRight size={16}/></button></>}
+        <button type="button" aria-pressed={map} onClick={() => map ? zoomTo(null) : toMap()}
+          className={`h-9 pl-3 pr-4 inline-flex items-center gap-2 rounded-full border backdrop-blur-md text-[12px] font-semibold transition-colors ${map ? (isNoir ? 'bg-white text-black border-white' : 'bg-rose-600 text-white border-rose-400/40') : `${glass(isNoir)} text-zinc-200 hover:text-white`}`}>
+          {map ? <Rows2 size={15}/> : <LayoutGrid size={15}/>}{map ? rowsLabel : mapLabel}<span className="tabular-nums opacity-60">{items.length}</span>
+        </button>
+      </span>
+    </div>
+    <div ref={stage} className="relative overflow-x-clip transition-[height] duration-700 ease-[cubic-bezier(.22,1,.36,1)]" style={map && mapHeight ? {height: mapHeight} : undefined}>
+      <div ref={row} translate="no" aria-label={label} className={`grid grid-rows-2 grid-flow-col gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden auto-cols-[calc((100%-12px)/2)] md:auto-cols-[calc((100%-36px)/4)] xl:auto-cols-[calc((100%-60px)/6)] ${map ? 'invisible absolute inset-x-0 top-0' : ''}`}>
         {items.map((item, idx) => <KineticItem key={idOf(item)} weight={0.8 + (idx % 3) * 0.14} drift={(idx % 3) - 1} {...k} enabled={k.enabled && !map}>
           <div data-flip-id={idOf(item)} className="snap-start">{renderCard(item, idx)}</div>
         </KineticItem>)}
@@ -86,13 +97,6 @@ export default function Panorama({items, idOf, renderCard, renderMini, k, isNoir
           className={`group relative block rounded-2xl overflow-hidden border text-left transition-[border-color,box-shadow] duration-300 ${isNoir ? 'border-white/20 hover:border-white/70' : 'border-white/[0.08] hover:border-rose-300/50 hover:shadow-[0_16px_36px_-16px_rgba(225,29,72,0.6)]'}`}
           style={{width: box.cell, height: box.cell * ASPECT}}>{renderMini(item)}</button>)}
       </div>}
-    </div>
-    <div className="mt-4 flex items-center justify-end gap-2">
-      {!map && <><button type="button" className={button} aria-label="Листать назад" onClick={() => page(-1)}><ChevronLeft size={16}/></button><button type="button" className={button} aria-label="Листать вперёд" onClick={() => page(1)}><ChevronRight size={16}/></button></>}
-      <button type="button" aria-pressed={map} onClick={() => map ? zoomTo(null) : toMap()}
-        className={`h-9 pl-3 pr-4 inline-flex items-center gap-2 rounded-full border backdrop-blur-md text-[12px] font-semibold transition-colors ${map ? (isNoir ? 'bg-white text-black border-white' : 'bg-rose-600 text-white border-rose-400/40') : `${glass(isNoir)} text-zinc-200 hover:text-white`}`}>
-        {map ? <Rows2 size={15}/> : <LayoutGrid size={15}/>}{map ? rowsLabel : mapLabel}<span className="tabular-nums opacity-60">{items.length}</span>
-      </button>
     </div>
   </div>;
 }

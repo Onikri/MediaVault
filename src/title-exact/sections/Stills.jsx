@@ -19,7 +19,7 @@ function FilmViewer({images, index, setIndex, isNoir, renderArtwork, caption}) {
     root.current?.querySelector('[aria-label="Закрыть кадры"]')?.focus({preventScroll: true});
     return () => { removeEventListener('keydown', key); if (document.fullscreenElement === root.current) document.exitFullscreen?.().catch(() => {}); };
   }, []);
-  useEffect(() => { strip.current?.querySelector(`[data-i="${index}"]`)?.scrollIntoView({behavior: reduce ? 'instant' : 'smooth', inline: 'center', block: 'nearest'}); }, [index]);
+  useEffect(() => { const box = strip.current, on = box?.querySelector(`[data-i="${index}"]`); if (box && on) box.scrollTo({left: on.offsetLeft - (box.clientWidth - on.offsetWidth) / 2, behavior: reduce ? 'auto' : 'smooth'}); }, [index]);
   const button = 'w-9 h-9 grid place-items-center rounded-full text-zinc-300 hover:text-white hover:bg-white/10';
   return <motion.div ref={root} className="fixed inset-0 flex flex-col bg-black/95 backdrop-blur-2xl" style={{zIndex: 1250}} initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} role="dialog" aria-modal="true" aria-label="Кадры">
     <div className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden px-4 sm:px-20 pt-16 pb-4">

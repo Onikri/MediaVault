@@ -50,10 +50,23 @@ html[data-blossom] .kt-capsule:disabled { opacity: .35; cursor: default; transfo
 /* The watch block on the title page: the design's player card and a quiet episode row. */
 html[data-blossom][data-title-exact] .online-watch .title-playback-reveal { border-radius: 24px; overflow: hidden; border: 1px solid rgba(255,255,255,.09); box-shadow: 0 25px 50px -12px rgba(0,0,0,.6); }
 html[data-blossom][data-theme='noir'][data-title-exact] .online-watch .title-playback-reveal { border-color: rgba(255,255,255,.25); }
+/* With the player inside, the player is the card: no second frame around it. */
+html[data-blossom][data-title-exact] .online-watch .title-playback-reveal:has(.mv-player, .retained-media-slot, video) { border-color: transparent; box-shadow: none; background: transparent; }
 html[data-blossom][data-title-exact] .online-watch .watch-episode-browser { margin-top: 24px; padding: 0; background: none; border: 0; }
-html[data-blossom][data-title-exact] .online-watch .watch-episodes-heading > :is(h3, span) { display: none; }
-html[data-blossom][data-title-exact] .online-watch .watch-episodes-heading { justify-content: flex-end; margin: 0 0 12px; }
-html[data-blossom][data-title-exact] .online-watch .watch-episodes-heading:not(:has(select)) { display: none; }
+/* Episodes: a small-caps heading with the count, the season as a glass pill,
+   capsules on one even grid from the player's left edge. */
+html[data-blossom][data-title-exact] .online-watch .watch-episodes-heading { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 0; }
+html[data-blossom][data-title-exact] .online-watch .watch-episodes-heading > h3 { margin: 0; font: 600 10px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #fb7185; }
+html[data-blossom][data-theme='noir'][data-title-exact] .online-watch .watch-episodes-heading > h3 { color: #fff; }
+html[data-blossom][data-title-exact] .online-watch .watch-episodes-heading > span { font: 500 11px/1 ui-monospace, monospace; color: #71717a; }
+html[data-blossom][data-title-exact] .online-watch .watch-episodes-heading > select {
+  margin-left: auto; height: 34px; min-height: 0; padding: 0 34px 0 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 999px; -webkit-appearance: none; appearance: none; cursor: pointer;
+  background: rgba(255,255,255,.05) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 13px center;
+  color: #fff; font: 600 12px/1 ui-sans-serif, system-ui, sans-serif; color-scheme: dark; box-shadow: inset 0 1px 0 rgba(255,255,255,.06); transition: background-color .2s, border-color .2s;
+}
+html[data-blossom][data-title-exact] .online-watch .watch-episodes-heading > select:hover { background-color: rgba(255,255,255,.09); border-color: rgba(255,255,255,.16); }
+html[data-blossom][data-title-exact] .online-watch .watch-episode-grid.kt-capsules { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin: 0; padding: 0; }
+html[data-blossom][data-title-exact] .online-watch .watch-episode-grid .kt-capsule { width: 100%; min-width: 0; height: 40px; padding: 0; display: grid; place-items: center; }
 
 /* Glass cards across the real sections. */
 html[data-blossom] .mv-tw .content-corridor :is(.song-card, .title-credits .credits-grid > button, .watch-route li > button, .release-calendar-entries li) {
