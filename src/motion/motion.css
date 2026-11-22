@@ -38,3 +38,7 @@
 @media (--phone){.splash-choice{grid-template-columns:minmax(0,1fr)}}
 .appearance-subhead{margin:0 0 10px;font:600 13px/1.3 var(--font-ui);color:var(--color-on-muted)}
 .splash-choice small{display:block;margin:4px 3px 2px;color:var(--color-quiet);font-size:11px;line-height:1.35}
+.theme-choice{grid-template-columns:repeat(2,minmax(0,1fr))}
+.theme-preview{display:block;height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.1)}
+.theme-preview.is-classic{background:radial-gradient(circle at 70% 25%,rgba(225,29,72,.55),#12090d 70%)}
+.theme-preview.is-noir{background:#000 radial-gradient(rgba(255,255,255,.18) 1px,transparent 1px) 0 0/8px 8px}

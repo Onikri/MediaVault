@@ -2,6 +2,7 @@ import {copyFileSync, mkdirSync, cpSync, readFileSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {defineConfig} from 'vite';
+import tailwind from 'tailwindcss';
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const runtimeFiles = [
@@ -19,6 +20,15 @@ const runtimeFiles = [
 // Breakpoint tokens: @media (--phone) → the query defined in breakpoints.css.
 const breakpoints = Object.fromEntries([...readFileSync(resolve(projectRoot, 'src/blossom/breakpoints.css'), 'utf8')
   .matchAll(/@custom-media\s+(--[\w-]+)\s+([^;]+);/g)].map(match => [match[1], match[2].trim()]));
+// Tailwind runs only on the title page's stylesheet (src/title-exact).
+const titleTailwind = {
+  postcssPlugin: 'title-tailwind',
+  async Once(root, {result}) {
+    if (!/[\/]src[\/]title-exact[\/]/.test(result.opts.from || '')) return;
+    for (const plugin of tailwind({config: resolve(projectRoot, 'tailwind.title.config.cjs')}).plugins)
+      await (typeof plugin === 'function' ? plugin : plugin.Once)?.(root, result);
+  }
+};
 const breakpointMedia = {
   postcssPlugin: 'mediavault-breakpoints',
   AtRule: {
@@ -45,7 +55,7 @@ export default defineConfig({
   optimizeDeps: {entries: ['index.html','src/**/*.{js,jsx}'],include:['hyphen/ru/index.js']},
   server: {port: 8080, strictPort: true,watch:{ignored:path=>['.codex-local','test-output'].some(dir=>path.replaceAll('\\','/').startsWith(resolve(projectRoot,dir).replaceAll('\\','/')+'/'))}},
   preview: {port: 8080, strictPort: true},
-  css: {postcss: {plugins: [breakpointMedia]}},
+  css: {postcss: {plugins: [titleTailwind, breakpointMedia]}},
   esbuild: {jsx: 'automatic'},
   worker: {format: 'es'},
   build: {

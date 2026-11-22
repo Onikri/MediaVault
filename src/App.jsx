@@ -42,6 +42,7 @@ import {useVault,formatSize,labels} from './vault.js';
 import Icon,{BrandMark} from './Icons.jsx';
 import {MotionIcon,SiteIcon,glyph} from './motion-icons/MotionIcon.jsx';
 import {BootSplash} from './motion/splash.jsx';
+import './title-exact/theme-mode.js';
 import RoomEntrance from './motion/RoomEntrance.jsx';
 import Artwork from './Artwork.jsx';
 import {MusicShelf} from './Soundtrack.jsx';

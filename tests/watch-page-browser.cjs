@@ -46,7 +46,7 @@ for(const [id,name] of [['c','Crunchyroll.Subtitles'],['d','Студия суб�
   });
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/watch/watch-page-harness.html');
   await page.getByRole('button',{name:'Серия 2',exact:false}).first().waitFor();
-  assert.equal(await page.locator('.watch-episode-grid .title-episode-card').count(),12);
+  assert.equal(await page.locator('.watch-episode-grid .kt-capsule').count(),12);
   assert.equal(await page.locator('#voiceSource').count(),0);assert.equal(await page.locator('[aria-label="Качество просмотра"]').count(),0,'No external voice/quality block');
   // Sources and player options live in one sheet ("Настройки просмотра"): rows that
   // unfold into radio groups and switches. The page shows no separate source block.
@@ -65,13 +65,11 @@ for(const [id,name] of [['c','Crunchyroll.Subtitles'],['d','Студия суб�
   const colors=await choices('Озвучка').getByRole('radio').first().evaluate(n=>({color:getComputedStyle(n).color,background:getComputedStyle(n.closest('.player-popover')).backgroundColor}));
   assert.notEqual(colors.background,colors.color,'Voice choices stay legible on the sheet');
   await closeSheet();
-  await page.locator('.watch-episode-grid .title-episode-card').first().scrollIntoViewIfNeeded();
-  await page.waitForFunction(()=>[...document.querySelectorAll('.watch-episode-grid img')].slice(0,3).length===3&&[...document.querySelectorAll('.watch-episode-grid img')].slice(0,3).every(n=>n.src.startsWith('data:image/')),{},{timeout:30000});
+  await page.locator('.watch-episode-grid .kt-capsule').first().scrollIntoViewIfNeeded();
   assert.deepEqual(previewHighLevels,[],'Background previews must not fetch higher-quality video');
   await page.screenshot({path:path.join(DIR,'title-idle-'+width+'.png'),fullPage:true});
-  await page.emulateMedia({reducedMotion:'no-preference'});await page.locator('.watch-episode-grid .title-episode-card').first().hover();await page.locator('.episode-motion-frame').first().waitFor();const motionFrame=await page.locator('.episode-motion-frame').first().getAttribute('src');await page.waitForFunction(src=>document.querySelector('.episode-motion-frame')?.src!==src,motionFrame);await page.mouse.move(0,0);await page.emulateMedia({reducedMotion:'reduce'});
   await openSources();await row('Найти другие качества').click();await page.waitForFunction(()=>document.querySelector('.player-popover')?.textContent.includes('Проверяем качества'));
-  await closeSheet();await page.locator('.watch-episode-grid .title-episode-card').first().click();await page.waitForFunction(()=>{const v=document.querySelector('.mv-player-stage>video');return v?.readyState>=2&&!v.paused&&v.currentTime>.2;},{},{timeout:6000});
+  await closeSheet();await page.locator('.watch-episode-grid .kt-capsule').first().click();await page.waitForFunction(()=>{const v=document.querySelector('.mv-player-stage>video');return v?.readyState>=2&&!v.paused&&v.currentTime>.2;},{},{timeout:6000});
   assert.equal(qualityRequests,1,'Playback starts while the quality probe is still unresolved');holdQuality=false;releaseQuality?.();
   await closePlayer();
   await openSources();await row('Найти другие качества').click();
@@ -80,7 +78,7 @@ for(const [id,name] of [['c','Crunchyroll.Subtitles'],['d','Студия суб�
   await bestVideo().click();await choose('Озвучка','Команда А');
   await bestVideo().click();assert.equal(await rowValue('Качество'),'Лучшее, авто','Returning to a lower-quality studio clears an incompatible filter');
   await bestVideo().click();assert.equal(await bestVideo().getAttribute('aria-checked'),'true');await page.waitForFunction(()=>document.querySelector('.player-popover')?.textContent.includes('Доступно до 2160p'));
-  await closeSheet();await page.locator('.watch-episode-grid .title-episode-card').nth(1).click();
+  await closeSheet();await page.locator('.watch-episode-grid .kt-capsule').nth(1).click();
   const video=page.locator('.mv-player-stage>video').first();await page.waitForFunction(()=>document.querySelector('.mv-player-stage>video')?.readyState>=2);
   await page.waitForFunction(()=>{const v=document.querySelector('.mv-player-stage>video');return v?.buffered.length&&v.buffered.end(0)>85;},{},{timeout:30000});
   networkDown=true;await video.evaluate(v=>{v.currentTime=6;v.play();});await page.waitForFunction(()=>document.querySelector('.mv-player-stage>video')?.currentTime>=8);await video.evaluate(v=>v.pause());networkDown=false;
@@ -134,7 +132,7 @@ for(const [id,name] of [['c','Crunchyroll.Subtitles'],['d','Студия суб�
   assert.equal(await page.locator('.mv-external-audio').count(),0);
   assert.match(requests.filter(b=>String(b.clientId||'').endsWith(':viewer')).at(-1).url,/^https:\/\/source\.example\/a(?:-hd)?\/2$/);
   // While a video plays, the episode grid lives in the player's episode panel.
-  await showEpisodes(page);assert.equal(await page.locator('.watch-episode-grid .title-episode-card').nth(1).locator('img').evaluate(n=>n.src.startsWith('data:image/')),true,'Preview survives page remount');
+  await showEpisodes(page);assert.equal(await page.locator('.watch-episode-grid .kt-capsule').count(),12,'Episode capsules survive page remount');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);
   // Captions from another version: a published track is switched on by itself;
   // burned-in subtitles switch the video to that version and say so.

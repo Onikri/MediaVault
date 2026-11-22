@@ -1,4 +1,6 @@
-// Real React, geometry, scrolling and media decoding. Artwork/catalogue video are fixtures.
+// The title page of the approved design on real React with fixture artwork and
+// catalogue: full-screen showcase, content card, chapter rail and typography,
+// episode capsules, the navbar morph and the Нуар theme. No external services.
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 let browser,vite,last;
 (async()=>{
@@ -6,71 +8,44 @@ let browser,vite,last;
  execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','testsrc2=size=320x180:rate=8','-t','12','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-movflags','+faststart','-y',path.join(dir,'fixture.mp4')]);
  await fs.writeFile(path.join(dir,'index.html'),'<meta name="viewport" content="width=device-width"><div id="root"></div><script type="module" src="'+base+'fixture.jsx"></script>');
  await fs.writeFile(path.join(dir,'fixture.jsx'),`
- import React from'react';import{createRoot}from'react-dom/client';import{ThemeProvider}from'/src/blossom/ThemeProvider.tsx';import{AnimatedNavbar}from'/src/blossom/components/AnimatedNavbar.tsx';import TitlePage from'/src/TitlePage.jsx';import PlaybackReveal from'/src/PlaybackReveal.jsx';import Player from'/src/MediaVaultPlayer.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/import-layout.css';
+ import React from'react';import{createRoot}from'react-dom/client';import{ThemeProvider}from'/src/blossom/ThemeProvider.tsx';import{AnimatedNavbar}from'/src/blossom/components/AnimatedNavbar.tsx';import TitlePage from'/src/TitlePage.jsx';import PlaybackReveal from'/src/PlaybackReveal.jsx';import Player from'/src/MediaVaultPlayer.jsx';import'/src/styles.css';import'/src/title-page.css';import'/src/import-layout.css';import'/src/site-layout.css';
  window.MEDIA_VAULT_CONFIG={importServerUrl:'https://api.fixture'};window.commands=[];window.addEventListener('message',e=>{try{const d=JSON.parse(e.data);if(d.fixtureCommand)window.commands.push(d.fixtureCommand);}catch{}});
  const profile={sourceId:'16498',source:'shikimori',origin:'Манга',rating:'R-17',age:17,studio:'Wit Studio',title:'Атака титанов',year:2013,score:8.58,status:'Завершён',format:'ТВ-сериал',episodes:25,duration:24,genres:['Экшен','Драма'],description:'С давних времён человечество ведёт борьбу с титанами. Это огромные существа, которые не обладают особым интеллектом. Остатки человечества укрылись за высокими стенами. Однажды привычный мир меняется, и Эрен решает узнать, что находится за его пределами.',cover:'https://art.fixture/poster.svg',backgrounds:['https://art.fixture/scene.svg'],directors:['Акинори Фудэсака'],themes:['Исторический','Медицина'],characters:[],trailers:[{url:'https://www.youtube.com/watch?v=abcdefghijk',image:'https://art.fixture/scene.svg'}]};
  const isManga=location.search.includes('manga'),item={id:'fixture',name:'Серия 1',category:'video'};
  createRoot(document.getElementById('root')).render(<ThemeProvider><div className="app-shell" data-view="library"><AnimatedNavbar links={[{id:'home',label:'Главная'},{id:'library',label:'Библиотека'},{id:'collection',label:'Коллекция'}]} active="library" onSearch={()=>{}} onNavigate={()=>{}} brand={<button className="brand logo">MediaVault</button>}><button className="avatar-button">Г</button></AnimatedNavbar><main className="app-main"><TitlePage title={{id:'fixture',name:profile.title,section:isManga?'manga':'anime',category:isManga?'manga':'video',items:[],parts:[],online:true}} state={{user:{sub:'fixture'},catalog:{items:[]}}} actions={{}} online onlineFacts={[["Доступ","Онлайн"],["Сезон просмотра","Сезон 1 · 25 сер."],["Статус оригинала","Завершён"],["Рейтинг","PG-13"],["Студия","OLM"]]} onlineProfile={profile} onBack={()=>{}} onRelated={()=>{}} materials={<><h2>Смотреть</h2><PlaybackReveal><Player item={item} source="${base}fixture.mp4" catalog={{items:[item]}} userId="fixture" apiRef={api=>window.player=api}/></PlaybackReveal></>}/></main></div></ThemeProvider>);
  `);
- const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-showcase',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
+  const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/vite-showcase',logLevel:'error',server:{watch:null,host:'127.0.0.1',port:0}});await vite.listen();
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required','--enable-unsafe-swiftshader']});
- // Warm-up: on a cold cache Vite discovers lazily imported dependencies after the first
- // render, re-optimises them and reloads the page. Let that happen before any check runs.
- {const warm=await browser.newPage();await warm.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');
-  await warm.waitForFunction(()=>window.player?.media.readyState>=2,null,{timeout:30000}).catch(()=>{});
-  await warm.evaluate(()=>scrollTo(0,document.body.scrollHeight)).catch(()=>{});await warm.waitForTimeout(2500);await warm.close();}
- for(const [width,height] of [[390,900],[768,900],[1024,768],[1366,768],[1440,900]]){
-  const page=await browser.newPage({viewport:{width,height}}),errors=[];last=page;page.setDefaultTimeout(8000);page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});
-  await page.route('https://art.fixture/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><defs><linearGradient id="s" x2="0" y2="1"><stop stop-color="#b2b9bb"/><stop offset="1" stop-color="#23373c"/></linearGradient></defs><path fill="url(#s)" d="M0 0h1600v900H0z"/><circle fill="#d9cfb2" cx="1100" cy="240" r="120"/><path fill="#28363b" d="M0 700l280-350 160 280 350-400 260 470 200-230 350 230v200H0z"/></svg>'}));
-  let backgroundPolls=0;await page.route('https://www.youtube.com/**',r=>r.fulfill({body:'',contentType:'text/html'}));await page.route('https://api.fixture/**',async r=>{
-   if(r.request().url().endsWith('/backgrounds/16498'))return r.fulfill({json:++backgroundPolls===1?{status:'streaming',url:'/backgrounds/16498/source'}:{status:'ready',url:'/backgrounds/16498/video'}});
-   if(['/backgrounds/16498/video','/backgrounds/16498/source'].some(p=>r.request().url().endsWith(p)))return r.fulfill({contentType:'video/mp4',body:await fs.readFile(path.join(dir,'fixture.mp4'))});
-   return r.fulfill({json:{data:[],tracks:[],ratings:[]}});
-  });
-  await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html');
-  await page.waitForFunction(()=>window.player?.media.readyState>=2);await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(200);
-  const hero=await page.locator('.title-showcase').boundingBox(),poster=await page.locator('.title-poster').boundingBox(),copy=await page.locator('.title-hero-copy').boundingBox(),materials=await page.locator('#titleMaterials').boundingBox();
-  assert.ok(hero.height>=height-20,'Scene fills the first screen');if(width>=1025){const content=await page.locator('.title-showcase-content').boundingBox();assert.ok(content.y+content.height<=height+1,'All hero information fits one screen: '+JSON.stringify(content));assert.ok(hero.height<=height,'Desktop scene stays within one screen');}assert.ok(Math.abs(hero.x-8)<1&&Math.abs(hero.width-(width-16))<1,'Backdrop spans the first-screen showcase');
-  assert.ok(poster.y-hero.y>=(width>=1025?100:width<=640?60:220),'Visible atmosphere remains above the unified content');assert.ok(materials.y>=hero.y+hero.height-1,'Sections begin after the showcase');
-  assert.equal(await page.locator('.title-showcase-poster-layer .poster-actions').count(),1,'Every title keeps its actions under the poster');assert.ok(poster.width>=(width<=640?150:width>=1025?170:220),'Poster is enlarged');
-  if(width>640)assert.ok(Math.abs(poster.y-copy.y)<1&&poster.x+poster.width<copy.x,'Poster and copy align at their top edges');else assert.ok(copy.y>=poster.y+poster.height+20,'Phone stacks the same content group');
-  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal overflow');
-  await page.screenshot({path:path.join(dir,'showcase-'+width+'x'+height+'.png'),fullPage:false});
-  await page.locator('.title-background-video video').waitFor();await page.waitForFunction(()=>document.querySelector('.title-background-video video')?.currentTime>.1);
-  await page.evaluate(()=>{window.originalFrame=document.querySelector('.title-background-video video');window.originalPath=document.querySelector('.title-playback-mask path').getAttribute('d');window.originalVideo=window.player.media;});
-  assert.ok((await page.locator('.title-playback-reveal').evaluate(n=>getComputedStyle(n).clipPath)).includes('url('),'Playback enters through the SVG mask');
-  await page.evaluate(()=>{
-   const sheet=document.querySelector('.title-content-sheet');
-   scrollTo({top:scrollY+sheet.getBoundingClientRect().top-innerHeight*.5,behavior:'instant'});
-  });
-  await page.waitForFunction(()=>{
-   const content=document.querySelector('.title-showcase-content');
-   return new DOMMatrix(getComputedStyle(content).transform).m42>innerHeight*.02;
-  });
-  const plane=await page.evaluate(()=>{
-   const hero=document.querySelector('.title-showcase').getBoundingClientRect();
-   const sheet=document.querySelector('.title-content-sheet').getBoundingClientRect();
-   const content=new DOMMatrix(getComputedStyle(document.querySelector('.title-showcase-content')).transform);
-   return {overlap:hero.bottom-sheet.top,scale:content.a};
-  });
-  assert.ok(plane.overlap>height*.24&&plane.scale<1,'The sheet overtakes the shrinking foreground: '+JSON.stringify(plane));
-  await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
-  await page.waitForFunction(()=>Math.abs(new DOMMatrix(getComputedStyle(document.querySelector('.title-showcase-content')).transform).m42)<2);
-  await page.evaluate(()=>{
-   const sheet=document.querySelector('.title-content-sheet');
-   scrollTo({top:scrollY+sheet.getBoundingClientRect().top+innerHeight,behavior:'instant'});
-  });
-  await page.waitForFunction(()=>document.querySelector('.title-background-video video').paused);
-  await page.waitForFunction(()=>document.querySelector('.title-playback-mask path').getAttribute('d')!==window.originalPath);
-  if(width>=1150){const info=await page.locator('.title-showcase .title-facts').boundingBox();assert.ok(info.x>copy.x+copy.width-1,'Information sits to the right of the description');}
-  if(width>640)assert.notEqual(await page.locator('.title-showcase-content').evaluate(n=>getComputedStyle(n).transform),'none','Foreground participates in the scroll composition');
-  await page.evaluate(()=>{window.player.media.loop=true;window.player.play();});await page.waitForFunction(()=>window.player.media.currentTime>.2);
-  const before=await page.evaluate(()=>window.player.media.currentTime);await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(350);
-  assert.ok(await page.evaluate(t=>window.originalVideo===window.player.media&&!window.player.media.paused&&window.player.media.currentTime>t,before),'Scroll and reveal preserve the playing media');
-  assert.ok(await page.evaluate(()=>window.originalFrame===document.querySelector('.title-background-video video')&&window.originalFrame.src.endsWith('/source')),'Progressive original stays mounted after MP4 is ready');
-  await page.waitForFunction(()=>document.querySelector('.title-playback-mask path').getAttribute('d')===window.originalPath);
-  await page.evaluate(()=>{window.commands=[];window.player.pause();});await page.waitForFunction(()=>!document.querySelector('.title-background-video video').paused);
-  await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.locator('.title-showcase').waitFor();await page.waitForFunction(()=>window.player?.media.readyState>=2);assert.equal(await page.locator('.title-background-video video').count(),0,'Reduced motion starts without autoplay');assert.equal(await page.locator('.title-playback-reveal').evaluate(n=>getComputedStyle(n).clipPath),'none');
-  assert.deepEqual(errors,[]);if(width>=1025){await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html?manga=1');await page.locator('.poster-actions').waitFor();await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(150);const content=await page.locator('.title-showcase-content').boundingBox();assert.ok(content.y+content.height<=height+1,'Manga poster actions fit the first screen '+JSON.stringify(content));await page.getByRole('button',{name:'Начать читать',exact:true}).waitFor();assert.notEqual(await page.locator('.title-showcase').evaluate(n=>getComputedStyle(n).boxShadow),'none','Rounded showcase edge stays visible');await page.screenshot({path:path.join(dir,'manga-'+width+'.png')});}await page.close();console.log('PASS first-screen composition, SVG reveal, media continuity, background suspension and reduced motion '+width);
+ const url='http://127.0.0.1:'+vite.httpServer.address().port+base+'index.html';
+ {const warm=await browser.newPage();await warm.goto(url);await warm.waitForTimeout(4000);await warm.close();}
+ for(const [width,height] of [[390,900],[1024,768],[1440,900]]){
+  const page=await browser.newPage({viewport:{width,height}}),errors=[];last=page;page.setDefaultTimeout(9000);page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});
+  await page.route('https://art.fixture/**',r=>r.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><rect width="1600" height="900" fill="#2b3a40"/><circle fill="#d9cfb2" cx="1100" cy="240" r="120"/></svg>'}));
+  await page.route('https://www.youtube.com/**',r=>r.fulfill({body:'',contentType:'text/html'}));
+  await page.route('https://api.fixture/**',r=>r.fulfill({json:{data:[],tracks:[],ratings:[]}}));
+  await page.goto(url);
+  // Showcase: the title in the design's monumental type, the call to action and the actions.
+  const hero=page.locator('.kt-hero');await hero.waitFor();
+  assert.equal((await hero.locator('h1').textContent()).replace(/\s+/g,' ').trim(),'Атака титанов');
+  await hero.getByRole('button',{name:'Смотреть онлайн',exact:true}).waitFor();
+  await hero.getByRole('button',{name:'Трейлеры',exact:true}).waitFor();
+  assert.equal(await hero.locator('[aria-label="В избранное"]').count(),1);
+  const box=await hero.boundingBox(),inner=await page.evaluate(()=>document.documentElement.clientWidth);assert.ok(Math.abs(box.height-height)<2&&Math.abs(box.y)<1&&box.width>=inner-1,'Showcase fills the screen '+JSON.stringify(box));
+  if(width>=1024){
+   assert.equal(await page.locator('.kt-hero [aria-label^="Серия "]').count(),25,'Episode ruler marks every episode');
+   assert.ok(await page.locator('.kt-hero').getByText('Акинори Фудэсака').count()>=1,'Telemetry lists the director');
+  }
+  // The content card slides over the showcase; chapters, rail and navbar follow the scroll.
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--nav-t').trim()),'0.0000');
+  await page.evaluate(()=>document.getElementById('chapter-watch').scrollIntoView({block:'start'}));
+  await page.waitForFunction(()=>Number(getComputedStyle(document.documentElement).getPropertyValue('--nav-t'))>.95);
+  if(width>=768){await page.getByLabel('Навигация по главам').waitFor({state:'visible'});await page.locator('[aria-label="Открыть список разделов"]').click();await page.getByRole('button',{name:'Трейлеры',exact:true}).last().waitFor();}
+  else await page.getByRole('button',{name:/^0\d/}).last().waitFor();
+  // Нуар: the page turns black, the accents white.
+  await page.evaluate(async()=>{const m=await import('/src/title-exact/theme-mode.js');m.setThemeMode('noir');});
+  await page.waitForFunction(()=>document.querySelector('.kt-page')?.dataset.theme==='noir');
+  await page.evaluate(async()=>{const m=await import('/src/title-exact/theme-mode.js');m.setThemeMode('classic');});
+  assert.deepEqual(errors,[]);await page.screenshot({path:path.join(dir,'title-'+width+'.png')});await page.close();
+  console.log('PASS kinetic title page: showcase, telemetry, chapter rail, navbar morph and theme '+width);
  }
 })().catch(async e=>{console.error(e);await last?.screenshot({path:'.codex-local/test-output/title-showcase/failure.png'}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

@@ -1,0 +1,86 @@
+/* The title page of the approved design. Tailwind utilities (no preflight)
+   are generated for src/title-exact only and scoped under .mv-tw. */
+/* base only adds Tailwind's --tw-* defaults here (preflight is off). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The page is full-bleed: the app column opens to the full width (100vw would
+   include the scrollbar and overflow), and the page starts under the navbar. */
+html[data-blossom] .app-shell:has(.kt-host) > .app-main:has(.kt-host) { width: 100%; max-width: none; margin-inline: 0; padding-top: 0; padding-inline: 0; }
+html[data-blossom] .kt-host { position: relative; width: 100%; margin-inline: 0; }
+html[data-blossom] #root:has(.kt-host) { overflow-x: clip; }
+html[data-blossom] .mv-tw { font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+/* Minimal reset inside the page, at zero specificity so Tailwind utilities win. */
+:where(.mv-tw) :where(h1, h2, h3, p) { margin: 0; }
+:where(.mv-tw) :where(button) { font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; background: none; border: 0 solid; padding: 0; cursor: pointer; }
+:where(.mv-tw) :where(button:disabled) { cursor: default; }
+html[data-blossom] .mv-tw :is(.kt-poster-art, .kt-cover) img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+html[data-blossom] .mv-tw .kt-fact a { color: inherit; text-decoration: none; }
+html[data-blossom] .mv-tw .kt-fact a:hover { color: #fff; }
+
+/* The site's share button joins the design's round glass buttons. */
+html[data-blossom] .mv-tw .kt-round-actions :is(.circle-button, .share-title-button) { width: 44px; height: 44px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #d4d4d8; backdrop-filter: blur(12px); display: inline-flex; align-items: center; justify-content: center; }
+html[data-blossom] .mv-tw .kt-round-actions :is(.circle-button, .share-title-button):hover { background: rgba(255,255,255,.12); color: #fff; }
+
+/* Section headings give way to the vertical chapter typography; their controls stay. */
+html[data-blossom] .mv-tw .content-corridor .section-heading > h2,
+html[data-blossom] .mv-tw .content-corridor .watch-materials-heading { display: none; }
+html[data-blossom] .mv-tw .content-corridor .section-heading:not(:has(> :not(h2))) { display: none; }
+html[data-blossom] .mv-tw .content-corridor { color: #fff; }
+
+/* Episode capsules (online and library): the design's glass pills in one row. */
+html[data-blossom] .mv-tw .kt-capsules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (--above-phone) { html[data-blossom] .mv-tw .kt-capsules { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (--desktop) { html[data-blossom] .mv-tw .kt-capsules { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
+html[data-blossom] .mv-tw .kt-capsule { width: 100%; padding: 12px 0; border-radius: 16px; border: 1px solid rgba(255,255,255,.07); font: 600 12px/1 ui-sans-serif, system-ui, sans-serif; color: #d4d4d8; cursor: pointer;
+  background: linear-gradient(to bottom, rgba(255,255,255,.06), rgba(255,255,255,.015)); box-shadow: inset 0 1px 0 rgba(255,255,255,.07); backdrop-filter: blur(12px); transition: all .3s; }
+html[data-blossom] .mv-tw .kt-capsule:hover { color: #fff; border-color: rgba(255,255,255,.2); transform: translateY(-2px); }
+html[data-blossom] .mv-tw .kt-capsule[aria-pressed='true'] { color: #fff; border-color: rgb(253 164 175 / .35); background: linear-gradient(to bottom, rgb(244 63 94 / .6), rgb(190 18 60 / .45)); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 10px 26px -8px rgba(225,29,72,.65); }
+html[data-theme='noir'] .mv-tw .kt-capsule[aria-pressed='true'] { color: #000; border-color: rgba(255,255,255,.8); background: linear-gradient(to bottom, #fff, #d4d4d8); box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 8px 24px -8px rgba(255,255,255,.5); }
+html[data-blossom] .mv-tw .kt-capsule:disabled { opacity: .35; cursor: default; transform: none; }
+
+/* Glass cards across the real sections. */
+html[data-blossom] .mv-tw .content-corridor :is(.song-card, .title-credits .credits-grid > button, .watch-route li > button, .release-calendar-entries li) {
+  background: linear-gradient(to bottom, rgba(255,255,255,.06), rgba(255,255,255,.015)); border-color: rgba(255,255,255,.07); box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
+html[data-theme='noir'] .mv-tw .content-corridor :is(.song-card, .title-credits .credits-grid > button, .watch-route li > button, .release-calendar-entries li) { border-color: rgba(255,255,255,.2); }
+
+/* Noir: grey artwork, white accents. */
+html[data-theme='noir'] .mv-tw .content-corridor img { filter: grayscale(1); }
+html[data-blossom][data-title-exact] .title-dock { display: none; }
+
+/* The site's own button paint must not reach the design's text buttons. */
+html[data-blossom] .mv-tw button:not([class*='bg-']):not(.kt-capsule):not(.circle-button) { background: transparent; box-shadow: none; }
+html[data-blossom] .mv-tw button:not([class*='border']):not(.kt-capsule):not(.circle-button) { border: 0; }
+html[data-blossom] .mv-tw button:not([class*='p-']):not([class*='px-']):not([class*='py-']):not([class*='pl-']):not(.kt-capsule):not(.circle-button) { padding: 0; }
+
+/* Navbar on the title page: the design's continuous morph. At the top it is an
+   open bar over the showcase haze; as the content card arrives (--nav-t → 1)
+   it drops from the edge, narrows and condenses into a floating glass capsule. */
+html[data-blossom][data-title-exact] .blossom-navbar,
+html[data-blossom][data-title-exact] .blossom-navbar.is-scrolled {
+  top: calc(4px + 10px * var(--nav-t, 0));
+  width: calc(min(1520px, 100% - 32px) - 24px * var(--nav-t, 0));
+  transition: none;
+}
+html[data-blossom][data-title-exact] .blossom-navbar .header-inner {
+  min-height: calc(64px - 10px * var(--nav-t, 0));
+  padding-block: calc(8px - 2px * var(--nav-t, 0));
+  padding-inline: calc(4px + 16px * var(--nav-t, 0)) calc(4px + 12px * var(--nav-t, 0));
+}
+html[data-blossom][data-title-exact] .blossom-navbar .header-inner::before {
+  opacity: var(--nav-t, 0);
+  border-radius: 999px;
+  background-color: rgb(18 8 13 / .6);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), inset 0 1px 0 rgba(255,255,255,.07), 0 20px 55px -14px rgba(0,0,0,.88);
+  transform: scale(calc(1.018 - .018 * var(--nav-t, 0)), calc(.9 + .1 * var(--nav-t, 0)));
+  transition: none;
+}
+html[data-blossom][data-theme='noir'][data-title-exact] .blossom-navbar .header-inner::before { background-color: rgb(0 0 0 / .7); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), inset 0 1px 0 rgba(255,255,255,.08), 0 18px 50px -12px rgba(0,0,0,.9); }
+html[data-blossom] .mv-tw .content-corridor .watch-episodes-heading > h3 { display: none; }
+
+/* The showcase backdrop keeps its loading anchor but never shows the placeholder glyph. */
+html[data-blossom] .mv-tw .kt-hero .hero-backdrop-drift.kt-cover > :not(img) { opacity: 0; }
+html[data-blossom][data-theme='noir'] .blossom-navbar { --nav-search-accent: #fff; --nav-search-ink: #000; }
+html[data-blossom][data-theme='noir'] .blossom-navbar .brand.logo { color: #fff; }

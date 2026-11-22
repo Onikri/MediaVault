@@ -488,7 +488,7 @@ async function main() {
   await owner.locator('#titleLookup').fill('Наруто');
   await owner.getByRole('button',{name:'Найти',exact:true}).click();
   await owner.getByText(titleFixture.description,{exact:true}).waitFor();
-  assert.equal(await owner.locator('.title-hero').getByRole('heading',{name:'Наруто',exact:true}).count(),1);
+  assert.equal(await owner.locator('.kt-hero').getByRole('heading',{name:'Наруто',exact:true}).count(),1);
   // Roles arrive after the description, so wait for the director instead of sampling once.
   await owner.locator('.title-page .title-facts').filter({hasText:'Хаято Датэ'}).filter({hasText:'Манга'}).waitFor({timeout:10000}).catch(()=>assert.fail('Compact header retains director and source in the information card'));
   await owner.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
@@ -507,8 +507,8 @@ async function main() {
   const snapshotProfile=(await decryptCatalog(files.get(catalogId))).titleProfiles;
   assert.ok(Object.values(snapshotProfile).some(value=>value.userRatings?.[OWNER]===8&&value.characters[0].description.includes('Хокагэ')),'Russian character details and own rating are stored in the encrypted catalog');
   assert.equal(await owner.getByRole('combobox',{name:'Сезон или том'}).locator('option').count(),2,'Seasons appear inside the title');
-  assert.equal(await owner.locator('.title-episode-card').count(),2);
-  await owner.locator('.title-episode-card').first().click();
+  assert.equal(await owner.locator('.kt-capsule').count(),2);
+  await owner.locator('.kt-capsule').first().click();
   await owner.waitForFunction(()=>document.querySelector('#viewerContent video')?.readyState>=2);
   const cinema=owner.locator('.mv-player.mvx');
   // On phones the settings sheet is portalled to <body>, so it is looked up on the page.
@@ -656,7 +656,7 @@ async function main() {
   await owner.locator('#filesInput').setInputFiles([{name:'Том-01.txt',mimeType:'text/plain',buffer:Buffer.from('Light novel volume text')}]);
   await owner.waitForFunction(()=>document.querySelector('#count').textContent==='10 файлов');
   await owner.locator('.title-card').click();
-  await owner.locator('.title-episode-card').click();
+  await owner.locator('.kt-capsule').click();
   await owner.locator('.reader-prose').waitFor();
   assert.equal(await owner.locator('.reader-prose').innerText(),'Light novel volume text','A light novel keeps the working book reader');
   await closeViewer(owner);
@@ -679,7 +679,7 @@ async function main() {
   cachedContext.on('request',request=>{if(new URL(request.url()).hostname==='art.example.test')externalArt.push(request.url());});
   const metadataBeforeCache=russianMetadataRequests.length;
   await cachedPage.goto(base+'?library='+catalogId+'#'+new URLSearchParams({title:'anime:'+animeTitle.id}));await signIn(cachedPage);await cachedPage.locator('#passphrase').fill(PHRASE);await cachedPage.locator('#unlockBtn').click();
-  await cachedPage.locator('.title-hero').waitFor();assert.equal(new URLSearchParams(new URL(cachedPage.url()).hash.slice(1)).get('title'),'anime:'+animeTitle.id,'A title deep link survives Google sign-in and unlocking');
+  await cachedPage.locator('.kt-hero').waitFor();assert.equal(new URLSearchParams(new URL(cachedPage.url()).hash.slice(1)).get('title'),'anime:'+animeTitle.id,'A title deep link survives Google sign-in and unlocking');
   await cachedPage.getByText(titleFixture.description,{exact:true}).waitFor();
   await cachedPage.waitForFunction(()=>document.querySelector('.title-poster img')?.naturalWidth===1);
   await cachedPage.getByRole('button',{name:'Наруто Узумаки Главный герой',exact:true}).click();
@@ -699,9 +699,9 @@ async function main() {
   }
   await cachedPage.locator('#backToTitles').click();
   for(const [name,selector] of [['Маленькие плитки','.library-layout-compact'],['Список','.library-layout-list'],['Таблица','.library-table'],['Плитки','.library-layout-grid']]){await cachedPage.getByRole('button',{name,exact:true}).click();await cachedPage.locator(selector).waitFor();}
-  await cachedPage.getByRole('button',{name:'Раздел Аниме',exact:true}).click();await cachedPage.locator('.title-card').click();await cachedPage.locator('.title-related button').click();await cachedPage.locator('.title-hero').waitFor();
-  await cachedPage.locator('.online-title-page .title-hero').waitFor();
-  assert.equal(await cachedPage.locator('.online-title-page .title-hero h1').innerText(),'Наруто');assert.equal(await cachedPage.locator('.online-title-page').getAttribute('data-kind'),'manga','Related manga opens the exact title rather than starting an ambiguous name search');
+  await cachedPage.getByRole('button',{name:'Раздел Аниме',exact:true}).click();await cachedPage.locator('.title-card').click();await cachedPage.locator('.title-related button').click();await cachedPage.locator('.kt-hero').waitFor();
+  await cachedPage.locator('.online-title-page .kt-hero').waitFor();
+  assert.equal(await cachedPage.locator('.online-title-page .kt-hero h1').innerText(),'Наруто');assert.equal(await cachedPage.locator('.online-title-page').getAttribute('data-kind'),'manga','Related manga opens the exact title rather than starting an ambiguous name search');
   const sharedItem=organized.items.find(item=>item.collectionId===animeTitle.id&&item.category==='video');
   const sharedPage=await cachedContext.newPage();
   await sharedPage.goto(base+'?library='+catalogId+'#'+new URLSearchParams({episode:sharedItem.id,t:'1'}));await signIn(sharedPage);await sharedPage.locator('#passphrase').fill(PHRASE);await sharedPage.locator('#unlockBtn').click();

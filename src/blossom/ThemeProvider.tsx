@@ -3,6 +3,7 @@ import {ImagePlus,RotateCcw,Trash2} from 'lucide-react';
 import {BLOSSOM,THEME_KEY,applyPalette,chosenPalette,imageSeed,presets,readAppearance,sanitizeAppearance} from './theme.js';
 import flower from './blossom.jpg';
 import {SPLASHES,readSplash,writeSplash} from '../motion/splash.jsx';
+import {THEME_MODES,setThemeMode,useThemeMode} from '../title-exact/theme-mode.js';
 import './fonts.css';
 import './motion.css';
 import './reference.css';
@@ -31,6 +32,7 @@ export function AppearanceSettings(){
  const {settings,update}=theme;
  return <section className="settings-card appearance-settings" id="appearanceSettings" aria-label="Оформление"><header className="section-head"><div><p className="section-number">ОФОРМЛЕНИЕ</p><h2>Палитра<span className="headline-dot">.</span></h2></div><button className="circle-button" aria-label="Сбросить оформление" onClick={()=>update({mode:'manual',preset:'blossom',custom:null})}><RotateCcw size={17}/></button></header>
  <div className="appearance-swatches" role="group" aria-label="Палитры интерфейса">{presets.map(p=><button type="button" key={p.id} aria-pressed={settings.mode==='manual'&&!settings.custom&&settings.preset===p.id} onClick={()=>update({mode:'manual',preset:p.id,custom:null})}><span className="swatch" style={{background:p.seed}}><i style={{background:BLOSSOM.canvas}}/><i style={{background:BLOSSOM.petal}}/></span><strong>{p.name}</strong></button>)}</div>
+ <ThemeChoice/>
  <SplashChoice/>
  <label className="appearance-color">Свой основной цвет<input type="color" aria-label="Основной цвет интерфейса" value={settings.custom||presets.find(p=>p.id===settings.preset)?.seed||'#ee3c35'} onChange={e=>update({mode:'manual',custom:e.target.value})}/></label>
  <label className="appearance-auto"><input type="checkbox" checked={settings.mode==='background'} onChange={e=>update({mode:e.target.checked?'background':'manual'})}/><span><strong>Палитра из фона</strong><small>Цвета всего интерфейса подстраиваются под текущий фон страницы. Контраст текста сохраняется.</small></span></label>
@@ -41,4 +43,10 @@ export function AppearanceSettings(){
 function SplashChoice(){
  const [value,setValue]=useState(readSplash);
  return <><h3 className="appearance-subhead">Заставка при запуске</h3><div className="appearance-swatches splash-choice" role="group" aria-label="Заставка при запуске">{SPLASHES.map(([id,name])=><button type="button" key={id} aria-pressed={value===id} onClick={()=>{writeSplash(id);setValue(id);}}><strong>{name}</strong><small>{id==='vault'?'Кольцо заполняется, лепестки щёлкают как замок':id==='petals'?'Лепестки слетаются в цветок и он открывает сайт':'Сайт открывается сразу'}</small></button>)}</div></>;
+}
+
+// Classic blossom or Нуар (black dot-matrix); the title page and icons follow it.
+function ThemeChoice(){
+ const mode=useThemeMode();
+ return <><h3 className="appearance-subhead">Тема</h3><div className="appearance-swatches splash-choice theme-choice" role="group" aria-label="Тема">{THEME_MODES.map(([id,name,note])=><button type="button" key={id} aria-pressed={mode===id} onClick={()=>setThemeMode(id)}><span className={'theme-preview is-'+id}/><strong>{name}</strong><small>{note}</small></button>)}</div></>;
 }
