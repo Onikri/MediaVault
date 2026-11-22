@@ -39,7 +39,7 @@ const NavMusicIsland = forwardRef(function NavMusicIsland({track, title, art, pl
   if (!track) return <Tw><span ref={ref} className="kt-music relative flex">
     <button type="button" className={iconButton} aria-label="Музыкальный плеер" aria-expanded={panelOpen} onClick={onPanel}><Headphones size={18}/></button>
   </span></Tw>;
-  return <Tw><div ref={ref} className={`kt-music relative flex items-center h-[38px] rounded-full border transition-[background-color,border-color,box-shadow] duration-300 ${open ? `pl-[5px] pr-1.5 gap-2.5 ${GLASS_PILL}` : 'border-transparent'}`}>
+  return <Tw><div ref={ref} className={`kt-music relative flex items-center h-9 rounded-full border transition-[background-color,border-color,box-shadow] duration-300 ${open ? `pl-[5px] pr-1.5 gap-2.5 ${GLASS_PILL}` : 'border-transparent'}`}>
     <button type="button" onClick={() => phone ? onPanel() : setOpen(v => !v)} aria-expanded={phone ? panelOpen : open} aria-label={open ? 'Свернуть плеер' : 'Открыть плеер: ' + title} title={error || undefined}
       className="relative w-7 h-7 rounded-full shrink-0">
       <span className={`absolute inset-0 rounded-full overflow-hidden [&_.music-artwork]:absolute [&_.music-artwork]:inset-0 [&_.music-artwork-vinyl]:absolute [&_.music-artwork-vinyl]:inset-0 [&_.music-artwork-vinyl]:grid [&_.music-artwork-vinyl]:place-items-center [&_img]:w-full [&_img]:h-full [&_img]:object-cover ${noir ? 'grayscale' : ''}`}

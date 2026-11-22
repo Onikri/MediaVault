@@ -27,7 +27,7 @@ export default function NavBell({userId, notice, onOpenTask}) {
   return <Tw>
     <button ref={trigger} type="button" className={'notification-bell ' + iconButton} title="Уведомления"
       aria-label={unread ? 'Уведомления: ' + unread + ' непрочитанных' : 'Уведомления'} aria-expanded={open} aria-controls="notification-center" onClick={() => setOpen(v => !v)}>
-      <SiteIcon name="bell" size={19}/>
+      <SiteIcon name="bell" size={16}/>
       {unread > 0 && <span aria-hidden="true" className={`absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center tabular-nums ${noir ? 'bg-white text-black' : 'bg-rose-600 text-white'}`}>{Math.min(unread, 99)}</span>}
     </button>
     <NavPopover open={open} anchor={trigger} onClose={close} id="notification-center" title="Уведомления" width={320}>

@@ -36,9 +36,9 @@ let browser,vite,last;
    assert.ok(await page.locator('.kt-hero').getByText('Акинори Фудэсака').count()>=1,'Telemetry lists the director');
   }
   // The content card slides over the showcase; chapters, rail and navbar follow the scroll.
-  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--nav-t').trim()),'0.0000');
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.kt-navbar')).getPropertyValue('--nav-t').trim()),'0.0000');
   await page.evaluate(()=>document.getElementById('chapter-watch').scrollIntoView({block:'start'}));
-  await page.waitForFunction(()=>Number(getComputedStyle(document.documentElement).getPropertyValue('--nav-t'))>.95);
+  await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.kt-navbar')).getPropertyValue('--nav-t'))>.95);
   if(width>=768){await page.getByLabel('Навигация по главам').waitFor({state:'visible'});await page.locator('[aria-label="Открыть список разделов"]').click();await page.getByRole('button',{name:'Трейлеры',exact:true}).last().waitFor();}
   else await page.getByRole('button',{name:/^0\d/}).last().waitFor();
   // Нуар: the page turns black, the accents white.

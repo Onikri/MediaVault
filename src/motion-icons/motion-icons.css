@@ -16,7 +16,3 @@
 .mi-round{stroke:var(--ink);stroke-width:4;stroke-linejoin:round}
 .mi-round12{stroke:var(--ink);stroke-width:12;stroke-linejoin:round}
 .mi-sep{stroke:var(--cut);stroke-width:4}
-/* Нуар: the red turns to white. */
-[data-theme=noir] .mi-a{--ring:#fff;--ink:#fff;--accent:#000;--tile:#000;--cut:#000}
-[data-theme=noir] .mi-r{--ring:#fff;--ink:#fff;--accent:#000}
-[data-theme=noir] .mi-c{--accent:#fff}

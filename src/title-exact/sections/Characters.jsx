@@ -67,7 +67,7 @@ function LiquidPager({index, names, onPick, isNoir}) {
 /* The dossier: the portrait flies in from the card, the name splits into
    letters. Walking the cast is direction-aware: the text leaves against the
    move and the next one enters with it; the portrait slides the same way. */
-export function Dossier({characters, character, busy, error, origin, isNoir, onPick, onClose, renderArtwork, onRelated, workTitle = ''}) {
+export function Dossier({characters, character, busy, error, origin, isNoir, onPick, onClose, renderArtwork, onRelated, workTitle = '', kind = 'character'}) {
   const root = useRef(null), art = useRef(null), body = useRef(null), dir = useRef(1), moving = useRef(false), shownIndex = useRef(-1), reduce = useReducedMotion();
   const [spoilers, setSpoilers] = useState(false);
   const found = characters.findIndex(c => String(c.id) === String(character.id));
@@ -122,7 +122,7 @@ export function Dossier({characters, character, busy, error, origin, isNoir, onP
       if (e.key === 'ArrowLeft') goRef.current(indexRef.current - 1);
     };
     addEventListener('keydown', key);
-    root.current?.querySelector('.kt-dossier-close')?.focus({preventScroll: true});
+    root.current?.focus({preventScroll: true});
     return () => removeEventListener('keydown', key);
   }, []);
   function openArts() {
@@ -135,20 +135,33 @@ export function Dossier({characters, character, busy, error, origin, isNoir, onP
   const voices = character.actors?.length ? character.actors.slice(0, 4).join(', ') : character.voice || character.voiceActors?.map(v => v.name).join(', ');
   const role = roleName(character.role);
   const label = 'text-zinc-500 uppercase tracking-[0.16em] text-[10px]';
-  return createPortal(<div className="mv-tw" style={{display: 'contents'}}><div ref={root} className="fixed inset-0 flex items-center justify-center p-3 sm:p-10" style={{zIndex: 1250}} role="dialog" aria-modal="true" aria-label={'Досье: ' + character.name}>
+  return createPortal(<div className="mv-tw" style={{display: 'contents'}}><div ref={root} tabIndex={-1} className="fixed inset-0 flex items-center justify-center p-3 sm:p-10 outline-none" style={{zIndex: 1250}} role="dialog" aria-modal="true" aria-label={(kind === 'person' ? 'Создатель: ' : 'Досье: ') + character.name}>
     <div className="kt-dossier-veil absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose}/>
     <div className={`kt-dossier-card relative w-full max-w-6xl max-h-full grid grid-cols-1 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] rounded-[32px] overflow-hidden border ${isNoir ? 'bg-black border-white/20' : 'bg-[#12080d]/90 border-white/[0.08]'} shadow-[0_40px_120px_-20px_rgba(0,0,0,0.9)]`}>
       <div ref={art} className={`relative h-[38vh] md:h-auto md:min-h-[620px] overflow-hidden bg-white/[0.03] ${isNoir ? 'grayscale' : ''}`}>
         <AnimatePresence mode="popLayout" initial={false} custom={dir.current}>
           <motion.span key={character.id} custom={dir.current} className="absolute inset-0 kt-cover kt-top"
             variants={{enter: d => ({opacity: 0, x: d * 90, scale: 1.08}), center: {opacity: 1, x: 0, scale: 1}, exit: d => ({opacity: 0, x: -d * 90, scale: 1.02})}}
-            initial={reduce ? false : 'enter'} animate="center" exit="exit" transition={{duration: reduce ? 0 : .65, ease}}>{renderArtwork(character)}</motion.span>
+            initial={reduce ? false : 'enter'} animate="center" exit="exit" transition={{duration: reduce ? 0 : .65, ease}}>{character.image ? renderArtwork(character) : <span aria-hidden="true" className="absolute inset-0 flex items-end p-8 bg-[radial-gradient(circle_at_30%_20%,rgba(244,63,94,0.18),transparent_60%)]"><span className="text-[clamp(48px,7vw,96px)] font-black tracking-tighter leading-[0.85] text-white/[0.07] break-words">{character.name}</span></span>}</motion.span>
         </AnimatePresence>
         <span className={`absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:via-transparent ${isNoir ? 'md:to-black/90' : 'md:to-[#12080d]/90'}`}/>
         <span className="absolute left-6 bottom-6 font-mono text-[11px] tracking-[0.3em] text-white/60">{String(index + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}</span>
       </div>
       <div ref={body} translate="no" className="kt-dossier-panel relative p-7 sm:p-10 flex flex-col gap-6 overflow-y-auto overscroll-contain max-h-[calc(100vh-24px-38vh)] md:max-h-[calc(100vh-80px)] [scrollbar-width:thin]">
-        <button type="button" onClick={onClose} aria-label="Закрыть персонажа" className={`kt-dossier-close absolute top-5 right-5 ${roundButton}`}><X size={18}/></button>
+        <button type="button" onClick={onClose} aria-label={kind === 'person' ? 'Закрыть участника группы' : 'Закрыть персонажа'} className={`kt-dossier-close absolute top-5 right-5 ${roundButton}`}><X size={18}/></button>
+        {kind === 'person' ? <>
+        <p className={`kt-dossier-in pr-12 text-[11px] uppercase tracking-[0.24em] ${accent}`}>{character.role || 'Создатель'}</p>
+        <h3 key={character.id + ':' + character.name} className="kt-dossier-name pr-12 text-4xl sm:text-6xl font-black tracking-tight leading-[0.95] text-white">{character.name}</h3>
+        {character.facts?.length > 0 && <div className="kt-dossier-in flex flex-wrap gap-2">
+          {character.facts.slice(0, 6).map(([k, v]) => <span key={k} className={`px-3 py-1 rounded-full text-[11px] border ${isNoir ? 'border-white/25 text-white' : 'border-rose-400/25 bg-rose-500/10 text-rose-200'}`}>{k} · {v}</span>)}
+        </div>}
+        <p className="kt-dossier-in text-[15px] leading-[1.75] text-zinc-300 max-w-xl whitespace-pre-line" role={busy ? 'status' : undefined}>{busy && !character.description ? 'Загружаем сведения…' : character.description || 'Русская биография пока не опубликована в каталоге.'}</p>
+        <div className="kt-dossier-in grid grid-cols-2 gap-4 pt-5 border-t border-white/[0.08] text-[12px]">
+          <div><p className={label}>В этом тайтле</p><p className="mt-1.5 text-white font-semibold">{character.role || 'Участник'}</p></div>
+          <div><p className={label}>Работы</p><a href={browseHref('person', '', character.id, character.name)} onClick={onClose} className={`mt-1.5 inline-flex items-center gap-1.5 font-semibold ${accent} hover:text-white`}>Все аниме автора<ExternalLink size={12}/></a></div>
+        </div>
+        {character.bioSource && <div className="kt-dossier-in text-[11px] text-zinc-500"><a href={character.bioSource} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-white">Источник биографии{character.license ? ' · ' + character.license : ''}<ExternalLink size={11}/></a></div>}
+        </> : <>
         <p className={`kt-dossier-in pr-12 text-[11px] uppercase tracking-[0.24em] ${accent}`}>{[role, character.nativeName].filter(Boolean).join(' · ') || 'Персонаж'}</p>
         <h3 key={character.id + ':' + character.name} className="kt-dossier-name pr-12 text-4xl sm:text-6xl font-black tracking-tight leading-[0.95] text-white">{character.name}</h3>
         {(character.aliases?.length > 0 || facts.length > 0) && <div className="kt-dossier-in flex flex-wrap gap-2">
@@ -177,12 +190,13 @@ export function Dossier({characters, character, busy, error, origin, isNoir, onP
           <a href={browseHref('character', '', character.id, character.name)} className="inline-flex items-center gap-1 hover:text-white">Все появления героя<ExternalLink size={11}/></a>
           {character.sources?.map(s => <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-white">{s.name}<ExternalLink size={11}/></a>)}
         </div>
+        </>}
         {error && <p className="text-[12px] text-rose-300" role="alert">{error}</p>}
         {/* The design's row: arrows on the left, the bars on the right; only the drop animates. */}
         {count > 1 && <div className="mt-auto flex items-center justify-between gap-4 pt-4">
           <div className="flex gap-2">
-            <button type="button" aria-label="Предыдущий персонаж" onClick={() => go(index - 1)} className="w-11 h-11 grid place-items-center rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12]"><ChevronLeft size={18}/></button>
-            <button type="button" aria-label="Следующий персонаж" onClick={() => go(index + 1)} className="w-11 h-11 grid place-items-center rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12]"><ChevronRight size={18}/></button>
+            <button type="button" aria-label={kind === 'person' ? 'Предыдущий создатель' : 'Предыдущий персонаж'} onClick={() => go(index - 1)} className="w-11 h-11 grid place-items-center rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12]"><ChevronLeft size={18}/></button>
+            <button type="button" aria-label={kind === 'person' ? 'Следующий создатель' : 'Следующий персонаж'} onClick={() => go(index + 1)} className="w-11 h-11 grid place-items-center rounded-full bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-white/[0.12]"><ChevronRight size={18}/></button>
           </div>
           {count <= 20 ? <LiquidPager index={index} names={characters.map(c => c.name)} onPick={go} isNoir={isNoir}/> : <span className="font-mono text-[11px] tabular-nums text-zinc-400">{String(index + 1).padStart(2, '0')} / {count}</span>}
         </div>}

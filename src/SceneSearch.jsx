@@ -8,8 +8,8 @@ import './scene-search.css';
 
 const EASE=[.22,1,.36,1],SPRING={type:'spring',stiffness:300,damping:30,mass:.9};
 const hasImage=dt=>!!dt&&([...(dt.items||[])].some(i=>i.kind==='file'&&/^image\//.test(i.type))||[...(dt.types||[])].includes('Files')||[...(dt.types||[])].includes('text/uri-list'));
-function searchOrigin(){const r=document.querySelector('.blossom-navbar .header-center-search .header-search')?.getBoundingClientRect();return r?{x:r.left+r.width/2,y:r.top+r.height/2}:{x:innerWidth/2,y:40};}
-function anchorTop(){const r=document.querySelector('.blossom-navbar')?.getBoundingClientRect();return Math.max(72,(r?.bottom||70)+22);}
+function searchOrigin(){const r=document.querySelector('.kt-nav-search')?.getBoundingClientRect();return r?{x:r.left+r.width/2,y:r.top+r.height/2}:{x:innerWidth/2,y:40};}
+function anchorTop(){const r=document.querySelector('.kt-nav-inner')?.getBoundingClientRect();return Math.max(72,(r?.bottom||70)+22);}
 
 // Drop a frame anywhere (or paste it, or pick it from the search panel): the
 // search button grows into a lens, swallows the picture, finds the scene and

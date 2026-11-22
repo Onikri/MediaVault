@@ -9,13 +9,13 @@ export default function MergedCatalogToolbar({stuck,children}){
  const local=useRef(null),lastHeight=useRef(100),[host,setHost]=useState(null),reduced=useReducedMotion(),desired=useRef(stuck),synchronize=useRef(()=>{});desired.current=stuck;
  useLayoutEffect(()=>{
   const slot=document.createElement('div');slot.className='catalog-nav-slot';
-  const dock=document.querySelector('.mobile-dock'),header=document.querySelector('.blossom-navbar');
+  const dock=document.querySelector('.mobile-dock'),header=document.querySelector('.kt-navbar');
   let frame;
   const sync=()=>{
    const focused=document.activeElement;
    if(focused?.matches('input,textarea')&&focused.closest('.catalog-toolbar,.fdock-panel'))return;
    const mobile=matchMedia('(max-width:1024px)').matches;
-   const target=desired.current?(mobile?dock:header?.querySelector('.header-center-search')):null;
+   const target=desired.current?(mobile?dock:header?.querySelector('.kt-nav-center')):null;
    if(target){const changed=slot.parentNode!==target;if(changed)target.append(slot);document.documentElement.dataset.catalogMerged='true';setHost(slot);if(changed)dispatchEvent(new CustomEvent('mediavault:catalog-merged',{detail:{mobile}}));}
    else{slot.remove();delete document.documentElement.dataset.catalogMerged;setHost(null);}
   };

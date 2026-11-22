@@ -9,7 +9,7 @@ export function titleSectionTarget(id){
 }
 
 export function titleDockBoundary(){
- const header=document.querySelector('.blossom-navbar');
+ const header=document.querySelector('.kt-nav-inner');
  return (header?.getBoundingClientRect().bottom||78)+12;
 }
 

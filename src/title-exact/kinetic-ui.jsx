@@ -167,6 +167,11 @@ export function useKineticPagePhysics(heroRef, sections, playerId = 'watch-playe
           }
         }
 
+        // The last chapter may be too short to reach the anchor before the page
+        // ends: over the final stretch of the scroll the focus glides onto it.
+        const rest = (document.documentElement.scrollHeight - viewportH) - scrollY, reach = viewportH * 0.4;
+        if (sections.length > 1 && rest < reach) targetIndex += ((sections.length - 1) - targetIndex) * Math.max(0, Math.min(1, 1 - rest / reach));
+
         // 3. Мягкая пружинная инерция и сглаженная скорость скролла
         const deltaScroll = scrollY - lastScrollYRef.current;
         lastScrollYRef.current = scrollY;

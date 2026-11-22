@@ -3,7 +3,7 @@ import {Check, Disc3, ExternalLink, MoreHorizontal, Play, Plus} from 'lucide-rea
 import {musicSnapshot, playMusic, subscribeMusic} from '../../music-player.js';
 import {spotifySearch, toggleTrack, tracks, youtubeSearch} from '../../music-library.js';
 import {PlaylistExport, SongDetails, songKind, useAnimeSoundtrack} from '../../Soundtrack.jsx';
-import EpisodeSoundtrack from '../../EpisodeSoundtrack.jsx';
+import {EpisodeOst} from './EpisodeOst.jsx';
 import {KineticItem} from '../kinetic.jsx';
 import {SectionFrame, rowScroll, useEntered} from './ui.jsx';
 
@@ -74,7 +74,7 @@ export function MusicSection({k, isNoir, identity, animeTitle, cover, userId, re
           })}
         </div>}
       <p className="text-[11px] text-zinc-500">Источник: {data?.source || 'AnimeThemes и MyAnimeList'}{data?.stale ? ', сохранённые титры' : ''}. Сохраняется только название песни, аудио не скачивается.</p>
-      <EpisodeSoundtrack identity={identity}/>
+      <EpisodeOst identity={identity} isNoir={isNoir}/>
     </SectionFrame>
     <PlaylistExport track={exporting} onClose={() => setExporting(null)}/>
   </section>;

@@ -42,14 +42,9 @@ let vite,browser,last;
   assert.equal(await page.getByText('Episode not out',{exact:true}).count(),0);
   await cards.first().hover();
   await page.waitForFunction(()=>[...document.querySelectorAll('.catalog-grid .title-rating-badge')].some(n=>Number(getComputedStyle(n).opacity)>.95&&n.textContent.includes('8.9')));
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.header-inner'),'::before').backdropFilter.includes('dock-lens-'));
-  const glass=await page.locator('.header-inner').evaluate(n=>{
-   const style=getComputedStyle(n,'::before');
-   return {height:n.getBoundingClientRect().height,filter:style.backdropFilter,texture:style.backgroundImage};
-  });
-  assert.match(glass.filter,/blur\(10px\)/);
-  assert.equal(glass.texture,'none');
-  assert.ok(glass.height<=62,'Matte glass preserves the compact header height');
+  const glass=await page.locator('.kt-nav-inner').evaluate(n=>{const c=getComputedStyle(n.querySelector('.kt-nav-capsule'));return {height:n.getBoundingClientRect().height,filter:c.backdropFilter};});
+  assert.match(glass.filter,/blur\(40px\)/,'The bar carries the design glass');
+  assert.ok(glass.height<=64,'The bar keeps the design height');
   assert.ok(content.width>=main.width-4,'Catalogue uses its whole main column: '+JSON.stringify({main,content}));
   if(width>=1000){const a=await cards.nth(0).boundingBox(),b=await cards.nth(1).boundingBox();assert.ok(Math.abs(a.y-b.y)<2&&b.x>a.x+a.width,'Cards form a row, rather than a narrow nested sidebar');}
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));

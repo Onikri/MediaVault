@@ -26,7 +26,7 @@ export default function TitleNavigation({title,profile}){
 
  useLayoutEffect(()=>{
   const items=JSON.parse(signature);
-  const header=document.querySelector('.blossom-navbar');
+  const header=document.querySelector('.kt-nav-inner');
   let frame=0,previous,preferred;
   const rememberJump=event=>{preferred=event.detail;schedule();};
   const observer=new ResizeObserver(schedule);

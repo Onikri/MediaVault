@@ -10,7 +10,7 @@ import '../title-exact.css';
 
 export const spring = {type: 'spring', stiffness: 420, damping: 36, mass: .9};
 export const GLASS_PILL = 'bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]';
-export const iconButton = `relative w-[38px] h-[38px] shrink-0 rounded-full ${GLASS_PILL} hover:from-white/[0.14] aria-expanded:from-white/[0.14] aria-expanded:border-white/[0.14] flex items-center justify-center text-zinc-300 hover:text-white aria-expanded:text-white transition-colors`;
+export const iconButton = `relative w-9 h-9 shrink-0 rounded-full ${GLASS_PILL} hover:from-white/[0.14] aria-expanded:from-white/[0.14] aria-expanded:border-white/[0.14] flex items-center justify-center text-zinc-300 hover:text-white aria-expanded:text-white transition-colors`;
 export const popoverGlass = noir => noir
   ? 'bg-black/85 border-white/[0.14] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_24px_60px_-20px_rgba(0,0,0,0.9)]'
   : 'bg-[#12080d]/75 border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_24px_60px_-20px_rgba(0,0,0,0.9)]';

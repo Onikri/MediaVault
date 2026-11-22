@@ -4,6 +4,7 @@ import { KineticSectionBlock } from './kinetic.jsx';
 import { useKineticPagePhysics, LeftKineticNavigator, MobileChapterPill, IconPlay, IconBookmark, IconDownload, IconStar } from './kinetic-ui.jsx';
 import './title-exact.css';
 import {useKinetics} from './theme-mode.js';
+import {setNavProgress} from './navbar/NavShell.jsx';
 
 /* The title page of the approved design (motion lab title demo), markup and
    Tailwind classes kept as they are, filled with the real title: the full
@@ -57,9 +58,9 @@ export default function KineticTitle({
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-title-exact', '');
-    return () => { root.removeAttribute('data-title-exact'); root.style.removeProperty('--nav-t'); };
+    return () => { root.removeAttribute('data-title-exact'); setNavProgress(null); requestAnimationFrame(() => dispatchEvent(new Event('scroll'))); };
   }, []);
-  useEffect(() => { document.documentElement.style.setProperty('--nav-t', headerT.toFixed(4)); }, [headerT]);
+  useEffect(() => { setNavProgress(headerT); }, [headerT]);
 
   const scrollToSection = useCallback((id) => {
     const el = document.getElementById(id);
@@ -265,8 +266,8 @@ export default function KineticTitle({
                   className="-ml-1 w-7 h-7 rounded-full bg-white/[0.06] hover:bg-white/[0.14] border border-white/[0.1] flex items-center justify-center text-zinc-300 hover:text-white transition-all normal-case tracking-normal">
                   <ArrowLeft size={14} aria-hidden="true" />
                 </button>}
-                <span className={`inline-flex items-center gap-2 font-semibold ${isNoir ? 'text-white' : 'text-rose-400'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isNoir ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.7)]' : 'bg-rose-500 shadow-[0_0_10px_#e11d48]'}`} />
+                <span className="inline-flex items-center gap-2 text-rose-400 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_10px_#e11d48]" />
                   {kindLabel}
                 </span>
                 {seasonLabel && <><span className="h-[1px] w-7 bg-white/20 origin-left" /><span>{seasonLabel}</span></>}
@@ -294,7 +295,7 @@ export default function KineticTitle({
                 style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translate3d(0,0,0)' : 'translate3d(0,16px,0)', transition: 'all 800ms cubic-bezier(0.16, 1, 0.3, 1) 340ms' }}>
                 {score && <>
                   <span className="inline-flex items-center gap-1.5 text-white font-semibold tabular-nums">
-                    <IconStar size={13} filled className={isNoir ? 'text-white' : 'text-rose-500'} />
+                    <IconStar size={13} filled className="text-rose-500" />
                     <span>{score}</span>
                     <span className="text-[11px] font-normal text-zinc-400">{scoreSource}</span>
                   </span>
@@ -357,7 +358,7 @@ export default function KineticTitle({
                       <span className="text-3xl font-light tracking-tight tabular-nums text-white">{episodes.total}</span>
                       <span className="text-[11px] uppercase tracking-[0.18em] text-zinc-400">{episodes.unit}</span>
                     </div>
-                    <span className={`text-[11px] font-mono tabular-nums ${isNoir ? 'text-white/80' : 'text-rose-300/90'}`}>
+                    <span className="text-[11px] font-mono tabular-nums text-rose-300/90">
                       {hoveredEpisode ? `${episodes.word} ${hoveredEpisode}` : `${episodes.current || 0} / ${episodes.total}`}
                     </span>
                   </div>

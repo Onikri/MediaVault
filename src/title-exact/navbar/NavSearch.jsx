@@ -38,7 +38,7 @@ export function NavSearchSlot({open, onOpen, children}) {
   const transition = reduce ? {duration: 0} : spring;
   const context = useMemo(() => ({morph, transition}), [morph, transition]);
   return <LayoutGroup id="nav-search"><Tw>
-    <span ref={slot} className="relative block w-[34px] h-[34px]">
+    <span ref={slot} className="kt-search-slot relative block w-8 h-8">
       {!open && <motion.button layoutId="search-shell" transition={transition} type="button" aria-label="Найти в библиотеке" title="Поиск (Ctrl+K)" onClick={onOpen}
         style={{borderRadius: 999}}
         className={`kt-nav-search absolute inset-0 flex items-center justify-center transition-[background-color] ${noir ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_20px_rgba(225,29,72,0.5)]'}`}>

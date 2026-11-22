@@ -11,11 +11,11 @@ for(const width of[320,390,1025,1280,1440,1669]){
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base);
  const dock=page.getByRole('navigation',{name:'Разделы тайтла'});
- const brand=page.locator('.header-brand-area .brand.logo');
+ const brand=page.locator('.kt-brand');
  const current=dock.locator('[aria-current="location"]');
  await dock.waitFor();
  await page.evaluate(()=>document.fonts.ready);
- const main=await page.locator('.header-inner').boundingBox();
+ const main=await page.locator('.kt-nav-inner').boundingBox();
  const rail=await dock.boundingBox();
  assert.ok(rail.y>=main.y+main.height&&rail.y-main.y-main.height<=5,'Section dock hugs the header '+JSON.stringify({main,rail}));
  assert.ok(main.x+main.width-rail.x-rail.width>=0&&main.x+main.width-rail.x-rail.width<12,'Section dock follows the right edge');
@@ -34,9 +34,9 @@ for(const width of[320,390,1025,1280,1440,1669]){
  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.title-dock-section[aria-current] .title-dock-label')).opacity==='0');
  if(width<640)assert.equal((await current.boundingBox()).height,44,'Touch controls keep a 44 px target');
  if(width>1024){
-  const lastLink=await page.locator('.desktop-nav .nav-link').last().boundingBox(),search=await page.locator('.kt-nav-search').boundingBox();
+  const lastLink=await page.locator('.kt-nav-links .kt-link').last().boundingBox(),search=await page.locator('.kt-nav-search').boundingBox();
   assert.ok(lastLink.x+lastLink.width<=search.x-2,'The primary navigation leaves a clear search lane');
-  assert.ok(await page.locator('.desktop-nav .nav-glide').evaluate(n=>parseFloat(getComputedStyle(n).borderTopLeftRadius)>=n.offsetHeight/2));
+  assert.ok(await page.locator('.kt-nav-links [aria-current="page"]').evaluate(n=>parseFloat(getComputedStyle(n).borderTopLeftRadius)>=n.offsetHeight/2));
  }
 
  const marker=dock.locator('.title-dock-marker');
@@ -74,11 +74,12 @@ for(const scrolled of [false,true]){
  await page.evaluate(value=>scrollTo(0,value?480:0),scrolled);await page.waitForTimeout(550);
  for(let cycle=0;cycle<2;cycle++){
   // The design's search: the ruby circle grows into the sheet bar and returns to the same circle.
-  await page.locator('.kt-nav-search').click();await page.locator('.kt-search-bar').waitFor();assert.equal(await dock.isVisible(),false);
+  // Phones and tablets search from the dock; the bar's ruby circle is a desktop control, as in the design.
+  await page.locator(width<1025?'.mobile-dock-search':'.kt-nav-search').click();await page.locator('.kt-search-bar').waitFor();assert.equal(await dock.isVisible(),false);
   await page.waitForTimeout(500);const bar=await page.locator('.kt-search-bar').boundingBox();
   assert.ok(bar.width>200&&bar.x>=0&&bar.x+bar.width<=width+1&&Math.round(bar.height)===52,'The search bar opens inside the viewport');
   await page.getByRole('button',{name:'Закрыть поиск',exact:true}).click();await page.locator('.kt-search-sheet').waitFor({state:'detached'});await dock.waitFor();await page.waitForTimeout(500);
-  const circle=await page.locator('.kt-nav-search').boundingBox();assert.ok(Math.abs(circle.width-circle.height)<.1&&Math.abs(circle.width-34)<.1,'Repeated close restores exactly the same circle');
+  if(width>=1025){const circle=await page.locator('.kt-nav-search').boundingBox();assert.ok(Math.abs(circle.width-circle.height)<.1&&Math.abs(circle.width-32)<.1,'Repeated close restores exactly the same circle');}
  }
 }
  if(width===390||width===1440){

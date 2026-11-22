@@ -21,7 +21,6 @@ import {mangaPolicyProfile,globalContentPolicy} from './manga-tag-policy.js';
 import useMangaPolicy from './use-manga-policy.js';
 import {jikan,youtubeTrailer} from './media-metadata.js';
 import {jikanProfile,fillProfile} from './title-supplement.js';
-import CreditsPanel from './CreditsPanel.jsx';
 import './title-sections.css';
 import './title-rails.css';
 import {usePlatformRatings} from './PlatformRatings.jsx';
@@ -38,6 +37,7 @@ import {MusicSection} from './title-exact/sections/Music.jsx';
 import {TrailersSection} from './title-exact/sections/Trailers.jsx';
 import {RelatedRow} from './title-exact/sections/Related.jsx';
 import {RouteSection} from './title-exact/sections/Route.jsx';
+import {CreatorsSection} from './title-exact/sections/Creators.jsx';
 const NO_RELEASES=[];
 import {EpisodeCapsules} from './title-exact/RealSections.jsx';
 import {useThemeMode} from './title-exact/theme-mode.js';
@@ -275,8 +275,8 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
     section==='anime'&&{id:'music',label:'Музыка',verticalLabel:'МУЗЫКА',node:<MusicSection k={k(4)} isNoir={isNoir} identity={p.sourceId||title.metadataId} userId={state.user?.sub} animeTitle={name} cover={p.cover} renderArtwork={url=>art(url,'Обложка аниме')}/>},
     p.trailers?.length>0&&{id:'trailers',label:'Трейлеры',verticalLabel:'ТРЕЙЛЕРЫ',node:<section className="title-trailers"><TrailersSection k={k(5)} isNoir={isNoir} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} profile={p} userId={state.user?.sub} onPlaybackChange={setPlaying} renderArtwork={value=>art(value.image,'')}/></section>},
     p.related?.length>0&&{id:'related',label:'Связи',verticalLabel:'СВЯЗИ',node:<section id="titleRelated" className="title-related"><RelatedRow isNoir={isNoir} related={p.related} onOpen={value=>onRelated({...value,artwork:p.artwork,savedAt:p.savedAt})} renderImage={value=>art(value.cover,value.title)}/></section>},
-    section==='anime'&&/^\d+$/.test(String(p.sourceId||''))&&{id:'order',label:'Порядок просмотра',verticalLabel:'ПОРЯДОК',node:<section id="titleWatchOrder" className="watch-route"><RouteSection k={k(7)} isNoir={isNoir} renderImage={item=>art(item.cover,item.title)} identity={p.sourceId} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} cached={p.watchOrder} onRelated={onRelated} onLoaded={value=>{setProfile(old=>({...old,watchOrder:value}));if(!online&&state.admin&&state.driveWritable)actions.saveTitleProfile(title.id,{watchOrder:value},[],{background:true});}}/></section>},
-    (p.staff?.length||p.characters?.some(c=>c.voiceActors?.length))&&{id:'creators',label:['manga','ranobe','book'].includes(section)?'Авторы':'Создатели',verticalLabel:['manga','ranobe','book'].includes(section)?'АВТОРЫ':'СОЗДАТЕЛИ',node:<CreditsPanel kind={section} profile={p} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} renderArtwork={value=>art(value.image,'')}/>},
+    section==='anime'&&/^\d+$/.test(String(p.sourceId||''))&&{id:'order',label:'Порядок просмотра',verticalLabel:'ПОРЯДОК',node:<section id="titleWatchOrder"><RouteSection k={k(7)} isNoir={isNoir} renderImage={item=>art(item.cover,item.title)} identity={p.sourceId} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} cached={p.watchOrder} onRelated={onRelated} onLoaded={value=>{setProfile(old=>({...old,watchOrder:value}));if(!online&&state.admin&&state.driveWritable)actions.saveTitleProfile(title.id,{watchOrder:value},[],{background:true});}}/></section>},
+    (p.staff?.length||p.characters?.some(c=>c.voiceActors?.length))&&{id:'creators',label:['manga','ranobe','book'].includes(section)?'Авторы':'Создатели',verticalLabel:['manga','ranobe','book'].includes(section)?'АВТОРЫ':'СОЗДАТЕЛИ',node:<section id="titleCredits"><CreatorsSection k={k(8)} isNoir={isNoir} kind={section} profile={p} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} renderArtwork={value=>art(value.image,value.name||'')}/></section>},
   ].filter(Boolean).map((c,i)=>({...c,verticalLabel:(w=>(w[0].length>2?w[0]:w.join(' ')).toUpperCase())(translateUi(c.label).split(' ')),id:chapter(c.id),key:c.id,glowPrimary:CHAPTER_GLOWS[c.id][0],glowSecondary:CHAPTER_GLOWS[c.id][1],node:c.node}));
   return <article data-kind={section} className={'kt-host kt-title-page'+(online?' online-title-page':'')} style={palette?{'--title-rgb':palette.base}:undefined}>
     {/* Marker for the site's :has(.title-page) rules that hide library chrome around a title. */}

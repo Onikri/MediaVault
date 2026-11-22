@@ -13,7 +13,11 @@ html[data-blossom] #root:has(.kt-host) { overflow-x: clip; }
 html[data-blossom] .mv-tw { font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 
 /* Minimal reset inside the page, at zero specificity so Tailwind utilities win. */
-:where(.mv-tw) :where(h1, h2, h3, p) { margin: 0; }
+/* Tailwind's border base (preflight is off): without it border-t / border-l set
+   a width on a 'none' style and the design's lines and panel edge vanish. */
+:where(.mv-tw), :where(.mv-tw) *, :where(.mv-tw) ::before, :where(.mv-tw) ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
+:where(.mv-tw) :where(h1, h2, h3, h4, p, dl, dd, figure) { margin: 0; }
+:where(.mv-tw) :where(ol, ul) { list-style: none; margin: 0; padding: 0; }
 :where(.mv-tw) :where(button) { font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; background: none; border: 0 solid; padding: 0; cursor: pointer; }
 :where(.mv-tw) :where(button:disabled) { cursor: default; }
 html[data-blossom] .mv-tw :is(.kt-poster-art, .kt-cover) img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
