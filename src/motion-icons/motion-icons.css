@@ -1,0 +1,18 @@
+/* Animated MediaVault icons (MotionIcon). Colours come from the blossom tokens. */
+.mi{display:block;overflow:visible;flex:none}
+.mi-a{--tile:var(--color-canvas,#0c0c0f);--ring:var(--color-blossom,#ee3c35);--ink:var(--color-blossom,#ee3c35);--accent:var(--color-petal,#f0e8e5);--cut:var(--color-canvas,#0c0c0f)}
+.mi-r{--ring:var(--color-blossom,#ee3c35);--ink:var(--color-blossom,#ee3c35);--accent:var(--color-petal,#f0e8e5);--cut:var(--mi-surface,var(--color-canvas,#0c0c0f))}
+/* Line icons take the control's text colour; cut-outs match the surface behind them. */
+.mi-c{--ink:currentColor;--accent:var(--color-blossom,#ee3c35);--cut:var(--mi-surface,var(--color-canvas,#0c0c0f))}
+:is([aria-current],[aria-pressed=true],.is-active,.active)>* .mi-c,:is([aria-current],[aria-pressed=true],.is-active,.active)>.mi-c{--accent:var(--color-petal,#f0e8e5)}
+.mi-tile{fill:var(--tile)}
+.mi-ring{fill:none;stroke:var(--ring);stroke-width:12}
+.mi-ink{fill:var(--ink)}
+.mi-accent{fill:var(--accent)}
+.mi-cut{fill:var(--cut)}
+.mi-stroke{fill:none;stroke:var(--ink);stroke-linecap:round;stroke-linejoin:round}
+.mi-cut-s{fill:none;stroke:var(--cut);stroke-linecap:round;stroke-linejoin:round}
+.mi-accent-s{fill:none;stroke:var(--accent);stroke-linecap:round}
+.mi-round{stroke:var(--ink);stroke-width:4;stroke-linejoin:round}
+.mi-round12{stroke:var(--ink);stroke-width:12;stroke-linejoin:round}
+.mi-sep{stroke:var(--cut);stroke-width:4}

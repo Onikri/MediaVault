@@ -1,7 +1,7 @@
 import {NavigationItem} from '../SectionNavigation.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
-import {Clapperboard,Gauge,HardDrive,ListChecks,LogOut,Palette,Plug,RefreshCw,ShieldCheck,SlidersHorizontal,UserRound,UsersRound} from 'lucide-react';
+import {Gauge,HardDrive,ListChecks,LogOut,Palette,Plug,RefreshCw,ShieldCheck,SlidersHorizontal,UserRound,UsersRound} from 'lucide-react';
 import {useControlData,useNow,since,jobCounts} from './use-control-data.js';
 import Overview from './Overview.jsx';
 import RoomsPanel from './RoomsPanel.jsx';
@@ -10,6 +10,8 @@ import TasksPanel from './TasksPanel.jsx';
 import RulesPanel from './RulesPanel.jsx';
 import SystemPanel from './SystemPanel.jsx';
 import ContentPanel from './ContentPanel.jsx';
+import {SiteIcon} from '../motion-icons/MotionIcon.jsx';
+const RoomsIcon=()=><SiteIcon name="rooms"/>;
 import './control-center.css';
 
 // The owner's control center and everyone's settings share one shell:
@@ -17,7 +19,7 @@ import './control-center.css';
 const GROUPS=[
  ['server','Сервер',[
   ['overview','Обзор',Gauge,'Что происходит на сервере прямо сейчас'],
-  ['rooms','Комнаты',Clapperboard,'Совместный просмотр: кто в комнатах и что идёт'],
+  ['rooms','Комнаты',RoomsIcon,'Совместный просмотр: кто в комнатах и что идёт'],
   ['guests','Гости',UsersRound,'Профили по приглашению, их доступ и активность'],
   ['tasks','Задачи',ListChecks,'Импорт и оформление библиотеки на ВМ'],
   ['rules','Правила',SlidersHorizontal,'Ограничения комнат и права новых гостей'],

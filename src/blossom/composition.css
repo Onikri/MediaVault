@@ -404,6 +404,8 @@ html[data-blossom] .blossom-navbar .header-actions{align-items:center;margin-blo
 html[data-blossom] .blossom-navbar{width:min(1600px,calc(100% - 24px))}
 html[data-blossom] .blossom-navbar.is-scrolled{width:min(1268px,calc(100% - 72px))}
 html[data-blossom] .blossom-navbar .brand.logo{color:var(--color-crimson)}
+html[data-blossom] .blossom-navbar .brand.logo{gap:8px;padding-left:8px;--mi-surface:rgb(var(--canvas-rgb,16 16 20))}
+html[data-blossom] .blossom-navbar .brand-mark{width:24px;height:24px}
 html[data-blossom] .blossom-navbar .header-inner{transition:none}
 html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:340px}
 @media (--tablet-only){html[data-blossom] .blossom-navbar.is-search-expanded .header-inner{--search-slot:max(180px,20vw)}}
