@@ -24,7 +24,7 @@ export function inStreamAudio(media,url){
 // The loaded media can stay: same request, or another dub of the same stream.
 export function keepsLoadedMedia(media,request){
  const loaded=media?.request;
- if(!loaded||loaded.quality!==request.quality||loaded.retry!==request.retry||loaded.server!==request.server)return false;
+ if(!loaded||loaded.quality!==request.quality||loaded.retry!==request.retry||loaded.server!==request.server||loaded.collapsGroup!==request.collapsGroup)return false;
  if(loaded.url===request.url)return loaded.sourceUrl===request.sourceUrl;
  return !!inStreamAudio(media,request.url);
 }

@@ -82,20 +82,55 @@ export function preferAudio(manifest,index){
  }).join('\n');
 }
 
-// Absolute addresses (the master becomes a blob) and an optional height cap.
-export function directMaster(manifest,base,maxHeight=null){
+const variantHeight=line=>Number(/RESOLUTION=\d+x(\d+)/.exec(line)?.[1]);
+const variantGroup=line=>/\bAUDIO="([^"]+)"/.exec(line)?.[1]||'';
+const audioGroup=line=>/\bGROUP-ID="([^"]+)"/.exec(line)?.[1]||'';
+const isAudioRendition=line=>line.startsWith('#EXT-X-MEDIA:')&&line.includes('TYPE=AUDIO');
+
+function videoRenditions(manifest,base,selectedName){
+ const lines=manifest.split(/\r?\n/);
+ const matchingGroups=new Set(lines.filter(line=>isAudioRendition(line)&&/NAME="([^"]*)"/.exec(line)?.[1]===selectedName).map(audioGroup));
+ return lines.flatMap((line,index)=>{
+  if(!line.startsWith('#EXT-X-STREAM-INF:'))return [];
+  const height=variantHeight(line),group=variantGroup(line),uri=lines[index+1]?.trim();
+  if(!height||!group||!uri||uri.startsWith('#')||(selectedName&&!matchingGroups.has(group)))return [];
+  return [{height,group,host:new URL(uri,base).host}];
+ });
+}
+
+// Collaps publishes parallel video variants with separate audio groups. A
+// different CDN can carry the same resolution and the same chosen dub.
+export function nextCollapsRendition(media,height,group,tried){
+ if(!tried&&group){
+  const variants=media.renditions.filter(row=>row.height===height);
+  const playing=variants.find(row=>row.group===group);
+  const mirror=playing&&variants.find(row=>row.group!==group&&row.host!==playing.host);
+  if(mirror)return {quality:String(height),group:mirror.group};
+ }
+ if(!tried||tried.group){
+  const lower=media.qualities.find(quality=>quality<height);
+  if(lower)return {quality:String(lower),group:''};
+ }
+ return null;
+}
+
+// Absolute addresses (the master becomes a blob), optional height cap and
+// audio group for a retry on a specific provider-published variant.
+export function directMaster(manifest,base,maxHeight=null,group=''){
  if(!manifest.trimStart().startsWith('#EXTM3U'))throw Error('Collaps не отдал плейлист HLS.');
  if(/#EXT-X-(?:SESSION-)?KEY:(?![^\n]*METHOD=NONE)/.test(manifest))throw Error('Зашифрованные потоки Collaps не поддерживаются.');
  let lines=manifest.split(/\r?\n/);
- if(maxHeight){
+ if(maxHeight||group){
   const keep=[];let dropped=0,kept=0;
   for(let i=0;i<lines.length;i++){
-   const height=Number(/RESOLUTION=\d+x(\d+)/.exec(lines[i])?.[1]);
-   if(lines[i].startsWith('#EXT-X-STREAM-INF')&&height>maxHeight){dropped++;i++;continue;}
-   if(lines[i].startsWith('#EXT-X-STREAM-INF'))kept++;
+   if(group&&isAudioRendition(lines[i])&&audioGroup(lines[i])!==group)continue;
+   if(lines[i].startsWith('#EXT-X-STREAM-INF:')){
+    if((maxHeight&&variantHeight(lines[i])>maxHeight)||(group&&variantGroup(lines[i])!==group)){dropped++;i++;continue;}
+    kept++;
+   }
    keep.push(lines[i]);
   }
-  if(kept)lines=keep;else if(dropped)throw Error('В этом потоке нет качества в выбранных пределах.');
+  if(kept)lines=keep;else if(dropped)throw Error(group?'Резервный поток Collaps больше недоступен.':'В этом потоке нет качества в выбранных пределах.');
  }
  return lines.map(line=>line.startsWith('#')?line.replace(/URI="([^"]+)"/g,(_,uri)=>'URI="'+new URL(uri,base).href+'"'):line.trim()?new URL(line.trim(),base).href:line).join('\n')+'\n';
 }
@@ -116,18 +151,20 @@ export async function collapsMaster(value,{signal,fetcher=fetch}={}){
  return {selection,raw:await master.text(),base:master.url||address,subtitles:captionsOf(episode)};
 }
 
-export async function prepareCollaps(value,{quality='best',signal,fetcher=fetch}={}){
+export async function prepareCollaps(value,{quality='best',group='',signal,fetcher=fetch}={}){
  const {selection,raw,base,subtitles}=await collapsMaster(value,{signal,fetcher}),maxHeight=quality==='best'?null:Number(quality);
- const playlist=directMaster(preferAudio(raw,selection.audio),base,maxHeight);
+ const names=audioNames(raw),renditions=videoRenditions(raw,base,names[selection.audio]);
+ if(group&&!renditions.some(row=>row.group===group))throw Error('Резервный поток Collaps больше недоступен с выбранной озвучкой.');
+ const playlist=directMaster(preferAudio(raw,selection.audio),base,maxHeight,group);
  const qualities=[...new Set([...raw.matchAll(/RESOLUTION=\d+x(\d+)/g)].map(m=>Number(m[1])))].sort((a,b)=>b-a);
  const url=URL.createObjectURL(new Blob([playlist],{type:'application/vnd.apple.mpegurl'}));
- return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,audioNames:audioNames(raw),subtitles,sourceIntervals:[],
-  guardSlate:selection.embed.endsWith('/embed/movie/2491')}; // The Blacklist (2013), all seasons.
+ return {id:'direct:'+crypto.randomUUID(),kind:'video',url,type:'hls',direct:true,qualities,renditions,
+  audioNames:names,subtitles,sourceIntervals:[],guardSlate:true};
 }
 
 // Shared by the viewer, the separate audio track and episode previews.
 export function prepareOnline(service,body,{signal}={}){
- if(body.kind==='video'&&collapsSelection(body.url))return prepareCollaps(body.url,{quality:body.quality||'best',signal});
+ if(body.kind==='video'&&collapsSelection(body.url))return prepareCollaps(body.url,{quality:body.quality||'best',group:body.collapsGroup,signal});
  return service.request('/online/prepare',{method:'POST',body,signal});
 }
 export function releaseOnline(service,data){

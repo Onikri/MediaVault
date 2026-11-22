@@ -47,7 +47,7 @@ export function usePlayerSession(controller){
     item:c.item,source:c.source,time:v?.currentTime||0,duration:Number.isFinite(v?.duration)?v.duration:0,
     playing:!!v&&!v.paused,volume:v?.volume??1,muted:v?.muted??false,
     panel:c.panel,theater:c.theater,fullscreen:c.isFullscreen,pip:c.isPip,
-    preferences:{...c.prefs},quality:c.streaming.level
+    preferences:{...c.prefs},quality:c.streaming.level,renditionGroup:c.streaming.renditionGroup()
    };},
    play:()=>{const c=latest.current;c.openPanel('watch');return c.videoRef.current?.play();},
    pause:()=>latest.current.videoRef.current?.pause(),

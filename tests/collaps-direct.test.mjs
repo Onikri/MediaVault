@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {collapsSelection,collapsStream,pageToken,preferAudio,directMaster,prepareCollaps} from '../src/collaps-direct.js';
+import {collapsSelection,collapsStream,pageToken,preferAudio,directMaster,prepareCollaps,nextCollapsRendition} from '../src/collaps-direct.js';
 import {isCollapsSlate,SLATE_WIDTH,SLATE_HEIGHT,watchCollapsFrames} from '../src/collaps-video-guard.js';
 
 const serial=readFileSync(new URL('./fixtures/players/collaps_serial.html',import.meta.url),'utf8');
@@ -46,7 +46,7 @@ test('the browser opens the embed and the stream itself, with the page token',as
   if(url==='https://cdn.example/m/master.m3u8?a=1&tok42')return new Response(MASTER);
   return new Response('',{status:410});};
  const data=await prepareCollaps('https://api.nextembed.ws/embed/movie/180?mv_audio=0',{fetcher});
- assert.equal(data.direct,true);assert.equal(data.type,'hls');assert.deepEqual(data.qualities,[720,360]);assert.equal(data.guardSlate,false);
+ assert.equal(data.direct,true);assert.equal(data.type,'hls');assert.deepEqual(data.qualities,[720,360]);assert.equal(data.guardSlate,true);
  assert.deepEqual(data.audioNames,['rus0','ukr1'],'the dubs inside the stream, in the order Collaps numbers them');
  assert.match(data.url,/^blob:/);assert.deepEqual(asked.map(a=>a[1]),['omit','omit']);
  URL.revokeObjectURL(data.url);
@@ -90,6 +90,33 @@ test('Blacklist playback enables slate detection for every season and keeps HD a
    assert.equal(data.subtitles[0].url,cdn+'/english.vtt');
   }finally{URL.revokeObjectURL(data.url);}
  }
+});
+
+test('a Collaps recovery tries another CDN at the same height with the same dub, then lowers quality once',async()=>{
+ const embed='https://api.embf.net/embed/movie/2491';
+ const master=MASTER+
+  '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="failover",NAME="ukr1",DEFAULT=NO,AUTOSELECT=NO,URI="https://backup.example/ua.m3u8"\n'+
+  '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="other",NAME="rus0",DEFAULT=YES,AUTOSELECT=YES,URI="https://other.example/ru.m3u8"\n'+
+  '#EXT-X-STREAM-INF:BANDWIDTH=1055277,RESOLUTION=1280x720,AUDIO="failover"\nhttps://backup.example/720.m3u8\n'+
+  '#EXT-X-STREAM-INF:BANDWIDTH=1055277,RESOLUTION=1280x720,AUDIO="other"\nhttps://other.example/720.m3u8\n';
+ const fetcher=async url=>new Response(url===embed?'var p={hls:"https://main.example/master.m3u8"};':master);
+ const url=embed+'?mv_audio=1';
+ const primary=await prepareCollaps(url,{quality:'720',fetcher});
+ try{
+  const alternate=nextCollapsRendition(primary,720,'a',null);
+  assert.deepEqual(alternate,{quality:'720',group:'failover'});
+  const mirror=await prepareCollaps(url,{...alternate,fetcher});
+  try{
+   const playlist=await fetch(mirror.url).then(response=>response.text());
+   assert.match(playlist,/https:\/\/backup\.example\/720\.m3u8/);
+   assert.match(playlist,/NAME="ukr1",DEFAULT=YES,AUTOSELECT=YES/);
+   assert.doesNotMatch(playlist,/v720\/|other\.example|NAME="rus0"/);
+   const low=nextCollapsRendition(mirror,720,'failover',alternate);
+   assert.deepEqual(low,{quality:'360',group:''});
+   assert.equal(nextCollapsRendition(mirror,360,'a',low),null);
+  }finally{URL.revokeObjectURL(mirror.url);}
+  await assert.rejects(prepareCollaps(url,{quality:'720',group:'other',fetcher}),/с выбранной озвучкой/);
+ }finally{URL.revokeObjectURL(primary.url);}
 });
 
 function slateFrame(){
