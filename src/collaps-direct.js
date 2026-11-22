@@ -102,6 +102,33 @@ export function directMaster(manifest,base,maxHeight=null){
 
 export const collapsRequest=(fetcher,signal)=>url=>fetcher(url,{signal,credentials:'omit',referrerPolicy:'strict-origin-when-cross-origin'});
 
+// The Blacklist (2013), S1E7–8. The Lift slate replaces picture in these
+// renditions, with no HLS cue. Keep the original timeline, audio and captions.
+const blacklistS1E7Hd='/11_15_26/11/15/23/RXMAXD5K/WX56W7XS.mp4/index-v1.m3u8';
+const blacklistS1E8Hd='/11_15_26/11/15/23/3ZTFKEHF/AMKSHDYQ.mp4/index-v1.m3u8';
+
+function excludePromotionalVariants(manifest,base){
+ const lines=manifest.split(/\r?\n/), excluded=new Set();
+ const isVariant=line=>line.startsWith('#EXT-X-STREAM-INF:');
+ for(let i=0;i<lines.length-1;i++){
+  if(!isVariant(lines[i]))continue;
+  const uri=lines[i+1].trim();
+  if(!uri||uri.startsWith('#'))continue;
+  let address;
+  try{address=new URL(uri,base);}catch{continue;}
+  if(!address.hostname.endsWith('.interkh.com'))continue;
+  if(address.pathname===blacklistS1E7Hd||
+     (address.pathname===blacklistS1E8Hd&&address.hostname==='x-bc.interkh.com')){
+   excluded.add(i);
+   excluded.add(++i);
+  }
+ }
+ if(!excluded.size)return manifest;
+ const remaining=lines.filter((_,index)=>!excluded.has(index));
+ if(!remaining.some(isVariant))throw Error('Collaps пока не отдал версию серии без рекламной вставки.');
+ return remaining.join('\n');
+}
+
 // The embed page → the episode's master playlist, exactly as Collaps' own player reads it.
 export async function collapsMaster(value,{signal,fetcher=fetch}={}){
  const selection=collapsSelection(value);if(!selection)throw Error('Это не плеер Collaps.');
@@ -113,7 +140,8 @@ export async function collapsMaster(value,{signal,fetcher=fetch}={}){
  const token=pageToken(text),address=token&&!stream.includes('&'+token)?stream+'&'+token:stream;
  const master=await request(address);
  if(!master.ok)throw Object.assign(Error('Collaps не отдал поток (HTTP '+master.status+').'),{status:master.status});
- return {selection,raw:await master.text(),base:master.url||address,subtitles:captionsOf(episode)};
+ const base=master.url||address;
+ return {selection,raw:excludePromotionalVariants(await master.text(),base),base,subtitles:captionsOf(episode)};
 }
 
 export async function prepareCollaps(value,{quality='best',signal,fetcher=fetch}={}){

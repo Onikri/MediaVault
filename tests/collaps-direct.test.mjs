@@ -68,3 +68,40 @@ test('the current Collaps mirror keeps VTT tracks scoped to the selected season 
  try{assert.deepEqual(data.subtitles,[{id:'collaps-cc-0',name:'Рус. полные',language:'ru',url:'https://media.example/two.vtt?token=fixture'}]);}
  finally{URL.revokeObjectURL(data.url);}
 });
+
+test('Blacklist playback uses clean Collaps renditions and keeps the selected audio and subtitles',async()=>{
+ const embed='https://api.embf.net/embed/movie/2491';
+ const assets=['RXMAXD5K/WX56W7XS','3ZTFKEHF/AMKSHDYQ','QAPF7PEY/WDMEFSQ2'];
+ const cdn='https://primary.interkh.com';
+ const directory=asset=>'/11_15_26/11/15/23/'+asset+'.mp4/';
+ const seasons=[{season:1,episodes:assets.map((asset,index)=>({
+  episode:7+index,hls:cdn+directory(asset)+'master.m3u8',cc:[{name:'Eng. full',url:cdn+'/english.vtt'}],
+ }))}];
+ const fetcher=async url=>{
+  if(url===embed)return new Response('makePlayer({seasons:'+JSON.stringify(seasons)+'})');
+  const dir=new URL(url).pathname.replace(/master\.m3u8$/,'');
+  const media=MASTER.split('#EXT-X-STREAM-INF')[0];
+  const variant=(resolution,uri)=>'#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION='+resolution+',AUDIO="a"\n'+uri+'\n';
+  return new Response(media+
+   variant('1280x720',cdn+dir+'index-v1.m3u8?token=primary')+
+   variant('1280x720','https://x-bc.interkh.com'+dir+'index-v1.m3u8?token=backup')+
+   variant('640x360',cdn+dir+'index-v2.m3u8?token=primary')+
+   variant('640x360','https://x-bc.interkh.com'+dir+'index-v2.m3u8?token=backup'));
+ };
+ for(const [episode,hdCount] of [[7,0],[8,1],[9,2]]){
+  const data=await prepareCollaps(embed+'?mv_season=1&mv_episode='+episode+'&mv_audio=1',{quality:'720',fetcher});
+  try{
+   const playlist=await fetch(data.url).then(response=>response.text());
+   assert.equal([...playlist.matchAll(/RESOLUTION=1280x720/g)].length,hdCount);
+   assert.equal([...playlist.matchAll(/RESOLUTION=640x360/g)].length,2);
+   assert.deepEqual(data.qualities,hdCount?[720,360]:[360]);
+   assert.match(playlist,/NAME="ukr1",DEFAULT=YES,AUTOSELECT=YES/);
+   assert.match(playlist,/index-v2\.m3u8\?token=backup/);
+   assert.equal(data.subtitles[0].url,cdn+'/english.vtt');
+   if(episode===8){
+    assert.ok(playlist.includes(cdn+directory(assets[1])+'index-v1.m3u8?token=primary'));
+    assert.ok(!playlist.includes('https://x-bc.interkh.com'+directory(assets[1])+'index-v1.m3u8'));
+   }
+  }finally{URL.revokeObjectURL(data.url);}
+ }
+});
