@@ -36,6 +36,7 @@ import ShareTitleButton from './ShareTitleButton.jsx';
 import {useTitleShare,useTitleStats} from './title-context.js';
 import './title-dossier.css';
 import TitleNavigation from './TitleNavigation.jsx';
+import TitleKinetics from './title-kinetics/TitleKinetics.jsx';
 import HoverPreview from './HoverPreview.jsx';
 import {readReading} from './reading-progress.js';
 import TitleEpisodeCard from './TitleEpisodeCard.jsx';
@@ -233,6 +234,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
     </TitleShowcase>
     <div className="title-content-sheet">
     <TitleNavigation title={title} profile={p}/>
+    <TitleKinetics/>
     {online&&materials&&<section id="titleMaterials" className={'title-stage online-title-materials title-stage-'+section}>{materials}</section>}
     <div className="title-page-columns mv-title-layout"><div className="title-page-main">
       {(!online&&(!p.sourceId||state.admin)||error)&&<section className="title-description title-metadata-tools"><div className="section-heading"><h2>Сведения о тайтле</h2>{(busy||onlineBusy)&&<span className="fine" role="status">{busy==='saving'?'Сохраняем оформление в Drive…':busy==='search'?'Ищем тайтл…':'Загружаем сведения…'}</span>}</div>
