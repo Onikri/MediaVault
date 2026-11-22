@@ -5,7 +5,7 @@ import {Play,X,Film,ExternalLink} from 'lucide-react';
 import YouTubeEmbed from './YouTubeEmbed.jsx';
 import {extractYouTubeId} from './blossom/utils/trailer.ts';
 
-function TrailerVideo({video,profile,server,userId,onPlaybackChange}){
+export function TrailerVideo({video,profile,server,userId,onPlaybackChange}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  useEffect(()=>{
   const abort=new AbortController();let timer;setData(null);setError('');

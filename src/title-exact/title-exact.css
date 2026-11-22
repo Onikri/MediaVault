@@ -74,3 +74,16 @@ html[data-blossom] .mv-tw button:not([class*='p-']):not([class*='px-']):not([cla
 
 /* The showcase backdrop keeps its loading anchor but never shows the placeholder glyph. */
 html[data-blossom] .mv-tw .kt-hero .hero-backdrop-drift.kt-cover > :not(img) { opacity: 0; }
+
+/* The navbar music island cover. */
+@keyframes ktDisc { to { transform: rotate(360deg); } }
+
+/* Section motion of the second design pass: stamp pulse, route checkpoint pulse. */
+@keyframes ktPulse { 0% { transform: scale(.85); opacity: .7; } 100% { transform: scale(1.25); opacity: 0; } }
+.kt-pulse { transform-origin: 32px 32px; animation: ktPulse 1.8s ease-out infinite; }
+@keyframes ktDotPulse { 0% { transform: scale(.7); opacity: .9; } 100% { transform: scale(1.35); opacity: 0; } }
+.kt-dot-pulse { animation: ktDotPulse 1.6s ease-out infinite; }
+@keyframes ktTrailer { from { width: 0; } to { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .kt-pulse, .kt-dot-pulse { animation: none; } }
+html[data-blossom] .mv-tw .kt-cover.kt-contain img { object-fit: contain; }
+html[data-blossom] .mv-tw .kt-cover.kt-top img { object-position: 50% 15%; }

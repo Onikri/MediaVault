@@ -53,41 +53,30 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   await page.evaluate(()=>dispatchEvent(new CustomEvent('mediavault:backdrop-palette',{detail:'#0000ff'})));assert.equal((await palette()).blossom,'#ee3c35','Manual theme ignores changing title backgrounds');
   await page.getByRole('button',{name:'Вернуть Blossom',exact:true}).click();await fits('Profile');await page.screenshot({path:path.join(dir,'profile-'+width+'.png'),fullPage:true});
   const mobile=width<=1000;
-  const trigger=page.locator(mobile?'.mobile-dock-search':'.header-center-search .header-search');
+  // The design's search: the ruby circle (or the dock button) opens a sheet with the bar on top.
+  const trigger=page.locator(mobile?'.mobile-dock-search':'.kt-nav-search');
   const originalSearch=await trigger.boundingBox();
-  assert.ok(Math.abs(originalSearch.width-(mobile?52:38))<1,'Search uses the dock circle on mobile and navbar circle on desktop');
+  assert.ok(Math.abs(originalSearch.width-(mobile?52:34))<1,'Search uses the dock circle on mobile and the ruby circle on desktop');
   await trigger.click();const dialog=page.getByRole('dialog',{name:'Поиск в библиотеке'});await dialog.waitFor();
-  assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).evaluate(e=>document.activeElement===e),true);
-  await page.getByRole('combobox',{name:'Поиск произведения'}).fill('Naruto');await dialog.getByRole('option').first().waitFor();await fits('Search');
-  const position=await dialog.boundingBox(),field=await page.locator('.morph-search-bar').boundingBox();
-  assert.ok(position.x>=0&&position.x+position.width<=width+1,'Search stays within viewport');
-  assert.ok(field.width>originalSearch.width+30,'Search expands into a readable field');
-  assert.equal(await dialog.locator('kbd').count(),0,'Search displays no hotkey legends');
-  assert.equal(await page.locator('.morph-search-backdrop').count(),0,'Search has no blocking backdrop');
-  if(mobile){
-   assert.equal(await dialog.evaluate(e=>e.classList.contains('is-sheet')),true,'Dock search opens the mobile sheet');
-   assert.ok(field.y>480&&field.y+field.height<=960,'Mobile field remains within thumb reach');
-   assert.equal(await page.locator('.header-center-search').isVisible(),false,'Mobile has only the dock search entry');
-   const panel=await dialog.locator('.morph-search-panel').boundingBox();
-   assert.ok(panel.y+panel.height<=field.y+1,'Suggestions stack above the mobile field');
-  }else{
-   const inner=await page.locator('.blossom-navbar .header-inner').boundingBox();
-   assert.ok(field.x>=inner.x-1&&field.x+field.width<=inner.x+inner.width+1,'Desktop search remains inside navbar');
-   assert.ok(Math.abs(field.y+field.height/2-inner.y-inner.height/2)<2,'Desktop search stays vertically centered');
-   const actions=await page.locator('.blossom-navbar .header-actions').boundingBox();
-   assert.ok(field.x+field.width<=actions.x+2,'Desktop search does not overlap profile and music controls');
-  }
+  await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Поиск произведения');
+  await page.getByRole('combobox',{name:'Поиск произведения'}).fill('Naruto');await dialog.getByRole('listbox',{name:'Результаты поиска'}).getByRole('option').first().waitFor();await fits('Search');
+  await page.waitForTimeout(500);
+  const field=await page.locator('.kt-search-bar').boundingBox(),panel=await page.locator('.kt-search-panel').boundingBox();
+  assert.ok(field.x>=0&&field.x+field.width<=width+1,'Search stays within viewport');
+  assert.ok(field.width>originalSearch.width+30&&field.width<=641,'Search expands into a readable bar of the design width');
+  assert.ok(Math.abs(field.x+field.width/2-width/2)<2,'The bar is centred');
+  assert.ok(field.y<40&&panel.y>=field.y+field.height,'Bar on top, results beneath it');
+  if(mobile)assert.equal(await page.locator('.header-center-search').isVisible(),false,'Mobile has only the dock search entry');
   await page.screenshot({path:path.join(dir,'search-'+width+'.png')});await page.keyboard.press('Escape');
-  assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).inputValue(),'','first Escape clears the query like MorphingSearchChips');
+  assert.equal(await page.getByRole('combobox',{name:'Поиск произведения'}).inputValue(),'','first Escape clears the query');
   await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
   if(width===1280){
    await page.evaluate(()=>scrollTo(0,480));
    await page.waitForFunction(()=>document.querySelector('.blossom-navbar')?.classList.contains('is-scrolled'));
-   const compactSearch=await page.locator('.header-center-search .header-search').boundingBox();
-   assert.ok(Math.abs(compactSearch.width-38)<1,'scrolled search restores the same circle');
+   await page.locator('.kt-nav-search').waitFor();await page.waitForTimeout(500);
+   const compactSearch=await page.locator('.kt-nav-search').boundingBox();
+   assert.ok(Math.abs(compactSearch.width-34)<1&&Math.abs(compactSearch.height-34)<1,'scrolled search restores the same circle');
    await page.keyboard.press('Control+k');const scrolled=page.getByRole('dialog',{name:'Поиск в библиотеке'});await scrolled.waitFor();
-   const scrolledBar=await page.locator('.morph-search-bar').boundingBox(),scrolledInner=await page.locator('.blossom-navbar .header-inner').boundingBox();
-   assert.ok(scrolledBar.x>=scrolledInner.x-1&&scrolledBar.x+scrolledBar.width<=scrolledInner.x+scrolledInner.width+1,'scrolled search remains inside the narrowed navbar');
    await page.keyboard.press('Escape');await scrolled.waitFor({state:'hidden'});await page.evaluate(()=>scrollTo(0,0));
   }
   await navigateApp(page,'Библиотека');await page.locator('.catalog-grid .anime-card').first().waitFor();await fits('Catalog');
@@ -101,8 +90,8 @@ const ROOT=path.resolve(__dirname,'..'),dir=path.join(ROOT,'.codex-local/test-ou
   assert.equal(widths.length,2);assert.ok(Math.abs(widths[0]-widths[1])<=1,'Title and file navigation have equal targets');
   assert.equal(await collectionSwitch.getByRole('button',{name:'Тайтлы'}).getAttribute('aria-pressed'),'true');if(width===1280){await page.waitForFunction(expected=>{const e=document.querySelector('#libraryGrid');return e&&Math.abs(e.getBoundingClientRect().width-expected)<1;},catalogWidth,{timeout:5000});assert.ok(Math.abs((await page.locator('#libraryGrid').boundingBox()).width-catalogWidth)<1,'Catalog and collection allocate equal poster space');}
   const centered=await page.locator('.blossom-navbar .brand.logo').evaluate(e=>{const r=e.getBoundingClientRect(),p=e.closest('.header-inner').getBoundingClientRect();return Math.abs(r.y+r.height/2-p.y-p.height/2);});assert.ok(centered<.6,'Navbar has equal top and bottom spacing');
-  await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();await page.waitForFunction(()=>{const e=document.querySelector('.music-island');return e?.classList.contains('is-expanded')&&Math.abs(e.getBoundingClientRect().height-parseFloat(e.style.height))<1&&Math.abs(e.getBoundingClientRect().x-parseFloat(e.style.left))<1&&Math.abs(e.getBoundingClientRect().y-parseFloat(e.style.top))<1;});assert.equal(await page.locator('.music-island .music-connections').count(),0,'Accounts do not occupy the empty player');const island=await page.locator('.music-island').boundingBox(),music=await page.locator('.music-nav').boundingBox();assert.ok(island.height<230&&island.y>=music.y+music.height,'Empty island is compact and anchored under music');await page.screenshot({path:path.join(dir,'collection-island-'+width+'.png')});await page.keyboard.press('Escape');await page.locator('.music-island[aria-hidden=true]').waitFor({state:'attached'});await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();await page.evaluate(()=>{const input=document.createElement('input');input.id='outsideFocusProbe';input.setAttribute('aria-label','Outside focus fixture');input.style.cssText='position:fixed;left:12px;bottom:12px;width:160px;height:36px;z-index:10000';document.body.append(input);});await page.locator('#outsideFocusProbe').click();await page.locator('.music-island[aria-hidden=true]').waitFor({state:'attached'});assert.equal(await page.locator('#outsideFocusProbe').evaluate(e=>document.activeElement===e),true,'Outside click collapses without stealing focus');await page.locator('#outsideFocusProbe').evaluate(e=>e.remove());
-  await page.keyboard.press('Control+k');await page.getByRole('dialog').getByRole('button',{name:'Аниме',exact:true}).click();await page.getByRole('combobox',{name:'Поиск произведения'}).fill('Naruto');await page.getByRole('dialog').getByRole('option').first().waitFor();await page.keyboard.press('Enter');await page.locator('.kt-hero h1').waitFor();
+  await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();await page.waitForFunction(()=>{const e=document.querySelector('.music-island');return e?.classList.contains('is-expanded')&&Math.abs(e.getBoundingClientRect().height-parseFloat(e.style.height))<1&&Math.abs(e.getBoundingClientRect().x-parseFloat(e.style.left))<1&&Math.abs(e.getBoundingClientRect().y-parseFloat(e.style.top))<1;});assert.equal(await page.locator('.music-island .music-connections').count(),0,'Accounts do not occupy the empty player');const island=await page.locator('.music-island').boundingBox(),music=await page.locator('.kt-music').boundingBox();assert.ok(island.height<230&&island.y>=music.y+music.height,'Empty island is compact and anchored under music');await page.screenshot({path:path.join(dir,'collection-island-'+width+'.png')});await page.keyboard.press('Escape');await page.locator('.music-island[aria-hidden=true]').waitFor({state:'attached'});await page.getByRole('button',{name:'Музыкальный плеер',exact:true}).click();await page.evaluate(()=>{const input=document.createElement('input');input.id='outsideFocusProbe';input.setAttribute('aria-label','Outside focus fixture');input.style.cssText='position:fixed;left:12px;bottom:12px;width:160px;height:36px;z-index:10000';document.body.append(input);});await page.locator('#outsideFocusProbe').click();await page.locator('.music-island[aria-hidden=true]').waitFor({state:'attached'});assert.equal(await page.locator('#outsideFocusProbe').evaluate(e=>document.activeElement===e),true,'Outside click collapses without stealing focus');await page.locator('#outsideFocusProbe').evaluate(e=>e.remove());
+  await page.keyboard.press('Control+k');await page.getByRole('dialog').getByRole('button',{name:'Аниме',exact:true}).click();await page.getByRole('combobox',{name:'Поиск произведения'}).fill('Naruto');await page.getByRole('listbox',{name:'Результаты поиска'}).getByRole('option').first().waitFor();await page.keyboard.press('Enter');await page.locator('.kt-hero h1').waitFor();
   await fits('Title');await page.screenshot({path:path.join(dir,'title-'+width+'.png'),fullPage:true});
   await page.waitForFunction(()=>[...document.querySelectorAll('.kt-hero img:not([data-placeholder])')].some(i=>i.complete&&i.naturalWidth>0&&i.getClientRects().length));assert.deepEqual(errors,[]);await context.close();console.log('PASS Blossom '+width+'px: theme persistence, wallpaper, background colors, keyboard search and real catalog navigation');
  }

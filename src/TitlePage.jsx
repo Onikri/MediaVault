@@ -14,7 +14,6 @@ import {useArtwork,fetchArtwork} from './title-artwork.js';
 import {titleParts,SECTION_LABELS} from './library-model.js';
 import {episodeNumber,voiceLabel} from './player-model.js';
 import Artwork from './Artwork.jsx';
-import WatchOrder from './WatchOrder.jsx';
 import {readProgress,progressClock} from './playback-progress.js';
 import TitleBackdrop from './TitleBackdrop.jsx';
 import TitleShowcase,{usePhone} from './TitleShowcase.jsx';
@@ -22,12 +21,7 @@ import {mangaPolicyProfile,globalContentPolicy} from './manga-tag-policy.js';
 import useMangaPolicy from './use-manga-policy.js';
 import {jikan,youtubeTrailer} from './media-metadata.js';
 import {jikanProfile,fillProfile} from './title-supplement.js';
-import ReleaseTimeline from './blossom/ReleaseTimeline.tsx';
 import CreditsPanel from './CreditsPanel.jsx';
-import Soundtrack from './Soundtrack.jsx';
-import Trailers from './Trailers.jsx';
-import CharacterDialog from './CharacterDialog.jsx';
-import TitleGallery from './TitleGallery.jsx';
 import './title-sections.css';
 import './title-rails.css';
 import {usePlatformRatings} from './PlatformRatings.jsx';
@@ -37,7 +31,15 @@ import {useTitleShare,useTitleStats} from './title-context.js';
 import './title-dossier.css';
 import TitleNavigation from './TitleNavigation.jsx';
 import KineticTitle from './title-exact/KineticTitle.jsx';
-import {CharactersRow,RelatedCards,EpisodeCapsules} from './title-exact/RealSections.jsx';
+import {CharactersRow,Dossier} from './title-exact/sections/Characters.jsx';
+import {StillsMosaic} from './title-exact/sections/Stills.jsx';
+import {ScheduleSection} from './title-exact/sections/Schedule.jsx';
+import {MusicSection} from './title-exact/sections/Music.jsx';
+import {TrailersSection} from './title-exact/sections/Trailers.jsx';
+import {RelatedRow} from './title-exact/sections/Related.jsx';
+import {RouteSection} from './title-exact/sections/Route.jsx';
+const NO_RELEASES=[];
+import {EpisodeCapsules} from './title-exact/RealSections.jsx';
 import {useThemeMode} from './title-exact/theme-mode.js';
 import {ratingColors} from './PlatformRatings.jsx';
 import {passportVolume} from './title-passport-model.js';
@@ -85,7 +87,6 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   const [palette,setPalette]=useState(null),[playing,setPlaying]=useState(false);
   useEffect(()=>()=>publishBackdrop(null),[title.id]);
   function backgroundPalette(value){setPalette(value);publishBackdrop(value);}
-  const [characterLimit,setCharacterLimit]=useState(4);
   const [part,setPart]=useState(''),[ratingBusy,setRatingBusy]=useState(false);
   const characterAbort=useRef(null),characterTrigger=useRef(null),abort=useRef(null),saveInProgress=useRef(false),live=useRef(state);live.current=state;
   const characterService=useMemo(()=>{let address='';try{address=validateServer(server||window.MEDIA_VAULT_CONFIG?.importServerUrl||localStorage.getItem('mediavault_import_server')||'');}catch{}return {...createImportClient(address,()=>live.current.token),server:address};},[server,state.user?.sub]);
@@ -106,7 +107,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   useEffect(()=>{if(online)setProfile(onlineProfile||{});else if(saved)setProfile(saved);},[saved,online,onlineProfile]);
   useEffect(()=>{
     const controller=new AbortController();abort.current=controller;
-    setProfile(online?onlineProfile:saved||title.profile||null);setError('');setCandidates([]);setSearch(title.name);setPart('');setCharacter(null);setCharacterLimit(4);
+    setProfile(online?onlineProfile:saved||title.profile||null);setError('');setCandidates([]);setSearch(title.name);setPart('');setCharacter(null);
     if(online)return()=>controller.abort();
     // Opening a page refreshes a dossier only when its retry is due; the save
     // then runs quietly. Manual refresh and search keep their visible status.
@@ -268,13 +269,13 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   </>;
   const chapters=[
     {id:'watch',key:'watch',label:watchLabel,verticalLabel:watchLabel.toUpperCase(),still:true,node:watchNode},
-    {id:'characters',label:['movie','tv'].includes(section)?'В ролях':'Персонажи',verticalLabel:['movie','tv'].includes(section)?'В РОЛЯХ':'ПЕРСОНАЖИ',node:<section id="titleCharacters" className="title-characters"><CharactersRow k={k(1)} isNoir={isNoir} characters={characters} limit={characterLimit} onMore={()=>setCharacterLimit(n=>n+4)} onOpen={showCharacter} renderImage={c=>art(c.image,'')} emptyNote={p.sourceId?'Каталог пока не предоставил персонажей.':'Персонажи появятся вместе со сведениями о тайтле.'}/></section>},
-    p.screenshots?.length>0&&{id:'stills',label:section==='ranobe'?'Иллюстрации':'Кадры',verticalLabel:section==='ranobe'?'АРТЫ':'КАДРЫ',node:<TitleGallery heading={({movie:'Кадры из фильма',tv:'Кадры из сериала',book:'Издания',ranobe:'Иллюстрации'})[section]} images={p.screenshots} profile={p} actions={actions} libraryId={state.libraryId} manga={title.category==='manga'} renderArtwork={(url,index)=>art(url,'Кадр '+(index+1))}/>},
-    section==='anime'&&{id:'schedule',label:'Расписание',verticalLabel:'РАСПИСАНИЕ',node:<ReleaseTimeline identity={p.sourceId||title.metadataId} releases={p.releases||[]} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl}/>},
-    section==='anime'&&{id:'music',label:'Музыка',verticalLabel:'МУЗЫКА',node:<Soundtrack identity={p.sourceId||title.metadataId} userId={state.user?.sub} animeTitle={name} cover={p.cover} renderArtwork={url=>art(url,'Обложка аниме')}/>},
-    p.trailers?.length>0&&{id:'trailers',label:'Трейлеры',verticalLabel:'ТРЕЙЛЕРЫ',node:<Trailers server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} profile={p} userId={state.user?.sub} libraryId={state.libraryId} onPlaybackChange={setPlaying} renderArtwork={value=>art(value.image,'')}/>},
-    p.related?.length>0&&{id:'related',label:'Связи',verticalLabel:'СВЯЗИ',node:<section id="titleRelated" className="title-related"><RelatedCards k={k(6)} isNoir={isNoir} related={p.related} onOpen={value=>onRelated({...value,artwork:p.artwork,savedAt:p.savedAt})} renderImage={value=>art(value.cover,value.title)}/></section>},
-    section==='anime'&&/^\d+$/.test(String(p.sourceId||''))&&{id:'order',label:'Порядок просмотра',verticalLabel:'ПОРЯДОК',node:<WatchOrder identity={p.sourceId} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} cached={p.watchOrder} onRelated={onRelated} onLoaded={value=>{setProfile(old=>({...old,watchOrder:value}));if(!online&&state.admin&&state.driveWritable)actions.saveTitleProfile(title.id,{watchOrder:value},[],{background:true});}}/>},
+    {id:'characters',label:['movie','tv'].includes(section)?'В ролях':'Персонажи',verticalLabel:['movie','tv'].includes(section)?'В РОЛЯХ':'ПЕРСОНАЖИ',node:<section id="titleCharacters" className="title-characters"><CharactersRow k={k(1)} isNoir={isNoir} characters={characters} onOpen={showCharacter} renderImage={c=>art(c.image,'')} emptyNote={p.sourceId?'Каталог пока не предоставил персонажей.':'Персонажи появятся вместе со сведениями о тайтле.'}/></section>},
+    p.screenshots?.length>0&&{id:'stills',label:section==='ranobe'?'Иллюстрации':'Кадры',verticalLabel:section==='ranobe'?'АРТЫ':'КАДРЫ',node:<section id="titleGallery" className="title-gallery"><StillsMosaic k={k(2)} isNoir={isNoir} images={p.screenshots} caption={({book:'Издание',ranobe:'Иллюстрация'})[section]||'Кадр'} renderArtwork={(url,index)=>art(url,'Кадр '+(index+1))}/></section>},
+    section==='anime'&&{id:'schedule',label:'Расписание',verticalLabel:'РАСПИСАНИЕ',node:<ScheduleSection k={k(3)} isNoir={isNoir} identity={String(p.sourceId||title.metadataId||'')} releases={p.releases||NO_RELEASES} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} activeEpisode={resumeNumber} total={p.episodes} onEpisode={units>1?pickEpisode:undefined}/>},
+    section==='anime'&&{id:'music',label:'Музыка',verticalLabel:'МУЗЫКА',node:<MusicSection k={k(4)} isNoir={isNoir} identity={p.sourceId||title.metadataId} userId={state.user?.sub} animeTitle={name} cover={p.cover} renderArtwork={url=>art(url,'Обложка аниме')}/>},
+    p.trailers?.length>0&&{id:'trailers',label:'Трейлеры',verticalLabel:'ТРЕЙЛЕРЫ',node:<section className="title-trailers"><TrailersSection k={k(5)} isNoir={isNoir} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} profile={p} userId={state.user?.sub} onPlaybackChange={setPlaying} renderArtwork={value=>art(value.image,'')}/></section>},
+    p.related?.length>0&&{id:'related',label:'Связи',verticalLabel:'СВЯЗИ',node:<section id="titleRelated" className="title-related"><RelatedRow isNoir={isNoir} related={p.related} onOpen={value=>onRelated({...value,artwork:p.artwork,savedAt:p.savedAt})} renderImage={value=>art(value.cover,value.title)}/></section>},
+    section==='anime'&&/^\d+$/.test(String(p.sourceId||''))&&{id:'order',label:'Порядок просмотра',verticalLabel:'ПОРЯДОК',node:<section id="titleWatchOrder" className="watch-route"><RouteSection k={k(7)} isNoir={isNoir} renderImage={item=>art(item.cover,item.title)} identity={p.sourceId} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} cached={p.watchOrder} onRelated={onRelated} onLoaded={value=>{setProfile(old=>({...old,watchOrder:value}));if(!online&&state.admin&&state.driveWritable)actions.saveTitleProfile(title.id,{watchOrder:value},[],{background:true});}}/></section>},
     (p.staff?.length||p.characters?.some(c=>c.voiceActors?.length))&&{id:'creators',label:['manga','ranobe','book'].includes(section)?'Авторы':'Создатели',verticalLabel:['manga','ranobe','book'].includes(section)?'АВТОРЫ':'СОЗДАТЕЛИ',node:<CreditsPanel kind={section} profile={p} server={server||window.MEDIA_VAULT_CONFIG?.importServerUrl} renderArtwork={value=>art(value.image,'')}/>},
   ].filter(Boolean).map((c,i)=>({...c,verticalLabel:(w=>(w[0].length>2?w[0]:w.join(' ')).toUpperCase())(translateUi(c.label).split(' ')),id:chapter(c.id),key:c.id,glowPrimary:CHAPTER_GLOWS[c.id][0],glowSecondary:CHAPTER_GLOWS[c.id][1],node:c.node}));
   return <article data-kind={section} className={'kt-host kt-title-page'+(online?' online-title-page':'')} style={palette?{'--title-rgb':palette.base}:undefined}>
@@ -298,6 +299,6 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
       ratings={scoreItems} facts={heroFacts}
       rating={online||state.admin?{value:ownRating,onRate:rate,disabled:ratingBusy||!online&&(!!state.busy||state.importActive)}:null}
       onBack={onBack} backLabel={backLabel} backId={online?undefined:'backToTitles'}/>
-    <CharacterDialog workTitle={otherNames.filter(n=>/^[ -~]+$/.test(n)).join(' ')} returnFocusRef={characterTrigger} character={character} busy={characterBusy} error={characterError} onClose={()=>{characterAbort.current?.abort();setCharacter(null);}} renderArtwork={value=><TitleImage url={value.image} {...artProps} alt={value.name}/>} onRelated={onRelated}/>
+    {character&&<Dossier characters={characters} character={character} busy={characterBusy} error={characterError} origin={characterTrigger.current} isNoir={isNoir} workTitle={otherNames.filter(n=>/^[ -~]+$/.test(n)).join(' ')} onPick={value=>showCharacter(value,characterTrigger.current)} onClose={()=>{characterAbort.current?.abort();setCharacter(null);const trigger=characterTrigger.current;if(trigger?.isConnected)trigger.focus({preventScroll:true});}} renderArtwork={value=><TitleImage url={value.image} {...artProps} alt={value.name}/>} onRelated={onRelated}/>}
   </article>;
 }

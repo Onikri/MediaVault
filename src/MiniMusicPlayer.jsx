@@ -11,6 +11,7 @@ import {openYouTubeAudio,openMusicAudio} from './youtube-audio.js';
 import {musicIslandLayout} from './music-island.js';
 import {cursorMusicTime} from './music-timeline.js';
 import './music-dock.css';
+import NavMusicIsland from './title-exact/navbar/NavMusicIsland.jsx';
 import useLyrics from './use-lyrics.js';
 import SyncedLyrics from './SyncedLyrics.jsx';
 import {parseLrc,parseTtml} from './lyrics.js';
@@ -198,5 +199,5 @@ export default function MiniMusicPlayer({userId,prepareStream,readWhole,resolveI
   </div>
  </motion.aside>;
  if(!track&&!nav)return null;
- return <>{audioBacked&&<audio className="music-audio" key={state.request} ref={audio} src={source||undefined} preload="metadata" onLoadedMetadata={e=>setDuration(Number.isFinite(e.currentTarget.duration)?e.currentTarget.duration:0)} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)} onPlay={playingEvent} onPause={()=>setPlaying(false)} onEnded={()=>{setPlaying(false);stepMusic(1);}} onError={()=>{if(source){if(serverAudio)setSource('');setPlaying(false);setError('Аудиопоток недоступен или формат не поддерживается браузером.');}}}/>}{<div ref={trigger} className={'music-nav'+(!nav?' music-dock-compact':'')+(track?' has-track':'')}><button className="music-nav-toggle" aria-label="Музыкальный плеер" title={error||undefined} aria-expanded={expanded} onClick={()=>expanded?collapse():setExpanded(true)}>{track?art:<Headphones size={19}/ >}{playing&&<i/>}</button>{bar}</div>}{createPortal(panel,document.body)}</>;
+ return <>{audioBacked&&<audio className="music-audio" key={state.request} ref={audio} src={source||undefined} preload="metadata" onLoadedMetadata={e=>setDuration(Number.isFinite(e.currentTarget.duration)?e.currentTarget.duration:0)} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)} onPlay={playingEvent} onPause={()=>setPlaying(false)} onEnded={()=>{setPlaying(false);stepMusic(1);}} onError={()=>{if(source){if(serverAudio)setSource('');setPlaying(false);setError('Аудиопоток недоступен или формат не поддерживается браузером.');}}}/>}{nav?<NavMusicIsland ref={trigger} track={track} title={displayTitle} art={art} playing={playing} time={time} duration={duration} canPlay={canPlay} error={error} busy={busy} onToggle={toggle} onSeek={seek} onPrev={()=>stepMusic(-1)} onNext={()=>stepMusic(1)} prevDisabled={!state?.index} nextDisabled={!state||state.index>=state.queue.length-1} panelOpen={expanded} onPanel={()=>expanded?collapse():setExpanded(true)}/>:<div ref={trigger} className={'music-nav'+(!nav?' music-dock-compact':'')+(track?' has-track':'')}><button className="music-nav-toggle" aria-label="Музыкальный плеер" title={error||undefined} aria-expanded={expanded} onClick={()=>expanded?collapse():setExpanded(true)}>{track?art:<Headphones size={19}/ >}{playing&&<i/>}</button>{bar}</div>}{createPortal(panel,document.body)}</>;
 }

@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { KineticSectionBlock } from './kinetic.jsx';
 import { useKineticPagePhysics, LeftKineticNavigator, MobileChapterPill, IconPlay, IconBookmark, IconDownload, IconStar } from './kinetic-ui.jsx';
 import './title-exact.css';
+import {useKinetics} from './theme-mode.js';
 
 /* The title page of the approved design (motion lab title demo), markup and
    Tailwind classes kept as they are, filled with the real title: the full
@@ -23,12 +24,14 @@ function titleLines(name) {
 }
 
 export default function KineticTitle({
-  sections, isNoir = false, morphEnabled = true,
+  sections, isNoir = false, morphEnabled: morphAllowed = true,
   backdrop, nativeName, poster, posterTop, posterAge, posterKicker, posterTitle, sourceLabel, sourceDetail,
   kindLabel, seasonLabel, originalName, name, score, scoreSource, status, runtimeLabel, genres = [],
   description, cta, onTrailers, bookmark, share, onDownload, extraActions,
   episodes, ratings = [], facts = [], rating, onBack, backLabel, backId,
 }) {
+  // Кинетика lives in the profile menu (theme-mode store).
+  const morphEnabled = useKinetics() && morphAllowed;
   const [heroMouse, setHeroMouse] = useState({ x: 0, y: 0 });
   const [posterTilt, setPosterTilt] = useState({ rx: 0, ry: 0, gx: 50, gy: 30, active: false });
   const [heroLoaded, setHeroLoaded] = useState(false);
