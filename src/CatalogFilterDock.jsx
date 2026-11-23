@@ -1,4 +1,5 @@
 import {filterValues} from './catalog-taxonomy.js';
+import {RollingNumber} from './LibraryRail.jsx';
 import {releaseStatusOptions} from './release-status.js';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
@@ -169,9 +170,64 @@ export function SortMenu({value,options,onChange,label='Сортировка'}){
  </>;
 }
 
+// «Рельс»: one «Фильтры» button next to the search; applied filters stay under
+// it as chips; every facet lives in one drawer (a bottom sheet on phones).
+function FilterDrawer({sentinel,stuck,search,items,active,bodyFor,noteOf,onReset,count,title,morphId}){
+ const [open,setOpen]=useState(false),[focus,setFocus]=useState(null),button=useRef(null),phone=useNarrow(),reduced=useReducedMotion();
+ const set=items.filter(item=>item.clear&&item.value);
+ const show=key=>{setFocus(key||null);setOpen(true);};
+ const close=useCallback(()=>{setOpen(false);requestAnimationFrame(()=>button.current?.focus({preventScroll:true}));},[]);
+ useEffect(()=>{
+  if(!open)return;
+  const key=event=>{if(event.key==='Escape'){event.preventDefault();close();}};
+  document.addEventListener('keydown',key);
+  const frame=requestAnimationFrame(()=>{const target=focus&&document.getElementById(morphId+'-facet-'+focus);if(target)target.scrollIntoView({block:'start',behavior:reduced?'instant':'smooth'});});
+  return()=>{document.removeEventListener('keydown',key);cancelAnimationFrame(frame);};
+ },[open,focus,close,morphId,reduced]);
+ const motionProps=reduced?{initial:{opacity:0},animate:{opacity:1},exit:{opacity:0}}:phone?{initial:{y:'100%'},animate:{y:0},exit:{y:'100%'}}:{initial:{x:'104%'},animate:{x:0},exit:{x:'104%'}};
+ return <>
+  <span ref={sentinel} className="fdock-sentinel" aria-hidden="true"/>
+  <div className={'catalog-toolbar is-rail'+(stuck?' is-stuck':'')}>
+   <div className="fdock-search"><div className="fdock-search-inner">{search}</div></div>
+   <motion.button ref={button} type="button" className={'rail-filters-button'+(active?' is-set':'')} aria-haspopup="dialog" aria-expanded={open} aria-label={'Фильтры'+(active?', выбрано '+active:'')} onClick={()=>show(null)} whileTap={reduced?undefined:{scale:.96}}>
+    <SlidersHorizontal size={17} aria-hidden="true"/><span>Фильтры</span>
+    <AnimatePresence initial={false}>{active>0&&<motion.span key="count" className="fdock-count" initial={{scale:0}} animate={{scale:1}} exit={{scale:0}} transition={SPRING}>{active}</motion.span>}</AnimatePresence>
+   </motion.button>
+  </div>
+  <motion.div layout={!reduced} className="rail-chips" aria-label="Выбранные фильтры">
+   <AnimatePresence initial={false} mode="popLayout">
+    {set.map(item=><motion.span layout={!reduced} key={item.key} className="rail-chip" initial={{opacity:0,scale:.8}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:.8}} transition={SPRING}>
+     <button type="button" className="rail-chip-edit" onClick={()=>show(item.key)}><small>{item.label}</small><span>{item.value}</span></button>
+     <button type="button" className="rail-chip-clear" aria-label={'Убрать фильтр '+item.label} onClick={item.clear}><X size={12}/></button>
+    </motion.span>)}
+    {set.length>1&&<motion.button layout={!reduced} key="reset" type="button" className="rail-chips-reset" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={onReset}>Сбросить всё</motion.button>}
+   </AnimatePresence>
+  </motion.div>
+  {createPortal(<AnimatePresence>{open&&<>
+   <motion.div key="scrim" className="rail-drawer-scrim" aria-hidden="true" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={close}/>
+   <motion.aside key="drawer" role="dialog" aria-modal="true" aria-label="Фильтры" className={'rail-drawer'+(phone?' is-sheet':'')} {...motionProps}
+    transition={reduced?{duration:.15}:{type:'spring',stiffness:380,damping:40}}
+    drag={phone&&!reduced?'y':false} dragConstraints={{top:0,bottom:0}} dragElastic={{top:0,bottom:.5}} onDragEnd={(_,info)=>{if(info.offset.y>100||info.velocity.y>600)close();}}>
+    {phone&&<span className="fdock-grip" aria-hidden="true"/>}
+    <div className="rail-drawer-head"><div><span className="rail-drawer-kicker">{title}</span><h2>Фильтры</h2></div><button type="button" className="fdock-close" aria-label="Закрыть фильтры" onClick={close}><X size={18}/></button></div>
+    <div className="rail-drawer-body">{items.map((item,index)=><motion.section key={item.key} id={morphId+'-facet-'+item.key} role="group" aria-label={item.label} className={'rail-facet'+(focus===item.key?' is-focus':'')}
+     initial={reduced?false:{opacity:0,x:24}} animate={{opacity:1,x:0,transition:{...SPRING,delay:.08+index*.035}}}>
+     <h3>{item.label}<AnimatePresence initial={false}>{item.clear&&item.value&&!item.quiet&&<motion.button key="clear" type="button" className="rail-facet-clear" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={item.clear}>Очистить</motion.button>}</AnimatePresence></h3>
+     <div className="rail-facet-body">{bodyFor(item.key,()=>{})}</div>
+     {noteOf(item.key)&&<p className="rail-facet-note">{noteOf(item.key)}</p>}
+    </motion.section>)}</div>
+    <div className="rail-drawer-foot">
+     <button type="button" className="rail-drawer-reset" disabled={!active} onClick={onReset}><RotateCcw size={14}/>Сбросить</button>
+     <motion.button type="button" className="rail-drawer-done" onClick={close} whileTap={reduced?undefined:{scale:.97}}>Показать{count!=null?<> <RollingNumber value={count}/></>:''}</motion.button>
+    </div>
+   </motion.aside>
+  </>}</AnimatePresence>,document.body)}
+ </>;
+}
+
 const InlineToolbar=({children})=>children;
 const libraryStatusOptions=[['available','Уже доступны'],...releaseStatusOptions];
-export default function CatalogFilterDock({mergeNavigation=false,search,kind,filters,defaultStatus='',onFilter,onReset,fields=['genre','year','status','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceTitle='Озвучка',voiceNote,language,sources,morphId='filters'}){
+export default function CatalogFilterDock({mergeNavigation=false,search,kind,filters,defaultStatus='',onFilter,onReset,fields=['genre','year','status','tag','format','age','voice','language'],years,genres=[],tags=[],formats=[],voice='',onVoice,voiceOptions=[],voiceDisabled=false,voiceExact=false,voiceTitle='Озвучка',voiceNote,language,sources,morphId='filters',variant='dock',resultCount,title='Каталог'}){
  const [panel,setPanel]=useState(null),anchors=useRef({}),sentinel=useRef(null),[stuck,setStuck]=useState(false),reduced=useReducedMotion(),[open,setOpen]=useFiltersOpen(),toggle=useRef(null),fold=useRef(null);
  // The bar stays in the page as a sticky glass strip under the navbar capsule;
  // the navbar keeps its sections and labels.
@@ -201,7 +257,24 @@ export default function CatalogFilterDock({mergeNavigation=false,search,kind,fil
  ].filter(Boolean);
  const active=items.filter(item=>item.clear&&item.value).length+Math.max(0,chosenTags.length-1);
  const current=items.find(item=>item.key===panel);
- const note=panel==='tag'?'Теги объединяются через ИЛИ; с жанрами — через И. Исключения имеют приоритет.':panel==='voice'?voiceNote:panel==='genre'&&kind==='manga'?'Жанры ищутся прямо в каталогах источников.':panel==='language'?language?.note:panel==='sources'?(sources?.value.length?'Ищем только в выбранных источниках.':'Ничего не выбрано: ищем во всех подключённых.'):'';
+ const noteOf=key=>key==='tag'?'Теги объединяются через ИЛИ; с жанрами — через И. Исключения имеют приоритет.':key==='voice'?voiceNote:key==='genre'&&kind==='manga'?'Жанры ищутся прямо в каталогах источников.':key==='language'?language?.note:key==='sources'?(sources?.value.length?'Ищем только в выбранных источниках.':'Ничего не выбрано: ищем во всех подключённых.'):'';
+ const note=noteOf(panel);
+ // One facet's controls: in a floating panel or a section of the filter drawer.
+ const bodyFor=(key,done)=><>
+  {key==='genre'&&mergeNavigation&&<SignedPanel label="Жанры" options={genres} positive={filters.genre} negative={filters.excludeGenre} onChange={(yes,no)=>{onFilter('genre',yes);onFilter('excludeGenre',no);}}/>}
+  {key==='genre'&&!mergeNavigation&&<ChoicePanel label="Жанры" findLabel="Найти жанр" options={genres} value={filters.genre} onPick={value=>{onFilter('genre',value);done(true);}}/>}
+  {key==='tag'&&!mergeNavigation&&<TagPanel value={filters.tag} options={tags} onChange={value=>onFilter('tag',value)}/>}
+  {key==='year'&&<YearPanel years={years} value={filters.year} onChange={value=>{onFilter('year',value);if(years)done(true);}}/>}
+  {key==='status'&&<Options label="Статус выпуска" options={statusOptions} selected={id=>id===(filters.status||'')} onPick={id=>{onFilter('status',id);done(true);}}/>}
+  {key==='tag'&&mergeNavigation&&<SignedPanel label="Теги" options={tags} positive={filters.tag} negative={filters.excludeTag} onChange={(yes,no)=>{onFilter('tag',yes);onFilter('excludeTag',no);}}/>}
+  {key==='readingMode'&&<Options label="Подача" options={[["","Любая"],["webtoon","Вебтун"],["paged","Страницы"]]} selected={value=>value===(filters.readingMode||'')} onPick={value=>{onFilter('readingMode',value);done(true);}}/>}
+  {key==='format'&&<ChoicePanel label="Форматы" findLabel="Найти формат" options={formats} value={filters.format} onPick={value=>{onFilter('format',same(value,filters.format||'')?'':value);done(true);}}/>}
+  {key==='age'&&<Options label="Возраст" options={AGES} selected={id=>id===(filters.age||'')} onPick={id=>{onFilter('age',id);done(true);}}/>}
+  {key==='voice'&&(voiceExact?<ChoicePanel label={voiceTitle} findLabel={voiceTitle==='Перевод'?'Найти перевод':'Найти озвучку'} options={voiceOptions} value={voice} onPick={value=>{onVoice(same(value,voice||'')?'':value);done(true);}}/>:<VoicePanel value={voice} onChange={onVoice} options={voiceOptions} disabled={voiceDisabled}/>)}
+  {key==='sources'&&<SourcePanel {...sources}/>}
+  {key==='language'&&<Options label={language.label} options={language.options} selected={id=>id===language.value} onPick={id=>{language.onChange(id);done(true);}}/>}
+ </>;
+ if(variant==='drawer')return <FilterDrawer sentinel={sentinel} stuck={stuck} search={search} items={items} active={active} bodyFor={bodyFor} noteOf={noteOf} onReset={()=>{setPanel(null);onReset();}} count={resultCount} title={title} morphId={morphId}/>;
  const morph=reduced?{duration:0}:MORPH,fade=reduced?{}:{initial:{opacity:0},animate:{opacity:1,transition:{delay:.12,duration:.2}}};
  return <>
   <span ref={sentinel} className="fdock-sentinel" aria-hidden="true"/>
@@ -234,18 +307,7 @@ export default function CatalogFilterDock({mergeNavigation=false,search,kind,fil
   </div></ToolbarHost>
   <AnimatePresence>{current&&<Panel key={current.key} anchor={anchors.current[current.key]} label={current.label} onClose={shut}
    footer={note||current.key==='tag'?<>{note&&<p>{note}</p>}{current.key==='tag'&&<button type="button" className="fdock-done" onClick={()=>shut(true)}>Готово{chosenTags.length?' · '+chosenTags.length+' '+plural(chosenTags.length,['тег','тега','тегов']):''}</button>}{current.key==='sources'&&<button type="button" className="fdock-done" onClick={()=>shut(true)}>Готово{sources.value.length?' · '+sources.value.length:''}</button>}</>:null}>
-   {current.key==='genre'&&mergeNavigation&&<SignedPanel label="Жанры" options={genres} positive={filters.genre} negative={filters.excludeGenre} onChange={(yes,no)=>{onFilter('genre',yes);onFilter('excludeGenre',no);}}/>}
-   {current.key==='genre'&&!mergeNavigation&&<ChoicePanel label="Жанры" findLabel="Найти жанр" options={genres} value={filters.genre} onPick={value=>{onFilter('genre',value);shut(true);}}/>}
-   {current.key==='tag'&&!mergeNavigation&&<TagPanel value={filters.tag} options={tags} onChange={value=>onFilter('tag',value)}/>}
-   {current.key==='year'&&<YearPanel years={years} value={filters.year} onChange={value=>{onFilter('year',value);if(years)shut(true);}}/>}
-   {current.key==='status'&&<Options label="Статус выпуска" options={statusOptions} selected={id=>id===(filters.status||'')} onPick={id=>{onFilter('status',id);shut(true);}}/>}
-   {current.key==='tag'&&mergeNavigation&&<SignedPanel label="Теги" options={tags} positive={filters.tag} negative={filters.excludeTag} onChange={(yes,no)=>{onFilter('tag',yes);onFilter('excludeTag',no);}}/>}
-   {current.key==='readingMode'&&<Options label="Подача" options={[["","Любая"],["webtoon","Вебтун"],["paged","Страницы"]]} selected={value=>value===(filters.readingMode||'')} onPick={value=>{onFilter('readingMode',value);shut(true);}}/>}
-   {current.key==='format'&&<ChoicePanel label="Форматы" findLabel="Найти формат" options={formats} value={filters.format} onPick={value=>{onFilter('format',same(value,filters.format||'')?'':value);shut(true);}}/>}
-   {current.key==='age'&&<Options label="Возраст" options={AGES} selected={id=>id===(filters.age||'')} onPick={id=>{onFilter('age',id);shut(true);}}/>}
-   {current.key==='voice'&&(voiceExact?<ChoicePanel label={voiceTitle} findLabel={voiceTitle==='Перевод'?'Найти перевод':'Найти озвучку'} options={voiceOptions} value={voice} onPick={value=>{onVoice(same(value,voice||'')?'':value);shut(true);}}/>:<VoicePanel value={voice} onChange={onVoice} options={voiceOptions} disabled={voiceDisabled}/>)}
-   {current.key==='sources'&&<SourcePanel {...sources}/>}
-   {current.key==='language'&&<Options label={language.label} options={language.options} selected={id=>id===language.value} onPick={id=>{language.onChange(id);shut(true);}}/>}
+   {bodyFor(current.key,shut)}
   </Panel>}</AnimatePresence>
  </>;
 }
