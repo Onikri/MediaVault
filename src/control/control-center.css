@@ -292,3 +292,33 @@ html[data-blossom] .cc-body>:is(.settings-card,.profile-card,.notice-card,.music
 .language-choice button:hover:not(:disabled),.language-choice button:focus-visible{outline:none;background:var(--color-surface-raised);color:var(--color-petal)}
 .language-choice button[aria-checked=true]{background:var(--color-surface-raised);color:var(--color-petal)}
 .language-choice button:disabled{cursor:progress}
+
+/* «Рельс»: the control center speaks the library's language — a typographic
+   rail with a sliding ink, live counters as pills, the section as a kinetic
+   headline under its group. */
+.cc-nav{gap:18px}
+.cc-group-label{padding:0 0 6px 18px;font:600 10.5px/1.4 var(--font-ui);letter-spacing:.24em;text-transform:uppercase;color:#fb7185}
+html[data-theme='noir'] .cc-group-label,html[data-theme='noir'] .cc-kicker{color:#fff}
+.cc-link{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:0;margin:0;padding:9px 14px 9px 18px;border:0;border-radius:12px;background:none;box-shadow:none;color:#71717a;font:600 17px/1.2 var(--font-display);letter-spacing:-.01em;text-align:left;cursor:pointer;transition:color .25s}
+.cc-link:hover{color:#a1a1aa}
+.cc-link:focus-visible{outline:none;color:#fff;background:rgba(255,255,255,.06)}
+.cc-link.is-on{color:#fff}
+.cc-ink{position:absolute;inset:0;border-radius:12px;background:rgba(255,255,255,.075)}
+.cc-ink::before{content:'';position:absolute;left:6px;top:11px;bottom:11px;width:3px;border-radius:3px;background:var(--kd-accent,#e11d48)}
+.cc-link-label,.cc-link .cc-count{position:relative}
+.cc-link .cc-count{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 6px;border-radius:10px;background:rgb(225 29 72 / .16);color:#fda4af;font:800 11px/1 var(--font-display)}
+.cc-link .cc-count.is-live{background:linear-gradient(to bottom,#f43f5e,#be123c);color:#fff}
+.cc-link .cc-count.is-warn{background:rgb(251 191 36 / .16);color:#fcd34d}
+html[data-theme='noir'] .cc-link .cc-count{background:rgba(255,255,255,.12);color:#fff}
+html[data-theme='noir'] .cc-link .cc-count.is-live{background:#fff;color:#000}
+.cc-who strong{font:800 22px/1.15 var(--font-display)}
+.cc-head{align-items:flex-end;min-height:0;margin-bottom:28px}
+.cc-kicker{display:block;margin-bottom:8px;font:600 10.5px/1.4 var(--font-ui);letter-spacing:.24em;text-transform:uppercase;color:#fb7185}
+.cc-title h1{margin:0;font:800 clamp(52px,7.4vw,124px)/.9 var(--font-display);letter-spacing:-.05em}
+.cc-title p{margin:14px 0 0;font-size:14.5px;color:#71717a}
+@media (--tablet){
+ .cc-group-label{display:none}
+ .cc-link{flex:none;width:auto;padding:9px 14px;font-size:15.5px;white-space:nowrap;scroll-snap-align:start}
+ .cc-ink::before{left:14px;right:14px;top:auto;bottom:3px;width:auto;height:2px}
+ .cc-title h1{font-size:clamp(44px,12vw,72px)}
+}

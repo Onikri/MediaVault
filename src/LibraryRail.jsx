@@ -43,7 +43,7 @@ export function LibraryRail({railRef,className='',label,kicker,note,sections,act
     {on&&<motion.span layoutId="ink" className="mv-rail-ink" transition={SPRING}/>}
     <span className="mv-rail-label">{s.label}</span>{s.count!=null&&<span className="mv-rail-count">{s.count||'—'}</span>}
    </button></li>;})}</ul>
-  {actions.length>0&&<div className="mv-rail-actions" role="group" aria-label="Действия">{actions.map(a=>{const on=a.id===activeAction;return <button key={a.id} type="button" className={on?'is-on':undefined} aria-pressed={on} aria-label={a.label} onClick={a.onClick}>
+  {actions.length>0&&<div className="mv-rail-actions" role="group" aria-label="Действия">{actions.map(a=>{const on=a.on??a.id===activeAction;return <button key={a.id} type="button" className={on?'is-on':undefined} aria-pressed={on} aria-label={a.label} title={a.title} disabled={a.disabled} onClick={a.onClick}>
    {on&&<motion.span layoutId="ink" className="mv-rail-ink is-action" transition={SPRING}/>}
    <span className="mv-rail-icon" aria-hidden="true">{a.icon}</span><span className="mv-rail-label">{a.label}</span>
   </button>;})}</div>}

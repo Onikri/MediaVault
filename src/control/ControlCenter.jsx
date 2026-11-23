@@ -1,6 +1,6 @@
-import {NavigationItem} from '../SectionNavigation.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
+import {AnimatePresence,LayoutGroup,motion,useReducedMotion} from 'motion/react';
+import {KineticText} from '../LibraryRail.jsx';
 import {Gauge,HardDrive,ListChecks,LogOut,Palette,Plug,RefreshCw,ShieldCheck,SlidersHorizontal,UserRound,UsersRound} from 'lucide-react';
 import {useControlData,useNow,since,jobCounts} from './use-control-data.js';
 import Overview from './Overview.jsx';
@@ -78,25 +78,28 @@ export default function ControlCenter({state,guest,service,initialTab,onLogout,p
  return <section className="cc" aria-label="Пульт и настройки">
   <aside className="cc-rail">
    <div className="cc-who"><strong>{name}</strong><span>{role}{state.user?.email?<small>{state.user.email}</small>:guest?<small>@{guest.guest.login}</small>:null}</span></div>
-   <nav className="cc-nav" aria-label="Разделы">{groups.map(([id,label,items])=><div className="cc-group" key={id} role="group" aria-label={label}><span className="cc-group-label">{label}</span>
-    {items.map(([key,text,Icon])=><NavigationItem key={key} className="cc-link" aria-current={current===key?'page':undefined}
-     label={text} icon={<Icon/>} detail={counts[key]?<Counter value={counts[key]} tone={tones[key]}/>:null}
-     onClick={event=>choose(key,event)}/>)}
-   </div>)}</nav>
+   <LayoutGroup id="cc-rail"><nav className="cc-nav" aria-label="Разделы">{groups.map(([id,label,items])=><div className="cc-group" key={id} role="group" aria-label={label}><span className="cc-group-label">{label}</span>
+    {items.map(([key,text])=>{const on=current===key;return <button type="button" key={key} className={'cc-link'+(on?' is-on':'')} aria-current={on?'page':undefined} onClick={event=>choose(key,event)}>
+     {on&&<motion.span layoutId="ink" className="cc-ink" transition={reduce?{duration:0}:{type:'spring',stiffness:520,damping:40,mass:.8}}/>}
+     <span className="cc-link-label">{text}</span>{counts[key]?<Counter value={counts[key]} tone={tones[key]}/>:null}
+    </button>;})}
+   </div>)}</nav></LayoutGroup>
    {(state.user||guest)&&<button type="button" className="cc-exit" onClick={onLogout}><LogOut size={16}/>Выйти</button>}
   </aside>
   <div className="cc-main" ref={content}>
    <header className="cc-head">
-    <AnimatePresence mode="wait" initial={false}><motion.div key={current} className="cc-title" initial={reduce?false:{opacity:0,y:direction.current*8}} animate={{opacity:1,y:0}} exit={reduce?undefined:{opacity:0,y:direction.current*-6}} transition={{duration:.18,ease:[.22,1,.36,1]}}>
-     <h1>{meta?.[1]}</h1><p>{meta?.[3]}</p>
-    </motion.div></AnimatePresence>
+    <div className="cc-title">
+     <span className="cc-kicker">{groups.find(([,,items])=>items.some(([key])=>key===current))?.[1]}</span>
+     <h1 aria-label={meta?.[1]}><KineticText text={meta?.[1]||''}/></h1>
+     <AnimatePresence mode="wait" initial={false}><motion.p key={current} initial={reduce?false:{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={reduce?undefined:{opacity:0}} transition={{duration:.25}}>{meta?.[3]}</motion.p></AnimatePresence>
+    </div>
     {LIVE.has(current)&&data.connected&&<button type="button" className="cc-sync" onClick={data.refresh} disabled={data.loading} title="Данные обновляются каждые 15 секунд">
      <RefreshCw size={15}/><span>{data.updatedAt?'Обновлено '+since(data.updatedAt,now):'Загружаем…'}</span>
     </button>}
    </header>
    {ADMIN.has(current)&&!data.connected&&<p className="cc-offline" role="status">{service?.error||'Подключаемся к серверу MediaVault. Пульт оживёт, как только сервер ответит.'}</p>}
    <AnimatePresence mode="wait" initial={false}>
-    <motion.div key={current} className="cc-body" initial={reduce?false:{opacity:0,y:direction.current*14}} animate={{opacity:1,y:0}} exit={reduce?undefined:{opacity:0,y:direction.current*-8,transition:{duration:.12}}} transition={{duration:.26,ease:[.22,1,.36,1]}}>
+    <motion.div key={current} className="cc-body" initial={reduce?false:{opacity:0,y:direction.current*18,filter:'blur(6px)'}} animate={{opacity:1,y:0,filter:'blur(0px)',transitionEnd:{filter:'none'}}} exit={reduce?undefined:{opacity:0,y:direction.current*-10,transition:{duration:.14}}} transition={{duration:.35,ease:[.22,1,.36,1]}}>
      {section}
     </motion.div>
    </AnimatePresence>

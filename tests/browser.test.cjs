@@ -239,7 +239,7 @@ async function main() {
   assert.ok(!(await owner.evaluate(()=>JSON.stringify({...localStorage})) ).includes(fixtureClientSecret),'Private Google settings never enter browser storage');
   await owner.getByRole('button',{name:'Закрыть настройки импорта'}).click();
   await navigateApp(owner,'Библиотека');
-  await owner.getByRole('tab',{name:'По ссылке',exact:true}).click();await owner.getByRole('button',{name:'В Google Диск',exact:true}).click();
+  await owner.getByRole('navigation',{name:'Разделы библиотеки'}).getByRole('button',{name:'По ссылке',exact:true}).click();await owner.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await owner.locator('#streamUrl').fill('https://source.example.com/season');
   await owner.getByRole('button',{name:'Проверить',exact:true}).click();
   await owner.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
@@ -426,7 +426,7 @@ async function main() {
   await navigateApp(fresh,'Библиотека');
   await fresh.locator('#profileBtn').click();await fresh.locator('.profile-menu').getByRole('button',{name:'Настройки'}).click();
   await fresh.locator('.cc-nav').getByRole('button',{name:'Хранилище'}).click();await fresh.locator('.connection-settings-card .import-settings-trigger').click();await fresh.locator('#importServer').fill('https://import.example.com');await fresh.locator('.import-settings-dialog').getByRole('button',{name:'Применить',exact:true}).click();
-  await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await navigateApp(fresh,'Библиотека');await fresh.getByRole('tab',{name:'По ссылке',exact:true}).click();await fresh.getByRole('button',{name:'В Google Диск',exact:true}).click();
+  await fresh.getByText('Сохранение в Drive не подключено',{exact:true}).waitFor();await fresh.getByRole('button',{name:'Закрыть настройки импорта'}).click();await navigateApp(fresh,'Библиотека');await fresh.getByRole('navigation',{name:'Разделы библиотеки'}).getByRole('button',{name:'По ссылке',exact:true}).click();await fresh.getByRole('button',{name:'В Google Диск',exact:true}).click();
   await fresh.locator('#streamUrl').fill('https://source.example.com/titans');await fresh.getByRole('button',{name:'Проверить',exact:true}).click();await fresh.locator('#importDub').selectOption('https://source.example.com/studio');await fresh.getByText('Найдено опубликованных файлов: 2.',{exact:false}).waitFor();
   await fresh.locator('#serverCollection').fill('Атака титанов');await fresh.getByRole('button',{name:'Одна',exact:true}).click();await fresh.getByRole('combobox',{name:'Номер серии'}).selectOption('3');
   assert.equal(await fresh.locator('#importVideoBtn').isDisabled(),true);await fresh.locator('#importPrerequisites').getByRole('button',{name:'Открыть библиотеку',exact:true}).click();

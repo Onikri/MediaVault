@@ -75,6 +75,37 @@ html[data-blossom] .rail-chip-clear:hover{color:#fff;background:rgba(255,255,255
 html[data-blossom] .rail-chips-reset{min-height:0;padding:6px 8px;border:0;border-radius:8px;background:none;color:#fda4af;font:600 13px/1 var(--font-ui);cursor:pointer}
 html[data-blossom] .rail-chips-reset:hover{color:#fff}
 
+/* Collection owner tools: actions sit in the rail; here only where new files go,
+   the title form when it is open, and the upload queue. */
+html[data-blossom] .mv-rail button:disabled{opacity:.38;cursor:default}
+html[data-blossom] .collection-admin{display:flex;flex-direction:column;gap:10px;margin:0 0 18px}
+html[data-blossom] .collection-admin .upload-options{margin:0;padding:0;border:0;border-radius:16px;background:rgba(255,255,255,.035);overflow:hidden}
+html[data-blossom] .collection-admin .upload-options>summary{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;padding:13px 18px;list-style:none;cursor:pointer;transition:background-color .2s}
+html[data-blossom] .collection-admin .upload-options>summary::-webkit-details-marker{display:none}
+html[data-blossom] .collection-admin .upload-options>summary:hover{background:rgba(255,255,255,.04)}
+html[data-blossom] .collection-admin .upload-options>summary span{font:600 10.5px/1.4 var(--font-ui);letter-spacing:.2em;text-transform:uppercase;color:#71717a}
+html[data-blossom] .collection-admin .upload-options>summary b{font:600 14px/1.3 var(--font-ui);color:var(--kd-text,#f4f4f5)}
+html[data-blossom] .collection-admin .upload-options>summary::after{content:'Изменить';margin-left:auto;font:600 12.5px/1 var(--font-ui);color:#fda4af}
+html[data-blossom] .collection-admin .upload-options[open]>summary::after{content:'Свернуть'}
+html[data-blossom][data-theme='noir'] .collection-admin .upload-options>summary::after{color:#e4e4e7}
+html[data-blossom] .collection-admin .local-upload-settings{padding:4px 18px 18px}
+html[data-blossom] .collection-admin .upload-panel{margin:0;padding:0;border:0;background:none;display:flex;flex-direction:column;gap:6px}
+html[data-blossom] .collection-admin .upload-row{padding:12px 16px;border:0;border-radius:14px;background:rgba(255,255,255,.035)}
+html[data-blossom] .collection-admin .upload-row .progress-track{height:3px;border:0;background:rgba(255,255,255,.08)}
+html[data-blossom] .collection-admin .upload-row .progress-fill{background:var(--kd-accent,#e11d48)}
+
+/* View switch and sort: tone capsules without outlines; the chosen view sits on
+   a pill that slides between the glyphs. */
+html[data-blossom] .catalog-views[role=group][aria-label]{gap:2px;padding:4px;border:0;border-radius:100px;background:rgba(255,255,255,.045);box-shadow:none}
+html[data-blossom] .catalog-views[role=group][aria-label]>button{position:relative;display:grid;place-items:center;width:36px;height:32px;min-height:0;padding:0;border:0;border-radius:100px;background:transparent;box-shadow:none;color:#71717a;transition:color .25s}
+html[data-blossom] .catalog-views[role=group][aria-label]>button:hover{color:#d4d4d8;background:transparent}
+html[data-blossom] .catalog-views[role=group][aria-label]>button[aria-pressed=true]{color:#fff;background:transparent;box-shadow:none}
+html[data-blossom] .catalog-views-lit{position:absolute;inset:0;border-radius:100px;background:rgba(255,255,255,.13)}
+html[data-blossom] .catalog-views-glyph{position:relative;display:grid}
+html[data-blossom] .catalog-views-glyph svg{width:15px;height:15px;fill:currentColor}
+html[data-blossom] .sort-pill.sort-pill{height:40px;border:0;border-radius:100px;background:rgba(255,255,255,.045);box-shadow:none;color:#a1a1aa}
+html[data-blossom] .sort-pill.sort-pill:hover,html[data-blossom] .sort-pill.sort-pill.is-open{background:rgba(255,255,255,.085);color:#fff}
+
 /* drawer */
 .rail-drawer-scrim{position:fixed;inset:0;z-index:998;background:rgb(5 5 7 / .58)}
 .rail-drawer{position:fixed;z-index:999;top:12px;right:12px;bottom:12px;display:flex;flex-direction:column;width:min(470px,calc(100vw - 24px));border-radius:24px;background:rgb(22 22 27 / .94);-webkit-backdrop-filter:blur(28px) saturate(1.4);backdrop-filter:blur(28px) saturate(1.4);box-shadow:0 30px 80px -24px rgba(0,0,0,.85);color:var(--color-petal,#f0e8e5);font-family:var(--font-ui);overflow:hidden}

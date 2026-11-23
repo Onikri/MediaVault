@@ -24,10 +24,13 @@ const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function paint(parts, noir) {
   const {shape, band, core, petal} = parts;
   gsap.killTweensOf([shape, band, core, petal]);
-  gsap.set(shape, {morphSVG: noir ? HAT : FLOWER, fill: noir ? SILK : RUBY, rotation: 0, scale: 1, x: 0, y: 0, svgOrigin: '12 12'});
+  // Origins are set once and never smoothed: re-setting a smoothed origin adds
+  // a compensating offset, which made the icon creep left on every switch.
+  gsap.set([shape, core, petal], {clearProps: 'transform'});
+  gsap.set(shape, {svgOrigin: '12 12', smoothOrigin: false, morphSVG: noir ? HAT : FLOWER, fill: noir ? SILK : RUBY});
+  gsap.set(core, {svgOrigin: '12 12', smoothOrigin: false, scale: noir ? 0 : 1});
+  gsap.set(petal, {svgOrigin: '12 8', smoothOrigin: false, opacity: 0});
   gsap.set(band, {strokeDashoffset: noir ? 0 : 12, opacity: noir ? 1 : 0});
-  gsap.set(core, {scale: noir ? 0 : 1, svgOrigin: '12 12'});
-  gsap.set(petal, {opacity: 0});
 }
 
 // The page changes theme behind a circle growing from the button.
@@ -53,7 +56,7 @@ export default function NavThemeToggle() {
     const next = noir ? 'classic' : 'noir', {shape, band, core, petal} = refs.current;
     timeline.current?.kill();
     if (reduced()) {switchTheme(next, button.current); return;}
-    const tl = gsap.timeline({defaults: {svgOrigin: '12 12'}, onComplete: () => paint(refs.current, next === 'noir')});
+    const tl = gsap.timeline({onComplete: () => paint(refs.current, next === 'noir')});
     if (next === 'noir') {
       tl.to(shape, {rotation: -144, scale: .86, duration: .38, ease: 'power2.in'}, 0)
         .to(core, {scale: 0, duration: .22, ease: 'power2.in'}, 0)
