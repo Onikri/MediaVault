@@ -1,0 +1,4 @@
+/* The theme wave: the new look grows as a circle from the toggle, the old one stays still under it. */
+html[data-theme-wave]::view-transition-old(root),html[data-theme-wave]::view-transition-new(root){animation:none;mix-blend-mode:normal}
+html[data-theme-wave]::view-transition-new(root){z-index:2}
+html[data-theme-wave]::view-transition-old(root){z-index:1}

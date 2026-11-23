@@ -1,3 +1,4 @@
+import {useEffect,useState} from 'react';
 import {AnimatePresence,LayoutGroup,motion,useReducedMotion} from 'motion/react';
 import './library-rail.css';
 
@@ -59,6 +60,13 @@ export function RailHeader({title,count,countLabel='в разделе',kicker='�
  </header>;
 }
 
+/** A soft glow in the colour of the hovered cover, behind the whole page. */
+export function CardAmbient(){
+ const [tone,setTone]=useState(null);
+ useEffect(()=>{const on=event=>setTone(event.detail||null);addEventListener('mediavault:card-tone',on);return()=>removeEventListener('mediavault:card-tone',on);},[]);
+ return <div className={'card-ambient'+(tone?' is-on':'')} aria-hidden="true"><span style={tone?{backgroundColor:tone}:undefined}/></div>;
+}
+
 export function RailLayout({rail,children,className=''}){
- return <div className={'mv-railed '+className}>{rail}<div className="mv-railed-main">{children}</div></div>;
+ return <div className={'mv-railed '+className}><CardAmbient/>{rail}<div className="mv-railed-main">{children}</div></div>;
 }
