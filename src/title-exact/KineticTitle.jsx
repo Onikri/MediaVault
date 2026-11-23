@@ -114,9 +114,10 @@ export default function KineticTitle({
             transform: scale(1.065) translate3d(-1.2%, -0.8%, 0);
           }
         }
+        /* One slow breath when the page opens, then the backdrop rests: an endless
+           drift kept the GPU compositing the full-screen hero at 60 fps while idle. */
         .hero-backdrop-drift {
-          animation: heroBackdropKenBurns 22s ease-in-out infinite;
-          will-change: transform;
+          animation: heroBackdropKenBurns 22s ease-in-out 1;
         }
         @keyframes heroScrollLine {
           0% {
@@ -132,7 +133,7 @@ export default function KineticTitle({
           }
         }
         .hero-scroll-line {
-          animation: heroScrollLine 2.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+          animation: heroScrollLine 2.3s cubic-bezier(0.4, 0, 0.2, 1) 4;
         }
         @keyframes mvDisc { to { transform: rotate(360deg); } }
         @keyframes mvEq { from { height: 25%; } to { height: 100%; } }

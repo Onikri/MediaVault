@@ -88,9 +88,14 @@ export function useKineticPagePhysics(heroRef, sections, playerId = 'watch-playe
   const lastScrollYRef = useRef(0);
 
   useEffect(() => {
-    let rafId = null;
+    // The tracker sleeps once scroll, inertia and the navbar morph have settled,
+    // and wakes on scroll, resize or a change of page height: an idle title page
+    // no longer measures the layout on every frame.
+    let rafId = null, calm = 0;
+    const wake = () => {calm = 0; if (rafId == null) rafId = window.requestAnimationFrame(tick);};
 
     const tick = () => {
+      let settled = false;
       try {
         const scrollY = window.scrollY || window.pageYOffset || 0;
         const viewportH = window.innerHeight || 800;
@@ -181,6 +186,8 @@ export function useKineticPagePhysics(heroRef, sections, playerId = 'watch-playe
         if (Math.abs(velocityRef.current) < 0.0006) velocityRef.current = 0;
 
         smoothIndexRef.current += (targetIndex - smoothIndexRef.current) * 0.17;
+        if (Math.abs(targetIndex - smoothIndexRef.current) < 0.0008) smoothIndexRef.current = targetIndex;
+        settled = deltaScroll === 0 && velocityRef.current === 0 && smoothIndexRef.current === targetIndex && headerTRef.current === targetHeaderT;
 
         const clampedSmooth = Math.max(0, Math.min(sections.length - 1, smoothIndexRef.current));
         // Section wrappers and cards read these directly (no React render per frame).
@@ -217,12 +224,20 @@ export function useKineticPagePhysics(heroRef, sections, playerId = 'watch-playe
         // Игнорируем временные ошибки измерения DOM при перестроении
       }
 
-      rafId = window.requestAnimationFrame(tick);
+      calm = settled ? calm + 1 : 0;
+      rafId = calm > 12 ? null : window.requestAnimationFrame(tick);
     };
 
-    rafId = window.requestAnimationFrame(tick);
+    wake();
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(wake);
+    resize?.observe(document.documentElement);
+    window.addEventListener('scroll', wake, {passive: true});
+    window.addEventListener('resize', wake);
     return () => {
-      if (rafId) window.cancelAnimationFrame(rafId);
+      if (rafId != null) window.cancelAnimationFrame(rafId);
+      resize?.disconnect();
+      window.removeEventListener('scroll', wake);
+      window.removeEventListener('resize', wake);
     };
   }, [heroRef, sections, playerId]);
 
