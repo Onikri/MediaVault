@@ -109,7 +109,7 @@ function SignedPanel({label,positive,negative,options,onChange}){
  };
  const visible=[...new Set([...included,...excluded,...options])].filter(v=>v.toLocaleLowerCase().includes(find.trim().toLocaleLowerCase())).slice(0,120);
  return <><Finder value={find} onChange={setFind} placeholder={'Найти: '+label.toLocaleLowerCase()}/>
-  <p className="fdock-signed-note">Любое включение подходит. Любое исключение убирает тайтл. До 64 значений каждого знака.</p>
+  <p className="fdock-signed-note">«+» — оставить тайтлы хотя бы с одним выбранным значением. «−» — скрыть тайтлы с выбранным значением.</p>
   <div className="fdock-signed-list">{visible.map(value=><div key={value} className="fdock-signed-option"><span>{value}</span>
    <button type="button" aria-label={'Включить '+value} aria-pressed={included.includes(value)} onClick={()=>choose(value,'include')}><Plus size={15}/></button>
    <button type="button" aria-label={'Исключить '+value} aria-pressed={excluded.includes(value)} onClick={()=>choose(value,'exclude')}><span aria-hidden="true">−</span></button>

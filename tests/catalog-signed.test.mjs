@@ -2,7 +2,7 @@ import test,{beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {setMangaPolicy} from '../src/manga-tag-policy.js';
 import {matchesFilters} from '../src/catalog.js';
-import {taxonomyFacts,formatOptions,hasCatalogFilters} from '../src/catalog-taxonomy.js';
+import {taxonomyFacts,formatOptions,hasCatalogFilters,readableCatalogLabel,classifyLabel} from '../src/catalog-taxonomy.js';
 import {mangaCatalogParams} from '../src/manga-catalog.js';
 beforeEach(()=>setMangaPolicy({schemaVersion:1,tags:[],includeDiscovered:true,hiddenTags:[],excludedTerms:[],excludedPrefixes:[]}));
 test('OR inside each positive group, AND between groups, any exclusion wins',()=>{
@@ -16,6 +16,13 @@ test('OR inside each positive group, AND between groups, any exclusion wins',()=
 test('source genres migrate to semantic genres or flat tags, never numeric IDs',()=>{
  const row=taxonomyFacts({kind:'manga',genres:['Fantasy','School','106'],tags:['Comedy','3D']});
  assert.deepEqual(row.genres,['Фэнтези','Комедия']);assert.deepEqual(row.tags,['School','3D']);
+});
+test('catalogue labels repair mojibake and policy aliases keep Crime a genre',()=>{
+ assert.equal(readableCatalogLabel('РљСЂРёРјРёРЅР°Р»'),'Криминал');
+ setMangaPolicy({schemaVersion:1,includeDiscovered:true,hiddenTags:[],excludedTerms:[],excludedPrefixes:[],tags:[{key:'преступность',label:'Преступность',aliases:['Crime']}]});
+ assert.equal(classifyLabel('Криминал','tags','anime').category,'genres');
+ assert.equal(classifyLabel('Преступность','tags','anime').category,'genres');
+ assert.deepEqual(taxonomyFacts({kind:'anime',genres:[],tags:['Crime']}).genres,['Преступность']);
 });
 test('ordinary books retain real genres and novels retain tags',()=>{
  assert.deepEqual(taxonomyFacts({kind:'book',genres:['Fantasy','shelf 106'],tags:['Dragons']}).tags,[]);

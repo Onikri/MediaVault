@@ -1,14 +1,20 @@
 import data from '../server/catalog-taxonomy.json' with {type:'json'};
 import {mangaPolicy} from './manga-tag-policy.js';
 import {hentaiExcluded,hentaiLabel,sourceGenreProjection} from './source-genres.js';
+import {readableCatalogLabel,readableCatalogLabels} from './catalog-label.js';
 const norm=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/[_-]/g,' ').replace(/\s+/g,' ').trim();
 const genres=new Map(data.genres.flatMap(row=>[row.key,row.label,...row.aliases].map(alias=>[norm(alias),row])));
 export function filterValues(value){if(Array.isArray(value))return value;try{if(String(value||'').startsWith('['))return JSON.parse(value);}catch{}return String(value||'').split(',').map(v=>v.trim()).filter(Boolean);}
 export const filterParam=value=>Array.isArray(value)?JSON.stringify(value):value??'';
 export const hasCatalogFilters=filters=>['genre','tag','excludeGenre','excludeTag'].some(key=>filterValues(filters[key]).length>0)||['format','readingMode','year','age','status'].some(key=>!!filters[key]);
+function semanticGenre(label,policy=mangaPolicy()){
+ const value=readableCatalogLabel(label),rule=policy.rules.get(policy.key(value));
+ return [value,rule?.label,rule?.key,...(rule?.aliases||[])].map(candidate=>genres.get(norm(candidate))).find(Boolean);
+}
 export function classifyLabel(label,field,kind){
  if(!label||/^\p{N}+$/u.test(String(label).trim()))return null;
- const policy=mangaPolicy(),rule=policy.rules.get(policy.key(label)),genre=genres.get(norm(label))||genres.get(norm(rule?.label))||genres.get(norm(rule?.key));
+ label=readableCatalogLabel(label);
+ const policy=mangaPolicy(),rule=policy.rules.get(policy.key(label)),genre=semanticGenre(label,policy);
  const category=({genre:'genres',tag:'tags'})[rule?.category]||(genre?'genres':'tags');
  if(kind==='book'&&(category!=='genres'||!genre&&rule?.category!=='genre'))return null;
  if(genre?.kinds&&!genre.kinds.includes(kind))return null;
@@ -23,6 +29,7 @@ export function taxonomyFacts(row){
 }
 export const genreOptions=kind=>data.genres.filter(row=>!row.kinds||row.kinds.includes(kind)).map(row=>row.label);
 export const formatOptions=kind=>data.formats[kind]||[];
+export {readableCatalogLabel,readableCatalogLabels};
 export function matchesTaxonomy(row,filters){
  const facts=taxonomyFacts(row),key=value=>norm(genres.get(norm(value))?.label||mangaPolicy().label(mangaPolicy().key(value),value));
  for(const [field,name,negative] of [['genres','genre',false],['tags','tag',false],['genres','excludeGenre',true],['tags','excludeTag',true]]){

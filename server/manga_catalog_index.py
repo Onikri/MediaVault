@@ -15,10 +15,12 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from manga_source_tags import unique, clean_label
+from catalog_labels import readable_label
 from manga_tag_policy import current, normalize, project_row
 from release_status import condition as status_condition, initialize_index as initialize_status_index, work_status
 
 FORMAT = {'manga', 'manhwa', 'manhua', 'webtoon','comic','rumanga'}
+LABEL_INDEX_REVISION='readable-labels-v1'
 
 def tag_key(value):
     return current().key(value)
@@ -85,7 +87,8 @@ def initialize(conn):
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(conn)
     revision=conn.execute("SELECT value FROM catalog_policy_state WHERE name='revision'").fetchone()
-    if not revision or revision[0]!=current().revision:
+    labels=conn.execute("SELECT value FROM catalog_policy_state WHERE name='label-index'").fetchone()
+    if not revision or revision[0]!=current().revision or not labels or labels[0]!=LABEL_INDEX_REVISION:
         with conn:reindex(conn)
 
 def upsert(conn, rows, source_id='', timestamp=None):
@@ -126,7 +129,7 @@ def upsert(conn, rows, source_id='', timestamp=None):
         raw = {}
         for category in ('tags', 'genres'):
             input_values = row.get(category)
-            fresh = unique(input_values) if isinstance(input_values, list) else []
+            fresh = unique(readable_label(value) for value in input_values) if isinstance(input_values, list) else []
             prior = unique(previous.get(category) or [])
             data[category] = list(dict.fromkeys([*prior, *fresh]))[:120]
             raw[category] = fresh
@@ -180,7 +183,8 @@ def upsert(conn, rows, source_id='', timestamp=None):
         conn.execute('DELETE FROM catalog_tags WHERE title_id=?',(identity,))
         policy=current();source=urlsplit(url).hostname or ''
         for category in ('tags','genres'):
-            for (label,) in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category)).fetchall():
+            for (raw_label,) in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category)).fetchall():
+                label=readable_label(raw_label)
                 key = policy.identity(label,source) if policy.include_discovered else policy.key(label,source)
                 if not key:
                     continue
@@ -355,7 +359,7 @@ def reindex(conn,policy=None):
         source=urlsplit(row.get('sourceUrl') or row.get('url') or '').hostname or ''
         raw_facts={}
         for category in ('tags','genres'):
-            facts=[v[0] for v in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category))]
+            facts=list(dict.fromkeys(readable_label(v[0]) for v in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category)) if readable_label(v[0])))
             raw_facts[category]=facts
             for label in facts:
                 added+=add(conn,label,source,category,'manga')
@@ -366,6 +370,7 @@ def reindex(conn,policy=None):
         row['tagStatus']=state
         conn.execute('UPDATE catalog_titles SET metadata=?,tag_state=? WHERE id=?',(json.dumps(row,ensure_ascii=False),state,identity))
     conn.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('revision',?)",(policy.revision,))
+    conn.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('label-index',?)",(LABEL_INDEX_REVISION,))
     if added:bump(conn)
     return count
 

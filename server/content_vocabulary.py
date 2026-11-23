@@ -2,6 +2,7 @@
 import hashlib,json,threading
 from urllib.parse import urlsplit
 from manga_tag_policy import canonical_json,current,normalize
+from catalog_labels import readable_label
 
 _cache={};_lock=threading.RLock()
 
@@ -26,6 +27,7 @@ def bump(db):
 
 def add(db,label,source,category,kind):
     from catalog_taxonomy import classify
+    label=readable_label(label)
     if not classify(label,category,kind,current(),source):return 0
     return db.execute('INSERT OR IGNORE INTO catalog_vocabulary VALUES(?,?,?,?)',(label,source,category,kind)).rowcount
 
@@ -49,7 +51,8 @@ def _public(db,identity):
     if policy.include_discovered:
         known={row['key']:dict(row) for row in data['tags']}
         from catalog_taxonomy import classify
-        for label,source,category,kind in db.execute('SELECT label,source,category,kind FROM catalog_vocabulary ORDER BY label,source'):
+        for raw_label,source,category,kind in db.execute('SELECT label,source,category,kind FROM catalog_vocabulary ORDER BY label,source'):
+            label=readable_label(raw_label)
             classified=classify(label,category,kind,policy,source)
             if not classified:continue
             category,label=classified
@@ -58,7 +61,8 @@ def _public(db,identity):
             if key not in known:known[key]={'key':key,'label':label,'aliases':[label]}
             if key not in policy.rules:
                 row=known[key]
-                if label not in row['aliases']:row['aliases'].append(label)
+                for alias in [label,raw_label]:
+                    if alias not in row['aliases']:row['aliases'].append(alias)
                 if category=='genres':row['genreHint']=True;row['category']='genre'
                 else:row.setdefault('category','tag')
         # Source-derived genres must be selectable even before any source

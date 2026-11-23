@@ -38,6 +38,16 @@ class SignedFilters(unittest.TestCase):
   self.assertEqual(row['tags'],['Robots','3D']);self.assertEqual(row['genres'],['Комедия'])
   self.assertEqual(content_catalog.browse(self.db,kind='movie',excludeGenre='Comedy')['total'],0)
   self.assertEqual(content_catalog.browse(self.db,kind='movie',excludeTag='Robots')['total'],0)
+ def test_crime_alias_uses_the_canonical_index_key_and_repairs_mojibake(self):
+  path=Path(os.environ['MANGA_TAG_POLICY_FILE'])
+  path.write_text(json.dumps({'schemaVersion':1,'tags':[{'key':'преступность','label':'Преступность','aliases':['Crime']}],'includeDiscovered':True,'excludedTerms':[],'excludedPrefixes':[],'hiddenTags':[]}),encoding='utf-8')
+  os.utime(path,ns=(time.time_ns(),time.time_ns()+1))
+  broken='Криминал'.encode().decode('cp1251')
+  content_catalog.ingest(self.db,[{'id':'crime','provider':'fixture','kind':'anime','title':'Гангста','genres':[],'tags':[broken]}])
+  result=content_catalog.browse(self.db,kind='anime',genre='Криминал')
+  self.assertEqual(result['total'],1);self.assertEqual(result['items'][0]['title'],'Гангста')
+  self.assertEqual(result['items'][0]['genres'],['Преступность'])
+  self.assertEqual(content_catalog.browse(self.db,kind='anime',tag='Криминал')['total'],0)
  def test_generic_work_groups_share_filters_and_totals_before_paging(self):
   content_catalog.ingest(self.db,[{'id':'one','provider':'one','kind':'anime','title':'Мир','ids':{'mal':'20'},'genres':['Fantasy'],'tags':[]},{'id':'two','provider':'two','kind':'anime','title':'World','ids':{'mal':'20'},'genres':[],'tags':['Robots']}])
   result=content_catalog.browse(self.db,kind='anime',genre='Fantasy',tag='Robots',limit=1)

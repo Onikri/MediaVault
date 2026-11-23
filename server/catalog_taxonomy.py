@@ -1,6 +1,7 @@
 """Shared presentation taxonomy; retained source facts and owner rules stay intact."""
 import hashlib,json,unicodedata
 from pathlib import Path
+from catalog_labels import readable_label
 
 DATA=json.loads(Path(__file__).with_name('catalog-taxonomy.json').read_text(encoding='utf-8'))
 REVISION=hashlib.sha256(json.dumps(DATA,sort_keys=True).encode()).hexdigest()
@@ -65,10 +66,18 @@ def hentai_work_set(policy,manga=False):
     negative='SELECT '+work('peer')+' FROM '+facts+' f JOIN '+table+' peer ON peer.id=f.title_id WHERE catalog_not_hentai(f.original)=1'
     return 'SELECT eligible.work FROM ('+explicit+' UNION '+origins+') eligible WHERE eligible.work NOT IN ('+negative+')',wanted
 
+def semantic_genre(label,policy=None,source=''):
+    clean=readable_label(label)
+    rule=policy.rules.get(policy.identity(clean,source),{}) if policy else {}
+    for value in [clean,rule.get('label'),rule.get('key'),*(rule.get('aliases') or [])]:
+        if genre:=GENRES.get(norm(value)):return genre
+    return None
+
 def classify(label,field,kind,policy=None,source=''):
     if not isinstance(label,str) or not label.strip() or label.strip().isdecimal():return None
+    label=readable_label(label)
     rule=policy.rules.get(policy.identity(label,source),{}) if policy else {}
-    genre=GENRES.get(norm(label)) or GENRES.get(norm(rule.get('label'))) or GENRES.get(norm(rule.get('key')))
+    genre=semantic_genre(label,policy,source)
     category={'genre':'genres','tag':'tags'}.get(rule.get('category')) or ('genres' if genre else 'tags')
     if kind=='book' and (category!='genres' or not genre and rule.get('category')!='genre'):return None
     if genre and genre.get('kinds') and kind not in genre['kinds']:return None
@@ -89,8 +98,9 @@ def project(policy,row,source=''):
     return {k:v[:120] for k,v in result.items()}
 
 def keys(value,policy,allow_hidden=False):
+    value=readable_label(value)
     if not allow_hidden and not policy.key(value):return []
-    row=GENRES.get(norm(value)) or GENRES.get(norm(policy.label(policy.identity(value))))
+    row=semantic_genre(value,policy)
     labels=[value,*([row['label'],row['key'],*row['aliases']] if row else [])]
     from manga_tag_policy import normalize
     return sorted({key for v in labels for key in (policy.identity(v),normalize(v))})
@@ -109,7 +119,7 @@ def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False)
             raise HTTPException(422,'Не больше 64 текстовых значений в группе фильтров.')
         values=list(dict.fromkeys(v.strip() for v in values if v.strip()))
         if not values:continue
-        wanted=sorted({k for v in values for k in keys(v,policy,allow_hidden=negative) if (classify(k,field,kind,policy) or ('',''))[0]==field})
+        wanted=sorted({k for v in values if (classify(v,field,kind,policy) or ('',''))[0]==field for k in keys(v,policy,allow_hidden=negative)})
         if not wanted:
             if not negative:result.append('0')
             continue

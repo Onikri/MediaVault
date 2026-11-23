@@ -1,10 +1,12 @@
 """Bounded, metadata-only facts shared by all catalogue media kinds."""
 import hashlib,json,re,time
 from urllib.parse import urlsplit
+from catalog_labels import readable_label
 from manga_tag_policy import current,normalize
 from release_status import condition as status_condition, initialize_index as initialize_status_index, work_status
 
 KINDS=frozenset({'movie','tv','anime','manga','ranobe','book'})
+LABEL_INDEX_REVISION='readable-labels-v1'
 RELEASE_YEAR = "MAX(CASE WHEN typeof(json_extract(t.raw,'$.year')) IN ('integer','text') AND CAST(json_extract(t.raw,'$.year') AS INTEGER) BETWEEN 1 AND 9999 THEN CAST(json_extract(t.raw,'$.year') AS INTEGER) END)"
 ORDERS = {
     'updated': 'MAX(t.updated) DESC',
@@ -52,12 +54,14 @@ def initialize(db):
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(db)
     state=db.execute("SELECT value FROM content_catalog_state WHERE name='policy'").fetchone()
-    if not db.execute("SELECT 1 FROM content_catalog_state WHERE name='facts-v1'").fetchone() or not state or state[0]!=current().revision:
+    labels=db.execute("SELECT value FROM content_catalog_state WHERE name='label-index'").fetchone()
+    if not db.execute("SELECT 1 FROM content_catalog_state WHERE name='facts-v1'").fetchone() or not state or state[0]!=current().revision or not labels or labels[0]!=LABEL_INDEX_REVISION:
         added=0
         for identity,raw in title_rows(db):added+=_index(db,identity,json.loads(raw),current())
         if added:invalidate(db)
         db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('facts-v1','1')")
         db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('policy',?)",(current().revision,))
+        db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('label-index',?)",(LABEL_INDEX_REVISION,))
 
 def title_rows(db):
     cursor=db.execute('SELECT id,raw FROM content_titles ORDER BY id')
@@ -76,7 +80,9 @@ def _index(db,identity,row,policy):
     source=urlsplit(row.get('sourceUrl') or row.get('sourceURL') or '').hostname or '';added=0
     db.execute('DELETE FROM content_tags WHERE title_id=?',(identity,))
     for field in ('genres','tags'):
-        for label in row.get(field) or []:
+        for raw_label in row.get(field) or []:
+            label=readable_label(raw_label)
+            if not label:continue
             db.execute('INSERT OR IGNORE INTO content_tag_facts VALUES(?,?,?,?,?)',(identity,row['kind'],source,field,label))
             added+=add(db,label,source,field,row['kind'])
             from catalog_taxonomy import classify
@@ -115,7 +121,7 @@ def ingest(db,rows):
             if isinstance(row.get(field),str) and re.match(r'^\d{4}(?:-\d{2}){0,2}(?:$|T)',row[field]):
                 data[field]=row[field][:10]
         for field in ('tags','genres','aliases'):
-            values=row.get(field);data[field]=list(dict.fromkeys(v.strip() for v in values if isinstance(v,str) and 0<len(v.strip())<=120))[:120] if isinstance(values,list) else []
+            values=row.get(field);data[field]=list(dict.fromkeys(readable_label(v) if field!='aliases' else v.strip() for v in values if isinstance(v,str) and 0<len(v.strip())<=120))[:120] if isinstance(values,list) else []
         for field in ('sourceUrl','sourceURL','url','cover'):data[field]=safe_url(row.get(field))
         # Never accept arbitrary client objects, account secrets or enormous text.
         data['description']=str(data.get('description') or '')[:12000]

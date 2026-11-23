@@ -1,6 +1,6 @@
 import {NavigationItem,NavigationRail} from './SectionNavigation.jsx';
 import {useSectionBrandFor} from './section-brand-store.js';
-import {taxonomyFacts,genreOptions,formatOptions,classifyLabel,filterValues,hasCatalogFilters} from './catalog-taxonomy.js';
+import {taxonomyFacts,genreOptions,formatOptions,classifyLabel,filterValues,hasCatalogFilters,readableCatalogLabels} from './catalog-taxonomy.js';
 import CatalogIndexProgress from './CatalogIndexProgress.jsx';
 import CatalogFilterDock,{SortMenu,splitTags} from './CatalogFilterDock.jsx';
 import {useCatalogFavorites} from './catalog-favorites.js';
@@ -136,8 +136,8 @@ export default function CatalogBrowser({service,state,onSubmitted,onItems,onOpen
   const sourceFacets=useMemo(()=>kind==='manga'?mangaFacetOptions(indexed.taxonomy,indexed.facets,{sourceIds,sources:knownSources}):[],[kind,indexed.taxonomy,indexed.facets,sourceIds,knownSources,tagPolicyVersion]);
   const [sectionNode,setSectionNode]=useState(null);
   useSectionBrandFor(sectionNode,{sections:kinds,active:kind,onPick:value=>{setKind(value);setFilters({});setPage(1);}});
-  const genres=[...new Set([...genreOptions(kind),...[...mangaPolicy().rules.values()].filter(row=>row.category==='genre').map(row=>row.label),...items.flatMap(item=>item.genres||[]),...sourceFacets.filter(t=>classifyLabel(t.label,t.type==='genre'?'genres':'tags',kind)?.category==='genres').map(t=>classifyLabel(t.label,'genres',kind).label)])].filter(label=>classifyLabel(label,'genres',kind)&&(!(kind==='manga'||globalTags)||mangaPolicy().key(label)));
-  const tagOptions=kind==='book'?[]:[...new Set([...mangaPolicy().rules.values()].filter(row=>row.category!=='genre').map(row=>row.label).concat(sourceFacets.map(t=>t.label),items.flatMap(item=>item.tags||[])))].filter(label=>classifyLabel(label,'tags',kind)?.category==='tags').sort((a,b)=>a.localeCompare(b,'ru'));
+  const genres=readableCatalogLabels([...genreOptions(kind),...[...mangaPolicy().rules.values()].filter(row=>row.category==='genre').map(row=>row.label),...items.flatMap(item=>item.genres||[]),...sourceFacets.filter(t=>classifyLabel(t.label,t.type==='genre'?'genres':'tags',kind)?.category==='genres').map(t=>classifyLabel(t.label,'genres',kind).label)]).filter(label=>classifyLabel(label,'genres',kind)&&(!(kind==='manga'||globalTags)||mangaPolicy().key(label)));
+  const tagOptions=kind==='book'?[]:readableCatalogLabels([...mangaPolicy().rules.values()].filter(row=>row.category!=='genre').map(row=>row.label).concat(sourceFacets.map(t=>t.label),items.flatMap(item=>item.tags||[]))).filter(label=>classifyLabel(label,'tags',kind)?.category==='tags').sort((a,b)=>a.localeCompare(b,'ru'));
   const formats=formatOptions(kind);
   const hasMore=contentBrowse||contentSpine?contentIndex.hasMore:indexSpine?!!indexed.hasMore:browsing?metadataPages?page<metadataPages:metadataItems.length>=16:!(!contentIndex.hasMore&&metadataItems.length<16&&(!indexed.ready||!indexed.hasMore));
   const pageCounts=contentBrowse||contentSpine?[contentIndex.pages].filter(Boolean):indexSpine?[indexed.ready&&(indexed.workTotal||indexed.total)?Math.ceil((indexed.workTotal||indexed.total)/perPage):null].filter(n=>n>0):browsing?[metadataPages].filter(n=>n>0):[metadataPages,contentIndex.pages,kind==='manga'&&indexed.ready&&indexed.total?Math.ceil(indexed.total/30):null].filter(n=>n>0);
