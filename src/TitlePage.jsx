@@ -57,12 +57,25 @@ import {uiLocale,t as translateUi} from './i18n/index.js';
 
 const day=value=>{try{return value?new Intl.DateTimeFormat(uiLocale(),{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(value)):'';}catch{return '';}};
 const equivalent=value=>String(value||'').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]/gu,'');
+// Title sections sit in perspective-transformed wrappers, where IntersectionObserver
+// cannot map its targets and reports them as never visible (character portraits
+// never loaded). Pending images are checked by their transformed rectangle instead:
+// one sweep per frame while scrolling (any scroller, captured), and each image
+// leaves the sweep once it is near the viewport.
+const nearViewport=new Set();let sweepQueued=false,sweepAttached=false;
+function sweepNearViewport(){sweepQueued=false;const h=innerHeight,w=innerWidth,m=300;
+  for(const entry of [...nearViewport]){if(!entry.node.isConnected){nearViewport.delete(entry);continue;}const r=entry.node.getBoundingClientRect();if((r.width||r.height)&&r.bottom>-m&&r.top<h+m&&r.right>-m&&r.left<w+m){nearViewport.delete(entry);entry.show();}}
+  if(!nearViewport.size&&sweepAttached){sweepAttached=false;removeEventListener('scroll',queueSweep,true);removeEventListener('resize',queueSweep);}}
+function queueSweep(){if(!sweepQueued){sweepQueued=true;requestAnimationFrame(sweepNearViewport);}}
+function watchNearViewport(node,show){const entry={node,show};nearViewport.add(entry);if(!sweepAttached){sweepAttached=true;addEventListener('scroll',queueSweep,{capture:true,passive:true});addEventListener('resize',queueSweep);}queueSweep();setTimeout(queueSweep,400);return()=>nearViewport.delete(entry);}
+// Without a fallback picture an empty anchor still stands in, so the visibility
+// observer has something to watch and the image starts loading.
 export function TitleImage({url,profile,actions,libraryId,alt='',className='',fallback=true,...props}){
   const anchor=useRef(null),[visible,setVisible]=useState(false);
-  useEffect(()=>{const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'300px'});if(anchor.current)observer.observe(anchor.current);return()=>observer.disconnect();},[]);
+  useEffect(()=>anchor.current?watchNearViewport(anchor.current,()=>setVisible(true)):undefined,[]);
   const source=useArtwork(url,profile,actions.readArtwork,libraryId,visible);
   const [broken,setBroken]=useState(false);useEffect(()=>setBroken(false),[source]);
-  return source&&!broken?<img ref={anchor} src={source} className={(className||'')+' mv-artwork-image'} onLoad={event=>event.currentTarget.dataset.ready='true'} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={()=>setBroken(true)} {...props}/>:fallback?<Artwork ref={anchor} kind="video" className={className}/>:null;
+  return source&&!broken?<img ref={anchor} src={source} className={(className||'')+' mv-artwork-image'} onLoad={event=>event.currentTarget.dataset.ready='true'} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={()=>setBroken(true)} {...props}/>:fallback?<Artwork ref={anchor} kind="video" className={className}/>:<span ref={anchor} className={(className||'')+' mv-artwork-pending'} aria-hidden="true"/>;
 }
 export function EpisodeArtwork({item,profile,actions,libraryId,index=0}){
   const asset=item.previewArtwork;
