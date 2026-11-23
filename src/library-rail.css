@@ -4,6 +4,7 @@
 
 /* The page heading stays for screen readers; the rail and the headline carry it visually. */
 html[data-blossom] .app-shell[data-view=library]>.app-main>.page-title-row,
+html[data-blossom] .app-shell[data-view=history]>.app-main>.page-title-row:has(+ .history-page),
 html[data-blossom] .app-shell[data-view=collection]>.app-main>.page-title-row{position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
 
 html[data-blossom] .mv-railed{display:grid;grid-template-columns:228px minmax(0,1fr);gap:clamp(28px,4vw,64px);align-items:start}
