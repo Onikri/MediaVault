@@ -131,6 +131,7 @@ def initialize(conn):
     with conn:conn.execute("UPDATE catalog_titles SET work_key=catalog_normalize(title) WHERE work_key=''")
     # Covers the per-work aggregates, so a page reads the index, not the rows.
     conn.execute('CREATE INDEX IF NOT EXISTS catalog_titles_works ON catalog_titles(work_key,year,chapter_count,first_seen)')
+    conn.execute('CREATE INDEX IF NOT EXISTS catalog_titles_newest ON catalog_titles((year IS NULL),year DESC,work_key,chapter_count)')
     initialize_work_tags(conn)
     initialize_status_index(conn,table='catalog_titles',document='metadata',work='work_key')
     from content_vocabulary import initialize as initialize_vocabulary
@@ -308,10 +309,11 @@ def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30
     where,args = _conditions(provider,format,source_id,**filters)
     from catalog_taxonomy import clauses
     extra,values=clauses(conn,kind='manga',tag=tag,manga=True,**facet)
+    newest_first_page = not where and not extra and status in ('','available') and sort in ('','new') and offset == 0
     restriction,states=status_condition(status,table='catalog_titles',document='metadata',work='t.work_key',peer_work='peer.work_key')
     if restriction:extra.append(restriction);values.extend(states)
     if extra:where+=(' AND ' if where else ' WHERE ')+' AND '.join(extra);args.extend(values)
-    return _browse_works(conn,where,args,sort,limit,offset,q=q)
+    return _browse_works(conn,where,args,sort,limit,offset,q=q,newest_first_page=newest_first_page)
 
 def _search_where(where, words, *, use_index):
     if not words:return where
@@ -323,7 +325,7 @@ def _search_where(where, words, *, use_index):
         terms=f't.rowid IN (SELECT s.rowid FROM catalog_titles s INDEXED BY catalog_titles_search WHERE {terms})'
     return where+(' AND ' if where else ' WHERE ')+terms
 
-def _browse_works(conn,where,args,sort,limit,offset,q=''):
+def _browse_works(conn,where,args,sort,limit,offset,q='',newest_first_page=False):
     # Page over works, then return every matching source row of those works
     # (a few per work) in page order; the client folds them into one card.
     # total stays the number of source rows; workTotal counts works for paging.
@@ -338,6 +340,23 @@ def _browse_works(conn,where,args,sort,limit,offset,q=''):
         ranking=[query,query]
         page=conn.execute('SELECT t.work_key,SUM(COUNT(*)) OVER (),COUNT(*) OVER ()'+grouped+' ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,*ranking,limit,offset]).fetchall()
         keys=[row[0] for row in page]
+    elif newest_first_page:
+        # The first edition of each work in this order has its maximum eligible
+        # year. Stop as soon as the page has enough distinct works.
+        page=[]
+        keys=[]
+        seen=set()
+        cursor=conn.execute('SELECT t.work_key FROM catalog_titles t INDEXED BY catalog_titles_newest'+where+' ORDER BY (t.year IS NULL),t.year DESC,t.work_key',args)
+        try:
+            for (key,) in cursor:
+                if key in seen:
+                    continue
+                seen.add(key)
+                keys.append(key)
+                if len(keys)==limit:
+                    break
+        finally:
+            cursor.close()
     else:
         page=[]
         keys=[k for (k,) in conn.execute('SELECT t.work_key'+grouped+' ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,limit,offset])]

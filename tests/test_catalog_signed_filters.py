@@ -26,6 +26,16 @@ class SignedFilters(unittest.TestCase):
   upsert(self.db,[self.row('Общий мир','source-a',['Fantasy'],[]),self.row('Общий мир','source-b',[],['Robots'])])
   self.assertEqual(browse(self.db,genre='Fantasy',tag='Robots')['workTotal'],1)
   self.assertEqual(browse(self.db,excludeTag='Robots')['workTotal'],0)
+ def test_first_manga_page_preserves_newest_eligible_work_order_and_totals(self):
+  def row(title,slug,year=None,**extra):
+   return {**self.row(title,slug,[],[]),'year':year,**extra}
+  upsert(self.db,[row('Apple','apple-old',2017,chapters=4),row('Apple','apple-new',2020,chapters=1),
+                  row('Berry','berry',2020,chapters=2),row('Cherry','cherry',2019,chapters=3),
+                  row('Future','future',2200,status='NOT_YET_RELEASED'),row('Unknown','unknown')])
+  page=browse(self.db,status='available',sort='new',limit=2)
+  self.assertEqual(list(dict.fromkeys(entry['title'] for entry in page['items'])),['Apple','Berry'])
+  self.assertEqual((page['works'],page['workTotal'],page['total']),(2,4,5))
+  self.assertEqual([entry['title'] for entry in browse(self.db,status='available',sort='new',limit=2,offset=2)['items']],['Cherry','Unknown'])
  def test_book_subjects_are_not_tags_or_genres_but_novel_tags_survive(self):
   content_catalog.ingest(self.db,[{'id':'book1','provider':'fixture','kind':'book','title':'Книга','genres':['Fantasy','library shelf 106'],'tags':['Dragons','106']},{'id':'novel1','provider':'fixture','kind':'ranobe','title':'Новелла','genres':['Fantasy'],'tags':['Dragons']}])
   book=content_catalog.browse(self.db,kind='book')['items'][0]

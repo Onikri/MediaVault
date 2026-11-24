@@ -1,6 +1,5 @@
 import {filterParam,taxonomyFacts} from './catalog-taxonomy.js';
 import {useEffect,useState} from 'react';
-import {acceptContentPolicy,contentPolicyRevision} from './manga-tag-policy.js';
 const sent=new Map();
 const empty=Object.freeze([]);
 export function contentCatalogParams({kind,query,filters,page=1,limit=30,sort=''}){
@@ -26,9 +25,8 @@ export default function useContentCatalog({service,state,kind,query,filters,rows
    if(busy||document.hidden)return;
    busy=true;
    try{
-    const value=await service.request('/catalog/content?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(20000)])});
+    const value=await service.request('/catalog/content?'+params+'&includeTagPolicy=false',{signal:AbortSignal.any([abort.signal,AbortSignal.timeout(20000)])});
     if(abort.signal.aborted)return;
-    acceptContentPolicy(value);
     const items=value.items||empty,total=Number(value.total)||0;
     setResult({items,key,ready:true,total,hasMore:Number(value.offset||0)+items.length<total,pages:total?Math.ceil(total/limit):null});
    }catch(error){

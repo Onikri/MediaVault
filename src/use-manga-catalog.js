@@ -1,7 +1,7 @@
 import {hasCatalogFilters} from './catalog-taxonomy.js';
 import {useEffect,useRef,useState} from 'react';
 import {loadMangaTaxonomy,mangaCatalogParams} from './manga-catalog.js';
-import {acceptContentPolicy,contentPolicyRevision} from './manga-tag-policy.js';
+import {contentPolicyRevision} from './manga-tag-policy.js';
 
 const facetCache=new Map();
 const pageCache=new Map();
@@ -74,8 +74,8 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
   if(recent)setFacetReadyScope(facetScope);
   setSnapshot(old=>old.key===key?{...old,error:'',loading:!old.ready}:recent||{...empty,key,loading:true});
 
-  function publish(value){
-   const data=acceptContentPolicy(value),results=data.items||[];
+  function publish(data){
+   const results=data.items||[];
    const workTotal=Number(data.workTotal??data.total??0);
    const next={...empty,key,results,candidates,total:data.total||0,workTotal,
     hasMore:Number(data.offset||0)+Number(data.works??results.length)<workTotal,ready:true,enriching};
@@ -83,7 +83,7 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
    setSnapshot(next);
    setFacetReadyScope(facetScope);
   }
-  const requestPage=()=>live.current.request('/manga/catalog?'+params+'&tagPolicyRevision='+encodeURIComponent(contentPolicyRevision()),{signal:AbortSignal.any([signal,AbortSignal.timeout(20000)])});
+  const requestPage=()=>live.current.request('/manga/catalog?'+params+'&includeTagPolicy=false',{signal:AbortSignal.any([signal,AbortSignal.timeout(20000)])});
 
   async function read({retry=false,report=false}={}){
    if(busy||signal.aborted)return false;
@@ -112,7 +112,7 @@ export default function useMangaCatalog({query,kind,filters,language,sourceIds,s
 
   async function enhance(){
    try{
-    const value=await live.current.request('/manga/catalog?'+candidateParams,{signal:AbortSignal.any([signal,AbortSignal.timeout(20000)])});
+    const value=await live.current.request('/manga/catalog?'+candidateParams+'&includeTagPolicy=false',{signal:AbortSignal.any([signal,AbortSignal.timeout(20000)])});
     if(signal.aborted)return;
     candidates=value.items||[];
     setSnapshot(old=>({...old,candidates}));

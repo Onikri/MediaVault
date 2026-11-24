@@ -30,6 +30,17 @@ class ContinuousTests(unittest.TestCase):
   public=public_policy(self.store)
   self.assertIn('Ecology',[r['label'] for r in public['policy']['tags']]);self.assertNotIn('Hidden word',json.dumps(public))
   self.assertEqual(current().data['tags'],[])
+ def test_public_vocabulary_skips_overlong_source_descriptions(self):
+  self.seed()
+  self.db.execute('INSERT INTO catalog_vocabulary VALUES(?,?,?,?)',('Color shelf with descriptions '*8,'fixture.example','tags','manga'))
+  rows=public_policy(self.store)['policy']['tags']
+  self.assertIn('Ecology',[row['label'] for row in rows])
+  self.assertFalse(any(row['label'].startswith('Color shelf') for row in rows))
+  self.assertTrue(all(len(alias.encode('utf-16-le'))<=240 for row in rows for alias in row['aliases']))
+ def test_listing_can_skip_public_policy_construction(self):
+  from content_management import with_policy
+  with patch('content_vocabulary.public',side_effect=AssertionError('listing fetched the full vocabulary')):
+   self.assertEqual(with_policy({'items':[]},None,self.store,self.db),{'items':[]})
  def test_unblocking_a_name_restores_all_retained_matches_without_network_or_corpus_rewrite(self):
   self.seed();data=copy.deepcopy(BASE);data['excludedTerms']=[]
   with patch('manga_catalog_index.reindex',side_effect=AssertionError('must not rebuild')),patch('content_catalog.reindex',side_effect=AssertionError('must not rebuild')):save(self.store,data,current().revision)

@@ -6,6 +6,10 @@ from catalog_labels import readable_label
 
 _cache={};_lock=threading.RLock()
 
+def _browser_label(value):
+    # The browser validates the length in UTF-16 code units.
+    return bool(value.strip()) and len(value.encode('utf-16-le'))<=240
+
 def host(url):
     try:return urlsplit(url or '').hostname or ''
     except ValueError:return ''
@@ -50,19 +54,29 @@ def _public(db,identity):
     # terms or an unrestricted fallback on unfiltered remote metadata.
     if policy.include_discovered:
         known={row['key']:dict(row) for row in data['tags']}
+        owners={normalize(alias):row['key'] for row in known.values() for alias in [row['key'],row['label'],*row['aliases']]}
         from catalog_taxonomy import classify
         for raw_label,source,category,kind in db.execute('SELECT label,source,category,kind FROM catalog_vocabulary ORDER BY label,source'):
+            if not _browser_label(raw_label):continue
             label=readable_label(raw_label)
             classified=classify(label,category,kind,policy,source)
             if not classified:continue
             category,label=classified
             key=policy.key(label,source)
-            if not key:continue
-            if key not in known:known[key]={'key':key,'label':label,'aliases':[label]}
+            if not key or not _browser_label(key) or not _browser_label(label):continue
+            if key not in known:
+                names={normalize(key),normalize(label)}
+                if any(owners.get(name,key)!=key for name in names):continue
+                known[key]={'key':key,'label':label,'aliases':[]}
+                owners.update(dict.fromkeys(names,key))
             if key not in policy.rules:
                 row=known[key]
                 for alias in [label,raw_label]:
+                    if not _browser_label(alias) or len(row['aliases'])>=120:continue
+                    spellings={normalize(alias),normalize(readable_label(alias))}
+                    if any(owners.get(name,key)!=key for name in spellings):continue
                     if alias not in row['aliases']:row['aliases'].append(alias)
+                    owners.update(dict.fromkeys(spellings,key))
                 if category=='genres':row['genreHint']=True;row['category']='genre'
                 else:row.setdefault('category','tag')
         # Source-derived genres must be selectable even before any source

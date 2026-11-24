@@ -676,14 +676,14 @@ content_management.install(app,content_owner,viewer,lambda:__import__('manga_dis
 
 
 @app.get('/manga/catalog')
-def manga_catalog(background:BackgroundTasks,q:str='',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',readingMode:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,sort:str='',status:str='',tagPolicyRevision:str='',subject=Depends(viewer)):
+def manga_catalog(background:BackgroundTasks,q:str='',tag:str='',genre:str='',excludeGenre:str='',excludeTag:str='',readingMode:str='',provider:str='',format:str='',language:str='all',year:str='',age:str='',sourceIds:str='',offset:int=0,limit:int=30,sort:str='',status:str='',tagPolicyRevision:str='',includeTagPolicy:bool=True,subject=Depends(viewer)):
     from manga_discovery import catalogue_reader,manager
     from manga_catalog_index import browse
     store=manager()
     if tag or genre:background.add_task(content_management.prioritize,store,subject,tag,genre)
     with catalogue_reader(store) as db:
         result=browse(db,q=q,tag=tag,genre=genre,excludeGenre=excludeGenre,excludeTag=excludeTag,readingMode=readingMode,provider=provider,format=format,offset=offset,limit=limit,sort=sort,status=status,**manga_catalog_filters(language,year,age,sourceIds))
-        return content_management.with_policy(result,tagPolicyRevision,store,db)
+        return content_management.with_policy(result,tagPolicyRevision if includeTagPolicy else None,store,db)
 
 @app.get('/manga/catalog/tags')
 def manga_catalog_tags(provider:str='',sourceId:str='',sourceIds:str='',language:str='all',q:str='',limit:int=500,subject=Depends(viewer)):

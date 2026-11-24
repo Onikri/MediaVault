@@ -1,6 +1,7 @@
 """Repair catalogue labels damaged by an accidental UTF-8 legacy decode."""
 import re
 import unicodedata
+from functools import lru_cache
 
 _LATIN_MOJIBAKE=re.compile(r'(?:[ÐÑ][^\s]){2,}')
 _CYRILLIC_MOJIBAKE=re.compile(r'(?:[РС][^\s]){2,}')
@@ -22,13 +23,20 @@ def _utf8(value,encoding):
 def readable_label(value):
     """Undo up to three common mojibake passes without changing clean text."""
     if not isinstance(value,str):return ''
+    return _readable_label(value)
+
+
+@lru_cache(maxsize=32768)
+def _readable_label(value):
     best=value.strip(' \t\r\n,;|')
     for _ in range(3):
+        score=_badness(best)
+        if not score:break
         choices=[best]
         for encoding in ('latin1','cp1251'):
             candidate=_utf8(best,encoding)
             if candidate is not None:choices.append(candidate)
         candidate=min(choices,key=lambda text:(_badness(text),-sum(c.isalpha() for c in text),len(text)))
-        if _badness(candidate)>=_badness(best):break
+        if _badness(candidate)>=score:break
         best=candidate
     return ' '.join(best.split())[:120]

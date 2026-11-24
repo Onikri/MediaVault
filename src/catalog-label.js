@@ -21,9 +21,11 @@ export function readableCatalogLabel(value){
  if(typeof value!=='string')return '';
  let best=value.replace(/^[\s,;|]+|[\s,;|]+$/gu,'');
  for(let pass=0;pass<3;pass++){
+  const score=badness(best);
+  if(!score)break;
   const choices=[best,...alphabets.map(map=>recode(best,map)).filter(Boolean)];
   choices.sort((a,b)=>badness(a)-badness(b)||[...b].filter(c=>/\p{L}/u.test(c)).length-[...a].filter(c=>/\p{L}/u.test(c)).length||a.length-b.length);
-  if(badness(choices[0])>=badness(best))break;
+  if(badness(choices[0])>=score)break;
   best=choices[0];
  }
  return best.replace(/\s+/gu,' ').trim().slice(0,120);
