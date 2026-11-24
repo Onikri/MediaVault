@@ -17,9 +17,10 @@ REGISTER = ROOT / 'docs/native-source-inventory.csv'
 ACTIVATION = ROOT / 'server/manga_native_activation.json'
 LIVE = ('search', 'catalogue', 'metadata', 'chapters', 'pages')
 # Sources whose current route carries more than the direct adapter does:
-# manga_discovery searches them with the owner's Lib session, the Russian
-# alias resolution for MangaDex or their own dedicated search modules.
-HOLD_NAMES = frozenset({'MangaLib', 'HentaiLib', 'SlashLib', 'MangaDex', 'Senkognito', 'HentaiChan', 'HenChan',
+# manga_discovery searches them with the owner's Lib session or their own
+# dedicated search modules. MangaDex profiles activate normally: an activated
+# profile still falls back to the Russian alias resolution in its search.
+HOLD_NAMES = frozenset({'MangaLib', 'HentaiLib', 'SlashLib', 'Senkognito', 'HentaiChan', 'HenChan',
                         'HentaiChan.cc', 'Hitomi', 'HManga', 'ReManga', 'Remanga'})
 
 

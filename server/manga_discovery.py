@@ -220,7 +220,12 @@ def search_source(source,query):
     adapter = manga_native_sources.for_source(source) if not relay else None
     if adapter:
         try:
-            return manga_native_sources.search(adapter, source, query)
+            found = manga_native_sources.search(adapter, source, query)
+            if found or source.get('name') != 'MangaDex' or not re.search(r'[а-яё]', query, re.I):
+                return found
+            # MangaDex matches only its own alt titles; the established alias
+            # route resolves a Russian name through the public Lib catalogues.
+            return native_search_source(source, query)
         except SourceRateLimitError:
             raise
         except SourceError as error:

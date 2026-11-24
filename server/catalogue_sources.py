@@ -156,7 +156,7 @@ def fetch(spec,cursor):
         fallback = cursor.get('route') == 'suwayomi' or spec.get('route') == 'suwayomi'
         if adapter and not fallback:
             try:
-                return catalogue_job(adapter,spec,page)
+                return catalogue_job(adapter,spec,page,cursor)
             except (SourceAccessError, SourceTemporaryError):
                 # A different pager can start a new scan. Preserve any ongoing cursor.
                 if kind != 'bridge' or page != 1 or spec.get('term') or not configured():

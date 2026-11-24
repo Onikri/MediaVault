@@ -145,7 +145,7 @@ def catalogue_vocabulary(adapter, http):
     return [term for item in vocabulary(http) if (term := catalogue_term(item))] if vocabulary else []
 
 
-def catalogue_job(adapter, spec, page):
+def catalogue_job(adapter, spec, page, cursor=None):
     from manga_source_tags import unique
     from source_transport import solver_budget
 
@@ -182,8 +182,14 @@ def catalogue_job(adapter, spec, page):
                 raise SourceError('Сохранённый фильтр больше не совпадает со справочником источника.')
             tag, name = next(iter(options.items()))
             term = {**term, 'label': name}
-        options = {'sort': adapter.index_sort} if getattr(type(adapter), 'index_sort', None) else {}
-        rows, more = adapter.catalogue(http, page=page, tag=tag, **options)
+        if getattr(type(adapter), 'index_page', None):
+            # A cursor walk past the API's offset limit; the job stores the cursor.
+            rows, following = adapter.index_page(http, cursor if isinstance(cursor, dict) and cursor.get('since') else {}, tag=tag)
+            more = bool(following)
+        else:
+            options = {'sort': adapter.index_sort} if getattr(type(adapter), 'index_sort', None) else {}
+            rows, more = adapter.catalogue(http, page=page, tag=tag, **options)
+            following = {'page': page + 1} if more else None
         if page == 1 and not rows and not term and not more:
             raise SourceError('Адаптер вернул пустую первую страницу каталога')
         details = []
@@ -195,7 +201,8 @@ def catalogue_job(adapter, spec, page):
                 **{key: value for key, value in spec.items() if key != 'term'},
                 'type': 'bridge-detail', 'url': row['url'], 'row': row,
             })
-        return {'rows': rows, 'next': {'page': page + 1} if more else None, 'details': details}
+        # A window whose rows were all read on the previous page still moves on.
+        return {'rows': rows, 'next': following, 'details': details, **({'emptySpan': True} if not rows and more else {})}
     finally:
         http.close()
 

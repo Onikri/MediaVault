@@ -1,6 +1,7 @@
 """MangaDex language profiles and public reader protocol from Keiyoushi."""
 
 import re
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 import time
 from urllib.parse import parse_qs, quote, urlencode, urljoin, urlsplit, urlunsplit
@@ -9,7 +10,7 @@ from manga_catalog_adapters import CONTENT_RATINGS, DEX_USER_AGENT, UUID, get, n
 from manga_madara import OriginPace
 from manga_source_tags import from_api, labels, unique
 from manga_source_urls import reader_url, split_reader_url
-from source_parser import SourceAccessError, SourceError, public_url
+from source_parser import SourceAccessError, SourceError, SourceRateLimitError, public_url
 
 
 API = 'https://api.mangadex.org'
@@ -17,6 +18,9 @@ ROOT = 'https://mangadex.org'
 LIMIT = 20
 FEED_LIMIT = 500
 MAX_OFFSET = 10000
+# The index walk pages by creation time: /manga refuses offset+limit > 10000.
+WALK_LIMIT = 100
+WALK_SINCE = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
 TITLE_PATH = re.compile(rf'/(?:title|manga)/({UUID})(?:/[^/]+)?/?')
 CHAPTER_PATH = re.compile(rf'/chapter/({UUID})(?:/[^/]+)?/?')
 UUID_PATTERN = re.compile(UUID)
@@ -29,15 +33,34 @@ ALL_RATINGS = [('contentRating[]', rating) for rating in CONTENT_RATINGS]
 PUBLIC_RATINGS = ALL_RATINGS[:2]
 IMAGE_MARKER = 'mv_dex_page='
 IMAGE_LEASE_SECONDS = 270
+# MangaDex allows about 5 requests per second per IP for the whole API.
+API_PACE_SECONDS = 0.4
 PACE = OriginPace()
-PACE.interval = 0.35
+PACE.interval = API_PACE_SECONDS
 _leases = {}
 _lease_lock = Lock()
 
 
 def request(http, path, params=()):
     PACE.wait(getattr(http, 'deadline', None))
-    return get(API + path + ('?' + urlencode(params) if params else ''), http)
+    try:
+        return get(API + path + ('?' + urlencode(params) if params else ''), http)
+    except SourceRateLimitError as error:
+        # Retry-After holds every MangaDex caller in this process, not only the
+        # indexer job that met the 429.
+        with PACE.lock:
+            PACE.next_request = max(PACE.next_request, time.monotonic() + min(3600, error.retry_after))
+        raise
+
+
+def created_second(row):
+    # createdAtSince takes UTC seconds without an offset.
+    try:
+        value = datetime.fromisoformat(str(attributes(row).get('createdAt', '')).replace('Z', '+00:00'))
+    except ValueError:
+        raise SourceError('MangaDex не указал дату добавления тайтла.') from None
+    value = value.replace(tzinfo=value.tzinfo or timezone.utc).astimezone(timezone.utc)
+    return value.replace(microsecond=0, tzinfo=None)
 
 
 def records(response):
@@ -284,6 +307,47 @@ class MangaDex:
         response = request(http, '/manga', params)
         rows = records(response)
         return [self.row(item) for item in rows], has_more(response, offset, len(rows), LIMIT)
+
+    def index_page(self, http, cursor, *, tag=''):
+        """One page of the whole catalogue in creation order for the indexer.
+
+        The cursor is a creation-time window rather than a growing offset. Each
+        page restarts the window one second before its newest title and skips
+        the IDs already read at that edge, so the walk is not bound by the API's
+        10 000 offset limit and survives restarts as plain JSON. A single second
+        holding more than a page of titles is paged by offset inside it.
+        """
+        since, offset, seen = cursor.get('since') or '', cursor.get('offset') or 0, set(cursor.get('seen') or ())
+        if (not isinstance(since, str) or since and not WALK_SINCE.fullmatch(since) or type(offset) is not int
+                or not 0 <= offset <= MAX_OFFSET - WALK_LIMIT or tag and not UUID_PATTERN.fullmatch(tag)):
+            raise SourceError('Некорректный курсор каталога MangaDex.')
+        params = [('limit', WALK_LIMIT), ('offset', offset), ('includes[]', 'cover_art'), ('order[createdAt]', 'asc'),
+                  ('hasAvailableChapters', 'true'), *self.language_filter('availableTranslatedLanguage[]'), *ALL_RATINGS]
+        if since:
+            params.append(('createdAtSince', since))
+        if tag:
+            params.append(('includedTags[]', tag))
+        response = request(http, '/manga', params)
+        rows, fresh = records(response), []
+        for item in rows:
+            if item.get('id') in seen:
+                continue
+            try:
+                fresh.append(self.row(item))
+            except SourceError:
+                # One malformed record must not hold the whole walk at this window.
+                continue
+        total = response.get('total')
+        if not rows or len(rows) < WALK_LIMIT or type(total) is int and offset + len(rows) >= total:
+            return fresh, None
+        page = cursor.get('page') if type(cursor.get('page')) is int else 1
+        edge = created_second(rows[-1]) - timedelta(seconds=1)
+        if not since or edge > datetime.fromisoformat(since):
+            return fresh, {'page': page + 1, 'since': edge.strftime('%Y-%m-%dT%H:%M:%S'), 'offset': 0,
+                           'seen': sorted(str(item['id']) for item in rows if created_second(item) >= edge)}
+        if offset + 2 * WALK_LIMIT > MAX_OFFSET:
+            raise SourceError('MangaDex добавил больше 10 000 тайтлов за одну секунду.')
+        return fresh, {'page': page + 1, 'since': since, 'offset': offset + len(rows), 'seen': sorted(seen)}
 
     def works(self, http, identities, params):
         if not identities:
