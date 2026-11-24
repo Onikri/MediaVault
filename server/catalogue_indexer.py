@@ -18,7 +18,7 @@ _PROFILE_CODES = ','.join("'" + lang + "'" for lang in sorted(PROFILE_LANGUAGES)
 _LANG = "lower(replace(json_extract(spec,'$.source.lang'),'_', '-'))"
 _SCOPE = f"(kind NOT LIKE 'bridge%' OR {_LANG} IS NULL OR substr({_LANG},1,instr({_LANG}||'-','-')-1) IN ({_PROFILE_CODES}))"
 CLAIMABLE=_SCOPE+" AND state IN ('queued','retry','done','partial','stalled') AND due<=?"
-BASE_KINDS=('lib','bridge','remanga','html','omdb')
+BASE_KINDS=('lib','bridge','remanga','html','omdb','hanime')
 # Per-host request spacing in seconds; LibGroup tolerates a faster pace and
 # slows down again by itself on 429.
 PACE={LIB_HOST:0.6}
@@ -302,7 +302,7 @@ class Indexer:
             result=self.fetch(spec,job['cursor']);rows=result.get('rows') or []
             # An AniList id span may hold no title of this kind; the walk goes on.
             if not rows and result.get('next') and not result.get('emptySpan'):raise RuntimeError('empty-page')
-            if not rows and not result.get('catalogues') and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html'}:raise RuntimeError('empty-page')
+            if not rows and not result.get('catalogues') and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html','hanime'}:raise RuntimeError('empty-page')
             digest=hashlib.sha256(canonical_json(sorted(str(r.get('sourceUrl') or r.get('url') or r.get('id')) for r in rows))).hexdigest()
             with self.store.lock,self.store.db:
                 active=self.store.db.execute('SELECT lease FROM catalogue_jobs WHERE id=?',(job['id'],)).fetchone()

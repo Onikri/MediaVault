@@ -63,6 +63,8 @@ def base_sources(installed):
     for kind,name in (('movie','Фильмы'),('tv','Сериалы')):
         jobs.append({'type':'omdb','kind':kind,'domain':'www.omdb.org','name':name+' · omdb'})
     jobs.append({'type':'books','kind':'book','domain':'openlibrary.org','name':'Книги · Open Library'})
+    # The whole HanimeTV catalogue is one cached feed: one request per crawl.
+    jobs.append({'type':'hanime','kind':'anime','domain':'hanime.tv','name':'Хентай · HanimeTV'})
     return jobs
 
 def headers(spec):
@@ -111,6 +113,9 @@ def fetch(spec,cursor):
     if kind=='omdb':
         from catalogue_omdb import catalogue
         return catalogue(spec['kind'],cursor)
+    if kind=='hanime':
+        from catalogue_hanime import catalogue
+        return catalogue(cursor)
     if kind in {'lib','lib-detail','lib-vocabulary'}:
         with httpx.Client(http2=True,timeout=15,headers=headers(spec)) as client:
             root='https://api.cdnrulib.link';hosts={'api.cdnrulib.link'}
