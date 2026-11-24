@@ -50,11 +50,15 @@ def retire_removed(db):
         if 'catalogue_tag_targets' in tables:
             db.execute("DELETE FROM catalogue_tag_targets WHERE json_extract(target,'$.domain')=?",(domain,))
         if 'catalog_policy_state' not in tables or db.execute('SELECT 1 FROM catalog_policy_state WHERE name=?',('retired:'+domain,)).fetchone():continue
-        titles=[title for (title,) in db.execute('SELECT id FROM catalog_titles WHERE mediavault_removed_host(source_url)')]
+        retired=db.execute('SELECT id,work_key FROM catalog_titles WHERE mediavault_removed_host(source_url)').fetchall()
+        titles=[title for title,_ in retired];work_keys={key for _,key in retired}
         for start in range(0,len(titles),500):
             chunk=titles[start:start+500];marks=','.join('?'*len(chunk))
             for table in ('catalog_tags','catalog_tag_facts'):db.execute('DELETE FROM '+table+' WHERE title_id IN ('+marks+')',chunk)
             db.execute('DELETE FROM catalog_titles WHERE id IN ('+marks+')',chunk)
+        if work_keys and 'catalog_work_tags' in tables:
+            from manga_catalog_index import refresh_work_tags
+            refresh_work_tags(db,work_keys)
         if 'catalog_vocabulary' in tables:db.execute('DELETE FROM catalog_vocabulary WHERE mediavault_removed_host(source)')
         if 'titles' in tables:
             sources={source for (source,) in db.execute("SELECT DISTINCT source_id FROM titles WHERE mediavault_removed_host(json_extract(metadata,'$.sourceUrl'))")}
@@ -103,6 +107,15 @@ class Indexer:
         sources=base_sources(installed)
         with self.store.lock,self.store.db:
             retire_removed(self.store.db)
+            # Legacy versions queued a detail request for every listing row.
+            # Cards now fetch cover and description on demand. Prune those
+            # automatic jobs during normal source seeding, while preserving an
+            # explicitly eager maintenance route and generic queue recovery.
+            stale=[key for (key,) in self.store.db.execute("SELECT id FROM catalogue_jobs WHERE kind LIKE '%-detail' AND COALESCE(json_extract(spec,'$.eagerDetails'),0)!=1").fetchall()]
+            for key in stale:
+                self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(key,))
+                self.store.db.execute('DELETE FROM catalogue_page_items WHERE job=?',(key,))
+            if stale:self.store.db.execute('DELETE FROM catalogue_jobs WHERE id IN ('+','.join('?'*len(stale))+')',stale)
             # The old HentaiChan feed was the home page, not its full catalogue.
             # Retire only that listing; retained cards and detail jobs stay intact.
             for key,raw in self.store.db.execute("SELECT id,spec FROM catalogue_jobs WHERE kind='html'").fetchall():
@@ -228,10 +241,14 @@ class Indexer:
                 count=upsert(self.store.db,manga)+ingest(self.store.db,other)
                 if count!=len(rows):raise RuntimeError('incomplete-write')
                 for child in result.get('catalogues') or []:self.enqueue(child,70)
-                for detail in result.get('details') or []:
-                    row=detail['row'];known=self.store.db.execute("SELECT inspected,json_extract(metadata,'$.sourceMetadataVersion'),json_extract(metadata,'$.description') FROM catalog_titles WHERE provider=? AND source_url=?",(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone()
-                    missing=(known[1] or 0)<2 if known and spec['domain']=='hentaichan.cc' else not known or not known[0]
-                    if not known or known[0]<self.clock()-7*86400 or missing:self.enqueue(detail,int(spec.get('detailPriority',15)))
+                # Do not fan one listing into millions of detail requests.
+                # Explicit maintenance may opt a source into eager details;
+                # normal cards enrich only when the client displays them.
+                if spec.get('eagerDetails'):
+                    for detail in result.get('details') or []:
+                        row=detail['row'];known=self.store.db.execute("SELECT inspected,json_extract(metadata,'$.sourceMetadataVersion'),json_extract(metadata,'$.description') FROM catalog_titles WHERE provider=? AND source_url=?",(row['provider'],row.get('sourceUrl') or row.get('url'))).fetchone()
+                        missing=(known[1] or 0)<2 if known and spec['domain']=='hentaichan.cc' else not known or not known[0]
+                        if not known or known[0]<self.clock()-7*86400 or missing:self.enqueue(detail,int(spec.get('detailPriority',15)))
                 from content_vocabulary import add,bump
                 vocabulary_added=0
                 if spec['type'] in {'anilist','books'}:

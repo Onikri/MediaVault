@@ -38,6 +38,17 @@ test('automatic vocabulary preserves unknown labels and exact hides are reversib
  assert.deepEqual(compileMangaPolicy({...data,hiddenTags:[]}).facts({genres:['Ecology']}),{genres:[],tags:['Ecology']});
 });
 
+test('semantic aliases and source counters compile to one canonical entity',()=>{
+ const policy=compileMangaPolicy({...base,includeDiscovered:true,tags:[...base.tags,
+  {key:'ужасы',label:'Ужасы',aliases:['Horror']},{key:'хоррор',label:'Хоррор',aliases:['Horror genre']},
+  {key:'жестокость',label:'Жестокость',aliases:['Cruelty']},{key:'гуро',label:'Гуро',aliases:['Guro']}],});
+ assert.equal(policy.key('Хоррор'),'ужасы');
+ assert.equal(policy.key('Gore'),'жестокость');
+ assert.equal(policy.key('Жестокость 222'),'жестокость');
+ assert.deepEqual(policy.facts({tags:['Guro','Кровь','Жестокость 222'],genres:['Хоррор']}),
+  {genres:['Ужасы'],tags:['Жестокость и кровь']});
+});
+
 test('cached catalogue response installs expanded vocabulary before projecting rows',()=>{
  setMangaPolicy(base,'old','all');
  const response={items:[{kind:'manga',genres:['Ocean worlds']}],tagPolicy:{revision:'new',scope:'all',policy:{...base,tags:[...base.tags,{key:'ocean worlds',label:'Миры океана',aliases:['Ocean worlds']}]}}};

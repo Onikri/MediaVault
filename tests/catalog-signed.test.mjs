@@ -22,7 +22,7 @@ test('catalogue labels repair mojibake and policy aliases keep Crime a genre',()
  setMangaPolicy({schemaVersion:1,includeDiscovered:true,hiddenTags:[],excludedTerms:[],excludedPrefixes:[],tags:[{key:'преступность',label:'Преступность',aliases:['Crime']}]});
  assert.equal(classifyLabel('Криминал','tags','anime').category,'genres');
  assert.equal(classifyLabel('Преступность','tags','anime').category,'genres');
- assert.deepEqual(taxonomyFacts({kind:'anime',genres:[],tags:['Crime']}).genres,['Преступность']);
+ assert.deepEqual(taxonomyFacts({kind:'anime',genres:[],tags:['Crime']}).genres,['Криминал']);
 });
 test('ordinary books retain real genres and novels retain tags',()=>{
  assert.deepEqual(taxonomyFacts({kind:'book',genres:['Fantasy','shelf 106'],tags:['Dragons']}).tags,[]);

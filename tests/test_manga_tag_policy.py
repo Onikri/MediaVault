@@ -36,6 +36,20 @@ class PolicyTests(unittest.TestCase):
                 'genres':['Drama'],'language':'en'}])
         self.db.commit()
 
+    def test_semantic_aliases_and_source_counters_share_one_identity(self):
+        policy=Policy({**BASE,'includeDiscovered':True,'hiddenTags':[],'tags':[
+            *BASE['tags'],
+            {'key':'ужасы','label':'Ужасы','aliases':['Horror']},
+            {'key':'хоррор','label':'Хоррор','aliases':['Horror genre']},
+            {'key':'жестокость','label':'Жестокость','aliases':['Cruelty']},
+            {'key':'гуро','label':'Гуро','aliases':['Guro']},
+        ]})
+        self.assertEqual(policy.identity('Хоррор'),'ужасы')
+        self.assertEqual(policy.identity('Gore'),'жестокость')
+        self.assertEqual(policy.identity('Жестокость 222'),'жестокость')
+        self.assertEqual(policy.facts({'kind':'anime','genres':['Хоррор'],'tags':['Guro','Кровь','Жестокость 222']}),
+                         {'genres':['Ужасы'],'tags':['Жестокость и кровь']})
+
     def test_delete_and_restore_rebuild_every_source_projection(self):
         self.seed();self.assertEqual(browse(self.db,genre='Fantasy')["total"],len(SOURCES))
         removed={**BASE,'tags':[BASE['tags'][1]]}

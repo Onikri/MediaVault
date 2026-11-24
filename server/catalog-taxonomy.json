@@ -65,7 +65,8 @@
       "label": "Ужасы",
       "aliases": [
         "Horror",
-        "Horror tales"
+        "Horror tales",
+        "Хоррор"
       ]
     },
     {
@@ -195,7 +196,8 @@
       "key": "crime",
       "label": "Криминал",
       "aliases": [
-        "Crime"
+        "Crime",
+        "Преступность"
       ]
     },
     {
@@ -286,6 +288,28 @@
       "kinds": [
         "book",
         "ranobe"
+      ]
+    }
+  ],
+  "tagGroups": [
+    {
+      "key": "жестокость",
+      "label": "Жестокость и кровь",
+      "category": "tag",
+      "aliases": [
+        "Жестокость",
+        "Насилие / жестокость",
+        "Насилие",
+        "Кровь",
+        "Кровавый",
+        "Гуро",
+        "Gore",
+        "Guro",
+        "Blood",
+        "Bloody",
+        "Violence",
+        "Brutality",
+        "Cruelty"
       ]
     }
   ],

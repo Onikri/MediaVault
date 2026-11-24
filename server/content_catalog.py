@@ -7,6 +7,7 @@ from release_status import condition as status_condition, initialize_index as in
 
 KINDS=frozenset({'movie','tv','anime','manga','ranobe','book'})
 LABEL_INDEX_REVISION='readable-labels-v1'
+WORK_TAG_INDEX_REVISION='work-tags-v1'
 RELEASE_YEAR = "MAX(CASE WHEN typeof(json_extract(t.raw,'$.year')) IN ('integer','text') AND CAST(json_extract(t.raw,'$.year') AS INTEGER) BETWEEN 1 AND 9999 THEN CAST(json_extract(t.raw,'$.year') AS INTEGER) END)"
 ORDERS = {
     'updated': 'MAX(t.updated) DESC',
@@ -38,6 +39,59 @@ def work_sql(alias='t'):
         expr+='WHEN '+value+' IS NOT NULL THEN '+repr(key+':')+'||'+value+' '
     return '('+expr+"ELSE 'id:'||"+p+'id END)'
 
+def work_key(row,identity):
+    kind=str(row.get('kind') or '')
+    ids=row.get('ids') if isinstance(row.get('ids'),dict) else {}
+    for key in ['mal','imdb','kinopoisk','anilist','kitsu','openlibrary','fantlab']:
+        if ids.get(key) not in (None,''):return kind+':'+key+':'+str(ids[key])
+    return kind+':id:'+identity
+
+def _work_tag_triggers(db):
+    db.execute('''CREATE TRIGGER IF NOT EXISTS content_work_tags_add AFTER INSERT ON content_work_tags BEGIN
+        INSERT INTO content_tag_stats(kind,category,tag_key,works) VALUES(NEW.kind,NEW.category,NEW.tag_key,1)
+        ON CONFLICT(kind,category,tag_key) DO UPDATE SET works=works+1;
+      END''')
+    db.execute('''CREATE TRIGGER IF NOT EXISTS content_work_tags_remove AFTER DELETE ON content_work_tags BEGIN
+        UPDATE content_tag_stats SET works=works-1 WHERE kind=OLD.kind AND category=OLD.category AND tag_key=OLD.tag_key;
+        DELETE FROM content_tag_stats WHERE kind=OLD.kind AND category=OLD.category AND tag_key=OLD.tag_key AND works<=0;
+      END''')
+
+def initialize_work_tags(db):
+    db.executescript('''
+      CREATE TABLE IF NOT EXISTS content_work_tags(
+        kind TEXT NOT NULL,work_key TEXT NOT NULL,category TEXT NOT NULL,tag_key TEXT NOT NULL,
+        PRIMARY KEY(kind,work_key,category,tag_key)) WITHOUT ROWID;
+      CREATE INDEX IF NOT EXISTS content_work_tags_lookup ON content_work_tags(kind,category,tag_key,work_key);
+      CREATE TABLE IF NOT EXISTS content_tag_stats(
+        kind TEXT NOT NULL,category TEXT NOT NULL,tag_key TEXT NOT NULL,works INTEGER NOT NULL,
+        PRIMARY KEY(kind,category,tag_key)) WITHOUT ROWID;
+    ''')
+    _work_tag_triggers(db)
+
+def rebuild_work_tags(db):
+    db.execute('DROP TRIGGER IF EXISTS content_work_tags_add')
+    db.execute('DROP TRIGGER IF EXISTS content_work_tags_remove')
+    db.execute('DELETE FROM content_work_tags');db.execute('DELETE FROM content_tag_stats')
+    work=work_sql('t')
+    db.execute('''INSERT OR IGNORE INTO content_work_tags(kind,work_key,category,tag_key)
+                  SELECT t.kind,'''+work+''',g.category,g.tag_key FROM content_tags g
+                  JOIN content_titles t ON t.id=g.title_id''')
+    db.execute('''INSERT INTO content_tag_stats(kind,category,tag_key,works)
+                  SELECT kind,category,tag_key,COUNT(*) FROM content_work_tags GROUP BY kind,category,tag_key''')
+    _work_tag_triggers(db)
+    db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('work-tag-index',?)",(WORK_TAG_INDEX_REVISION,))
+
+def refresh_work_tags(db,keys):
+    keys=sorted({key for key in keys if key})
+    if not keys:return
+    # Avoid executescript() here: it commits an active ingest transaction.
+    # initialize() has already created the materialized index and triggers.
+    marks=','.join('?' for _ in keys);work=work_sql('t')
+    db.execute('DELETE FROM content_work_tags WHERE work_key IN ('+marks+')',keys)
+    db.execute('''INSERT OR IGNORE INTO content_work_tags(kind,work_key,category,tag_key)
+                  SELECT t.kind,'''+work+''',g.category,g.tag_key FROM content_tags g
+                  JOIN content_titles t ON t.id=g.title_id WHERE '''+work+' IN ('+marks+')',keys)
+
 
 def initialize(db):
     db.execute('CREATE TABLE IF NOT EXISTS content_titles(id TEXT PRIMARY KEY,kind TEXT NOT NULL,search TEXT NOT NULL,raw TEXT NOT NULL,updated INTEGER NOT NULL)')
@@ -49,19 +103,23 @@ def initialize(db):
     db.execute('CREATE TABLE IF NOT EXISTS content_tags(title_id TEXT NOT NULL,category TEXT NOT NULL,tag_key TEXT NOT NULL,original TEXT NOT NULL,PRIMARY KEY(title_id,category,tag_key,original))')
     db.execute('CREATE INDEX IF NOT EXISTS content_tags_key ON content_tags(tag_key,category,title_id)')
     db.execute('CREATE INDEX IF NOT EXISTS content_fact_labels ON content_tag_facts(original,source)')
+    initialize_work_tags(db)
     from catalog_taxonomy import initialize_origins
     initialize_origins(db)
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(db)
     state=db.execute("SELECT value FROM content_catalog_state WHERE name='policy'").fetchone()
     labels=db.execute("SELECT value FROM content_catalog_state WHERE name='label-index'").fetchone()
-    if not db.execute("SELECT 1 FROM content_catalog_state WHERE name='facts-v1'").fetchone() or not state or state[0]!=current().revision or not labels or labels[0]!=LABEL_INDEX_REVISION:
+    compiled=db.execute("SELECT value FROM content_catalog_state WHERE name='work-tag-index'").fetchone()
+    needs_index=not db.execute("SELECT 1 FROM content_catalog_state WHERE name='facts-v1'").fetchone() or not state or state[0]!=current().revision or not labels or labels[0]!=LABEL_INDEX_REVISION
+    if needs_index:
         added=0
         for identity,raw in title_rows(db):added+=_index(db,identity,json.loads(raw),current())
         if added:invalidate(db)
         db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('facts-v1','1')")
         db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('policy',?)",(current().revision,))
         db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('label-index',?)",(LABEL_INDEX_REVISION,))
+    if needs_index or not compiled or compiled[0]!=WORK_TAG_INDEX_REVISION:rebuild_work_tags(db)
 
 def title_rows(db):
     cursor=db.execute('SELECT id,raw FROM content_titles ORDER BY id')
@@ -105,7 +163,7 @@ def title_key(kind,provider,identity):
     return hashlib.sha256((kind+'\0'+provider+'\0'+identity).encode()).hexdigest()[:32]
 
 def ingest(db,rows):
-    initialize(db);count=0;new_facts=0
+    initialize(db);count=0;new_facts=0;affected=set()
     for row in rows[:100]:
         if not isinstance(row,dict) or row.get('kind') not in KINDS:continue
         provider=row.get('provider');identity=str(row.get('id') or '')
@@ -132,6 +190,7 @@ def ingest(db,rows):
         previous=db.execute('SELECT raw FROM content_titles WHERE id=?',(key,)).fetchone()
         if previous:
             old=json.loads(previous[0])
+            affected.add(work_key(old,key))
             for field in ('tags','genres','aliases'):data[field]=list(dict.fromkeys([*data[field],*old.get(field,[])]))[:120]
             for field in ('sourceUrl','sourceURL','url','cover','description'):
                 if not data.get(field):data[field]=old.get(field,'')
@@ -147,7 +206,9 @@ def ingest(db,rows):
         search=normalize(' '.join([title,*data['aliases'],*data['titles'].values()]))[:5000]
         db.execute('INSERT OR REPLACE INTO content_titles VALUES(?,?,?,?,?)',(key,data['kind'],search,raw,int(time.time())))
         new_facts+=_index(db,key,data,current())
+        affected.add(work_key(data,key))
         count+=1
+    refresh_work_tags(db,affected)
     if new_facts:invalidate(db)
     return count
 
@@ -213,5 +274,6 @@ def reindex(db,policy):
     for identity,raw in title_rows(db):
         _index(db,identity,json.loads(raw),policy);count+=1
     db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('policy',?)",(policy.revision,))
+    rebuild_work_tags(db)
     invalidate(db)
     return count

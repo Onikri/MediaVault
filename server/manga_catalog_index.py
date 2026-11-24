@@ -21,6 +21,7 @@ from release_status import condition as status_condition, initialize_index as in
 
 FORMAT = {'manga', 'manhwa', 'manhua', 'webtoon','comic','rumanga'}
 LABEL_INDEX_REVISION='readable-labels-v1'
+WORK_TAG_INDEX_REVISION='work-tags-v1'
 
 def tag_key(value):
     return current().key(value)
@@ -47,6 +48,53 @@ def _url(row):
     if p.hostname in {'localhost', '127.0.0.1'} or p.hostname.endswith('.local'):
         return ''
     return value
+
+def _work_tag_triggers(conn):
+    conn.execute('''CREATE TRIGGER IF NOT EXISTS catalog_work_tags_add AFTER INSERT ON catalog_work_tags BEGIN
+        INSERT INTO catalog_tag_stats(category,tag_key,works) VALUES(NEW.category,NEW.tag_key,1)
+        ON CONFLICT(category,tag_key) DO UPDATE SET works=works+1;
+      END''')
+    conn.execute('''CREATE TRIGGER IF NOT EXISTS catalog_work_tags_remove AFTER DELETE ON catalog_work_tags BEGIN
+        UPDATE catalog_tag_stats SET works=works-1 WHERE category=OLD.category AND tag_key=OLD.tag_key;
+        DELETE FROM catalog_tag_stats WHERE category=OLD.category AND tag_key=OLD.tag_key AND works<=0;
+      END''')
+
+def initialize_work_tags(conn):
+    conn.executescript('''
+      CREATE TABLE IF NOT EXISTS catalog_work_tags(
+        work_key TEXT NOT NULL,category TEXT NOT NULL,tag_key TEXT NOT NULL,
+        PRIMARY KEY(work_key,category,tag_key)) WITHOUT ROWID;
+      CREATE INDEX IF NOT EXISTS catalog_work_tags_lookup ON catalog_work_tags(category,tag_key,work_key);
+      CREATE TABLE IF NOT EXISTS catalog_tag_stats(
+        category TEXT NOT NULL,tag_key TEXT NOT NULL,works INTEGER NOT NULL,
+        PRIMARY KEY(category,tag_key)) WITHOUT ROWID;
+    ''')
+    _work_tag_triggers(conn)
+
+def rebuild_work_tags(conn):
+    """Compile source-level tag facts into one indexed row per work and tag."""
+    conn.execute('DROP TRIGGER IF EXISTS catalog_work_tags_add')
+    conn.execute('DROP TRIGGER IF EXISTS catalog_work_tags_remove')
+    conn.execute('DELETE FROM catalog_work_tags');conn.execute('DELETE FROM catalog_tag_stats')
+    conn.execute('''INSERT OR IGNORE INTO catalog_work_tags(work_key,category,tag_key)
+                    SELECT t.work_key,g.category,g.tag_key FROM catalog_tags g
+                    JOIN catalog_titles t ON t.id=g.title_id WHERE length(t.work_key)>0''')
+    conn.execute('''INSERT INTO catalog_tag_stats(category,tag_key,works)
+                    SELECT category,tag_key,COUNT(*) FROM catalog_work_tags GROUP BY category,tag_key''')
+    _work_tag_triggers(conn)
+    conn.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('work-tag-index',?)",(WORK_TAG_INDEX_REVISION,))
+
+def refresh_work_tags(conn,work_keys):
+    keys=sorted({key for key in work_keys if key})
+    if not keys:return
+    # initialize() owns schema setup. executescript() commits implicitly in
+    # sqlite3, so calling it here would publish a crawler batch halfway
+    # through its transaction to concurrent catalogue readers.
+    marks=','.join('?' for _ in keys)
+    conn.execute('DELETE FROM catalog_work_tags WHERE work_key IN ('+marks+')',keys)
+    conn.execute('''INSERT OR IGNORE INTO catalog_work_tags(work_key,category,tag_key)
+                    SELECT t.work_key,g.category,g.tag_key FROM catalog_tags g
+                    JOIN catalog_titles t ON t.id=g.title_id WHERE t.work_key IN ('''+marks+')',keys)
 
 def initialize(conn):
     conn.create_function('catalog_normalize',1,normalize,deterministic=True)
@@ -83,20 +131,24 @@ def initialize(conn):
     with conn:conn.execute("UPDATE catalog_titles SET work_key=catalog_normalize(title) WHERE work_key=''")
     # Covers the per-work aggregates, so a page reads the index, not the rows.
     conn.execute('CREATE INDEX IF NOT EXISTS catalog_titles_works ON catalog_titles(work_key,year,chapter_count,first_seen)')
+    initialize_work_tags(conn)
     initialize_status_index(conn,table='catalog_titles',document='metadata',work='work_key')
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(conn)
     revision=conn.execute("SELECT value FROM catalog_policy_state WHERE name='revision'").fetchone()
     labels=conn.execute("SELECT value FROM catalog_policy_state WHERE name='label-index'").fetchone()
+    compiled=conn.execute("SELECT value FROM catalog_policy_state WHERE name='work-tag-index'").fetchone()
     if not revision or revision[0]!=current().revision or not labels or labels[0]!=LABEL_INDEX_REVISION:
         with conn:reindex(conn)
+    elif not compiled or compiled[0]!=WORK_TAG_INDEX_REVISION:
+        with conn:rebuild_work_tags(conn)
 
 def upsert(conn, rows, source_id='', timestamp=None):
     """Idempotent; weak search results never erase enriched source tags."""
     now = float(time.time() if timestamp is None else timestamp)
     count = 0
     from content_vocabulary import add,bump,host
-    vocabulary_added=0
+    vocabulary_added=0;affected=set()
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -106,8 +158,9 @@ def upsert(conn, rows, source_id='', timestamp=None):
         if not title or not provider or not url or row.get('kind', 'manga') != 'manga':
             continue
         identity = hashlib.sha256((provider + '\x00' + url).encode('utf-8')).hexdigest()[:32]
-        old = conn.execute('SELECT metadata,first_seen,inspected,tag_state,chapter_count FROM catalog_titles WHERE id=?',
+        old = conn.execute('SELECT metadata,first_seen,inspected,tag_state,chapter_count,work_key FROM catalog_titles WHERE id=?',
                            (identity,)).fetchone()
+        if old:affected.add(old[5])
         # The discovery worker may supply a partial metadata-only row.
         previous = json.loads(old[0]) if old else {}
         inspected = isinstance(row.get('episodes'), list) or row.get('metadataInspected') is True
@@ -166,6 +219,7 @@ def upsert(conn, rows, source_id='', timestamp=None):
             for label in facts[category]:
                 conn.execute('INSERT OR IGNORE INTO catalog_tag_facts VALUES(?,?,?)',(identity,category,label))
                 vocabulary_added+=add(conn,label,host(url),category,'manga')
+        work_key=normalize(title) or identity
         conn.execute('''INSERT INTO catalog_titles(
              id,provider,source_id,source_url,title,search_text,language,format,
              adult,year,chapter_count,tag_state,metadata,first_seen,updated,inspected,work_key)
@@ -179,21 +233,26 @@ def upsert(conn, rows, source_id='', timestamp=None):
              inspected=excluded.inspected,work_key=excluded.work_key''',
              (identity,provider,sid,url,title,search,lang,kind,adult,year,chapter_count,
               data['tagStatus'],clean_metadata,old[1] if old else now,now,
-              now if inspected else old[2] if old else 0,normalize(title) or identity))
+              now if inspected else old[2] if old else 0,work_key))
+        affected.add(work_key)
         conn.execute('DELETE FROM catalog_tags WHERE title_id=?',(identity,))
         policy=current();source=urlsplit(url).hostname or ''
+        from catalog_taxonomy import classify
         for category in ('tags','genres'):
             for (raw_label,) in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category)).fetchall():
                 label=readable_label(raw_label)
                 key = policy.identity(label,source) if policy.include_discovered else policy.key(label,source)
                 if not key:
                     continue
+                classified=classify(label,category,'manga',policy,source)
+                if not classified:continue
                 # Keep each original provider name; aliases for the same key can
                 # be recovered from the JSON metadata.
                 conn.execute('''INSERT OR IGNORE INTO catalog_tags(
                    title_id,category,tag_key,original) VALUES(?,?,?,?)''',
-                   (identity,{'tag':'tags','genre':'genres'}.get(policy.rules.get(key,{}).get('category'),category),key,label))
+                   (identity,classified[0],key,label))
         count += 1
+    refresh_work_tags(conn,affected)
     if vocabulary_added:bump(conn)
     return count
 
@@ -352,6 +411,7 @@ def reindex(conn,policy=None):
     for identity,raw in rows:
         count+=1
         row=json.loads(raw)
+        from catalog_taxonomy import classify
         for category in ('tags','genres'):
             if not conn.execute('SELECT 1 FROM catalog_tag_facts WHERE title_id=? AND category=? LIMIT 1',(identity,category)).fetchone():
                 for label in unique(row.get(category) or []):
@@ -364,13 +424,15 @@ def reindex(conn,policy=None):
             for label in facts:
                 added+=add(conn,label,source,category,'manga')
                 key=policy.identity(label,source) if policy.include_discovered else policy.key(label,source)
-                if key:conn.execute('INSERT OR IGNORE INTO catalog_tags VALUES(?,?,?,?)',(identity,{'tag':'tags','genre':'genres'}.get(policy.rules.get(key,{}).get('category'),category),key,label))
+                classified=classify(label,category,'manga',policy,source)
+                if key and classified:conn.execute('INSERT OR IGNORE INTO catalog_tags VALUES(?,?,?,?)',(identity,classified[0],key,label))
         row.update(raw_facts if policy.include_discovered else policy.facts(raw_facts,source))
         state='present' if row['tags'] or row['genres'] else 'not_provided_in_detail' if row.get('metadataChecked') else 'not_requested'
         row['tagStatus']=state
         conn.execute('UPDATE catalog_titles SET metadata=?,tag_state=? WHERE id=?',(json.dumps(row,ensure_ascii=False),state,identity))
     conn.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('revision',?)",(policy.revision,))
     conn.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('label-index',?)",(LABEL_INDEX_REVISION,))
+    rebuild_work_tags(conn)
     if added:bump(conn)
     return count
 
@@ -389,6 +451,22 @@ def _visibility(policy):
 
 def tags(conn, *, provider='', source_id='', limit=100, q='', **filters):
     policy=current()
+    limit=min(500,max(1,int(limit)))
+    global_scope=(not provider and not source_id and
+                  filters.get('language','all') in ('','all') and
+                  not filters.get('source_ids') and not filters.get('year') and
+                  not filters.get('age') and not filters.get('format') and
+                  not filters.get('readingMode'))
+    if global_scope:
+        needle=normalize(q);items=[]
+        for kind,key,count in conn.execute('SELECT category,tag_key,works FROM catalog_tag_stats ORDER BY works DESC,tag_key'):
+            if not policy.key(key):continue
+            label=policy.label(key,key)
+            aliases=policy.rules.get(key,{}).get('aliases',[])
+            if needle and needle not in normalize(' '.join([key,label,*aliases])):continue
+            items.append({'type':kind,'key':key,'original':label,'originalLabels':[label],'works':count})
+            if len(items)>=limit:break
+        return {'tags':items,'compiled':True}
     conn.create_function('catalog_tag_visible',2,_visibility(policy))
     conn.create_function('catalog_tag_label',1,policy.label)
     where,params = _conditions(provider=provider,source_id=source_id,**filters)
@@ -400,9 +478,10 @@ def tags(conn, *, provider='', source_id='', limit=100, q='', **filters):
     rows=conn.execute('''SELECT g.category,g.tag_key,MIN(g.original),COUNT(DISTINCT g.title_id),json_group_array(DISTINCT g.original)
                          FROM catalog_tags g JOIN catalog_titles t ON t.id=g.title_id'''+where+
                       ''' GROUP BY g.category,g.tag_key ORDER BY COUNT(DISTINCT g.title_id) DESC,g.tag_key LIMIT ?''',
-                      [*params,min(500,max(1,int(limit)))]).fetchall()
-    return {'tags':[{'type':kind,'key':key,'original':original,'originalLabels':json.loads(originals) if originals else [],'works':count}
-                    for kind,key,original,count,originals in rows if clean_label(original)]}
+                      [*params,limit]).fetchall()
+    return {'tags':[{'type':kind,'key':key,'original':policy.label(key,original),
+                     'originalLabels':[policy.label(key,original)],'works':count}
+                    for kind,key,original,count,_ in rows if clean_label(policy.label(key,original))]}
 
 # Facets read every tag row of the whole index and change slowly.
 # Each answer (about 80 KB per

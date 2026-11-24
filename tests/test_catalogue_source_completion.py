@@ -120,7 +120,7 @@ class CompletionTests(unittest.TestCase):
    worker=Indexer(store,lambda s,c:{'rows':[row],'next':None,'state':'partial','details':[detail]},lambda:1000,interval=0)
    with db:worker.enqueue({'type':'html','domain':'fixture.example','name':'Fixture','url':'https://fixture.example/catalog'})
    worker.run_once();status=worker.status()['sources'][0]
-   self.assertEqual(status['storedTitles'],1);self.assertEqual(status['pendingDetails'],1);self.assertEqual(status['status'],'enriching');db.close()
+   self.assertEqual(status['storedTitles'],1);self.assertEqual(status['pendingDetails'],0);self.assertEqual(status['status'],'partial');db.close()
 
  def test_remanga_uses_the_published_alternative_name_when_primary_name_is_empty(self):
   from manga_remanga import catalogue_page

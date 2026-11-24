@@ -3,8 +3,10 @@ from pathlib import Path
 import hashlib
 import json
 import os
+import re
 import threading
 import unicodedata
+from catalog_labels import readable_label
 
 MAX_BYTES=1_000_000
 _lock=threading.RLock()
@@ -15,6 +17,15 @@ _stamp=None
 def normalize(value):
     text=unicodedata.normalize('NFKC',str(value or '')).casefold().replace('ё','е')
     return ' '.join(''.join(c if c.isalnum() else ' ' for c in text).split())
+
+
+def discovered_identity(value):
+    """Collapse source counters and separator noise without changing real numbered tags."""
+    text=readable_label(value)
+    text=re.sub(r'\s*[\(\[\{]\s*\d{1,9}\s*[\)\]\}]\s*$','',text)
+    if len(re.findall(r'[^\W\d_]',text,re.UNICODE))>=3:
+        text=re.sub(r'(?:\s+|[\-_/|:]+)\d{1,9}\s*$','',text)
+    return normalize(text)
 
 
 def canonical_json(value):
@@ -79,13 +90,53 @@ class Policy:
                         token=(actual,normalize(alias))
                         if token in self.scoped and self.scoped[token]!=key:raise ValueError('Ambiguous source alias')
                         self.scoped[token]=key
-        from catalog_taxonomy import DATA
-        for genre in DATA['genres']:
-            labels=[genre['label'],genre['key'],*genre['aliases']]
-            key=next((self.aliases[normalize(v)] for v in labels if normalize(v) in self.aliases),normalize(genre['label']))
-            for label in labels:self.aliases.setdefault(normalize(label),key)
-        self.hidden.update(self.aliases.get(normalize(v),normalize(v)) for v in hidden)
-        self.revision=hashlib.sha256(canonical_json(self.data)).hexdigest()
+        from catalog_taxonomy import DATA,REVISION
+        self.redirects={}
+        def resolve(key):
+            seen=set()
+            while key in self.redirects and key not in seen:
+                seen.add(key);key=self.redirects[key]
+            return key
+        def group(row,category):
+            labels=[row['key'],row['label'],*row.get('aliases',[])]
+            candidates=list(dict.fromkeys(resolve(self.aliases[token]) for value in labels if (token:=normalize(value)) in self.aliases))
+            preferred=resolve(self.aliases.get(normalize(row['key'])) or (candidates[0] if candidates else normalize(row['label'])))
+            # The taxonomy groups entries admitted by the owner policy. It
+            # must not resurrect a tag that was deliberately removed. In the
+            # automatic-vocabulary mode a new canonical group is allowed.
+            if preferred not in self.rules and not self.include_discovered:return
+            if preferred not in self.rules:
+                self.rules[preferred]={'key':preferred,'label':row['label'],'aliases':[],'category':category}
+            for candidate in candidates:
+                if candidate!=preferred:self.redirects[candidate]=preferred
+            known={normalize(value) for value in labels}
+            base=dict(self.rules[preferred]);current=readable_label(base.get('label'))
+            # Preserve an intentional owner rename, but replace source synonyms
+            # such as «Преступность» with the one catalogue display label.
+            base['label']=row['label'] if normalize(current) in known else current or row['label']
+            base['key']=preferred;base['category']=base.get('category') or category
+            base['aliases']=list(dict.fromkeys([*base.get('aliases',[]),*labels]))[:120]
+            self.rules[preferred]=base
+            for label in labels:self.aliases[normalize(label)]=preferred
+        for genre in DATA['genres']:group(genre,'genre')
+        for row in DATA.get('tagGroups',[]):group(row,row.get('category','tag'))
+        self.aliases={token:resolve(key) for token,key in self.aliases.items()}
+        self.scoped={token:resolve(key) for token,key in self.scoped.items()}
+        merged={};expanded={}
+        for old,row in self.rules.items():
+            key=resolve(old);canonical=self.rules.get(key,row)
+            target=merged.setdefault(key,{'key':key,'label':readable_label(canonical.get('label')) or key,'aliases':[],**({'category':canonical['category']} if canonical.get('category') else {})})
+            # Keep provider spellings ahead of internal canonical keys. Query
+            # adapters prefer the first Latin alias when talking upstream.
+            target['aliases']=list(dict.fromkeys([*target['aliases'],readable_label(row.get('label')),*row.get('aliases',[]),old]))[:120]
+            if row.get('category') and not target.get('category'):target['category']=row['category']
+            for domain,values in self.expanded.get(old,{}).items():
+                bucket=expanded.setdefault(key,{}).setdefault(domain,[])
+                bucket.extend(value for value in values if value not in bucket)
+        self.rules=merged;self.expanded=expanded
+        self.hidden.update(self.aliases.get(normalize(v),discovered_identity(v)) for v in hidden)
+        self.hidden={resolve(key) for key in self.hidden}
+        self.revision=hashlib.sha256(canonical_json({'policy':self.data,'taxonomy':REVISION})).hexdigest()
 
     def clean(self,value):
         if not isinstance(value,str):return ''
@@ -108,9 +159,9 @@ class Policy:
     def identity(self,value,source=''):
         token=(value,source)
         if token not in self._identities:
-            norm=normalize(value)
+            norm=normalize(value);fallback=discovered_identity(value)
             if len(self._identities)>100000:self._identities.clear()
-            self._identities[token]=self.scoped.get((source,norm)) or self.aliases.get(norm) or norm
+            self._identities[token]=self.scoped.get((source,norm)) or self.aliases.get(norm) or self.aliases.get(fallback) or fallback
         return self._identities[token]
 
     def label(self,key,fallback=''):

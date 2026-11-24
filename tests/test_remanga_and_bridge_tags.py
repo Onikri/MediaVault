@@ -149,8 +149,7 @@ class CrawlerRouteTests(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT error FROM catalogue_jobs WHERE state='retry'").fetchall(),[],'the filtered page was fetched')
         found=browse(self.db,genre='Драма')['items']
         self.assertEqual([r['title'] for r in found],['Отмеченная история'],'a filtered listing labels its titles')
-        detail=json.loads(self.db.execute("SELECT spec FROM catalogue_jobs WHERE kind='bridge-detail'").fetchone()[0])
-        self.assertNotIn('term',detail)
+        self.assertIsNone(self.db.execute("SELECT spec FROM catalogue_jobs WHERE kind='bridge-detail'").fetchone())
 
     def test_remanga_replaces_the_captcha_html_listing(self):
         from manga_source_coverage import SOURCES

@@ -105,6 +105,12 @@ def keys(value,policy,allow_hidden=False):
     from manga_tag_policy import normalize
     return sorted({key for v in labels for key in (policy.identity(v),normalize(v))})
 
+def compiled_work_tags(db,manga=False):
+    table='catalog_policy_state' if manga else 'content_catalog_state'
+    try:row=db.execute("SELECT value FROM "+table+" WHERE name='work-tag-index'").fetchone()
+    except Exception:return False
+    return bool(row and row[0]=='work-tags-v1')
+
 def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False):
     from manga_tag_policy import current
     policy=current()
@@ -123,13 +129,17 @@ def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False)
         if not wanted:
             if not negative:result.append('0')
             continue
+        compiled=compiled_work_tags(db,manga)
+        query_args=[]
         if manga:
             work='t.work_key'
-            query='SELECT peer.work_key FROM catalog_tags x JOIN catalog_titles peer ON peer.id=x.title_id WHERE '
+            if compiled:query='SELECT x.work_key FROM catalog_work_tags x WHERE x.category=? AND ';query_args=[field]
+            else:query='SELECT peer.work_key FROM catalog_tags x JOIN catalog_titles peer ON peer.id=x.title_id WHERE '
         else:
             from content_catalog import work_sql
             work=work_sql('t')
-            query='SELECT '+work_sql('peer')+' FROM content_tags x JOIN content_titles peer ON peer.id=x.title_id WHERE '
+            if compiled:query='SELECT x.work_key FROM content_work_tags x WHERE x.kind=? AND x.category=? AND ';query_args=[kind,field]
+            else:query='SELECT '+work_sql('peer')+' FROM content_tags x JOIN content_titles peer ON peer.id=x.title_id WHERE '
         # Resolve each signed set once from the tag index, not once per title.
         query+='x.tag_key IN ('+','.join('?' for _ in wanted)+')'
         if field=='genres' and any(is_hentai(k,policy) for k in wanted):
@@ -137,9 +147,10 @@ def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False)
             hentai_query,hentai_args=hentai_work_set(policy,manga)
             if ordinary:
                 query=query[:query.index('x.tag_key IN (')]+'x.tag_key IN ('+','.join('?' for _ in ordinary)+') UNION '+hentai_query
-                wanted=[*ordinary,*hentai_args]
-            else:query=hentai_query;wanted=hentai_args
-        result.append(work+(' NOT IN (' if negative else ' IN (')+query+')');params.extend(wanted)
+                query_args.extend([*ordinary,*hentai_args])
+            else:query=hentai_query;query_args=list(hentai_args)
+        else:query_args.extend(wanted)
+        result.append(work+(' NOT IN (' if negative else ' IN (')+query+')');params.extend(query_args)
     return result,params
 
 def format_label(value,kind):

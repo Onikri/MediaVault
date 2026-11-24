@@ -65,7 +65,7 @@ class IndexTests(unittest.TestCase):
   specs=[json.loads(r[0]) for r in self.db.execute("SELECT spec FROM catalogue_jobs WHERE kind='html'")]
   self.assertEqual([s['url'] for s in specs if s['domain']=='hentaichan.cc'],['https://hentaichan.cc/catalog'])
  def test_full_listing_is_not_complete_until_detail_tags_are_enriched_and_unhidden(self):
-  spec={'type':'html','domain':'hentaichan.cc','name':'HentaiChan.cc','url':'https://hentaichan.cc/catalog','hosts':['hentaichan.cc']}
+  spec={'type':'html','domain':'hentaichan.cc','name':'HentaiChan.cc','url':'https://hentaichan.cc/catalog','hosts':['hentaichan.cc'],'eagerDetails':True}
   row=catalogue_page(listing(1,1),spec['url'],1)['rows'][0]
   upsert(self.db,[{**row,'description':'Legacy cached summary','sourceMetadataVersion':1,'metadataInspected':True}]);self.db.commit()
   def fetch(s,c):return {'rows':[{**row,'tags':['Кимоно','Экология'],'sourceMetadataVersion':2,'metadataInspected':True}],'next':None} if s['type']=='html-detail' else {'rows':[row],'next':None,'state':'done','total':1,'details':[{**spec,'type':'html-detail','url':row['url'],'row':row}]}

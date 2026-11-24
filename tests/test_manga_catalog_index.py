@@ -44,6 +44,9 @@ class CatalogIndexTests(unittest.TestCase):
         self.assertEqual(browse(self.db,genre='романтика',format='manhwa')['total'],1)
         self.assertEqual(browse(self.db,genre='романтика',format='manga')['total'],0)
         self.assertEqual(tags(self.db)['tags'][0]['works'],1)
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM catalog_work_tags').fetchone()[0],3)
+        plan=' '.join(str(part) for row in self.db.execute("EXPLAIN QUERY PLAN SELECT work_key FROM catalog_work_tags WHERE category='genres' AND tag_key='фэнтези'") for part in row)
+        self.assertIn('catalog_work_tags_lookup',plan)
 
     def test_detail_preserved_after_search_without_tags(self):
         original=self.work()
@@ -72,6 +75,7 @@ class CatalogIndexTests(unittest.TestCase):
         self.assertEqual(browse(self.db,provider='hmanga')['total'],1)
         self.assertEqual(browse(self.db,genre='фэнтези')['total'],2)
         self.assertEqual(tags(self.db,source_id='990000000000000003')['tags'][0]['works'],2)
+        self.assertEqual(next(row['works'] for row in tags(self.db)['tags'] if row['key']=='фэнтези'),1)
 
     def test_missing_taxonomy_is_not_invented_and_bad_url_ignored(self):
         row=self.work()
@@ -174,7 +178,7 @@ class CatalogIndexTests(unittest.TestCase):
         upsert(self.db,[{**self.work(),'tags':['Comedy','Time Travel'],'metadataInspected':True}])
         facet=tags(self.db,q='TRAVEL',limit=1)['tags']
         self.assertEqual(len(facet),1)
-        self.assertEqual(facet[0]['original'],'Time Travel')
+        self.assertEqual(facet[0]['original'],'Путешествия во времени')
         self.assertTrue(browse(self.db)['items'][0]['metadataChecked'])
         self.assertIsNone(browse(self.db)['items'][0]['chapterCount'])
 
