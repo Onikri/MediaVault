@@ -20,8 +20,9 @@ LIVE = ('search', 'catalogue', 'metadata', 'chapters', 'pages')
 # manga_discovery searches them with the owner's Lib session or their own
 # dedicated search modules. MangaDex profiles activate normally: an activated
 # profile still falls back to the Russian alias resolution in its search.
+# YaoiChan was removed by the owner (manga_source_coverage.REMOVED_DOMAINS).
 HOLD_NAMES = frozenset({'MangaLib', 'HentaiLib', 'SlashLib', 'Senkognito', 'HentaiChan', 'HenChan',
-                        'HentaiChan.cc', 'Hitomi', 'HManga', 'ReManga', 'Remanga'})
+                        'HentaiChan.cc', 'Hitomi', 'HManga', 'ReManga', 'Remanga', 'YaoiChan'})
 
 
 def main():
