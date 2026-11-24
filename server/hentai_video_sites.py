@@ -128,6 +128,16 @@ def _hanime1_cards(soup, base):
         image = card.select_one('img')
         cover = _url(image.get('src') if image else '', base, ('vdownload.hembed.com',)) if image else ''
         found.setdefault(url, (url, title, cover))
+    # Anime genre listings (裏番) show a poster grid: the whole card is the link.
+    for card in soup.select('a[href*="watch?v="] > div.home-rows-videos-div'):
+        url = _url(card.parent.get('href'), base, ('hanime1.me',))
+        heading = card.select_one('.home-rows-videos-title')
+        title = clean(heading.get_text(' ', strip=True)) if heading else ''
+        if not url or not provider_for(url) or not title:
+            continue
+        image = card.select_one('img')
+        cover = _url(image.get('src'), base, ('vdownload.hembed.com',)) if image else ''
+        found.setdefault(url, (url, title, cover))
     return list(found.values())
 
 
@@ -138,16 +148,24 @@ def _latin(text):
 
 def hanime1_search(query, http):
     text, final, _ = http.document(HANIME1 + '/search?' + urlencode({'query': query}))
+    groups = hanime1_groups(_hanime1_cards(BeautifulSoup(text, 'html.parser'), final))
+    return [hanime1_row(items) for items in list(groups.values())[:MAX_RESULTS]]
+
+
+def hanime1_groups(cards):
+    """(url, title, cover) cards as series in listing order, lowest episode first."""
     groups = {}
-    for url, title, cover in _hanime1_cards(BeautifulSoup(text, 'html.parser'), final):
-        name = _series(title)
-        groups.setdefault(_key(title), []).append((_number(title) or 1, url, name, cover))
-    results = []
-    for items in list(groups.values())[:MAX_RESULTS]:
+    for url, title, cover in cards:
+        groups.setdefault(_key(title), []).append((_number(title) or 1, url, _series(title), cover))
+    for items in groups.values():
         items.sort()
-        _, url, name, cover = items[0]
-        results.append(_row('hanime1', url, name, [_latin(name)], cover, len(items)))
-    return results
+    return groups
+
+
+def hanime1_row(items):
+    """The search result of one series; it opens at its lowest episode."""
+    _, url, name, cover = items[0]
+    return _row('hanime1', url, name, [_latin(name)], cover, len(items))
 
 
 def hanime1_episodes(url, http):

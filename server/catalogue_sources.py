@@ -70,6 +70,8 @@ def base_sources(installed):
     jobs.append({'type':'books','kind':'book','domain':'openlibrary.org','name':'Книги · Open Library'})
     # The whole HanimeTV catalogue is one cached feed: one request per crawl.
     jobs.append({'type':'hanime','kind':'anime','domain':'hanime.tv','name':'Хентай · HanimeTV'})
+    # hanime1.me pages its whole listing; page 1 also queues its genre routes.
+    jobs.append({'type':'hanime1','kind':'anime','domain':'hanime1.me','name':'Хентай · Hanime1'})
     return jobs
 
 def headers(spec):
@@ -122,6 +124,9 @@ def fetch(spec,cursor):
     if kind=='hanime':
         from catalogue_hanime import catalogue
         return catalogue(cursor)
+    if kind=='hanime1':
+        from catalogue_hanime1 import catalogue
+        return catalogue(spec,cursor)
     if kind in {'lib','lib-detail','lib-vocabulary'}:
         with httpx.Client(http2=True,timeout=15,headers=headers(spec)) as client:
             root='https://api.cdnrulib.link';hosts={'api.cdnrulib.link'}
