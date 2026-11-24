@@ -51,6 +51,6 @@ export default function LmtSettings({value,onChange,backendStatus,onClearCache,o
   {!visual&&<label>Переводить заранее<UiSelect aria-label="Переводить заранее" value={v.prefetch} onChange={e=>set({prefetch:Number(e.target.value)})}>{[0,1,2,4,9].map(n=><option key={n} value={n}>{n?n+' стр. вперёд':'Только текущая страница'}</option>)}</UiSelect></label>}
   <h4 className="reader-settings-category">Модели и кэш</h4><ReaderModelStorage config={v}/>
   <label className="reader-checkbox"><UiSwitch checked={v.cache} onChange={e=>set({cache:e.target.checked})}/>Сохранять готовый перевод на устройстве</label><p className="reader-hint">Зашифрованный кэш для этого профиля и библиотеки: перевод до 1000 записей / 256 МБ; исходники главы и подготовленные фоны — до 1 ГБ. В памяти хранится буфер из девяти страниц. Повторное открытие не запускает модели. Изменение моделей создаёт новый вариант.</p><button type="button" onClick={onClearCache}>Очистить кэш перевода</button>
-  <a href="./lmt/upstream/LICENSE" target="_blank" rel="noopener noreferrer">AGPL-3.0 · лицензия</a> · <a href="https://github.com/Onikri/MediaVault/tree/main" target="_blank" rel="noopener noreferrer">Исходники</a>
+  <p className="reader-legal"><a href="./lmt/upstream/LICENSE" target="_blank" rel="noopener noreferrer">AGPL-3.0 · лицензия</a> · <a href="https://github.com/Onikri/MediaVault/tree/main" target="_blank" rel="noopener noreferrer">Исходники</a></p>
  </section>;
 }

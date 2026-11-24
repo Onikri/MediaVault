@@ -1,7 +1,7 @@
-import ReaderPageTrack from './ReaderPageTrack.jsx';
+import ReaderDock from './ReaderDock.jsx';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
+import {AnimatePresence,motion,useDragControls,useReducedMotion} from 'motion/react';
 import {ArrowLeft,ChevronDown,ChevronLeft,ChevronRight,ChevronUp,Settings2,Maximize,Minimize,Minimize2,List,Grid2X2,X,Ellipsis} from 'lucide-react';
 import {showShortcuts} from './ShortcutSheet.jsx';
 import {isHelpKey} from './reader-keys.js';
@@ -10,6 +10,7 @@ import './reader-morph.css';
 import './reader-rail.css';
 import './reader-status.css';
 import './reader-chrome.css';
+import './reader-skin.css';
 
 const ZONES_SEEN='mv_reader_zones_v1';
 const sheetSpring={type:'spring',stiffness:380,damping:38,mass:.9};
@@ -42,7 +43,7 @@ function readerKeySheet(m){
  groups.get('Экран').push(['F','Полный экран'],['Esc',m.rail?'Свернуть читалку':'Скрыть панели или закрыть'],['?','Эта подсказка']);
  return [...groups.entries()];
 }
-export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='vertical',navigationDirection='reading',chapterControl,gesturesEnabled=true,layout='overlay',dock=null,onMinimize,navigationLabels,pagePreview,statusWide=false,onStep,zoneGuide=0,keys=[],shortcutTitle='Читалка'}){
+export default function ReaderShell({readerRef,title,subtitle,onClose,children,settings,settingsOpen=false,onSettingsOpenChange,contents,previews,actions,progress,onPage,onPrevious,onNext,canPrevious=true,canNext=true,paged=true,direction='ltr',theme='dark',inline=false,embedded=false,className='',chromeWidth=1200,status,debug,readingMode,onReadingMode,progressOrientation='vertical',navigationDirection='reading',chapterControl,gesturesEnabled=true,layout='overlay',dock=null,onMinimize,navigationLabels,pagePreview,statusWide=false,onStep,zoneGuide=0,keys=[],shortcutTitle='Читалка',chapterLabel,primaryAction}){
  const local=useRef(null),root=readerRef||local,timer=useRef(null),gesture=useRef(null),methods=useRef({}),stage=useRef(null);
  const rail=layout==='rail',reduce=useReducedMotion();
  const [visible,setVisible]=useState(false),[panel,setPanel]=useState(''),[full,setFull]=useState(false),[fullscreenError,setFullscreenError]=useState(''),[zone,setZone]=useState(''),[guide,setGuide]=useState(false),[sheet,setSheet]=useState(false),[portal,setPortal]=useState(null),[more,setMore]=useState(false);
@@ -115,6 +116,7 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
  const sideEnabled=side=>paged?(side===forwardSide?canNext:canPrevious):true;
  // Text readers keep their full-window panel; the manga reader's panel slides out of the reader itself.
  const container=rail?(full?root.current:typeof document==='undefined'?null:document.body):portal;
+ const drag=useDragControls(),pop=!rail&&!sheet;
  const panelTitle={settings:'Настройки читалки',contents:'Главы и тома',previews:'Страницы главы'}[shownPanel.current]||'Читалка';
  return <section id="viewer" ref={root} tabIndex={-1} className={'mv-viewer immersive-reader'+(progressOrientation==='vertical'?' reader-vertical-tools':'')+' reader-theme-'+theme+' '+className+(inline?' mv-viewer-inline':'')+(embedded?' reader-embedded':'')+(full?' is-fullscreen':'')} style={{'--reader-chrome-width':Math.max(320,Math.min(1800,Number(chromeWidth)||1200))+'px'}} data-chrome={rail||visible||!!activePanel} data-layout={layout} data-panel={activePanel||undefined} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={title}>
   <div ref={stage} className="immersive-stage" onPointerDown={pointerDown} onPointerUp={pointerUp} onPointerCancel={()=>gesture.current=null} onPointerMove={pointerMove} onPointerLeave={()=>setZone('')}>{children}</div>
@@ -148,16 +150,12 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
   <AnimatePresence>{guide&&<motion.div key="guide" className={'reader-zone-guide '+(paged?'is-paged':'is-scroll')} aria-hidden="true" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={{duration:reduce?0:.28}}>
    {(paged?['left','center','right']:['top','center','bottom']).map((side,index)=>{const Icon=zoneIcon[side];return <motion.div key={side} data-zone={side} initial={reduce?{opacity:0}:{opacity:0,scale:.96}} animate={{opacity:1,scale:1}} transition={reduce?{duration:0}:{delay:.06*index,type:'spring',stiffness:300,damping:30}}><span>{Icon&&<Icon size={22}/>}<strong>{labels[side]}</strong>{side==='center'&&<small>Касание по центру</small>}</span></motion.div>;})}
   </motion.div>}</AnimatePresence>
-  <div className="reader-chrome reader-top" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
-   <button className="reader-control" aria-label="Закрыть просмотр" title="Закрыть" onClick={onClose}><ArrowLeft size={20}/></button>
-   <div className="reader-title-group"><div className="mv-viewer-title"><strong>{title}</strong></div>{chapterControl}</div>
-   <div className="reader-top-actions">{previews&&<button className="reader-control" aria-label="Превью страниц" title="Страницы главы" onClick={()=>openPanel('previews')}><Grid2X2 size={19}/></button>}{contents&&<button className="reader-control" aria-label="Главы и тома" title="Главы и тома" onClick={()=>openPanel('contents')}><List size={20}/></button>}{actions}<button className="reader-control reader-fullscreen" aria-label={full?'Выйти из полного экрана':'На весь экран'} title={full?'Выйти из полного экрана':'На весь экран'} onClick={fullscreen}>{full?<Minimize size={19}/>:<Maximize size={19}/>}</button>{settings&&<button className="reader-control" aria-label="Настройки читалки" title="Настройки читалки" aria-expanded={settingsOpen} onClick={()=>openPanel('settings')}><Settings2 size={20}/></button>}</div>
-  </div>
-  <nav className="reader-chrome reader-pager" aria-label="Страницы главы" inert={!visible&&!activePanel} onPointerEnter={()=>clearTimeout(timer.current)} onPointerLeave={show} onFocusCapture={()=>clearTimeout(timer.current)} onBlurCapture={show}>
-   <button className="reader-control" aria-label="Назад" title="Предыдущая страница" disabled={!canPrevious} onClick={onPrevious}><ChevronUp size={22}/></button>
-   {onPage&&progress?.total>1?<ReaderPageTrack progress={progress} onPage={onPage} orientation="vertical" chapter={title} preview={pagePreview}/>:<span className="reader-page-count" aria-live="polite"><strong>{progress?.current||0}</strong>{' '}<small>из {progress?.total||0}</small></span>}
-   <button className="reader-control" aria-label="Вперёд" title="Следующая страница" disabled={!canNext} onClick={onNext}><ChevronDown size={22}/></button>
-  </nav>
+  <ReaderDock title={title} chapterLabel={chapterLabel} full={full} embedded={embedded} vertical={readingMode==='scroll'} compact={sheet} visible={visible} activePanel={activePanel}
+   onClose={onClose} onFullscreen={fullscreen} onExitFullscreen={()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}}
+   progress={progress} onPage={onPage} preview={pagePreview} flip={readingMode!=='scroll'&&navigation==='rtl'}
+   onPrevious={onPrevious} onNext={onNext} canPrevious={canPrevious} canNext={canNext}
+   onChapters={contents?()=>activePanel==='contents'?closePanel():openPanel('contents'):undefined} onSettings={settings?()=>activePanel==='settings'?closePanel():openPanel('settings'):undefined} onPreviews={previews?()=>openPanel('previews'):undefined}
+   translate={primaryAction} actions={actions} keepOpen={()=>clearTimeout(timer.current)} release={show}/>
   {fullscreenError&&<small className="reader-fullscreen-note" role="status">{fullscreenError}</small>}
   {/* Page status lives in its own floating chip, never inside the page track. */}
   <AnimatePresence>{status&&<motion.div key="status" className={'reader-status-dock'+(statusWide?' is-wide':'')} layout={!reduce} initial={{opacity:0,y:10,scale:.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:8,scale:.97,transition:{duration:.16}}} transition={reduce?{duration:0}:{type:'spring',stiffness:420,damping:34}}>{status}</motion.div>}</AnimatePresence>
@@ -167,8 +165,11 @@ export default function ReaderShell({readerRef,title,subtitle,onClose,children,s
    <AnimatePresence>{activePanel&&container&&<Dialog.Portal forceMount container={container}>
     <Dialog.Overlay asChild forceMount><motion.div className="reader-panel-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={{duration:reduce?0:.22}}/></Dialog.Overlay>
     <Dialog.Content asChild forceMount data-reader-panel onCloseAutoFocus={e=>{e.preventDefault();root.current?.focus({preventScroll:true});}}>
-     <motion.div className={'reader-panel reader-panel-'+shownPanel.current+(sheet?' is-sheet':'')} initial={reduce?{opacity:0}:sheet?{y:'104%'}:{x:'calc(100% + 28px)'}} animate={reduce?{opacity:1}:sheet?{y:0}:{x:0}} exit={reduce?{opacity:0}:sheet?{y:'104%'}:{x:'calc(100% + 28px)'}} transition={reduce?{duration:.12}:sheetSpring}>
-      <header><Dialog.Title>{panelTitle}</Dialog.Title><Dialog.Close className="reader-control" aria-label={shownPanel.current==='settings'?'Закрыть настройки читалки':'Закрыть панель читалки'}><X size={20}/></Dialog.Close></header>
+     <motion.div className={'reader-panel reader-panel-'+shownPanel.current+(sheet?' is-sheet':pop?' is-pop'+(readingMode==='scroll'?' is-side':'')+(full?' is-full':''):'')} initial={reduce?{opacity:0}:sheet?{y:'104%'}:pop?{opacity:0,scale:.96,y:-6}:{x:'calc(100% + 28px)'}} animate={reduce?{opacity:1}:sheet?{y:0}:pop?{opacity:1,scale:1,y:0}:{x:0}} exit={reduce?{opacity:0}:sheet?{y:'104%'}:pop?{opacity:0,scale:.97,y:-4,transition:{duration:.14}}:{x:'calc(100% + 28px)'}} transition={reduce?{duration:.12}:pop?{duration:.2,ease:[.22,1,.36,1]}:sheetSpring}
+      drag={sheet?'y':false} dragListener={false} dragControls={drag} dragConstraints={{top:0,bottom:0}} dragElastic={{top:0,bottom:.7}} onDragEnd={(_,info)=>{if(info.offset.y>110||info.velocity.y>600)closePanel();}}>
+      {/* Phones: pull the sheet down by its handle (or tap outside) to close it. */}
+      {sheet&&<div className="reader-sheet-grip" onPointerDown={event=>drag.start(event)} aria-hidden="true"><i/></div>}
+      <header onPointerDown={event=>{if(sheet&&!event.target.closest('button,a,input,select,[role=tab]'))drag.start(event);}}><Dialog.Title className={shownPanel.current==='settings'?'sr-only':undefined}>{panelTitle}</Dialog.Title><Dialog.Close className="reader-control" aria-label={shownPanel.current==='settings'?'Закрыть настройки читалки':'Закрыть панель читалки'}><X size={20}/></Dialog.Close></header>
       <Dialog.Description className="sr-only">Настройки и навигация. Закрой панель, чтобы вернуться к чтению.</Dialog.Description>
       <div className="reader-panel-body" onClick={e=>{if(shownPanel.current!=='settings'&&e.target.closest('button'))closePanel();}}>{shownPanel.current==='settings'?settings:shownPanel.current==='contents'?contents:previews}</div>
      </motion.div>

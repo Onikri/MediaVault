@@ -1,0 +1,356 @@
+/* The readers in the site language («Рельс», «Лента», Пульт): glass without
+   outlines, tone-only separation, one lit pill for the choice, kickers over
+   display headings. Layout and behaviour stay in the other reader sheets;
+   this file only dresses them. Ruby by default, white in Нуар. */
+.immersive-reader,.reader-panel{
+  --rs-glass:rgb(18 10 14 / .8);
+  --rs-panel:rgb(22 20 25 / .95);
+  --rs-tone:rgba(255,255,255,.055);
+  --rs-tone-hover:rgba(255,255,255,.09);
+  --rs-quiet:#8b8790;
+  --rs-ink:#f4f4f5;
+  --rs-kicker:#fb7185;
+  --rs-soft:rgb(225 29 72 / .2);
+  --rs-soft-ink:#fda4af;
+  --rs-lit:linear-gradient(to bottom,rgb(244 63 94 / .94),rgb(190 18 60 / .88));
+  --rs-lit-ink:#fff;
+  --rs-lit-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 10px 26px -10px rgba(225,29,72,.75);
+  --rs-ease:cubic-bezier(.22,1,.36,1);
+}
+html[data-theme='noir'] :is(.immersive-reader,.reader-panel){
+  --rs-glass:rgb(0 0 0 / .82);--rs-panel:rgb(10 10 12 / .96);--rs-kicker:#fff;--rs-soft:rgba(255,255,255,.14);--rs-soft-ink:#fff;
+  --rs-lit:#fff;--rs-lit-ink:#000;--rs-lit-shadow:0 10px 26px -12px rgba(255,255,255,.45);
+}
+
+/* Top bar and page column: the same glass as the stuck library toolbar. */
+html .immersive-reader[data-layout] .reader-chrome.reader-top,
+html .immersive-reader[data-layout]>.reader-chrome.reader-pager{border:0;background:var(--rs-glass);-webkit-backdrop-filter:blur(28px) saturate(1.5);backdrop-filter:blur(28px) saturate(1.5);box-shadow:0 26px 60px -24px rgba(0,0,0,.95)}
+html .immersive-reader[data-layout][data-chrome] .reader-top{border-radius:22px;padding:6px 8px 6px 6px}
+html .immersive-reader[data-layout] .reader-top .mv-viewer-title strong{font:700 15px/1.2 var(--font-display,inherit);letter-spacing:-.015em;color:var(--rs-ink)}
+
+/* Icon buttons: quiet until touched, the pressed one glows softly. */
+html .immersive-reader[data-layout] .reader-chrome .reader-control{border:0;border-radius:13px;background:transparent;box-shadow:none;color:#a1a1aa;transition:background-color .25s var(--rs-ease),color .25s,transform .25s var(--rs-ease)}
+html .immersive-reader[data-layout] .reader-chrome .reader-control:hover:not(:disabled){background:var(--rs-tone-hover);color:#fff}
+html .immersive-reader[data-layout] .reader-chrome .reader-control:active:not(:disabled){transform:scale(.92)}
+html .immersive-reader[data-layout] .reader-chrome .reader-control:disabled{opacity:.3}
+html .immersive-reader[data-layout] .reader-chrome .reader-control:focus-visible{outline:none;background:var(--rs-tone-hover);color:#fff}
+html .immersive-reader[data-layout][data-chrome] .reader-chrome .reader-control[aria-pressed=true]{background:var(--rs-soft);color:var(--rs-soft-ink)}
+
+/* Chapter jump in the bar: a tone capsule, not a framed select. */
+html .immersive-reader[data-layout] .reader-top .reader-chapter-menu .mv-select-trigger{min-height:36px;border:0;border-radius:12px;background:var(--rs-tone);box-shadow:none;color:var(--rs-ink);font:600 13px/1 var(--font-display,inherit);transition:background-color .25s}
+html .immersive-reader[data-layout] .reader-top .reader-chapter-menu .mv-select-trigger:hover{background:var(--rs-tone-hover)}
+
+/* Page column: display numerals, the title colour fill and a white pill for «you are here». */
+html .immersive-reader[data-layout]>.reader-chrome.reader-pager{border-radius:24px}
+.immersive-reader .reader-page-count strong{font:800 19px/1 var(--font-display,inherit);letter-spacing:-.04em;color:var(--rs-ink)}
+.immersive-reader .reader-page-count small{font:500 10.5px/1.2 var(--font-ui,inherit);color:var(--rs-quiet)}
+.immersive-reader .reader-page-groove{background:rgba(255,255,255,.08)}
+.immersive-reader .reader-page-thumb{background:#fff;box-shadow:0 0 0 4px var(--rs-soft),0 4px 14px -2px rgba(225,29,72,.6)}
+html[data-theme='noir'] .immersive-reader .reader-page-thumb{box-shadow:0 0 0 4px rgba(255,255,255,.18),0 4px 14px -2px rgba(0,0,0,.8)}
+.immersive-reader .reader-page-preview-frame{border-radius:14px;box-shadow:0 26px 60px -20px #000}
+.immersive-reader .reader-page-hint{background:var(--rs-glass);font-weight:600}
+
+/* What a click on the edge does: a glass chip. */
+.immersive-reader .reader-zone-hover{background:rgb(255 255 255 / .025)}
+.immersive-reader .reader-zone-hover>span{padding:12px 16px;border-radius:18px;background:var(--rs-glass);-webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4);box-shadow:0 20px 50px -20px #000}
+.immersive-reader .reader-zone-hover small{font:600 12px/1.2 var(--font-ui,inherit)}
+.immersive-reader .reader-zone-guide>div{border-radius:22px;background:rgba(255,255,255,.06)}
+.immersive-reader .reader-zone-guide>div[data-zone=center]{background:var(--rs-soft)}
+.immersive-reader .reader-status-dock{border:0;background:var(--rs-glass);-webkit-backdrop-filter:blur(28px) saturate(1.5);backdrop-filter:blur(28px) saturate(1.5);box-shadow:0 22px 50px -22px #000}
+
+/* Panels: the filter drawer of the library. */
+html .reader-panel-backdrop.reader-panel-backdrop{background:rgb(5 5 7 / .58);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+html .reader-panel.reader-panel.reader-panel{border:0;border-radius:24px;background:var(--rs-panel);-webkit-backdrop-filter:blur(28px) saturate(1.4);backdrop-filter:blur(28px) saturate(1.4);box-shadow:0 30px 80px -24px rgba(0,0,0,.85);color:var(--rs-ink)}
+html .reader-panel.reader-panel.reader-panel>header{align-items:flex-start;padding:22px 16px 12px 26px;border:0}
+html .reader-panel.reader-panel.reader-panel h2{margin:4px 0 0;font:800 28px/1.1 var(--font-display,inherit);letter-spacing:-.025em}
+html .reader-panel.reader-panel.reader-panel>header .reader-control{border:0;border-radius:13px;background:var(--rs-tone);color:#d4d4d8;transition:background-color .25s,color .25s}
+html .reader-panel.reader-panel.reader-panel>header .reader-control:hover{background:var(--rs-tone-hover);color:#fff}
+/* Settings carry no heading: the tabs say where you are, the close button sits beside them. */
+html .reader-panel.reader-panel.reader-panel-settings>header{position:absolute;top:0;right:0;z-index:2;padding:14px 14px 0 0}
+html .reader-panel.reader-panel.reader-panel-settings .reader-panel-body{padding-top:16px}
+html .reader-panel.reader-panel.reader-panel-settings .reader-settings-tabs{margin-inline:0 54px}
+/* Phones: a bottom sheet with a handle; tap outside or pull it down to close. */
+.reader-sheet-grip{display:flex;justify-content:center;padding:10px 0 4px;cursor:grab;touch-action:none}
+.reader-sheet-grip:active{cursor:grabbing}
+.reader-sheet-grip>i{display:block;width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.22);transition:width .3s var(--rs-ease),background-color .3s}
+.reader-sheet-grip:hover>i,.reader-sheet-grip:active>i{width:56px;background:rgba(255,255,255,.4)}
+html .reader-panel.reader-panel.is-sheet{border-radius:26px 26px 22px 22px;touch-action:auto}
+html .reader-panel.reader-panel.is-sheet>header{position:static;padding:2px 22px 8px;touch-action:none}
+html .reader-panel.reader-panel.is-sheet>header .reader-control{position:absolute;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+html .reader-panel.reader-panel.reader-panel-settings.is-sheet>header{padding:0}
+html .reader-panel.reader-panel.reader-panel-settings.is-sheet .reader-panel-body{padding-top:6px}
+html .reader-panel.reader-panel.reader-panel-settings.is-sheet .reader-settings-tabs{margin-inline:auto}
+html .reader-panel.reader-panel.reader-panel .reader-panel-body{padding:6px 26px 28px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
+
+/* Settings sections: tabs on a tone tray, kickers for groups, lit choices. */
+.reader-panel .reader-settings-tabs.mv-nav-rail{padding:4px;border-radius:15px;background:var(--rs-tone)}
+.reader-panel .reader-settings-tabs .mv-nav-item{border:0;border-radius:11px;color:var(--rs-quiet);font-weight:600;transition:background-color .3s var(--rs-ease),color .25s}
+.reader-panel .reader-settings-tabs .mv-nav-item:hover{color:#fff}
+.reader-panel .reader-settings-tabs .mv-nav-item[data-state=active]{background:rgba(255,255,255,.12);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.reader-panel .reader-view-settings{gap:28px}
+.reader-panel .reader-view-settings h3,.reader-panel .reader-translation-heading{margin:0;font:600 10.5px/1.4 var(--font-ui,inherit);letter-spacing:.24em;text-transform:uppercase;color:var(--rs-kicker)}
+.reader-panel .reader-view-row>span,.reader-panel .reader-view-toggle{font:500 13.5px/1.35 var(--font-ui,inherit);color:#e4e4e7}
+.reader-panel .reader-view-row>span>small,.reader-panel .reader-view-toggle small{font-size:11.5px;color:var(--rs-quiet)}
+.reader-panel .mv-segmented{padding:4px;border-radius:14px;background:var(--rs-tone)}
+.reader-panel .mv-segmented>button{color:#a1a1aa;font-weight:600}
+.reader-panel .mv-segmented>button[aria-checked=true],.reader-panel .mv-segmented>button[aria-pressed=true]{color:var(--rs-lit-ink)}
+.reader-panel .mv-segmented .mv-segmented-pill,.reader-panel .mv-segmented-pill{background:var(--rs-lit);box-shadow:var(--rs-lit-shadow)}
+.reader-panel .reader-mode-picker{position:relative;gap:4px;padding:4px;border-radius:18px;background:var(--rs-tone)}
+/* Icons share one axis: a fixed icon row on top, labels hang below it. */
+.reader-panel .reader-mode-picker>button{position:relative;display:grid!important;grid-template-rows:28px auto;align-content:start!important;justify-items:center;gap:6px!important;padding:12px 4px 11px!important;border:0;border-radius:14px!important;background:transparent!important;color:#a1a1aa!important;isolation:isolate;transition:color .3s}
+.reader-panel .reader-mode-picker>button:hover:not(:disabled){color:#fff!important}
+.reader-panel .reader-mode-picker>button[aria-pressed=true]{color:var(--rs-lit-ink)!important}
+.reader-panel .reader-mode-picker>button:disabled{opacity:.35}
+.reader-panel .reader-mode-picker>button:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--rs-soft)}
+.reader-mode-lit{position:absolute;inset:0;z-index:-1;border-radius:14px;background:var(--rs-lit,#e11d48);box-shadow:var(--rs-lit-shadow)}
+.reader-mode-glyph{--glyph-fill:transparent;display:block;overflow:visible;transition:transform .45s var(--rs-ease)}
+.reader-panel .reader-mode-picker>button:hover:not(:disabled) .reader-mode-glyph{transform:translateY(-2px)}
+.reader-panel .reader-mode-picker>button[aria-pressed=true] .reader-mode-glyph{--glyph-fill:rgb(255 255 255 / .22)}
+html[data-theme='noir'] .reader-panel .reader-mode-picker>button[aria-pressed=true] .reader-mode-glyph{--glyph-fill:rgb(0 0 0 / .12)}
+.reader-panel .reader-mode-label{font:600 11px/1.2 var(--font-ui,inherit);text-align:center;text-wrap:balance}
+.reader-panel .reader-view-toggle>input{width:44px;height:26px;background:rgba(255,255,255,.1)}
+.reader-panel .reader-view-toggle>input::after{top:3px;left:3px;width:20px;height:20px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.reader-panel .reader-view-toggle>input:active::after{width:24px}
+.reader-panel .reader-view-toggle>input:checked{background:var(--rs-lit);box-shadow:var(--rs-lit-shadow)}
+.reader-panel .reader-view-toggle>input:checked::after{transform:translateX(18px)}
+html[data-theme='noir'] .reader-panel .reader-view-toggle>input:checked::after{background:#000}
+.reader-panel .reader-view-toggle>input:checked:active::after{transform:translateX(14px)}
+.reader-panel .reader-view-toggle>input:focus-visible{outline:none;box-shadow:0 0 0 3px var(--rs-soft)}
+.reader-panel .reader-zones-button{border-radius:14px;background:var(--rs-tone)}
+.reader-panel .reader-zones-button:hover{background:var(--rs-tone-hover)}
+.reader-panel .mv-select-trigger{border:0;border-radius:12px;background:var(--rs-tone);box-shadow:none}
+
+/* Text readers keep their native selects (fast on phones); they sit on tone. */
+.reader-panel .reader-book-settings>label{margin-bottom:10px;padding:6px 6px 6px 0;font:500 13.5px/1.35 var(--font-ui,inherit);color:#e4e4e7}
+.reader-panel .reader-book-settings select,.reader-panel .reader-settings select{min-height:38px;padding:0 34px 0 14px;border:0;border-radius:12px;background-color:var(--rs-tone);box-shadow:none;color:var(--rs-ink);font:600 13px/1 var(--font-ui,inherit);cursor:pointer;transition:background-color .25s}
+.reader-panel .reader-book-settings select:hover,.reader-panel .reader-settings select:hover{background-color:var(--rs-tone-hover)}
+.reader-panel .reader-book-settings select:focus-visible,.reader-panel .reader-settings select:focus-visible{outline:none;box-shadow:0 0 0 3px var(--rs-soft)}
+.reader-panel select option{background:#18171b;color:#f4f4f5}
+
+/* Pages of the chapter: thumbnails on tone, the current one lit. */
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip button{border-radius:14px;padding:6px;background:var(--rs-tone);color:var(--rs-quiet);font:600 12px/1 var(--font-display,inherit);transition:background-color .25s,transform .35s var(--rs-ease),box-shadow .3s}
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip button:hover{background:var(--rs-tone-hover);transform:translateY(-2px)}
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip button[aria-current=true]{background:var(--rs-lit);box-shadow:var(--rs-lit-shadow);color:var(--rs-lit-ink)}
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip img{border-radius:9px}
+
+/* Chapter lists (manga shelf and ranobe contents): rows on tone, the open one lit. */
+.reader-panel .reader-chapter-list{display:flex;flex-direction:column;gap:4px}
+.reader-panel :is(.reader-chapter-list,.reader-chapter-shelf) button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:10px 14px;border:0;border-radius:13px;background:transparent;box-shadow:none;color:#d4d4d8;font:500 14px/1.3 var(--font-ui,inherit);text-align:left;transition:background-color .25s,color .25s}
+.reader-panel :is(.reader-chapter-list,.reader-chapter-shelf) button:hover{background:var(--rs-tone-hover);color:#fff}
+.reader-panel :is(.reader-chapter-list,.reader-chapter-shelf) button:is([aria-current],[aria-current=true],[aria-pressed=true]){background:var(--rs-lit);box-shadow:var(--rs-lit-shadow);color:var(--rs-lit-ink)}
+
+/* Ranobe rail: the site's dark glass on every paper theme, so the controls
+   read as ours and never turn white on «Бумага». */
+html .immersive-reader[data-layout=rail]{--rail-tint:var(--rs-glass);--rail-ink:#a1a1aa;--rail-hover:var(--rs-tone-hover)}
+html .immersive-reader[data-layout=rail] .reader-rail-group,html .immersive-reader[data-layout=rail] .reader-rail-dock .narration-bar{background:var(--rs-glass);-webkit-backdrop-filter:blur(28px) saturate(1.5);backdrop-filter:blur(28px) saturate(1.5);box-shadow:0 22px 50px -24px rgba(0,0,0,.9);color:#a1a1aa}
+html .immersive-reader[data-layout=rail] .reader-rail .reader-control:hover:not(:disabled){background:var(--rs-tone-hover);color:#fff}
+html .immersive-reader[data-layout=rail] .reader-rail-count{color:var(--rs-ink)}
+html .immersive-reader[data-layout=rail] .reader-rail-dock .narration-main{background:var(--rs-lit);box-shadow:var(--rs-lit-shadow);color:var(--rs-lit-ink)}
+.immersive-reader[data-layout=rail] .reader-rail-group,.immersive-reader[data-layout=rail] .reader-rail-dock .narration-bar{border-radius:20px}
+.immersive-reader[data-layout=rail] .reader-rail .reader-control{transition:background-color .25s var(--rs-ease),color .25s,transform .25s var(--rs-ease)}
+.immersive-reader[data-layout=rail] .reader-rail .reader-control:active:not(:disabled){transform:scale(.92)}
+.immersive-reader[data-layout=rail] .reader-rail .reader-control[aria-pressed=true]{background:var(--rs-lit);box-shadow:var(--rs-lit-shadow);color:var(--rs-lit-ink)}
+.immersive-reader[data-layout=rail] .reader-rail-count{font:800 15px/1.1 var(--font-display,inherit);letter-spacing:-.03em}
+.immersive-reader[data-layout=rail] .reader-rail-count small{font:500 10px/1.2 var(--font-ui,inherit);letter-spacing:0;opacity:.7}
+.reader-more-menu{border-radius:22px;background:var(--rs-glass,rgb(18 10 14 / .8));box-shadow:0 26px 60px -24px #000}
+
+@media(prefers-reduced-motion:reduce){
+  .immersive-reader .reader-control,.reader-panel .reader-mode-picker>button,.reader-panel .reader-settings-tabs .mv-nav-item{transition:none!important}
+}
+
+/* Icons act out what they do, once, when pointed at or focused. Nothing loops. */
+.immersive-reader button svg.lucide,.reader-more-menu button svg.lucide,.reader-panel button svg.lucide{overflow:visible;transform-origin:50% 50%}
+.immersive-reader button svg.lucide>*,.reader-more-menu button svg.lucide>*,.reader-panel button svg.lucide>*{transform-box:fill-box;transform-origin:50% 50%}
+:is(.immersive-reader,.reader-more-menu,.reader-panel) button:is(:hover,:focus-visible):not(:disabled) svg{
+  --i-ease:cubic-bezier(.34,1.56,.64,1);
+}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-arrow-left{animation:rs-back .5s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-chevron-left{animation:rs-left .45s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-chevron-right{animation:rs-right .45s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-chevron-up{animation:rs-up .45s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-chevron-down{animation:rs-down .45s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-grid2x2{animation:rs-quarter .6s cubic-bezier(.34,1.56,.64,1)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-list>:nth-child(n+4){transform-origin:0 50%;animation:rs-line .5s var(--rs-ease) both}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-list>:nth-child(5){animation-delay:.06s}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-list>:nth-child(6){animation-delay:.12s}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-download>:is(:nth-child(1),:nth-child(3)){animation:rs-drop .6s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-triangle-alert{animation:rs-shake .5s ease-in-out}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-languages{animation:rs-flip .7s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg:is(.lucide-maximize,.lucide-minimize)>:nth-child(1){animation:rs-tl .5s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg:is(.lucide-maximize,.lucide-minimize)>:nth-child(2){animation:rs-tr .5s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg:is(.lucide-maximize,.lucide-minimize)>:nth-child(3){animation:rs-bl .5s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg:is(.lucide-maximize,.lucide-minimize)>:nth-child(4){animation:rs-br .5s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-settings2>circle:nth-of-type(1){animation:rs-slide-l .6s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-settings2>circle:nth-of-type(2){animation:rs-slide-r .6s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu,.reader-panel) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-x{animation:rs-quarter .45s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-ellipsis>*{animation:rs-hop .45s var(--rs-ease) both}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-ellipsis>:nth-child(2){animation-delay:.07s}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-ellipsis>:nth-child(3){animation-delay:.14s}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg:is(.lucide-moon,.lucide-sun){animation:rs-swing .7s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-music{animation:rs-beat .6s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-headphones{animation:rs-pulse .55s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-skip-back{animation:rs-left .45s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-skip-forward{animation:rs-right .45s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-users>:nth-child(n+3){animation:rs-right .5s var(--rs-ease)}
+:is(.immersive-reader,.reader-more-menu) button:is(:hover,:focus-visible):not(:disabled) svg.lucide-minimize2{animation:rs-pulse .5s var(--rs-ease) reverse}
+@keyframes rs-back{40%{transform:translateX(-4px)}}
+@keyframes rs-left{40%{transform:translateX(-3px)}}
+@keyframes rs-right{40%{transform:translateX(3px)}}
+@keyframes rs-up{40%{transform:translateY(-3px)}}
+@keyframes rs-down{40%{transform:translateY(3px)}}
+@keyframes rs-quarter{from{transform:rotate(0)}to{transform:rotate(90deg)}}
+@keyframes rs-line{from{transform:scaleX(.2);opacity:.3}}
+@keyframes rs-drop{35%{transform:translateY(3px)}70%{transform:translateY(-1px)}}
+@keyframes rs-shake{20%{transform:rotate(-10deg)}40%{transform:rotate(9deg)}60%{transform:rotate(-6deg)}80%{transform:rotate(3deg)}}
+@keyframes rs-flip{from{transform:perspective(60px) rotateY(0)}to{transform:perspective(60px) rotateY(360deg)}}
+@keyframes rs-tl{40%{transform:translate(-2px,-2px)}}
+@keyframes rs-tr{40%{transform:translate(2px,-2px)}}
+@keyframes rs-bl{40%{transform:translate(-2px,2px)}}
+@keyframes rs-br{40%{transform:translate(2px,2px)}}
+@keyframes rs-slide-l{45%{transform:translateX(-6px)}}
+@keyframes rs-slide-r{45%{transform:translateX(6px)}}
+@keyframes rs-hop{40%{transform:translateY(-3px)}}
+@keyframes rs-swing{30%{transform:rotate(-24deg)}65%{transform:rotate(10deg)}}
+@keyframes rs-beat{25%{transform:rotate(-12deg) translateY(-2px)}55%{transform:rotate(8deg)}80%{transform:rotate(-3deg)}}
+@keyframes rs-pulse{40%{transform:scale(1.18)}}
+@media(prefers-reduced-motion:reduce){:is(.immersive-reader,.reader-more-menu,.reader-panel) button svg,:is(.immersive-reader,.reader-more-menu,.reader-panel) button svg *{animation:none!important}}
+html .immersive-reader[data-layout=rail] .reader-rail-dock .narration-bar button:hover:not(:disabled){background:var(--rs-tone-hover);color:#fff}
+html .immersive-reader[data-layout=rail] .reader-rail-dock .narration-bar .narration-main:hover:not(:disabled){background:var(--rs-lit);color:var(--rs-lit-ink);filter:brightness(1.08)}
+html .immersive-reader[data-layout=rail] .reader-more-menu{color:#d4d4d8}
+
+/* Page bar along the bottom while paging, laid out like Mihon: round chapter
+   buttons at the ends, one slim capsule with the page, the slider and the
+   page count between them. No box behind the whole row. */
+html .immersive-reader[data-layout=overlay]>.reader-chrome.reader-pager.is-across{left:50%;right:auto;top:auto;bottom:max(16px,env(safe-area-inset-bottom));flex-direction:row;align-items:center;gap:10px;width:min(760px,calc(100% - 24px));height:auto;min-height:0;padding:0;border-radius:0;background:none!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;transform:translate(-50%,22px)}
+html .immersive-reader[data-layout=overlay][data-chrome=true]>.reader-chrome.reader-pager.is-across{transform:translate(-50%,0)}
+.reader-pager-pill{flex:1;min-width:0;display:flex;align-items:center;gap:2px;height:48px;padding:0 6px;border-radius:24px;background:var(--rs-glass);-webkit-backdrop-filter:blur(28px) saturate(1.5);backdrop-filter:blur(28px) saturate(1.5);box-shadow:0 18px 44px -22px rgba(0,0,0,.95)}
+html .immersive-reader[data-layout=overlay][data-chrome] .reader-pager.is-across .reader-control{width:36px;min-width:36px;height:36px;min-height:36px;border-radius:18px}
+html .immersive-reader[data-layout=overlay][data-chrome] .reader-pager.is-across>.reader-pager-chapter{flex:none;width:48px;min-width:48px;height:48px;min-height:48px;border-radius:24px;background:var(--rs-glass);-webkit-backdrop-filter:blur(28px) saturate(1.5);backdrop-filter:blur(28px) saturate(1.5);box-shadow:0 18px 44px -22px rgba(0,0,0,.95);color:#d4d4d8}
+html .immersive-reader[data-layout=overlay][data-chrome] .reader-pager.is-across>.reader-pager-chapter:hover{background:rgb(40 30 36 / .88);color:#fff}
+/* «5 ───●─── 12»: the page on the left, the total on the right. */
+.reader-pager.is-across .reader-page-track:not(.is-vertical){flex:1;height:48px;gap:14px;padding:0 6px}
+.reader-pager.is-across .reader-page-count{display:contents}
+.reader-pager.is-across .reader-page-count strong{order:0;min-width:2ch;font:700 14px/1 var(--font-ui,inherit);letter-spacing:0;text-align:center;color:var(--rs-ink)}
+.reader-pager.is-across .reader-page-rail{order:1}
+.reader-pager.is-across .reader-page-count small{order:2;min-width:2ch;font:600 14px/1 var(--font-ui,inherit);text-align:center;color:var(--rs-quiet)}
+.reader-pager.is-across .reader-page-track.is-reverse .reader-page-count strong{order:2}
+.reader-pager.is-across .reader-page-track.is-reverse .reader-page-count small{order:0}
+.reader-pager.is-across .reader-page-of{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* A thin groove with a round thumb, the read part in the title colour. */
+.reader-pager.is-across .reader-page-track:not(.is-vertical) .reader-page-groove,.reader-pager.is-across .reader-page-track:not(.is-vertical) .reader-page-fill{height:4px;margin-top:-2px}
+.reader-pager.is-across .reader-page-groove{background:rgba(255,255,255,.14)}
+.reader-pager.is-across .reader-page-track:not(.is-vertical) .reader-page-thumb{width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;box-shadow:0 0 0 5px color-mix(in srgb,var(--reader-accent,#e11d48) 30%,transparent),0 3px 10px rgba(0,0,0,.6);transition:box-shadow .25s}
+.reader-pager.is-across .reader-page-track.is-reverse:not(.is-vertical) .reader-page-thumb{margin:-8px -8px 0 0}
+.reader-pager.is-across .reader-page-track.is-dragging .reader-page-thumb,.reader-pager.is-across .reader-page-track.is-hovered .reader-page-thumb{box-shadow:0 0 0 8px color-mix(in srgb,var(--reader-accent,#e11d48) 34%,transparent),0 3px 10px rgba(0,0,0,.6)}
+/* Webtoon column: the chapter buttons cap it top and bottom. */
+html .immersive-reader[data-layout=overlay][data-chrome] .reader-pager:not(.is-across)>.reader-pager-chapter{width:40px;min-width:40px;height:40px;min-height:40px;color:var(--rs-quiet)}
+
+/* ── Reader menus: one grid for every popover (navbar popover language) ──
+   Panel padding 16, group gap 20, row gap 12; labels 13px over their
+   control; quiet uppercase group names; controls span the full width;
+   switches sit on the right of their text. Nothing scrolls sideways. */
+html .reader-panel.reader-panel .reader-panel-body{overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
+html .reader-panel.reader-panel .reader-panel-body *{min-width:0;max-width:100%}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop .reader-panel-body{padding:4px 16px 16px}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.reader-panel-settings.is-pop .reader-panel-body{padding-top:12px}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.reader-panel-settings.is-pop>header{top:10px;right:10px;padding:0}
+
+/* Tabs: a tone tray that leaves room for the close button. */
+html .reader-panel.reader-panel .reader-settings-tabs.mv-nav-rail{display:grid;grid-template-columns:repeat(var(--nav-count,3),minmax(0,1fr));inline-size:auto!important;margin:0 0 16px!important;padding:3px;border:0;border-radius:999px;background:rgba(255,255,255,.05)}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel-settings.is-pop .reader-settings-tabs.mv-nav-rail{margin-right:40px!important}
+html .reader-panel.reader-panel .reader-settings-tabs .mv-nav-item{height:30px;min-height:0;padding:0 8px;border:0;border-radius:999px;background:transparent;color:#a1a1aa;font:600 12px/1 var(--font-ui,inherit);box-shadow:none}
+html .reader-panel.reader-panel .reader-settings-tabs .mv-nav-item:hover{color:#fff}
+html .reader-panel.reader-panel .reader-settings-tabs .mv-nav-item[data-state=active]{background:rgba(255,255,255,.1);color:#fff;box-shadow:none}
+html .reader-panel.reader-panel .reader-settings-tabs .mv-nav-icon{display:none}
+
+/* Group names. */
+html .reader-panel.reader-panel :is(.reader-view-settings h3,.reader-settings-category,.reader-payload-picker h4,.reader-model-storage h3,.reader-model-storage h4){display:block;margin:4px 0 0;font:600 10px/1.4 var(--font-ui,inherit);letter-spacing:.18em;text-transform:uppercase;color:#71717a}
+html .reader-panel.reader-panel .reader-translation-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0}
+html .reader-panel.reader-panel .reader-translation-heading h3{margin:0;font:600 10px/1.4 var(--font-ui,inherit);letter-spacing:.18em;text-transform:uppercase;color:#71717a}
+html .reader-panel.reader-panel .reader-details-toggle{display:grid;place-items:center;width:28px;height:28px;min-height:0;padding:0;border:0;border-radius:999px;background:transparent;color:#8b8790}
+html .reader-panel.reader-panel .reader-details-toggle:is(:hover,[aria-expanded=true]){background:rgba(255,255,255,.08);color:#fff}
+
+/* Rows: text over a full-width control. */
+html .reader-panel.reader-panel .reader-view-settings{display:grid;gap:20px}
+html .reader-panel.reader-panel .reader-view-settings section{display:grid;gap:12px}
+html .reader-panel.reader-panel .reader-view-row,html .reader-panel.reader-panel .reader-view-row.is-wide{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-items:stretch}
+html .reader-panel.reader-panel :is(.reader-view-row>span,.reader-view-toggle>span){display:grid;gap:3px;font:500 13px/1.35 var(--font-ui,inherit);color:#e4e4e7}
+html .reader-panel.reader-panel :is(.reader-view-row small,.reader-view-toggle small,.reader-hint,.reader-payload-description,.reader-save-quiet,.reader-language-result){margin:0;font:400 11.5px/1.45 var(--font-ui,inherit)!important;color:#8b8790!important}
+html .reader-panel.reader-panel .reader-view-row .mv-segmented,html .reader-panel.reader-panel .reader-view-row .mv-select-trigger{width:100%}
+
+/* Switches on the right of their text. */
+html .reader-panel.reader-panel :is(.reader-view-toggle,.reader-checkbox){display:flex!important;flex-direction:row;align-items:center;justify-content:space-between;gap:14px;min-height:36px;margin:0!important;font:500 13px/1.35 var(--font-ui,inherit);color:#e4e4e7;cursor:pointer}
+html .reader-panel.reader-panel .reader-checkbox{flex-direction:row-reverse}
+html .reader-panel.reader-panel .reader-checkbox>.mv-switch{flex:none}
+
+/* Segmented choices: a tone tray, the choice lit in ruby. */
+html .reader-panel.reader-panel .mv-segmented{display:flex;width:100%;padding:3px;gap:2px;border-radius:999px;background:rgba(255,255,255,.05)}
+html .reader-panel.reader-panel .mv-segmented>button{flex:1 1 0;height:30px;padding:0 10px;border-radius:999px!important;font:600 12px/1 var(--font-ui,inherit);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html .reader-panel.reader-panel .mv-segmented-pill{border-radius:999px;box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+
+/* Selects, secondary buttons, disclosures, links. */
+html .reader-panel.reader-panel .mv-select-trigger{width:100%;max-width:none;height:38px;min-height:38px;padding:0 12px 0 14px;border:0;border-radius:12px;background:rgba(255,255,255,.06);box-shadow:none;color:#f4f4f5;font:500 13px/1 var(--font-ui,inherit)}
+html .reader-panel.reader-panel .mv-select-trigger:hover{background:rgba(255,255,255,.09)}
+html .reader-panel.reader-panel .mv-select-trigger>span:first-child{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+html .reader-panel.reader-panel :is(.lmt-settings>button,.reader-model-storage button,.reader-zones-button,.reader-save-secondary){display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:38px;min-height:38px;padding:0 14px;border:0;border-radius:12px;background:rgba(255,255,255,.06);box-shadow:none;color:#e4e4e7;font:500 13px/1 var(--font-ui,inherit);cursor:pointer;transition:background-color .2s,color .2s}
+html .reader-panel.reader-panel :is(.lmt-settings>button,.reader-model-storage button,.reader-zones-button,.reader-save-secondary):hover{background:rgba(255,255,255,.1);color:#fff}
+html .reader-panel.reader-panel details>summary{display:flex;align-items:center;gap:8px;min-height:32px;list-style:none;font:500 13px/1.3 var(--font-ui,inherit);color:#d4d4d8;cursor:pointer}
+html .reader-panel.reader-panel details>summary::-webkit-details-marker{display:none}
+html .reader-panel.reader-panel details>summary::before{content:'';flex:none;width:6px;height:6px;margin:0 3px 0 2px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .25s var(--rs-ease)}
+html .reader-panel.reader-panel details[open]>summary::before{transform:rotate(45deg)}
+html .reader-panel.reader-panel details>summary:hover{color:#fff}
+html .reader-panel.reader-panel details[open]{display:grid;gap:12px}
+html .reader-panel.reader-panel .lmt-settings a{color:#8b8790;font:400 11.5px/1.4 var(--font-ui,inherit);text-decoration:none}
+html .reader-panel.reader-panel .lmt-settings a:hover{color:#fff}
+
+/* Translation settings: one column on the same rhythm. */
+html .reader-panel.reader-panel .reader-panel-body .lmt-settings{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+html .reader-panel.reader-panel .reader-panel-body .lmt-settings>label:not(.reader-checkbox),html .reader-panel.reader-panel .reader-panel-body .lmt-settings label:not(.reader-checkbox):has(>.mv-select-trigger){display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0;font:500 13px/1.35 var(--font-ui,inherit);color:#e4e4e7}
+html .reader-panel.reader-panel .lmt-settings>.reader-settings-category{margin-top:12px}
+html .reader-panel.reader-panel .reader-model-storage{display:grid;gap:8px;margin:0;padding:0;border:0;background:none}
+html .reader-panel.reader-panel .reader-model-storage-actions{display:grid;gap:6px}
+html .reader-panel.reader-panel .reader-payload-picker>div{display:flex;width:100%;padding:3px;gap:2px;margin-top:8px;border-radius:999px;background:rgba(255,255,255,.05)}
+html .reader-panel.reader-panel .reader-panel-body .reader-payload-picker button{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:7px;width:auto;height:30px;min-height:0;padding:0 10px;border:0;border-radius:999px;background:transparent;color:#a1a1aa;font:600 12px/1 var(--font-ui,inherit)}
+html .reader-panel.reader-panel .reader-panel-body .reader-payload-picker button svg{width:15px;height:15px}
+html .reader-panel.reader-panel .reader-panel-body .reader-payload-picker button[aria-pressed=true]{background:var(--rs-lit);box-shadow:inset 0 1px 0 rgba(255,255,255,.2);color:var(--rs-lit-ink)}
+html .reader-panel.reader-panel .reader-payload-description{margin-top:8px!important}
+html .reader-panel.reader-panel .reader-translate-toggle{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;min-height:42px;border:0;border-radius:14px;background:var(--rs-lit);box-shadow:inset 0 1px 0 rgba(255,255,255,.2);color:var(--rs-lit-ink);font:600 13.5px/1 var(--font-ui,inherit)}
+
+/* Reading modes: four calm tiles; the chosen one in tone with a rose icon. */
+html .reader-panel.reader-panel .reader-mode-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;margin:0;padding:3px;border-radius:16px;background:rgba(255,255,255,.05)}
+html .reader-panel.reader-panel .reader-mode-picker>button{display:grid!important;grid-template-rows:22px auto;align-content:center!important;justify-items:center;gap:6px!important;height:62px;padding:0 4px!important;border:0;border-radius:13px!important;background:transparent!important;color:#a1a1aa!important;box-shadow:none!important}
+html .reader-panel.reader-panel .reader-mode-picker>button:hover:not(:disabled){color:#fff!important}
+html .reader-panel.reader-panel .reader-mode-picker>button[aria-pressed=true]{color:#fff!important}
+html .reader-panel.reader-panel .reader-mode-lit{border-radius:13px;background:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+html .reader-panel.reader-panel .reader-mode-glyph{width:22px;height:22px;--glyph-fill:transparent!important;stroke-width:1.4}
+html .reader-panel.reader-panel .reader-mode-picker>button[aria-pressed=true] .reader-mode-glyph{color:#fb7185}
+html[data-theme='noir'] .reader-panel.reader-panel .reader-mode-picker>button[aria-pressed=true] .reader-mode-glyph{color:#fff}
+html .reader-panel.reader-panel .reader-mode-label{max-width:100%;overflow:hidden;font:500 11px/1 var(--font-ui,inherit);white-space:nowrap;text-overflow:ellipsis}
+
+/* Page thumbnails: the current page in tone, not a ruby block. */
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip{grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip button{padding:5px 5px 7px;border-radius:14px;background:transparent;box-shadow:none;color:#8b8790;font:500 11.5px/1 var(--font-ui,inherit)}
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip button:hover{background:rgba(255,255,255,.05);transform:none}
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip button[aria-current=true]{background:rgba(255,255,255,.1);box-shadow:none;color:#fff}
+html .immersive-reader[data-layout] .reader-panel-body .reader-filmstrip img{border-radius:9px}
+
+/* «Save chapter»: the same popover glass and rhythm. */
+html .reader-save-sheet{border:1px solid rgba(255,255,255,.07);border-radius:24px;background:rgb(18 8 13 / .82);-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4);box-shadow:0 24px 60px -20px rgba(0,0,0,.9);color:#f4f4f5}
+html[data-theme='noir'] .reader-save-sheet{background:rgb(0 0 0 / .88);border-color:rgba(255,255,255,.14)}
+html .reader-save-sheet .reader-save-body{padding:16px}
+html .reader-save-sheet .reader-save-head :is(h2,h3,strong){font:800 15px/1.2 var(--font-display,inherit);letter-spacing:-.015em}
+html .reader-save-sheet .reader-save-close{width:28px;height:28px;margin:-2px -4px 0 0;background:transparent;color:#a1a1aa}
+html .reader-save-sheet .reader-save-close:hover{background:rgba(255,255,255,.08);color:#fff}
+html .reader-save-sheet .reader-save-field{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-top:16px;font:500 13px/1.35 var(--font-ui,inherit);color:#e4e4e7}
+html .reader-save-sheet .mv-segmented{display:flex;width:100%;padding:3px;gap:2px;border-radius:999px;background:rgba(255,255,255,.05)}
+html .reader-save-sheet .mv-segmented>button{flex:1 1 0;height:30px;border-radius:999px!important;font:600 12px/1 var(--font-ui,inherit)}
+html .reader-save-sheet .mv-segmented-pill{border-radius:999px;background:var(--rs-lit,#e11d48);box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+html .reader-save-sheet .reader-save-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-top:16px}
+html .reader-save-sheet .reader-save-hint{order:2;margin:0;text-align:center;font:400 11.5px/1.4 var(--font-ui,inherit);color:#8b8790}
+html .reader-save-sheet .reader-save-primary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;border:0;border-radius:14px;background:var(--rs-lit,#e11d48);box-shadow:inset 0 1px 0 rgba(255,255,255,.2);color:var(--rs-lit-ink,#fff);font:600 13.5px/1 var(--font-ui,inherit)}
+html .reader-save-sheet .reader-save-summary,html .reader-save-sheet .reader-save-now{font:400 12px/1.45 var(--font-ui,inherit);color:#d4d4d8}
+html .reader-panel.reader-panel .reader-model-storage>legend{float:left;width:100%;margin:0 0 4px;padding:0;font:500 13px/1.35 var(--font-ui,inherit);color:#e4e4e7}
+html .reader-panel.reader-panel .reader-model-storage>legend+*{clear:both}
+html .reader-panel.reader-panel .reader-legal{margin:0;font:400 11.5px/1.4 var(--font-ui,inherit);color:#71717a}
+/* Settings without tabs (translation only): the heading leaves room for the close button. */
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel-settings.is-pop .lmt-settings>.reader-translation-heading{margin-right:36px}

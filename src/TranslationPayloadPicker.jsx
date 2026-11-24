@@ -7,8 +7,7 @@ const descriptions={
 };
 export default function TranslationPayloadPicker({value,onChange}){
  return <div className="reader-payload-picker"><h4>Что отправлять Google</h4><div role="group" aria-label="Формат отправки перевода">
- <button type="button" aria-label="Страницы с рамками" title={descriptions.annotated} aria-pressed={value!=='blocks'} onClick={()=>onChange('annotated')}><Images size={22}/></button>
- <button type="button" aria-label="Блоки на листе" title={descriptions.blocks} aria-pressed={value==='blocks'} onClick={()=>onChange('blocks')}><PanelsTopLeft size={22}/></button>
- <span>{value==='blocks'?'Блоки на листе':'Страницы'}</span>
+ <button type="button" aria-label="Страницы с рамками" title={descriptions.annotated} aria-pressed={value!=='blocks'} onClick={()=>onChange('annotated')}><Images size={16}/><span aria-hidden="true">Страницы</span></button>
+ <button type="button" aria-label="Блоки на листе" title={descriptions.blocks} aria-pressed={value==='blocks'} onClick={()=>onChange('blocks')}><PanelsTopLeft size={16}/><span aria-hidden="true">Блоки</span></button>
  </div><p className="reader-payload-description" role="status">{descriptions[value]||descriptions.annotated}</p></div>;
 }

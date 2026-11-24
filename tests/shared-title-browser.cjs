@@ -4,7 +4,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{chromium}=require('playwright');
 const ROOT=path.resolve(__dirname,'..'),DIR=path.join(ROOT,'.codex-local','shared-title-fixture');
 const HARNESS='/.codex-local/shared-title-fixture/shared-title-harness';
-const reveal=async page=>{const reader=page.locator('.immersive-reader').last();await reader.waitFor();if(await reader.getAttribute('data-chrome')!=='true'){const box=await reader.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+2);await page.mouse.move(box.x+box.width/2,box.y+20);await page.waitForFunction(()=>document.querySelector('.immersive-reader')?.dataset.chrome==='true');}};
+const reveal=require('./reader-controls.cjs').revealReader;
 const lastPageImage='[data-page="2"] .reader-image-stack img';
 async function reachEnd(page,view){
  await page.locator('.reader-page img').first().waitFor();
@@ -99,9 +99,9 @@ async function reachEnd(page,view){
   await reveal(page);
   assert.equal(await page.getByRole('button',{name:'Отладка страницы'}).count(),0,'Server diagnostics stay hidden from a visitor');
   assert.equal(await page.getByRole('button',{name:'Поделиться тайтлом'}).count(),0,'A visitor cannot reshare');
-  await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();
-  await page.getByRole('button',{name:'Читать',exact:true}).waitFor();
-  assert.match(await page.evaluate(()=>location.hash),/^#share=/,'Closing the reader keeps the visitor on the shared title');
+  // A reader embedded in the page has no «back»: the page around it is where the visitor is.
+  assert.equal(await page.getByRole('button',{name:'Закрыть просмотр',exact:true}).count(),0,'Embedded reader has no back button');
+  assert.match(await page.evaluate(()=>location.hash),/^#share=/,'The visitor stays on the shared title');
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'No sideways scroll on a phone');
   assert.equal(await page.getByRole('combobox',{name:'Выбрать главу'}).inputValue(),'1');
@@ -110,7 +110,7 @@ async function reachEnd(page,view){
   // The owner shares from the existing toolbar in both viewports.
   await page.setViewportSize({width:1280,height:860});await page.goto(base+'?mode=owner');
   await page.locator('.reader-page img').first().waitFor();await reveal(page);
-  const toolbar=page.locator('.reader-top');
+  const toolbar=page.locator('.reader-dock .rd-bar');
   const before=await toolbar.boundingBox();
   await page.getByRole('button',{name:'Поделиться тайтлом'}).click();
   assert.equal(await page.locator('.title-share-capsule button').count(),2);

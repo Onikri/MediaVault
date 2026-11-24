@@ -17,9 +17,9 @@ createRoot(document.getElementById('root')).render(<Demo/>);
   const context=await browser.newContext({viewport:{width,height:950}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>localStorage.setItem('mediavault_reader_v3:handoff:manga',JSON.stringify({nextChapter:true,translate:false,preload:2,fit:'page'})));
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/.codex-local/test-output/chapter-handoff/index.html');await page.waitForFunction(()=>document.querySelector('.reader-page img')?.naturalWidth===600&&window.rangeReads.some(r=>r.id==='chapter-21'));
-  // The chapter jump lives in the reader's top bar as a UiSelect (no longer inside settings).
-  await require('./reader-controls.cjs').revealReader(page);await require('./reader-select.cjs').chooseOption(page,'Перейти к главе','Глава 21');
-  await page.waitForFunction(()=>document.querySelector('.reader-top .mv-viewer-title strong')?.textContent==='Глава 21'&&document.querySelector('.reader-page img')?.naturalWidth===600);
+  // Chapters open from the dock's «Главы и тома» button: a list of rows.
+  await require('./reader-controls.cjs').revealReader(page);await page.getByRole('button',{name:'Главы и тома',exact:true}).click();await page.locator('.rd-chapters-panel button').filter({has:page.locator('b',{hasText:/^21$/})}).click();
+  await page.waitForFunction(()=>document.querySelector('.reader-dock .rd-title small')?.textContent?.startsWith('Глава 21')&&document.querySelector('.reader-page img')?.naturalWidth===600);
   const result=await page.evaluate(()=>({sameLease:window.first21Signal===window.last21Signal,aborted:window.last21Signal.aborted,wholeReads:window.wholeReads,reads21:window.rangeReads.filter(r=>r.id==='chapter-21').length,alerts:[...document.querySelectorAll('[role="alert"]')].map(n=>n.textContent)}));
   assert.ok(result.sameLease);assert.equal(result.aborted,false);assert.equal(result.wholeReads,0);assert.ok(result.reads21>=3);assert.deepEqual(result.alerts,[]);assert.deepEqual(errors,[]);
   await page.evaluate(()=>window.closeReader());await page.waitForFunction(()=>window.last21Signal.aborted);await context.close();console.log('PASS Drive CBZ prefetch handoff 20 → 21, valid lazy pages and cancellation on close at '+width);

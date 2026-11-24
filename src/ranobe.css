@@ -21,3 +21,15 @@
 /* A reader that failed to open (CrashBoundary): its message in place of the reader. */
 .crash-boundary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:14px;padding:12px 14px}
 .crash-boundary p{flex:1 1 220px;margin:0}
+
+/* Dialogue set like the reader demos: the speaker's name sits above the line
+   in their colour, the line itself starts flush and carries a hint of that
+   colour; narration keeps its indent. The phrase being read glows softly. */
+.ranobe-prose p:has(>.role-name.is-lead),.ranobe-prose p:has(>.role-speech:first-child){text-indent:0}
+.ranobe-surface .ranobe-prose .role-name.is-lead,.ranobe-surface.has-role-margin .ranobe-prose .role-name.is-lead{position:static;display:flex;align-items:baseline;gap:.6em;max-width:none;margin:0 0 .25em;font:600 .78em/1.4 var(--font-ui,system-ui,sans-serif);font-variant-caps:all-small-caps;letter-spacing:.1em;text-align:left;white-space:nowrap;color:var(--role,currentColor)}
+.ranobe-surface .ranobe-prose .role-name.is-lead i{margin:0;font-size:1em;font-weight:500;letter-spacing:.02em;font-variant-caps:normal;opacity:.7}
+.ranobe-prose .role-name:not(.is-lead){font-size:.8em;font-variant-caps:all-small-caps;letter-spacing:.06em}
+.ranobe-prose .role-speech{color:color-mix(in oklab,var(--role,currentColor) 34%,currentColor)}
+.ranobe-prose .role-thought{color:color-mix(in oklab,var(--role,currentColor) 24%,currentColor)}
+.reader-theme-paper .ranobe-prose .role-name,.reader-theme-paper .ranobe-prose .role-speech{filter:brightness(.72) saturate(1.3)}
+.text-reader .ranobe-prose .role-segment.is-speaking{border-radius:.3em;padding:.04em .12em;margin:0 -.12em;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:color-mix(in srgb,var(--role,var(--color-blossom,#e11d48)) 16%,transparent);transition:background-color .3s}

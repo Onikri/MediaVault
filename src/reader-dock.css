@@ -1,0 +1,109 @@
+/* Reader dock (ReaderDock.jsx): the navbar's glass, kept light. One layer of
+   glass, a faint rim, a thin top line that fills with the chapter; buttons are
+   bare icons that get a tone under the pointer. Only transform and opacity
+   animate. */
+.reader-dock{--rd-glass:rgb(18 8 13 / .55);--rd-rim:rgba(255,255,255,.06);--rd-rose:244 63 94;--rd-ease:cubic-bezier(.22,1,.36,1);--rd-h:44px;
+  position:absolute;z-index:12;top:12px;left:12px;right:12px;display:flex;pointer-events:none;opacity:0;visibility:hidden;transform:translateY(-8px);transition:opacity .25s var(--rd-ease),transform .35s var(--rd-ease),visibility 0s linear .35s}
+html[data-theme='noir'] .reader-dock{--rd-glass:rgb(0 0 0 / .62);--rd-rim:rgba(255,255,255,.1);--rd-rose:255 255 255}
+.reader-dock.is-on{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+.reader-dock.is-split{justify-content:space-between;align-items:flex-start}
+.reader-dock.is-vertical{top:12px;bottom:12px;left:auto;right:12px;flex-direction:column;transform:translateX(8px)}
+.reader-dock.is-vertical.is-on{transform:none}
+.reader-dock.is-vertical.is-split{justify-content:space-between;align-items:flex-end}
+.reader-dock.is-vertical.is-joined{justify-content:flex-end}
+
+/* Glass. */
+.rd-glass{position:relative;display:flex;align-items:center;gap:2px;height:var(--rd-h);padding:0 5px;box-sizing:border-box;border:1px solid var(--rd-rim);border-radius:999px;background:var(--rd-glass);-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4);box-shadow:0 12px 30px -16px rgba(0,0,0,.85);color:#d4d4d8;pointer-events:auto;will-change:transform,opacity}
+.rd-bar{flex:1;min-width:0}
+.reader-dock.is-joined:not(.is-vertical) .rd-bar{max-width:1100px;margin:0 auto}
+.reader-dock.is-vertical .rd-glass{flex-direction:column;width:var(--rd-h);height:auto;padding:5px 0}
+.reader-dock.is-vertical .rd-bar{flex:none}
+
+/* Progress: a hairline along the top edge that fills with the chapter. */
+.rd-line{position:absolute;z-index:3;top:-1px;left:22px;right:22px;height:1px;overflow:hidden;pointer-events:none;background:rgba(255,255,255,.07)}
+.rd-line>i{position:absolute;inset:0;background:linear-gradient(90deg,rgb(var(--rd-rose) / .25),rgb(var(--rd-rose)));transition:transform .45s var(--rd-ease)}
+.reader-dock.is-vertical .rd-line{top:22px;bottom:22px;left:-1px;right:auto;width:1px;height:auto}
+.reader-dock.is-vertical .rd-line>i{background:linear-gradient(180deg,rgb(var(--rd-rose) / .25),rgb(var(--rd-rose)))}
+
+/* Empty glass is the page slider; a small peek follows the pointer. */
+.rd-scrub{position:absolute;inset:0;z-index:0;border-radius:inherit}
+.rd-scrub-input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:pointer;appearance:none;-webkit-appearance:none;touch-action:none;direction:ltr}
+.reader-dock.is-vertical .rd-scrub-input{writing-mode:vertical-lr}
+.rd-glass:has(.rd-scrub-input:focus-visible){border-color:rgba(255,255,255,.2)}
+.rd-peek{position:absolute;top:calc(100% + 10px);transform:translateX(-50%);display:grid;justify-items:center;gap:6px;padding:5px 5px 7px;border-radius:16px;border:1px solid rgba(255,255,255,.07);background:rgb(18 8 13 / .8);box-shadow:0 18px 40px -18px rgba(0,0,0,.9);pointer-events:none;z-index:6}
+.reader-dock.is-vertical .rd-peek{top:auto;right:calc(100% + 12px);transform:translateY(-50%)}
+.rd-peek>img{display:block;width:88px;max-height:130px;object-fit:cover;object-position:top;border-radius:11px}
+.rd-peek>b{font:600 11px/1 var(--font-ui,inherit);color:#e4e4e7}
+
+/* Contents. */
+.rd-title,.rd-group,.rd-glass>button{position:relative;z-index:1}
+.rd-title{display:grid;gap:2px;min-width:0;margin-right:auto;padding:0 16px 0 12px;pointer-events:none}
+.rd-title>strong{overflow:hidden;font:800 13px/1.15 var(--font-display,inherit);letter-spacing:-.015em;color:#fff;white-space:nowrap;text-overflow:ellipsis}
+.rd-title>small{font:500 11px/1.2 var(--font-ui,inherit);color:#8b8790;white-space:nowrap}
+.rd-group{display:flex;align-items:center;gap:2px}
+.reader-dock.is-joined:not(.is-vertical) .rd-group{margin-left:auto}
+.reader-dock.is-vertical .rd-group{flex-direction:column}
+
+/* Rows that unroll on hover: grid 0fr → 1fr, buttons fade in after. */
+.rd-unroll{display:grid;grid-template-columns:0fr;transition:grid-template-columns .32s var(--rd-ease)}
+.rd-unroll.is-open{grid-template-columns:1fr}
+.rd-unroll.is-vertical{grid-template-columns:none;grid-template-rows:0fr;transition-property:grid-template-rows}
+.rd-unroll.is-vertical.is-open{grid-template-rows:1fr}
+.rd-unroll-inner{display:flex;align-items:center;gap:2px;min-width:0;min-height:0;overflow:hidden;opacity:0;visibility:hidden;transition:opacity .2s,visibility 0s linear .32s}
+.rd-unroll.is-vertical>.rd-unroll-inner{flex-direction:column}
+.rd-unroll.is-open>.rd-unroll-inner{opacity:1;visibility:visible;transition:opacity .22s .08s,visibility 0s}
+
+/* Buttons: bare icons, a tone under the pointer and when their menu is open. */
+html .immersive-reader .reader-dock .reader-control{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;width:32px!important;min-width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;border:0;border-radius:999px!important;background:transparent;box-shadow:none;color:#a1a1aa;transition:background-color .2s,color .2s}
+html .immersive-reader .reader-dock .reader-control svg{width:16px;height:16px}
+html .immersive-reader .reader-dock .reader-control:hover:not(:disabled){background:rgba(255,255,255,.08);color:#fff}
+html .immersive-reader .reader-dock .reader-control:disabled{opacity:.3}
+html .immersive-reader .reader-dock .reader-control:focus-visible{outline:none;background:rgba(255,255,255,.1);color:#fff}
+html .immersive-reader .reader-dock .reader-control:is([aria-expanded=true],[aria-pressed=true]){background:rgba(255,255,255,.1);color:#fff}
+/* Chapters show the page: «5 из 12». */
+html .immersive-reader .reader-dock .reader-control.rd-chapters{width:auto!important;padding:0 11px 0 9px!important;color:#d4d4d8}
+.rd-chapters .reader-page-count{min-width:0!important;font-size:inherit!important;display:inline-flex;align-items:baseline;gap:3px;font-variant-numeric:tabular-nums;color:inherit}
+.rd-chapters .reader-page-count strong{font:600 12.5px/1 var(--font-ui,inherit);color:#fff}
+.rd-chapters .reader-page-count small{font:500 11.5px/1 var(--font-ui,inherit);color:#8b8790}
+html .immersive-reader .reader-dock.is-vertical .reader-control.rd-chapters{flex-direction:column;gap:4px;width:32px!important;height:auto!important;padding:8px 0!important}
+.reader-dock.is-vertical .rd-chapters .reader-page-count{flex-direction:column;align-items:center;gap:1px}
+/* Back: a circle; in full screen pointing at it unrolls the title. */
+.rd-island.rd-lead{padding:0 5px}
+html .immersive-reader .reader-dock .reader-control.rd-back{width:auto!important;min-width:32px!important;padding:0 8px!important;gap:0;color:#e4e4e7}
+.rd-back-name{display:block;padding:0 6px 0 8px;font:800 13px/1 var(--font-display,inherit);letter-spacing:-.015em;color:#fff;white-space:nowrap}
+
+/* Menus open out of the dock as the navbar's popovers. */
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop{inset:64px 12px auto auto;width:min(340px,calc(100% - 24px));max-height:calc(100% - 76px);padding:0;border:1px solid rgba(255,255,255,.07);border-radius:24px;background:rgb(18 8 13 / .78);-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4);box-shadow:0 24px 60px -20px rgba(0,0,0,.9);transform-origin:calc(100% - 70px) -12px}
+html[data-theme='noir'] .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop{background:rgb(0 0 0 / .85);border-color:rgba(255,255,255,.14)}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop.is-side{top:12px;right:64px;max-height:calc(100% - 24px);transform-origin:calc(100% + 12px) 40px}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop>header{padding:10px 8px 2px 16px}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop h2{margin:0;font:600 10px/1.4 var(--font-ui,inherit);letter-spacing:.18em;text-transform:uppercase;color:#71717a}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop>header .reader-control{width:28px;min-width:28px;height:28px;min-height:28px;border:0;border-radius:999px;background:transparent;color:#a1a1aa}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop>header .reader-control:hover{background:rgba(255,255,255,.08);color:#fff}
+html .immersive-reader[data-layout=overlay] .reader-panel.reader-panel.is-pop .reader-panel-body{padding:2px 8px 8px}
+html .immersive-reader[data-layout=overlay] .reader-panel-backdrop{background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
+
+/* Chapters: volumes, number, name and team, in the navbar's row style. */
+.rd-chapters-panel{display:grid;gap:6px}
+.rd-chapters-panel h3{display:flex;align-items:center;height:28px;margin:0;padding:0 12px;font:600 10px/1 var(--font-ui,inherit);letter-spacing:.18em;text-transform:uppercase;color:#71717a}
+.rd-chapters-panel ol{display:grid;gap:1px;margin:0;padding:0;list-style:none}
+.rd-chapters-panel button{display:grid;grid-template-columns:26px minmax(0,1fr);align-items:center;gap:10px;width:100%;padding:8px 12px 8px 6px;border:0;border-radius:16px;background:transparent;color:#e4e4e7;text-align:left;cursor:pointer;transition:background-color .2s,color .2s}
+.rd-chapters-panel button:hover{background:rgba(255,255,255,.05);color:#fff}
+.rd-chapters-panel button>b{font:600 12.5px/1 var(--font-ui,inherit);font-variant-numeric:tabular-nums;text-align:center;color:#71717a}
+.rd-chapters-panel button>span{display:grid;gap:2px;min-width:0}
+.rd-chapters-panel strong{overflow:hidden;font:500 13px/1.25 var(--font-ui,inherit);white-space:nowrap;text-overflow:ellipsis}
+.rd-chapters-panel small{overflow:hidden;font:400 11.5px/1.2 var(--font-ui,inherit);color:#71717a;white-space:nowrap;text-overflow:ellipsis}
+.rd-chapters-panel button[aria-current]{background:rgba(255,255,255,.08);color:#fff}
+.rd-chapters-panel button[aria-current]>b{color:#fff}
+
+@media (--phone){
+  .reader-dock{top:8px;left:8px;right:8px}
+  .reader-dock.is-joined .rd-title{display:none}
+}
+@media(prefers-reduced-motion:reduce){.reader-dock,.rd-unroll,.rd-unroll-inner,.rd-line>i,html .immersive-reader .reader-dock .reader-control{transition:none}}
+
+/* Narrow docks: the folded buttons drop as their own glass row under the bar
+   (like the navbar's phone menu) instead of squeezing the bar. */
+.reader-dock.is-compact:not(.is-vertical) .rd-unroll{position:absolute;top:calc(100% + 14px);right:-5px;display:block;width:max-content;max-width:min(360px,calc(100vw - 24px))}
+.reader-dock.is-compact:not(.is-vertical) .rd-unroll-inner{flex-wrap:wrap;justify-content:flex-end;gap:2px;padding:5px;overflow:visible;border:1px solid var(--rd-rim);border-radius:22px;background:var(--rd-glass);-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4);box-shadow:0 12px 30px -16px rgba(0,0,0,.85);transform:translateY(-6px) scale(.98);transform-origin:calc(100% - 20px) 0;transition:opacity .2s,transform .3s var(--rd-ease),visibility 0s linear .3s}
+.reader-dock.is-compact:not(.is-vertical) .rd-unroll.is-open>.rd-unroll-inner{transform:none;transition:opacity .22s,transform .3s var(--rd-ease),visibility 0s}
