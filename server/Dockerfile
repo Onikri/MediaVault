@@ -7,7 +7,7 @@ COPY src/ src/
 COPY lmt/ lmt/
 COPY reader-fonts/ reader-fonts/
 COPY public/data/ public/data/
-COPY server/manga-tag-policy.json server/catalog-taxonomy.json server/
+COPY server/manga-tag-policy.json server/catalog-taxonomy.json server/release-statuses.json server/
 COPY scripts/build-lmt.mjs scripts/
 COPY vite.config.js tailwind.title.config.cjs index.html manga-export.html narration-export.html config.js spotify-callback.html translation-demo.html sw.js crypto.js drive.js selftest.html icon.svg manifest.webmanifest ./
 RUN npm run build && test -s dist/manga-export.html && test -s dist/narration-export.html && test -s dist/lmt/index.html
