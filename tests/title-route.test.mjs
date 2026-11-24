@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeCatalog} from '../src/catalog.js';
+import {mergeCatalog,titleLookup} from '../src/catalog.js';
 import {readOnlineTitle,onlineTitleLocation} from '../src/title-route.js';
 
 test('online title address restores exact identity without a catalogue search or private media',()=>{
@@ -20,4 +20,27 @@ test('online title address restores exact identity without a catalogue search or
   const manga=readOnlineTitle();assert.deepEqual(manga.catalogIds,['a'.repeat(32),'b'.repeat(32)]);
   assert.equal(manga.sources,undefined,'Only public index identities survive routing, never source/stream payloads');
  }finally{Object.assign(globalThis,previous);}
+});
+
+test('index-only cards reopened without a snapshot read the index card, never a catalogue API',()=>{
+ const empty={getItem:()=>null};
+ for(const [route,kind,provider,id] of [
+  ['ranobe:ranobelib:ranobelib:https://ranobelib.me/ru/book/116379--i-devour-mechas','ranobe','ranobelib','https://ranobelib.me/ru/book/116379--i-devour-mechas'],
+  ['anime:hanime:hanime:https://hanime.tv/videos/hentai/tropical-kiss-ova-1','anime','hanime','https://hanime.tv/videos/hentai/tropical-kiss-ova-1']]){
+  const value=readOnlineTitle('#watch='+route,empty);
+  // The route alone sets providerId to the whole "provider:url" identity.
+  assert.equal(value.providerId,provider+':'+id);
+  assert.deepEqual(titleLookup(value,true),{index:{kind,provider,id}});
+  assert.equal(titleLookup(value,false),null,'an older server without the index asks nothing');
+  // The same identity from the index row itself (no providerId) needs no lookup.
+  assert.equal(titleLookup({kind,provider,id:provider+':'+id,title:'X'},true),null);
+ }
+ assert.deepEqual(titleLookup({kind:'anime',provider:'shikimori',providerId:'1'},true),{catalog:true});
+ assert.deepEqual(titleLookup({kind:'book',provider:'openlibrary',providerId:'OL1W'},false),{catalog:true});
+ assert.equal(titleLookup({kind:'book',provider:'openlibrary',providerId:'OL1M'},true),null);
+ assert.deepEqual(titleLookup({kind:'movie',provider:'omdb',providerId:'42'},true),{index:{kind:'movie',provider:'omdb',id:'42'}});
+ assert.equal(titleLookup({kind:'movie',provider:'omdb',providerId:'42'},false),null);
+ assert.equal(titleLookup({kind:'anime',provider:'youtube',providerId:'v'},true),null);
+ assert.equal(titleLookup({kind:'manga',provider:'mangalib',providerId:'mangalib:https://mangalib.me/ru/x'},true),null);
+ assert.equal(titleLookup({kind:'anime',provider:'hanime',providerId:'hanime:u',sourceOnly:true},true),null);
 });

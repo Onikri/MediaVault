@@ -4,13 +4,15 @@ from urllib.parse import urlsplit,urljoin,urlencode
 from bs4 import BeautifulSoup
 import httpx,requests
 from content_source_routes import LIB,HTML
-from content_sources import checked_get,permitted,html_terms,lib_terms,lib_titles,lib_metadata
+from content_sources import checked_get,permitted,html_terms,lib_terms,lib_titles,lib_metadata,ranobe_titles
 from manga_source_tags import from_api,from_html,unique
 from source_parser import SourceAccessError, SourceError, SourceTemporaryError
 
+RANOBE_LIB={'type':'lib','kind':'ranobe','domain':'ranobelib.me','name':'Ранобэ · RanobeLib','site':3,'referer':'https://ranobelib.me/','eagerTerms':True}
+
 def source_provider(spec):
     if spec.get('source',{}).get('id'):return 'suwayomi:'+str(spec['source']['id'])
-    if spec.get('site') in {1,2,4}:return {1:'mangalib',2:'slashlib',4:'hentailib'}[spec['site']]
+    if spec.get('site') in {1,2,3,4}:return {1:'mangalib',2:'slashlib',3:'ranobelib',4:'hentailib'}[spec['site']]
     return {'hentaichan.cc':'hentaichan-cc','hentaichan.live':'hentaichan','h-chan.me':'hentaichan','manga-chan.me':'mangachan','hmanga.su':'hmanga','remanga.org':'remanga'}.get(spec['domain'],spec['domain'])
 
 def base_sources(installed):
@@ -56,6 +58,9 @@ def base_sources(installed):
             jobs.append({'type':'bridge','domain':urlsplit(adapter.ROOT).hostname,
                          'name':adapter.NAME+' · '+source['lang'],
                          'source':{key:source.get(key) for key in ('id','name','lang','baseUrl','isNsfw')}})
+    # RanobeLib is the LibGroup catalogue of site 3: the same 'lib' listing
+    # job, host pace and slots as MangaLib, written as ranobe content rows.
+    jobs.append(dict(RANOBE_LIB))
     for kind in ('anime','manga','ranobe'):jobs.append({'type':'anilist','kind':kind,'domain':'anilist.co','name':{'anime':'Аниме','manga':'Манга','ranobe':'Ранобэ'}[kind]+' · AniList'})
     for kind,name in (('anime','Аниме'),('ranobe','Ранобэ')):
         jobs.append({'type':'anilist-trending','kind':kind,'domain':'anilist.co','name':name+' · Популярное сейчас'})
@@ -69,6 +74,7 @@ def base_sources(installed):
 
 def headers(spec):
     result={'Site-id':str(spec['site']),'Referer':spec['referer'],'Accept':'application/json','User-Agent':'MediaVault-Catalogue/1.0'}
+    if spec.get('kind')=='ranobe':result['Origin']=spec['referer'].rstrip('/')
     if spec['type']=='lib-detail':
         from catalogue_lib_auth import token
         if value:=token(spec['site']):result['Authorization']='Bearer '+value
@@ -135,8 +141,11 @@ def fetch(spec,cursor):
             if spec.get('term'):params.append(('genres[]' if spec['term']['category']=='genre' else 'tags[]',spec['term']['sourceId']))
             raw,_=checked_get(client,root+'/api/manga?'+urlencode(params),hosts);data=json.loads(raw)
             if not isinstance(data.get('data'),list):raise SourceError('Источник изменил структуру каталога')
-            term=spec.get('term') or {};rows=lib_titles(data,spec['site'],term.get('label',''),term.get('category','tag'))
-            for row in rows:
+            term=spec.get('term') or {};ranobe=spec.get('kind')=='ranobe'
+            rows=(ranobe_titles if ranobe else lib_titles)(data,spec['site'],term.get('label',''),term.get('category','tag'))
+            # Ranobe rows go to content_titles; the lazy card details below
+            # are manga catalog_titles records.
+            for row in [] if ranobe else rows:
                 slug=urlsplit(row['url']).path.rstrip('/').split('/')[-1]
                 details.append({**spec,'type':'lib-detail','slug':slug,'row':row})
             meta=data.get('meta') or {};more=meta.get('has_next_page')

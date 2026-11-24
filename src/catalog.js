@@ -146,6 +146,20 @@ export function catalogItem(value){
     ids:value.ids||{},titles:value.titles||{}};
 }
 
+// How a title page refreshes its card. A provider with a catalogue
+// (fetchCatalog) is asked by its id. HanimeTV, RanobeLib and other sources
+// indexed by MediaVault have none: their "provider:url" id reads the index
+// card (/catalog/content/title), and their readers find sources by title.
+export function titleLookup(value,indexed=false){
+  const id=String(value?.providerId||'');
+  if(!id||value.sourceOnly||value.provider==='youtube')return null;
+  if(value.provider==='omdb')return indexed?{index:{kind:value.kind,provider:'omdb',id}}:null;
+  if(Object.hasOwn(providers,value.provider))return value.provider==='openlibrary'&&!/^OL\d+W$/.test(id)?null:{catalog:true};
+  if(!indexed||value.kind==='manga'||!value.provider)return null;
+  const own=value.provider+':';
+  return {index:{kind:value.kind,provider:value.provider,id:id.startsWith(own)?id.slice(own.length):id}};
+}
+
 export function mergeCatalog(values){
   const result=[];
   for(const value of values){

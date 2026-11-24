@@ -248,7 +248,7 @@ def install(app,owner,viewer,manager):
     @app.get('/catalog/content/title')
     def content_title(kind:str,provider:str,id:str,subject=Depends(viewer)):
         from manga_discovery import catalogue_reader
-        if kind not in content_catalog.KINDS or not 1<=len(provider)<=100 or not 1<=len(id)<=100:
+        if kind not in content_catalog.KINDS or not 1<=len(provider)<=100 or not 1<=len(id)<=200:
             raise HTTPException(404,'Тайтл отсутствует в индексе.')
         store=manager()
         with catalogue_reader(store) as db:result=content_catalog.title(db,kind,provider,id,prepared=True)

@@ -1,5 +1,5 @@
 """Owner-triggered bounded public taxonomy/metadata refresh. No reader bytes."""
-import json,time,threading
+import json,re,time,threading
 from urllib.parse import urljoin,urlsplit,urlencode
 from urllib.robotparser import RobotFileParser
 import requests,httpx
@@ -121,6 +121,47 @@ def lib_titles(payload,site_id,label,category):
         format={'Манга':'manga','Манхва':'manhwa','Маньхуа':'manhua','Manga':'manga','Manhwa':'manhwa','Manhua':'manhua'}.get((row.get('type') or {}).get('label'),'manga')
         rows.append({'kind':'manga','format':format,'provider':provider,'providerName':name,'title':title,'aliases':[title],
                      'url':root+'/ru/'+slug,'sourceUrl':root+'/ru/'+slug,'language':'ru','adult':site_id==4,'age':18 if site_id==4 else None,**lib_metadata(row),**lib_identity(row),**facts})
+    return rows
+
+# RanobeLib (LibGroup site 3) tells its editions apart; content_catalog's
+# ranobe format aliases turn these into Ранобэ / Веб-новелла / Новелла.
+RANOBE_EDITIONS={'light-novel':'light_novel','web-novel':'web_novel','novel':'novel'}
+NOVEL_SUFFIX=re.compile(r'\s*\((?:Новелла|Ранобэ|Novel|Light Novel|Web Novel)\)\s*$',re.I)
+
+def ranobe_titles(payload,site_id,label,category):
+    """RanobeLib listing rows as content_catalog ranobe rows.
+
+    The identity and link are those of ranobe_ru.lib_search: provider
+    ranobelib, https://ranobelib.me/ru/book/<slug_url>, id "provider:url" like
+    a client source result. No providerId: the title page asks no catalogue API."""
+    from ranobe_ru import LIB_ROOT,LIB_SITE
+    if site_id!=LIB_SITE:return []
+    rows=[]
+    for row in payload.get('data',[])[:60]:
+        if not isinstance(row,dict):continue
+        slug=row.get('slug_url')
+        if not isinstance(slug,str) or not re.fullmatch(r'[\w-]{1,150}',slug):continue
+        names=[' '.join(v.split()) for v in (row.get('rus_name'),row.get('eng_name'),row.get('name')) if isinstance(v,str) and v.strip()]
+        if not names:continue
+        # LibGroup marks the book next to its manga adaptation: "X (Новелла)".
+        title=NOVEL_SUFFIX.sub('',names[0]) or names[0]
+        url=LIB_ROOT+'/ru/book/'+slug;facts=from_api(row)
+        if label:
+            field='genres' if category=='genre' else 'tags';facts[field]=list(dict.fromkeys([*facts[field],label]))
+        titles={k:NOVEL_SUFFIX.sub('',' '.join(row[f].split())) for k,f in (('ru','rus_name'),('en','eng_name')) if isinstance(row.get(f),str) and row[f].strip()}
+        other=[v for v in row.get('otherNames') or [] if isinstance(v,str)]
+        aliases=list(dict.fromkeys(v for v in [title,*names,*titles.values(),*other] if v.strip()))[:60]
+        item={'id':'ranobelib:'+url,'kind':'ranobe','provider':'ranobelib','providerName':'RanobeLib','title':title[:500],'titles':titles,
+              'aliases':aliases,'url':url,'sourceUrl':url,'language':'ru',**facts}
+        cover=row.get('cover')
+        if isinstance(cover,dict) and isinstance(cover.get('default'),str):item['cover']=cover['default']
+        if year:=re.search(r'\b(?:18|19|20)\d{2}\b',str(row.get('releaseDateString') or row.get('releaseDate') or '')):item['year']=int(year[0])
+        if isinstance(row.get('status'),dict) and isinstance(row['status'].get('label'),str):item['status']=row['status']['label']
+        age=re.fullmatch(r'(\d{1,2})\+',str((row.get('ageRestriction') or {}).get('label') or '').strip()) if isinstance(row.get('ageRestriction'),dict) else None
+        if age:item['age']=int(age[1])
+        if edition:=RANOBE_EDITIONS.get(str((row.get('edition') or {}).get('slug') or '') if isinstance(row.get('edition'),dict) else ''):item['format']=edition
+        if isinstance(row.get('summary'),str) and row['summary'].strip():item['description']=summary_text(row['summary'])
+        rows.append(item)
     return rows
 
 def scan(store,keys=None):

@@ -38,6 +38,8 @@ JOB_ERRORS={'storage','repeated-page','empty-page','incomplete-write'}
 # slowly; base listings bring new titles. An explicit prioritize still makes a
 # finished tag route due at once.
 REFRESH_TAG=7*86400
+# Below base listings (10): eager tag routes fill in behind discovery.
+TERM_ROUTE_PRIORITY=5
 REFRESH_BASE=48*3600
 REFRESH_DETAIL=86400
 REFRESH_FIXED={'anilist-trending':3600,'omdb':86400}
@@ -344,11 +346,14 @@ class Indexer:
                                 self.store.db.execute('INSERT OR IGNORE INTO catalogue_tag_targets VALUES(?,?,?)',(spec['domain'],label,canonical_json(target).decode()))
                 for term in result.get('vocabulary') or []:
                     field='genres' if term.get('category')=='genre' else 'tags'
-                    vocabulary_added+=add(self.store.db,term['label'],spec['domain'],field,'manga')
+                    vocabulary_added+=add(self.store.db,term['label'],spec['domain'],field,spec.get('kind') or 'manga')
                     if spec['type'] in {'lib-vocabulary','bridge-vocabulary','remanga-vocabulary'}:target={**spec,'type':spec['type'].removesuffix('-vocabulary'),'term':term}
                     elif term.get('url'):target={**spec,'type':'html','url':term['url'],'term':term}
                     else:continue
                     self.store.db.execute('INSERT OR IGNORE INTO catalogue_tag_targets VALUES(?,?,?)',(spec['domain'],term['label'],canonical_json(target).decode()))
+                    # A source whose listing carries no tags (RanobeLib) walks every
+                    # route of its vocabulary; the same job id keeps one copy.
+                    if spec.get('eagerTerms') and spec['type']=='lib-vocabulary':self.enqueue(target,TERM_ROUTE_PRIORITY)
                 if vocabulary_added:bump(self.store.db)
                 next_cursor=result.get('next');state='queued' if next_cursor else result.get('state') or ('partial' if spec['type']=='html' else 'done')
                 if kept and '-detail' not in spec['type']:
@@ -473,7 +478,7 @@ class Indexer:
                 rows.append({'domain':spec['domain'],'name':spec['name'],'status':status,'pages':pages,'indexed':records,'storedTitles':stored.get(source_provider(spec),0),'expected':expected,'pendingDetails':details,'pendingCatalogues':catalogues,'error':reason or error,'retryAt':due if state in {'retry','stalled'} else None})
                 if reason:rows[-1]['failure']=error
                 if state=='stalled':rows[-1]['stalled']=True
-                if spec['type']=='omdb':rows[-1].pop('storedTitles')  # This source writes to content_titles.
+                if spec['type']=='omdb' or spec.get('kind')=='ranobe':rows[-1].pop('storedTitles')  # These sources write to content_titles.
                 if spec['type']=='mirror':rows[-1]['mirrorOf']=spec['primary']
                 if self.paused.get(host_of(spec),0)>self.clock():rows[-1]['pausedUntil']=self.paused[host_of(spec)]
             by_domain={r['domain']:r for r in rows}

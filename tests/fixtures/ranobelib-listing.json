@@ -1,0 +1,309 @@
+{
+ "recorded": "2026-11-24",
+ "request": "GET https://api.cdnrulib.link/api/manga?site_id[]=3&page=200 ->page=200 (Site-Id: 3)",
+ "data": [
+  {
+   "id": 116379,
+   "name": "I Devour Mechas (Novel)",
+   "rus_name": "Я пожираю мехов (Новелла)",
+   "eng_name": "I Devour Mechas",
+   "slug": "i-devour-mechas",
+   "slug_url": "116379--i-devour-mechas",
+   "cover": {
+    "filename": "uw4Z2F8fhvjD",
+    "thumbnail": "https://cover.mangalib.me/uploads/cover/i-devour-mechas/cover/uw4Z2F8fhvjD_thumb.jpg",
+    "default": "https://cover.mangalib.me/uploads/cover/i-devour-mechas/cover/uw4Z2F8fhvjD_250x350.jpg",
+    "md": "https://cover.mangalib.me/uploads/cover/i-devour-mechas/cover/uw4Z2F8fhvjD_250x350.jpg"
+   },
+   "ageRestriction": {
+    "id": 1,
+    "label": "6+"
+   },
+   "site": 3,
+   "type": {
+    "id": 13,
+    "label": "Английский"
+   },
+   "releaseDateString": "2021 г.",
+   "rating": {
+    "average": "8",
+    "averageFormated": "8",
+    "votes": 4,
+    "votesFormated": "4",
+    "user": 0
+   },
+   "model": "manga",
+   "status": {
+    "id": 1,
+    "label": "Онгоинг"
+   },
+   "is_licensed": false,
+   "edition": null,
+   "content_marking": []
+  },
+  {
+   "id": 80544,
+   "name": "Пепельные цветы (Novel)",
+   "rus_name": "Пепельные цветы (Новелла)",
+   "eng_name": "Ash flowers",
+   "slug": "pepelnye-cvety-novel",
+   "slug_url": "80544--pepelnye-cvety-novel",
+   "cover": {
+    "filename": "mIWqVOaUwO9d",
+    "thumbnail": "https://cover.mangalib.me/uploads/cover/pepelnye-cvety-novel/cover/mIWqVOaUwO9d_thumb.jpg",
+    "default": "https://cover.mangalib.me/uploads/cover/pepelnye-cvety-novel/cover/mIWqVOaUwO9d_250x350.jpg",
+    "md": "https://cover.mangalib.me/uploads/cover/pepelnye-cvety-novel/cover/mIWqVOaUwO9d_250x350.jpg"
+   },
+   "ageRestriction": {
+    "id": 3,
+    "label": "16+"
+   },
+   "site": 3,
+   "type": {
+    "id": 14,
+    "label": "Авторский"
+   },
+   "releaseDateString": "2021 г.",
+   "rating": {
+    "average": "8",
+    "averageFormated": "8",
+    "votes": 4,
+    "votesFormated": "4",
+    "user": 0
+   },
+   "model": "manga",
+   "status": {
+    "id": 2,
+    "label": "Завершён"
+   },
+   "is_licensed": false,
+   "edition": null,
+   "content_marking": [
+    {
+     "id": 2,
+     "label": "Содержит упоминание наркотиков"
+    }
+   ]
+  },
+  {
+   "id": 216234,
+   "name": "Эхо Души",
+   "rus_name": "Эхо Души",
+   "eng_name": "Echo Of The Soul",
+   "slug": "exo-dusi",
+   "slug_url": "216234--exo-dusi",
+   "cover": {
+    "filename": "9cedcba0-2e16-4be9-aa93-d7ae13bbdedc",
+    "thumbnail": "https://cover.mangalib.me/uploads/cover/exo-dusi/cover/9cedcba0-2e16-4be9-aa93-d7ae13bbdedc_thumb.jpg",
+    "default": "https://cover.mangalib.me/uploads/cover/exo-dusi/cover/9cedcba0-2e16-4be9-aa93-d7ae13bbdedc.jpg",
+    "md": "https://cover.mangalib.me/uploads/cover/exo-dusi/cover/9cedcba0-2e16-4be9-aa93-d7ae13bbdedc.jpg"
+   },
+   "ageRestriction": {
+    "id": 3,
+    "label": "16+"
+   },
+   "site": 3,
+   "type": {
+    "id": 14,
+    "label": "Авторский"
+   },
+   "releaseDateString": "2024 г.",
+   "rating": {
+    "average": "8",
+    "averageFormated": "8",
+    "votes": 4,
+    "votesFormated": "4",
+    "user": 0
+   },
+   "model": "manga",
+   "status": {
+    "id": 1,
+    "label": "Онгоинг"
+   },
+   "is_licensed": false,
+   "edition": null,
+   "content_marking": [
+    {
+     "id": 2,
+     "label": "Содержит упоминание наркотиков"
+    }
+   ]
+  },
+  {
+   "id": 51630,
+   "name": "Всегда второй.... (Novel)",
+   "rus_name": "Всегда второй.... (Новелла)",
+   "eng_name": "Always second",
+   "slug": "slabeisii-iz-silneisix",
+   "slug_url": "51630--slabeisii-iz-silneisix",
+   "cover": {
+    "filename": "O5mqKC9rbBrB",
+    "thumbnail": "https://cover.mangalib.me/uploads/cover/slabeisii-iz-silneisix/cover/O5mqKC9rbBrB_thumb.jpg",
+    "default": "https://cover.mangalib.me/uploads/cover/slabeisii-iz-silneisix/cover/O5mqKC9rbBrB_250x350.jpg",
+    "md": "https://cover.mangalib.me/uploads/cover/slabeisii-iz-silneisix/cover/O5mqKC9rbBrB_250x350.jpg"
+   },
+   "ageRestriction": {
+    "id": 1,
+    "label": "6+"
+   },
+   "site": 3,
+   "type": {
+    "id": 14,
+    "label": "Авторский"
+   },
+   "releaseDateString": "2020 г.",
+   "rating": {
+    "average": "8",
+    "averageFormated": "8",
+    "votes": 4,
+    "votesFormated": "4",
+    "user": 0
+   },
+   "model": "manga",
+   "status": {
+    "id": 1,
+    "label": "Онгоинг"
+   },
+   "is_licensed": false,
+   "edition": null,
+   "content_marking": []
+  },
+  {
+   "id": 244658,
+   "name": "Обитель её последнего желания",
+   "rus_name": "Обитель её последнего желания",
+   "eng_name": "The abode of her last wish",
+   "slug": "obitel-ee-poslednego-zelaniia",
+   "slug_url": "244658--obitel-ee-poslednego-zelaniia",
+   "cover": {
+    "filename": "63508ceb-aa9f-4d87-a2ab-5a44842ad33c",
+    "thumbnail": "https://cover.mangalib.me/uploads/cover/obitel-ee-poslednego-zelaniia/cover/63508ceb-aa9f-4d87-a2ab-5a44842ad33c_thumb.jpg",
+    "default": "https://cover.mangalib.me/uploads/cover/obitel-ee-poslednego-zelaniia/cover/63508ceb-aa9f-4d87-a2ab-5a44842ad33c.jpg",
+    "md": "https://cover.mangalib.me/uploads/cover/obitel-ee-poslednego-zelaniia/cover/63508ceb-aa9f-4d87-a2ab-5a44842ad33c.jpg"
+   },
+   "ageRestriction": {
+    "id": 4,
+    "label": "18+"
+   },
+   "site": 3,
+   "type": {
+    "id": 14,
+    "label": "Авторский"
+   },
+   "releaseDateString": "2025 г.",
+   "rating": {
+    "average": "8",
+    "averageFormated": "8",
+    "votes": 4,
+    "votesFormated": "4",
+    "user": 0
+   },
+   "model": "manga",
+   "status": {
+    "id": 1,
+    "label": "Онгоинг"
+   },
+   "is_licensed": false,
+   "edition": null,
+   "content_marking": [
+    {
+     "id": 2,
+     "label": "Содержит упоминание наркотиков"
+    }
+   ]
+  },
+  {
+   "id": 226011,
+   "name": "Xiūxiān, wǒ cái shì nǚ zhǔ",
+   "rus_name": "Совершенствование в бессмертии, я — главная героиня",
+   "eng_name": "Cultivation in immortality, I am the main character.",
+   "slug": "xiuxian-wo-cai-shi-nu-zhu",
+   "slug_url": "226011--xiuxian-wo-cai-shi-nu-zhu",
+   "cover": {
+    "filename": "bba4ecf5-ca26-48d1-bf21-de9340ebec40",
+    "thumbnail": "https://cover.mangalib.me/uploads/cover/xiuxian-wo-cai-shi-nu-zhu/cover/bba4ecf5-ca26-48d1-bf21-de9340ebec40_thumb.jpg",
+    "default": "https://cover.mangalib.me/uploads/cover/xiuxian-wo-cai-shi-nu-zhu/cover/bba4ecf5-ca26-48d1-bf21-de9340ebec40.jpg",
+    "md": "https://cover.mangalib.me/uploads/cover/xiuxian-wo-cai-shi-nu-zhu/cover/bba4ecf5-ca26-48d1-bf21-de9340ebec40.jpg"
+   },
+   "ageRestriction": {
+    "id": 2,
+    "label": "12+"
+   },
+   "site": 3,
+   "type": {
+    "id": 12,
+    "label": "Китай"
+   },
+   "releaseDateString": "2023 г.",
+   "rating": {
+    "average": "8",
+    "averageFormated": "8",
+    "votes": 4,
+    "votesFormated": "4",
+    "user": 0
+   },
+   "model": "manga",
+   "status": {
+    "id": 2,
+    "label": "Завершён"
+   },
+   "is_licensed": false,
+   "edition": null,
+   "content_marking": []
+  },
+  {
+   "id": 184550,
+   "name": "Genius Blacksmith’s Game",
+   "rus_name": "Игра гениального кузнеца",
+   "eng_name": "Genius Blacksmith’s Game",
+   "slug": "genius-blacksmiths-game",
+   "slug_url": "184550--genius-blacksmiths-game",
+   "cover": {
+    "filename": "b4e0a101-32db-40af-9a87-d61d5790c582",
+    "thumbnail": "https://cover.mangalib.me/uploads/cover/genius-blacksmiths-game/cover/b4e0a101-32db-40af-9a87-d61d5790c582_thumb.jpg",
+    "default": "https://cover.mangalib.me/uploads/cover/genius-blacksmiths-game/cover/b4e0a101-32db-40af-9a87-d61d5790c582.jpg",
+    "md": "https://cover.mangalib.me/uploads/cover/genius-blacksmiths-game/cover/b4e0a101-32db-40af-9a87-d61d5790c582.jpg"
+   },
+   "ageRestriction": {
+    "id": 1,
+    "label": "6+"
+   },
+   "site": 3,
+   "type": {
+    "id": 11,
+    "label": "Корея"
+   },
+   "releaseDateString": "2023 г.",
+   "rating": {
+    "average": "8",
+    "averageFormated": "8",
+    "votes": 4,
+    "votesFormated": "4",
+    "user": 0
+   },
+   "model": "manga",
+   "status": {
+    "id": 1,
+    "label": "Онгоинг"
+   },
+   "is_licensed": false,
+   "edition": {
+    "id": 8,
+    "slug": "web-novel",
+    "name": "Веб-новелла",
+    "short_name": "WN"
+   },
+   "content_marking": []
+  }
+ ],
+ "meta": {
+  "current_page": 200,
+  "from": 11941,
+  "path": "http://api.cdnrulib.link/api/manga",
+  "per_page": 60,
+  "to": 12000,
+  "page": 200,
+  "has_next_page": true,
+  "seed": "b169c016c5318d8f3d26198ca1686628"
+ }
+}

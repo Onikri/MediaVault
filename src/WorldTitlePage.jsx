@@ -2,7 +2,7 @@ import CrashBoundary from './CrashBoundary.jsx';
 import {useEffect,useMemo,useState,useRef,useCallback,lazy,Suspense} from 'react';
 import {mergeTitleIdentity,preserveCatalogFacts} from './title-details.js';
 import {profileForSeason} from './use-season-source.js';
-import {catalogItem,fetchCatalog,mergeCatalog,normalized} from './catalog.js';
+import {catalogItem,fetchCatalog,mergeCatalog,normalized,titleLookup} from './catalog.js';
 import {loadTitleProfile,translate} from './title-metadata.js';
 import TitlePage from './TitlePage.jsx';
 import OfficialSeriesPlayer from './OfficialSeriesPlayer.jsx';
@@ -36,7 +36,7 @@ function withSupplement(base,extra){const result={...base};for(const [key,value]
 const languageNames={ru:'Русский',en:'Английский',ja:'Японский',ko:'Корейский'};
 export default function WorldTitlePage({value,service,state,onBack,onSubmitted,onOpenLibrary,destination='online',onRelated}){
  const localInput=useRef(null),[localFile,setLocalFile]=useState(null);
- const [item,setItem]=useState(value),[profile,setProfile]=useState(null),[supplement,setSupplement]=useState(null),[loading,setLoading]=useState(false),[saveOpen,setSaveOpen]=useState(false),[saveTo,setSaveTo]=useState('local'),[viewSeason,setViewSeason]=useState(null),[seasonProfiles,setSeasonProfiles]=useState({});
+ const [item,setItem]=useState(value),[profile,setProfile]=useState(null),[supplement,setSupplement]=useState(null),[loading,setLoading]=useState(false),[cardPending,setCardPending]=useState(false),[saveOpen,setSaveOpen]=useState(false),[saveTo,setSaveTo]=useState('local'),[viewSeason,setViewSeason]=useState(null),[seasonProfiles,setSeasonProfiles]=useState({});
  const tagPolicyVersion=useMangaPolicy(service);
  useTabIdentity(item?.title||value.title,item?.kind||value.kind);
  useEffect(()=>{loadSelection().catch(()=>{});},[]);
@@ -64,12 +64,16 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  },[value.id,tagPolicyVersion,service.server]);
  useEffect(()=>{
   const abort=new AbortController();setItem(value);setProfile(null);setSupplement(null);setViewSeason(null);setSeasonProfiles({});setSaveOpen(false);setLoading(true);
-  const tasks=[];
-  if(value.provider==='omdb'&&value.providerId&&service.session?.worldCatalogueBrowse)tasks.push(
-   service.request('/catalog/content/title?'+new URLSearchParams({kind:value.kind,provider:value.provider,id:value.providerId}),{signal:abort.signal})
-    .then(row=>{if(!abort.signal.aborted)setItem(catalogItem({...row,id:value.id}));})
+  const tasks=[],lookup=titleLookup(value,service.session?.worldCatalogueBrowse===true);
+  // An index-only card (no catalogue API) holds its reader/player until the
+  // card's own title arrives, so sources are searched by it, not a placeholder.
+  setCardPending(!!lookup?.index&&value.provider!=='omdb');
+  if(lookup?.index)tasks.push(
+   service.request('/catalog/content/title?'+new URLSearchParams(lookup.index),{signal:abort.signal})
+    .then(row=>{if(!abort.signal.aborted)setItem(old=>catalogItem(value.provider==='omdb'?{...row,id:value.id}:{...old,...row,id:value.id,providerId:value.providerId}));})
+    .finally(()=>{if(!abort.signal.aborted)setCardPending(false);})
   );
-  else if(!value.sourceOnly&&value.providerId&&!['youtube','omdb'].includes(value.provider)&&!(value.provider==='openlibrary'&&!/^OL\d+W$/.test(value.providerId)))tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem(old=>({...mergeCatalog(value.kind==='book'?[old,...rows]:[...rows,old])[0],id:value.id}));}));
+  else if(lookup?.catalog)tasks.push(fetchCatalog(value.provider,{identity:value.providerId,kind:value.kind,server:service.server,signal:abort.signal}).then(rows=>{if(!abort.signal.aborted&&rows.length)setItem(old=>({...mergeCatalog(value.kind==='book'?[old,...rows]:[...rows,old])[0],id:value.id}));}));
   // Books: the Russian description and edition from Fantlab, the same work by ID.
   if(value.kind==='book'&&value.provider!=='fantlab'){
    const same=row=>[row.titles?.en,row.titles?.ru].some(t=>t&&(value.aliases||[value.title]).some(a=>normalized(a)===normalized(t)));
@@ -131,7 +135,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  }
  const publishedSeries=guestLocked(service.session,searchItem)?null:officialSeries(searchItem);
  const materials=<><div className="section-heading watch-materials-heading"><h2>{['manga','ranobe','book'].includes(item.kind)?'Читать':'Смотреть'}</h2></div>
-  <CrashBoundary label={['ranobe','book'].includes(item.kind)?'Читалка':item.kind==='manga'?'Читалка манги':'Плеер'}><Suspense fallback={<div className="lazy-stage" role="status" aria-label="Загружаем…"/>}>{['ranobe','book'].includes(item.kind)?<RanobeSources item={searchItem} service={service} state={state} expected={displayProfile.chapters}/>:publishedSeries?<OfficialSeriesPlayer key={item.id} title={item.title} source={publishedSeries}/>:<ImportSelection compact key={item.id} destination="online" onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} expected={displayProfile.chapters} onMangaPublication={receivePublication} onSeasonBrowse={setViewSeason} state={state} service={service} onSubmitted={onSubmitted}/>}</Suspense></CrashBoundary>
+  <CrashBoundary label={['ranobe','book'].includes(item.kind)?'Читалка':item.kind==='manga'?'Читалка манги':'Плеер'}><Suspense fallback={<div className="lazy-stage" role="status" aria-label="Загружаем…"/>}>{cardPending?<div className="lazy-stage" role="status" aria-label="Загружаем…"/>:['ranobe','book'].includes(item.kind)?<RanobeSources item={searchItem} service={service} state={state} expected={displayProfile.chapters}/>:publishedSeries?<OfficialSeriesPlayer key={item.id} title={item.title} source={publishedSeries}/>:<ImportSelection compact key={item.id} destination="online" onOpenLibrary={onOpenLibrary} item={searchItem} profile={baseDisplayProfile} expected={displayProfile.chapters} onMangaPublication={receivePublication} onSeasonBrowse={setViewSeason} state={state} service={service} onSubmitted={onSubmitted}/>}</Suspense></CrashBoundary>
  </>;
  return <><TitlePage shareService={service} onLocalFile={()=>localInput.current?.click()} title={title} state={state} actions={remoteArtwork} onBack={onBack} onRelated={openRelated} online onOnlinePlay={destinationAction} heroActions={heroActions} onlineProfile={displayProfile} onlineBusy={loading} materials={materials} onlineFacts={facts} server={service.server} backLabel="К результатам поиска"/><input ref={localInput} type="file" accept=".cbz,.zip" hidden onChange={e=>{const file=e.target.files?.[0];if(file)setLocalFile({id:'local:'+file.name+':'+file.lastModified,name:file.name,category:'manga',size:file.size,file});e.target.value='';}}/>{localFile&&<Suspense fallback={<p role="status">Открываем файл…</p>}><LocalMediaViewer item={localFile} catalog={{items:[localFile]}} libraryId="local" userId={state.user?.sub} readWhole={()=>Promise.resolve(localFile.file)} onClose={()=>setLocalFile(null)} readerService={service}/></Suspense>}</>;
 }
