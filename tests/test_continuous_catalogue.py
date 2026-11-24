@@ -63,6 +63,16 @@ class ContinuousTests(unittest.TestCase):
   with self.store.lock,self.db:worker.enqueue({'type':'lib','domain':'fixture.example','name':'Fixture','site':1})
   worker.run_once();self.now+=3;worker.run_once()
   self.assertEqual(worker.status()['sources'][0]['status'],'retry');self.assertEqual(browse(self.db)['total'],1)
+ def test_seed_prunes_a_large_automatic_detail_backlog_in_sqlite_sized_chunks(self):
+  worker=Indexer(self.store,lambda s,c:{'rows':[]},lambda:self.now,interval=0)
+  with self.store.lock,self.db:
+   keys=[worker.enqueue({'type':'html-detail','domain':'fixture.example','name':'Fixture','url':'https://fixture.example/title/'+str(number)},5) for number in range(1200)]
+   self.db.executemany('INSERT INTO catalogue_page_fingerprints(job,digest) VALUES(?,?)',((key,'old') for key in keys))
+   self.db.executemany('INSERT INTO catalogue_page_items(job,url) VALUES(?,?)',((key,'old') for key in keys))
+  worker.seed([])
+  self.assertEqual(self.db.execute("SELECT COUNT(*) FROM catalogue_jobs WHERE kind LIKE '%-detail'").fetchone()[0],0)
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM catalogue_page_fingerprints').fetchone()[0],0)
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM catalogue_page_items').fetchone()[0],0)
  def test_generic_catalogue_sql_filter_and_paging_preserve_total(self):
   # A small indexed fixture checks SQL paging/total independently of the result
   # limit; no artificial source corpus or network request is needed.

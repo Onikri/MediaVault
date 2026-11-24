@@ -112,10 +112,14 @@ class Indexer:
             # automatic jobs during normal source seeding, while preserving an
             # explicitly eager maintenance route and generic queue recovery.
             stale=[key for (key,) in self.store.db.execute("SELECT id FROM catalogue_jobs WHERE kind LIKE '%-detail' AND COALESCE(json_extract(spec,'$.eagerDetails'),0)!=1").fetchall()]
-            for key in stale:
-                self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(key,))
-                self.store.db.execute('DELETE FROM catalogue_page_items WHERE job=?',(key,))
-            if stale:self.store.db.execute('DELETE FROM catalogue_jobs WHERE id IN ('+','.join('?'*len(stale))+')',stale)
+            # A production backlog can contain hundreds of thousands of jobs.
+            # Keep every DELETE below SQLite's bound-variable limit and avoid
+            # issuing two statements per stale row during application startup.
+            for start in range(0,len(stale),500):
+                chunk=stale[start:start+500];marks=','.join('?'*len(chunk))
+                for table in ('catalogue_page_fingerprints','catalogue_page_items'):
+                    self.store.db.execute('DELETE FROM '+table+' WHERE job IN ('+marks+')',chunk)
+                self.store.db.execute('DELETE FROM catalogue_jobs WHERE id IN ('+marks+')',chunk)
             # The old HentaiChan feed was the home page, not its full catalogue.
             # Retire only that listing; retained cards and detail jobs stay intact.
             for key,raw in self.store.db.execute("SELECT id,spec FROM catalogue_jobs WHERE kind='html'").fetchall():
