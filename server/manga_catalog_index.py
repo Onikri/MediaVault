@@ -144,6 +144,9 @@ def initialize(conn):
     elif not compiled or compiled[0]!=WORK_TAG_INDEX_REVISION:
         with conn:rebuild_work_tags(conn)
 
+def _without_index_time(metadata):
+    return {key:value for key,value in metadata.items() if key!='indexedAt'}
+
 def upsert(conn, rows, source_id='', timestamp=None):
     """Idempotent; weak search results never erase enriched source tags."""
     now = float(time.time() if timestamp is None else timestamp)
@@ -159,9 +162,9 @@ def upsert(conn, rows, source_id='', timestamp=None):
         if not title or not provider or not url or row.get('kind', 'manga') != 'manga':
             continue
         identity = hashlib.sha256((provider + '\x00' + url).encode('utf-8')).hexdigest()[:32]
-        old = conn.execute('SELECT metadata,first_seen,inspected,tag_state,chapter_count,work_key FROM catalog_titles WHERE id=?',
+        old = conn.execute('SELECT metadata,first_seen,inspected,tag_state,chapter_count,work_key,'
+                           'title,source_id,search_text,language,format,adult,year FROM catalog_titles WHERE id=?',
                            (identity,)).fetchone()
-        if old:affected.add(old[5])
         # The discovery worker may supply a partial metadata-only row.
         previous = json.loads(old[0]) if old else {}
         inspected = isinstance(row.get('episodes'), list) or row.get('metadataInspected') is True
@@ -216,11 +219,23 @@ def upsert(conn, rows, source_id='', timestamp=None):
         if len(clean_metadata.encode('utf-8')) > 32000:
             # Never let an abnormally large upstream payload poison the index.
             continue
+        changes=conn.total_changes
         for category in ('tags','genres'):
             for label in facts[category]:
                 conn.execute('INSERT OR IGNORE INTO catalog_tag_facts VALUES(?,?,?)',(identity,category,label))
                 vocabulary_added+=add(conn,label,host(url),category,'manga')
         work_key=normalize(title) or identity
+        # A crawler revisits most rows unchanged. Keep updated/inspected as
+        # "last seen" and skip the tag and work-tag rewrite when the stored
+        # columns, metadata (apart from indexedAt) and tag facts are the same.
+        if (old and conn.total_changes==changes and tuple(old[6:13])==(title,sid,search,lang,kind,adult,year)
+                and old[3]==data['tagStatus'] and old[4]==chapter_count and old[5]==work_key
+                and _without_index_time(previous)==_without_index_time(json.loads(clean_metadata))):
+            conn.execute('UPDATE catalog_titles SET updated=?,inspected=CASE WHEN ? THEN ? ELSE inspected END WHERE id=?',
+                         (now,inspected,now,identity))
+            count += 1
+            continue
+        if old:affected.add(old[5])
         conn.execute('''INSERT INTO catalog_titles(
              id,provider,source_id,source_url,title,search_text,language,format,
              adult,year,chapter_count,tag_state,metadata,first_seen,updated,inspected,work_key)

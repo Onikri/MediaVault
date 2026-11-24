@@ -190,7 +190,6 @@ def ingest(db,rows):
         previous=db.execute('SELECT raw FROM content_titles WHERE id=?',(key,)).fetchone()
         if previous:
             old=json.loads(previous[0])
-            affected.add(work_key(old,key))
             for field in ('tags','genres','aliases'):data[field]=list(dict.fromkeys([*data[field],*old.get(field,[])]))[:120]
             for field in ('sourceUrl','sourceURL','url','cover','description'):
                 if not data.get(field):data[field]=old.get(field,'')
@@ -200,9 +199,13 @@ def ingest(db,rows):
             for field in ('ids','titles'):data[field]={**old.get(field,{}),**data[field]}
         raw=json.dumps(data,ensure_ascii=False,separators=(',',':'))
         if len(raw.encode())>24000:continue
-        if provider=='omdb' and previous and previous[0]==raw:
+        if previous and previous[0]==raw:
+            # Unchanged: tags, facts and work tags already match this record.
+            # OMDb keeps its old behaviour of leaving the row untouched.
+            if provider!='omdb':db.execute('UPDATE content_titles SET updated=? WHERE id=?',(int(time.time()),key))
             count+=1
             continue
+        if previous:affected.add(work_key(old,key))
         search=normalize(' '.join([title,*data['aliases'],*data['titles'].values()]))[:5000]
         db.execute('INSERT OR REPLACE INTO content_titles VALUES(?,?,?,?,?)',(key,data['kind'],search,raw,int(time.time())))
         new_facts+=_index(db,key,data,current())

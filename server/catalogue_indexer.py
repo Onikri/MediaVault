@@ -1,5 +1,5 @@
 """Durable, fair metadata crawling on the VM; no image or chapter requests."""
-import hashlib,json,os,shutil,threading,time
+import hashlib,json,logging,os,re,shutil,threading,time
 from pathlib import Path
 from manga_tag_policy import canonical_json,current
 
@@ -17,7 +17,7 @@ from manga_profile_languages import PROFILE_LANGUAGES
 _PROFILE_CODES = ','.join("'" + lang + "'" for lang in sorted(PROFILE_LANGUAGES))
 _LANG = "lower(replace(json_extract(spec,'$.source.lang'),'_', '-'))"
 _SCOPE = f"(kind NOT LIKE 'bridge%' OR {_LANG} IS NULL OR substr({_LANG},1,instr({_LANG}||'-','-')-1) IN ({_PROFILE_CODES}))"
-CLAIMABLE=_SCOPE+" AND state IN ('queued','retry','done','partial') AND due<=?"
+CLAIMABLE=_SCOPE+" AND state IN ('queued','retry','done','partial','stalled') AND due<=?"
 BASE_KINDS=('lib','bridge','remanga','html','omdb')
 # Per-host request spacing in seconds; LibGroup tolerates a faster pace and
 # slows down again by itself on 429.
@@ -26,11 +26,75 @@ PACE={LIB_HOST:0.6}
 # minute and a burst of 429s would rest the whole host.
 FLOOR={'anilist.co':2.2}
 HOST_SLOTS=2
-# Bridge jobs all run inside the one local Suwayomi process.
+# Bridge jobs routed through the one local Suwayomi process share these
+# slots. A bridge job served by a native adapter talks to its site directly
+# and is bounded only by the per-host pace and HOST_SLOTS.
 BRIDGE_SLOTS=4
 # Consecutive transport failures that pause a whole host.
 TRIP_AFTER=5
 JOB_ERRORS={'storage','repeated-page','empty-page','incomplete-write'}
+# A finished crawl starts again from page one after this many seconds.
+# Tag/genre routes (catalogue_tag_targets, the owner's prioritize) change
+# slowly; base listings bring new titles. An explicit prioritize still makes a
+# finished tag route due at once.
+REFRESH_TAG=7*86400
+REFRESH_BASE=48*3600
+REFRESH_DETAIL=86400
+REFRESH_FIXED={'anilist-trending':3600,'omdb':86400}
+# Consecutive failures after which a job only retries once a week.
+STALL_AFTER=48
+STALL_RETRY=7*86400
+# catalogue_page_items of a finished crawl are dropped in short transactions.
+PURGE_BATCH=5000
+PURGE_MIN_BATCH=500
+PURGE_HOLD=0.2
+# One failure log line per host per this many seconds.
+LOG_EVERY=60
+log=logging.getLogger('catalogue_indexer')
+# A server error page indexed as a title ("MySQL Fatal Error"). Distinctive
+# technical phrases match at the start; generic ones only as the whole title.
+JUNK_TITLE_PREFIXES=('mysql fatal error','warning: mysqli','warning: mysql_','fatal error: uncaught','502 bad gateway',
+                     '503 service unavailable','503 service temporarily unavailable','504 gateway time-out','504 gateway timeout',
+                     'error establishing a database connection','database error','attention required! | cloudflare','ddos-guard')
+JUNK_TITLES=('access denied','just a moment','attention required','internal server error','bad gateway','service unavailable',
+             '403 forbidden','404 not found','site maintenance')
+
+def junk_title(title):
+    text=' '.join(str(title or '').lower().split())
+    return text.startswith(JUNK_TITLE_PREFIXES) or text.rstrip(' .!…') in JUNK_TITLES
+
+_QUERY=re.compile(r'(https?://[^\s?#\'"]+)[?#][^\s\'"]*')
+_SECRET=re.compile(r'(?i)\b(?:headers?|cookies?|authorization|set-cookie)\b')
+
+def failure_text(error):
+    """The class and message of a failure, without URL parameters or headers."""
+    text=_QUERY.sub(r'\1',' '.join(str(error).split()))
+    if found:=_SECRET.search(text):text=text[:found.start()].rstrip(' :,;({[')+' …'
+    return (type(error).__name__+': '+text[:200]).rstrip(': ')
+
+def refresh_interval(spec):
+    kind=str(spec.get('type',''))
+    if kind in REFRESH_FIXED:return REFRESH_FIXED[kind]
+    if '-detail' in kind:return REFRESH_DETAIL
+    return REFRESH_TAG if spec.get('term') else REFRESH_BASE
+
+def suwayomi_route(spec,cursor=None):
+    """Whether this job's requests go through the local Suwayomi process."""
+    if not str(spec.get('type','')).startswith('bridge'):return False
+    if spec.get('route')=='suwayomi' or (cursor or {}).get('route')=='suwayomi':return True
+    from manga_native_sources import for_source
+    return for_source(spec.get('source') or {}) is None
+
+_suwayomi_sql=None
+def suwayomi_sql():
+    """SQL twin of suwayomi_route() for the claim filter."""
+    global _suwayomi_sql
+    if _suwayomi_sql is None:
+        from manga_native_sources import ADAPTERS
+        native=','.join("'"+str(key).replace("'","''")+"'" for key in sorted(ADAPTERS,key=str)) or "''"
+        _suwayomi_sql=("(kind LIKE 'bridge%' AND (COALESCE(CAST(json_extract(spec,'$.source.id') AS TEXT),'') NOT IN ("+native+")"
+                       " OR COALESCE(json_extract(spec,'$.route'),'')='suwayomi' OR COALESCE(json_extract(cursor,'$.route'),'')='suwayomi'))")
+    return _suwayomi_sql
 
 def retire_removed(db):
     """Forget a site the owner removed: its crawl queue, indexed cards and search cache.
@@ -73,7 +137,7 @@ def host_of(spec):
 class Indexer:
     def __init__(self,store,fetch=None,clock=time.time,interval=1.1):
         self.store=store;self.clock=clock;self.fetch=fetch or __import__('catalogue_sources').fetch;self.stop=threading.Event();self.threads=[];self.rate={};self.rate_lock=threading.Lock();self.interval=interval;self.turn=0;self.inflight={}
-        self.pace={};self.failures={};self.trips={};self.paused={};self.served={};self.bridges=0
+        self.pace={};self.failures={};self.trips={};self.paused={};self.served={};self.bridges=0;self.logged={}
         self.claim_lock=threading.Lock()
         with store.lock,store.db:
             store.db.execute('CREATE TABLE IF NOT EXISTS catalogue_jobs(id TEXT PRIMARY KEY,spec TEXT NOT NULL,cursor TEXT NOT NULL,state TEXT NOT NULL,priority INTEGER NOT NULL,due REAL NOT NULL,pages INTEGER NOT NULL DEFAULT 0,records INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT \'\',updated REAL NOT NULL,lease TEXT NOT NULL DEFAULT \'\')')
@@ -85,6 +149,8 @@ class Indexer:
             store.db.execute('CREATE INDEX IF NOT EXISTS catalogue_jobs_kind ON catalogue_jobs(kind,state)')
             store.db.execute("CREATE INDEX IF NOT EXISTS catalogue_jobs_domain_due ON catalogue_jobs(kind,json_extract(spec,'$.domain'),state,due,id)")
             if 'expected' not in columns:store.db.execute('ALTER TABLE catalogue_jobs ADD COLUMN expected INTEGER')
+            # error keeps the technical failure; reason is the owner-facing phrase.
+            if 'reason' not in columns:store.db.execute("ALTER TABLE catalogue_jobs ADD COLUMN reason TEXT NOT NULL DEFAULT ''")
             # The request host is stored so a claim reads one indexed row per
             # host instead of sorting the whole queue through JSON.
             if 'host' not in columns:store.db.execute("ALTER TABLE catalogue_jobs ADD COLUMN host TEXT NOT NULL DEFAULT ''")
@@ -150,11 +216,14 @@ class Indexer:
         if not keys:return
         with self.store.lock,self.store.db:
             for source,label,target in self.store.db.execute('SELECT source,label,target FROM catalogue_tag_targets').fetchall():
-                if policy.key(label,source) in keys:self.enqueue(json.loads(target),80)
+                if policy.key(label,source) in keys:
+                    key=self.enqueue(json.loads(target),80)
+                    # A finished route waits days for its refresh; the owner's ask runs now.
+                    self.store.db.execute("UPDATE catalogue_jobs SET due=MIN(due,?) WHERE id=? AND state IN ('done','partial','stalled')",(self.clock(),key))
 
     def _candidate(self, db, now, columns):
         # Hosts without a due job need no per-host index lookup.
-        bridge='' if self.bridges<BRIDGE_SLOTS else " AND kind NOT LIKE 'bridge%'"
+        bridge='' if self.bridges<BRIDGE_SLOTS else ' AND NOT '+suwayomi_sql()
         eligible=db.execute('SELECT DISTINCT host FROM catalogue_jobs WHERE '+CLAIMABLE+bridge,(now,))
         hosts=[host for (host,) in eligible if self.inflight.get(host,0)<HOST_SLOTS and self.paused.get(host,0)<=now]
         self.turn+=1
@@ -194,7 +263,6 @@ class Indexer:
             if row is None:return None
             names=columns.split(',')[:7]
             job=dict(zip(names,row));job['spec']=json.loads(job['spec']);job['cursor']=json.loads(job['cursor']);host=job['host']=row[7]
-            job['bridge']=job['spec'].get('type','').startswith('bridge')
             job['lease']=os.urandom(12).hex()
             with self.store.lock,self.store.db:
                 # An operator or source maintenance may have updated this job since the snapshot.
@@ -202,9 +270,10 @@ class Indexer:
                                               (job['lease'],now,row[0],row[6],row[9],row[2],row[1]))
                 if not updated.rowcount:return None
                 if job['state'] in {'done','partial'}:
-                    job['cursor']={'page':1};self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
-                    self.store.db.execute('DELETE FROM catalogue_page_items WHERE job=?',(job['id'],))
+                    job['cursor']={'page':1};job['pages']=0;self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
+                    # The previous run's URL set is dropped in short batches by run_once().
                     self.store.db.execute('UPDATE catalogue_jobs SET pages=0,records=0,expected=NULL WHERE id=?',(job['id'],))
+            job['bridge']=suwayomi_route(job['spec'],job['cursor'])
             self.inflight[host]=self.inflight.get(host,0)+1;self.served[host]=self.turn
             if job['bridge']:self.bridges+=1
             return job
@@ -216,6 +285,8 @@ class Indexer:
         try:
             data_dir=Path(os.getenv('DATA_DIR','/data'))
             if data_dir.exists() and shutil.disk_usage(data_dir).free<512*1024*1024:raise RuntimeError('storage')
+            # A run from page one counts its own unique records.
+            if not job['pages'] and '-detail' not in spec['type']:self.purge_items(job['id'])
             # One request per host per pace step, even across all workers.
             host=job['host']
             with self.rate_lock:
@@ -236,14 +307,24 @@ class Indexer:
             with self.store.lock,self.store.db:
                 active=self.store.db.execute('SELECT lease FROM catalogue_jobs WHERE id=?',(job['id'],)).fetchone()
                 if not active or active[0]!=job['lease']:return True
-                if rows and self.store.db.execute('SELECT 1 FROM catalogue_page_fingerprints WHERE job=? AND digest=?',(job['id'],digest)).fetchone():raise RuntimeError('repeated-page')
+                if rows and self.store.db.execute('SELECT 1 FROM catalogue_page_fingerprints WHERE job=? AND digest=?',(job['id'],digest)).fetchone():
+                    # Past its end a source may serve its last page again
+                    # (Kinobox, SayManhwa): after distinct pages, the same page
+                    # twice in a row ends the listing. A pager that ignores the
+                    # page number or loops back is still an error.
+                    last=self.store.db.execute('SELECT digest FROM catalogue_page_fingerprints WHERE job=? ORDER BY rowid DESC LIMIT 1',(job['id'],)).fetchone()
+                    if result.get('next') and not (job['pages']>=2 and last and last[0]==digest):raise RuntimeError('repeated-page')
+                    rows=[];result={'rows':[],'next':None,'state':result.get('state'),'total':result.get('total'),'reason':result.get('reason','')}
                 if rows:self.store.db.execute('INSERT INTO catalogue_page_fingerprints VALUES(?,?)',(job['id'],digest))
                 from manga_catalog_index import upsert
                 from content_catalog import ingest
-                manga=[r for r in rows if r.get('kind')=='manga' and str(r.get('provider','')).split(':')[0] not in {'anilist','kitsu','jikan','shikimori'}]
-                other=[r for r in rows if r not in manga]
+                # A server error page is not a title.
+                kept=[r for r in rows if not junk_title(r.get('title'))]
+                if len(kept)<len(rows):self.log_failure(host,spec['type'],'error-page title',None,len(rows)-len(kept))
+                manga=[r for r in kept if r.get('kind')=='manga' and str(r.get('provider','')).split(':')[0] not in {'anilist','kitsu','jikan','shikimori'}]
+                other=[r for r in kept if r not in manga]
                 count=upsert(self.store.db,manga)+ingest(self.store.db,other)
-                if count!=len(rows):raise RuntimeError('incomplete-write')
+                if count!=len(kept):raise RuntimeError('incomplete-write')
                 for child in result.get('catalogues') or []:self.enqueue(child,70)
                 # Do not fan one listing into millions of detail requests.
                 # Explicit maintenance may opt a source into eager details;
@@ -270,18 +351,23 @@ class Indexer:
                     self.store.db.execute('INSERT OR IGNORE INTO catalogue_tag_targets VALUES(?,?,?)',(spec['domain'],term['label'],canonical_json(target).decode()))
                 if vocabulary_added:bump(self.store.db)
                 next_cursor=result.get('next');state='queued' if next_cursor else result.get('state') or ('partial' if spec['type']=='html' else 'done')
-                if rows and '-detail' not in spec['type']:
+                if kept and '-detail' not in spec['type']:
                     before=self.store.db.total_changes
-                    self.store.db.executemany('INSERT OR IGNORE INTO catalogue_page_items VALUES(?,?)',[(job['id'],str(r.get('sourceUrl') or r.get('url') or r.get('id'))) for r in rows])
+                    self.store.db.executemany('INSERT OR IGNORE INTO catalogue_page_items VALUES(?,?)',[(job['id'],str(r.get('sourceUrl') or r.get('url') or r.get('id'))) for r in kept])
                     count=self.store.db.total_changes-before
-                interval={'anilist-trending':3600,'omdb':86400}.get(spec['type'],86400 if '-detail' in spec['type'] else 21600)
-                due=self.clock()+(2 if next_cursor else interval)
-                self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),priority=CASE WHEN ? THEN priority ELSE MIN(priority,10) END,attempts=0,error=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),bool(next_cursor),result.get('reason',''),self.clock(),job['id']))
+                due=self.clock()+(2 if next_cursor else refresh_interval(spec))
+                finished=not next_cursor and '-detail' not in spec['type']
+                # Items written before this point belong to the finished run.
+                below=self.store.db.execute('SELECT MAX(rowid) FROM catalogue_page_items').fetchone()[0] if finished else None
+                self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),priority=CASE WHEN ? THEN priority ELSE MIN(priority,10) END,attempts=0,error=?,reason=\'\',updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),bool(next_cursor),result.get('reason',''),self.clock(),job['id']))
                 if '-detail' in spec['type'] and not next_cursor:
                     self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(job['id'],));self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
             self.answered(host)
+            # records keeps the run's total; its URL set is no longer needed.
+            if finished and below:self.purge_items(job['id'],below)
         except Exception as error:
             from source_parser import SourceRateLimitError
+            failure=failure_text(error)
             response = getattr(error, 'response', None)
             code = getattr(response, 'status_code', None)
             retry_after = getattr(response, 'headers', {}).get('Retry-After')
@@ -297,12 +383,40 @@ class Indexer:
                     self.paused[job['host']] = max(self.paused.get(job['host'], 0), self.clock() + wait)
             elif str(error) not in JOB_ERRORS:
                 self.failed(job['host'], code)
-            with self.store.lock,self.store.db:self.store.db.execute("UPDATE catalogue_jobs SET state='retry',due=?,attempts=attempts+1,error=?,updated=?,lease='' WHERE id=? AND lease=?",(self.clock()+wait,reason,self.clock(),job['id'],job['lease']))
+            attempt=job['attempts']+1
+            # A job failing for days rests for a week instead of hourly retries.
+            state='stalled' if attempt>=STALL_AFTER and str(error)!='storage' else 'retry'
+            if state=='stalled':wait=max(wait,STALL_RETRY)
+            self.log_failure(job['host'],spec.get('type',''),type(error).__name__,attempt)
+            with self.store.lock,self.store.db:self.store.db.execute("UPDATE catalogue_jobs SET state=?,due=?,attempts=attempts+1,error=?,reason=?,updated=?,lease='' WHERE id=? AND lease=?",(state,self.clock()+wait,failure,reason,self.clock(),job['id'],job['lease']))
         finally:
             with self.claim_lock:
                 self.inflight[job['host']]=max(0,self.inflight.get(job['host'],1)-1)
                 if job['bridge']:self.bridges=max(0,self.bridges-1)
         return True
+
+    def purge_items(self,job_id,below=None):
+        """Drop a job's catalogue_page_items without holding the writer for long."""
+        batch=PURGE_BATCH;limit='' if below is None else ' AND rowid<=?'
+        while True:
+            with self.store.lock:
+                started=time.monotonic()
+                with self.store.db:
+                    deleted=self.store.db.execute('DELETE FROM catalogue_page_items WHERE rowid IN (SELECT rowid FROM catalogue_page_items WHERE job=?'+limit+' LIMIT ?)',
+                                                  (job_id,*(() if below is None else (below,)),batch)).rowcount
+                held=time.monotonic()-started
+            if deleted<batch or self.stop.is_set():return
+            if held>PURGE_HOLD:batch=max(PURGE_MIN_BATCH,batch//2)
+            # Let a waiting writer in between batches.
+            time.sleep(0.005)
+
+    def log_failure(self,host,kind,error,attempt,skipped=0):
+        now=time.monotonic()
+        with self.rate_lock:
+            if host in self.logged and now-self.logged[host]<LOG_EVERY:return
+            self.logged[host]=now
+        if skipped:log.warning('catalogue page host=%s kind=%s skipped=%d reason=%s',host,kind,skipped,error)
+        else:log.warning('catalogue job failed host=%s kind=%s error=%s attempt=%d',host,kind,error,attempt)
 
     def base_pace(self,host):
         return max(FLOOR.get(host,0) if self.interval else 0,min(self.interval,PACE.get(host,self.interval)))
@@ -349,12 +463,16 @@ class Indexer:
             pending_catalogues={domain:count for domain,count in db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind IN ('html','lib','bridge','remanga') AND json_extract(spec,'$.term') IS NOT NULL AND state IN ('queued','retry','running') GROUP BY json_extract(spec,'$.domain')")}
             stored=dict(db.execute('SELECT provider,COUNT(*) FROM catalog_titles GROUP BY provider'))
             from catalogue_sources import source_provider
-            for spec,state,pages,records,error,due,expected in db.execute("SELECT spec,state,pages,records,error,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books','omdb') ORDER BY id"):
+            for spec,state,pages,records,error,reason,due,expected in db.execute("SELECT spec,state,pages,records,error,reason,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books','omdb') ORDER BY id"):
                 spec=json.loads(spec)
                 if '-detail' in spec['type'] or spec['type'].endswith('-vocabulary') or spec.get('term'):continue
                 details=pending_details.get(spec['domain'],0)
                 catalogues=pending_catalogues.get(spec['domain'],0)
-                rows.append({'domain':spec['domain'],'name':spec['name'],'status':'enriching' if state in {'done','partial'} and (details or catalogues) else state,'pages':pages,'indexed':records,'storedTitles':stored.get(source_provider(spec),0),'expected':expected,'pendingDetails':details,'pendingCatalogues':catalogues,'error':error,'retryAt':due if state=='retry' else None})
+                # A stalled job is a slow retry for every status consumer.
+                status='enriching' if state in {'done','partial'} and (details or catalogues) else 'retry' if state=='stalled' else state
+                rows.append({'domain':spec['domain'],'name':spec['name'],'status':status,'pages':pages,'indexed':records,'storedTitles':stored.get(source_provider(spec),0),'expected':expected,'pendingDetails':details,'pendingCatalogues':catalogues,'error':reason or error,'retryAt':due if state in {'retry','stalled'} else None})
+                if reason:rows[-1]['failure']=error
+                if state=='stalled':rows[-1]['stalled']=True
                 if spec['type']=='omdb':rows[-1].pop('storedTitles')  # This source writes to content_titles.
                 if spec['type']=='mirror':rows[-1]['mirrorOf']=spec['primary']
                 if self.paused.get(host_of(spec),0)>self.clock():rows[-1]['pausedUntil']=self.paused[host_of(spec)]

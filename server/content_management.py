@@ -211,7 +211,7 @@ def install(app,owner,viewer,manager):
             if service:
                 from suwayomi_bridge import sources
                 service.seed(sources())
-                with service.store.lock,service.store.db:service.store.db.execute("UPDATE catalogue_jobs SET state='queued',due=0 WHERE state IN ('done','partial','retry','unsupported') AND spec NOT LIKE '%-detail%'")
+                with service.store.lock,service.store.db:service.store.db.execute("UPDATE catalogue_jobs SET state='queued',due=0 WHERE state IN ('done','partial','retry','stalled','unsupported') AND spec NOT LIKE '%-detail%'")
                 return service.status()
         prior=scan_status()
         return start_scan(manager(),prior.get('keys') if prior.get('state') in {'failed','interrupted'} else None)

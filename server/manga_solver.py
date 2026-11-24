@@ -61,7 +61,7 @@ def configure(manifest, reader_ids=()):
                     if {'jobs', 'work'}.issubset(tables):
                         stats['invalidatedSnapshots'] += db.execute("UPDATE jobs SET state='interrupted' WHERE state='done' AND id IN (SELECT job FROM work WHERE source_id=? AND state IN ('skipped','unavailable'))", (identity,)).rowcount
                     if 'catalogue_jobs' in tables:
-                        stats['queuedCatalogueJobs'] += db.execute("UPDATE catalogue_jobs SET due=MIN(due,?) WHERE state IN ('retry','partial') AND CAST(json_extract(spec,'$.source.id') AS TEXT)=?", (time.time(), identity)).rowcount
+                        stats['queuedCatalogueJobs'] += db.execute("UPDATE catalogue_jobs SET due=MIN(due,?) WHERE state IN ('retry','stalled','partial') AND CAST(json_extract(spec,'$.source.id') AS TEXT)=?", (time.time(), identity)).rowcount
         if reader_ids:
             from manga_source_health import reset_failures
             reset_failures(reader_ids)

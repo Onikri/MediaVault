@@ -6,7 +6,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 from catalogue_html import catalogue,metadata
 from catalogue_sources import base_sources,fetch
-from catalogue_indexer import Indexer
+from catalogue_indexer import Indexer,REFRESH_BASE
 from manga_catalog_index import initialize
 from source_parser import SourceError
 from bs4 import BeautifulSoup
@@ -71,7 +71,9 @@ class CompletionTests(unittest.TestCase):
    worker.run_once();now[0]+=3;worker.run_once();status=worker.status()['sources'][0]
    self.assertEqual(status['indexed'],3);self.assertEqual(status['pages'],2)
    self.assertEqual(db.execute('SELECT priority FROM catalogue_jobs').fetchone()[0],10)
-   now[0]+=21601;worker.run_once();status=worker.status()['sources'][0]
+   self.assertEqual(db.execute('SELECT COUNT(*) FROM catalogue_page_items').fetchone()[0],0)
+   now[0]+=21601;self.assertFalse(worker.run_once())
+   now[0]+=REFRESH_BASE;worker.run_once();status=worker.status()['sources'][0]
    self.assertEqual(status['indexed'],2);self.assertEqual(status['pages'],1);db.close()
 
  def test_existing_private_lib_session_is_reused_only_for_detail_requests(self):

@@ -349,6 +349,8 @@ class Discovery:
         with self.db:
             self.db.executescript('''
               PRAGMA journal_mode=WAL;
+              PRAGMA synchronous=NORMAL;
+              PRAGMA journal_size_limit=268435456;
               CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,owner TEXT NOT NULL,signature TEXT NOT NULL,
                 query TEXT NOT NULL,language TEXT NOT NULL,state TEXT NOT NULL,created REAL NOT NULL,updated REAL NOT NULL,expires REAL NOT NULL,dispatched REAL NOT NULL);
               CREATE INDEX IF NOT EXISTS jobs_owner_signature ON jobs(owner,signature,state,expires);
