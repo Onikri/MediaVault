@@ -163,6 +163,10 @@ def recover(manager):
             keys=None if status.get('keys') is None or pending.get('all') else sorted(set(status.get('keys',[])+pending.get('keys',[])))
             start_scan(manager(),keys)
     except (OSError,ValueError):pass
+    # Owner-approved merges dropped in as tag-merge-pending.json are applied
+    # in short batches instead of save()'s single full reindex.
+    import tag_merge
+    tag_merge.start(manager)
     if current().include_discovered:
         from catalogue_indexer import ensure
         ensure(manager())

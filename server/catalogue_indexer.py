@@ -491,7 +491,8 @@ class Indexer:
             other=db.execute('SELECT COUNT(*) FROM content_titles').fetchone()[0]
             pending=db.execute("SELECT COUNT(*) FROM catalogue_jobs WHERE state IN ('queued','retry','running')").fetchone()[0]
         completed=sum(r['status'] in {'done','unsupported'} for r in rows)
-        return {'state':'running' if pending else 'done','continuous':True,'total':len(rows),'completed':completed,'indexed':manga+other,'pending':pending,'sources':rows}
+        from tag_merge import status as merge_status
+        return {'state':'running' if pending else 'done','continuous':True,'total':len(rows),'completed':completed,'indexed':manga+other,'pending':pending,'sources':rows,**merge_status()}
 
 def ensure(store):
     global _service

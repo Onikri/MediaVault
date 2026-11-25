@@ -438,37 +438,47 @@ def _public_metadata(row):
 def reindex(conn,policy=None):
     """Rebuild the projection from retained source facts, including removals."""
     policy=policy or current()
-    from content_vocabulary import add,bump
+    from content_vocabulary import bump
     rows=conn.execute('SELECT id,metadata FROM catalog_titles ORDER BY id')
     count=0;added=0
     conn.execute('DELETE FROM catalog_tags')
     for identity,raw in rows:
         count+=1
-        row=json.loads(raw)
-        from catalog_taxonomy import classify
-        for category in ('tags','genres'):
-            if not conn.execute('SELECT 1 FROM catalog_tag_facts WHERE title_id=? AND category=? LIMIT 1',(identity,category)).fetchone():
-                for label in unique(row.get(category) or []):
-                    conn.execute('INSERT OR IGNORE INTO catalog_tag_facts VALUES(?,?,?)',(identity,category,label))
-        source=urlsplit(row.get('sourceUrl') or row.get('url') or '').hostname or ''
-        raw_facts={}
-        for category in ('tags','genres'):
-            facts=list(dict.fromkeys(readable_label(v[0]) for v in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category)) if readable_label(v[0])))
-            raw_facts[category]=facts
-            for label in facts:
-                added+=add(conn,label,source,category,'manga')
-                key=policy.identity(label,source) if policy.include_discovered else policy.key(label,source)
-                classified=classify(label,category,'manga',policy,source)
-                if key and classified:conn.execute('INSERT OR IGNORE INTO catalog_tags VALUES(?,?,?,?)',(identity,classified[0],key,label))
-        row.update(raw_facts if policy.include_discovered else policy.facts(raw_facts,source))
-        state='present' if row['tags'] or row['genres'] else 'not_provided_in_detail' if row.get('metadataChecked') else 'not_requested'
-        row['tagStatus']=state
-        conn.execute('UPDATE catalog_titles SET metadata=?,tag_state=? WHERE id=?',(json.dumps(row,ensure_ascii=False),state,identity))
+        added+=reproject_title(conn,identity,raw,policy)
     conn.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('revision',?)",(policy.revision,))
     conn.execute("INSERT OR REPLACE INTO catalog_policy_state VALUES('label-index',?)",(LABEL_INDEX_REVISION,))
     rebuild_work_tags(conn)
     if added:bump(conn)
     return count
+
+def reproject_title(conn,identity,raw,policy,*,single=False):
+    """Project one title's retained facts. single=True replaces only its rows
+    and rewrites the stored document only when the projection changed."""
+    from content_vocabulary import add
+    from catalog_taxonomy import classify
+    row=json.loads(raw);added=0
+    if single:
+        before=json.loads(raw)
+        conn.execute('DELETE FROM catalog_tags WHERE title_id=?',(identity,))
+    for category in ('tags','genres'):
+        if not conn.execute('SELECT 1 FROM catalog_tag_facts WHERE title_id=? AND category=? LIMIT 1',(identity,category)).fetchone():
+            for label in unique(row.get(category) or []):
+                conn.execute('INSERT OR IGNORE INTO catalog_tag_facts VALUES(?,?,?)',(identity,category,label))
+    source=urlsplit(row.get('sourceUrl') or row.get('url') or '').hostname or ''
+    raw_facts={}
+    for category in ('tags','genres'):
+        facts=list(dict.fromkeys(readable_label(v[0]) for v in conn.execute('SELECT original FROM catalog_tag_facts WHERE title_id=? AND category=?',(identity,category)) if readable_label(v[0])))
+        raw_facts[category]=facts
+        for label in facts:
+            added+=add(conn,label,source,category,'manga')
+            key=policy.identity(label,source) if policy.include_discovered else policy.key(label,source)
+            classified=classify(label,category,'manga',policy,source)
+            if key and classified:conn.execute('INSERT OR IGNORE INTO catalog_tags VALUES(?,?,?,?)',(identity,classified[0],key,label))
+    row.update(raw_facts if policy.include_discovered else policy.facts(raw_facts,source))
+    state='present' if row['tags'] or row['genres'] else 'not_provided_in_detail' if row.get('metadataChecked') else 'not_requested'
+    row['tagStatus']=state
+    if not single or row!=before:conn.execute('UPDATE catalog_titles SET metadata=?,tag_state=? WHERE id=?',(json.dumps(row,ensure_ascii=False),state,identity))
+    return added
 
 
 def _visibility(policy):
