@@ -141,14 +141,24 @@ def catalogue(spec, cursor, http=None):
         if own:http.close()
     soup = BeautifulSoup(text, 'html.parser')
     cards = sites._hanime1_cards(soup, final_url)
-    if not cards:raise SourceError('hanime1 не отдал карточки каталога на странице ' + str(page))
-    last = last_page(soup, final_url, genre, tag, date)
+    # The walk keeps the deepest page any pager named: one page served with a
+    # short or missing pager (the base walk stopped at page 41 of 387 on
+    # 2026-11-25) no longer ends it.
+    known = int(cursor.get('last') or 0)
+    if not cards:
+        # Past page 1 an empty listing inside the pager is where the site stops serving.
+        if page > 1:
+            from source_parser import SourceListingEnd
+            raise SourceListingEnd(f'Дочитано до предела сайта: страница {page} без карточек'
+                                   + (f' из {known} по пейджеру' if known else '') + f'; частичный охват, прочитано {page - 1} стр.')
+        raise SourceError('hanime1 не отдал карточки каталога на странице ' + str(page))
+    last = max(known, last_page(soup, final_url, genre, tag, date))
     more = page < last
     ready, held = page_rows(cards, cursor.get('held') or [], not more)
     rows = [term_row(items, term) if tag or date else series_row(items, genre) for items in ready]
     if len(rows) > MAX_ROWS:raise SourceError('hanime1 отдал больше карточек, чем пишет одна страница индекса')
     # A page whose every series waits for its first episode is not the end.
-    result = {'rows': rows, 'next': {'page': page + 1, **({'held': held} if held else {})} if more else None,
+    result = {'rows': rows, 'next': {'page': page + 1, 'last': last, **({'held': held} if held else {})} if more else None,
               'emptySpan': not rows}
     # A tag or year route writes facts only to series the listing already
     # holds: a series seen there without its first episode is not a new card.

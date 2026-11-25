@@ -98,7 +98,8 @@ def provider_for(url):
     host, path = parts.hostname or '', parts.path
     if host == 'hanime1.me' and path == '/watch' and re.fullmatch(r'\d{1,9}', (parse_qs(parts.query).get('v') or [''])[0]):
         return 'hanime1', PROVIDERS['hanime1'][0]
-    if host == 'hentaimama.io' and re.fullmatch(r'/(?:tvshows|episodes)/[a-z0-9-]{1,160}/?', path, re.I):
+    # A few HentaiMama slugs keep a symbol percent-encoded ("star%e2%98%86jewel").
+    if host == 'hentaimama.io' and re.fullmatch(r'/(?:tvshows|episodes)/(?:[a-z0-9-]|%[0-9a-f]{2}){1,160}/?', path, re.I):
         return 'hentaimama', PROVIDERS['hentaimama'][0]
     if host == 'hentai.com.ua' and re.fullmatch(r'/hentai_video/[^/]{1,240}/?', path):
         return 'hentaicomua', PROVIDERS['hentaicomua'][0]
@@ -239,6 +240,14 @@ def mama_episodes(url, http):
     soup = BeautifulSoup(text, 'html.parser')
     heading = soup.select_one('h1')
     title = clean(heading.get_text(' ', strip=True)) if heading else ''
+    episodes = mama_episode_links(soup, final)
+    if not episodes:
+        raise SourceError('HentaiMama не показал серии этого тайтла.')
+    return title, episodes
+
+
+def mama_episode_links(soup, final):
+    """Episodes a series page links (".../<slug>-episode-<n>/"), in number order."""
     episodes = {}
     for anchor in soup.select('a[href*="/episodes/"]'):
         link = _url(anchor.get('href'), final, ('hentaimama.io',))
@@ -246,9 +255,7 @@ def mama_episodes(url, http):
         if match:
             number = int(match[1])
             episodes.setdefault(number, {'number': number, 'season': 1, 'url': link, 'title': 'Episode ' + str(number)})
-    if not episodes:
-        raise SourceError('HentaiMama не показал серии этого тайтла.')
-    return title, sorted(episodes.values(), key=lambda e: e['number'])[:MAX_EPISODES]
+    return sorted(episodes.values(), key=lambda e: e['number'])[:MAX_EPISODES]
 
 
 def mama_streams(url, http):

@@ -74,6 +74,8 @@ def base_sources(installed):
     jobs.append({'type':'hanime','kind':'anime','domain':'hanime.tv','name':'Хентай · HanimeTV'})
     # hanime1.me pages its whole listing; page 1 also queues its genre routes.
     jobs.append({'type':'hanime1','kind':'anime','domain':'hanime1.me','name':'Хентай · Hanime1'})
+    # HentaiMama: its series archive, then each series page (genres, studio, episodes).
+    jobs.append({'type':'hentaimama','kind':'anime','domain':'hentaimama.io','name':'Хентай · HentaiMama'})
     return jobs
 
 # A distinct address that serves the same catalogue as another source:
@@ -138,6 +140,9 @@ def fetch(spec,cursor):
         return catalogue(cursor)
     if kind=='hanime1':
         from catalogue_hanime1 import catalogue
+        return catalogue(spec,cursor)
+    if kind=='hentaimama':
+        from catalogue_hentaimama import catalogue
         return catalogue(spec,cursor)
     if kind in {'lib','lib-detail','lib-vocabulary'}:
         with httpx.Client(http2=True,timeout=15,headers=headers(spec)) as client:

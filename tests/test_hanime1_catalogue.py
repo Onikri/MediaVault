@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 import catalogue_hanime1,content_catalog,hentai_video_sites as sites
 from catalogue_indexer import Indexer,REFRESH_BASE
 from manga_catalog_index import initialize
-from source_parser import SourceChallengeError
+from source_parser import SourceChallengeError,SourceError
 
 FIXTURES=Path(__file__).parent/'fixtures'
 SEARCH=(FIXTURES/'hanime1-search.html').read_text(encoding='utf-8')
@@ -171,6 +171,33 @@ class Hanime1Catalogue(unittest.TestCase):
   # The weekly pass again: no fact twice, no new card.
   first=facts();now[0]+=8*86400;walk()
   self.assertEqual(len(http.calls),6);self.assertEqual(facts(),first);self.assertEqual(sorted(raw()),['Garden','Solo'])
+
+ def test_a_page_with_a_short_pager_does_not_end_the_walk(self):
+  # Page 1 names 387 pages; the cursor keeps that end.
+  first=catalogue_hanime1.catalogue(BASE,{'page':1},Http({catalogue_hanime1.listing_url(None,1):SEARCH}))
+  self.assertEqual((first['next']['page'],first['next']['last']),(2,387))
+  # On 2026-11-25 the base walk ended at page 41: that page's pager named no
+  # later page. With the cursor's end the walk reads page 42 on.
+  short=page([(41*60+n,'Solo '+chr(65+n)) for n in range(3)],41)
+  cursor={'page':41,'last':387}
+  result=catalogue_hanime1.catalogue(BASE,cursor,Http({catalogue_hanime1.listing_url(None,41):short}))
+  self.assertEqual((len(result['rows']),result['next']['page'],result['next']['last']),(3,42,387))
+  self.assertIsNone(catalogue_hanime1.catalogue(BASE,{'page':41},Http({catalogue_hanime1.listing_url(None,41):short}))['next'])
+  # The last page of the pager still ends the walk.
+  self.assertIsNone(catalogue_hanime1.catalogue(BASE,{'page':387,'last':387},Http({catalogue_hanime1.listing_url(None,387):short}))['next'])
+
+ def test_an_empty_page_past_page_one_finishes_the_walk_marked(self):
+  store=SimpleNamespace(db=self.db,lock=threading.RLock());now=[10000.0]
+  from catalogue_sources import fetch
+  worker=Indexer(store,fetch,lambda:now[0],interval=0);worker.seed([])
+  self.db.execute("UPDATE catalogue_jobs SET due=? WHERE kind!='hanime1'",(now[0]+10**9,))
+  self.db.execute("UPDATE catalogue_jobs SET cursor=?,pages=41 WHERE kind='hanime1'",(json.dumps({'page':42,'last':387}),))
+  http=Http({catalogue_hanime1.listing_url(None,42):'<div>no cards</div>'+''.join(f'<a href="?page={n}">{n}</a>' for n in (41,43,387))})
+  with patch('source_parser.PublicHttp',lambda **_:http):self.assertTrue(worker.run_once())
+  state,cursor,reason=self.db.execute("SELECT state,cursor,reason FROM catalogue_jobs WHERE kind='hanime1'").fetchone()
+  self.assertEqual((state,cursor),('done','{"page":1}'));self.assertIn('страница 42 без карточек из 387',reason)
+  # Page 1 without cards is still a failure, not an end.
+  with self.assertRaises(SourceError):catalogue_hanime1.catalogue(BASE,{'page':1},Http({catalogue_hanime1.listing_url(None,1):'<div></div>'}))
 
  def test_a_genre_route_refreshes_weekly_and_the_listing_every_two_days(self):
   from catalogue_indexer import refresh_interval,REFRESH_TAG
