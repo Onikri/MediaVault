@@ -4,7 +4,7 @@ from urllib.parse import urlsplit,urljoin,urlencode
 from bs4 import BeautifulSoup
 import httpx,requests
 from content_source_routes import LIB,HTML
-from content_sources import checked_get,permitted,html_terms,lib_terms,lib_titles,lib_metadata,ranobe_titles
+from content_sources import checked_get,permitted,html_terms,html_text,lib_terms,lib_titles,lib_metadata,ranobe_titles
 from manga_source_tags import from_api,from_html,unique
 from source_parser import SourceAccessError, SourceError, SourceTemporaryError
 
@@ -218,6 +218,7 @@ def fetch(spec,cursor):
             session.headers.update({'User-Agent':UA,'Referer':'https://'+urlsplit(url).hostname+'/','Accept':'text/html'})
             if not permitted(session,url,hosts):raise SourceError('Источник не разрешил получение каталога')
             raw,final=checked_get(session,url,hosts,timeout=30)
+        raw=html_text(raw)
         soup=BeautifulSoup(raw,'html.parser')
         from manga_sources import guard
         guard(soup)

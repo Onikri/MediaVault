@@ -66,6 +66,22 @@ def hentai_work_set(policy,manga=False):
     negative='SELECT '+work('peer')+' FROM '+facts+' f JOIN '+table+' peer ON peer.id=f.title_id WHERE catalog_not_hentai(f.original)=1'
     return 'SELECT eligible.work FROM ('+explicit+' UNION '+origins+') eligible WHERE eligible.work NOT IN ('+negative+')',wanted
 
+def hentai_only(raw,policy,negative=False):
+    """True when a genre filter value selects «Хентай» and nothing else."""
+    try:values=raw if isinstance(raw,(list,tuple)) else json.loads(raw) if str(raw or '').startswith('[') else str(raw or '').split(',')
+    except (ValueError,TypeError):return False
+    if not isinstance(values,(list,tuple)):return False
+    values=[v.strip() for v in values if isinstance(v,str) and v.strip()]
+    wanted={k for v in values if (classify(v,'genres','manga',policy) or ('',''))[0]=='genres' for k in keys(v,policy,allow_hidden=negative)}
+    return bool(wanted) and all(is_hentai(k,policy) for k in wanted)
+
+def hentai_works_query(db,policy,manga=False):
+    """The materialized manga work set once filled, else the derived union."""
+    if manga:
+        import hentai_works
+        if hentai_works.ready(db,policy):return 'SELECT h.work_key FROM '+hentai_works.TABLE+' h',[]
+    return hentai_work_set(policy,manga)
+
 def semantic_genre(label,policy=None,source=''):
     clean=readable_label(label)
     rule=policy.rules.get(policy.identity(clean,source),{}) if policy else {}
@@ -144,7 +160,7 @@ def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False)
         query+='x.tag_key IN ('+','.join('?' for _ in wanted)+')'
         if field=='genres' and any(is_hentai(k,policy) for k in wanted):
             ordinary=[k for k in wanted if not is_hentai(k,policy)]
-            hentai_query,hentai_args=hentai_work_set(policy,manga)
+            hentai_query,hentai_args=hentai_works_query(db,policy,manga)
             if ordinary:
                 query=query[:query.index('x.tag_key IN (')]+'x.tag_key IN ('+','.join('?' for _ in ordinary)+') UNION '+hentai_query
                 query_args.extend([*ordinary,*hentai_args])

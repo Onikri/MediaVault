@@ -54,9 +54,17 @@ def permitted(session,url,hosts,headers=None):
         _robots[key]=(now+ttl,robots,allowed)
     return allowed
 
+def html_text(raw):
+    """Decode a page before BeautifulSoup sees it. Given bytes, bs4 trusts the
+    UTF-8 <meta> only while every byte is valid; one stray byte makes it guess
+    a Mac code page (im.manga-chan.me: «веб» became «–≤–µ–±»)."""
+    if not isinstance(raw,(bytes,bytearray)):return raw
+    from source_parser import decode_document
+    return decode_document(bytes(raw))
+
 def html_terms(raw,url,hosts):
     found={}
-    for anchor in BeautifulSoup(raw,'html.parser').select(SELECTOR)[:4000]:
+    for anchor in BeautifulSoup(html_text(raw),'html.parser').select(SELECTOR)[:4000]:
         label=clean_label(anchor.get_text(' ',strip=True));link=urljoin(url,anchor.get('href') or '')
         p=urlsplit(link)
         if not label or p.scheme!='https' or p.hostname not in hosts:continue

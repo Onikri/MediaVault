@@ -93,6 +93,11 @@ def read_job():
 
 
 def status():
+    import label_repair
+    return {**_merge_status(), **label_repair.status()}
+
+
+def _merge_status():
     job = read_job()
     if not job:
         return {}
@@ -250,7 +255,14 @@ def step(store, pause=None):
         begin(store, pending)
         return True
     if job.get('state') != 'running':
-        return False
+        # Same thread, lower priority: the one-off label repair, then the
+        # resumable fill of the materialized «Хентай» work set.
+        import hentai_works
+        import label_repair
+        if not (label_repair.step(store) or hentai_works.step(store)):
+            return False
+        time.sleep(PAUSE if pause is None else pause)
+        return True
     try:
         if job.get('phase') == 'collect':
             collect(store, job)
