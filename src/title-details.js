@@ -6,9 +6,11 @@ export function titleNames(value={}){
  const seen=new Set();return [value.title,...Object.values(value.titles||{}),...(value.aliases||[])].filter(text).map(v=>v.trim()).filter(v=>{const k=key(v);if(!k||seen.has(k))return false;seen.add(k);return true;}).slice(0,30);
 }
 export function alternativeTitleNames(value,current=value?.title){return titleNames(value).filter(v=>key(v)!==key(current)).sort((a,b)=>Number(/[а-яё]/i.test(b))-Number(/[а-яё]/i.test(a)));}
+const PLACEHOLDER=/^название уточняется$/i;
 export function mergeTitleIdentity(item,profile={}){
- const aliases=titleNames({...item,aliases:[...titleNames(profile),...(item.aliases||[])]});
- const russian=text(profile.title)&&/[а-яё]/i.test(profile.title)?profile.title:'';
+ const aliases=titleNames({...item,aliases:[...titleNames(profile),...(item.aliases||[])]}).filter(v=>!PLACEHOLDER.test(v));
+ // «Название уточняется» is Shikimori's placeholder, not a Russian title.
+ const russian=text(profile.title)&&/[а-яё]/i.test(profile.title)&&!PLACEHOLDER.test(profile.title.trim())?profile.title:'';
  // The original catalogue IDs, kind and year remain the identity authority.
  return {...item,aliases,...(russian?{title:russian,titles:{...item.titles,ru:russian}}:{})};
 }

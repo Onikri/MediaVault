@@ -225,7 +225,7 @@ class AggregationTests(unittest.TestCase):
             return {'url':url,'title':'Дандадан','ids':{'mal':'57334'},'year':2024,'provider':'fixture', 'dubs':[choice('Studio A','https://kodikplayer.com/serial/1/h/720p')], 'episodes':[{'number':1,'url':url}]}
         # Kinobox now looks anime up by title; keep this aggregation test offline.
         offline=lambda selected:{'provider':'kinobox','name':'Kinobox','status':'no_match','sources':[],'complete':True}
-        with patch.object(discovery,'SITES',[BY_ID['yummy'],BY_ID['animego']]),patch.object(discovery,'search_site',side_effect=search),patch.object(discovery,'inspect_source',side_effect=inspect),patch('kinobox_source.discover',offline):
+        with patch.object(discovery,'SITES',[BY_ID['yummy'],BY_ID['animejoy']]),patch.object(discovery,'search_site',side_effect=search),patch.object(discovery,'inspect_source',side_effect=inspect),patch('kinobox_source.discover',offline):
             result=discovery._discover(selected)
         self.assertEqual(len(result['voices']),1)
         self.assertEqual(len(result['voices'][0]['variants']),2)

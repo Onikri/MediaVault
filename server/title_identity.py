@@ -40,7 +40,12 @@ def base_title(value):
     return normalized(re.sub(r'\s+\d{1,2}\s*$','',text))
 
 
-def match_title(selected, candidate):
+def counterless(value):
+    """The name without a trailing published-episode counter («[1-24 из 24]»)."""
+    return normalized(re.sub(r'\s*\[\s*\d+[^\]]*(?:из|серия|серий|эпизод)[^\]]*\]\s*$', '', str(value or '')))
+
+
+def match_title(selected, candidate, *, year_slack=0):
     wanted,found=aliases(selected),aliases(candidate)
     if not wanted or not found:return False,'missing_title'
     left,right=selected.get('ids') or {},candidate.get('ids') or {}
@@ -50,6 +55,15 @@ def match_title(selected, candidate):
     if selected.get('kind') and candidate.get('kind') and selected['kind']!=candidate['kind']:
         return False,'different_kind'
     if selected.get('year') and candidate.get('year') and str(selected['year'])[:4]!=str(candidate['year'])[:4]:
+        try:gap=abs(int(str(selected['year'])[:4])-int(str(candidate['year'])[:4]))
+        except ValueError:gap=None
+        if not year_slack or gap is None or gap>year_slack:
+            return False,'different_year'
+        # A neighbouring year (a TV season across New Year, another catalogue's
+        # premiere date) is the same work only under the very same name:
+        # a «(фильм)», «2 сезон» or subtitle variant still needs the exact year.
+        if any(counterless(a) and counterless(a)==counterless(b) for a in wanted for b in found):
+            return True,'exact_title_near_year'
         return False,'different_year'
     for a in wanted:
         for b in found:

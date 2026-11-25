@@ -3,13 +3,82 @@ from concurrent.futures import ThreadPoolExecutor,as_completed
 import threading
 import time
 import re
-from title_identity import aliases, match_title
+from title_identity import aliases, match_title, normalized
 from site_adapters import SITES, search_site, inspect_source
 from player_catalog import group_voices
 from source_parser import PublicHttp
 
 _cache={};_lock=threading.Lock();_slots=threading.BoundedSemaphore(2)
 _progress={}
+
+# Sites left out of the title search, with the reason seen on the server
+# (G3 check, 2026-11-26). Their adapters stay; a catalogued page of such a site
+# still opens. Re-check before switching one back on.
+OFF={
+    'sovet':'выключен ранее', 'anilibriafun':'выключен ранее', 'animevosttv':'выключен ранее',
+    'animejet':'домен не существует (DNS)', 'animeone':'домен не существует (DNS)',
+    'animebesst':'домен указывает на служебный адрес', 'animeon':'HTTP 526 (сертификат сайта)',
+    'animego':'HTTP 500 на поиске', 'animebit':'не отвечает', 'animebuff':'не отвечает',
+    'animeonline':'не отвечает', 'freeanime':'не отвечает',
+    'shiza':'поиск отдаёт главную страницу на любой запрос',
+    'anime365':'поиск отдаёт ленту новинок на любой запрос',
+    'animelayer':'торрент-трекер: поиск отдаёт ленту раздач, плееров нет',
+    'hentasis':'поиск отдаёт главную страницу на любой запрос',
+}
+# Hentai video sites: searched for adult cards only (a card the client marks
+# adult=False never has its title there). Their indexed pages always open.
+ADULT={'hentaichan-video','hanime','hanime1','hentaimama','hentaicomua','watchhentai','ohentai','hentasis'}
+# Sites that found the measured cards most often go first: with six workers the
+# first playable answer no longer waits behind dead or empty searches.
+ORDER=('anilibria','animedia','yummy','animejoy','anidub','anixart','animegoonline','animevost','jutsu','eneyida','uaserials',
+       'ohentai','hanime1','hanime','hentaimama','watchhentai','hentaicomua')
+PLACEHOLDERS={'названиеуточняется'}  # Shikimori's «Название уточняется» is not a title.
+
+
+def _russian_names(mal):
+    """Shikimori names of a MAL id (cached catalogue call), waited for briefly."""
+    box={}
+    def fetch():
+        try:
+            from metadata_catalog import metadata
+            data=metadata('shikimori',identity=str(mal),kind='anime')
+            if isinstance(data,dict) and str(data.get('id'))==str(mal):box['data']=data
+        except Exception:pass
+    thread=threading.Thread(target=fetch,daemon=True,name='discovery-names');thread.start();thread.join(3)
+    data=box.get('data') or {}
+    names=[data.get('russian'),data.get('name'),*(data.get('english') or []),*(data.get('synonyms') or [])]
+    return [v.strip() for v in names if isinstance(v,str) and v.strip()]
+
+
+def discovery_sites(kind,adult=None,anchored=None):
+    """Sites _discover asks for a card, in the order they are queued.
+
+    OFF sites and, for a card marked not adult, hentai sites are skipped unless
+    the card has a catalogued page there; an adult card queues hentai sites first."""
+    anchored=anchored or {}
+    sites=[s for s in SITES if (s.serves(kind) if hasattr(s,'serves') else s.kind==kind=='anime') and s.kind!='manga'
+           and (anchored.get(s.id) or s.id not in OFF and not (adult is False and s.id in ADULT))]
+    rank=lambda s:(0 if adult is True and s.id in ADULT else 1,adult is not True and s.id in ADULT,ORDER.index(s.id) if s.id in ORDER else len(ORDER))
+    return sorted(sites,key=rank)
+
+
+def search_card(selected):
+    """The card with the names Russian sites list it under.
+
+    Drops Shikimori's placeholder title. An anime card without any Cyrillic
+    name (its Shikimori profile did not reach the client) gets its Russian
+    name by its MAL id, the client's own source of that name. IDs, kind and
+    year stay the card's, so every match keeps the same identity rules."""
+    names=[v for v in aliases(selected) if normalized(v) not in PLACEHOLDERS]
+    card={**selected,'title':names[0] if names else selected.get('title'),
+          'titles':{k:v for k,v in (selected.get('titles') or {}).items() if normalized(v) not in PLACEHOLDERS} if isinstance(selected.get('titles'),dict) else selected.get('titles'),
+          'aliases':names}
+    mal=(selected.get('ids') or {}).get('mal')
+    if selected.get('kind','anime')=='anime' and mal and str(mal).isdigit() and not any(re.search(r'[а-яё]',v,re.I) for v in names):
+        extra=[v for v in _russian_names(mal) if normalized(v) not in PLACEHOLDERS]
+        russian=next((v for v in extra if re.search(r'[а-яё]',v,re.I)),'')
+        if russian:card={**card,'title':russian,'aliases':list(dict.fromkeys([*names,*extra]))[:30]}
+    return card
 
 def voice_suggestions(query='',limit=30,language='all'):
     """Labels observed on real Russian source/player pages; never a studio list.
@@ -86,7 +155,13 @@ def _discover(selected,*,refresh=False,continuing=False):
         known={s['url']:s for s in hit[1]['sources'] if s.get('complete',True)} if hit and hit[0]>time.monotonic() else {}
     if not _slots.acquire(blocking=False):raise ValueError('Поиск источников уже выполняется. Повтори через несколько секунд.')
     try:
-        names=aliases(selected)
+        card=search_card(selected)
+        names=aliases(card)
+        # Anime sites date a season by its last airing year or another
+        # catalogue's premiere; film catalogues publish the release year, and
+        # same-name films a year apart (remakes, TV versions) are common.
+        slack=1 if selected.get('kind','anime')=='anime' else 0
+        same=lambda candidate:match_title(card,candidate,year_slack=slack)
         # Search engines rarely match a catalogue's full localized film title.
         # Broaden the query only; all results still pass exact title/year/ID.
         stems=[v.split(':',1)[0].split('. Фильм',1)[0].strip() for v in names if re.search(r'[а-яё]',v,re.I)]
@@ -113,7 +188,7 @@ def _discover(selected,*,refresh=False,continuing=False):
                     response=search_site(site,query,http=http)
                     status=response['status'];message=response.get('message',message)
                     for candidate in response['results']:
-                        accepted,evidence=match_title(selected,candidate)
+                        accepted,evidence=same(candidate)
                         if accepted and not any(m['url']==candidate['url'] for m in matches):
                             matches.append({**candidate,'matchEvidence':evidence})
                     if matches:break  # Leave the request budget for its players.
@@ -141,7 +216,7 @@ def _discover(selected,*,refresh=False,continuing=False):
                             inspected.append({**value,'title':candidate['title'] or value.get('title',''),'providerName':site.name,'matchEvidence':'catalogue_source'})
                             continue
                         verified={**candidate,'ids':value.get('ids') or candidate.get('ids') or {},'year':value.get('year') or candidate.get('year')}
-                        accepted,evidence=match_title(selected,verified)
+                        accepted,evidence=same(verified)
                         if not accepted:continue
                         if selected.get('year') and not verified.get('year') and evidence!='external_id':
                             status='unverified';message='Название совпадает, но год или внешний ID не подтверждён страницей.';continue
@@ -149,7 +224,7 @@ def _discover(selected,*,refresh=False,continuing=False):
                         page_title=re.split(r'\s+(?:смотреть|watch)\b|\s+[|–—]\s+',value.get('title',''),flags=re.I)[0]
                         detail = {'title': page_title, 'aliases': value.get('aliases', []),
                                   'ids': value.get('ids') or {}, 'kind': selected.get('kind', 'anime')}
-                        if page_title and not match_title(selected, detail)[0]:
+                        if page_title and not same(detail)[0]:
                             # Some older Ukrainian pages publish only their localized
                             # heading. The card has already passed the identity check.
                             if value.get('aliases') or site.id not in {'eneyida', 'uaserials'} or not re.search(r'[іїєґ]', page_title, re.I):
@@ -166,7 +241,7 @@ def _discover(selected,*,refresh=False,continuing=False):
                 return {'provider':site.id,'name':site.name,'status':'unavailable','message':'Источник не ответил или изменил разметку.','sources':[]}
             finally:http.close()
         wanted=selected.get('kind','anime')
-        sites=[s for s in SITES if (s.serves(wanted) if hasattr(s,'serves') else s.kind==wanted=='anime') and s.kind!='manga' and s.id not in {'sovet','anilibriafun','animevosttv'}]
+        sites=discovery_sites(wanted,selected.get('adult'),anchored)
         providers=[]
         def snapshot(unfinished=False):
             sources=[s for p in providers for s in p.get('sources',[])]
@@ -178,7 +253,6 @@ def _discover(selected,*,refresh=False,continuing=False):
                 'pending':unfinished or any(s.get('pending') for s in sources) or any(p.get('pending') for p in providers),
                 'complete':not unfinished and all(p.get('complete',False) for p in providers),'checkedAt':int(time.time())}
         with ThreadPoolExecutor(max_workers=6) as pool:
-            from kodik_api import discover as kodik_discover
             futures=[]
             if selected.get('kind','anime') in {'anime','movie'} and str((selected.get('ids') or {}).get('mal'))=='57555':
                 from yummy_anime_source import discover_reze
@@ -187,7 +261,9 @@ def _discover(selected,*,refresh=False,continuing=False):
             # Sites with an indexed page of this work answer with one inspection:
             # they go first instead of queueing behind searches of other sites.
             first=[pool.submit(work,site) for site in sites if anchored.get(site.id)]
-            futures.extend([*first,pool.submit(kodik_discover,selected),pool.submit(kinobox_discover,selected),*[pool.submit(work,site) for site in sites if not anchored.get(site.id)]])
+            # Kodik plays from the players the sites embed (player_catalog); the
+            # owner-token Kodik API is not part of discovery.
+            futures.extend([*first,pool.submit(kinobox_discover,card),*[pool.submit(work,site) for site in sites if not anchored.get(site.id)]])
             for future in as_completed(futures):
                 providers.append(future.result());result=snapshot(len(providers)<len(futures))
                 with _lock:_cache[key]=(time.monotonic()+(300 if result['sources'] else 30),result)

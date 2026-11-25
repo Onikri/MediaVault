@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import {guestLocked,GUEST_LOCKED} from './guest-session.js';
+import {adultCard} from './source-genres.js';
 
 // One discovery per work at a time. Every view of the same title (the player
 // on the page and the save window) follows the same search and shares its
@@ -33,6 +34,7 @@ export default function useSourceDiscovery(item,service){
     const title=Object.fromEntries(['id','ids','title','titles','aliases','year','startDate','kind','format'].map(key=>[key,item[key]]));
     if(sourceURL){title.provider=item.provider;title.sourceURL=sourceURL;}
     if(indexedSources.length)title.indexedSources=indexedSources;
+    const adult=adultCard(item);if(adult!==null)title.adult=adult;
     // Keyed like the effect: the same work, not its (late-arriving) aliases.
     const key=String(service.server||'')+'|'+JSON.stringify([item.id,item.kind,item.ids||{},item.startDate||item.year||null,sourceURL||'',indexedSources.map(s=>s.url)]);
     if(revision){const old=searches.get(key);old?.controller?.abort();searches.delete(key);}

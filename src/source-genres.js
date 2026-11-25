@@ -20,3 +20,10 @@ export function sourceGenreProjection(row,result,{allowed=true,label='Хента
  if(allowed&&hentaiOrigin(row,source)&&!result.genres.includes(label))return {...result,genres:[...result.genres,label]};
  return result;
 }
+// Hentai sites are searched only for a card that is hentai; a card without
+// genres says nothing (null), and the server then searches every site.
+export function adultCard(item){
+ if(hentaiExcluded(item||{}))return false;
+ if(hentaiOrigin({...(item||{}),kind:item?.kind||'anime'}))return true;
+ return Array.isArray(item?.genres)&&item.genres.length?item.genres.some(v=>hentaiLabel(typeof v==='string'?v:v?.name||v?.russian||'')):null;
+}

@@ -33,3 +33,22 @@ test('source chapter numbers and counts are deduplicated without replacing catal
  assert.deepEqual(publicationFacts({chapters:120,volumes:16,sourcePublication},'manga'),[['Главы в каталоге','120'],['Тома','16'],['Главы в источнике','не менее 2 · Русский'],['Последняя глава в источнике','2.5']]);
  assert.deepEqual(publicationFacts({},'manga'),[]);
 });
+
+test('Shikimori placeholder «Название уточняется» never becomes the searched title (G3)',()=>{
+ const item={id:'anilist:1',kind:'anime',title:'Azarashi no Eru Aru',titles:{en:'Azarashi no Eru Aru'},aliases:['Azarashi no Eru Aru']};
+ const identity=mergeTitleIdentity(item,{title:'Название уточняется',aliases:['Azarashi no Eru Aru']});
+ assert.equal(identity.title,'Azarashi no Eru Aru');
+ assert.ok(!identity.aliases.includes('Название уточняется'));
+ assert.equal(identity.titles.ru,undefined);
+ assert.equal(mergeTitleIdentity(item,{title:'Тюлень Эру',aliases:[]}).title,'Тюлень Эру');
+});
+
+test('discovery marks a card adult only from its own genres or hentai source (G3)',async()=>{
+ const {adultCard}=await import('../src/source-genres.js');
+ assert.equal(adultCard({kind:'anime',genres:['Action','Hentai']}),true);
+ assert.equal(adultCard({kind:'anime',genres:['Хентай']}),true);
+ assert.equal(adultCard({kind:'anime',genres:['Action','Comedy']}),false);
+ assert.equal(adultCard({kind:'anime',provider:'ohentai',sourceUrl:'https://ohentai.org/x'}),true);
+ assert.equal(adultCard({kind:'anime'}),null);
+ assert.equal(adultCard({kind:'anime',genres:['Hentai'],hentaiExcluded:true}),false);
+});
