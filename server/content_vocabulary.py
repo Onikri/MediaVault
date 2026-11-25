@@ -71,7 +71,8 @@ def _public(db,identity):
                 owners.update(dict.fromkeys(names,key))
             if key not in policy.rules:
                 row=known[key]
-                for alias in [label,raw_label]:
+                # A repaired spelling never ships its mojibake source as an alias.
+                for alias in [label,*([raw_label] if readable_label(raw_label)==raw_label else [])]:
                     if not _browser_label(alias) or len(row['aliases'])>=120:continue
                     spellings={normalize(alias),normalize(readable_label(alias))}
                     if any(owners.get(name,key)!=key for name in spellings):continue
