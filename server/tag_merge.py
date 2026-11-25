@@ -256,10 +256,12 @@ def step(store, pause=None):
         return True
     if job.get('state') != 'running':
         # Same thread, lower priority: the one-off label repair, then the
-        # resumable fill of the materialized «Хентай» work set.
+        # resumable fills of the materialized «Хентай» work set and of the
+        # full-text title index.
+        import catalog_search
         import hentai_works
         import label_repair
-        if not (label_repair.step(store) or hentai_works.step(store)):
+        if not (label_repair.step(store) or hentai_works.step(store) or catalog_search.step(store)):
             return False
         time.sleep(PAUSE if pause is None else pause)
         return True

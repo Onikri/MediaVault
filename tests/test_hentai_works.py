@@ -171,7 +171,8 @@ class HentaiWorkTests(Fixture, unittest.TestCase):
             with patch.object(manga_catalog_index, 'TOTAL_BUDGET', -1), patch.object(manga_catalog_index, 'TOTAL_STEPS', 1):
                 first = browse(reader, genre='Романтика', limit=2)
                 self.assertIs(first['totalExact'], False)
-                self.assertEqual(first['workTotal'], 3)
+                # A single counted genre pages by its exact catalog_tag_stats works.
+                self.assertEqual(first['workTotal'], 6)
                 for thread in threading.enumerate():
                     if thread.name == 'catalog-total':
                         thread.join(10)

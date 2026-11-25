@@ -127,10 +127,9 @@ def compiled_work_tags(db,manga=False):
     except Exception:return False
     return bool(row and row[0]=='work-tags-v1')
 
-def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False):
-    from manga_tag_policy import current
-    policy=current()
-    result=[];params=[]
+def _signed(policy,kind,genre,tag,excludeGenre,excludeTag):
+    """(field, wanted keys, negative) per filter group; no keys matches nothing."""
+    groups=[]
     for field,raw,negative in [('genres',genre,False),('tags',tag,False),('genres',excludeGenre,True),('tags',excludeTag,True)]:
         try:values=raw if isinstance(raw,(list,tuple)) else json.loads(raw) if str(raw or '').startswith('[') else str(raw or '').split(',')
         except (ValueError,TypeError):
@@ -142,6 +141,14 @@ def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False)
         values=list(dict.fromkeys(v.strip() for v in values if v.strip()))
         if not values:continue
         wanted=sorted({k for v in values if (classify(v,field,kind,policy) or ('',''))[0]==field for k in keys(v,policy,allow_hidden=negative)})
+        groups.append((field,wanted,negative))
+    return groups
+
+def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False):
+    from manga_tag_policy import current
+    policy=current()
+    result=[];params=[]
+    for field,wanted,negative in _signed(policy,kind,genre,tag,excludeGenre,excludeTag):
         if not wanted:
             if not negative:result.append('0')
             continue
@@ -168,6 +175,54 @@ def clauses(db,*,kind,genre='',tag='',excludeGenre='',excludeTag='',manga=False)
         else:query_args.extend(wanted)
         result.append(work+(' NOT IN (' if negative else ' IN (')+query+')');params.extend(query_args)
     return result,params
+
+_hentai_count={}
+
+def work_filters(db,*,genre='',tag='',excludeGenre='',excludeTag=''):
+    """Manga filter groups over compiled work tags, or None (use clauses()).
+
+    Each group: 'within' is the clauses() form (the set resolved once, good to
+    drive a query from a small set), 'exists' the same test correlated with
+    t.work_key (a primary-key probe per row, good for index-order scans and
+    for checking a few candidate works). 'works' estimates the works of the
+    set from catalog_tag_stats; 'exact' marks a single counted key."""
+    from manga_tag_policy import current
+    policy=current()
+    if not compiled_work_tags(db,True):return None
+    import hentai_works
+    groups=[]
+    for field,wanted,negative in _signed(policy,'manga',genre,tag,excludeGenre,excludeTag):
+        if not wanted:
+            if not negative:groups.append({'within':('0',[]),'exists':('0',[]),'negative':False,'works':0,'exact':True})
+            continue
+        hentai=field=='genres' and any(is_hentai(k,policy) for k in wanted)
+        if hentai and not hentai_works.ready(db,policy):return None
+        ordinary=[k for k in wanted if not (hentai and is_hentai(k,policy))]
+        tests=[];sets=[];args=[];works=0;counted=0
+        if ordinary:
+            marks=','.join('?' for _ in ordinary)
+            tests.append('EXISTS(SELECT 1 FROM catalog_work_tags x WHERE x.work_key=t.work_key AND x.category=? AND x.tag_key IN ('+marks+'))')
+            sets.append('SELECT x.work_key FROM catalog_work_tags x WHERE x.category=? AND x.tag_key IN ('+marks+')')
+            args=[field,*ordinary]
+            for (count,) in db.execute('SELECT works FROM catalog_tag_stats WHERE category=? AND tag_key IN ('+marks+')',args):
+                works+=count;counted+=1
+        if hentai:
+            tests.append('EXISTS(SELECT 1 FROM '+hentai_works.TABLE+' h WHERE h.work_key=t.work_key)')
+            sets.append('SELECT h.work_key FROM '+hentai_works.TABLE+' h')
+            works+=_hentai_works(db)
+        test='('+' OR '.join(tests)+')' if len(tests)>1 else tests[0]
+        groups.append({'within':('t.work_key'+(' NOT IN (' if negative else ' IN (')+' UNION '.join(sets)+')',list(args)),
+                       'exists':(('NOT ' if negative else '')+test,list(args)),'negative':negative,'works':works,
+                       'exact':not hentai and counted<=1})
+    return groups
+
+def _hentai_works(db):
+    import time
+    hit=_hentai_count.get('value')
+    if hit and time.monotonic()-hit[0]<600:return hit[1]
+    value=db.execute('SELECT COUNT(*) FROM catalog_hentai_works').fetchone()[0]
+    _hentai_count['value']=(time.monotonic(),value)
+    return value
 
 def format_label(value,kind):
     return DATA.get('formatAliases',{}).get(kind,{}).get(str(value).casefold(),value)

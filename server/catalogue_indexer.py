@@ -122,6 +122,8 @@ def retire_removed(db):
         for start in range(0,len(titles),500):
             chunk=titles[start:start+500];marks=','.join('?'*len(chunk))
             for table in ('catalog_tags','catalog_tag_facts'):db.execute('DELETE FROM '+table+' WHERE title_id IN ('+marks+')',chunk)
+            from catalog_search import forget
+            forget(db,chunk)
             db.execute('DELETE FROM catalog_titles WHERE id IN ('+marks+')',chunk)
         if work_keys and 'catalog_work_tags' in tables:
             from manga_catalog_index import refresh_work_tags

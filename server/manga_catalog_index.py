@@ -132,13 +132,18 @@ def initialize(conn):
     # pages over these work keys so the work cannot reappear on another page.
     if 'work_key' not in {r[1] for r in conn.execute('PRAGMA table_info(catalog_titles)')}:
         conn.execute("ALTER TABLE catalog_titles ADD COLUMN work_key TEXT NOT NULL DEFAULT ''")
-    with conn:conn.execute("UPDATE catalog_titles SET work_key=catalog_normalize(title) WHERE work_key=''")
+    with conn:
+        if conn.execute("UPDATE catalog_titles SET work_key=catalog_normalize(title) WHERE work_key=''").rowcount and \
+                conn.execute("SELECT 1 FROM sqlite_master WHERE name='catalog_search_rows'").fetchone():
+            conn.execute("UPDATE catalog_search_rows SET work_key=(SELECT c.work_key FROM catalog_titles c WHERE c.rowid=catalog_search_rows.id) WHERE work_key=''")
     # Covers the per-work aggregates, so a page reads the index, not the rows.
     conn.execute('CREATE INDEX IF NOT EXISTS catalog_titles_works ON catalog_titles(work_key,year,chapter_count,first_seen)')
     conn.execute('CREATE INDEX IF NOT EXISTS catalog_titles_newest ON catalog_titles((year IS NULL),year DESC,work_key,chapter_count)')
     initialize_work_tags(conn)
     import hentai_works
     hentai_works.initialize(conn)
+    import catalog_search
+    catalog_search.initialize(conn)
     initialize_status_index(conn,table='catalog_titles',document='metadata',work='work_key')
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(conn)
@@ -158,7 +163,7 @@ def upsert(conn, rows, source_id='', timestamp=None):
     now = float(time.time() if timestamp is None else timestamp)
     count = 0
     from content_vocabulary import add,bump,host
-    vocabulary_added=0;affected=set()
+    vocabulary_added=0;affected=set();searchable=[]
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -169,7 +174,7 @@ def upsert(conn, rows, source_id='', timestamp=None):
             continue
         identity = hashlib.sha256((provider + '\x00' + url).encode('utf-8')).hexdigest()[:32]
         old = conn.execute('SELECT metadata,first_seen,inspected,tag_state,chapter_count,work_key,'
-                           'title,source_id,search_text,language,format,adult,year FROM catalog_titles WHERE id=?',
+                           'title,source_id,search_text,language,format,adult,year,rowid FROM catalog_titles WHERE id=?',
                            (identity,)).fetchone()
         # The discovery worker may supply a partial metadata-only row.
         previous = json.loads(old[0]) if old else {}
@@ -257,6 +262,10 @@ def upsert(conn, rows, source_id='', timestamp=None):
               data['tagStatus'],clean_metadata,old[1] if old else now,now,
               now if inspected else old[2] if old else 0,work_key))
         affected.add(work_key)
+        # The full-text document of the row as stored before and after.
+        searchable.append((old[13] if old else conn.execute('SELECT rowid FROM catalog_titles WHERE id=?',(identity,)).fetchone()[0],
+                           (old[6],old[8],old[0],old[5],old[12],old[4],old[1]) if old else None,
+                           (title,search,clean_metadata,work_key,year,chapter_count,old[1] if old else now)))
         conn.execute('DELETE FROM catalog_tags WHERE title_id=?',(identity,))
         policy=current();source=urlsplit(url).hostname or ''
         from catalog_taxonomy import classify
@@ -274,11 +283,19 @@ def upsert(conn, rows, source_id='', timestamp=None):
                    title_id,category,tag_key,original) VALUES(?,?,?,?)''',
                    (identity,classified[0],key,label))
         count += 1
+    if searchable:
+        import catalog_search
+        catalog_search.update(conn,searchable)
     refresh_work_tags(conn,affected)
     if vocabulary_added:bump(conn)
     return count
 
-def _conditions(provider='', format='', source_id='', *, readingMode='', language='all', year='', age='', source_ids=()):
+def _conditions(*values, **filters):
+    sql,args=_condition_list(*values,**filters)
+    return (' WHERE '+' AND '.join(sql) if sql else ''), args
+
+def _condition_list(provider='', format='', source_id='', *, readingMode='', language='all', year='', age='', source_ids=()):
+    """Source-row conditions: they can differ between the rows of one work."""
     sql = []
     args = []
     if provider:
@@ -302,7 +319,7 @@ def _conditions(provider='', format='', source_id='', *, readingMode='', languag
         sql.append('t.year=?');args.append(str(year))
     if age=='adult':sql.append('(t.adult=1 OR CAST(json_extract(t.metadata,\'$.age\') AS INTEGER)>=18)')
     elif age=='under18':sql.append('(t.adult=0 OR CAST(json_extract(t.metadata,\'$.age\') AS INTEGER)<18)')
-    return (' WHERE '+' AND '.join(sql) if sql else ''), args
+    return sql, args
 
 # Whole-catalogue orders for paging. Every order ends in the id, so a title
 # keeps one place across page requests while the crawler rewrites rows.
@@ -327,34 +344,77 @@ def browse(conn, *, q='', tag='', provider='', format='', source_id='', limit=30
     limit = min(100,max(1,int(limit)))
     offset = min(10_000_000,max(0,int(offset)))
     facet={k:filters.pop(k,'') for k in ['genre','excludeGenre','excludeTag']}
-    where,args = _conditions(provider,format,source_id,**filters)
-    from catalog_taxonomy import clauses
-    extra,values=clauses(conn,kind='manga',tag=tag,manga=True,**facet)
-    stream=_stream_conditions(conn,facet,tag) if not where and status in ('','available') and sort in ('','new') and offset<=STREAM_WORKS else None
+    rows,args=_condition_list(provider,format,source_id,**filters)
+    plain=not rows
+    # The release status tests a row's year and chapters and the work's state.
     restriction,states=status_condition(status,table='catalog_titles',document='metadata',work='t.work_key',peer_work='peer.work_key')
-    if restriction:
-        extra.append(restriction);values.extend(states)
-        if stream is not None:stream=([*stream[0],restriction],[*stream[1],*states])
-    if extra:where+=(' AND ' if where else ' WHERE ')+' AND '.join(extra);args.extend(values)
-    return _browse_works(conn,where,args,sort,limit,offset,q=q,stream=stream)
+    if restriction:rows.append(restriction);args.extend(states)
+    from catalog_taxonomy import clauses,work_filters
+    groups=work_filters(conn,tag=tag,**facet)
+    if groups is None:
+        extra,values=clauses(conn,kind='manga',tag=tag,manga=True,**facet)
+        groups=[{'within':(' AND '.join(extra),values),'exists':None,'negative':False,'works':None,'exact':False}] if extra else []
+    return _browse_works(conn,rows,args,groups,sort,limit,offset,q=q,plain=plain,status=status)
 
-# Pages up to this many works deep are read in the newest-index order and stop
-# after enough distinct works; deeper pages group the whole filtered set.
-STREAM_WORKS=1200
+# Pages in the default order are read from the newest index and stop after
+# enough distinct works when that is expected to read at most STREAM_ROWS
+# index rows (estimated from catalog_tag_stats); a stream still running after
+# STREAM_BUDGET gives way to grouping the whole filtered set.
+STREAM_ROWS=60000
+STREAM_BUDGET=.3
+ROWS_PER_WORK=2.2
+# A text search with more matching rows than this pages the default order
+# from the newest index too (exact-name works first) instead of grouping all.
+HIT_LIMIT=20000
 
-def _stream_conditions(conn,facet,tag):
-    """Conditions for an index-order scan, or None. Exact only for work-level
-    filters: every source row of a work passes or fails together."""
-    if tag or facet.get('excludeTag'):return None
-    genre,exclude=facet.get('genre',''),facet.get('excludeGenre','')
-    if not genre and not exclude:return [],[]
-    if genre and exclude:return None
-    import hentai_works
-    from catalog_taxonomy import hentai_only
-    policy=current()
-    if not hentai_works.ready(conn,policy) or not hentai_only(genre or exclude,policy,negative=bool(exclude)):return None
-    member='EXISTS(SELECT 1 FROM '+hentai_works.TABLE+' h WHERE h.work_key=t.work_key)'
-    return [member if genre else 'NOT '+member],[]
+def _where(parts):
+    return ' WHERE '+' AND '.join(parts) if parts else ''
+
+def _flatten(parts):
+    return [sql for sql,_ in parts],[value for _,values in parts for value in values]
+
+def _within(groups):
+    """Filter groups for grouping a set: the smallest positive set drives the
+    query, the others are probed per row instead of being resolved as well."""
+    driver=min((g for g in groups if not g['negative'] and g['exists'] and g['works'] is not None),key=lambda g:g['works'],default=None)
+    return [g['within'] if driver is None or g is driver or not g['exists'] else g['exists'] for g in groups]
+
+def _expected_rows(conn,groups,need):
+    """Index rows a stream reads for this many works. Tags of one work are
+    strongly correlated («Школа» and «Романтика» share 70 % of the smaller
+    set), so a combination is estimated by its rarest tag; the stream budget
+    covers combinations that turn out rarer."""
+    top=conn.execute('SELECT MAX(rowid) FROM catalog_titles').fetchone()[0] or 0
+    works=max(1.0,top/ROWS_PER_WORK);share=1.0
+    for group in groups:
+        part=min(1.0,group['works']/works)
+        share=min(share,1-part if group['negative'] else part)
+    return need*ROWS_PER_WORK/max(share,1e-9)
+
+def _stream(conn,conditions,args,offset,limit,first=(),budget=None):
+    """Distinct works in the default order, read from the newest index; None
+    when the budget ran out first."""
+    import sqlite3
+    keys=list(first);seen=set(keys)
+    if budget:
+        deadline=time.monotonic()+budget
+        conn.set_progress_handler(lambda:1 if time.monotonic()>deadline else 0,5000)
+    try:
+        cursor=conn.execute('SELECT t.work_key FROM catalog_titles t INDEXED BY catalog_titles_newest'+_where(conditions)+
+                            ' ORDER BY (t.year IS NULL),t.year DESC,t.work_key',args)
+        try:
+            # The first row of a work in this order carries its maximum year.
+            for (key,) in cursor:
+                if len(keys)>=offset+limit:break
+                if key not in seen:seen.add(key);keys.append(key)
+        finally:
+            cursor.close()
+    except sqlite3.OperationalError as error:
+        if not budget or 'interrupt' not in str(error).lower():raise
+        return None
+    finally:
+        if budget:conn.set_progress_handler(None,0)
+    return keys[offset:offset+limit]
 
 # Totals by filter. Counting all matching works is a pass over the filtered
 # rows (seconds on the VM). A count that does not finish in TOTAL_BUDGET runs
@@ -403,15 +463,16 @@ def _count_later(path,key,sql,args):
             with _totals_lock:_counting.discard(key)
     threading.Thread(target=run,daemon=True,name='catalog-total').start()
 
-def _total(conn,sql,args,clock=time.monotonic):
-    """(sources, works) for a grouped filter, or None while it is counted."""
+def _total(conn,sql,args,clock=time.monotonic,wait=True):
+    """(sources, works) for a grouped filter, or None while it is counted.
+    wait=False skips the in-request attempt (the caller has a better bound)."""
     import sqlite3
     path=_database(conn);key=(path,sql,tuple(args))
     with _totals_lock:hit=_totals.get(key)
     if hit:
         if clock()-hit[0]>TOTAL_TTL:_count_later(path,key,sql,args)
         return hit[1]
-    if clock()-_slow.get(key,-TOTAL_TTL)<TOTAL_TTL:
+    if path and (not wait or clock()-_slow.get(key,-TOTAL_TTL)<TOTAL_TTL):
         _count_later(path,key,sql,args)
         return None
     deadline=clock()+TOTAL_BUDGET
@@ -441,75 +502,103 @@ def _search_where(where, words, *, use_index):
         terms=f't.rowid IN (SELECT s.rowid FROM catalog_titles s INDEXED BY catalog_titles_search WHERE {terms})'
     return where+(' AND ' if where else ' WHERE ')+terms
 
-def _browse_works(conn,where,args,sort,limit,offset,q='',stream=None):
+def _search(conn,rows,args,groups,query,words,order,limit,offset,plain,streamable):
+    """A text search over catalog_search: keys, page rows with window totals,
+    and the count query."""
+    import catalog_search
+    match=catalog_search.match_words(words);name=catalog_search.match_name(query)
+    hits='t.rowid IN (SELECT rowid FROM '+catalog_search.FTS+' WHERE '+catalog_search.FTS+' MATCH ?)'
+    # Without source-row conditions the compact rows table has every column a
+    # work order needs; the catalogue table is read only for hydration.
+    source=' FROM '+(catalog_search.ROWS if plain else 'catalog_titles')+' t'
+    conditions,values=_flatten([group['exists'] or group['within'] for group in groups])
+    grouped=source+_where([hits,*rows,*conditions])+' GROUP BY t.work_key'
+    common=[*args,*values]
+    count_sql='SELECT COALESCE(SUM(sources),0),COUNT(*) FROM (SELECT COUNT(*) AS sources'+grouped+')'
+    many=len(conn.execute('SELECT rowid FROM '+catalog_search.FTS+' WHERE '+catalog_search.FTS+' MATCH ? LIMIT ?',(match,HIT_LIMIT+1)).fetchall())>HIT_LIMIT
+    if many and streamable:
+        # Works with an exact title or alias first (the rank below), then the
+        # others in index order; the total is counted in the background.
+        first=[k for (k,) in conn.execute('SELECT t.work_key'+grouped+' ORDER BY '+WORK_SORTS['new']+' LIMIT ?',[name,*common,offset+limit])]
+        keys=_stream(conn,[hits,*rows,*conditions],[match,*common],offset,limit,first=first)
+        return keys,[],count_sql,[match,*common]
+    rank='MIN(CASE WHEN t.work_key=? OR '+hits+' THEN 0 ELSE 1 END),'
+    page=conn.execute('SELECT t.work_key,SUM(COUNT(*)) OVER (),COUNT(*) OVER ()'+grouped+' ORDER BY '+rank+order+' LIMIT ? OFFSET ?',
+                      [match,*common,query,name,limit,offset]).fetchall()
+    return [row[0] for row in page],page,count_sql,[match,*common]
+
+def _rarest_first(groups):
+    return [group['exists'] for group in sorted(groups,key=lambda g:(g['negative'],g['works']))]
+
+def _known_works(groups):
+    """The exact number of works of a single counted tag, if that is the filter."""
+    if len(groups)==1 and not groups[0]['negative'] and groups[0]['exact']:return groups[0]['works']
+    return None
+
+def _browse_works(conn,rows,args,groups,sort,limit,offset,q='',plain=True,status=''):
     # Page over works, then return every matching source row of those works
     # (a few per work) in page order; the client folds them into one card.
     # total stays the number of source rows; workTotal counts works for paging.
     query=normalize(q)
     words=query[:160].split()[:12]
-    if words:stream=None
-    args=[*args,*('%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for word in words)]
-    search_where=_search_where(where,words,use_index=True)
-    grouped=' FROM catalog_titles t'+search_where+' GROUP BY t.work_key'
-    order=WORK_SORTS.get(sort) or WORK_SORTS['new'];ranking=[]
-    if words:
-        order="MIN(CASE WHEN catalog_normalize(t.title)=? OR EXISTS(SELECT 1 FROM json_each(t.metadata,'$.aliases') a WHERE catalog_normalize(a.value)=?) THEN 0 ELSE 1 END),"+order
-        ranking=[query,query]
-        page=conn.execute('SELECT t.work_key,SUM(COUNT(*)) OVER (),COUNT(*) OVER ()'+grouped+' ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,*ranking,limit,offset]).fetchall()
+    likes=['%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for word in words]
+    order=WORK_SORTS.get(sort) or WORK_SORTS['new']
+    tests=[group['exists'] for group in groups]
+    streamable=plain and sort in ('','new') and status in ('','available') and all(tests)
+    conditions,values=_flatten(_within(groups))
+    filters=[*rows,*conditions];filter_args=[*args,*values]
+    grouped=' FROM catalog_titles t'+_where(filters)+' GROUP BY t.work_key'
+    count_sql,count_args='SELECT COALESCE(SUM(sources),0),COUNT(*) FROM (SELECT COUNT(*) AS sources'+grouped+')',filter_args
+    keys=None;page=[]
+    import catalog_search
+    if words and all(len(word)>=catalog_search.MIN_WORD for word in words) and catalog_search.ready(conn):
+        keys,page,count_sql,count_args=_search(conn,rows,args,groups,query,words,order,limit,offset,plain,streamable)
+    elif words:
+        # Words under three characters (or the index is still being filled):
+        # the substring scan of search_text.
+        grouped=' FROM catalog_titles t'+_search_where(_where(filters),words,use_index=True)+' GROUP BY t.work_key'
+        count_sql,count_args='SELECT COALESCE(SUM(sources),0),COUNT(*) FROM (SELECT COUNT(*) AS sources'+grouped+')',[*filter_args,*likes]
+        ranking="MIN(CASE WHEN catalog_normalize(t.title)=? OR EXISTS(SELECT 1 FROM json_each(t.metadata,'$.aliases') a WHERE catalog_normalize(a.value)=?) THEN 0 ELSE 1 END),"
+        page=conn.execute('SELECT t.work_key,SUM(COUNT(*)) OVER (),COUNT(*) OVER ()'+grouped+' ORDER BY '+ranking+order+' LIMIT ? OFFSET ?',[*count_args,query,query,limit,offset]).fetchall()
         keys=[row[0] for row in page]
-    elif stream is not None:
-        # The first edition of each work in this order has its maximum eligible
-        # year. Stop as soon as the page has enough distinct works.
-        page=[]
-        keys=[]
-        seen=set()
-        conditions,stream_args=stream
-        stream_where=' WHERE '+' AND '.join(conditions) if conditions else ''
-        cursor=conn.execute('SELECT t.work_key FROM catalog_titles t INDEXED BY catalog_titles_newest'+stream_where+' ORDER BY (t.year IS NULL),t.year DESC,t.work_key',stream_args)
-        try:
-            for (key,) in cursor:
-                if key in seen:
-                    continue
-                seen.add(key)
-                if len(seen)<=offset:
-                    continue
-                keys.append(key)
-                if len(keys)==limit:
-                    break
-        finally:
-            cursor.close()
-    else:
-        page=[]
-        keys=[k for (k,) in conn.execute('SELECT t.work_key'+grouped+' ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,limit,offset])]
+    elif streamable and _expected_rows(conn,groups,offset+limit)<=STREAM_ROWS:
+        tested,tested_args=_flatten(_rarest_first(groups))
+        keys=_stream(conn,[*rows,*tested],[*args,*tested_args],offset,limit,budget=STREAM_BUDGET if _database(conn) else None)
+    if keys is None:
+        keys=[k for (k,) in conn.execute('SELECT t.work_key'+grouped+' ORDER BY '+order+' LIMIT ? OFFSET ?',[*filter_args,limit,offset])]
     exact=True
     if page:
         total,works_total=page[0][1:]
     else:
-        counted=_total(conn,'SELECT COALESCE(SUM(sources),0),COUNT(*) FROM (SELECT COUNT(*) AS sources'+grouped+')',args)
+        known=None if words or rows else _known_works(groups)
+        counted=_total(conn,count_sql,count_args,wait=known is None)
         if counted is None:
             exact=False
             works_total=offset+len(keys)+(1 if len(keys)==limit else 0)
+            if known is not None:works_total=max(works_total,known)
             total=works_total
         else:
             total,works_total=counted
 
     result=[]
     if keys:
-        # The work-key index narrows hydration to just these works.
-        if stream is not None:
-            where=' WHERE '+' AND '.join(stream[0]) if stream[0] else '';args=list(stream[1])
-        where=_search_where(where,words,use_index=False)
+        # The work-key index narrows hydration to just these works. Tag and
+        # genre filters hold for whole works, so only row conditions repeat.
+        where=_search_where(_where(rows),words,use_index=False)
         place={k:i for i,k in enumerate(keys)}
         clause=(' AND ' if where else ' WHERE ')+'t.work_key IN ('+','.join('?'*len(keys))+')'
-        rows=conn.execute('SELECT t.id,t.metadata,t.chapter_count,t.tag_state,t.updated,t.work_key FROM catalog_titles t'+where+clause+' ORDER BY t.chapter_count IS NULL,t.chapter_count DESC,t.id',[*args,*keys]).fetchall()
-        facts=_work_facts(conn,keys)
+        rows=conn.execute('SELECT t.id,t.metadata,t.chapter_count,t.tag_state,t.updated,t.work_key FROM catalog_titles t'+where+clause+' ORDER BY t.chapter_count IS NULL,t.chapter_count DESC,t.id',[*args,*likes,*keys]).fetchall()
+        projected={}
+        facts=_work_facts(conn,keys,projected)
         counts={}
+        from catalog_taxonomy import is_hentai
+        policy=current()
         for identity,metadata,chapters,status,updated,key in sorted(rows,key=lambda r:place[r[5]]):
             counts[key]=counts.get(key,0)+1
             if counts[key]>WORK_SOURCES:continue
-            row=_public_metadata({**json.loads(metadata),'hentaiExcluded':facts[key]['hentaiExcluded']})
-            from catalog_taxonomy import is_hentai
-            row['genres']=list(dict.fromkeys([*row['genres'],*[v for v in facts[key]['genres'] if is_hentai(v,current())]]))
+            # The same projection _work_facts made of this row (one read, one parse).
+            row=dict(projected[identity]) if identity in projected else _public_metadata({**json.loads(metadata),'hentaiExcluded':facts[key]['hentaiExcluded']})
+            row['genres']=list(dict.fromkeys([*row['genres'],*[v for v in facts[key]['genres'] if is_hentai(v,policy)]]))
             row['hentaiExcluded']=facts[key]['hentaiExcluded']
             row.update({'catalogId':identity,'chapterCount':chapters,'tagStatus':status,'indexedAt':updated,'workKey':key,'workFacts':facts[key]})
             if facts[key].get('releaseStatus'):row['releaseStatus']=facts[key]['releaseStatus']
@@ -529,17 +618,20 @@ def title(conn, identity):
     result['tagStatus'] = row[2]
     return result
 
-def _work_facts(conn,keys):
+def _work_facts(conn,keys,projected=None):
+    """Facts of whole works; projected (catalogId -> public row) collects the
+    projection of every source row for the caller."""
     from catalog_taxonomy import hentai_excluded
     marks=','.join('?' for _ in keys)
     blocked={key for (key,) in conn.execute('SELECT DISTINCT t.work_key FROM catalog_titles t JOIN catalog_tag_facts f ON f.title_id=t.id WHERE t.work_key IN ('+marks+') AND catalog_not_hentai(f.original)=1',keys)}
-    records=[(key,json.loads(raw)) for key,raw in conn.execute('SELECT work_key,metadata FROM catalog_titles WHERE work_key IN ('+marks+')',keys)]
-    blocked.update(key for key,row in records if hentai_excluded(row))
+    records=[(key,identity,json.loads(raw)) for key,identity,raw in conn.execute('SELECT work_key,id,metadata FROM catalog_titles WHERE work_key IN ('+marks+')',keys)]
+    blocked.update(key for key,_,row in records if hentai_excluded(row))
     facts={key:{'genres':[],'tags':[],'hentaiExcluded':key in blocked} for key in keys}
     states={key:[] for key in keys}
-    for key,row in records:
+    for key,identity,row in records:
         states[key].append(row)
         public=_public_metadata({**row,'hentaiExcluded':key in blocked})
+        if projected is not None:projected[identity]=public
         for field in ['genres','tags']:facts[key][field]=list(dict.fromkeys([*facts[key][field],*public.get(field,[])]))[:120]
     for key,rows in states.items():
         if status:=work_status(rows):facts[key]['releaseStatus']=status
