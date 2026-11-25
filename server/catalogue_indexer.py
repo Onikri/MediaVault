@@ -2,6 +2,7 @@
 import hashlib,json,logging,os,re,shutil,threading,time
 from pathlib import Path
 from manga_tag_policy import canonical_json,current
+from source_parser import CATALOGUE_PAGE_LIMIT
 
 _service=None;_service_lock=threading.Lock()
 
@@ -74,6 +75,19 @@ def failure_text(error):
     text=_QUERY.sub(r'\1',' '.join(str(error).split()))
     if found:=_SECRET.search(text):text=text[:found.start()].rstrip(' :,;({[')+' …'
     return (type(error).__name__+': '+text[:200]).rstrip(': ')
+
+def listing_end(job,spec,error,code):
+    """A listing page the site will not serve after it served the earlier ones.
+
+    404/410 on page N after pages 1..N-1 (HentaiMoody stops at /page/100/,
+    e621 at 751) and our own page bound end the walk; a first page or a card
+    request with the same answer is still a failure."""
+    from source_parser import SourceListingEnd
+    kind=str(spec.get('type',''))
+    if '-detail' in kind or kind.endswith('-vocabulary') or kind in {'anilist-trending','hanime'}:return False
+    if isinstance(error,SourceListingEnd):return True
+    page=job['cursor'].get('page')
+    return code in {404,410} and type(page) is int and page>1 and job['pages']>0
 
 def refresh_interval(spec):
     kind=str(spec.get('type',''))
@@ -210,6 +224,11 @@ class Indexer:
             for key, in self.store.db.execute("SELECT id FROM catalogue_jobs WHERE kind='anilist' AND json_extract(spec,'$.term') IS NULL AND json_extract(cursor,'$.from') IS NULL AND COALESCE(json_extract(cursor,'$.page'),1)>1").fetchall():
                 for table in ('catalogue_page_fingerprints','catalogue_page_items'):self.store.db.execute('DELETE FROM '+table+' WHERE job=?',(key,))
                 self.store.db.execute("UPDATE catalogue_jobs SET cursor=?,state='queued',due=?,pages=0,records=0,attempts=0,expected=NULL,error='' WHERE id=?",('{"page":1}',self.clock(),key))
+            # A listing that stalled on its site's pagination end (404/410
+            # after served pages) or on the closed HentaiChan listing gets its
+            # next turn now; it then ends as done or reads the new route.
+            self.store.db.execute("UPDATE catalogue_jobs SET due=MIN(due,?) WHERE state='stalled' AND pages>0 AND kind NOT LIKE '%-detail' AND (error LIKE '%HTTP 404%' OR error LIKE '%HTTP 410%' OR error LIKE '%404 Client Error%' OR error LIKE '%410 Client Error%')",(self.clock(),))
+            self.store.db.execute("UPDATE catalogue_jobs SET due=MIN(due,?) WHERE state='stalled' AND kind='html' AND json_extract(spec,'$.term') IS NULL AND json_extract(spec,'$.domain') IN ('hentaichan.live','y.hentaichan.live','henchan.pro')",(self.clock(),))
             for spec in sources:
                 self.enqueue(spec,65 if spec['type']=='anilist-trending' else 10)
                 # Each source's own genre/tag list becomes owner vocabulary and
@@ -307,7 +326,8 @@ class Indexer:
             result=self.fetch(spec,job['cursor']);rows=result.get('rows') or []
             # An AniList id span may hold no title of this kind; the walk goes on.
             if not rows and result.get('next') and not result.get('emptySpan'):raise RuntimeError('empty-page')
-            if not rows and not result.get('catalogues') and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html','hanime','hanime1'}:raise RuntimeError('empty-page')
+            # A mirror or a parked domain answers by design without a listing.
+            if not rows and not result.get('catalogues') and not result.get('noListing') and job['cursor'].get('page',1)==1 and not spec.get('term') and spec['type'] in {'lib','bridge','remanga','html','hanime','hanime1'}:raise RuntimeError('empty-page')
             digest=hashlib.sha256(canonical_json(sorted(str(r.get('sourceUrl') or r.get('url') or r.get('id')) for r in rows))).hexdigest()
             with self.store.lock,self.store.db:
                 active=self.store.db.execute('SELECT lease FROM catalogue_jobs WHERE id=?',(job['id'],)).fetchone()
@@ -359,6 +379,10 @@ class Indexer:
                     if spec.get('eagerTerms') and spec['type']=='lib-vocabulary':self.enqueue(target,TERM_ROUTE_PRIORITY)
                 if vocabulary_added:bump(self.store.db)
                 next_cursor=result.get('next');state='queued' if next_cursor else result.get('state') or ('partial' if spec['type']=='html' else 'done')
+                end_reason=''
+                if next_cursor and type(next_cursor.get('page')) is int and next_cursor['page']>CATALOGUE_PAGE_LIMIT and '-detail' not in spec['type']:
+                    # Our sanity bound, far past any site seen so far: the run ends, it does not fail.
+                    next_cursor=None;state='done';end_reason=f'Дочитано до предела обхода: {CATALOGUE_PAGE_LIMIT} страниц каталога'
                 if kept and '-detail' not in spec['type']:
                     before=self.store.db.total_changes
                     self.store.db.executemany('INSERT OR IGNORE INTO catalogue_page_items VALUES(?,?)',[(job['id'],str(r.get('sourceUrl') or r.get('url') or r.get('id'))) for r in kept])
@@ -367,7 +391,7 @@ class Indexer:
                 finished=not next_cursor and '-detail' not in spec['type']
                 # Items written before this point belong to the finished run.
                 below=self.store.db.execute('SELECT MAX(rowid) FROM catalogue_page_items').fetchone()[0] if finished else None
-                self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),priority=CASE WHEN ? THEN priority ELSE MIN(priority,10) END,attempts=0,error=?,reason=\'\',updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),bool(next_cursor),result.get('reason',''),self.clock(),job['id']))
+                self.store.db.execute('UPDATE catalogue_jobs SET cursor=?,state=?,due=?,pages=pages+1,records=records+?,expected=COALESCE(?,expected),priority=CASE WHEN ? THEN priority ELSE MIN(priority,10) END,attempts=0,error=?,reason=?,updated=?,lease=\'\' WHERE id=?',(canonical_json(next_cursor or {'page':1}).decode(),state,due,count,result.get('total'),bool(next_cursor),result.get('reason',''),end_reason,self.clock(),job['id']))
                 if '-detail' in spec['type'] and not next_cursor:
                     self.store.db.execute('DELETE FROM catalogue_jobs WHERE id=?',(job['id'],));self.store.db.execute('DELETE FROM catalogue_page_fingerprints WHERE job=?',(job['id'],))
             self.answered(host)
@@ -377,7 +401,10 @@ class Indexer:
             from source_parser import SourceRateLimitError
             failure=failure_text(error)
             response = getattr(error, 'response', None)
-            code = getattr(response, 'status_code', None)
+            code = getattr(response, 'status_code', None) or getattr(error, 'http_status', None)
+            if listing_end(job, spec, error, code):
+                self.finish_listing(job, spec, error, code, failure)
+                return True
             retry_after = getattr(response, 'headers', {}).get('Retry-After')
             reason='Недостаточно свободного места' if str(error)=='storage' else 'Источник повторяет страницу каталога' if str(error)=='repeated-page' else 'Источник вернул пустую промежуточную страницу' if str(error)=='empty-page' else 'Источник временно не отдаёт метаданные'
             if code == 429 or (code == 503 and retry_after):
@@ -417,6 +444,22 @@ class Indexer:
             if held>PURGE_HOLD:batch=max(PURGE_MIN_BATCH,batch//2)
             # Let a waiting writer in between batches.
             time.sleep(0.005)
+
+    def finish_listing(self,job,spec,error,code,failure):
+        """End a listing the site serves no further: done and marked, never an endless retry."""
+        from source_parser import SourceListingEnd
+        page=int(job['cursor'].get('page',1) or 1)
+        reason=(str(error) if isinstance(error,SourceListingEnd) else
+                f'Дочитано до предела сайта: страница {page} не отдаётся (HTTP {code}); частичный охват, прочитано {page-1} стр.')
+        with self.store.lock,self.store.db:
+            active=self.store.db.execute('SELECT lease FROM catalogue_jobs WHERE id=?',(job['id'],)).fetchone()
+            if not active or active[0]!=job['lease']:return
+            # Items written before this point belong to the finished run.
+            below=self.store.db.execute('SELECT MAX(rowid) FROM catalogue_page_items').fetchone()[0]
+            self.store.db.execute("UPDATE catalogue_jobs SET cursor=?,state='done',due=?,attempts=0,error=?,reason=?,updated=?,lease='' WHERE id=? AND lease=?",
+                                  ('{"page":1}',self.clock()+refresh_interval(spec),failure,reason[:300],self.clock(),job['id'],job['lease']))
+        self.answered(job['host'])
+        if below:self.purge_items(job['id'],below)
 
     def log_failure(self,host,kind,error,attempt,skipped=0):
         now=time.monotonic()

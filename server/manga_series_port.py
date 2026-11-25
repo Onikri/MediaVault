@@ -414,7 +414,10 @@ class SeriesPort(Webcomic):
         return self.metadata(*self.title_document(http, url), self.meta)
 
     def catalogue_params(self, page, query, tag):
-        if type(page) is not int or not 1 <= page <= 2000 or not isinstance(query, str) or not isinstance(tag, str):
+        from source_parser import CATALOGUE_PAGE_LIMIT, SourceListingEnd
+        if type(page) is int and page > CATALOGUE_PAGE_LIMIT:
+            raise SourceListingEnd(f'Дочитано до предела обхода: {CATALOGUE_PAGE_LIMIT} страниц каталога.')
+        if type(page) is not int or not 1 <= page or not isinstance(query, str) or not isinstance(tag, str):
             raise SourceError('Некорректные параметры каталога.')
         return query.strip()[:160]
 

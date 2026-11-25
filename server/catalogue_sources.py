@@ -36,8 +36,10 @@ def base_sources(installed):
         # empty popular list even while the public catalogue is available.
         if domain in {'hentaichan.live','manga-chan.me'}:
             url,allowed=HTML[domain]
+            # HentaiChan cards belong to the native reader's source, not to
+            # the retiring Suwayomi HenChan extension.
             jobs.append({'type':'html','domain':domain,'name':name,'url':url,'hosts':sorted(allowed),
-                         **({'source':matches[0]} if matches else {})})
+                         **({'source':matches[0]} if matches and domain!='hentaichan.live' else {})})
         elif domain=='h-chan.me':
             jobs.append({'type':'mirror','domain':domain,'name':name,'primary':'hentaichan.live'})
         elif domain=='henchan.pro':
@@ -73,6 +75,16 @@ def base_sources(installed):
     # hanime1.me pages its whole listing; page 1 also queues its genre routes.
     jobs.append({'type':'hanime1','kind':'anime','domain':'hanime1.me','name':'Хентай · Hanime1'})
     return jobs
+
+# A distinct address that serves the same catalogue as another source:
+# y.hentaichan.live is HentaiChan's news front page, every card links x17.h-chan.me.
+HTML_MIRRORS={'y.hentaichan.live':'Зеркало hentaichan.live: та же база x17.h-chan.me'}
+
+def parked(soup):
+    """A domain-parking page ("This domain may be for sale"), not a catalogue."""
+    meta=soup.select_one('meta[name="description"]')
+    text=(meta.get('content','') if meta else '')+' '+' '.join(s.get('src','') for s in soup.select('script[src]'))
+    return bool(re.search(r'domain may be for sale|abovedomains\.com|sedoparking\.com|parkingcrew\.net',text,re.I))
 
 def headers(spec):
     result={'Site-id':str(spec['site']),'Referer':spec['referer'],'Accept':'application/json','User-Agent':'MediaVault-Catalogue/1.0'}
@@ -211,8 +223,17 @@ def fetch(spec,cursor):
             if fallback and next_cursor:next_cursor['route']='suwayomi'
             return {'rows':rows,'next':next_cursor,'details':details}
         finally:client.close()
+    if kind=='html' and not spec.get('term'):
+        if spec['domain'] in HTML_MIRRORS:
+            return {'rows':[],'next':None,'state':'done','noListing':True,'reason':HTML_MIRRORS[spec['domain']]}
+        if spec['domain']=='hentaichan.live' and (spec.get('source') or {}).get('id'):
+            # The same site under the old HenChan bridge id: one walk is enough.
+            return {'rows':[],'next':None,'state':'done','noListing':True,'reason':'Каталог hentaichan.live читает основное задание источника'}
     if kind in {'html','html-detail'}:
         url=cursor.get('url') or spec['url'];hosts=set(spec['hosts'])
+        if kind=='html' and spec['domain']=='hentaichan.live':
+            from catalogue_html import listing_url
+            url=listing_url(url,page)
         with requests.Session() as session:
             from content_sources import UA
             session.headers.update({'User-Agent':UA,'Referer':'https://'+urlsplit(url).hostname+'/','Accept':'text/html'})
@@ -222,6 +243,8 @@ def fetch(spec,cursor):
         soup=BeautifulSoup(raw,'html.parser')
         from manga_sources import guard
         guard(soup)
+        if kind=='html' and parked(soup):
+            return {'rows':[],'next':None,'state':'done','noListing':True,'reason':'Домен припаркован и выставлен на продажу: каталога на сайте нет'}
         if kind=='html-detail':
             if urlsplit(final).path.rstrip('/')!=urlsplit(url).path.rstrip('/'):
                 raise SourceError('Источник перенаправил карточку на другое произведение')

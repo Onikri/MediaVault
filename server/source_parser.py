@@ -95,6 +95,17 @@ class SourceRouteError(SourceTemporaryError):
     status = 'route_unavailable'
 
 
+# Our own bound on a catalogue page number. It is a sanity limit with ample
+# headroom, not a crawl ceiling: big gallery sites page far past 2000, and a
+# listing normally ends where the site stops linking a next page.
+CATALOGUE_PAGE_LIMIT = 100_000
+
+
+class SourceListingEnd(SourceError):
+    """The listing cannot go deeper: the crawl is finished, not failing."""
+    status = 'listing_end'
+
+
 def source_status(error):
     """Status of any adapter failure, including older adapters' plain SourceErrors."""
     if not isinstance(error, SourceError):
@@ -1168,7 +1179,11 @@ class PublicHttp:
                     raise SourceAccessError("Источник требует вход, проверку браузера или ограничивает доступ.")
                 if status in {408, 502, 503, 504}:
                     raise SourceTemporaryError(f"Источник вернул HTTP {status}.")
-                raise SourceError(f"Источник вернул HTTP {status}.")
+                error = SourceError(f"Источник вернул HTTP {status}.")
+                # The catalogue crawler tells a site's pagination end (404/410
+                # after served pages) from a broken source by this status.
+                error.http_status = status
+                raise error
             if response.headers.get('cf-mitigated', '').strip().lower() == 'challenge':
                 response.close()
                 raise transport.error_for('challenge', url)

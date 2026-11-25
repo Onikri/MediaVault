@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 from manga_madara import OriginPace, image_url
 from manga_source_tags import unique
 from manga_source_urls import reader_url, split_reader_url
-from source_parser import SourceError, public_url
+from source_parser import CATALOGUE_PAGE_LIMIT, SourceError, public_url
 
 
 SLUG = r'[A-Za-z0-9_-]{1,255}'
@@ -101,7 +101,10 @@ class HentaiHand:
         return row
 
     def catalogue(self, http, page=1, *, query='', sort='popular', tag=''):
-        if type(page) is not int or not 1 <= page <= 2000 or not isinstance(query, str) or not isinstance(tag, str):
+        from source_parser import SourceListingEnd
+        if type(page) is int and page > CATALOGUE_PAGE_LIMIT:
+            raise SourceListingEnd(f'Дочитано до предела обхода: {CATALOGUE_PAGE_LIMIT} страниц каталога.')
+        if type(page) is not int or not 1 <= page or not isinstance(query, str) or not isinstance(tag, str):
             raise SourceError('Некорректные параметры HentaiHand.')
         params = {'page': page, 'sort': 'uploaded_at' if sort == 'updated' else 'popularity',
                   'order': 'desc', 'duration': 'all'}
@@ -196,7 +199,7 @@ def public_api(host, path, query):
         value = values[0]
         if key == 'q' and 0 < len(value) <= 160:
             continue
-        if key == 'page' and value.isascii() and value.isdecimal() and 0 < len(value) <= 4 and 1 <= int(value) <= 2000:
+        if key == 'page' and value.isascii() and value.isdecimal() and 0 < len(value) <= 6 and 1 <= int(value) <= CATALOGUE_PAGE_LIMIT:
             continue
         if (key == 'sort' and value in {'popularity', 'uploaded_at'}
                 or key == 'order' and value == 'desc' or key == 'duration' and value == 'all'):

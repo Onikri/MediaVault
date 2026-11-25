@@ -7,10 +7,44 @@ import re
 from urllib.parse import urljoin, urlsplit, parse_qs
 from bs4 import BeautifulSoup
 from manga_source_tags import unique
-from source_parser import SourceError
+from source_parser import SourceError, SourceTemporaryError
 
 CHAN = {'manga-chan.me', 'hentaichan.live', 'h-chan.me', 'y.hentaichan.live'}
 SPECIAL = CHAN | {'online.hentaimoody.com', 'hentaros.com'}
+# HentaiChan's own listing modules (/manga/newest, /mostfavorites, /tags/...)
+# answer a bare "technical maintenance." (observed 2026-11-25, offset 0 and
+# 200 alike), while the DLE category /manga/page/N/ serves the same catalogue:
+# 20 cards a page with their tags, newest first, 1657 pages.
+MAINTENANCE = re.compile(r'\s*technical maintenance\.?\s*', re.I)
+DLE_LISTING = re.compile(r'/manga/(?:page/([1-9]\d{0,5})/)?')
+# Indexed cards carry the native reader's source id, which the Library source
+# filter selects (manga_hentaichan.SOURCE), not a Suwayomi extension id.
+NATIVE_SOURCE = {'hentaichan.live': '990000000000000001'}
+
+
+def listing_url(url, page):
+    """The served HentaiChan listing page for a stored /manga/newest cursor.
+
+    Both listings hold 20 cards a page, newest first, so page N continues
+    where offset (N-1)*20 stopped."""
+    p = urlsplit(url)
+    if p.path.rstrip('/') != '/manga/newest':return url
+    return p.scheme + '://' + p.netloc + '/manga/' + ('' if page == 1 else f'page/{page}/')
+
+
+def dle_pages(soup, url, hosts, page, count):
+    """Next page and catalogue size from the DLE navigation of /manga/page/N/."""
+    numbers = {}
+    for a in soup.select('.navigation a[href]'):
+        target = urljoin(url, a.get('href', '')); p = urlsplit(target); match = DLE_LISTING.fullmatch(p.path)
+        if p.scheme != 'https' or p.hostname not in hosts or not match or p.query:continue
+        numbers[int(match[1] or 1)] = target
+    later = [n for n in numbers if n > page]
+    if later and min(later) != page + 1:raise SourceError('Источник пропустил страницу каталога')
+    following = {'page': page + 1, 'url': numbers[page + 1]} if later else None
+    # The last linked page bounds the catalogue; the final page gives it exactly.
+    total = max([page, *numbers]) * 20 if following else (page - 1) * 20 + count
+    return following, total
 
 
 def valid_url(value, base, hosts, pattern):
@@ -27,7 +61,10 @@ def facts(scope):
 
 
 def catalogue(raw, url, spec, page):
-    soup = BeautifulSoup(raw, 'html.parser'); domain = spec['domain']; hosts = set(spec['hosts'])
+    domain = spec['domain']; hosts = set(spec['hosts'])
+    if domain in CHAN and MAINTENANCE.fullmatch(raw.lstrip('\ufeff')):
+        raise SourceTemporaryError('Раздел каталога на сайте закрыт на техническое обслуживание')
+    soup = BeautifulSoup(raw, 'html.parser')
     if domain=='hentaros.com' and urlsplit(url).path.rstrip('/')=='/tag':
         vocabulary=[];catalogues=[];seen=set()
         for a in soup.select('a.card[href]'):
@@ -63,11 +100,15 @@ def catalogue(raw, url, spec, page):
         tags = facts(node) if chan else {'tags': [], 'genres': unique([s for n in node.select('.manga-card__meta') for s in n.stripped_strings])}
         row = {'kind':'manga','title':title[:500],'aliases':[title[:500]],'provider':provider,'providerName':spec['name'].split(' · ')[0],
                'url':target,'sourceUrl':target,'sourceOnly':True,'language':'ru','cover':cover,**tags}
-        if source.get('id'):row['sourceId'] = str(source['id'])
+        if sid := NATIVE_SOURCE.get(domain) or source.get('id'):row['sourceId'] = str(sid)
         if chan and node.select_one('.genre,.tags'):row['sourceMetadataVersion'] = 2
         rows.append(row)
     if not rows:raise SourceError('Не удалось прочитать карточки каталога')
     # Offset navigation is outside .pagination in all three Chan templates.
+    if chan and (listing := DLE_LISTING.fullmatch(urlsplit(url).path)):
+        if int(listing[1] or 1) != page:raise SourceError('Источник вернул другую страницу каталога')
+        following, total = dle_pages(soup, url, hosts, page, len(rows))
+        return {'rows':rows,'next':following,'state':'done','total':total}
     if chan:
         current = int((parse_qs(urlsplit(url).query).get('offset') or ['0'])[0])
         if current != (page-1)*20:raise SourceError('Источник вернул другую страницу каталога')
