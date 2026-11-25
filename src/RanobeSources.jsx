@@ -50,22 +50,27 @@ export default function RanobeSources({item,service,state,expected=0}){
   if(!ready)return;const abort=new AbortController();
   setSearch({loading:true,error:'',results:[],providers:[]});setSource(null);setOpened(null);setBusy(false);setError('');
   setBooks({});picked.current=false;
-  searchRanobe(service,item,language,{signal:abort.signal}).then(async data=>{
+  // A book already in the index arrives first (pending: the server is still
+  // searching the sites); each later answer adds the sites' results.
+  const measured={},started=new Set();
+  const consider=async data=>{
    if(abort.signal.aborted)return;
    const results=data.results||[];
    setSearch({loading:false,error:'',results,providers:data.providers||[],fallback:data.fallback==='all'});
+   if(picked.current&&data.pending)return;
    const saved=results.find(r=>ranobeProgress(userId,r.url));
    // A book being read, or a favourite site, opens at once; otherwise every
    // source is measured first and the most complete translation opens.
    const first=saved||rankSources(results,{favorites:favorites.list}).find(r=>favorites.has(r));
-   if(first){picked.current=true;choose(first);}
-   let next=0;const measured={};
-   async function worker(){while(next<Math.min(results.length,8)){const row=results[next++];try{const book=await inspectRanobe(service,row.url,item,{signal:abort.signal});measured[row.url]=book;setBooks(old=>({...old,[row.url]:book}));}catch(e){if(abort.signal.aborted)return;measured[row.url]={error:e.message||'Источник не открылся',episodes:[]};setBooks(old=>({...old,[row.url]:measured[row.url]}));}}}
+   if(first&&!picked.current){picked.current=true;choose(first);}
+   const queue=results.slice(0,8).filter(r=>!started.has(r.url));queue.forEach(r=>started.add(r.url));let next=0;
+   async function worker(){while(next<queue.length){const row=queue[next++];try{const book=await inspectRanobe(service,row.url,item,{signal:abort.signal});measured[row.url]=book;setBooks(old=>({...old,[row.url]:book}));}catch(e){if(abort.signal.aborted)return;measured[row.url]={error:e.message||'Источник не открылся',episodes:[]};setBooks(old=>({...old,[row.url]:measured[row.url]}));}}}
    await Promise.all([worker(),worker(),worker()]);
    if(abort.signal.aborted||picked.current)return;
-   const best=rankSources(results.filter(r=>measured[r.url]?.episodes?.length),{favorites:favorites.list,expected,count:r=>measured[r.url]?.episodes?.length})[0]||results[0];
+   const best=rankSources(results.filter(r=>measured[r.url]?.episodes?.length),{favorites:favorites.list,expected,count:r=>measured[r.url]?.episodes?.length})[0]||(data.pending?null:results[0]);
    if(best){picked.current=true;choose(best);}
-  }).catch(e=>{if(!abort.signal.aborted)setSearch({loading:false,error:e.message||'Источники не ответили.',results:[],providers:[]});});
+  };
+  searchRanobe(service,item,language,{signal:abort.signal,onPartial:consider}).then(consider).catch(e=>{if(!abort.signal.aborted)setSearch({loading:false,error:e.message||'Источники не ответили.',results:[],providers:[]});});
   return()=>{abort.abort();inspection.current?.abort();};
  },[ready,item.id,language,revision]);
  async function choose(row){

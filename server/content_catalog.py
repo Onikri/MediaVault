@@ -113,6 +113,8 @@ def initialize(db):
     initialize_vocabulary(db)
     import content_works
     content_works.initialize(db)
+    import content_names
+    content_names.initialize(db)
     state=db.execute("SELECT value FROM content_catalog_state WHERE name='policy'").fetchone()
     labels=db.execute("SELECT value FROM content_catalog_state WHERE name='label-index'").fetchone()
     compiled=db.execute("SELECT value FROM content_catalog_state WHERE name='work-tag-index'").fetchone()
@@ -225,6 +227,8 @@ def ingest(db,rows):
         search=normalize(' '.join([title,*data['aliases'],*data['titles'].values()]))[:5000]
         db.execute('INSERT OR REPLACE INTO content_titles VALUES(?,?,?,?,?)',(key,data['kind'],search,raw,int(time.time())))
         new_facts+=_index(db,key,data,current())
+        from content_names import update as update_names
+        update_names(db,key,data)
         affected.add(work_key(data,key));works.add(db.execute('SELECT '+work+' FROM content_titles WHERE id=?',(key,)).fetchone()[0])
         count+=1
     refresh_work_tags(db,affected)

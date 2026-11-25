@@ -202,6 +202,57 @@ def search(title, language='all'):
     with _lock:
         hit = _cache.get(key)
         if hit and hit[0] > time.monotonic(): return hit[1]
+    indexed = indexed_results(title) if language in {'all', 'ru'} else []
+    if not indexed: return _live(title, language, key)
+    # The index already holds this work's RanobeLib book: it is the first
+    # source at once; the live search of every site continues in the
+    # background and the next request returns its merged result.
+    with _lock:
+        if key not in _running:
+            _running.add(key)
+            threading.Thread(target=_background, args=(title, language, key, indexed), daemon=True, name='ranobe-search').start()
+    others = [s for s in SOURCES if language == 'all' or s[2] == language]
+    return {'results': indexed,
+            'providers': [{'provider': identity, 'name': name, 'language': source_language,
+                           'status': 'ok' if identity == 'ranobelib' else 'pending',
+                           'message': 'Найдено в индексе: ' + str(len(indexed)) if identity == 'ranobelib' else 'Поиск продолжается.'}
+                          for identity, name, source_language in others],
+            'language': language, 'checkedAt': int(time.time()), 'pending': True}
+
+
+_running = set()
+
+
+def indexed_results(title):
+    """RanobeLib books of this work already in the catalogue index, in the
+    live search's result form. Same identity rule as the live search
+    (match_title with the kind ignored, strong evidence only, 3 at most)."""
+    import content_names
+    from ranobe_ru import LIB_ROOT
+    found = []
+    for row in content_names.matches({**title, 'kind': None}, 'ranobe', year_required=False):
+        url = row.get('sourceUrl') or row.get('url') or ''
+        if row.get('provider') != 'ranobelib' or not re.fullmatch(re.escape(LIB_ROOT) + r'/ru/book/[\w-]{1,250}', url): continue
+        if row['matchEvidence'] not in {'external_id', 'exact_title', 'title_and_season'}: continue
+        found.append({'provider': 'ranobelib', 'providerName': 'RanobeLib', 'language': 'ru', 'title': row['title'],
+                      'aliases': row.get('aliases') or [row['title']], 'url': url, 'cover': row.get('cover') or '',
+                      'kind': 'ranobe', 'matchEvidence': row['matchEvidence'], 'indexed': True})
+    return list({r['url']: r for r in found}.values())[:3]
+
+
+def _background(title, language, key, indexed):
+    try:
+        _live(title, language, key, indexed)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('Ranobe live search failed')
+        value = {'results': indexed, 'providers': [], 'language': language, 'checkedAt': int(time.time())}
+        with _lock: _cache[key] = (time.monotonic() + 30, value)
+    finally:
+        with _lock: _running.discard(key)
+
+
+def _live(title, language, key, indexed=()):
     wanted = {**title, 'kind': None}
 
     def work(source):
@@ -234,7 +285,10 @@ def search(title, language='all'):
     sources = [s for s in SOURCES if language == 'all' or s[2] == language]
     with ThreadPoolExecutor(max_workers=len(sources)) as pool:
         providers = list(pool.map(work, sources))
-    value = {'results': [r for p in providers for r in p['results']],
+    for provider in providers:
+        if provider['provider'] == 'ranobelib' and indexed and provider['status'] != 'ok':
+            provider.update(status='ok', message='Найдено в индексе: ' + str(len(indexed)))
+    value = {'results': list({r['url']: r for r in [*indexed, *(r for p in providers for r in p['results'])]}.values()),
              'providers': [{k: p[k] for k in ('provider', 'name', 'language', 'status', 'message')} for p in providers],
              'language': language, 'checkedAt': int(time.time())}
     with _lock:

@@ -53,6 +53,23 @@ def indexed_sources(selected):
             if url not in found.setdefault(provider,[]):found[provider].append(url)
     return found
 
+def index_anchors(selected):
+    """provider -> series pages of the card's work found in the index by name.
+
+    A metadata card (AniList …) and the catalogued site's row of the same work
+    are separate works in the index (the sites have no MAL/AniList IDs). The
+    row is accepted by the live search's own rule: match_title plus the year
+    rule of _discover (a card's year must be stated by the row). Read-only;
+    {} when the index cannot be read."""
+    from dynamic_video_sources import catalogued_source
+    from content_names import matches
+    if selected.get('kind', 'anime') != 'anime':return {}
+    found={}
+    for row in matches(selected,'anime',year_required=True):
+        if url:=catalogued_source(row.get('provider'),row.get('sourceUrl') or row.get('url')):
+            if url not in found.setdefault(row['provider'],[]):found[row['provider']].append(url)
+    return {provider:urls[:4] for provider,urls in found.items() if urls}
+
 def _key(selected):
     anchors=tuple(sorted((p,tuple(u)) for p,u in indexed_sources(selected).items()))
     return repr((selected.get('ids'),aliases(selected),selected.get('startDate') or selected.get('year'),selected.get('kind'))+((anchors,) if anchors else ()))
@@ -76,6 +93,8 @@ def _discover(selected,*,refresh=False,continuing=False):
         keywords=[v.split()[-1].strip(' .:!?') for v in names if ':' in v and re.search(r'[а-яё]',v,re.I)]
         queries=list(dict.fromkeys([*names[:2],*[v for v in keywords if len(v)>=4],*[v for v in stems if len(v)>=4]]))[:4]
         anchored=indexed_sources(selected)
+        for provider,urls in index_anchors(selected).items():
+            anchored[provider]=list(dict.fromkeys([*anchored.get(provider,[]),*urls]))[:8]
         def work(site):
             http=PublicHttp(timeout=(2,4),deadline=time.monotonic()+15)
             try:
@@ -165,7 +184,10 @@ def _discover(selected,*,refresh=False,continuing=False):
                 from yummy_anime_source import discover_reze
                 futures.append(pool.submit(discover_reze))
             from kinobox_source import discover as kinobox_discover
-            futures.extend([pool.submit(kodik_discover,selected),pool.submit(kinobox_discover,selected),*[pool.submit(work,site) for site in sites]])
+            # Sites with an indexed page of this work answer with one inspection:
+            # they go first instead of queueing behind searches of other sites.
+            first=[pool.submit(work,site) for site in sites if anchored.get(site.id)]
+            futures.extend([*first,pool.submit(kodik_discover,selected),pool.submit(kinobox_discover,selected),*[pool.submit(work,site) for site in sites if not anchored.get(site.id)]])
             for future in as_completed(futures):
                 providers.append(future.result());result=snapshot(len(providers)<len(futures))
                 with _lock:_cache[key]=(time.monotonic()+(300 if result['sources'] else 30),result)

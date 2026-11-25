@@ -258,15 +258,16 @@ def step(store, pause=None):
     if job.get('state') != 'running':
         # Same thread, lower priority: the one-off label repair, then the
         # resumable fills of the materialized «Хентай» work set, the owner's
-        # page cache compaction (minutes), the content works and the
-        # full-text title index.
+        # page cache compaction (minutes), the content works, the
+        # full-text title index and the names of playable index rows.
         import catalog_search
+        import content_names
         import content_works
         import hentai_works
         import label_repair
         import page_cache_compact
         if not (label_repair.step(store) or hentai_works.step(store) or page_cache_compact.step(store)
-                or content_works.step(store) or catalog_search.step(store)):
+                or content_works.step(store) or catalog_search.step(store) or content_names.step(store)):
             return False
         time.sleep(PAUSE if pause is None else pause)
         return True

@@ -190,8 +190,29 @@ def indexed_search(source,query):
         return []
     return list(found.values())[:40]
 
-def indexed_title_sources(db, selected, sources):
-    """Return exact indexed editions before scheduling live source requests."""
+def fts_editions(db, keys, limit=120):
+    """catalog_titles rows with one of the normalized names as their exact
+    title or alias (catalog_search); nothing until that index is filled."""
+    import catalog_search
+    try:
+        if not catalog_search.ready(db):
+            return []
+        rowids = []
+        for key in keys[:8]:
+            rowids += [r[0] for r in db.execute('SELECT rowid FROM ' + catalog_search.FTS + ' WHERE ' + catalog_search.FTS + ' MATCH ? LIMIT ?',
+                                                (catalog_search.match_name(key), limit))]
+    except sqlite3.Error:
+        return []
+    rowids = list(dict.fromkeys(rowids))[:limit]
+    if not rowids:
+        return []
+    return db.execute('SELECT id,source_id,metadata FROM catalog_titles WHERE rowid IN (' + ','.join('?' for _ in rowids) + ')', rowids).fetchall()
+
+def indexed_title_sources(db, selected, sources, *, aliases_index=False):
+    """Return exact indexed editions before scheduling live source requests.
+
+    aliases_index (the card's first answer only, not per source): when no
+    row's own title matches, also look the card's names up among aliases."""
     from manga_tag_policy import normalize as work_normalize
     from title_identity import aliases, match_title
     keys = list(dict.fromkeys(key for name in aliases(selected) if (key := work_normalize(name))))
@@ -199,8 +220,7 @@ def indexed_title_sources(db, selected, sources):
         return {}
     profiles = {str(source['id']):source for source in sources}
     result = {}
-    for key in keys:
-        rows = db.execute('SELECT id,source_id,metadata FROM catalog_titles WHERE work_key=? LIMIT 120', (key,))
+    def take(rows):
         for identity, source_id, metadata in rows:
             source = profiles.get(source_id)
             if not source:
@@ -212,6 +232,13 @@ def indexed_title_sources(db, selected, sources):
                 **row, 'id':row.get('id') or identity, 'indexed':True,
                 'sourceId':source_id, 'providerName':source['name'],
             }
+    for key in keys:
+        take(db.execute('SELECT id,source_id,metadata FROM catalog_titles WHERE work_key=? LIMIT 120', (key,)))
+    if not result and aliases_index:
+        # The work key is a row's own title. An edition titled in another
+        # language ("Побег соло танка") carries the card's name only among
+        # its aliases: the full-text index finds the exact alias.
+        take(fts_editions(db, keys))
     return {source_id:list(rows.values())[:40] for source_id,rows in result.items()}
 
 def search_source(source,query):
@@ -471,7 +498,7 @@ class Discovery:
         saved={}
         if title:
             with catalogue_reader(self) as reader:
-                saved=indexed_title_sources(reader,title,selected)
+                saved=indexed_title_sources(reader,title,selected,aliases_index=True)
         now=self.clock()
         with self.condition,self.db:
             self._prune(now)

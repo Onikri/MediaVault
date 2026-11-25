@@ -8,8 +8,23 @@ const LIMIT=24;
 export function ranobeTitle(item){
  return {id:item.id,title:item.title,titles:item.titles||{},aliases:item.aliases||[],ids:item.ids||{},year:item.year,kind:item.kind==='book'?'book':'ranobe',...(item.kind==='book'?{authors:(item.authors||[]).slice(0,4)}:{})};
 }
-export async function searchRanobe(service,item,language,{signal}={}){
- return service.request('/ranobe/search',{method:'POST',body:{title:ranobeTitle(item),language},signal});
+// A book already in the server's index answers at once with pending=true while
+// the sites are still searched; onPartial receives it and the search repeats
+// until the merged answer arrives.
+export async function searchRanobe(service,item,language,{signal,onPartial,interval=1500,rounds=30}={}){
+ const request=()=>service.request('/ranobe/search',{method:'POST',body:{title:ranobeTitle(item),language},signal});
+ let data=await request();
+ for(let round=0;data?.pending&&round<rounds;round++){
+  onPartial?.(data);
+  await new Promise((resolve,reject)=>{
+   if(signal?.aborted){reject(signal.reason);return;}
+   const timer=setTimeout(()=>{signal?.removeEventListener('abort',stop);resolve();},interval);
+   function stop(){clearTimeout(timer);reject(signal.reason);}
+   signal?.addEventListener('abort',stop,{once:true});
+  });
+  data=await request();
+ }
+ return data;
 }
 export async function inspectRanobe(service,url,item,{signal}={}){
  return service.request('/ranobe/inspect',{method:'POST',body:{url,...(item?{title:ranobeTitle(item)}:{})},signal});
