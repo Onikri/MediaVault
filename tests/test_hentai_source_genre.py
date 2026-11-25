@@ -52,13 +52,21 @@ class HentaiOrigins(unittest.TestCase):
   self.assertEqual(content_catalog.browse(self.db,kind='anime',genre='Хентай')['total'],0)
   row=content_catalog.browse(self.db,kind='anime')['items'][0];self.assertTrue(row['hentaiExcluded']);self.assertNotIn('Хентай',row['genres'])
 
- def test_source_rule_updates_replace_derived_indexes_without_rewriting_facts(self):
-  from catalog_taxonomy import HENTAI,initialize_origins
+ def test_source_rule_updates_replace_derived_sets_without_rewriting_facts(self):
+  import hentai_works
+  from catalog_taxonomy import HENTAI
+  store=SimpleNamespace(db=self.db,lock=threading.RLock())
+  def settle():
+   while hentai_works.step(store):pass
   manga.upsert(self.db,[self.row('Garden')]);before=self.db.execute('SELECT * FROM catalog_tag_facts').fetchall()
+  indexes=self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'catalog_hentai_%'").fetchall()
   with patch.dict(HENTAI,{'hosts':['fixture.example']}):
-   initialize_origins(self.db,manga=True)
+   manga.initialize(self.db)
+   # The previous set answers until the background pass for the new rules ends.
+   self.assertEqual(manga.browse(self.db,genre='Хентай')['workTotal'],1)
+   settle()
    self.assertEqual(manga.browse(self.db,genre='Хентай')['workTotal'],0)
-   self.assertEqual(self.db.execute("SELECT count(*) FROM sqlite_master WHERE type='index' AND name LIKE 'catalog_hentai_%'").fetchone()[0],2)
-  initialize_origins(self.db,manga=True)
+   self.assertEqual(self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'catalog_hentai_%'").fetchall(),indexes)
+  manga.initialize(self.db);settle()
   self.assertEqual(manga.browse(self.db,genre='Хентай')['workTotal'],1)
   self.assertEqual(self.db.execute('SELECT * FROM catalog_tag_facts').fetchall(),before)

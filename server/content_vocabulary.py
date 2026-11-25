@@ -82,12 +82,10 @@ def _public(db,identity):
                 else:row.setdefault('category','tag')
         # Source-derived genres must be selectable even before any source
         # happens to send the same literal label in its tag array.
-        from catalog_taxonomy import origin_sql
+        from catalog_taxonomy import hentai_present
         key=policy.key('Хентай')
         if key and key not in known:
-            tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            has_origin=any(db.execute('SELECT 1 FROM '+table+' t WHERE '+origin_sql('t',manga)+'=1 LIMIT 1').fetchone() for table,manga in [('catalog_titles',True),('content_titles',False)] if table in tables)
-            if has_origin:known[key]={'key':key,'label':policy.label(key,'Хентай'),'aliases':['Хентай','Hentai'],'category':'genre'}
+            if hentai_present(db):known[key]={'key':key,'label':policy.label(key,'Хентай'),'aliases':['Хентай','Hentai'],'category':'genre'}
         data['tags']=list(known.values())
     # The private switch is implemented by expanding observed, allowed
     # source labels; its private hidden list is never delivered publicly.

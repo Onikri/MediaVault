@@ -21,7 +21,9 @@ the same SQL expressions over the work's rows (refresh()):
   Every time test of eligible() has the form «a moment has passed», so 1 stays
   true until the rows change, and refresh() runs on every change.
 * hentai: catalog_taxonomy.hentai_work_set() for this work (explicit tag or
-  hentai origin, no «Не хентай» fact), valid for the signature in the state.
+  hentai origin, no «Не хентай» fact). The state's 'hentai' names the rules of
+  the last complete pass; while a pass for new rules runs, every work carries
+  either its previous or its new flag and «Хентай» pages keep using it.
 
 content_work_stats counts works per (kind, avail, hentai) through triggers: the
 exact total of an unfiltered page without a COUNT.
@@ -31,7 +33,8 @@ merges) call refresh() with the affected work keys; an unchanged row only
 moves updated (touch()). step() fills an existing catalogue in resumable
 portions of content_titles rowids (state row content_catalog_state
 'content-works'); rebuild_work_tags() restarts the pass for the hentai flag
-only. Until a pass reports complete, browse keeps the old grouped query.
+only. Until a first pass reports complete, browse keeps the old grouped
+query.
 """
 import hashlib
 import json
@@ -44,6 +47,10 @@ KINDS = ('anime', 'movie', 'tv', 'ranobe')
 # Bump when a column's definition changes: the table is rebuilt and refilled.
 REVISION = 'content-works-v1'
 PORTION = 2000
+# The legacy origin expression index is dropped only by a release that has
+# been answering for this long (the deploy's rollback target still uses it).
+RETIRE_AFTER = 900
+_started = time.monotonic()
 FRESH = 7200
 # A streamed page stops being cheaper than reading a tag's works and sorting
 # them once about this many index entries must be tested.
@@ -141,11 +148,12 @@ def initialize(conn):
 
 
 def _restart(conn, state):
-    """New hentai inputs: recompute every work; other columns stay valid."""
+    """New hentai inputs: recompute every work in the background; other
+    columns stay valid and the previous flags are served meanwhile."""
     if not conn.execute('SELECT 1 FROM content_titles LIMIT 1').fetchone():
         _save(conn, {**state, 'signature': signature(), 'phase': 'done', 'cursor': 0, 'hentai': signature(), 'complete': True})
         return
-    _save(conn, {**state, 'signature': signature(), 'phase': 'fill', 'cursor': 0, 'hentai': ''})
+    _save(conn, {**state, 'signature': signature(), 'phase': 'fill', 'cursor': 0})
 
 
 def invalidate_hentai(conn):
@@ -162,13 +170,20 @@ def ready(conn):
 
 
 def hentai_ready(conn, policy=None):
+    """The hentai flags are complete: for the current rules or, while a pass
+    for new rules runs, for the previous ones."""
+    return ready(conn) and bool(_state(conn).get('hentai'))
+
+
+def hentai_current(conn, policy=None):
+    """The hentai flags follow the current rules (no pass is recomputing them)."""
     state = _state(conn)
-    return ready(conn) and state.get('hentai') == signature(policy)
+    return ready(conn) and state.get('phase') == 'done' and state.get('hentai') == signature(policy)
 
 
 def progress(conn):
     state = _state(conn)
-    return {**state, 'ready': ready(conn), 'hentaiReady': hentai_ready(conn)}
+    return {**state, 'ready': ready(conn), 'hentaiReady': hentai_ready(conn), 'hentaiCurrent': hentai_current(conn)}
 
 
 def aggregate_sql(conn, condition, policy=None, many=True):
@@ -178,7 +193,7 @@ def aggregate_sql(conn, condition, policy=None, many=True):
     catalog_taxonomy.hentai_work_set(). many: the hentai-tagged and «Не хентай»
     rows are read once from their indexes instead of probed row by row (the
     same sets; probes are cheaper for the few rows of one ingest)."""
-    from catalog_taxonomy import keys as tag_keys, origin_sql, register_origin_functions
+    from catalog_taxonomy import keys as tag_keys, origin_sql, register_origin_functions, veto_index
     from content_catalog import RELEASE_YEAR
     from manga_tag_policy import current
     from release_status import eligible
@@ -190,9 +205,12 @@ def aggregate_sql(conn, condition, policy=None, many=True):
     tags = ','.join('?' for _ in wanted) or "''"
     if many:
         tagged = 't.id IN (SELECT x.title_id FROM content_tags x WHERE x.tag_key IN (' + tags + '))'
-        vetoed = 't.id IN (SELECT f.title_id FROM content_tag_facts f WHERE catalog_not_hentai(f.original)=1)'
     else:
         tagged = 'EXISTS(SELECT 1 FROM content_tags x WHERE x.title_id=t.id AND x.tag_key IN (' + tags + '))'
+    if many and veto_index(conn):
+        vetoed = 't.id IN (SELECT f.title_id FROM content_tag_facts f WHERE catalog_not_hentai(f.original)=1)'
+    else:
+        # Without an index for the current labels: the row's own facts.
         vetoed = 'EXISTS(SELECT 1 FROM content_tag_facts f WHERE f.title_id=t.id AND catalog_not_hentai(f.original)=1)'
     work = _work('t')
     sql = ('SELECT ' + work + ',MIN(t.kind),MAX(t.updated),' + RELEASE_YEAR + ',MIN(t.search),'
@@ -256,13 +274,17 @@ def _portion(conn, cursor):
                         'WHERE rowid>? ORDER BY rowid LIMIT ?', (cursor, PORTION)).fetchall()
 
 
-def step(store):
+def step(store, clock=time.monotonic):
     """Advance the fill by one portion; False when there is nothing to do."""
     with store.lock:
         if not _present(store.db):
             return False
         state = _state(store.db)
         if state.get('revision') != REVISION or state.get('phase') != 'fill':
+            if state.get('revision') == REVISION and hentai_current(store.db) and clock() - _started >= RETIRE_AFTER:
+                from catalog_taxonomy import retire_indexes
+                with store.db:
+                    return retire_indexes(store.db)
             return False
     # Read (and warm) the portion and its works outside the lock; under it the
     # same works are recomputed from the page cache.

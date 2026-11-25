@@ -263,15 +263,16 @@ class Maintenance(Base):
         ingest(self.db, rows(works=8))
         content_catalog.reindex(self.db, __import__('manga_tag_policy').current())
         self.assertTrue(content_works.ready(self.db))
-        self.assertFalse(content_works.hentai_ready(self.db))
-        # Everything but «Хентай» stays on the materialized path meanwhile.
-        with patch.object(content_catalog, 'read_works', wraps=content_catalog.read_works):
-            self.assertIsNotNone(content_works.page(self.db, kind='anime', genre='Fantasy'))
-            self.assertIsNone(content_works.page(self.db, kind='anime', genre='Хентай'))
+        self.assertFalse(content_works.hentai_current(self.db))
+        # Every filter, «Хентай» too (the previous flags), stays on the
+        # materialized path meanwhile.
+        self.assertTrue(content_works.hentai_ready(self.db))
+        self.assertIsNotNone(content_works.page(self.db, kind='anime', genre='Fantasy'))
+        self.assertIsNotNone(content_works.page(self.db, kind='anime', genre='Хентай'))
         store = SimpleNamespace(lock=threading.RLock(), db=self.db)
         while content_works.step(store):
             pass
-        self.assertTrue(content_works.hentai_ready(self.db))
+        self.assertTrue(content_works.hentai_current(self.db))
         self.same(kind='anime', genre='Хентай', sort='trending', limit=5)
 
 

@@ -4,7 +4,25 @@ from pathlib import Path
 from catalog_labels import readable_label
 
 DATA=json.loads(Path(__file__).with_name('catalog-taxonomy.json').read_text(encoding='utf-8'))
-REVISION=hashlib.sha256(json.dumps(DATA,sort_keys=True).encode()).hexdigest()
+# The provider and host lists of sourceGenres.hentai only decide which source
+# rows count as «Хентай». hentai_works and content_works recompute their sets
+# in the background when they change (their signatures hash HENTAI), so the
+# projection revision counts these lists as they were at its last full
+# reindex: adding a new source (rows that do not exist yet) must not start a
+# synchronous reindex of millions of titles in initialize(). Keep the lists
+# frozen; editing them forces one full reindex. A rule that turns rows that
+# already exist into hentai updates the «Хентай» filter after the background
+# pass and the label of such a card at its next ingest.
+PROJECTED_ORIGINS={
+    'providers':['hentailib','hentaichan','hentaichan-cc','hitomi','hmanga','hanime','hanime1','hentaimama','hentaicomua'],
+    'hosts':['hentailib.me','hentailib.org','hentaichan.live','h-chan.me','hentaichan.cc','henchan.pro','hmanga.su','hmanga.me',
+             'hentaros.com','hentaimoody.com','nude-moon.org','nude-moon.fun','allhen.online','allhentai.ru','hitomi.la','hanime.tv',
+             'hanime1.me','hentaimama.io','hentai.com.ua','freeanimehentai.net','hentaifox.com','rokuhentai.com','akuma.moe','3hentai.net']}
+def _revision(data):
+    data=json.loads(json.dumps(data))
+    data['sourceGenres']['hentai'].update(PROJECTED_ORIGINS)
+    return hashlib.sha256(json.dumps(data,sort_keys=True).encode()).hexdigest()
+REVISION=_revision(DATA)
 def norm(value):return ' '.join(unicodedata.normalize('NFKC',str(value or '')).casefold().replace('_',' ').replace('-',' ').split())
 GENRES={norm(alias):row for row in DATA['genres'] for alias in [row['label'],row['key'],*row['aliases']]}
 HENTAI=DATA['sourceGenres']['hentai']
@@ -40,21 +58,76 @@ def register_origin_functions(db):
     db.create_function('catalog_hentai_origin',3,hentai_origin,deterministic=True)
     db.create_function('catalog_not_hentai',1,lambda value:norm(value) in HENTAI_NEGATIVE,deterministic=True)
 
+# Every «Не хентай» veto index built before C3 carries the 12-hex stamp of the
+# whole HENTAI block in its name; excludeLabels were these four in every
+# version of catalog-taxonomy.json since the veto exists (ad6a944..ae3e725).
+LEGACY_VETO_LABELS=['Не хентай','Not hentai','Non-hentai','Nonhentai']
+
+def _prefixes(manga):
+    if manga:return 'catalog_titles','catalog_tag_facts','catalog_hentai_origin_','catalog_hentai_veto_'
+    return 'content_titles','content_tag_facts','content_hentai_origin_','content_hentai_veto_'
+
+def veto_stamp():
+    """The veto index depends only on the normalized «Не хентай» labels."""
+    return 'l'+hashlib.sha256(json.dumps(sorted(HENTAI_NEGATIVE),ensure_ascii=False).encode()).hexdigest()[:12]
+
+def _veto_valid(name,prefix):
+    suffix=name[len(prefix):]
+    if suffix==veto_stamp():return True
+    legacy=len(suffix)==12 and all(c in '0123456789abcdef' for c in suffix)
+    return legacy and HENTAI_NEGATIVE=={norm(v) for v in LEGACY_VETO_LABELS}
+
+def veto_index(db,manga=False):
+    """Name of an index of catalog_not_hentai(original) built for the current
+    labels, or None (callers then probe a title's facts by its key)."""
+    prefix=_prefixes(manga)[3]
+    for (name,) in db.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE ?",(prefix+'%',)).fetchall():
+        if name.startswith(prefix) and _veto_valid(name,prefix):return name
+    return None
+
 def initialize_origins(db,manga=False):
+    """Register the SQL functions. Never builds or drops an index over the
+    title or fact tables of an existing catalogue: millions of Python calls
+    under the write lock kept the release from answering its health check.
+    The «Хентай» sets are recomputed in the background (hentai_works,
+    content_works); a fresh, empty catalogue gets the veto index for free."""
     register_origin_functions(db)
-    table='catalog_titles' if manga else 'content_titles'
-    stamp=hashlib.sha256(json.dumps(HENTAI,sort_keys=True).encode()).hexdigest()[:12]
-    prefix='catalog_hentai_origin_' if manga else 'content_hentai_origin_'
-    name=prefix+stamp
-    veto_prefix='catalog_hentai_veto_' if manga else 'content_hentai_veto_'
-    for family in [prefix,veto_prefix]:
-        for (old,) in db.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE ?",(family+'%',)).fetchall():
-            if old!=family+stamp:db.execute('DROP INDEX "'+old+'"')
-    expression=origin_sql('t',manga).replace('t.','')
-    db.execute('CREATE INDEX IF NOT EXISTS '+name+' ON '+table+'('+expression+')')
-    facts='catalog_tag_facts' if manga else 'content_tag_facts'
-    veto=veto_prefix+stamp
-    db.execute('CREATE INDEX IF NOT EXISTS '+veto+' ON '+facts+'(catalog_not_hentai(original),title_id)')
+    _,facts,_,veto_prefix=_prefixes(manga)
+    if veto_index(db,manga) is None and not db.execute('SELECT 1 FROM '+facts+' LIMIT 1').fetchone():
+        for (old,) in db.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE ?",(veto_prefix+'%',)).fetchall():
+            db.execute('DROP INDEX "'+old+'"')
+        db.execute('CREATE INDEX IF NOT EXISTS '+veto_prefix+veto_stamp()+' ON '+facts+'(catalog_not_hentai(original),title_id)')
+
+def retire_indexes(db,manga=False):
+    """Drop one expression index nothing reads any more; True when one was.
+
+    The origin indexes (catalog_hentai_origin(...) per title, before C3) keep
+    the values of the rules they were built with: a rule that changes an
+    existing row would leave an entry a later delete cannot find. The veto
+    index stays while its labels are current. Called by the background passes
+    once their set is current and the release has been running for a while."""
+    _,_,origin_prefix,veto_prefix=_prefixes(manga)
+    for (name,) in db.execute("SELECT name FROM sqlite_master WHERE type='index' AND (name LIKE ? OR name LIKE ?) ORDER BY name",
+                              (origin_prefix+'%',veto_prefix+'%')).fetchall():
+        if name.startswith(origin_prefix) or name.startswith(veto_prefix) and not _veto_valid(name,veto_prefix):
+            db.execute('DROP INDEX "'+name+'"')
+            return True
+    return False
+
+def hentai_present(db):
+    """Whether any work counts as «Хентай»: the materialized sets once served,
+    else one probe of the origin expression."""
+    import content_works,hentai_works
+    tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    for table,manga in [('catalog_titles',True),('content_titles',False)]:
+        if table not in tables:continue
+        if manga and hentai_works.TABLE in tables and hentai_works.ready(db):
+            found=db.execute('SELECT 1 FROM '+hentai_works.TABLE+' LIMIT 1').fetchone()
+        elif not manga and content_works.hentai_ready(db):
+            found=db.execute('SELECT 1 FROM '+content_works.STATS+' WHERE hentai=1 AND works>0 LIMIT 1').fetchone()
+        else:found=db.execute('SELECT 1 FROM '+table+' t WHERE '+origin_sql('t',manga)+'=1 LIMIT 1').fetchone()
+        if found:return True
+    return False
 
 def hentai_work_set(policy,manga=False):
     from content_catalog import work_sql
@@ -76,10 +149,14 @@ def hentai_only(raw,policy,negative=False):
     return bool(wanted) and all(is_hentai(k,policy) for k in wanted)
 
 def hentai_works_query(db,policy,manga=False):
-    """The materialized manga work set once filled, else the derived union."""
+    """The materialized work set once one was filled (the previous one while
+    changed rules are recomputed in the background), else the derived union."""
     if manga:
         import hentai_works
         if hentai_works.ready(db,policy):return 'SELECT h.work_key FROM '+hentai_works.TABLE+' h',[]
+    else:
+        import content_works
+        if content_works.hentai_ready(db,policy):return 'SELECT w.work_key FROM '+content_works.TABLE+' w WHERE w.hentai=1',[]
     return hentai_work_set(policy,manga)
 
 def semantic_genre(label,policy=None,source=''):

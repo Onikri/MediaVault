@@ -146,15 +146,18 @@ class HentaiWorkTests(Fixture, unittest.TestCase):
     def test_background_fill_resumes_and_gives_the_same_set(self):
         expected = sorted(self.db.execute('SELECT work_key FROM catalog_hentai_works').fetchall())
         hentai_works.invalidate(self.db)
-        self.assertFalse(hentai_works.ready(self.db, manga_catalog_index.current()))
+        # The previous set is served while the new one is computed.
+        self.assertTrue(hentai_works.ready(self.db, manga_catalog_index.current()))
+        self.assertFalse(hentai_works.current(self.db))
         self.assertEqual(self.keys(browse(self.db, genre='Хентай', limit=100)), self.keys(self.old(genre='Хентай', limit=100)))
-        with patch.object(hentai_works, 'PORTION', 3):
-            for _ in range(6):
+        with patch.object(hentai_works, 'PORTION', 3), patch.object(hentai_works, 'SCAN', 4):
+            for _ in range(12):
                 hentai_works.step(self.store)
-            hentai_works._origins.clear()          # a restart keeps only the state row
+                self.assertEqual(self.keys(browse(self.db, genre='Хентай', limit=100)), self.keys(self.old(genre='Хентай', limit=100)))
             while tag_merge.step(self.store, pause=0):
                 pass
-        self.assertTrue(hentai_works.ready(self.db, manga_catalog_index.current()))
+        self.assertTrue(hentai_works.current(self.db))
+        self.assertFalse(self.db.execute("SELECT 1 FROM sqlite_master WHERE name='catalog_hentai_works_next'").fetchone())
         self.assertEqual(sorted(self.db.execute('SELECT work_key FROM catalog_hentai_works').fetchall()), expected)
 
     def test_slow_totals_are_counted_in_the_background(self):
