@@ -3,11 +3,14 @@
 * hanime1.me — Japanese audio with Chinese subtitles burned in.
 * HentaiMama (hentaimama.io) — English subtitles.
 * Hentai.com.ua — Ukrainian dubs and subtitles.
+* WatchHentai (watchhentai.net) — English subtitles and dubs.
 
 Search, episode lists and the MP4 address come from the sites' public HTML
-(and HentaiMama's public player AJAX). MediaVault plays the file in its own
+(HentaiMama's public player AJAX, WatchHentai's own player page). MediaVault plays the file in its own
 player: no third-party iframe is embedded, no account or cookie is used.
 """
+import base64
+import binascii
 import html
 import json
 import re
@@ -20,10 +23,12 @@ from source_parser import SourceError, playback_headers, public_url
 HANIME1 = 'https://hanime1.me'
 MAMA = 'https://hentaimama.io'
 UA = 'https://hentai.com.ua'
+WATCH = 'https://watchhentai.net'
 PROVIDERS = {
     'hanime1': ('Hanime1 · JA', ('hanime1.me',)),
     'hentaimama': ('HentaiMama · EN', ('hentaimama.io',)),
     'hentaicomua': ('Hentai.com.ua · UA', ('hentai.com.ua',)),
+    'watchhentai': ('WatchHentai · EN', ('watchhentai.net',)),
 }
 MAX_RESULTS = 12
 MAX_EPISODES = 200
@@ -103,6 +108,11 @@ def provider_for(url):
         return 'hentaimama', PROVIDERS['hentaimama'][0]
     if host == 'hentai.com.ua' and re.fullmatch(r'/hentai_video/[^/]{1,240}/?', path):
         return 'hentaicomua', PROVIDERS['hentaicomua'][0]
+    # WatchHentai: a series (/series/<slug>/) or an episode (/videos/<slug>/);
+    # /series/page/N/ and the bare /videos/ index are listings, not titles.
+    match = re.fullmatch(r'/(series|videos)/((?:[a-z0-9-]|%[0-9a-f]{2}){1,200})/?', path, re.I) if host == 'watchhentai.net' else None
+    if match and match[2].lower() != 'page' and not parts.query:
+        return 'watchhentai', PROVIDERS['watchhentai'][0]
     return None
 
 
@@ -284,6 +294,156 @@ def mama_streams(url, http):
     return streams
 
 
+# --- WatchHentai ---------------------------------------------------------------
+
+WATCH_HOSTS = ('watchhentai.net',)
+WATCH_PLAYER = re.compile(r'/player(?:-alt)?/\d{1,9}/\d{1,2}/mp4/?')
+
+
+def _watch_page(value, base, kind):
+    """A watchhentai.net series ('series') or episode ('videos') address, else ''."""
+    url = _url(value, base, WATCH_HOSTS)
+    return url if url and provider_for(url) and urlsplit(url).path.startswith('/' + kind + '/') else ''
+
+
+def watch_cards(soup, base):
+    """[url, title, cover, year] of the series cards of an archive or search page.
+
+    Only the listing's own cards count: the sidebar's popular/new widgets and
+    the menus link other series."""
+    found = {}
+    for card in soup.select('#dt-tvshows article.item.tvshows, #archive-content article.item.tvshows'):
+        anchor = card.select_one('.data h3 a[href]') or card.select_one('a[href*="/series/"]')
+        url = _watch_page(anchor.get('href') if anchor else '', base, 'series')
+        title = clean((anchor.get('title') or anchor.get_text(' ', strip=True)) if anchor else '', 200)
+        if not url or not title:
+            continue
+        image = card.select_one('.poster img')
+        cover = _url((image.get('data-src') or image.get('src')) if image else '', base, WATCH_HOSTS)
+        badge = card.select_one('.buttonyear')
+        year = re.fullmatch(r'(?:19|20)\d\d', clean(badge.get_text() if badge else ''))
+        found.setdefault(url, [url, title, cover, int(year[0]) if year else None])
+    return list(found.values())
+
+
+def watch_search(query, http):
+    text, final, _ = http.document(WATCH + '/?' + urlencode({'s': query}))
+    results = []
+    for url, title, cover, year in watch_cards(BeautifulSoup(text, 'html.parser'), final)[:MAX_RESULTS]:
+        row = _row('watchhentai', url, title, [], cover)
+        row['year'] = year
+        results.append(row)
+    return results
+
+
+def watch_episode_links(soup, final):
+    """Episodes a series page lists (/videos/<slug>-episode-<n>[-id-NN]/), in number order.
+
+    An announced episode is listed as «Episode 2 (PREVIEW)»: it plays the
+    site's preview clip and keeps that mark in its title."""
+    episodes = {}
+    for anchor in soup.select('ul.episodios li a[href]'):
+        link = _watch_page(anchor.get('href'), final, 'videos')
+        if not link:
+            continue
+        label = anchor.select_one('.eptitle')
+        label = clean(label.get_text(' ', strip=True) if label else anchor.get('title') or '', 120)
+        match = (re.search(r'\bepisode\s*(\d{1,3})\b', label, re.I)
+                 or re.search(r'-episode-(\d{1,3})(?:-id-\d{1,3})?/?$', urlsplit(link).path))
+        if not match:
+            continue
+        number = int(match[1])
+        preview = bool(re.search(r'\bpreview\b', label, re.I))
+        episodes.setdefault(number, {'number': number, 'season': 1, 'url': link,
+                                     'title': 'Episode ' + str(number) + (' (preview)' if preview else ''),
+                                     **({'preview': True} if preview else {})})
+    return sorted(episodes.values(), key=lambda e: e['number'])[:MAX_EPISODES]
+
+
+def _watch_series_url(url, http):
+    if urlsplit(url).path.startswith('/series/'):
+        return url
+    text, final, _ = http.document(url)
+    soup = BeautifulSoup(text, 'html.parser')
+    # The episode page's «All Episodes» button and its series card; not the sidebar.
+    for anchor in soup.select('nav.pag_episodes .item-all a[href], .ep-series-card a[href]'):
+        series = _watch_page(anchor.get('href'), final, 'series')
+        if series:
+            return series
+    raise SourceError('WatchHentai не указал сериал этой серии.')
+
+
+def watch_episodes(url, http):
+    series = _watch_series_url(url, http)
+    text, final, _ = http.document(series)
+    soup = BeautifulSoup(text, 'html.parser')
+    heading = soup.select_one('.sheader .data h1') or soup.select_one('h1')
+    title = clean(heading.get_text(' ', strip=True)) if heading else ''
+    episodes = watch_episode_links(soup, final)
+    if not episodes:
+        raise SourceError('WatchHentai не показал серии этого тайтла.')
+    return title, episodes
+
+
+def watch_decode(value, key=13, cycle=17):
+    """The player page's whDecodeMediaUrl: base64url, XOR with (key + i % cycle), reversed base64."""
+    value = str(value).replace('-', '+').replace('_', '/')
+    try:
+        raw = base64.b64decode(value + '=' * (-len(value) % 4), validate=True)
+        mixed = ''.join(chr(byte ^ ((key + index % cycle) & 255)) for index, byte in enumerate(raw))[::-1]
+        return base64.b64decode(mixed + '=' * (-len(mixed) % 4), validate=True).decode('utf-8')
+    except (binascii.Error, UnicodeError, ValueError):
+        return ''
+
+
+def watch_player_sources(text, base):
+    """[(MP4 URL, quality)] of a /player/<post>/<n>/mp4/ page, best first.
+
+    The page lists its qualities in whJwSources with the address encoded; its
+    JSON-LD contentUrl names a file the CDN does not serve, so it is not used."""
+    decoder = re.search(r'function\s+whDecodeMediaUrl\s*\(\s*\w+\s*\)\s*\{(.{0,800}?)\}\s*(?:var|let|const|function)\b', text, re.S)
+    key = re.search(r'\bk\s*=\s*(\d{1,3})\b', decoder[1]) if decoder else None
+    cycle = re.search(r'\(\s*k\s*\+\s*\w+\s*%\s*(\d{1,3})\s*\)', decoder[1]) if decoder else None
+    key, cycle = int(key[1]) if key else 13, int(cycle[1]) if cycle else 17
+    listed = re.search(r'\bwhJwSources\s*=\s*(\[.{0,8000}?\])\s*;', text, re.S)
+    try:
+        entries = json.loads(listed[1]) if listed else []
+    except ValueError:
+        entries = []
+    found = {}
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict) or not isinstance(entry.get('file'), str):
+            continue
+        file = entry['file'] if entry['file'].startswith('https://') else watch_decode(entry['file'], key, cycle)
+        media = _media(file, base)
+        size = re.match(r'(\d{3,4})p', str(entry.get('label') or ''))
+        if media:
+            found.setdefault(media, int(size[1]) if size else None)
+    return sorted(found.items(), key=lambda item: -(item[1] or 0))
+
+
+def watch_streams(url, http):
+    if not urlsplit(url).path.startswith('/videos/'):
+        raise SourceError('WatchHentai: откройте серию, а не страницу сериала.')
+    text, final, _ = http.document(url)
+    frame = BeautifulSoup(text, 'html.parser').select_one('iframe[data-primary-player-url]')
+    players = [frame.get(name) for name in ('data-primary-player-url', 'data-alternate-player-url')] if frame else []
+    if not players:
+        raise SourceError('WatchHentai не опубликовал плеер этой серии.')
+    streams = []
+    for player in players:
+        target = _url(player, final, WATCH_HOSTS)
+        if not target or not WATCH_PLAYER.fullmatch(urlsplit(target).path):
+            continue
+        page, page_url, _ = http.document(target, headers={'Referer': final})
+        for media, quality in watch_player_sources(page, page_url):
+            streams.append({'url': media, 'type': 'mp4', 'quality': quality,
+                            'headers': playback_headers({'Referer': WATCH + '/'})})
+        if streams:
+            break  # The alternate player names the same files.
+    return streams
+
+
 # --- Hentai.com.ua ------------------------------------------------------------
 
 def _ua_names(title):
@@ -352,9 +512,11 @@ def ua_streams(url, http):
     return streams
 
 
-SEARCH = {'hanime1': hanime1_search, 'hentaimama': mama_search, 'hentaicomua': ua_search}
-EPISODES = {'hanime1': hanime1_episodes, 'hentaimama': mama_episodes, 'hentaicomua': ua_episodes}
-STREAMS = {'hanime1': hanime1_streams, 'hentaimama': mama_streams, 'hentaicomua': ua_streams}
+SEARCH = {'hanime1': hanime1_search, 'hentaimama': mama_search, 'hentaicomua': ua_search, 'watchhentai': watch_search}
+EPISODES = {'hanime1': hanime1_episodes, 'hentaimama': mama_episodes, 'hentaicomua': ua_episodes,
+            'watchhentai': watch_episodes}
+STREAMS = {'hanime1': hanime1_streams, 'hentaimama': mama_streams, 'hentaicomua': ua_streams,
+           'watchhentai': watch_streams}
 
 
 def search(provider, query, http):
