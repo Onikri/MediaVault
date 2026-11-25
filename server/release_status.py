@@ -56,11 +56,19 @@ def eligible(data, kind=''):
         # Episode totals describe the plan. Only a broadcast, a past
         # premiere or known completion count as evidence of release.
         first=f"CAST(json_extract({data},'$.firstAiringAt') AS INTEGER)"
+        # A video site's own watch page (url) with episodes and no date at all
+        # (hanime1) is playable now (owner, 2026-11-25). Metadata catalogues
+        # (AniList, Shikimori, omdb) leave url empty; a date keeps the tests above.
+        # content_catalog keeps episodes only as a count of at least one.
+        episodes=f"CAST(json_extract({data},'$.episodes') AS INTEGER)"
+        undated=(f"COALESCE(json_extract({data},'$.year'),'')='' AND COALESCE(json_extract({data},'$.startDate'),'')=''"
+                 f" AND COALESCE(json_extract({data},'$.firstAiringAt'),'')=''")
+        watch=f"{undated} AND COALESCE(json_extract({data},'$.url'),'')<>'' AND {episodes}>0 AND COALESCE({aired},1)>0"
         result+=f""" AND ({expression}='released' OR {first} BETWEEN 1 AND unixepoch()
                 OR {aired}>0 OR (COALESCE({aired},1)>0 AND (
                 date({start})<date('now') OR (length({start})=7 AND {start}<strftime('%Y-%m','now'))
                 OR {year} BETWEEN 1 AND {this_year}-1
-            )))"""
+            )) OR ({watch}))"""
     return result
 
 

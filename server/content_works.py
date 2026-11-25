@@ -46,6 +46,10 @@ STATE = 'content-works'
 KINDS = ('anime', 'movie', 'tv', 'ranobe')
 # Bump when a column's definition changes: the table is rebuilt and refilled.
 REVISION = 'content-works-v1'
+# Bump when release_status.eligible() changes: like new hentai rules, a new
+# signature recomputes every work in the background (step()) while the
+# previous values are served; nothing runs at startup.
+AVAILABILITY = 'available-v2'
 PORTION = 2000
 # The legacy origin expression index is dropped only by a release that has
 # been answering for this long (the deploy's rollback target still uses it).
@@ -73,7 +77,8 @@ def _work(alias='t'):
 
 
 def signature(policy=None):
-    """The hentai flag's inputs: HENTAI rules and the keys of «Хентай»."""
+    """The recomputed inputs: HENTAI rules, the keys of «Хентай» and the
+    revision of «available»."""
     from catalog_taxonomy import HENTAI, keys
     from manga_tag_policy import current
     policy = policy or current()
@@ -81,7 +86,7 @@ def signature(policy=None):
         if len(_signatures) > 16:
             _signatures.clear()
         wanted = keys('Хентай', policy, allow_hidden=True)
-        _signatures[policy.revision] = hashlib.sha256(json.dumps([REVISION, HENTAI, wanted], sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
+        _signatures[policy.revision] = hashlib.sha256(json.dumps([REVISION, HENTAI, wanted, AVAILABILITY], sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
     return _signatures[policy.revision]
 
 

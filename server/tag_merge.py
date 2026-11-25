@@ -94,7 +94,8 @@ def read_job():
 
 def status():
     import label_repair
-    return {**_merge_status(), **label_repair.status()}
+    import page_cache_compact
+    return {**_merge_status(), **label_repair.status(), **page_cache_compact.status()}
 
 
 def _merge_status():
@@ -256,13 +257,16 @@ def step(store, pause=None):
         return True
     if job.get('state') != 'running':
         # Same thread, lower priority: the one-off label repair, then the
-        # resumable fills of the materialized «Хентай» work set, of the
-        # content works (a few minutes) and of the full-text title index.
+        # resumable fills of the materialized «Хентай» work set, the owner's
+        # page cache compaction (minutes), the content works and the
+        # full-text title index.
         import catalog_search
         import content_works
         import hentai_works
         import label_repair
-        if not (label_repair.step(store) or hentai_works.step(store) or content_works.step(store) or catalog_search.step(store)):
+        import page_cache_compact
+        if not (label_repair.step(store) or hentai_works.step(store) or page_cache_compact.step(store)
+                or content_works.step(store) or catalog_search.step(store)):
             return False
         time.sleep(PAUSE if pause is None else pause)
         return True
