@@ -78,6 +78,8 @@ def base_sources(installed):
     jobs.append({'type':'hentaimama','kind':'anime','domain':'hentaimama.io','name':'Хентай · HentaiMama'})
     # WatchHentai: its series archive (genre menu on page 1), then each series page.
     jobs.append({'type':'watchhentai','kind':'anime','domain':'watchhentai.net','name':'Хентай · WatchHentai'})
+    # OHentai: its one-page series list, its tag dictionary, then each series page.
+    jobs.append({'type':'ohentai','kind':'anime','domain':'ohentai.org','name':'Хентай · OHentai'})
     return jobs
 
 # A distinct address that serves the same catalogue as another source:
@@ -148,6 +150,9 @@ def fetch(spec,cursor):
         return catalogue(spec,cursor)
     if kind=='watchhentai':
         from catalogue_watchhentai import catalogue
+        return catalogue(spec,cursor)
+    if kind=='ohentai':
+        from catalogue_ohentai import catalogue
         return catalogue(spec,cursor)
     if kind in {'lib','lib-detail','lib-vocabulary'}:
         with httpx.Client(http2=True,timeout=15,headers=headers(spec)) as client:

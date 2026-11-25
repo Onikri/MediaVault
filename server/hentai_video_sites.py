@@ -4,9 +4,10 @@
 * HentaiMama (hentaimama.io) — English subtitles.
 * Hentai.com.ua — Ukrainian dubs and subtitles.
 * WatchHentai (watchhentai.net) — English subtitles and dubs.
+* OHentai (ohentai.org) — English subtitles, old OVAs and 3D/western collections.
 
 Search, episode lists and the MP4 address come from the sites' public HTML
-(HentaiMama's public player AJAX, WatchHentai's own player page). MediaVault plays the file in its own
+(HentaiMama's public player AJAX, WatchHentai's own player page, OHentai's episode page). MediaVault plays the file in its own
 player: no third-party iframe is embedded, no account or cookie is used.
 """
 import base64
@@ -14,7 +15,7 @@ import binascii
 import html
 import json
 import re
-from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlencode, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -24,11 +25,13 @@ HANIME1 = 'https://hanime1.me'
 MAMA = 'https://hentaimama.io'
 UA = 'https://hentai.com.ua'
 WATCH = 'https://watchhentai.net'
+OH = 'https://ohentai.org'
 PROVIDERS = {
     'hanime1': ('Hanime1 · JA', ('hanime1.me',)),
     'hentaimama': ('HentaiMama · EN', ('hentaimama.io',)),
     'hentaicomua': ('Hentai.com.ua · UA', ('hentai.com.ua',)),
     'watchhentai': ('WatchHentai · EN', ('watchhentai.net',)),
+    'ohentai': ('OHentai · EN', ('ohentai.org',)),
 }
 MAX_RESULTS = 12
 MAX_EPISODES = 200
@@ -113,6 +116,10 @@ def provider_for(url):
     match = re.fullmatch(r'/(series|videos)/((?:[a-z0-9-]|%[0-9a-f]{2}){1,200})/?', path, re.I) if host == 'watchhentai.net' else None
     if match and match[2].lower() != 'page' and not parts.query:
         return 'watchhentai', PROVIDERS['watchhentai'][0]
+    # OHentai: a series (/sery_video.php?seryid=<base64 id>) or an episode
+    # (/detail.php?vid=<base64 id>), nothing else in the query.
+    if host == 'ohentai.org' and _oh_parts(url):
+        return 'ohentai', PROVIDERS['ohentai'][0]
     return None
 
 
@@ -444,6 +451,171 @@ def watch_streams(url, http):
     return streams
 
 
+# --- OHentai -------------------------------------------------------------------
+
+OH_HOSTS = ('ohentai.org',)
+OH_PAGES = {'/sery_video.php': 'seryid', '/detail.php': 'vid'}
+
+
+def oh_number(value):
+    """The integer a seryid/vid stands for (base64 of its decimal digits), else None."""
+    value = unquote(str(value or ''))
+    if not re.fullmatch(r'[A-Za-z0-9+/]{2,16}={0,2}', value):
+        return None
+    try:
+        digits = base64.b64decode(value + '=' * (-len(value) % 4), validate=True).decode('ascii')
+    except (binascii.Error, UnicodeError, ValueError):
+        return None
+    return int(digits) if re.fullmatch(r'\d{1,7}', digits) else None
+
+
+def oh_address(path, number):
+    """The site's own spelling of a series or episode address: ?seryid=MjIz, ?vid=MTQ5NA==."""
+    return OH + path + '?' + OH_PAGES[path] + '=' + base64.b64encode(str(number).encode()).decode('ascii')
+
+
+def _oh_parts(url):
+    """(path, number) of an ohentai.org series or episode address, else None."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    key = OH_PAGES.get(parts.path)
+    match = re.fullmatch(re.escape(key) + r'=([^&#]{2,48})', parts.query) if key else None
+    if parts.scheme != 'https' or parts.hostname not in OH_HOSTS or parts.port or not match or parts.fragment:
+        return None
+    number = oh_number(match[1])
+    return None if number is None else (parts.path, number)
+
+
+def _oh_page(value, base, path):
+    """The canonical address of an ohentai.org series ('/sery_video.php') or episode ('/detail.php') link, else ''."""
+    found = _oh_parts(_url(value, base, OH_HOSTS))
+    return oh_address(*found) if found and found[0] == path else ''
+
+
+def _oh_asset(value, base):
+    """An image of the site's own video_data folder, its spaces percent-encoded."""
+    url = _url(value, base, OH_HOSTS)
+    if not url:
+        return ''
+    parts = urlsplit(url)
+    return parts._replace(path=quote(unquote(parts.path), safe='/!$&\'()*+,;=:@-._~'), query='', fragment='').geturl()
+
+
+def _oh_brick_title(brick):
+    title = brick.select_one('.videotitle')
+    return clean((title.get('title') or title.get_text(' ', strip=True)) if title else '', 200)
+
+
+def oh_episode_title(text):
+    """«Makai Kishi Ingrid - Episode 3» → «Makai Kishi Ingrid»."""
+    return clean(re.sub(r'\s+[-–—]\s+episode\s*\d{1,3}\s*$', '', clean(text), flags=re.I))
+
+
+def oh_bricks(soup, base):
+    """[(episode URL, title, image)] of a listing's video bricks; sponsored bricks link off the site."""
+    found = {}
+    for brick in soup.select('.videobrickwrap .videobrick'):
+        anchor = brick.select_one('.videotitle a[href]') or brick.select_one('a[href]')
+        url = _oh_page(anchor.get('href') if anchor else '', base, '/detail.php')
+        title = _oh_brick_title(brick)
+        if not url or not title:
+            continue
+        image = brick.select_one('.videocontentblock img')
+        found.setdefault(url, (url, title, _oh_asset(image.get('src') if image else '', base)))
+    return list(found.values())
+
+
+def oh_search(query, http):
+    """search.php lists episodes; they are grouped into their series, first episode as the address."""
+    text, final, _ = http.document(OH + '/search.php?' + urlencode({'k': query}))
+    groups = {}
+    for url, title, cover in oh_bricks(BeautifulSoup(text, 'html.parser'), final):
+        name = oh_episode_title(title)
+        key = name.casefold()
+        if key not in groups and len(groups) < MAX_RESULTS:
+            groups[key] = _row('ohentai', url, name, [], cover)
+    return list(groups.values())
+
+
+def oh_series_episodes(soup, final):
+    """Episodes of a series page in the site's order; the number is the position
+    («Makai Kishi Ingrid:Re - Episode 1» is the fifth of «Makai Kishi Ingrid»)."""
+    episodes = []
+    for url, title, _ in oh_bricks(soup, final):
+        episodes.append({'number': len(episodes) + 1, 'season': 1, 'url': url, 'title': title})
+    return episodes[:MAX_EPISODES]
+
+
+def oh_detail_episodes(soup, final):
+    """The episode strip of an episode page (Episode1, Episode2…), the open one included."""
+    episodes = []
+    for anchor in soup.select('.descriptionsection .epscontainer a[href]'):
+        url = _oh_page(anchor.get('href'), final, '/detail.php')
+        if url and all(e['url'] != url for e in episodes):
+            episodes.append({'number': len(episodes) + 1, 'season': 1, 'url': url,
+                             'title': 'Episode ' + str(len(episodes) + 1)})
+    return episodes[:MAX_EPISODES]
+
+
+def oh_episodes(url, http):
+    path, _ = _oh_parts(url) or (None, None)
+    if not path:
+        raise SourceError('OHentai: адрес не похож на сериал или серию.')
+    text, final, _ = http.document(url)
+    soup = BeautifulSoup(text, 'html.parser')
+    if path == '/sery_video.php':
+        heading = soup.select_one('.serydetailsection h1')
+        episodes = oh_series_episodes(soup, final)
+    else:
+        heading = soup.select_one('.descriptionsection .sectiontitle')
+        episodes = oh_detail_episodes(soup, final)
+        if not episodes:
+            # A single video outside any series.
+            own = soup.select_one('h1.title')
+            heading = heading or own
+            episodes = [{'number': 1, 'season': 1, 'url': _oh_page(final, final, '/detail.php') or url,
+                         'title': clean(own.get_text(' ', strip=True), 200) if own else 'Episode 1'}]
+    title = clean(heading.get_text(' ', strip=True), 200) if heading else ''
+    if not episodes:
+        raise SourceError('OHentai не показал серии этого тайтла.')
+    return title, episodes
+
+
+def oh_player_sources(text, base):
+    """MP4 files of an episode page's jwplayer, in page order (the selected server first).
+
+    The page sets up jwplayer with one server and loads the other on a tab
+    click: `sources: [{"file": "https://…mp4?token=…&expires=…"}]`. The
+    advertising VAST tag is not a source."""
+    found = []
+    for listed in re.finditer(r'\bsources\s*:\s*(\[\s*\{.{0,4000}?\}\s*\])', text, re.S):
+        try:
+            entries = json.loads(listed[1])
+        except ValueError:
+            continue
+        for entry in entries if isinstance(entries, list) else []:
+            file = entry.get('file') if isinstance(entry, dict) else None
+            if not isinstance(file, str):
+                continue
+            parts = urlsplit(file.strip())
+            media = _media(parts._replace(path=quote(unquote(parts.path), safe='/!$&\'()*+,;=:@-._~')).geturl(), base)
+            if media and media not in found:
+                found.append(media)
+    return found
+
+
+def oh_streams(url, http):
+    path, _ = _oh_parts(url) or (None, None)
+    if path != '/detail.php':
+        raise SourceError('OHentai: откройте серию, а не страницу сериала.')
+    text, final, _ = http.document(url)
+    # The address is signed for about an hour: it is read each time the episode starts.
+    return [{'url': media, 'type': 'mp4', 'quality': None, 'headers': playback_headers({'Referer': OH + '/'})}
+            for media in oh_player_sources(text, final)]
+
+
 # --- Hentai.com.ua ------------------------------------------------------------
 
 def _ua_names(title):
@@ -512,11 +684,12 @@ def ua_streams(url, http):
     return streams
 
 
-SEARCH = {'hanime1': hanime1_search, 'hentaimama': mama_search, 'hentaicomua': ua_search, 'watchhentai': watch_search}
+SEARCH = {'hanime1': hanime1_search, 'hentaimama': mama_search, 'hentaicomua': ua_search, 'watchhentai': watch_search,
+          'ohentai': oh_search}
 EPISODES = {'hanime1': hanime1_episodes, 'hentaimama': mama_episodes, 'hentaicomua': ua_episodes,
-            'watchhentai': watch_episodes}
+            'watchhentai': watch_episodes, 'ohentai': oh_episodes}
 STREAMS = {'hanime1': hanime1_streams, 'hentaimama': mama_streams, 'hentaicomua': ua_streams,
-           'watchhentai': watch_streams}
+           'watchhentai': watch_streams, 'ohentai': oh_streams}
 
 
 def search(provider, query, http):

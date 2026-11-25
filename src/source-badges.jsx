@@ -23,7 +23,8 @@ const SOURCES=[
   ['hanime',/hanime/i,'Hanime',335],
   ['hentaimama',/hentaimama/i,'HentaiMama',135],
   ['hentaicomua',/hentai\.com\.ua/i,'Hentai UA',230],
-  ['watchhentai',/watchhentai/i,'WatchHentai',15]
+  ['watchhentai',/watchhentai/i,'WatchHentai',15],
+  ['ohentai',/ohentai/i,'OHentai',75]
 ];
 export function sourceOf(player){
   const name=String(player||'').trim();if(!name)return null;
