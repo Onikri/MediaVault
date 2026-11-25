@@ -91,6 +91,9 @@ def refresh_work_tags(db,keys):
     db.execute('''INSERT OR IGNORE INTO content_work_tags(kind,work_key,category,tag_key)
                   SELECT t.kind,'''+work+''',g.category,g.tag_key FROM content_tags g
                   JOIN content_titles t ON t.id=g.title_id WHERE '''+work+' IN ('+marks+')',keys)
+    # Explicit hentai tags of these works may have changed with them.
+    import content_works
+    content_works.refresh(db,keys)
 
 
 def initialize(db):
@@ -108,6 +111,8 @@ def initialize(db):
     initialize_origins(db)
     from content_vocabulary import initialize as initialize_vocabulary
     initialize_vocabulary(db)
+    import content_works
+    content_works.initialize(db)
     state=db.execute("SELECT value FROM content_catalog_state WHERE name='policy'").fetchone()
     labels=db.execute("SELECT value FROM content_catalog_state WHERE name='label-index'").fetchone()
     compiled=db.execute("SELECT value FROM content_catalog_state WHERE name='work-tag-index'").fetchone()
@@ -116,6 +121,7 @@ def initialize(db):
         added=0
         for identity,raw in title_rows(db):added+=_index(db,identity,json.loads(raw),current())
         if added:invalidate(db)
+        content_works.invalidate_hentai(db)
         db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('facts-v1','1')")
         db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('policy',?)",(current().revision,))
         db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('label-index',?)",(LABEL_INDEX_REVISION,))
@@ -166,7 +172,8 @@ def title_key(kind,provider,identity):
     return hashlib.sha256((kind+'\0'+provider+'\0'+identity).encode()).hexdigest()[:32]
 
 def ingest(db,rows):
-    initialize(db);count=0;new_facts=0;affected=set()
+    initialize(db);count=0;new_facts=0;affected=set();works=set();touched=[]
+    work=work_sql('')
     for row in rows[:100]:
         if not isinstance(row,dict) or row.get('kind') not in KINDS:continue
         provider=row.get('provider');identity=str(row.get('id') or '')
@@ -193,7 +200,7 @@ def ingest(db,rows):
         if not isinstance(data.get('titles'),dict):data['titles']={}
         data['titles']={k:v[:500] for k,v in data['titles'].items() if k in {'ru','uk','en','native','romaji'} and isinstance(v,str)}
         key=title_key(data['kind'],provider,identity)
-        previous=db.execute('SELECT raw FROM content_titles WHERE id=?',(key,)).fetchone()
+        previous=db.execute('SELECT raw,'+work+' FROM content_titles WHERE id=?',(key,)).fetchone()
         if previous:
             old=json.loads(previous[0])
             for field in ('tags','genres','aliases'):data[field]=list(dict.fromkeys([*data[field],*old.get(field,[])]))[:120]
@@ -209,29 +216,51 @@ def ingest(db,rows):
         if previous and previous[0]==raw:
             # Unchanged: tags, facts and work tags already match this record.
             # OMDb keeps its old behaviour of leaving the row untouched.
-            if provider!='omdb':db.execute('UPDATE content_titles SET updated=? WHERE id=?',(int(time.time()),key))
+            if provider!='omdb':
+                now=int(time.time())
+                db.execute('UPDATE content_titles SET updated=? WHERE id=?',(now,key));touched.append((now,previous[1]))
             count+=1
             continue
-        if previous:affected.add(work_key(old,key))
+        if previous:affected.add(work_key(old,key));works.add(previous[1])
         search=normalize(' '.join([title,*data['aliases'],*data['titles'].values()]))[:5000]
         db.execute('INSERT OR REPLACE INTO content_titles VALUES(?,?,?,?,?)',(key,data['kind'],search,raw,int(time.time())))
         new_facts+=_index(db,key,data,current())
-        affected.add(work_key(data,key))
+        affected.add(work_key(data,key));works.add(db.execute('SELECT '+work+' FROM content_titles WHERE id=?',(key,)).fetchone()[0])
         count+=1
     refresh_work_tags(db,affected)
+    # The materialized works of the rows' SQL work keys (refresh_work_tags
+    # already recomputed the ones that equal the Python keys).
+    import content_works
+    content_works.refresh(db,works-affected)
+    content_works.touch(db,touched)
+    content_works.advance(db)
     if new_facts:invalidate(db)
     return count
 
 def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='',year='',age='',limit=60,offset=0,sort='updated',status='',prepared=False):
     if not prepared:initialize(db)
     if kind not in KINDS:return {'items':[],'total':0}
-    policy=current();where=['kind=?'];params=[kind]
+    policy=current();limit=min(100,max(1,limit));offset=max(0,min(10_000_000,offset))
+    import content_works
+    works_ready=kind in content_works.KINDS and content_works.ready(db)
+    if works_ready and not (normalize(q).split() or format or year or age):
+        # Whole-work filters only: pages in the order indexes of content_works.
+        found=content_works.page(db,kind=kind,genre=genre,tag=tag,excludeGenre=excludeGenre,excludeTag=excludeTag,status=status,sort=sort,limit=limit,offset=offset,policy=policy)
+        if found is not None:
+            keys,total,exact=found
+            result={'items':read_works(db,keys,policy),'total':total,'offset':offset,'limit':limit}
+            if not exact:result['totalExact']=False
+            return result
+    where=['kind=?'];params=[kind]
     for word in normalize(q).split()[:12]:
         where.append("search LIKE ? ESCAPE '\\'");params.append('%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%')
     from catalog_taxonomy import clauses
     extra,values=clauses(db,kind=kind,tag=tag,genre=genre,excludeGenre=excludeGenre,excludeTag=excludeTag)
     where.extend(extra);params.extend(values)
-    restriction,states=status_condition(status,table='content_titles',document='raw',work=work_sql(),peer_work=work_sql('peer'),kind=kind)
+    if status=='available' and works_ready:
+        # The materialized flag, tested only for the rows that match.
+        restriction,states=content_works.available(kind,work_sql())
+    else:restriction,states=status_condition(status,table='content_titles',document='raw',work=work_sql(),peer_work=work_sql('peer'),kind=kind)
     if restriction:where.append(restriction);params.extend(states)
     from catalog_taxonomy import format_label
     db.create_function('catalog_format',2,format_label,deterministic=True)
@@ -239,18 +268,31 @@ def browse(db,*,kind,q='',tag='',genre='',excludeGenre='',excludeTag='',format='
     if year:where.append("CAST(json_extract(t.raw,'$.year') AS TEXT)=?");params.append(str(year))
     if age=='adult':where.append("CAST(json_extract(t.raw,'$.age') AS INTEGER)>=18")
     elif age=='under18':where.append("CAST(json_extract(t.raw,'$.age') AS INTEGER)<18")
-    condition=' AND '.join(where);limit=min(100,max(1,limit));offset=max(0,min(10_000_000,offset))
+    condition=' AND '.join(where)
     work=work_sql();total=db.execute('SELECT COUNT(DISTINCT '+work+') FROM content_titles t WHERE '+condition,params).fetchone()[0]
     order=ORDERS.get(sort,ORDERS['updated'])
     keys=[value[0] for value in db.execute('SELECT '+work+' FROM content_titles t WHERE '+condition+' GROUP BY '+work+' ORDER BY '+order+','+work+' LIMIT ? OFFSET ?',[*params,limit,offset])]
-    rows=[row for key in keys if (row:=read_work(db,key,policy)) is not None]
-    return {'items':rows,'total':total,'offset':offset,'limit':limit}
+    return {'items':read_works(db,keys,policy),'total':total,'offset':offset,'limit':limit}
+
+def read_works(db,keys,policy):
+    """read_work() for a page of works with two queries."""
+    keys=list(dict.fromkeys(keys))
+    if not keys:return []
+    marks=','.join('?' for _ in keys);records={}
+    for identity,raw,key in db.execute('SELECT id,raw,'+work_sql()+' FROM content_titles t WHERE '+work_sql()+' IN ('+marks+') ORDER BY updated DESC,id',keys):
+        records.setdefault(key,[]).append((identity,json.loads(raw)))
+    vetoed={key for (key,) in db.execute('SELECT DISTINCT '+work_sql('peer')+' FROM content_tag_facts f JOIN content_titles peer ON peer.id=f.title_id WHERE '+work_sql('peer')+' IN ('+marks+') AND catalog_not_hentai(f.original)=1',keys)}
+    return [row for key in keys if key in records and (row:=_work_row(key,records[key],key in vetoed,policy)) is not None]
 
 def read_work(db,key,policy,preferred_id=''):
     records=[(identity,json.loads(raw)) for identity,raw in db.execute('SELECT id,raw FROM content_titles t WHERE '+work_sql()+'=? ORDER BY updated DESC,id',(key,))]
     if not records:return None
+    vetoed=bool(db.execute('SELECT 1 FROM content_tag_facts f JOIN content_titles peer ON peer.id=f.title_id WHERE '+work_sql('peer')+'=? AND catalog_not_hentai(f.original)=1 LIMIT 1',(key,)).fetchone())
+    return _work_row(key,records,vetoed,policy,preferred_id)
+
+def _work_row(key,records,vetoed,policy,preferred_id=''):
     from catalog_taxonomy import hentai_excluded
-    excluded=any(hentai_excluded(record) for _,record in records) or bool(db.execute('SELECT 1 FROM content_tag_facts f JOIN content_titles peer ON peer.id=f.title_id WHERE '+work_sql('peer')+'=? AND catalog_not_hentai(f.original)=1 LIMIT 1',(key,)).fetchone())
+    excluded=any(hentai_excluded(record) for _,record in records) or vetoed
     identity,row=next((entry for entry in records if entry[0]==preferred_id),records[0])
     for field in ('cover','description','score','popularity','episodes','episodesAired','chapters','firstAiringAt','startDate','endDate'):
         if row.get(field) in (None,''):
@@ -285,5 +327,7 @@ def reindex(db,policy):
         _index(db,identity,json.loads(raw),policy);count+=1
     db.execute("INSERT OR REPLACE INTO content_catalog_state VALUES('policy',?)",(policy.revision,))
     rebuild_work_tags(db)
+    import content_works
+    content_works.invalidate_hentai(db)
     invalidate(db)
     return count

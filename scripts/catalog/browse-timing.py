@@ -2,14 +2,17 @@
 
 Run on the VM, always with a timeout inside the container:
 
-  ssh mediavault-vm 'sudo -n docker exec -i -w /app oracle-importer-1 timeout 120 nice -n 19 python - [--rounds 2] [--simulate] [--content]' < scripts/catalog/browse-timing.py
+  ssh mediavault-vm 'sudo -n docker exec -i -w /app oracle-importer-1 timeout 120 nice -n 19 python - [--rounds 2] [--simulate] [--content [--kinds anime,movie]]' < scripts/catalog/browse-timing.py
 
 It opens the catalogue read-only (like the API's catalogue_reader) and times
 manga_catalog_index.browse(limit=60): no filter, deep pages, «Романтика»
 pages 1 and 2, «Школа», both, «Большая грудь», «Хентай», text searches with
 and without a filter. Round 2 shows the cached totals a running API serves.
---content adds content_catalog.browse for anime, movies and ranobe (search
-and the most used tag). Nothing is written to the database file.
+--content times content_catalog.browse instead (C2): per kind (anime, movie,
+tv, ranobe or --kinds) the client's sorts with and without «available»,
+page 2, the most used genre and tag, a rare tag, an exclusion, a search, and
+«Хентай» for anime; it prints the content-works fill state first. Each case
+stops after 20 s. Nothing is written to the database file.
 
 --simulate (before the deploy has filled the work set or the search index):
 builds catalog_hentai_works and, for the searched words only, catalog_search
@@ -102,30 +105,58 @@ def timed(label, call):
         line = 'ERROR ' + str(error)[:120]
     finally:
         db.execute('COMMIT')
-    print('%-24s %6.2fs %s' % (label, time.monotonic() - started, line), flush=True)
+    print('%-44s %6.2fs %s' % (label, time.monotonic() - started, line), flush=True)
 
 
 content_cases = []
 if content:
     import content_catalog
-    for kind, q in (('anime', 'naruto'), ('movie', 'love'), ('ranobe', 'маг')):
-        top = db.execute('SELECT category,tag_key FROM content_tag_stats WHERE kind=? ORDER BY works DESC LIMIT 1', (kind,)).fetchone()
-        content_cases.append((kind, {}))
-        content_cases.append((kind + ' q=' + q, {'q': q}))
-        if top:
-            label = current().label(top[1], top[1])
-            content_cases.append((kind + ' ' + label, {'genre' if top[0] == 'genres' else 'tag': label}))
+    try:
+        import content_works
+        print('content-works:', content_works.progress(db), flush=True)
+    except ImportError:
+        content_works = None
+    kinds = sys.argv[sys.argv.index('--kinds') + 1].split(',') if '--kinds' in sys.argv else ['anime', 'movie', 'tv', 'ranobe']
+    for kind in kinds:
+        add = lambda label, args, kind=kind: content_cases.append((kind, kind + ' ' + label, args))
+        for status in ('available', ''):
+            for sort in ('trending', 'score', 'new', 'old', 'title', 'updated'):
+                add(sort + (' [available]' if status else ''), {'sort': sort, 'status': status})
+            add('trending, стр. 2' + (' [available]' if status else ''), {'sort': 'trending', 'status': status, 'offset': 60})
+        picks = [('genres', 'DESC'), ('tags', 'DESC')]
+        for category, direction in picks:
+            top = db.execute('SELECT tag_key,works FROM content_tag_stats WHERE kind=? AND category=? ORDER BY works ' + direction + ' LIMIT 1', (kind, category)).fetchone()
+            if top:
+                label = current().label(top[0], top[0])
+                field = 'genre' if category == 'genres' else 'tag'
+                add('%s=%s (%d)' % (field, label, top[1]), {field: label, 'sort': 'trending', 'status': 'available'})
+                add('%s=%s, стр. 2' % (field, label), {field: label, 'sort': 'trending', 'status': 'available', 'offset': 60})
+                add('%s=%s [все, new]' % (field, label), {field: label, 'sort': 'new'})
+                add('не %s' % label, {'exclude' + field.capitalize(): label, 'sort': 'trending', 'status': 'available'})
+        rare = db.execute('SELECT tag_key,works FROM content_tag_stats WHERE kind=? AND category=? AND works BETWEEN 50 AND 400 ORDER BY works DESC LIMIT 1', (kind, 'tags')).fetchone()
+        if rare:
+            label = current().label(rare[0], rare[0])
+            add('редкий tag=%s (%d)' % (label, rare[1]), {'tag': label, 'sort': 'trending', 'status': 'available'})
+        if kind == 'anime':
+            add('Хентай', {'genre': 'Хентай', 'sort': 'trending', 'status': 'available'})
+            add('Хентай, стр. 2', {'genre': 'Хентай', 'sort': 'trending', 'status': 'available', 'offset': 60})
+            add('Хентай [все, new]', {'genre': 'Хентай', 'sort': 'new'})
+        for q in ('love', 'маг'):
+            add('q=' + q + ' [available]', {'q': q, 'sort': 'trending', 'status': 'available'})
+            add('q=' + q, {'q': q})
 
 for number in range(1, rounds + 1):
     print('--- round', number, flush=True)
-    for status in ('', 'available'):
+    for status in ('', 'available') if not content else ():
         for label, args in CASES:
             if status and label.startswith('q='):
                 continue
             timed(label + (' [available]' if status else ''), lambda: index.browse(db, limit=60, status=status, **args))
-    for label, args in content_cases:
-        kind = label.split()[0]
-        timed('content ' + label, lambda: content_catalog.browse(db, kind=kind, limit=60, prepared=True, **args))
+    for kind, label, args in content_cases:
+        deadline = time.monotonic() + 20
+        db.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, 20000)
+        timed(label, lambda: content_catalog.browse(db, kind=kind, limit=60, prepared=True, **args))
+        db.set_progress_handler(None, 0)
     # Let the single background count of this process finish before the next round.
     for thread in threading.enumerate():
         if thread.name == 'catalog-total':
