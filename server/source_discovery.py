@@ -36,9 +36,30 @@ def voice_suggestions(query='',limit=30,language='all'):
     return {'query':query,'voices':values[:max(1,min(int(limit),50))],'total':len(values),'observedOnly':True}
 
 
+def indexed_sources(selected):
+    """provider -> index page URLs of the card's catalogued video sources.
+
+    A catalogue row of HanimeTV, Hanime1, HentaiMama, WatchHentai or OHentai
+    is that site's own series page: it is inspected directly instead of being
+    re-found by title search (the sites' search omits years and spells titles
+    differently, so the exact-title rule turned those cards down)."""
+    from dynamic_video_sources import catalogued_source
+    rows=[(selected.get('provider'),selected.get('sourceURL'))]
+    extra=selected.get('indexedSources')
+    if isinstance(extra,list):rows.extend((v.get('provider'),v.get('url')) for v in extra[:8] if isinstance(v,dict))
+    found={}
+    for provider,url in rows:
+        if url:=catalogued_source(provider,url):
+            if url not in found.setdefault(provider,[]):found[provider].append(url)
+    return found
+
+def _key(selected):
+    anchors=tuple(sorted((p,tuple(u)) for p,u in indexed_sources(selected).items()))
+    return repr((selected.get('ids'),aliases(selected),selected.get('startDate') or selected.get('year'),selected.get('kind'))+((anchors,) if anchors else ()))
+
 def _discover(selected,*,refresh=False,continuing=False):
     if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')
-    key=repr((selected.get('ids'),aliases(selected),selected.get('startDate') or selected.get('year'),selected.get('kind')))
+    key=_key(selected)
     with _lock:
         hit=_cache.get(key)
         if not refresh and hit and hit[0]>time.monotonic():return hit[1]
@@ -54,13 +75,17 @@ def _discover(selected,*,refresh=False,continuing=False):
         stems=[v.split(':',1)[0].split('. Фильм',1)[0].strip() for v in names if re.search(r'[а-яё]',v,re.I)]
         keywords=[v.split()[-1].strip(' .:!?') for v in names if ':' in v and re.search(r'[а-яё]',v,re.I)]
         queries=list(dict.fromkeys([*names[:2],*[v for v in keywords if len(v)>=4],*[v for v in stems if len(v)>=4]]))[:4]
+        anchored=indexed_sources(selected)
         def work(site):
             http=PublicHttp(timeout=(2,4),deadline=time.monotonic()+15)
             try:
                 matches=[{**s,'kind':selected.get('kind','anime'),'matchEvidence':s.get('matchEvidence','exact_title')} for s in (hit[1]['sources'] if hit and hit[0]>time.monotonic() else []) if s.get('provider')==site.id]
                 status='empty';message='Точное совпадение тайтла и сезона не найдено.'
-                site_queries = queries
-                if site.id in {'eneyida', 'uaserials'}:
+                site_queries = [] if anchored.get(site.id) else queries
+                for url in anchored.get(site.id,[]):
+                    if not any(m['url']==url for m in matches):
+                        matches.insert(0,{'url':url,'title':selected.get('title',''),'provider':site.id,'matchEvidence':'catalogue_source'})
+                if site.id in {'eneyida', 'uaserials'} and site_queries:
                     # These catalogues index original and Ukrainian names.
                     localized = [v for v in names if re.search(r'[іїєґ]', v, re.I)]
                     original = [v for v in names if re.search(r'[a-z]', v, re.I) and not re.search(r'[а-яіїєґ]', v, re.I)]
@@ -92,6 +117,10 @@ def _discover(selected,*,refresh=False,continuing=False):
                                 progress['expires']=time.monotonic()+300
                             if not value.get('pending'):
                                 with _lock:_progress.pop(progress_key,None)
+                        if candidate['matchEvidence']=='catalogue_source':
+                            # The card is this page's own index row: its identity needs no title search.
+                            inspected.append({**value,'title':candidate['title'] or value.get('title',''),'providerName':site.name,'matchEvidence':'catalogue_source'})
+                            continue
                         verified={**candidate,'ids':value.get('ids') or candidate.get('ids') or {},'year':value.get('year') or candidate.get('year')}
                         accepted,evidence=match_title(selected,verified)
                         if not accepted:continue
@@ -166,7 +195,7 @@ def discover(selected,*,refresh=False,continuing=False):
                                    'status': 'ok' if available else 'no_players', 'complete': True}],
                     'progress': 1, 'pending': False, 'complete': True, 'checkedAt': int(time.time())}
     if not aliases(selected):raise ValueError('Выбери конкретный тайтл из каталога.')
-    key=repr((selected.get('ids'),aliases(selected),selected.get('startDate') or selected.get('year'),selected.get('kind')))
+    key=_key(selected)
     with _lock:hit=_cache.get(key)
     with _jobs_lock:
         job=_jobs.get(key)

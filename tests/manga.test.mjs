@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {chapterRanges,selectChapters} from '../src/manga-import.js';
+import {chapterRanges,selectChapters,readerLanguage} from '../src/manga-import.js';
 import {readReading,writeReading} from '../src/reading-progress.js';
 test('Russian manga selection retains zero, decimals and volume identity while rejecting another language',()=>{
  const entries=[{number:0,season:1,language:'ru',url:'zero'},{number:1.5,season:1,language:'ru',url:'extra'},{number:1.5,season:2,language:'ru',url:'other-volume'},{number:2,season:1,language:'en',url:'english'}];
@@ -12,4 +12,10 @@ test('Reading positions are isolated by account and library and remember the exa
 test('raw Japanese and Korean chapters keep their source language and never mix with translated variants',()=>{
  const entries=['ru','en','ja','ko'].flatMap(language=>[{number:0,season:1,language,url:language+'0'},{number:1.5,season:1,language,url:language+'1.5'}]);
  assert.deepEqual(selectChapters(entries,{language:'ja'}).map(v=>v.url),['ja0','ja1.5']);assert.deepEqual(selectChapters(entries,{language:'ko',selection:'1-2'}).map(v=>v.url),['ko1.5']);
+});
+test('indexed galleries in every language open in the reader (3Hentai «all», FSI Comics «fr», pt-BR)',()=>{
+ for(const code of ['ru','uk','en','ja','ko','zh','all','fr','es','pt-BR','zh-Hant','es-419'])assert.equal(readerLanguage(code),true,code);
+ for(const code of ['',null,undefined,'ALL','english','ru;drop','x'.repeat(20),'<b>'])assert.equal(readerLanguage(code),false,String(code));
+ // A multi-language gallery's chapter carries the same 'all' as its title, so the reader keeps it.
+ assert.deepEqual(selectChapters([{number:1,season:1,language:'all',url:'g'}],{language:'all'}).map(e=>e.url),['g']);
 });

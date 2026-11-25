@@ -1,6 +1,9 @@
 export const MANGA_LANGUAGES=[['all','Все языки'],['ru','Русский'],['uk','Українська'],['en','Английский'],['ja','Японский · равки'],['ko','Корейский · оригинал'],['zh','Китайский · маньхуа']];
 export const MANGA_FORMATS=[['all','Все форматы'],['manga','Манга'],['manhwa','Манхва'],['manhua','Маньхуа'],['webtoon','Вебтуны']];
 export const mangaLanguageName=code=>MANGA_LANGUAGES.find(v=>v[0]===code)?.[1]||code?.toUpperCase()||'Язык не указан';
+// Multi-language galleries answer 'all'; other catalogues publish their own
+// language code (fr, pt-BR …). Pages read the same way in every language.
+export const readerLanguage=code=>typeof code==='string'&&/^(?:all|[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?)$/.test(code);
 export function chapterRanges(text){
  if(!text||String(text).toLowerCase()==='all')return null;
  return String(text).split(',').map(value=>{const m=value.match(/^\s*(\d+(?:\.\d{1,3})?)(?:\s*-\s*(\d+(?:\.\d{1,3})?))?\s*$/);if(!m)throw Error('Укажи главы: 0, 1-20, 12.5.');const a=Number(m[1]),b=Number(m[2]||m[1]);if(b<a||b>=10000)throw Error('Проверь диапазон глав.');return [a,b];});

@@ -22,6 +22,24 @@ def provider_for(url):
     return native_provider(url)
 
 
+# Video sites the catalogue indexer walks: each index row is the site's own
+# series page, so its address is the playable source of that card.
+CATALOGUED = frozenset({'hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai'})
+
+
+def catalogued_source(provider, url):
+    """The indexed page of a catalogued video site, or '' when it is not one."""
+    from source_parser import public_url
+    if provider not in CATALOGUED or not isinstance(url, str) or len(url) > 2048:
+        return ''
+    try:
+        url = public_url(url, resolve_dns=False)
+    except (SourceError, ValueError):
+        return ''
+    found = provider_for(url)
+    return url if found and found[0] == provider else ''
+
+
 def native(identifier):
     from hentai_video_sites import PROVIDERS
     return identifier in PROVIDERS

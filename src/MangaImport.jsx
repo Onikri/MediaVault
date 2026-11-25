@@ -12,7 +12,7 @@ import {useRetainedMedia} from './RetainedMedia.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {BookOpen,Globe,Check,ArrowRight,ShieldCheck,RefreshCw} from 'lucide-react';
 import ImportReadiness,{canImport} from './ImportReadiness.jsx';
-import {selectChapters,mangaMetadata,MANGA_LANGUAGES,MANGA_FORMATS,mangaLanguageName} from './manga-import.js';
+import {selectChapters,mangaMetadata,MANGA_LANGUAGES,MANGA_FORMATS,mangaLanguageName,readerLanguage} from './manga-import.js';
 import OnlineViewer from './OnlineViewer.jsx';
 import useGlobalManga from './use-global-manga.js';
 import MangaSearchDiagnostics from './MangaSearchDiagnostics.jsx';
@@ -117,7 +117,7 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
    const previous=automatic?inspectionCache.current.get(cacheKey):null;
    const data=cached?.inspection||previous?.data||await service.request('/manga/inspect',{method:'POST',body:{url:value,...(item?{title:inspectionTitle}:{}),verifyPages:false,refresh:!automatic}});
    if(version!==generation.current)return;
-   if(!['ru','uk','en','ja','ko','zh'].includes(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
+   if(!readerLanguage(data.language))throw Error('Источник вернул язык, который пока не поддерживает читалка.');
    if(!data.episodes?.length)throw Error('У этого тайтла нет открытых глав на языке «'+mangaLanguageName(data.language)+'».');
    const known=cached?.readable!==undefined?cached:previous?.status||cached;
    inspectionCache.current.set(cacheKey,{data,status:known});

@@ -308,7 +308,12 @@ def _work_row(key,records,vetoed,policy,preferred_id=''):
     for _,record in reversed(records):ids.update(record.get('ids') or {});titles.update(record.get('titles') or {})
     providers=list(dict.fromkeys(record['provider'] for _,record in records))
     state=work_status(record for _,record in records)
-    return {**row,**merged,'hentaiExcluded':excluded,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records),'providers':providers,'releaseStatus':state}
+    # Index rows of catalogued video sites are their playable series pages;
+    # the player opens them directly (source_discovery.indexed_sources).
+    from dynamic_video_sources import CATALOGUED
+    playable=list({(r['provider'],r.get('sourceUrl') or r.get('url')):None for _,r in records if r.get('provider') in CATALOGUED and (r.get('sourceUrl') or r.get('url'))})[:8]
+    extra={'indexedSources':[{'provider':p,'url':u} for p,u in playable]} if playable else {}
+    return {**row,**merged,'hentaiExcluded':excluded,'aliases':aliases,'ids':ids,'titles':titles,'contentCatalogId':identity,'workKey':key,'providerCount':len(records),'providers':providers,'releaseStatus':state,**extra}
 
 def title(db,kind,provider,source_id,*,prepared=False):
     if not prepared:initialize(db)

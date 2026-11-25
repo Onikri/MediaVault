@@ -14,9 +14,16 @@ function share(key){
 function publish(search){for(const listener of search.listeners)listener(search);}
 function prune(){for(const [key,search] of searches)if(!search.listeners.size&&(!search.done||Date.now()-search.at>FRESH))searches.delete(key);while(searches.size>20)searches.delete(searches.keys().next().value);}
 
+export const INDEXED_VIDEO=new Set(['hanime','hanime1','hentaimama','watchhentai','ohentai']);
+export function indexedVideoSources(item){
+ return (Array.isArray(item?.indexedSources)?item.indexedSources:[]).filter(s=>INDEXED_VIDEO.has(s?.provider)&&typeof s.url==='string'&&s.url.startsWith('https://')&&s.url.length<=2048).slice(0,8).map(s=>({provider:s.provider,url:s.url}));
+}
 export default function useSourceDiscovery(item,service){
   const [data,setData]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[revision,setRevision]=useState(0);
-  const sourceURL=item?.provider==='hentaichan-video'?(item.sourceURL||item.sourceUrl):undefined;
+  // Index rows of catalogued video sites are their own series pages: the
+  // server inspects them directly instead of re-finding the card by title.
+  const sourceURL=item?.provider==='hentaichan-video'||INDEXED_VIDEO.has(item?.provider)?(item.sourceURL||item.sourceUrl):undefined;
+  const indexedSources=indexedVideoSources(item);
   const externalIds=JSON.stringify(item?.ids||{});
   useEffect(()=>{
     setData(null);setError('');setLoading(false);
@@ -25,8 +32,9 @@ export default function useSourceDiscovery(item,service){
     if(service.session?.serverVersion&&service.session.serverVersion<7){setError('Сервер импорта нужно обновить для полного списка озвучек и качеств.');return;}
     const title=Object.fromEntries(['id','ids','title','titles','aliases','year','startDate','kind','format'].map(key=>[key,item[key]]));
     if(sourceURL){title.provider=item.provider;title.sourceURL=sourceURL;}
+    if(indexedSources.length)title.indexedSources=indexedSources;
     // Keyed like the effect: the same work, not its (late-arriving) aliases.
-    const key=String(service.server||'')+'|'+JSON.stringify([item.id,item.kind,item.ids||{},item.startDate||item.year||null,sourceURL||'']);
+    const key=String(service.server||'')+'|'+JSON.stringify([item.id,item.kind,item.ids||{},item.startDate||item.year||null,sourceURL||'',indexedSources.map(s=>s.url)]);
     if(revision){const old=searches.get(key);old?.controller?.abort();searches.delete(key);}
     const search=share(key);
     const listener=value=>{setData(value.data);setError(value.error);setLoading(!value.done);};
@@ -58,6 +66,6 @@ export default function useSourceDiscovery(item,service){
       prune();
     }
     return leave;
-  },[item?.id,item?.year,item?.startDate,externalIds,sourceURL,service.server,service.session?.serverVersion||service.status==='connected',revision]);
+  },[item?.id,item?.year,item?.startDate,externalIds,sourceURL,JSON.stringify(indexedSources),service.server,service.session?.serverVersion||service.status==='connected',revision]);
   return {data,loading,error,retry:()=>setRevision(r=>r+1)};
 }

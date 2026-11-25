@@ -618,6 +618,35 @@ def title(conn, identity):
     result['tagStatus'] = row[2]
     return result
 
+def source_names(conn, provider, urls):
+    """Identities of the index rows recorded for one source page.
+
+    A source page's own heading may differ from its catalogue card ("Naturalia"
+    on the card, "Elena B in Met Art set Naturalia" on the page). The reader
+    accepts the page when the work matches the card that indexed it."""
+    from manga_source_urls import split_reader_url
+    wanted = []
+    for url in urls:
+        if isinstance(url, str) and url.startswith('https://') and len(url) <= 8192:
+            wanted.append(url)
+            try:
+                wanted.append(split_reader_url(url)[1])
+            except ValueError:
+                pass
+    wanted = list(dict.fromkeys(wanted))[:6]
+    if not isinstance(provider, str) or not provider or not wanted:
+        return []
+    marks = ','.join('?' for _ in wanted)
+    found = []
+    for title, raw in conn.execute('SELECT title,metadata FROM catalog_titles WHERE provider=? AND source_url IN (' + marks + ') LIMIT 4', (provider, *wanted)):
+        try:
+            meta = json.loads(raw)
+        except ValueError:
+            meta = {}
+        found.append({'title': title, 'aliases': [v for v in meta.get('aliases') or [] if isinstance(v, str)][:40],
+                      'kind': 'manga', 'year': meta.get('year'), 'ids': meta.get('ids') or {}})
+    return found
+
 def _work_facts(conn,keys,projected=None):
     """Facts of whole works; projected (catalogId -> public row) collects the
     projection of every source row for the caller."""

@@ -885,6 +885,20 @@ def ranobe_chapter(body:RanobeLink,subject=Depends(viewer)):
     try:return chapter(body.url)
     except SourceError as error:raise HTTPException(422,str(error)) from None
 
+def indexed_card_matches(title,value,url):
+    """The inspected page is the source of an index card of this very work."""
+    from manga_discovery import catalogue_reader,manager
+    from manga_catalog_index import source_names
+    from title_identity import match_title
+    try:
+        with catalogue_reader(manager()) as db:
+            rows=source_names(db,value.get('provider'),[url,value.get('url')])
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('Could not read the catalogue card of a manga source')
+        return False
+    return any(match_title(title,row)[0] for row in rows)
+
 @app.post('/manga/inspect')
 def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
     if body.title:guest_may_open(subject,{**body.title,'kind':body.title.get('kind') or 'manga'})
@@ -900,7 +914,7 @@ def manga_inspect(body:MangaInspection,subject=Depends(viewer)):
         # identity rule; missing/conflicting years retain canonical-only names.
         if body.title.get('year') and value.get('year') and str(body.title['year'])[:4]==str(value['year'])[:4]:
             candidate['aliases']=list(dict.fromkeys([*candidate['aliases'],*(value.get('aliases') or [])]))
-        if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0]:raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
+        if body.title.get('kind')!='manga' or not match_title(body.title,candidate)[0] and not indexed_card_matches(body.title,value,body.url):raise HTTPException(422,'Источник относится к другому произведению. Выбери перевод нужной манги.')
     if not value.get('pages'):
         # A successful title inspection enriches the persistent catalogue.
         # Indexing failure must never break a working reader.
