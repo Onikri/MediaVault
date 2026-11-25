@@ -22,7 +22,11 @@ class ContentFixture:
   self.temp=tempfile.TemporaryDirectory();self.path=Path(self.temp.name)/'manga-tag-policy.json';self.path.write_bytes(canonical_json(BASE))
   self.env=patch.dict(os.environ,{'DATA_DIR':self.temp.name,'MANGA_TAG_POLICY_FILE':str(self.path)});self.env.start()
   self.db=sqlite3.connect(':memory:',check_same_thread=False);initialize(self.db);self.store=SimpleNamespace(db=self.db,lock=threading.RLock())
- def tearDown(self):self.db.close();self.env.stop();self.temp.cleanup()
+ def tearDown(self):
+  # Close under the store lock, as the real store does: the background tag-merge
+  # thread may be inside a maintenance step on this connection.
+  with self.store.lock:self.store.stopping=True;self.db.close()
+  self.env.stop();self.temp.cleanup()
  def seed(self):
   rows=[{'id':'fixture:'+kind,'provider':'fixture','kind':kind,'title':'Garden World','sourceUrl':'https://fixture.example/'+kind,'tags':['旅','Ecology'],'genres':[]} for kind in content_catalog.KINDS]
   content_catalog.ingest(self.db,rows)
