@@ -150,6 +150,9 @@ def _index(db,identity,row,policy):
             if key:
                 category=classified[0]
                 db.execute('INSERT OR IGNORE INTO content_tags VALUES(?,?,?,?)',(identity,category,key,label))
+    # A studio is a fact of its own category, outside tag filters and vocabulary.
+    for raw_label in row.get('studios') or []:
+        if label:=readable_label(raw_label):db.execute('INSERT OR IGNORE INTO content_tag_facts VALUES(?,?,?,?,?)',(identity,row['kind'],source,'studios',label))
     return added
 
 def safe_url(value):
@@ -180,6 +183,9 @@ def ingest(db,rows):
                 data[field]=row[field][:10]
         for field in ('tags','genres','aliases'):
             values=row.get(field);data[field]=list(dict.fromkeys(readable_label(v) if field!='aliases' else v.strip() for v in values if isinstance(v,str) and 0<len(v.strip())<=120))[:120] if isinstance(values,list) else []
+        # Studios only where a source names them; other rows keep their stored form.
+        values=row.get('studios')
+        if isinstance(values,list) and (studios:=list(dict.fromkeys(' '.join(readable_label(v).split()) for v in values if isinstance(v,str) and 0<len(v.strip())<=120))[:30]):data['studios']=studios
         for field in ('sourceUrl','sourceURL','url','cover'):data[field]=safe_url(row.get(field))
         # Never accept arbitrary client objects, account secrets or enormous text.
         data['description']=str(data.get('description') or '')[:12000]
@@ -191,6 +197,7 @@ def ingest(db,rows):
         if previous:
             old=json.loads(previous[0])
             for field in ('tags','genres','aliases'):data[field]=list(dict.fromkeys([*data[field],*old.get(field,[])]))[:120]
+            if old.get('studios'):data['studios']=list(dict.fromkeys([*data.get('studios',[]),*old['studios']]))[:30]
             for field in ('sourceUrl','sourceURL','url','cover','description'):
                 if not data.get(field):data[field]=old.get(field,'')
             if not data.get('status') and old.get('status'):data['status']=old['status']

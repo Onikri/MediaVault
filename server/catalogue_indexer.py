@@ -89,6 +89,12 @@ def listing_end(job,spec,error,code):
     page=job['cursor'].get('page')
     return code in {404,410} and type(page) is int and page>1 and job['pages']>0
 
+def known_title(db,row):
+    from content_catalog import title_key
+    if not isinstance(row.get('provider'),str) or not isinstance(row.get('kind'),str):return False
+    try:return bool(db.execute('SELECT 1 FROM content_titles WHERE id=?',(title_key(row['kind'],row['provider'],str(row.get('id') or '')),)).fetchone())
+    except Exception:return False
+
 def refresh_interval(spec):
     kind=str(spec.get('type',''))
     if kind in REFRESH_FIXED:return REFRESH_FIXED[kind]
@@ -348,6 +354,9 @@ class Indexer:
                 if len(kept)<len(rows):self.log_failure(host,spec['type'],'error-page title',None,len(rows)-len(kept))
                 manga=[r for r in kept if r.get('kind')=='manga' and str(r.get('provider','')).split(':')[0] not in {'anilist','kitsu','jikan','shikimori'}]
                 other=[r for r in kept if r not in manga]
+                # A fact route (hanime1 tags, years) adds to titles already
+                # indexed; it never creates a second card of a known series.
+                if result.get('enrichOnly'):other=[r for r in other if known_title(self.store.db,r)];kept=[*manga,*other]
                 count=upsert(self.store.db,manga)+ingest(self.store.db,other)
                 if count!=len(kept):raise RuntimeError('incomplete-write')
                 for child in result.get('catalogues') or []:self.enqueue(child,70)

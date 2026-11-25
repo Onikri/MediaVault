@@ -73,11 +73,34 @@ class HanimeCatalogue(unittest.TestCase):
   self.assertEqual(data['total'],4);self.assertTrue(all('Хентай' in item['genres'] for item in data['items']))
   raw=[json.loads(r) for (r,) in self.db.execute('SELECT raw FROM content_titles')]
   self.assertTrue(all(r['genres']==[] for r in raw))
-  facts=self.db.execute("SELECT DISTINCT source,category FROM content_tag_facts").fetchall()
-  self.assertEqual(facts,[('hanime.tv','tags')])
+  facts=self.db.execute("SELECT DISTINCT source,category FROM content_tag_facts ORDER BY category").fetchall()
+  self.assertEqual(facts,[('hanime.tv','studios'),('hanime.tv','tags')])
   self.assertEqual(content_catalog.browse(self.db,kind='anime',tag='Tentacle',genre='Хентай')['total'],
                    sum('tentacle' in r['tags'] for r in self.rows().values()))
   self.assertEqual(content_catalog.browse(self.db,kind='anime',age='adult')['total'],4)
+
+ def test_studio_and_description_come_from_the_feed(self):
+  rows=self.rows();kiss=rows['Tropical Kiss']
+  # Every episode's studio once; the first episode with a description speaks for the series.
+  self.assertEqual(kiss['studios'],['Pink Pineapple'])
+  self.assertEqual(kiss['description'],'Two girls & one summer.\nThe sea is warm.\nEpisode one.')
+  self.assertEqual((rows['Yabai! Fukushuu Yami Site']['studios'],rows['Yabai! Fukushuu Yami Site']['description']),(['Suzuki Mirano'],'A mysterious fire.'))
+  self.assertEqual((rows['Cafe Junkie']['studios'],rows['Cafe Junkie']['description']),([],''))
+  self.assertEqual(content_catalog.ingest(self.db,list(rows.values())),4)
+  stored={r['title']:r for (raw,) in self.db.execute('SELECT raw FROM content_titles') for r in [json.loads(raw)]}
+  self.assertEqual((stored['Tropical Kiss']['studios'],stored['Tropical Kiss']['description']),(kiss['studios'],kiss['description']))
+  self.assertNotIn('studios',stored['Cafe Junkie'])
+  studio=lambda:self.db.execute("SELECT t.raw,f.original FROM content_tag_facts f JOIN content_titles t ON t.id=f.title_id WHERE f.category='studios' ORDER BY 2").fetchall()
+  self.assertEqual([(json.loads(raw)['title'],label) for raw,label in studio()],[('Tropical Kiss','Pink Pineapple'),('Yabai! Fukushuu Yami Site','Suzuki Mirano')])
+  # A studio is no tag or genre of the catalogue filters.
+  self.assertFalse(self.db.execute("SELECT 1 FROM content_tags WHERE original IN ('Pink Pineapple','Suzuki Mirano')").fetchone())
+  item=next(i for i in content_catalog.browse(self.db,kind='anime',q='Tropical')['items'])
+  self.assertEqual((item['studios'],item['description']),(['Pink Pineapple'],kiss['description']))
+  self.assertNotIn('Pink Pineapple',item['tags']+item['genres'])
+  # A second pass adds no fact twice.
+  before=self.db.execute('SELECT * FROM content_tag_facts ORDER BY 1,3,4,5').fetchall()
+  self.assertEqual(content_catalog.ingest(self.db,list(self.rows().values())),4)
+  self.assertEqual(self.db.execute('SELECT * FROM content_tag_facts ORDER BY 1,3,4,5').fetchall(),before)
 
  def test_seeded_job_crawls_and_a_refresh_leaves_unchanged_rows_alone(self):
   store=SimpleNamespace(db=self.db,lock=threading.RLock());now=[10000.0]

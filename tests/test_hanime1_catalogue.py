@@ -55,6 +55,15 @@ class Hanime1Catalogue(unittest.TestCase):
   self.assertEqual(catalogue_hanime1.last_page(soup,'https://hanime1.me/search',None),387)
   self.assertEqual(catalogue_hanime1.last_page(BeautifulSoup(GENRE,'html.parser'),'https://hanime1.me/search?genre=裏番','裏番'),73)
   self.assertEqual(catalogue_hanime1.listing_url('Motion Anime',2),'https://hanime1.me/search?genre=Motion+Anime&page=2')
+  # The search form holds the tag dictionary and the release years.
+  self.assertEqual(catalogue_hanime1.tags(soup),['無碼','中文字幕','巨乳','POV'])
+  self.assertEqual(catalogue_hanime1.years(soup),['2026 年','2003 年'])
+  self.assertEqual(catalogue_hanime1.listing_url(None,2,'巨乳'),'https://hanime1.me/search?'+urlencode([('tags[]','巨乳'),('page',2)]))
+  self.assertEqual(catalogue_hanime1.listing_url(None,1,None,'2003 年'),'https://hanime1.me/search?date=2003+%E5%B9%B4')
+  # The pager of a tag route writes tags[0]; a pager of another filter does not count.
+  pager=BeautifulSoup('<a href="?'+urlencode([('tags[0]','巨乳'),('page',5)])+'">5</a><a href="?'+urlencode([('tags[0]','POV'),('page',9)])+'">9</a>','html.parser')
+  self.assertEqual(catalogue_hanime1.last_page(pager,catalogue_hanime1.listing_url(None,1,'巨乳'),None,'巨乳'),5)
+  self.assertEqual(catalogue_hanime1.last_page(pager,'https://hanime1.me/search',None),1)
 
  def test_genre_page_groups_series_with_the_genre_and_the_search_identity(self):
   http=Http({catalogue_hanime1.listing_url('裏番',1):GENRE})
@@ -110,16 +119,62 @@ class Hanime1Catalogue(unittest.TestCase):
    self.assertTrue(worker.run_once())
    state,records,cursor=self.db.execute('SELECT state,records,cursor FROM catalogue_jobs WHERE id=?',(key,)).fetchone()
    self.assertEqual((state,records,json.loads(cursor)['page']),('queued',5,2))
-   routes=[json.loads(s)['term']['label'] for (s,) in self.db.execute("SELECT spec FROM catalogue_jobs WHERE kind='hanime1' AND json_extract(spec,'$.term') IS NOT NULL ORDER BY rowid")]
+   terms=[json.loads(s)['term'] for (s,) in self.db.execute("SELECT spec FROM catalogue_jobs WHERE kind='hanime1' AND json_extract(spec,'$.term') IS NOT NULL ORDER BY rowid")]
+   routes=[t['label'] for t in terms if t['category']=='genre']
    self.assertEqual(len(routes),10);self.assertIn('裏番',routes)
+   # Every tag of the search form and every release year walk as routes too.
+   self.assertEqual([t['label'] for t in terms if t['category']=='tag'],['無碼','中文字幕','巨乳','POV'])
+   self.assertEqual([(t['label'],t['sourceId']) for t in terms if t['category']=='year'],[('2026','2026 年'),('2003','2003 年')])
+   self.assertEqual(len(terms),16)
    self.db.execute("UPDATE catalogue_jobs SET due=? WHERE id!=?",(now[0]+10**9,key));now[0]+=3
    self.assertTrue(worker.run_once())
   state,error=self.db.execute('SELECT state,error FROM catalogue_jobs WHERE id=?',(key,)).fetchone()
   self.assertEqual(state,'retry');self.assertIn('SourceChallengeError',error)
   self.assertEqual(http.calls,[catalogue_hanime1.listing_url(None,1),catalogue_hanime1.listing_url(None,2)])
 
+ def test_tag_and_year_routes_add_facts_to_known_series_only(self):
+  store=SimpleNamespace(db=self.db,lock=threading.RLock());now=[10000.0]
+  from catalogue_sources import fetch
+  # The genre route found two series; Garden has two episodes.
+  listing=Http({catalogue_hanime1.listing_url('裏番',1):page([(9,'Garden 2'),(8,'Solo'),(5,'Garden 1')],1)})
+  self.assertEqual(content_catalog.ingest(self.db,catalogue_hanime1.catalogue(HENTAI_GENRE,{'page':1},listing)['rows']),2)
+  raw=lambda:{r['title']:r for (v,) in self.db.execute('SELECT raw FROM content_titles') for r in [json.loads(v)]}
+  before=raw()
+  tag={**BASE,'term':{'category':'tag','label':'巨乳','sourceId':'巨乳'}}
+  year={**BASE,'term':{'category':'year','label':'2003','sourceId':'2003 年'}}
+  tag_pager=lambda n:'<a href="?'+urlencode([('tags[0]','巨乳'),('page',n)])+'">'+str(n)+'</a>'
+  # Garden's first episode carries the tag; Stranger shows only episode 2 and
+  # Lonely is not in the index yet: neither becomes a new card.
+  pages={catalogue_hanime1.listing_url(None,1,'巨乳'):page([(4,'Stranger 2'),(5,'Garden 1')],1)+tag_pager(2),
+         catalogue_hanime1.listing_url(None,2,'巨乳'):page([(3,'Lonely')],1)+tag_pager(2),
+         catalogue_hanime1.listing_url(None,1,None,'2003 年'):page([(8,'Solo')],1)}
+  http=Http(pages);worker=Indexer(store,fetch,lambda:now[0],interval=0)
+  def walk():
+   for spec in (tag,year):worker.enqueue(spec)
+   self.db.execute("UPDATE catalogue_jobs SET due=? WHERE json_extract(spec,'$.term.category') IN ('tag','year')",(now[0],))
+   with patch('source_parser.PublicHttp',lambda **_:http):
+    while worker.run_once():now[0]+=3
+  walk()
+  states=self.db.execute("SELECT json_extract(spec,'$.term.label'),state,pages,records,error FROM catalogue_jobs ORDER BY 1").fetchall()
+  self.assertEqual(states,[('2003','done',1,1,''),('巨乳','done',2,1,'')])
+  after=raw()
+  self.assertEqual(sorted(after),['Garden','Solo'])
+  self.assertEqual((after['Garden']['tags'],after['Garden']['genres'],after['Garden']['episodes']),(['巨乳'],['裏番'],2))
+  self.assertEqual(after['Garden']['cover'],before['Garden']['cover'])
+  self.assertEqual((after['Solo']['year'],after['Solo']['tags'],after['Solo']['genres']),(2003,[],['裏番']))
+  facts=lambda:self.db.execute('SELECT * FROM content_tag_facts ORDER BY 1,3,4,5').fetchall()
+  garden=content_catalog.title_key('anime','hanime1','hanime1:'+WATCH+'5')
+  self.assertEqual([f[1:] for f in facts() if f[0]==garden],[('anime','hanime1.me','genres','裏番'),('anime','hanime1.me','tags','巨乳')])
+  # The tag filter finds the series and the site genre stays a fact.
+  self.assertEqual([i['title'] for i in content_catalog.browse(self.db,kind='anime',tag='巨乳')['items']],['Garden'])
+  self.assertEqual(content_catalog.browse(self.db,kind='anime',tag='裏番',genre='Хентай')['total'],2)
+  # The weekly pass again: no fact twice, no new card.
+  first=facts();now[0]+=8*86400;walk()
+  self.assertEqual(len(http.calls),6);self.assertEqual(facts(),first);self.assertEqual(sorted(raw()),['Garden','Solo'])
+
  def test_a_genre_route_refreshes_weekly_and_the_listing_every_two_days(self):
   from catalogue_indexer import refresh_interval,REFRESH_TAG
   self.assertEqual((refresh_interval(BASE),refresh_interval(HENTAI_GENRE)),(REFRESH_BASE,REFRESH_TAG))
+  self.assertEqual(refresh_interval({**BASE,'term':{'category':'tag','label':'巨乳','sourceId':'巨乳'}}),REFRESH_TAG)
 
 if __name__=='__main__':unittest.main()

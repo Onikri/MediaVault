@@ -6,6 +6,7 @@ feed. Episodes are grouped into series exactly like the live HanimeTV search,
 and each row carries the same identity and link as that search result, so a
 library card opens the same title page and our own player.
 """
+import html
 import re
 
 import hanime_source
@@ -69,18 +70,30 @@ def alternative_titles(name, episode, search_titles):
     return result[:12]
 
 
+def plain_text(value):
+    """The feed's HTML description ("<p>…</p>") as paragraphs of plain text."""
+    text = re.sub(r'(?i)<br\s*/?>|</p\s*>', '\n', str(value or ''))
+    text = html.unescape(re.sub(r'<[^>]*>', '', text))
+    return '\n'.join(' '.join(line.split()) for line in text.splitlines() if line.strip())
+
+
 def series_row(name, episodes):
     first = episodes[0]
     url = hanime_source.VIDEO + first['slug']
     year = re.match(r'(\d{4})', str(first.get('released_at') or ''))
     tags = list(dict.fromkeys(tag for row in episodes for tag in row.get('tags') or [] if isinstance(tag, str)))
+    # The feed names each episode's studio ("brand"); a series may change it.
+    studios = list(dict.fromkeys(' '.join(row['brand'].split()) for row in episodes
+                                 if isinstance(row.get('brand'), str) and row['brand'].strip()))
+    description = next((text for row in episodes if (text := plain_text(row.get('description')))), '')
     # The same identity, link and fields as hanime_source.search and the
     # client's source result ("provider:url"); no providerId, so the title page
     # does not ask a catalogue API that HanimeTV does not have.
     row = {'id': 'hanime:' + url, 'provider': 'hanime', 'kind': 'anime', 'title': name,
            'aliases': alternative_titles(name, first['name'], first.get('search_titles')),
            'url': url, 'sourceUrl': url, 'cover': first.get('cover_url') or first.get('poster_url') or '',
-           'episodes': len(episodes), 'tags': tags, 'genres': [], 'age': 18}
+           'episodes': len(episodes), 'tags': tags, 'genres': [], 'studios': studios,
+           'description': description, 'age': 18}
     if year:row['year'] = int(year[1])
     return row
 

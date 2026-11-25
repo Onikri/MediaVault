@@ -22,7 +22,7 @@ def initialize(db):
         tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if {'catalog_tag_facts','catalog_titles'}<=tables:
             db.execute("INSERT OR IGNORE INTO catalog_vocabulary SELECT DISTINCT f.original,catalog_source_host(t.source_url),f.category,'manga' FROM catalog_tag_facts f JOIN catalog_titles t ON t.id=f.title_id")
-        if 'content_tag_facts' in tables:db.execute('INSERT OR IGNORE INTO catalog_vocabulary SELECT DISTINCT original,source,category,kind FROM content_tag_facts')
+        if 'content_tag_facts' in tables:db.execute('INSERT OR IGNORE INTO catalog_vocabulary SELECT DISTINCT original,source,category,kind FROM content_tag_facts WHERE category IN (\'genres\',\'tags\')')
         db.execute("INSERT INTO content_catalog_state VALUES('vocabulary-v1','1')")
         bump(db)
 
