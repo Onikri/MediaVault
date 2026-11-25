@@ -86,10 +86,14 @@ backup.mkdir(parents=True,mode=0o700);os.chmod(backup.parent,0o700)
 # databases are copied, not while 7 GB are compressed:
 #  1. with the importer running: every ordinary file (keys, profiles, models)
 #     into private-files.tar.gz; regenerable caches are left out;
-#  2. with the importer stopped: the small databases, the service key and the
+#  2. with the importer still running: a consistent snapshot of each large
+#     WAL database through SQLite's online backup API (a 13 GB catalogue no
+#     longer fits the RAM staging, and copying it while stopped meant ~16 min
+#     of downtime);
+#  3. with the importer stopped: the small databases, the service key and the
 #     configuration into private-data.tar.gz, and a raw copy of each large
-#     database into RAM (its pages are read into the page cache beforehand);
-#  3. once the new release answers (or the old one is back): the large copies
+#     non-WAL database into RAM (its pages are read into the page cache first);
+#  4. once the new release answers (or the old one is back): the large copies
 #     into private-databases.tar.gz.
 CACHE_DIRS={'temporary','.codex-local/alloha-delivery/segments','.codex-local/alloha-delivery/vod','.codex-local/alloha-delivery/logs','.codex-local/export-translations','catalogue-maintenance/hc-html-cache'}
 CHROMIUM_CACHES={'Cache','Code Cache','GPUCache','GrShaderCache','ShaderCache','DawnCache','DawnGraphiteCache','DawnWebGPUCache','GPUPersistentCache','component_crx_cache','CacheStorage','ScriptCache'}
@@ -130,8 +134,25 @@ staging=(ram if in_ram else backup)/('mediavault-backup-'+revision[:12])
 def warm(path):
     with path.open('rb') as source:
         while source.read(16*1024**2):pass
-for path in large:warm(path)
+def wal_database(path):
+    try:
+        with contextlib.closing(sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True,timeout=30)) as db:
+            return str(db.execute('PRAGMA journal_mode').fetchone()[0]).lower()=='wal'
+    except sqlite3.Error:return False
+online=[p for p in large if wal_database(p)]
+for path in large:
+    if path not in online:warm(path)
 staged=[]
+staging.mkdir(parents=True,mode=0o700,exist_ok=True)
+for path in online:
+    # One backup step reads a single snapshot while the importer keeps writing.
+    relative=path.relative_to(data).as_posix();copy=staging/relative.replace('/','__')
+    with contextlib.closing(sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True,timeout=60)) as source,contextlib.closing(sqlite3.connect(copy)) as target:
+        source.backup(target)
+    os.chmod(copy,0o600)
+    with contextlib.closing(sqlite3.connect(copy.resolve().as_uri()+'?mode=ro',uri=True)) as check:
+        if not check.execute('SELECT COUNT(*) FROM sqlite_master').fetchone()[0]:raise RuntimeError('Online database backup is empty.')
+    staged.append((relative,copy))
 def finish_large():
     if not staged:return
     try:
@@ -159,6 +180,7 @@ try:
         if 'data/service.key' not in archive.getnames() or 'data/tasks.sqlite' not in archive.getnames():raise RuntimeError('Private backup verification failed.')
     staging.mkdir(parents=True,mode=0o700,exist_ok=True)
     for path in large:
+        if path in online:continue
         for part in [path,*(path.with_name(path.name+s) for s in SIDECARS)]:
             if part.is_file():
                 relative=part.relative_to(data).as_posix();copy=staging/relative.replace('/','__')

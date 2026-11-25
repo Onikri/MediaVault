@@ -158,3 +158,24 @@ class ExistingUpdateTests(unittest.TestCase):
                 self.assertEqual(saved.extractfile('data/manga-discovery.sqlite').read(),(data/'manga-discovery.sqlite').read_bytes())
             self.assertEqual(list((root/'ram').iterdir()),[],'the RAM copy is removed')
 
+    def test_large_wal_database_is_backed_up_online_before_the_stop(self):
+        def prepare(data):
+            db=sqlite3.connect(data/'manga-discovery.sqlite')
+            db.execute('PRAGMA journal_mode=WAL');db.execute('CREATE TABLE titles (id TEXT)')
+            with db:db.executemany('INSERT INTO titles VALUES (?)',[('t'*40+str(i),) for i in range(400)])
+            db.close()
+        seen={}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'ram').mkdir()
+            def on_stop():
+                seen['copied']=any(p.name.endswith('manga-discovery.sqlite') for p in root.rglob('mediavault-backup-*/*'))
+            work,data,files,calls,error=self.exercise(root,prepare=prepare,on_stop=on_stop,large=20000)
+            self.assertIsNone(error)
+            self.assertEqual(seen,{'copied':True},'the WAL snapshot exists before the importer stops')
+            folder=next((root/'backups').glob('*'))
+            with tarfile.open(folder/'private-databases.tar.gz') as saved:
+                self.assertEqual(saved.getnames(),['data/manga-discovery.sqlite'])
+                restored=root/'restored.sqlite';restored.write_bytes(saved.extractfile('data/manga-discovery.sqlite').read())
+            with contextlib.closing(sqlite3.connect(restored)) as db:
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM titles').fetchone()[0],400)
+
