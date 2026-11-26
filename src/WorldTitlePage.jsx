@@ -92,7 +92,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  useEffect(()=>{
   if(!['movie','tv','book'].includes(item.kind))return;
   const abort=new AbortController();
-  (item.kind==='book'?bookSupplement(item,{signal:abort.signal}):filmSupplement(item,{signal:abort.signal})).then(data=>{if(!abort.signal.aborted)setSupplement(data&&Object.keys(data).length?data:null);}).catch(()=>{});
+  (item.kind==='book'?bookSupplement(item,{signal:abort.signal}):filmSupplement(item,{signal:abort.signal,server:service.server})).then(data=>{if(!abort.signal.aborted)setSupplement(data&&Object.keys(data).length?data:null);}).catch(()=>{});
   return()=>abort.abort();
  },[supplementKey]);
  const baseDisplayProfile=useMemo(()=>{const base={

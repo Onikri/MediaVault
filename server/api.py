@@ -1107,6 +1107,8 @@ install_chapter_thumbnails(app, viewer)
 
 from character_profile import install as install_character_profile
 install_character_profile(app)
+from character_art import install as install_character_art
+install_character_art(app)
 
 # Where a profile stopped reading or watching, shared between its devices.
 from reading_places import install as install_reading_places

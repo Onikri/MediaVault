@@ -9,7 +9,7 @@ import {useReducedMotion} from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {ArrowLeft,Play,Star,ChevronRight,RefreshCw,Cloud,CloudUpload,Users,X,ExternalLink,Film,BookOpen,Bookmark,Download,FolderOpen} from 'lucide-react';
 import {useUkrainianTitle} from './use-ukrainian-title.js';
-import {loadTitleProfile,loadCharacter,searchRussianTitles,russianText,hasRussian,profileNeedsRefresh,scheduleProfileRetry} from './title-metadata.js';
+import {loadTitleProfile,loadCharacter,searchRussianTitles,russianText,hasRussian,profileNeedsRefresh,scheduleProfileRetry,imageURL,characterPortraits,withPortraits} from './title-metadata.js';
 import {useArtwork,fetchArtwork} from './title-artwork.js';
 import {titleParts,SECTION_LABELS} from './library-model.js';
 import {episodeNumber,voiceLabel} from './player-model.js';
@@ -113,12 +113,28 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
     const controller=new AbortController(),kind=title.section==='anime'?'anime':'manga';
     jikan(kind+'/'+supplementIdentity+'/full',{server:server||window.MEDIA_VAULT_CONFIG?.importServerUrl,signal:controller.signal}).then(result=>{if(!controller.signal.aborted&&String(result.data?.mal_id)===supplementIdentity)setProfile(old=>fillProfile(old||{},jikanProfile(result.data,kind)));}).catch(()=>{});
     if(kind==='anime'&&!currentProfile.current?.characters?.length)jikan('anime/'+supplementIdentity+'/characters',{server,signal:controller.signal}).then(result=>{if(controller.signal.aborted)return;const characters=(result.data||[]).slice(0,18).map(row=>({id:String(row.character.mal_id),name:row.character.name,image:[row.character.images?.webp?.image_url,row.character.images?.jpg?.image_url].find(url=>url&&!/questionmark/i.test(url))||'',role:row.role==='Main'?'Главный герой':'Персонаж',description:''}));setProfile(old=>fillProfile(old||{},{characters}));}).catch(()=>{});
-    // Minor characters often have no portrait in Shikimori; MyAnimeList (same ids) usually does.
-    const missingArt=(currentProfile.current?.characters||[]).filter(c=>!c.image).length;
-    if(kind==='anime'&&missingArt)jikan('anime/'+supplementIdentity+'/characters',{server,signal:controller.signal}).then(result=>{if(controller.signal.aborted)return;const pics=new Map((result.data||[]).map(row=>[String(row.character.mal_id),row.character.images?.webp?.image_url||row.character.images?.jpg?.image_url||'']).filter(([,url])=>url&&!/questionmark/i.test(url)));if(pics.size)setProfile(old=>({...old,characters:(old?.characters||[]).map(c=>c.image||!pics.get(String(c.id))?c:{...c,image:pics.get(String(c.id))})}));}).catch(()=>{});
     if(kind==='anime'&&!currentProfile.current?.screenshots?.length)jikan('anime/'+supplementIdentity+'/videos',{server,signal:controller.signal}).then(result=>{if(controller.signal.aborted)return;const screenshots=(result.data?.episodes||[]).map(row=>row.images?.jpg?.image_url).filter(Boolean).slice(0,12);setProfile(old=>fillProfile(old||{},{screenshots}));}).catch(()=>{});
     return()=>controller.abort();
   },[supplementIdentity,title.section,server]);
+  // A saved dossier may keep empty or placeholder portraits. The server looks the
+  // title's characters up in MAL, AniList and Kitsu (exact id or exact name in
+  // this title) and the admin's copy stores only the characters with their art.
+  useEffect(()=>{
+    const address=server||window.MEDIA_VAULT_CONFIG?.importServerUrl;
+    if(online||!address||!/^\d{1,12}$/.test(supplementIdentity)||!['anime','manga','ranobe'].includes(title.section))return;
+    const missing=(currentProfile.current?.characters||[]).filter(c=>!imageURL(c.image)).map(c=>c.id);
+    if(!missing.length)return;
+    const controller=new AbortController();
+    characterPortraits(supplementIdentity,title.section,missing,{server:address,signal:controller.signal}).then(async found=>{
+      if(controller.signal.aborted||!Object.keys(found).length)return;
+      setProfile(old=>({...old,characters:withPortraits(old?.characters,found)}));
+      if(!live.current.admin||!live.current.driveWritable)return;
+      const characters=withPortraits(currentProfile.current?.characters,found);
+      const {images}=await fetchArtwork({characters,artwork:currentProfile.current?.artwork},{signal:controller.signal});
+      if(!controller.signal.aborted)await actions.saveTitleProfile(title.id,{characters},images,{background:true});
+    }).catch(()=>{});
+    return()=>controller.abort();
+  },[supplementIdentity,title.section,online]);
   function saveRatings(value){setProfile(old=>({...old,ratings:value}));if(!online&&live.current.admin&&live.current.driveWritable)actions.saveTitleProfile(title.id,{ratings:value},[],{background:true});}
   useEffect(()=>{if(online)setProfile(onlineProfile||{});else if(saved)setProfile(saved);},[saved,online,onlineProfile]);
   useEffect(()=>{

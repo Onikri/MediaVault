@@ -51,7 +51,15 @@ const minutes=claims=>{
  return Math.round(unit.endsWith('Q7727')?number:unit.endsWith('Q11574')?number/60:unit.endsWith('Q25235')?number*60:number)||null;
 };
 
-async function fromWikidata(item,signal){
+// An actor Wikidata has no photo of takes Kinopoisk's, found by that actor's
+// exact Kinopoisk person id (P2604); the server keeps only real photos.
+async function kinopoiskPhotos(ids,server,signal){
+ const wanted=[...new Set(ids.filter(id=>/^[1-9]\d{0,9}$/.test(String(id||''))))].slice(0,24);
+ if(!server||!wanted.length)return {};
+ try{const response=await fetch(server+'/metadata/person-photos/kinopoisk?'+new URLSearchParams({ids:wanted.join(',')}),{signal:timed(signal,15000)});return response.ok?await response.json():{};}catch{return {};}
+}
+const kinopoiskPhoto=url=>/^https:\/\/avatars\.mds\.yandex\.net\/get-kinopoisk-image\//.test(String(url||''))?url:'';
+async function fromWikidata(item,signal,server){
  const entity=await wikidataEntity(item,signal);if(!entity)return {};
  const c=entity.claims||{};
  const cast=(c.P161||[]).filter(s=>s.rank!=='deprecated'&&s.mainsnak?.datavalue).slice(0,24).map(s=>({actor:s.mainsnak.datavalue.value.id,roles:(s.qualifiers?.P453||[]).map(q=>q.datavalue?.value?.id).filter(Boolean),names:(s.qualifiers?.P4633||[]).map(q=>q.datavalue?.value).filter(Boolean)}));
@@ -63,10 +71,12 @@ async function fromWikidata(item,signal){
   ...people.creators.map(id=>person(id,'Создатель')),...people.directors.map(id=>person(id,'Режиссёр')),...people.writers.map(id=>person(id,'Сценарий')),
   ...people.composers.map(id=>person(id,'Композитор')),...people.operators.map(id=>person(id,'Оператор')),...people.producers.map(id=>person(id,'Продюсер'))
  ].filter(p=>p?.name).reduce((list,p)=>{const same=list.find(v=>v.id===p.id);if(same)same.role+=', '+p.role.toLocaleLowerCase('ru');else list.push({...p});return list;},[]);
+ const unpictured=cast.filter(row=>lookup[row.actor]&&!value(lookup[row.actor].claims,'P18')).map(row=>String(value(lookup[row.actor].claims,'P2604')||''));
+ const photos=await kinopoiskPhotos(unpictured,server,signal);
  const characters=cast.map(row=>{
   const actor=lookup[row.actor];if(!actor)return null;
   const role=row.roles.map(id=>label(lookup[id])).find(Boolean)||row.names[0]||'';
-  const image=commons(value(actor.claims,'P18'));
+  const image=commons(value(actor.claims,'P18'))||kinopoiskPhoto(photos[String(value(actor.claims,'P2604')||'')]);
   return {id:'wd:'+row.actor,name:role||label(actor),role:role?label(actor):'В ролях',image,actors:role?[label(actor)]:[],description:''};
  }).filter(Boolean);
  const related=[...family.previous.map(id=>[id,'Предыдущая часть']),...family.next.map(id=>[id,'Следующая часть']),...family.basedOn.map(id=>[id,'Первоисточник'])]
@@ -114,9 +124,9 @@ async function fromTvmaze(imdb,signal){
 
 // A movie or series profile filled from both catalogs. Values from the
 // Kinopoisk record stay first; the catalogs only add what is missing.
-export async function filmSupplement(item,{signal}={}){
+export async function filmSupplement(item,{signal,server}={}){
  if(!['movie','tv'].includes(item?.kind))return {};
- const wiki=await fromWikidata(item,signal).catch(()=>({}));
+ const wiki=await fromWikidata(item,signal,server).catch(()=>({}));
  const imdb=item.ids?.imdb||wiki.imdb;
  const show=item.kind==='tv'?await fromTvmaze(imdb,signal).catch(()=>({})):{};
  // TVmaze names the characters with their pictures; Wikidata has the actor

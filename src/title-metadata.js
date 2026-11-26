@@ -29,9 +29,24 @@ export function plainText(value){
   return String(value||'').replace(/<br\s*\/?\s*>/gi,'\n').replace(/<\/(?:p|div|li|h[1-6])>/gi,'\n\n').replace(/<[^>]*>/g,'').replace(/\[(?:\/?[a-z_]+)(?:[^\]]*)\]/gi,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\n{3,}/g,'\n\n').trim();
 }
 export const russianText=value=>{const text=plainText(value),letters=(text.match(/\p{L}/gu)||[]).length,cyrillic=(text.match(/[а-яё]/gi)||[]).length;return cyrillic&&cyrillic/Math.max(1,letters)>=.25?text:'';};
+// Catalogue placeholders (Shikimori missing_*, MAL questionmark, AniList
+// default, Kinopoisk no-poster …) are no picture. Mirrors server/character_art.py.
+const PLACEHOLDER=/(?:^|\/)(?:missing|questionmark|default|no[_-]?(?:image|photo|poster|picture|avatar)|noimage|nopicture|placeholder|blank|404)(?:[._\/-][^\/]*)?$|\/missing\//i;
 export function imageURL(value){
   if(!value||typeof value!=='string'||/(?:\/|_)(?:404|missing|no[_-]?image)(?:[.\/_-]|$)/i.test(value))return '';
-  try{const url=new URL(value,ORIGIN);return url.protocol==='https:'&&!url.username&&!url.password?url.href:'';}catch{return '';}
+  try{const url=new URL(value,ORIGIN);return url.protocol==='https:'&&!url.username&&!url.password&&!PLACEHOLDER.test(url.pathname)?url.href:'';}catch{return '';}
+}
+// Portraits the server found for this title in MAL, AniList or Kitsu (exact
+// character id or exact name inside the same title) fill only empty pictures.
+export function withPortraits(characters=[],found={}){
+  return characters.map(c=>{const image=!imageURL(c.image)&&imageURL(found[String(c.id)]?.image||'');return image?{...c,image}:c;});
+}
+export async function characterPortraits(id,kind,ids,{server,signal}={}){
+  const wanted=[...new Set(ids.map(String).filter(v=>/^\d{1,12}$/.test(v)))].slice(0,40);
+  if(!server||!/^\d{1,12}$/.test(String(id))||!wanted.length)return {};
+  const response=await fetch(server+'/metadata/character-art/'+(kind==='anime'?'anime':'manga')+'/'+id+'?'+new URLSearchParams({ids:wanted.join(',')}),{signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000)});
+  if(!response.ok)return {};
+  const value=await response.json();return value&&typeof value.portraits==='object'&&value.portraits||{};
 }
 export const translated={releasing:'Выходит',current:'Выходит','not_yet_released':'Анонсирован',upcoming:'Анонсирован',unreleased:'Анонсирован',cancelled:'Отменён',hiatus:'Приостановлен','finished airing':'Завершён','currently airing':'Выходит','not yet aired':'Анонсирован',finished:'Завершён',publishing:'Выходит',tv:'Аниме',movie:'Фильм',ova:'OVA',ona:'ONA',special:'Спецвыпуск',music:'Музыкальное видео',manga:'Манга',novel:'Ранобэ',light_novel:'Ранобэ',one_shot:'Ваншот',manhwa:'Манхва',manhua:'Маньхуа',released:'Завершён',ongoing:'Выходит',anons:'Анонсирован',manga_source:'Манга',original:'Оригинальное произведение',light_novel_source:'Ранобэ',novel_source:'Роман',game:'Игра',visual_novel:'Визуальная новелла',webtoon:'Вебтун',web_manga:'Веб-манга',four_koma_manga:'Ёнкома',book:'Книга',other:'Другое'};
 export const translate=(value,fallback='Не указано')=>translated[String(value||'').toLowerCase()]||(hasRussian(value)?String(value):fallback);
@@ -96,9 +111,10 @@ export async function loadTitleProfile(id,kind='anime',options={}){
   kind=['manga','ranobe','novel'].includes(kind)?kind:'anime';const path=resource(kind)+'/'+id;
   if(options.refresh)for(const key of pending.keys())if(key===path||key.startsWith(path+'/'))pending.delete(key);
   const data=await request(path,options),names=['roles','related',...(kind==='anime'?['screenshots']:[])];
-  const values=names.map(()=>[]),failed=[],posters={};let art=null,cross=[],complete=false;
+  const values=names.map(()=>[]),failed=[],posters={},portraits={};let art=null,cross=[],complete=false;
   function snapshot(){
     const profile=normalizeProfile(data,{roles:values[0],related:values[1],screenshots:values[2]});
+    profile.characters=withPortraits(profile.characters,portraits);
     if(art?.background){profile.backgrounds=[imageURL(art.background)].filter(Boolean);profile.artworkSources=[{provider:'anilist',url:art.sourceURL}];}
     if(art?.cover)profile.cover=imageURL(art.cover);
     for(const value of cross)if(!profile.related.some(item=>item.kind===value.kind&&(String(item.id)===String(value.ids?.mal||'')||item.title===value.title)))profile.related.push(value);
@@ -113,7 +129,11 @@ export async function loadTitleProfile(id,kind='anime',options={}){
   }
   // Core copy and artwork can render now. No dependency between roles, gallery,
   // cross-media links and cover enrichment: all I/O starts in the same turn.
-  const extra=names.map((part,index)=>request(path+'/'+part,options).then(value=>{values[index]=value;notify();}).catch(error=>{failed.push(part);notify();}));
+  async function loadPortraits(){
+    const missing=normalizeProfile(data,{roles:values[0]}).characters.filter(c=>!c.image).map(c=>c.id);
+    try{Object.assign(portraits,await characterPortraits(id,kind,missing,options));}catch{options.signal?.throwIfAborted();}
+  }
+  const extra=names.map((part,index)=>request(path+'/'+part,options).then(async value=>{values[index]=value;notify();if(part==='roles'){await loadPortraits();notify();}}).catch(error=>{failed.push(part);notify();}));
   const enrichment=[highResolutionArtwork(id,kind).then(value=>{art=value;notify();}),request(path+'/external_links',options).then(async value=>{cross=await crossMediaFromLinks(value);notify();}),loadPosters([id]).then(notify)];
   await Promise.allSettled([...extra,...enrichment]);options.signal?.throwIfAborted();
   const missing=snapshot().related.filter(r=>r.kind===kind&&!r.cover&&/^\d+$/.test(String(r.id))).map(r=>r.id);

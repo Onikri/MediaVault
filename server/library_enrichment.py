@@ -23,7 +23,8 @@ def russian(value):
     return text if re.search('[а-яё]',text,re.I) else ''
 
 def image(value):
-    if not value or re.search(r'(?:/|_)(?:missing|404|no[_-]?image)(?:[./_-]|$)',value,re.I):return ''
+    from character_art import placeholder
+    if not value or re.search(r'(?:/|_)(?:missing|404|no[_-]?image)(?:[./_-]|$)',value,re.I) or placeholder(value):return ''
     value=urljoin('https://shikimori.io',value)
     return value if value.startswith('https://') else ''
 
@@ -66,6 +67,9 @@ def load_profile(identity,kind):
                     'actors':[russian(a.get('russian')) for a in detail.get('seyu',[]) if russian(a.get('russian'))],
                     'voiceActors':[{'id':str(a['id']),'name':russian(a.get('russian')),'image':image((a.get('image') or {}).get('original')),'role':'Сэйю'} for a in detail.get('seyu',[]) if a.get('id') and russian(a.get('russian'))]}
         except Exception:return value
+    # Portraits Shikimori lacks come from MAL, AniList or Kitsu of the same title.
+    from character_art import fill
+    fill(profile['characters'],kind,identity,roles)
     with ThreadPoolExecutor(max_workers=2) as pool:profile['characters']=list(pool.map(character_detail,profile['characters']))
     profile['partial']=profile['partial'] or not profile['description']
     if profile['screenshots']:profile['background']=profile['screenshots'][0]

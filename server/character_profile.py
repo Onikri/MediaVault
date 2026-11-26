@@ -4,8 +4,8 @@ from collections import OrderedDict
 import re
 import threading
 import time
-from urllib.parse import urljoin
 from metadata_catalog import metadata,get_json
+from character_art import real
 from source_parser import SourceError
 
 cache=OrderedDict();pending={};lock=threading.RLock();slots=threading.BoundedSemaphore(4)
@@ -43,7 +43,8 @@ def build(identity,base,details):
             appearances.append({'id':str(work['mal_id']),'kind':kind,'title':str(work.get('title') or '')[:250],
                 'role':'Главный герой' if row.get('role')=='Main' else 'Персонаж','image':(work.get('images',{}).get('jpg') or {}).get('image_url','')})
     return {'id':identity,'name':base.get('russian') or base.get('name') or details.get('name') or '',
-        'image':urljoin('https://shikimori.io',(base.get('image') or {}).get('original') or '') if (base.get('image') or {}).get('original') else ((details.get('images') or {}).get('jpg') or {}).get('image_url',''),
+        # Placeholders (Shikimori missing_*, MAL questionmark) are no picture.
+        'image':real((base.get('image') or {}).get('original') or '') or real(((details.get('images') or {}).get('jpg') or {}).get('image_url') or ''),
         'actors':[p.get('russian') or p.get('name') for p in base.get('seyu',[]) if p.get('russian') or p.get('name')],
         'nativeName':details.get('name_kanji') or '', 'aliases':(details.get('nicknames') or [])[:12],
         'description':plain(base.get('description_html') or base.get('description')),

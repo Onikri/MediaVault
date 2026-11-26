@@ -7,16 +7,25 @@ from manga_hitomi import DOMAIN as HITOMI_DOMAIN, ROOT as HITOMI_ROOT, THUMBNAIL
 
 HOSTS={'img.youtube.com','i.ytimg.com','shikimori.io','desu.shikimori.io','shikimori.one','shikimori.me','shikimori.org','desu.shikimori.one','s4.anilist.co','cdn.myanimelist.net',
        'media.kitsu.io','media.kitsu.app','upload.wikimedia.org','commons.wikimedia.org','covers.openlibrary.org',
-       'static.tvmaze.com','fantlab.ru','www.gutenberg.org'}
+       'static.tvmaze.com','fantlab.ru','www.gutenberg.org','avatars.mds.yandex.net'}
+# Shared CDNs serve only the namespace a catalogue uses there.
+PATHS={'avatars.mds.yandex.net':'/get-kinopoisk-image/'}
 cache,lock=OrderedDict(),threading.Lock()
 
 def hitomi_cover(url):
     parts=urlsplit(url)
     return parts.hostname in {'atn.'+HITOMI_DOMAIN,'btn.'+HITOMI_DOMAIN} and not parts.query and bool(THUMBNAIL_PATH.fullmatch(parts.path))
 
+def allowed(url):
+    """Exact host (and namespace on shared CDNs) check, no network."""
+    parts=urlsplit(str(url or ''))
+    if parts.scheme!='https' or parts.username or parts.password or parts.port not in (None,443):return False
+    host=parts.hostname or ''
+    return host in HOSTS and parts.path.startswith(PATHS.get(host,'/'))
+
 def image_url(value):
     result=public_url(value)
-    if urlsplit(result).hostname not in HOSTS and not hitomi_cover(result):raise SourceError('Изображения этого источника не поддерживаются.')
+    if not allowed(result) and not hitomi_cover(result):raise SourceError('Изображения этого источника не поддерживаются.')
     return result
 
 def fetch_image(url):
