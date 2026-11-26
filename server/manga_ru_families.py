@@ -9,7 +9,7 @@ from manga_series_port import NUMBER, Meta, SeriesPort, number
 from manga_source_tags import from_api, unique
 from manga_sources import parse_pages
 from manga_webcomics import query_url
-from source_parser import SourceAccessError, SourceError
+from source_parser import SourceAccessError, SourceAuthError, SourceError
 
 
 GROUPLE = (
@@ -120,12 +120,22 @@ class GroupLe(SeriesPort):
             dates = row.select('td.d-none')
             date = release_date(node_text(dates[-1]) if dates else '', '%d.%m.%Y')
             result[identity] = self.chapter(target, node_text(a), n / 10 if n is not None else None,
-                                            date, translator=a.get('title', '').removesuffix(' (Переводчик)'))
+                                            date, translator=a.get('title', '').removesuffix(' (Переводчик)').removesuffix(' Переводчик'))
         return self.order(result), False
 
     def pages(self, http, url):
         target = query_url(urlunsplit(urlsplit(url)._replace(query='', fragment='')), mtr='true')
-        doc, final = self.page_document(http, target)
+        try:
+            doc, final = self.page_document(http, target)
+        except SourceAccessError:
+            raise
+        except SourceError as error:
+            # AllHentai answers every chapter with 404 and placeholder images
+            # to guests (checked 2026-11-26 on two titles); only signed-in
+            # readers get the pages. MediaVault never signs in for a source.
+            if self.NAME == 'AllHentai' and getattr(error, 'http_status', None) == 404:
+                raise SourceAuthError('AllHentai показывает главы только вошедшим читателям.') from None
+            raise
         if doc.select_one('div.alert, h1:-soup-contains("требуется премиум")'):
             raise SourceAccessError('Выпуск требует доступ на стороне GroupLe.')
         return parse_pages(str(doc), final)

@@ -939,6 +939,167 @@
       "routes": [
         {"hosts": ["newxtoon5.com"], "operations": ["*"], "exit": "warp", "tls": "chrome"}
       ]
+    },
+    "232952896490317872": {
+      "name": "Yaoi.me pt",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "418222621742506139": {
+      "name": "Yaoi.me mn",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "440596664459681045": {
+      "name": "Yaoi.me cs",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "539129098615592048": {
+      "name": "Yaoi.me pt-BR",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "684979558971387583": {
+      "name": "Yaoi.me ja",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "897292737452472946": {
+      "name": "Yaoi.me uk",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2168411991469853368": {
+      "name": "Yaoi.me de",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2307425329251826653": {
+      "name": "Yaoi.me fa",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "2452661550434610263": {
+      "name": "Yaoi.me tr",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3655991679509066856": {
+      "name": "Yaoi.me th",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3681435886557602253": {
+      "name": "Yaoi.me en",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "3771454461235531869": {
+      "name": "Yaoi.me it",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4095510774501140142": {
+      "name": "Yaoi.me ar",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "4814355377128062865": {
+      "name": "Yaoi.me ko",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5641437402179331405": {
+      "name": "Yaoi.me es-419",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "5795748004620209296": {
+      "name": "Yaoi.me zh",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7019584478930992166": {
+      "name": "Yaoi.me vi",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7082138383955241331": {
+      "name": "Yaoi.me id",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7744489183918674408": {
+      "name": "Yaoi.me pl",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7848768801791608136": {
+      "name": "Yaoi.me ru",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "7877477352716506018": {
+      "name": "Yaoi.me hu",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "8120530126288646203": {
+      "name": "Yaoi.me es",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
+    },
+    "9187201611611882471": {
+      "name": "Yaoi.me fr",
+      "solverBudget": 45,
+      "routes": [
+        {"hosts": ["yaoi.me"], "operations": ["chapters", "pages", "images"], "exit": "direct", "solver": true, "format": "html", "tls": "firefox"}
+      ]
     }
   }
 }

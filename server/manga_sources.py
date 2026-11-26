@@ -51,7 +51,14 @@ SITES=(MangaSite('hentaichan','HentaiChan','https://hentaichan.live','hentaichan
        MangaSite('toonkor','Toonkor · KO','https://004.toonkor.net','toonkor',hosts=('toonkor7.org','toonkor0.org','toonkor2.org'),languages=('ko',),format='manhwa'),
        MangaSite('honey-manga','Honey Manga · UA','https://honey-manga.com.ua','honey',languages=('uk',)),
        MangaSite('zenko','Zenko · UA','https://zenko.online','zenko',languages=('uk',)),
-       MangaSite('webtoons','WEBTOON · EN · Originals и Canvas','https://www.webtoons.com','webtoons',hosts=('webtoons.com','m.webtoons.com'),languages=('en',),format='webtoon'))
+       MangaSite('webtoons','WEBTOON · EN · Originals и Canvas','https://www.webtoons.com','webtoons',hosts=('webtoons.com','m.webtoons.com'),languages=('en',),format='webtoon'),
+       # Readers of catalogue_html cards; their ids are the index providers.
+       MangaSite('online.hentaimoody.com','HentaiMoody','https://online.hentaimoody.com','hentaimoody'),
+       MangaSite('hentaros.com','Hentaros','https://hentaros.com','hentaros'))
+# Readers of indexed cards only: catalogue_html crawls their listings, and their
+# HTML search is not a verified title search.
+CARD_READERS={'hentaimoody','hentaros'}
+INDEX_ONLY={'grouple','novelcool',*CARD_READERS}
 _cache={};_lock=threading.RLock()
 MANGACHAN_HEADERS={'User-Agent':'MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal catalogue)'}
 def site_for(url):
@@ -194,7 +201,7 @@ def search_title(title,language='auto',format='all'):
         return {'provider':site.id,'name':site.name,'status':status,'message':message,'results':results}
     # Current GroupLe search is JS/API-only; its HTML reader remains available
     # for direct links. Do not misrepresent an empty HTML search as a working API.
-    sites=[s for s in SITES if s.family not in {'grouple','novelcool'} and (language=='all' or (language if language!='auto' else 'ru') in s.languages) and (format not in {'manhwa','manhua','webtoon'} or not s.format or s.format==format or format=='webtoon' and s.format=='manhwa' or format=='manhwa' and s.format=='webtoon')]
+    sites=[s for s in SITES if s.family not in INDEX_ONLY and (language=='all' or (language if language!='auto' else 'ru') in s.languages) and (format not in {'manhwa','manhua','webtoon'} or not s.format or s.format==format or format=='webtoon' and s.format=='manhwa' or format=='manhwa' and s.format=='webtoon')]
     with ThreadPoolExecutor(max_workers=min(12,len(sites) or 1)) as pool:providers=list(pool.map(work,sites))
     if language=='auto' and not any(p['results'] for p in providers):
         with ThreadPoolExecutor(max_workers=3) as pool:providers.extend(pool.map(work,[s for s in SITES if s.family in {'pill','katana','webtoons'}]))
@@ -286,6 +293,12 @@ def inspect(url,http=None):
         if initial and initial.family=='novelcool':
             from manga_novelcool import inspect as inspect_novelcool
             return inspect_novelcool(url,http)
+        if initial and initial.family=='hentaimoody':
+            from manga_hentaimoody import inspect as inspect_hentaimoody
+            return inspect_hentaimoody(url,http)
+        if initial and initial.family=='hentaros':
+            from manga_hentaros import inspect as inspect_hentaros
+            return inspect_hentaros(url,http)
         if initial and initial.family=='suwayomi':
             from suwayomi_bridge import inspect as inspect_bridge
             return inspect_bridge(url)

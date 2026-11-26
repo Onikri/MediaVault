@@ -85,10 +85,11 @@ def lib_terms(raw,site_id):
     return out[:1500]
 
 def html_titles(raw,url,label,category):
-    from manga_sources import site_for,parse_search
+    from manga_sources import CARD_READERS,site_for,parse_search
     from manga_hmanga import parse_search as hmanga
     site=site_for(url)
-    if not site:return []
+    # catalogue_html owns the listings of the card-only readers.
+    if not site or site.family in CARD_READERS:return []
     text=raw.decode('utf-8',errors='replace')
     if site.id=='hmanga':rows=hmanga(text,url)
     else:

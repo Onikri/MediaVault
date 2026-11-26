@@ -1,0 +1,82 @@
+{
+ "312452": [
+  {
+   "title": "Госпожа хозяйка",
+   "volume": 0.0,
+   "chapter": 0.0,
+   "part": 0.0,
+   "category": 4,
+   "translation": "",
+   "translation_chapter": "",
+   "chapter_name": "",
+   "chapter_value_link": "",
+   "chapter_translater_id": "",
+   "number_of_pages": 189,
+   "date": "2026-08-12 20:55:51"
+  }
+ ],
+ "312453": [
+  {
+   "title": "Госпожа хозяйка Том - 1 Глава - 1",
+   "volume": 1.0,
+   "chapter": 1.0,
+   "part": 0.0,
+   "category": 5,
+   "translation": "",
+   "translation_chapter": "",
+   "chapter_name": "",
+   "chapter_value_link": "1",
+   "chapter_translater_id": "",
+   "number_of_pages": 53,
+   "date": "2026-08-12 20:55:51"
+  }
+ ],
+ "312454": [
+  {
+   "title": "Госпожа хозяйка Том - 1 Глава - 2",
+   "volume": 1.0,
+   "chapter": 2.0,
+   "part": 0.0,
+   "category": 5,
+   "translation": "",
+   "translation_chapter": "",
+   "chapter_name": "",
+   "chapter_value_link": "2",
+   "chapter_translater_id": "",
+   "number_of_pages": 44,
+   "date": "2026-08-12 20:55:51"
+  }
+ ],
+ "312455": [
+  {
+   "title": "Госпожа хозяйка Том - 1 Глава - 3",
+   "volume": 1.0,
+   "chapter": 3.0,
+   "part": 0.0,
+   "category": 5,
+   "translation": "",
+   "translation_chapter": "",
+   "chapter_name": "",
+   "chapter_value_link": "3",
+   "chapter_translater_id": "",
+   "number_of_pages": 41,
+   "date": "2026-08-12 20:55:51"
+  }
+ ],
+ "312456": [
+  {
+   "title": "Госпожа хозяйка Том - 1 Глава - 3.5",
+   "volume": 1.0,
+   "chapter": 3.5,
+   "part": 0.0,
+   "category": 5,
+   "translation": "",
+   "translation_chapter": "",
+   "chapter_name": "Экстра",
+   "chapter_value_link": "3-5",
+   "chapter_translater_id": "",
+   "number_of_pages": 51,
+   "date": "2026-08-12 20:55:51"
+  }
+ ]
+}

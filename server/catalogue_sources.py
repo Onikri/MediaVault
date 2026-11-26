@@ -122,9 +122,9 @@ def html_rows(raw,url):
     rows=html_titles(raw,url,'','tag')
     if rows:return rows
     # Next.js catalogues can expose plain title links without the older wrappers.
-    from manga_sources import site_for
+    from manga_sources import CARD_READERS,site_for
     site=site_for(url)
-    if not site:return []
+    if not site or site.family in CARD_READERS:return []
     result={};soup=BeautifulSoup(raw,'html.parser')
     for anchor in soup.select('a[href*="/manga/"]'):
         target=urljoin(url,anchor.get('href',''));p=urlsplit(target);title=anchor.get_text(' ',strip=True)
