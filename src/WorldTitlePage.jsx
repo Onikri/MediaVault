@@ -111,7 +111,7 @@ export default function WorldTitlePage({value,service,state,onBack,onSubmitted,o
  const title=useMemo(()=>({id:item.id,name:sceneItem.title,section:item.kind,category:item.kind==='manga'?'manga':['ranobe','book'].includes(item.kind)?'book':'video',items:[],parts:[],metadataId:sceneItem.ids?.mal,online:true,profile:displayProfile}),[item,sceneItem,displayProfile]);
  const facts=[['Сезон просмотра',viewSeason?viewSeason.name+(viewSeason.episodes?' · '+viewSeason.episodes+' сер.':''):null],['Язык',languageNames[item.language]],['Источники',[...new Set((item.sources||[]).map(s=>s.providerName).filter(Boolean))].join(', ')||item.providerName],['Перевод',item.language==='ru'?'Русский перевод':item.language?'Оригинал · перевод в читалке':null]];
  function destinationAction(){requestAnimationFrame(()=>document.getElementById('titleMaterials')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'}));}
- const share=useTitleShare(),stats=useTitleStats();
+ const share=useTitleShare(item.id),stats=useTitleStats();
  const sheetTitle=item.kind==='manga'?'Сохранить главы':['ranobe','book'].includes(item.kind)?'Сохранить книгу':item.kind==='movie'?'Сохранить фильм':'Сохранить серии';
  const heroActions=<ExportSheet open={saveOpen} onOpenChange={setSaveOpen} title={sheetTitle} subtitle={displayProfile.title||item.title} destination={saveTo} onDestination={setSaveTo} destinations={DESTINATIONS} trigger={<ExportTrigger label={sheetTitle}/>}>
   {['ranobe','book'].includes(item.kind)

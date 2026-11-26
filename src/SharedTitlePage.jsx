@@ -107,6 +107,9 @@ function SharedTitle({grant,service}){
     <p className="shared-title-kind">{[kind,year,units?units+' '+unitWord:null,grant.dub||null].filter(Boolean).join(' · ')}</p>
     <h1>{grant.title.name}</h1>
     {description&&<><p className={'shared-title-about'+(more?' is-open':'')}>{description}</p>{description.length>220&&<button type="button" className="shared-title-more" aria-expanded={more} onClick={()=>setMore(v=>!v)}>{more?'Свернуть':'Подробнее'}</button>}</>}
+    {!units&&<p className="shared-title-empty" role="note">{grant.kind==='title'
+     ?'По этой ссылке открыто только описание: '+(grant.title.section==='manga'||grant.title.format in formatNames?'главы':'серии')+' в неё не вошли. Попроси новую ссылку из плеера или читалки.'
+     :'Смотреть по этой ссылке пока нечего.'}</p>}
     {units>0&&<div className="shared-title-actions">
      <label className="shared-title-chapters">
       <span>{manga?'Главы':'Серии'}</span>

@@ -9,7 +9,7 @@ import MangaExportSettings from './MangaExportSettings.jsx';
 import {defaultMangaExport,exportTranslation} from './manga-export-options.js';
 import {readLmt} from './LmtSettings.jsx';
 import {useRetainedMedia} from './RetainedMedia.jsx';
-import {useEffect,useMemo,useRef,useState} from 'react';
+import {useEffect,useId,useMemo,useRef,useState} from 'react';
 import {BookOpen,Globe,Check,ArrowRight,ShieldCheck,RefreshCw} from 'lucide-react';
 import ImportReadiness,{canImport} from './ImportReadiness.jsx';
 import {selectChapters,mangaMetadata,MANGA_LANGUAGES,MANGA_FORMATS,mangaLanguageName,readerLanguage} from './manga-import.js';
@@ -169,16 +169,16 @@ export default function MangaImport({state,service,item,onSubmitted,onOpenLibrar
  }
  // The hero's share button and chapter counts read what this reader chose.
  const chapterEntries=inspection?selectChapters(deskEpisodes,{volume:'all',team,language:inspection.language}):[];
- const shareKey=inspection?[item?.id,inspection.url,team,initialChapter?.url,chapterEntries.length,collection,sourceReady].join('|'):'';
+ const shareOwner=useId(),shareKey=inspection?[item?.id,inspection.url,team,initialChapter?.url,chapterEntries.length,collection,sourceReady].join('|'):'';
  useEffect(()=>{
   if(!compact||destination!=='online')return;
-  if(!inspection){publishTitleShare(null);publishTitleStats(null);return;}
+  if(!inspection){publishTitleShare(null,shareOwner);publishTitleStats(null);return;}
   publishTitleShare(sourceReady&&chapterEntries.length?{service,title:{...item,title:collection,format:inspection.format||item?.format,readingMode:inspection.readingMode},
-   kind:'manga',entries:chapterEntries,initial:initialChapter,referer:inspection.url,dub:team,language:inspection.language,userId:state.user?.sub}:null);
+   kind:'manga',entries:chapterEntries,initial:initialChapter,referer:inspection.url,dub:team,language:inspection.language,userId:state.user?.sub}:null,shareOwner);
   const chapters=new Set(inspection.episodes.map(e=>(e.season||1)+':'+e.number)).size;
   publishTitleStats({kind:'manga',chapters,volumes:inspection.seasons?.length||null,source:inspection.url||url,sourceName:visibleSources.find(s=>s.url===url)?.providerName||inspection.providerName||'',language:inspection.language});
  },[shareKey]);
- useEffect(()=>()=>{if(compact&&destination==='online'){publishTitleShare(null);publishTitleStats(null);}},[]);
+ useEffect(()=>()=>{if(compact&&destination==='online'){publishTitleShare(null,shareOwner);publishTitleStats(null);}},[]);
  const reader=online&&inspection&&<OnlineViewer inline={compact} onReaderProgress={compact?setReaderProgress:undefined} onEntryChange={e=>setOne(e.url)} kind="manga" entries={readerEntries} initial={initialChapter} title={collection} service={service} userId={state.user?.sub} language={inspection.language} errorActions={chapterAlternatives} metadata={{...item,format:inspection.format||item?.format,readingMode:inspection.readingMode}} onClose={()=>setOnline(false)}/>;
  const requireVerified=Number(service.session?.serverVersion)>=47,stateOf=s=>displayInfo[s.url]||{};
  const failedSource=s=>stateOf(s).state==='error'||stateOf(s).readable===false||stateOf(s).chapterCount===0;

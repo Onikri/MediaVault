@@ -229,7 +229,7 @@ export default function TitlePage({title,state,actions,onBack,onPlay,onRelated,o
   const isAnimePage=title.section==='anime',releaseSeason=isAnimePage?animeSeason(p.startDate):null;
   const factValue=(label,value)=>!isAnimePage?value:label==='Студия'?(p.studios||[]).map(name=><a key={name} href={browseHref('studio','',p.studioRefs?.find(s=>s.name===name)?.id||'',name)}>{name}</a>):label==='Режиссёры'?(p.directors||[]).map(name=><a key={name} href={browseHref('person','',p.staff?.find(s=>s.name===name)?.id||'',name)}>{name}</a>):label==='Выпуск'&&isAnimePage?<a href={browseHref('year',String(p.year),'',String(p.year))}>{value}</a>:value;
   const ownRating=online?localRating:p.userRatings?.[state.user?.sub]||0;
-  const onlineShare=useTitleShare(),published=useTitleStats();
+  const onlineShare=useTitleShare(title.id),published=useTitleStats();
   const sharePayload=online&&onlineShare?.title.id===title.id?onlineShare:null;
   const shareTitle={...sharePayload?.title,title:name,cover:p.cover||sharePayload?.title.cover,
     description:p.description||sharePayload?.title.description,year:p.year||sharePayload?.title.year,

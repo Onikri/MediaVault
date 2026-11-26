@@ -91,7 +91,7 @@ export default function ShareTitleButton({service,title,kind,entries=[],initial,
   const address=new URL(location.href);
   address.search='';
   address.hash=new URLSearchParams({share:row.token}).toString();
-  const result={key,id:row.id,link:address.href,translate};
+  const result={key,id:row.id,link:address.href,translate,card:!entries.length};
   cached.current.set(translate,result);
   return result;
  }
@@ -106,7 +106,8 @@ export default function ShareTitleButton({service,title,kind,entries=[],initial,
   try{
    await copyLink(link);
    last.current=await creation;
-   setMessage('Ссылка скопирована');
+   // Without chosen episodes or chapters the guest gets only the card: say so.
+   setMessage(last.current.card?'Скопирована ссылка только на карточку: серии и главы ещё не выбраны':'Ссылка скопирована');
    setPhase('copied');
   }catch(error){
    const row=await creation.catch(()=>null);
@@ -150,7 +151,7 @@ export default function ShareTitleButton({service,title,kind,entries=[],initial,
    role="group" aria-label="Варианты ссылки" aria-busy={phase==='busy'}>
    {phase==='choose'&&<><button type="button" onClick={()=>share(true)}>С переводом</button><button type="button" onClick={()=>share(false)}>Без перевода</button></>}
    {phase==='busy'&&<span className="title-share-feedback"><LoaderCircle size={14} className="reader-translation-spinner" aria-hidden="true"/>Копируем…</span>}
-   {phase==='copied'&&<><span className="title-share-feedback" title={message}><Check size={15} aria-hidden="true"/>Скопировано</span><button type="button" className="title-share-revoke" aria-label="Закрыть доступ по ссылке" title="Закрыть доступ по ссылке" onClick={revoke}><Link2Off size={15}/></button></>}
+   {phase==='copied'&&<><span className="title-share-feedback" title={message}><Check size={15} aria-hidden="true"/>{last.current?.card?'Только карточка':'Скопировано'}</span><button type="button" className="title-share-revoke" aria-label="Закрыть доступ по ссылке" title="Закрыть доступ по ссылке" onClick={revoke}><Link2Off size={15}/></button></>}
    {phase==='revoked'&&<span className="title-share-feedback"><Check size={15} aria-hidden="true"/>Доступ закрыт</span>}
    {phase==='retry'&&<button type="button" aria-label="Повторить отправку ссылки" title={message} onClick={()=>share(last.current?.translate===true)}>Повторить</button>}
    {phase==='manual'&&<><input aria-label="Ссылка на тайтл" title={message} readOnly value={manualLink} onFocus={event=>event.target.select()}/><button type="button" className="title-share-revoke" aria-label="Закрыть доступ по ссылке" title="Закрыть доступ по ссылке" onClick={revoke}><Link2Off size={15}/></button></>}
