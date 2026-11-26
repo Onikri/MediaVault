@@ -88,7 +88,9 @@ class HentaiHaven(Fresh):
                  {'id': 2, 'slug': 'other', 'type': 'wp-manga', 'title': {'rendered': 'Other'}, 'link': 'https://cms.hentaihaven.xxx/channels/other/'},
                  {'id': 3, 'slug': 'kept', 'type': 'wp-manga', 'title': {'rendered': 'Kept &amp; Sound'}, 'link': 'https://cms.hentaihaven.xxx/watch/kept/'}]
         self.assertEqual([r['title'] for r in sites.haven_rows(posts, {})], ['Kept & Sound'])
-        for url in ('https://hentaihaven.xxx/rule34/video/some-clip/', 'https://hentaihaven.xxx/channels/x/', 'https://hentaihaven.xxx/series/uncensored/',
+        # A Rule 34 clip is its own provider (G8), never a HentaiHaven series.
+        self.assertEqual(sites.provider_for('https://hentaihaven.xxx/rule34/video/some-clip/')[0], 'hentaihaven-rule34')
+        for url in ('https://hentaihaven.xxx/channels/x/', 'https://hentaihaven.xxx/series/uncensored/',
                     'https://hentaihaven.xxx/watch/', 'https://hentaihaven.xxx/watch/a/b/c/', 'https://hentaihaven.xxx/watch/overflow/?x=1',
                     'https://evil.example/watch/overflow/', 'https://hentaihaven.xxx/ru/watch/overflow/'):
             self.assertIsNone(sites.provider_for(url), url)

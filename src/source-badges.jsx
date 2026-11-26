@@ -24,6 +24,8 @@ const SOURCES=[
   ['hentaimama',/hentaimama/i,'HentaiMama',135],
   ['hentaicomua',/hentai\.com\.ua/i,'Hentai UA',230],
   ['watchhentai',/watchhentai/i,'WatchHentai',15],
+  // Before HentaiHaven: its Rule 34 clips are a source of their own.
+  ['hentaihaven-rule34',/hentai ?haven\W*rule ?34/i,'HentaiHaven · Rule 34',165],
   ['hentaihaven',/hentai ?haven/i,'HentaiHaven',165],
   // Before OHentai: «MioHentai» contains «ohentai».
   ['miohentai',/mio ?hentai/i,'MioHentai',195],

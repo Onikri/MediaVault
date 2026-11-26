@@ -148,11 +148,13 @@ def index_anchors(selected):
     rule of _discover (a card's year must be stated by the row). Read-only;
     {} when the index cannot be read."""
     from dynamic_video_sources import catalogued_source
-    from content_names import matches
+    from content_names import UNANCHORED, matches
     if selected.get('kind', 'anime') != 'anime':return {}
     found={}
     # The neighbouring-year rule of the live anime search (exact name only).
     for row in matches(selected,'anime',year_required=True,year_slack=1):
+        # Rule 34 clips are fan works: a franchise name never makes one the card's source.
+        if row.get('provider') in UNANCHORED:continue
         if url:=catalogued_source(row.get('provider'),row.get('sourceUrl') or row.get('url')):
             if url not in found.setdefault(row['provider'],[]):found[row['provider']].append(url)
     return {provider:urls[:4] for provider,urls in found.items() if urls}
@@ -306,8 +308,35 @@ def _discover(selected,*,refresh=False,continuing=False):
 
 _jobs={};_jobs_lock=threading.RLock()
 
+# Catalogued providers whose card is only ever its own index row (HentaiHaven's
+# Rule 34 clips): the row's page is inspected alone, without a title search on
+# any site, so a clip never borrows another work's players and vice versa.
+OWN_PAGE_ONLY={'hentaihaven-rule34'}
+
+
+def own_page(selected,url):
+    """The discovery answer of a card that is its own index row: one inspection."""
+    from hentai_video_sites import PROVIDERS
+    from source_parser import SourceError
+    name=selected['provider'];label=PROVIDERS[name][0]
+    try:
+        source=inspect_source(url,kind='anime')
+        sources=[{**source,'providerName':label,'matchEvidence':'catalogue_source'}] if source.get('episodes') else []
+        status,message='ok' if sources else 'no_players',''
+    except SourceError as error:
+        sources,status,message=[],'unavailable',str(error)
+    provider={'provider':name,'name':label,'status':status,'complete':True,**({'message':message} if message else {})}
+    return {'title':selected,'sources':sources,'voices':group_voices(sources),'providers':[provider],
+            'progress':1,'pending':False,'complete':True,'checkedAt':int(time.time())}
+
+
 def discover(selected,*,refresh=False,continuing=False):
     source_url = selected.get('sourceURL')
+    if selected.get('provider') in OWN_PAGE_ONLY:
+        from dynamic_video_sources import catalogued_source
+        url=catalogued_source(selected.get('provider'),source_url)
+        if not url:raise ValueError('Ролик Rule 34 открывается только со своей страницы.')
+        return own_page(selected,url)
     if selected.get('provider') == 'hentaichan-video' and isinstance(source_url, str):
         from hentaichan_video import video_page
         if video_page(source_url):

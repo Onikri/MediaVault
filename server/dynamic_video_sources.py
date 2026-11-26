@@ -23,8 +23,9 @@ def provider_for(url):
 
 
 # Video sites the catalogue indexer walks: each index row is the site's own
-# series page, so its address is the playable source of that card.
-CATALOGUED = frozenset({'hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai', 'hentaihaven'})
+# series page (a HentaiHaven Rule 34 row: its clip page), so its address is the
+# playable source of that card.
+CATALOGUED = frozenset({'hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai', 'hentaihaven', 'hentaihaven-rule34'})
 
 
 def catalogued_source(provider, url):

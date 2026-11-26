@@ -84,6 +84,9 @@ def base_sources(installed):
     jobs.append({'type':'ohentai','kind':'anime','domain':'ohentai.org','name':'Хентай · OHentai'})
     # HentaiHaven: its WordPress REST list of series (years, genres, then 100 series a request).
     jobs.append({'type':'hentaihaven','kind':'anime','domain':'hentaihaven.xxx','name':'Хентай · HentaiHaven'})
+    # Its Rule 34 section: term dictionaries, then 100 clips a request; the
+    # same host, so it shares the series job's pace and slot.
+    jobs.append({'type':'hentaihaven-rule34','kind':'anime','domain':'hentaihaven.xxx','name':'Хентай · HentaiHaven · Rule 34'})
     return jobs
 
 # A distinct address that serves the same catalogue as another source:
@@ -160,6 +163,9 @@ def fetch(spec,cursor):
         return catalogue(spec,cursor)
     if kind=='hentaihaven':
         from catalogue_hentaihaven import catalogue
+        return catalogue(spec,cursor)
+    if kind=='hentaihaven-rule34':
+        from catalogue_hentaihaven_rule34 import catalogue
         return catalogue(spec,cursor)
     if kind=='gutenberg':
         from catalogue_gutenberg import catalogue

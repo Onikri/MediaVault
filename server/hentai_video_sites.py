@@ -5,7 +5,8 @@
 * Hentai.com.ua — Ukrainian dubs and subtitles.
 * WatchHentai (watchhentai.net) — English subtitles and dubs.
 * OHentai (ohentai.org) — English subtitles, old OVAs and 3D/western collections.
-* HentaiHaven (hentaihaven.xxx) — English audio, WebVTT subtitles (Russian among them), HLS.
+* HentaiHaven (hentaihaven.xxx) — English audio, WebVTT subtitles (Russian among them), HLS;
+  its Rule 34 clips as a provider of their own (hentaihaven-rule34), never searched by title.
 * MioHentai (miohentai.com) — English subtitles, MP4.
 
 Search, episode lists and the MP4 address come from the sites' public HTML
@@ -39,6 +40,7 @@ PROVIDERS = {
     'watchhentai': ('WatchHentai · EN', ('watchhentai.net',)),
     'ohentai': ('OHentai · EN', ('ohentai.org',)),
     'hentaihaven': ('HentaiHaven · EN', ('hentaihaven.xxx',)),
+    'hentaihaven-rule34': ('HentaiHaven · Rule 34', ('hentaihaven.xxx',)),
     'miohentai': ('MioHentai · EN', ('miohentai.com',)),
 }
 MAX_RESULTS = 12
@@ -129,9 +131,12 @@ def provider_for(url):
     if host == 'ohentai.org' and _oh_parts(url):
         return 'ohentai', PROVIDERS['ohentai'][0]
     # HentaiHaven: a series (/watch/<slug>/) or its episode (/watch/<slug>/<episode>/);
-    # its Rule 34 section (/rule34/video/…), channels and genre pages are not titles.
+    # a Rule 34 clip (/rule34/video/<slug>/) is its own provider. Channels,
+    # «porn sites» and genre pages are not titles.
     if host == 'hentaihaven.xxx' and haven_parts(url):
         return 'hentaihaven', PROVIDERS['hentaihaven'][0]
+    if host == 'hentaihaven.xxx' and rule34_slug(url):
+        return RULE34, PROVIDERS[RULE34][0]
     # MioHentai: a series (/series/<slug>/) or an episode post by its id (/?p=<id>).
     if host == 'miohentai.com' and mio_parts(url):
         return 'miohentai', PROVIDERS['miohentai'][0]
@@ -705,7 +710,8 @@ def ua_streams(url, http):
 # search, release years and each series' episodes («chapters») with their HLS
 # master on octopusmanifest.org. Rule 34 clips are another post type
 # (rule34-video, /rule34/video/…) and channels/«porn sites» other routes: the
-# wp-manga search never returns them and provider_for accepts only /watch/.
+# wp-manga search never returns them; provider_for gives /watch/ to the series
+# and /rule34/video/<slug>/ to the Rule 34 provider below, nothing else.
 
 HAVEN_HOSTS = ('hentaihaven.xxx',)
 HAVEN_SLUG = r'[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?'
@@ -864,8 +870,10 @@ def haven_streams(url, http):
     if not episode:
         raise SourceError('HentaiHaven: откройте серию, а не страницу сериала.')
     master = next((value for _, name, value in haven_chapters(slug, http) if name == episode), '')
-    if not master:
-        return []
+    return _haven_stream(master, http) if master else []
+
+
+def _haven_stream(master, http):
     headers = playback_headers({'Referer': HAVEN + '/'})
     stream = {'url': master, 'type': 'hls', 'quality': None, 'headers': headers}
     try:
@@ -877,6 +885,100 @@ def haven_streams(url, http):
     except SourceError:
         pass
     return [stream]
+
+
+# --- HentaiHaven · Rule 34 --------------------------------------------------------
+# The site's Rule 34 section is the post type rule34-video of the same WordPress
+# back end (/rule34/video/<slug>/, ~20 500 clips in November 2026). A clip is one
+# video whose REST post names its HLS master on octopusmanifest.org
+# (manifest_url, the player of the series); older imports name none and do not
+# play. Clips are fan works about other franchises: only their own index row
+# (catalogue_hentaihaven_rule34) opens one, no card finds them by its title (no
+# search here, no index anchors: content_names.UNANCHORED).
+
+RULE34 = 'hentaihaven-rule34'
+RULE34_HOSTS = ('cms.hentaihaven.xxx', 'hentaihaven.xxx')
+# Short enough for the index row id ("hentaihaven-rule34:" + the clip URL ≤ 200).
+RULE34_SLUG = r'[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?'
+RULE34_MASTER = re.compile(r'/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/playlist\.m3u8')
+RULE34_MASTER_HOSTS = ('octopusmanifest.org',)
+RULE34_FIELDS = 'id,slug,type,title,link,date,manifest_url'
+RULE34_TTL = 600
+# slug -> (time, clip or None): an inspection and its playback read the post once.
+_rule34_posts = {}
+
+
+def rule34_slug(url):
+    """The clip slug of a hentaihaven.xxx /rule34/video/<slug>/ address, else ''."""
+    try:
+        parts = urlsplit(url)
+    except (TypeError, ValueError):
+        return ''
+    match = re.fullmatch(r'/rule34/video/(' + RULE34_SLUG + r')/', parts.path)
+    if parts.scheme != 'https' or parts.hostname not in HAVEN_HOSTS or parts.query or parts.fragment or not match:
+        return ''
+    return match[1]
+
+
+def rule34_url(slug):
+    return HAVEN + '/rule34/video/' + slug + '/'
+
+
+def rule34_master(value):
+    """The octopusmanifest.org HLS master a clip names, else ''."""
+    master = _haven_master(value)
+    parts = urlsplit(master) if master else None
+    return master if parts and parts.hostname in RULE34_MASTER_HOSTS and RULE34_MASTER.fullmatch(parts.path) else ''
+
+
+def rule34_clip(post):
+    """{slug, title, year, master} of a rule34-video post that plays, else None."""
+    if not isinstance(post, dict) or post.get('type') != 'rule34-video':
+        return None
+    slug = str(post.get('slug') or '')
+    rendered = post['title'].get('rendered') if isinstance(post.get('title'), dict) else ''
+    title = clean(html.unescape(str(rendered or '')), 200)
+    link = urlsplit(str(post.get('link') or ''))
+    if not re.fullmatch(RULE34_SLUG, slug) or not title or link.hostname not in RULE34_HOSTS or link.path != '/rule34/video/' + slug + '/':
+        return None
+    master = rule34_master(post.get('manifest_url'))
+    if not master:
+        return None
+    year = re.match(r'((?:19|20)\d\d)-\d\d-\d\d', str(post.get('date') or ''))
+    return {'slug': slug, 'title': title, 'year': int(year[1]) if year else None, 'master': master}
+
+
+def rule34_post(slug, http, now=None):
+    import time
+    now = time.monotonic() if now is None else now
+    hit = _rule34_posts.get(slug)
+    if hit and now - hit[0] < RULE34_TTL:
+        return hit[1]
+    posts = _json(http, HAVEN_CMS + '/wp-json/wp/v2/rule34-video?' + urlencode({'slug': slug, '_fields': RULE34_FIELDS}))
+    clip = next((found for post in posts if (found := rule34_clip(post)) and found['slug'] == slug), None) if isinstance(posts, list) else None
+    if len(_rule34_posts) >= 256:
+        _rule34_posts.pop(next(iter(_rule34_posts)))
+    _rule34_posts[slug] = (now, clip)
+    return clip
+
+
+def rule34_episodes(url, http):
+    slug = rule34_slug(url)
+    if not slug:
+        raise SourceError('HentaiHaven: это не страница ролика Rule 34.')
+    clip = rule34_post(slug, http)
+    if not clip:
+        raise SourceError('HentaiHaven не опубликовал открытое видео этого ролика.')
+    episodes = [{'number': 1, 'season': 1, 'url': rule34_url(slug), 'title': clip['title']}]
+    return clip['title'], episodes, ({'year': clip['year']} if clip['year'] else {})
+
+
+def rule34_streams(url, http):
+    slug = rule34_slug(url)
+    if not slug:
+        raise SourceError('HentaiHaven: это не страница ролика Rule 34.')
+    clip = rule34_post(slug, http)
+    return _haven_stream(clip['master'], http) if clip else []
 
 
 # --- MioHentai ------------------------------------------------------------------
@@ -989,14 +1091,17 @@ def mio_streams(url, http):
 SEARCH = {'hanime1': hanime1_search, 'hentaimama': mama_search, 'hentaicomua': ua_search, 'watchhentai': watch_search,
           'ohentai': oh_search, 'hentaihaven': haven_search, 'miohentai': mio_search}
 EPISODES = {'hanime1': hanime1_episodes, 'hentaimama': mama_episodes, 'hentaicomua': ua_episodes,
-            'watchhentai': watch_episodes, 'ohentai': oh_episodes, 'hentaihaven': haven_episodes, 'miohentai': mio_episodes}
+            'watchhentai': watch_episodes, 'ohentai': oh_episodes, 'hentaihaven': haven_episodes, 'miohentai': mio_episodes,
+            RULE34: rule34_episodes}
 STREAMS = {'hanime1': hanime1_streams, 'hentaimama': mama_streams, 'hentaicomua': ua_streams,
-           'watchhentai': watch_streams, 'ohentai': oh_streams, 'hentaihaven': haven_streams, 'miohentai': mio_streams}
+           'watchhentai': watch_streams, 'ohentai': oh_streams, 'hentaihaven': haven_streams, 'miohentai': mio_streams,
+           RULE34: rule34_streams}
 
 
 def search(provider, query, http):
+    # Rule 34 clips have no title search: their own index row opens them.
     query = clean(query, 160)
-    return SEARCH[provider](query, http) if len(query) >= 2 else []
+    return SEARCH[provider](query, http) if provider in SEARCH and len(query) >= 2 else []
 
 
 def episodes(provider, url, http):

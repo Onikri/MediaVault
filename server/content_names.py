@@ -28,6 +28,11 @@ STATE = 'content-names'
 REVISION = 'playable-names-v1'
 # kind -> providers whose index row is the page our player/reader opens.
 PROVIDERS = {'anime': ('hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai', 'hentaihaven'), 'book': ('gutenberg',), 'ranobe': ('ranobelib',)}
+# Catalogued rows that open in our player but are never a card's source by
+# name: HentaiHaven's Rule 34 clips are fan works about other franchises (a
+# clip named after a series is not that series). Their names are not stored,
+# lookup() never returns them; only their own index row opens them.
+UNANCHORED = frozenset({'hentaihaven-rule34'})
 MAX_NAMES = 60
 
 
@@ -38,7 +43,7 @@ def names(row):
 
 
 def playable(row):
-    return isinstance(row, dict) and row.get('provider') in PROVIDERS.get(row.get('kind'), ())
+    return isinstance(row, dict) and row.get('provider') not in UNANCHORED and row.get('provider') in PROVIDERS.get(row.get('kind'), ())
 
 
 def _state(conn):
