@@ -7,7 +7,7 @@ from manga_hitomi import DOMAIN as HITOMI_DOMAIN, ROOT as HITOMI_ROOT, THUMBNAIL
 
 HOSTS={'img.youtube.com','i.ytimg.com','shikimori.io','desu.shikimori.io','shikimori.one','shikimori.me','shikimori.org','desu.shikimori.one','s4.anilist.co','cdn.myanimelist.net',
        'media.kitsu.io','media.kitsu.app','upload.wikimedia.org','commons.wikimedia.org','covers.openlibrary.org',
-       'static.tvmaze.com','fantlab.ru'}
+       'static.tvmaze.com','fantlab.ru','www.gutenberg.org'}
 cache,lock=OrderedDict(),threading.Lock()
 
 def hitomi_cover(url):

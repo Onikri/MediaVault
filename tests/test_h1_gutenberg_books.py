@@ -79,6 +79,7 @@ class Feed(unittest.TestCase):
         self.assertEqual({k: pride[k] for k in ('id', 'provider', 'kind', 'title', 'authors', 'language', 'ids', 'sourceUrl')},
                          {'id': 'gutenberg:1342', 'provider': 'gutenberg', 'kind': 'book', 'title': 'Pride and Prejudice', 'authors': ['Jane Austen'],
                           'language': 'en', 'ids': {'gutenberg': '1342'}, 'sourceUrl': 'https://www.gutenberg.org/ebooks/1342'})
+        self.assertEqual(pride['cover'], 'https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg')
         self.assertEqual(pride['genres'], ['Courtship -- Fiction', 'England -- Fiction', 'Love stories'])
         self.assertEqual(rows[1]['aliases'], ['Frankenstein'])
         # A translator is not the writer; a two-line title is one title.

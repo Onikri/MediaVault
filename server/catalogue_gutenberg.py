@@ -151,7 +151,9 @@ def book_row(record):
     return {'id': 'gutenberg:' + number, 'provider': 'gutenberg', 'providerId': number, 'kind': 'book', 'title': title,
             'aliases': names[1:], 'authors': authors(record.get('Authors')), 'language': language[0] if language else 'und',
             'genres': list(dict.fromkeys(s for s in subjects if s))[:MAX_SUBJECTS], 'tags': [], 'ids': {'gutenberg': number},
-            'sourceUrl': 'https://www.gutenberg.org/ebooks/' + number}
+            'sourceUrl': 'https://www.gutenberg.org/ebooks/' + number,
+            # Gutenberg's own cover of every ebook; the client loads it only when the card is shown.
+            'cover': f'https://www.gutenberg.org/cache/epub/{number}/pg{number}.cover.medium.jpg'}
 
 
 def read(path, offset=0, limit=PAGE):
