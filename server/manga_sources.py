@@ -262,8 +262,21 @@ def parse_pages(text,base):
     result=list(dict.fromkeys(safe_link(p,base) for p in pages if p))
     return [p for p in result if p and not re.search(r'(?:placeholder|no-image|premium|blocked|not.?found)',urlsplit(p).path,re.I)]
 
+CARD_DEADLINE=32
+def card_deadline(url):
+    """Seconds a card may take. A native source behind a browser check gets the
+    budget its route declares (as its search and catalogue requests already do):
+    with the plain 32 s the solver kept only ~21 s, and one Byparr run takes
+    17-20 s alone, so any second solve at the same time failed the card."""
+    try:
+        from manga_native_sources import for_url
+        from source_transport import solver_budget
+        adapter=for_url(url)
+        return solver_budget(getattr(adapter,'SOURCE_ID',None),CARD_DEADLINE) if adapter else CARD_DEADLINE
+    except Exception:
+        return CARD_DEADLINE
 def inspect(url,http=None):
-    own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+32)
+    own=http is None;http=http or PublicHttp(timeout=(3,7),deadline=time.monotonic()+card_deadline(url))
     try:
         initial=site_for(url)
         if initial and initial.family=='native':
