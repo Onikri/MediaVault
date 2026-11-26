@@ -24,6 +24,9 @@ const SOURCES=[
   ['hentaimama',/hentaimama/i,'HentaiMama',135],
   ['hentaicomua',/hentai\.com\.ua/i,'Hentai UA',230],
   ['watchhentai',/watchhentai/i,'WatchHentai',15],
+  ['hentaihaven',/hentai ?haven/i,'HentaiHaven',165],
+  // Before OHentai: «MioHentai» contains «ohentai».
+  ['miohentai',/mio ?hentai/i,'MioHentai',195],
   ['ohentai',/ohentai/i,'OHentai',75]
 ];
 export function sourceOf(player){

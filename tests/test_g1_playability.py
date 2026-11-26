@@ -98,7 +98,7 @@ class IndexedVideoCardPlays(unittest.TestCase):
                                                                      {'provider': 'watchhentai', 'url': 'http://watchhentai.net/series/x/'},
                                                                      {'provider': 'hentaimama', 'url': 'https://hentaimama.io/tvshows/15-bishoujo-hyouryuuki/'}]})
         self.assertEqual(found, {'ohentai': [INGRID], 'hentaimama': ['https://hentaimama.io/tvshows/15-bishoujo-hyouryuuki/']})
-        self.assertEqual(CATALOGUED, {'hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai'})
+        self.assertEqual(CATALOGUED, {'hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai', 'hentaihaven'})
         for provider, url in [('hanime1', 'https://hanime1.me/watch?v=27938'), ('hanime', 'https://hanime.tv/videos/hentai/zutto-suki-datta-1'),
                               ('watchhentai', 'https://watchhentai.net/series/ikusa-otome-valkyrie-shinshou-id-01/')]:
             self.assertEqual(catalogued_source(provider, url), url)

@@ -24,7 +24,7 @@ def provider_for(url):
 
 # Video sites the catalogue indexer walks: each index row is the site's own
 # series page, so its address is the playable source of that card.
-CATALOGUED = frozenset({'hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai'})
+CATALOGUED = frozenset({'hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai', 'hentaihaven'})
 
 
 def catalogued_source(provider, url):
@@ -85,10 +85,14 @@ def inspect(url, provider, http, dub_url=None, state=None):
     if native(identifier):
         # The series, its episodes and their MP4s come from the site's own pages.
         from hentai_video_sites import episodes as native_episodes
-        title, episodes = native_episodes(identifier, url, http)
+        title, episodes, *extra = native_episodes(identifier, url, http)
+        # An adapter may add what its page states about the series: a release
+        # year, or only an upper bound for it (MioHentai's first upload year).
+        about = {key: value for key, value in (extra[0] if extra and isinstance(extra[0], dict) else {}).items()
+                 if key in {'year', 'uploadYear'} and isinstance(value, int)}
         return {'provider': identifier, 'title': title or label, 'url': url, 'episodes': episodes,
                 'dubs': [choice('Дорожка источника', url, player=label, episodes=episodes)],
-                'seasons': [], 'releases': [], 'complete': True, 'available': True, 'diagnostics': []}
+                'seasons': [], 'releases': [], 'complete': True, 'available': True, 'diagnostics': [], **about}
     title = label
     diagnostics = []
     try:
@@ -138,8 +142,14 @@ def resolve_dynamic(http, url, referer, title, provider=None):
 
     if provider and native(provider):
         from hentai_video_sites import streams as native_streams
-        playable = []
+        playable, subtitles = [], []
         for stream in native_streams(provider, url, http):
+            subtitles.extend(stream.pop('subtitles', None) or [])
+            if stream['type'] == 'hls':
+                # The online session reads the master and its first fragment
+                # (online_sessions.playable) before it grants playback.
+                playable.append(stream)
+                continue
             try:
                 check_mp4(http, stream)
             except SourceError:
@@ -147,7 +157,7 @@ def resolve_dynamic(http, url, referer, title, provider=None):
             playable.append(stream)
         if not playable:
             raise SourceError('Источник не отдал MP4 с поддержкой перемотки.')
-        return Page(title=title, streams=playable)
+        return Page(title=title, streams=playable, subtitles=subtitles)
     if provider == 'hanime':
         # Cloudflare challenges the Oracle address for every HanimeTV page and
         # signed API call. The handshake and playlists go through the owner's

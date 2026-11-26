@@ -70,6 +70,14 @@ def match_title(selected, candidate, *, year_slack=0):
             if normalized(a)==normalized(b):return True,'exact_title'
             if len(base_title(a))>=4 and base_title(a)==base_title(b) and season_of(a)==season_of(b):
                 return True,'title_and_season'
+    # «Sagurare Otome THE ANIMATION» and «Sagurare Otome» name one adaptation:
+    # the suffix marks a game's or manga's anime, never another work. Numbered
+    # sequels keep their number («… 2 The Animation» is not «… The Animation»).
+    for a in wanted:
+        for b in found:
+            stem_a,stem_b=animation_stem(a),animation_stem(b)
+            if (stem_a!=normalized(a) or stem_b!=normalized(b)) and len(stem_a)>=6 and stem_a==stem_b:
+                return True,'title_without_animation'
     # Light-novel titles are often listed by sites without their long subtitle
     # ("Main title: I can also ..."). A long enough headline is the same work;
     # short ones ("Атака титанов: Финал") stay distinct. Year/ID checks above
@@ -79,6 +87,15 @@ def match_title(selected, candidate, *, year_slack=0):
         if normalized(a)==normalized(b) or base_title(a)==base_title(b) and season_of(a)==season_of(b):
             return True,'headline'
     return False,'different_title_or_season'
+
+
+def without_animation(value):
+    """The name without a trailing «(The) Animation» marker."""
+    return re.sub(r'[\s\-–—:~]*\b(?:the\s+)?animation\s*$','',str(value or '').strip(),flags=re.I)
+
+
+def animation_stem(value):
+    return normalized(without_animation(value))
 
 
 def headline(value):

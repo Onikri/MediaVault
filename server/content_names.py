@@ -3,7 +3,7 @@
 A metadata card (AniList, OMDb, Shikimori …) has no page to play or read: the
 client used to find one by a live title search on every site. The index often
 holds the same work from a site we can open: RanobeLib books, the series pages
-of HanimeTV, Hanime1, HentaiMama, WatchHentai and OHentai, the Project
+of HanimeTV, Hanime1, HentaiMama, WatchHentai, OHentai and HentaiHaven, the Project
 Gutenberg books of its catalogue feed (catalogue_gutenberg). Their rows are
 grouped into other works (work_sql() keys by external IDs, which those sites
 lack), so a card cannot reach them by its work key.
@@ -27,7 +27,7 @@ TABLE = 'content_names'
 STATE = 'content-names'
 REVISION = 'playable-names-v1'
 # kind -> providers whose index row is the page our player/reader opens.
-PROVIDERS = {'anime': ('hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai'), 'book': ('gutenberg',), 'ranobe': ('ranobelib',)}
+PROVIDERS = {'anime': ('hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai', 'hentaihaven'), 'book': ('gutenberg',), 'ranobe': ('ranobelib',)}
 MAX_NAMES = 60
 
 
@@ -140,13 +140,13 @@ def lookup(conn, kind, values, limit=40):
     return [row for row in rows if playable(row)]
 
 
-def same_work(selected, row, *, year_required):
+def same_work(selected, row, *, year_required, year_slack=0):
     """The live search's identity rule for an indexed row: match_title (IDs,
     kind, year, exact title or title and season) and, for video, the year
     check of source_discovery (a card's year must be confirmed by the row
     unless an external ID matched)."""
     from title_identity import match_title
-    accepted, evidence = match_title(selected, row)
+    accepted, evidence = match_title(selected, row, year_slack=year_slack)
     if not accepted:
         return False, evidence
     if year_required and selected.get('year') and not row.get('year') and evidence != 'external_id':
@@ -154,20 +154,23 @@ def same_work(selected, row, *, year_required):
     return True, evidence
 
 
-def matches(selected, kind, *, year_required, limit=8):
+def matches(selected, kind, *, year_required, limit=8, year_slack=0):
     """Indexed playable rows of the card's work, read-only; [] on any failure."""
-    from title_identity import aliases
+    from title_identity import aliases, without_animation
+    names = aliases(selected)
+    # «X The Animation» is listed by the sites as «X» too (match_title accepts it).
+    names = list(dict.fromkeys([*names, *(without_animation(name) for name in names)]))
     try:
         from manga_discovery import catalogue_reader, manager
         with catalogue_reader(manager()) as db:
-            rows = lookup(db, kind, aliases(selected))
+            rows = lookup(db, kind, names)
     except Exception:
         import logging
         logging.getLogger(__name__).exception('Could not read indexed playable sources')
         return []
     found = []
     for row in rows:
-        accepted, evidence = same_work(selected, row, year_required=year_required)
+        accepted, evidence = same_work(selected, row, year_required=year_required, year_slack=year_slack)
         if accepted and (row.get('sourceUrl') or row.get('url')):
             found.append({**row, 'matchEvidence': evidence})
     return found[:limit]

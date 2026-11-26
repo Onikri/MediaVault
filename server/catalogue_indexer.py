@@ -19,7 +19,7 @@ _PROFILE_CODES = ','.join("'" + lang + "'" for lang in sorted(PROFILE_LANGUAGES)
 _LANG = "lower(replace(json_extract(spec,'$.source.lang'),'_', '-'))"
 _SCOPE = f"(kind NOT LIKE 'bridge%' OR {_LANG} IS NULL OR substr({_LANG},1,instr({_LANG}||'-','-')-1) IN ({_PROFILE_CODES}))"
 CLAIMABLE=_SCOPE+" AND state IN ('queued','retry','done','partial','stalled') AND due<=?"
-BASE_KINDS=('lib','bridge','remanga','html','omdb','hanime','hanime1','hentaimama','watchhentai','ohentai')
+BASE_KINDS=('lib','bridge','remanga','html','omdb','hanime','hanime1','hentaimama','watchhentai','ohentai','hentaihaven')
 # Per-host request spacing in seconds; LibGroup tolerates a faster pace and
 # slows down again by itself on 429.
 PACE={LIB_HOST:0.6}
@@ -28,7 +28,7 @@ PACE={LIB_HOST:0.6}
 # HTML pages behind Cloudflare and is never asked faster than every 1.5 s;
 # hentaimama.io and watchhentai.net (Cloudflare, WordPress) and ohentai.org
 # (Cloudflare, PHP, ~0.9 s a page) keep the same pause.
-FLOOR={'anilist.co':2.2,'hanime1.me':1.5,'hentaimama.io':1.5,'watchhentai.net':1.5,'ohentai.org':1.5}
+FLOOR={'anilist.co':2.2,'hanime1.me':1.5,'hentaimama.io':1.5,'watchhentai.net':1.5,'ohentai.org':1.5,'hentaihaven.xxx':1.5}
 HOST_SLOTS=2
 # Bridge jobs routed through the one local Suwayomi process share these
 # slots. A bridge job served by a native adapter talks to its site directly
@@ -47,9 +47,9 @@ TERM_ROUTE_PRIORITY=5
 REFRESH_BASE=48*3600
 REFRESH_DETAIL=86400
 # A HentaiMama walk reads every series page (~1 550 requests), a WatchHentai
-# walk ~1 450, an OHentai walk ~4 200: once a week. Project Gutenberg's
+# walk ~1 450, an OHentai walk ~4 200, a HentaiHaven walk ~1 000 (REST list + each series' episodes): once a week. Project Gutenberg's
 # catalogue feed (one CSV download a run) is read once a week too.
-REFRESH_FIXED={'anilist-trending':3600,'omdb':86400,'hentaimama':7*86400,'watchhentai':7*86400,'ohentai':7*86400,'gutenberg':7*86400}
+REFRESH_FIXED={'anilist-trending':3600,'omdb':86400,'hentaimama':7*86400,'watchhentai':7*86400,'ohentai':7*86400,'hentaihaven':7*86400,'gutenberg':7*86400}
 # Consecutive failures after which a job only retries once a week.
 STALL_AFTER=48
 STALL_RETRY=7*86400

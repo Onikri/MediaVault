@@ -77,6 +77,24 @@ def create(owner,headers,kind='video',client_id='',reservation=None):
         if len(sessions)>=24 or sum(s.owner==owner for s in sessions.values())>=4:raise HTTPException(429,'Закрой предыдущий онлайн-просмотр и повтори.')
         token=secrets.token_urlsafe(32);session=Session(owner,headers,time.monotonic()+(LEASE_SECONDS if client_id else 7200),kind,client_id);sessions[token]=session;return token,session
 
+def drop_vtt_renditions(text):
+    """A master whose SUBTITLES renditions point at bare .vtt files
+    (HentaiHaven) instead of media playlists: hls.js cannot load those as
+    playlists, so the renditions and their group go; the resolver publishes
+    the files as the session's own subtitle tracks."""
+    dropped=set();kept=[]
+    for line in text.splitlines():
+        if line.startswith('#EXT-X-MEDIA:') and 'TYPE=SUBTITLES' in line:
+            uri=re.search(r'URI="([^"]+)"',line)
+            if uri and urlsplit(uri[1]).path.lower().endswith('.vtt'):
+                dropped.add((re.search(r'GROUP-ID="([^"]*)"',line) or [None,''])[1]);continue
+        kept.append(line)
+    if not dropped:return text
+    remaining={(re.search(r'GROUP-ID="([^"]*)"',l) or [None,''])[1] for l in kept if l.startswith('#EXT-X-MEDIA:') and 'TYPE=SUBTITLES' in l}
+    gone=dropped-remaining
+    kept=[re.sub(r',SUBTITLES="([^"]*)"',lambda m:'' if m[1] in gone else m[0],l) if l.startswith('#EXT-X-STREAM-INF:') else l for l in kept]
+    return '\n'.join(kept)+('\n' if text.endswith('\n') else '')
+
 def rewrite_manifest(text,base,link,max_height=None,audio_index=None):
     if not text.lstrip().startswith('#EXTM3U'):raise SourceError('Источник не предоставил HLS.')
     if audio_index is not None:
@@ -99,6 +117,7 @@ def rewrite_manifest(text,base,link,max_height=None,audio_index=None):
             if not variants:raise SourceError('В этом потоке нет качества в выбранных пределах.')
             playlist.playlists[:]=variants
             text=playlist.dumps()
+    text=drop_vtt_renditions(text)
     lines=[]
     for line in text.splitlines():
         if line.startswith('#'):
@@ -134,6 +153,14 @@ def disguised_segment(url):
     host=urlsplit(url).hostname or ''
     return host.endswith(DISGUISED_SEGMENT_HOSTS) and urlsplit(url).path.lower().endswith('.html')
 
+def media_sample(sample):
+    """The real type of a fragment by its first bytes: 'video/mp4' (ISO BMFF
+    box: ftyp/styp/moof/moov/sidx/emsg), 'video/mp2t' (TS sync bytes) or ''.
+    HentaiHaven's CDN labels its fMP4 fragments application/x-mpegURL."""
+    if len(sample)>=8 and sample[4:8] in {b'ftyp',b'styp',b'moof',b'moov',b'sidx',b'emsg'}:return 'video/mp4'
+    if sample[:1]==b'\x47' and (len(sample)<189 or sample[188:189]==b'\x47'):return 'video/mp2t'
+    return ''
+
 def html_document(sample):
     return bool(re.match(rb'\s*(?:<!doctype\s+html\b|<html\b|<head\b|<body\b|<script\b|<!--|<\?xml\b)',sample[:2048],re.I))
 def playable(text,base,headers,http,document,depth=0):
@@ -159,7 +186,7 @@ def playable(text,base,headers,http,document,depth=0):
         mime=response.headers.get('Content-Type','').split(';')[0].strip().lower()
         sample=next(response.iter_content(2048),b'')
     finally:response.close()
-    if not sample or html_document(sample) or not disguised_segment(first) and (mime=='text/html' or sample.lstrip()[:1]==b'<' or mime and not mime.startswith(VIDEO_TYPES) and 'mp2t' not in mime):
+    if not sample or html_document(sample) or not (disguised_segment(first) or media_sample(sample)) and (mime=='text/html' or sample.lstrip()[:1]==b'<' or mime and not mime.startswith(VIDEO_TYPES) and 'mp2t' not in mime):
         raise SourceError('Источник отдаёт страницу вместо видео. Выбери другой плеер или повтори позже.')
     with _ready_lock:
         if len(_ready)>512:_ready.clear()
@@ -448,19 +475,26 @@ def install(app,owner,exports_owner=None):
                 if not extension:raise SourceError('Источник не предоставил изображение.')
                 return Response(raw,media_type='image/'+('jpeg' if extension=='jpg' else extension),headers=common)
             is_hls='mpegurl' in mime or urlsplit(final).path.lower().endswith('.m3u8')
+            prefix=None;iterator=None
+            if is_hls and s.kind in {'video','preview'} and not urlsplit(final).path.lower().endswith('.m3u8'):
+                # A fragment labelled as a playlist: its first bytes decide.
+                iterator=iter(response.iter_content(65536));prefix=next(iterator,b'')
+                sniffed=media_sample(prefix)
+                if sniffed:is_hls=False;mime=sniffed
             if is_hls:
-                parts=[];size=0
-                for block in response.iter_content(65536):
+                parts=[prefix] if prefix else [];size=len(prefix or b'')
+                for block in (iterator if iterator is not None else response.iter_content(65536)):
                     size+=len(block)
                     if size>4*1024*1024:raise SourceError('Слишком большой плейлист.')
                     parts.append(block)
                 data=rewrite_manifest(b''.join(parts).decode('utf-8'),final,lambda value:'/online/'+token+'/'+s.resource(value),s.max_height,s.audio_index)
                 return Response(data,media_type='application/vnd.apple.mpegurl',headers=common)
-            prefix=None;iterator=None
-            if s.kind in {'video','preview'} and disguised_segment(final):
+            if iterator is None and s.kind in {'video','preview'} and disguised_segment(final):
                 iterator=iter(response.iter_content(128*1024));prefix=next(iterator,b'')
                 if not prefix or html_document(prefix):raise SourceError('Источник отдаёт страницу вместо видео. Повтори подключение.')
                 if mime=='text/html':mime='video/mp2t'
+            if urlsplit(final).path.lower().endswith('.vtt') and mime in {'application/octet-stream','binary/octet-stream','text/plain'}:
+                mime='text/vtt'  # A <track> file served as bytes (HentaiHaven's CDN).
             allowed=mime.startswith(('video/','audio/','image/')) or mime in {'application/octet-stream','binary/octet-stream','text/vtt'}
             if not allowed:raise SourceError('Источник вернул неподдерживаемый файл.')
             for name in ('Content-Length','Content-Range','Accept-Ranges'):

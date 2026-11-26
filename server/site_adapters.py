@@ -84,6 +84,8 @@ SITES = (
     Site('hentaicomua','Hentai.com.ua · UA','https://hentai.com.ua',('hentai.com.ua',),'',''),
     Site('watchhentai','WatchHentai · EN','https://watchhentai.net',('watchhentai.net',),'',''),
     Site('ohentai','OHentai · EN','https://ohentai.org',('ohentai.org',),'',''),
+    Site('hentaihaven','HentaiHaven · EN','https://hentaihaven.xxx',('hentaihaven.xxx',),'',''),
+    Site('miohentai','MioHentai · EN','https://miohentai.com',('miohentai.com',),'',''),
     Site('hentasis','Hentasis','https://v5.hentasis5.top',('v5.hentasis5.top','hentasis1.top','www.hentasis1.top','v4.hentasis.me','hentasis.me'),'a.sres-wrap','h2'),
     # Ukrainian dubbed films, serials and anime; players are HDVB-UA / Ashdi.
     Site('eneyida','Eneyida · UA','https://eneyida.tv',('eneyida.tv',),'.short','.short_title',kinds=('movie','tv','anime'),original='.short_subtitle'),
@@ -300,7 +302,7 @@ def search_site(site, query, *, http=None):
         elif site.id=='hentasis':
             from dynamic_video_sources import search_hentasis
             values=search_hentasis(query,http)
-        elif site.id in {'hanime1','hentaimama','hentaicomua','watchhentai','ohentai'}:
+        elif site.id in {'hanime1','hentaimama','hentaicomua','watchhentai','ohentai','hentaihaven','miohentai'}:
             from hentai_video_sites import search as search_native
             values=search_native(site.id,query,http)
         else:

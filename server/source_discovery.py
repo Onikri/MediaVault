@@ -27,11 +27,17 @@ OFF={
 }
 # Hentai video sites: searched for adult cards only (a card the client marks
 # adult=False never has its title there). Their indexed pages always open.
-ADULT={'hentaichan-video','hanime','hanime1','hentaimama','hentaicomua','watchhentai','ohentai','hentasis'}
+ADULT={'hentaichan-video','hanime','hanime1','hentaimama','hentaicomua','watchhentai','ohentai','hentasis','hentaihaven','miohentai'}
+# Sites that publish no release year, only upload dates (G5): an exact title
+# is accepted when the card's year is not later than the series' first upload.
+UNDATED={'miohentai'}
 # Sites that found the measured cards most often go first: with six workers the
 # first playable answer no longer waits behind dead or empty searches.
 ORDER=('anilibria','animedia','yummy','animejoy','anidub','anixart','animegoonline','animevost','jutsu','eneyida','uaserials',
-       'ohentai','hanime1','hanime','hentaimama','watchhentai','hentaicomua')
+       'ohentai','hentaihaven','hanime1','hanime','hentaimama','watchhentai','miohentai','hentaicomua')
+LATIN=re.compile(r'[a-z]',re.I);CYRILLIC=re.compile(r'[а-яёіїєґ]',re.I)
+# Hentai sites that list Russian or Ukrainian names keep the card's query order.
+CYRILLIC_SITES={'hentaichan-video','hentasis','hentaicomua'}
 PLACEHOLDERS={'названиеуточняется'}  # Shikimori's «Название уточняется» is not a title.
 
 
@@ -60,6 +66,17 @@ def discovery_sites(kind,adult=None,anchored=None):
            and (anchored.get(s.id) or s.id not in OFF and not (adult is False and s.id in ADULT))]
     rank=lambda s:(0 if adult is True and s.id in ADULT else 1,adult is not True and s.id in ADULT,ORDER.index(s.id) if s.id in ORDER else len(ORDER))
     return sorted(sites,key=rank)
+
+
+def undated_match(site,selected,value,evidence):
+    """A site without release years (UNDATED): the very same name, and the
+    card's year not after the series' first upload (a work cannot be uploaded
+    before it is released). A different name, an unknown upload year or a
+    card released after the upload stays unconfirmed."""
+    upload=value.get('uploadYear')
+    try:year=int(str(selected.get('year'))[:4])
+    except ValueError:return False
+    return site in UNDATED and evidence=='exact_title' and isinstance(upload,int) and year<=upload
 
 
 def search_card(selected):
@@ -108,7 +125,7 @@ def voice_suggestions(query='',limit=30,language='all'):
 def indexed_sources(selected):
     """provider -> index page URLs of the card's catalogued video sources.
 
-    A catalogue row of HanimeTV, Hanime1, HentaiMama, WatchHentai or OHentai
+    A catalogue row of HanimeTV, Hanime1, HentaiMama, WatchHentai, OHentai or HentaiHaven
     is that site's own series page: it is inspected directly instead of being
     re-found by title search (the sites' search omits years and spells titles
     differently, so the exact-title rule turned those cards down)."""
@@ -134,7 +151,8 @@ def index_anchors(selected):
     from content_names import matches
     if selected.get('kind', 'anime') != 'anime':return {}
     found={}
-    for row in matches(selected,'anime',year_required=True):
+    # The neighbouring-year rule of the live anime search (exact name only).
+    for row in matches(selected,'anime',year_required=True,year_slack=1):
         if url:=catalogued_source(row.get('provider'),row.get('sourceUrl') or row.get('url')):
             if url not in found.setdefault(row['provider'],[]):found[row['provider']].append(url)
     return {provider:urls[:4] for provider,urls in found.items() if urls}
@@ -179,6 +197,11 @@ def _discover(selected,*,refresh=False,continuing=False):
                 for url in anchored.get(site.id,[]):
                     if not any(m['url']==url for m in matches):
                         matches.insert(0,{'url':url,'title':selected.get('title',''),'provider':site.id,'matchEvidence':'catalogue_source'})
+                if site.id in ADULT-CYRILLIC_SITES and site_queries:
+                    # These hentai sites list English/romaji names: a Russian name
+                    # from Shikimori would spend the first request for nothing.
+                    latin = [v for v in names if LATIN.search(v) and not CYRILLIC.search(v)]
+                    site_queries = list(dict.fromkeys([*latin[:3], *[v for v in queries if not CYRILLIC.search(v)], *queries]))[:4]
                 if site.id in {'eneyida', 'uaserials'} and site_queries:
                     # These catalogues index original and Ukrainian names.
                     localized = [v for v in names if re.search(r'[іїєґ]', v, re.I)]
@@ -219,7 +242,9 @@ def _discover(selected,*,refresh=False,continuing=False):
                         accepted,evidence=same(verified)
                         if not accepted:continue
                         if selected.get('year') and not verified.get('year') and evidence!='external_id':
-                            status='unverified';message='Название совпадает, но год или внешний ID не подтверждён страницей.';continue
+                            if not undated_match(site.id,selected,value,evidence):
+                                status='unverified';message='Название совпадает, но год или внешний ID не подтверждён страницей.';continue
+                            candidate={**candidate,'matchEvidence':'exact_title_undated'}
                         # HTML title must not contradict the selected identity. Search snippets can be stale.
                         page_title=re.split(r'\s+(?:смотреть|watch)\b|\s+[|–—]\s+',value.get('title',''),flags=re.I)[0]
                         detail = {'title': page_title, 'aliases': value.get('aliases', []),

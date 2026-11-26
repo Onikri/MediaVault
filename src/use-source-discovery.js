@@ -15,7 +15,7 @@ function share(key){
 function publish(search){for(const listener of search.listeners)listener(search);}
 function prune(){for(const [key,search] of searches)if(!search.listeners.size&&(!search.done||Date.now()-search.at>FRESH))searches.delete(key);while(searches.size>20)searches.delete(searches.keys().next().value);}
 
-export const INDEXED_VIDEO=new Set(['hanime','hanime1','hentaimama','watchhentai','ohentai']);
+export const INDEXED_VIDEO=new Set(['hanime','hanime1','hentaimama','watchhentai','ohentai','hentaihaven']);
 export function indexedVideoSources(item){
  return (Array.isArray(item?.indexedSources)?item.indexedSources:[]).filter(s=>INDEXED_VIDEO.has(s?.provider)&&typeof s.url==='string'&&s.url.startsWith('https://')&&s.url.length<=2048).slice(0,8).map(s=>({provider:s.provider,url:s.url}));
 }

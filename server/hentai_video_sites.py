@@ -5,9 +5,12 @@
 * Hentai.com.ua — Ukrainian dubs and subtitles.
 * WatchHentai (watchhentai.net) — English subtitles and dubs.
 * OHentai (ohentai.org) — English subtitles, old OVAs and 3D/western collections.
+* HentaiHaven (hentaihaven.xxx) — English audio, WebVTT subtitles (Russian among them), HLS.
+* MioHentai (miohentai.com) — English subtitles, MP4.
 
 Search, episode lists and the MP4 address come from the sites' public HTML
-(HentaiMama's public player AJAX, WatchHentai's own player page, OHentai's episode page). MediaVault plays the file in its own
+(HentaiMama's public player AJAX, WatchHentai's own player page, OHentai's episode page,
+HentaiHaven's and MioHentai's public WordPress REST APIs). MediaVault plays the file in its own
 player: no third-party iframe is embedded, no account or cookie is used.
 """
 import base64
@@ -26,12 +29,17 @@ MAMA = 'https://hentaimama.io'
 UA = 'https://hentai.com.ua'
 WATCH = 'https://watchhentai.net'
 OH = 'https://ohentai.org'
+HAVEN = 'https://hentaihaven.xxx'
+HAVEN_CMS = 'https://cms.hentaihaven.xxx'
+MIO = 'https://miohentai.com'
 PROVIDERS = {
     'hanime1': ('Hanime1 · JA', ('hanime1.me',)),
     'hentaimama': ('HentaiMama · EN', ('hentaimama.io',)),
     'hentaicomua': ('Hentai.com.ua · UA', ('hentai.com.ua',)),
     'watchhentai': ('WatchHentai · EN', ('watchhentai.net',)),
     'ohentai': ('OHentai · EN', ('ohentai.org',)),
+    'hentaihaven': ('HentaiHaven · EN', ('hentaihaven.xxx',)),
+    'miohentai': ('MioHentai · EN', ('miohentai.com',)),
 }
 MAX_RESULTS = 12
 MAX_EPISODES = 200
@@ -120,6 +128,13 @@ def provider_for(url):
     # (/detail.php?vid=<base64 id>), nothing else in the query.
     if host == 'ohentai.org' and _oh_parts(url):
         return 'ohentai', PROVIDERS['ohentai'][0]
+    # HentaiHaven: a series (/watch/<slug>/) or its episode (/watch/<slug>/<episode>/);
+    # its Rule 34 section (/rule34/video/…), channels and genre pages are not titles.
+    if host == 'hentaihaven.xxx' and haven_parts(url):
+        return 'hentaihaven', PROVIDERS['hentaihaven'][0]
+    # MioHentai: a series (/series/<slug>/) or an episode post by its id (/?p=<id>).
+    if host == 'miohentai.com' and mio_parts(url):
+        return 'miohentai', PROVIDERS['miohentai'][0]
     return None
 
 
@@ -684,12 +699,299 @@ def ua_streams(url, http):
     return streams
 
 
+# --- HentaiHaven ----------------------------------------------------------------
+# The site is a Next.js front end over a WordPress back end (cms.hentaihaven.xxx)
+# whose public REST API publishes the hentai series as the post type wp-manga:
+# search, release years and each series' episodes («chapters») with their HLS
+# master on octopusmanifest.org. Rule 34 clips are another post type
+# (rule34-video, /rule34/video/…) and channels/«porn sites» other routes: the
+# wp-manga search never returns them and provider_for accepts only /watch/.
+
+HAVEN_HOSTS = ('hentaihaven.xxx',)
+HAVEN_SLUG = r'[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?'
+HAVEN_YEARS_TTL = 86400
+_haven_years = {'at': 0.0, 'years': {}}
+# Series titles seen by search, so an inspection names the series without
+# another request (bounded; a miss only leaves the title to the card).
+_haven_titles = {}
+
+
+def haven_parts(url):
+    """(series slug, episode slug or '') of a hentaihaven.xxx /watch/ address."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    match = re.fullmatch(r'/watch/(' + HAVEN_SLUG + r')/(?:(' + HAVEN_SLUG + r')/)?', parts.path)
+    if parts.scheme != 'https' or parts.hostname not in HAVEN_HOSTS or parts.query or not match:
+        return None
+    return match[1], match[2] or ''
+
+
+def haven_series_url(slug):
+    return HAVEN + '/watch/' + slug + '/'
+
+
+def _json(http, url):
+    text, _, _ = http.document(url)
+    try:
+        return json.loads(text)
+    except ValueError:
+        raise SourceError('Источник вернул не JSON.') from None
+
+
+def haven_years(http, now=None):
+    """Release term id -> year (the site's «Released» years), cached for a day.
+
+    Unknown years leave a result undated: the card's year then is not confirmed
+    and the result is not accepted, rather than guessed."""
+    import time
+    now = time.time() if now is None else now
+    if _haven_years['years'] and now - _haven_years['at'] < HAVEN_YEARS_TTL:
+        return _haven_years['years']
+    try:
+        terms = _json(http, HAVEN_CMS + '/wp-json/wp/v2/wp-manga-release?' + urlencode({'per_page': 100, '_fields': 'id,name'}))
+    except SourceError:
+        return _haven_years['years']
+    years = {}
+    for term in terms if isinstance(terms, list) else []:
+        name = clean(term.get('name') if isinstance(term, dict) else '', 8)
+        if re.fullmatch(r'(?:19|20)\d\d', name) and isinstance(term.get('id'), int):
+            years[term['id']] = int(name)
+    if years:
+        _haven_years.update(at=now, years=years)
+    return years
+
+
+def haven_rows(posts, years):
+    """Series rows of wp-manga posts: only /watch/<slug>/ pages, earliest release year.
+
+    A series tagged with several «Released» years (a 2020 OVA re-released in
+    2025) is dated by its first release."""
+    rows = []
+    for post in posts if isinstance(posts, list) else []:
+        if not isinstance(post, dict) or post.get('type', 'wp-manga') != 'wp-manga':
+            continue
+        slug = str(post.get('slug') or '')
+        title = clean(html.unescape(str((post.get('title') or {}).get('rendered') or '')), 200)
+        link = urlsplit(str(post.get('link') or ''))
+        if not re.fullmatch(HAVEN_SLUG, slug) or not title or link.path != '/watch/' + slug + '/':
+            continue
+        dated = sorted(years[t] for t in post.get('wp-manga-release') or [] if t in years)
+        row = _row('hentaihaven', haven_series_url(slug), title, [])
+        row['year'] = dated[0] if dated else None
+        row['slug'] = slug
+        rows.append(row)
+    return rows
+
+
+def haven_search(query, http):
+    posts = _json(http, HAVEN_CMS + '/wp-json/wp/v2/wp-manga?' + urlencode(
+        {'search': query, 'per_page': MAX_RESULTS, '_fields': 'id,slug,type,title,link,wp-manga-release'}))
+    rows = haven_rows(posts, haven_years(http))
+    for row in rows:
+        if len(_haven_titles) >= 512:
+            _haven_titles.pop(next(iter(_haven_titles)))
+        _haven_titles[row.pop('slug')] = row['title']
+    return rows
+
+
+def haven_episode_number(chapter, index):
+    for value in (chapter.get('chapter_name'), chapter.get('episode_slug'), chapter.get('chapter_slug')):
+        match = re.search(r'(?:episode|ep\.?|season)[\s-]*0*(\d{1,3})\b', str(value or ''), re.I)
+        if match:
+            return int(match[1])
+    return index
+
+
+def _haven_master(value):
+    """An https HLS master the API names, else ''."""
+    try:
+        target = public_url(html.unescape(str(value or '')).strip(), resolve_dns=False)
+    except (SourceError, TypeError, ValueError):
+        return ''
+    parts = urlsplit(target)
+    return target if parts.scheme == 'https' and parts.path.endswith('/playlist.m3u8') and not parts.query else ''
+
+
+def haven_chapters(slug, http):
+    """[(number, episode slug, master)] of a series, in number order."""
+    chapters = _json(http, HAVEN_CMS + '/wp-json/hhaven/v1/manga/by-slug/' + slug + '/chapters')
+    found = {}
+    for index, chapter in enumerate(chapters if isinstance(chapters, list) else [], 1):
+        if not isinstance(chapter, dict) or chapter.get('is_deleted'):
+            continue
+        episode = str(chapter.get('episode_slug') or chapter.get('chapter_slug') or '')
+        master = _haven_master(chapter.get('chapter_content') or chapter.get('indexable_content_url'))
+        if re.fullmatch(HAVEN_SLUG, episode) and master:
+            found.setdefault(haven_episode_number(chapter, index), (episode, master))
+    return [(number, *found[number]) for number in sorted(found)][:MAX_EPISODES]
+
+
+def haven_episodes(url, http):
+    slug, _ = haven_parts(url) or (None, None)
+    if not slug:
+        raise SourceError('HentaiHaven: это не страница сериала.')
+    episodes = [{'number': number, 'season': 1, 'url': haven_series_url(slug) + episode + '/', 'title': 'Episode ' + str(number)}
+                for number, episode, _ in haven_chapters(slug, http)]
+    if not episodes:
+        raise SourceError('HentaiHaven не показал серии этого тайтла.')
+    return _haven_titles.get(slug, ''), episodes
+
+
+SUBTITLE_LANGUAGES = ('ru', 'uk', 'en')
+
+
+def haven_subtitles(text, base):
+    """WebVTT files a master lists as subtitle renditions (ru, uk, en)."""
+    found = {}
+    for line in text.splitlines():
+        if not line.startswith('#EXT-X-MEDIA:') or 'TYPE=SUBTITLES' not in line:
+            continue
+        uri = re.search(r'URI="([^"]+)"', line)
+        language = (re.search(r'LANGUAGE="([a-z]{2,3})', line) or [None, ''])[1]
+        name = (re.search(r'NAME="([^"]{1,60})"', line) or [None, language])[1]
+        if not uri or language not in SUBTITLE_LANGUAGES:
+            continue
+        target = _url(uri[1], base, (urlsplit(base).hostname,))
+        if target and urlsplit(target).path.endswith('.vtt'):
+            found.setdefault(language, {'url': target, 'language': language, 'name': name})
+    return [found[language] for language in SUBTITLE_LANGUAGES if language in found]
+
+
+def haven_streams(url, http):
+    slug, episode = haven_parts(url) or (None, None)
+    if not episode:
+        raise SourceError('HentaiHaven: откройте серию, а не страницу сериала.')
+    master = next((value for _, name, value in haven_chapters(slug, http) if name == episode), '')
+    if not master:
+        return []
+    headers = playback_headers({'Referer': HAVEN + '/'})
+    stream = {'url': master, 'type': 'hls', 'quality': None, 'headers': headers}
+    try:
+        # Subtitles are separate WebVTT files (Russian among them): the player
+        # shows them as its own tracks, the master's renditions are not used.
+        text, final, _ = http.document(master, headers=headers)
+        if text.lstrip().startswith('#EXTM3U'):
+            stream['subtitles'] = haven_subtitles(text, final)
+    except SourceError:
+        pass
+    return [stream]
+
+
+# --- MioHentai ------------------------------------------------------------------
+# WordPress with a public REST API: the custom taxonomy «series» groups the
+# episode posts. A post page names its MP4 as a signed cdn.miohentai.com
+# address (the REST meta video_link answers 404). The site publishes upload
+# dates only, never a release year.
+
+MIO_HOSTS = ('miohentai.com',)
+MIO_CDN = ('cdn.miohentai.com',)
+MIO_SLUG = r'[a-z0-9](?:[a-z0-9-]{0,198}[a-z0-9])?'
+_mio_series = {}  # slug -> term id seen by search (bounded)
+
+
+def mio_parts(url):
+    """('series', slug) or ('post', id) of a miohentai.com address."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    if parts.scheme != 'https' or parts.hostname not in MIO_HOSTS:
+        return None
+    match = re.fullmatch(r'/series/(' + MIO_SLUG + r')/', parts.path)
+    if match and not parts.query:
+        return 'series', match[1]
+    post = re.fullmatch(r'p=([1-9]\d{0,9})', parts.query)
+    if parts.path == '/' and post:
+        return 'post', post[1]
+    return None
+
+
+def mio_series_url(slug):
+    return MIO + '/series/' + slug + '/'
+
+
+def mio_search(query, http):
+    terms = _json(http, MIO + '/wp-json/wp/v2/series?' + urlencode(
+        {'search': query, 'per_page': MAX_RESULTS, '_fields': 'id,name,slug,count'}))
+    rows = []
+    for term in terms if isinstance(terms, list) else []:
+        if not isinstance(term, dict) or not isinstance(term.get('id'), int) or not term.get('count'):
+            continue
+        slug = str(term.get('slug') or '')
+        title = _series(html.unescape(str(term.get('name') or '')))
+        if not re.fullmatch(MIO_SLUG, slug) or not title:
+            continue
+        if len(_mio_series) >= 512:
+            _mio_series.pop(next(iter(_mio_series)))
+        _mio_series[slug] = term['id']
+        rows.append(_row('miohentai', mio_series_url(slug), title, [], episodes=term['count'] if term['count'] <= MAX_EPISODES else None))
+    return rows
+
+
+def mio_episode_number(title, index):
+    return _number(title) or index
+
+
+def mio_episodes(url, http):
+    kind, slug = mio_parts(url) or (None, None)
+    if kind != 'series':
+        raise SourceError('MioHentai: это не страница сериала.')
+    term = _mio_series.get(slug)
+    title = ''
+    if not term:
+        found = _json(http, MIO + '/wp-json/wp/v2/series?' + urlencode({'slug': slug, '_fields': 'id,name'}))
+        found = found[0] if isinstance(found, list) and found and isinstance(found[0], dict) else {}
+        term, title = found.get('id'), _series(html.unescape(str(found.get('name') or '')))
+    if not isinstance(term, int):
+        raise SourceError('MioHentai не нашёл этот сериал.')
+    posts = _json(http, MIO + '/wp-json/wp/v2/posts?' + urlencode(
+        {'series': term, 'per_page': 100, 'orderby': 'date', 'order': 'asc', '_fields': 'id,title,date'}))
+    episodes, years = {}, []
+    for index, post in enumerate(posts if isinstance(posts, list) else [], 1):
+        if not isinstance(post, dict) or not isinstance(post.get('id'), int):
+            continue
+        name = clean(html.unescape(str((post.get('title') or {}).get('rendered') or '')), 200)
+        number = mio_episode_number(name, index)
+        episodes.setdefault(number, {'number': number, 'season': 1, 'url': MIO + '/?p=' + str(post['id']), 'title': 'Episode ' + str(number)})
+        title = title or _series(name)
+        year = re.match(r'((?:19|20)\d\d)-', str(post.get('date') or ''))
+        if year:
+            years.append(int(year[1]))
+    if not episodes:
+        raise SourceError('MioHentai не показал серии этого тайтла.')
+    # Upload dates bound the release from above; they never date it.
+    return title, sorted(episodes.values(), key=lambda e: e['number'])[:MAX_EPISODES], {'uploadYear': min(years) if years else None}
+
+
+def mio_media(value, base):
+    """The signed MP4 address of a post page (cdn.miohentai.com/index.php?data=<hex>)."""
+    target = _url(value, base, MIO_CDN)
+    parts = urlsplit(target) if target else None
+    if parts and parts.path == '/index.php' and re.fullmatch(r'data=[0-9a-f]{16,2048}', parts.query):
+        return target
+    return _media(target, base) if target else ''
+
+
+def mio_streams(url, http):
+    kind, _ = mio_parts(url) or (None, None)
+    if kind != 'post':
+        raise SourceError('MioHentai: откройте серию, а не страницу сериала.')
+    text, final, _ = http.document(url)
+    if urlsplit(final).hostname not in MIO_HOSTS:
+        raise SourceError('MioHentai перенаправил на другой сайт.')
+    player = BeautifulSoup(text, 'html.parser').select_one('video#video-player[data-video-src], video[data-video-src]')
+    media = mio_media(player.get('data-video-src') if player else '', final)
+    return [{'url': media, 'type': 'mp4', 'quality': None, 'headers': playback_headers({'Referer': MIO + '/'})}] if media else []
+
+
 SEARCH = {'hanime1': hanime1_search, 'hentaimama': mama_search, 'hentaicomua': ua_search, 'watchhentai': watch_search,
-          'ohentai': oh_search}
+          'ohentai': oh_search, 'hentaihaven': haven_search, 'miohentai': mio_search}
 EPISODES = {'hanime1': hanime1_episodes, 'hentaimama': mama_episodes, 'hentaicomua': ua_episodes,
-            'watchhentai': watch_episodes, 'ohentai': oh_episodes}
+            'watchhentai': watch_episodes, 'ohentai': oh_episodes, 'hentaihaven': haven_episodes, 'miohentai': mio_episodes}
 STREAMS = {'hanime1': hanime1_streams, 'hentaimama': mama_streams, 'hentaicomua': ua_streams,
-           'watchhentai': watch_streams, 'ohentai': oh_streams}
+           'watchhentai': watch_streams, 'ohentai': oh_streams, 'hentaihaven': haven_streams, 'miohentai': mio_streams}
 
 
 def search(provider, query, http):
