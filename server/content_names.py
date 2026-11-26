@@ -3,7 +3,8 @@
 A metadata card (AniList, OMDb, Shikimori …) has no page to play or read: the
 client used to find one by a live title search on every site. The index often
 holds the same work from a site we can open: RanobeLib books, the series pages
-of HanimeTV, Hanime1, HentaiMama, WatchHentai and OHentai. Their rows are
+of HanimeTV, Hanime1, HentaiMama, WatchHentai and OHentai, the Project
+Gutenberg books of its catalogue feed (catalogue_gutenberg). Their rows are
 grouped into other works (work_sql() keys by external IDs, which those sites
 lack), so a card cannot reach them by its work key.
 
@@ -26,7 +27,7 @@ TABLE = 'content_names'
 STATE = 'content-names'
 REVISION = 'playable-names-v1'
 # kind -> providers whose index row is the page our player/reader opens.
-PROVIDERS = {'anime': ('hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai'), 'ranobe': ('ranobelib',)}
+PROVIDERS = {'anime': ('hanime', 'hanime1', 'hentaimama', 'watchhentai', 'ohentai'), 'book': ('gutenberg',), 'ranobe': ('ranobelib',)}
 MAX_NAMES = 60
 
 

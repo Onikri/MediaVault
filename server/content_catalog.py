@@ -195,10 +195,14 @@ def ingest(db,rows):
         # Studios only where a source names them; other rows keep their stored form.
         values=row.get('studios')
         if isinstance(values,list) and (studios:=list(dict.fromkeys(' '.join(readable_label(v).split()) for v in values if isinstance(v,str) and 0<len(v.strip())<=120))[:30]):data['studios']=studios
+        # Writers where a book source names them (Project Gutenberg): the reader's
+        # index match checks the surname, never the title alone.
+        values=row.get('authors')
+        if isinstance(values,list) and (authors:=list(dict.fromkeys(' '.join(v.split()) for v in values if isinstance(v,str) and 0<len(v.strip())<=120))[:10]):data['authors']=authors
         for field in ('sourceUrl','sourceURL','url','cover'):data[field]=safe_url(row.get(field))
         # Never accept arbitrary client objects, account secrets or enormous text.
         data['description']=str(data.get('description') or '')[:12000]
-        data['ids']={k:str(v)[:100] for k,v in (data.get('ids') or {}).items() if k in {'mal','anilist','kitsu','imdb','wikidata','fantlab','kinopoisk','openlibrary'}} if isinstance(data.get('ids'),dict) else {}
+        data['ids']={k:str(v)[:100] for k,v in (data.get('ids') or {}).items() if k in {'mal','anilist','kitsu','imdb','wikidata','fantlab','kinopoisk','openlibrary','gutenberg'}} if isinstance(data.get('ids'),dict) else {}
         if not isinstance(data.get('titles'),dict):data['titles']={}
         data['titles']={k:v[:500] for k,v in data['titles'].items() if k in {'ru','uk','en','native','romaji'} and isinstance(v,str)}
         key=title_key(data['kind'],provider,identity)
@@ -207,6 +211,7 @@ def ingest(db,rows):
             old=json.loads(previous[0])
             for field in ('tags','genres','aliases'):data[field]=list(dict.fromkeys([*data[field],*old.get(field,[])]))[:120]
             if old.get('studios'):data['studios']=list(dict.fromkeys([*data.get('studios',[]),*old['studios']]))[:30]
+            if old.get('authors') and not data.get('authors'):data['authors']=old['authors']
             for field in ('sourceUrl','sourceURL','url','cover','description'):
                 if not data.get(field):data[field]=old.get(field,'')
             if not data.get('status') and old.get('status'):data['status']=old['status']

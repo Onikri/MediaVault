@@ -47,8 +47,9 @@ TERM_ROUTE_PRIORITY=5
 REFRESH_BASE=48*3600
 REFRESH_DETAIL=86400
 # A HentaiMama walk reads every series page (~1 550 requests), a WatchHentai
-# walk ~1 450, an OHentai walk ~4 200: once a week.
-REFRESH_FIXED={'anilist-trending':3600,'omdb':86400,'hentaimama':7*86400,'watchhentai':7*86400,'ohentai':7*86400}
+# walk ~1 450, an OHentai walk ~4 200: once a week. Project Gutenberg's
+# catalogue feed (one CSV download a run) is read once a week too.
+REFRESH_FIXED={'anilist-trending':3600,'omdb':86400,'hentaimama':7*86400,'watchhentai':7*86400,'ohentai':7*86400,'gutenberg':7*86400}
 # Consecutive failures after which a job only retries once a week.
 STALL_AFTER=48
 STALL_RETRY=7*86400
@@ -527,7 +528,7 @@ class Indexer:
             pending_catalogues={domain:count for domain,count in db.execute("SELECT json_extract(spec,'$.domain'),COUNT(*) FROM catalogue_jobs WHERE kind IN ('html','lib','bridge','remanga') AND json_extract(spec,'$.term') IS NOT NULL AND state IN ('queued','retry','running') GROUP BY json_extract(spec,'$.domain')")}
             stored=dict(db.execute('SELECT provider,COUNT(*) FROM catalog_titles GROUP BY provider'))
             from catalogue_sources import source_provider
-            for spec,state,pages,records,error,reason,due,expected in db.execute("SELECT spec,state,pages,records,error,reason,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books','omdb') ORDER BY id"):
+            for spec,state,pages,records,error,reason,due,expected in db.execute("SELECT spec,state,pages,records,error,reason,due,expected FROM catalogue_jobs WHERE kind IN ('lib','bridge','remanga','html','mirror','unsupported','anilist','kinobox','books','gutenberg','omdb') ORDER BY id"):
                 spec=json.loads(spec)
                 if '-detail' in spec['type'] or spec['type'].endswith('-vocabulary') or spec.get('term'):continue
                 details=pending_details.get(spec['domain'],0)
@@ -537,7 +538,7 @@ class Indexer:
                 rows.append({'domain':spec['domain'],'name':spec['name'],'status':status,'pages':pages,'indexed':records,'storedTitles':stored.get(source_provider(spec),0),'expected':expected,'pendingDetails':details,'pendingCatalogues':catalogues,'error':reason or error,'retryAt':due if state in {'retry','stalled'} else None})
                 if reason:rows[-1]['failure']=error
                 if state=='stalled':rows[-1]['stalled']=True
-                if spec['type']=='omdb' or spec.get('kind')=='ranobe':rows[-1].pop('storedTitles')  # These sources write to content_titles.
+                if spec['type'] in {'omdb','gutenberg'} or spec.get('kind')=='ranobe':rows[-1].pop('storedTitles')  # These sources write to content_titles.
                 if spec['type']=='mirror':rows[-1]['mirrorOf']=spec['primary']
                 if self.paused.get(host_of(spec),0)>self.clock():rows[-1]['pausedUntil']=self.paused[host_of(spec)]
             by_domain={r['domain']:r for r in rows}

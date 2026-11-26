@@ -70,6 +70,8 @@ def base_sources(installed):
     for kind,name in (('movie','Фильмы'),('tv','Сериалы')):
         jobs.append({'type':'omdb','kind':kind,'domain':'www.omdb.org','name':name+' · omdb'})
     jobs.append({'type':'books','kind':'book','domain':'openlibrary.org','name':'Книги · Open Library'})
+    # Gutenberg's whole catalogue is one CSV feed: one request per weekly run.
+    jobs.append({'type':'gutenberg','kind':'book','domain':'www.gutenberg.org','name':'Книги · Project Gutenberg'})
     # The whole HanimeTV catalogue is one cached feed: one request per crawl.
     jobs.append({'type':'hanime','kind':'anime','domain':'hanime.tv','name':'Хентай · HanimeTV'})
     # hanime1.me pages its whole listing; page 1 also queues its genre routes.
@@ -153,6 +155,9 @@ def fetch(spec,cursor):
         return catalogue(spec,cursor)
     if kind=='ohentai':
         from catalogue_ohentai import catalogue
+        return catalogue(spec,cursor)
+    if kind=='gutenberg':
+        from catalogue_gutenberg import catalogue
         return catalogue(spec,cursor)
     if kind in {'lib','lib-detail','lib-vocabulary'}:
         with httpx.Client(http2=True,timeout=15,headers=headers(spec)) as client:

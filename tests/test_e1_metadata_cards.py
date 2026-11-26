@@ -111,7 +111,7 @@ class NamesIndexFill(ContentIndex):
         with self.db:
             self.db.execute('DROP TABLE content_names'); self.db.execute("DELETE FROM content_catalog_state WHERE name='content-names'")
             content_names.initialize(self.db)
-        self.assertEqual(content_names.pending(self.db), ['anime', 'ranobe'])
+        self.assertEqual(content_names.pending(self.db), ['anime', 'book', 'ranobe'])
         self.assertEqual(content_names.lookup(self.db, 'ranobe', ['Kniga']), [])
         store = SimpleNamespace(lock=threading.RLock(), db=self.db)
         while content_names.step(store):

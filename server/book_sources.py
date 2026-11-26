@@ -1,11 +1,23 @@
-"""Public-domain book texts: Project Gutenberg and Wikisource.
+"""Public-domain book texts: Project Gutenberg, Standard Ebooks, Wikisource
+and the public scans of the Internet Archive.
 
-Both are legal, free full texts: Gutenberg works are public domain in the US,
-Wikisource holds public-domain and freely licensed texts.
-A book is split into chapters by its own headings (Gutenberg HTML) or by its
+All are legal, free full texts: Gutenberg works are public domain in the US,
+Standard Ebooks are proofread editions of them, Wikisource holds public-domain
+and freely licensed texts, and an Internet Archive item is read only when Open
+Library marks it public (ebook_access=public) and the item itself is not
+access-restricted: lent and print-disabled books are never opened.
+A book is split into chapters by its own headings (Gutenberg HTML, the single
+XHTML page of Standard Ebooks, the headings of a scan's text) or by its
 subpages (Wikisource), and chapters are returned as plain paragraphs, in the
 same shape as the ranobe sources, so the reader and narration are shared.
-Only the fixed hosts below are contacted.
+
+A catalogue card first gets the books it is known to be: the free-text
+identifiers Open Library keeps for the work (one cached search.json request:
+Gutenberg numbers, Standard Ebooks ids, Internet Archive items) and the
+Gutenberg rows of the catalogue index with the same title and the same
+author's surname (catalogue_gutenberg, content_names). Those answer at once
+(pending); the live title search of the libraries continues in the background
+and its answer keeps the old form. Only the fixed hosts below are contacted.
 """
 from __future__ import annotations
 
@@ -16,6 +28,7 @@ import threading
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from urllib.parse import quote, unquote, urlencode, urljoin, urlsplit, parse_qs
 
 import requests
@@ -32,7 +45,16 @@ from source_parser import SourceError
 USER_AGENT = "MediaVault/5.1 (https://github.com/Onikri/MediaVault; personal catalogue)"
 GUTENBERG = "https://www.gutenberg.org"
 WIKISOURCE = {"ru": "Викитека", "uk": "Вікіджерела", "en": "Wikisource", "ja": "ウィキソース", "ko": "위키문헌"}
-HOSTS = {"www.gutenberg.org", *(code + ".wikisource.org" for code in WIKISOURCE)}
+STANDARD = "https://standardebooks.org"
+ARCHIVE = "https://archive.org"
+HOSTS = {"www.gutenberg.org", "standardebooks.org", "archive.org", *(code + ".wikisource.org" for code in WIKISOURCE)}
+# archive.org serves the files of an item from its storage hosts
+# (ia800300.us.archive.org, dn720003.ca.archive.org …).
+ARCHIVE_STORAGE = re.compile(r"[a-z0-9-]{1,40}(?:\.[a-z0-9-]{1,20})?\.archive\.org")
+OPENLIBRARY_SEARCH = "https://openlibrary.org/search.json"
+OPENLIBRARY_FIELDS = "key,title,author_name,id_project_gutenberg,id_standard_ebooks,ia,ebook_access,language"
+# Open Library's MARC language codes of the reader's languages.
+MARC = {"eng": "en", "rus": "ru", "ukr": "uk", "jpn": "ja", "kor": "ko"}
 # Catalogue hosts asked only for the original title of a work (never texts).
 TITLE_HOSTS = {"openlibrary.org", "api.fantlab.ru"}
 MAX_BYTES = 24 * 1024 * 1024
@@ -40,7 +62,10 @@ MAX_CHAPTERS = 3000
 MAX_PARAGRAPHS = 4000
 PART = 120  # paragraphs per part when a text has no headings
 BOOK_FORMATS = ("text/plain", "text/html", "application/xhtml+xml", "application/epub+zip", "application/x-mobipocket-ebook")
-SOURCES = (("gutenberg", "Project Gutenberg"), *((f"wikisource-{code}", name) for code, name in WIKISOURCE.items()))
+SOURCES = (("gutenberg", "Project Gutenberg"), ("standard-ebooks", "Standard Ebooks"), ("internet-archive", "Internet Archive · скан"),
+           *((f"wikisource-{code}", name) for code, name in WIKISOURCE.items()))
+# Evidence an index or identifier answer may rest on (the live search's rule).
+STRONG = {"external_id", "exact_title", "title_and_season"}
 _cache: dict = {}
 _lock = threading.RLock()
 
@@ -64,10 +89,12 @@ def _remember(key, ttl, make):
 
 def _get(url, *, params=None, accept="application/json"):
     headers = {"User-Agent": USER_AGENT, "Accept": accept}
+    origin = urlsplit(url).netloc
     try:
         for _ in range(5):
             parts = urlsplit(url)
-            if parts.scheme != "https" or parts.netloc not in HOSTS | TITLE_HOSTS:
+            storage = origin == "archive.org" and ARCHIVE_STORAGE.fullmatch(parts.netloc)
+            if parts.scheme != "https" or parts.netloc not in HOSTS | TITLE_HOSTS and not storage:
                 raise SourceError("Этот адрес не относится к библиотекам книг.")
             with requests.get(url, params=params, headers=headers, timeout=(5, 15), stream=True, allow_redirects=False) as response:
                 if response.is_redirect:
@@ -259,14 +286,275 @@ def _original_titles(title):
     return [value for value in found if value]
 
 
+def _catalogue_ids(title):
+    """Free texts Open Library knows for the card's work, by identifier.
+
+    One search.json request per work (cached a day): Gutenberg numbers,
+    Standard Ebooks ids and, only when the work's best edition is public,
+    its Internet Archive items. Its title and authors complete a card that
+    arrived without them. {} when the card has no Open Library id or the
+    request fails (the failure is not cached)."""
+    library = str((title.get("ids") or {}).get("openlibrary") or "")
+    if not re.fullmatch(r"OL\d{1,12}W", library):
+        return {}
+
+    def load():
+        data = json.loads(_get(OPENLIBRARY_SEARCH, params={"q": "key:/works/" + library, "fields": OPENLIBRARY_FIELDS, "limit": 1}))
+        doc = next((d for d in data.get("docs") or [] if isinstance(d, dict) and d.get("key") == "/works/" + library), None)
+        if not doc:
+            return {}
+        listed = lambda field: [str(v).strip() for v in doc.get(field) or [] if isinstance(v, (str, int))] if isinstance(doc.get(field), list) else []
+        standard = [re.sub(r"^(?:https://standardebooks\.org)?/?(?:ebooks/)?", "", v).strip("/") for v in listed("id_standard_ebooks")]
+        return {"title": str(doc.get("title") or "")[:200], "authors": [a[:120] for a in listed("author_name")][:4],
+                "gutenberg": list(dict.fromkeys(v for v in listed("id_project_gutenberg") if re.fullmatch(r"\d{1,7}", v)))[:6],
+                "standard": list(dict.fromkeys(v for v in standard if _standard_id(v)))[:3],
+                "ia": list(dict.fromkeys(v for v in listed("ia") if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}", v)))[:6] if doc.get("ebook_access") == "public" else [],
+                "languages": [MARC.get(v, v) for v in listed("language")][:6]}
+    try:
+        return _remember(("openlibrary-ids", library), 24 * 3600, load)
+    except (SourceError, ValueError, TypeError, AttributeError):
+        return {}
+
+
+def _fold(value):
+    value = unicodedata.normalize("NFKD", _norm(value))
+    return "".join(c for c in value if not unicodedata.combining(c))
+
+
+def _last_names(authors):
+    """Surnames of 'First Last' (or 'Last, First') names, accents folded."""
+    found = set()
+    for author in authors or []:
+        name = str(author or "").strip()
+        if "," in name:
+            name = name.split(",")[0]
+        words = [w for w in _fold(name).split() if not re.fullmatch(r"(?:jr|sr|[ivx]+)", w)]
+        if words and len(words[-1]) >= 2:
+            found.add(words[-1])
+    return found
+
+
+def _one_edit(left, right):
+    if abs(len(left) - len(right)) > 1:
+        return False
+    if len(left) == len(right):
+        return sum(a != b for a, b in zip(left, right)) <= 1
+    short, long = sorted((left, right), key=len)
+    return any(long[:i] + long[i + 1:] == short for i in range(len(long)))
+
+
+def _same_author(card, row):
+    """One surname in common; a one-letter spelling difference only in long
+    names (Dostoevsky / Dostoyevsky). No author on either side is no match."""
+    left, right = _last_names(card), _last_names(row)
+    return any(a == b or len(a) >= 6 and len(b) >= 6 and _one_edit(a, b) for a in left for b in right)
+
+
+@contextmanager
+def _catalogue():
+    from manga_discovery import catalogue_reader, manager
+    with catalogue_reader(manager()) as db:
+        yield db
+
+
+def _index(title, numbers):
+    """Gutenberg rows of the catalogue index: by number, and by name for a card
+    with an author. Read-only; nothing on any failure."""
+    authors = title.get("authors") or []
+    if not numbers and not authors:
+        return {}, []
+    try:
+        import content_names
+        from content_catalog import title_key
+        from title_identity import aliases
+        with _catalogue() as db:
+            if not content_names.present(db):
+                return {}, []
+            by_number = {}
+            if numbers:
+                keys = [title_key("book", "gutenberg", "gutenberg:" + n) for n in numbers]
+                for (raw,) in db.execute("SELECT raw FROM content_titles WHERE id IN (" + ",".join("?" for _ in keys) + ")", keys):
+                    row = json.loads(raw)
+                    by_number[str(row.get("providerId") or "")] = row
+            named = content_names.lookup(db, "book", [*aliases(title), *(title.get("_original") or [])]) if authors else []
+        return by_number, named
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Could not read the Gutenberg rows of the catalogue")
+        return {}, []
+
+
+def _same_book(title, row):
+    """The live search's identity rule (match_title, strong evidence only) and
+    the author's surname: one title by another writer is another book."""
+    from title_identity import match_title
+    accepted, evidence = match_title(title, row)
+    if not accepted or evidence not in STRONG or not _same_author(title.get("authors"), row.get("authors")):
+        return False, evidence
+    return True, evidence
+
+
+def _row_language(row, facts):
+    language = str((row or {}).get("language") or "")
+    if not language or language == "und":
+        languages = set((facts or {}).get("languages") or [])
+        language = next(iter(languages)) if len(languages) == 1 else "und"
+    return language[:3]
+
+
+def _gutenberg_result(number, row, title, facts, evidence):
+    return {"provider": "gutenberg", "providerName": "Project Gutenberg", "title": str((row or {}).get("title") or title.get("title") or "")[:300],
+            "translator": ", ".join((row or {}).get("authors") or [])[:120], "url": GUTENBERG + "/ebooks/" + number,
+            "language": _row_language(row, facts), "matchEvidence": evidence, "indexed": bool(row)}
+
+
+def _ia_item(identifier):
+    """An archive.org item's own metadata: public only when it is not lent."""
+    def load():
+        data = json.loads(_get(ARCHIVE + "/metadata/" + identifier + "/metadata"))
+        meta = data.get("result") if isinstance(data, dict) else None
+        if not isinstance(meta, dict) or not meta:
+            raise MissingBook("Книга не найдена в Internet Archive.")
+        first = lambda value: _clean(value[0] if isinstance(value, list) and value else value if isinstance(value, str) else "")
+        restricted = str(meta.get("access-restricted-item") or "").lower() == "true"
+        language = first(meta.get("language")).lower()
+        return {"public": not restricted and first(meta.get("mediatype")) in {"", "texts"}, "title": first(meta.get("title"))[:300],
+                "creator": first(meta.get("creator"))[:120], "language": MARC.get(language, language[:2] or "und")}
+    return _remember(("ia-item", identifier), 6 * 3600, load)
+
+
+def _fast(title, facts):
+    """Books of the card known by identifier or from the index, without a title search."""
+    numbers = list(dict.fromkeys([str(n) for n in [(title.get("ids") or {}).get("gutenberg")] if re.fullmatch(r"\d{1,7}", str(n or ""))]
+                                 + (facts.get("gutenberg") or [])))[:6]
+    by_number, named = _index(title, numbers)
+    # Rows the index holds (texts of the feed) go first; an unknown number
+    # (the index is still filling) stays after them.
+    found = [_gutenberg_result(n, by_number[n], title, facts, "external_id") for n in numbers if n in by_number]
+    found += [_gutenberg_result(n, None, title, facts, "external_id") for n in numbers if n not in by_number]
+    for identity in facts.get("standard") or []:
+        found.append({"provider": "standard-ebooks", "providerName": "Standard Ebooks", "title": str(facts.get("title") or title.get("title") or "")[:300],
+                      "translator": ", ".join(facts.get("authors") or [])[:120], "url": STANDARD + "/ebooks/" + identity,
+                      "language": "en", "matchEvidence": "external_id"})
+    for row in named:
+        accepted, evidence = _same_book(title, row)
+        number = str(row.get("providerId") or "")
+        if accepted and re.fullmatch(r"\d{1,7}", number):
+            found.append(_gutenberg_result(number, row, title, facts, evidence))
+    if not found:
+        # The last resort: a public scan (two items checked at most).
+        for identifier in (facts.get("ia") or [])[:2]:
+            try:
+                item = _ia_item(identifier)
+            except SourceError:
+                continue
+            if item["public"]:
+                found.append({"provider": "internet-archive", "providerName": dict(SOURCES)["internet-archive"],
+                              "title": item["title"] or str(title.get("title") or "")[:300], "translator": item["creator"],
+                              "url": ARCHIVE + "/details/" + identifier, "language": item["language"], "matchEvidence": "external_id", "scan": True})
+                break
+    unique, seen = [], set()
+    for row in found:
+        if row["url"] not in seen:
+            seen.add(row["url"])
+            unique.append({**row, "kind": "book"})
+    return unique[:6]
+
+
+def _prepared(title):
+    """The card with the facts its Open Library work adds (authors, original title)."""
+    facts = _catalogue_ids(title)
+    title = dict(title)
+    if facts.get("authors") and not title.get("authors"):
+        title["authors"] = facts["authors"]
+    if "_original" not in title:
+        latin = any(re.search(r"[a-z]", a, re.I) for a in _aliases(title))
+        known = facts.get("title") if facts.get("title") and re.search(r"[a-z]", facts["title"], re.I) else ""
+        title["_original"] = [] if latin else [known] if known else _original_titles(title)
+    return title, facts
+
+
 def search(title, language="all"):
-    if isinstance(title, dict) and "_original" not in title:
-        title = {**title, "_original": _original_titles(title)}
-    if not isinstance(title, dict) or not _aliases(title):
+    if not isinstance(title, dict):
         raise SourceError("Выбери конкретную книгу из каталога.")
     if language not in {"all", *WIKISOURCE}:
         raise SourceError("Выбери поддерживаемый язык книги.")
-    jobs = [("gutenberg", "Project Gutenberg", language, lambda: _gutenberg_search(title, list(WIKISOURCE) if language == "all" else [language]))]
+    title, facts = _prepared(title)
+    if not _aliases(title):
+        raise SourceError("Выбери конкретную книгу из каталога.")
+    fast = _fast(title, facts)
+    if not fast:
+        return _live(title, language)
+    key = ("merged", language, json.dumps([_aliases(title), sorted(_surnames(title)), [r["url"] for r in fast]], ensure_ascii=False))
+    with _lock:
+        hit = _cache.get(key)
+        if hit and hit[0] > time.monotonic():
+            return hit[1]
+        if key not in _running:
+            _running.add(key)
+            threading.Thread(target=_background, args=(title, language, key, fast), daemon=True, name="book-search").start()
+    # The books known by identifier or from the index answer at once; the
+    # libraries are still searched (pending) and the next request merges them.
+    lead = [r for r in fast if language == "all" or r["language"] == language]
+    found = {r["provider"] for r in fast}
+    providers = [{"provider": identity, "name": name, "language": source_language,
+                  "status": "ok" if identity in found else "pending",
+                  "message": "Найдено по каталогу: " + str(sum(r["provider"] == identity for r in fast)) if identity in found else "Поиск продолжается."}
+                 for identity, name, source_language in _jobs(language, fast)]
+    return {"results": lead + [r for r in fast if r not in lead], "providers": providers, "language": language,
+            "checkedAt": int(time.time()), "pending": True, **({"fallback": "all"} if not lead else {})}
+
+
+_running = set()
+
+
+def _jobs(language, fast=()):
+    """(provider, name, language) of the libraries a search asks."""
+    rows = [("gutenberg", "Project Gutenberg", language)]
+    rows += [(r, dict(SOURCES)[r], "en" if r == "standard-ebooks" else "all") for r in ("standard-ebooks", "internet-archive") if any(f["provider"] == r for f in fast)]
+    return rows + [("wikisource-" + code, name, code) for code, name in WIKISOURCE.items() if language in {"all", code}]
+
+
+def _background(title, language, key, fast):
+    try:
+        value = _merged(title, language, fast)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Book live search failed")
+        value, ttl = {"results": fast, "providers": [], "language": language, "checkedAt": int(time.time())}, 30
+    else:
+        ttl = 600
+    with _lock:
+        if len(_cache) > 200:
+            _cache.clear()
+        _cache[key] = (time.monotonic() + ttl, value)
+        _running.discard(key)
+
+
+def _merged(title, language, fast):
+    """The live answer with the identifier/index books: those in the reader's
+    language first, the others after the libraries' own results."""
+    skip = {"gutenberg"} if any(r["provider"] == "gutenberg" for r in fast) else set()
+    live = _live(title, language, skip)
+    lead = [r for r in fast if language == "all" or r["language"] == language]
+    rows = {}
+    for row in [*lead, *live["results"], *fast]:
+        rows.setdefault(row["url"], row)
+    found = {r["provider"] for r in fast}
+    known = [{"provider": identity, "name": name, "language": source_language, "status": "ok",
+              "message": "Найдено по каталогу: " + str(sum(r["provider"] == identity for r in fast))}
+             for identity, name, source_language in _jobs(language, fast) if identity in found]
+    value = {"results": list(rows.values()), "providers": known + [p for p in live["providers"] if p["provider"] not in found],
+             "language": language, "checkedAt": live["checkedAt"]}
+    if language != "all" and value["results"] and not any(r["language"] == language for r in value["results"]):
+        # No text in the reader's language: the original edition (the reader shows its language).
+        value["fallback"] = "all"
+    return value
+
+
+def _live(title, language, skip=frozenset()):
+    """The libraries' own title search (Gutenberg OPDS, Wikisource)."""
+    jobs = [] if "gutenberg" in skip else [("gutenberg", "Project Gutenberg", language, lambda: _gutenberg_search(title, list(WIKISOURCE) if language == "all" else [language]))]
     for code, name in WIKISOURCE.items():
         if language in {"all", code}:
             jobs.append(("wikisource-" + code, name, code, lambda code=code: _wikisource_search(title, code)))
@@ -282,10 +570,10 @@ def search(title, language="all"):
         except (ValueError, TypeError, KeyError, AttributeError):
             return {"provider": identity, "name": name, "language": lang, "status": "unavailable", "message": "Формат библиотеки изменился.", "results": []}
 
-    key = ("search", language, json.dumps([_aliases(title), sorted(_surnames(title))], ensure_ascii=False))
+    key = ("search", language, json.dumps([_aliases(title), sorted(_surnames(title)), sorted(skip)], ensure_ascii=False))
 
     def make():
-        with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+        with ThreadPoolExecutor(max_workers=max(1, len(jobs))) as pool:
             providers = list(pool.map(work, jobs))
         return {"results": [{**r, "kind": "book"} for p in providers for r in p["results"]],
                 "providers": [{k: p[k] for k in ("provider", "name", "language", "status", "message")} for p in providers],
@@ -295,7 +583,7 @@ def search(title, language="all"):
     if language != "all" and not found["results"]:
         # No free text in the reader's language: offer the original edition
         # instead of an empty shelf (the reader shows its language).
-        wider = search(title, "all")
+        wider = _live(title, "all", skip)
         if wider["results"]:
             return {**wider, "language": language, "fallback": "all", "providers": found["providers"] + wider["providers"]}
     return found
@@ -407,6 +695,88 @@ def _gutenberg_book(identity):
     return _remember(("gutenberg", identity), 6 * 3600, make)
 
 
+def _standard_id(value):
+    """author/title[/translator…] of a Standard Ebooks book page."""
+    parts = str(value or "").split("/")
+    return 2 <= len(parts) <= 4 and all(re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,99}", part) for part in parts) and not {"text", "downloads", "single-page"} & set(parts)
+
+
+# Sections of a Standard Ebooks page that are not the book's text.
+STANDARD_FRAME = re.compile(r"\b(?:titlepage|halftitlepage|imprint|colophon|copyright-page|toc|loi|endnotes|noteref)\b")
+
+
+def _standard_book(identity):
+    """The "Read online" single XHTML page of a Standard Ebooks book."""
+    def make():
+        html = _get(STANDARD + "/ebooks/" + identity + "/text/single-page", accept="application/xhtml+xml,text/html")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            soup = BeautifulSoup(html, "html.parser")
+        root = soup.find("html")
+        language = str((root.get("xml:lang") or root.get("lang") or "en") if root else "en")[:2].lower()
+        author = soup.find(attrs={"epub:type": re.compile(r"\bz3998:author\b")})
+        author = _clean(author.get_text())[:120] if author else ""
+        title = _clean(soup.title.get_text() if soup.title else "")
+        title = re.sub(r"\s+[-–—|]\s+Standard Ebooks$", "", title) or identity.split("/")[1].replace("-", " ").title()
+        for node in soup.find_all(attrs={"epub:type": STANDARD_FRAME}):
+            node.decompose()
+        for node in soup.select("nav"):
+            node.decompose()
+        # "Chapter 1" and its name in one heading group are one chapter title.
+        for node in soup.select("hgroup p"):
+            node.name = "h4"
+        chapters = _chapters_from_html(str(soup))
+        if not chapters:
+            raise SourceError("Не удалось разобрать текст книги.")
+        return {"title": title[:300], "authors": [author] if author else [],
+                "language": language if language in WIKISOURCE else "und", "chapters": chapters}
+    return _remember(("standard", identity), 6 * 3600, make)
+
+
+SCAN_HEADING = re.compile(r"(?:chapter|book|part|глава|книга|часть|розділ|частина)\s+[\wivxlc]{1,12}\.?(?:\s.{0,60})?|[IVXLC]{1,7}\.?", re.I)
+
+
+def _chapters_from_scan(text):
+    """Paragraphs of a scan's OCR text (blank lines), chapters at its headings.
+    Lone page numbers are dropped; a word broken at a line end is rejoined."""
+    body = []
+    for block in re.split(r"\n[ \t\f\v]*\n", str(text or "").replace("\r\n", "\n").replace("\r", "\n")):
+        lines = [line.strip() for line in block.split("\n") if line.strip()]
+        lines = [line for line in lines if not re.fullmatch(r"\d{1,4}|[ivxlc]{1,7}\.?", line)]
+        if not lines:
+            continue
+        paragraph = lines[0]
+        for line in lines[1:]:
+            if re.search(r"[A-Za-zА-Яа-яЁё]-$", paragraph) and re.match(r"[a-zа-яё]", line):
+                paragraph = paragraph[:-1] + line
+            else:
+                paragraph += " " + line
+        paragraph = _clean(paragraph)
+        if len(paragraph) <= 80 and SCAN_HEADING.fullmatch(paragraph) and (paragraph.isupper() or not re.fullmatch(r"[ivxlc]+\.?", paragraph)):
+            body.append("<h3>" + html_tools.escape(paragraph) + "</h3>")
+        else:
+            body.append("<p>" + html_tools.escape(paragraph) + "</p>")
+    return _chapters_from_html("<body>" + "".join(body) + "</body>")
+
+
+def _ia_book(identifier):
+    """A public Internet Archive scan: its OCR text (_djvu.txt), marked as a scan."""
+    def make():
+        item = _ia_item(identifier)
+        if not item["public"]:
+            raise SourceError("Эту книгу Internet Archive только выдаёт читателям: открытого текста нет.")
+        text = _get(ARCHIVE + "/download/" + identifier + "/" + identifier + "_djvu.txt", accept="text/plain")
+        if text.lstrip().startswith("<"):
+            raise SourceError("Internet Archive не предоставил текст книги.")
+        chapters = _chapters_from_scan(text)
+        if not chapters:
+            raise SourceError("Не удалось разобрать текст книги.")
+        language = item["language"]
+        return {"title": item["title"] or identifier, "authors": [item["creator"]] if item["creator"] else [],
+                "language": language if language in WIKISOURCE else "und", "chapters": chapters, "scan": True}
+    return _remember(("ia", identifier), 6 * 3600, make)
+
+
 def _wiki_page(language, page):
     return _remember(("wikipage", language, page), 6 * 3600, lambda: _wiki_html(language, page))
 
@@ -471,6 +841,14 @@ def route(url):
         match = re.fullmatch(r"/ebooks/(\d{1,7})/?", parts.path)
         if match:
             return "gutenberg", match[1], selected
+    if host == "standardebooks.org":
+        match = re.fullmatch(r"/ebooks/([a-z0-9_/-]{3,400}?)/?", parts.path)
+        if match and _standard_id(match[1]):
+            return "standard-ebooks", match[1], selected
+    if host == "archive.org":
+        match = re.fullmatch(r"/details/([A-Za-z0-9][A-Za-z0-9._-]{0,99})/?", parts.path)
+        if match:
+            return "internet-archive", match[1], selected
     if host.removesuffix(".wikisource.org") in WIKISOURCE:
         match = re.fullmatch(r"/wiki/([^?#]{1,300})", unquote(parts.path))
         if match:
@@ -482,20 +860,36 @@ def route(url):
 
 
 def _book_url(identity, book):
-    return GUTENBERG + "/ebooks/" + book if identity == "gutenberg" else f"https://{identity[-2:]}.wikisource.org/wiki/" + quote(book)
+    if identity == "gutenberg":
+        return GUTENBERG + "/ebooks/" + book
+    if identity == "standard-ebooks":
+        return STANDARD + "/ebooks/" + book
+    if identity == "internet-archive":
+        return ARCHIVE + "/details/" + book
+    return f"https://{identity[-2:]}.wikisource.org/wiki/" + quote(book)
+
+
+def _book(identity, book):
+    if identity == "gutenberg":
+        return _gutenberg_book(book)
+    if identity == "standard-ebooks":
+        return _standard_book(book)
+    if identity == "internet-archive":
+        return _ia_book(book)
+    return _wikisource_book(identity[-2:], book)
 
 
 def inspect(url):
     identity, book, _ = route(url) or (None, None, None)
     if not identity:
         raise SourceError("Эта ссылка не относится к библиотекам книг.")
-    data = _gutenberg_book(book) if identity == "gutenberg" else _wikisource_book(identity[-2:], book)
+    data = _book(identity, book)
     base = _book_url(identity, book)
     episodes = [{"number": i + 1, "season": 1, "title": c["title"] or "Глава " + str(i + 1), "translator": "",
                  "language": data["language"], "url": base + "?" + urlencode({"mv_chapter": i})} for i, c in enumerate(data["chapters"])]
     return {"provider": identity, "providerName": dict(SOURCES)[identity], "kind": "book", "title": data["title"],
             "aliases": [data["title"]], "authors": data.get("authors", []), "url": base, "language": data["language"],
-            "episodes": episodes, "seasons": [{"number": 1, "name": "Книга"}]}
+            "episodes": episodes, "seasons": [{"number": 1, "name": "Книга"}], **({"scan": True} if data.get("scan") else {})}
 
 
 def chapter(url):
@@ -504,7 +898,7 @@ def chapter(url):
         raise SourceError("Эта ссылка не относится к библиотекам книг.")
     if selected == "":
         raise SourceError("Выбери конкретную главу.")
-    data = _gutenberg_book(book) if identity == "gutenberg" else _wikisource_book(identity[-2:], book)
+    data = _book(identity, book)
     index = int(selected)
     if index >= len(data["chapters"]):
         raise SourceError("Такой главы в книге нет.")
