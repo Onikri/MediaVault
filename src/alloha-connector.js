@@ -6,6 +6,19 @@ export function isAllohaUrl(value){
   return protocol==='https:'&&!username&&!password&&!port&&(hostname==='alloha.yani.tv'||/\.(?:stravers\.live|thealloha\.club|alloha\.tv)$/.test(hostname));
  }catch{return false;}
 }
+export function allohaAutoplayUrl(value){
+ const url=new URL(value);
+ url.searchParams.set('autoplay','1');
+ return url.href;
+}
+export function blacklistAlloha(item,profile,sources=[]){
+ return item.kind==='tv'&&[item,profile,...(sources||[])].some(record=>{
+  const ids=record?.ids||{};
+  return ids.imdb==='tt2741602'||String(ids.kinopoisk||ids.kp)==='741231'||
+   (record?.provider==='kinobox'&&String(record.providerId)==='741231')||
+   (['imdb','omdb'].includes(record?.provider)&&record.providerId==='tt2741602');
+ });
+}
 export function allohaMode(){
  try{return localStorage.getItem(storageKey)==='bnsi'?'bnsi':'browser';}catch{return 'browser';}
 }

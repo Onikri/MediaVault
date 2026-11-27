@@ -27,7 +27,13 @@ const fs=require('node:fs/promises'),path=require('node:path'),assert=require('n
  function MirrorDemo(){const[include,setInclude]=useState(false);window.addMirror=()=>setInclude(true);window.mirrorAvailable=include;
   const discovery={data:{voices:[{id:'same-voice',name:'Та же озвучка',variants:include?[blockedVariant,mirror]:[blockedVariant]}]},loading:false};
   return <OnlineWatch item={{id:'mirror-test',kind:'tv',title:'Проверка зеркала'}} profile={{title:'Проверка зеркала'}} discovery={discovery} service={mirrorService} userId="test"/>;}
+ const blacklistService={...service,request:async(path)=>{if(path==='/online/prepare')window.blacklistPreparations++;return {};}};
+ function BlacklistDemo(){
+  const item={id:'kinobox:741231',kind:'tv',title:'Чёрный список',ids:{kinopoisk:'741231'}};
+  const discovery={data:{voices:[{id:'same-voice',name:'Дублированный',variants:[mirror,blockedVariant]}]},loading:false};
+  return <OnlineWatch item={item} discovery={discovery} service={blacklistService} userId="test"/>;}
  const root=createRoot(document.getElementById('root'));root.render(<Demo/>);window.showBrowserDemo=()=>root.render(<BrowserDemo/>);window.showMirrorDemo=()=>root.render(<MirrorDemo/>);
+ window.showBlacklistDemo=()=>{window.blacklistPreparations=0;root.render(<BlacklistDemo/>);};
  `);
  const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/recovery-ui',logLevel:'error',server:{watch:null,port:0,strictPort:false,host:'127.0.0.1'}});await vite.listen();
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -56,5 +62,10 @@ const fs=require('node:fs/promises'),path=require('node:path'),assert=require('n
  await page.evaluate(()=>releaseBlocked());await page.waitForFunction(()=>typeof failMirror==='function');
  assert.equal(await frame.count(),0);
  await page.evaluate(()=>failMirror());await frame.waitFor();assert.match(await frame.getAttribute('src'),/episode=7&translation=55/);
- assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,refreshes:1,preparations:count,healthyPlaybackNotRestarted:true,sameVoiceMirrorBeforeProviderFrame:true}));
+ await page.evaluate(()=>showBlacklistDemo());
+ await page.getByRole('button',{name:'Смотреть серию 7',exact:true}).click();await frame.waitFor();
+ const native=new URL(await frame.getAttribute('src'));
+ assert.equal(native.hostname,'theatre.stravers.live');assert.equal(native.searchParams.get('translation'),'55');assert.equal(native.searchParams.get('autoplay'),'1');
+ assert.equal(await page.evaluate(()=>blacklistPreparations),0);
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,refreshes:1,preparations:count,healthyPlaybackNotRestarted:true,sameVoiceMirrorBeforeProviderFrame:true,blacklistPlaysAllohaDirectly:true}));
 })().catch(e=>{console.error(e.message.slice(0,500));process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

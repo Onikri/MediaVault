@@ -29,6 +29,7 @@ const signedOutForChapters=service=>['disconnected','unconfigured'].includes(ser
 import {bestQualityRow,qualityHeights} from './watch-quality.js';
 import {voiceSwitchState} from './voice-switch.js';
 import {usePlaceRevision} from './use-place-sync.js';
+import {blacklistAlloha,isAllohaUrl} from './alloha-connector.js';
 
 const noEntries=Object.freeze([]);
 export default function OnlineWatch({item:basisItem,profile:basisProfile=basisItem,discovery:basisDiscovery,service,userId,onSeasonBrowse}){
@@ -45,7 +46,12 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const playbackMetadata=useMemo(()=>({...profile,ids:item.ids}),[profile,item.ids]);
  const languageFilter=useContentLanguage();
  const titleSeason=catalogueSeasonHint(item);
- const titleVoices=useMemo(()=>orderedVoices(voicesForCatalogue(discovery.data?.voices||[],discovery.data?.sources,titleSeason),saved.current,{filter:languageFilter,prefer:preferredVoiceLanguage(languageFilter),preferName:voiceHintFor(item)}),[discovery.data,item,titleSeason,languageFilter]);
+ const allohaOnly=blacklistAlloha(item,profile,discovery.data?.sources);
+ const titleVoices=useMemo(()=>{
+  const found=discovery.data?.voices||[];
+  const eligible=allohaOnly?found.map(voice=>({...voice,variants:voice.variants.filter(v=>isAllohaUrl(v.url))})).filter(voice=>voice.variants.length):found;
+  return orderedVoices(voicesForCatalogue(eligible,discovery.data?.sources,titleSeason),saved.current,{filter:languageFilter,prefer:preferredVoiceLanguage(languageFilter),preferName:voiceHintFor(item)});
+ },[discovery.data,item,titleSeason,languageFilter,allohaOnly]);
  // A scene found by frame search names this work's own episode, so the saved
  // season of earlier viewing must not override it.
  const sceneJump=useRef(readSceneJump(identity));
@@ -59,7 +65,8 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const [entries,setEntries]=useState([]),[seasons,setSeasons]=useState([]),[variant,setVariant]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[playing,setPlaying]=useState(false),[count,setCount]=useState(24);
  useRetainedMedia(playing,{label:item.title+' · '+season+' сезон · '+episode+' серия',kind:'video'},()=>setPlaying(false));
  const [hovering,setHovering]=useState(false),[sourceSettings,setSourceSettings]=useState(false),sourceButton=useRef(null);
- const [quality,setQuality]=useState(saved.current.quality||'best'),[bestVideo,setBestVideo]=useState(!!saved.current.bestVideo);
+ const [quality,setQuality]=useState(saved.current.quality||'best'),[preferBestVideo,setBestVideo]=useState(!!saved.current.bestVideo);
+ const bestVideo=!allohaOnly&&preferBestVideo;
  const frozen=useRef(null);
  const [scanScope,setScanScope]=useState(''),[scanRun,setScanRun]=useState(0),[applyRevision,setApplyRevision]=useState(0),[preparedRows,setPreparedRows]=useState([]);
  const [previewStore,setPreviewStore]=useState({}),[audio,setAudio]=useState(null),[captions,setCaptions]=useState([]),[trackError,setTrackError]=useState(''),[trackBusy,setTrackBusy]=useState(false),[captionNotice,setCaptionNotice]=useState(''),burnedCaptions=useRef(null);
@@ -184,7 +191,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const voiceSwitch=voiceSwitchState({playing,bestVideo,voiceId:voice?.id,loadedVoiceId,busy,error});
  // Independent audio/captions get their own lease; changing them never
  // replaces the video source or its HLS quality selection.
- useEffect(()=>{setAudio(null);setCaptions([]);setTrackError('');if(!playing||!effectiveAudioId&&!subtitleId)return;
+ useEffect(()=>{setAudio(null);setCaptions([]);setTrackError('');if(allohaOnly){setTrackBusy(false);return;}if(!playing||!effectiveAudioId&&!subtitleId)return;
   const abort=new AbortController(),leases=[];let closed=false;setTrackBusy(true);
   const prepare=async(id,mode)=>{
    if(!id)return;const group=voices.find(v=>v.id===id);if(!group)throw Error('Сохранённая дорожка пока недоступна.');
@@ -202,7 +209,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   Promise.allSettled([prepare(effectiveAudioId,'audio'),prepare(subtitleId,'captions')]).then(results=>{if(!closed){const rejected=results.find(v=>v.status==='rejected');if(rejected)setTrackError(rejected.reason.message);setTrackBusy(false);}});
   const timer=setInterval(()=>leases.forEach(data=>{if(!data.direct)service.request('/online/'+data.id+'/heartbeat',{method:'POST'}).catch(()=>{});}),35000);
   return()=>{closed=true;abort.abort();clearInterval(timer);leases.forEach(data=>releaseOnline(service,data));};
- },[effectiveAudioId,subtitleId,episode,season,playing,service.server]);
+ },[effectiveAudioId,subtitleId,episode,season,playing,allohaOnly,service.server]);
  const current=viewEntries.find(e=>Number(e.number)===Number(episode))||viewEntries[0];
  // Browsing another season is metadata work; it never mutates the active session.
  useEffect(()=>{
@@ -330,7 +337,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   useEffect(()=>()=>publishTitleShare(null,shareOwner),[]);
  return <div className="online-watch">
   <OnlineEpisodePreviews minimumDuration={minimumEpisodeDuration(displayProfile)} entries={previewTargets} active={!playing&&!busy&&!browseBusy&&!foreignBusy&&!hovering} service={service} sourceUrl={previewVariant?.sourceUrl} sourceId={displayVariant?.id} identity={displayIdentity} season={displaySeason} userId={userId} onPreview={(number,image)=>preview(number,image,displaySeason,displayVariant?.id,displayIdentity)}/>
-  <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} errorActions={alternativeActions} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
+  <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer nativeAlloha={allohaOnly} quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} errorActions={alternativeActions} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
    :<div className="watch-idle mv-player mvx mvx-idle watch-player-idle" style={profile.cover?{'--watch-poster':`url("${profile.cover.replace(/["\\]/g,'')}")`}:undefined}>
     <div className="mvx-idle-poster" aria-hidden="true"/>
     <div className="mvx-overview mvx-idle-overview">

@@ -14,15 +14,16 @@ import {exportLocally} from './local-export.js';
 import './online.css';
 import {minimumEpisodeDuration,onlineEpisodeId} from './watch-session.js';
 import {inStreamAudio,keepsLoadedMedia} from './voice-switch.js';
-import {isAllohaUrl} from './alloha-connector.js';
-export default function OnlineViewer({entries,initial,kind,title,service,userId,onClose,onEntryChange,language='ru',dub='',metadata,quality='best',inline=false,sourceUrl,identity,voiceId,controls,onPreview,previews,onUnavailable,onPrepared,errorActions,readerPreset,onReaderProgress,scrollOnOpen=true}){
+import {allohaAutoplayUrl,isAllohaUrl} from './alloha-connector.js';
+export default function OnlineViewer({entries,initial,kind,title,service,userId,onClose,onEntryChange,language='ru',dub='',metadata,quality='best',inline=false,sourceUrl,identity,voiceId,controls,onPreview,previews,onUnavailable,onPrepared,errorActions,readerPreset,onReaderProgress,scrollOnOpen=true,nativeAlloha=false}){
  useEffect(()=>()=>stopLmt(),[]);
  const [playbackQuality,setPlaybackQuality]=useState(quality),[qualityBasis,setQualityBasis]=useState(quality),[streamVoice,setStreamVoice]=useState(voiceId);
  const unavailable=useRef(onUnavailable);unavailable.current=onUnavailable;const prepared=useRef(onPrepared);prepared.current=onPrepared;
  const [current,setCurrent]=useState(initial),[media,setMedia]=useState(null),[busy,setBusy]=useState(true),[error,setError]=useState('');
  const [browserFrame,setBrowserFrame]=useState(null),browserBackup=useRef(null);
  const browserKey=JSON.stringify([identity||title,voiceId||dub,current.season||1,current.number]);
- const browserPlayback=browserFrame?.key===browserKey;
+ const directAlloha=nativeAlloha&&kind==='video'&&isAllohaUrl(current.url);
+ const browserPlayback=directAlloha||browserFrame?.key===browserKey;
  const [initialURL,setInitialURL]=useState(initial?.url);
  if(initialURL!==initial?.url){
   setInitialURL(initial?.url);setCurrent(initial);
@@ -102,7 +103,10 @@ export default function OnlineViewer({entries,initial,kind,title,service,userId,
   if(!recoverSource(error))setError(error.message);
  }
  useEffect(()=>{
-  if(browserPlayback)return;
+  if(browserPlayback){
+   activeLease.current?.();activeLease.current=null;setMedia(null);setBusy(false);setError('');
+   return;
+  }
   setBrowserFrame(null);
   if(browserBackup.current?.key!==browserKey)browserBackup.current=null;
   const request={url:current.url,quality:streamQuality,retry,server:service.server,sourceUrl,collapsGroup};
@@ -156,10 +160,10 @@ export default function OnlineViewer({entries,initial,kind,title,service,userId,
   <button type="button" className="btn btn-secondary" onClick={()=>{setSlateRetry(null);setRetry(v=>v+1);}}>Повторить подключение</button>
   {typeof errorActions==='function'?errorActions(current):errorActions}
  </div>;
- const browserPlayer=browserPlayback&&<><iframe className="online-alloha-frame" src={browserFrame.url}
+ const browserPlayer=browserPlayback&&<><iframe className="online-alloha-frame" src={directAlloha?allohaAutoplayUrl(current.url):browserFrame.url}
   title={['Плеер Alloha',title,current.title,dub].filter(Boolean).join(' · ')}
   sandbox="allow-scripts allow-same-origin" allow="autoplay; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/>
-  <div className="online-alloha-tools"><p className="fine">Нажми Play в плеере Alloha.</p>{typeof errorActions==='function'?errorActions(current):errorActions}</div></>;
+  {!directAlloha&&<div className="online-alloha-tools"><p className="fine">Нажми Play в плеере Alloha.</p>{typeof errorActions==='function'?errorActions(current):errorActions}</div>}</>;
  const content=<section ref={host} className={'online-viewer'+(busy&&media?' is-switching':'')+(inline?' online-viewer-inline'+(kind==='video'?(browserPlayback?'':' online-video-frameless'):' online-reader-frameless'):'')} role={inline?'region':'dialog'} aria-modal={inline?undefined:'true'} aria-label={inline?(kind==='manga'?'Читалка на странице':'Плеер на странице'):'Онлайн без сохранения'}>{(kind!=='manga'||!media)&&<header>{!inline&&<button className="icon-button" onClick={onClose} aria-label="Закрыть онлайн-просмотр"><ArrowLeft size={20}/></button>}<div><strong>{title}</strong><small>{current.title||'Онлайн'}{dub?' · '+dub:''}</small></div>{inline&&<div className="online-viewer-actions"><button type="button" className="icon-button" onClick={fullscreen} aria-label={full?'Вернуть на страницу':'Развернуть просмотр на весь экран'}>{full?<Minimize size={18}/>:<Maximize size={18}/>}</button><button type="button" className="icon-button" onClick={onClose} aria-label="Закрыть встроенный просмотр"><X size={18}/></button></div>}</header>}{fullscreenError&&<p className="fine" role="status">{fullscreenError}</p>}{busy&&!voiceSwitch&&<p className="online-loading" role="status"><span className="loading-ring"/>Подключаем источник{elapsed?' · '+elapsed+' с':'…'}</p>}{errorPanel}{browserPlayer}{media&&selected&&(kind==='manga'?<MangaReader key={selected.id} item={{...selected,sharedTranslation:readerPreset,onlinePages:media.pages.map(p=>server+p)}} catalog={catalog} userId={userId} libraryId="online" onClose={onClose} onSelectItem={choose} readerService={service} retainLmt inline embedded={inline} onProgress={onReaderProgress} errorActions={typeof errorActions==='function'?errorActions(media.entry):errorActions}/>:<MediaVaultPlayer apiRef={playerApi} extensions={playbackExtensions} characterService={service} autoPlay={media.resume?media.resume.playing:true} item={{...selected,onlineType:media.type}} source={media.direct?media.url:server+media.url} onDownload={media.direct&&kind==='video'&&!['guest','share'].includes(service.session?.role)?(height,name,progress)=>saveCollapsLocally({service:live.current,entries:[{url:current.url}],quality:height?String(height):'best',name,onProgress:progress}):media.allohaMode&&!['guest','share'].includes(service.session?.role)?(height,name,progress)=>exportLocally({service:live.current,kind:'video',entries:[media.entry||current],referer:sourceUrl,quality:height?String(height):'best',name,onProgress:progress}):undefined} catalog={media.catalog||catalog} userId={userId} libraryId="online" onClose={onClose} onSelectItem={choose} minimumDuration={minimumEpisodeDuration(metadata)} onError={onVideoError} onRejectedSource={e=>{activeLease.current?.();activeLease.current=null;setMedia(null);if(!recoverSource(e))setError(e.message);}} onPlaybackRecovered={()=>setError('')} onPreview={onPreview} onlineControls={{...controls,alloha:!!media.allohaMode,sourceIntervals:media.sourceIntervals||[],server:service.server,externalEpisodeList:!!controls?.voices,sessionRecovery:!!(media.sessionRecovery??media.playbackTelemetry),retryStream:()=>reconnect.current(true),voiceSwitch,audioName:inStreamAudio(media,current.url),continuing:!!media.resume,quality:streamQuality,qualities:media.qualities||[],onQuality:chooseQuality,externalCaptions:[...(controls?.externalCaptions||[]),...(media.subtitles||[]).map(t=>({...t,url:onlineMediaUrl(service,media,t.url)}))]}}/>)}</section>;
  return inline?content:createPortal(content,document.body);
 }
