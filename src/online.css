@@ -8,6 +8,8 @@
 .online-viewer-inline .online-loading{min-height:260px}
 .online-viewer-inline .inline-error{padding:18px}
 .online-alloha-frame{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}
+.online-alloha-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px}
+.online-alloha-tools .fine{margin:0 auto 0 0}
 .online-viewer:fullscreen .online-alloha-frame{height:calc(100dvh - 70px)}
 .online-viewer-inline .immersive-reader.reader-embedded{position:relative!important;inset:auto!important;z-index:1!important;height:clamp(440px,75dvh,950px)!important;min-height:0!important}
 .online-viewer-inline .immersive-reader.reader-embedded:fullscreen{height:100dvh!important}

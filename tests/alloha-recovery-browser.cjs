@@ -15,7 +15,19 @@ const fs=require('node:fs/promises'),path=require('node:path'),assert=require('n
  function BrowserDemo(){const[number,setNumber]=useState(7);const[open,setOpen]=useState(true);window.changeBrowserEpisode=()=>setNumber(8);
   const entry={number,season:1,title:'Серия '+number,url:'https://theatre.stravers.live/?token=fixture&season=1&episode='+number+'&translation=55'};
   return open&&<OnlineViewer entries={[entry]} initial={entry} service={blockedService} kind="video" title="Чёрный список" dub="Дублированный" inline onClose={()=>setOpen(false)}/>;}
- const root=createRoot(document.getElementById('root'));root.render(<Demo/>);window.showBrowserDemo=()=>root.render(<BrowserDemo/>);
+ const blockedEpisode={number:7,season:1,url:'https://theatre.stravers.live/?season=1&episode=7&translation=55'};
+ const mirrorURL='https://mirror.example/episodes/7';
+ const mirror={id:'mirror',player:'Другой плеер',provider:'kinobox',url:mirrorURL,sourceUrl:mirrorURL,episodes:[{...blockedEpisode,url:mirrorURL}]};
+ const blockedVariant={id:'blocked',player:'Alloha',provider:'kinobox',url:blockedEpisode.url,sourceUrl:blockedEpisode.url,episodes:[blockedEpisode]};
+ const mirrorService={...blockedService,request:async(path,options)=>{
+  if(path!=='/online/prepare')return {};
+  if(options.body.url===mirrorURL)return new Promise((_,reject)=>{window.failMirror=()=>reject(Error('mirror fixture failed'));});
+  await new Promise(resolve=>{window.releaseBlocked=resolve;});return blockedService.request(path,options);
+ }};
+ function MirrorDemo(){const[include,setInclude]=useState(false);window.addMirror=()=>setInclude(true);window.mirrorAvailable=include;
+  const discovery={data:{voices:[{id:'same-voice',name:'Та же озвучка',variants:include?[blockedVariant,mirror]:[blockedVariant]}]},loading:false};
+  return <OnlineWatch item={{id:'mirror-test',kind:'tv',title:'Проверка зеркала'}} profile={{title:'Проверка зеркала'}} discovery={discovery} service={mirrorService} userId="test"/>;}
+ const root=createRoot(document.getElementById('root'));root.render(<Demo/>);window.showBrowserDemo=()=>root.render(<BrowserDemo/>);window.showMirrorDemo=()=>root.render(<MirrorDemo/>);
  `);
  const {createServer}=await import('vite');vite=await createServer({root,cacheDir:'.codex-local/cache/recovery-ui',logLevel:'error',server:{watch:null,port:0,strictPort:false,host:'127.0.0.1'}});await vite.listen();
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -30,14 +42,19 @@ const fs=require('node:fs/promises'),path=require('node:path'),assert=require('n
  await page.waitForFunction(()=>document.getElementById('discovered')?.textContent==='new');
  await page.route('https://theatre.stravers.live/**',route=>route.fulfill({body:'<title>Alloha fixture</title>',contentType:'text/html'}));
  await page.evaluate(()=>showBrowserDemo());
- const openBrowser=page.getByRole('button',{name:'Открыть в плеере Alloha'}),frame=page.locator('iframe.online-alloha-frame');
- await openBrowser.waitFor();assert.equal(await frame.count(),0);
- await openBrowser.click();await frame.waitFor();
+ const frame=page.locator('iframe.online-alloha-frame');
+ await frame.waitFor();
  const opened=new URL(await frame.getAttribute('src'));
  assert.equal(opened.searchParams.get('episode'),'7');assert.equal(opened.searchParams.get('translation'),'55');
  assert.equal(await frame.getAttribute('sandbox'),'allow-scripts allow-same-origin');
- await page.evaluate(()=>changeBrowserEpisode());await openBrowser.waitFor();assert.equal(await frame.count(),0);
- await openBrowser.click();await frame.waitFor();assert.match(await frame.getAttribute('src'),/episode=8&translation=55/);
+ await page.evaluate(()=>changeBrowserEpisode());await page.locator('iframe.online-alloha-frame[src*="episode=8&translation=55"]').waitFor();
  await page.getByRole('button',{name:'Закрыть встроенный просмотр'}).click();await frame.waitFor({state:'detached'});
- assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,refreshes:1,preparations:count,healthyPlaybackNotRestarted:true,providerFrameKeepsEpisodeAndVoice:true}));
+ await page.evaluate(()=>showMirrorDemo());
+ await page.getByRole('button',{name:'Смотреть серию 7',exact:true}).click();
+ await page.waitForFunction(()=>typeof releaseBlocked==='function');await page.evaluate(()=>addMirror());
+ await page.waitForFunction(()=>window.mirrorAvailable);
+ await page.evaluate(()=>releaseBlocked());await page.waitForFunction(()=>typeof failMirror==='function');
+ assert.equal(await frame.count(),0);
+ await page.evaluate(()=>failMirror());await frame.waitFor();assert.match(await frame.getAttribute('src'),/episode=7&translation=55/);
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,refreshes:1,preparations:count,healthyPlaybackNotRestarted:true,sameVoiceMirrorBeforeProviderFrame:true}));
 })().catch(e=>{console.error(e.message.slice(0,500));process.exitCode=1;}).finally(async()=>{await browser?.close();await vite?.close();});

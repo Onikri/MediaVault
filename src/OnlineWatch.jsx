@@ -243,8 +243,10 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const spoken=voices.filter(v=>v.kind!=='subtitles');
  burnedCaptions.current=group=>{changeVoice(group.id);setCaptionNotice('Субтитры «'+group.name+'» вшиты в видео этой версии: включили её.');};
  function changeVoice(id,nextQuality=quality){setCaptionNotice('');manualVoice.current=true;failed.current.clear();setVoiceId(id);setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
- function fallback(){
+ function fallback(error){
   if(!viewVariant)return false;
+  if(error?.code==='client_blocked'&&!variantsFor(voice,episode,failed.current).some(v=>!isAllohaVariant(v)&&v.id!==viewVariant.id&&
+     v.episodes?.some(e=>e.url&&Number(e.season||1)===Number(season)&&Number(e.number)===Number(episode))))return false;
   failed.current.add(viewVariant.id);
   if(!variantsFor(voice,episode,failed.current).length){
    const key=[identity,voice?.id,season,episode].join(':');
