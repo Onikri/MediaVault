@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server'))
 import kinobox_source
-from source_parser import PublicHttp, SourceError
+from source_parser import PublicHttp, SourceError, public_url
 FIXTURES=Path(__file__).parent/'fixtures'/'players'
 
 
@@ -34,7 +34,10 @@ class KinoboxTests(unittest.TestCase):
         import json
         from ua_players import collaps_episode, collaps_captions
         from player_catalog import group_voices
-        url = 'https://api.embf.net/embed/movie/123'
+        url = 'https://api.datavex.ws/embed/movie/123'
+        self.assertEqual(public_url(url, resolve_dns=False), url)
+        with self.assertRaises(SourceError):
+            public_url('https://api.datavex.ws/api/private', resolve_dns=False)
         def episode(number, language):
             return {'episode': str(number), 'hls': 'https://media.example/video.m3u8',
                     'audio': {'names': ['LostFilm', 'Eng.Original']},

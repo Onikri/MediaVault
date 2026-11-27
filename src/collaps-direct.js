@@ -7,7 +7,7 @@
 // stream allow this site's origin (CORS). The browser therefore opens the
 // public embed itself, takes the published HLS and hands it to hls.js. No
 // server traffic, no address substitution: the viewer's own connection plays.
-const HOSTS=/^api\.(?:nextembed\.ws|delivembd\.ws|namy\.ws|bhcesh\.me|embf\.net)$/i;
+const HOSTS=/^api\.(?:nextembed\.ws|delivembd\.ws|namy\.ws|bhcesh\.me|embf\.net|datavex\.ws)$/i;
 
 export function collapsSelection(value){
  try{

@@ -13,7 +13,7 @@ import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 PLAYERJS_HOSTS = ('ashdi.vip', 'hdvbua.pro', 'tortuga.tw', 'tortuga.wtf')
-COLLAPS_HOSTS = ('api.nextembed.ws', 'api.bhcesh.me', 'api.namy.ws', 'api.delivembd.ws', 'api.embf.net')
+COLLAPS_HOSTS = ('api.nextembed.ws', 'api.bhcesh.me', 'api.namy.ws', 'api.delivembd.ws', 'api.embf.net', 'api.datavex.ws')
 SELECTORS = ('mv_voice', 'mv_season', 'mv_episode', 'mv_audio')
 
 

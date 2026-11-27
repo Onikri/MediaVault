@@ -54,7 +54,7 @@ test('the browser opens the embed and the stream itself, with the page token',as
 });
 
 test('the current Collaps mirror keeps VTT tracks scoped to the selected season and episode',async()=>{
- const embed='https://api.embf.net/embed/movie/123';
+ const embed='https://api.datavex.ws/embed/movie/123';
  const hls='https://media.example/season-2/master.m3u8';
  const seasons=[{season:2,episodes:[
   {episode:1,hls,cc:[{name:'Eng. full - 1',url:'https://media.example/one.vtt'}]},
