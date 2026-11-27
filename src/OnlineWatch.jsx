@@ -250,10 +250,8 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
  const spoken=voices.filter(v=>v.kind!=='subtitles');
  burnedCaptions.current=group=>{changeVoice(group.id);setCaptionNotice('Субтитры «'+group.name+'» вшиты в видео этой версии: включили её.');};
  function changeVoice(id,nextQuality=quality){setCaptionNotice('');manualVoice.current=true;failed.current.clear();setVoiceId(id);setSubtitleId('');if(nextQuality!=='best'&&!bestVideo&&!knownRows.some(r=>r.voiceId===id&&r.qualities.includes(Number(nextQuality)))){setQuality('best');persist({quality:'best'});}persist({voiceId:id,audioId:'',subtitleId:''});}
- function fallback(error){
+ function fallback(){
   if(!viewVariant)return false;
-  if(error?.code==='client_blocked'&&!variantsFor(voice,episode,failed.current).some(v=>!isAllohaVariant(v)&&v.id!==viewVariant.id&&
-     v.episodes?.some(e=>e.url&&Number(e.season||1)===Number(season)&&Number(e.number)===Number(episode))))return false;
   failed.current.add(viewVariant.id);
   if(!variantsFor(voice,episode,failed.current).length){
    const key=[identity,voice?.id,season,episode].join(':');
@@ -337,7 +335,7 @@ export default function OnlineWatch({item:basisItem,profile:basisProfile=basisIt
   useEffect(()=>()=>publishTitleShare(null,shareOwner),[]);
  return <div className="online-watch">
   <OnlineEpisodePreviews minimumDuration={minimumEpisodeDuration(displayProfile)} entries={previewTargets} active={!playing&&!busy&&!browseBusy&&!foreignBusy&&!hovering} service={service} sourceUrl={previewVariant?.sourceUrl} sourceId={displayVariant?.id} identity={displayIdentity} season={displaySeason} userId={userId} onPreview={(number,image)=>preview(number,image,displaySeason,displayVariant?.id,displayIdentity)}/>
-  <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer nativeAlloha={allohaOnly} quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} errorActions={alternativeActions} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
+  <PlaybackReveal active={playing}>{playing&&current&&viewVariant?<OnlineViewer quality={quality} entries={viewEntries} initial={current} kind="video" title={item.title} service={service} userId={userId} inline sourceUrl={(isAllohaVariant(viewVariant)&&viewVariant.referer)||viewVariant.sourceUrl} dub={voice?.name} metadata={playbackMetadata} identity={identity} voiceId={voice?.id} controls={controls} onPreview={preview} previews={previews} onUnavailable={fallback} errorActions={alternativeActions} onPrepared={prepared} onClose={()=>{setPlaying(false);setScanScope('');}} onEntryChange={e=>{setEpisode(Number(e.number));persist({episode:Number(e.number),season:e.season||season});}}/>
    :<div className="watch-idle mv-player mvx mvx-idle watch-player-idle" style={profile.cover?{'--watch-poster':`url("${profile.cover.replace(/["\\]/g,'')}")`}:undefined}>
     <div className="mvx-idle-poster" aria-hidden="true"/>
     <div className="mvx-overview mvx-idle-overview">
