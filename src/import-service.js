@@ -44,7 +44,7 @@ export function createImportClient(server,googleToken,fetcher=fetch,guestSession
           return request(path,{...options,reauthenticated:true});
         }
       }
-      throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status});
+      throw Object.assign(Error(typeof result.detail==='string'?result.detail:'Сервер не выполнил запрос.'),{status:response.status,code:response.headers?.get('X-Alloha-Error')});
     }
     return result;
   }

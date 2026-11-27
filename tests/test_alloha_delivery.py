@@ -204,6 +204,26 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         await self.service.close_session(session)
         self.assertEqual(self.service.slots._value,2)
 
+    async def test_client_block_reports_browser_option_without_retrying_the_blocked_client(self):
+        class Blocked(Source):
+            async def fetch(self, url, byte_range, *, probe=False):
+                self.requests.append(url)
+                raise SourceRefused('fixture block', status=403, reason='client_blocked')
+
+        self.service.factory = Blocked
+        response = await self.client.get('/resolve', params={'iframe': IFRAME, 'mode': 'browser'})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.headers['x-alloha-error'], 'client_blocked')
+        self.assertEqual(self.profiles.failures, 0)
+        self.assertEqual(self.profiles.unavailable_urls, [IFRAME])
+        self.assertTrue(Source.opened[0].closed)
+        self.assertEqual(self.service.slots._value, 2)
+
+        self.service.direct_factory = lambda iframe, **kwargs: Blocked(None, iframe, **kwargs)
+        response = await self.client.get('/resolve', params={'iframe': IFRAME, 'mode': 'bnsi'})
+        self.assertEqual(response.headers['x-alloha-error'], 'client_blocked')
+        self.assertEqual(len(Source.opened), 2)
+
     async def test_authenticated_viewer_state_and_closed_native_lease(self):
         import online_sessions
         subject = {'id': 'viewer'}
@@ -385,6 +405,16 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BootstrapTests(unittest.IsolatedAsyncioTestCase):
+    async def test_media_refusal_keeps_the_provider_status_and_reason(self):
+        session = NativeSession(None, IFRAME)
+        url = ORIGIN + 'master.m3u8'
+        session.validate = AsyncMock(return_value=url)
+        session.fetch_page = SimpleNamespace(evaluate=AsyncMock(return_value={
+            'url': url, 'status': 403, 'headers': {'x-vd': 'client_blocked'}}))
+        with patch('alloha_browser.request_delay', return_value=0), self.assertRaises(SourceRefused) as error:
+            await session.fetch(url)
+        self.assertEqual((error.exception.status, error.exception.reason), (403, 'client_blocked'))
+
     async def test_missing_iframe_fails_without_waiting_for_player_timeout(self):
         session = NativeSession(None, IFRAME)
         async def waiting(*args, **kwargs):

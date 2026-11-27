@@ -2,8 +2,8 @@ const storageKey='mediavault_alloha_connector';
 export const ALLOHA_MODE_VERSION=64;
 export function isAllohaUrl(value){
  try{
-  const {protocol,hostname}=new URL(value);
-  return protocol==='https:'&&(hostname==='alloha.yani.tv'||/\.(?:stravers\.live|thealloha\.club|alloha\.tv)$/.test(hostname));
+  const {protocol,hostname,username,password,port}=new URL(value);
+  return protocol==='https:'&&!username&&!password&&!port&&(hostname==='alloha.yani.tv'||/\.(?:stravers\.live|thealloha\.club|alloha\.tv)$/.test(hostname));
  }catch{return false;}
 }
 export function allohaMode(){

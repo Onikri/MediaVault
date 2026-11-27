@@ -141,9 +141,8 @@ class BnsiSession:
                         continue
                     status = reply.status_code
                     if status in {401, 403, 429}:
-                        reason = reply.headers.get('x-vd', '')
                         raise SourceRefused('Alloha refused HTTP transport', status=status,
-                                            reason=reason if re.fullmatch(r'[A-Za-z0-9_-]{1,50}',reason) else None)
+                                            reason=reply.headers.get('x-vd'))
                     if not 200 <= status < 300:
                         raise SourceInvalid('Alloha HTTP transport failed', status=status)
                     content = bytearray()

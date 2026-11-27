@@ -160,6 +160,12 @@ class DeliverySession:
     archive_pending: bool = False
 
 
+class AllohaClientBlocked(HTTPException):
+    def __init__(self):
+        super().__init__(409, 'Alloha ограничил доступ к видео с сервера MediaVault.',
+                         headers={'X-Alloha-Error': 'client_blocked'})
+
+
 class AllohaDelivery:
     def __init__(self, directory=None, *, profiles=None, factory=NativeSession, direct_factory=BnsiSession,
                  clock=time.monotonic, queue_timeout=30, session_ttl=TTL, default_mode='bnsi'):
@@ -303,14 +309,18 @@ class AllohaDelivery:
                                 'source_host': urlsplit(url).hostname, **({'reason': reason} if reason else {}), **timing}, ensure_ascii=True))
 
     async def failed(self, session, error, url):
+        reason = getattr(error, 'reason', None)
+        client_blocked = isinstance(error, SourceRefused) and reason == 'client_blocked'
         if not session.closed and session.profile is not None:
-            if isinstance(error, SourceRefused):
+            if isinstance(error, SourceRefused) and not client_blocked:
                 self.profiles.refused(session.profile, session.iframe)
             else:
                 self.profiles.unavailable(session.profile, session.iframe)
         code = 409 if isinstance(error, SourceRefused) else 502
-        self.log(session, code, url)
+        self.log(session, code, url, reason=reason)
         await self.close_session(session)
+        if client_blocked:
+            raise AllohaClientBlocked()
         if code == 409:
             raise HTTPException(409, 'Alloha временно отказал сессии. Разреши iframe заново.', headers={'Retry-After': '120'})
         if getattr(error, 'status', None) in {404, 410}:
@@ -770,14 +780,14 @@ class AllohaDelivery:
         try:
             return await self._resolve(iframe, audio=audio, online_quality=online_quality, referer=referer, mode=mode)
         except HTTPException as direct_error:
-            if mode != 'bnsi' or direct_error.status_code not in {409, 502}:
+            if isinstance(direct_error, AllohaClientBlocked) or mode != 'bnsi' or direct_error.status_code not in {409, 502}:
                 raise
             # Some signed links stop working at the CDN while the iframe is
             # still valid. Try the full browser session for the same release.
             try:
                 return await self._resolve(iframe, audio=audio, online_quality=online_quality, referer=referer, mode='browser')
             except HTTPException as browser_error:
-                if browser_error.status_code not in {409, 502}:
+                if isinstance(browser_error, AllohaClientBlocked) or browser_error.status_code not in {409, 502}:
                     raise
                 raise HTTPException(direct_error.status_code,
                     'Alloha не отдал рабочий поток через BNSI и браузерный режим.',
@@ -1094,5 +1104,5 @@ async def lifespan(app):
 app = FastAPI(title='Alloha delivery', lifespan=lifespan, docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=[os.getenv('ALLOWED_ORIGIN', 'https://onikri.github.io')],
                    allow_methods=['GET'], allow_headers=['Range'],
-                   expose_headers=['Content-Range', 'X-Alloha-Quality', 'X-Alloha-Degradation', 'Retry-After'])
+                   expose_headers=['Content-Range', 'X-Alloha-Quality', 'X-Alloha-Degradation', 'X-Alloha-Error', 'Retry-After'])
 install(app)

@@ -4,6 +4,7 @@ import base64
 import contextlib
 import html
 import json
+import re
 import secrets
 import threading
 import time
@@ -27,7 +28,8 @@ def request_delay():
 class SourceRefused(Exception):
     def __init__(self, message, *, status=None, reason=None):
         super().__init__(message)
-        self.status, self.reason = status, reason
+        self.status = status
+        self.reason = reason if isinstance(reason, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,50}', reason) else None
 
 
 class SourceInvalid(Exception):
@@ -339,10 +341,12 @@ class NativeSession:
             except Exception as error:
                 status = self.response_status.get(url)
                 if status in {401, 403, 429}:
-                    raise SourceRefused('Source refused the browser media request') from None
+                    raise SourceRefused('Source refused the browser media request', status=status,
+                                        reason=self.response_headers.get(url, {}).get('x-vd')) from None
                 raise SourceInvalid('Source browser request failed', status=status) from error
         if result['status'] in {401, 403, 429}:
-            raise SourceRefused(f'Source returned HTTP {result["status"]}')
+            raise SourceRefused(f'Source returned HTTP {result["status"]}', status=result['status'],
+                                reason=result['headers'].get('x-vd'))
         if not 200 <= result['status'] < 300:
             raise SourceInvalid(f'Source returned HTTP {result["status"]}', status=result['status'])
         return base64.b64decode(result['data'], validate=True), result['headers'], result['status'], result['url']
